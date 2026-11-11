@@ -55,6 +55,12 @@ class Field {
   struct CarHit { i32 lamp = -1; bool topple = false; Vec3 impulse; bool clang = false; };
   std::vector<CarHit> car(Vec3 pos, f32 yaw, Vec3 vel, f32 half_len, f32 half_w, f32 mass) const;
   void reset_broken() { broken_.clear(); for (Lamp& l : lamps_) l.state = 0; }
+  /// Every broken lamp there is, placed here or not (cell key, state), sorted by key - the state a
+  /// player who joins a session gets (game_townsync.cpp).
+  std::vector<std::pair<i64, u8>> broken_list() const;
+  /// A lamp broken on another machine: remembered by its cell (for when its tile is placed here)
+  /// and set on the lamp standing there now. Only ever worse; true when something changed.
+  bool merge_broken(i64 key, u8 state);
   std::size_t broken() const { return broken_.size(); }
 
  private:

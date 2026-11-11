@@ -127,7 +127,7 @@ kern/games/spawncity/
     weapons.h     Waffentabelle mit SpawnCity-Werten
     game_weapons.cpp  Waffen: Kerns Soldatenwaffen (MP/Glock/Sniper), Werfer, Nahkampf, Handgranate,
                   Drohne (MG, Raketen, GUIDED), Jet (Kanone, Rakete, Bombe), Projektile
-    net_session.* Mehrspieler: Kerns Client/Server über HostTransport, Posen 15 Hz, Treffer
+    net_session.* Mehrspieler: Kerns Client/Server über HostTransport, Posen 30 Hz, Treffer
     game_net.cpp  Mehrspieler im Spiel: eigene Pose, andere Spieler zeichnen, Treffer senden/anwenden
     settings.*    Einstellungstabelle (Werte, Bereiche, Hilfe aus SpawnCity), `set`/`get`/`settings schema`
     gps_live.*    LIVE-GPS-Filter (Sprünge verwerfen, Vorhersage, Tätigkeit)
@@ -138,7 +138,14 @@ kern/games/spawncity/
 
     net_session.* Mehrspieler-Protokoll: Kerns Client/Server über HostTransport, Posen 30 Hz, der Host
                   als Autorität (Treffer, Kills, Rang, Regeln, Abstimmung, Spawn-Anker), Effekte,
-                  Pings und Sprache über den Host
+                  Pings und Sprache über den Host; der „Schwarm" eines Spielers (seine Zombies,
+                  Militär, Polizei, Sandbox-Gegner) in nummerierten Teilen, Treffer darauf an ihn
+    town_sync.*   die Bytes des einen Ortes: Treffer eines Clients auf Autos und Passanten des Hosts,
+                  kaputte Laternen, Barrikaden-Bretter, die Explosionen hinter den Brandspuren, der
+                  ganze Zustand für Nachzügler
+    game_worldsync.cpp  eine Welt: Verkehr, Passanten und Tiere des Hosts bei allen (Autos 20 Hz, Leute/Tiere 5 Hz)
+    game_swarm.cpp  die Einheiten der Mitspieler hier: sehen, treffen (alle 120 ms)
+    game_townsync.cpp  Treffer eines Clients auf den Ort des Hosts; Laternen, Bretter, Spuren als Zustand des Hosts
     mp_rules.*    reine Mehrspieler-Logik: Posen-Zeitleiste (Jitter-Puffer), Farben, Schaden je Waffe
                   und Zone, Regeneration, Respawn, Gruppen-Spawn, Abstimmung, µ-law-Sprache mit
                   Abstands-Lautstärke, Routen-Hinweise, Karten-Rand, Pings
@@ -230,8 +237,26 @@ kern/games/spawncity/
   Punkte: Chaos-Score mit Combo (`sandbox_game.mjs`) und Aufträge mit Risikobank, die erst beim
   Entkommen gutgeschrieben wird (`gameplay_fun_logic.mjs`).
 * **Mehrspieler** (`vs_multiplayer.mjs`, `lan_vs.mjs`, `vs_pose_sync.mjs`, `vs_combat_presentation.mjs`,
-  `vs_group_spawn.mjs`, `game_rules_sync.mjs`, `mp_fun_hud.mjs`): jeder simuliert seine Welt in der Stadt
-  des Hosts (Kartenursprung im Willkommen). Posen alle 33 ms: der gesteuerte Körper, die Person selbst,
+  `vs_group_spawn.mjs`, `game_rules_sync.mjs`, `mp_fun_hud.mjs`): **eine Welt für alle** in der Stadt
+  des Hosts (Kartenursprung im Willkommen), mit drei Arten von Besitz. *Dem Spieler selbst* gehören
+  sein Körper, seine Waffen, Leben und Tod, das Auto, das er fährt, seine Geschosse und was er wirft.
+  *Dem Host* gehört der Ort: Verkehr, parkende Autos, Wracks, Passanten und Tiere (ein Client fährt
+  keinen eigenen Ort, er zeigt die Listen des Hosts: Autos 20-mal, Leute und Tiere 5-mal je Sekunde),
+  Krater und Gebäudeschaden, kaputte Laternen, Barrikaden-Bretter, die Tageszeit, die WORLD-Schalter.
+  *Dem Spieler, für alle sichtbar* („Schwarm"), gehört, was ihn jagt: seine Zombies, das Militär
+  (Hubschrauber, Panzer, Soldaten), seine Polizei (Beamte zu Fuß, Streifenwagen, Drohnen) und die
+  Sandbox-Gegner (COP / SWAT / HEAVY). Nur er simuliert sie, nur ihn jagen sie; die anderen sehen sie
+  alle 120 ms dort, wo er sie hat (Art, Lage und Zustand: zu Fuß und zielend, Blaulicht, brennend,
+  Wrack, per EMP abgeschossen, gefallen), und ihr Treffer geht an ihn, der ihn nach denselben Regeln
+  anwendet wie seine eigenen (Beamter 25 je gezähltem Treffer, Streifenwagen 22, Drohne 34, Gegner 1
+  Treffer); Explosionen eines Mitspielers rechnet jeder Rechner selbst auf seine Einheiten. Passen
+  nicht alle Einheiten in eine Nachricht (64), gehen sie in nummerierten Teilen; gezeigt wird nur eine
+  vollständige Liste. Trifft ein Client ein Auto oder einen Passanten des Hosts, geht der Treffer
+  zuverlässig an den Host (Auto, Schaden, Ursache; von wem, sagt die Verbindung), der ihn mit
+  `damage_car` bzw. als Passanten-Treffer anwendet – Brand, Wrack, Sturz und Flucht sehen alle über
+  die Listen des Hosts; die Tat (Fahndung) und die Punkte bleiben beim Schützen. Die Fahndung selbst
+  bleibt je Spieler die eigene (wie im Original); seine Sterne stehen auf seinem Namensschild.
+  Posen alle 33 ms: der gesteuerte Körper, die Person selbst,
   dazu geparkte Drohne und Jet (alle sehen die abgestellten Fahrzeuge der anderen). Darstellung über
   SpawnCitys Zeitleiste auf der Uhr des Senders: Uhrversatz als gleitendes Minimum, 90 ms Verzögerung,
   Interpolation, höchstens 100 ms Extrapolation, dann Halten; Sprung > 35 m setzt neu an.
@@ -245,8 +270,10 @@ kern/games/spawncity/
   und Respawn bleiben lokal) und meldet seinen Tod der Autorität; die Lebenspunkte gehen in der Pose mit.
   Nach dem Tod Respawn 3–5 m vom Ort (Kern: 3 s), Regeneration nach 5 s ohne Schaden 12 HP/s.
   Effekte: Leuchtspuren (210 m/s, Farbe des Schützen), Explosionen (Blitz, Partikel, Ton, Wackeln),
-  Einschläge. Polizei und Passanten bleiben lokal (wie in SpawnCity). Ein Kill an einem Mitspieler ist
-  eine Tat (`Crime::player`).
+  Einschläge. Wer später beitritt, bekommt vom Host den ganzen Zustand des Ortes: Krater und
+  Gebäudeschaden, kaputte Laternen, Barrikaden-Bretter und die letzten 64 Explosionen, die Brand- und
+  Wandspuren hinterlassen haben (er lässt sie bei sich noch einmal ablaufen); Änderungen gehen
+  zuverlässig über den Host an alle. Ein Kill an einem Mitspieler ist eine Tat (`Crime::player`).
 * **Verbindung** (`lan_vs.mjs`, `direct_udp_peer.mjs`, `mqtt_data_relay.mjs`, `share_button.mjs`,
   `qr_pairing.mjs`): die Bytes laufen über `sc_net_push`/`sc_net_take`; `web/mp_host.mjs` trägt sie
   per BroadcastChannel, Kern-Relay oder – wie spawncity.de – öffentlich: WebRTC-Datenkanal (ungeordnet,
@@ -257,7 +284,8 @@ kern/games/spawncity/
   erzeugt) und öffnet das Teilen-Menü des Systems. SpawnCitys zweiter Weg über Nostr-Relays
   (`nostr_data_relay.mjs`) ist nicht nachgebaut: er braucht Schnorr-Signaturen auf secp256k1, die der
   Browser nicht mitbringt (eine eigene Krypto-Bibliothek wäre nötig); der MQTT-Weg deckt dasselbe ab.
-  Fällt der Host weg, endet die Runde (SpawnCitys Autoritätswechsel zum nächstältesten ist offen).
+  Fällt der Host weg, übernimmt der älteste Mitspieler (der niedrigste Platz, `host_lost` /
+  `successor`): er hostet am selben Ursprung weiter, die anderen verbinden sich neu mit ihm.
 * **Sprachchat** (`proximity_voice.mjs`, `voice_codec.mjs`): das Mikrofon öffnet die Seite erst, wenn
   der Spieler es einschaltet (H / R3 / Knopf), und schließt es beim Ausschalten. C++ teilt die Samples
   auf 8 kHz herunter (Schrittweite), µ-law, 640 Samples (80 ms) je Paket; der Host leitet nur an Spieler
@@ -281,9 +309,11 @@ kern/games/spawncity/
   Polizeidrohnen bei 34 % (2,2 s), die eigene Drohne bei 28 % (2,05 s). Kugeln geben Box3D-Körpern
   ihren Impuls (9 mm 2,9 N·s, 5,56 mm 3,8 N·s, .50 BMG 41 N·s, `ballistics.mjs`). Kampfklänge sind
   SpawnCitys synthetisierte Bank (`combat_audio_bank.mjs`), beim Audio-Start einmal berechnet.
-* **Mehrspieler:** wie SpawnCity: jeder simuliert seine Welt, die Spieler tauschen Posen; der Host
-  verteilt sie und gibt neuen Spielern seinen Kartenursprung (alle streamen dieselbe Stadt). Treffer auf
-  andere Spieler gehen an deren Rechner, der sie anwendet. Polizei und Passanten sind lokal.
+* **Mehrspieler:** eine Welt für alle: die Spieler tauschen Posen; der Host verteilt sie, gibt neuen
+  Spielern seinen Kartenursprung (alle streamen dieselbe Stadt) und führt den Ort (Verkehr, Passanten,
+  Tiere, Zerstörung, Laternen). Treffer auf andere Spieler gehen an deren Rechner, der sie anwendet.
+  Was einen Spieler jagt (Polizei, Sandbox-Gegner, Militär, Zombies), simuliert er selbst, und alle
+  sehen und treffen es (`game_swarm.cpp`).
 
 ## Welt (M3)
 
@@ -670,7 +700,8 @@ Testbefehle: `gaps` (Zustand), `canspawn X Y`, `burn N`, `jetdamage N`, `lampbre
 Mehrspieler-Testbefehle (`SpawnCity.command`): `net remotes`, `net hit N` (Runde auf den ersten
 Mitspieler), `net blast`, `mp ff on|off`, `mp vote yes|no`, `mp state`, `voice mic|mute|all|tone N|state`,
 `ping [x y]`, `bigmap open|close|toggle|follow R|X Y R`, `nav set X Y Name | geo LON LAT Name | clear`,
-`qr TEXT`.
+`qr TEXT`, `net swarm` (die Einheiten der Mitspieler, wie sie hier stehen: Besitzer, Art, Id, Zustand, Ort),
+`town sync` (Zustand des Ortes in der Sitzung: Laternen, offene Türen, Spuren, Treffer auf Autos / Passanten).
 
 ```sh
 kern/games/spawncity/tests/run_tests.sh          # nativ, ohne GL, ASan/UBSan
@@ -686,7 +717,11 @@ Wanted-Regeln, den Straßengraph (A*, Pure Pursuit), Treffer und Taten der Leute
 Bewegung. Die Mehrspieler-Tests prüfen die Posen-Zeitleiste, Schaden/Regeln/Abstimmung, µ-law und
 Sprach-Wiedergabe, die Routen-Mathematik, den QR-Encoder und drei Sitzungen (Host + zwei Clients) über
 eine Schleife: Friendly Fire aus, Abstimmung, genehmigter Treffer, Kill und Tafel, Spawn-Schutz, Effekte,
-Pings, Sprache nur in Reichweite. Der Smoke-Test spielt zuerst zwei Tabs (BroadcastChannel): sehen sich,
+Pings, Sprache nur in Reichweite; dazu die eine Welt: Polizei und Sandbox-Gegner eines Spielers kommen mit
+Art und Zustand bei den anderen an, ein Treffer darauf nur beim Besitzer, mehr Einheiten als eine Nachricht
+trägt vollständig (ein verlorener Teil zeigt keine halbe Liste), der Treffer eines Clients auf Auto und
+Passant erreicht den Host und wird dort angewandt, ein Nachzügler bekommt Laternen, Bretter und Spuren
+(Befehl `town sync` zeigt den Stand im Spiel). Der Smoke-Test spielt zuerst zwei Tabs (BroadcastChannel): sehen sich,
 Spawn-Anker, Farben, Namensschild, Friendly Fire aus/Abstimmung/Treffer/Kill/Respawn, Explosion, Ping,
 Sprache (Testton), QR-Code, große Karte mit Ziel. Danach lädt er die Seite zweimal (Desktop mit synthetischen Vektorkacheln über den
 echten MVT-Pfad, Telefon mit Touch offline), prüft Passanten, Polizei (Wagen und Drohnen), eine
@@ -730,11 +765,12 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
 Der genaue Stand je SpawnCity-Modul steht in `PARITY.md` (Status, Kern-Dateien, Begründung). Offen sind
 dort (Stand sc-m3-gaps):
 
-* **Mehrspieler:** Autoritätswechsel zum Nächstältesten, wenn der Host geht (`lan_vs.mjs`; heute endet
-  die Runde); Nostr-Relays als zweiter öffentlicher Signalweg (`nostr_data_relay.mjs`; die Signatur
-  BIP-340 gibt es schon in `nostr.cpp`); Schnappschüsse von Militär (`mil-snap`/`mil-hit`) und Zombies
-  (`zombie-sync`/`zombie-hit`) an die Mitspieler; dieselben Passanten auf allen Rechnern (im Original
-  deterministische Agenten, deren Tod per `npc-death` geht).
+* **Mehrspieler:** Nostr-Relays als zweiter öffentlicher Signalweg (`nostr_data_relay.mjs`; die Signatur
+  BIP-340 gibt es schon in `nostr.cpp`). Eine Explosion, die kein Spieler ausgelöst hat (ein Wrack, das
+  hochgeht), sehen alle und rechnen sie auf ihre Einheiten – einem Mitspieler daneben schadet sie nicht
+  (Schaden zwischen Spielern geht nur über die Treffer-Prüfung des Hosts). Die Einheiten der Mitspieler
+  trifft man mit den Runden zu Fuß; Drohnen-MG und Jet-Kanone gehen durch sie hindurch (wie schon bei
+  deren Hubschraubern und Panzern). Glasrisse von Kugeln bleiben je Rechner.
 * **Panzer** als Box3D-Fahrzeug (`military_response.mjs upsertBody kind bus, 9200 kg`), heute ein
   leichter Agent auf dem Straßengraph.
 * **Trainingslevel** (`training_test_level_v2.mjs`, `training_showcase.mjs`): die Welt ohne Geodaten ist

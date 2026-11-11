@@ -12,7 +12,7 @@ namespace {
 enum : u16 {
   kPose = 1, kPoseRelay = 2, kWelcome = 4, kFxMsg = 5, kHitReq = 6, kHitMsg = 7, kConfirm = 8, kDeath = 9, kKillMsg = 10, kScores = 11,
   kRespawn = 12, kProtect = 13, kAnchor = 14, kPingMsg = 15, kVoice = 16, kRules = 17, kPropose = 18, kBallotMsg = 19, kVote = 20,
-  kBallotResult = 21, kLeft = 22, kSeatReq = 23, kSeatState = 24, kSwarmMsg = 25, kSwarmHitMsg = 26, kWorldMsg = 27, kOriginMsg = 28, kDestroyMsg = 29, kTossMsg = 30, kProjMsg = 31,
+  kBallotResult = 21, kLeft = 22, kSeatReq = 23, kSeatState = 24, kSwarmMsg = 25, kSwarmHitMsg = 26, kWorldMsg = 27, kOriginMsg = 28, kDestroyMsg = 29, kTossMsg = 30, kProjMsg = 31, kTownMsg = 32,
 };
 constexpr f64 kSeatsEvery = 1.5;         // jet_seat_coordinator.mjs tick: the table again every 1.5 s
 enum : int { kReliable = 0, kUnreliable = 1 };
@@ -62,22 +62,29 @@ struct R {
 
 bool sane(Vec3 v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z) && std::fabs(v.x) < 1e6f && std::fabs(v.y) < 1e6f && std::fabs(v.z) < 1e5f; }
 
-std::vector<u8> pack_swarm(u8 owner, const std::vector<SwarmUnit>& units) {
+// One part of a player's swarm snapshot: owner, the snapshot's serial, the part's number (bit 7: the
+// last one), its units - 18 bytes a unit (64 fit in one unreliable message of 1200): z in dm, yaw
+// and aux in 1/100.
+std::vector<u8> pack_swarm(u8 owner, u8 serial, u8 part, bool last, const SwarmUnit* units, std::size_t n) {
   W w;
-  w.put(owner).put(static_cast<u8>(std::min<std::size_t>(units.size(), 64)));
-  for (std::size_t i = 0; i < units.size() && i < 64; ++i) {
+  w.put(owner).put(serial).put(static_cast<u8>(part | (last ? 0x80 : 0))).put(static_cast<u8>(n));
+  for (std::size_t i = 0; i < n; ++i) {
     const SwarmUnit& u = units[i];
-    // 18 bytes a unit (64 fit in one unreliable message of 1200): z in dm, yaw and aux in 1/100
     const auto q16 = [](f32 v, f32 k) { return static_cast<std::int16_t>(std::clamp(std::lround(v * k), -32767L, 32767L)); };
     w.put(u.id).put(static_cast<u8>(u.kind)).put(u.flags).put(u.p.x).put(u.p.y).put(q16(u.p.z, 10)).put(q16(u.yaw, 100)).put(q16(u.aux, 100));
   }
   return w.b;
 }
-bool unpack_swarm(const std::vector<u8>& b, Swarm& s) {
+bool unpack_swarm(const std::vector<u8>& b, u8& owner, u8& serial, u8& part, bool& last, std::vector<SwarmUnit>& units) {
   R r{b};
-  s.owner = r.get<u8>();
+  owner = r.get<u8>();
+  serial = r.get<u8>();
+  const u8 pt = r.get<u8>();
+  part = pt & 0x7f;
+  last = pt & 0x80;
   const u8 n = r.get<u8>();
-  s.units.clear();
+  units.clear();
+  if (n > kSwarmPerMessage) return false;
   for (u8 i = 0; i < n && r.ok; ++i) {
     SwarmUnit u;
     u.id = r.get<u16>();
@@ -88,9 +95,9 @@ bool unpack_swarm(const std::vector<u8>& b, Swarm& s) {
     u.p.z = r.get<std::int16_t>() / 10.0f;
     u.yaw = r.get<std::int16_t>() / 100.0f;
     u.aux = r.get<std::int16_t>() / 100.0f;
-    if (!r.ok || k > 3 || !sane(u.p) || !std::isfinite(u.yaw) || !std::isfinite(u.aux)) return false;
+    if (!r.ok || k > static_cast<u8>(SwarmKind::kLast) || !sane(u.p) || !std::isfinite(u.yaw) || !std::isfinite(u.aux)) return false;
     u.kind = static_cast<SwarmKind>(k);
-    s.units.push_back(u);
+    units.push_back(u);
   }
   return r.ok;
 }
@@ -101,7 +108,7 @@ bool unpack_swarm_hit(const std::vector<u8>& b, SwarmHit& h) {
   const u8 k = r.get<u8>();
   h.damage = r.get<f32>();
   h.kind = static_cast<SwarmKind>(k);
-  return r.ok && k <= 3 && std::isfinite(h.damage) && h.damage > 0 && h.damage < 1e4f;
+  return r.ok && k <= static_cast<u8>(SwarmKind::kLast) && std::isfinite(h.damage) && h.damage > 0 && h.damage < 1e4f;
 }
 
 std::vector<u8> pack_hit(const Hit& h) { return W().put(h.target).put(h.by).put(h.weapon).put(h.zone).put(h.damage).put(h.from).b; }
@@ -185,6 +192,7 @@ void Session::stop() {
   client_.reset();
   server_.reset();
   remotes_.clear();
+  swarm_parts_.clear();
   protected_.clear();
   ballot_ = remote_ballot_ = mp::Ballot{};
   role_ = Role::none;
@@ -303,9 +311,51 @@ void Session::send_fx(Fx f) {
   f.owner = self_slot_;
   to_host(f.kind == Fx::shot ? kUnreliable : kReliable, kFxMsg, pack_fx(f));
 }
-void Session::send_swarm(const std::vector<SwarmUnit>& units) {
-  if (role_ == Role::none) return;
-  to_host(kUnreliable, kSwarmMsg, pack_swarm(self_slot_, units));
+bool Session::send_swarm(const std::vector<SwarmUnit>& units) {
+  if (role_ == Role::none) return true;
+  if (units.size() > kSwarmMaxUnits) { refused(kSwarmMsg, units.size() * 18); return false; }
+  // every unit goes: 64 a message, the parts numbered, the last one marked (an empty list is one
+  // empty part - "I have none" is a snapshot too)
+  ++swarm_serial_;
+  const std::size_t parts = std::max<std::size_t>(1, (units.size() + kSwarmPerMessage - 1) / kSwarmPerMessage);
+  for (std::size_t k = 0; k < parts; ++k) {
+    const std::size_t from = k * kSwarmPerMessage, n = std::min(kSwarmPerMessage, units.size() - from);
+    to_host(kUnreliable, kSwarmMsg, pack_swarm(self_slot_, swarm_serial_, static_cast<u8>(k), k + 1 == parts, units.data() + from, n));
+  }
+  return true;
+}
+// A part of somebody's snapshot came: the snapshot is handed on (take_swarms) once every part of
+// it is here - a snapshot with a part lost on the way is dropped whole (the next one comes 120 ms
+// later), never shown with units missing.
+void Session::swarm_part(u8 owner, u8 serial, u8 part, bool last, std::vector<SwarmUnit>& units) {
+  SwarmParts* p = nullptr;
+  for (SwarmParts& x : swarm_parts_) if (x.owner == owner) p = &x;
+  if (!p) { swarm_parts_.push_back({}); p = &swarm_parts_.back(); p->owner = owner; p->serial = static_cast<u8>(serial - 1); }
+  if (p->serial != serial) {
+    if (static_cast<kern::i8>(serial - p->serial) < 0) return;  // a part of an older snapshot, late
+    *p = SwarmParts{};
+    p->owner = owner;
+    p->serial = serial;
+  }
+  const u64 mark = 1ull << (part & 63);
+  if (p->have[part >> 6] & mark) return;  // (twice)
+  p->have[part >> 6] |= mark;
+  p->units.insert(p->units.end(), units.begin(), units.end());
+  if (last) p->last = part;
+  if (p->last < 0) return;
+  for (int k = 0; k <= p->last; ++k) if (!(p->have[k >> 6] & (1ull << (k & 63)))) return;
+  swarms_.push_back({owner, std::move(p->units)});
+  p->units.clear();
+  p->last = -1;  // (handed on: its parts stay marked, so a duplicate does not start it again)
+}
+void Session::town_to_host(const std::vector<u8>& blob) {
+  if (role_ == Role::client && client_ && client_->connected() && !client_->send(kReliable, kTownMsg, blob)) refused(kTownMsg, blob.size());
+}
+void Session::town_to_all(const std::vector<u8>& blob) {
+  if (role_ == Role::host) to_all(kReliable, kTownMsg, blob, kHost);
+}
+void Session::town_to(u8 slot, const std::vector<u8>& blob) {
+  if (role_ == Role::host) to_client(slot, kReliable, kTownMsg, blob);
 }
 void Session::send_world(const std::vector<u8>& blob) {
   if (role_ == Role::host) to_all(kUnreliable, kWorldMsg, blob, kHost);
@@ -456,6 +506,7 @@ void Session::send_seats() {
 void Session::dispatch(u8 from, u16 type, const std::vector<u8>& d) {
   switch (type) {
     case kDestroyMsg: { if (role_ == Role::host && destroy_.size() < 64) destroy_.push_back({from, d}); return; }
+    case kTownMsg: { if (role_ == Role::host && from != self_slot_ && town_.size() < 512) town_.push_back({from, d}); return; }
     case kProjMsg: {  // a client's rounds in flight: drawn here, and on to the others
       if (role_ != Role::host) return;
       if (proj_.size() < 64) proj_.push_back({from, d});
@@ -484,11 +535,12 @@ void Session::dispatch(u8 from, u16 type, const std::vector<u8>& d) {
     }
     case kSwarmMsg: {
       // the host passes a player's units on to everybody else (the owner is who sent them)
-      Swarm sw;
-      if (!unpack_swarm(d, sw)) return;
-      sw.owner = from;
-      if (from != self_slot_) swarms_.push_back(sw);
-      to_all(kUnreliable, kSwarmMsg, pack_swarm(from, sw.units), from);
+      u8 owner, serial, part;
+      bool last;
+      std::vector<SwarmUnit> units;
+      if (!unpack_swarm(d, owner, serial, part, last, units)) return;
+      to_all(kUnreliable, kSwarmMsg, pack_swarm(from, serial, part, last, units.data(), units.size()), from);
+      if (from != self_slot_) swarm_part(from, serial, part, last, units);
       return;
     }
     case kSwarmHitMsg: {
@@ -595,10 +647,17 @@ void Session::deliver(u16 type, const std::vector<u8>& d) {
       return;
     }
     case kFxMsg: { Fx f; if (unpack_fx(d, f) && f.owner != self_slot_) fx_.push_back(f); return; }
-    case kSwarmMsg: { Swarm sw; if (unpack_swarm(d, sw) && sw.owner != self_slot_) swarms_.push_back(sw); return; }
+    case kSwarmMsg: {
+      u8 owner, serial, part;
+      bool last;
+      std::vector<SwarmUnit> units;
+      if (unpack_swarm(d, owner, serial, part, last, units) && owner != self_slot_) swarm_part(owner, serial, part, last, units);
+      return;
+    }
     case kSwarmHitMsg: { SwarmHit h; if (unpack_swarm_hit(d, h) && h.to == self_slot_) swarm_hits_.push_back(h); return; }
     case kWorldMsg: { if (world_.size() < 8) world_.push_back(d); return; }
     case kDestroyMsg: { if (role_ == Role::client && destroy_.size() < 64) destroy_.push_back({kHost, d}); return; }
+    case kTownMsg: { if (role_ == Role::client && town_.size() < 512) town_.push_back({kHost, d}); return; }
     case kProjMsg: {  // (relayed: the shooter's slot first)
       if (role_ != Role::client) return;
       const u8 from = r.get<u8>();
@@ -679,6 +738,7 @@ void Session::deliver(u16 type, const std::vector<u8>& d) {
     case kLeft: {
       const u8 slot = r.get<u8>();
       remotes_.erase(std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& x) { return x.state.slot == slot; }), remotes_.end());
+      std::erase_if(swarm_parts_, [&](const SwarmParts& p) { return p.owner == slot; });
       return;
     }
     default: return;
@@ -738,6 +798,7 @@ void Session::update(f64 time, f32 dt, const PlayerState& me, bool send_pose) {
         if (ballot_.id) finish_ballot(mp::Ballot::Status::cancelled);  // the roster changed
       } else {
         remotes_.erase(std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& r) { return r.state.slot == slot; }), remotes_.end());
+        std::erase_if(swarm_parts_, [&](const SwarmParts& p) { return p.owner == slot; });  // (the slot's next player starts his own serials)
         scores_.remove(slot);
         if (seats_.drop(slot)) send_seats();  // a player who leaves loses his seats
         to_all(kReliable, kLeft, W().put(slot).b, kNobody);

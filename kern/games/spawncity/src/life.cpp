@@ -1361,7 +1361,7 @@ void Life::net_bird(u64 key, Vec3 at, f32 yaw, Vec3 vel, bool held) {
 void Life::update_joggers(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeOut& out) {
   if (!view.people_on) { chain_alive_ = false; return; }
   if (remote_joggers_) {
-    // the host's club: eased to his runners (100 ms snapshots), gone when he stops sending it
+    // the host's club: eased to his runners (his snapshots, five a second), gone when he stops sending it
     if (now - remote_joggers_at_ > 1.5f) { chain_alive_ = false; return; }
     if (!chain_alive_) return;
     for (Runner& r : chain_.runners) {

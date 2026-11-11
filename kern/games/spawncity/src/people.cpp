@@ -309,6 +309,25 @@ void People::kill(Person& p, Vec3 from_dir, bool by_player, f32 now, bool hit_by
   frighten(at, 22, now, 1.2f);
 }
 
+void People::mate_hurt(i32 index, u32 seed, f32 damage, HurtBy by, Vec3 push, f32 now) {
+  if (index < 0 || index >= static_cast<i32>(people_.size()) || !(damage > 0)) return;
+  Person& p = people_[static_cast<std::size_t>(index)];
+  if (p.kind != Kind::citizen || p.seed != seed || p.state == State::down || p.state == State::gone || now < p.knocked_until) return;
+  p.hp -= damage;
+  p.hurt_at = now;
+  if (p.hp <= 0) { kill(p, push, false, now, by == HurtBy::vehicle); return; }
+  if (by == HurtBy::vehicle) {
+    falls_.push_back({index, push, true, true});
+    p.knocked_until = now + 6;
+    p.v = 0;
+    frighten(p.pos, 8, now, 1.4f);
+    return;
+  }
+  if (by == HurtBy::blow && p.hp > 35) p.v = 0;  // a blow he takes standing: a stagger
+  else knock(p, push, now);
+  frighten(p.pos, 3, now, 1.6f);
+}
+
 i32 People::shot(Vec3 from, Vec3& to, f32 damage, bool by_player, f32 now, f32 melee_ns, f32 self_r) {
   i32 best = -1;
   f32 best_s = 2;
@@ -340,6 +359,7 @@ i32 People::shot(Vec3 from, Vec3& to, f32 damage, bool by_player, f32 now, f32 m
   if (p.kind == Kind::citizen && damage > 0) {
     const f32 hd = std::fmax(1e-3f, std::hypot(dir.x, dir.y));
     const Vec3 flat{dir.x / hd, dir.y / hd, 0};
+    const f32 hp_before = p.hp;
     if (melee_ns >= 0) {
       // world_procedural_population.mjs punch(): hp - damage; dead at 0, down at 35, else a stagger
       const f32 k = std::fmax(0.5f, melee_ns / 30);
@@ -358,17 +378,27 @@ i32 People::shot(Vec3 from, Vec3& to, f32 damage, bool by_player, f32 now, f32 m
     if (p.state != State::down) {
       if (by_player) reports_.push_back({wanted::Crime::person_hit, p.pos, true});
       frighten(p.pos, 3, now, 1.6f);
+      // the host's citizen (MP client): what we did to him goes to the host (take_hurts)
+      if (by_player && puppets_ && p.net >= 0)
+        hurts_.push_back({static_cast<u8>(p.net), p.seed, hp_before - p.hp, melee_ns >= 0 ? HurtBy::blow : HurtBy::round,
+                          melee_ns >= 0 ? flat * (2 * std::fmax(0.5f, melee_ns / 30)) + Vec3{0, 0, 0.9f} : flat * 2.5f + Vec3{0, 0, 1.4f}});
     }
     return best;
   }
+  f32 dealt = damage * (head ? 3.0f : 1.0f);  // VS zones: head x3
   if (p.kind == Kind::officer && damage > 0 && melee_ns < 0) {
     // police_ground_units.mjs registerPoliceHit: HIT_DAMAGE 25 per counted hit; the gun decides how
     // often a round counts (gameplay_final_runtime_v2.mjs): MP 1 (head 3, routeKill max 3), Glock and
     // sniper 6 (hitWeight; head 10)
     const f32 hits = damage >= 26 ? (head ? 10.0f : 6.0f) : (head ? 3.0f : 1.0f);
-    p.hp -= 25 * hits;
-  } else
-    p.hp -= damage * (head ? 3.0f : 1.0f);  // VS zones: head x3
+    dealt = 25 * hits;
+  }
+  // a mate's unit: the hit is his to apply (take_remote_hits), by the same rule
+  if (p.remote) {
+    if (by_player && dealt > 0) remote_hits_.push_back({best, dealt});
+    return best;
+  }
+  p.hp -= dealt;
   if (p.hp <= 0) kill(p, dir, by_player, now, false);
   else {
     if (by_player && p.kind == Kind::citizen) reports_.push_back({wanted::Crime::person_hit, p.pos, true});
@@ -379,7 +409,7 @@ i32 People::shot(Vec3 from, Vec3& to, f32 damage, bool by_player, f32 now, f32 m
 
 void People::blast(Vec3 at, f32 radius, f32 damage, bool by_player, f32 now) {
   for (Person& p : people_) {
-    if (p.state == State::down || p.state == State::gone) continue;
+    if (p.state == State::down || p.state == State::gone || p.remote) continue;  // (a mate's unit: his machine runs the blast on it)
     const f32 d = kern::length(p.pos + Vec3{0, 0, 0.9f} - at);
     if (d >= radius) continue;
     const f32 t = clampf(1 - d / radius, 0, 1);
@@ -538,6 +568,7 @@ void People::update(f32 dt, f32 now, const PeopleView& view, Rng& rng) {
     p.phase += p.v * dt * 3.4f;
     // On the terrain (terrain.h): everybody stands on the ground's surface.
     p.pos.z = view.city->ground_height(p.pos.x, p.pos.y);
+    if (p.remote) continue;  // a mate's unit stands where he has it: nothing here throws it
     // Vehicles: knocked down by anything driving into them (SpawnCity: person-hit / person).
     for (const VehicleView& v : view.vehicles) {
       if (v.airborne) {
@@ -564,6 +595,7 @@ void People::update(f32 dt, f32 now, const PeopleView& view, Rng& rng) {
         falls_.push_back({static_cast<i32>(&p - people_.data()), push, true, true});
         p.knocked_until = now + 6;
         p.v = 0;
+        if (v.player && p.kind == Kind::citizen && puppets_ && p.net >= 0) hurts_.push_back({static_cast<u8>(p.net), p.seed, damage, HurtBy::vehicle, push});  // the host's citizen under our car
         if (v.player && p.kind == Kind::citizen) reports_.push_back({wanted::Crime::person_hit, p.pos, true});
         if (p.kind == Kind::citizen) frighten(p.pos, 8, now, 1.4f);
       }

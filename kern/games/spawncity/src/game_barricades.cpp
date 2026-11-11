@@ -5,7 +5,9 @@
 // 3.4 s however many pound on it (each zombie 0.8..1.3 x 3.4 s) - then steps in (1.8 m inside) and
 // hunts the player through the building. Nobody is clawed through an intact barricade. Near a door
 // (3.2 m) the player boards it up again for 10 zombie points a plank (REPARIEREN, F). Nothing is
-// locked: the player walks in and out as he likes. Planks are kept per building.
+// locked: the player walks in and out as he likes. Planks are kept per building - in a session by
+// the host, for everybody: a plank broken or nailed back here is a step he applies, the door's
+// count comes back from him (game_townsync.cpp), so two players at one door see one barricade.
 #include <cmath>
 
 #include "game.h"
@@ -85,7 +87,10 @@ Vec3 Game::gaps_zombie_goal(i32 person, Vec3 pos, Vec3 player, f32 now, bool& wa
       z.next_plank = now + kPlankS * (0.8f + rng_.unit() * 0.5f);
       door_next = now + kPlankS * 0.9f;
       std::vector<u8>& st = g.planks[d->key];
-      if (d->i < static_cast<i32>(st.size()) && st[static_cast<std::size_t>(d->i)] > 0) --st[static_cast<std::size_t>(d->i)];
+      if (d->i < static_cast<i32>(st.size()) && st[static_cast<std::size_t>(d->i)] > 0) {
+        --st[static_cast<std::size_t>(d->i)];
+        townsync_plank(d->key, static_cast<u8>(d->i), static_cast<u8>(st.size()), -1);
+      }
       world_->play_sound(combat_sfx(combat_audio::Kind::bounce), {d->c.x, d->c.y, d->floor + 1}, 0.5f, 0.55f, true);
       ++g.planks_broken;
     }
@@ -110,6 +115,7 @@ bool Game::gaps_repair_barricade() {
   }
   if (!best || best->planks >= kPlanks || combat_.zombies.points < kRepairCost) return false;
   ++gaps_->planks[best->key][static_cast<std::size_t>(best->i)];
+  townsync_plank(best->key, static_cast<u8>(best->i), static_cast<u8>(gaps_->planks[best->key].size()), 1);
   combat_.zombies.points -= kRepairCost;
   world_->play_sound(combat_sfx(combat_audio::Kind::bounce), cam_.eye, 0.4f, 0.7f, false);  // playCombatAudio "bounce" .4 / .7
   osfx("zombie_nights.repairKnock", cam_.eye);

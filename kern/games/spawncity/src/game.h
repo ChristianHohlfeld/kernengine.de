@@ -43,6 +43,7 @@
 #include "sound_fx.h"
 #include "game_controls.h"  // controls state (game_controls.cpp)
 #include "touch_play.h"     // touch controls of every mode (touch_play.cpp)
+#include "town_sync.h"
 #include "vehicle_art.h"
 #include "wanted.h"
 #include "weapons.h"
@@ -53,6 +54,7 @@ struct MpLocal;  // multiplayer presentation state (game_net.cpp)
 struct DestroySync;  // the destruction state in a session (game_destruction_sync.cpp)
 struct TossState;    // thrown things in a session (game_toss.cpp)
 struct ProjSync;     // rounds in flight in a session (game_projsync.cpp)
+struct TownSync;     // the town's lasting state and a client's hits on it in a session (game_townsync.cpp)
 struct MpLocalDelete { void operator()(MpLocal* m) const; };
 
 enum class Mode : u8 { foot, drone, car, jet, parachute };
@@ -96,7 +98,7 @@ struct PoliceUnit {
   enum class State : u8 { pursuit, stopping, engage, back, leave, abandoned, wreck };
   i32 car = -1;
   State state = State::pursuit;
-  struct Cop { i32 person = -1; u32 seed = 0; bool inside = true; f32 next_shot = 0, los_at = 0; bool los = false; i32 seat = 1; };
+  struct Cop { i32 person = -1; u32 seed = 0; bool inside = true; f32 next_shot = 0, los_at = 0; bool los = false; i32 seat = 1; u16 id = 0; };  // id: in the snapshots to the mates (game_swarm.cpp)
   Cop cops[2];
   std::vector<Vec2> path;
   f32 path_at = -99, recover_until = -1, recover_start = 0, stuck_since = -1, turn_since = -1, corner_speed = 17;
@@ -236,6 +238,23 @@ class Game {
   ProjSync& projsync();
   std::shared_ptr<ProjSync> projsync_;
   u32 proj_serial_ = 0;
+  // the town's lasting state and a client's hits on it (game_townsync.cpp, town_sync.h): street
+  // lamps, barricade planks and the blasts that left marks are the host's; what a client does to a
+  // car or a passer-by of the host's town goes to the host
+  void townsync_update(f32 dt);
+  void townsync_send_full(i32 to);
+  void townsync_reset();
+  void townsync_lamp(i64 key, u8 state);
+  void townsync_plank(i64 key, u8 door, u8 doors, i32 step);
+  void townsync_car_hit(i32 car, f32 amount, town::Cause cause);
+  /// A blast's scorch, soot and breaches (world_marks.h), remembered for a player who joins later.
+  void town_mark(Vec3 at, f32 radius, f32 strength, bool craters);
+  /// A car of the host's town on a client (his puppet, not the one we drive): what is done to it is
+  /// done on the host's machine.
+  bool town_car_remote(i32 car) const;
+  std::string townsync_json();
+  TownSync& townsync();
+  std::shared_ptr<TownSync> townsync_;
   std::string worldsync_list() const;
   bool world_puppet() const;
   std::vector<Vec3> mate_foci() const;
@@ -277,7 +296,8 @@ class Game {
   bool update_police_drones(f32 dt);  // true: a drone sees the player
   void spawn_police_drones();
   void emp_pulse();
-  void damage_car(i32 car, f32 amount, bool by_player);
+  void damage_car(i32 car, f32 amount, bool by_player, town::Cause cause = town::Cause::other);
+  void police_drone_mate_hit(u16 id, f32 damage);  // a mate's round on our police drone (game_swarm.cpp)
   void wreck_car(i32 car);
   void damage_player_vehicle(f32 amount);
   /// What set a blast off: only weapons break buildings (destruction.h); the guided missile x 2.2.
@@ -300,17 +320,40 @@ class Game {
   void draw_projectiles();
   // multiplayer (game_net.cpp; its state lives in MpLocal, see mp_rules.h / net_session.h)
   MpLocal& mp_local();
-  // ---- the mates' units (game_swarm.cpp: zombie_nights.mjs zombie-sync, military_response.mjs mil-snap)
-  struct RemoteUnit { u16 id = 0; net::SwarmKind kind = net::SwarmKind::zombie; u8 flags = 0; Vec3 p, tp; f32 yaw = 0, tyaw = 0, aux = 0, rotor = 0; i32 person = -1; };
+  // ---- the mates' units (game_swarm.cpp: zombie_nights.mjs zombie-sync, military_response.mjs mil-snap;
+  // the police and the sandbox enemies the same way)
+  struct RemoteUnit {
+    u16 id = 0;
+    net::SwarmKind kind = net::SwarmKind::zombie;
+    u8 flags = 0;
+    Vec3 p, tp;
+    f32 yaw = 0, tyaw = 0, aux = 0, rotor = 0;
+    i32 person = -1;
+    f32 wreck_at = -1;  // a cruiser: since when it is a wreck here (its fire)
+    bool fallen = false;  // an officer / enemy who went down: his body lies here, the unit only waits to be dropped
+  };
   struct RemoteSwarm { f64 seen = 0; std::vector<RemoteUnit> units; };
   std::unordered_map<u8, RemoteSwarm> swarms_;
   f64 swarm_clock_ = 0;
   u16 swarm_serial_ = 0;
+  // ours as last sent: an officer or enemy missing from the next list who lies dead is sent on for
+  // a moment as fallen, so he falls on the mates' machines too instead of vanishing
+  struct SwarmSent { net::SwarmUnit unit; i32 person = -1; u32 seed = 0; };
+  struct SwarmFallen { net::SwarmUnit unit; f64 until = 0; };
+  std::vector<SwarmSent> swarm_sent_;
+  std::vector<SwarmFallen> swarm_fallen_;
+  std::unique_ptr<Car> swarm_cruiser_;  // the mates' cruisers are drawn with it
   void swarm_update(f32 dt);
   void swarm_clear();
-  bool swarm_shot(kern::game::ShotEvent& s);   // a mate's helicopter or tank on the line
+  void swarm_collect(std::vector<net::SwarmUnit>& out);  // ours, every kind
+  void swarm_apply_hit(const net::SwarmHit& h);  // a mate's hit on one of ours
+  bool swarm_shot(kern::game::ShotEvent& s);   // a mate's helicopter, tank, cruiser or police drone on the line
   bool swarm_person_hit(i32 person, f32 damage);  // a mate's zombie / soldier: the hit goes to him
-  void swarm_draw();
+  void swarm_draw();           // helicopters, tanks, the enemies' stripes (combat art)
+  void swarm_draw_vehicles();  // cruisers (vehicle art)
+  void swarm_draw_town();      // light bars, wreck fires, police drones (people art)
+  /// A blast everybody sees and runs on his own units though no player set it off (a wreck going up).
+  void blast_shown(Vec3 at, f32 radius, f32 damage);
   void mp_input(kern::Engine& e, f32 dt);
   std::string mp_hud_json();
   std::string net_command(const std::string& cmd);
@@ -498,7 +541,9 @@ class Game {
   // cars and buses as the original (game_vehicle_damage.cpp)
   f32 car_max_hp(const TrafficCar& c) const;
   void car_bullet(i32 car, bool by_player);
-  void blast_cars(Vec3 at, f32 radius, f32 damage, bool by_player);
+  /// police_only: a mate's blast (Fx::explosion) - our cruisers are ours to damage, the town's cars
+  /// took it on the machine that fired.
+  void blast_cars(Vec3 at, f32 radius, f32 damage, bool by_player, bool police_only = false);
   bool melee_hit(f32 reach, f32 sweep, f32 damage, bool knife, f32 momentum_ns);
   void melee_attack();
   void gaps_init(kern::Engine& e);

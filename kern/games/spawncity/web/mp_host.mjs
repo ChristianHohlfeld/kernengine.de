@@ -268,6 +268,7 @@ const MP_CSS = `
 .mp-plate .t{display:flex;gap:6px;align-items:center;padding:3px 9px;border-radius:9px;background:#060b10cc;border:2px solid var(--c);white-space:nowrap}
 .mp-plate strong{font:900 14px/1 system-ui;letter-spacing:.06em;color:var(--c)}.mp-plate small{font:800 12px/1 system-ui;color:#fff}
 .mp-plate .el{font:900 12px/1 system-ui;color:#fff;padding:1px 5px;border-radius:6px;background:var(--c);color:#06090d}.mp-plate .el:empty{display:none}
+.mp-plate .st{font:900 12px/1 system-ui;color:#ffd24a;letter-spacing:.04em}.mp-plate .st:empty{display:none}
 .mp-plate .hp{width:48px;height:4px;border-radius:2px;background:#ffffff30;overflow:hidden}.mp-plate .hp u{display:block;height:100%;background:var(--c)}
 .mp-plate .caret{width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;border-top:12px solid var(--c)}
 .mp-plate .edge{display:none;position:relative;width:54px;height:54px}
@@ -571,7 +572,7 @@ export class MpPage {
       let el = this.plates.get(p.slot);
       if (!el) {
         el = document.createElement("div"); el.className = "mp-plate";
-        el.innerHTML = '<div class="on"><span class="t"><strong></strong><small></small><span class="el"></span><span class="mic">🎙</span></span><b class="hp"><u></u></b><i class="caret"></i></div>'
+        el.innerHTML = '<div class="on"><span class="t"><strong></strong><span class="st"></span><small></small><span class="el"></span><span class="mic">🎙</span></span><b class="hp"><u></u></b><i class="caret"></i></div>'
           + '<div class="edge"><i class="arrow"></i><div class="ring"></div><div class="lab"><b></b><i></i></div></div>';
         // the plates live with the game's own HUD (the original view's #viewport: above its canvas),
         // else in Kern's layer
@@ -596,7 +597,7 @@ export class MpPage {
       const dz = Number(p.dz) || 0, el3 = Math.abs(dz) >= 2.5 ? `${dz > 0 ? "▲" : "▼"} ${Math.round(Math.abs(dz))} m` : "";
       const rel = Number(p.rel) || 0, side = Math.abs(rel) > 135 ? "HINTER DIR" : rel < -20 ? "◀ LINKS" : rel > 20 ? "RECHTS ▶" : dz > 2.5 ? "ÜBER DIR" : dz < -2.5 ? "UNTER DIR" : "VORN";
       const put = (q, t) => { const n = el.querySelector(q); if (n.textContent !== t) n.textContent = t; };
-      put("strong", name); put("small", d); put(".on .el", el3); el.querySelector(".hp u").style.width = `${p.hp}%`;
+      put("strong", name); put(".on .st", p.dead ? "" : "★".repeat(Math.max(0, Math.min(5, p.stars | 0)))); put("small", d);  // his wanted level (his own) put(".on .el", el3); el.querySelector(".hp u").style.width = `${p.hp}%`;
       put(".edge .ring", `P${p.index}`); put(".edge .lab b", el3 ? `${d} · ${el3}` : d); put(".edge .lab i", side);
     }
     for (const [slot, el] of this.plates) if (!seen.has(slot)) { el.remove(); this.plates.delete(slot); }

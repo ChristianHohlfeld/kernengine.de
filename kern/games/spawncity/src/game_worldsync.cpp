@@ -1,11 +1,14 @@
-// SpawnCity on Kern - one world in multiplayer: the host's traffic and citizens are everybody's.
+// SpawnCity on Kern - one world in multiplayer: the host's traffic, citizens and animals are everybody's.
 //
 // Alone every machine runs its own town (traffic placed around the player, citizens on the
 // pavements). In a session that would be one town per player, drifting apart: a car here is not
-// there, a passer-by walks elsewhere. So the host is the authority of the street life near him:
-//  * every 100 ms he sends the cars and the citizens within reach of any mate (unreliable, the
-//    newest wins): a car's index, kind, colour, pose and velocity; a citizen's index, seed (his
-//    looks), state, place, heading and pace
+// there, a passer-by walks elsewhere. So the host is the authority of the street life around
+// every player:
+//  * to every mate he sends what is within reach of that mate (unreliable, the newest wins, each
+//    list complete in numbered parts): the cars 20 times a second (a car's index, kind, colour,
+//    wreck / burning, pose and velocity; one at rest is only named), the citizens, cows, dogs,
+//    cats, pigeons and the running club 5 times a second (a citizen's index, seed - his looks -,
+//    state, place, heading and pace)
 //  * the host loads the town around every mate too (CityStream::extra_foci) and places his
 //    traffic and people around all of them; a client runs no traffic and no citizens of his own
 //    while the host's world comes - his cars are puppets steered onto the host's poses
@@ -13,9 +16,14 @@
 //    to the host's places, a death or a fall there is one here (People::apply_snapshot)
 //  * the car a player drives is his (PlayerState.car): the host leaves it out and hides his copy,
 //    the others draw it as that player's car; let go, it is the host's again where it stopped
-//  * only until the host's world reaches a client (the first seconds there, the town loading on
-//    the host) the client's own town fills the gap; then it is the host's, everywhere
-// Police, the military and the zombies stay with the player they belong to (wanted, swarm).
+//  * a client in a session never runs a town of his own: until the host's lists reach him the
+//    streets are empty, then they are the host's
+//  * what a client does to a car or a passer-by of the host's goes to the host (damage_car,
+//    People::take_hurts -> game_townsync.cpp), who applies it; the result - the car burning, the
+//    wreck, the passer-by down or running - comes back in these lists
+// What hunts a player - his police (officers, cruisers, drones), the sandbox enemies, the military
+// and the zombies - stays his own and is shown to the others as his swarm (game_swarm.cpp); the
+// cruisers are therefore left out of the car list.
 //
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
 #include <algorithm>
@@ -137,7 +145,7 @@ void Game::worldsync_update(f32 dt) {
         c.driver = false;  // parked where he left it
       }
     }
-    // (in real time: a host whose game runs slow still sends five times a second)
+    // (in real time: a host whose game runs slow still sends at his rates)
     {
       const f64 real = kern::now_ms();
       const f32 real_dt = world_send_real_ > 0 ? static_cast<f32>(std::min(1000.0, real - world_send_real_) / 1000) : dt;
@@ -393,6 +401,20 @@ void Game::worldsync_update(f32 dt) {
     if (type == kCars) {
       std::vector<bool>& seen = car_seen_;
       if (seen.size() != cars_.size()) seen.assign(cars_.size(), false);
+      // what a car's flags say of it (a whole entry, and one at rest that is only named, alike)
+      auto car_state = [&](TrafficCar& c, u8 fl, Vec3 at) {
+        // it went up on the host's machine: a wreck here from now (its fire, its debris) - and if we
+        // shot at it, our crime and our score, as when it goes up in our own town (wreck_car)
+        if ((fl & 2) && !c.wreck) {
+          c.wreck_at = now;
+          if (c.hit_by_player) wanted_.report(fl & 1 ? wanted::Crime::bus : wanted::Crime::car, people_.witnessed(at));
+        }
+        c.wreck = fl & 2;
+        // critical on his machine: it smokes here too (the countdown is his - update_town leaves it)
+        if (!(fl & 8) || c.wreck) c.burn_until = -1;
+        else if (c.burn_until < 0) c.burn_until = now + (fl & 1 ? 3.1f : 2.45f);
+        c.input.pedal = (fl & 4) ? -0.5f : 0;
+      };
       for (u8 k = 0; k < n && r.ok; ++k) {
         const u8 idx = r.get<u8>(), flags = r.get<u8>();
         if (flags & 0x80) {
@@ -402,6 +424,7 @@ void Game::worldsync_update(f32 dt) {
             if (car_net_[i] == idx) {
               seen[i] = true;
               if (i < car_line_.size() && !car_line_[i].empty()) car_line_[i].push(car_line_[i].last_position(), car_rest_q_[i], {}, true, static_cast<f64>(t_ms), now_ms);
+              if (cars_[i].placed && static_cast<i32>(i) != car_index_) car_state(cars_[i], flags, matrix_of(cars_[i].actor).translation());  // (a standing car burns too)
               break;
             }
           continue;
@@ -431,6 +454,9 @@ void Game::worldsync_update(f32 dt) {
         seen[static_cast<std::size_t>(local)] = true;
         if (car_net_[static_cast<std::size_t>(local)] != idx || !c.placed) {
           car_net_[static_cast<std::size_t>(local)] = idx;
+          c.wreck = false;  // another car of his: nothing of the one this body played before
+          c.hit_by_player = false;
+          c.burn_until = -1;
           car_line_[static_cast<std::size_t>(local)].reset();
           if (!world_->actor_alive(c.actor)) { world_->set_alive(c.actor, true); c.solid_masks.clear(); }
           traffic_solid(c);  // (it had no physics far away here: his car is a body that pushes)
@@ -450,8 +476,7 @@ void Game::worldsync_update(f32 dt) {
         }
         c.driver = false;
         c.color = col;
-        c.wreck = flags & 2;
-        c.input.pedal = (flags & 4) ? -0.5f : 0;
+        car_state(c, flags, p);
         c.car->show(steer);
         car_line_[static_cast<std::size_t>(local)].push(p, q, v, true, static_cast<f64>(t_ms), now_ms);
         car_rest_q_[static_cast<std::size_t>(local)] = q;
