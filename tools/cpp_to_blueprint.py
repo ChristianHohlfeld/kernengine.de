@@ -55,7 +55,7 @@ CPP_WORDS = set("""alignas alignof and and_eq asm auto bitand bitor bool break c
 constinit const_cast continue co_await co_return co_yield decltype default delete do double dynamic_cast else enum explicit export extern false float for friend goto if inline
 int long mutable namespace new noexcept not not_eq nullptr operator or or_eq private protected public register reinterpret_cast requires return short signed sizeof static
 static_assert static_cast struct switch template this thread_local throw true try typedef typeid typename union unsigned using virtual void volatile wchar_t while xor xor_eq
-Bool Int Float Vector Text Actor List loop machine entry detached kern value actor delta text other self""".split())
+Bool Int Float Vector Text Actor List loop machine entry detached kern""".split())
 FORMULA_WORDS = set("min max clamp abs sign floor ceil round trunc sqrt pow exp log sin cos tan asin acos atan atan2 rad deg lerp div mod pi".split())
 NODE_NAME = re.compile(r"^(math|logic|flow|list|text|vector|struct|enum|value|func|var|debug|random|time|event|actor|physics|combat|game|n\d+|go\d+|on\d+|it\d+|machine\d+)(_|$)")
 
@@ -97,7 +97,7 @@ def f32_decimal(x):
 
 def text_literal(s):
     out = []
-    for ch in s.encode("utf-8"):
+    for ch in (s if isinstance(s, bytes) else s.encode("utf-8")):
         c = chr(ch)
         if c == "\n": out.append("\\n")
         elif c == "\t": out.append("\\t")
@@ -110,8 +110,42 @@ def text_literal(s):
 
 
 def c_string(v):
-    """The bytes of a string literal as clang prints it."""
-    return json.loads(v) if v.startswith('"') else v
+    """The bytes of a string literal as clang prints it (a C literal, with its escapes)."""
+    if not v.startswith('"'):
+        return v.encode("utf-8")
+    v = v[1:-1]
+    out, i = bytearray(), 0
+    simple = {"n": 10, "t": 9, "r": 13, "a": 7, "b": 8, "f": 12, "v": 11, "\\": 92, '"': 34, "'": 39, "?": 63}
+    while i < len(v):
+        c = v[i]
+        if c != "\\":
+            out += c.encode("utf-8")
+            i += 1
+            continue
+        e = v[i + 1]
+        if e in simple:
+            out.append(simple[e])
+            i += 2
+        elif e == "x":
+            j = i + 2
+            while j < len(v) and v[j] in "0123456789abcdefABCDEF":
+                j += 1
+            out.append(int(v[i + 2:j], 16) & 255)
+            i = j
+        elif e in "01234567":
+            j = i + 1
+            while j < len(v) and j < i + 4 and v[j] in "01234567":
+                j += 1
+            out.append(int(v[i + 1:j], 8) & 255)
+            i = j
+        elif e in "uU":
+            n = 4 if e == "u" else 8
+            out += chr(int(v[i + 2:i + 2 + n], 16)).encode("utf-8")
+            i += 2 + n
+        else:
+            out += e.encode("utf-8")
+            i += 2
+    return bytes(out)
 
 
 # ---- the syntax tree ---------------------------------------------------------------------------
@@ -174,7 +208,8 @@ def annotate(o, st):
 
 
 def kids(n):
-    return [c for c in n.get("inner", []) or [] if isinstance(c, dict) and c.get("kind")]
+    """The parts of a node (without the comments and attributes that stand with a declaration)."""
+    return [c for c in n.get("inner", []) or [] if isinstance(c, dict) and c.get("kind") and not c["kind"].endswith("Comment") and not c["kind"].endswith("Attr")]
 
 
 def qtype(n):
@@ -301,6 +336,13 @@ class Function:
         self.decl = None
         self.calls = []       # the functions it calls (Function)
         self.indexes = False  # it reads an entry of a list at a place it computes
+        self.self_type = None # a method: the struct that is its object (its first parameter)
+        self.mutates = False  # a method that changes its object
+        self.refs = []        # the parameters (by place) it writes through
+        self.value = None     # the type of what the C++ returns
+        self.out = None       # the struct of its results, when it gives more than one
+        self.out_fields = []  # (field, type, "self" | "result" | ("ref", place of the parameter))
+        self.ctor = False     # a constructor: it gives the object it makes
         self.file = ""
 
 
@@ -459,7 +501,7 @@ class Unit:
                     raise Wait(f"the struct {q.split('::')[-1]} (its field {c.get('name')}: {w})")
                 fname = self.fresh(c.get("name", "field"), taken)
                 taken.add(fname)
-                init = kids(c)[-1] if kids(c) else None
+                init = kids(c)[-1] if kids(c) and c.get("hasInClassInitializer") else None
                 default = self.zero(ft)
                 if init is not None:
                     try:
@@ -561,7 +603,13 @@ class Unit:
             return f
         owner = self.tree.owner.get(d["id"], "")
         cpp = (owner.split("::")[-1] + "::" if owner else "") + d.get("name", "?")
-        f = Function(self.fresh(cpp.replace("::", "_")))
+        ops = {"+": "add", "-": "sub", "*": "mul", "/": "div", "==": "equal", "!=": "differs", "<": "less", "[]": "at", "()": "call", "+=": "add_to", "-=": "sub_from", "*=": "scale"}
+        want = cpp.replace("::", "_")
+        if d.get("kind") == "CXXConstructorDecl":
+            want = owner.split("::")[-1] + "_new"
+        elif d.get("name", "").startswith("operator") and d["name"][8:] in ops:
+            want = (owner.split("::")[-1] + "_" if owner else "") + ops[d["name"][8:]]
+        f = Function(self.fresh(want))
         f.cpp = cpp
         f.decl = d
         f.file = d.get("_file", "")
@@ -569,34 +617,55 @@ class Unit:
         f.lines = self.tree.text(f.file).count("\n", a, b) + 1 if a is not None else 0
         self.functions[d["id"]] = f
         self.names.add(f.name)
-        marks = (len(self.types), len(self.variable_lines), len(self.members), self.next_node, dict(self.enums), dict(self.structs), dict(self.variables), set(self.names),
-                 dict(self.struct_fields), dict(self.enum_values))
         try:
             Emit(self, f).run()
             self.order.append(f)
         except Wait as w:
             f.wait = str(w)
-            # (what it had begun to declare is not declared - unless a function written meanwhile uses it;
-            # those were written before it began, so nothing is)
-            del self.types[marks[0]:]
-            del self.variable_lines[marks[1]:]
-            del self.members[marks[2]:]
-            self.enums, self.structs, self.variables, self.struct_fields, self.enum_values = marks[4], marks[5], marks[6], marks[8], marks[9]
-            self.names = marks[7] | {f.name}
+            # (what it had begun to declare stays known - a function written on the way may use it; the
+            # Blueprint's text has only the declarations its functions use: see text)
             raise
         return f
 
     def text(self):
+        """The Blueprint: its functions, and of the declarations made on the way those they use."""
+        word = re.compile(r"[A-Za-z_]\w*")
+        used = set()
+        for f in self.order:
+            used.update(word.findall(f.text))
+        def name_of(line):
+            m = re.match(r"\s*KERN_(?:ENUM|STRUCT)\((\w+)", line) or re.match(r"\s*(?:[\w<>:]+)\s+(\w+)\s*=", line) or re.search(r"\}\s*(n\d+);", line)
+            return m.group(1) if m else None
+        variables = []
+        pending = []
+        for line in self.variable_lines:   # (a /// line belongs to the variable below it)
+            if line.strip().startswith("///"):
+                pending = [line]
+                continue
+            if name_of(line) in used:
+                variables += pending + [line]
+                used.update(word.findall(line))
+            pending = []
+        keep = [False] * len(self.types)
+        changed = True
+        while changed:   # (a type another kept type is made of is kept too)
+            changed = False
+            for i, line in enumerate(self.types):
+                if not keep[i] and name_of(line) in used:
+                    keep[i] = changed = True
+                    used.update(word.findall(line))
+        types = [line for i, line in enumerate(self.types) if keep[i]]
+        members = [line for line in self.members if name_of(line) in used]
         out = [f"struct {self.name} : kern::Blueprint {{"]
-        if self.types:
-            out += ["  // ---- types ----", *self.types, ""]
-        if self.variable_lines:
-            out += ["  // ---- variables ----", *self.variable_lines, ""]
+        if types:
+            out += ["  // ---- types ----", *types, ""]
+        if variables:
+            out += ["  // ---- variables ----", *variables, ""]
         out.append("  // ---- functions ----")
         for f in self.order:
             out += [f.text, ""]
-        if self.members:
-            out += ["  // ---- what nodes give and keep ----", *self.members]
+        if members:
+            out += ["  // ---- what nodes give and keep ----", *members]
         while out[-1] == "":
             out.pop()
         out.append("};")
@@ -801,6 +870,9 @@ class Emit:
         self.locals = []      # (name, type): declared at the top of the body
         self.taken = set()
         self.index = {}       # decl id of a loop's counter -> "n12.index"
+        self.pre = []         # steps to run before the statement being written
+        self.loops = []       # the loops around the statement being written: their flags for break and continue
+        self.ref_names = {}
         self.result_struct = None
 
     # ---- types ----
@@ -831,40 +903,104 @@ class Emit:
     # ---- the function ----
     def run(self):
         d, f, u = self.f.decl, self.f, self.u
-        if d.get("kind") == "CXXConstructorDecl":
-            raise Wait("a constructor")
-        if d.get("kind") == "CXXMethodDecl" and not d.get("storageClass") == "static":
-            if any(x.get("kind") == "CXXThisExpr" for x in walk(d)):
-                raise Wait("the state of its object (a method)")
         if d.get("variadic"):
             raise Wait("a variadic function")
         ret = qtype(d).split("(")[0].strip()
-        f.result = u.btype(ret)
+        f.value = u.btype(ret) if d.get("kind") != "CXXConstructorDecl" else None
+        if d.get("kind") == "CXXConstructorDecl":
+            # a constructor: a function that makes the object - it begins as the struct's default (the
+            # defaults of the class's data), then what the constructor sets
+            owner = self.tree.owner.get(d["id"])
+            if owner is None:
+                raise Wait("a constructor of a class that is not known here")
+            try:
+                f.self_type = u.struct(owner)
+            except Wait as w:
+                raise Wait(f"the state of its object: {w}")
+            f.mutates = f.ctor = True
+        if "&" in ret and not re.search(r"\bconst\b", ret):
+            raise Wait("a function that gives a reference to something to change")
         body = next(c for c in kids(d) if c.get("kind") == "CompoundStmt")
+        # a method: its object is a value of the struct its class's data is, the first parameter
+        if d.get("kind") == "CXXMethodDecl" and d.get("storageClass") != "static" and any(x.get("kind") == "CXXThisExpr" for x in walk(d)):
+            owner = self.tree.owner.get(d["id"])
+            if owner is None:
+                raise Wait("the state of its object (its class is not known here)")
+            try:
+                f.self_type = u.struct(owner)
+            except Wait as w:
+                raise Wait(f"the state of its object: {w}")
+            f.mutates = not qtype(d).rstrip().endswith("const")
+            name = u.fresh("self", self.taken)
+            self.taken.add(name)
+            f.params.append((name, f.self_type))
+            self.self_name = name
         assigned = self.assigned(body)
         copies = []
         for p in kids(d):
             if p.get("kind") != "ParmVarDecl":
                 continue
             raw = qtype(p)
-            if "&" in raw and not re.search(r"\bconst\b", raw):
-                raise Wait("a parameter the function writes through (a reference)")
+            ref = "&" in raw and "&&" not in raw and not re.search(r"\bconst\b", raw)
             t = u.btype(raw)
             name = u.fresh(p.get("name") or f"arg{len(f.params) + 1}", self.taken)
             self.taken.add(name)
+            if ref:
+                f.refs.append(len(f.params))
             f.params.append((name, t))
             self.names[p["id"]] = name
             self.types[p["id"]] = t
-            if p["id"] in assigned:  # (a function's input is not a variable: what the body changes is a local copy)
+            if ref or p["id"] in assigned:  # (a function's input is not a variable: what the body changes is a local copy)
                 copies.append((p, name, t))
+        # what it gives back: its changed object, what the C++ returns, what it wrote through its parameters
+        if f.mutates:
+            f.out_fields.append(("Self", f.self_type, "self"))
+        if f.value is not None:
+            f.out_fields.append(("Result", f.value, "result"))
+        taken = {"Self", "Result"}
+        for place in f.refs:
+            field = u.fresh(f.params[place][0], taken)
+            taken.add(field)
+            f.out_fields.append((field, f.params[place][1], ("ref", place)))
+        if len(f.out_fields) > 1:
+            f.out = u.fresh(f.name + "_out")
+            u.names.add(f.out)
+            u.struct_fields[f.out] = [(n, t, u.zero(t), None) for n, t, _ in f.out_fields]
+            u.types.append(f"  KERN_STRUCT({f.out}) {{ " + " ".join(f"{t} {n} = {u.zero(t)};" for n, t, _ in f.out_fields) + " };")
+            f.result = f.out
+        else:
+            f.result = f.out_fields[0][1] if f.out_fields else None
         lines = []
+        if f.ctor:
+            self.self_name = self.temp("self", f.self_type)
+            for init in kids(d):
+                if init.get("kind") != "CXXCtorInitializer":
+                    continue
+                if "anyInit" not in init:
+                    raise Wait("a constructor that calls another constructor or a base class")
+                e = kids(init)[0] if kids(init) else None
+                if e is None or bare(e).get("kind") == "CXXDefaultInitExpr":
+                    continue   # (the data's own default: the struct has it)
+                fname, ft = u.field(f.self_type, init["anyInit"]["name"])
+                saved, self.pre = self.pre, []
+                text = self.ex(e, ft)
+                lines += self.pre + [f"{self.self_name}.{fname} = {text};"]
+                self.pre = saved
+        elif f.mutates:
+            c = self.temp(self.self_name + "_", f.self_type)
+            lines.append(f"{c} = {self.self_name};")
+            self.self_name = c
+        self.ref_names = {}
         for p, name, t in copies:
             c = self.temp(name + "_", t)
             self.names[p["id"]] = c
             lines.append(f"{c} = {name};")
+        for place in f.refs:
+            pid = [p["id"] for p in kids(d) if p.get("kind") == "ParmVarDecl"][place - (1 if f.self_type else 0)]
+            self.ref_names[place] = self.names[pid]
         lines += self.block(kids(body))
-        if not self.pure_ok:
-            f.pure = False
+        if not self.ends(kids(body)) and f.out_fields and f.value is None:
+            lines.append(self.ret_line(None))
         head = []
         doc = u.comment_of(d)
         if f.result is not None:
@@ -876,32 +1012,98 @@ class Emit:
         out = head + [f"    {t} {n} = {u.zero(t)};" for n, t in self.locals] + ["    " + ln for ln in lines] + ["  }"]
         f.text = "\n".join(out)
 
+    def ret_line(self, value):
+        """The return of the function: everything it gives back, as it is at this place."""
+        vals = []
+        for _, _, src in self.f.out_fields:
+            vals.append(self.self_name if src == "self" else value if src == "result" else self.ref_names[src[1]])
+        if not vals:
+            return "return;"
+        if len(vals) == 1:
+            return f"return {{{vals[0]}}};"
+        return f"return {{struct_make<{self.f.out}>({', '.join(vals)})}};"
+
+    def self_var(self):
+        if not self.f.mutates:
+            raise Wait("a method that changes its object though it says it does not (const)")
+        return self.self_name
+
+    def is_this(self, n):
+        n = bare(n)
+        while n.get("kind") in ("ImplicitCastExpr",) and kids(n):
+            n = bare(kids(n)[0])
+        if n.get("kind") == "UnaryOperator" and n.get("opcode") == "*" and kids(n):
+            return self.is_this(kids(n)[0])
+        return n.get("kind") == "CXXThisExpr"
+
+    def hoist(self, lines):
+        """Steps that run before the statement being written (a call that gives several things)."""
+        if self.cond_depth:
+            raise Wait("a call that changes something, in a part of an expression that does not always run")
+        self.pre += lines
+
+    def sometimes(self, fn):
+        """Writes a part of an expression that C++ does not always evaluate (the right of && and ||, a branch of ?:)."""
+        self.cond_depth += 1
+        try:
+            return fn()
+        finally:
+            self.cond_depth -= 1
+
     pure_ok = True
+    self_name = None
+    cond_depth = 0
+
+    def root(self, target):
+        """The variable an lvalue is a part of (its declaration's id), or None."""
+        while target is not None:
+            target = bare(target)
+            if target.get("kind") == "DeclRefExpr":
+                return target.get("referencedDecl", {}).get("id")
+            if target.get("kind") in ("MemberExpr", "ArraySubscriptExpr", "ImplicitCastExpr") and kids(target):
+                target = kids(target)[0]
+            elif target.get("kind") == "CXXOperatorCallExpr" and callee_name(target) == "operator[]":
+                target = kids(target)[1]
+            else:
+                return None
+        return None
 
     def assigned(self, body):
+        """The variables the body changes: by assigning, or through a call that writes to its object or
+        through a parameter."""
         out = set()
         for n in walk(body):
             k = n.get("kind")
-            target = None
+            targets = []
             if k in ("BinaryOperator", "CompoundAssignOperator") and (n.get("opcode") == "=" or k == "CompoundAssignOperator"):
-                target = kids(n)[0]
+                targets.append(kids(n)[0])
             elif k == "UnaryOperator" and n.get("opcode") in ("++", "--"):
-                target = kids(n)[0]
+                targets.append(kids(n)[0])
             elif k == "CXXOperatorCallExpr" and callee_name(n) in ("operator=", "operator+=", "operator-=", "operator*=", "operator/="):
-                target = kids(n)[1]
+                targets.append(kids(n)[1])
             elif k == "CXXMemberCallExpr" and callee(n).get("name") in ("push_back", "emplace_back", "clear", "pop_back", "resize", "erase", "insert", "assign"):
-                target = kids(callee(n))[0] if kids(callee(n)) else None
-            while target is not None:
-                target = bare(target)
-                if target.get("kind") == "DeclRefExpr":
-                    out.add(target.get("referencedDecl", {}).get("id"))
-                    break
-                if target.get("kind") in ("MemberExpr", "ArraySubscriptExpr", "ImplicitCastExpr") and kids(target):
-                    target = kids(target)[0]
-                elif target.get("kind") == "CXXOperatorCallExpr" and callee_name(target) == "operator[]":
-                    target = kids(target)[1]
-                else:
-                    break
+                if kids(callee(n)):
+                    targets.append(kids(callee(n))[0])
+            if k in ("CallExpr", "CXXMemberCallExpr", "CXXOperatorCallExpr"):
+                c = callee(n)
+                d = self.tree.decl.get(c.get("referencedMemberDecl") or c.get("referencedDecl", {}).get("id"))
+                if d is not None:
+                    args = kids(n)[1:]
+                    if d.get("kind") == "CXXMethodDecl":
+                        obj = kids(c)[0] if k == "CXXMemberCallExpr" and kids(c) else args[0] if k == "CXXOperatorCallExpr" and args else None
+                        if k == "CXXOperatorCallExpr":
+                            args = args[1:]
+                        if obj is not None and not qtype(d).rstrip().endswith("const"):
+                            targets.append(obj)
+                    params = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
+                    for a, p in zip(args, params):
+                        raw = qtype(p)
+                        if "&" in raw and "&&" not in raw and not re.search(r"\bconst\b", raw):
+                            targets.append(a)
+            for t in targets:
+                i = self.root(t)
+                if i is not None:
+                    out.add(i)
         return out
 
     # ---- statements ----
@@ -910,7 +1112,12 @@ class Emit:
         for i, s in enumerate(stmts):
             lines, ends = self.stmt(s)
             out += lines
-            if ends:
+            if ends or s.get("kind") in ("BreakStmt", "ContinueStmt"):
+                break
+            if self.loops and any(self.jumps(s)):   # (after a statement that may break or continue: the rest only if it did not)
+                rest = self.block(stmts[i + 1:])
+                if rest:
+                    out += [f"if ({self.going()}) {{", *["  " + ln for ln in rest], "}"]
                 break
         return out
 
@@ -930,6 +1137,31 @@ class Emit:
 
     def stmt(self, s):
         """The lines of one statement, and whether the path ends there."""
+        saved, self.pre = self.pre, []
+        try:
+            lines, ends = self.stmt1(s)
+            return self.pre + lines, ends
+        finally:
+            self.pre = saved
+
+    def take_pre(self):
+        lines, self.pre = self.pre, []
+        return lines
+
+    def loop_lines(self, cond, cond_pre, body, loop=None):
+        """A loop while `cond` holds. Steps the condition needs (a call that gives several things) run
+        before every test of it. A break ends it: its flag is part of the condition."""
+        stop = loop["stop"] if loop else None
+        first = [f"{stop} = false;"] if stop else []
+        if not cond_pre:
+            if stop:
+                cond = f"logic_not({stop})" if cond == "true" else f"logic_and(logic_not({stop}), {cond})"
+            return first + [f"while (loop({cond})) {{", *["  " + ln for ln in body], "}"]
+        go = self.temp("go", "Bool")
+        test = f"logic_and({go}, logic_not({stop}))" if stop else go
+        return first + [f"{go} = true;", f"while (loop({test})) {{", *["  " + ln for ln in cond_pre], f"  if ({cond}) {{", *["    " + ln for ln in body], "  } else {", f"    {go} = false;", "  }", "}"]
+
+    def stmt1(self, s):
         k = s.get("kind")
         if k == "CompoundStmt":
             lines = self.block(kids(s))
@@ -961,8 +1193,8 @@ class Emit:
         if k == "ReturnStmt":
             c = kids(s)
             if not c:
-                return ["return;"], True
-            return [f"return {{{self.ex(c[0], self.f.result)}}};"], True
+                return [self.ret_line(None)], True
+            return [self.ret_line(self.ex(c[0], self.f.value))], True
         if k == "IfStmt":
             if s.get("hasInit") or s.get("hasVar"):
                 raise Wait("an if that declares a variable")
@@ -983,36 +1215,74 @@ class Emit:
             return self.for_loop(s), False
         if k == "WhileStmt":
             c = kids(s)
-            self.no_jumps(c[-1])
             cond = self.bx(c[0])
-            body = self.block([c[-1]])
-            return [f"while (loop({cond})) {{", *["  " + ln for ln in body], "}"], False
+            cond_pre = self.take_pre()
+            loop = self.enter_loop(c[-1])
+            body = self.loop_body(loop, [c[-1]])
+            return self.loop_lines(cond, cond_pre, body, loop), False
         if k == "CXXForRangeStmt":
             return self.for_each(s), False
         if k == "SwitchStmt":
             return self.switch(s)
         if k in ("BreakStmt", "ContinueStmt"):
-            raise Wait("break / continue in a loop")
+            if not self.loops or not self.loops[-1]["stop" if k == "BreakStmt" else "skip"]:
+                raise Wait("a break outside a loop")
+            return [f"{self.loops[-1]['stop' if k == 'BreakStmt' else 'skip']} = true;"], False
         if k == "DoStmt":
-            raise Wait("a do-while loop")
+            c = kids(s)
+            again = self.temp("again", "Bool")
+            loop = self.enter_loop(c[0])
+            body = self.loop_body(loop, [c[0]])
+            cond = self.bx(c[1])
+            test = self.take_pre() + [f"{again} = {cond};"]
+            if loop["stop"]:   # (after a break the condition is not asked)
+                test = [f"if (logic_not({loop['stop']})) {{", *["  " + ln for ln in test], "}"]
+            return [f"{again} = true;"] + self.loop_lines(again, [], body + test, loop), False
         if k in ("GotoStmt", "LabelStmt", "CXXTryStmt"):
             raise Wait(k)
         return self.effect(s), False
 
-    def no_jumps(self, body):
+    def jumps(self, body):
+        """(has break, has continue) of the loop this is the body of."""
+        found = [False, False]
         def scan(n, in_switch):
             k = n.get("kind")
-            if k == "ContinueStmt" or (k == "BreakStmt" and not in_switch):
-                raise Wait("break / continue in a loop")
+            if k == "ContinueStmt":
+                found[1] = True
+            if k == "BreakStmt" and not in_switch:
+                found[0] = True
             if k in ("ForStmt", "WhileStmt", "DoStmt", "CXXForRangeStmt", "LambdaExpr"):
                 return
             for c in kids(n):
                 scan(c, in_switch or k == "SwitchStmt")
         scan(body, False)
+        return found[0], found[1]
+
+    def enter_loop(self, body):
+        """The flags a loop's body needs: `stop` is set by break, `skip` by continue. What follows either
+        in the body runs only while neither is set (see block)."""
+        has_break, has_continue = self.jumps(body)
+        loop = {"stop": self.temp("stop", "Bool") if has_break else None, "skip": self.temp("skip", "Bool") if has_continue else None}
+        self.loops.append(loop)
+        return loop
+
+    def loop_body(self, loop, body_stmts, after=None):
+        """The lines of a loop's body: the flags, the statements, and `after` (a for loop's step), which
+        continue does not skip but break does."""
+        lines = ([f"{loop['skip']} = false;"] if loop["skip"] else []) + self.block(body_stmts)
+        self.loops.pop()
+        if after:
+            lines += [f"if (logic_not({loop['stop']})) {{", *["  " + ln for ln in after], "}"] if loop["stop"] else after
+        return lines
+
+    def going(self):
+        loop = self.loops[-1]
+        flags = [x for x in (loop["stop"], loop["skip"]) if x]
+        return f"logic_not({flags[0]})" if len(flags) == 1 else f"logic_not(logic_or({flags[0]}, {flags[1]}))"
 
     def for_loop(self, s):
         init, _, cond, inc, body = (s.get("inner") or [{}] * 5)[:5]
-        self.no_jumps(body)
+        has_break = self.jumps(body)[0]
         # the counting loop: for (int i = a; i < b; ++i), with i only read in the body
         v = None
         if init.get("kind") == "DeclStmt" and len(kids(init)) == 1 and kids(init)[0].get("kind") == "VarDecl":
@@ -1021,7 +1291,7 @@ class Emit:
         i = bare(inc) if inc else {}
         counting = (v is not None and NUMBER.get(self.ctype(v)) == "Int" and v.get("init") and c.get("kind") == "BinaryOperator" and c.get("opcode") in ("<", "<=")
                     and self.refers(kids(c)[0], v["id"]) and i.get("kind") == "UnaryOperator" and i.get("opcode") == "++" and self.refers(kids(i)[0], v["id"])
-                    and v["id"] not in self.assigned(body) and not any(x in self.assigned(body) for x in self.reads(kids(c)[1])))
+                    and v["id"] not in self.assigned(body) and not any(x in self.assigned(body) for x in self.reads(kids(c)[1])) and not has_break)
         if counting:
             node = self.u.next_node
             self.u.next_node += 1
@@ -1032,16 +1302,25 @@ class Emit:
             self.u.members.append(f"  struct : kern::Node<{node}> {{ Int index = 0; }} n{node};")
             self.names[v["id"]] = f"n{node}.index"
             self.types[v["id"]] = "Int"
-            lines = self.block([body])
-            return [f"for (auto it{node} = flow_for(n{node}, {first}, {last}); it{node}.next();) {{", *["  " + ln for ln in lines], "}"]
+            lines = self.loop_body(self.enter_loop(body), [body])
+            return self.take_pre() + [f"for (auto it{node} = flow_for(n{node}, {first}, {last}); it{node}.next();) {{", *["  " + ln for ln in lines], "}"]
         out = []
         if init:
             out += self.stmt(init)[0]
+        out += self.take_pre()
         condition = self.bx(cond) if cond else "true"
-        lines = self.block([body])
-        if inc:
-            lines += self.effect(inc)
-        return out + [f"while (loop({condition})) {{", *["  " + ln for ln in lines], "}"]
+        cond_pre = self.take_pre()
+        loop = self.enter_loop(body)
+        lines = self.loop_body(loop, [body], self.effect_stmt(inc) if inc else None)
+        return out + self.loop_lines(condition, cond_pre, lines, loop)
+
+    def effect_stmt(self, n):
+        saved, self.pre = self.pre, []
+        try:
+            lines = self.effect(n)
+            return self.pre + lines
+        finally:
+            self.pre = saved
 
     def minus_one(self, n, text):
         b = bare(n)
@@ -1063,15 +1342,13 @@ class Emit:
     def for_each(self, s):
         c = kids(s)
         body = c[-1]
-        self.no_jumps(body)
         var = next((x for x in c if x.get("kind") == "DeclStmt" and kids(x) and kids(x)[0].get("kind") == "VarDecl" and not kids(x)[0].get("isImplicit")), None)
         rng = next((x for x in c if x.get("kind") == "DeclStmt" and kids(x) and kids(x)[0].get("name", "").startswith("__range")), None)
         if var is None or rng is None:
             raise Wait("a loop over a range of another shape")
         v = kids(var)[0]
         raw = qtype(v)
-        if "&" in raw and not re.search(r"\bconst\b", raw):
-            raise Wait("a loop that changes the entries of its list")
+        changes = "&" in raw and not re.search(r"\bconst\b", raw)
         src = kids(kids(rng)[0])[-1]
         lt = self.tp(src)
         if not lt.startswith("List<"):
@@ -1080,11 +1357,28 @@ class Emit:
         node = self.u.next_node
         self.u.next_node += 1
         self.u.members.append(f"  struct : kern::Node<{node}> {{ {it} item = {self.u.zero(it)}; Int index = 0; }} n{node};")
-        self.names[v["id"]] = f"n{node}.item"
-        self.types[v["id"]] = it
         lst = self.ex(src, lt)
-        lines = self.block([body])
-        return [f"for (auto it{node} = flow_for_each<{it}>(n{node}, {lst}); it{node}.next();) {{", *["  " + ln for ln in lines], "}"]
+        before = self.take_pre()
+        loop = self.enter_loop(body)
+        if not changes:
+            self.names[v["id"]] = f"n{node}.item"
+            self.types[v["id"]] = it
+            lines = self.loop_body(loop, [body])
+        else:
+            # a loop that changes its entries: the entry is a local variable, stored back into the list
+            # when the pass is over (the loop itself goes through the list as it was at its start)
+            if any(x.get("kind") == "ReturnStmt" for x in walk(body)):
+                raise Wait("a loop that changes the entries of its list and returns from inside")
+            item = self.local(v, it)
+            lines = [f"{item} = n{node}.item;"] + self.loop_body(loop, [body])
+            saved, self.pre = self.pre, []
+            lines += self.store({"kind": "ArraySubscriptExpr", "type": v.get("type", {}), "inner": [src, {"kind": "_Text", "_text": f"n{node}.index", "_type": "Int"}]}, lambda _t: item)
+            lines = lines[:len(lines)] if not self.pre else lines
+            self.pre = saved
+        if loop["stop"]:   # (For Each goes through the whole list: after a break the remaining passes do nothing)
+            lines = [f"if (logic_not({loop['stop']})) {{", *["  " + ln for ln in lines], "}"]
+            before.append(f"{loop['stop']} = false;")
+        return before + [f"for (auto it{node} = flow_for_each<{it}>(n{node}, {lst}); it{node}.next();) {{", *["  " + ln for ln in lines], "}"]
 
     def switch(self, s):
         c = kids(s)
@@ -1211,7 +1505,10 @@ class Emit:
             return []  # (void)x;
         if k == "BinaryOperator" and n.get("opcode") == "=":
             a, b = kids(n)
-            return self.assign(a, lambda t: self.ex(b, t))
+            inner = self.unwrap(b)
+            if inner.get("kind") == "BinaryOperator" and inner.get("opcode") == "=":   # a = b = v: first b, then a is what b is now
+                return self.effect(inner) + self.store(a, lambda t: self.ex(kids(inner)[0], t))
+            return self.store(a, lambda t: self.ex(b, t))
         if k == "BinaryOperator" and n.get("opcode") == ",":
             a, b = kids(n)
             return self.effect(a) + self.effect(b)
@@ -1222,7 +1519,7 @@ class Emit:
             if op == "+" and self.plain_variable(a) and ta in ("Float", "Int"):
                 return [f"{self.lvalue(a)} += {self.ex(b, ta)};"]
             synth = {"kind": "BinaryOperator", "opcode": op, "type": n.get("type", {}) if "computeResultType" not in n else n["computeResultType"], "inner": [a, b]}
-            return self.assign(a, lambda t: self.ex(synth, t))
+            return self.store(a, lambda t: self.ex(synth, t))
         if k == "UnaryOperator" and n.get("opcode") in ("++", "--"):
             a = kids(n)[0]
             ta = self.tp(a)
@@ -1230,41 +1527,43 @@ class Emit:
                 return [f"{self.lvalue(a)} += {'1' if ta == 'Int' else '1.0'};"]
             one = {"kind": "IntegerLiteral", "value": "1", "type": {"qualType": "int"}}
             synth = {"kind": "BinaryOperator", "opcode": "+" if n["opcode"] == "++" else "-", "type": a.get("type", {}), "inner": [a, one]}
-            return self.assign(a, lambda t: self.ex(synth, t))
+            return self.store(a, lambda t: self.ex(synth, t))
         if k == "CXXOperatorCallExpr":
             name = callee_name(n)
             ops = kids(n)[1:]
             if name == "operator=":
-                return self.assign(ops[0], lambda t: self.ex(ops[1], t))
+                return self.store(ops[0], lambda t: self.ex(ops[1], t))
             if name in ("operator+=", "operator-=", "operator*=", "operator/=") and self.is_vec(ops[0]):
                 synth = {"kind": "CXXOperatorCallExpr", "type": ops[0].get("type", {}), "_op": "operator" + name[8], "inner": [kids(n)[0], ops[0], ops[1]]}
-                return self.assign(ops[0], lambda t: self.ex(synth, t))
+                return self.store(ops[0], lambda t: self.ex(synth, t))
             if name == "operator+=" and self.tp(ops[0]) == "Text":
-                return self.assign(ops[0], lambda t: f'text_append({self.ex(ops[0], "Text")}, {self.ex(ops[1], "Text")}, "")')
+                return self.store(ops[0], lambda t: f'text_append({self.ex(ops[0], "Text")}, {self.ex(ops[1], "Text")}, "")')
         if k == "CallExpr":
             name = callee_name(n)
             ref = callee(n).get("referencedDecl", {})
             if ref.get("id") in self.tree.decl or ref.get("id") in self.tree.body:
-                g = self.u.function(ref["id"])
-                if g.pure:
-                    return []  # (a value nobody reads)
-                self.pure_ok = False
-                return [f"{g.name}({self.args(n, g)});"]
+                self.invoke(self.u.function(ref["id"]), kids(n)[1:])
+                return []  # (what it changes is written back by steps before this place; a value nobody reads is not computed)
             raise Wait(f"call: {name}()")
         if k == "CXXMemberCallExpr":
             m = callee(n)
             base = kids(m)[0] if kids(m) else None
             name = m.get("name")
-            if base is not None and self.tp(base).startswith("List<"):
+            if m.get("referencedMemberDecl") in self.tree.decl or m.get("referencedMemberDecl") in self.tree.body:
+                if m.get("isArrow") and not self.is_this(base):
+                    raise Wait("a pointer")
+                self.invoke(self.u.function(m["referencedMemberDecl"]), kids(n)[1:], obj=base)
+                return []
+            if base is not None and not self.is_this(base) and self.tp(base).startswith("List<"):
                 it = self.tp(base)[5:-1]
-                lv = self.list_variable(base)
+                before, lv, after = self.variable_of(base, self.tp(base))
                 args = kids(n)[1:]
                 if name in ("push_back", "emplace_back") and len(args) == 1:
-                    return [f"list_add({lv}, {self.ex(args[0], it)});"]
+                    return before + [f"list_add({lv}, {self.ex(args[0], it)});"] + after
                 if name == "clear":
-                    return [f"list_clear({lv});"]
+                    return before + [f"list_clear({lv});"] + after
                 if name == "pop_back":
-                    return [f"list_remove_at({lv}, kern::to<Int>(kern::formula([](Float n) -> Float {{ return n - 1.0; }}, kern::to<Float>(list_length<{it}>({lv})))));"]
+                    return before + [f"list_remove_at({lv}, kern::to<Int>(kern::formula([](Float n) -> Float {{ return n - 1.0; }}, kern::to<Float>(list_length<{it}>({lv})))));"] + after
                 if name == "reserve":
                     return []
                 raise Wait(f"list: {name}()")
@@ -1286,34 +1585,53 @@ class Emit:
             raise Wait("state outside the function is changed")
         raise Wait("an assignment to something that is not a variable")
 
-    def list_variable(self, n):
+    def unwrap(self, n):
         n = bare(n)
-        if n.get("kind") == "DeclRefExpr":
-            return self.lvalue(n)
-        raise Wait("a list inside something else is changed")
+        while n.get("kind") == "ImplicitCastExpr" and kids(n):
+            n = bare(kids(n)[0])
+        return n
 
-    def assign(self, target, value):
-        """Lines that set a variable, a field of one, a component of a vector or an entry of a list."""
-        t = bare(target)
+    def variable_of(self, n, t):
+        """A variable to change in place of an lvalue: (lines before, its name, lines after). The lvalue
+        itself when it is a variable; otherwise a copy that is stored back afterwards."""
+        b = self.unwrap(n)
+        if self.plain_variable(b):
+            return [], self.lvalue(b), []
+        tmp = self.temp("t", t)
+        return [f"{tmp} = {self.ex(n, t)};"], tmp, self.store(n, lambda _t: tmp)
+
+    def store(self, target, value):
+        """Lines that set an lvalue: a variable, a field, a component of a vector, an entry of a list -
+        of a variable, of the method's object, or of such a place inside another (the outer value is
+        read, changed and stored back, level by level)."""
+        t = self.unwrap(target)
         k = t.get("kind")
         if k == "DeclRefExpr":
             return [f"{self.lvalue(t)} = {value(self.tp(t))};"]
+        if self.is_this(t):
+            return [f"{self.self_var()} = {value(self.f.self_type)};"]
         if k == "MemberExpr":
-            base = kids(t)[0]
-            bb = bare(base)
+            base = kids(t)[0] if kids(t) else None
+            if base is None or self.is_this(base):
+                if self.f.self_type is None:
+                    raise Wait("the state of its object (a method)")
+                fname, ft = self.u.field(self.f.self_type, t["name"])
+                return [f"{self.self_var()}.{fname} = {value(ft)};"]
+            if t.get("isArrow"):
+                raise Wait("a pointer")
             if self.is_vec(base):
-                if bb.get("kind") != "DeclRefExpr":
-                    raise Wait("a component of a vector inside something else is set")
-                v = self.lvalue(bb)
-                parts = [f"vector_break({v}).x", f"vector_break({v}).y", f"vector_break({v}).z"]
-                at = "xyz".index(t["name"])
-                parts[at] = value("Float")
-                return [f"{v} = vector_make({', '.join(parts)});"]
+                if t.get("name") not in ("x", "y", "z"):
+                    raise Wait(f"vector: .{t.get('name')}")
+                old = self.ex(base, "Vector")
+                parts = [f"vector_break({old}).x", f"vector_break({old}).y", f"vector_break({old}).z"]
+                parts[["x", "y", "z"].index(t["name"])] = value("Float")
+                return self.store(base, lambda _t: f"vector_make({', '.join(parts)})")
             st = self.tp(base)
-            if st in self.u.struct_fields and bb.get("kind") == "DeclRefExpr":
+            if st in self.u.struct_fields:
                 fname, ft = self.u.field(st, t["name"])
-                return [f"{self.lvalue(bb)}.{fname} = {value(ft)};"]
-            raise Wait("a field inside something else is set")
+                before, var, after = self.variable_of(base, st)
+                return before + [f"{var}.{fname} = {value(ft)};"] + after
+            raise Wait(f"a member of {st} is set")
         if k in ("ArraySubscriptExpr", "CXXOperatorCallExpr"):
             if k == "CXXOperatorCallExpr":
                 if callee_name(t) != "operator[]":
@@ -1321,13 +1639,83 @@ class Emit:
                 base, idx = kids(t)[1], kids(t)[2]
             else:
                 base, idx = kids(t)
-            while bare(base).get("kind") == "ImplicitCastExpr":
-                base = kids(bare(base))[0]
+            base = self.unwrap(base) if not self.is_this(base) else base
+            if self.is_vec(base):
+                raise Wait("a component of a vector by its number is set")
             lt = self.tp(base)
             if not lt.startswith("List<"):
                 raise Wait("an entry of something that is not a list is set")
-            return [f"list_set({self.list_variable(base)}, {self.ex(idx, 'Int')}, {value(lt[5:-1])});"]
+            before, var, after = self.variable_of(base, lt)
+            return before + [f"list_set({var}, {self.ex(idx, 'Int')}, {value(lt[5:-1])});"] + after
         raise Wait(f"an assignment to {k}")
+
+    def invoke(self, g, args, obj=None):
+        """A call of one of the program's functions: (text, type) of what the C++ call returns, or
+        (None, None). What it changes - its object, what it writes through its parameters - is stored
+        back by steps before the statement being written."""
+        self.f.calls.append(g)
+        self.f.indexes = self.f.indexes or g.indexes
+        texts, backs = [], {}
+        params = g.params
+        if any(x.get("kind") == "CXXDefaultArgExpr" for x in args):
+            # an argument the call leaves out: the default the function's declaration gives it
+            decls, chain = [], g.decl
+            while chain is not None:
+                decls.append(chain)
+                chain = self.tree.decl.get(chain.get("previousDecl"))
+            filled = []
+            for i, x in enumerate(args):
+                if x.get("kind") != "CXXDefaultArgExpr":
+                    filled.append(x)
+                    continue
+                default = None
+                for dd in decls:
+                    ps = [p for p in kids(dd) if p.get("kind") == "ParmVarDecl"]
+                    if i < len(ps) and kids(ps[i]):
+                        default = kids(ps[i])[-1]
+                        break
+                if default is None:
+                    raise Wait("a call with a default argument that is declared elsewhere")
+                filled.append(default)
+            args = filled
+        if g.self_type is not None and not g.ctor:
+            if obj is None or self.is_this(obj):
+                if self.f.self_type != g.self_type:
+                    raise Wait("a method of another object is called as its own")
+                texts.append(self.self_name)
+                if g.mutates:
+                    backs["self"] = lambda v: [f"{self.self_var()} = {v};"]
+            else:
+                texts.append(self.ex(obj, g.self_type))
+                if g.mutates:
+                    backs["self"] = lambda v, o=obj: self.store(o, lambda _t: v)
+            params = params[1:]
+        if len(args) != len(params):
+            raise Wait("a call with default arguments")
+        for i, (a, (_, pt)) in enumerate(zip(args, params)):
+            texts.append(self.ex(a, pt))
+            place = i + (1 if g.self_type is not None else 0)
+            if place in g.refs:
+                backs[("ref", place)] = lambda v, o=a: self.store(o, lambda _t: v)
+        call = f"{g.name}({', '.join(texts)}).Result"
+        if not g.out_fields:
+            return None, None
+        if g.out is None:
+            _, t, src = g.out_fields[0]
+            if src == "result" or g.ctor:
+                return call, t
+            self.hoist(backs[src](call))
+            return None, None
+        tmp = self.temp("r", g.out)
+        self.hoist([f"{tmp} = {call};"])
+        got = (None, None)
+        for field, t, src in g.out_fields:
+            part = f"struct_break<{g.out}>({tmp}).{field}"
+            if src == "result":
+                got = (part, t)
+            else:
+                self.hoist(backs[src](part))
+        return got
 
     # ---- expressions ----
     def conv(self, text, have, want):
@@ -1388,6 +1776,8 @@ class Emit:
         u = self.u
         b = bare(n)
         k = b.get("kind")
+        if k == "_Text":
+            return b["_text"], b["_type"]
         if k in ("FloatingLiteral", "IntegerLiteral", "CXXBoolLiteralExpr", "CharacterLiteral"):
             t = self.tp(b)
             v = Const(u).number(b)
@@ -1442,8 +1832,11 @@ class Emit:
             raise Wait(f"a name that is {ref.get('kind')}")
         if k == "MemberExpr":
             base = kids(b)[0] if kids(b) else None
-            if base is None or bare(base).get("kind") == "CXXThisExpr":
-                raise Wait("the state of its object (a method)")
+            if base is None or self.is_this(base):
+                if self.f.self_type is None:
+                    raise Wait("the state of its object (a method)")
+                fname, ft = u.field(self.f.self_type, b["name"])
+                return f"struct_break<{self.f.self_type}>({self.self_name}).{fname}", ft
             if b.get("isArrow"):
                 raise Wait("a pointer")
             if self.is_vec(base):
@@ -1459,6 +1852,8 @@ class Emit:
             op = b.get("opcode")
             if op == "!":
                 return f"logic_not({self.bx(kids(b)[0])})", "Bool"
+            if op == "*" and self.is_this(b) and self.f.self_type is not None:
+                return self.self_name, self.f.self_type
             if op in ("*", "&"):
                 raise Wait("a pointer")
             if op == "~":
@@ -1470,9 +1865,9 @@ class Emit:
             op = b.get("opcode")
             x, y = kids(b)
             if op == "&&":
-                return f"logic_and({self.bx(x)}, {self.bx(y)})", "Bool"
+                return f"logic_and({self.bx(x)}, {self.sometimes(lambda: self.bx(y))})", "Bool"
             if op == "||":
-                return f"logic_or({self.bx(x)}, {self.bx(y)})", "Bool"
+                return f"logic_or({self.bx(x)}, {self.sometimes(lambda: self.bx(y))})", "Bool"
             if op in COMPARE:
                 tx, ty = self.tp(x), self.tp(y)
                 if tx in ("Float", "Int") and ty in ("Float", "Int") or (tx in ("Float", "Int", "Bool") and ty in ("Float", "Int", "Bool") and op not in ("==", "!=")):
@@ -1501,7 +1896,7 @@ class Emit:
             t = self.tp(b)
             if t is None:
                 raise Wait("a choice between nothing")
-            return f"logic_select<{t}>({self.bx(c)}, {self.ex(x, t)}, {self.ex(y, t)})", t
+            return f"logic_select<{t}>({self.bx(c)}, {self.sometimes(lambda: self.ex(x, t))}, {self.sometimes(lambda: self.ex(y, t))})", t
         if k == "CallExpr":
             return self.call(b)
         if k == "CXXOperatorCallExpr":
@@ -1525,7 +1920,7 @@ class Emit:
             t = self.tp(b)
             return u.zero(t), t
         if k == "CXXThisExpr":
-            raise Wait("the state of its object (a method)")
+            raise Wait("a pointer")
         if k == "LambdaExpr":
             raise Wait("a function value (lambda / std::function)")
         if k == "CXXStdInitializerListExpr":
@@ -1549,7 +1944,12 @@ class Emit:
         body = self.fx(n, leaves)
         t = self.tp(n)
         if not leaves:
-            raise Wait("a computation without inputs")
+            v = Const(self.u).number(n)   # (everything in it is known: it is its value)
+            if t == "Int":
+                return str(int(v)), "Int"
+            if t == "Bool":
+                return ("true" if v else "false"), "Bool"
+            return flit(f32_decimal(v) if self.ctype(bare(n)) == "float" else v), "Float"
         params = ", ".join(f"Float {p}" for p in leaves.values())
         text = f"kern::formula([]({params}) -> Float {{ return {body}; }}, {', '.join(leaves)})"
         if t == "Int":
@@ -1622,12 +2022,12 @@ class Emit:
             if op in COMPARE and self.numeric(x) and self.numeric(y):
                 return f"({self.fx(x, leaves)} {op} {self.fx(y, leaves)})"
             if op in ("&&", "||"):
-                return f"({self.fx(x, leaves)} {op} {self.fx(y, leaves)})"
+                return f"({self.fx(x, leaves)} {op} {self.sometimes(lambda: self.fx(y, leaves))})"
             if op in ("&", "|", "^", "<<", ">>"):
                 raise Wait("bit arithmetic (& | ^ << >>)")
         if k == "ConditionalOperator":
             c, x, y = kids(b)
-            return f"({self.fb(c, leaves)} ? {self.fx(x, leaves)} : {self.fx(y, leaves)})"
+            return f"({self.fb(c, leaves)} ? {self.sometimes(lambda: self.fx(x, leaves))} : {self.sometimes(lambda: self.fx(y, leaves))})"
         if k == "CallExpr" and all(self.numeric(a) for a in kids(b)[1:]) and (callee_name(b) in MATH or callee_name(b) in ("hypot", "clampf", "lerp", "sign0")):
             name = callee_name(b)
             if name in ("clamp", "clampf") and len(kids(b)) == 4:
@@ -1662,7 +2062,7 @@ class Emit:
         if k == "BinaryOperator" and b.get("opcode") in COMPARE + ("&&", "||") and all(self.numeric(c) for c in kids(b)):
             x, y = kids(b)
             if b["opcode"] in ("&&", "||"):
-                return f"({self.fb(x, leaves)} {b['opcode']} {self.fb(y, leaves)})"
+                return f"({self.fb(x, leaves)} {b['opcode']} {self.sometimes(lambda: self.fb(y, leaves))})"
             return f"({self.fx(x, leaves)} {b['opcode']} {self.fx(y, leaves)})"
         if k == "UnaryOperator" and b.get("opcode") == "!":
             return f"(!{self.fb(kids(b)[0], leaves)})"
@@ -1693,6 +2093,11 @@ class Emit:
             defaulted = True
         else:
             defaulted = False
+        if ref.get("id") in self.tree.body and name not in ("length", "dot", "cross", "distance", "normalize", "lerp", "length_sq", "distance_sq"):
+            got = self.invoke(u.function(ref["id"]), kids(b)[1:])
+            if got[0] is None:
+                raise Wait("a call without a result as a value")
+            return got
         vec = [self.is_vec(x) for x in a]
         if name == "isfinite" and len(a) == 1 and self.numeric(a[0]):
             x = self.ex(a[0], "Float")
@@ -1738,18 +2143,22 @@ class Emit:
             raise Wait(f"call: {name}()")
         if defaulted:
             raise Wait("a call with default arguments")
-        g = u.function(ref["id"])
-        self.f.calls.append(g)
-        self.f.indexes = self.f.indexes or g.indexes
-        if g.result is None:
+        got = self.invoke(u.function(ref["id"]), a)
+        if got[0] is None:
             raise Wait("a call without a result as a value")
-        if not g.pure:
-            raise Wait("a call that changes something, inside an expression")
-        return f"{g.name}({self.args(b, g)}).Result", g.result
+        return got
 
     def operator(self, b):
         name = b.get("_op") or callee_name(b)
         ops = kids(b)[1:]
+        ref = callee(b).get("referencedDecl", {}) if not b.get("_op") else {}
+        if ref.get("id") in self.tree.body:   # an operator the program itself defines
+            d = self.tree.body[ref["id"]]
+            g = self.u.function(ref["id"])
+            got = self.invoke(g, ops[1:], obj=ops[0]) if d.get("kind") == "CXXMethodDecl" else self.invoke(g, ops)
+            if got[0] is None:
+                raise Wait("an operator without a result as a value")
+            return got
         if all(self.is_vec(x) or self.numeric(x) for x in ops) and any(self.is_vec(x) for x in ops):
             v = [self.is_vec(x) for x in ops]
             if name in ("operator+", "operator+=") and v == [True, True]:
@@ -1817,6 +2226,14 @@ class Emit:
             if b.get("kind") != "InitListExpr":
                 if len(a) == 1 and self.tp(a[0]) == t:
                     return self.ex(a[0], t), t
+                q = next((x for x, n_ in u.structs.items() if n_ == t), None)
+                rec = self.tree.records.get(q, {})
+                want = b.get("ctorType", {}).get("qualType")
+                for c in kids(rec):   # the constructor the class itself has for these arguments
+                    if c.get("kind") == "CXXConstructorDecl" and not c.get("isImplicit") and qtype(c) == want or (c.get("kind") == "CXXConstructorDecl" and not c.get("isImplicit") and c.get("type", {}).get("qualType") == want):
+                        if c["id"] not in self.tree.body:
+                            raise Wait(f"a {t} made by a constructor that is defined in another file")
+                        return self.invoke(u.function(c["id"]), kids(b))
                 if a:
                     raise Wait(f"a {t} made by a constructor")
                 return u.zero(t), t
@@ -1851,7 +2268,14 @@ class Emit:
         m = callee(b)
         base = kids(m)[0] if kids(m) else None
         name = m.get("name")
-        if base is None or bare(base).get("kind") == "CXXThisExpr":
+        if m.get("referencedMemberDecl") in self.tree.decl or m.get("referencedMemberDecl") in self.tree.body:
+            if m.get("isArrow") and not self.is_this(base):
+                raise Wait("a pointer")
+            got = self.invoke(self.u.function(m["referencedMemberDecl"]), kids(b)[1:], obj=base)
+            if got[0] is None:
+                raise Wait("a call without a result as a value")
+            return got
+        if base is None or self.is_this(base):
             raise Wait("the state of its object (a method)")
         bt = self.tp(base)
         a = kids(b)[1:]
@@ -1894,11 +2318,55 @@ class TestWriter:
         self.path = unit.tree.path
         self.source_dir = source_dir
         self.helpers = collections.OrderedDict()   # struct (qualified) -> its helper functions
+        self.outs = []             # the test's own structs
+        self.open_private = False  # the test reaches data behind private: (it reads the headers with private as public)
 
     def local(self, q):
         """Is this type declared in the source file itself (and so copied into the test)?"""
         d = self.tree.records.get(q) or self.tree.enums.get(q)
         return d is not None and os.path.abspath(d.get("_file", "")) == self.path
+
+    def access(self, q):
+        """How the test reaches a class's data: "public", "open" (behind private: or protected: - the
+        test opens those), "closed" (hidden by the word class itself)."""
+        o = self.tree.records[q]
+        cur, explicit, worst = ("private" if o.get("tagUsed") == "class" else "public"), False, "public"
+        for c in kids(o):
+            if c.get("kind") == "AccessSpecDecl":
+                cur, explicit = c.get("access", "public"), True
+            elif c.get("kind") == "FieldDecl" and cur != "public":
+                worst = "open" if explicit and worst != "closed" else "closed"
+        return worst
+
+    def method_access(self, q, d):
+        ids = {d["id"]}
+        pd = d.get("previousDecl")
+        while pd:
+            ids.add(pd)
+            pd = self.tree.decl.get(pd, {}).get("previousDecl")
+        o = self.tree.records[q]
+        cur, explicit = ("private" if o.get("tagUsed") == "class" else "public"), False
+        for c in kids(o):
+            if c.get("kind") == "AccessSpecDecl":
+                cur, explicit = c.get("access", "public"), True
+            elif c.get("id") in ids:
+                if cur == "public":
+                    return "public"
+                if explicit:
+                    self.open_private = True
+                    return "open"
+                return "closed"
+        return "public"
+
+    def plain_struct(self, name, fields):
+        """A struct of the test itself (what a call gives and changes), with what the comparison needs."""
+        lines = [f"struct {name} {{ " + " ".join(f"{t} {f};" for f, t in fields) + " };"]
+        lines.append(f"[[maybe_unused]] static bool same(const {name}& want, const converted::Value& got) {{ return got.rows && got.rows->size() == {len(fields)}"
+                     + "".join(f" && same(want.{f}, (*got.rows)[{i}])" for i, (f, _) in enumerate(fields)) + "; }")
+        lines.append(f"[[maybe_unused]] static bool defined(const {name}& s) {{ return " + " && ".join(f"defined(s.{f})" for f, _ in fields) + "; }")
+        lines.append(f"[[maybe_unused]] static void flat(const {name}& s, std::vector<kern::f64>& o) {{ " + " ".join(f"flat(s.{f}, o);" for f, _ in fields) + " }")
+        lines.append(f"[[maybe_unused]] static std::string text(const {name}& s) {{ return std::string(\"{{\") + " + ' + ", " + '.join(f"text(s.{f})" for f, _ in fields) + ' + "}"; }')
+        self.outs += lines
 
     def spell(self, raw):
         c = self.u.clean(raw)
@@ -1907,10 +2375,19 @@ class TestWriter:
             return q.split("::")[-1] if self.local(q) else "::" + self.tree.namespace + "::" + q.lstrip(":")
         if c in NUMBER or c.startswith("kern::"):
             return c
+        if (c in TEXT or c.startswith("std::basic_string<char")) and "string_view" not in c and "*" not in c:
+            return "std::string"
+        m = re.match(r"std::vector<(.+)>$", c)
+        if m:
+            return f"std::vector<{self.spell(m.group(1).split(', std::allocator')[0])}>"
         raise Wait(f"the test has no values of {c}")
 
     def draw(self, raw):
         c = self.u.clean(raw)
+        m = re.match(r"std::vector<(.+)>$", c)
+        if m:
+            inner = m.group(1).split(", std::allocator")[0]
+            return f"draw_list(draw, [&]() -> {self.spell(inner)} {{ return {self.draw(inner)}; }})" if self.u.clean(inner) != "bool" else "draw_list(draw, [&] { return draw.flag(); })"
         if c in ("float", "double"):
             return "draw.number()"
         if c == "bool":
@@ -1921,6 +2398,10 @@ class TestWriter:
             return "draw.vector()"
         if c == "kern::Vec2":
             return "draw.vector2()"
+        if c in TEXT or c.startswith("std::basic_string<char"):
+            if "string_view" in c:
+                raise Wait("the test has no values of std::string_view")
+            return "draw.word()"
         q = self.u.find_type(c)
         if q in self.tree.enums:
             return f"static_cast<{self.spell(raw)}>(draw.below({len(self.u.enum_values[self.u.enums[q]])}))"
@@ -1932,6 +2413,9 @@ class TestWriter:
         c = self.u.clean(raw)
         if c in NUMBER or c in ("kern::Vec3", "kern::Vec2") or raw.strip() in ("const char *", "const char *const") or c in TEXT or c.startswith("std::basic_string<char"):
             return True
+        m = re.match(r"std::vector<(.+)>$", c)
+        if m:
+            return self.comparable(m.group(1).split(", std::allocator")[0])
         q = self.u.find_type(c)
         if q in self.tree.enums:
             return True
@@ -1948,20 +2432,38 @@ class TestWriter:
             return name
         self.helpers[q] = None
         o = self.tree.records[q]
-        t = self.spell(q if not q.startswith("::") else q)
-        fields = [(c["name"], qtype(c)) for c in kids(o) if c.get("kind") == "FieldDecl"]
-        for _, ft in fields:
-            self.comparable(ft)
-        lines = [f"[[maybe_unused]] static {t} {name}(converted::Draw& draw) {{", f"  {t} s{{}};"]
-        lines += [f"  s.{f} = {self.draw(ft)};" for f, ft in fields]
+        acc = self.access(q)
+        ctors = [c for c in kids(o) if c.get("kind") == "CXXConstructorDecl" and not c.get("isImplicit")]
+        if ctors and not any(not [p for p in kids(c) if p.get("kind") == "ParmVarDecl"] for c in ctors):
+            del self.helpers[q]
+            raise Wait("the test cannot make an object of a class without a default constructor")
+        if acc == "closed":
+            del self.helpers[q]
+            raise Wait("its data is private to the class")
+        if acc == "open":
+            self.open_private = True
+        try:
+            t = self.spell(q)
+            fields = [(c["name"], qtype(c)) for c in kids(o) if c.get("kind") == "FieldDecl"]
+            for _, ft in fields:
+                if "&" in ft:
+                    raise Wait("the test cannot make an object that holds a reference")
+                self.comparable(ft)
+            lines = [f"[[maybe_unused]] static {t} {name}(converted::Draw& draw) {{", f"  {t} s{{}};"]
+            lines += [f"  s.{f} = {self.draw(ft)};" for f, ft in fields]
+        except Wait:
+            del self.helpers[q]
+            raise
         lines += ["  return s;", "}"]
         lines.append(f"[[maybe_unused]] static converted::Value arg(const {t}& s) {{ using converted::arg; return converted::Value::structure({{{', '.join(f'arg(s.{f})' for f, _ in fields)}}}); }}")
         lines.append(f"[[maybe_unused]] static bool same(const {t}& want, const converted::Value& got) {{ using converted::same; return got.rows && got.rows->size() == {len(fields)}"
                      + "".join(f" && same(want.{f}, (*got.rows)[{i}])" for i, (f, _) in enumerate(fields)) + "; }")
         lines.append(f"[[maybe_unused]] static {t} near({t} s, int k, int slot) {{ using converted::near; " + " ".join(f"s.{f} = near(s.{f}, k, slot * 7 + {i});" for i, (f, _) in enumerate(fields)) + " return s; }")
         lines.append(f"[[maybe_unused]] static bool defined(const {t}& s) {{ using converted::defined; return " + " && ".join(f"defined(s.{f})" for f, _ in fields) + "; }")
+        lines.append(f"[[maybe_unused]] static void flat(const {t}& s, std::vector<kern::f64>& o) {{ using converted::flat; " + " ".join(f"flat(s.{f}, o);" for f, _ in fields) + " }")
         lines.append(f"[[maybe_unused]] static std::string text(const {t}& s) {{ using converted::text; return std::string(\"{{\") + " + ' + ", " + '.join(f"text(s.{f})" for f, _ in fields) + ' + "}"; }')
         self.helpers[q] = (lines, self.local(q), q)
+        self.helpers.move_to_end(q)   # (after the helpers of the structs it is made of)
         return name
 
     def write(self):
@@ -1997,17 +2499,24 @@ class TestWriter:
             scope = [x for x in tree.scope_of.get(d["id"], "").split("::") if x]
             if scope and not any(x in u.short and any(q in tree.records for q in u.short[x]) for x in scope):
                 spaces.add("::".join(scope))
-            if tree.owner.get(d["id"]):
-                skipped.append((f, "a method"))
+            owner = tree.owner.get(d["id"])
+            if owner and f.self_type is None:
+                skipped.append((f, "a method that does not use its object"))
                 continue
-            if in_file and (not declared_in_header or not linked):
+            if owner:
+                # a method: called on a drawn object of its class. Its C++ is the class's own where the tests
+                # link the source or the class is copied with it; otherwise the definition is copied.
+                if in_file and (self.local(owner) or not linked):
+                    a, b = d["_at"]
+                    copies.append((a, src[a:b]))
+            elif in_file and (not declared_in_header or not linked):
                 a, b = d["_at"]
                 copies.append((a, src[a:b]))
                 if declared_in_header:
                     renames.append(d["name"])
                     call = d["name"] + "_as_written"
-            if not f.pure or f.result is None:
-                skipped.append((f, "it changes something"))
+            if f.result is None:
+                skipped.append((f, "it gives nothing"))
                 continue
             if f.indexes:
                 # (C++ reads beside an array where the Blueprint gives the type's zero value; which places
@@ -2016,28 +2525,70 @@ class TestWriter:
                 continue
             try:
                 params = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
-                decls, names = [], []
-                for i, p in enumerate(params):
+                decls, names, types = [], [], []
+                if owner:
+                    if self.method_access(owner, d) == "closed":
+                        raise Wait("the method is private to its class")
+                    self.struct(owner)
+                    types.append(self.spell(owner))
+                    decls.append(f"const {types[-1]} a0 = {self.struct(owner)}(draw);")
+                    names.append("a0")
+                for p in params:
                     self.comparable(qtype(p))
-                    decls.append(f"const {self.spell(qtype(p))} a{i} = {self.draw(qtype(p))};")
-                    names.append(f"a{i}")
-                self.comparable(qtype(d).split("(")[0].strip())
+                    types.append(self.spell(qtype(p)))
+                    decls.append(f"const {types[-1]} a{len(names)} = {self.draw(qtype(p))};")
+                    names.append(f"a{len(names)}")
+                ret = qtype(d).split("(")[0].strip()
+                if f.value is not None:
+                    self.comparable(ret)
+                plain = not owner and not f.refs
+                if not plain:
+                    # what the C++ call gives and changes, in the order of the Blueprint function's results
+                    first = 1 if owner else 0
+                    parts = {"self": "a0", "result": "r"}
+                    for place in f.refs:
+                        parts[("ref", place)] = f"a{place}"
+                    fields = [(n, types[0] if src_ == "self" else self.spell(ret) if src_ == "result" else types[src_[1]]) for n, _, src_ in f.out_fields]
+                    target = ("a0." if owner else "") + (d["name"] if owner else call)
+                    body = f"{'const auto r = ' if f.value is not None else ''}{target}({', '.join(names[first:])});"
+                    if f.out is not None:
+                        out_t = f"Out_{f.name}"
+                        self.plain_struct(out_t, fields)
+                        give = f"return {out_t}{{{', '.join(parts[src_] for _, _, src_ in f.out_fields)}}};"
+                    else:
+                        give = f"return {parts[f.out_fields[0][2]]};"
+                    run = f"const auto run = [&]({', '.join(f'{t} {n}' for t, n in zip(types, names))}) {{ {body} {give} }};"
             except Wait as w:
                 skipped.append((f, str(w)))
                 continue
             shown = ' + ", " + '.join(f"text({n})" for n in names) if names else 'std::string()'
-            cases.append("\n".join([
-                f"  {{  // {f.cpp}",
-                f'    converted::Tally tally("{f.name}");',
-                "    for (int i = 0; i < converted::kCalls; ++i) {",
-                *[f"      {x}" for x in decls],
-                "      const converted::Watch watch;",
-                f"      const auto want = {call}({', '.join(names)});",
-                "      const bool outside = watch.outside();",
-                f"      tally.take(bp, {{{', '.join(f'arg({n})' for n in names)}}}, want, wide::{d['name']}({', '.join(f'wide_arg({n})' for n in names)}), outside, [&] {{ return {shown}; }}, "
-                f"[&]([[maybe_unused]] int k) {{ return {call}({', '.join(f'near({n}, k, {i})' for i, n in enumerate(names))}); }});",
-                "    }",
-                "  }"]))
+            if plain:
+                cases.append("\n".join([
+                    f"  {{  // {f.cpp}",
+                    f'    converted::Tally tally("{f.name}");',
+                    "    for (int i = 0; i < converted::kCalls; ++i) {",
+                    *[f"      {x}" for x in decls],
+                    "      const converted::Watch watch;",
+                    f"      const auto want = {call}({', '.join(names)});",
+                    "      const bool outside = watch.outside();",
+                    f"      tally.take(bp, {{{', '.join(f'arg({n})' for n in names)}}}, want, wide::{d['name']}({', '.join(f'wide_arg({n})' for n in names)}), outside, [&] {{ return {shown}; }}, "
+                    f"[&]([[maybe_unused]] int k) {{ return {call}({', '.join(f'near({n}, k, {i})' for i, n in enumerate(names))}); }});",
+                    "    }",
+                    "  }"]))
+            else:
+                cases.append("\n".join([
+                    f"  {{  // {f.cpp}",
+                    f'    converted::Tally tally("{f.name}");',
+                    f"    {run}",
+                    "    for (int i = 0; i < converted::kCalls; ++i) {",
+                    *[f"      {x}" for x in decls],
+                    "      const converted::Watch watch;",
+                    f"      const auto want = run({', '.join(names)});",
+                    "      const bool outside = watch.outside();",
+                    f"      tally.take(bp, {{{', '.join(f'arg({n})' for n in names)}}}, want, want, outside, [&] {{ return {shown}; }}, "
+                    f"[&]([[maybe_unused]] int k) {{ return run({', '.join(f'near({n}, k, {i})' for i, n in enumerate(names))}); }});",
+                    "    }",
+                    "  }"]))
         if not cases:
             return None, skipped
         for i, (name, t) in u.variables.items():
@@ -2063,9 +2614,18 @@ class TestWriter:
                 continue
             else:
                 merged.append((a, t))
-        includes = []
+        system, own = ["#include <cfenv>", "#include <cmath>", "#include <cstdio>", "#include <string>", "#include <type_traits>", "#include <vector>"], []
         for m in re.finditer(r'^#include\s+(["<])([^">]+)[">]', src, re.M):
-            includes.append(f'#include "{self.source_dir}/{m.group(2)}"' if m.group(1) == '"' and not m.group(2).startswith("kern/") else f"#include {m.group(1)}{m.group(2)}{'>' if m.group(1) == '<' else chr(34)}")
+            if m.group(1) == "<":
+                if f"#include <{m.group(2)}>" not in system:
+                    system.append(f"#include <{m.group(2)}>")
+            elif m.group(2).startswith("kern/"):
+                own.append(f'#include "{m.group(2)}"')
+            else:
+                own.append(f'#include "{self.source_dir}/{m.group(2)}"')
+        opened = ["// (the test sets the data of objects and calls methods a class keeps to itself: it reads the headers with private as public)",
+                  "#define private public", "#define protected public"] if self.open_private else []
+        includes = system + opened + own
         out = [f"// Generated by tools/cpp_to_blueprint.py from {os.path.basename(self.path)} - do not edit. The Blueprint \"{u.name}\" of the level",
                "// is this file's C++, converted; here every converted function runs next to the C++ it was read from.",
                *includes, '#include "../converted.h"', "",
@@ -2081,8 +2641,8 @@ class TestWriter:
             out += ([f"namespace {ns} {{"] if ns else []) + lines + ([f"}}  // namespace {ns}"] if ns else [])
         # (the file's own `using` lines: its copied code is written with them)
         usings = [m.group(0).strip() for m in re.finditer(r"^using\s+[^;\n]+;", src, re.M)]
-        out += [f"namespace {space} {{", "using namespace converted;", "using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::near;",
-                *[f"using ::{tree.namespace}{'::' + ns if ns else ''}::{fn};" for ns in outer for fn in ("arg", "same", "defined", "text", "near")],
+        out += [f"namespace {space} {{", "using namespace converted;", "using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::near; using converted::flat;",
+                *[f"using ::{tree.namespace}{'::' + ns if ns else ''}::{fn};" for ns in outer for fn in ("arg", "same", "defined", "text", "near", "flat")],
                 *[f"using namespace ::{tree.namespace}::{x};" for x in sorted(spaces)], *usings]
         if merged:
             out += ["", f"// ---- {os.path.basename(self.path)}, as it stands ----", '#pragma GCC diagnostic push', '#pragma GCC diagnostic ignored "-Wunused-function"',
@@ -2094,6 +2654,7 @@ class TestWriter:
         for q, h in self.helpers.items():
             if h and h[1]:
                 out += h[0]
+        out += self.outs
         wide_consts.sort()
         seen_at = set()
         out += ["", "// ---- the same functions with 64-bit numbers, as a Blueprint computes ----", "namespace wide {", "using f32 = double;",

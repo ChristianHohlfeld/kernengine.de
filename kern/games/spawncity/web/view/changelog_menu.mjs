@@ -7,6 +7,9 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-12",time:"20:37",title:"Der Konverter schreibt jetzt auch Objekte",items:[
+    "Unter der Haube: Der Konverter, der den Code des Spiels als Blueprints schreibt, kann jetzt Klassen: Ihre Daten werden eine Struktur, ihre Methoden Funktionen darüber. Dazu Schleifen mit Abbruch und Konstruktoren. Damit stehen 127 Funktionen aus 41 Dateien als Blueprints im Level – etwa das Kamerawackeln und die Touch-Steuerung. Am Spiel ändert sich dadurch nichts.",
+  ]},
   {date:"2026-11-12",time:"18:40",title:"Ein Konverter schreibt den Code des Spiels als Blueprints",items:[
     "Unter der Haube: Ein Konverter liest den C++-Code des Spiels und schreibt ihn als Blueprints ins Level. Die ersten 90 Funktionen aus 36 Dateien stehen dort jetzt – Kameraformeln, Geländefarben, Batterie der Drohne, Straßenbreiten und mehr. Am Spiel ändert sich dadurch nichts.",
     "Die umgeschriebenen Funktionen werden gegen ihren bisherigen Code geprüft: gleiche Eingaben, gleiches Ergebnis – im Interpreter und als kompilierter Code.",

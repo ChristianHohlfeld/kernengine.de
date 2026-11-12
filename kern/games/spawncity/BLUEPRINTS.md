@@ -351,23 +351,31 @@ und schreibt sie in der Schreibweise:
   Blueprint rechnet (der Test übersetzt die Funktion dafür ein zweites Mal mit `f32` als
   `double`): Wo der 32-Bit-Lauf unterwegs Stellen verliert (eine Schleife, die aufaddiert, ein
   Produkt mit einer großen Zahl), ist der Blueprint der 64-Bit-Lauf. Verlässt das C++ die Zahlen
-  (Division durch null, Wurzel aus Negativem), wird nichts verglichen; an einem Sprung einer
-  Funktion (Schwelle, Umbruch eines Winkels) entscheiden die Nachbarn des Arguments, auf welcher
-  Seite ein Aufruf liegt.
+  (Division durch null, Wurzel aus Negativem), wird nichts verglichen; und wo das
+  letzte Bit eines Arguments im C++ selbst das Ergebnis verschiebt (an einer Schwelle, am Umbruch
+  eines Winkels, im Sinus einer großen Zahl), gilt als gleich, was dort liegt, wo die
+  C++-Ergebnisse der Nachbarn des Arguments liegen. Methoden werden auf einem gewürfelten Objekt
+  ihrer Klasse aufgerufen; verglichen wird alles, was der Aufruf gibt und ändert.
 - Eine Funktion wird geschrieben, wenn alles in ihr einen Platz in der Schreibweise hat – und
   alles, was sie aufruft. Die anderen bleiben C++, bis der Konverter oder die Sprache den Platz
   hat. Der Lauf nennt, worauf sie warten, nach Zeilen geordnet.
 
-Stand (12.11.2026): 90 von 1.428 Funktionen (365 von 28.607 Zeilen) aus 36 von 77 Dateien stehen
-als Blueprints im Level (36 Actors im Ordner „Source“). Mit den Hilfsfunktionen aus Headern, die
-in den Blueprints stehen, sind es 94; 72 davon vergleicht der Test mit ihrem C++, 22 nicht:
-16 sind Methoden ohne Zustand, 3 lesen ein Feld an einer berechneten Stelle (das
-C++ liest daneben, wo der Blueprint den Nullwert gibt – der Test kennt den gültigen Bereich
-nicht), 3 haben Text oder Listen als Ein- oder Ausgang, für die der Test noch keine Werte hat.
-Das Spiel führt für diese Dateien weiter ihr C++ aus (Stufe 5). Worauf die anderen warten, nach
-Zeilen: der Zustand ihres Objekts (Methoden: 827 Funktionen, 23.937 Zeilen), Parameter, durch
-die sie schreiben (87, 1.187), Zeiger (42, 372), Listen von Listen, 32-Bit-Überlauf und
-Bit-Arithmetik (49, 274), Typen der Engine ohne Wert in der Sprache.
+Stand (12.11.2026, mit Objekten): 127 von 1.428 Funktionen (631 von 28.607 Zeilen) aus 41 von 77
+Dateien stehen als Blueprints im Level (41 Actors im Ordner „Source“). 104 Funktionen vergleicht
+der Test mit ihrem C++; nicht verglichen sind 33: 17 Methoden, die ihr Objekt nicht benutzen, 6,
+die ein Feld an einer berechneten Stelle lesen (das C++ liest daneben, wo der Blueprint den
+Nullwert gibt – der Test kennt den gültigen Bereich nicht), 5, deren Klasse der Test nicht bauen
+kann (kein Default-Konstruktor, eine Referenz als Feld), 5 mit festen Feldern oder `char*` als
+Ein- oder Ausgang. (Die Zählung der Tests schließt Hilfsfunktionen aus Headern ein, die in den
+Blueprints stehen.) Das Spiel führt für diese Dateien weiter ihr C++ aus (Stufe 5).
+
+Worauf die anderen warten, nach Zeilen: Fast alles hängt am Zustand einer Klasse, der noch
+keine Struktur sein kann – `Game` (323 Funktionen, 13.534 Zeilen: besitzende Zeiger, Typen der
+Engine), Klassen mit einem Zeiger auf die Welt, den Renderer oder den Mixer der Engine (`Life`,
+`PeopleArt`, `Destruction`, `Interiors`, `Ragdolls` …: zusammen rund 3.500 Zeilen), `Terrain` und
+`CityStream` (Vec4: 2.000 Zeilen), `Session` (Netz der Engine: 664), Strukturen mit mehr als 32
+Feldern (`Person`, `JetSpec`: 774). Dazu Zeiger (735), Listen von Listen, Lambdas, 32-Bit-Überlauf
+und Bit-Arithmetik (381), Aufrufe der Regel-Blueprints (`logic::Value`: 468).
 
 Aufruf (in `kern/games/spawncity`):
 
@@ -375,18 +383,29 @@ Aufruf (in `kern/games/spawncity`):
         -I../../include -I../../third_party/box3d/include -Isrc -- src/*.cpp
 
 Was als Nächstes dazukommt, in der Reihenfolge der Zeilen, die darauf warten:
-1. [ ] **Objekte:** Die Daten einer Klasse sind eine Struktur, ihre Methoden Funktionen über diesen
+1. [x] **Objekte:** Die Daten einer Klasse sind eine Struktur, ihre Methoden Funktionen über diesen
    Wert (`Shake_add(self, amount)` gibt das geänderte `self` zurück). Parameter, durch die eine
-   Funktion schreibt (`f32& out`), sind weitere Ergebnisse. Konstruktoren sind Funktionen, die
-   den Wert bauen.
+   Funktion schreibt (`f32& out`), sind weitere Ergebnisse; gibt eine Funktion mehreres zurück, ist
+   ihr Ergebnis eine Struktur (`Shake_sample_out`). Der Aufrufer speichert zurück, was sich
+   geändert hat – auch in ein Feld, eine Komponente eines Vektors oder einen Eintrag einer Liste,
+   Ebene für Ebene. Konstruktoren sind Funktionen, die den Wert bauen (`Projector_new`);
+   Default-Argumente stehen beim Aufruf.
 2. [ ] **Lambdas:** eine lokale Funktion wird eine Funktion des Blueprints; was sie fängt, sind
    ihre Eingänge, was sie davon ändert, ihre Ergebnisse.
-3. [ ] **Schleifen mit `break` / `continue`,** `do-while`, Referenzen auf Einträge einer Liste.
+3. [x] **Schleifen mit `break` / `continue`** (Flags, die den Rest des Durchlaufs überspringen),
+   `do-while`, Schleifen, die die Einträge ihrer Liste ändern (der Eintrag ist eine lokale
+   Variable und wird am Ende des Durchlaufs zurückgespeichert), `a = b = c`.
 4. [ ] **Sprache:** ganze Zahlen in 32 Bit mit Überlauf und Bit-Arithmetik (Hashes, Paketformate);
    Drehung (Quat) und Matrix als Werte; Vec4; Maps; Text formatieren und zerlegen; Listen:
-   einfügen, löschen, sortieren, suchen.
+   einfügen, löschen, sortieren, suchen, Listen von Listen; Strukturen mit mehr als 32 Feldern.
+   Zeiger: ein Zeiger auf ein Objekt des Spiels ist sein Platz in einer Liste oder ein Actor.
 5. [ ] **Aufrufe zwischen Blueprints als Werte:** eine reine Funktion eines anderen Blueprints
-   ohne Umweg über einen Schritt (heute: Call on Actor).
+   ohne Umweg über einen Schritt (heute: Call on Actor) – damit rufen umgeschriebene Funktionen die
+   Regel-Blueprints der Stufe 3 direkt auf, wo das C++ heute über `blueprint_call.h` geht, und
+   Funktionen anderer Dateien.
+5a. [ ] **Der Zustand des Spiels:** `Game` und die Systeme, die es einmal gibt (Gelände,
+   Stadt, Leben, Sitzung), sind Blueprints mit Variablen statt Strukturen; ihre Methoden ändern
+   diese Variablen. Kleine Klassen, die es oft gibt, bleiben Strukturen in Listen.
 6. [ ] **Die Engine als Knoten:** was die Quellen von der Engine aufrufen – Physik (Körper,
    Gelenke, Abfragen), Kamera, Renderer und Meshes, Netz, Ton, Zeit –, allgemein und für jedes
    Spiel.
