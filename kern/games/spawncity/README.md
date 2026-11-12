@@ -88,14 +88,12 @@ des SpawnCity-HUDs); ARM in der Luft startet die kontrollierte Landung (`simulat
 
 ```
 kern/games/spawncity/
-  firmware/       Arondight45-Flugregler, unverändert aus spawncity-de/esp32 (Core, StateControl,
-                  HardwareSensors, FirmwareRuntime) – dieselbe Quelle wie auf dem ESP32
+  (Auto, Drohne mit dem Arondight45-Flugregler und Jet sind Module der Engine:
+   kern/include/kern/game/vehicles, kern/src/game/vehicles – die Firmware unverändert aus
+   spawncity-de/esp32 unter kern/src/game/vehicles/firmware)
   src/
     main.cpp      kern::App (Renderer-Optionen, NightWindows) und die sc_*-Exporte für die Seite
     game.*        das Spiel: Level, Modi, Eingabe, fester Physikschritt, Kameras, HUD-JSON
-    drone.*       Quad-Strecke (Motor/Prop/Akku/IMU/NAV/SBUS) + Firmware bei ~1 kHz
-    jet.*         6-DoF-Aerodynamik, Triebwerk, RCS, Fahrwerk, Fly-by-Wire (Port von jet_flight_dynamics.mjs)
-    car.*         Fahrzeugmodell (Reifen, Lenkung, Antrieb aus world_vehicle_dynamics.mjs) auf Raycast-Fahrwerk
     mvt.*         Mapbox-Vector-Tile-Decoder (zeitgeteilt) + kleiner Writer (Tests)
     tiles.*       Kachelmathematik, OpenMapTiles-Ebenen → Gebäude/Straßen/Flächen, prozedurale Ersatzstadt
     terrain.*     Gelände (M3): Terrarium-Höhen → Bare-Earth-Raster, Wasserbecken, Krater, Bodenkacheln
@@ -746,7 +744,7 @@ CI (`node kern/games/spawncity/tests/smoke.mjs` nach dem Build, Screenshots als 
 
 ## Lizenzen und Namensnennung
 
-* Spielcode: Apache License 2.0 wie Kern. Die Firmware unter `firmware/` stammt aus SpawnCity
+* Spielcode: Apache License 2.0 wie Kern. Die Firmware des Flugreglers (`kern/src/game/vehicles/firmware/`) stammt aus SpawnCity
   (`nostack-dev/spawncity-de/esp32`, Christian Hohlfeld) und steht hier ebenfalls unter Apache 2.0.
 * Kartendaten: © OpenStreetMap-Mitwirkende, ODbL 1.0; Vektorkacheln von OpenFreeMap im
   OpenMapTiles-Schema (© OpenMapTiles). Die Namensnennung steht dauerhaft im Spiel (rechts unten).

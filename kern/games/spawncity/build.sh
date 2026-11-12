@@ -11,8 +11,8 @@
 #   generated/spawncity.html  everything inlined (modules + wasm as base64): runs from file:// or
 #                          any static host
 #
-# kern/build.sh keys its object cache on Kern's own headers only; the game's headers (src/*.h,
-# firmware/*.hpp) go into the flags as a hash, so a header change rebuilds the game's objects.
+# kern/build.sh keys its object cache on Kern's own headers only; the game's headers (src/*.h)
+# go into the flags as a hash, so a header change rebuilds the game's objects.
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd "$here/../../.." && pwd)"
@@ -29,7 +29,7 @@ if [ "$skip_wasm" = 0 ]; then
   # Each game source compiles through a generated wrapper that names the hashes of the game's
   # headers and of the source: kern/build.sh hashes the wrapper's text, so a change recompiles the
   # game's objects only (a -D flag would change the flags key and rebuild the whole engine).
-  header_hash="$(find "$here/src" "$here/firmware" -name '*.h' -o -name '*.hpp' | sort | xargs cat | sha256sum | cut -c1-16)"
+  header_hash="$(find "$here/src" -name '*.h' | sort | xargs cat | sha256sum | cut -c1-16)"
   # One wrapper folder per checkout (parallel builds of several worktrees must not share it).
   wrap="${TMPDIR:-/tmp}/spawncity-wrap-$(printf '%s' "$here" | sha256sum | cut -c1-12)"
   rm -rf "$wrap" && mkdir -p "$wrap"

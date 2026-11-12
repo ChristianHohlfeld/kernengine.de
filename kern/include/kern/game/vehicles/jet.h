@@ -13,10 +13,9 @@
 // Body frame: +X right wing, +Y nose, +Z up.
 #pragma once
 
-#include "common.h"
-#include "rigid_spec.h"
+#include "kern/game/vehicles/base.h"
 
-namespace sc {
+namespace kern::game::vehicles {
 
 struct JetSpec {
   f32 mass = 12000;
@@ -96,4 +95,4 @@ class Jet {
 
 f32 air_density(f32 h);
 
-}  // namespace sc
+}  // namespace kern::game::vehicles

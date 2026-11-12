@@ -1,7 +1,7 @@
 // SpawnCity's vehicle dynamics on a ray-cast chassis (see car.h).
-#include "car.h"
+#include "kern/game/vehicles/car.h"
 
-namespace sc {
+namespace kern::game::vehicles {
 
 namespace {
 constexpr f32 kKappaPeak = 0.1f, kSlideGrip = 0.78f, kLoadSensitivity = 0.15f, kVReg = 2, kTcsSlip = 0.11f, kAbsSlip = 0.11f;
@@ -124,15 +124,15 @@ void Car::attach(kern::physics::World& world, kern::physics::Body chassis) {
     ground.material.density = s.wheel_mass / volume;
     ground.material.friction = 0;
     ground.material.restitution = 0;
-    ground.material.category_bits = kCatVehicle;
-    ground.material.mask_bits = kCatWorld;
+    ground.material.category_bits = s.category;
+    ground.material.mask_bits = s.ground;
     ground.material.user = hit_user;
     world.create_shape(g.body, ground);
     kern::physics::ShapeSettings rubber = ground;
     rubber.material.density = 0;
     rubber.material.friction = kRubberFriction;
     rubber.material.restitution = 0.05f;
-    rubber.material.mask_bits = ~static_cast<u64>(kCatWorld);
+    rubber.material.mask_bits = ~s.ground;
     world.create_shape(g.body, rubber);
     // the wheel joint: suspension axis, spring, bump stops, the spin held (the wheel's rotation is
     // the tyre model's own degree of freedom), the steering servo on the front axle
@@ -447,4 +447,4 @@ CarInput ai_drive(Vec3 position, Vec3 forward, f32 vf, Vec3 target, f32 target_s
   return in;
 }
 
-}  // namespace sc
+}  // namespace kern::game::vehicles

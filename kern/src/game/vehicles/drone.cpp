@@ -1,11 +1,11 @@
 // SpawnCity drone plant + the Arondight45 firmware (see drone.h).
-#include "drone.h"
+#include "kern/game/vehicles/drone.h"
 
 #include <cstring>
 
-#include "../firmware/Arondight45_FirmwareRuntime.hpp"
+#include "firmware/Arondight45_FirmwareRuntime.hpp"
 
-namespace sc {
+namespace kern::game::vehicles {
 
 namespace {
 
@@ -262,7 +262,7 @@ void Drone::step(kern::physics::World& world, kern::physics::Body body, f32 h, c
     Vec3 o = s.position + s.rotation.rotate({0, 0, -0.018f});
     f32 travelled = 0;
     for (int k = 0; k < 6; ++k) {
-      const kern::physics::RayHit h = world.cast_ray(o, down * (kNavRayMax - travelled), kCatWorld, body);
+      const kern::physics::RayHit h = world.cast_ray(o, down * (kNavRayMax - travelled), p_.ground, body);
       if (!h.hit) break;
       const f32 d = h.fraction * (kNavRayMax - travelled);
       if (!h.body.valid() || world.body_type(h.body) == kern::physics::BodyType::fixed) {
@@ -379,4 +379,4 @@ void Drone::step(kern::physics::World& world, kern::physics::Body body, f32 h, c
   for (int i = 0; i < 3; ++i) tele_.attitude_deg[i] = out.attitude_cdeg[i] * 0.01f;
 }
 
-}  // namespace sc
+}  // namespace kern::game::vehicles

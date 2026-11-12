@@ -14,7 +14,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "car.h"
+#include "kern/game/vehicles/car.h"
 #include "city_stream.h"
 #include "facades.h"
 #include "water_look.h"
@@ -23,12 +23,12 @@
 #include "guided.h"
 #include "combat_detail.h"
 #include "combat_audio.h"
-#include "drone.h"
+#include "kern/game/vehicles/drone.h"
 #include "game_ui.h"
 #include "game_combat.h"
 #include "game_gaps.h"
 #include "game_look.h"
-#include "jet.h"
+#include "kern/game/vehicles/jet.h"
 #include "kern/app/app.h"
 #include "kern/audio/audio.h"
 #include "kern/game/runtime.h"

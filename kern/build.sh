@@ -129,7 +129,7 @@ cxxflags=("${target[@]}" -std=c++20 "${opt[@]}" "${features[@]}"
           "${includes[@]}" "${extra_flags[@]}")
 flags_key="$(printf '%s ' "${cxxflags[@]}" "$({ "$CXX" --version || true; } | head -1)" | sha256sum | cut -c1-16)"
 # Any header or included data (.inc) change rebuilds everything (simple and safe).
-headers_key="$(find "$here/include" "$here/src" "$here/third_party/box3d/include" "$here/third_party/microduck" -name '*.h' -o -name '*.inl' -o -name '*.inc' | sort | xargs cat | sha256sum | cut -c1-16)"
+headers_key="$(find "$here/include" "$here/src" "$here/third_party/box3d/include" "$here/third_party/microduck" -name '*.h' -o -name '*.hpp' -o -name '*.inl' -o -name '*.inc' | sort | xargs cat | sha256sum | cut -c1-16)"
 cpp_cache="$cache_root/cpp-$flags_key"
 mkdir -p "$cpp_cache"
 cpp_objects=()

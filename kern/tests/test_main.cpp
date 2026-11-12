@@ -11086,6 +11086,8 @@ TEST(app_input_and_args) {
 // The app runtime is linked into the test binary; it needs an app factory.
 App* kern_create_app() { return nullptr; }
 
+#include "vehicle_tests.h"
+
 int main(int argc, char** argv) {
   // kern_tests --emit-native <dir>: Blueprints as their C++ text, calls to them and the
   // interpreter's answers (run.sh compiles them into blueprint_native_test).

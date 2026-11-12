@@ -25,10 +25,9 @@
 // Chassis frame: +X forward, +Y left, +Z up.
 #pragma once
 
-#include "common.h"
-#include "rigid_spec.h"
+#include "kern/game/vehicles/base.h"
 
-namespace sc {
+namespace kern::game::vehicles {
 
 struct CarSpec {
   const char* kind = "car";
@@ -46,6 +45,10 @@ struct CarSpec {
   f32 upper_mass = 95;  // the greenhouse (glass, pillars, roof) as its own hull
   std::vector<Vec2> upper_profile{{-1.02f, 0.8f}, {-0.64f, 1.37f}, {0.3f, 1.37f}, {0.86f, 0.8f}};
   f32 upper_half_width = 0.71f, upper_dz = 0.54f;
+  /// The level's collision channels (WorldSettings::channels): the one the wheels are in, and the
+  /// one they roll on - the fixed world. (A wheel rolls on the ground without friction - the tyre
+  /// model is the friction - and rubs on everything else with rubber's.)
+  u64 category = 2, ground = 1;
 
   static CarSpec car() { return {}; }
   static CarSpec bus();
@@ -126,4 +129,4 @@ class Car {
 /// SpawnCity's AI driver (world_vehicle_dynamics.mjs aiInput): steer to the target, slow for bends.
 CarInput ai_drive(Vec3 position, Vec3 forward, f32 vf, Vec3 target, f32 target_speed);
 
-}  // namespace sc
+}  // namespace kern::game::vehicles

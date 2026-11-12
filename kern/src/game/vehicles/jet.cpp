@@ -1,8 +1,8 @@
 // SpawnCity's VTOL fighter flight model in C++ (see jet.h). A line-by-line port of
 // sim/jet_flight_dynamics.mjs airframeStep(); comments there apply here.
-#include "jet.h"
+#include "kern/game/vehicles/jet.h"
 
-namespace sc {
+namespace kern::game::vehicles {
 
 namespace {
 constexpr f32 G = 9.81f;   // the jet model's own constant (jet_flight_dynamics.mjs)
@@ -303,4 +303,4 @@ void Jet::step(kern::physics::World& world, kern::physics::Body body, f32 dt, co
   tele_.w_flight = w_flight;
 }
 
-}  // namespace sc
+}  // namespace kern::game::vehicles

@@ -5,7 +5,7 @@
 
 #include <vector>
 
-#include "car.h"
+#include "kern/game/vehicles/car.h"
 #include "kern/gfx/renderer.h"
 
 namespace sc {

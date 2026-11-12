@@ -15,10 +15,9 @@
 
 #include <array>
 
-#include "common.h"
-#include "rigid_spec.h"
+#include "kern/game/vehicles/base.h"
 
-namespace sc {
+namespace kern::game::vehicles {
 
 /// drone_simulator.html:409-410 defaults (5" 4S racer, ~0.72 kg).
 struct DroneParams {
@@ -29,6 +28,8 @@ struct DroneParams {
   f32 motor_limit_a = 45, esc_limit_a = 45;
   f32 cells = 4, capacity_ah = 1.5f, battery_r = 0.055f, battery_max_a = 180;
   f32 rho = 1.225f, drag_scale = 0.35f, ground_effect = 0.18f;
+  /// The level's collision channel the rangefinder sees: the fixed world (WorldSettings::channels).
+  u64 ground = 1;
   Vec3 wind;
   // component masses (kg) and placements (m), component_mass_model.mjs
   f32 m_frame = 0.180f, m_motor = 0.035f, m_prop = 0.005f, m_battery = 0.200f, m_esc = 0.030f, m_fc_rx = 0.020f, m_cam_vtx = 0.030f,
@@ -115,4 +116,4 @@ class Drone {
 f32 clearance_rate(f32 axis);
 f32 clearance_lead(f32 vz);
 
-}  // namespace sc
+}  // namespace kern::game::vehicles

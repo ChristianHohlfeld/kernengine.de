@@ -2,7 +2,7 @@
 #include "vehicle_art.h"
 
 #include "kern/geo/primitives.h"
-#include "jet.h"
+#include "kern/game/vehicles/jet.h"
 
 namespace sc {
 

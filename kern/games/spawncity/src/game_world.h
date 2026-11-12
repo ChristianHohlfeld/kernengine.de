@@ -6,7 +6,7 @@
 #include <memory>
 #include <vector>
 
-#include "car.h"
+#include "kern/game/vehicles/car.h"
 #include "common.h"
 #include "kern/audio/audio.h"
 #include "world_art.h"
