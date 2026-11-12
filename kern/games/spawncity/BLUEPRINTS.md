@@ -228,6 +228,16 @@ In dieser Reihenfolge (klein nach groß; jede Datei verschwindet, ihre Tests ble
   die Aufzählung Organic und die Funktionen HornHz, WhoopHz, SirenGain, SirenCutoff, VoiceUpdate
   (Doppler aus der Abstandsänderung), PostArrivalGraceMs und OrganicRate. Offen aus `gaps_rules`:
   Rauchfeld, VisualPose und die Hashes – das sind Systeme (Stufe 4).
+- [x] **`controls`** – Actor „Controls“: die Eingabe-Mathematik. Totzonen, Kurven und Zeiten als
+  Variablen (die Blickkurve als drei Listen ihrer Stützpunkte, die Tastenhilfe als Tabelle Hints),
+  die Strukturen Look und Cook, die Aufzählung DeviceEvent und vierzig Funktionen: WalkPadAxis,
+  ShapeFpsStick, FpsDynamicCurve, LookAxisStep, FpsAimAssist, GamepadAxis, GameStickLeft / Right
+  (mit der Umkehrung der Kurve des Flugreglers in 30 Halbierungen), RateStickStep, LookAdd /
+  LookStep, ViewButtonStep, VoiceChordStep, ReleaseLatchStep, GrenadePull / Step / Release,
+  DeviceInput, HintLine … `controls.cpp` hält nur noch, was ein Modus zwischen zwei Bildern
+  behält, und ruft auf. Der Blueprint rechnet wie das JavaScript des Originals in 64 Bit; drei
+  Prüfungen, die genau auf dem Rand einer Totzone standen (0,1 als 32-Bit-Zahl liegt knapp
+  darüber), prüfen jetzt knapp darunter.
 - Geschrieben wird so ein Regel-Blueprint als sein C++-Text und mit
   `tools/blueprint_cpp.sh --apply level.klevel <Actor> text.cpp` in das Level gelegt (dieselbe
   Lesart wie „Apply“ in der C++-Ansicht des Editors); das Level bleibt die eine Quelle.

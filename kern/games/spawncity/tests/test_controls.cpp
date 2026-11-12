@@ -4,6 +4,7 @@
 
 #include "../src/controls.h"
 #include "../src/touch_play.h"
+#include "rule_blueprint.h"
 #include "test_util.h"
 
 using namespace sc;
@@ -14,17 +15,21 @@ bool near(f32 a, f32 b, f32 eps = 1e-4f) { return std::fabs(a - b) <= eps; }
 }  // namespace
 
 SC_TEST(controls_dead_zones) {
+  RuleBlueprint bp("Controls", &controls::bind);
+  SC_CHECK(bp.inst && bp.problems.empty() && !bp.inst->disabled(), "the level's Controls Blueprint compiles and runs: %s", bp.problems.c_str());
+  SC_CHECK(bp.inst && std::string(bp.inst->tier()) == "native C++", "it runs as its C++ class");
   // player_walk_mode_v4.mjs axis(): .10, exponent 1.28
-  SC_CHECK(walk_pad_axis(0.1f) == 0 && near(walk_pad_axis(1), 1) && near(walk_pad_axis(-1), -1), "walk ends");
+  SC_CHECK(walk_pad_axis(0.0999f) == 0 && near(walk_pad_axis(1), 1) && near(walk_pad_axis(-1), -1), "walk ends");
   SC_CHECK(near(walk_pad_axis(0.55f), std::pow(0.5f, 1.28f)), "walk mid %g", walk_pad_axis(0.55f));
   // xbox_gamepad.mjs .14 linear, car .08, jet .12 hard cut, height axis .05
-  SC_CHECK(gamepad_axis(0.14f) == 0 && near(gamepad_axis(0.57f), 0.5f) && near(gamepad_axis(-1), -1), "drone .14 linear");
+  SC_CHECK(gamepad_axis(0.1399f) == 0 && near(gamepad_axis(0.57f), 0.5f) && near(gamepad_axis(-1), -1), "drone .14 linear");
   SC_CHECK(near(gamepad_axis(0.54f, 0.08f), 0.5f), "car .08 linear");
   SC_CHECK(hard_cut(0.11f, 0.12f) == 0 && hard_cut(0.13f, 0.12f) == 0.13f, "jet hard cut, no rescale");
   SC_CHECK(height_axis(0.52f, 0.5f) == 0 && near(height_axis(1, 0.25f), 0.75f), "height axis .05");
 }
 
 SC_TEST(controls_fps_stick) {
+  RuleBlueprint bp("Controls", &controls::bind);
   // fps_control_math.mjs: the dynamic curve passes its knots; inner dead zone; anti dead zone .045
   SC_CHECK(near(fps_dynamic_curve(0.3f), 0.24f) && near(fps_dynamic_curve(0.7f), 0.5f) && near(fps_dynamic_curve(0.9f), 0.89f) && fps_dynamic_curve(1) == 1, "knots");
   f32 last = 0;
@@ -42,6 +47,7 @@ SC_TEST(controls_fps_stick) {
 }
 
 SC_TEST(controls_look_rates) {
+  RuleBlueprint bp("Controls", &controls::bind);
   // integrateFpsLookVelocity: growing at 26 /s
   LookAxis a;
   const f32 dt = 1 / 60.0f;
@@ -59,11 +65,12 @@ SC_TEST(controls_look_rates) {
 }
 
 SC_TEST(controls_drone_sticks) {
+  RuleBlueprint bp("Controls", &controls::bind);
   // control_semantics.mjs
   SC_CHECK(near(phone_axis(1, 10), 1) && near(phone_axis(0.5f, 1), 0.5f), "phone axis ends");
   const f32 e = 0.70f * 0.38f;
   SC_CHECK(near(phone_axis(0.5f, 10), 0.5f * (1 - e) + 0.125f * e), "phone axis expo");
-  SC_CHECK(game_state_stick_magnitude(0.035f) == 0 && near(game_state_stick_magnitude(1), 1), "FC shaping");
+  SC_CHECK(game_state_stick_magnitude(0.0349f) == 0 && near(game_state_stick_magnitude(1), 1), "FC shaping");
   for (f32 v : {0.1f, 0.3f, 0.5f, 0.9f}) SC_CHECK(near(game_state_stick_magnitude(inverse_game_state_stick_magnitude(v)), v, 1e-5f), "inverse %g", v);
   DroneAxes a;
   apply_game_stick_left(a, 0, -1, 10, false, 90);
@@ -80,6 +87,7 @@ SC_TEST(controls_drone_sticks) {
 }
 
 SC_TEST(controls_mouse_and_look) {
+  RuleBlueprint bp("Controls", &controls::bind);
   // desktop_controls.mjs drone rate: 1500 px/s full, tau 50 ms
   RateStick r{1500, 0.05f, {}};
   for (int i = 0; i < 120; ++i) r.step({750.0f / 60, 0}, 1 / 60.0f);
@@ -98,6 +106,7 @@ SC_TEST(controls_mouse_and_look) {
 }
 
 SC_TEST(controls_pad_buttons) {
+  RuleBlueprint bp("Controls", &controls::bind);
   ViewButton v;
   SC_CHECK(v.step(true, 0) == 0 && v.step(false, 0.2f) == 1, "VIEW tap = camera on release");
   SC_CHECK(v.step(true, 1) == 0 && v.step(true, 1.5f) == 2 && v.step(false, 1.6f) == 0, "VIEW hold = map, no tap");
@@ -114,6 +123,7 @@ SC_TEST(controls_pad_buttons) {
 }
 
 SC_TEST(controls_grenade_cook) {
+  RuleBlueprint bp("Controls", &controls::bind);
   GrenadeCook g;
   SC_CHECK(g.pull(0, 0) && g.carry == 2 && !g.pull(0.1f, 0), "pull once");
   g.drag(110);
@@ -129,6 +139,7 @@ SC_TEST(controls_grenade_cook) {
 }
 
 SC_TEST(controls_devices) {
+  RuleBlueprint bp("Controls", &controls::bind);
   Devices d;
   d.platform(false, true, 5);
   SC_CHECK(!d.desktop, "a phone starts with touch");
@@ -149,6 +160,7 @@ SC_TEST(controls_devices) {
 }
 
 SC_TEST(controls_touch_foot) {
+  RuleBlueprint bp("Controls", &controls::bind);
   TouchPlay t;
   t.set_frame(844, 390, 0, 0, 0, 0);
   TouchLayout l;
@@ -192,6 +204,7 @@ SC_TEST(controls_touch_foot) {
 }
 
 SC_TEST(controls_touch_vehicles) {
+  RuleBlueprint bp("Controls", &controls::bind);
   TouchPlay t;
   t.set_frame(844, 390, 0, 0, 0, 0);
   TouchLayout l;
@@ -234,6 +247,7 @@ SC_TEST(controls_touch_vehicles) {
 }
 
 SC_TEST(controls_aim_assist) {
+  RuleBlueprint bp("Controls", &controls::bind);
   // fpsAimAssist: inactive outside the window, beyond 90 m or without input; a pull towards the
   // target, capped at .38 s rad/s, and a slowdown of up to .30 s on top of it
   SC_CHECK(!fps_aim_assist(0.2f, 0, 20, 1, 1, 0, 0.55f).active, "outside the 7 deg window");

@@ -249,7 +249,6 @@ bool Game::start(kern::Engine& e) {
 
   register_node();
   const bool coarse = e.arg_number("coarse", mobile_ ? 1 : 0) > 0;
-  ctl_.dev.platform(!coarse, coarse, coarse ? 5 : 0);  // the page reports the real device (game_controls.cpp)
   soldier_controller_ = kern::game::ControllerComponent{};
   soldier_controller_.mode = kern::game::ControlMode::soldier;
   soldier_controller_.camera = kern::game::CameraMode::first_person;
@@ -286,7 +285,11 @@ bool Game::start(kern::Engine& e) {
     kern::logic::Instance* sirens = logic ? logic->find(world_->find_actor("Sirens")) : nullptr;
     if (!sirens || sirens->disabled()) return kern::fail("the level's Blueprint \"Sirens\" is missing or has errors");
     gaps::bind_sirens(sirens);
+    kern::logic::Instance* control_rules = logic ? logic->find(world_->find_actor("Controls")) : nullptr;
+    if (!control_rules || control_rules->disabled()) return kern::fail("the level's Blueprint \"Controls\" is missing or has errors");
+    controls::bind(control_rules);
   }
+  ctl_.dev.platform(!coarse, coarse, coarse ? 5 : 0);  // the page reports the real device (game_controls.cpp)
   soldier_ = world_->find_actor("Player");
   drone_actor_ = world_->find_actor("Drone");
   jet_actor_ = world_->find_actor("Jet");

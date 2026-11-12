@@ -1,278 +1,188 @@
-// SpawnCity's input maths (see controls.h; values from the files named there).
+// SpawnCity's input maths: the Blueprint of the level's actor "Controls" computes it (see controls.h).
 #include "controls.h"
 
-#include <cstring>
+#include "blueprint_call.h"
 
 namespace sc::controls {
-
-f32 smoothstep01(f32 t) {
-  t = clampf(t, 0, 1);
-  return t * t * (3 - 2 * t);
+namespace {
+using kern::logic::Value;
+rules::Blueprint g_rules;
+Value N(f32 x) { return Value::number(x); }
+Value B(bool x) { return Value::boolean(x); }
+f32 num(const char* function, const std::vector<Value>& args) { return static_cast<f32>(g_rules.number(function, args)); }
+f32 f(const Value& v) { return static_cast<f32>(v.as_number()); }
+/// A function with two numbers as results.
+Vec2 pair(const char* function, const std::vector<Value>& args) {
+  std::vector<Value> r;
+  if (!g_rules.call(function, args, r) || r.size() < 2) return {};
+  return {f(r[0]), f(r[1])};
 }
-
-f32 walk_pad_axis(f32 v) {
-  const f32 x = clampf(v, -1, 1), a = std::fabs(x);
-  if (a <= 0.10f) return 0;
-  return sign0(x) * std::pow((a - 0.10f) / 0.90f, 1.28f);
+Value to_value(const WorldLook& l) { return Value::structure({N(l.yaw_deg), N(l.pitch_deg), B(l.snapping), N(l.idle), B(l.owned)}); }
+void from_value(const Value& v, WorldLook& l) {
+  if (v.fields() < 5) return;
+  l.yaw_deg = f(*v.field(0));
+  l.pitch_deg = f(*v.field(1));
+  l.snapping = v.field(2)->b;
+  l.idle = f(*v.field(3));
+  l.owned = v.field(4)->b;
 }
-
-Vec2 shape_first_person_move(f32 x, f32 y, f32 move_fineness, bool invert_h) {
-  x = clampf(x, -1, 1);
-  y = clampf(y, -1, 1);
-  if (invert_h) x = -x;
-  const f32 m = std::fmin(1.0f, std::hypot(x, y));
-  if (m <= 1e-9f) return {};
-  const f32 expo = 0.60f * (clampf(move_fineness, 1, 10) - 1) / 9;
-  const f32 shaped = m * (1 - expo) + m * m * m * expo;
-  return {x * shaped / m, y * shaped / m};
+void look(const char* function, const std::vector<Value>& args, WorldLook& l) {
+  std::vector<Value> r;
+  if (g_rules.call(function, args, r) && !r.empty()) from_value(r[0], l);
 }
-
-f32 fps_dynamic_curve(f32 n) {
-  static const f32 k[5][3] = {{0, 0, 1.0f}, {0.3f, 0.24f, 0.62f}, {0.7f, 0.5f, 1.1f}, {0.9f, 0.89f, 1.5f}, {1, 1, 1.0f}};
-  const f32 x = clampf(n, 0, 1);
-  for (int i = 0; i < 4; ++i) {
-    const f32 a = k[i][0], fa = k[i][1], da = k[i][2], b = k[i + 1][0], fb = k[i + 1][1], db = k[i + 1][2];
-    if (x <= b) {
-      const f32 h = b - a, t = (x - a) / h, t2 = t * t, t3 = t2 * t;
-      return clampf((2 * t3 - 3 * t2 + 1) * fa + (t3 - 2 * t2 + t) * h * da + (-2 * t3 + 3 * t2) * fb + (t3 - t2) * h * db, 0, 1);
-    }
-  }
-  return 1;
+Value to_value(const GrenadeCook& g) {
+  return Value::structure({Value::integer(g.carry), N(g.regen_at), B(g.cooking), N(g.at), N(g.power), Value::integer(g.source)});
 }
-
-Vec2 shape_fps_stick(f32 x, f32 y, f32 inner, f32 curve_strength) {
-  x = clampf(x, -1, 1);
-  y = clampf(y, -1, 1);
-  const f32 raw = std::fmin(1.0f, std::hypot(x, y));
-  inner = clampf(inner, 0, 0.45f);
-  const f32 outer = clampf(0.97f, inner + 0.01f, 1);
-  if (raw <= inner) return {};
-  const f32 n = clampf((raw - inner) / (outer - inner), 0, 1), kk = clampf(curve_strength, 0, 0.6f), anti = 0.045f;
-  const f32 w = 0.5f + kk / 0.6f * 0.5f;
-  const f32 curve = fps_dynamic_curve(n) * w + n * (1 - w);
-  const f32 curved = n >= 1 ? 1.0f : clampf(anti + (1 - anti) * curve, 0, 1);
-  const f32 s = curved / std::fmax(raw, 1e-9f);
-  return {x * s, y * s};
+void from_value(const Value& v, GrenadeCook& g) {
+  if (v.fields() < 6) return;
+  g.carry = static_cast<int>(v.field(0)->i);
+  g.regen_at = f(*v.field(1));
+  g.cooking = v.field(2)->b;
+  g.at = f(*v.field(3));
+  g.power = f(*v.field(4));
+  g.source = static_cast<int>(v.field(5)->i);
 }
+}  // namespace
+
+void bind(kern::logic::Instance* blueprint) { g_rules.running = blueprint; }
+
+f32 smoothstep01(f32 t) { return num("Smoothstep01", {N(t)}); }
+f32 walk_pad_axis(f32 v) { return num("WalkPadAxis", {N(v)}); }
+Vec2 shape_first_person_move(f32 x, f32 y, f32 move_fineness, bool invert_h) { return pair("ShapeFirstPersonMove", {N(x), N(y), N(move_fineness), B(invert_h)}); }
+f32 fps_dynamic_curve(f32 n) { return num("FpsDynamicCurve", {N(n)}); }
+f32 look_curve_strength(f32 look_fineness) { return num("LookCurveStrength", {N(look_fineness)}); }
+Vec2 shape_fps_stick(f32 x, f32 y, f32 inner, f32 curve_strength) { return pair("ShapeFpsStick", {N(x), N(y), N(inner), N(curve_strength)}); }
 
 f32 LookAxis::step(f32 target, f32 dt) {
-  const f32 d = clampf(dt, 0, 0.25f);
-  if (d <= 0) return 0;
-  const f32 from = velocity;
-  const bool reversing = from * target < 0, growing = std::fabs(target) > std::fabs(from);
-  const f32 rate = reversing ? 40.0f : growing ? 26.0f : 40.0f;
-  const f32 decay = std::exp(-rate * d);
-  velocity = target + (from - target) * decay;
-  return target * d + (from - target) * (1 - decay) / rate;
+  const Vec2 r = pair("LookAxisStep", {N(velocity), N(target), N(dt)});
+  velocity = r.x;
+  return r.y;
 }
 
 void touch_look_delta(f32 dx, f32 dy, f32 speed_px_s, f32& yaw, f32& pitch) {
-  // a slow drag is fine aim, a flick turns far (CoD Mobile's acceleration): up to x 1.6
-  const f32 gain = 1 + 0.6f * smoothstep01((speed_px_s - 500) / 1800);
-  yaw = dx * 0.0068f * gain;
-  pitch = -dy * 0.0059f * gain;
+  const Vec2 r = pair("TouchLookDelta", {N(dx), N(dy), N(speed_px_s)});
+  yaw = r.x;
+  pitch = r.y;
 }
 
 AimAssist fps_aim_assist(f32 yaw, f32 pitch, f32 dist, f32 input, f32 in_yaw, f32 in_pitch, f32 s) {
   AimAssist a;
-  input = clampf(input, 0, 1);
-  dist = std::fmax(0.0f, dist);
-  const f32 ellipse = aim_ellipse(yaw, pitch);
-  if (input <= 0.02f || ellipse >= 1 || dist > 90 || s <= 0) return a;
-  const f32 prox = smoothstep01(1 - ellipse), dist_s = 1 - 0.65f * smoothstep01(clampf((dist - 8) / 82, 0, 1));
-  const f32 il = std::hypot(in_yaw, in_pitch), el = std::hypot(yaw, pitch);
-  const f32 track = el < 0.002f || il < 1e-6f ? 1.0f : clampf((in_yaw * yaw + in_pitch * pitch) / (il * el), 0, 1);
-  const f32 act = prox * dist_s * input * (0.35f + 0.65f * track);
-  const f32 cap = 0.38f * s;
-  a.active = true;
-  a.yaw = clampf(yaw * 4.0f * s * act, -cap, cap);
-  a.pitch = clampf(pitch * 4.0f * s * act, -cap, cap);
-  a.slowdown = 1 - 0.30f * s * prox * dist_s;
+  std::vector<Value> r;
+  if (!g_rules.call("FpsAimAssist", {N(yaw), N(pitch), N(dist), N(input), N(in_yaw), N(in_pitch), N(s)}, r) || r.size() < 4) return a;
+  a.active = r[0].b;
+  a.slowdown = f(r[1]);
+  a.yaw = f(r[2]);
+  a.pitch = f(r[3]);
   return a;
 }
+f32 aim_ellipse(f32 yaw_err, f32 pitch_err) { return num("AimEllipse", {N(yaw_err), N(pitch_err)}); }
 
-f32 gamepad_axis(f32 v, f32 dz) {
-  const f32 x = clampf(v, -1, 1), a = std::fabs(x), z = clampf(dz, 0, 0.5f);
-  return a <= z ? 0.0f : sign0(x) * (a - z) / (1 - z);
-}
-
-f32 phone_axis(f32 v, f32 fineness) {
-  const f32 x = clampf(v, -1, 1), e = 0.70f * (clampf(std::round(fineness), 1, 10) - 1) / 9 * 0.38f;
-  return clampf(x * (1 - e) + x * x * x * e, -1, 1);
-}
-
-f32 game_state_stick_magnitude(f32 a) {
-  a = clampf(std::fabs(a), 0, 1);
-  if (a <= 0.035f) return 0;
-  const f32 t = (a - 0.035f) / (1 - 0.035f);
-  return clampf(t * (1 - 0.25f) + t * t * t * 0.25f, 0, 1);
-}
-
-f32 inverse_game_state_stick_magnitude(f32 v) {
-  const f32 target = clampf(std::fabs(v), 0, 1);
-  if (target == 0 || target == 1) return target;
-  f32 lo = 0, hi = 1;
-  for (int i = 0; i < 30; ++i) {
-    const f32 mid = (lo + hi) / 2;
-    if (game_state_stick_magnitude(mid) < target) lo = mid;
-    else hi = mid;
-  }
-  return (lo + hi) / 2;
-}
-
-namespace {
-Vec2 unit_disc(f32 x, f32 y) {
-  const f32 l = std::hypot(x, y);
-  if (l > 1) { x /= l; y /= l; }
-  return {clampf(x, -1, 1), clampf(y, -1, 1)};
-}
-}  // namespace
+f32 gamepad_axis(f32 v, f32 dz) { return num("GamepadAxis", {N(v), N(dz)}); }
+f32 hard_cut(f32 v, f32 dz) { return num("HardCut", {N(v), N(dz)}); }
+f32 height_axis(f32 rt, f32 lt) { return num("HeightAxis", {N(rt), N(lt)}); }
+f32 phone_axis(f32 v, f32 fineness) { return num("PhoneAxis", {N(v), N(fineness)}); }
+f32 game_state_stick_magnitude(f32 a) { return num("GameStickMagnitude", {N(a)}); }
+f32 inverse_game_state_stick_magnitude(f32 v) { return num("InverseGameStickMagnitude", {N(v)}); }
 
 void apply_game_stick_left(DroneAxes& out, f32 x, f32 y, f32 fineness, bool invert_h, f32 max_kmh) {
-  const Vec2 p = unit_disc(x, y);
-  const f32 px = invert_h ? -p.x : p.x, fwd = -p.y, m = std::hypot(px, fwd);
-  const f32 frac = phone_axis(m, fineness) * (clampf(max_kmh, 5, 90) / 90);
-  const f32 enc = inverse_game_state_stick_magnitude(frac);
-  const f32 k = m > 1e-9f ? enc / m : 0;
-  out.roll = px * k;
-  out.pitch = fwd * k;
+  const Vec2 r = pair("GameStickLeft", {N(x), N(y), N(fineness), B(invert_h), N(max_kmh)});
+  out.roll = r.x;
+  out.pitch = r.y;
 }
-
 void apply_game_stick_right(DroneAxes& out, f32 x, f32 y, f32 fineness, bool invert_h, bool invert_v) {
-  const Vec2 p = unit_disc(x, y);
-  const f32 px = invert_h ? -p.x : p.x, py = invert_v ? -p.y : p.y;
-  out.yaw = phone_axis(-px, fineness);
-  out.body_pitch = phone_axis(-py, fineness);
+  const Vec2 r = pair("GameStickRight", {N(x), N(y), N(fineness), B(invert_h), B(invert_v)});
+  out.yaw = r.x;
+  out.body_pitch = r.y;
 }
+f32 clearance_pad_axis(f32 centre_y, f32 y, f32 height) { return num("ClearancePadAxis", {N(centre_y), N(y), N(height)}); }
 
 void RateStick::step(Vec2 px, f32 dt) {
-  if (dt <= 0) return;
-  const f32 a = 1 - std::exp(-dt / tau);
-  rate.x += (clampf(px.x / dt / full_px_s, -1, 1) - rate.x) * a;
-  rate.y += (clampf(px.y / dt / full_px_s, -1, 1) - rate.y) * a;
+  rate.x = num("RateStickStep", {N(rate.x), N(px.x), N(dt), N(full_px_s), N(tau)});
+  rate.y = num("RateStickStep", {N(rate.y), N(px.y), N(dt), N(full_px_s), N(tau)});
 }
 
-void WorldLook::add(f32 dx, f32 dy, f32 kx, f32 ky) {
-  owned = true;
-  idle = 0;
-  snapping = false;
-  yaw_deg = std::fmod(yaw_deg + dx * kx + 540, 360.0f);
-  if (yaw_deg < 0) yaw_deg += 360;
-  yaw_deg -= 180;
-  pitch_deg = clampf(pitch_deg - dy * ky, -75, 60);
-}
-
-void WorldLook::set(f32 yaw, f32 pitch) {
-  owned = true;
-  idle = 0;
-  snapping = false;
-  yaw_deg = std::fmod(yaw + 540, 360.0f);
-  if (yaw_deg < 0) yaw_deg += 360;
-  yaw_deg -= 180;
-  pitch_deg = clampf(pitch, -75, 60);
-}
-
-void WorldLook::step(f32 dt, bool keep) {
-  if (owned) {
-    idle += dt;
-    if (idle > 1.4f) release();  // desktop_controls.mjs LOOK_IDLE_SNAP_MS
-  }
-  if (snapping && !keep) {
-    const f32 k = 1 - std::exp(-8 * dt);  // real_world_bootstrap.mjs WORLD_LOOK_SNAP_RATE
-    yaw_deg -= yaw_deg * k;
-    pitch_deg -= pitch_deg * k;
-    if (std::fabs(yaw_deg) < 0.05f && std::fabs(pitch_deg) < 0.05f) { yaw_deg = pitch_deg = 0; snapping = false; }
-  }
-}
+void WorldLook::add(f32 dx, f32 dy, f32 kx, f32 ky) { look("LookAdd", {to_value(*this), N(dx), N(dy), N(kx), N(ky)}, *this); }
+void WorldLook::set(f32 yaw, f32 pitch) { look("LookSet", {N(yaw), N(pitch)}, *this); }
+void WorldLook::release() { look("LookRelease", {to_value(*this)}, *this); }
+void WorldLook::step(f32 dt, bool keep) { look("LookStep", {to_value(*this), N(dt), B(keep)}, *this); }
 
 void CarHeadSpring::step(f32 x, f32 y, f32 dt) {
-  const f32 k = 1 - std::exp(-dt * (std::fabs(x) + std::fabs(y) > 0.05f ? 9.0f : 6.0f));
-  yaw += (x * 1.75f - yaw) * k;
-  pitch += (y * 0.7f - pitch) * k;
+  const Vec2 r = pair("CarHeadStep", {N(yaw), N(pitch), N(x), N(y), N(dt)});
+  yaw = r.x;
+  pitch = r.y;
 }
 
 int ViewButton::step(bool down, f32 now) {
-  int out = 0;
-  if (down && !was) { down_at = now; held_map = false; }
-  if (down && !held_map && now - down_at > 0.42f) { held_map = true; map_at = now; out = 2; }
-  if (!down && was && !held_map && now - down_at < 0.4f && !(now - map_at < 1.5f)) out = 1;
-  was = down;
-  return out;
+  std::vector<Value> r;
+  if (!g_rules.call("ViewButtonStep", {B(was), B(held_map), N(down_at), N(map_at), B(down), N(now)}, r) || r.size() < 5) return 0;
+  was = r[1].b;
+  held_map = r[2].b;
+  down_at = f(r[3]);
+  map_at = f(r[4]);
+  return static_cast<int>(r[0].i);
 }
 
 VoiceChord::Out VoiceChord::step(bool r3_now, bool y_now, bool allowed) {
   Out o;
-  o.mute = allowed && r3_now && y_now && !y;
-  const bool next_latched = r3_now && (latched || o.mute);
-  o.mic = allowed && !r3_now && r3 && !latched;
-  o.suppress_weapon = o.mute;
-  r3 = r3_now;
-  y = y_now;
-  latched = next_latched;
+  std::vector<Value> r;
+  if (!g_rules.call("VoiceChordStep", {B(r3), B(y), B(latched), B(r3_now), B(y_now), B(allowed)}, r) || r.size() < 6) return o;
+  o.mic = r[0].b;
+  o.mute = r[1].b;
+  o.suppress_weapon = r[2].b;
+  r3 = r[3].b;
+  y = r[4].b;
+  latched = r[5].b;
   return o;
 }
 
 bool ReleaseLatch::step(const f32* values, int n) {
-  if (!armed) return false;
-  for (int i = 0; i < n; ++i)
-    if (values[i] > 0.18f) return true;
-  armed = false;
-  return false;
+  std::vector<f64> list(values, values + n);
+  std::vector<Value> r;
+  if (!g_rules.call("ReleaseLatchStep", {B(armed), Value::of(std::move(list))}, r) || r.size() < 2) return false;
+  armed = r[1].b;
+  return r[0].b;
 }
 
 bool GrenadeCook::pull(f32 now, int from) {
-  if (cooking || carry <= 0) return false;
-  --carry;
-  if (regen_at <= 0) regen_at = now + kRegen;
-  cooking = true;
-  at = now;
-  power = 0.7f;
-  source = from;
-  return true;
+  std::vector<Value> r;
+  if (!g_rules.call("GrenadePull", {to_value(*this), N(now), Value::integer(from)}, r) || r.size() < 2) return false;
+  from_value(r[0], *this);
+  return r[1].b;
 }
-
+void GrenadeCook::drag(f32 up_px) { power = num("GrenadeDrag", {N(up_px)}); }
 f32 GrenadeCook::release(f32 now) {
-  if (!cooking) return 0;
-  cooking = false;
-  return std::fmax(0.0f, kFuse - (now - at));
+  std::vector<Value> r;
+  if (!g_rules.call("GrenadeRelease", {to_value(*this), N(now)}, r) || r.size() < 2) return 0;
+  from_value(r[0], *this);
+  return f(r[1]);
 }
-
 bool GrenadeCook::step(f32 now) {
-  if (carry < kCarry && regen_at > 0 && now >= regen_at) {
-    ++carry;
-    regen_at = carry < kCarry ? now + kRegen : 0;
-  }
-  if (cooking && now - at >= kFuse) { cooking = false; return true; }
-  return false;
+  std::vector<Value> r;
+  if (!g_rules.call("GrenadeStep", {to_value(*this), N(now)}, r) || r.size() < 2) return false;
+  from_value(r[0], *this);
+  return r[1].b;
 }
+f32 GrenadeCook::left(f32 now) const { return num("GrenadeLeft", {to_value(*this), N(now)}); }
+f32 GrenadeCook::speed() const { return num("GrenadeSpeed", {N(power)}); }
+f32 grenade_fuse() { return static_cast<f32>(g_rules.variable("GrenadeFuse")); }
 
 void Devices::platform(bool fine_pointer, bool coarse_pointer, i32 max_touch_points) {
   fine = fine_pointer;
   coarse = coarse_pointer;
   touch_points = max_touch_points;
-  set(fine || touch_points == 0);
+  set(g_rules.flag("DevicePlatform", {B(fine), Value::integer(touch_points)}));
+}
+void Devices::input(Event e) {
+  std::vector<Value> r;
+  if (!g_rules.call("DeviceInput", {rules::of_enum(e), B(fine), B(coarse), B(desktop), B(pad)}, r) || r.size() < 2) return;
+  set(r[0].b);
+  pad = r[1].b;
 }
 
 std::string hint_line(const char* mode, const char* weapon, bool dead) {
-  if (dead) return "DOWN · SPACE / ENTER / R = RESPAWN";
-  const char* text = "";
-  bool prefix = false;
-  if (!std::strcmp(mode, "foot")) {
-    text = "WASD move · SHIFT sprint · SPACE jump (2× jetpack) · LMB fire · RMB aim / scope · 1 MP 2 Glock 3 Sniper 5 Granatwerfer 6 Raketenwerfer "
-           "7 Fäuste (LMB links · RMB rechts) 8 Messer · Z / MMB ping · T halten Granate / Q / WHEEL · F vehicle · V drone · 4 strike · G EMP · "
-           "P multiplayer · M map · ESC menu";
-    prefix = true;
-  } else if (!std::strcmp(mode, "drone")) {
-    text = "WASD fly · SPACE / SHIFT up / down · MOUSE turn · RMB look · LMB fire · R arm · C camera · 1-3 / Q weapon · V on foot · M map · ESC menu";
-    prefix = true;
-  } else if (!std::strcmp(mode, "car")) {
-    text = "W / S gas / brake · A / D steer · SPACE handbrake · MOUSE look · C camera · F exit · M map · ESC menu";
-  } else if (!std::strcmp(mode, "jet")) {
-    text = "W / S throttle · A / D rudder · MOUSE pitch / roll · LMB / SPACE gun · R rocket · B bomb · V hover / flight · C camera · F exit / eject · M map · ESC menu";
-  }
-  std::string s;
-  if (prefix && weapon && *weapon) s = std::string("[ ") + weapon + " ]  ";
-  return s + text;
+  std::vector<Value> r;
+  if (!g_rules.call("HintLine", {Value::text(mode ? mode : ""), Value::text(weapon ? weapon : ""), B(dead)}, r) || r.empty()) return {};
+  return r[0].s;
 }
 
 }  // namespace sc::controls

@@ -337,7 +337,7 @@ void Game::ctl_grenade(bool hold_key, bool hold_pad, f32 dt) {
   if (g.cooking) {
     const f32 held = (now - g.at) * 1000;
     const int sec = static_cast<int>(std::floor(held / 1000));
-    if (sec > last_tick - 1 && held - static_cast<f32>(last_tick) * 1000 >= 0) { last_tick = sec + 1; osfx("hand_grenade.tickSound", cam_.eye, controls::GrenadeCook::kFuse * 1000 - held < 1200 ? 1 : 0); }
+    if (sec > last_tick - 1 && held - static_cast<f32>(last_tick) * 1000 >= 0) { last_tick = sec + 1; osfx("hand_grenade.tickSound", cam_.eye, controls::grenade_fuse() * 1000 - held < 1200 ? 1 : 0); }
   }
   key_was = hold_key;
   pad_was = hold_pad;
