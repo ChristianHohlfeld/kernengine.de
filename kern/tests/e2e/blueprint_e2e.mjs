@@ -53,6 +53,8 @@ await page.click('[data-act="fn-out"]');
 l = await until(async () => { const x = await logic(); return x.functions[0].inputs.length === 1 && x.functions[0].outputs.length === 1 && x; });
 check(!!l && l.functions[0].inputs[0].name === "value" && l.functions[0].outputs[0].name === "result", "+ Input and + Output add its pins");
 const pin = page.locator('.lg-frow[data-side="in"] [data-pf="name"]');
+// (Details has drawn both pins: a field filled while the panel is still being redrawn is gone with the old panel)
+await until(async () => await page.locator('.lg-dbody .lg-frow[data-side="out"]').count() === 1 && await pin.count() === 1 && await pin.inputValue() === "value");
 await pin.fill("x");
 await pin.press("Enter");
 check(await until(async () => (await logic()).functions[0].inputs[0].name === "x"), "a pin is renamed in place");
