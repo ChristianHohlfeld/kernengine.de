@@ -80,7 +80,7 @@ f32 kCourseScale = 0;
 namespace {
 using kern::logic::Value;
 rules::Blueprint g_military, g_zombies, g_sandbox, g_fun, g_race;
-Value N(f32 x) { return Value::number(x); }
+Value N(f32 x) { return rules::number(x); }
 Value I(i64 x) { return Value::integer(x); }
 Value B(bool x) { return Value::boolean(x); }
 f32 f(const Value& v) { return static_cast<f32>(v.as_number()); }
@@ -211,7 +211,7 @@ Arms arms_of(u32 seed) {
   u32 h = (static_cast<u32>(static_cast<f64>(agent_random(seed)) * 4294967296.0) ^ 0x9e3779b9u) * 2654435761u;
   h ^= h >> 15;
   std::vector<Value> r;
-  return g_military.call("ArmsOf", {rules::of_enum(temper_of(seed)), Value::number(static_cast<f64>(h % 10000) / 10000.0)}, r) && !r.empty() ? static_cast<Arms>(r[0].i) : Arms::fists;
+  return g_military.call("ArmsOf", {rules::of_enum(temper_of(seed)), rules::number(static_cast<f64>(h % 10000) / 10000.0)}, r) && !r.empty() ? static_cast<Arms>(r[0].i) : Arms::fists;
 }
 
 // ---------------------------------------------------------------- "Zombies"

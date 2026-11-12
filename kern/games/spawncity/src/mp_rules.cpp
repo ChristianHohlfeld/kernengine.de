@@ -187,23 +187,23 @@ std::string zone_name(Zone z) {
   return g_rules.call("ZoneName", {rules::of_enum(z)}, r) && !r.empty() ? r[0].as_text() : std::string();
 }
 f32 round_damage(Weapon w, Zone z) { return num("RoundDamage", {rules::of_enum(w), rules::of_enum(z)}); }
-f32 blast_damage(f32 damage) { return num("BlastDamage", {Value::number(damage)}); }
+f32 blast_damage(f32 damage) { return num("BlastDamage", {rules::number(damage)}); }
 
 HitVerdict judge_hit(bool target_known, bool shooter_known, bool self_damage, bool friendly_fire, f64 now, f64 protected_until, f32 hp) {
   std::vector<Value> r;
-  if (!g_rules.call("JudgeHit", {Value::boolean(target_known), Value::boolean(shooter_known), Value::boolean(self_damage), Value::boolean(friendly_fire), Value::number(now),
-                                 Value::number(protected_until), Value::number(hp)},
+  if (!g_rules.call("JudgeHit", {Value::boolean(target_known), Value::boolean(shooter_known), Value::boolean(self_damage), Value::boolean(friendly_fire), rules::number(now),
+                                 rules::number(protected_until), rules::number(hp)},
                     r) ||
       r.empty())
     return HitVerdict::unknown_player;
   return static_cast<HitVerdict>(r[0].i);
 }
 
-f32 regen(f32 hp, f64 now, f64 last_hurt, f32 dt) { return num("Regen", {Value::number(hp), Value::number(now), Value::number(last_hurt), Value::number(dt)}); }
+f32 regen(f32 hp, f64 now, f64 last_hurt, f32 dt) { return num("Regen", {rules::number(hp), rules::number(now), rules::number(last_hurt), rules::number(dt)}); }
 
 Vec2 respawn_offset(Rng& rng) {
   const f32 r1 = rng.unit(), r2 = rng.unit();  // (how far out, then which way)
-  return pair("RespawnOffset", {Value::number(r1), Value::number(r2)});
+  return pair("RespawnOffset", {rules::number(r1), rules::number(r2)});
 }
 
 void Scoreboard::ensure(u8 slot) {
@@ -267,7 +267,7 @@ std::vector<u8> bytes(const Value& v) {
   return out;
 }
 Value to_value(const Ballot& b) {
-  return Value::structure({Value::integer(b.id), Value::integer(b.key), Value::boolean(b.value), Value::integer(b.host), ints(b.members), ints(b.yes), Value::number(b.expires_ms),
+  return Value::structure({Value::integer(b.id), Value::integer(b.key), Value::boolean(b.value), Value::integer(b.host), ints(b.members), ints(b.yes), rules::number(b.expires_ms),
                            rules::of_enum(b.status)});
 }
 bool take(const Value& v, Ballot& b) {
@@ -292,7 +292,7 @@ void roster(std::vector<u8>& members) {
 bool create_ballot(Ballot& b, u32 id, u8 key, bool value, u8 host, std::vector<u8> members, f64 now) {
   roster(members);
   std::vector<Value> r;
-  if (!g_rules.call("CreateBallot", {Value::integer(id), Value::integer(key), Value::boolean(value), Value::integer(host), ints(members), Value::number(now)}, r) || r.size() < 2 || !r[0].b)
+  if (!g_rules.call("CreateBallot", {Value::integer(id), Value::integer(key), Value::boolean(value), Value::integer(host), ints(members), rules::number(now)}, r) || r.size() < 2 || !r[0].b)
     return false;
   return take(r[1], b);
 }
@@ -300,7 +300,7 @@ bool create_ballot(Ballot& b, u32 id, u8 key, bool value, u8 host, std::vector<u
 Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now) {
   roster(current);
   std::vector<Value> r;
-  if (g_rules.call("CastVote", {to_value(b), Value::integer(voter), Value::boolean(approve), ints(current), Value::number(now)}, r) && !r.empty()) take(r[0], b);
+  if (g_rules.call("CastVote", {to_value(b), Value::integer(voter), Value::boolean(approve), ints(current), rules::number(now)}, r) && !r.empty()) take(r[0], b);
   return b.status;
 }
 
@@ -323,7 +323,7 @@ f32 decode_mulaw(u8 byte) {
 }
 
 f32 proximity_gain(f32 d) { return voice_gain(d, false); }
-f32 voice_gain(f32 d, bool everywhere) { return std::isfinite(d) ? num("VoiceGain", {Value::number(d), Value::boolean(everywhere)}) : everywhere ? voice_gain(1e9f, true) : 0; }
+f32 voice_gain(f32 d, bool everywhere) { return std::isfinite(d) ? num("VoiceGain", {rules::number(d), Value::boolean(everywhere)}) : everywhere ? voice_gain(1e9f, true) : 0; }
 
 bool VoiceStream::push(u32 seq, const std::vector<u8>& mulaw, f32 gain) {
   if (gain <= 0 || mulaw.empty() || mulaw.size() > 800) return false;
@@ -476,14 +476,14 @@ f32 route_left(const std::vector<Vec2>& pts, Vec2 pos) {
 
 std::string bearing_arrow(f32 b) {
   std::vector<Value> r;
-  return g_rules.call("BearingArrow", {Value::number(b)}, r) && !r.empty() ? r[0].as_text() : std::string();
+  return g_rules.call("BearingArrow", {rules::number(b)}, r) && !r.empty() ? r[0].as_text() : std::string();
 }
 
 MapEdge locate_map_peer(Vec2 p, f32 w, f32 h, f32 ix, f32 it, f32 ib) {
   MapEdge out;
   if (!(std::isfinite(p.x) && std::isfinite(p.y))) return out;
   std::vector<Value> r;
-  if (!g_rules.call("LocateMapPeer", {Value::number(p.x), Value::number(p.y), Value::number(w), Value::number(h), Value::number(ix), Value::number(it), Value::number(ib)}, r) || r.size() < 6)
+  if (!g_rules.call("LocateMapPeer", {rules::number(p.x), rules::number(p.y), rules::number(w), rules::number(h), rules::number(ix), rules::number(it), rules::number(ib)}, r) || r.size() < 6)
     return out;
   out.valid = r[0].b;
   out.p = {static_cast<f32>(r[1].as_number()), static_cast<f32>(r[2].as_number())};
@@ -494,7 +494,7 @@ MapEdge locate_map_peer(Vec2 p, f32 w, f32 h, f32 ix, f32 it, f32 ib) {
 }
 
 Vec2 safe_mobile_marker_point(Vec2 p, f32 w, f32 h, bool mobile) {
-  return pair("SafeMobileMarkerPoint", {Value::number(p.x), Value::number(p.y), Value::number(w), Value::number(h), Value::boolean(mobile)});
+  return pair("SafeMobileMarkerPoint", {rules::number(p.x), rules::number(p.y), rules::number(w), rules::number(h), Value::boolean(mobile)});
 }
 
 std::string format_distance(f32 m) {
@@ -512,7 +512,7 @@ std::string format_distance(f32 m) {
 
 bool PingBoard::toggle(u8 owner, Vec3 p, u32 color, f64 now) {
   for (const Ping& q : pings_)
-    if (q.owner == owner && g_rules.flag("PingToggles", {Value::number(std::hypot(q.p.x - p.x, q.p.y - p.y))})) { clear(owner); return false; }
+    if (q.owner == owner && g_rules.flag("PingToggles", {rules::number(std::hypot(q.p.x - p.x, q.p.y - p.y))})) { clear(owner); return false; }
   set(owner, p, color, now);
   return true;
 }
@@ -522,8 +522,8 @@ void PingBoard::set(u8 owner, Vec3 p, u32 color, f64 now) {
   pings_.push_back({owner, p, color, now});
 }
 void PingBoard::clear(u8 owner) { pings_.erase(std::remove_if(pings_.begin(), pings_.end(), [&](const Ping& q) { return q.owner == owner; }), pings_.end()); }
-void PingBoard::expire(f64 now) { pings_.erase(std::remove_if(pings_.begin(), pings_.end(), [&](const Ping& q) { return g_rules.flag("PingExpired", {Value::number(now - q.at_ms)}); }), pings_.end()); }
+void PingBoard::expire(f64 now) { pings_.erase(std::remove_if(pings_.begin(), pings_.end(), [&](const Ping& q) { return g_rules.flag("PingExpired", {rules::number(now - q.at_ms)}); }), pings_.end()); }
 
-f32 PingBoard::fade(const Ping& p, f64 now_ms) { return num("PingFade", {Value::number(now_ms - p.at_ms)}); }
+f32 PingBoard::fade(const Ping& p, f64 now_ms) { return num("PingFade", {rules::number(now_ms - p.at_ms)}); }
 
 }  // namespace sc::mp

@@ -7,7 +7,7 @@ namespace sc::controls {
 namespace {
 using kern::logic::Value;
 rules::Blueprint g_rules;
-Value N(f32 x) { return Value::number(x); }
+Value N(f32 x) { return rules::number(x); }
 Value B(bool x) { return Value::boolean(x); }
 f32 num(const char* function, const std::vector<Value>& args) { return static_cast<f32>(g_rules.number(function, args)); }
 f32 f(const Value& v) { return static_cast<f32>(v.as_number()); }

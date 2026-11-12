@@ -1,11 +1,14 @@
 // The controls: curves, dead zones, latches and the touch controls against spawncity.de's numbers
 // (controls.h / touch_play.h, CONTROLS.md).
 #include <chrono>
+#include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <string>
 
 #include "../src/controls.h"
 #include "../src/touch_play.h"
+#include "../src/blueprint_call.h"
 #include "rule_blueprint.h"
 #include "test_util.h"
 
@@ -21,10 +24,10 @@ SC_TEST(controls_dead_zones) {
   SC_CHECK(bp.inst && bp.problems.empty() && !bp.inst->disabled(), "the level's Controls Blueprint compiles and runs: %s", bp.problems.c_str());
   SC_CHECK(bp.inst && std::string(bp.inst->tier()) == "native C++", "it runs as its C++ class");
   // player_walk_mode_v4.mjs axis(): .10, exponent 1.28
-  SC_CHECK(walk_pad_axis(0.0999f) == 0 && near(walk_pad_axis(1), 1) && near(walk_pad_axis(-1), -1), "walk ends");
+  SC_CHECK(walk_pad_axis(0.1f) == 0 && near(walk_pad_axis(1), 1) && near(walk_pad_axis(-1), -1), "walk ends");
   SC_CHECK(near(walk_pad_axis(0.55f), std::pow(0.5f, 1.28f)), "walk mid %g", walk_pad_axis(0.55f));
   // xbox_gamepad.mjs .14 linear, car .08, jet .12 hard cut, height axis .05
-  SC_CHECK(gamepad_axis(0.1399f) == 0 && near(gamepad_axis(0.57f), 0.5f) && near(gamepad_axis(-1), -1), "drone .14 linear");
+  SC_CHECK(gamepad_axis(0.14f) == 0 && near(gamepad_axis(0.57f), 0.5f) && near(gamepad_axis(-1), -1), "drone .14 linear");
   SC_CHECK(near(gamepad_axis(0.54f, 0.08f), 0.5f), "car .08 linear");
   SC_CHECK(hard_cut(0.11f, 0.12f) == 0 && hard_cut(0.13f, 0.12f) == 0.13f, "jet hard cut, no rescale");
   SC_CHECK(height_axis(0.52f, 0.5f) == 0 && near(height_axis(1, 0.25f), 0.75f), "height axis .05");
@@ -72,7 +75,7 @@ SC_TEST(controls_drone_sticks) {
   SC_CHECK(near(phone_axis(1, 10), 1) && near(phone_axis(0.5f, 1), 0.5f), "phone axis ends");
   const f32 e = 0.70f * 0.38f;
   SC_CHECK(near(phone_axis(0.5f, 10), 0.5f * (1 - e) + 0.125f * e), "phone axis expo");
-  SC_CHECK(game_state_stick_magnitude(0.0349f) == 0 && near(game_state_stick_magnitude(1), 1), "FC shaping");
+  SC_CHECK(game_state_stick_magnitude(0.035f) == 0 && near(game_state_stick_magnitude(1), 1), "FC shaping");
   for (f32 v : {0.1f, 0.3f, 0.5f, 0.9f}) SC_CHECK(near(game_state_stick_magnitude(inverse_game_state_stick_magnitude(v)), v, 1e-5f), "inverse %g", v);
   DroneAxes a;
   apply_game_stick_left(a, 0, -1, 10, false, 90);
@@ -280,4 +283,38 @@ SC_TEST(controls_call_cost) {
   const auto cook = ns([&g](f32 x) { return g.step(x) ? 1.0f : 0.0f; });
   std::printf("     Controls as its C++ class, per call: GamepadAxis %.0f ns, ShapeFpsStick %.0f ns, GrenadeStep %.0f ns\n", axis.first, stick.first, cook.first);
   SC_CHECK(axis.second > 0 && stick.second > 0 && axis.first < 1e6 && stick.first < 1e6 && cook.first < 1e6, "the calls answer");
+}
+
+// A 32-bit number of the game enters a Blueprint as the decimal it stands for (blueprint_call.h):
+// on a threshold it is on the threshold, next to it on its side - as in 32 bit.
+SC_TEST(controls_numbers_cross_exactly) {
+  SC_CHECK(rules::decimal(0.1f) == 0.1 && rules::decimal(0.035f) == 0.035 && rules::decimal(2.6f) == 2.6 && rules::decimal(0.7071f) == 0.7071 && rules::decimal(-0.42f) == -0.42,
+           "the decimal a 32-bit number stands for");
+  SC_CHECK(rules::decimal(0) == 0 && rules::decimal(3) == 3 && rules::decimal(-1e9f) == -1e9 && rules::decimal(16777216.0f) == 16777216.0, "whole numbers are themselves");
+  // every threshold a rule names, and the 32-bit numbers around it: the same answer as in 32 bit
+  const f32 thresholds[] = {0.02f, 0.035f, 0.05f, 0.06f, 0.08f, 0.1f, 0.12f, 0.14f, 0.18f, 0.2f, 0.22f, 0.32f, 0.36f, 0.4f, 0.42f, 0.5f, 0.55f, 0.7071f, 0.97f, 1.4f, 1.6f, 2.5f, 2.6f, 3.5f, 7.7f, 9.81f, 14.0f, 36.0f, 260.0f};
+  bool same = true, back = true, ordered = true;
+  for (f32 c : thresholds) {
+    const f64 exact = std::strtod(std::to_string(static_cast<f64>(c)).c_str(), nullptr);  // (the decimal as a rule writes it; six digits after the point print them all)
+    f32 x = c;
+    for (int k = 0; k < 4; ++k) x = std::nextafter(x, -1e30f);
+    f64 last = -1e300;
+    for (int k = 0; k < 9; ++k, x = std::nextafter(x, 1e30f)) {
+      const f64 d = rules::decimal(x);
+      same &= (x < c) == (d < exact) && (x <= c) == (d <= exact) && (x == c) == (d == exact);
+      back &= static_cast<f32>(d) == x;
+      ordered &= d > last;
+      last = d;
+    }
+  }
+  SC_CHECK(same, "at and around every threshold the comparison answers as in 32 bit");
+  SC_CHECK(back && ordered, "the way is one to one and keeps the order");
+  u32 seed = 12345;
+  bool all = true;
+  for (int i = 0; i < 200000; ++i) {
+    seed = seed * 1664525u + 1013904223u;
+    const f32 x = (static_cast<f32>(seed >> 8) / 16777216.0f - 0.5f) * (i % 3 == 0 ? 2.0f : i % 3 == 1 ? 400.0f : 0.01f);
+    all &= static_cast<f32>(rules::decimal(x)) == x;
+  }
+  SC_CHECK(all, "200000 numbers come back as the 32-bit numbers they were");
 }

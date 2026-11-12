@@ -23,14 +23,14 @@ f32 whoop_base() { return static_cast<f32>(g_sirens.variable("WhoopBase")); }
 f32 organic_gain() { return static_cast<f32>(g_sirens.variable("OrganicGain")); }
 f32 organic_min_gap_s() { return static_cast<f32>(g_sirens.variable("OrganicMinGapS")); }
 
-f32 horn_hz(f32 t) { return num("HornHz", {Value::number(t)}); }
-f32 whoop_hz(f32 t) { return num("WhoopHz", {Value::number(t)}); }
-f32 siren_gain(f32 base, f32 d, f32 level) { return num("SirenGain", {Value::number(base), Value::number(d), Value::number(level)}); }
-f32 siren_cutoff(f32 d) { return num("SirenCutoff", {Value::number(d)}); }
+f32 horn_hz(f32 t) { return num("HornHz", {rules::number(t)}); }
+f32 whoop_hz(f32 t) { return num("WhoopHz", {rules::number(t)}); }
+f32 siren_gain(f32 base, f32 d, f32 level) { return num("SirenGain", {rules::number(base), rules::number(d), rules::number(level)}); }
+f32 siren_cutoff(f32 d) { return num("SirenCutoff", {rules::number(d)}); }
 
 f32 SirenVoice::update(f32 d, f32 dt, f32 base, f32 level) {
   std::vector<Value> r;
-  if (!g_sirens.call("VoiceUpdate", {Value::number(d), Value::number(dt), Value::number(base), Value::number(level), Value::boolean(have_d), Value::number(last_d), Value::number(doppler)}, r) ||
+  if (!g_sirens.call("VoiceUpdate", {rules::number(d), rules::number(dt), rules::number(base), rules::number(level), Value::boolean(have_d), rules::number(last_d), rules::number(doppler)}, r) ||
       r.size() < 4)
     return 0;
   have_d = r[1].b;

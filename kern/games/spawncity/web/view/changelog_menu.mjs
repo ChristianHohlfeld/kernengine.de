@@ -7,6 +7,9 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-12",time:"11:30",title:"Regeln rechnen an Schwellen exakt wie zuvor",items:[
+    "Unter der Haube: Die Blueprints rechnen mit 64-Bit-Zahlen, das Spiel hält seinen Zustand in 32 Bit. Jede Zahl des Spiels geht jetzt als genau die Dezimalzahl in eine Regel, für die sie steht – so entscheidet jede Schwelle (Totzonen, Abstände, Zeiten) exakt wie vorher, auch wenn ein Wert genau auf ihr liegt.",
+  ]},
   {date:"2026-11-12",time:"11:22",title:"Die Mehrspieler-Regeln sind ein Blueprint",items:[
     "Unter der Haube: Spielerfarben, Schaden je Waffe und Körperzone, Spawn-Schutz, Heilung, Wiedereinstieg, die Abstimmung über Spielregeln, die Reichweite der Stimme, Kartenpfeile und Pings stehen jetzt als Blueprint „Multiplayer“ im Level. Damit sind alle Spielregeln von SpawnCity Blueprints (17 Stück) – am Spiel ändert sich dadurch nichts.",
   ]},

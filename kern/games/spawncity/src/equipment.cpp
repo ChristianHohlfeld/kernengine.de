@@ -34,15 +34,15 @@ bool Jetpack::ignite(f32 vz) {
 
 f32 Jetpack::update(f32 dt, f32 now, bool airborne, f32 vz, f32 height, bool hold) {
   std::vector<Value> r;
-  if (!g_jetpack.call("Update", {pack(), Value::number(dt), Value::number(now), Value::boolean(airborne), Value::number(vz), Value::number(height), Value::boolean(hold)}, r) || r.size() < 2)
+  if (!g_jetpack.call("Update", {pack(), rules::number(dt), rules::number(now), Value::boolean(airborne), rules::number(vz), rules::number(height), Value::boolean(hold)}, r) || r.size() < 2)
     return 0;
   take(r[0]);
   return static_cast<f32>(r[1].as_number());
 }
 
 kern::logic::Value Jetpack::pack() const {
-  return Value::structure({Value::number(fuel), Value::boolean(thrusting), Value::boolean(used), Value::integer(ignitions), Value::number(burst_left_), Value::number(ground_since_),
-                           Value::number(last_thrust_)});
+  return Value::structure({rules::number(fuel), Value::boolean(thrusting), Value::boolean(used), Value::integer(ignitions), rules::number(burst_left_), rules::number(ground_since_),
+                           rules::number(last_thrust_)});
 }
 void Jetpack::take(const kern::logic::Value& v) {
   if (v.fields() < 7) return;

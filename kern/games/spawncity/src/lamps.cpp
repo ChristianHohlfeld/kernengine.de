@@ -128,11 +128,11 @@ i32 Field::shot(Vec3 a, Vec3 b) const {
 
 std::vector<Field::BlastHit> Field::blast(Vec3 p, f32 radius) const {
   std::vector<BlastHit> out;
-  const f32 reach = static_cast<f32>(g_rules.number("BlastReach", {Value::number(radius)}));
+  const f32 reach = static_cast<f32>(g_rules.number("BlastReach", {rules::number(radius)}));
   std::vector<Value> r;
   for (i32 k : near(p.x, p.y, reach)) {
     const Lamp& l = lamps_[static_cast<std::size_t>(k)];
-    if (!g_rules.call("BlastFate", {Value::vector(l.foot), Value::vector(p), Value::number(reach)}, r) || r.size() < 3) continue;
+    if (!g_rules.call("BlastFate", {Value::vector(l.foot), Value::vector(p), rules::number(reach)}, r) || r.size() < 3) continue;
     const Vec3 push = r[1].as_vector();
     out.push_back({k, static_cast<u8>(r[0].i), {push.x, push.y}, static_cast<f32>(r[2].as_number())});
   }
@@ -144,7 +144,7 @@ std::vector<Field::CarHit> Field::car(Vec3 pos, f32 yaw, Vec3 v, f32 hl, f32 hw,
   std::vector<Value> r;
   for (i32 k : near(pos.x, pos.y, hl + 1)) {
     const Lamp& l = lamps_[static_cast<std::size_t>(k)];
-    if (!g_rules.call("CarFate", {Value::vector(l.foot), Value::integer(l.state), Value::vector(pos), Value::number(yaw), Value::vector(v), Value::number(hl), Value::number(hw), Value::number(m)}, r) ||
+    if (!g_rules.call("CarFate", {Value::vector(l.foot), Value::integer(l.state), Value::vector(pos), rules::number(yaw), Value::vector(v), rules::number(hl), rules::number(hw), rules::number(m)}, r) ||
         r.size() < 4 || !r[0].b)
       continue;
     CarHit h;

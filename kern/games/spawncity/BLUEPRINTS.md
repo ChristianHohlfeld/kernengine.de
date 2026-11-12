@@ -235,9 +235,7 @@ In dieser Reihenfolge (klein nach groß; jede Datei verschwindet, ihre Tests ble
   (mit der Umkehrung der Kurve des Flugreglers in 30 Halbierungen), RateStickStep, LookAdd /
   LookStep, ViewButtonStep, VoiceChordStep, ReleaseLatchStep, GrenadePull / Step / Release,
   DeviceInput, HintLine … `controls.cpp` hält nur noch, was ein Modus zwischen zwei Bildern
-  behält, und ruft auf. Der Blueprint rechnet wie das JavaScript des Originals in 64 Bit; drei
-  Prüfungen, die genau auf dem Rand einer Totzone standen (0,1 als 32-Bit-Zahl liegt knapp
-  darüber), prüfen jetzt knapp darunter.
+  behält, und ruft auf.
 - [x] **`settings`** – Actor „Settings“: die Tabelle aller 60 Einstellungen als Datentabelle
   (Variable Options, eine Liste der Struktur Option: Key, Section, Label, Help, Min, Max, Step,
   Default, Toggle, Live – im Editor als Tabelle zu bearbeiten) und die Funktionen Snap (ein Wert,
@@ -278,6 +276,20 @@ In dieser Reihenfolge (klein nach groß; jede Datei verschwindet, ihre Tests ble
   Punktetafel, die dichteste Gruppe für den Einstieg – Systeme (Stufe 4).
 - **Damit sind die Regeln aller dreizehn Dateien Blueprints** (17 Actors im Ordner „Rules“ des
   Levels). Was in den Dateien noch steht, sind Brücken und Systeme.
+- **Zahlen an der Grenze (32 Bit im Spiel, 64 Bit im Blueprint).** Ein Blueprint rechnet in
+  64 Bit, wie das JavaScript des Originals, und nennt seine Schwellen dezimal (0,1 · 2,6 · 0,42).
+  Das C++ des Spiels hält seinen Zustand in 32 Bit; dort ist „0,1“ die Zahl 0,100000001490116…
+  – unverändert weitergereicht läge sie knapp jenseits einer Schwelle 0,1, auf der sie genau
+  steht. Darum geht jede 32-Bit-Zahl als die Dezimalzahl hinüber, für die sie steht
+  (`rules::number`, `rules::decimal` in `blueprint_call.h`: die kürzeste Dezimalzahl, die genau
+  diese 32-Bit-Zahl ist). Damit antwortet jeder Vergleich einer Zahl des Spiels mit einer
+  Schwelle genau wie vorher in 32 Bit – auf der Schwelle und auf beiden Seiten; der Weg ist
+  eineindeutig (zurück in 32 Bit ist es dieselbe Zahl) und erhält die Ordnung. Geprüft im Test
+  `controls_numbers_cross_exactly`: 29 Schwellen der Regeln mit je vier 32-Bit-Nachbarn zu beiden
+  Seiten, dazu 200.000 Zahlen hin und zurück. Die drei Prüfungen, die zwischenzeitlich „knapp
+  unter der Schwelle“ prüften, prüfen wieder genau auf ihr. Was eine Regel aus mehreren Zahlen
+  *ausrechnet*, rechnet sie in 64 Bit – in Interpreter, JIT und Klasse und auf jeder Plattform
+  Bit für Bit gleich (die Vergleichsläufe der Stufen prüfen das mit jedem Aufruf).
 - **Gemessen** (wie das Spiel gebaut, -O2, `SC_TEST_RELEASE=1 run_tests.sh controls_call_cost`):
   Ein Aufruf einer Regel aus C++ kostet als Klasse rund 0,2 µs (eine Formel), 0,3 µs (mehrere
   Knoten, eine Schleife, eine zweite Funktion) bis 0,7 µs (eine Struktur hinein und heraus). Je

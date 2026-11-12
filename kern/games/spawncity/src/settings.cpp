@@ -74,7 +74,7 @@ Settings::Settings() {
 void Settings::set(Opt o, f32 value) {
   const u32 i = static_cast<u32>(o);
   if (i >= g_rows.size() || !std::isfinite(value)) return;
-  const f32 v = static_cast<f32>(g_rules.number("Snap", {g_rows[i], Value::number(value)}));
+  const f32 v = static_cast<f32>(g_rules.number("Snap", {g_rows[i], rules::number(value)}));
   if (v != v_[i]) { v_[i] = v; ++version_; }
 }
 

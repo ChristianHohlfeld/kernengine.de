@@ -110,8 +110,8 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
     j.arms = n.arms;
     f32 wmax = 0;
     for (const Arm& a : n.arms) wmax = std::fmax(wmax, a.width);
-    j.lights = g_rules.flag("JunctionLights", {Value::number(wmax)});
-    j.radius = num("JunctionRadius", {Value::number(wmax)});
+    j.lights = g_rules.flag("JunctionLights", {rules::number(wmax)});
+    j.radius = num("JunctionRadius", {rules::number(wmax)});
     // The axis: the widest arm (the main road); of several as wide, the one with the smallest
     // bearing - the same on every machine, whatever order its streets came in
     {
@@ -186,7 +186,7 @@ void TrafficRules::bind(kern::logic::Instance* blueprint) {
 i32 TrafficRules::light(const Junction& j, Vec2 heading, f32 now) const {
   if (!j.lights) return -1;
   std::vector<Value> r;
-  if (!g_rules.call("Light", {Value::number(lights_time >= 0 ? lights_time : now), Value::number(j.offset), Value::number(heading.x * j.axis.x + heading.y * j.axis.y)}, r) || r.empty()) return -1;
+  if (!g_rules.call("Light", {rules::number(lights_time >= 0 ? lights_time : now), rules::number(j.offset), rules::number(heading.x * j.axis.x + heading.y * j.axis.y)}, r) || r.empty()) return -1;
   return static_cast<i32>(r[0].i);
 }
 
@@ -241,7 +241,7 @@ f32 TrafficRules::gap_speed(i32 self, Vec2 pos, Vec2 fwd, bool bus, const std::v
   }
   if (limiter) *limiter = who;
   if (who < 0) return 1e9f;
-  return num("GapSpeed", {Value::number(gap)});
+  return num("GapSpeed", {rules::number(gap)});
 }
 
 f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 now, const std::vector<Vec3>& cars, const std::vector<Vec2>& people, Vec2 player,
@@ -251,7 +251,7 @@ f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 no
   const f32 v = std::fmax(0.0f, speed);
   // 1. people in the corridor (yieldsToPedestrian)
   {
-    const f32 reach = num("YieldReach", {Value::boolean(bus), Value::number(v)}), half = num("YieldHalfWidth", {Value::boolean(bus)});
+    const f32 reach = num("YieldReach", {Value::boolean(bus), rules::number(v)}), half = num("YieldHalfWidth", {Value::boolean(bus)});
     auto in_lane = [&](Vec2 q) {
       const f32 dx = q.x - pos.x, dy = q.y - pos.y, along = dx * fwd.x + dy * fwd.y;
       return along >= -0.5f && along <= reach && std::fabs(-dx * fwd.y + dy * fwd.x) < half;
@@ -267,7 +267,7 @@ f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 no
       // honkCheck: the player sooner, a pedestrian after a while; then 9..16 s apart
       // (how much later the next honk comes: a number 0..1 from the car and the second)
       const f32 roll = static_cast<f32>((static_cast<u32>(car) * 2654435761u + static_cast<u32>(now)) % 700) / 700;
-      if (std::vector<Value> r; g_rules.call("Honk", {Value::boolean(by_player), Value::number(b.since), Value::number(b.next_honk), Value::number(now), Value::number(roll)}, r) && r.size() >= 2) {
+      if (std::vector<Value> r; g_rules.call("Honk", {Value::boolean(by_player), rules::number(b.since), rules::number(b.next_honk), rules::number(now), rules::number(roll)}, r) && r.size() >= 2) {
         view.honk = r[0].b;
         b.next_honk = static_cast<f32>(r[1].as_number());
       }
@@ -299,7 +299,7 @@ f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 no
     const f32 stop = std::fmax(0.0f, view.distance - g_laws.stop_line);  // the stop line before the junction
     bool must_stop = false;
     view.light = light(j, fwd, now);
-    if (view.light >= 0) must_stop = g_rules.flag("MustStop", {Value::integer(view.light), Value::number(stop), Value::number(v)});  // red; amber: stop if it can
+    if (view.light >= 0) must_stop = g_rules.flag("MustStop", {Value::integer(view.light), rules::number(stop), rules::number(v)});  // red; amber: stop if it can
     else if (view.distance < g_laws.first_come) {
       // Unsignalled: wait while someone else holds the junction (and is still in it).
       if (j.claim >= 0 && j.claim != car && j.claim < static_cast<i32>(cars.size()) && now - j.claim_at < g_laws.claim_s) {
@@ -326,7 +326,7 @@ f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 no
     }
     if (must_stop) {
       view.wait = true;
-      lim = std::fmin(lim, num("StopSpeed", {Value::number(stop)}));
+      lim = std::fmin(lim, num("StopSpeed", {rules::number(stop)}));
     }
   }
   return lim;

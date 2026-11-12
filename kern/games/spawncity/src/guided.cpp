@@ -11,8 +11,8 @@ rules::Blueprint g_rules;
 
 // The Blueprint's struct Missile, field by field in its order.
 Value to_value(const Missile& m) {
-  return Value::structure({Value::vector(m.p), Value::vector(m.v), Value::vector(m.goal), Value::number(m.born), Value::number(m.cruise_z), Value::boolean(m.motor),
-                           Value::boolean(m.pedestrian), Value::number(m.dodge.seconds), Value::boolean(m.dodge.lost), Value::vector({m.dodge_last.x, m.dodge_last.y, 0}),
+  return Value::structure({Value::vector(m.p), Value::vector(m.v), Value::vector(m.goal), rules::number(m.born), rules::number(m.cruise_z), Value::boolean(m.motor),
+                           Value::boolean(m.pedestrian), rules::number(m.dodge.seconds), Value::boolean(m.dodge.lost), Value::vector({m.dodge_last.x, m.dodge_last.y, 0}),
                            Value::boolean(m.tracking)});
 }
 bool to_missile(const Value& v, Missile& m) {
@@ -47,31 +47,31 @@ f32 ignite() { return static_cast<f32>(g_rules.variable("Ignite")); }
 
 Dodge update_dodge(Dodge state, Vec2 previous, Vec2 current, f32 dt, bool pedestrian) {
   std::vector<Value> r;
-  if (!g_rules.call("UpdateDodge", {Value::number(state.seconds), Value::boolean(state.lost), Value::vector({previous.x, previous.y, 0}), Value::vector({current.x, current.y, 0}),
-                                    Value::number(dt), Value::boolean(pedestrian)}, r) || r.size() < 2)
+  if (!g_rules.call("UpdateDodge", {rules::number(state.seconds), Value::boolean(state.lost), Value::vector({previous.x, previous.y, 0}), Value::vector({current.x, current.y, 0}),
+                                    rules::number(dt), Value::boolean(pedestrian)}, r) || r.size() < 2)
     return state;
   return {static_cast<f32>(r[0].as_number()), r[1].b};
 }
 
 f32 pick_score(Vec3 eye, Vec3 forward, f32 fov, f32 height_px, Vec3 target) {
-  return static_cast<f32>(g_rules.number("PickScore", {Value::vector(eye), Value::vector(forward), Value::number(fov), Value::number(height_px), Value::vector(target)}));
+  return static_cast<f32>(g_rules.number("PickScore", {Value::vector(eye), Value::vector(forward), rules::number(fov), rules::number(height_px), Value::vector(target)}));
 }
 
 Missile launch(Vec3 start, Vec3 target, f32 now, bool pedestrian) {
   Missile m;
   std::vector<Value> r;
-  if (g_rules.call("Launch", {Value::vector(start), Value::vector(target), Value::number(now), Value::boolean(pedestrian)}, r) && !r.empty()) to_missile(r[0], m);
+  if (g_rules.call("Launch", {Value::vector(start), Value::vector(target), rules::number(now), Value::boolean(pedestrian)}, r) && !r.empty()) to_missile(r[0], m);
   return m;
 }
 
 void track(Missile& m, Vec3 at, f32 dt) {
   std::vector<Value> r;
-  if (g_rules.call("Track", {to_value(m), Value::vector(at), Value::number(dt)}, r) && !r.empty()) to_missile(r[0], m);
+  if (g_rules.call("Track", {to_value(m), Value::vector(at), rules::number(dt)}, r) && !r.empty()) to_missile(r[0], m);
 }
 
 Result step(Missile& m, f32 now, f32 dt, f32 ground) {
   std::vector<Value> r;
-  if (!g_rules.call("Step", {to_value(m), Value::number(now), Value::number(dt), Value::number(ground)}, r) || r.size() < 2 || !to_missile(r[0], m)) return Result::flying;
+  if (!g_rules.call("Step", {to_value(m), rules::number(now), rules::number(dt), rules::number(ground)}, r) || r.size() < 2 || !to_missile(r[0], m)) return Result::flying;
   return static_cast<Result>(r[1].i);
 }
 
