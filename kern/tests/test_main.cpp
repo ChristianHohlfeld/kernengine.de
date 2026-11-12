@@ -748,6 +748,61 @@ TEST(primitives_capsule_torus) {
   CHECK(outward_winding(tor, {}));
 }
 
+TEST(physics_query_filter_is_box3ds) {
+  // A query has a category and a mask, as a shape has: it meets a shape when
+  // (shape.category & query.mask) != 0 && (shape.mask & query.category) != 0 (Box3D, Query Filtering).
+  using namespace physics;
+  enum : u64 { kStatic = 1, kMonster = 4, kWindow = 8, kCamera = 16, kProjectile = 32 };
+  World w;
+  CHECK(w.create({}));
+  auto slab = [&](f32 z, u64 category, u64 mask) {
+    BodySettings bs;
+    bs.type = BodyType::fixed;
+    bs.position = {0, 0, z};
+    const Body b = w.create_body(bs);
+    ShapeSettings ss;
+    ss.size = {4, 4, 0.2f};
+    ss.material.category_bits = category;
+    ss.material.mask_bits = mask;
+    CHECK(w.create_shape(b, ss).valid());
+    return b;
+  };
+  const Body floor = slab(0, kStatic, ~0ull);
+  const Body window = slab(2, kWindow, ~kCamera);  // (a window: the view goes through it)
+  const Body monster = slab(4, kMonster, ~0ull);
+  w.step(1.0f / 60, 4);
+  const Vec3 from{0, 0, 10}, down{0, 0, -20};
+  // everything: the first on the way
+  CHECK(w.cast_ray(from, down).body == monster);
+  // the mask alone: only these categories
+  CHECK(w.cast_ray(from, down, kStatic).body == floor);
+  CHECK(w.cast_ray(from, down, kStatic | kWindow).body == window);
+  CHECK(!w.cast_ray(from, down, kProjectile).hit);
+  // the query's own category: the window leaves the camera's ray out, not the projectile's
+  CHECK(w.cast_ray(from, down, QueryFilter(kStatic | kWindow, kCamera)).body == floor);
+  CHECK(w.cast_ray(from, down, QueryFilter(kStatic | kWindow, kProjectile)).body == window);
+  // the same for a swept sphere
+  CHECK(w.cast_sphere(from, 0.2f, down, QueryFilter(kStatic | kWindow, kCamera)).body == floor);
+  CHECK(w.cast_sphere(from, 0.2f, down, QueryFilter(kWindow | kMonster, kCamera)).body == monster);
+}
+
+TEST(level_collision_channels_have_names) {
+  // The level names its collision channels; a name is a bit of a collider's category and mask.
+  game::WorldSettings w;
+  CHECK(game::channel_names(w) == std::vector<std::string>{"World"} && game::channel_bits(w, "World") == 1);
+  w.channels = "World, Vehicle ,Drone,, Query";
+  CHECK((game::channel_names(w) == std::vector<std::string>{"World", "Vehicle", "Drone", "", "Query"}));
+  CHECK(game::channel_bits(w, "Vehicle") == 2 && game::channel_bits(w, " Drone , World") == 5 && game::channel_bits(w, "Query") == 16);
+  CHECK(game::channel_bits(w, "Nothing") == 0 && game::channel_bits(w, "") == 0 && game::channel_bits(w, "All") == 0xffffffffu && game::channel_bits(w, "World, *") == 0xffffffffu);
+  // it is part of the level file (the default is left out)
+  game::Level level;
+  level.world.channels = w.channels;
+  game::Level back;
+  std::string error;
+  CHECK(game::from_json(game::to_json(level), back, &error) && back.world.channels == w.channels);
+  CHECK(!game::to_json(game::Level())["world"].find("channels"));
+}
+
 TEST(physics_world_bodies_and_events) {
   using namespace physics;
   World w;
@@ -3806,7 +3861,7 @@ TEST(game_blueprints_as_classes) {
     if (!used.count(type)) std::printf("no game case has %s\n", type.c_str());
     CHECK(d && d->native && used.count(type));
   }
-  CHECK(game::logic_node_types().size() == 72 && game::logic_node_shapes_registered());
+  CHECK(game::logic_node_types().size() == 74 && game::logic_node_shapes_registered());
   // the Arena, as the file the classes are written from: the same Blueprints
   game::Level stored;
   CHECK(game::from_text(game::to_text(cases[0].level), stored, &error) && logic::graph_hash(stored.logic) == logic::graph_hash(cases[0].level.logic));
@@ -10258,6 +10313,26 @@ TEST(studio_shortcuts_and_commands) {
   CHECK(!f.s->level().find(cube)->body.has_value());
   CHECK(f.cmd(R"({"cmd":"setWorld","path":"world.timeOfDay","value":0.5})")["ok"].as_bool());
   CHECK_NEAR(f.s->level().world.time_of_day, 0.5f, 1e-4f);
+  // Collision channels: the level names them, a collider's fields show the names (its bits are Box3D's category and mask).
+  CHECK(f.cmd(R"({"cmd":"setWorld","path":"world.channels","value":"World, Vehicle, Drone"})")["ok"].as_bool());
+  CHECK(f.s->level().world.channels == "World, Vehicle, Drone");
+  CHECK(f.cmd(R"({"cmd":"addComponent","type":"collider"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"set","path":"components.colliders.0.category","value":2})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"set","path":"components.colliders.0.mask","value":5})")["ok"].as_bool());
+  CHECK(f.s->level().find(cube)->colliders.size() == 1 && f.s->level().find(cube)->colliders[0].category == 2 && f.s->level().find(cube)->colliders[0].mask == 5);
+  {
+    const json::Value shown = f.s->state();
+    int channel_fields = 0;
+    for (const json::Value& sec : shown["details"]["sections"].items())
+      for (const json::Value& fd : sec["fields"].items())
+        if (fd["type"].as_string() == "channels") {
+          ++channel_fields;
+          CHECK(fd["names"].size() == 3 && fd["names"][1].as_string() == "Vehicle");
+          CHECK(fd["path"].as_string() == "components.colliders.0.category" ? fd["value"].as_number() == 2 : fd["value"].as_number() == 5);
+        }
+    CHECK(channel_fields == 2);
+  }
+  CHECK(f.cmd(R"({"cmd":"removeComponent","type":"collider","index":0})")["ok"].as_bool());
   // Details JSON lists the sections of the selection.
   const json::Value st = f.s->state();
   CHECK(st["details"]["sections"].size() >= 3);

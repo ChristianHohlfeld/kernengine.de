@@ -1,10 +1,16 @@
 // sc-m3-gaps: spawn visibility and vehicle clearance (spawn_guard.h), sirens, dispatch, critical
 // smoke, organic hit audio (gaps_rules.h).
+#include <memory>
+
 #include "../src/gaps_rules.h"
 #include "../src/jet_seats.h"
 #include "../src/lamps.h"
+#include "../src/rules.h"
 #include "../src/spawn_guard.h"
 #include "../src/world_traffic.h"
+#include "kern/game/runtime.h"
+#include "kern/kern.h"
+#include "rule_blueprint.h"
 #include "test_util.h"
 
 using namespace sc;
@@ -21,7 +27,64 @@ SC_TEST(gaps_crossing_junctions) {
   SC_CHECK(t.junctions().size() == 1 && t.junctions()[0].arms.size() == 4 && t.junctions()[0].lights, "junctions %zu", t.junctions().size());
 }
 
+namespace {
+/// The level's actor "SpawnGuard" running in a game world of its own - the rule asks the world
+/// whether buildings hide a point (a ray against the channel "World") - bound to spawn_guard.h.
+/// With a wall: a building across the view, 40 m ahead.
+struct SpawnGuardWorld {
+  kern::Renderer renderer;
+  kern::game::NightWindows windows;
+  std::unique_ptr<kern::game::GameWorld> world;
+  kern::logic::Instance* inst = nullptr;
+  std::string problems;
+  explicit SpawnGuardWorld(bool wall, bool vehicle_wall = false) {
+    kern::ShaderExtension* ext[1] = {&windows};
+    kern::RendererOptions o;
+    renderer.init(o, kern::Span<kern::ShaderExtension* const>(ext, 1));
+    world = std::make_unique<kern::game::GameWorld>(renderer, &windows);
+    kern::game::Level level;
+    level.world.channels = "World, Vehicle, Drone, Query";
+    level.world.ground = false;
+    kern::game::Actor guard;
+    guard.name = "SpawnGuard";
+    guard.logic.emplace();
+    std::string error;
+    if (!rules::actor_graph("SpawnGuard", *guard.logic, &error)) problems = error;
+    for (const kern::logic::Issue& i : kern::logic::check(*guard.logic)) problems += (i.error ? "error: " : "warning: ") + i.text + "\n";
+    const kern::game::ActorId id = level.add(guard).id;
+    if (wall) {
+      kern::game::Actor a;
+      a.name = "Wall";
+      a.transform.position = {40, 0, 30};
+      a.mesh.emplace();
+      a.mesh->shape = kern::game::Shape::box;
+      a.mesh->size = {1, 400, 60};
+      if (vehicle_wall) {  // (not a building: a thing of the channel "Vehicle")
+        a.mesh->collision = false;
+        kern::game::ColliderComponent c;
+        c.size = a.mesh->size;
+        c.category = 2;
+        a.colliders.push_back(c);
+      }
+      level.add(a);
+    }
+    if (!world->start(level, kern::game::SimMode::simulate)) problems += "the world does not start\n";
+    inst = world->logic_runtime() ? world->logic_runtime()->find(id) : nullptr;
+    spawn::bind(inst);
+  }
+  ~SpawnGuardWorld() {
+    spawn::bind(nullptr);
+    world.reset();
+    renderer.shutdown();
+  }
+};
+}  // namespace
+
 SC_TEST(spawn_guard_rules) {
+  SpawnGuardWorld open(false);
+  SC_CHECK(open.inst && open.problems.empty() && !open.inst->disabled(), "the level's SpawnGuard Blueprint compiles and runs: %s", open.problems.c_str());
+  if (!open.inst) return;
+  SC_CHECK(std::string(open.inst->tier()) == "native C++", "the SpawnGuard Blueprint runs as its C++ class (it runs: %s)", open.inst->tier());
   spawn::Viewer v;
   v.eye = {0, 0, 1.7f};
   v.forward = {1, 0, 0};
@@ -30,25 +93,38 @@ SC_TEST(spawn_guard_rules) {
   const std::vector<spawn::Viewer> vs{v};
   // the 60 deg vertical / 16:9 view is ~91 deg wide: half 45.7 + 20 deg
   SC_CHECK(std::fabs(v.half_angle - (45.7f + 20) * kDeg) < 0.6f * kDeg, "half %.2f", v.half_angle / kDeg);
-  SC_CHECK(!spawn::can_spawn(vs, {10, -15, 0}, 0, 2.2f, nullptr), "closer than 24 m is always seen");
-  SC_CHECK(!spawn::can_spawn(vs, {-20, 5, 0}, 0, 2.2f, nullptr), "behind but within 24 m");
-  SC_CHECK(spawn::can_spawn(vs, {-60, 0, 0}, 0, 2.2f, nullptr), "behind, far enough");
-  SC_CHECK(!spawn::can_spawn(vs, {80, 20, 0}, 0, 2.2f, nullptr), "in view");
-  // a building in between hides it - both the feet and the top
-  auto wall = [](Vec3, Vec3) { return true; };
-  SC_CHECK(spawn::can_spawn(vs, {80, 20, 0}, 0, 2.2f, wall), "hidden by a building");
-  SC_CHECK(!spawn::can_spawn(vs, {500, 0, 0}, 0, 2.2f, wall), "beyond 420 m buildings do not count");
-  SC_CHECK(spawn::can_spawn(vs, {1600, 0, 0}, 0, 2.2f, nullptr), "beyond the far plane");
-  SC_CHECK(spawn::can_spawn(vs, {300, 0, 0}, 250, 2.2f, nullptr), "far entry allowed in view");
+  SC_CHECK(std::fabs(spawn::default_far() - 1500) < 1e-3f, "the distances are its variables");
+  SC_CHECK(!spawn::can_spawn(vs, {10, -15, 0}, 0, 2.2f), "closer than 24 m is always seen");
+  SC_CHECK(!spawn::can_spawn(vs, {-20, 5, 0}, 0, 2.2f), "behind but within 24 m");
+  SC_CHECK(spawn::can_spawn(vs, {-60, 0, 0}, 0, 2.2f), "behind, far enough");
+  SC_CHECK(!spawn::can_spawn(vs, {80, 20, 0}, 0, 2.2f), "in view");
+  SC_CHECK(spawn::seen_by(v, {80, 20, 0}, 0, 2.2f) && !spawn::seen_by(v, {-60, 0, 0}, 0, 2.2f), "one viewer alone");
+  SC_CHECK(spawn::can_spawn(vs, {1600, 0, 0}, 0, 2.2f), "beyond the far plane");
+  SC_CHECK(spawn::can_spawn(vs, {300, 0, 0}, 250, 2.2f), "far entry allowed in view");
   // a mate looking the other way sees what we do not
   spawn::Viewer mate;
   mate.eye = {0, 0, 1.7f};
   mate.forward = {-1, 0, 0};
   mate.half_angle = v.half_angle;
-  SC_CHECK(!spawn::can_spawn({v, mate}, {-60, 0, 0}, 0, 2.2f, nullptr), "in the mate's view");
+  SC_CHECK(!spawn::can_spawn({v, mate}, {-60, 0, 0}, 0, 2.2f), "in the mate's view");
+  {
+    // a building in between hides it - both the feet and the top
+    SpawnGuardWorld town(true);
+    SC_CHECK(town.inst && town.problems.empty(), "(a world with a building: %s)", town.problems.c_str());
+    SC_CHECK(spawn::can_spawn(vs, {80, 20, 0}, 0, 2.2f), "hidden by a building");
+    SC_CHECK(!spawn::can_spawn(vs, {80, 20, 0}, 0, 200.0f), "something taller than the building shows above it");
+    SC_CHECK(!spawn::can_spawn(vs, {500, 0, 0}, 0, 2.2f), "beyond 420 m buildings do not count");
+    SC_CHECK(!spawn::can_spawn(vs, {30, 5, 0}, 0, 2.2f), "in front of the building");
+  }
+  {
+    // only buildings hide: a thing of another collision channel in the way does not
+    SpawnGuardWorld traffic(true, true);
+    SC_CHECK(!spawn::can_spawn(vs, {80, 20, 0}, 0, 2.2f), "a vehicle in between hides nothing");
+  }
 }
 
 SC_TEST(vehicle_clearance_sat) {
+  SpawnGuardWorld bp(false);
   const spawn::Footprint a{{0, 0}, 0, {2.3f, 0.95f}};
   SC_CHECK(spawn::footprints_overlap(a, {{4.0f, 0}, 0, {2.3f, 0.95f}}), "nose to tail 4 m apart overlap (4.6 m long)");
   SC_CHECK(!spawn::footprints_overlap(a, {{5.2f, 0}, 0, {2.3f, 0.95f}}), "5.2 m apart: clear with 0.35 margin");
@@ -140,6 +216,10 @@ SC_TEST(gaps_street_lamps) {
 SC_TEST(gaps_jet_seats) {
   using seats::Result;
   using seats::Seat;
+  RuleBlueprint bp("JetSeats", &seats::bind);
+  SC_CHECK(bp.inst && bp.problems.empty() && !bp.inst->disabled(), "the level's JetSeats Blueprint compiles and runs: %s", bp.problems.c_str());
+  SC_CHECK(bp.inst && std::string(bp.inst->tier()) == "native C++", "it runs as its C++ class");
+  SC_CHECK(seats::result_name(Result::owner_only_pilot) == "owner-only-pilot" && seats::result_name(Result::ok) == "ok", "a result by its name");
   seats::Table t;
   SC_CHECK(t.claim(1, 2, Seat::pilot) == Result::owner_only_pilot, "only the owner flies");
   SC_CHECK(t.claim(1, 2, Seat::passenger) == Result::no_pilot, "no ride without a pilot");

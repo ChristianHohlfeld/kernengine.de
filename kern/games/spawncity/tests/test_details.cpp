@@ -4,6 +4,7 @@
 #include "../src/combat_detail.h"
 #include "../src/guided.h"
 #include "../src/rules.h"
+#include "rule_blueprint.h"
 #include "test_util.h"
 
 #include <algorithm>
@@ -12,31 +13,6 @@
 using namespace sc;
 
 namespace {
-/// A rule actor of the level running in a logic runtime of its own, bound to the C++ that calls it.
-struct RuleBlueprint {
-  struct Host : kern::logic::Host {
-    std::string errors;
-    f64 time() const override { return 0; }
-    void print(const std::string&, bool) override {}
-    void error(const std::string& text) override { errors += text + "\n"; }
-    kern::u32 random() override { return 4; }
-  } host;
-  kern::logic::Runtime rt{host};
-  kern::logic::Instance* inst = nullptr;
-  std::string problems;
-  void (*bind)(kern::logic::Instance*) = nullptr;
-  RuleBlueprint(const char* actor, void (*binder)(kern::logic::Instance*), bool native = true) : bind(binder) {
-    kern::logic::Graph g;
-    std::string error;
-    if (!rules::actor_graph(actor, g, &error)) { problems = error; return; }
-    for (const kern::logic::Issue& i : kern::logic::check(g)) problems += (i.error ? "error: " : "warning: ") + i.text + "\n";
-    rt.native = native;
-    inst = rt.add(g, 2, actor);
-    rt.begin();
-    bind(inst);
-  }
-  ~RuleBlueprint() { bind(nullptr); }
-};
 struct CombatDetailBlueprint : RuleBlueprint {
   explicit CombatDetailBlueprint(bool native = true) : RuleBlueprint("CombatDetail", &detail::bind, native) {}
 };

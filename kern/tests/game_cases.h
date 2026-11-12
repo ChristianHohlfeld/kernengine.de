@@ -95,6 +95,11 @@ struct Level : kern::Blueprint {
     Last = n40.actor;
     At = vector_add(n40.location, n40.normal);
     physics_trace(Vector{0.0, 0.0, 10.0}, Vector{0.0, 0.0, 9.0}, actor);
+    physics_trace_channels(n41, Vector{0.0, 0.0, 10.0}, Vector{0.0, 0.0, -1.0}, Actor{0}, physics_channels("World"), 4294967295);
+    physics_trace_channels(n42, Vector{0.0, 0.0, 10.0}, Vector{0.0, 0.0, -1.0}, Actor{0}, physics_channels("Nothing"), 4294967295);
+    Log = text_append(Log, kern::to<Text>(n41.hit), kern::to<Text>(n42.hit));
+    Log = text_append(Log, kern::to<Text>(physics_channels("All")), actor_name(n41.actor));
+    physics_trace_channels(Vector{0.0, 0.0, 10.0}, Vector{0.0, 0.0, 9.0}, actor, 1, 1);
   }
 
   KERN_EVENT(on5, event_custom<"Boom">)
@@ -235,6 +240,8 @@ struct Level : kern::Blueprint {
 
   kern::Node<20> n20;
   struct { Bool hit = false; Actor actor = Actor{0}; Vector location = Vector{0.0, 0.0, 0.0}; Vector normal = Vector{0.0, 0.0, 0.0}; } n40;
+  struct { Bool hit = false; Actor actor = Actor{0}; Vector location = Vector{0.0, 0.0, 0.0}; Vector normal = Vector{0.0, 0.0, 0.0}; } n41;
+  struct { Bool hit = false; Actor actor = Actor{0}; Vector location = Vector{0.0, 0.0, 0.0}; Vector normal = Vector{0.0, 0.0, 0.0}; } n42;
   struct { Actor spawned = Actor{0}; } n50;
   struct : kern::Node<60> { Actor actor = Actor{0}; Int index = 0; } n60;
   struct : kern::Node<61> { Actor item = Actor{0}; Int index = 0; } n61;

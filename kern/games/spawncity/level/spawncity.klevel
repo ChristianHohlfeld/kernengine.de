@@ -3,6 +3,7 @@
  "version": 1,
  "name": "SpawnCity",
  "world": {
+  "channels": "World, Vehicle, Drone, Query",
   "title": "SpawnCity",
   "timeOfDay": 0.4,
   "dayLength": 480,
@@ -15,7 +16,7 @@
   "ambienceVolume": 0.35,
   "reverb": 0.2
  },
- "nextId": 4,
+ "nextId": 6,
  "actors": [
   {
    "id": 1,
@@ -9780,6 +9781,6979 @@
          "name": "MaxDv",
          "type": "float",
          "value": 0
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": 4,
+   "name": "SpawnGuard",
+   "folder": "Rules",
+   "transform": {
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     1
+    ]
+   },
+   "components": {
+    "logic": {
+     "kind": "kern-logic",
+     "version": 1,
+     "nextId": 207,
+     "variables": [
+      {
+       "name": "MinDistance",
+       "type": "float",
+       "value": 24,
+       "help": "spawn_visibility_guard.mjs: never closer to any viewer (m)"
+      },
+      {
+       "name": "ConeMargin",
+       "type": "float",
+       "value": 0.3490658503988659,
+       "help": "On top of the half field of view (20 degrees, in radians)"
+      },
+      {
+       "name": "OcclusionMax",
+       "type": "float",
+       "value": 420,
+       "help": "Buildings only hide what is nearer (m)"
+      },
+      {
+       "name": "DefaultFar",
+       "type": "float",
+       "value": 1500
+      },
+      {
+       "name": "DefaultHeight",
+       "type": "float",
+       "value": 2.2
+      },
+      {
+       "name": "FrustumSphere",
+       "type": "float",
+       "value": 1.5,
+       "help": "The sphere tested against the local frustum (m)"
+      },
+      {
+       "name": "BuildingChannels",
+       "type": "text",
+       "value": "World",
+       "help": "What hides a point from an eye: the collision channels of the buildings"
+      }
+     ],
+     "structs": [
+      {
+       "name": "Viewer",
+       "fields": [
+        {
+         "name": "Eye",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "Forward",
+         "type": "vector",
+         "value": [
+          1,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "HalfAngle",
+         "type": "float",
+         "value": 1.5707963267948966
+        },
+        {
+         "name": "Far",
+         "type": "float",
+         "value": 1500
+        },
+        {
+         "name": "Local",
+         "type": "bool",
+         "value": false
+        }
+       ],
+       "help": "Somebody who looks: a player's camera. Forward: a unit vector. Local: the presented camera - the frustum of a sphere is tested as well as the cone."
+      },
+      {
+       "name": "Footprint",
+       "fields": [
+        {
+         "name": "Center",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "Yaw",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "Half",
+         "type": "vector",
+         "value": [
+          1,
+          1,
+          0
+         ]
+        }
+       ],
+       "help": "A vehicle's footprint on the map: half extents along its x and y, turned by Yaw"
+      }
+     ],
+     "nodes": [
+      {
+       "id": 30,
+       "type": "func.call",
+       "x": 3920,
+       "y": 1390,
+       "params": {
+        "function": "Hidden"
+       }
+      },
+      {
+       "id": 32,
+       "type": "func.call",
+       "x": 4760,
+       "y": 1390,
+       "params": {
+        "function": "Hidden"
+       }
+      },
+      {
+       "id": 60,
+       "type": "physics.trace_channels",
+       "x": 1120,
+       "y": 380,
+       "values": {
+        "ignore": 0,
+        "category": 4294967295
+       }
+      },
+      {
+       "id": 70,
+       "type": "flow.for_each",
+       "x": 280,
+       "y": 2850,
+       "params": {
+        "type": "Viewer"
+       }
+      },
+      {
+       "id": 71,
+       "type": "func.call",
+       "x": 840,
+       "y": 2850,
+       "params": {
+        "function": "SeenBy"
+       }
+      },
+      {
+       "id": 72,
+       "type": "func.entry",
+       "x": 0,
+       "y": 0,
+       "params": {
+        "function": "ConeHalfAngle"
+       }
+      },
+      {
+       "id": 73,
+       "type": "func.return",
+       "x": 280,
+       "y": 0,
+       "params": {
+        "function": "ConeHalfAngle"
+       }
+      },
+      {
+       "id": 74,
+       "type": "math.formula",
+       "x": 160,
+       "y": 150,
+       "params": {
+        "formula": "min(2.8902652413026093, max(fov, 2 * atan(tan(fov / 2) * max(0.2, aspect))) / 2 + margin)"
+       }
+      },
+      {
+       "id": 75,
+       "type": "var.get",
+       "x": 160,
+       "y": 240,
+       "params": {
+        "variable": "ConeMargin"
+       }
+      },
+      {
+       "id": 76,
+       "type": "func.entry",
+       "x": 0,
+       "y": 380,
+       "params": {
+        "function": "Hidden"
+       }
+      },
+      {
+       "id": 77,
+       "type": "var.set",
+       "x": 280,
+       "y": 380,
+       "params": {
+        "variable": "L",
+        "scope": "Hidden"
+       }
+      },
+      {
+       "id": 78,
+       "type": "vector.distance",
+       "x": 160,
+       "y": 530
+      },
+      {
+       "id": 79,
+       "type": "flow.branch",
+       "x": 560,
+       "y": 380
+      },
+      {
+       "id": 80,
+       "type": "math.compare",
+       "x": 440,
+       "y": 530,
+       "params": {
+        "op": "<="
+       },
+       "values": {
+        "b": 1
+       }
+      },
+      {
+       "id": 81,
+       "type": "var.get",
+       "x": 440,
+       "y": 620,
+       "params": {
+        "variable": "L",
+        "scope": "Hidden"
+       }
+      },
+      {
+       "id": 82,
+       "type": "func.return",
+       "x": 840,
+       "y": 380,
+       "params": {
+        "function": "Hidden"
+       },
+       "values": {
+        "hidden": false
+       }
+      },
+      {
+       "id": 83,
+       "type": "vector.add",
+       "x": 1000,
+       "y": 530
+      },
+      {
+       "id": 84,
+       "type": "vector.scale",
+       "x": 1000,
+       "y": 620
+      },
+      {
+       "id": 85,
+       "type": "vector.sub",
+       "x": 1000,
+       "y": 710
+      },
+      {
+       "id": 86,
+       "type": "math.div",
+       "x": 1000,
+       "y": 800
+      },
+      {
+       "id": 87,
+       "type": "math.sub",
+       "x": 1000,
+       "y": 890,
+       "values": {
+        "b": 0.5
+       }
+      },
+      {
+       "id": 88,
+       "type": "var.get",
+       "x": 1000,
+       "y": 980,
+       "params": {
+        "variable": "L",
+        "scope": "Hidden"
+       }
+      },
+      {
+       "id": 89,
+       "type": "var.get",
+       "x": 1000,
+       "y": 1070,
+       "params": {
+        "variable": "L",
+        "scope": "Hidden"
+       }
+      },
+      {
+       "id": 90,
+       "type": "physics.channels",
+       "x": 1000,
+       "y": 1160
+      },
+      {
+       "id": 91,
+       "type": "var.get",
+       "x": 1000,
+       "y": 1250,
+       "params": {
+        "variable": "BuildingChannels"
+       }
+      },
+      {
+       "id": 92,
+       "type": "func.return",
+       "x": 1400,
+       "y": 380,
+       "params": {
+        "function": "Hidden"
+       }
+      },
+      {
+       "id": 93,
+       "type": "func.entry",
+       "x": 0,
+       "y": 1390,
+       "params": {
+        "function": "SeenBy"
+       }
+      },
+      {
+       "id": 94,
+       "type": "var.set",
+       "x": 280,
+       "y": 1390,
+       "params": {
+        "variable": "To",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 95,
+       "type": "vector.sub",
+       "x": 160,
+       "y": 1540
+      },
+      {
+       "id": 96,
+       "type": "struct.break",
+       "x": 160,
+       "y": 1630,
+       "params": {
+        "struct": "Viewer"
+       }
+      },
+      {
+       "id": 97,
+       "type": "var.set",
+       "x": 560,
+       "y": 1390,
+       "params": {
+        "variable": "D",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 98,
+       "type": "vector.length",
+       "x": 440,
+       "y": 1540
+      },
+      {
+       "id": 99,
+       "type": "var.get",
+       "x": 440,
+       "y": 1630,
+       "params": {
+        "variable": "To",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 100,
+       "type": "flow.branch",
+       "x": 840,
+       "y": 1390
+      },
+      {
+       "id": 101,
+       "type": "math.compare",
+       "x": 720,
+       "y": 1540,
+       "params": {
+        "op": "<"
+       }
+      },
+      {
+       "id": 102,
+       "type": "var.get",
+       "x": 720,
+       "y": 1630,
+       "params": {
+        "variable": "D",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 103,
+       "type": "var.get",
+       "x": 720,
+       "y": 1720,
+       "params": {
+        "variable": "MinDistance"
+       }
+      },
+      {
+       "id": 104,
+       "type": "func.return",
+       "x": 1120,
+       "y": 1390,
+       "params": {
+        "function": "SeenBy"
+       },
+       "values": {
+        "seen": true
+       }
+      },
+      {
+       "id": 105,
+       "type": "flow.branch",
+       "x": 1400,
+       "y": 1390
+      },
+      {
+       "id": 106,
+       "type": "logic.or",
+       "x": 1280,
+       "y": 1540
+      },
+      {
+       "id": 107,
+       "type": "math.compare",
+       "x": 1280,
+       "y": 1630,
+       "params": {
+        "op": ">"
+       }
+      },
+      {
+       "id": 108,
+       "type": "var.get",
+       "x": 1280,
+       "y": 1720,
+       "params": {
+        "variable": "D",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 109,
+       "type": "struct.break",
+       "x": 1280,
+       "y": 1810,
+       "params": {
+        "struct": "Viewer"
+       }
+      },
+      {
+       "id": 110,
+       "type": "logic.and",
+       "x": 1280,
+       "y": 1900
+      },
+      {
+       "id": 111,
+       "type": "math.compare",
+       "x": 1280,
+       "y": 1990,
+       "params": {
+        "op": ">"
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 112,
+       "type": "math.compare",
+       "x": 1280,
+       "y": 2080,
+       "params": {
+        "op": ">="
+       }
+      },
+      {
+       "id": 113,
+       "type": "var.get",
+       "x": 1280,
+       "y": 2170,
+       "params": {
+        "variable": "D",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 114,
+       "type": "func.return",
+       "x": 1680,
+       "y": 1390,
+       "params": {
+        "function": "SeenBy"
+       },
+       "values": {
+        "seen": false
+       }
+      },
+      {
+       "id": 115,
+       "type": "var.set",
+       "x": 1960,
+       "y": 1390,
+       "params": {
+        "variable": "Inside",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 116,
+       "type": "math.formula",
+       "x": 1840,
+       "y": 1540,
+       "params": {
+        "formula": "toward / max(d, 1e-06) >= cos(half)"
+       }
+      },
+      {
+       "id": 117,
+       "type": "vector.dot",
+       "x": 1840,
+       "y": 1630
+      },
+      {
+       "id": 118,
+       "type": "var.get",
+       "x": 1840,
+       "y": 1720,
+       "params": {
+        "variable": "To",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 119,
+       "type": "struct.break",
+       "x": 1840,
+       "y": 1810,
+       "params": {
+        "struct": "Viewer"
+       }
+      },
+      {
+       "id": 120,
+       "type": "var.get",
+       "x": 1840,
+       "y": 1900,
+       "params": {
+        "variable": "D",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 121,
+       "type": "struct.break",
+       "x": 1840,
+       "y": 1990,
+       "params": {
+        "struct": "Viewer"
+       }
+      },
+      {
+       "id": 122,
+       "type": "flow.branch",
+       "x": 2240,
+       "y": 1390
+      },
+      {
+       "id": 123,
+       "type": "logic.and",
+       "x": 2120,
+       "y": 1540
+      },
+      {
+       "id": 124,
+       "type": "logic.not",
+       "x": 2120,
+       "y": 1630
+      },
+      {
+       "id": 125,
+       "type": "var.get",
+       "x": 2120,
+       "y": 1720,
+       "params": {
+        "variable": "Inside",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 126,
+       "type": "struct.break",
+       "x": 2120,
+       "y": 1810,
+       "params": {
+        "struct": "Viewer"
+       }
+      },
+      {
+       "id": 127,
+       "type": "var.set",
+       "x": 2520,
+       "y": 1390,
+       "params": {
+        "variable": "Inside",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 128,
+       "type": "math.formula",
+       "x": 2400,
+       "y": 1540,
+       "params": {
+        "formula": "toward / max(0.001, d) >= cos(min(3.141592653589793, half + asin(min(1, sphere / max(0.001, d)))))"
+       }
+      },
+      {
+       "id": 129,
+       "type": "vector.dot",
+       "x": 2400,
+       "y": 1630
+      },
+      {
+       "id": 130,
+       "type": "vector.add",
+       "x": 2400,
+       "y": 1720
+      },
+      {
+       "id": 131,
+       "type": "var.get",
+       "x": 2400,
+       "y": 1810,
+       "params": {
+        "variable": "To",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 132,
+       "type": "vector.make",
+       "x": 2400,
+       "y": 1900,
+       "values": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      {
+       "id": 133,
+       "type": "math.mul",
+       "x": 2400,
+       "y": 1990,
+       "values": {
+        "b": 0.5
+       }
+      },
+      {
+       "id": 134,
+       "type": "struct.break",
+       "x": 2400,
+       "y": 2080,
+       "params": {
+        "struct": "Viewer"
+       }
+      },
+      {
+       "id": 135,
+       "type": "vector.length",
+       "x": 2400,
+       "y": 2170
+      },
+      {
+       "id": 136,
+       "type": "vector.add",
+       "x": 2400,
+       "y": 2260
+      },
+      {
+       "id": 137,
+       "type": "var.get",
+       "x": 2400,
+       "y": 2350,
+       "params": {
+        "variable": "To",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 138,
+       "type": "vector.make",
+       "x": 2400,
+       "y": 2440,
+       "values": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      {
+       "id": 139,
+       "type": "math.mul",
+       "x": 2400,
+       "y": 2530,
+       "values": {
+        "b": 0.5
+       }
+      },
+      {
+       "id": 140,
+       "type": "struct.break",
+       "x": 2400,
+       "y": 2620,
+       "params": {
+        "struct": "Viewer"
+       }
+      },
+      {
+       "id": 141,
+       "type": "var.get",
+       "x": 2400,
+       "y": 2710,
+       "params": {
+        "variable": "FrustumSphere"
+       }
+      },
+      {
+       "id": 142,
+       "type": "flow.branch",
+       "x": 2800,
+       "y": 1390
+      },
+      {
+       "id": 143,
+       "type": "logic.not",
+       "x": 2680,
+       "y": 1540
+      },
+      {
+       "id": 144,
+       "type": "var.get",
+       "x": 2680,
+       "y": 1630,
+       "params": {
+        "variable": "Inside",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 145,
+       "type": "func.return",
+       "x": 3080,
+       "y": 1390,
+       "params": {
+        "function": "SeenBy"
+       },
+       "values": {
+        "seen": false
+       }
+      },
+      {
+       "id": 146,
+       "type": "flow.branch",
+       "x": 3360,
+       "y": 1390
+      },
+      {
+       "id": 147,
+       "type": "math.compare",
+       "x": 3240,
+       "y": 1540,
+       "params": {
+        "op": ">"
+       }
+      },
+      {
+       "id": 148,
+       "type": "var.get",
+       "x": 3240,
+       "y": 1630,
+       "params": {
+        "variable": "D",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 149,
+       "type": "var.get",
+       "x": 3240,
+       "y": 1720,
+       "params": {
+        "variable": "OcclusionMax"
+       }
+      },
+      {
+       "id": 150,
+       "type": "func.return",
+       "x": 3640,
+       "y": 1390,
+       "params": {
+        "function": "SeenBy"
+       },
+       "values": {
+        "seen": true
+       }
+      },
+      {
+       "id": 151,
+       "type": "struct.break",
+       "x": 3800,
+       "y": 1540,
+       "params": {
+        "struct": "Viewer"
+       }
+      },
+      {
+       "id": 152,
+       "type": "vector.add",
+       "x": 3800,
+       "y": 1630,
+       "values": {
+        "b": [
+         0,
+         0,
+         0.30000001192092896
+        ]
+       }
+      },
+      {
+       "id": 153,
+       "type": "flow.branch",
+       "x": 4200,
+       "y": 1390
+      },
+      {
+       "id": 154,
+       "type": "logic.not",
+       "x": 4080,
+       "y": 1540
+      },
+      {
+       "id": 155,
+       "type": "func.return",
+       "x": 4480,
+       "y": 1390,
+       "params": {
+        "function": "SeenBy"
+       },
+       "values": {
+        "seen": true
+       }
+      },
+      {
+       "id": 156,
+       "type": "struct.break",
+       "x": 4640,
+       "y": 1540,
+       "params": {
+        "struct": "Viewer"
+       }
+      },
+      {
+       "id": 157,
+       "type": "vector.add",
+       "x": 4640,
+       "y": 1630
+      },
+      {
+       "id": 158,
+       "type": "vector.make",
+       "x": 4640,
+       "y": 1720,
+       "values": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      {
+       "id": 159,
+       "type": "func.return",
+       "x": 5040,
+       "y": 1390,
+       "params": {
+        "function": "SeenBy"
+       }
+      },
+      {
+       "id": 160,
+       "type": "logic.not",
+       "x": 4920,
+       "y": 1540
+      },
+      {
+       "id": 161,
+       "type": "func.entry",
+       "x": 0,
+       "y": 2850,
+       "params": {
+        "function": "CanSpawn"
+       }
+      },
+      {
+       "id": 162,
+       "type": "flow.branch",
+       "x": 560,
+       "y": 2850
+      },
+      {
+       "id": 163,
+       "type": "var.get",
+       "x": 440,
+       "y": 3000,
+       "params": {
+        "variable": "Ok",
+        "scope": "CanSpawn"
+       }
+      },
+      {
+       "id": 164,
+       "type": "flow.branch",
+       "x": 1120,
+       "y": 2850
+      },
+      {
+       "id": 165,
+       "type": "var.set",
+       "x": 1400,
+       "y": 2850,
+       "params": {
+        "variable": "Ok",
+        "scope": "CanSpawn"
+       },
+       "values": {
+        "value": false
+       }
+      },
+      {
+       "id": 166,
+       "type": "func.return",
+       "x": 1680,
+       "y": 2850,
+       "params": {
+        "function": "CanSpawn"
+       }
+      },
+      {
+       "id": 167,
+       "type": "var.get",
+       "x": 1560,
+       "y": 3000,
+       "params": {
+        "variable": "Ok",
+        "scope": "CanSpawn"
+       }
+      },
+      {
+       "id": 168,
+       "type": "func.entry",
+       "x": 0,
+       "y": 3140,
+       "params": {
+        "function": "Reach"
+       }
+      },
+      {
+       "id": 169,
+       "type": "func.return",
+       "x": 280,
+       "y": 3140,
+       "params": {
+        "function": "Reach"
+       }
+      },
+      {
+       "id": 170,
+       "type": "math.formula",
+       "x": 160,
+       "y": 3290,
+       "params": {
+        "formula": "hx * abs(cos(yaw - angle)) + hy * abs(sin(yaw - angle))"
+       }
+      },
+      {
+       "id": 171,
+       "type": "vector.break",
+       "x": 160,
+       "y": 3380
+      },
+      {
+       "id": 172,
+       "type": "struct.break",
+       "x": 160,
+       "y": 3470,
+       "params": {
+        "struct": "Footprint"
+       }
+      },
+      {
+       "id": 173,
+       "type": "struct.break",
+       "x": 160,
+       "y": 3560,
+       "params": {
+        "struct": "Footprint"
+       }
+      },
+      {
+       "id": 174,
+       "type": "vector.break",
+       "x": 160,
+       "y": 3650
+      },
+      {
+       "id": 175,
+       "type": "struct.break",
+       "x": 160,
+       "y": 3740,
+       "params": {
+        "struct": "Footprint"
+       }
+      },
+      {
+       "id": 176,
+       "type": "func.entry",
+       "x": 0,
+       "y": 3880,
+       "params": {
+        "function": "AxisMeets"
+       }
+      },
+      {
+       "id": 177,
+       "type": "func.return",
+       "x": 280,
+       "y": 3880,
+       "params": {
+        "function": "AxisMeets"
+       }
+      },
+      {
+       "id": 178,
+       "type": "math.compare",
+       "x": 160,
+       "y": 4030,
+       "params": {
+        "op": "<"
+       }
+      },
+      {
+       "id": 179,
+       "type": "math.formula",
+       "x": 160,
+       "y": 4120,
+       "params": {
+        "formula": "abs(dx * cos(angle) + dy * sin(angle))"
+       }
+      },
+      {
+       "id": 180,
+       "type": "vector.break",
+       "x": 160,
+       "y": 4210
+      },
+      {
+       "id": 181,
+       "type": "vector.sub",
+       "x": 160,
+       "y": 4300
+      },
+      {
+       "id": 182,
+       "type": "struct.break",
+       "x": 160,
+       "y": 4390,
+       "params": {
+        "struct": "Footprint"
+       }
+      },
+      {
+       "id": 183,
+       "type": "struct.break",
+       "x": 160,
+       "y": 4480,
+       "params": {
+        "struct": "Footprint"
+       }
+      },
+      {
+       "id": 184,
+       "type": "vector.break",
+       "x": 160,
+       "y": 4570
+      },
+      {
+       "id": 185,
+       "type": "vector.sub",
+       "x": 160,
+       "y": 4660
+      },
+      {
+       "id": 186,
+       "type": "struct.break",
+       "x": 160,
+       "y": 4750,
+       "params": {
+        "struct": "Footprint"
+       }
+      },
+      {
+       "id": 187,
+       "type": "struct.break",
+       "x": 160,
+       "y": 4840,
+       "params": {
+        "struct": "Footprint"
+       }
+      },
+      {
+       "id": 188,
+       "type": "math.add",
+       "x": 160,
+       "y": 4930
+      },
+      {
+       "id": 189,
+       "type": "math.add",
+       "x": 160,
+       "y": 5020
+      },
+      {
+       "id": 190,
+       "type": "func.pure",
+       "x": 160,
+       "y": 5110,
+       "params": {
+        "function": "Reach"
+       }
+      },
+      {
+       "id": 191,
+       "type": "func.pure",
+       "x": 160,
+       "y": 5200,
+       "params": {
+        "function": "Reach"
+       }
+      },
+      {
+       "id": 192,
+       "type": "func.entry",
+       "x": 0,
+       "y": 5340,
+       "params": {
+        "function": "FootprintsOverlap"
+       }
+      },
+      {
+       "id": 193,
+       "type": "func.return",
+       "x": 280,
+       "y": 5340,
+       "params": {
+        "function": "FootprintsOverlap"
+       }
+      },
+      {
+       "id": 194,
+       "type": "logic.and",
+       "x": 160,
+       "y": 5490
+      },
+      {
+       "id": 195,
+       "type": "logic.and",
+       "x": 160,
+       "y": 5580
+      },
+      {
+       "id": 196,
+       "type": "func.pure",
+       "x": 160,
+       "y": 5670,
+       "params": {
+        "function": "AxisMeets"
+       }
+      },
+      {
+       "id": 197,
+       "type": "struct.break",
+       "x": 160,
+       "y": 5760,
+       "params": {
+        "struct": "Footprint"
+       }
+      },
+      {
+       "id": 198,
+       "type": "func.pure",
+       "x": 160,
+       "y": 5850,
+       "params": {
+        "function": "AxisMeets"
+       }
+      },
+      {
+       "id": 199,
+       "type": "math.add",
+       "x": 160,
+       "y": 5940,
+       "values": {
+        "b": 1.5707963267948966
+       }
+      },
+      {
+       "id": 200,
+       "type": "struct.break",
+       "x": 160,
+       "y": 6030,
+       "params": {
+        "struct": "Footprint"
+       }
+      },
+      {
+       "id": 201,
+       "type": "logic.and",
+       "x": 160,
+       "y": 6120
+      },
+      {
+       "id": 202,
+       "type": "func.pure",
+       "x": 160,
+       "y": 6210,
+       "params": {
+        "function": "AxisMeets"
+       }
+      },
+      {
+       "id": 203,
+       "type": "struct.break",
+       "x": 160,
+       "y": 6300,
+       "params": {
+        "struct": "Footprint"
+       }
+      },
+      {
+       "id": 204,
+       "type": "func.pure",
+       "x": 160,
+       "y": 6390,
+       "params": {
+        "function": "AxisMeets"
+       }
+      },
+      {
+       "id": 205,
+       "type": "math.add",
+       "x": 160,
+       "y": 6480,
+       "values": {
+        "b": 1.5707963267948966
+       }
+      },
+      {
+       "id": 206,
+       "type": "struct.break",
+       "x": 160,
+       "y": 6570,
+       "params": {
+        "struct": "Footprint"
+       }
+      }
+     ],
+     "links": [
+      [
+       30,
+       "hidden",
+       154,
+       "a"
+      ],
+      [
+       30,
+       "then",
+       153,
+       "exec"
+      ],
+      [
+       32,
+       "hidden",
+       160,
+       "a"
+      ],
+      [
+       32,
+       "then",
+       159,
+       "exec"
+      ],
+      [
+       60,
+       "hit",
+       92,
+       "hidden"
+      ],
+      [
+       60,
+       "then",
+       92,
+       "exec"
+      ],
+      [
+       70,
+       "body",
+       162,
+       "exec"
+      ],
+      [
+       70,
+       "completed",
+       166,
+       "exec"
+      ],
+      [
+       70,
+       "item",
+       71,
+       "viewer"
+      ],
+      [
+       71,
+       "seen",
+       164,
+       "condition"
+      ],
+      [
+       71,
+       "then",
+       164,
+       "exec"
+      ],
+      [
+       72,
+       "aspect",
+       74,
+       "aspect"
+      ],
+      [
+       72,
+       "fov",
+       74,
+       "fov"
+      ],
+      [
+       72,
+       "then",
+       73,
+       "exec"
+      ],
+      [
+       74,
+       "result",
+       73,
+       "half"
+      ],
+      [
+       75,
+       "value",
+       74,
+       "margin"
+      ],
+      [
+       76,
+       "eye",
+       60,
+       "start"
+      ],
+      [
+       76,
+       "eye",
+       78,
+       "b"
+      ],
+      [
+       76,
+       "eye",
+       83,
+       "a"
+      ],
+      [
+       76,
+       "eye",
+       85,
+       "b"
+      ],
+      [
+       76,
+       "point",
+       78,
+       "a"
+      ],
+      [
+       76,
+       "point",
+       85,
+       "a"
+      ],
+      [
+       76,
+       "then",
+       77,
+       "exec"
+      ],
+      [
+       77,
+       "then",
+       79,
+       "exec"
+      ],
+      [
+       78,
+       "result",
+       77,
+       "value"
+      ],
+      [
+       79,
+       "false",
+       60,
+       "exec"
+      ],
+      [
+       79,
+       "true",
+       82,
+       "exec"
+      ],
+      [
+       80,
+       "result",
+       79,
+       "condition"
+      ],
+      [
+       81,
+       "value",
+       80,
+       "a"
+      ],
+      [
+       83,
+       "result",
+       60,
+       "end"
+      ],
+      [
+       84,
+       "result",
+       83,
+       "b"
+      ],
+      [
+       85,
+       "result",
+       84,
+       "a"
+      ],
+      [
+       86,
+       "result",
+       84,
+       "b"
+      ],
+      [
+       87,
+       "result",
+       86,
+       "a"
+      ],
+      [
+       88,
+       "value",
+       87,
+       "a"
+      ],
+      [
+       89,
+       "value",
+       86,
+       "b"
+      ],
+      [
+       90,
+       "mask",
+       60,
+       "mask"
+      ],
+      [
+       91,
+       "value",
+       90,
+       "names"
+      ],
+      [
+       93,
+       "farEntry",
+       111,
+       "a"
+      ],
+      [
+       93,
+       "farEntry",
+       112,
+       "b"
+      ],
+      [
+       93,
+       "height",
+       133,
+       "a"
+      ],
+      [
+       93,
+       "height",
+       139,
+       "a"
+      ],
+      [
+       93,
+       "height",
+       158,
+       "z"
+      ],
+      [
+       93,
+       "point",
+       95,
+       "a"
+      ],
+      [
+       93,
+       "point",
+       152,
+       "a"
+      ],
+      [
+       93,
+       "point",
+       157,
+       "a"
+      ],
+      [
+       93,
+       "then",
+       94,
+       "exec"
+      ],
+      [
+       93,
+       "viewer",
+       96,
+       "value"
+      ],
+      [
+       93,
+       "viewer",
+       109,
+       "value"
+      ],
+      [
+       93,
+       "viewer",
+       119,
+       "value"
+      ],
+      [
+       93,
+       "viewer",
+       121,
+       "value"
+      ],
+      [
+       93,
+       "viewer",
+       126,
+       "value"
+      ],
+      [
+       93,
+       "viewer",
+       134,
+       "value"
+      ],
+      [
+       93,
+       "viewer",
+       140,
+       "value"
+      ],
+      [
+       93,
+       "viewer",
+       151,
+       "value"
+      ],
+      [
+       93,
+       "viewer",
+       156,
+       "value"
+      ],
+      [
+       94,
+       "then",
+       97,
+       "exec"
+      ],
+      [
+       95,
+       "result",
+       94,
+       "value"
+      ],
+      [
+       96,
+       "Eye",
+       95,
+       "b"
+      ],
+      [
+       97,
+       "then",
+       100,
+       "exec"
+      ],
+      [
+       98,
+       "result",
+       97,
+       "value"
+      ],
+      [
+       99,
+       "value",
+       98,
+       "a"
+      ],
+      [
+       100,
+       "false",
+       105,
+       "exec"
+      ],
+      [
+       100,
+       "true",
+       104,
+       "exec"
+      ],
+      [
+       101,
+       "result",
+       100,
+       "condition"
+      ],
+      [
+       102,
+       "value",
+       101,
+       "a"
+      ],
+      [
+       103,
+       "value",
+       101,
+       "b"
+      ],
+      [
+       105,
+       "false",
+       115,
+       "exec"
+      ],
+      [
+       105,
+       "true",
+       114,
+       "exec"
+      ],
+      [
+       106,
+       "result",
+       105,
+       "condition"
+      ],
+      [
+       107,
+       "result",
+       106,
+       "a"
+      ],
+      [
+       108,
+       "value",
+       107,
+       "a"
+      ],
+      [
+       109,
+       "Far",
+       107,
+       "b"
+      ],
+      [
+       110,
+       "result",
+       106,
+       "b"
+      ],
+      [
+       111,
+       "result",
+       110,
+       "a"
+      ],
+      [
+       112,
+       "result",
+       110,
+       "b"
+      ],
+      [
+       113,
+       "value",
+       112,
+       "a"
+      ],
+      [
+       115,
+       "then",
+       122,
+       "exec"
+      ],
+      [
+       116,
+       "result",
+       115,
+       "value"
+      ],
+      [
+       117,
+       "result",
+       116,
+       "toward"
+      ],
+      [
+       118,
+       "value",
+       117,
+       "a"
+      ],
+      [
+       119,
+       "Forward",
+       117,
+       "b"
+      ],
+      [
+       120,
+       "value",
+       116,
+       "d"
+      ],
+      [
+       121,
+       "HalfAngle",
+       116,
+       "half"
+      ],
+      [
+       122,
+       "false",
+       142,
+       "exec"
+      ],
+      [
+       122,
+       "true",
+       127,
+       "exec"
+      ],
+      [
+       123,
+       "result",
+       122,
+       "condition"
+      ],
+      [
+       124,
+       "result",
+       123,
+       "a"
+      ],
+      [
+       125,
+       "value",
+       124,
+       "a"
+      ],
+      [
+       126,
+       "Local",
+       123,
+       "b"
+      ],
+      [
+       127,
+       "then",
+       142,
+       "exec"
+      ],
+      [
+       128,
+       "result",
+       127,
+       "value"
+      ],
+      [
+       129,
+       "result",
+       128,
+       "toward"
+      ],
+      [
+       130,
+       "result",
+       129,
+       "a"
+      ],
+      [
+       131,
+       "value",
+       130,
+       "a"
+      ],
+      [
+       132,
+       "result",
+       130,
+       "b"
+      ],
+      [
+       133,
+       "result",
+       132,
+       "z"
+      ],
+      [
+       134,
+       "Forward",
+       129,
+       "b"
+      ],
+      [
+       135,
+       "result",
+       128,
+       "d"
+      ],
+      [
+       136,
+       "result",
+       135,
+       "a"
+      ],
+      [
+       137,
+       "value",
+       136,
+       "a"
+      ],
+      [
+       138,
+       "result",
+       136,
+       "b"
+      ],
+      [
+       139,
+       "result",
+       138,
+       "z"
+      ],
+      [
+       140,
+       "HalfAngle",
+       128,
+       "half"
+      ],
+      [
+       141,
+       "value",
+       128,
+       "sphere"
+      ],
+      [
+       142,
+       "false",
+       146,
+       "exec"
+      ],
+      [
+       142,
+       "true",
+       145,
+       "exec"
+      ],
+      [
+       143,
+       "result",
+       142,
+       "condition"
+      ],
+      [
+       144,
+       "value",
+       143,
+       "a"
+      ],
+      [
+       146,
+       "false",
+       30,
+       "exec"
+      ],
+      [
+       146,
+       "true",
+       150,
+       "exec"
+      ],
+      [
+       147,
+       "result",
+       146,
+       "condition"
+      ],
+      [
+       148,
+       "value",
+       147,
+       "a"
+      ],
+      [
+       149,
+       "value",
+       147,
+       "b"
+      ],
+      [
+       151,
+       "Eye",
+       30,
+       "eye"
+      ],
+      [
+       152,
+       "result",
+       30,
+       "point"
+      ],
+      [
+       153,
+       "false",
+       32,
+       "exec"
+      ],
+      [
+       153,
+       "true",
+       155,
+       "exec"
+      ],
+      [
+       154,
+       "result",
+       153,
+       "condition"
+      ],
+      [
+       156,
+       "Eye",
+       32,
+       "eye"
+      ],
+      [
+       157,
+       "result",
+       32,
+       "point"
+      ],
+      [
+       158,
+       "result",
+       157,
+       "b"
+      ],
+      [
+       160,
+       "result",
+       159,
+       "seen"
+      ],
+      [
+       161,
+       "farEntry",
+       71,
+       "farEntry"
+      ],
+      [
+       161,
+       "height",
+       71,
+       "height"
+      ],
+      [
+       161,
+       "point",
+       71,
+       "point"
+      ],
+      [
+       161,
+       "then",
+       70,
+       "exec"
+      ],
+      [
+       161,
+       "viewers",
+       70,
+       "list"
+      ],
+      [
+       162,
+       "true",
+       71,
+       "exec"
+      ],
+      [
+       163,
+       "value",
+       162,
+       "condition"
+      ],
+      [
+       164,
+       "true",
+       165,
+       "exec"
+      ],
+      [
+       167,
+       "value",
+       166,
+       "ok"
+      ],
+      [
+       168,
+       "angle",
+       170,
+       "angle"
+      ],
+      [
+       168,
+       "print",
+       172,
+       "value"
+      ],
+      [
+       168,
+       "print",
+       173,
+       "value"
+      ],
+      [
+       168,
+       "print",
+       175,
+       "value"
+      ],
+      [
+       168,
+       "then",
+       169,
+       "exec"
+      ],
+      [
+       170,
+       "result",
+       169,
+       "reach"
+      ],
+      [
+       171,
+       "x",
+       170,
+       "hx"
+      ],
+      [
+       172,
+       "Half",
+       171,
+       "v"
+      ],
+      [
+       173,
+       "Yaw",
+       170,
+       "yaw"
+      ],
+      [
+       174,
+       "y",
+       170,
+       "hy"
+      ],
+      [
+       175,
+       "Half",
+       174,
+       "v"
+      ],
+      [
+       176,
+       "a",
+       183,
+       "value"
+      ],
+      [
+       176,
+       "a",
+       187,
+       "value"
+      ],
+      [
+       176,
+       "a",
+       190,
+       "print"
+      ],
+      [
+       176,
+       "angle",
+       179,
+       "angle"
+      ],
+      [
+       176,
+       "angle",
+       190,
+       "angle"
+      ],
+      [
+       176,
+       "angle",
+       191,
+       "angle"
+      ],
+      [
+       176,
+       "b",
+       182,
+       "value"
+      ],
+      [
+       176,
+       "b",
+       186,
+       "value"
+      ],
+      [
+       176,
+       "b",
+       191,
+       "print"
+      ],
+      [
+       176,
+       "margin",
+       188,
+       "b"
+      ],
+      [
+       176,
+       "then",
+       177,
+       "exec"
+      ],
+      [
+       178,
+       "result",
+       177,
+       "meets"
+      ],
+      [
+       179,
+       "result",
+       178,
+       "a"
+      ],
+      [
+       180,
+       "x",
+       179,
+       "dx"
+      ],
+      [
+       181,
+       "result",
+       180,
+       "v"
+      ],
+      [
+       182,
+       "Center",
+       181,
+       "a"
+      ],
+      [
+       183,
+       "Center",
+       181,
+       "b"
+      ],
+      [
+       184,
+       "y",
+       179,
+       "dy"
+      ],
+      [
+       185,
+       "result",
+       184,
+       "v"
+      ],
+      [
+       186,
+       "Center",
+       185,
+       "a"
+      ],
+      [
+       187,
+       "Center",
+       185,
+       "b"
+      ],
+      [
+       188,
+       "result",
+       178,
+       "b"
+      ],
+      [
+       189,
+       "result",
+       188,
+       "a"
+      ],
+      [
+       190,
+       "reach",
+       189,
+       "a"
+      ],
+      [
+       191,
+       "reach",
+       189,
+       "b"
+      ],
+      [
+       192,
+       "a",
+       196,
+       "a"
+      ],
+      [
+       192,
+       "a",
+       197,
+       "value"
+      ],
+      [
+       192,
+       "a",
+       198,
+       "a"
+      ],
+      [
+       192,
+       "a",
+       200,
+       "value"
+      ],
+      [
+       192,
+       "a",
+       202,
+       "a"
+      ],
+      [
+       192,
+       "a",
+       204,
+       "a"
+      ],
+      [
+       192,
+       "b",
+       196,
+       "b"
+      ],
+      [
+       192,
+       "b",
+       198,
+       "b"
+      ],
+      [
+       192,
+       "b",
+       202,
+       "b"
+      ],
+      [
+       192,
+       "b",
+       203,
+       "value"
+      ],
+      [
+       192,
+       "b",
+       204,
+       "b"
+      ],
+      [
+       192,
+       "b",
+       206,
+       "value"
+      ],
+      [
+       192,
+       "margin",
+       196,
+       "margin"
+      ],
+      [
+       192,
+       "margin",
+       198,
+       "margin"
+      ],
+      [
+       192,
+       "margin",
+       202,
+       "margin"
+      ],
+      [
+       192,
+       "margin",
+       204,
+       "margin"
+      ],
+      [
+       192,
+       "then",
+       193,
+       "exec"
+      ],
+      [
+       194,
+       "result",
+       193,
+       "overlap"
+      ],
+      [
+       195,
+       "result",
+       194,
+       "a"
+      ],
+      [
+       196,
+       "meets",
+       195,
+       "a"
+      ],
+      [
+       197,
+       "Yaw",
+       196,
+       "angle"
+      ],
+      [
+       198,
+       "meets",
+       195,
+       "b"
+      ],
+      [
+       199,
+       "result",
+       198,
+       "angle"
+      ],
+      [
+       200,
+       "Yaw",
+       199,
+       "a"
+      ],
+      [
+       201,
+       "result",
+       194,
+       "b"
+      ],
+      [
+       202,
+       "meets",
+       201,
+       "a"
+      ],
+      [
+       203,
+       "Yaw",
+       202,
+       "angle"
+      ],
+      [
+       204,
+       "meets",
+       201,
+       "b"
+      ],
+      [
+       205,
+       "result",
+       204,
+       "angle"
+      ],
+      [
+       206,
+       "Yaw",
+       205,
+       "a"
+      ]
+     ],
+     "machines": [],
+     "functions": [
+      {
+       "name": "ConeHalfAngle",
+       "pure": true,
+       "help": "Half angle of the view cone for a vertical field of view (radians) and an aspect: max(vertical, horizontal) / 2 + the margin, at most 0.92 pi",
+       "inputs": [
+        {
+         "name": "fov",
+         "type": "float",
+         "value": 1
+        },
+        {
+         "name": "aspect",
+         "type": "float",
+         "value": 1
+        }
+       ],
+       "outputs": [
+        {
+         "name": "half",
+         "type": "float",
+         "value": 1.5707963267948966
+        }
+       ]
+      },
+      {
+       "name": "Hidden",
+       "help": "Buildings between an eye and a point? A ray that meets only the buildings' channels, ending half a metre before the point.",
+       "inputs": [
+        {
+         "name": "eye",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "point",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        }
+       ],
+       "outputs": [
+        {
+         "name": "hidden",
+         "type": "bool",
+         "value": false
+        }
+       ],
+       "locals": [
+        {
+         "name": "L",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "SeenBy",
+       "help": "Would something of this height standing at point be seen by the viewer? farEntry above 0: beyond this distance an arrival is allowed even in view (far traffic).",
+       "inputs": [
+        {
+         "name": "viewer",
+         "type": "struct",
+         "of": "Viewer",
+         "value": {
+          "Eye": [
+           0,
+           0,
+           0
+          ],
+          "Forward": [
+           1,
+           0,
+           0
+          ],
+          "HalfAngle": 1.5707963267948966,
+          "Far": 1500,
+          "Local": false
+         }
+        },
+        {
+         "name": "point",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "farEntry",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "height",
+         "type": "float",
+         "value": 2.2
+        }
+       ],
+       "outputs": [
+        {
+         "name": "seen",
+         "type": "bool",
+         "value": false
+        }
+       ],
+       "locals": [
+        {
+         "name": "To",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "D",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "Inside",
+         "type": "bool",
+         "value": false
+        }
+       ]
+      },
+      {
+       "name": "CanSpawn",
+       "help": "No viewer sees it",
+       "inputs": [
+        {
+         "name": "viewers",
+         "type": "struct_list",
+         "of": "Viewer",
+         "value": []
+        },
+        {
+         "name": "point",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "farEntry",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "height",
+         "type": "float",
+         "value": 2.2
+        }
+       ],
+       "outputs": [
+        {
+         "name": "ok",
+         "type": "bool",
+         "value": true
+        }
+       ],
+       "locals": [
+        {
+         "name": "Ok",
+         "type": "bool",
+         "value": true
+        }
+       ]
+      },
+      {
+       "name": "Reach",
+       "pure": true,
+       "help": "How far a footprint reaches along a direction on the map (an angle)",
+       "inputs": [
+        {
+         "name": "print",
+         "type": "struct",
+         "of": "Footprint",
+         "value": {
+          "Center": [
+           0,
+           0,
+           0
+          ],
+          "Yaw": 0,
+          "Half": [
+           1,
+           1,
+           0
+          ]
+         }
+        },
+        {
+         "name": "angle",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "reach",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "AxisMeets",
+       "pure": true,
+       "help": "Do two footprints overlap as seen along a direction (with a margin)?",
+       "inputs": [
+        {
+         "name": "a",
+         "type": "struct",
+         "of": "Footprint",
+         "value": {
+          "Center": [
+           0,
+           0,
+           0
+          ],
+          "Yaw": 0,
+          "Half": [
+           1,
+           1,
+           0
+          ]
+         }
+        },
+        {
+         "name": "b",
+         "type": "struct",
+         "of": "Footprint",
+         "value": {
+          "Center": [
+           0,
+           0,
+           0
+          ],
+          "Yaw": 0,
+          "Half": [
+           1,
+           1,
+           0
+          ]
+         }
+        },
+        {
+         "name": "margin",
+         "type": "float",
+         "value": 0.35
+        },
+        {
+         "name": "angle",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "meets",
+         "type": "bool",
+         "value": false
+        }
+       ]
+      },
+      {
+       "name": "FootprintsOverlap",
+       "pure": true,
+       "help": "vehicle_spawn_clearance.mjs: two yawed footprints overlap when no axis of either separates them (with a margin, 0.35 m)",
+       "inputs": [
+        {
+         "name": "a",
+         "type": "struct",
+         "of": "Footprint",
+         "value": {
+          "Center": [
+           0,
+           0,
+           0
+          ],
+          "Yaw": 0,
+          "Half": [
+           1,
+           1,
+           0
+          ]
+         }
+        },
+        {
+         "name": "b",
+         "type": "struct",
+         "of": "Footprint",
+         "value": {
+          "Center": [
+           0,
+           0,
+           0
+          ],
+          "Yaw": 0,
+          "Half": [
+           1,
+           1,
+           0
+          ]
+         }
+        },
+        {
+         "name": "margin",
+         "type": "float",
+         "value": 0.35
+        }
+       ],
+       "outputs": [
+        {
+         "name": "overlap",
+         "type": "bool",
+         "value": false
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": 5,
+   "name": "JetSeats",
+   "folder": "Rules",
+   "transform": {
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     1
+    ]
+   },
+   "components": {
+    "logic": {
+     "kind": "kern-logic",
+     "version": 1,
+     "nextId": 257,
+     "variables": [
+      {
+       "name": "None",
+       "type": "int",
+       "value": 253,
+       "help": "No player (the host is slot 255, nobody 254)"
+      },
+      {
+       "name": "MaxRows",
+       "type": "int",
+       "value": 64,
+       "help": "A table holds at most this many jets"
+      },
+      {
+       "name": "ResultNames",
+       "type": "text_list",
+       "value": [
+        "ok",
+        "unchanged",
+        "invalid",
+        "owner-only-pilot",
+        "already-seated",
+        "seat-occupied",
+        "no-pilot",
+        "not-occupant"
+       ],
+       "help": "A row for each Result, in its order"
+      }
+     ],
+     "enums": [
+      {
+       "name": "Seat",
+       "values": [
+        "pilot",
+        "passenger"
+       ],
+       "help": "The two seats of a jet"
+      },
+      {
+       "name": "Result",
+       "values": [
+        "ok",
+        "unchanged",
+        "invalid",
+        "owner_only_pilot",
+        "already_seated",
+        "seat_occupied",
+        "no_pilot",
+        "not_occupant"
+       ],
+       "help": "What became of a request for a seat"
+      }
+     ],
+     "structs": [
+      {
+       "name": "Row",
+       "fields": [
+        {
+         "name": "Owner",
+         "type": "int",
+         "value": 253
+        },
+        {
+         "name": "Pilot",
+         "type": "int",
+         "value": 253
+        },
+        {
+         "name": "Passenger",
+         "type": "int",
+         "value": 253
+        }
+       ],
+       "help": "Who sits in the jet of Owner (a player's slot; None: nobody)"
+      }
+     ],
+     "nodes": [
+      {
+       "id": 20,
+       "type": "flow.for_each",
+       "x": 280,
+       "y": 1500,
+       "params": {
+        "type": "Row"
+       }
+      },
+      {
+       "id": 40,
+       "type": "flow.for_each",
+       "x": 280,
+       "y": 4170,
+       "params": {
+        "type": "Row"
+       }
+      },
+      {
+       "id": 50,
+       "type": "flow.for_each",
+       "x": 280,
+       "y": 4550,
+       "params": {
+        "type": "Row"
+       }
+      },
+      {
+       "id": 51,
+       "type": "func.entry",
+       "x": 0,
+       "y": 0,
+       "params": {
+        "function": "Same"
+       }
+      },
+      {
+       "id": 52,
+       "type": "func.return",
+       "x": 280,
+       "y": 0,
+       "params": {
+        "function": "Same"
+       }
+      },
+      {
+       "id": 53,
+       "type": "math.compare",
+       "x": 160,
+       "y": 150,
+       "params": {
+        "op": "=="
+       }
+      },
+      {
+       "id": 54,
+       "type": "func.entry",
+       "x": 0,
+       "y": 290,
+       "params": {
+        "function": "ResultName"
+       }
+      },
+      {
+       "id": 55,
+       "type": "func.return",
+       "x": 280,
+       "y": 290,
+       "params": {
+        "function": "ResultName"
+       }
+      },
+      {
+       "id": 56,
+       "type": "list.get",
+       "x": 160,
+       "y": 440,
+       "params": {
+        "type": "text"
+       }
+      },
+      {
+       "id": 57,
+       "type": "var.get",
+       "x": 160,
+       "y": 530,
+       "params": {
+        "variable": "ResultNames"
+       }
+      },
+      {
+       "id": 58,
+       "type": "enum.index",
+       "x": 160,
+       "y": 620,
+       "params": {
+        "enum": "Result"
+       }
+      },
+      {
+       "id": 59,
+       "type": "func.entry",
+       "x": 0,
+       "y": 760,
+       "params": {
+        "function": "Get"
+       }
+      },
+      {
+       "id": 60,
+       "type": "func.return",
+       "x": 280,
+       "y": 760,
+       "params": {
+        "function": "Get"
+       }
+      },
+      {
+       "id": 61,
+       "type": "logic.select",
+       "x": 160,
+       "y": 910,
+       "params": {
+        "type": "Row"
+       }
+      },
+      {
+       "id": 62,
+       "type": "list.find_row",
+       "x": 160,
+       "y": 1000,
+       "params": {
+        "struct": "Row",
+        "field": "Owner"
+       }
+      },
+      {
+       "id": 63,
+       "type": "list.find_row",
+       "x": 160,
+       "y": 1090,
+       "params": {
+        "struct": "Row",
+        "field": "Owner"
+       }
+      },
+      {
+       "id": 64,
+       "type": "struct.make",
+       "x": 160,
+       "y": 1180,
+       "params": {
+        "struct": "Row"
+       }
+      },
+      {
+       "id": 65,
+       "type": "var.get",
+       "x": 160,
+       "y": 1270,
+       "params": {
+        "variable": "None"
+       }
+      },
+      {
+       "id": 66,
+       "type": "var.get",
+       "x": 160,
+       "y": 1360,
+       "params": {
+        "variable": "None"
+       }
+      },
+      {
+       "id": 67,
+       "type": "func.entry",
+       "x": 0,
+       "y": 1500,
+       "params": {
+        "function": "SeatOf"
+       }
+      },
+      {
+       "id": 68,
+       "type": "flow.branch",
+       "x": 560,
+       "y": 1500
+      },
+      {
+       "id": 69,
+       "type": "logic.not",
+       "x": 440,
+       "y": 1650
+      },
+      {
+       "id": 70,
+       "type": "var.get",
+       "x": 440,
+       "y": 1740,
+       "params": {
+        "variable": "Found",
+        "scope": "SeatOf"
+       }
+      },
+      {
+       "id": 71,
+       "type": "flow.branch",
+       "x": 840,
+       "y": 1500
+      },
+      {
+       "id": 72,
+       "type": "func.pure",
+       "x": 720,
+       "y": 1650,
+       "params": {
+        "function": "Same"
+       }
+      },
+      {
+       "id": 73,
+       "type": "struct.break",
+       "x": 720,
+       "y": 1740,
+       "params": {
+        "struct": "Row"
+       }
+      },
+      {
+       "id": 74,
+       "type": "var.set",
+       "x": 1120,
+       "y": 1500,
+       "params": {
+        "variable": "Found",
+        "scope": "SeatOf"
+       },
+       "values": {
+        "value": true
+       }
+      },
+      {
+       "id": 75,
+       "type": "var.set",
+       "x": 1400,
+       "y": 1500,
+       "params": {
+        "variable": "At",
+        "scope": "SeatOf"
+       }
+      },
+      {
+       "id": 76,
+       "type": "var.set",
+       "x": 1680,
+       "y": 1500,
+       "params": {
+        "variable": "In",
+        "scope": "SeatOf"
+       },
+       "values": {
+        "value": 0
+       }
+      },
+      {
+       "id": 77,
+       "type": "flow.branch",
+       "x": 1960,
+       "y": 1500
+      },
+      {
+       "id": 78,
+       "type": "func.pure",
+       "x": 1840,
+       "y": 1650,
+       "params": {
+        "function": "Same"
+       }
+      },
+      {
+       "id": 79,
+       "type": "struct.break",
+       "x": 1840,
+       "y": 1740,
+       "params": {
+        "struct": "Row"
+       }
+      },
+      {
+       "id": 80,
+       "type": "var.set",
+       "x": 2240,
+       "y": 1500,
+       "params": {
+        "variable": "Found",
+        "scope": "SeatOf"
+       },
+       "values": {
+        "value": true
+       }
+      },
+      {
+       "id": 81,
+       "type": "var.set",
+       "x": 2520,
+       "y": 1500,
+       "params": {
+        "variable": "At",
+        "scope": "SeatOf"
+       }
+      },
+      {
+       "id": 82,
+       "type": "var.set",
+       "x": 2800,
+       "y": 1500,
+       "params": {
+        "variable": "In",
+        "scope": "SeatOf"
+       },
+       "values": {
+        "value": 1
+       }
+      },
+      {
+       "id": 83,
+       "type": "func.return",
+       "x": 3080,
+       "y": 1500,
+       "params": {
+        "function": "SeatOf"
+       }
+      },
+      {
+       "id": 84,
+       "type": "var.get",
+       "x": 2960,
+       "y": 1650,
+       "params": {
+        "variable": "Found",
+        "scope": "SeatOf"
+       }
+      },
+      {
+       "id": 85,
+       "type": "var.get",
+       "x": 2960,
+       "y": 1740,
+       "params": {
+        "variable": "At",
+        "scope": "SeatOf"
+       }
+      },
+      {
+       "id": 86,
+       "type": "var.get",
+       "x": 2960,
+       "y": 1830,
+       "params": {
+        "variable": "In",
+        "scope": "SeatOf"
+       }
+      },
+      {
+       "id": 87,
+       "type": "func.entry",
+       "x": 0,
+       "y": 1970,
+       "params": {
+        "function": "Claim"
+       }
+      },
+      {
+       "id": 88,
+       "type": "flow.branch",
+       "x": 280,
+       "y": 1970
+      },
+      {
+       "id": 89,
+       "type": "logic.or",
+       "x": 160,
+       "y": 2120
+      },
+      {
+       "id": 90,
+       "type": "func.pure",
+       "x": 160,
+       "y": 2210,
+       "params": {
+        "function": "Same"
+       }
+      },
+      {
+       "id": 91,
+       "type": "var.get",
+       "x": 160,
+       "y": 2300,
+       "params": {
+        "variable": "None"
+       }
+      },
+      {
+       "id": 92,
+       "type": "func.pure",
+       "x": 160,
+       "y": 2390,
+       "params": {
+        "function": "Same"
+       }
+      },
+      {
+       "id": 93,
+       "type": "var.get",
+       "x": 160,
+       "y": 2480,
+       "params": {
+        "variable": "None"
+       }
+      },
+      {
+       "id": 94,
+       "type": "func.return",
+       "x": 560,
+       "y": 1970,
+       "params": {
+        "function": "Claim"
+       },
+       "values": {
+        "result": 2
+       }
+      },
+      {
+       "id": 95,
+       "type": "flow.branch",
+       "x": 840,
+       "y": 1970
+      },
+      {
+       "id": 96,
+       "type": "logic.and",
+       "x": 720,
+       "y": 2120
+      },
+      {
+       "id": 97,
+       "type": "enum.equal",
+       "x": 720,
+       "y": 2210,
+       "params": {
+        "enum": "Seat"
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 98,
+       "type": "logic.not",
+       "x": 720,
+       "y": 2300
+      },
+      {
+       "id": 99,
+       "type": "func.pure",
+       "x": 720,
+       "y": 2390,
+       "params": {
+        "function": "Same"
+       }
+      },
+      {
+       "id": 100,
+       "type": "func.return",
+       "x": 1120,
+       "y": 1970,
+       "params": {
+        "function": "Claim"
+       },
+       "values": {
+        "result": 3
+       }
+      },
+      {
+       "id": 101,
+       "type": "flow.branch",
+       "x": 1400,
+       "y": 1970
+      },
+      {
+       "id": 102,
+       "type": "logic.and",
+       "x": 1280,
+       "y": 2120
+      },
+      {
+       "id": 103,
+       "type": "func.pure",
+       "x": 1280,
+       "y": 2210,
+       "params": {
+        "function": "SeatOf"
+       }
+      },
+      {
+       "id": 104,
+       "type": "logic.not",
+       "x": 1280,
+       "y": 2300
+      },
+      {
+       "id": 105,
+       "type": "logic.and",
+       "x": 1280,
+       "y": 2390
+      },
+      {
+       "id": 106,
+       "type": "func.pure",
+       "x": 1280,
+       "y": 2480,
+       "params": {
+        "function": "Same"
+       }
+      },
+      {
+       "id": 107,
+       "type": "struct.break",
+       "x": 1280,
+       "y": 2570,
+       "params": {
+        "struct": "Row"
+       }
+      },
+      {
+       "id": 108,
+       "type": "func.pure",
+       "x": 1280,
+       "y": 2660,
+       "params": {
+        "function": "SeatOf"
+       }
+      },
+      {
+       "id": 109,
+       "type": "enum.equal",
+       "x": 1280,
+       "y": 2750,
+       "params": {
+        "enum": "Seat"
+       }
+      },
+      {
+       "id": 110,
+       "type": "func.pure",
+       "x": 1280,
+       "y": 2840,
+       "params": {
+        "function": "SeatOf"
+       }
+      },
+      {
+       "id": 111,
+       "type": "func.return",
+       "x": 1680,
+       "y": 1970,
+       "params": {
+        "function": "Claim"
+       },
+       "values": {
+        "result": 4
+       }
+      },
+      {
+       "id": 112,
+       "type": "var.set",
+       "x": 1960,
+       "y": 1970,
+       "params": {
+        "variable": "Cur",
+        "scope": "Claim"
+       }
+      },
+      {
+       "id": 113,
+       "type": "func.pure",
+       "x": 1840,
+       "y": 2120,
+       "params": {
+        "function": "Get"
+       }
+      },
+      {
+       "id": 114,
+       "type": "var.set",
+       "x": 2240,
+       "y": 1970,
+       "params": {
+        "variable": "Slot",
+        "scope": "Claim"
+       }
+      },
+      {
+       "id": 115,
+       "type": "logic.select",
+       "x": 2120,
+       "y": 2120,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 116,
+       "type": "enum.equal",
+       "x": 2120,
+       "y": 2210,
+       "params": {
+        "enum": "Seat"
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 117,
+       "type": "struct.break",
+       "x": 2120,
+       "y": 2300,
+       "params": {
+        "struct": "Row"
+       }
+      },
+      {
+       "id": 118,
+       "type": "var.get",
+       "x": 2120,
+       "y": 2390,
+       "params": {
+        "variable": "Cur",
+        "scope": "Claim"
+       }
+      },
+      {
+       "id": 119,
+       "type": "struct.break",
+       "x": 2120,
+       "y": 2480,
+       "params": {
+        "struct": "Row"
+       }
+      },
+      {
+       "id": 120,
+       "type": "var.get",
+       "x": 2120,
+       "y": 2570,
+       "params": {
+        "variable": "Cur",
+        "scope": "Claim"
+       }
+      },
+      {
+       "id": 121,
+       "type": "flow.branch",
+       "x": 2520,
+       "y": 1970
+      },
+      {
+       "id": 122,
+       "type": "func.pure",
+       "x": 2400,
+       "y": 2120,
+       "params": {
+        "function": "Same"
+       }
+      },
+      {
+       "id": 123,
+       "type": "var.get",
+       "x": 2400,
+       "y": 2210,
+       "params": {
+        "variable": "Slot",
+        "scope": "Claim"
+       }
+      },
+      {
+       "id": 124,
+       "type": "func.return",
+       "x": 2800,
+       "y": 1970,
+       "params": {
+        "function": "Claim"
+       },
+       "values": {
+        "result": 1
+       }
+      },
+      {
+       "id": 125,
+       "type": "flow.branch",
+       "x": 3080,
+       "y": 1970
+      },
+      {
+       "id": 126,
+       "type": "logic.not",
+       "x": 2960,
+       "y": 2120
+      },
+      {
+       "id": 127,
+       "type": "func.pure",
+       "x": 2960,
+       "y": 2210,
+       "params": {
+        "function": "Same"
+       }
+      },
+      {
+       "id": 128,
+       "type": "var.get",
+       "x": 2960,
+       "y": 2300,
+       "params": {
+        "variable": "Slot",
+        "scope": "Claim"
+       }
+      },
+      {
+       "id": 129,
+       "type": "var.get",
+       "x": 2960,
+       "y": 2390,
+       "params": {
+        "variable": "None"
+       }
+      },
+      {
+       "id": 130,
+       "type": "func.return",
+       "x": 3360,
+       "y": 1970,
+       "params": {
+        "function": "Claim"
+       },
+       "values": {
+        "result": 5
+       }
+      },
+      {
+       "id": 131,
+       "type": "flow.branch",
+       "x": 3640,
+       "y": 1970
+      },
+      {
+       "id": 132,
+       "type": "logic.and",
+       "x": 3520,
+       "y": 2120
+      },
+      {
+       "id": 133,
+       "type": "enum.equal",
+       "x": 3520,
+       "y": 2210,
+       "params": {
+        "enum": "Seat"
+       },
+       "values": {
+        "b": 1
+       }
+      },
+      {
+       "id": 134,
+       "type": "func.pure",
+       "x": 3520,
+       "y": 2300,
+       "params": {
+        "function": "Same"
+       }
+      },
+      {
+       "id": 135,
+       "type": "struct.break",
+       "x": 3520,
+       "y": 2390,
+       "params": {
+        "struct": "Row"
+       }
+      },
+      {
+       "id": 136,
+       "type": "var.get",
+       "x": 3520,
+       "y": 2480,
+       "params": {
+        "variable": "Cur",
+        "scope": "Claim"
+       }
+      },
+      {
+       "id": 137,
+       "type": "var.get",
+       "x": 3520,
+       "y": 2570,
+       "params": {
+        "variable": "None"
+       }
+      },
+      {
+       "id": 138,
+       "type": "func.return",
+       "x": 3920,
+       "y": 1970,
+       "params": {
+        "function": "Claim"
+       },
+       "values": {
+        "result": 6
+       }
+      },
+      {
+       "id": 139,
+       "type": "flow.branch",
+       "x": 4200,
+       "y": 1970
+      },
+      {
+       "id": 140,
+       "type": "enum.equal",
+       "x": 4080,
+       "y": 2120,
+       "params": {
+        "enum": "Seat"
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 141,
+       "type": "struct.set_field",
+       "x": 4480,
+       "y": 1970,
+       "params": {
+        "variable": "Cur",
+        "field": "Pilot",
+        "scope": "Claim"
+       }
+      },
+      {
+       "id": 142,
+       "type": "struct.set_field",
+       "x": 4760,
+       "y": 1970,
+       "params": {
+        "variable": "Cur",
+        "field": "Passenger",
+        "scope": "Claim"
+       }
+      },
+      {
+       "id": 143,
+       "type": "var.set",
+       "x": 5040,
+       "y": 1970,
+       "params": {
+        "variable": "Rows",
+        "scope": "Claim"
+       }
+      },
+      {
+       "id": 144,
+       "type": "flow.branch",
+       "x": 5320,
+       "y": 1970
+      },
+      {
+       "id": 145,
+       "type": "list.find_row",
+       "x": 5200,
+       "y": 2120,
+       "params": {
+        "struct": "Row",
+        "field": "Owner"
+       }
+      },
+      {
+       "id": 146,
+       "type": "list.set",
+       "x": 5600,
+       "y": 1970,
+       "params": {
+        "variable": "Rows",
+        "scope": "Claim"
+       }
+      },
+      {
+       "id": 147,
+       "type": "list.find_row",
+       "x": 5480,
+       "y": 2120,
+       "params": {
+        "struct": "Row",
+        "field": "Owner"
+       }
+      },
+      {
+       "id": 148,
+       "type": "var.get",
+       "x": 5480,
+       "y": 2210,
+       "params": {
+        "variable": "Cur",
+        "scope": "Claim"
+       }
+      },
+      {
+       "id": 149,
+       "type": "list.add",
+       "x": 5880,
+       "y": 1970,
+       "params": {
+        "variable": "Rows",
+        "scope": "Claim"
+       }
+      },
+      {
+       "id": 150,
+       "type": "var.get",
+       "x": 5760,
+       "y": 2120,
+       "params": {
+        "variable": "Cur",
+        "scope": "Claim"
+       }
+      },
+      {
+       "id": 151,
+       "type": "func.return",
+       "x": 6160,
+       "y": 1970,
+       "params": {
+        "function": "Claim"
+       },
+       "values": {
+        "result": 0
+       }
+      },
+      {
+       "id": 152,
+       "type": "var.get",
+       "x": 6040,
+       "y": 2120,
+       "params": {
+        "variable": "Rows",
+        "scope": "Claim"
+       }
+      },
+      {
+       "id": 153,
+       "type": "func.entry",
+       "x": 0,
+       "y": 2980,
+       "params": {
+        "function": "Release"
+       }
+      },
+      {
+       "id": 154,
+       "type": "flow.branch",
+       "x": 280,
+       "y": 2980
+      },
+      {
+       "id": 155,
+       "type": "logic.or",
+       "x": 160,
+       "y": 3130
+      },
+      {
+       "id": 156,
+       "type": "func.pure",
+       "x": 160,
+       "y": 3220,
+       "params": {
+        "function": "Same"
+       }
+      },
+      {
+       "id": 157,
+       "type": "var.get",
+       "x": 160,
+       "y": 3310,
+       "params": {
+        "variable": "None"
+       }
+      },
+      {
+       "id": 158,
+       "type": "func.pure",
+       "x": 160,
+       "y": 3400,
+       "params": {
+        "function": "Same"
+       }
+      },
+      {
+       "id": 159,
+       "type": "var.get",
+       "x": 160,
+       "y": 3490,
+       "params": {
+        "variable": "None"
+       }
+      },
+      {
+       "id": 160,
+       "type": "func.return",
+       "x": 560,
+       "y": 2980,
+       "params": {
+        "function": "Release"
+       },
+       "values": {
+        "result": 2
+       }
+      },
+      {
+       "id": 161,
+       "type": "var.set",
+       "x": 840,
+       "y": 2980,
+       "params": {
+        "variable": "Cur",
+        "scope": "Release"
+       }
+      },
+      {
+       "id": 162,
+       "type": "list.find_row",
+       "x": 720,
+       "y": 3130,
+       "params": {
+        "struct": "Row",
+        "field": "Owner"
+       }
+      },
+      {
+       "id": 163,
+       "type": "flow.branch",
+       "x": 1120,
+       "y": 2980
+      },
+      {
+       "id": 164,
+       "type": "logic.or",
+       "x": 1000,
+       "y": 3130
+      },
+      {
+       "id": 165,
+       "type": "logic.not",
+       "x": 1000,
+       "y": 3220
+      },
+      {
+       "id": 166,
+       "type": "list.find_row",
+       "x": 1000,
+       "y": 3310,
+       "params": {
+        "struct": "Row",
+        "field": "Owner"
+       }
+      },
+      {
+       "id": 167,
+       "type": "logic.not",
+       "x": 1000,
+       "y": 3400
+      },
+      {
+       "id": 168,
+       "type": "func.pure",
+       "x": 1000,
+       "y": 3490,
+       "params": {
+        "function": "Same"
+       }
+      },
+      {
+       "id": 169,
+       "type": "logic.select",
+       "x": 1000,
+       "y": 3580,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 170,
+       "type": "enum.equal",
+       "x": 1000,
+       "y": 3670,
+       "params": {
+        "enum": "Seat"
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 171,
+       "type": "struct.break",
+       "x": 1000,
+       "y": 3760,
+       "params": {
+        "struct": "Row"
+       }
+      },
+      {
+       "id": 172,
+       "type": "var.get",
+       "x": 1000,
+       "y": 3850,
+       "params": {
+        "variable": "Cur",
+        "scope": "Release"
+       }
+      },
+      {
+       "id": 173,
+       "type": "struct.break",
+       "x": 1000,
+       "y": 3940,
+       "params": {
+        "struct": "Row"
+       }
+      },
+      {
+       "id": 174,
+       "type": "var.get",
+       "x": 1000,
+       "y": 4030,
+       "params": {
+        "variable": "Cur",
+        "scope": "Release"
+       }
+      },
+      {
+       "id": 175,
+       "type": "func.return",
+       "x": 1400,
+       "y": 2980,
+       "params": {
+        "function": "Release"
+       },
+       "values": {
+        "result": 7
+       }
+      },
+      {
+       "id": 176,
+       "type": "flow.branch",
+       "x": 1680,
+       "y": 2980
+      },
+      {
+       "id": 177,
+       "type": "enum.equal",
+       "x": 1560,
+       "y": 3130,
+       "params": {
+        "enum": "Seat"
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 178,
+       "type": "struct.set_field",
+       "x": 1960,
+       "y": 2980,
+       "params": {
+        "variable": "Cur",
+        "field": "Pilot",
+        "scope": "Release"
+       }
+      },
+      {
+       "id": 179,
+       "type": "var.get",
+       "x": 1840,
+       "y": 3130,
+       "params": {
+        "variable": "None"
+       }
+      },
+      {
+       "id": 180,
+       "type": "struct.set_field",
+       "x": 2240,
+       "y": 2980,
+       "params": {
+        "variable": "Cur",
+        "field": "Passenger",
+        "scope": "Release"
+       }
+      },
+      {
+       "id": 181,
+       "type": "var.get",
+       "x": 2120,
+       "y": 3130,
+       "params": {
+        "variable": "None"
+       }
+      },
+      {
+       "id": 182,
+       "type": "var.set",
+       "x": 2520,
+       "y": 2980,
+       "params": {
+        "variable": "Rows",
+        "scope": "Release"
+       }
+      },
+      {
+       "id": 183,
+       "type": "flow.branch",
+       "x": 2800,
+       "y": 2980
+      },
+      {
+       "id": 184,
+       "type": "func.pure",
+       "x": 2680,
+       "y": 3130,
+       "params": {
+        "function": "Same"
+       }
+      },
+      {
+       "id": 185,
+       "type": "struct.break",
+       "x": 2680,
+       "y": 3220,
+       "params": {
+        "struct": "Row"
+       }
+      },
+      {
+       "id": 186,
+       "type": "var.get",
+       "x": 2680,
+       "y": 3310,
+       "params": {
+        "variable": "Cur",
+        "scope": "Release"
+       }
+      },
+      {
+       "id": 187,
+       "type": "var.get",
+       "x": 2680,
+       "y": 3400,
+       "params": {
+        "variable": "None"
+       }
+      },
+      {
+       "id": 188,
+       "type": "list.remove_at",
+       "x": 3080,
+       "y": 2980,
+       "params": {
+        "variable": "Rows",
+        "scope": "Release"
+       }
+      },
+      {
+       "id": 189,
+       "type": "list.find_row",
+       "x": 2960,
+       "y": 3130,
+       "params": {
+        "struct": "Row",
+        "field": "Owner"
+       }
+      },
+      {
+       "id": 190,
+       "type": "list.set",
+       "x": 3360,
+       "y": 2980,
+       "params": {
+        "variable": "Rows",
+        "scope": "Release"
+       }
+      },
+      {
+       "id": 191,
+       "type": "list.find_row",
+       "x": 3240,
+       "y": 3130,
+       "params": {
+        "struct": "Row",
+        "field": "Owner"
+       }
+      },
+      {
+       "id": 192,
+       "type": "var.get",
+       "x": 3240,
+       "y": 3220,
+       "params": {
+        "variable": "Cur",
+        "scope": "Release"
+       }
+      },
+      {
+       "id": 193,
+       "type": "func.return",
+       "x": 3640,
+       "y": 2980,
+       "params": {
+        "function": "Release"
+       },
+       "values": {
+        "result": 0
+       }
+      },
+      {
+       "id": 194,
+       "type": "var.get",
+       "x": 3520,
+       "y": 3130,
+       "params": {
+        "variable": "Rows",
+        "scope": "Release"
+       }
+      },
+      {
+       "id": 195,
+       "type": "func.entry",
+       "x": 0,
+       "y": 4170,
+       "params": {
+        "function": "Drop"
+       }
+      },
+      {
+       "id": 196,
+       "type": "flow.branch",
+       "x": 560,
+       "y": 4170
+      },
+      {
+       "id": 197,
+       "type": "func.pure",
+       "x": 440,
+       "y": 4320,
+       "params": {
+        "function": "Same"
+       }
+      },
+      {
+       "id": 198,
+       "type": "struct.break",
+       "x": 440,
+       "y": 4410,
+       "params": {
+        "struct": "Row"
+       }
+      },
+      {
+       "id": 199,
+       "type": "var.set",
+       "x": 840,
+       "y": 4170,
+       "params": {
+        "variable": "Changed",
+        "scope": "Drop"
+       },
+       "values": {
+        "value": true
+       }
+      },
+      {
+       "id": 200,
+       "type": "var.set",
+       "x": 1120,
+       "y": 4170,
+       "params": {
+        "variable": "Cur",
+        "scope": "Drop"
+       }
+      },
+      {
+       "id": 201,
+       "type": "flow.branch",
+       "x": 1400,
+       "y": 4170
+      },
+      {
+       "id": 202,
+       "type": "func.pure",
+       "x": 1280,
+       "y": 4320,
+       "params": {
+        "function": "Same"
+       }
+      },
+      {
+       "id": 203,
+       "type": "struct.break",
+       "x": 1280,
+       "y": 4410,
+       "params": {
+        "struct": "Row"
+       }
+      },
+      {
+       "id": 204,
+       "type": "struct.set_field",
+       "x": 1680,
+       "y": 4170,
+       "params": {
+        "variable": "Cur",
+        "field": "Passenger",
+        "scope": "Drop"
+       }
+      },
+      {
+       "id": 205,
+       "type": "var.get",
+       "x": 1560,
+       "y": 4320,
+       "params": {
+        "variable": "None"
+       }
+      },
+      {
+       "id": 206,
+       "type": "var.set",
+       "x": 1960,
+       "y": 4170,
+       "params": {
+        "variable": "Changed",
+        "scope": "Drop"
+       },
+       "values": {
+        "value": true
+       }
+      },
+      {
+       "id": 207,
+       "type": "list.add",
+       "x": 2240,
+       "y": 4170,
+       "params": {
+        "variable": "Rows",
+        "scope": "Drop"
+       }
+      },
+      {
+       "id": 208,
+       "type": "var.get",
+       "x": 2120,
+       "y": 4320,
+       "params": {
+        "variable": "Cur",
+        "scope": "Drop"
+       }
+      },
+      {
+       "id": 209,
+       "type": "func.return",
+       "x": 2520,
+       "y": 4170,
+       "params": {
+        "function": "Drop"
+       }
+      },
+      {
+       "id": 210,
+       "type": "var.get",
+       "x": 2400,
+       "y": 4320,
+       "params": {
+        "variable": "Rows",
+        "scope": "Drop"
+       }
+      },
+      {
+       "id": 211,
+       "type": "var.get",
+       "x": 2400,
+       "y": 4410,
+       "params": {
+        "variable": "Changed",
+        "scope": "Drop"
+       }
+      },
+      {
+       "id": 212,
+       "type": "func.entry",
+       "x": 0,
+       "y": 4550,
+       "params": {
+        "function": "Valid"
+       }
+      },
+      {
+       "id": 213,
+       "type": "flow.branch",
+       "x": 560,
+       "y": 4550
+      },
+      {
+       "id": 214,
+       "type": "logic.or",
+       "x": 440,
+       "y": 4700
+      },
+      {
+       "id": 215,
+       "type": "logic.or",
+       "x": 440,
+       "y": 4790
+      },
+      {
+       "id": 216,
+       "type": "func.pure",
+       "x": 440,
+       "y": 4880,
+       "params": {
+        "function": "Same"
+       }
+      },
+      {
+       "id": 217,
+       "type": "struct.break",
+       "x": 440,
+       "y": 4970,
+       "params": {
+        "struct": "Row"
+       }
+      },
+      {
+       "id": 218,
+       "type": "var.get",
+       "x": 440,
+       "y": 5060,
+       "params": {
+        "variable": "None"
+       }
+      },
+      {
+       "id": 219,
+       "type": "logic.not",
+       "x": 440,
+       "y": 5150
+      },
+      {
+       "id": 220,
+       "type": "func.pure",
+       "x": 440,
+       "y": 5240,
+       "params": {
+        "function": "Same"
+       }
+      },
+      {
+       "id": 221,
+       "type": "struct.break",
+       "x": 440,
+       "y": 5330,
+       "params": {
+        "struct": "Row"
+       }
+      },
+      {
+       "id": 222,
+       "type": "struct.break",
+       "x": 440,
+       "y": 5420,
+       "params": {
+        "struct": "Row"
+       }
+      },
+      {
+       "id": 223,
+       "type": "logic.or",
+       "x": 440,
+       "y": 5510
+      },
+      {
+       "id": 224,
+       "type": "func.pure",
+       "x": 440,
+       "y": 5600,
+       "params": {
+        "function": "Same"
+       }
+      },
+      {
+       "id": 225,
+       "type": "struct.break",
+       "x": 440,
+       "y": 5690,
+       "params": {
+        "struct": "Row"
+       }
+      },
+      {
+       "id": 226,
+       "type": "struct.break",
+       "x": 440,
+       "y": 5780,
+       "params": {
+        "struct": "Row"
+       }
+      },
+      {
+       "id": 227,
+       "type": "logic.or",
+       "x": 440,
+       "y": 5870
+      },
+      {
+       "id": 228,
+       "type": "list.contains",
+       "x": 440,
+       "y": 5960,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 229,
+       "type": "var.get",
+       "x": 440,
+       "y": 6050,
+       "params": {
+        "variable": "Owners",
+        "scope": "Valid"
+       }
+      },
+      {
+       "id": 230,
+       "type": "struct.break",
+       "x": 440,
+       "y": 6140,
+       "params": {
+        "struct": "Row"
+       }
+      },
+      {
+       "id": 231,
+       "type": "list.contains",
+       "x": 440,
+       "y": 6230,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 232,
+       "type": "var.get",
+       "x": 440,
+       "y": 6320,
+       "params": {
+        "variable": "Seated",
+        "scope": "Valid"
+       }
+      },
+      {
+       "id": 233,
+       "type": "struct.break",
+       "x": 440,
+       "y": 6410,
+       "params": {
+        "struct": "Row"
+       }
+      },
+      {
+       "id": 234,
+       "type": "var.set",
+       "x": 840,
+       "y": 4550,
+       "params": {
+        "variable": "Ok",
+        "scope": "Valid"
+       },
+       "values": {
+        "value": false
+       }
+      },
+      {
+       "id": 235,
+       "type": "list.add",
+       "x": 1120,
+       "y": 4550,
+       "params": {
+        "variable": "Owners",
+        "scope": "Valid"
+       }
+      },
+      {
+       "id": 236,
+       "type": "struct.break",
+       "x": 1000,
+       "y": 4700,
+       "params": {
+        "struct": "Row"
+       }
+      },
+      {
+       "id": 237,
+       "type": "list.add",
+       "x": 1400,
+       "y": 4550,
+       "params": {
+        "variable": "Seated",
+        "scope": "Valid"
+       }
+      },
+      {
+       "id": 238,
+       "type": "struct.break",
+       "x": 1280,
+       "y": 4700,
+       "params": {
+        "struct": "Row"
+       }
+      },
+      {
+       "id": 239,
+       "type": "flow.branch",
+       "x": 1680,
+       "y": 4550
+      },
+      {
+       "id": 240,
+       "type": "logic.not",
+       "x": 1560,
+       "y": 4700
+      },
+      {
+       "id": 241,
+       "type": "func.pure",
+       "x": 1560,
+       "y": 4790,
+       "params": {
+        "function": "Same"
+       }
+      },
+      {
+       "id": 242,
+       "type": "struct.break",
+       "x": 1560,
+       "y": 4880,
+       "params": {
+        "struct": "Row"
+       }
+      },
+      {
+       "id": 243,
+       "type": "var.get",
+       "x": 1560,
+       "y": 4970,
+       "params": {
+        "variable": "None"
+       }
+      },
+      {
+       "id": 244,
+       "type": "flow.branch",
+       "x": 1960,
+       "y": 4550
+      },
+      {
+       "id": 245,
+       "type": "list.contains",
+       "x": 1840,
+       "y": 4700,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 246,
+       "type": "var.get",
+       "x": 1840,
+       "y": 4790,
+       "params": {
+        "variable": "Seated",
+        "scope": "Valid"
+       }
+      },
+      {
+       "id": 247,
+       "type": "struct.break",
+       "x": 1840,
+       "y": 4880,
+       "params": {
+        "struct": "Row"
+       }
+      },
+      {
+       "id": 248,
+       "type": "var.set",
+       "x": 2240,
+       "y": 4550,
+       "params": {
+        "variable": "Ok",
+        "scope": "Valid"
+       },
+       "values": {
+        "value": false
+       }
+      },
+      {
+       "id": 249,
+       "type": "list.add",
+       "x": 2520,
+       "y": 4550,
+       "params": {
+        "variable": "Seated",
+        "scope": "Valid"
+       }
+      },
+      {
+       "id": 250,
+       "type": "struct.break",
+       "x": 2400,
+       "y": 4700,
+       "params": {
+        "struct": "Row"
+       }
+      },
+      {
+       "id": 251,
+       "type": "func.return",
+       "x": 2800,
+       "y": 4550,
+       "params": {
+        "function": "Valid"
+       }
+      },
+      {
+       "id": 252,
+       "type": "logic.and",
+       "x": 2680,
+       "y": 4700
+      },
+      {
+       "id": 253,
+       "type": "var.get",
+       "x": 2680,
+       "y": 4790,
+       "params": {
+        "variable": "Ok",
+        "scope": "Valid"
+       }
+      },
+      {
+       "id": 254,
+       "type": "math.compare",
+       "x": 2680,
+       "y": 4880,
+       "params": {
+        "op": "<="
+       }
+      },
+      {
+       "id": 255,
+       "type": "list.length",
+       "x": 2680,
+       "y": 4970,
+       "params": {
+        "type": "Row"
+       }
+      },
+      {
+       "id": 256,
+       "type": "var.get",
+       "x": 2680,
+       "y": 5060,
+       "params": {
+        "variable": "MaxRows"
+       }
+      }
+     ],
+     "links": [
+      [
+       20,
+       "body",
+       68,
+       "exec"
+      ],
+      [
+       20,
+       "completed",
+       83,
+       "exec"
+      ],
+      [
+       20,
+       "item",
+       73,
+       "value"
+      ],
+      [
+       20,
+       "item",
+       75,
+       "value"
+      ],
+      [
+       20,
+       "item",
+       79,
+       "value"
+      ],
+      [
+       20,
+       "item",
+       81,
+       "value"
+      ],
+      [
+       40,
+       "body",
+       196,
+       "exec"
+      ],
+      [
+       40,
+       "completed",
+       209,
+       "exec"
+      ],
+      [
+       40,
+       "item",
+       198,
+       "value"
+      ],
+      [
+       40,
+       "item",
+       200,
+       "value"
+      ],
+      [
+       40,
+       "item",
+       203,
+       "value"
+      ],
+      [
+       50,
+       "body",
+       213,
+       "exec"
+      ],
+      [
+       50,
+       "completed",
+       251,
+       "exec"
+      ],
+      [
+       50,
+       "item",
+       217,
+       "value"
+      ],
+      [
+       50,
+       "item",
+       221,
+       "value"
+      ],
+      [
+       50,
+       "item",
+       222,
+       "value"
+      ],
+      [
+       50,
+       "item",
+       225,
+       "value"
+      ],
+      [
+       50,
+       "item",
+       226,
+       "value"
+      ],
+      [
+       50,
+       "item",
+       230,
+       "value"
+      ],
+      [
+       50,
+       "item",
+       233,
+       "value"
+      ],
+      [
+       50,
+       "item",
+       236,
+       "value"
+      ],
+      [
+       50,
+       "item",
+       238,
+       "value"
+      ],
+      [
+       50,
+       "item",
+       242,
+       "value"
+      ],
+      [
+       50,
+       "item",
+       247,
+       "value"
+      ],
+      [
+       50,
+       "item",
+       250,
+       "value"
+      ],
+      [
+       51,
+       "a",
+       53,
+       "a"
+      ],
+      [
+       51,
+       "b",
+       53,
+       "b"
+      ],
+      [
+       51,
+       "then",
+       52,
+       "exec"
+      ],
+      [
+       53,
+       "result",
+       52,
+       "same"
+      ],
+      [
+       54,
+       "result",
+       58,
+       "value"
+      ],
+      [
+       54,
+       "then",
+       55,
+       "exec"
+      ],
+      [
+       56,
+       "item",
+       55,
+       "name"
+      ],
+      [
+       57,
+       "value",
+       56,
+       "list"
+      ],
+      [
+       58,
+       "index",
+       56,
+       "index"
+      ],
+      [
+       59,
+       "owner",
+       62,
+       "value"
+      ],
+      [
+       59,
+       "owner",
+       63,
+       "value"
+      ],
+      [
+       59,
+       "owner",
+       64,
+       "Owner"
+      ],
+      [
+       59,
+       "rows",
+       62,
+       "list"
+      ],
+      [
+       59,
+       "rows",
+       63,
+       "list"
+      ],
+      [
+       59,
+       "then",
+       60,
+       "exec"
+      ],
+      [
+       61,
+       "result",
+       60,
+       "row"
+      ],
+      [
+       62,
+       "found",
+       61,
+       "pick"
+      ],
+      [
+       63,
+       "row",
+       61,
+       "a"
+      ],
+      [
+       64,
+       "value",
+       61,
+       "b"
+      ],
+      [
+       65,
+       "value",
+       64,
+       "Pilot"
+      ],
+      [
+       66,
+       "value",
+       64,
+       "Passenger"
+      ],
+      [
+       67,
+       "player",
+       72,
+       "b"
+      ],
+      [
+       67,
+       "player",
+       78,
+       "b"
+      ],
+      [
+       67,
+       "rows",
+       20,
+       "list"
+      ],
+      [
+       67,
+       "then",
+       20,
+       "exec"
+      ],
+      [
+       68,
+       "true",
+       71,
+       "exec"
+      ],
+      [
+       69,
+       "result",
+       68,
+       "condition"
+      ],
+      [
+       70,
+       "value",
+       69,
+       "a"
+      ],
+      [
+       71,
+       "false",
+       77,
+       "exec"
+      ],
+      [
+       71,
+       "true",
+       74,
+       "exec"
+      ],
+      [
+       72,
+       "same",
+       71,
+       "condition"
+      ],
+      [
+       73,
+       "Pilot",
+       72,
+       "a"
+      ],
+      [
+       74,
+       "then",
+       75,
+       "exec"
+      ],
+      [
+       75,
+       "then",
+       76,
+       "exec"
+      ],
+      [
+       77,
+       "true",
+       80,
+       "exec"
+      ],
+      [
+       78,
+       "same",
+       77,
+       "condition"
+      ],
+      [
+       79,
+       "Passenger",
+       78,
+       "a"
+      ],
+      [
+       80,
+       "then",
+       81,
+       "exec"
+      ],
+      [
+       81,
+       "then",
+       82,
+       "exec"
+      ],
+      [
+       84,
+       "value",
+       83,
+       "found"
+      ],
+      [
+       85,
+       "value",
+       83,
+       "row"
+      ],
+      [
+       86,
+       "value",
+       83,
+       "seat"
+      ],
+      [
+       87,
+       "owner",
+       90,
+       "a"
+      ],
+      [
+       87,
+       "owner",
+       99,
+       "b"
+      ],
+      [
+       87,
+       "owner",
+       106,
+       "b"
+      ],
+      [
+       87,
+       "owner",
+       113,
+       "owner"
+      ],
+      [
+       87,
+       "owner",
+       145,
+       "value"
+      ],
+      [
+       87,
+       "owner",
+       147,
+       "value"
+      ],
+      [
+       87,
+       "player",
+       92,
+       "a"
+      ],
+      [
+       87,
+       "player",
+       99,
+       "a"
+      ],
+      [
+       87,
+       "player",
+       103,
+       "player"
+      ],
+      [
+       87,
+       "player",
+       108,
+       "player"
+      ],
+      [
+       87,
+       "player",
+       110,
+       "player"
+      ],
+      [
+       87,
+       "player",
+       122,
+       "b"
+      ],
+      [
+       87,
+       "player",
+       141,
+       "value"
+      ],
+      [
+       87,
+       "player",
+       142,
+       "value"
+      ],
+      [
+       87,
+       "rows",
+       94,
+       "rows"
+      ],
+      [
+       87,
+       "rows",
+       100,
+       "rows"
+      ],
+      [
+       87,
+       "rows",
+       103,
+       "rows"
+      ],
+      [
+       87,
+       "rows",
+       108,
+       "rows"
+      ],
+      [
+       87,
+       "rows",
+       110,
+       "rows"
+      ],
+      [
+       87,
+       "rows",
+       111,
+       "rows"
+      ],
+      [
+       87,
+       "rows",
+       113,
+       "rows"
+      ],
+      [
+       87,
+       "rows",
+       124,
+       "rows"
+      ],
+      [
+       87,
+       "rows",
+       130,
+       "rows"
+      ],
+      [
+       87,
+       "rows",
+       138,
+       "rows"
+      ],
+      [
+       87,
+       "rows",
+       143,
+       "value"
+      ],
+      [
+       87,
+       "rows",
+       145,
+       "list"
+      ],
+      [
+       87,
+       "rows",
+       147,
+       "list"
+      ],
+      [
+       87,
+       "seat",
+       97,
+       "a"
+      ],
+      [
+       87,
+       "seat",
+       109,
+       "b"
+      ],
+      [
+       87,
+       "seat",
+       116,
+       "a"
+      ],
+      [
+       87,
+       "seat",
+       133,
+       "a"
+      ],
+      [
+       87,
+       "seat",
+       140,
+       "a"
+      ],
+      [
+       87,
+       "then",
+       88,
+       "exec"
+      ],
+      [
+       88,
+       "false",
+       95,
+       "exec"
+      ],
+      [
+       88,
+       "true",
+       94,
+       "exec"
+      ],
+      [
+       89,
+       "result",
+       88,
+       "condition"
+      ],
+      [
+       90,
+       "same",
+       89,
+       "a"
+      ],
+      [
+       91,
+       "value",
+       90,
+       "b"
+      ],
+      [
+       92,
+       "same",
+       89,
+       "b"
+      ],
+      [
+       93,
+       "value",
+       92,
+       "b"
+      ],
+      [
+       95,
+       "false",
+       101,
+       "exec"
+      ],
+      [
+       95,
+       "true",
+       100,
+       "exec"
+      ],
+      [
+       96,
+       "result",
+       95,
+       "condition"
+      ],
+      [
+       97,
+       "result",
+       96,
+       "a"
+      ],
+      [
+       98,
+       "result",
+       96,
+       "b"
+      ],
+      [
+       99,
+       "same",
+       98,
+       "a"
+      ],
+      [
+       101,
+       "false",
+       112,
+       "exec"
+      ],
+      [
+       101,
+       "true",
+       111,
+       "exec"
+      ],
+      [
+       102,
+       "result",
+       101,
+       "condition"
+      ],
+      [
+       103,
+       "found",
+       102,
+       "a"
+      ],
+      [
+       104,
+       "result",
+       102,
+       "b"
+      ],
+      [
+       105,
+       "result",
+       104,
+       "a"
+      ],
+      [
+       106,
+       "same",
+       105,
+       "a"
+      ],
+      [
+       107,
+       "Owner",
+       106,
+       "a"
+      ],
+      [
+       108,
+       "row",
+       107,
+       "value"
+      ],
+      [
+       109,
+       "result",
+       105,
+       "b"
+      ],
+      [
+       110,
+       "seat",
+       109,
+       "a"
+      ],
+      [
+       112,
+       "then",
+       114,
+       "exec"
+      ],
+      [
+       113,
+       "row",
+       112,
+       "value"
+      ],
+      [
+       114,
+       "then",
+       121,
+       "exec"
+      ],
+      [
+       115,
+       "result",
+       114,
+       "value"
+      ],
+      [
+       116,
+       "result",
+       115,
+       "pick"
+      ],
+      [
+       117,
+       "Pilot",
+       115,
+       "a"
+      ],
+      [
+       118,
+       "value",
+       117,
+       "value"
+      ],
+      [
+       119,
+       "Passenger",
+       115,
+       "b"
+      ],
+      [
+       120,
+       "value",
+       119,
+       "value"
+      ],
+      [
+       121,
+       "false",
+       125,
+       "exec"
+      ],
+      [
+       121,
+       "true",
+       124,
+       "exec"
+      ],
+      [
+       122,
+       "same",
+       121,
+       "condition"
+      ],
+      [
+       123,
+       "value",
+       122,
+       "a"
+      ],
+      [
+       125,
+       "false",
+       131,
+       "exec"
+      ],
+      [
+       125,
+       "true",
+       130,
+       "exec"
+      ],
+      [
+       126,
+       "result",
+       125,
+       "condition"
+      ],
+      [
+       127,
+       "same",
+       126,
+       "a"
+      ],
+      [
+       128,
+       "value",
+       127,
+       "a"
+      ],
+      [
+       129,
+       "value",
+       127,
+       "b"
+      ],
+      [
+       131,
+       "false",
+       139,
+       "exec"
+      ],
+      [
+       131,
+       "true",
+       138,
+       "exec"
+      ],
+      [
+       132,
+       "result",
+       131,
+       "condition"
+      ],
+      [
+       133,
+       "result",
+       132,
+       "a"
+      ],
+      [
+       134,
+       "same",
+       132,
+       "b"
+      ],
+      [
+       135,
+       "Pilot",
+       134,
+       "a"
+      ],
+      [
+       136,
+       "value",
+       135,
+       "value"
+      ],
+      [
+       137,
+       "value",
+       134,
+       "b"
+      ],
+      [
+       139,
+       "false",
+       142,
+       "exec"
+      ],
+      [
+       139,
+       "true",
+       141,
+       "exec"
+      ],
+      [
+       140,
+       "result",
+       139,
+       "condition"
+      ],
+      [
+       141,
+       "then",
+       143,
+       "exec"
+      ],
+      [
+       142,
+       "then",
+       143,
+       "exec"
+      ],
+      [
+       143,
+       "then",
+       144,
+       "exec"
+      ],
+      [
+       144,
+       "false",
+       149,
+       "exec"
+      ],
+      [
+       144,
+       "true",
+       146,
+       "exec"
+      ],
+      [
+       145,
+       "found",
+       144,
+       "condition"
+      ],
+      [
+       146,
+       "then",
+       151,
+       "exec"
+      ],
+      [
+       147,
+       "index",
+       146,
+       "index"
+      ],
+      [
+       148,
+       "value",
+       146,
+       "item"
+      ],
+      [
+       149,
+       "then",
+       151,
+       "exec"
+      ],
+      [
+       150,
+       "value",
+       149,
+       "item"
+      ],
+      [
+       152,
+       "value",
+       151,
+       "rows"
+      ],
+      [
+       153,
+       "owner",
+       156,
+       "a"
+      ],
+      [
+       153,
+       "owner",
+       162,
+       "value"
+      ],
+      [
+       153,
+       "owner",
+       166,
+       "value"
+      ],
+      [
+       153,
+       "owner",
+       189,
+       "value"
+      ],
+      [
+       153,
+       "owner",
+       191,
+       "value"
+      ],
+      [
+       153,
+       "player",
+       158,
+       "a"
+      ],
+      [
+       153,
+       "player",
+       168,
+       "b"
+      ],
+      [
+       153,
+       "rows",
+       160,
+       "rows"
+      ],
+      [
+       153,
+       "rows",
+       162,
+       "list"
+      ],
+      [
+       153,
+       "rows",
+       166,
+       "list"
+      ],
+      [
+       153,
+       "rows",
+       175,
+       "rows"
+      ],
+      [
+       153,
+       "rows",
+       182,
+       "value"
+      ],
+      [
+       153,
+       "rows",
+       189,
+       "list"
+      ],
+      [
+       153,
+       "rows",
+       191,
+       "list"
+      ],
+      [
+       153,
+       "seat",
+       170,
+       "a"
+      ],
+      [
+       153,
+       "seat",
+       177,
+       "a"
+      ],
+      [
+       153,
+       "then",
+       154,
+       "exec"
+      ],
+      [
+       154,
+       "false",
+       161,
+       "exec"
+      ],
+      [
+       154,
+       "true",
+       160,
+       "exec"
+      ],
+      [
+       155,
+       "result",
+       154,
+       "condition"
+      ],
+      [
+       156,
+       "same",
+       155,
+       "a"
+      ],
+      [
+       157,
+       "value",
+       156,
+       "b"
+      ],
+      [
+       158,
+       "same",
+       155,
+       "b"
+      ],
+      [
+       159,
+       "value",
+       158,
+       "b"
+      ],
+      [
+       161,
+       "then",
+       163,
+       "exec"
+      ],
+      [
+       162,
+       "row",
+       161,
+       "value"
+      ],
+      [
+       163,
+       "false",
+       176,
+       "exec"
+      ],
+      [
+       163,
+       "true",
+       175,
+       "exec"
+      ],
+      [
+       164,
+       "result",
+       163,
+       "condition"
+      ],
+      [
+       165,
+       "result",
+       164,
+       "a"
+      ],
+      [
+       166,
+       "found",
+       165,
+       "a"
+      ],
+      [
+       167,
+       "result",
+       164,
+       "b"
+      ],
+      [
+       168,
+       "same",
+       167,
+       "a"
+      ],
+      [
+       169,
+       "result",
+       168,
+       "a"
+      ],
+      [
+       170,
+       "result",
+       169,
+       "pick"
+      ],
+      [
+       171,
+       "Pilot",
+       169,
+       "a"
+      ],
+      [
+       172,
+       "value",
+       171,
+       "value"
+      ],
+      [
+       173,
+       "Passenger",
+       169,
+       "b"
+      ],
+      [
+       174,
+       "value",
+       173,
+       "value"
+      ],
+      [
+       176,
+       "false",
+       180,
+       "exec"
+      ],
+      [
+       176,
+       "true",
+       178,
+       "exec"
+      ],
+      [
+       177,
+       "result",
+       176,
+       "condition"
+      ],
+      [
+       178,
+       "then",
+       180,
+       "exec"
+      ],
+      [
+       179,
+       "value",
+       178,
+       "value"
+      ],
+      [
+       180,
+       "then",
+       182,
+       "exec"
+      ],
+      [
+       181,
+       "value",
+       180,
+       "value"
+      ],
+      [
+       182,
+       "then",
+       183,
+       "exec"
+      ],
+      [
+       183,
+       "false",
+       190,
+       "exec"
+      ],
+      [
+       183,
+       "true",
+       188,
+       "exec"
+      ],
+      [
+       184,
+       "same",
+       183,
+       "condition"
+      ],
+      [
+       185,
+       "Pilot",
+       184,
+       "a"
+      ],
+      [
+       186,
+       "value",
+       185,
+       "value"
+      ],
+      [
+       187,
+       "value",
+       184,
+       "b"
+      ],
+      [
+       188,
+       "then",
+       193,
+       "exec"
+      ],
+      [
+       189,
+       "index",
+       188,
+       "index"
+      ],
+      [
+       190,
+       "then",
+       193,
+       "exec"
+      ],
+      [
+       191,
+       "index",
+       190,
+       "index"
+      ],
+      [
+       192,
+       "value",
+       190,
+       "item"
+      ],
+      [
+       194,
+       "value",
+       193,
+       "rows"
+      ],
+      [
+       195,
+       "player",
+       197,
+       "b"
+      ],
+      [
+       195,
+       "player",
+       202,
+       "b"
+      ],
+      [
+       195,
+       "rows",
+       40,
+       "list"
+      ],
+      [
+       195,
+       "then",
+       40,
+       "exec"
+      ],
+      [
+       196,
+       "false",
+       200,
+       "exec"
+      ],
+      [
+       196,
+       "true",
+       199,
+       "exec"
+      ],
+      [
+       197,
+       "same",
+       196,
+       "condition"
+      ],
+      [
+       198,
+       "Pilot",
+       197,
+       "a"
+      ],
+      [
+       200,
+       "then",
+       201,
+       "exec"
+      ],
+      [
+       201,
+       "false",
+       207,
+       "exec"
+      ],
+      [
+       201,
+       "true",
+       204,
+       "exec"
+      ],
+      [
+       202,
+       "same",
+       201,
+       "condition"
+      ],
+      [
+       203,
+       "Passenger",
+       202,
+       "a"
+      ],
+      [
+       204,
+       "then",
+       206,
+       "exec"
+      ],
+      [
+       205,
+       "value",
+       204,
+       "value"
+      ],
+      [
+       206,
+       "then",
+       207,
+       "exec"
+      ],
+      [
+       208,
+       "value",
+       207,
+       "item"
+      ],
+      [
+       210,
+       "value",
+       209,
+       "rows"
+      ],
+      [
+       211,
+       "value",
+       209,
+       "changed"
+      ],
+      [
+       212,
+       "rows",
+       50,
+       "list"
+      ],
+      [
+       212,
+       "rows",
+       255,
+       "list"
+      ],
+      [
+       212,
+       "then",
+       50,
+       "exec"
+      ],
+      [
+       213,
+       "false",
+       235,
+       "exec"
+      ],
+      [
+       213,
+       "true",
+       234,
+       "exec"
+      ],
+      [
+       214,
+       "result",
+       213,
+       "condition"
+      ],
+      [
+       215,
+       "result",
+       214,
+       "a"
+      ],
+      [
+       216,
+       "same",
+       215,
+       "a"
+      ],
+      [
+       217,
+       "Owner",
+       216,
+       "a"
+      ],
+      [
+       218,
+       "value",
+       216,
+       "b"
+      ],
+      [
+       219,
+       "result",
+       215,
+       "b"
+      ],
+      [
+       220,
+       "same",
+       219,
+       "a"
+      ],
+      [
+       221,
+       "Pilot",
+       220,
+       "a"
+      ],
+      [
+       222,
+       "Owner",
+       220,
+       "b"
+      ],
+      [
+       223,
+       "result",
+       214,
+       "b"
+      ],
+      [
+       224,
+       "same",
+       223,
+       "a"
+      ],
+      [
+       225,
+       "Passenger",
+       224,
+       "a"
+      ],
+      [
+       226,
+       "Pilot",
+       224,
+       "b"
+      ],
+      [
+       227,
+       "result",
+       223,
+       "b"
+      ],
+      [
+       228,
+       "result",
+       227,
+       "a"
+      ],
+      [
+       229,
+       "value",
+       228,
+       "list"
+      ],
+      [
+       230,
+       "Owner",
+       228,
+       "item"
+      ],
+      [
+       231,
+       "result",
+       227,
+       "b"
+      ],
+      [
+       232,
+       "value",
+       231,
+       "list"
+      ],
+      [
+       233,
+       "Pilot",
+       231,
+       "item"
+      ],
+      [
+       234,
+       "then",
+       235,
+       "exec"
+      ],
+      [
+       235,
+       "then",
+       237,
+       "exec"
+      ],
+      [
+       236,
+       "Owner",
+       235,
+       "item"
+      ],
+      [
+       237,
+       "then",
+       239,
+       "exec"
+      ],
+      [
+       238,
+       "Pilot",
+       237,
+       "item"
+      ],
+      [
+       239,
+       "true",
+       244,
+       "exec"
+      ],
+      [
+       240,
+       "result",
+       239,
+       "condition"
+      ],
+      [
+       241,
+       "same",
+       240,
+       "a"
+      ],
+      [
+       242,
+       "Passenger",
+       241,
+       "a"
+      ],
+      [
+       243,
+       "value",
+       241,
+       "b"
+      ],
+      [
+       244,
+       "false",
+       249,
+       "exec"
+      ],
+      [
+       244,
+       "true",
+       248,
+       "exec"
+      ],
+      [
+       245,
+       "result",
+       244,
+       "condition"
+      ],
+      [
+       246,
+       "value",
+       245,
+       "list"
+      ],
+      [
+       247,
+       "Passenger",
+       245,
+       "item"
+      ],
+      [
+       248,
+       "then",
+       249,
+       "exec"
+      ],
+      [
+       250,
+       "Passenger",
+       249,
+       "item"
+      ],
+      [
+       252,
+       "result",
+       251,
+       "ok"
+      ],
+      [
+       253,
+       "value",
+       252,
+       "a"
+      ],
+      [
+       254,
+       "result",
+       252,
+       "b"
+      ],
+      [
+       255,
+       "length",
+       254,
+       "a"
+      ],
+      [
+       256,
+       "value",
+       254,
+       "b"
+      ]
+     ],
+     "machines": [],
+     "functions": [
+      {
+       "name": "Same",
+       "pure": true,
+       "inputs": [
+        {
+         "name": "a",
+         "type": "int",
+         "value": 0
+        },
+        {
+         "name": "b",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "same",
+         "type": "bool",
+         "value": false
+        }
+       ]
+      },
+      {
+       "name": "ResultName",
+       "pure": true,
+       "inputs": [
+        {
+         "name": "result",
+         "type": "enum",
+         "of": "Result",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "name",
+         "type": "text",
+         "value": ""
+        }
+       ]
+      },
+      {
+       "name": "Get",
+       "pure": true,
+       "help": "The row of the owner's jet (nobody in it when the table has none)",
+       "inputs": [
+        {
+         "name": "rows",
+         "type": "struct_list",
+         "of": "Row",
+         "value": []
+        },
+        {
+         "name": "owner",
+         "type": "int",
+         "value": 253
+        }
+       ],
+       "outputs": [
+        {
+         "name": "row",
+         "type": "struct",
+         "of": "Row",
+         "value": {
+          "Owner": 253,
+          "Pilot": 253,
+          "Passenger": 253
+         }
+        }
+       ]
+      },
+      {
+       "name": "SeatOf",
+       "pure": true,
+       "help": "Where a player sits: the row (its owner) and the seat",
+       "inputs": [
+        {
+         "name": "rows",
+         "type": "struct_list",
+         "of": "Row",
+         "value": []
+        },
+        {
+         "name": "player",
+         "type": "int",
+         "value": 253
+        }
+       ],
+       "outputs": [
+        {
+         "name": "found",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "row",
+         "type": "struct",
+         "of": "Row",
+         "value": {
+          "Owner": 253,
+          "Pilot": 253,
+          "Passenger": 253
+         }
+        },
+        {
+         "name": "seat",
+         "type": "enum",
+         "of": "Seat",
+         "value": 0
+        }
+       ],
+       "locals": [
+        {
+         "name": "Found",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "At",
+         "type": "struct",
+         "of": "Row",
+         "value": {
+          "Owner": 253,
+          "Pilot": 253,
+          "Passenger": 253
+         }
+        },
+        {
+         "name": "In",
+         "type": "enum",
+         "of": "Seat",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "Claim",
+       "pure": true,
+       "help": "A player takes a seat. Only the owner flies his jet; a passenger needs a pilot; a player sits in one seat at most.",
+       "inputs": [
+        {
+         "name": "rows",
+         "type": "struct_list",
+         "of": "Row",
+         "value": []
+        },
+        {
+         "name": "owner",
+         "type": "int",
+         "value": 253
+        },
+        {
+         "name": "player",
+         "type": "int",
+         "value": 253
+        },
+        {
+         "name": "seat",
+         "type": "enum",
+         "of": "Seat",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "rows",
+         "type": "struct_list",
+         "of": "Row",
+         "value": []
+        },
+        {
+         "name": "result",
+         "type": "enum",
+         "of": "Result",
+         "value": 2
+        }
+       ],
+       "locals": [
+        {
+         "name": "Rows",
+         "type": "struct_list",
+         "of": "Row",
+         "value": []
+        },
+        {
+         "name": "Cur",
+         "type": "struct",
+         "of": "Row",
+         "value": {
+          "Owner": 253,
+          "Pilot": 253,
+          "Passenger": 253
+         }
+        },
+        {
+         "name": "Slot",
+         "type": "int",
+         "value": 253
+        }
+       ]
+      },
+      {
+       "name": "Release",
+       "pure": true,
+       "help": "A player leaves a seat. The pilot leaving takes the passenger out too: no unmanaged flight.",
+       "inputs": [
+        {
+         "name": "rows",
+         "type": "struct_list",
+         "of": "Row",
+         "value": []
+        },
+        {
+         "name": "owner",
+         "type": "int",
+         "value": 253
+        },
+        {
+         "name": "player",
+         "type": "int",
+         "value": 253
+        },
+        {
+         "name": "seat",
+         "type": "enum",
+         "of": "Seat",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "rows",
+         "type": "struct_list",
+         "of": "Row",
+         "value": []
+        },
+        {
+         "name": "result",
+         "type": "enum",
+         "of": "Result",
+         "value": 2
+        }
+       ],
+       "locals": [
+        {
+         "name": "Rows",
+         "type": "struct_list",
+         "of": "Row",
+         "value": []
+        },
+        {
+         "name": "Cur",
+         "type": "struct",
+         "of": "Row",
+         "value": {
+          "Owner": 253,
+          "Pilot": 253,
+          "Passenger": 253
+         }
+        }
+       ]
+      },
+      {
+       "name": "Drop",
+       "pure": true,
+       "help": "A player left the session: his jet's row goes, his passenger seat elsewhere is freed",
+       "inputs": [
+        {
+         "name": "rows",
+         "type": "struct_list",
+         "of": "Row",
+         "value": []
+        },
+        {
+         "name": "player",
+         "type": "int",
+         "value": 253
+        }
+       ],
+       "outputs": [
+        {
+         "name": "rows",
+         "type": "struct_list",
+         "of": "Row",
+         "value": []
+        },
+        {
+         "name": "changed",
+         "type": "bool",
+         "value": false
+        }
+       ],
+       "locals": [
+        {
+         "name": "Rows",
+         "type": "struct_list",
+         "of": "Row",
+         "value": []
+        },
+        {
+         "name": "Cur",
+         "type": "struct",
+         "of": "Row",
+         "value": {
+          "Owner": 253,
+          "Pilot": 253,
+          "Passenger": 253
+         }
+        },
+        {
+         "name": "Changed",
+         "type": "bool",
+         "value": false
+        }
+       ]
+      },
+      {
+       "name": "Valid",
+       "pure": true,
+       "help": "Is this a table the authority could have sent? Every jet once, its owner the pilot, every player in one seat at most.",
+       "inputs": [
+        {
+         "name": "rows",
+         "type": "struct_list",
+         "of": "Row",
+         "value": []
+        }
+       ],
+       "outputs": [
+        {
+         "name": "ok",
+         "type": "bool",
+         "value": true
+        }
+       ],
+       "locals": [
+        {
+         "name": "Ok",
+         "type": "bool",
+         "value": true
+        },
+        {
+         "name": "Owners",
+         "type": "int_list",
+         "value": []
+        },
+        {
+         "name": "Seated",
+         "type": "int_list",
+         "value": []
         }
        ]
       }

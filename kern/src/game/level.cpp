@@ -946,8 +946,44 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
   return r.ok;
 }
 
+std::vector<std::string> channel_names(const WorldSettings& w) {
+  std::vector<std::string> names;
+  std::string name;
+  auto end = [&] {
+    const std::size_t a = name.find_first_not_of(" \t"), b = name.find_last_not_of(" \t");
+    if (names.size() < 32) names.push_back(a == std::string::npos ? std::string() : name.substr(a, b - a + 1));
+    name.clear();
+  };
+  for (char c : w.channels) {
+    if (c == ',') end();
+    else name += c;
+  }
+  end();
+  while (!names.empty() && names.back().empty()) names.pop_back();
+  return names;
+}
+
+u32 channel_bits(const WorldSettings& w, std::string_view names) {
+  const std::vector<std::string> have = channel_names(w);
+  u32 bits = 0;
+  std::size_t at = 0;
+  while (at <= names.size()) {
+    std::size_t comma = names.find(',', at);
+    if (comma == std::string_view::npos) comma = names.size();
+    std::string_view one = names.substr(at, comma - at);
+    while (!one.empty() && (one.front() == ' ' || one.front() == '\t')) one.remove_prefix(1);
+    while (!one.empty() && (one.back() == ' ' || one.back() == '\t')) one.remove_suffix(1);
+    if (one == "*" || one == "All") return 0xffffffffu;
+    for (std::size_t k = 0; k < have.size(); ++k)
+      if (!one.empty() && have[k] == one) bits |= 1u << k;
+    at = comma + 1;
+  }
+  return bits;
+}
+
 json::Value world_to_json(const WorldSettings& w) {
   json::Value o = json::Value::object();
+  if (w.channels != "World") o.set("channels", w.channels);
   o.set("gravity", vec(w.gravity));
   o.set("substeps", w.substeps);
   o.set("stepHz", num(w.step_hz));
@@ -987,6 +1023,7 @@ json::Value world_to_json(const WorldSettings& w) {
 bool world_from_json(const json::Value& v, WorldSettings& w, std::string* error) {
   if (!v.is_object()) return true;
   Reader r{v, error};
+  r.string("channels", w.channels);
   r.vector("gravity", w.gravity);
   r.integer("substeps", w.substeps, 1, 16);
   r.number("stepHz", w.step_hz, 15, 480);

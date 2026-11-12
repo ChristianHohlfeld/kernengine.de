@@ -270,6 +270,12 @@ bool Game::start(kern::Engine& e) {
     kern::logic::Instance* guided_rules = logic ? logic->find(world_->find_actor("Guided")) : nullptr;
     if (!guided_rules || guided_rules->disabled()) return kern::fail("the level's Blueprint \"Guided\" is missing or has errors");
     guided::bind(guided_rules);
+    kern::logic::Instance* spawn_guard = logic ? logic->find(world_->find_actor("SpawnGuard")) : nullptr;
+    if (!spawn_guard || spawn_guard->disabled()) return kern::fail("the level's Blueprint \"SpawnGuard\" is missing or has errors");
+    spawn::bind(spawn_guard);
+    kern::logic::Instance* jet_seats = logic ? logic->find(world_->find_actor("JetSeats")) : nullptr;
+    if (!jet_seats || jet_seats->disabled()) return kern::fail("the level's Blueprint \"JetSeats\" is missing or has errors");
+    seats::bind(jet_seats);
   }
   soldier_ = world_->find_actor("Player");
   drone_actor_ = world_->find_actor("Drone");

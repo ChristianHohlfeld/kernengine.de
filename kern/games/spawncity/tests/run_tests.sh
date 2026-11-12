@@ -28,10 +28,11 @@ python3 "$game/tools/embed_level.py" "$game/level/spawncity.klevel" "$game/src/l
 # ... and its Blueprints as C++ classes, as the game links them: the tests run the rules as the game does.
 "$kern/../tools/blueprint_cpp.sh" "$game/level/spawncity.klevel" "$game/src/level_blueprints.cpp"
 # Kern's engine-side pieces the models use (physics, geometry builders, the renderer headless on
-# Kern's GL stub, Kern Logic for the rules that are Blueprints), then the game's simulation sources
-# (no GameWorld) and the tests.
+# Kern's GL stub, Kern Logic for the rules that are Blueprints, the game layer for the Blueprints
+# that ask the world - a ray, an actor), then the game's simulation sources (not the Game itself)
+# and the tests.
 sources=()
-for d in core physics geo gfx scene audio net logic; do while IFS= read -r f; do sources+=("$f"); done < <(find "$kern/src/$d" -name '*.cpp' | sort); done
+for d in core physics geo gfx scene audio net logic game; do while IFS= read -r f; do sources+=("$f"); done < <(find "$kern/src/$d" -name '*.cpp' | sort); done
 sources+=("$kern/tests/gl_stub.cpp")
 # Every game source that does not need GameWorld (not main.cpp, nothing that includes game.h).
 for f in "$game"/src/*.cpp; do [ "$(basename "$f")" = main.cpp ] || grep -q '#include "game.h"' "$f" || sources+=("$f"); done
@@ -55,8 +56,9 @@ if [ $# -eq 0 ]; then
   nat="$out/native"
   rm -rf "$nat" && mkdir -p "$nat"
   "$out/spawncity_tests" --emit-native "$nat"
-  logic_objects=()
-  for f in "${cpp_objects[@]}"; do case "$f" in *_kern_src_logic_*|*_kern_src_core_*) logic_objects+=("$f") ;; esac; done
-  "$cxx" "${flags[@]}" -Werror -I"$nat" "$nat/blueprint_native_main.cpp" "${logic_objects[@]}" "$out"/musl/*.o -lm -o "$out/wanted_native_test"
+  # (the engine, as the classes call it: Kern Logic, and the game layer for the nodes that ask the world)
+  engine_objects=()
+  for f in "${cpp_objects[@]}"; do case "$f" in *_kern_src_*|*_kern_tests_gl_stub*) engine_objects+=("$f") ;; esac; done
+  "$cxx" "${flags[@]}" -Werror -I"$nat" "$nat/blueprint_native_main.cpp" "${engine_objects[@]}" "${objects[@]}" -lm -o "$out/wanted_native_test"
   "$out/wanted_native_test" "$nat/blueprint_native_expected.txt"
 fi

@@ -7,6 +7,12 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-12",time:"04:03",title:"Kollisionskanäle nach Box3D, Spawn-Regeln und Jet-Sitze als Blueprint",items:[
+    "Kern: Was womit kollidiert und was ein Strahl trifft, folgt jetzt vollständig Box3Ds Filter. Ein Level benennt seine Kollisionskanäle (SpawnCity: World, Vehicle, Drone, Query); im Editor hat ein Collider dafür Kästchen mit Namen statt Bitzahlen.",
+    "Kern-Blueprints: neuer Knoten „Line Trace by Channels“ – ein Strahl, der nur bestimmte Kanäle trifft – und „Channels“, der Kanäle beim Namen nennt.",
+    "Unter der Haube: Die Regel „nichts entsteht dort, wo ein Spieler hinsieht“ und der Abstand neuer Fahrzeuge stehen jetzt als Blueprint „SpawnGuard“ im Level. Ob ein Gebäude die Stelle verdeckt, fragt der Blueprint die Welt selbst. Am Spiel ändert sich dadurch nichts.",
+    "Ebenso die Sitzplätze im Jet (wer fliegt, wer mitfliegt, was beim Aussteigen und Verlassen der Runde passiert): jetzt der Blueprint „JetSeats“.",
+  ]},
   {date:"2026-11-11",time:"23:47",title:"Die Lenkrakete ist jetzt ein Blueprint",items:[
     "Unter der Haube: Die Regeln der Lenkrakete der Drohne – Zielauswahl am Fadenkreuz, Flug von der Schiene über den Marschflug bis zum Sturz, Annäherungszünder und das Abschütteln durch Sprinten – stehen jetzt als Blueprint „Guided“ im Level. Am Spiel ändert sich dadurch nichts.",
   ]},

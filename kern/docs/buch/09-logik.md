@@ -422,7 +422,7 @@ das Netz stimmen überein.
 
 ## 9.6 Spiel-Knoten
 
-Die Bibliothek hat 71 Spiel-Knoten (`logic_node_shapes.cpp`, `logic_nodes.cpp`). Sie rufen Funktionen der GameWorld
+Die Bibliothek hat 73 Spiel-Knoten (`logic_node_shapes.cpp`, `logic_nodes.cpp`). Sie rufen Funktionen der GameWorld
 ([Kapitel 8](08-spiel-laufzeit.md)); ein Actor-Eingang ohne Draht (0) bedeutet **Self**.
 
 ### Events
@@ -466,7 +466,7 @@ z. B. `components.mesh.material.color` – repliziert)
 `actor.launch` Launch (behält die horizontale Geschwindigkeit, addiert diese) · `actor.simulate` Set
 Simulate Physics (dynamisch ↔ kinematisch) · `actor.joint_motor` Set Joint Motor (Scharnier, Slider,
 Seil: Türen, Lifte, Winden) · `actor.explode` Explosion (Box3D-Radialimpuls mit Blitz, Sound und
-fallendem Schaden) · `physics.trace` Line Trace (Box3D-Strahl)
+fallendem Schaden) · `physics.trace` Line Trace (Box3D-Strahl) · `physics.trace_channels` Line Trace by Channels (derselbe Strahl mit Box3Ds Abfragefilter: welche Kollisionskanäle er trifft, und seine eigenen) · `physics.channels` Channels (die Bits der Kollisionskanäle des Levels mit diesen Namen)
 
 ### Spiel, Kampf, Effekte, Audio
 

@@ -564,6 +564,23 @@ const vpCenter = async (page, i = 0) => {
     await cmd(page, {cmd: "undo"});
     check(await until(async () => (await colorOf()) !== "#0000ff"), "color: undo takes the whole session back");
   }
+  // Collision channels: the level names them, a collider shows a box per name (Box3D's category
+  // and mask bits behind them).
+  {
+    await cmd(page, {cmd: "setWorld", path: "world.channels", value: "World, Vehicle, Drone"});
+    await cmd(page, {cmd: "addComponent", type: "collider"});
+    const box = (path, bit) => `#details .flags.channels input[data-path="${path}"][data-part="${bit}"]`;
+    check(await until(() => page.locator(box("components.colliders.0.category", 1)).count()), "channels: a collider's channels are boxes with the level's names");
+    const labels = await page.locator('#details .flags.channels').first().locator("label").allTextContents();
+    check(labels.join("|") === "World|Vehicle|Drone", `channels: the boxes carry the names (${labels.join("|")})`);
+    const bitsOf = path => page.evaluate(path => window.KernStudio.state.details.sections.flatMap(s => s.fields).find(f => f.path === path)?.value, path);
+    check(await bitsOf("components.colliders.0.category") === 1 && await bitsOf("components.colliders.0.mask") === 4294967295, "channels: a new collider is of the first channel and collides with all");
+    await page.click(box("components.colliders.0.category", 1));
+    await page.click(box("components.colliders.0.category", 0));
+    check(await until(async () => (await bitsOf("components.colliders.0.category")) === 2), "channels: ticking Vehicle and unticking World makes it a vehicle (bit 2)");
+    await page.click(box("components.colliders.0.mask", 2));
+    check(await until(async () => (await bitsOf("components.colliders.0.mask")) === 4294967291), "channels: unticking Drone under Collides with clears only that bit");
+  }
   check(errors.length === 0, "no page errors in the module build" + (errors.length ? ": " + errors.slice(0, 3).join(" | ") : ""));
   await ctx.close();
 }
