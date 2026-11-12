@@ -1,13 +1,15 @@
 # SpawnCity als Editor-Projekt: der Weg
 
 Ziel: SpawnCity ist ein Projekt des Kern-Editors – ein Level, Blueprints und Daten – und wird vom
-Editor exportiert. Es enthält kein eigenes C++ mehr. Was heute in `src/` steht, ist dann entweder
-ein System der Engine (für jedes Kern-Spiel nutzbar, im Editor als Komponente und als
-Blueprint-Knoten), ein Blueprint (Spielregeln, Ablauf) oder ein Datensatz im Level.
+Editor geladen und exportiert. Es enthält kein eigenes C++ mehr.
 
-Das beweist, was die Engine können muss, um ein Spiel dieser Größe ohne Code zu bauen – und es
-hält SpawnCity von selbst im Gleichschritt mit der Engine, weil es nichts Eigenes mehr gibt, das
-auseinanderlaufen könnte.
+Der Weg dahin ist die Sprache selbst: Ein Blueprint und sein C++ sind dasselbe in zwei
+Schreibweisen (`kern/docs/blueprint_cpp.md`); die Schreibweise ist ein Teil von C++. Was heute in
+`src/` steht, ist gewöhnliches C++ und benutzt mehr von der Sprache als diesen Teil. Es wird in
+die Schreibweise umgeschrieben – Datei für Datei, Funktion für Funktion, von einem Konverter
+(`tools/cpp_to_blueprint.py`) – und ist danach ein Blueprint des Levels. Nichts von SpawnCity
+wandert in die Engine. Die Engine und die Sprache bekommen nur, was allgemein ist: Fähigkeiten
+der Sprache (Werte, Knoten), die dem Konverter noch fehlen, um eine Stelle zu schreiben.
 
 spawncity.de bleibt bei jedem Schritt das exakte Drop-in: Jede Stufe ist für sich lauffähig,
 getestet und live.
@@ -26,18 +28,20 @@ getestet und live.
 
 ## Inventar: was wohin geht
 
-| Teil | Dateien | Zeilen | Ziel |
-|---|---|---:|---|
-| Reine Regeln (Formeln und Tabellen des Originals) | `wanted`, `combat_rules`, `combat_detail`, `mp_rules`, `gaps_rules`, `guided`, `spawn_guard`, `jet_seats`, `lamps`, `world_traffic`, `controls`, `settings`, `equipment` | 2.643 | Blueprint-Funktionen und Datentabellen |
-| Spielablauf (was wann passiert) | `game`, `game_town`, `game_events`, `game_military`, `game_gaps`, `game_weapons`, `game_foot_rounds`, `game_equipment`, `game_details`, `game_guided`, `game_barricades`, `game_seats`, `game_traffic`, `game_traffic_far`, `game_vehicle_damage`, `game_lamps`, `game_life`, `game_world`, `game_ui`, `game_controls` | 11.159 | Level- und Actor-Blueprints; was darin System ist, wandert mit dem System |
-| Welt | `city_stream`, `tiles`, `mvt`, `terrain`, `interiors`, `destruction`, `world_marks`, `road_graph`, `city_jobs`, `facades`, `water_look` | 5.351 | Engine: Komponente „Kartenwelt“ (löst die vereinfachte „Procedural City“ ab) |
-| Fahrzeuge | `car`, `drone`, `jet` | 1.138 | Engine: Player-Controller Vehicle / Drone / Jet mit diesen Modellen |
-| Leben | `life`, `people`, `ragdoll` | 2.548 | Engine: Passanten, Tiere, Ragdoll als Komponenten |
-| Mehrspieler | `net_session`, `game_net`, `game_worldsync`, `game_destruction_sync`, `game_projsync`, `game_toss`, `game_swarm` | 3.713 | Engine: Replikation der Komponenten (`net_game`) |
-| Eingabe, Bild, Ton | `touch_play`, `look`, `game_look`, `perf`, `game_vr`, `sound_fx`, `combat_audio`, `game_audio_web` | 2.972 | Engine: Touch-Layout, Kamera/Look, VR, Sound |
-| Modelle | `combat_art`, `life_art`, `people_art`, `vehicle_art`, `mp_art`, `world_art` | 1.234 | Engine: prozedurale Meshes im Katalog |
-| Hilfen | `nostr`, `qr_code`, `gps_live` | 631 | Engine-Bibliothek |
-| Einstieg | `main` | 160 | entfällt (Host des Editors) |
+| Teil | Dateien | Zeilen |
+|---|---|---:|
+| Reine Regeln (Formeln und Tabellen des Originals) | `wanted`, `combat_rules`, `combat_detail`, `mp_rules`, `gaps_rules`, `guided`, `spawn_guard`, `jet_seats`, `lamps`, `world_traffic`, `controls`, `settings`, `equipment` | 2.643 |
+| Spielablauf (was wann passiert) | `game`, `game_town`, `game_events`, `game_military`, `game_gaps`, `game_weapons`, `game_foot_rounds`, `game_equipment`, `game_details`, `game_guided`, `game_barricades`, `game_seats`, `game_traffic`, `game_traffic_far`, `game_vehicle_damage`, `game_lamps`, `game_life`, `game_world`, `game_ui`, `game_controls` | 11.159 |
+| Welt | `city_stream`, `tiles`, `mvt`, `terrain`, `interiors`, `destruction`, `world_marks`, `road_graph`, `city_jobs`, `facades`, `water_look` | 5.351 |
+| Fahrzeuge | `car`, `drone`, `jet` | 1.138 |
+| Leben | `life`, `people`, `ragdoll` | 2.548 |
+| Mehrspieler | `net_session`, `game_net`, `game_worldsync`, `game_destruction_sync`, `game_projsync`, `game_toss`, `game_swarm` | 3.713 |
+| Eingabe, Bild, Ton | `touch_play`, `look`, `game_look`, `perf`, `game_vr`, `sound_fx`, `combat_audio`, `game_audio_web` | 2.972 |
+| Modelle | `combat_art`, `life_art`, `people_art`, `vehicle_art`, `mp_art`, `world_art` | 1.234 |
+| Hilfen | `nostr`, `qr_code`, `gps_live` | 631 |
+| Einstieg | `main` | 160 |
+
+Alles davon wird Blueprint des Projekts; `main` entfällt (der Host des Editors lädt das Projekt).
 
 Die Seite (`web/`: Ansicht des Originals, Menüs, Ton des Originals) wird das Seitenmodul des
 Projekts: Der Export des Editors nimmt es mit.
@@ -326,32 +330,97 @@ In dieser Reihenfolge (klein nach groß; jede Datei verschwindet, ihre Tests ble
   `tools/blueprint_cpp.sh --apply level.klevel <Actor> text.cpp` in das Level gelegt (dieselbe
   Lesart wie „Apply“ in der C++-Ansicht des Editors); das Level bleibt die eine Quelle.
 
-### 4 – Systeme in die Engine
-Je System: Code nach `kern/src/…`, als Komponente im Level und im Editor, Knoten für Blueprints,
-Replikation; das vereinfachte Gegenstück der Engine entfällt.
-1. Fahrzeuge (Auto mit Reifenmodell, Drohne mit Firmware, Jet)
-2. Welt (Kartenwelt: Kacheln, Gelände, Innenräume, Zerstörung, Straßengraph)
-3. Verkehr und Leben (Fahrer, Passanten, Tiere, Ragdoll)
-4. Waffen, Geschosse, Ausrüstung
-5. Mehrspieler
-6. Eingabe, Kamera, VR, Ton, Modelle
+### 4 – Der Konverter: C++ zu Blueprints
+`tools/cpp_to_blueprint.py` liest die Quellen mit dem Parser des Compilers (clangs Syntaxbaum)
+und schreibt sie in der Schreibweise:
 
-### 5 – Der Spielablauf als Blueprints
-`game_*.cpp` wird zu Blueprints der Actors (Spieler, Polizei, Militär, Abschleppdienst, Ereignisse …)
-und des Levels.
+- Jede Quelldatei wird der Blueprint eines Actors im Ordner „Source“ des Levels (`terrain.cpp` →
+  „Terrain“): ihre Funktionen sind seine Funktionen, ihre Konstanten seine Variablen, die
+  Aufzählungen und Strukturen, mit denen sie rechnet, seine Typen. Hilfsfunktionen aus Headern
+  (`inline`) stehen in jedem Blueprint, der sie benutzt – wie in C++ in jeder Übersetzungseinheit.
+- Gerechnet wird mit der Arithmetik der Blueprint-Sprache: Zahlen in 64 Bit, ganze Zahlen exakt,
+  eine Division durch null ergibt 0, Vektoren in 32 Bit. Das ist in Interpreter, JIT und Klasse
+  und auf jeder Maschine gleich. Wo das C++ in 32 Bit rechnete, ist der Blueprint mindestens so
+  genau. Eine Stelle, deren Bedeutung sich ändern würde (Überlauf in 32 Bit, Bit-Arithmetik),
+  wird nicht geschrieben, solange die Sprache keinen Knoten dafür hat.
+- **Der Beweis je Funktion:** `--test` schreibt zu jeder Datei einen Test (`tests/converted/`),
+  der jede umgeschriebene Funktion mit denselben Argumenten aufruft – das C++, aus dem sie gelesen
+  wurde, den Blueprint im Interpreter und den Blueprint als kompilierte Klasse – und die
+  Ergebnisse vergleicht (300 Aufrufe je Funktion; Interpreter und Klasse müssen dasselbe geben).
+  Als gleich gilt, was das C++ gibt – in 32 Bit, wie es dasteht, oder mit 64-Bit-Zahlen, wie ein
+  Blueprint rechnet (der Test übersetzt die Funktion dafür ein zweites Mal mit `f32` als
+  `double`): Wo der 32-Bit-Lauf unterwegs Stellen verliert (eine Schleife, die aufaddiert, ein
+  Produkt mit einer großen Zahl), ist der Blueprint der 64-Bit-Lauf. Verlässt das C++ die Zahlen
+  (Division durch null, Wurzel aus Negativem), wird nichts verglichen; an einem Sprung einer
+  Funktion (Schwelle, Umbruch eines Winkels) entscheiden die Nachbarn des Arguments, auf welcher
+  Seite ein Aufruf liegt.
+- Eine Funktion wird geschrieben, wenn alles in ihr einen Platz in der Schreibweise hat – und
+  alles, was sie aufruft. Die anderen bleiben C++, bis der Konverter oder die Sprache den Platz
+  hat. Der Lauf nennt, worauf sie warten, nach Zeilen geordnet.
 
-### 6 – Export
-- [ ] Der Editor exportiert das Projekt mit Seitenmodul; der Export ist das Drop-in für
-  spawncity.de (CI vergleicht).
-- [ ] `src/` ist leer und wird gelöscht.
+Stand (12.11.2026): 90 von 1.428 Funktionen (365 von 28.607 Zeilen) aus 36 von 77 Dateien stehen
+als Blueprints im Level (36 Actors im Ordner „Source“). Mit den Hilfsfunktionen aus Headern, die
+in den Blueprints stehen, sind es 94; 72 davon vergleicht der Test mit ihrem C++, 22 nicht:
+16 sind Methoden ohne Zustand, 3 lesen ein Feld an einer berechneten Stelle (das
+C++ liest daneben, wo der Blueprint den Nullwert gibt – der Test kennt den gültigen Bereich
+nicht), 3 haben Text oder Listen als Ein- oder Ausgang, für die der Test noch keine Werte hat.
+Das Spiel führt für diese Dateien weiter ihr C++ aus (Stufe 5). Worauf die anderen warten, nach
+Zeilen: der Zustand ihres Objekts (Methoden: 827 Funktionen, 23.937 Zeilen), Parameter, durch
+die sie schreiben (87, 1.187), Zeiger (42, 372), Listen von Listen, 32-Bit-Überlauf und
+Bit-Arithmetik (49, 274), Typen der Engine ohne Wert in der Sprache.
+
+Aufruf (in `kern/games/spawncity`):
+
+    ../../../tools/cpp_to_blueprint.py --convert sc --level level/spawncity.klevel --test tests/converted \
+        -I../../include -I../../third_party/box3d/include -Isrc -- src/*.cpp
+
+Was als Nächstes dazukommt, in der Reihenfolge der Zeilen, die darauf warten:
+1. [ ] **Objekte:** Die Daten einer Klasse sind eine Struktur, ihre Methoden Funktionen über diesen
+   Wert (`Shake_add(self, amount)` gibt das geänderte `self` zurück). Parameter, durch die eine
+   Funktion schreibt (`f32& out`), sind weitere Ergebnisse. Konstruktoren sind Funktionen, die
+   den Wert bauen.
+2. [ ] **Lambdas:** eine lokale Funktion wird eine Funktion des Blueprints; was sie fängt, sind
+   ihre Eingänge, was sie davon ändert, ihre Ergebnisse.
+3. [ ] **Schleifen mit `break` / `continue`,** `do-while`, Referenzen auf Einträge einer Liste.
+4. [ ] **Sprache:** ganze Zahlen in 32 Bit mit Überlauf und Bit-Arithmetik (Hashes, Paketformate);
+   Drehung (Quat) und Matrix als Werte; Vec4; Maps; Text formatieren und zerlegen; Listen:
+   einfügen, löschen, sortieren, suchen.
+5. [ ] **Aufrufe zwischen Blueprints als Werte:** eine reine Funktion eines anderen Blueprints
+   ohne Umweg über einen Schritt (heute: Call on Actor).
+6. [ ] **Die Engine als Knoten:** was die Quellen von der Engine aufrufen – Physik (Körper,
+   Gelenke, Abfragen), Kamera, Renderer und Meshes, Netz, Ton, Zeit –, allgemein und für jedes
+   Spiel.
+
+### 5 – Umschalten
+Eine Datei schaltet um, sobald sie ganz durchläuft: Ihr C++ wird gelöscht, das Spiel läuft auf
+ihrem Blueprint, und ihre bisherigen Tests prüfen den Blueprint. Bis dahin ist das C++ die Quelle,
+aus der der Konverter den Blueprint schreibt, und der Vergleichstest hält beide gleich.
+
+### 6 – Das Projekt laden
+Das Projekt ist die Datei des Levels: `level/spawncity.klevel` mit den Actors, ihren Blueprints,
+den Typen des Projekts und den Daten – dazu das Seitenmodul (`web/`: Ansicht, Menüs, Ton).
+
+- [x] Der Editor öffnet die Datei wie jedes Level (Kern Studio: Open); jeder Blueprint ist im
+  Blueprint-Editor als Graph und als C++ zu sehen und zu ändern.
+- [x] `tools/blueprint_cpp.sh level.klevel out.cpp` schreibt die Blueprints als Klassen;
+  `tools/export_game.sh level.klevel spiel.html` baut daraus das eigenständige Spiel.
+- [ ] Das Projekt nennt sein Seitenmodul und die Einstellungen der Laufzeit (Schleifenwächter,
+  Schrittweite), damit der Export des Editors ohne `build.sh` auskommt.
+- [ ] Solange noch C++ in `src/` steht, baut `build.sh` beides zusammen: das Level mit seinen
+  Blueprints als Klassen und das restliche C++.
+- [ ] Der Export des Editors ist das Drop-in für spawncity.de (CI vergleicht); `src/` ist leer und
+  wird gelöscht.
 
 ## Regeln für jeden Schritt
-- Es gibt zu jeder Zeit genau eine Umsetzung einer Regel oder eines Systems – nie C++ und
-  Blueprint nebeneinander.
+- Es gibt zu jeder Zeit genau eine Quelle einer Regel oder eines Systems. Für die Regeln der
+  Stufe 3 ist das der Blueprint. Für eine Datei, die der Konverter noch nicht ganz schreibt, ist
+  es ihr C++: Der Blueprint daneben ist daraus erzeugt (nie von Hand geändert) und durch den
+  Vergleichstest an das C++ gebunden, bis die Datei umschaltet.
 - Werte und Verhalten bleiben die des Originals; die bestehenden Tests wandern mit und prüfen
-  danach den Blueprint bzw. das Engine-System.
+  danach den Blueprint.
 - Box3D wird nicht getunt; Physik bleibt nach `kern/docs/physics.md`.
 - Die Engine und die Blueprint-Sprache bleiben allgemein: Was hier dazukommt – Knoten, Typen,
-  Engine-Systeme, Replikation –, ist für jedes Spiel gebaut, nicht für SpawnCity. Was nur
+  Fähigkeiten der Sprache –, ist für jedes Spiel gebaut, nicht für SpawnCity. Code von SpawnCity
+  wandert nicht in die Engine. Was nur
   SpawnCity ist (Werte, Regeln, Inhalte), steht im Projekt: in seinem Level, seinen Blueprints
-  und seinen Daten. Ein Engine-System bekommt nie einen SpawnCity-Sonderfall.
+  und seinen Daten.

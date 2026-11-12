@@ -7,6 +7,10 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-12",time:"18:40",title:"Ein Konverter schreibt den Code des Spiels als Blueprints",items:[
+    "Unter der Haube: Ein Konverter liest den C++-Code des Spiels und schreibt ihn als Blueprints ins Level. Die ersten 90 Funktionen aus 36 Dateien stehen dort jetzt – Kameraformeln, Geländefarben, Batterie der Drohne, Straßenbreiten und mehr. Am Spiel ändert sich dadurch nichts.",
+    "Die umgeschriebenen Funktionen werden gegen ihren bisherigen Code geprüft: gleiche Eingaben, gleiches Ergebnis – im Interpreter und als kompilierter Code.",
+  ]},
   {date:"2026-11-12",time:"17:05",title:"Kern-Blueprints: Typen des Projekts",items:[
     "Kern-Blueprints: Eine Aufzählung oder Struktur kann jetzt mehreren Blueprints eines Levels gehören – ein „Typ des Projekts“, in allen gleich. Unter Enums und Structures holt „+ An enum / A struct of another Blueprint…“ den Typ eines anderen Blueprints; wer eine Funktion eines anderen Blueprints erklärt, bekommt die Typen ihrer Ein- und Ausgänge von selbst.",
     "Eine Änderung an so einem Typ – ein Wert mehr, ein Feld mehr, ein neuer Name – geschieht in allen Blueprints zugleich und lässt sich mit einem Undo zurücknehmen. Als C++: KERN_PROJECT_ENUM und KERN_PROJECT_STRUCT.",
