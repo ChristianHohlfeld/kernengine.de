@@ -205,10 +205,13 @@ In dieser Reihenfolge (klein nach groß; jede Datei verschwindet, ihre Tests ble
   UpdateDodge, PickScore, Launch, Track und Step (der Flug: von der Schiene fallen, steigen, flach
   fliegen, stürzen, zünden). `guided.cpp` ruft nur noch auf; die Flugtests sind dieselben und
   laufen gegen den Blueprint. Klasse gegen Interpreter: mit CombatDetail und Wanted 1306 Aufrufe.
-- [ ] **`spawn_guard`** wartet auf Stufe 4: Die Regel fragt die Welt („verdeckt ein Gebäude den
-  Punkt?“) mit einem Strahl, der nur die Welt trifft. Line Trace der Engine trifft alles; die
-  Kollisionskanäle eines Projekts (Welt, Fahrzeug, Drohne …) kommen mit der Physik-Komponente.
-  Bis dahin bleibt die Datei, wie sie ist – nicht halb im Blueprint und halb im C++.
+- [x] **`spawn_guard`** – Actor „SpawnGuard“: die Strukturen Viewer und Footprint, die Abstände
+  und Winkel als Variablen, die Funktionen ConeHalfAngle, SeenBy, CanSpawn, FootprintsOverlap. Ob
+  ein Gebäude den Punkt verdeckt, fragt der Blueprint die Welt selbst: **Line Trace by Channels**
+  gegen den Kanal „World“ – kein Rückruf ins C++ mehr. Dafür hat die Engine Box3Ds Abfragefilter
+  bekommen (Kategorie und Maske, `physics::QueryFilter`) und das Level benannte Kollisionskanäle
+  (SpawnCity: World, Vehicle, Drone, Query). Die Tests laufen in einer GameWorld mit einem
+  Gebäude; ein „Fahrzeug“ im Weg verdeckt nichts.
 - Der Aufruf aus C++ steht einmal in `blueprint_call.h` (`rules::Blueprint`).
 - Geschrieben wird so ein Regel-Blueprint als sein C++-Text und mit
   `tools/blueprint_cpp.sh --apply level.klevel <Actor> text.cpp` in das Level gelegt (dieselbe

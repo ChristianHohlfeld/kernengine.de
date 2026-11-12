@@ -170,7 +170,7 @@ const I18N_DE = {
   "Cast shadow": "Wirft Schatten", "Motion": "Bewegungsart", "Mobility": "Mobilität", "Mass (0 = from density)": "Masse (0 = aus Dichte)", "Density": "Dichte",
   "Linear damping": "Lineare Dämpfung", "Angular damping": "Winkeldämpfung", "Gravity scale": "Schwerkraftfaktor", "Allow sleep": "Ruhen erlauben", "Start awake": "Wach starten",
   "Lock position": "Position sperren", "Lock rotation": "Drehung sperren", "Continuous (bullet)": "Kontinuierlich (Geschoss)", "Initial velocity": "Anfangsgeschwindigkeit",
-  "Initial spin": "Anfangsdrehung", "Sensor (overlap only)": "Sensor (nur Überlappung)", "Group index": "Gruppenindex", "Channel bits": "Kanal-Bits", "Collides with bits": "Kollidiert mit Bits",
+  "Initial spin": "Anfangsdrehung", "Sensor (overlap only)": "Sensor (nur Überlappung)", "Group index": "Gruppenindex", "Channels": "Kanäle", "Collides with": "Kollidiert mit", "Collision channels": "Kollisionskanäle", "Bit": "Bit", "Channel bits": "Kanal-Bits", "Collides with bits": "Kollidiert mit Bits",
   "Offset": "Versatz", "Box size": "Boxgröße", "Capsule length": "Kapsellänge", "Connected actor": "Verbundener Actor", "World (fixed point)": "Welt (fester Punkt)",
   "Anchor (local)": "Anker (lokal)", "Axis (local)": "Achse (lokal)", "Collide connected": "Verbundene kollidieren", "Limit": "Begrenzung", "Lower": "Unten", "Upper": "Oben",
   "Frequency": "Frequenz", "Damping ratio": "Dämpfungsgrad", "Max force / torque": "Max. Kraft / Drehmoment", "Speed": "Geschwindigkeit",

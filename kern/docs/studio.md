@@ -465,6 +465,29 @@ sie **auf einem Actor** auf.
   selbst auf ihrem eigenen Actor): Jeder Aufruf hat seine eigenen Parameter und lokalen Variablen.
   Tiefer als 64 ineinander geht es nicht – der Aufruf entfällt dann und wird gemeldet.
 
+### Kollisionskanäle (Box3Ds Filter)
+
+Was womit kollidiert und was ein Strahl trifft, folgt genau Box3D (Erin Catto, *Filtering* und
+*Query Filtering*):
+
+- Ein Level nennt seine **Kollisionskanäle** (Welt-Einstellungen, *Collision channels*): Namen
+  durch Kommas getrennt, höchstens 32 – der erste ist Bit 1, der zweite Bit 2, der dritte Bit 4.
+  Box3D: „The category bits should represent your application object types.“ Neu ist ein Level
+  mit dem einen Kanal `World`.
+- Ein **Collider** hat *Channels* (wozu er gehört – normalerweise ein Kanal) und *Collides with*
+  (welche Kanäle er annimmt), im Editor je ein Kästchen pro Kanal. Zwei Collider kollidieren, wenn
+  jeder den Kanal des anderen annimmt: `(catA & maskB) != 0 && (catB & maskA) != 0`. Der
+  *Group index* geht vor: gleiche positive Gruppe kollidiert immer, gleiche negative nie.
+- Eine **Abfrage** – ein Strahl, ein Cast – hat denselben Filter: die Kanäle, die sie trifft, und
+  ihre eigenen. Sie trifft einen Collider, wenn
+  `(shape.category & query.mask) != 0 && (shape.mask & query.category) != 0`; so kann ein Collider
+  bestimmte Strahlen auslassen (ein Fenster die Kamera). In C++ ist das `physics::QueryFilter`
+  an `cast_ray`, `cast_sphere`, `cast_mover` und `GameWorld::line_trace`.
+- Im Blueprint: **Line Trace by Channels** (wie Line Trace, dazu *Channels* und *Own Channels*)
+  und **Channels**, das die Bits zu Namen gibt (`"World, Vehicle"`, `"All"`). Ein Name, den das
+  Level nicht hat, ist kein Bit. In C++:
+  `physics_trace_channels(n4, start, end, Actor{0}, physics_channels("World"), 4294967295);`
+
 ### Listen und For Each
 
 Eine Variable, ein Pin einer Funktion oder ein Draht kann eine **Liste** von Werten eines Typs

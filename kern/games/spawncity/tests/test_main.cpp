@@ -124,7 +124,7 @@ int main(int argc, char** argv) {
   // the interpreter's answers (run_tests.sh compiles them into wanted_native_test).
   if (argc > 2 && std::strcmp(argv[1], "--emit-native") == 0) {
     std::string error;
-    if (!blueprint_native::emit(argv[2], {wanted_case(), combat_detail_case(), guided_case()}, &error)) {
+    if (!blueprint_native::emit(argv[2], {wanted_case(), combat_detail_case(), guided_case(), rule_case("SpawnGuard")}, &error)) {
       std::printf("FAIL --emit-native: %s\n", error.c_str());
       return 1;
     }

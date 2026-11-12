@@ -308,6 +308,18 @@ void add_game_nodes(logic::Library& lib) {
                {data("start", "Start", PinType::vector, zero3), data("end", "End", PinType::vector, vec3(10, 0, 0)), data("ignore", "Ignore", PinType::actor, 0)},
                {data("hit", "Hit", PinType::boolean), data("actor", "Hit Actor", PinType::actor), data("location", "Location", PinType::vector), data("normal", "Normal", PinType::vector)},
                "First thing between Start and End (a Box3D ray).", "raycast ray line of sight"));
+  // The same with Box3D's query filter: which collision channels the ray meets, and its own.
+  lib.add(step("physics.trace_channels", "Line Trace by Channels", "Physics",
+               {data("start", "Start", PinType::vector, zero3), data("end", "End", PinType::vector, vec3(10, 0, 0)), data("ignore", "Ignore", PinType::actor, 0),
+                data("mask", "Channels", PinType::integer, 4294967295.0), data("category", "Own Channels", PinType::integer, 4294967295.0)},
+               {data("hit", "Hit", PinType::boolean), data("actor", "Hit Actor", PinType::actor), data("location", "Location", PinType::vector), data("normal", "Normal", PinType::vector)},
+               "First thing between Start and End that is of one of Channels - the bits of the level's collision channels (the node Channels gives them by name). A collider that does "
+               "not collide with Own Channels is left out too: so a collider can ignore certain rays. (Box3D: a ray meets a shape when shape.category & Channels and shape.mask & Own Channels.)",
+               "raycast ray line of sight filter category mask layer"));
+  lib.add(value("physics.channels", "Channels", "Physics", {data("names", "Names", PinType::text, "World")}, {data("mask", "Channels", PinType::integer)},
+                "The bits of the level's collision channels with these names, separated by commas (World Settings: Collision channels). \"All\": every channel. For a collider's "
+                "channels and for Line Trace by Channels.",
+                "collision channel category mask layer bits filter"));
   // For each actor with a tag.
   {
     NodeDef d = make("flow.for_each_tag", "For Each Actor with Tag", "Flow", NodeKind::flow, "Runs Loop Body for every living actor with the tag, then Completed.", "loop all every");

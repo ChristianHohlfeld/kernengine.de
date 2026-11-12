@@ -3,6 +3,7 @@
  "version": 1,
  "name": "SpawnCity",
  "world": {
+  "channels": "World, Vehicle, Drone, Query",
   "title": "SpawnCity",
   "timeOfDay": 0.4,
   "dayLength": 480,
@@ -15,7 +16,7 @@
   "ambienceVolume": 0.35,
   "reverb": 0.2
  },
- "nextId": 4,
+ "nextId": 5,
  "actors": [
   {
    "id": 1,
@@ -9780,6 +9781,2868 @@
          "name": "MaxDv",
          "type": "float",
          "value": 0
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": 4,
+   "name": "SpawnGuard",
+   "folder": "Rules",
+   "transform": {
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     1
+    ]
+   },
+   "components": {
+    "logic": {
+     "kind": "kern-logic",
+     "version": 1,
+     "nextId": 207,
+     "variables": [
+      {
+       "name": "MinDistance",
+       "type": "float",
+       "value": 24,
+       "help": "spawn_visibility_guard.mjs: never closer to any viewer (m)"
+      },
+      {
+       "name": "ConeMargin",
+       "type": "float",
+       "value": 0.3490658503988659,
+       "help": "On top of the half field of view (20 degrees, in radians)"
+      },
+      {
+       "name": "OcclusionMax",
+       "type": "float",
+       "value": 420,
+       "help": "Buildings only hide what is nearer (m)"
+      },
+      {
+       "name": "DefaultFar",
+       "type": "float",
+       "value": 1500
+      },
+      {
+       "name": "DefaultHeight",
+       "type": "float",
+       "value": 2.2
+      },
+      {
+       "name": "FrustumSphere",
+       "type": "float",
+       "value": 1.5,
+       "help": "The sphere tested against the local frustum (m)"
+      },
+      {
+       "name": "BuildingChannels",
+       "type": "text",
+       "value": "World",
+       "help": "What hides a point from an eye: the collision channels of the buildings"
+      }
+     ],
+     "structs": [
+      {
+       "name": "Viewer",
+       "fields": [
+        {
+         "name": "Eye",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "Forward",
+         "type": "vector",
+         "value": [
+          1,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "HalfAngle",
+         "type": "float",
+         "value": 1.5707963267948966
+        },
+        {
+         "name": "Far",
+         "type": "float",
+         "value": 1500
+        },
+        {
+         "name": "Local",
+         "type": "bool",
+         "value": false
+        }
+       ],
+       "help": "Somebody who looks: a player's camera. Forward: a unit vector. Local: the presented camera - the frustum of a sphere is tested as well as the cone."
+      },
+      {
+       "name": "Footprint",
+       "fields": [
+        {
+         "name": "Center",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "Yaw",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "Half",
+         "type": "vector",
+         "value": [
+          1,
+          1,
+          0
+         ]
+        }
+       ],
+       "help": "A vehicle's footprint on the map: half extents along its x and y, turned by Yaw"
+      }
+     ],
+     "nodes": [
+      {
+       "id": 30,
+       "type": "func.call",
+       "x": 3920,
+       "y": 1390,
+       "params": {
+        "function": "Hidden"
+       }
+      },
+      {
+       "id": 32,
+       "type": "func.call",
+       "x": 4760,
+       "y": 1390,
+       "params": {
+        "function": "Hidden"
+       }
+      },
+      {
+       "id": 60,
+       "type": "physics.trace_channels",
+       "x": 1120,
+       "y": 380,
+       "values": {
+        "ignore": 0,
+        "category": 4294967295
+       }
+      },
+      {
+       "id": 70,
+       "type": "flow.for_each",
+       "x": 280,
+       "y": 2850,
+       "params": {
+        "type": "Viewer"
+       }
+      },
+      {
+       "id": 71,
+       "type": "func.call",
+       "x": 840,
+       "y": 2850,
+       "params": {
+        "function": "SeenBy"
+       }
+      },
+      {
+       "id": 72,
+       "type": "func.entry",
+       "x": 0,
+       "y": 0,
+       "params": {
+        "function": "ConeHalfAngle"
+       }
+      },
+      {
+       "id": 73,
+       "type": "func.return",
+       "x": 280,
+       "y": 0,
+       "params": {
+        "function": "ConeHalfAngle"
+       }
+      },
+      {
+       "id": 74,
+       "type": "math.formula",
+       "x": 160,
+       "y": 150,
+       "params": {
+        "formula": "min(2.8902652413026093, max(fov, 2 * atan(tan(fov / 2) * max(0.2, aspect))) / 2 + margin)"
+       }
+      },
+      {
+       "id": 75,
+       "type": "var.get",
+       "x": 160,
+       "y": 240,
+       "params": {
+        "variable": "ConeMargin"
+       }
+      },
+      {
+       "id": 76,
+       "type": "func.entry",
+       "x": 0,
+       "y": 380,
+       "params": {
+        "function": "Hidden"
+       }
+      },
+      {
+       "id": 77,
+       "type": "var.set",
+       "x": 280,
+       "y": 380,
+       "params": {
+        "variable": "L",
+        "scope": "Hidden"
+       }
+      },
+      {
+       "id": 78,
+       "type": "vector.distance",
+       "x": 160,
+       "y": 530
+      },
+      {
+       "id": 79,
+       "type": "flow.branch",
+       "x": 560,
+       "y": 380
+      },
+      {
+       "id": 80,
+       "type": "math.compare",
+       "x": 440,
+       "y": 530,
+       "params": {
+        "op": "<="
+       },
+       "values": {
+        "b": 1
+       }
+      },
+      {
+       "id": 81,
+       "type": "var.get",
+       "x": 440,
+       "y": 620,
+       "params": {
+        "variable": "L",
+        "scope": "Hidden"
+       }
+      },
+      {
+       "id": 82,
+       "type": "func.return",
+       "x": 840,
+       "y": 380,
+       "params": {
+        "function": "Hidden"
+       },
+       "values": {
+        "hidden": false
+       }
+      },
+      {
+       "id": 83,
+       "type": "vector.add",
+       "x": 1000,
+       "y": 530
+      },
+      {
+       "id": 84,
+       "type": "vector.scale",
+       "x": 1000,
+       "y": 620
+      },
+      {
+       "id": 85,
+       "type": "vector.sub",
+       "x": 1000,
+       "y": 710
+      },
+      {
+       "id": 86,
+       "type": "math.div",
+       "x": 1000,
+       "y": 800
+      },
+      {
+       "id": 87,
+       "type": "math.sub",
+       "x": 1000,
+       "y": 890,
+       "values": {
+        "b": 0.5
+       }
+      },
+      {
+       "id": 88,
+       "type": "var.get",
+       "x": 1000,
+       "y": 980,
+       "params": {
+        "variable": "L",
+        "scope": "Hidden"
+       }
+      },
+      {
+       "id": 89,
+       "type": "var.get",
+       "x": 1000,
+       "y": 1070,
+       "params": {
+        "variable": "L",
+        "scope": "Hidden"
+       }
+      },
+      {
+       "id": 90,
+       "type": "physics.channels",
+       "x": 1000,
+       "y": 1160
+      },
+      {
+       "id": 91,
+       "type": "var.get",
+       "x": 1000,
+       "y": 1250,
+       "params": {
+        "variable": "BuildingChannels"
+       }
+      },
+      {
+       "id": 92,
+       "type": "func.return",
+       "x": 1400,
+       "y": 380,
+       "params": {
+        "function": "Hidden"
+       }
+      },
+      {
+       "id": 93,
+       "type": "func.entry",
+       "x": 0,
+       "y": 1390,
+       "params": {
+        "function": "SeenBy"
+       }
+      },
+      {
+       "id": 94,
+       "type": "var.set",
+       "x": 280,
+       "y": 1390,
+       "params": {
+        "variable": "To",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 95,
+       "type": "vector.sub",
+       "x": 160,
+       "y": 1540
+      },
+      {
+       "id": 96,
+       "type": "struct.break",
+       "x": 160,
+       "y": 1630,
+       "params": {
+        "struct": "Viewer"
+       }
+      },
+      {
+       "id": 97,
+       "type": "var.set",
+       "x": 560,
+       "y": 1390,
+       "params": {
+        "variable": "D",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 98,
+       "type": "vector.length",
+       "x": 440,
+       "y": 1540
+      },
+      {
+       "id": 99,
+       "type": "var.get",
+       "x": 440,
+       "y": 1630,
+       "params": {
+        "variable": "To",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 100,
+       "type": "flow.branch",
+       "x": 840,
+       "y": 1390
+      },
+      {
+       "id": 101,
+       "type": "math.compare",
+       "x": 720,
+       "y": 1540,
+       "params": {
+        "op": "<"
+       }
+      },
+      {
+       "id": 102,
+       "type": "var.get",
+       "x": 720,
+       "y": 1630,
+       "params": {
+        "variable": "D",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 103,
+       "type": "var.get",
+       "x": 720,
+       "y": 1720,
+       "params": {
+        "variable": "MinDistance"
+       }
+      },
+      {
+       "id": 104,
+       "type": "func.return",
+       "x": 1120,
+       "y": 1390,
+       "params": {
+        "function": "SeenBy"
+       },
+       "values": {
+        "seen": true
+       }
+      },
+      {
+       "id": 105,
+       "type": "flow.branch",
+       "x": 1400,
+       "y": 1390
+      },
+      {
+       "id": 106,
+       "type": "logic.or",
+       "x": 1280,
+       "y": 1540
+      },
+      {
+       "id": 107,
+       "type": "math.compare",
+       "x": 1280,
+       "y": 1630,
+       "params": {
+        "op": ">"
+       }
+      },
+      {
+       "id": 108,
+       "type": "var.get",
+       "x": 1280,
+       "y": 1720,
+       "params": {
+        "variable": "D",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 109,
+       "type": "struct.break",
+       "x": 1280,
+       "y": 1810,
+       "params": {
+        "struct": "Viewer"
+       }
+      },
+      {
+       "id": 110,
+       "type": "logic.and",
+       "x": 1280,
+       "y": 1900
+      },
+      {
+       "id": 111,
+       "type": "math.compare",
+       "x": 1280,
+       "y": 1990,
+       "params": {
+        "op": ">"
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 112,
+       "type": "math.compare",
+       "x": 1280,
+       "y": 2080,
+       "params": {
+        "op": ">="
+       }
+      },
+      {
+       "id": 113,
+       "type": "var.get",
+       "x": 1280,
+       "y": 2170,
+       "params": {
+        "variable": "D",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 114,
+       "type": "func.return",
+       "x": 1680,
+       "y": 1390,
+       "params": {
+        "function": "SeenBy"
+       },
+       "values": {
+        "seen": false
+       }
+      },
+      {
+       "id": 115,
+       "type": "var.set",
+       "x": 1960,
+       "y": 1390,
+       "params": {
+        "variable": "Inside",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 116,
+       "type": "math.formula",
+       "x": 1840,
+       "y": 1540,
+       "params": {
+        "formula": "toward / max(d, 1e-06) >= cos(half)"
+       }
+      },
+      {
+       "id": 117,
+       "type": "vector.dot",
+       "x": 1840,
+       "y": 1630
+      },
+      {
+       "id": 118,
+       "type": "var.get",
+       "x": 1840,
+       "y": 1720,
+       "params": {
+        "variable": "To",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 119,
+       "type": "struct.break",
+       "x": 1840,
+       "y": 1810,
+       "params": {
+        "struct": "Viewer"
+       }
+      },
+      {
+       "id": 120,
+       "type": "var.get",
+       "x": 1840,
+       "y": 1900,
+       "params": {
+        "variable": "D",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 121,
+       "type": "struct.break",
+       "x": 1840,
+       "y": 1990,
+       "params": {
+        "struct": "Viewer"
+       }
+      },
+      {
+       "id": 122,
+       "type": "flow.branch",
+       "x": 2240,
+       "y": 1390
+      },
+      {
+       "id": 123,
+       "type": "logic.and",
+       "x": 2120,
+       "y": 1540
+      },
+      {
+       "id": 124,
+       "type": "logic.not",
+       "x": 2120,
+       "y": 1630
+      },
+      {
+       "id": 125,
+       "type": "var.get",
+       "x": 2120,
+       "y": 1720,
+       "params": {
+        "variable": "Inside",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 126,
+       "type": "struct.break",
+       "x": 2120,
+       "y": 1810,
+       "params": {
+        "struct": "Viewer"
+       }
+      },
+      {
+       "id": 127,
+       "type": "var.set",
+       "x": 2520,
+       "y": 1390,
+       "params": {
+        "variable": "Inside",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 128,
+       "type": "math.formula",
+       "x": 2400,
+       "y": 1540,
+       "params": {
+        "formula": "toward / max(0.001, d) >= cos(min(3.141592653589793, half + asin(min(1, sphere / max(0.001, d)))))"
+       }
+      },
+      {
+       "id": 129,
+       "type": "vector.dot",
+       "x": 2400,
+       "y": 1630
+      },
+      {
+       "id": 130,
+       "type": "vector.add",
+       "x": 2400,
+       "y": 1720
+      },
+      {
+       "id": 131,
+       "type": "var.get",
+       "x": 2400,
+       "y": 1810,
+       "params": {
+        "variable": "To",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 132,
+       "type": "vector.make",
+       "x": 2400,
+       "y": 1900,
+       "values": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      {
+       "id": 133,
+       "type": "math.mul",
+       "x": 2400,
+       "y": 1990,
+       "values": {
+        "b": 0.5
+       }
+      },
+      {
+       "id": 134,
+       "type": "struct.break",
+       "x": 2400,
+       "y": 2080,
+       "params": {
+        "struct": "Viewer"
+       }
+      },
+      {
+       "id": 135,
+       "type": "vector.length",
+       "x": 2400,
+       "y": 2170
+      },
+      {
+       "id": 136,
+       "type": "vector.add",
+       "x": 2400,
+       "y": 2260
+      },
+      {
+       "id": 137,
+       "type": "var.get",
+       "x": 2400,
+       "y": 2350,
+       "params": {
+        "variable": "To",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 138,
+       "type": "vector.make",
+       "x": 2400,
+       "y": 2440,
+       "values": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      {
+       "id": 139,
+       "type": "math.mul",
+       "x": 2400,
+       "y": 2530,
+       "values": {
+        "b": 0.5
+       }
+      },
+      {
+       "id": 140,
+       "type": "struct.break",
+       "x": 2400,
+       "y": 2620,
+       "params": {
+        "struct": "Viewer"
+       }
+      },
+      {
+       "id": 141,
+       "type": "var.get",
+       "x": 2400,
+       "y": 2710,
+       "params": {
+        "variable": "FrustumSphere"
+       }
+      },
+      {
+       "id": 142,
+       "type": "flow.branch",
+       "x": 2800,
+       "y": 1390
+      },
+      {
+       "id": 143,
+       "type": "logic.not",
+       "x": 2680,
+       "y": 1540
+      },
+      {
+       "id": 144,
+       "type": "var.get",
+       "x": 2680,
+       "y": 1630,
+       "params": {
+        "variable": "Inside",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 145,
+       "type": "func.return",
+       "x": 3080,
+       "y": 1390,
+       "params": {
+        "function": "SeenBy"
+       },
+       "values": {
+        "seen": false
+       }
+      },
+      {
+       "id": 146,
+       "type": "flow.branch",
+       "x": 3360,
+       "y": 1390
+      },
+      {
+       "id": 147,
+       "type": "math.compare",
+       "x": 3240,
+       "y": 1540,
+       "params": {
+        "op": ">"
+       }
+      },
+      {
+       "id": 148,
+       "type": "var.get",
+       "x": 3240,
+       "y": 1630,
+       "params": {
+        "variable": "D",
+        "scope": "SeenBy"
+       }
+      },
+      {
+       "id": 149,
+       "type": "var.get",
+       "x": 3240,
+       "y": 1720,
+       "params": {
+        "variable": "OcclusionMax"
+       }
+      },
+      {
+       "id": 150,
+       "type": "func.return",
+       "x": 3640,
+       "y": 1390,
+       "params": {
+        "function": "SeenBy"
+       },
+       "values": {
+        "seen": true
+       }
+      },
+      {
+       "id": 151,
+       "type": "struct.break",
+       "x": 3800,
+       "y": 1540,
+       "params": {
+        "struct": "Viewer"
+       }
+      },
+      {
+       "id": 152,
+       "type": "vector.add",
+       "x": 3800,
+       "y": 1630,
+       "values": {
+        "b": [
+         0,
+         0,
+         0.30000001192092896
+        ]
+       }
+      },
+      {
+       "id": 153,
+       "type": "flow.branch",
+       "x": 4200,
+       "y": 1390
+      },
+      {
+       "id": 154,
+       "type": "logic.not",
+       "x": 4080,
+       "y": 1540
+      },
+      {
+       "id": 155,
+       "type": "func.return",
+       "x": 4480,
+       "y": 1390,
+       "params": {
+        "function": "SeenBy"
+       },
+       "values": {
+        "seen": true
+       }
+      },
+      {
+       "id": 156,
+       "type": "struct.break",
+       "x": 4640,
+       "y": 1540,
+       "params": {
+        "struct": "Viewer"
+       }
+      },
+      {
+       "id": 157,
+       "type": "vector.add",
+       "x": 4640,
+       "y": 1630
+      },
+      {
+       "id": 158,
+       "type": "vector.make",
+       "x": 4640,
+       "y": 1720,
+       "values": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      {
+       "id": 159,
+       "type": "func.return",
+       "x": 5040,
+       "y": 1390,
+       "params": {
+        "function": "SeenBy"
+       }
+      },
+      {
+       "id": 160,
+       "type": "logic.not",
+       "x": 4920,
+       "y": 1540
+      },
+      {
+       "id": 161,
+       "type": "func.entry",
+       "x": 0,
+       "y": 2850,
+       "params": {
+        "function": "CanSpawn"
+       }
+      },
+      {
+       "id": 162,
+       "type": "flow.branch",
+       "x": 560,
+       "y": 2850
+      },
+      {
+       "id": 163,
+       "type": "var.get",
+       "x": 440,
+       "y": 3000,
+       "params": {
+        "variable": "Ok",
+        "scope": "CanSpawn"
+       }
+      },
+      {
+       "id": 164,
+       "type": "flow.branch",
+       "x": 1120,
+       "y": 2850
+      },
+      {
+       "id": 165,
+       "type": "var.set",
+       "x": 1400,
+       "y": 2850,
+       "params": {
+        "variable": "Ok",
+        "scope": "CanSpawn"
+       },
+       "values": {
+        "value": false
+       }
+      },
+      {
+       "id": 166,
+       "type": "func.return",
+       "x": 1680,
+       "y": 2850,
+       "params": {
+        "function": "CanSpawn"
+       }
+      },
+      {
+       "id": 167,
+       "type": "var.get",
+       "x": 1560,
+       "y": 3000,
+       "params": {
+        "variable": "Ok",
+        "scope": "CanSpawn"
+       }
+      },
+      {
+       "id": 168,
+       "type": "func.entry",
+       "x": 0,
+       "y": 3140,
+       "params": {
+        "function": "Reach"
+       }
+      },
+      {
+       "id": 169,
+       "type": "func.return",
+       "x": 280,
+       "y": 3140,
+       "params": {
+        "function": "Reach"
+       }
+      },
+      {
+       "id": 170,
+       "type": "math.formula",
+       "x": 160,
+       "y": 3290,
+       "params": {
+        "formula": "hx * abs(cos(yaw - angle)) + hy * abs(sin(yaw - angle))"
+       }
+      },
+      {
+       "id": 171,
+       "type": "vector.break",
+       "x": 160,
+       "y": 3380
+      },
+      {
+       "id": 172,
+       "type": "struct.break",
+       "x": 160,
+       "y": 3470,
+       "params": {
+        "struct": "Footprint"
+       }
+      },
+      {
+       "id": 173,
+       "type": "struct.break",
+       "x": 160,
+       "y": 3560,
+       "params": {
+        "struct": "Footprint"
+       }
+      },
+      {
+       "id": 174,
+       "type": "vector.break",
+       "x": 160,
+       "y": 3650
+      },
+      {
+       "id": 175,
+       "type": "struct.break",
+       "x": 160,
+       "y": 3740,
+       "params": {
+        "struct": "Footprint"
+       }
+      },
+      {
+       "id": 176,
+       "type": "func.entry",
+       "x": 0,
+       "y": 3880,
+       "params": {
+        "function": "AxisMeets"
+       }
+      },
+      {
+       "id": 177,
+       "type": "func.return",
+       "x": 280,
+       "y": 3880,
+       "params": {
+        "function": "AxisMeets"
+       }
+      },
+      {
+       "id": 178,
+       "type": "math.compare",
+       "x": 160,
+       "y": 4030,
+       "params": {
+        "op": "<"
+       }
+      },
+      {
+       "id": 179,
+       "type": "math.formula",
+       "x": 160,
+       "y": 4120,
+       "params": {
+        "formula": "abs(dx * cos(angle) + dy * sin(angle))"
+       }
+      },
+      {
+       "id": 180,
+       "type": "vector.break",
+       "x": 160,
+       "y": 4210
+      },
+      {
+       "id": 181,
+       "type": "vector.sub",
+       "x": 160,
+       "y": 4300
+      },
+      {
+       "id": 182,
+       "type": "struct.break",
+       "x": 160,
+       "y": 4390,
+       "params": {
+        "struct": "Footprint"
+       }
+      },
+      {
+       "id": 183,
+       "type": "struct.break",
+       "x": 160,
+       "y": 4480,
+       "params": {
+        "struct": "Footprint"
+       }
+      },
+      {
+       "id": 184,
+       "type": "vector.break",
+       "x": 160,
+       "y": 4570
+      },
+      {
+       "id": 185,
+       "type": "vector.sub",
+       "x": 160,
+       "y": 4660
+      },
+      {
+       "id": 186,
+       "type": "struct.break",
+       "x": 160,
+       "y": 4750,
+       "params": {
+        "struct": "Footprint"
+       }
+      },
+      {
+       "id": 187,
+       "type": "struct.break",
+       "x": 160,
+       "y": 4840,
+       "params": {
+        "struct": "Footprint"
+       }
+      },
+      {
+       "id": 188,
+       "type": "math.add",
+       "x": 160,
+       "y": 4930
+      },
+      {
+       "id": 189,
+       "type": "math.add",
+       "x": 160,
+       "y": 5020
+      },
+      {
+       "id": 190,
+       "type": "func.pure",
+       "x": 160,
+       "y": 5110,
+       "params": {
+        "function": "Reach"
+       }
+      },
+      {
+       "id": 191,
+       "type": "func.pure",
+       "x": 160,
+       "y": 5200,
+       "params": {
+        "function": "Reach"
+       }
+      },
+      {
+       "id": 192,
+       "type": "func.entry",
+       "x": 0,
+       "y": 5340,
+       "params": {
+        "function": "FootprintsOverlap"
+       }
+      },
+      {
+       "id": 193,
+       "type": "func.return",
+       "x": 280,
+       "y": 5340,
+       "params": {
+        "function": "FootprintsOverlap"
+       }
+      },
+      {
+       "id": 194,
+       "type": "logic.and",
+       "x": 160,
+       "y": 5490
+      },
+      {
+       "id": 195,
+       "type": "logic.and",
+       "x": 160,
+       "y": 5580
+      },
+      {
+       "id": 196,
+       "type": "func.pure",
+       "x": 160,
+       "y": 5670,
+       "params": {
+        "function": "AxisMeets"
+       }
+      },
+      {
+       "id": 197,
+       "type": "struct.break",
+       "x": 160,
+       "y": 5760,
+       "params": {
+        "struct": "Footprint"
+       }
+      },
+      {
+       "id": 198,
+       "type": "func.pure",
+       "x": 160,
+       "y": 5850,
+       "params": {
+        "function": "AxisMeets"
+       }
+      },
+      {
+       "id": 199,
+       "type": "math.add",
+       "x": 160,
+       "y": 5940,
+       "values": {
+        "b": 1.5707963267948966
+       }
+      },
+      {
+       "id": 200,
+       "type": "struct.break",
+       "x": 160,
+       "y": 6030,
+       "params": {
+        "struct": "Footprint"
+       }
+      },
+      {
+       "id": 201,
+       "type": "logic.and",
+       "x": 160,
+       "y": 6120
+      },
+      {
+       "id": 202,
+       "type": "func.pure",
+       "x": 160,
+       "y": 6210,
+       "params": {
+        "function": "AxisMeets"
+       }
+      },
+      {
+       "id": 203,
+       "type": "struct.break",
+       "x": 160,
+       "y": 6300,
+       "params": {
+        "struct": "Footprint"
+       }
+      },
+      {
+       "id": 204,
+       "type": "func.pure",
+       "x": 160,
+       "y": 6390,
+       "params": {
+        "function": "AxisMeets"
+       }
+      },
+      {
+       "id": 205,
+       "type": "math.add",
+       "x": 160,
+       "y": 6480,
+       "values": {
+        "b": 1.5707963267948966
+       }
+      },
+      {
+       "id": 206,
+       "type": "struct.break",
+       "x": 160,
+       "y": 6570,
+       "params": {
+        "struct": "Footprint"
+       }
+      }
+     ],
+     "links": [
+      [
+       30,
+       "hidden",
+       154,
+       "a"
+      ],
+      [
+       30,
+       "then",
+       153,
+       "exec"
+      ],
+      [
+       32,
+       "hidden",
+       160,
+       "a"
+      ],
+      [
+       32,
+       "then",
+       159,
+       "exec"
+      ],
+      [
+       60,
+       "hit",
+       92,
+       "hidden"
+      ],
+      [
+       60,
+       "then",
+       92,
+       "exec"
+      ],
+      [
+       70,
+       "body",
+       162,
+       "exec"
+      ],
+      [
+       70,
+       "completed",
+       166,
+       "exec"
+      ],
+      [
+       70,
+       "item",
+       71,
+       "viewer"
+      ],
+      [
+       71,
+       "seen",
+       164,
+       "condition"
+      ],
+      [
+       71,
+       "then",
+       164,
+       "exec"
+      ],
+      [
+       72,
+       "aspect",
+       74,
+       "aspect"
+      ],
+      [
+       72,
+       "fov",
+       74,
+       "fov"
+      ],
+      [
+       72,
+       "then",
+       73,
+       "exec"
+      ],
+      [
+       74,
+       "result",
+       73,
+       "half"
+      ],
+      [
+       75,
+       "value",
+       74,
+       "margin"
+      ],
+      [
+       76,
+       "eye",
+       60,
+       "start"
+      ],
+      [
+       76,
+       "eye",
+       78,
+       "b"
+      ],
+      [
+       76,
+       "eye",
+       83,
+       "a"
+      ],
+      [
+       76,
+       "eye",
+       85,
+       "b"
+      ],
+      [
+       76,
+       "point",
+       78,
+       "a"
+      ],
+      [
+       76,
+       "point",
+       85,
+       "a"
+      ],
+      [
+       76,
+       "then",
+       77,
+       "exec"
+      ],
+      [
+       77,
+       "then",
+       79,
+       "exec"
+      ],
+      [
+       78,
+       "result",
+       77,
+       "value"
+      ],
+      [
+       79,
+       "false",
+       60,
+       "exec"
+      ],
+      [
+       79,
+       "true",
+       82,
+       "exec"
+      ],
+      [
+       80,
+       "result",
+       79,
+       "condition"
+      ],
+      [
+       81,
+       "value",
+       80,
+       "a"
+      ],
+      [
+       83,
+       "result",
+       60,
+       "end"
+      ],
+      [
+       84,
+       "result",
+       83,
+       "b"
+      ],
+      [
+       85,
+       "result",
+       84,
+       "a"
+      ],
+      [
+       86,
+       "result",
+       84,
+       "b"
+      ],
+      [
+       87,
+       "result",
+       86,
+       "a"
+      ],
+      [
+       88,
+       "value",
+       87,
+       "a"
+      ],
+      [
+       89,
+       "value",
+       86,
+       "b"
+      ],
+      [
+       90,
+       "mask",
+       60,
+       "mask"
+      ],
+      [
+       91,
+       "value",
+       90,
+       "names"
+      ],
+      [
+       93,
+       "farEntry",
+       111,
+       "a"
+      ],
+      [
+       93,
+       "farEntry",
+       112,
+       "b"
+      ],
+      [
+       93,
+       "height",
+       133,
+       "a"
+      ],
+      [
+       93,
+       "height",
+       139,
+       "a"
+      ],
+      [
+       93,
+       "height",
+       158,
+       "z"
+      ],
+      [
+       93,
+       "point",
+       95,
+       "a"
+      ],
+      [
+       93,
+       "point",
+       152,
+       "a"
+      ],
+      [
+       93,
+       "point",
+       157,
+       "a"
+      ],
+      [
+       93,
+       "then",
+       94,
+       "exec"
+      ],
+      [
+       93,
+       "viewer",
+       96,
+       "value"
+      ],
+      [
+       93,
+       "viewer",
+       109,
+       "value"
+      ],
+      [
+       93,
+       "viewer",
+       119,
+       "value"
+      ],
+      [
+       93,
+       "viewer",
+       121,
+       "value"
+      ],
+      [
+       93,
+       "viewer",
+       126,
+       "value"
+      ],
+      [
+       93,
+       "viewer",
+       134,
+       "value"
+      ],
+      [
+       93,
+       "viewer",
+       140,
+       "value"
+      ],
+      [
+       93,
+       "viewer",
+       151,
+       "value"
+      ],
+      [
+       93,
+       "viewer",
+       156,
+       "value"
+      ],
+      [
+       94,
+       "then",
+       97,
+       "exec"
+      ],
+      [
+       95,
+       "result",
+       94,
+       "value"
+      ],
+      [
+       96,
+       "Eye",
+       95,
+       "b"
+      ],
+      [
+       97,
+       "then",
+       100,
+       "exec"
+      ],
+      [
+       98,
+       "result",
+       97,
+       "value"
+      ],
+      [
+       99,
+       "value",
+       98,
+       "a"
+      ],
+      [
+       100,
+       "false",
+       105,
+       "exec"
+      ],
+      [
+       100,
+       "true",
+       104,
+       "exec"
+      ],
+      [
+       101,
+       "result",
+       100,
+       "condition"
+      ],
+      [
+       102,
+       "value",
+       101,
+       "a"
+      ],
+      [
+       103,
+       "value",
+       101,
+       "b"
+      ],
+      [
+       105,
+       "false",
+       115,
+       "exec"
+      ],
+      [
+       105,
+       "true",
+       114,
+       "exec"
+      ],
+      [
+       106,
+       "result",
+       105,
+       "condition"
+      ],
+      [
+       107,
+       "result",
+       106,
+       "a"
+      ],
+      [
+       108,
+       "value",
+       107,
+       "a"
+      ],
+      [
+       109,
+       "Far",
+       107,
+       "b"
+      ],
+      [
+       110,
+       "result",
+       106,
+       "b"
+      ],
+      [
+       111,
+       "result",
+       110,
+       "a"
+      ],
+      [
+       112,
+       "result",
+       110,
+       "b"
+      ],
+      [
+       113,
+       "value",
+       112,
+       "a"
+      ],
+      [
+       115,
+       "then",
+       122,
+       "exec"
+      ],
+      [
+       116,
+       "result",
+       115,
+       "value"
+      ],
+      [
+       117,
+       "result",
+       116,
+       "toward"
+      ],
+      [
+       118,
+       "value",
+       117,
+       "a"
+      ],
+      [
+       119,
+       "Forward",
+       117,
+       "b"
+      ],
+      [
+       120,
+       "value",
+       116,
+       "d"
+      ],
+      [
+       121,
+       "HalfAngle",
+       116,
+       "half"
+      ],
+      [
+       122,
+       "false",
+       142,
+       "exec"
+      ],
+      [
+       122,
+       "true",
+       127,
+       "exec"
+      ],
+      [
+       123,
+       "result",
+       122,
+       "condition"
+      ],
+      [
+       124,
+       "result",
+       123,
+       "a"
+      ],
+      [
+       125,
+       "value",
+       124,
+       "a"
+      ],
+      [
+       126,
+       "Local",
+       123,
+       "b"
+      ],
+      [
+       127,
+       "then",
+       142,
+       "exec"
+      ],
+      [
+       128,
+       "result",
+       127,
+       "value"
+      ],
+      [
+       129,
+       "result",
+       128,
+       "toward"
+      ],
+      [
+       130,
+       "result",
+       129,
+       "a"
+      ],
+      [
+       131,
+       "value",
+       130,
+       "a"
+      ],
+      [
+       132,
+       "result",
+       130,
+       "b"
+      ],
+      [
+       133,
+       "result",
+       132,
+       "z"
+      ],
+      [
+       134,
+       "Forward",
+       129,
+       "b"
+      ],
+      [
+       135,
+       "result",
+       128,
+       "d"
+      ],
+      [
+       136,
+       "result",
+       135,
+       "a"
+      ],
+      [
+       137,
+       "value",
+       136,
+       "a"
+      ],
+      [
+       138,
+       "result",
+       136,
+       "b"
+      ],
+      [
+       139,
+       "result",
+       138,
+       "z"
+      ],
+      [
+       140,
+       "HalfAngle",
+       128,
+       "half"
+      ],
+      [
+       141,
+       "value",
+       128,
+       "sphere"
+      ],
+      [
+       142,
+       "false",
+       146,
+       "exec"
+      ],
+      [
+       142,
+       "true",
+       145,
+       "exec"
+      ],
+      [
+       143,
+       "result",
+       142,
+       "condition"
+      ],
+      [
+       144,
+       "value",
+       143,
+       "a"
+      ],
+      [
+       146,
+       "false",
+       30,
+       "exec"
+      ],
+      [
+       146,
+       "true",
+       150,
+       "exec"
+      ],
+      [
+       147,
+       "result",
+       146,
+       "condition"
+      ],
+      [
+       148,
+       "value",
+       147,
+       "a"
+      ],
+      [
+       149,
+       "value",
+       147,
+       "b"
+      ],
+      [
+       151,
+       "Eye",
+       30,
+       "eye"
+      ],
+      [
+       152,
+       "result",
+       30,
+       "point"
+      ],
+      [
+       153,
+       "false",
+       32,
+       "exec"
+      ],
+      [
+       153,
+       "true",
+       155,
+       "exec"
+      ],
+      [
+       154,
+       "result",
+       153,
+       "condition"
+      ],
+      [
+       156,
+       "Eye",
+       32,
+       "eye"
+      ],
+      [
+       157,
+       "result",
+       32,
+       "point"
+      ],
+      [
+       158,
+       "result",
+       157,
+       "b"
+      ],
+      [
+       160,
+       "result",
+       159,
+       "seen"
+      ],
+      [
+       161,
+       "farEntry",
+       71,
+       "farEntry"
+      ],
+      [
+       161,
+       "height",
+       71,
+       "height"
+      ],
+      [
+       161,
+       "point",
+       71,
+       "point"
+      ],
+      [
+       161,
+       "then",
+       70,
+       "exec"
+      ],
+      [
+       161,
+       "viewers",
+       70,
+       "list"
+      ],
+      [
+       162,
+       "true",
+       71,
+       "exec"
+      ],
+      [
+       163,
+       "value",
+       162,
+       "condition"
+      ],
+      [
+       164,
+       "true",
+       165,
+       "exec"
+      ],
+      [
+       167,
+       "value",
+       166,
+       "ok"
+      ],
+      [
+       168,
+       "angle",
+       170,
+       "angle"
+      ],
+      [
+       168,
+       "print",
+       172,
+       "value"
+      ],
+      [
+       168,
+       "print",
+       173,
+       "value"
+      ],
+      [
+       168,
+       "print",
+       175,
+       "value"
+      ],
+      [
+       168,
+       "then",
+       169,
+       "exec"
+      ],
+      [
+       170,
+       "result",
+       169,
+       "reach"
+      ],
+      [
+       171,
+       "x",
+       170,
+       "hx"
+      ],
+      [
+       172,
+       "Half",
+       171,
+       "v"
+      ],
+      [
+       173,
+       "Yaw",
+       170,
+       "yaw"
+      ],
+      [
+       174,
+       "y",
+       170,
+       "hy"
+      ],
+      [
+       175,
+       "Half",
+       174,
+       "v"
+      ],
+      [
+       176,
+       "a",
+       183,
+       "value"
+      ],
+      [
+       176,
+       "a",
+       187,
+       "value"
+      ],
+      [
+       176,
+       "a",
+       190,
+       "print"
+      ],
+      [
+       176,
+       "angle",
+       179,
+       "angle"
+      ],
+      [
+       176,
+       "angle",
+       190,
+       "angle"
+      ],
+      [
+       176,
+       "angle",
+       191,
+       "angle"
+      ],
+      [
+       176,
+       "b",
+       182,
+       "value"
+      ],
+      [
+       176,
+       "b",
+       186,
+       "value"
+      ],
+      [
+       176,
+       "b",
+       191,
+       "print"
+      ],
+      [
+       176,
+       "margin",
+       188,
+       "b"
+      ],
+      [
+       176,
+       "then",
+       177,
+       "exec"
+      ],
+      [
+       178,
+       "result",
+       177,
+       "meets"
+      ],
+      [
+       179,
+       "result",
+       178,
+       "a"
+      ],
+      [
+       180,
+       "x",
+       179,
+       "dx"
+      ],
+      [
+       181,
+       "result",
+       180,
+       "v"
+      ],
+      [
+       182,
+       "Center",
+       181,
+       "a"
+      ],
+      [
+       183,
+       "Center",
+       181,
+       "b"
+      ],
+      [
+       184,
+       "y",
+       179,
+       "dy"
+      ],
+      [
+       185,
+       "result",
+       184,
+       "v"
+      ],
+      [
+       186,
+       "Center",
+       185,
+       "a"
+      ],
+      [
+       187,
+       "Center",
+       185,
+       "b"
+      ],
+      [
+       188,
+       "result",
+       178,
+       "b"
+      ],
+      [
+       189,
+       "result",
+       188,
+       "a"
+      ],
+      [
+       190,
+       "reach",
+       189,
+       "a"
+      ],
+      [
+       191,
+       "reach",
+       189,
+       "b"
+      ],
+      [
+       192,
+       "a",
+       196,
+       "a"
+      ],
+      [
+       192,
+       "a",
+       197,
+       "value"
+      ],
+      [
+       192,
+       "a",
+       198,
+       "a"
+      ],
+      [
+       192,
+       "a",
+       200,
+       "value"
+      ],
+      [
+       192,
+       "a",
+       202,
+       "a"
+      ],
+      [
+       192,
+       "a",
+       204,
+       "a"
+      ],
+      [
+       192,
+       "b",
+       196,
+       "b"
+      ],
+      [
+       192,
+       "b",
+       198,
+       "b"
+      ],
+      [
+       192,
+       "b",
+       202,
+       "b"
+      ],
+      [
+       192,
+       "b",
+       203,
+       "value"
+      ],
+      [
+       192,
+       "b",
+       204,
+       "b"
+      ],
+      [
+       192,
+       "b",
+       206,
+       "value"
+      ],
+      [
+       192,
+       "margin",
+       196,
+       "margin"
+      ],
+      [
+       192,
+       "margin",
+       198,
+       "margin"
+      ],
+      [
+       192,
+       "margin",
+       202,
+       "margin"
+      ],
+      [
+       192,
+       "margin",
+       204,
+       "margin"
+      ],
+      [
+       192,
+       "then",
+       193,
+       "exec"
+      ],
+      [
+       194,
+       "result",
+       193,
+       "overlap"
+      ],
+      [
+       195,
+       "result",
+       194,
+       "a"
+      ],
+      [
+       196,
+       "meets",
+       195,
+       "a"
+      ],
+      [
+       197,
+       "Yaw",
+       196,
+       "angle"
+      ],
+      [
+       198,
+       "meets",
+       195,
+       "b"
+      ],
+      [
+       199,
+       "result",
+       198,
+       "angle"
+      ],
+      [
+       200,
+       "Yaw",
+       199,
+       "a"
+      ],
+      [
+       201,
+       "result",
+       194,
+       "b"
+      ],
+      [
+       202,
+       "meets",
+       201,
+       "a"
+      ],
+      [
+       203,
+       "Yaw",
+       202,
+       "angle"
+      ],
+      [
+       204,
+       "meets",
+       201,
+       "b"
+      ],
+      [
+       205,
+       "result",
+       204,
+       "angle"
+      ],
+      [
+       206,
+       "Yaw",
+       205,
+       "a"
+      ]
+     ],
+     "machines": [],
+     "functions": [
+      {
+       "name": "ConeHalfAngle",
+       "pure": true,
+       "help": "Half angle of the view cone for a vertical field of view (radians) and an aspect: max(vertical, horizontal) / 2 + the margin, at most 0.92 pi",
+       "inputs": [
+        {
+         "name": "fov",
+         "type": "float",
+         "value": 1
+        },
+        {
+         "name": "aspect",
+         "type": "float",
+         "value": 1
+        }
+       ],
+       "outputs": [
+        {
+         "name": "half",
+         "type": "float",
+         "value": 1.5707963267948966
+        }
+       ]
+      },
+      {
+       "name": "Hidden",
+       "help": "Buildings between an eye and a point? A ray that meets only the buildings' channels, ending half a metre before the point.",
+       "inputs": [
+        {
+         "name": "eye",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "point",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        }
+       ],
+       "outputs": [
+        {
+         "name": "hidden",
+         "type": "bool",
+         "value": false
+        }
+       ],
+       "locals": [
+        {
+         "name": "L",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "SeenBy",
+       "help": "Would something of this height standing at point be seen by the viewer? farEntry above 0: beyond this distance an arrival is allowed even in view (far traffic).",
+       "inputs": [
+        {
+         "name": "viewer",
+         "type": "struct",
+         "of": "Viewer",
+         "value": {
+          "Eye": [
+           0,
+           0,
+           0
+          ],
+          "Forward": [
+           1,
+           0,
+           0
+          ],
+          "HalfAngle": 1.5707963267948966,
+          "Far": 1500,
+          "Local": false
+         }
+        },
+        {
+         "name": "point",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "farEntry",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "height",
+         "type": "float",
+         "value": 2.2
+        }
+       ],
+       "outputs": [
+        {
+         "name": "seen",
+         "type": "bool",
+         "value": false
+        }
+       ],
+       "locals": [
+        {
+         "name": "To",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "D",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "Inside",
+         "type": "bool",
+         "value": false
+        }
+       ]
+      },
+      {
+       "name": "CanSpawn",
+       "help": "No viewer sees it",
+       "inputs": [
+        {
+         "name": "viewers",
+         "type": "struct_list",
+         "of": "Viewer",
+         "value": []
+        },
+        {
+         "name": "point",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "farEntry",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "height",
+         "type": "float",
+         "value": 2.2
+        }
+       ],
+       "outputs": [
+        {
+         "name": "ok",
+         "type": "bool",
+         "value": true
+        }
+       ],
+       "locals": [
+        {
+         "name": "Ok",
+         "type": "bool",
+         "value": true
+        }
+       ]
+      },
+      {
+       "name": "Reach",
+       "pure": true,
+       "help": "How far a footprint reaches along a direction on the map (an angle)",
+       "inputs": [
+        {
+         "name": "print",
+         "type": "struct",
+         "of": "Footprint",
+         "value": {
+          "Center": [
+           0,
+           0,
+           0
+          ],
+          "Yaw": 0,
+          "Half": [
+           1,
+           1,
+           0
+          ]
+         }
+        },
+        {
+         "name": "angle",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "reach",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "AxisMeets",
+       "pure": true,
+       "help": "Do two footprints overlap as seen along a direction (with a margin)?",
+       "inputs": [
+        {
+         "name": "a",
+         "type": "struct",
+         "of": "Footprint",
+         "value": {
+          "Center": [
+           0,
+           0,
+           0
+          ],
+          "Yaw": 0,
+          "Half": [
+           1,
+           1,
+           0
+          ]
+         }
+        },
+        {
+         "name": "b",
+         "type": "struct",
+         "of": "Footprint",
+         "value": {
+          "Center": [
+           0,
+           0,
+           0
+          ],
+          "Yaw": 0,
+          "Half": [
+           1,
+           1,
+           0
+          ]
+         }
+        },
+        {
+         "name": "margin",
+         "type": "float",
+         "value": 0.35
+        },
+        {
+         "name": "angle",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "meets",
+         "type": "bool",
+         "value": false
+        }
+       ]
+      },
+      {
+       "name": "FootprintsOverlap",
+       "pure": true,
+       "help": "vehicle_spawn_clearance.mjs: two yawed footprints overlap when no axis of either separates them (with a margin, 0.35 m)",
+       "inputs": [
+        {
+         "name": "a",
+         "type": "struct",
+         "of": "Footprint",
+         "value": {
+          "Center": [
+           0,
+           0,
+           0
+          ],
+          "Yaw": 0,
+          "Half": [
+           1,
+           1,
+           0
+          ]
+         }
+        },
+        {
+         "name": "b",
+         "type": "struct",
+         "of": "Footprint",
+         "value": {
+          "Center": [
+           0,
+           0,
+           0
+          ],
+          "Yaw": 0,
+          "Half": [
+           1,
+           1,
+           0
+          ]
+         }
+        },
+        {
+         "name": "margin",
+         "type": "float",
+         "value": 0.35
+        }
+       ],
+       "outputs": [
+        {
+         "name": "overlap",
+         "type": "bool",
+         "value": false
         }
        ]
       }

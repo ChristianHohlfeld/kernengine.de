@@ -171,6 +171,17 @@ Trace physics_trace(GameWorld& w, Self, Vector start, Vector end, Actor ignore) 
   const bool hit = w.line_trace(start, end, ignore.id, a, p, n);
   return {hit, {a}, p, n};
 }
+namespace {
+/// A Blueprint's whole number as channel bits (a level has 32; anything else: all of them).
+u64 as_bits(Int v) { return v < 0 || v > 0xffffffffll ? ~0ull : static_cast<u64>(v); }
+}  // namespace
+Trace physics_trace_channels(GameWorld& w, Self, Vector start, Vector end, Actor ignore, Int mask, Int category) {
+  ActorId a = 0;
+  Vec3 p, n;
+  const bool hit = w.line_trace(start, end, ignore.id, a, p, n, physics::QueryFilter(as_bits(mask), as_bits(category)));
+  return {hit, {a}, p, n};
+}
+Int physics_channels(GameWorld& w, Self, const Text& names) { return static_cast<Int>(channel_bits(w.level().world, names)); }
 std::vector<logic::ActorRef> actors_with_tag(GameWorld& w, const Text& tag) {
   std::vector<ActorId> v;
   w.actors_with_tag(tag, v);
@@ -374,6 +385,8 @@ void bind_game_nodes(logic::Library& lib) {
   bind(lib, "combat.kill", &nodes::combat_kill);
   bind(lib, "combat.ammo", &nodes::combat_ammo);
   bind(lib, "physics.trace", &nodes::physics_trace);
+  bind(lib, "physics.trace_channels", &nodes::physics_trace_channels);
+  bind(lib, "physics.channels", &nodes::physics_channels);
   bind(lib, "flow.for_each_tag", [](Context& c) {
     // Where the loop is, is the node's: the actors as the loop started, and the pass.
     logic::NodeState& s = c.state();

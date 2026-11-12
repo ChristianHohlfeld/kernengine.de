@@ -417,7 +417,7 @@ the network agree.
 
 ## 9.6 Game nodes
 
-The library has 71 game nodes (`logic_node_shapes.cpp`, `logic_nodes.cpp`). They call functions of the GameWorld
+The library has 73 game nodes (`logic_node_shapes.cpp`, `logic_nodes.cpp`). They call functions of the GameWorld
 ([Chapter 8](08-game-runtime.md)); an actor input without a wire (0) means **Self**.
 
 ### Events
@@ -460,7 +460,7 @@ children and logic, replicated to all players) · `actor.destroy` · `actor.enab
 `actor.launch` Launch (keeps the horizontal velocity, adds this one) · `actor.simulate` Set Simulate
 Physics (dynamic ↔ kinematic) · `actor.joint_motor` Set Joint Motor (hinge, slider, rope: doors,
 elevators, winches) · `actor.explode` Explosion (Box3D radial impulse with flash, sound and falling-off
-damage) · `physics.trace` Line Trace (Box3D ray)
+damage) · `physics.trace` Line Trace (Box3D ray) · `physics.trace_channels` Line Trace by Channels (the same ray with Box3D's query filter: the collision channels it meets, and its own) · `physics.channels` Channels (the bits of the level's collision channels with these names)
 
 ### Game, combat, effects, audio
 

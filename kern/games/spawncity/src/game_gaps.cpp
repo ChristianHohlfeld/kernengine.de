@@ -337,7 +337,7 @@ bool Game::gaps_can_spawn(Vec3 p, f32 height, f32 far_entry) const {
   const f32 aspect = frame_w_ / std::fmax(1.0f, frame_h_);
   const f32 foot_fov = 2 * std::atan(std::tan(45 * kDeg) / std::fmax(0.2f, aspect));  // Kern's soldier: 90 deg horizontal
   me.half_angle = spawn::cone_half_angle(mode_ == Mode::foot ? std::fmax(cam_.fov, foot_fov) : cam_.fov, aspect);
-  me.far = std::fmax(200.0f, cam_.far > 0 ? cam_.far : spawn::kDefaultFar);
+  me.far = std::fmax(200.0f, cam_.far > 0 ? cam_.far : spawn::default_far());
   me.local = true;
   vs.push_back(me);
   // the other players' views (collectPeerViewers: a drone looks along its nose, a person ahead)
@@ -356,12 +356,8 @@ bool Game::gaps_can_spawn(Vec3 p, f32 height, f32 far_entry) const {
     v.forward = kern::normalize(v.forward, {1, 0, 0});
     vs.push_back(v);
   }
-  const kern::physics::World& w = world_->physics();
-  const bool ok = spawn::can_spawn(vs, p, far_entry, height, [&w](Vec3 a, Vec3 b) {
-    const Vec3 d = b - a;
-    const f32 l = kern::length(d);
-    return l > 1 && cast(w, a, d * (1.0f / l), l - 0.5f, {}, kCatWorld).hit;
-  });
+  // (whether buildings hide the point is the Blueprint's own question to the world: a ray against the channel "World")
+  const bool ok = spawn::can_spawn(vs, p, far_entry, height);
   ++(ok ? gaps_->spawn_allowed : gaps_->spawn_denied);
   return ok;
 }

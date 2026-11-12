@@ -784,11 +784,12 @@ void World::touching(Body body, std::vector<std::pair<Body, f32>>& out) const {
   }
 }
 
-RayHit World::cast_ray_ignoring(Vec3 origin, Vec3 translation, Span<const Body> ignore, u64 mask_bits) const {
+RayHit World::cast_ray_ignoring(Vec3 origin, Vec3 translation, Span<const Body> ignore, QueryFilter query) const {
   RayHit hit;
   if (!valid() || !finite_vec(origin) || !finite_vec(translation)) return hit;
   b3QueryFilter filter = b3DefaultQueryFilter();
-  filter.maskBits = mask_bits;
+  filter.maskBits = query.mask_bits;
+  filter.categoryBits = query.category_bits;
   struct Closest {
     Span<const Body> ignore;
     b3ShapeId shape = b3_nullShapeId;
@@ -820,11 +821,12 @@ RayHit World::cast_ray_ignoring(Vec3 origin, Vec3 translation, Span<const Body> 
   return hit;
 }
 
-RayHit World::cast_ray(Vec3 origin, Vec3 translation, u64 mask_bits, Body ignore) const {
+RayHit World::cast_ray(Vec3 origin, Vec3 translation, QueryFilter query, Body ignore) const {
   RayHit hit;
   if (!valid() || !finite_vec(origin) || !finite_vec(translation)) return hit;
   b3QueryFilter filter = b3DefaultQueryFilter();
-  filter.maskBits = mask_bits;
+  filter.maskBits = query.mask_bits;
+  filter.categoryBits = query.category_bits;
   // Closest non-sensor hit: returning the fraction clips the ray, -1 skips a shape.
   struct Closest {
     u64 ignore = 0;
@@ -854,11 +856,12 @@ RayHit World::cast_ray(Vec3 origin, Vec3 translation, u64 mask_bits, Body ignore
   return hit;
 }
 
-RayHit World::cast_sphere(Vec3 origin, f32 radius, Vec3 translation, u64 mask_bits, Body ignore) const {
+RayHit World::cast_sphere(Vec3 origin, f32 radius, Vec3 translation, QueryFilter query, Body ignore) const {
   RayHit hit;
   if (!valid() || !finite_vec(origin) || !finite_vec(translation) || !(radius > 0)) return hit;
   b3QueryFilter filter = b3DefaultQueryFilter();
-  filter.maskBits = mask_bits;
+  filter.maskBits = query.mask_bits;
+  filter.categoryBits = query.category_bits;
   const b3Vec3 point{0, 0, 0};
   b3ShapeProxy proxy{&point, 1, radius};
   struct Closest {
@@ -903,21 +906,23 @@ bool mover_accepts(b3ShapeId shape, void* context) {
 b3Capsule capsule_of(const Capsule& c) { return {bv(c.center1), bv(c.center2), c.radius}; }
 }  // namespace
 
-f32 World::cast_mover(Vec3 origin, const Capsule& capsule, Vec3 translation, u64 mask_bits, Body ignore) const {
+f32 World::cast_mover(Vec3 origin, const Capsule& capsule, Vec3 translation, QueryFilter query, Body ignore) const {
   if (!valid() || !finite_vec(origin) || !finite_vec(translation)) return 0;
   b3QueryFilter filter = b3DefaultQueryFilter();
-  filter.maskBits = mask_bits;
+  filter.maskBits = query.mask_bits;
+  filter.categoryBits = query.category_bits;
   MoverFilter f;
   f.ignore = ignore.id;
   const b3Capsule c = capsule_of(capsule);
   return b3World_CastMover(world_id(world_), bv(origin), &c, bv(translation), filter, &mover_accepts, &f);
 }
 
-void World::collide_mover(Vec3 origin, const Capsule& capsule, u64 mask_bits, Body ignore, std::vector<MoverPlane>& out) const {
+void World::collide_mover(Vec3 origin, const Capsule& capsule, QueryFilter query, Body ignore, std::vector<MoverPlane>& out) const {
   out.clear();
   if (!valid() || !finite_vec(origin)) return;
   b3QueryFilter filter = b3DefaultQueryFilter();
-  filter.maskBits = mask_bits;
+  filter.maskBits = query.mask_bits;
+  filter.categoryBits = query.category_bits;
   MoverFilter f;
   f.ignore = ignore.id;
   f.out = &out;

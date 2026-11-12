@@ -14,7 +14,8 @@ namespace kern::studio {
 
 namespace {
 
-enum class F : u8 { number, integer, vec3, boolean, choice, color, text, actor, texture, flags3, uinteger, sound, sound_auto };
+/// channels: bits, one per collision channel of the level - shown with the channels' names.
+enum class F : u8 { number, integer, vec3, boolean, choice, color, text, actor, texture, flags3, uinteger, sound, sound_auto, channels };
 
 struct FieldDef {
   const char* key;     // JSON key below the section's root
@@ -97,8 +98,8 @@ constexpr FieldDef kCollider[] = {
     {"restitution", "Restitution (bounce)", F::number, 0, 1, 0.05},
     {"rollingResistance", "Rolling resistance", F::number, 0, 10, 0.01},
     {"sensor", "Sensor (overlap only)", F::boolean, 0, 0, 0, "", nullptr, "Collision"},
-    {"category", "Channel bits", F::uinteger, 0, 4294967295.0, 1},
-    {"mask", "Collides with bits", F::uinteger, 0, 4294967295.0, 1},
+    {"category", "Channels", F::channels, 0, 4294967295.0, 1},
+    {"mask", "Collides with", F::channels, 0, 4294967295.0, 1},
     {"group", "Group index", F::integer, -32768, 32767, 1},
     {"impactSound", "Impact sound", F::sound_auto, 0, 0, 0, "", nullptr, "Sound"},
 };
@@ -250,6 +251,7 @@ constexpr FieldDef kWorld[] = {
     {"ground", "Endless ground", F::boolean},
     {"groundColor", "Ground color", F::color},
     {"gravity", "Gravity", F::vec3, -1e3, 1e3, 0.1, "m/s²", nullptr, "Physics (Box3D)"},
+    {"channels", "Collision channels", F::text},
     {"substeps", "Sub-steps", F::integer, 1, 16, 1},
     {"groundFriction", "Ground friction", F::number, 0, 10, 0.05},
     {"groundRestitution", "Ground bounciness", F::number, 0, 1, 0.05},
@@ -329,6 +331,7 @@ const char* type_name(F t) {
     case F::number: return "number";
     case F::integer: return "integer";
     case F::uinteger: return "integer";
+    case F::channels: return "channels";
     case F::vec3: return "vec3";
     case F::boolean: return "bool";
     case F::choice: return "enum";
@@ -426,6 +429,14 @@ json::Value Studio::details_json() const {
     s.set("fields", json::Value::array());
     return s;
   };
+  // (a field of collision channels knows the names the level gives them)
+  auto named = [&](const FieldDef& f, json::Value o) {
+    if (f.type != F::channels) return o;
+    json::Value names = json::Value::array();
+    for (const std::string& n : game::channel_names(level_.world)) names.push(n);
+    o.set("names", std::move(names));
+    return o;
+  };
   auto simple = [&](const char* path, const char* label, F type, const char* group = nullptr) {
     FieldDef f{path, label, type};
     f.group = group;
@@ -498,7 +509,7 @@ json::Value Studio::details_json() const {
         json::Value& fields = *s.find("fields");
         for (std::size_t k = 0; k < sd.count; ++k) {
           const std::string path = std::string("components.") + sd.type + "." + std::to_string(i) + "." + sd.fields[k].key;
-          fields.push(field_json(sd.fields[k], path, collect(path)));
+          fields.push(named(sd.fields[k], field_json(sd.fields[k], path, collect(path))));
         }
         if (std::strcmp(sd.type, "joints") == 0) {
           // Units of the limits follow the joint type.
@@ -520,7 +531,7 @@ json::Value Studio::details_json() const {
     json::Value& fields = *s.find("fields");
     for (std::size_t k = 0; k < sd.count; ++k) {
       const std::string path = std::string("components.") + sd.type + "." + sd.fields[k].key;
-      fields.push(field_json(sd.fields[k], path, collect(path)));
+      fields.push(named(sd.fields[k], field_json(sd.fields[k], path, collect(path))));
     }
     if (std::strcmp(sd.type, "mesh") == 0 && actors.size() == 1 && p.mesh) {
       // Only the dimensions the shape uses.
@@ -599,8 +610,9 @@ json::Value Studio::world_json() const {
     f.set("value", level_.name);
     fields.push(std::move(f));
   }
+  const json::Value channels = level_.world.channels;  // (the level file leaves the default out)
   for (const FieldDef& f : kWorld) {
-    const json::Value* v = w.find(f.key);
+    const json::Value* v = std::string_view(f.key) == "channels" ? &channels : w.find(f.key);
     fields.push(field_json(f, std::string("world.") + f.key, {v}));
   }
   s.set("fields", std::move(fields));

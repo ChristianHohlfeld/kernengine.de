@@ -327,6 +327,11 @@ enum class GameGoal : u8 { none, collect_all, reach_goal, survive, score };
 const char* game_goal_name(GameGoal g);
 
 struct WorldSettings {
+  /// The names of the level's collision channels, separated by commas: the first is bit 1 of a
+  /// collider's category and mask (Box3D's category bits: "they should represent your application
+  /// object types"), the second bit 2, the third bit 4 ... up to 32. A new collider is of the
+  /// first channel and collides with all.
+  std::string channels = "World";
   Vec3 gravity{0, 0, -9.80665f};
   i32 substeps = 4;
   f32 step_hz = 60;
@@ -406,6 +411,12 @@ struct EditorCamera {
 /// The actor Play possesses: world.player when it has a Player Controller, else the first that has one.
 struct Level;
 u32 default_player(const Level& level);
+
+/// The names of a level's collision channels, in the order of their bits (WorldSettings::channels).
+std::vector<std::string> channel_names(const WorldSettings& w);
+/// The bits of the channels a text names ("World, Vehicle"); a name the level does not have is
+/// no bit. "*" or "All": every bit.
+u32 channel_bits(const WorldSettings& w, std::string_view names);
 
 struct Level {
   std::string name = "Untitled";

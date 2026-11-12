@@ -63,6 +63,18 @@ struct BodySettings {
   u64 user = 0;  // returned by World::body_user
 };
 
+/// What a query (a ray, a cast, a mover) meets - Box3D's b3QueryFilter. A query has a category of
+/// its own and a mask, as a shape has (ShapeMaterial): it meets a shape when
+///   (shape.category_bits & query.mask_bits) != 0 && (shape.mask_bits & query.category_bits) != 0
+/// - the mask says which categories of shapes the query accepts, the category lets a shape leave
+/// out certain queries (a camera ray, a projectile). The default meets everything; a plain number
+/// is the mask alone.
+struct QueryFilter {
+  u64 mask_bits = ~0ull, category_bits = ~0ull;
+  QueryFilter() = default;
+  QueryFilter(u64 mask, u64 category = ~0ull) : mask_bits(mask), category_bits(category) {}
+};
+
 struct ShapeMaterial {
   f32 density = 1;            // kg/m^3
   f32 friction = 0.6f;
@@ -272,15 +284,15 @@ class World {
 
   /// Closest hit along origin + translation (non-sensor shapes whose category matches
   /// mask_bits; shapes of `ignore` are skipped, e.g. the body the ray starts in).
-  RayHit cast_ray(Vec3 origin, Vec3 translation, u64 mask_bits = ~0ull, Body ignore = {}) const;
+  RayHit cast_ray(Vec3 origin, Vec3 translation, QueryFilter filter = {}, Body ignore = {}) const;
   /// Closest hit that is not on any of `ignore` (a robot's sensor does not see its own links).
-  RayHit cast_ray_ignoring(Vec3 origin, Vec3 translation, Span<const Body> ignore, u64 mask_bits = ~0ull) const;
+  RayHit cast_ray_ignoring(Vec3 origin, Vec3 translation, Span<const Body> ignore, QueryFilter filter = {}) const;
   /// Closest hit of a sphere swept along translation (a fat ray: ground probes that do not miss ledges).
-  RayHit cast_sphere(Vec3 origin, f32 radius, Vec3 translation, u64 mask_bits = ~0ull, Body ignore = {}) const;
+  RayHit cast_sphere(Vec3 origin, f32 radius, Vec3 translation, QueryFilter filter = {}, Body ignore = {}) const;
   /// Character mover queries (Box3D "Character Mover"): how far the capsule can travel (0..1) and
   /// the planes it touches. Sensors and the shapes of `ignore` are skipped.
-  f32 cast_mover(Vec3 origin, const Capsule& capsule, Vec3 translation, u64 mask_bits = ~0ull, Body ignore = {}) const;
-  void collide_mover(Vec3 origin, const Capsule& capsule, u64 mask_bits, Body ignore, std::vector<MoverPlane>& out) const;
+  f32 cast_mover(Vec3 origin, const Capsule& capsule, Vec3 translation, QueryFilter filter = {}, Body ignore = {}) const;
+  void collide_mover(Vec3 origin, const Capsule& capsule, QueryFilter filter, Body ignore, std::vector<MoverPlane>& out) const;
   /// Radial impulse on spheres, capsules and hulls (b3World_Explode); negative impulse implodes.
   void explode(Vec3 center, f32 radius, f32 falloff, f32 impulse_per_area, u64 mask_bits = ~0ull);
   /// Impulse a mover moving with `velocity` applies to a dynamic body at `point` along `normal` (into the body).

@@ -1223,6 +1223,15 @@ class StudioPage {
       case "bool":
         editor = `<input type="checkbox" class="chk${mixed ? " mixed" : ""}" ${attrs} ${f.value && !mixed ? "checked" : ""}>`;
         break;
+      case "channels": {
+        // One box per collision channel of the level (World Settings: Collision channels), and
+        // one for every further bit that is set.
+        const bits = (f.value ?? 0) >>> 0, names = f.names || [];
+        const shown = [];
+        for (let i = 0; i < 32; ++i) if ((names[i] ?? "") !== "" || (i >= names.length && (bits >>> i & 1) && bits !== 0xffffffff)) shown.push(i);
+        editor = `<div class="flags channels" data-bits="${bits}">${shown.map(i => `<label><input type="checkbox" class="chk" ${attrs} data-part="${i}" ${bits >>> i & 1 ? "checked" : ""}>${esc(names[i] || tr("Bit") + " " + (i + 1))}</label>`).join("")}</div>`;
+        break;
+      }
       case "flags3": {
         const v = f.value || [false, false, false];
         editor = `<div class="flags">${["X", "Y", "Z"].map((a, i) => `<label><input type="checkbox" class="chk" ${attrs} data-part="${i}" ${v[i] ? "checked" : ""}>${a}</label>`).join("")}</div>`;
@@ -1326,6 +1335,13 @@ class StudioPage {
         if (el.value.trim() === "" || !isFinite(n)) return;
         set(path, type === "integer" ? Math.round(n) : n);
       } else if (type === "bool") set(path, el.checked);
+      else if (type === "channels") {
+        // (the boxes shown change their bits; every other bit stays as it is)
+        const box = el.closest(".flags");
+        let bits = +box.dataset.bits >>> 0;
+        for (const i of box.querySelectorAll("input")) bits = (i.checked ? bits | (1 << +i.dataset.part) : bits & ~(1 << +i.dataset.part)) >>> 0;
+        set(path, bits);
+      }
       else if (type === "flags3") set(path, [...el.closest(".flags").querySelectorAll("input")].map(i => i.checked));
       else if (type === "enum") { if (el.value !== "") set(path, el.value); }
       else if (type === "actor") set(path, +el.value);

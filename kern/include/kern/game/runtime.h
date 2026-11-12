@@ -328,7 +328,8 @@ class GameWorld {
   void actors_with_tag(std::string_view tag, std::vector<ActorId>& out) const;
   bool has_tag(ActorId id, std::string_view tag) const;
   /// Closest hit between two points (sensors ignored): actor, point, normal.
-  bool line_trace(Vec3 from, Vec3 to, ActorId ignore, ActorId& actor, Vec3& point, Vec3& normal);
+  /// `filter`: what the ray meets (Box3D's query filter: the channels it accepts and its own).
+  bool line_trace(Vec3 from, Vec3 to, ActorId ignore, ActorId& actor, Vec3& point, Vec3& normal, physics::QueryFilter filter = {});
   void add_score(f32 points);
   void end_game(bool won, const std::string& message);
   void show_message(const std::string& message) { say(message); }

@@ -422,12 +422,12 @@ bool GameWorld::has_tag(ActorId id, std::string_view tag) const {
   return a && std::find(a->tags.begin(), a->tags.end(), tag) != a->tags.end();
 }
 
-bool GameWorld::line_trace(Vec3 from, Vec3 to, ActorId ignore, ActorId& actor, Vec3& point, Vec3& normal) {
+bool GameWorld::line_trace(Vec3 from, Vec3 to, ActorId ignore, ActorId& actor, Vec3& point, Vec3& normal, physics::QueryFilter filter) {
   actor = 0;
   point = to;
   normal = {};
   if (!physics_.valid() || !finite(from) || !finite(to)) return false;
-  const physics::RayHit hit = physics_.cast_ray(from, to - from, ~0ull, actor_body(ignore));
+  const physics::RayHit hit = physics_.cast_ray(from, to - from, filter, actor_body(ignore));
   if (!hit.hit) return false;
   actor = static_cast<ActorId>(physics_.shape_user(hit.shape));
   if (!actor) actor = actor_for_body(hit.body);

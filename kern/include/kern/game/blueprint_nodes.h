@@ -93,6 +93,8 @@ void combat_heal(GameWorld& w, Self self, Actor target, Float amount);
 void combat_kill(GameWorld& w, Self self, Actor target);
 void combat_ammo(GameWorld& w, Self self, Actor target, Int rounds);
 Trace physics_trace(GameWorld& w, Self self, Vector start, Vector end, Actor ignore);
+Trace physics_trace_channels(GameWorld& w, Self self, Vector start, Vector end, Actor ignore, Int mask, Int category);
+Int physics_channels(GameWorld& w, Self self, const Text& names);
 /// For Each Actor with Tag: the living actors with the tag, as the loop starts.
 std::vector<logic::ActorRef> actors_with_tag(GameWorld& w, const Text& tag);
 
@@ -193,6 +195,19 @@ template <class Core> struct BlueprintNodesOf : Core {
   void combat_kill(Actor target) { if (GameWorld* g = kern_game()) nodes::combat_kill(*g, kern_self(), target); }
   void combat_ammo(Actor target, Int rounds) { if (GameWorld* g = kern_game()) nodes::combat_ammo(*g, kern_self(), target, rounds); }
   void physics_trace(Vector start, Vector end, Actor ignore) { if (GameWorld* g = kern_game()) nodes::physics_trace(*g, kern_self(), start, end, ignore); }
+  void physics_trace_channels(Vector start, Vector end, Actor ignore, Int mask, Int category) {
+    if (GameWorld* g = kern_game()) nodes::physics_trace_channels(*g, kern_self(), start, end, ignore, mask, category);
+  }
+  template <class N> void physics_trace_channels(N& n, Vector start, Vector end, Actor ignore, Int mask, Int category) {
+    GameWorld* g = kern_game();
+    if (!g) return;
+    const nodes::Trace t = nodes::physics_trace_channels(*g, kern_self(), start, end, ignore, mask, category);
+    n.hit = t.hit;
+    n.actor = t.actor;
+    n.location = t.location;
+    n.normal = t.normal;
+  }
+  Int physics_channels(const Text& names) const { GameWorld* g = kern_game(); return g ? nodes::physics_channels(*g, kern_self(), names) : 0; }
   template <class N> void physics_trace(N& n, Vector start, Vector end, Actor ignore) {
     GameWorld* g = kern_game();
     if (!g) return;
