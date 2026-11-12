@@ -2158,6 +2158,80 @@ TEST(logic_local_variables) {
   CHECK(error.find("local variable L") != std::string::npos);
 }
 
+TEST(logic_call_on_the_program) {
+  // A function no Blueprint has: the program the Blueprints run in answers it (Host::call). The
+  // Blueprint declares it like a function of another Blueprint and calls it on an actor.
+  struct Program : FakeLogicHost {
+    std::vector<std::string> asked;
+    bool call(logic::ActorRef target, std::string_view function, const std::vector<logic::Value>& args, std::vector<logic::Value>& results) override {
+      asked.push_back(std::string(function) + "@" + std::to_string(target));
+      if (function == "Damage" && args.size() == 2) {
+        results = {logic::Value::number(args[1].as_number() * 2), logic::Value::text("hit")};
+        return true;
+      }
+      return false;  // (it has no Unknown)
+    }
+  };
+  const char* text = R"kn(
+struct Shooter : kern::Blueprint {
+  Float Left = 0.0;
+  Text Said = "";
+  Float Other = 0.0;
+  Int Own = 0;
+
+  struct DamageResult { Float left = -1.0; Text what = "nothing"; };
+  /// What the program's cars take.
+  KERN_EXTERN DamageResult Damage(Int car = 0, Float amount = 1.0);
+  struct UnknownResult { Float value = 4.5; };
+  KERN_EXTERN UnknownResult Unknown();
+  struct MineResult { Int n = 0; };
+  MineResult Mine() {
+    return {7};
+  }
+
+  KERN_EVENT(on1, event_custom<"Fire">)
+  void on1(Actor actor, Float value, Text text) {
+    func_call_on<"Damage">(actor, kern::out(n2.left, n2.what), 3, value);
+    Left = n2.left;
+    Said = n2.what;
+    func_call_on<"Unknown">(actor, kern::out(n5.value));
+    Other = n5.value;
+    func_call_on<"Mine">(Actor{7}, kern::out(n8.n));
+    Own = n8.n;
+  }
+
+  struct { Float left = 0.0; Text what = ""; } n2;
+  struct { Float value = 0.0; } n5;
+  struct { Int n = 0; } n8;
+};
+)kn";
+  logic::Graph g;
+  std::string error;
+  CHECK(logic::from_cpp(text, g, nullptr, &error));
+  if (!error.empty()) std::printf("%s\n", error.c_str());
+  CHECK(no_errors(logic::check(g)));
+  for (bool jit : {false, true}) {
+    Program host;
+    logic::Runtime rt(host);
+    rt.jit = jit;
+    logic::Instance* a = rt.add(g, 7, "Shooter");
+    CHECK(a && !a->disabled());
+    if (!a) continue;
+    rt.begin();
+    // the target (actor 42) has no Blueprint; the Shooter's own Blueprint only declares Damage: the program answers
+    rt.call("Fire", 7, {{"actor", logic::Value::actor(42)}, {"value", logic::Value::number(1.5)}, {"text", logic::Value::text("")}});
+    CHECK_NEAR(a->get("Left").as_number(), 3.0, 1e-12);
+    CHECK(a->get("Said").as_text() == "hit");
+    // what the program does not have gives the declared default; a function a Blueprint has is the Blueprint's
+    CHECK_NEAR(a->get("Other").as_number(), 4.5, 1e-12);
+    CHECK(a->get("Own").i == 7);
+    CHECK(host.asked.size() == 2 && host.asked[0] == "Damage@42" && host.asked[1] == "Unknown@42");
+    rt.call("Fire", 7, {{"actor", logic::Value::actor(7)}, {"value", logic::Value::number(2)}, {"text", logic::Value::text("")}});
+    CHECK_NEAR(a->get("Left").as_number(), 4.0, 1e-12);  // (on its own actor too: it has no body there)
+    CHECK(host.errors.empty());
+  }
+}
+
 TEST(logic_call_on_actor) {
   // A Blueprint calls a function of another one: it declares what the function looks like
   // (KERN_EXTERN) and calls it on an actor - or on the Level (no target).

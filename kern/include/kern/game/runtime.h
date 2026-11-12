@@ -9,6 +9,7 @@
 //   world.stop();                            // back to the edited level
 #pragma once
 
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
@@ -303,6 +304,11 @@ class GameWorld {
   // ---- logic (Kern Logic graphs: the level's and the actors') ----
   /// The running graphs (Play and Simulate on the authority; null otherwise).
   logic::Runtime* logic_runtime() { return logic_.get(); }
+  /// The program's own functions for the Blueprints (logic::Host::call): what a Call on Actor
+  /// reaches when no Blueprint of the target has the function - a system the program implements
+  /// itself, declared in the calling Blueprint like a function of another Blueprint. `target` is
+  /// the actor the call names (0: the Level). False: the program has no such function.
+  std::function<bool(ActorId target, std::string_view function, const std::vector<logic::Value>& args, std::vector<logic::Value>& results)> program_functions;
   /// A Blueprint whose C++ class the program has runs as that class (logic::Runtime::native).
   /// Off: the interpreter or the JIT, whatever the program has - read when the game starts.
   bool logic_native = true;

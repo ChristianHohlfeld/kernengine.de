@@ -655,6 +655,14 @@ class Host {
   virtual u32 random() = 0;
   /// The game world behind this host (gameplay nodes), or null.
   virtual void* game() { return nullptr; }
+  /// A function of the program itself: what a Call on Actor reaches when the Blueprint of `target`
+  /// has no function of that name (or the actor has no Blueprint). The Blueprint that calls
+  /// declares it like a function of another Blueprint (KERN_EXTERN). False: the program has none -
+  /// the call gives the declared defaults.
+  virtual bool call(ActorRef target, std::string_view function, const std::vector<Value>& args, std::vector<Value>& results) {
+    (void)target; (void)function; (void)args; (void)results;
+    return false;
+  }
   /// Native code: the host compiles the WebAssembly module of an instance (asynchronously)
   /// and calls jit_ready(id, function) when it is linked. False: no compiler here (interpreter).
   virtual bool jit_compile(const std::vector<u8>& module, i32 id);
@@ -982,8 +990,9 @@ class Runtime {
   void call(std::string_view name, ActorRef target = 0, std::vector<std::pair<std::string, Value>> args = {});
   /// Call on Actor, for every tier: runs `function` of the Blueprint of `target` (0: the Level's)
   /// with `args` and gives `results` as `caller` declares that function - its outputs in their
-  /// order, each of the declared type; the declared defaults where the target has no Blueprint,
-  /// no such function or fewer outputs. The call is a chain of its own (it counts for how deep
+  /// order, each of the declared type. Where the target has no Blueprint or its Blueprint no such
+  /// function, the program is asked (Host::call: a function of its own); the declared defaults
+  /// where it has none either, or fewer outputs. The call is a chain of its own (it counts for how deep
   /// chains nest: at most 64, then the call is left out and reported), and a Blueprint that is in
   /// the middle of a call of that function has its own values back afterwards.
   void call_on(Instance& caller, std::string_view function, ActorRef target, const std::vector<Value>& args, std::vector<Value>& results);

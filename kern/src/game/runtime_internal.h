@@ -203,6 +203,9 @@ class GameWorld::LogicHost : public logic::Host {
     return s;
   }
   void* game() override { return &w_; }
+  bool call(logic::ActorRef target, std::string_view function, const std::vector<logic::Value>& args, std::vector<logic::Value>& results) override {
+    return w_.program_functions && w_.program_functions(static_cast<ActorId>(target), function, args, results);
+  }
 
  private:
   GameWorld& w_;

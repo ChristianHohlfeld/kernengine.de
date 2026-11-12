@@ -1711,7 +1711,18 @@ void Runtime::call_on(Instance& caller, std::string_view function, ActorRef targ
   if (declared)
     for (const FunctionPin& p : declared->outputs) results.push_back(Value::from_json(p.value, p.type, g, p.of));
   Instance* to = find(target);
-  if (!to || to->disabled_) return;
+  auto take = [&](const std::vector<Value>& got) {
+    if (!declared) return;
+    for (std::size_t k = 0; k < results.size() && k < got.size(); ++k)
+      results[k] = from_outside(got[k], {declared->outputs[k].type, declared->outputs[k].of}, g);
+  };
+  const Function* there = to && !to->disabled_ ? to->graph().function(function) : nullptr;
+  if (!there || there->external) {
+    // (no Blueprint there has it: a function of the program itself?)
+    std::vector<Value> got;
+    if (host_.call(target, function, args, got)) take(got);
+    return;
+  }
   if (depth_ >= 64) {
     host_.error(caller.name() + ": calls on other Blueprints nest more than 64 deep - the call of " + std::string(function) + " is left out");
     return;
