@@ -3861,7 +3861,7 @@ TEST(game_blueprints_as_classes) {
     if (!used.count(type)) std::printf("no game case has %s\n", type.c_str());
     CHECK(d && d->native && used.count(type));
   }
-  CHECK(game::logic_node_types().size() == 72 && game::logic_node_shapes_registered());
+  CHECK(game::logic_node_types().size() == 74 && game::logic_node_shapes_registered());
   // the Arena, as the file the classes are written from: the same Blueprints
   game::Level stored;
   CHECK(game::from_text(game::to_text(cases[0].level), stored, &error) && logic::graph_hash(stored.logic) == logic::graph_hash(cases[0].level.logic));

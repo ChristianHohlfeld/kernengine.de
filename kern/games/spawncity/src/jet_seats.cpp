@@ -1,88 +1,91 @@
-// Jet seats (see jet_seats.h): jet_seat_table.mjs.
+// The seat table's questions to the Blueprint of the actor "JetSeats" (see jet_seats.h): no rule lives here.
 #include "jet_seats.h"
 
-#include <algorithm>
+#include "blueprint_call.h"
 
 namespace sc::seats {
 
-const char* result_name(Result r) {
-  static const char* n[] = {"ok", "unchanged", "invalid", "owner-only-pilot", "already-seated", "seat-occupied", "no-pilot", "not-occupant"};
-  return n[static_cast<u8>(r)];
-}
+namespace {
+using kern::logic::Value;
+using rules::of_enum;
+rules::Blueprint g_rules;
 
-Row* Table::find(u8 owner) {
-  for (Row& r : rows_)
-    if (r.owner == owner) return &r;
-  return nullptr;
+// The Blueprint's struct Row, field by field in its order - and a table of them.
+Value to_value(const Row& r) { return Value::structure({Value::integer(r.owner), Value::integer(r.pilot), Value::integer(r.passenger)}); }
+Value to_value(const std::vector<Row>& rows) {
+  std::vector<Value> list;
+  list.reserve(rows.size());
+  for (const Row& r : rows) list.push_back(to_value(r));
+  return Value::of(std::move(list));
+}
+Row to_row(const Value& v) {
+  Row r;
+  if (v.fields() < 3) return r;
+  r.owner = static_cast<u8>(v.field(0)->i);
+  r.pilot = static_cast<u8>(v.field(1)->i);
+  r.passenger = static_cast<u8>(v.field(2)->i);
+  return r;
+}
+std::vector<Row> to_rows(const Value& v) {
+  std::vector<Row> rows;
+  for (std::size_t k = 0; k < v.size(); ++k) rows.push_back(to_row(v.item(k)));
+  return rows;
+}
+}  // namespace
+
+void bind(kern::logic::Instance* blueprint) { g_rules.running = blueprint; }
+kern::logic::Instance* blueprint() { return g_rules.running; }
+
+std::string result_name(Result r) {
+  std::vector<Value> out;
+  return g_rules.call("ResultName", {of_enum(r)}, out) && !out.empty() ? out[0].as_text() : std::string();
 }
 
 Row Table::get(u8 owner) const {
-  for (const Row& r : rows_)
-    if (r.owner == owner) return r;
-  return Row{owner, kNone, kNone};
+  std::vector<Value> out;
+  return g_rules.call("Get", {to_value(rows_), Value::integer(owner)}, out) && !out.empty() ? to_row(out[0]) : Row{owner, kNone, kNone};
 }
 
 bool Table::seat_of(u8 player, Row& row, Seat& seat) const {
-  for (const Row& r : rows_) {
-    if (r.pilot == player) { row = r; seat = Seat::pilot; return true; }
-    if (r.passenger == player) { row = r; seat = Seat::passenger; return true; }
-  }
-  return false;
+  std::vector<Value> out;
+  if (!g_rules.call("SeatOf", {to_value(rows_), Value::integer(player)}, out) || out.size() < 3 || !out[0].b) return false;
+  row = to_row(out[1]);
+  seat = static_cast<Seat>(out[2].i);
+  return true;
 }
 
 Result Table::claim(u8 owner, u8 player, Seat seat) {
-  if (owner == kNone || player == kNone) return Result::invalid;
-  if (seat == Seat::pilot && player != owner) return Result::owner_only_pilot;
-  Row before;
-  Seat bs;
-  if (seat_of(player, before, bs) && !(before.owner == owner && bs == seat)) return Result::already_seated;
-  Row cur = get(owner);
-  u8& slot = seat == Seat::pilot ? cur.pilot : cur.passenger;
-  if (slot == player) return Result::unchanged;
-  if (slot != kNone) return Result::seat_occupied;
-  if (seat == Seat::passenger && cur.pilot == kNone) return Result::no_pilot;
-  slot = player;
-  if (Row* r = find(owner)) *r = cur;
-  else rows_.push_back(cur);
-  ++revision_;
-  return Result::ok;
+  std::vector<Value> out;
+  if (!g_rules.call("Claim", {to_value(rows_), Value::integer(owner), Value::integer(player), of_enum(seat)}, out) || out.size() < 2) return Result::invalid;
+  const Result r = static_cast<Result>(out[1].i);
+  if (r == Result::ok) {
+    rows_ = to_rows(out[0]);
+    ++revision_;
+  }
+  return r;
 }
 
 Result Table::release(u8 owner, u8 player, Seat seat) {
-  if (owner == kNone || player == kNone) return Result::invalid;
-  Row* r = find(owner);
-  if (!r || (seat == Seat::pilot ? r->pilot : r->passenger) != player) return Result::not_occupant;
-  if (seat == Seat::pilot) { r->pilot = kNone; r->passenger = kNone; }  // failsafe: no unmanaged flight
-  else r->passenger = kNone;
-  if (r->pilot == kNone && r->passenger == kNone) rows_.erase(rows_.begin() + (r - rows_.data()));
-  ++revision_;
-  return Result::ok;
+  std::vector<Value> out;
+  if (!g_rules.call("Release", {to_value(rows_), Value::integer(owner), Value::integer(player), of_enum(seat)}, out) || out.size() < 2) return Result::invalid;
+  const Result r = static_cast<Result>(out[1].i);
+  if (r == Result::ok) {
+    rows_ = to_rows(out[0]);
+    ++revision_;
+  }
+  return r;
 }
 
 bool Table::drop(u8 player) {
-  bool changed = false;
-  for (std::size_t i = 0; i < rows_.size();) {
-    if (rows_[i].pilot == player) { rows_.erase(rows_.begin() + static_cast<std::ptrdiff_t>(i)); changed = true; continue; }
-    if (rows_[i].passenger == player) { rows_[i].passenger = kNone; changed = true; }
-    ++i;
-  }
-  if (changed) ++revision_;
-  return changed;
+  std::vector<Value> out;
+  if (!g_rules.call("Drop", {to_value(rows_), Value::integer(player)}, out) || out.size() < 2 || !out[1].b) return false;
+  rows_ = to_rows(out[0]);
+  ++revision_;
+  return true;
 }
 
 bool Table::load(u32 revision, const std::vector<Row>& rows) {
-  if (rows.size() > 64) return false;
-  std::vector<u8> seen;
-  for (const Row& r : rows) {
-    if (r.owner == kNone || r.pilot != r.owner || r.passenger == r.pilot) return false;
-    for (const Row& q : rows)
-      if (&q != &r && q.owner == r.owner) return false;
-    for (u8 p : {r.pilot, r.passenger}) {
-      if (p == kNone) continue;
-      if (std::find(seen.begin(), seen.end(), p) != seen.end()) return false;
-      seen.push_back(p);
-    }
-  }
+  if (!g_rules.flag("Valid", {to_value(rows)})) return false;
   rows_ = rows;
   revision_ = revision;
   return true;

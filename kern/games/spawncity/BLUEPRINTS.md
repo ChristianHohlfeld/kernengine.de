@@ -212,7 +212,15 @@ In dieser Reihenfolge (klein nach groß; jede Datei verschwindet, ihre Tests ble
   bekommen (Kategorie und Maske, `physics::QueryFilter`) und das Level benannte Kollisionskanäle
   (SpawnCity: World, Vehicle, Drone, Query). Die Tests laufen in einer GameWorld mit einem
   Gebäude; ein „Fahrzeug“ im Weg verdeckt nichts.
+- [x] **`jet_seats`** – Actor „JetSeats“: die Aufzählungen Seat und Result, die Struktur Row und
+  die Funktionen Claim, Release, Drop, Valid, Get und SeatOf. Jede nimmt die Tabelle (eine Liste
+  von Row) und gibt sie so zurück, wie sie danach ist – die Tabelle selbst hält weiter die
+  Session (jede ihre eigene), entschieden wird im Blueprint.
 - Der Aufruf aus C++ steht einmal in `blueprint_call.h` (`rules::Blueprint`).
+- **`lamps` ist als Nächstes dran, in zwei Teilen:** die Regeln je Lampe (Abstände, wann ein
+  Schuss den Kopf trifft, was eine Explosion und ein Auto mit dem Mast machen) als Blueprint; das
+  Feld selbst – tausende Lampen im Raster, 64-Bit-Zellschlüssel – ist ein System und gehört zu
+  Stufe 4 (ein Blueprint-Int ist nur bis 2^53 exakt).
 - Geschrieben wird so ein Regel-Blueprint als sein C++-Text und mit
   `tools/blueprint_cpp.sh --apply level.klevel <Actor> text.cpp` in das Level gelegt (dieselbe
   Lesart wie „Apply“ in der C++-Ansicht des Editors); das Level bleibt die eine Quelle.

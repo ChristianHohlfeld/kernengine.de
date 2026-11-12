@@ -119,12 +119,37 @@ static blueprint_native::Case guided_case() {
   return c;
 }
 
+// The Blueprint of the actor "JetSeats": its functions with many values, and a table through a
+// pilot, a passenger, a second jet and their leaving.
+static blueprint_native::Case jet_seats_case() {
+  using kern::logic::Value;
+  blueprint_native::Case c = rule_case("JetSeats");
+  auto row = [](int owner, int pilot, int passenger) { return Value::structure({Value::integer(owner), Value::integer(pilot), Value::integer(passenger)}); };
+  auto rows = [](std::vector<Value> v) { return Value::of(std::move(v)); };
+  const Value none = rows({}), one = rows({row(255, 255, 253)}), two = rows({row(255, 255, 0), row(1, 1, 253)});
+  for (const Value& t : {none, one, two})
+    for (int owner : {255, 1, 0, 253})
+      for (int player : {255, 0, 1, 2, 253})
+        for (int seat : {0, 1}) {
+          c.calls.push_back({"Claim", {t, Value::integer(owner), Value::integer(player), Value::enumeration(seat)}});
+          c.calls.push_back({"Release", {t, Value::integer(owner), Value::integer(player), Value::enumeration(seat)}});
+        }
+  for (const Value& t : {none, one, two})
+    for (int player : {255, 0, 1, 7}) {
+      c.calls.push_back({"Drop", {t, Value::integer(player)}});
+      c.calls.push_back({"SeatOf", {t, Value::integer(player)}});
+      c.calls.push_back({"Get", {t, Value::integer(player)}});
+    }
+  for (const Value& t : {none, one, two, rows({row(1, 2, 253)}), rows({row(1, 1, 1)}), rows({row(1, 1, 3), row(2, 2, 3)}), rows({row(1, 1, 253), row(1, 1, 253)})}) c.calls.push_back({"Valid", {t}});
+  return c;
+}
+
 int main(int argc, char** argv) {
   // spawncity_tests --emit-native <dir>: the Wanted Blueprint as its C++ text, calls to it and
   // the interpreter's answers (run_tests.sh compiles them into wanted_native_test).
   if (argc > 2 && std::strcmp(argv[1], "--emit-native") == 0) {
     std::string error;
-    if (!blueprint_native::emit(argv[2], {wanted_case(), combat_detail_case(), guided_case(), rule_case("SpawnGuard")}, &error)) {
+    if (!blueprint_native::emit(argv[2], {wanted_case(), combat_detail_case(), guided_case(), rule_case("SpawnGuard"), jet_seats_case()}, &error)) {
       std::printf("FAIL --emit-native: %s\n", error.c_str());
       return 1;
     }

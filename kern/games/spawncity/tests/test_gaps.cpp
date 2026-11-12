@@ -10,6 +10,7 @@
 #include "../src/world_traffic.h"
 #include "kern/game/runtime.h"
 #include "kern/kern.h"
+#include "rule_blueprint.h"
 #include "test_util.h"
 
 using namespace sc;
@@ -215,6 +216,10 @@ SC_TEST(gaps_street_lamps) {
 SC_TEST(gaps_jet_seats) {
   using seats::Result;
   using seats::Seat;
+  RuleBlueprint bp("JetSeats", &seats::bind);
+  SC_CHECK(bp.inst && bp.problems.empty() && !bp.inst->disabled(), "the level's JetSeats Blueprint compiles and runs: %s", bp.problems.c_str());
+  SC_CHECK(bp.inst && std::string(bp.inst->tier()) == "native C++", "it runs as its C++ class");
+  SC_CHECK(seats::result_name(Result::owner_only_pilot) == "owner-only-pilot" && seats::result_name(Result::ok) == "ok", "a result by its name");
   seats::Table t;
   SC_CHECK(t.claim(1, 2, Seat::pilot) == Result::owner_only_pilot, "only the owner flies");
   SC_CHECK(t.claim(1, 2, Seat::passenger) == Result::no_pilot, "no ride without a pilot");
