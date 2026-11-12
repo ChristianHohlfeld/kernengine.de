@@ -134,18 +134,22 @@ SC_TEST(vehicle_clearance_sat) {
 }
 
 SC_TEST(gaps_sirens) {
-  SC_CHECK(gaps::horn_hz(0.1f) == gaps::kHornLow && gaps::horn_hz(0.7f) == gaps::kHornHigh && gaps::horn_hz(1.4f) == gaps::kHornLow, "two tones of 0.66 s");
+  RuleBlueprint bp("Sirens", &gaps::bind_sirens);
+  SC_CHECK(bp.inst && bp.problems.empty() && !bp.inst->disabled(), "the level's Sirens Blueprint compiles and runs: %s", bp.problems.c_str());
+  SC_CHECK(bp.inst && std::string(bp.inst->tier()) == "native C++", "it runs as its C++ class");
+  SC_CHECK(gaps::horn_hz(0.1f) == gaps::horn_low() && gaps::horn_hz(0.7f) == gaps::horn_high() && gaps::horn_hz(1.4f) == gaps::horn_low(), "two tones of 0.66 s");
   SC_CHECK(std::fabs(gaps::whoop_hz(0) - 760) < 1 && std::fabs(gaps::whoop_hz(0.6999f) - 1480) < 2 && gaps::whoop_hz(0.9f) == 760, "whoop %f", gaps::whoop_hz(0.6999f));
   SC_CHECK(std::fabs(gaps::siren_gain(0.06f, 0, 1) - 0.06f) < 1e-6f && gaps::siren_gain(0.06f, 261, 1) == 0, "level law");
   SC_CHECK(std::fabs(gaps::siren_gain(0.06f, 14, 1) - 0.03f) < 1e-6f, "half at 14 m");
   SC_CHECK(gaps::siren_cutoff(0) == 5200 && gaps::siren_cutoff(400) == 900 && std::fabs(gaps::siren_cutoff(100) - 3600) < 1e-3f, "cutoff");
   gaps::SirenVoice v;
-  for (int i = 0; i < 120; ++i) v.update(100 - i * 0.25f, 1.0f / 60, gaps::kCarGain, 1);  // closing at 15 m/s
+  for (int i = 0; i < 120; ++i) v.update(100 - i * 0.25f, 1.0f / 60, gaps::car_gain(), 1);  // closing at 15 m/s
   SC_CHECK(v.doppler > 1.03f && v.doppler < 1.05f, "approaching raises the pitch %f", v.doppler);
   SC_CHECK(gaps::post_arrival_grace_ms(1) == 675 && gaps::post_arrival_grace_ms(5) == 495, "grace");
 }
 
 SC_TEST(gaps_smoke) {
+  RuleBlueprint bp("Sirens", &gaps::bind_sirens);
   gaps::SmokeField f(78);
   const f32 at = f.start("car-1", {0, 0, 1}, 0.92f, 2.45f, 10);
   SC_CHECK(std::fabs(at - 12.45f) < 1e-4f && f.live_puffs() == 1, "first puff at once");
@@ -181,6 +185,9 @@ SC_TEST(gaps_visual_pose) {
 }
 
 SC_TEST(gaps_street_lamps) {
+  RuleBlueprint bp("Lamps", &lamps::bind);
+  SC_CHECK(bp.inst && bp.problems.empty() && !bp.inst->disabled(), "the level's Lamps Blueprint compiles and runs: %s", bp.problems.c_str());
+  SC_CHECK(bp.inst && std::string(bp.inst->tier()) == "native C++", "it runs as its C++ class");
   lamps::Field f;
   // a straight 200 m street, 8 m wide: lamps from 17 m on every 34 m, alternating kerbs, 1.15 m out
   f.place_road({{0, 0}, {200, 0}}, 8, 0, [](f32, f32) { return 2.0f; });

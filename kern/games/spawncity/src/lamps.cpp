@@ -4,11 +4,21 @@
 #include <algorithm>
 #include <cmath>
 
+#include "blueprint_call.h"
+
 namespace sc::lamps {
 
 namespace {
+using kern::logic::Value;
+rules::Blueprint g_rules;  // the level's actor "Lamps": what happens to one lamp
+/// The Blueprint's function Worse: may a lamp in `state` become `to`?
+bool worse(u8 state, u8 to) { return g_rules.flag("Worse", {Value::integer(state), Value::integer(to)}); }
 i64 grid_key(f32 x, f32 y) { return (static_cast<i64>(std::floor(x / kGridM)) << 32) ^ (static_cast<i64>(std::floor(y / kGridM)) & 0xffffffffll); }
 }  // namespace
+
+void bind(kern::logic::Instance* blueprint) { g_rules.running = blueprint; }
+kern::logic::Instance* blueprint() { return g_rules.running; }
+f32 pole_radius() { return static_cast<f32>(g_rules.variable("PoleRadius")); }
 
 i64 cell_key(f32 x, f32 y) { return (static_cast<i64>(std::lround(x / 8)) << 32) ^ (static_cast<i64>(std::lround(y / 8)) & 0xffffffffll); }
 
@@ -81,7 +91,7 @@ std::vector<i32> Field::near(f32 x, f32 y, f32 r) const {
 bool Field::set_state(i32 i, u8 state) {
   if (i < 0 || i >= static_cast<i32>(lamps_.size())) return false;
   Lamp& l = lamps_[static_cast<std::size_t>(i)];
-  if (state <= l.state) return false;
+  if (!worse(l.state, state)) return false;
   l.state = state;
   broken_[l.key] = state;
   return true;
@@ -94,63 +104,54 @@ std::vector<std::pair<i64, u8>> Field::broken_list() const {
 }
 
 bool Field::merge_broken(i64 key, u8 state) {
-  if (state < 1 || state > 2) return false;
-  u8& known = broken_[key];
-  if (state <= known) return false;
-  known = state;
+  const auto was = broken_.find(key);
+  if (!worse(was == broken_.end() ? 0 : was->second, state)) return false;
+  broken_[key] = state;
   for (Lamp& l : lamps_)
-    if (l.key == key && l.state < state) l.state = state;
+    if (l.key == key && worse(l.state, state)) l.state = state;
   return true;
 }
 
 i32 Field::shot(Vec3 a, Vec3 b) const {
-  const Vec3 d = b - a;
-  const f32 L = kern::length(d);
-  if (L < 0.1f) return -1;
-  const f32 mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+  const f32 L = kern::length(b - a), mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
   i32 best = -1;
-  f32 bt = 1e9f;
+  f64 first = 1e9;
+  std::vector<Value> r;
   for (i32 k : near(mx, my, L / 2 + 2)) {
     const Lamp& l = lamps_[static_cast<std::size_t>(k)];
-    if (l.state >= 1) continue;
-    const Vec3 h{l.head.x, l.head.y, l.foot.z + kHeadZ};
-    const f32 t = clampf(kern::dot(h - a, d) / (L * L), 0, 1);
-    if (kern::length(a + d * t - h) < kHeadHitR && t < bt) { bt = t; best = k; }
+    // (the Blueprint's ShotAt: does the round pass this lamp's head, and how far down its path)
+    if (!g_rules.call("ShotAt", {Value::vector(a), Value::vector(b), Value::vector({l.head.x, l.head.y, l.foot.z + kHeadZ}), Value::integer(l.state)}, r) || r.size() < 2 || !r[0].b) continue;
+    if (r[1].as_number() < first) { first = r[1].as_number(); best = k; }
   }
   return best;
 }
 
 std::vector<Field::BlastHit> Field::blast(Vec3 p, f32 radius) const {
   std::vector<BlastHit> out;
-  const f32 r = std::fmax(3.0f, radius > 0 ? radius : 8);
-  for (i32 k : near(p.x, p.y, r)) {
+  const f32 reach = static_cast<f32>(g_rules.number("BlastReach", {Value::number(radius)}));
+  std::vector<Value> r;
+  for (i32 k : near(p.x, p.y, reach)) {
     const Lamp& l = lamps_[static_cast<std::size_t>(k)];
-    const f32 dist = std::hypot(l.foot.x - p.x, l.foot.y - p.y);
-    if (dist < r * 0.6f) out.push_back({k, 2, {l.foot.x - p.x, l.foot.y - p.y}, 9 * (1 - dist / r) + 3});
-    else out.push_back({k, 1, {}, 0});
+    if (!g_rules.call("BlastFate", {Value::vector(l.foot), Value::vector(p), Value::number(reach)}, r) || r.size() < 3) continue;
+    const Vec3 push = r[1].as_vector();
+    out.push_back({k, static_cast<u8>(r[0].i), {push.x, push.y}, static_cast<f32>(r[2].as_number())});
   }
   return out;
 }
 
 std::vector<Field::CarHit> Field::car(Vec3 pos, f32 yaw, Vec3 v, f32 hl, f32 hw, f32 m) const {
   std::vector<CarHit> out;
-  const f32 c = std::cos(yaw), s = std::sin(yaw), sp = std::hypot(v.x, v.y);
+  std::vector<Value> r;
   for (i32 k : near(pos.x, pos.y, hl + 1)) {
     const Lamp& l = lamps_[static_cast<std::size_t>(k)];
-    if (l.state == 2) continue;
-    const f32 dx = l.foot.x - pos.x, dy = l.foot.y - pos.y, u = dx * c + dy * s, w = -dx * s + dy * c;
-    if (std::fabs(u) > hl + kPoleR || std::fabs(w) > hw + kPoleR) continue;
-    const f32 dd = std::fmax(1e-3f, std::hypot(dx, dy)), nx = dx / dd, ny = dy / dd, toward = v.x * nx + v.y * ny;
+    if (!g_rules.call("CarFate", {Value::vector(l.foot), Value::integer(l.state), Value::vector(pos), Value::number(yaw), Value::vector(v), Value::number(hl), Value::number(hw), Value::number(m)}, r) ||
+        r.size() < 4 || !r[0].b)
+      continue;
     CarHit h;
     h.lamp = k;
-    if (sp > kToppleMps && toward > 1) {
-      h.topple = true;
-      const f32 loss = std::fmin(sp * 0.22f, 2.4f);
-      h.impulse = {-v.x / sp * m * loss, -v.y / sp * m * loss, 0};
-    } else if (toward > 0) {
-      h.impulse = {-nx * m * toward * 1.05f, -ny * m * toward * 1.05f, 0};
-      h.clang = toward > 1;
-    } else continue;
+    h.topple = r[1].b;
+    h.impulse = r[2].as_vector();
+    h.clang = r[3].b;
     out.push_back(h);
   }
   return out;

@@ -217,10 +217,17 @@ In dieser Reihenfolge (klein nach groß; jede Datei verschwindet, ihre Tests ble
   von Row) und gibt sie so zurück, wie sie danach ist – die Tabelle selbst hält weiter die
   Session (jede ihre eigene), entschieden wird im Blueprint.
 - Der Aufruf aus C++ steht einmal in `blueprint_call.h` (`rules::Blueprint`).
-- **`lamps` ist als Nächstes dran, in zwei Teilen:** die Regeln je Lampe (Abstände, wann ein
-  Schuss den Kopf trifft, was eine Explosion und ein Auto mit dem Mast machen) als Blueprint; das
-  Feld selbst – tausende Lampen im Raster, 64-Bit-Zellschlüssel – ist ein System und gehört zu
-  Stufe 4 (ein Blueprint-Int ist nur bis 2^53 exakt).
+- [x] **`lamps`** (die Regeln je Lampe) – Actor „Lamps“: sechs Zahlen als Variablen
+  (HeadHitRadius, PoleRadius, ToppleSpeed, BlastMin, BlastDefault, BlastToppleShare) und die
+  Funktionen Flat, Worse, ShotAt, BlastReach, BlastFate und CarFate – wann ein Schuss den Kopf
+  trifft, was eine Explosion und ein Auto mit dem Mast machen, welcher Zustand der schlimmere ist.
+  Das Feld selbst – tausende Lampen im Raster, 64-Bit-Zellschlüssel – bleibt in `lamps.cpp` und
+  fragt je Lampe den Blueprint; es ist ein System und gehört zu Stufe 4 (ein Blueprint-Int ist nur
+  bis 2^53 exakt).
+- [x] **`gaps_rules`, Teil Sirenen** – Actor „Sirens“: Tonhöhen, Pegel und Hörweite als Variablen,
+  die Aufzählung Organic und die Funktionen HornHz, WhoopHz, SirenGain, SirenCutoff, VoiceUpdate
+  (Doppler aus der Abstandsänderung), PostArrivalGraceMs und OrganicRate. Offen aus `gaps_rules`:
+  Rauchfeld, VisualPose und die Hashes – das sind Systeme (Stufe 4).
 - Geschrieben wird so ein Regel-Blueprint als sein C++-Text und mit
   `tools/blueprint_cpp.sh --apply level.klevel <Actor> text.cpp` in das Level gelegt (dieselbe
   Lesart wie „Apply“ in der C++-Ansicht des Editors); das Level bleibt die eine Quelle.

@@ -7,6 +7,10 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-12",time:"08:56",title:"Laternen und Sirenen als Blueprint",items:[
+    "Unter der Haube: Wann ein Schuss eine Laterne löscht und was eine Explosion oder ein Auto mit dem Mast macht, steht jetzt als Blueprint „Lamps“ im Level. Am Spiel ändert sich dadurch nichts.",
+    "Ebenso die Polizeisirenen – Tonfolge des Horns, das Heulen der Drohne, Lautstärke und Dumpfheit über die Entfernung, der Doppler-Effekt – und die Schonfrist nach dem Eintreffen einer Polizeidrohne: jetzt der Blueprint „Sirens“.",
+  ]},
   {date:"2026-11-12",time:"04:03",title:"Kollisionskanäle nach Box3D, Spawn-Regeln und Jet-Sitze als Blueprint",items:[
     "Kern: Was womit kollidiert und was ein Strahl trifft, folgt jetzt vollständig Box3Ds Filter. Ein Level benennt seine Kollisionskanäle (SpawnCity: World, Vehicle, Drone, Query); im Editor hat ein Collider dafür Kästchen mit Namen statt Bitzahlen.",
     "Kern-Blueprints: neuer Knoten „Line Trace by Channels“ – ein Strahl, der nur bestimmte Kanäle trifft – und „Channels“, der Kanäle beim Namen nennt.",

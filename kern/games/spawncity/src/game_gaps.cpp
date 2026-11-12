@@ -522,10 +522,10 @@ void Game::gaps_update(f32 dt) {
   if (g.death_scan < 0) g.death_scan = now;
   for (const People::Person& p : people_.all()) {
     if (p.state != People::State::down || p.down_at <= g.death_scan || p.kind == People::Kind::zombie) continue;
-    if (now - g.last_organic < gaps::kOrganicMinGapS) continue;
+    if (now - g.last_organic < gaps::organic_min_gap_s()) continue;
     g.last_organic = now;
     ++g.organic_plays;
-    world_->play_sound(combat_sfx(combat_audio::Kind::crack), cam_.eye, gaps::kOrganicGain * clampf(ui_.settings.get(Opt::audio_fx) / 100, 0, 1), gaps::organic_rate(gaps::Organic::person), false);
+    world_->play_sound(combat_sfx(combat_audio::Kind::crack), cam_.eye, gaps::organic_gain() * clampf(ui_.settings.get(Opt::audio_fx) / 100, 0, 1), gaps::organic_rate(gaps::Organic::person), false);
     osfx("world-kill", p.pos, 0);  // kind person
     // and the voice: a dying cry at the body, its pitch the person's (low, middle, high voices by
     // the seed, a little random on top), now and then a long one
@@ -588,11 +588,11 @@ void Game::gaps_sirens(f32 dt) {
   const u32 rate = mixer_.sample_rate();
   if (!g.horn) {
     // voice(ctx, "car"): sawtooth 0 ct .5, square +7 ct .22, triangle -5 ct .45 -> peaking 1650 Hz Q .9 +7 dB -> low-pass 4200
-    g.horn = mixer_.adopt_clip(siren_loop(rate, gaps::kHornLow, {{Osc::saw, 0, 0.5f}, {Osc::square, 7, 0.22f}, {Osc::triangle, -5, 0.45f}}, true, 5200), 1, "spawncity:horn", true);
-    g.horn_dull = mixer_.adopt_clip(siren_loop(rate, gaps::kHornLow, {{Osc::saw, 0, 0.5f}, {Osc::square, 7, 0.22f}, {Osc::triangle, -5, 0.45f}}, true, 900), 1, "spawncity:horn-far", true);
+    g.horn = mixer_.adopt_clip(siren_loop(rate, gaps::horn_low(), {{Osc::saw, 0, 0.5f}, {Osc::square, 7, 0.22f}, {Osc::triangle, -5, 0.45f}}, true, 5200), 1, "spawncity:horn", true);
+    g.horn_dull = mixer_.adopt_clip(siren_loop(rate, gaps::horn_low(), {{Osc::saw, 0, 0.5f}, {Osc::square, 7, 0.22f}, {Osc::triangle, -5, 0.45f}}, true, 900), 1, "spawncity:horn-far", true);
     // voice(ctx, "drone"): sine .8 + triangle +4 ct .35 -> low-pass 4200
-    g.whoop = mixer_.adopt_clip(siren_loop(rate, gaps::kWhoopBase, {{Osc::sine, 0, 0.8f}, {Osc::triangle, 4, 0.35f}}, false, 5200), 1, "spawncity:whoop", true);
-    g.whoop_dull = mixer_.adopt_clip(siren_loop(rate, gaps::kWhoopBase, {{Osc::sine, 0, 0.8f}, {Osc::triangle, 4, 0.35f}}, false, 900), 1, "spawncity:whoop-far", true);
+    g.whoop = mixer_.adopt_clip(siren_loop(rate, gaps::whoop_base(), {{Osc::sine, 0, 0.8f}, {Osc::triangle, 4, 0.35f}}, false, 5200), 1, "spawncity:whoop", true);
+    g.whoop_dull = mixer_.adopt_clip(siren_loop(rate, gaps::whoop_base(), {{Osc::sine, 0, 0.8f}, {Osc::triangle, 4, 0.35f}}, false, 900), 1, "spawncity:whoop-far", true);
   }
   g.clock += dt;
   const Vec3 ear = cam_.eye;
@@ -637,8 +637,8 @@ void Game::gaps_sirens(f32 dt) {
       }
     }
   };
-  drive(g.car, dc, gaps::kCarGain, g.car_level, g.horn, g.horn_dull, g.v_horn, g.v_horn_dull, gaps::horn_hz(g.clock), gaps::kHornLow, 0.014f);
-  drive(g.drone, dd, gaps::kDroneGain, g.drone_level, g.whoop, g.whoop_dull, g.v_whoop, g.v_whoop_dull, gaps::whoop_hz(g.clock), gaps::kWhoopBase, 0.03f);
+  drive(g.car, dc, gaps::car_gain(), g.car_level, g.horn, g.horn_dull, g.v_horn, g.v_horn_dull, gaps::horn_hz(g.clock), gaps::horn_low(), 0.014f);
+  drive(g.drone, dd, gaps::drone_gain(), g.drone_level, g.whoop, g.whoop_dull, g.v_whoop, g.v_whoop_dull, gaps::whoop_hz(g.clock), gaps::whoop_base(), 0.03f);
 }
 
 namespace {

@@ -11,6 +11,8 @@
 #include "people.h"
 #include "town_sync.h"
 #include "qr_code.h"
+#include "../src/lamps.h"
+#include "rule_blueprint.h"
 #include "test_util.h"
 
 using namespace sc;
@@ -526,6 +528,7 @@ SC_TEST(mp_town_a_clients_hits_reach_the_host) {
 // One world, gaps 3 and 4: broken lamps, barricade planks and the blasts that left marks are the
 // host's state - a late joiner gets all of it, changes go round reliably.
 SC_TEST(mp_town_state_for_a_late_joiner) {
+  RuleBlueprint lamp_rules("Lamps", &lamps::bind);  // (what breaks a lamp, and that it only gets worse)
   net::Session host, a, b;
   Wire w;
   w.peers = {{11, &host}, {22, &a}};

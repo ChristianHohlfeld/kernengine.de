@@ -1,8 +1,14 @@
-// Street lamps as SpawnCity places and breaks them (street_lamps.mjs), pure rules (no GameWorld):
+// Street lamps as SpawnCity places and breaks them (street_lamps.mjs):
 // every 34 m along the streets (not paths / tracks), alternating kerbs, 1.15 m beyond the road
 // edge, the arm (1.42 m) over the road, one lamp per 8 m cell. A round through the head puts it
 // out; a blast tops (inner 60 %) or darkens it; a car faster than 3.5 m/s heading into the post
 // shears it off, a slower one is stopped by it. Broken lamps stay broken (by cell key) until RESET.
+//
+// What a round, a blast and a vehicle do to one lamp - and that a lamp only ever gets worse - are
+// a Blueprint: the level's actor "Lamps" (level/spawncity.klevel, open it in Kern Studio), its
+// functions ShotAt, BlastReach, BlastFate, CarFate and Worse with their numbers. The Field here is
+// the lamps themselves: where they stand, the grid that finds the near ones, what is broken. It
+// asks the Blueprint about each lamp in reach and decides nothing itself.
 #pragma once
 
 #include <functional>
@@ -11,11 +17,20 @@
 #include <vector>
 
 #include "common.h"
+#include "kern/logic/logic.h"
 
 namespace sc::lamps {
 
-constexpr f32 kSpacing = 34, kPoleH = 6.2f, kGridM = 10, kPoleR = 0.13f, kToppleMps = 3.5f, kArm = 1.42f, kHeadZ = kPoleH - 0.2f, kKerb = 1.15f;
-constexpr f32 kPoleMass = 140, kHeadHitR = 0.38f;
+/// The running Blueprint of the actor "Lamps" (the game binds it once its world has started;
+/// tests bind the one they run). Unbound, nothing happens to a lamp.
+void bind(kern::logic::Instance* blueprint);
+kern::logic::Instance* blueprint();
+/// The Blueprint's variable PoleRadius.
+f32 pole_radius();
+
+// The lamp as it is built and laid out (the model and the field, not a rule).
+constexpr f32 kSpacing = 34, kPoleH = 6.2f, kGridM = 10, kArm = 1.42f, kHeadZ = kPoleH - 0.2f, kKerb = 1.15f;
+constexpr f32 kPoleMass = 140;
 constexpr u32 kFallenMax = 14, kMax = 900;
 
 struct Lamp {

@@ -37,7 +37,7 @@ f32 Game::hit_material(Vec3 at, u8 surface, bool flesh) const {
   if (gaps_)
     for (i32 i : gaps_->lamps.near(at.x, at.y, 2.5f)) {
       const lamps::Lamp& l = gaps_->lamps.all()[static_cast<std::size_t>(i)];
-      if (l.state < 2 && (std::hypot(at.x - l.foot.x, at.y - l.foot.y) < lamps::kPoleR + 0.25f || std::hypot(at.x - l.head.x, at.y - l.head.y) < 0.6f) && at.z < l.foot.z + lamps::kPoleH + 0.4f)
+      if (l.state < 2 && (std::hypot(at.x - l.foot.x, at.y - l.foot.y) < lamps::pole_radius() + 0.25f || std::hypot(at.x - l.head.x, at.y - l.head.y) < 0.6f) && at.z < l.foot.z + lamps::kPoleH + 0.4f)
         return 2;
     }
   if (glife_)

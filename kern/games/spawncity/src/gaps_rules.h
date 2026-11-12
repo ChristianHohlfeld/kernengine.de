@@ -12,24 +12,35 @@
 #include <vector>
 
 #include "common.h"
+#include "kern/logic/logic.h"
 
 namespace sc::gaps {
 
-// ---- police_sirens.mjs
-constexpr f32 kHornLow = 466.16f, kHornHigh = 622.25f, kHornToneS = 0.66f;  // B flat 4 / E flat 5
-constexpr f32 kCarGain = 0.06f, kDroneGain = 0.032f, kAudibleM = 260, kSoundMps = 343;
-constexpr f32 kWhoopBase = 760;
-/// Pitch of the horn at time t (alternating tones, 0.66 s each).
+// ---- police_sirens.mjs, wanted_dispatch_guard.mjs, world_organic_hit_audio.mjs
+// These rules are a Blueprint: the level's actor "Sirens" (level/spawncity.klevel, open it in Kern
+// Studio) - its variables hold the pitches, levels and distances, its functions the laws. What
+// follows is only how the game's C++ calls them.
+/// The running Blueprint of the actor "Sirens" (the game binds it once its world has started;
+/// tests bind the one they run). Unbound, every rule answers 0.
+void bind_sirens(kern::logic::Instance* blueprint);
+// The Blueprint's variables HornLow, HornHigh, CarGain, DroneGain and WhoopBase.
+f32 horn_low();
+f32 horn_high();
+f32 car_gain();
+f32 drone_gain();
+f32 whoop_base();
+/// Pitch of the horn at time t (alternating tones, 0.66 s each) - the Blueprint's HornHz.
 f32 horn_hz(f32 t);
-/// The drone whoop: 760 -> 1480 Hz over 0.7 s with an easing, then low until 1.05 s.
+/// The drone whoop: 760 -> 1480 Hz over 0.7 s with an easing, then low until 1.05 s (WhoopHz).
 f32 whoop_hz(f32 t);
-/// Level at distance d (0 beyond 260 m): base * level / (1 + (d / 14)^1.25).
+/// Level at distance d (0 beyond 260 m): base * level / (1 + (d / 14)^1.25) (SirenGain).
 f32 siren_gain(f32 base, f32 d, f32 level);
-/// Low-pass cutoff for air absorption: 5200 - 16 d, 900 .. 5200 Hz.
+/// Low-pass cutoff for air absorption: 5200 - 16 d, 900 .. 5200 Hz (SirenCutoff).
 f32 siren_cutoff(f32 d);
 
 /// One positional siren voice: Doppler from the change of distance, smoothed (no chirp when the
-/// nearest unit changes or teleports), as drive() in police_sirens.mjs.
+/// nearest unit changes or teleports), as drive() in police_sirens.mjs. (What the voice holds is
+/// here; what it does with it is the Blueprint's function VoiceUpdate.)
 struct SirenVoice {
   bool have_d = false;
   f32 last_d = 0, doppler = 1, gain = 0;
@@ -86,9 +97,11 @@ f32 unit_hash(u32 seed);
 
 // ---- world_organic_hit_audio.mjs
 enum class Organic : u8 { person, animal, bird };
-/// Playback rate of the "crack" (bird 1.16, animal 0.94, person 1) and its gain .34 * fx.
+/// Playback rate of the "crack" (bird 1.16, animal 0.94, person 1) and its gain .34 * fx - the
+/// Blueprint's enum Organic (the same order), its function OrganicRate and its variables.
 f32 organic_rate(Organic k);
-constexpr f32 kOrganicGain = 0.34f, kOrganicMinGapS = 0.024f;
+f32 organic_gain();
+f32 organic_min_gap_s();
 
 // ---- visual_pose_stabilization.mjs: the drone as drawn in the follow / third camera rides on the
 // camera anchor with a damped offset and a damped rotation, errors capped (soft / hard limits).

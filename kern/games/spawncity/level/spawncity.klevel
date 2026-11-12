@@ -16,7 +16,7 @@
   "ambienceVolume": 0.35,
   "reverb": 0.2
  },
- "nextId": 6,
+ "nextId": 8,
  "actors": [
   {
    "id": 1,
@@ -16754,6 +16754,3283 @@
          "name": "Seated",
          "type": "int_list",
          "value": []
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": 6,
+   "name": "Lamps",
+   "folder": "Rules",
+   "transform": {
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     1
+    ]
+   },
+   "components": {
+    "logic": {
+     "kind": "kern-logic",
+     "version": 1,
+     "nextId": 109,
+     "variables": [
+      {
+       "name": "HeadHitRadius",
+       "type": "float",
+       "value": 0.38,
+       "help": "street_lamps.mjs: a round within this distance (m) of the head puts the lamp out"
+      },
+      {
+       "name": "PoleRadius",
+       "type": "float",
+       "value": 0.13,
+       "help": "The post's radius (m): a vehicle whose footprint reaches it has hit it"
+      },
+      {
+       "name": "ToppleSpeed",
+       "type": "float",
+       "value": 3.5,
+       "help": "A vehicle faster than this (m/s) heading into the post shears it off"
+      },
+      {
+       "name": "BlastMin",
+       "type": "float",
+       "value": 3,
+       "help": "A blast reaches at least this far (m)"
+      },
+      {
+       "name": "BlastDefault",
+       "type": "float",
+       "value": 8,
+       "help": "... and this far when it says no radius"
+      },
+      {
+       "name": "BlastToppleShare",
+       "type": "float",
+       "value": 0.6,
+       "help": "Inside this share of its reach the post goes down; farther out only the head goes dark"
+      }
+     ],
+     "nodes": [
+      {
+       "id": 1,
+       "type": "func.entry",
+       "x": 0,
+       "y": 0,
+       "params": {
+        "function": "Flat"
+       }
+      },
+      {
+       "id": 2,
+       "type": "func.return",
+       "x": 280,
+       "y": 0,
+       "params": {
+        "function": "Flat"
+       }
+      },
+      {
+       "id": 3,
+       "type": "vector.make",
+       "x": 160,
+       "y": 150,
+       "values": {
+        "z": 0
+       }
+      },
+      {
+       "id": 4,
+       "type": "vector.break",
+       "x": 160,
+       "y": 240
+      },
+      {
+       "id": 5,
+       "type": "vector.break",
+       "x": 160,
+       "y": 330
+      },
+      {
+       "id": 6,
+       "type": "func.entry",
+       "x": 0,
+       "y": 470,
+       "params": {
+        "function": "Worse"
+       }
+      },
+      {
+       "id": 7,
+       "type": "func.return",
+       "x": 280,
+       "y": 470,
+       "params": {
+        "function": "Worse"
+       }
+      },
+      {
+       "id": 8,
+       "type": "math.formula",
+       "x": 160,
+       "y": 620,
+       "params": {
+        "formula": "to > state && to >= 1 && to <= 2"
+       }
+      },
+      {
+       "id": 9,
+       "type": "func.entry",
+       "x": 0,
+       "y": 760,
+       "params": {
+        "function": "ShotAt"
+       }
+      },
+      {
+       "id": 10,
+       "type": "flow.branch",
+       "x": 280,
+       "y": 760
+      },
+      {
+       "id": 11,
+       "type": "logic.or",
+       "x": 160,
+       "y": 910
+      },
+      {
+       "id": 12,
+       "type": "math.compare",
+       "x": 160,
+       "y": 1000,
+       "params": {
+        "op": ">="
+       },
+       "values": {
+        "b": 1
+       }
+      },
+      {
+       "id": 13,
+       "type": "math.compare",
+       "x": 160,
+       "y": 1090,
+       "params": {
+        "op": "<"
+       },
+       "values": {
+        "b": 0.1
+       }
+      },
+      {
+       "id": 14,
+       "type": "vector.distance",
+       "x": 160,
+       "y": 1180
+      },
+      {
+       "id": 15,
+       "type": "func.return",
+       "x": 560,
+       "y": 760,
+       "params": {
+        "function": "ShotAt"
+       },
+       "values": {
+        "hit": false,
+        "along": 0
+       }
+      },
+      {
+       "id": 16,
+       "type": "var.set",
+       "x": 840,
+       "y": 760,
+       "params": {
+        "variable": "T",
+        "scope": "ShotAt"
+       }
+      },
+      {
+       "id": 17,
+       "type": "math.clamp",
+       "x": 720,
+       "y": 910,
+       "values": {
+        "min": 0,
+        "max": 1
+       }
+      },
+      {
+       "id": 18,
+       "type": "math.div",
+       "x": 720,
+       "y": 1000
+      },
+      {
+       "id": 19,
+       "type": "vector.dot",
+       "x": 720,
+       "y": 1090
+      },
+      {
+       "id": 20,
+       "type": "vector.sub",
+       "x": 720,
+       "y": 1180
+      },
+      {
+       "id": 21,
+       "type": "vector.sub",
+       "x": 720,
+       "y": 1270
+      },
+      {
+       "id": 22,
+       "type": "math.mul",
+       "x": 720,
+       "y": 1360
+      },
+      {
+       "id": 23,
+       "type": "vector.distance",
+       "x": 720,
+       "y": 1450
+      },
+      {
+       "id": 24,
+       "type": "vector.distance",
+       "x": 720,
+       "y": 1540
+      },
+      {
+       "id": 25,
+       "type": "func.return",
+       "x": 1120,
+       "y": 760,
+       "params": {
+        "function": "ShotAt"
+       }
+      },
+      {
+       "id": 26,
+       "type": "math.compare",
+       "x": 1000,
+       "y": 910,
+       "params": {
+        "op": "<"
+       }
+      },
+      {
+       "id": 27,
+       "type": "vector.distance",
+       "x": 1000,
+       "y": 1000
+      },
+      {
+       "id": 28,
+       "type": "vector.add",
+       "x": 1000,
+       "y": 1090
+      },
+      {
+       "id": 29,
+       "type": "vector.scale",
+       "x": 1000,
+       "y": 1180
+      },
+      {
+       "id": 30,
+       "type": "vector.sub",
+       "x": 1000,
+       "y": 1270
+      },
+      {
+       "id": 31,
+       "type": "var.get",
+       "x": 1000,
+       "y": 1360,
+       "params": {
+        "variable": "T",
+        "scope": "ShotAt"
+       }
+      },
+      {
+       "id": 32,
+       "type": "var.get",
+       "x": 1000,
+       "y": 1450,
+       "params": {
+        "variable": "HeadHitRadius"
+       }
+      },
+      {
+       "id": 33,
+       "type": "var.get",
+       "x": 1000,
+       "y": 1540,
+       "params": {
+        "variable": "T",
+        "scope": "ShotAt"
+       }
+      },
+      {
+       "id": 34,
+       "type": "func.entry",
+       "x": 0,
+       "y": 1680,
+       "params": {
+        "function": "BlastReach"
+       }
+      },
+      {
+       "id": 35,
+       "type": "func.return",
+       "x": 280,
+       "y": 1680,
+       "params": {
+        "function": "BlastReach"
+       }
+      },
+      {
+       "id": 36,
+       "type": "math.max",
+       "x": 160,
+       "y": 1830
+      },
+      {
+       "id": 37,
+       "type": "var.get",
+       "x": 160,
+       "y": 1920,
+       "params": {
+        "variable": "BlastMin"
+       }
+      },
+      {
+       "id": 38,
+       "type": "logic.select",
+       "x": 160,
+       "y": 2010,
+       "params": {
+        "type": "float"
+       }
+      },
+      {
+       "id": 39,
+       "type": "math.compare",
+       "x": 160,
+       "y": 2100,
+       "params": {
+        "op": ">"
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 40,
+       "type": "var.get",
+       "x": 160,
+       "y": 2190,
+       "params": {
+        "variable": "BlastDefault"
+       }
+      },
+      {
+       "id": 41,
+       "type": "func.entry",
+       "x": 0,
+       "y": 2330,
+       "params": {
+        "function": "BlastFate"
+       }
+      },
+      {
+       "id": 42,
+       "type": "var.set",
+       "x": 280,
+       "y": 2330,
+       "params": {
+        "variable": "Away",
+        "scope": "BlastFate"
+       }
+      },
+      {
+       "id": 43,
+       "type": "func.pure",
+       "x": 160,
+       "y": 2480,
+       "params": {
+        "function": "Flat"
+       }
+      },
+      {
+       "id": 44,
+       "type": "vector.sub",
+       "x": 160,
+       "y": 2570
+      },
+      {
+       "id": 45,
+       "type": "flow.branch",
+       "x": 560,
+       "y": 2330
+      },
+      {
+       "id": 46,
+       "type": "math.compare",
+       "x": 440,
+       "y": 2480,
+       "params": {
+        "op": "<"
+       }
+      },
+      {
+       "id": 47,
+       "type": "vector.length",
+       "x": 440,
+       "y": 2570
+      },
+      {
+       "id": 48,
+       "type": "var.get",
+       "x": 440,
+       "y": 2660,
+       "params": {
+        "variable": "Away",
+        "scope": "BlastFate"
+       }
+      },
+      {
+       "id": 49,
+       "type": "math.mul",
+       "x": 440,
+       "y": 2750
+      },
+      {
+       "id": 50,
+       "type": "var.get",
+       "x": 440,
+       "y": 2840,
+       "params": {
+        "variable": "BlastToppleShare"
+       }
+      },
+      {
+       "id": 51,
+       "type": "func.return",
+       "x": 840,
+       "y": 2330,
+       "params": {
+        "function": "BlastFate"
+       },
+       "values": {
+        "state": 2
+       }
+      },
+      {
+       "id": 52,
+       "type": "var.get",
+       "x": 720,
+       "y": 2480,
+       "params": {
+        "variable": "Away",
+        "scope": "BlastFate"
+       }
+      },
+      {
+       "id": 53,
+       "type": "math.formula",
+       "x": 720,
+       "y": 2570,
+       "params": {
+        "formula": "9 * (1 - dist / reach) + 3"
+       }
+      },
+      {
+       "id": 54,
+       "type": "vector.length",
+       "x": 720,
+       "y": 2660
+      },
+      {
+       "id": 55,
+       "type": "var.get",
+       "x": 720,
+       "y": 2750,
+       "params": {
+        "variable": "Away",
+        "scope": "BlastFate"
+       }
+      },
+      {
+       "id": 56,
+       "type": "func.return",
+       "x": 1120,
+       "y": 2330,
+       "params": {
+        "function": "BlastFate"
+       },
+       "values": {
+        "state": 1,
+        "push": [
+         0,
+         0,
+         0
+        ],
+        "speed": 0
+       }
+      },
+      {
+       "id": 57,
+       "type": "func.entry",
+       "x": 0,
+       "y": 2980,
+       "params": {
+        "function": "CarFate"
+       }
+      },
+      {
+       "id": 58,
+       "type": "var.set",
+       "x": 280,
+       "y": 2980,
+       "params": {
+        "variable": "D",
+        "scope": "CarFate"
+       }
+      },
+      {
+       "id": 59,
+       "type": "func.pure",
+       "x": 160,
+       "y": 3130,
+       "params": {
+        "function": "Flat"
+       }
+      },
+      {
+       "id": 60,
+       "type": "vector.sub",
+       "x": 160,
+       "y": 3220
+      },
+      {
+       "id": 61,
+       "type": "flow.branch",
+       "x": 560,
+       "y": 2980
+      },
+      {
+       "id": 62,
+       "type": "logic.or",
+       "x": 440,
+       "y": 3130
+      },
+      {
+       "id": 63,
+       "type": "math.compare",
+       "x": 440,
+       "y": 3220,
+       "params": {
+        "op": ">="
+       },
+       "values": {
+        "b": 2
+       }
+      },
+      {
+       "id": 64,
+       "type": "math.formula",
+       "x": 440,
+       "y": 3310,
+       "params": {
+        "formula": "abs(dx * cos(yaw) + dy * sin(yaw)) > hl + r || abs(dy * cos(yaw) - dx * sin(yaw)) > hw + r"
+       }
+      },
+      {
+       "id": 65,
+       "type": "vector.break",
+       "x": 440,
+       "y": 3400
+      },
+      {
+       "id": 66,
+       "type": "var.get",
+       "x": 440,
+       "y": 3490,
+       "params": {
+        "variable": "D",
+        "scope": "CarFate"
+       }
+      },
+      {
+       "id": 67,
+       "type": "vector.break",
+       "x": 440,
+       "y": 3580
+      },
+      {
+       "id": 68,
+       "type": "var.get",
+       "x": 440,
+       "y": 3670,
+       "params": {
+        "variable": "D",
+        "scope": "CarFate"
+       }
+      },
+      {
+       "id": 69,
+       "type": "var.get",
+       "x": 440,
+       "y": 3760,
+       "params": {
+        "variable": "PoleRadius"
+       }
+      },
+      {
+       "id": 70,
+       "type": "func.return",
+       "x": 840,
+       "y": 2980,
+       "params": {
+        "function": "CarFate"
+       },
+       "values": {
+        "hit": false,
+        "topple": false,
+        "impulse": [
+         0,
+         0,
+         0
+        ],
+        "clang": false
+       }
+      },
+      {
+       "id": 71,
+       "type": "var.set",
+       "x": 1120,
+       "y": 2980,
+       "params": {
+        "variable": "N",
+        "scope": "CarFate"
+       }
+      },
+      {
+       "id": 72,
+       "type": "vector.scale",
+       "x": 1000,
+       "y": 3130
+      },
+      {
+       "id": 73,
+       "type": "var.get",
+       "x": 1000,
+       "y": 3220,
+       "params": {
+        "variable": "D",
+        "scope": "CarFate"
+       }
+      },
+      {
+       "id": 74,
+       "type": "math.div",
+       "x": 1000,
+       "y": 3310,
+       "values": {
+        "a": 1
+       }
+      },
+      {
+       "id": 75,
+       "type": "math.max",
+       "x": 1000,
+       "y": 3400,
+       "values": {
+        "a": 0.001
+       }
+      },
+      {
+       "id": 76,
+       "type": "vector.length",
+       "x": 1000,
+       "y": 3490
+      },
+      {
+       "id": 77,
+       "type": "var.get",
+       "x": 1000,
+       "y": 3580,
+       "params": {
+        "variable": "D",
+        "scope": "CarFate"
+       }
+      },
+      {
+       "id": 78,
+       "type": "var.set",
+       "x": 1400,
+       "y": 2980,
+       "params": {
+        "variable": "V",
+        "scope": "CarFate"
+       }
+      },
+      {
+       "id": 79,
+       "type": "func.pure",
+       "x": 1280,
+       "y": 3130,
+       "params": {
+        "function": "Flat"
+       }
+      },
+      {
+       "id": 80,
+       "type": "var.set",
+       "x": 1680,
+       "y": 2980,
+       "params": {
+        "variable": "Toward",
+        "scope": "CarFate"
+       }
+      },
+      {
+       "id": 81,
+       "type": "vector.dot",
+       "x": 1560,
+       "y": 3130
+      },
+      {
+       "id": 82,
+       "type": "var.get",
+       "x": 1560,
+       "y": 3220,
+       "params": {
+        "variable": "V",
+        "scope": "CarFate"
+       }
+      },
+      {
+       "id": 83,
+       "type": "var.get",
+       "x": 1560,
+       "y": 3310,
+       "params": {
+        "variable": "N",
+        "scope": "CarFate"
+       }
+      },
+      {
+       "id": 84,
+       "type": "flow.branch",
+       "x": 1960,
+       "y": 2980
+      },
+      {
+       "id": 85,
+       "type": "logic.and",
+       "x": 1840,
+       "y": 3130
+      },
+      {
+       "id": 86,
+       "type": "math.compare",
+       "x": 1840,
+       "y": 3220,
+       "params": {
+        "op": ">"
+       }
+      },
+      {
+       "id": 87,
+       "type": "vector.length",
+       "x": 1840,
+       "y": 3310
+      },
+      {
+       "id": 88,
+       "type": "var.get",
+       "x": 1840,
+       "y": 3400,
+       "params": {
+        "variable": "V",
+        "scope": "CarFate"
+       }
+      },
+      {
+       "id": 89,
+       "type": "var.get",
+       "x": 1840,
+       "y": 3490,
+       "params": {
+        "variable": "ToppleSpeed"
+       }
+      },
+      {
+       "id": 90,
+       "type": "math.compare",
+       "x": 1840,
+       "y": 3580,
+       "params": {
+        "op": ">"
+       },
+       "values": {
+        "b": 1
+       }
+      },
+      {
+       "id": 91,
+       "type": "var.get",
+       "x": 1840,
+       "y": 3670,
+       "params": {
+        "variable": "Toward",
+        "scope": "CarFate"
+       }
+      },
+      {
+       "id": 92,
+       "type": "func.return",
+       "x": 2240,
+       "y": 2980,
+       "params": {
+        "function": "CarFate"
+       },
+       "values": {
+        "hit": true,
+        "topple": true,
+        "clang": false
+       }
+      },
+      {
+       "id": 93,
+       "type": "vector.scale",
+       "x": 2120,
+       "y": 3130
+      },
+      {
+       "id": 94,
+       "type": "var.get",
+       "x": 2120,
+       "y": 3220,
+       "params": {
+        "variable": "V",
+        "scope": "CarFate"
+       }
+      },
+      {
+       "id": 95,
+       "type": "math.formula",
+       "x": 2120,
+       "y": 3310,
+       "params": {
+        "formula": "-mass * min(speed * 0.22, 2.4) / speed"
+       }
+      },
+      {
+       "id": 96,
+       "type": "vector.length",
+       "x": 2120,
+       "y": 3400
+      },
+      {
+       "id": 97,
+       "type": "var.get",
+       "x": 2120,
+       "y": 3490,
+       "params": {
+        "variable": "V",
+        "scope": "CarFate"
+       }
+      },
+      {
+       "id": 98,
+       "type": "flow.branch",
+       "x": 2520,
+       "y": 2980
+      },
+      {
+       "id": 99,
+       "type": "math.compare",
+       "x": 2400,
+       "y": 3130,
+       "params": {
+        "op": ">"
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 100,
+       "type": "var.get",
+       "x": 2400,
+       "y": 3220,
+       "params": {
+        "variable": "Toward",
+        "scope": "CarFate"
+       }
+      },
+      {
+       "id": 101,
+       "type": "func.return",
+       "x": 2800,
+       "y": 2980,
+       "params": {
+        "function": "CarFate"
+       },
+       "values": {
+        "hit": true,
+        "topple": false
+       }
+      },
+      {
+       "id": 102,
+       "type": "vector.scale",
+       "x": 2680,
+       "y": 3130
+      },
+      {
+       "id": 103,
+       "type": "var.get",
+       "x": 2680,
+       "y": 3220,
+       "params": {
+        "variable": "N",
+        "scope": "CarFate"
+       }
+      },
+      {
+       "id": 104,
+       "type": "math.formula",
+       "x": 2680,
+       "y": 3310,
+       "params": {
+        "formula": "-mass * toward * 1.05"
+       }
+      },
+      {
+       "id": 105,
+       "type": "var.get",
+       "x": 2680,
+       "y": 3400,
+       "params": {
+        "variable": "Toward",
+        "scope": "CarFate"
+       }
+      },
+      {
+       "id": 106,
+       "type": "math.compare",
+       "x": 2680,
+       "y": 3490,
+       "params": {
+        "op": ">"
+       },
+       "values": {
+        "b": 1
+       }
+      },
+      {
+       "id": 107,
+       "type": "var.get",
+       "x": 2680,
+       "y": 3580,
+       "params": {
+        "variable": "Toward",
+        "scope": "CarFate"
+       }
+      },
+      {
+       "id": 108,
+       "type": "func.return",
+       "x": 3080,
+       "y": 2980,
+       "params": {
+        "function": "CarFate"
+       },
+       "values": {
+        "hit": false,
+        "topple": false,
+        "impulse": [
+         0,
+         0,
+         0
+        ],
+        "clang": false
+       }
+      }
+     ],
+     "links": [
+      [
+       1,
+       "then",
+       2,
+       "exec"
+      ],
+      [
+       1,
+       "v",
+       4,
+       "v"
+      ],
+      [
+       1,
+       "v",
+       5,
+       "v"
+      ],
+      [
+       3,
+       "result",
+       2,
+       "flat"
+      ],
+      [
+       4,
+       "x",
+       3,
+       "x"
+      ],
+      [
+       5,
+       "y",
+       3,
+       "y"
+      ],
+      [
+       6,
+       "state",
+       8,
+       "state"
+      ],
+      [
+       6,
+       "then",
+       7,
+       "exec"
+      ],
+      [
+       6,
+       "to",
+       8,
+       "to"
+      ],
+      [
+       8,
+       "result",
+       7,
+       "worse"
+      ],
+      [
+       9,
+       "a",
+       14,
+       "a"
+      ],
+      [
+       9,
+       "a",
+       20,
+       "b"
+      ],
+      [
+       9,
+       "a",
+       21,
+       "b"
+      ],
+      [
+       9,
+       "a",
+       23,
+       "a"
+      ],
+      [
+       9,
+       "a",
+       24,
+       "a"
+      ],
+      [
+       9,
+       "a",
+       28,
+       "a"
+      ],
+      [
+       9,
+       "a",
+       30,
+       "b"
+      ],
+      [
+       9,
+       "b",
+       14,
+       "b"
+      ],
+      [
+       9,
+       "b",
+       21,
+       "a"
+      ],
+      [
+       9,
+       "b",
+       23,
+       "b"
+      ],
+      [
+       9,
+       "b",
+       24,
+       "b"
+      ],
+      [
+       9,
+       "b",
+       30,
+       "a"
+      ],
+      [
+       9,
+       "head",
+       20,
+       "a"
+      ],
+      [
+       9,
+       "head",
+       27,
+       "b"
+      ],
+      [
+       9,
+       "state",
+       12,
+       "a"
+      ],
+      [
+       9,
+       "then",
+       10,
+       "exec"
+      ],
+      [
+       10,
+       "false",
+       16,
+       "exec"
+      ],
+      [
+       10,
+       "true",
+       15,
+       "exec"
+      ],
+      [
+       11,
+       "result",
+       10,
+       "condition"
+      ],
+      [
+       12,
+       "result",
+       11,
+       "a"
+      ],
+      [
+       13,
+       "result",
+       11,
+       "b"
+      ],
+      [
+       14,
+       "result",
+       13,
+       "a"
+      ],
+      [
+       16,
+       "then",
+       25,
+       "exec"
+      ],
+      [
+       17,
+       "result",
+       16,
+       "value"
+      ],
+      [
+       18,
+       "result",
+       17,
+       "value"
+      ],
+      [
+       19,
+       "result",
+       18,
+       "a"
+      ],
+      [
+       20,
+       "result",
+       19,
+       "a"
+      ],
+      [
+       21,
+       "result",
+       19,
+       "b"
+      ],
+      [
+       22,
+       "result",
+       18,
+       "b"
+      ],
+      [
+       23,
+       "result",
+       22,
+       "a"
+      ],
+      [
+       24,
+       "result",
+       22,
+       "b"
+      ],
+      [
+       26,
+       "result",
+       25,
+       "hit"
+      ],
+      [
+       27,
+       "result",
+       26,
+       "a"
+      ],
+      [
+       28,
+       "result",
+       27,
+       "a"
+      ],
+      [
+       29,
+       "result",
+       28,
+       "b"
+      ],
+      [
+       30,
+       "result",
+       29,
+       "a"
+      ],
+      [
+       31,
+       "value",
+       29,
+       "b"
+      ],
+      [
+       32,
+       "value",
+       26,
+       "b"
+      ],
+      [
+       33,
+       "value",
+       25,
+       "along"
+      ],
+      [
+       34,
+       "radius",
+       38,
+       "a"
+      ],
+      [
+       34,
+       "radius",
+       39,
+       "a"
+      ],
+      [
+       34,
+       "then",
+       35,
+       "exec"
+      ],
+      [
+       36,
+       "result",
+       35,
+       "reach"
+      ],
+      [
+       37,
+       "value",
+       36,
+       "a"
+      ],
+      [
+       38,
+       "result",
+       36,
+       "b"
+      ],
+      [
+       39,
+       "result",
+       38,
+       "pick"
+      ],
+      [
+       40,
+       "value",
+       38,
+       "b"
+      ],
+      [
+       41,
+       "at",
+       44,
+       "b"
+      ],
+      [
+       41,
+       "foot",
+       44,
+       "a"
+      ],
+      [
+       41,
+       "reach",
+       49,
+       "a"
+      ],
+      [
+       41,
+       "reach",
+       53,
+       "reach"
+      ],
+      [
+       41,
+       "then",
+       42,
+       "exec"
+      ],
+      [
+       42,
+       "then",
+       45,
+       "exec"
+      ],
+      [
+       43,
+       "flat",
+       42,
+       "value"
+      ],
+      [
+       44,
+       "result",
+       43,
+       "v"
+      ],
+      [
+       45,
+       "false",
+       56,
+       "exec"
+      ],
+      [
+       45,
+       "true",
+       51,
+       "exec"
+      ],
+      [
+       46,
+       "result",
+       45,
+       "condition"
+      ],
+      [
+       47,
+       "result",
+       46,
+       "a"
+      ],
+      [
+       48,
+       "value",
+       47,
+       "a"
+      ],
+      [
+       49,
+       "result",
+       46,
+       "b"
+      ],
+      [
+       50,
+       "value",
+       49,
+       "b"
+      ],
+      [
+       52,
+       "value",
+       51,
+       "push"
+      ],
+      [
+       53,
+       "result",
+       51,
+       "speed"
+      ],
+      [
+       54,
+       "result",
+       53,
+       "dist"
+      ],
+      [
+       55,
+       "value",
+       54,
+       "a"
+      ],
+      [
+       57,
+       "foot",
+       60,
+       "a"
+      ],
+      [
+       57,
+       "halfLength",
+       64,
+       "hl"
+      ],
+      [
+       57,
+       "halfWidth",
+       64,
+       "hw"
+      ],
+      [
+       57,
+       "mass",
+       95,
+       "mass"
+      ],
+      [
+       57,
+       "mass",
+       104,
+       "mass"
+      ],
+      [
+       57,
+       "pos",
+       60,
+       "b"
+      ],
+      [
+       57,
+       "state",
+       63,
+       "a"
+      ],
+      [
+       57,
+       "then",
+       58,
+       "exec"
+      ],
+      [
+       57,
+       "velocity",
+       79,
+       "v"
+      ],
+      [
+       57,
+       "yaw",
+       64,
+       "yaw"
+      ],
+      [
+       58,
+       "then",
+       61,
+       "exec"
+      ],
+      [
+       59,
+       "flat",
+       58,
+       "value"
+      ],
+      [
+       60,
+       "result",
+       59,
+       "v"
+      ],
+      [
+       61,
+       "false",
+       71,
+       "exec"
+      ],
+      [
+       61,
+       "true",
+       70,
+       "exec"
+      ],
+      [
+       62,
+       "result",
+       61,
+       "condition"
+      ],
+      [
+       63,
+       "result",
+       62,
+       "a"
+      ],
+      [
+       64,
+       "result",
+       62,
+       "b"
+      ],
+      [
+       65,
+       "x",
+       64,
+       "dx"
+      ],
+      [
+       66,
+       "value",
+       65,
+       "v"
+      ],
+      [
+       67,
+       "y",
+       64,
+       "dy"
+      ],
+      [
+       68,
+       "value",
+       67,
+       "v"
+      ],
+      [
+       69,
+       "value",
+       64,
+       "r"
+      ],
+      [
+       71,
+       "then",
+       78,
+       "exec"
+      ],
+      [
+       72,
+       "result",
+       71,
+       "value"
+      ],
+      [
+       73,
+       "value",
+       72,
+       "a"
+      ],
+      [
+       74,
+       "result",
+       72,
+       "b"
+      ],
+      [
+       75,
+       "result",
+       74,
+       "b"
+      ],
+      [
+       76,
+       "result",
+       75,
+       "b"
+      ],
+      [
+       77,
+       "value",
+       76,
+       "a"
+      ],
+      [
+       78,
+       "then",
+       80,
+       "exec"
+      ],
+      [
+       79,
+       "flat",
+       78,
+       "value"
+      ],
+      [
+       80,
+       "then",
+       84,
+       "exec"
+      ],
+      [
+       81,
+       "result",
+       80,
+       "value"
+      ],
+      [
+       82,
+       "value",
+       81,
+       "a"
+      ],
+      [
+       83,
+       "value",
+       81,
+       "b"
+      ],
+      [
+       84,
+       "false",
+       98,
+       "exec"
+      ],
+      [
+       84,
+       "true",
+       92,
+       "exec"
+      ],
+      [
+       85,
+       "result",
+       84,
+       "condition"
+      ],
+      [
+       86,
+       "result",
+       85,
+       "a"
+      ],
+      [
+       87,
+       "result",
+       86,
+       "a"
+      ],
+      [
+       88,
+       "value",
+       87,
+       "a"
+      ],
+      [
+       89,
+       "value",
+       86,
+       "b"
+      ],
+      [
+       90,
+       "result",
+       85,
+       "b"
+      ],
+      [
+       91,
+       "value",
+       90,
+       "a"
+      ],
+      [
+       93,
+       "result",
+       92,
+       "impulse"
+      ],
+      [
+       94,
+       "value",
+       93,
+       "a"
+      ],
+      [
+       95,
+       "result",
+       93,
+       "b"
+      ],
+      [
+       96,
+       "result",
+       95,
+       "speed"
+      ],
+      [
+       97,
+       "value",
+       96,
+       "a"
+      ],
+      [
+       98,
+       "false",
+       108,
+       "exec"
+      ],
+      [
+       98,
+       "true",
+       101,
+       "exec"
+      ],
+      [
+       99,
+       "result",
+       98,
+       "condition"
+      ],
+      [
+       100,
+       "value",
+       99,
+       "a"
+      ],
+      [
+       102,
+       "result",
+       101,
+       "impulse"
+      ],
+      [
+       103,
+       "value",
+       102,
+       "a"
+      ],
+      [
+       104,
+       "result",
+       102,
+       "b"
+      ],
+      [
+       105,
+       "value",
+       104,
+       "toward"
+      ],
+      [
+       106,
+       "result",
+       101,
+       "clang"
+      ],
+      [
+       107,
+       "value",
+       106,
+       "a"
+      ]
+     ],
+     "machines": [],
+     "functions": [
+      {
+       "name": "Flat",
+       "pure": true,
+       "help": "A point on the map: without its height",
+       "inputs": [
+        {
+         "name": "v",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        }
+       ],
+       "outputs": [
+        {
+         "name": "flat",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        }
+       ]
+      },
+      {
+       "name": "Worse",
+       "pure": true,
+       "help": "A lamp only ever gets worse: 0 lit, 1 its head shattered (dark), 2 the post down",
+       "inputs": [
+        {
+         "name": "state",
+         "type": "int",
+         "value": 0
+        },
+        {
+         "name": "to",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "worse",
+         "type": "bool",
+         "value": false
+        }
+       ]
+      },
+      {
+       "name": "ShotAt",
+       "pure": true,
+       "help": "Does a round from a to b put out the lamp with this head? Only a lit one; along: how far down the path (0..1) it passes the head.",
+       "inputs": [
+        {
+         "name": "a",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "b",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "head",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "state",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "hit",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "along",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "locals": [
+        {
+         "name": "T",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "BlastReach",
+       "pure": true,
+       "help": "How far a blast of this radius reaches the lamps",
+       "inputs": [
+        {
+         "name": "radius",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "reach",
+         "type": "float",
+         "value": 8
+        }
+       ]
+      },
+      {
+       "name": "BlastFate",
+       "pure": true,
+       "help": "What a blast at a point does to a lamp within its reach: the post goes down (2), pushed away with a speed, or only the head goes dark (1)",
+       "inputs": [
+        {
+         "name": "foot",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "at",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "reach",
+         "type": "float",
+         "value": 8
+        }
+       ],
+       "outputs": [
+        {
+         "name": "state",
+         "type": "int",
+         "value": 1
+        },
+        {
+         "name": "push",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "speed",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "locals": [
+        {
+         "name": "Away",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        }
+       ]
+      },
+      {
+       "name": "CarFate",
+       "pure": true,
+       "help": "What a vehicle (its place, heading, velocity, half length and width, mass) and a post do to each other. A fast one heading into it shears it off and loses some speed; a slow one is stopped by it (clang: it hit hard).",
+       "inputs": [
+        {
+         "name": "foot",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "state",
+         "type": "int",
+         "value": 0
+        },
+        {
+         "name": "pos",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "yaw",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "velocity",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "halfLength",
+         "type": "float",
+         "value": 1.88
+        },
+        {
+         "name": "halfWidth",
+         "type": "float",
+         "value": 0.86
+        },
+        {
+         "name": "mass",
+         "type": "float",
+         "value": 1000
+        }
+       ],
+       "outputs": [
+        {
+         "name": "hit",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "topple",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "impulse",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "clang",
+         "type": "bool",
+         "value": false
+        }
+       ],
+       "locals": [
+        {
+         "name": "D",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "N",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "V",
+         "type": "vector",
+         "value": [
+          0,
+          0,
+          0
+         ]
+        },
+        {
+         "name": "Toward",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": 7,
+   "name": "Sirens",
+   "folder": "Rules",
+   "transform": {
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     1
+    ]
+   },
+   "components": {
+    "logic": {
+     "kind": "kern-logic",
+     "version": 1,
+     "nextId": 48,
+     "variables": [
+      {
+       "name": "HornLow",
+       "type": "float",
+       "value": 466.16,
+       "help": "police_sirens.mjs: the cruisers' two-tone horn, B flat 4 ..."
+      },
+      {
+       "name": "HornHigh",
+       "type": "float",
+       "value": 622.25,
+       "help": "... and E flat 5"
+      },
+      {
+       "name": "HornToneS",
+       "type": "float",
+       "value": 0.66,
+       "help": "Seconds each tone lasts"
+      },
+      {
+       "name": "CarGain",
+       "type": "float",
+       "value": 0.06
+      },
+      {
+       "name": "DroneGain",
+       "type": "float",
+       "value": 0.032
+      },
+      {
+       "name": "AudibleM",
+       "type": "float",
+       "value": 260,
+       "help": "Beyond this distance (m) a siren is silent"
+      },
+      {
+       "name": "SoundMps",
+       "type": "float",
+       "value": 343,
+       "help": "Speed of sound (m/s), for the Doppler shift"
+      },
+      {
+       "name": "WhoopBase",
+       "type": "float",
+       "value": 760,
+       "help": "The police drones' whoop starts at this pitch (Hz)"
+      },
+      {
+       "name": "OrganicRates",
+       "type": "float_list",
+       "value": [
+        1,
+        0.94,
+        1.16
+       ],
+       "help": "Playback rate of the crack for each Organic, in its order"
+      },
+      {
+       "name": "OrganicGain",
+       "type": "float",
+       "value": 0.34
+      },
+      {
+       "name": "OrganicMinGapS",
+       "type": "float",
+       "value": 0.024,
+       "help": "Seconds between two cracks at least"
+      }
+     ],
+     "enums": [
+      {
+       "name": "Organic",
+       "values": [
+        "person",
+        "animal",
+        "bird"
+       ],
+       "help": "world_organic_hit_audio.mjs: what died"
+      }
+     ],
+     "nodes": [
+      {
+       "id": 1,
+       "type": "func.entry",
+       "x": 0,
+       "y": 0,
+       "params": {
+        "function": "HornHz"
+       }
+      },
+      {
+       "id": 2,
+       "type": "func.return",
+       "x": 280,
+       "y": 0,
+       "params": {
+        "function": "HornHz"
+       }
+      },
+      {
+       "id": 3,
+       "type": "math.formula",
+       "x": 160,
+       "y": 150,
+       "params": {
+        "formula": "floor(t / tone) % 2 != 0 ? high : low"
+       }
+      },
+      {
+       "id": 4,
+       "type": "var.get",
+       "x": 160,
+       "y": 240,
+       "params": {
+        "variable": "HornToneS"
+       }
+      },
+      {
+       "id": 5,
+       "type": "var.get",
+       "x": 160,
+       "y": 330,
+       "params": {
+        "variable": "HornHigh"
+       }
+      },
+      {
+       "id": 6,
+       "type": "var.get",
+       "x": 160,
+       "y": 420,
+       "params": {
+        "variable": "HornLow"
+       }
+      },
+      {
+       "id": 7,
+       "type": "func.entry",
+       "x": 0,
+       "y": 560,
+       "params": {
+        "function": "WhoopHz"
+       }
+      },
+      {
+       "id": 8,
+       "type": "func.return",
+       "x": 280,
+       "y": 560,
+       "params": {
+        "function": "WhoopHz"
+       }
+      },
+      {
+       "id": 9,
+       "type": "math.formula",
+       "x": 160,
+       "y": 710,
+       "params": {
+        "formula": "max(0, t) % 1.05 / 0.7 >= 1 ? base : base + 720 * sin(max(0, t) % 1.05 / 0.7 * 1.5707963267948966) ^ 1.4"
+       }
+      },
+      {
+       "id": 10,
+       "type": "var.get",
+       "x": 160,
+       "y": 800,
+       "params": {
+        "variable": "WhoopBase"
+       }
+      },
+      {
+       "id": 11,
+       "type": "func.entry",
+       "x": 0,
+       "y": 940,
+       "params": {
+        "function": "SirenGain"
+       }
+      },
+      {
+       "id": 12,
+       "type": "func.return",
+       "x": 280,
+       "y": 940,
+       "params": {
+        "function": "SirenGain"
+       }
+      },
+      {
+       "id": 13,
+       "type": "math.formula",
+       "x": 160,
+       "y": 1090,
+       "params": {
+        "formula": "d >= 0 && d < audible ? base * level / (1 + (d / 14) ^ 1.25) : 0"
+       }
+      },
+      {
+       "id": 14,
+       "type": "var.get",
+       "x": 160,
+       "y": 1180,
+       "params": {
+        "variable": "AudibleM"
+       }
+      },
+      {
+       "id": 15,
+       "type": "func.entry",
+       "x": 0,
+       "y": 1320,
+       "params": {
+        "function": "SirenCutoff"
+       }
+      },
+      {
+       "id": 16,
+       "type": "func.return",
+       "x": 280,
+       "y": 1320,
+       "params": {
+        "function": "SirenCutoff"
+       }
+      },
+      {
+       "id": 17,
+       "type": "math.clamp",
+       "x": 160,
+       "y": 1470,
+       "values": {
+        "min": 900,
+        "max": 5200
+       }
+      },
+      {
+       "id": 18,
+       "type": "math.sub",
+       "x": 160,
+       "y": 1560,
+       "values": {
+        "a": 5200
+       }
+      },
+      {
+       "id": 19,
+       "type": "math.mul",
+       "x": 160,
+       "y": 1650,
+       "values": {
+        "b": 16
+       }
+      },
+      {
+       "id": 20,
+       "type": "func.entry",
+       "x": 0,
+       "y": 1790,
+       "params": {
+        "function": "VoiceUpdate"
+       }
+      },
+      {
+       "id": 21,
+       "type": "flow.branch",
+       "x": 280,
+       "y": 1790
+      },
+      {
+       "id": 22,
+       "type": "logic.or",
+       "x": 160,
+       "y": 1940
+      },
+      {
+       "id": 23,
+       "type": "math.compare",
+       "x": 160,
+       "y": 2030,
+       "params": {
+        "op": "<"
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 24,
+       "type": "math.compare",
+       "x": 160,
+       "y": 2120,
+       "params": {
+        "op": ">="
+       }
+      },
+      {
+       "id": 25,
+       "type": "var.get",
+       "x": 160,
+       "y": 2210,
+       "params": {
+        "variable": "AudibleM"
+       }
+      },
+      {
+       "id": 26,
+       "type": "func.return",
+       "x": 560,
+       "y": 1790,
+       "params": {
+        "function": "VoiceUpdate"
+       },
+       "values": {
+        "gain": 0,
+        "haveD": false
+       }
+      },
+      {
+       "id": 27,
+       "type": "var.set",
+       "x": 840,
+       "y": 1790,
+       "params": {
+        "variable": "Shift",
+        "scope": "VoiceUpdate"
+       }
+      },
+      {
+       "id": 28,
+       "type": "flow.branch",
+       "x": 1120,
+       "y": 1790
+      },
+      {
+       "id": 29,
+       "type": "logic.and",
+       "x": 1000,
+       "y": 1940
+      },
+      {
+       "id": 30,
+       "type": "math.compare",
+       "x": 1000,
+       "y": 2030,
+       "params": {
+        "op": ">"
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 31,
+       "type": "var.set",
+       "x": 1400,
+       "y": 1790,
+       "params": {
+        "variable": "Shift",
+        "scope": "VoiceUpdate"
+       }
+      },
+      {
+       "id": 32,
+       "type": "math.formula",
+       "x": 1280,
+       "y": 1940,
+       "params": {
+        "formula": "doppler + (sound / (sound + clamp((d - last) / dt, -60, 60)) - doppler) * min(1, dt * 4)"
+       }
+      },
+      {
+       "id": 33,
+       "type": "var.get",
+       "x": 1280,
+       "y": 2030,
+       "params": {
+        "variable": "SoundMps"
+       }
+      },
+      {
+       "id": 34,
+       "type": "func.return",
+       "x": 1680,
+       "y": 1790,
+       "params": {
+        "function": "VoiceUpdate"
+       },
+       "values": {
+        "haveD": true
+       }
+      },
+      {
+       "id": 35,
+       "type": "func.pure",
+       "x": 1560,
+       "y": 1940,
+       "params": {
+        "function": "SirenGain"
+       }
+      },
+      {
+       "id": 36,
+       "type": "var.get",
+       "x": 1560,
+       "y": 2030,
+       "params": {
+        "variable": "Shift",
+        "scope": "VoiceUpdate"
+       }
+      },
+      {
+       "id": 37,
+       "type": "func.entry",
+       "x": 0,
+       "y": 2350,
+       "params": {
+        "function": "PostArrivalGraceMs"
+       }
+      },
+      {
+       "id": 38,
+       "type": "func.return",
+       "x": 280,
+       "y": 2350,
+       "params": {
+        "function": "PostArrivalGraceMs"
+       }
+      },
+      {
+       "id": 39,
+       "type": "math.max",
+       "x": 160,
+       "y": 2500,
+       "values": {
+        "a": 450
+       }
+      },
+      {
+       "id": 40,
+       "type": "math.sub",
+       "x": 160,
+       "y": 2590,
+       "values": {
+        "a": 720
+       }
+      },
+      {
+       "id": 41,
+       "type": "math.mul",
+       "x": 160,
+       "y": 2680,
+       "values": {
+        "b": 45
+       }
+      },
+      {
+       "id": 42,
+       "type": "math.clamp",
+       "x": 160,
+       "y": 2770,
+       "values": {
+        "min": 1,
+        "max": 5
+       }
+      },
+      {
+       "id": 43,
+       "type": "func.entry",
+       "x": 0,
+       "y": 2910,
+       "params": {
+        "function": "OrganicRate"
+       }
+      },
+      {
+       "id": 44,
+       "type": "func.return",
+       "x": 280,
+       "y": 2910,
+       "params": {
+        "function": "OrganicRate"
+       }
+      },
+      {
+       "id": 45,
+       "type": "list.get",
+       "x": 160,
+       "y": 3060,
+       "params": {
+        "type": "float"
+       }
+      },
+      {
+       "id": 46,
+       "type": "var.get",
+       "x": 160,
+       "y": 3150,
+       "params": {
+        "variable": "OrganicRates"
+       }
+      },
+      {
+       "id": 47,
+       "type": "enum.index",
+       "x": 160,
+       "y": 3240,
+       "params": {
+        "enum": "Organic"
+       }
+      }
+     ],
+     "links": [
+      [
+       1,
+       "t",
+       3,
+       "t"
+      ],
+      [
+       1,
+       "then",
+       2,
+       "exec"
+      ],
+      [
+       3,
+       "result",
+       2,
+       "hz"
+      ],
+      [
+       4,
+       "value",
+       3,
+       "tone"
+      ],
+      [
+       5,
+       "value",
+       3,
+       "high"
+      ],
+      [
+       6,
+       "value",
+       3,
+       "low"
+      ],
+      [
+       7,
+       "t",
+       9,
+       "t"
+      ],
+      [
+       7,
+       "then",
+       8,
+       "exec"
+      ],
+      [
+       9,
+       "result",
+       8,
+       "hz"
+      ],
+      [
+       10,
+       "value",
+       9,
+       "base"
+      ],
+      [
+       11,
+       "base",
+       13,
+       "base"
+      ],
+      [
+       11,
+       "d",
+       13,
+       "d"
+      ],
+      [
+       11,
+       "level",
+       13,
+       "level"
+      ],
+      [
+       11,
+       "then",
+       12,
+       "exec"
+      ],
+      [
+       13,
+       "result",
+       12,
+       "gain"
+      ],
+      [
+       14,
+       "value",
+       13,
+       "audible"
+      ],
+      [
+       15,
+       "d",
+       19,
+       "a"
+      ],
+      [
+       15,
+       "then",
+       16,
+       "exec"
+      ],
+      [
+       17,
+       "result",
+       16,
+       "hz"
+      ],
+      [
+       18,
+       "result",
+       17,
+       "value"
+      ],
+      [
+       19,
+       "result",
+       18,
+       "b"
+      ],
+      [
+       20,
+       "base",
+       35,
+       "base"
+      ],
+      [
+       20,
+       "d",
+       23,
+       "a"
+      ],
+      [
+       20,
+       "d",
+       24,
+       "a"
+      ],
+      [
+       20,
+       "d",
+       32,
+       "d"
+      ],
+      [
+       20,
+       "d",
+       34,
+       "lastD"
+      ],
+      [
+       20,
+       "d",
+       35,
+       "d"
+      ],
+      [
+       20,
+       "doppler",
+       26,
+       "doppler"
+      ],
+      [
+       20,
+       "doppler",
+       27,
+       "value"
+      ],
+      [
+       20,
+       "doppler",
+       32,
+       "doppler"
+      ],
+      [
+       20,
+       "dt",
+       30,
+       "a"
+      ],
+      [
+       20,
+       "dt",
+       32,
+       "dt"
+      ],
+      [
+       20,
+       "haveD",
+       29,
+       "a"
+      ],
+      [
+       20,
+       "lastD",
+       26,
+       "lastD"
+      ],
+      [
+       20,
+       "lastD",
+       32,
+       "last"
+      ],
+      [
+       20,
+       "level",
+       35,
+       "level"
+      ],
+      [
+       20,
+       "then",
+       21,
+       "exec"
+      ],
+      [
+       21,
+       "false",
+       27,
+       "exec"
+      ],
+      [
+       21,
+       "true",
+       26,
+       "exec"
+      ],
+      [
+       22,
+       "result",
+       21,
+       "condition"
+      ],
+      [
+       23,
+       "result",
+       22,
+       "a"
+      ],
+      [
+       24,
+       "result",
+       22,
+       "b"
+      ],
+      [
+       25,
+       "value",
+       24,
+       "b"
+      ],
+      [
+       27,
+       "then",
+       28,
+       "exec"
+      ],
+      [
+       28,
+       "false",
+       34,
+       "exec"
+      ],
+      [
+       28,
+       "true",
+       31,
+       "exec"
+      ],
+      [
+       29,
+       "result",
+       28,
+       "condition"
+      ],
+      [
+       30,
+       "result",
+       29,
+       "b"
+      ],
+      [
+       31,
+       "then",
+       34,
+       "exec"
+      ],
+      [
+       32,
+       "result",
+       31,
+       "value"
+      ],
+      [
+       33,
+       "value",
+       32,
+       "sound"
+      ],
+      [
+       35,
+       "gain",
+       34,
+       "gain"
+      ],
+      [
+       36,
+       "value",
+       34,
+       "doppler"
+      ],
+      [
+       37,
+       "stars",
+       42,
+       "value"
+      ],
+      [
+       37,
+       "then",
+       38,
+       "exec"
+      ],
+      [
+       39,
+       "result",
+       38,
+       "ms"
+      ],
+      [
+       40,
+       "result",
+       39,
+       "b"
+      ],
+      [
+       41,
+       "result",
+       40,
+       "b"
+      ],
+      [
+       42,
+       "result",
+       41,
+       "a"
+      ],
+      [
+       43,
+       "kind",
+       47,
+       "value"
+      ],
+      [
+       43,
+       "then",
+       44,
+       "exec"
+      ],
+      [
+       45,
+       "item",
+       44,
+       "rate"
+      ],
+      [
+       46,
+       "value",
+       45,
+       "list"
+      ],
+      [
+       47,
+       "index",
+       45,
+       "index"
+      ]
+     ],
+     "machines": [],
+     "functions": [
+      {
+       "name": "HornHz",
+       "pure": true,
+       "help": "Pitch of the horn at a time: the two tones in turn",
+       "inputs": [
+        {
+         "name": "t",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "hz",
+         "type": "float",
+         "value": 466.16
+        }
+       ]
+      },
+      {
+       "name": "WhoopHz",
+       "pure": true,
+       "help": "The drone whoop: from the base 720 Hz up over 0.7 s with an easing, then low until 1.05 s",
+       "inputs": [
+        {
+         "name": "t",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "hz",
+         "type": "float",
+         "value": 760
+        }
+       ]
+      },
+      {
+       "name": "SirenGain",
+       "pure": true,
+       "help": "Level at a distance (silent beyond AudibleM): base * level / (1 + (d / 14)^1.25)",
+       "inputs": [
+        {
+         "name": "base",
+         "type": "float",
+         "value": 0.06
+        },
+        {
+         "name": "d",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "level",
+         "type": "float",
+         "value": 1
+        }
+       ],
+       "outputs": [
+        {
+         "name": "gain",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "SirenCutoff",
+       "pure": true,
+       "help": "Low-pass cutoff for air absorption: 5200 - 16 d, 900 .. 5200 Hz",
+       "inputs": [
+        {
+         "name": "d",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "hz",
+         "type": "float",
+         "value": 5200
+        }
+       ]
+      },
+      {
+       "name": "VoiceUpdate",
+       "pure": true,
+       "help": "One siren voice at distance d (below 0: no unit in range): its level, and the Doppler shift from the change of distance, smoothed - no chirp when the nearest unit changes",
+       "inputs": [
+        {
+         "name": "d",
+         "type": "float",
+         "value": -1
+        },
+        {
+         "name": "dt",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "base",
+         "type": "float",
+         "value": 0.06
+        },
+        {
+         "name": "level",
+         "type": "float",
+         "value": 1
+        },
+        {
+         "name": "haveD",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "lastD",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "doppler",
+         "type": "float",
+         "value": 1
+        }
+       ],
+       "outputs": [
+        {
+         "name": "gain",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "haveD",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "lastD",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "doppler",
+         "type": "float",
+         "value": 1
+        }
+       ],
+       "locals": [
+        {
+         "name": "Shift",
+         "type": "float",
+         "value": 1
+        }
+       ]
+      },
+      {
+       "name": "PostArrivalGraceMs",
+       "pure": true,
+       "help": "wanted_dispatch_guard.mjs: after the police drones are revealed, a grace before the first shot: max(450, 720 - 45 * stars) ms",
+       "inputs": [
+        {
+         "name": "stars",
+         "type": "int",
+         "value": 1
+        }
+       ],
+       "outputs": [
+        {
+         "name": "ms",
+         "type": "float",
+         "value": 675
+        }
+       ]
+      },
+      {
+       "name": "OrganicRate",
+       "pure": true,
+       "help": "Playback rate of the crack when a person, an animal or a bird dies",
+       "inputs": [
+        {
+         "name": "kind",
+         "type": "enum",
+         "of": "Organic",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "rate",
+         "type": "float",
+         "value": 1
         }
        ]
       }

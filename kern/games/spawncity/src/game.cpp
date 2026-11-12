@@ -1,5 +1,7 @@
 // SpawnCity on Kern: world, modes, fixed-step hook, cameras (see game.h).
+#include "gaps_rules.h"
 #include "jet_seats.h"
+#include "lamps.h"
 #include "spawn_guard.h"
 #include "game.h"
 #include "world_traffic.h"
@@ -278,6 +280,12 @@ bool Game::start(kern::Engine& e) {
     kern::logic::Instance* jet_seats = logic ? logic->find(world_->find_actor("JetSeats")) : nullptr;
     if (!jet_seats || jet_seats->disabled()) return kern::fail("the level's Blueprint \"JetSeats\" is missing or has errors");
     seats::bind(jet_seats);
+    kern::logic::Instance* lamp_rules = logic ? logic->find(world_->find_actor("Lamps")) : nullptr;
+    if (!lamp_rules || lamp_rules->disabled()) return kern::fail("the level's Blueprint \"Lamps\" is missing or has errors");
+    lamps::bind(lamp_rules);
+    kern::logic::Instance* sirens = logic ? logic->find(world_->find_actor("Sirens")) : nullptr;
+    if (!sirens || sirens->disabled()) return kern::fail("the level's Blueprint \"Sirens\" is missing or has errors");
+    gaps::bind_sirens(sirens);
   }
   soldier_ = world_->find_actor("Player");
   drone_actor_ = world_->find_actor("Drone");

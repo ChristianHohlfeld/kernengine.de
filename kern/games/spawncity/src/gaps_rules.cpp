@@ -4,36 +4,43 @@
 #include <algorithm>
 #include <cmath>
 
+#include "blueprint_call.h"
+
 namespace sc::gaps {
 
-// ---- police_sirens.mjs
-f32 horn_hz(f32 t) { return static_cast<i64>(std::floor(t / kHornToneS)) % 2 ? kHornHigh : kHornLow; }
+// ---- police_sirens.mjs, the dispatch grace, the organic crack: the Blueprint of the actor "Sirens"
+namespace {
+using kern::logic::Value;
+rules::Blueprint g_sirens;
+f32 num(const char* function, const std::vector<Value>& args) { return static_cast<f32>(g_sirens.number(function, args)); }
+}  // namespace
+void bind_sirens(kern::logic::Instance* blueprint) { g_sirens.running = blueprint; }
+f32 horn_low() { return static_cast<f32>(g_sirens.variable("HornLow")); }
+f32 horn_high() { return static_cast<f32>(g_sirens.variable("HornHigh")); }
+f32 car_gain() { return static_cast<f32>(g_sirens.variable("CarGain")); }
+f32 drone_gain() { return static_cast<f32>(g_sirens.variable("DroneGain")); }
+f32 whoop_base() { return static_cast<f32>(g_sirens.variable("WhoopBase")); }
+f32 organic_gain() { return static_cast<f32>(g_sirens.variable("OrganicGain")); }
+f32 organic_min_gap_s() { return static_cast<f32>(g_sirens.variable("OrganicMinGapS")); }
 
-f32 whoop_hz(f32 t) {
-  const f32 u = std::fmod(std::fmax(0.0f, t), 1.05f) / 0.7f;
-  return u >= 1 ? kWhoopBase : kWhoopBase + 720 * std::pow(std::sin(u * kPi / 2), 1.4f);
-}
-
-f32 siren_gain(f32 base, f32 d, f32 level) {
-  if (!(d >= 0) || d >= kAudibleM) return 0;
-  return base * level / (1 + std::pow(d / 14, 1.25f));
-}
-
-f32 siren_cutoff(f32 d) { return clampf(5200 - d * 16, 900, 5200); }
+f32 horn_hz(f32 t) { return num("HornHz", {Value::number(t)}); }
+f32 whoop_hz(f32 t) { return num("WhoopHz", {Value::number(t)}); }
+f32 siren_gain(f32 base, f32 d, f32 level) { return num("SirenGain", {Value::number(base), Value::number(d), Value::number(level)}); }
+f32 siren_cutoff(f32 d) { return num("SirenCutoff", {Value::number(d)}); }
 
 f32 SirenVoice::update(f32 d, f32 dt, f32 base, f32 level) {
-  if (d < 0 || d >= kAudibleM) { have_d = false; return 0; }
-  if (have_d && dt > 0) {
-    const f32 vr = clampf((d - last_d) / dt, -60, 60);
-    doppler += (kSoundMps / (kSoundMps + vr) - doppler) * std::fmin(1.0f, dt * 4);
-  }
-  last_d = d;
-  have_d = true;
-  return siren_gain(base, d, level);
+  std::vector<Value> r;
+  if (!g_sirens.call("VoiceUpdate", {Value::number(d), Value::number(dt), Value::number(base), Value::number(level), Value::boolean(have_d), Value::number(last_d), Value::number(doppler)}, r) ||
+      r.size() < 4)
+    return 0;
+  have_d = r[1].b;
+  last_d = static_cast<f32>(r[2].as_number());
+  doppler = static_cast<f32>(r[3].as_number());
+  return static_cast<f32>(r[0].as_number());
 }
 
-// ---- dispatch
-f32 post_arrival_grace_ms(i32 stars) { return std::fmax(450.0f, 720.0f - static_cast<f32>(std::clamp(stars, 1, 5)) * 45); }
+f32 post_arrival_grace_ms(i32 stars) { return num("PostArrivalGraceMs", {Value::integer(stars)}); }
+f32 organic_rate(Organic k) { return num("OrganicRate", {rules::of_enum(k)}); }
 
 // ---- world_critical_damage_fx.mjs
 u32 hash_text(const std::string& s) {
@@ -215,6 +222,5 @@ void VisualPose::update(Vec3 position, Quat rotation, Vec3 anchor, i32 mode, f32
 }
 
 // ---- organic hit
-f32 organic_rate(Organic k) { return k == Organic::bird ? 1.16f : k == Organic::animal ? 0.94f : 1.0f; }
 
 }  // namespace sc::gaps
