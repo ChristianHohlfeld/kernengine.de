@@ -17,7 +17,6 @@ namespace sc {
 
 namespace {
 constexpr f64 kSyncMs = 120, kSilentMs = 2500, kFallenMs = 1500;
-constexpr f32 kZombieHit = 34;  // zombie_nights.mjs HIT_DMG
 constexpr f32 kPoliceDroneHit = 34, kCruiserHit = 22;  // wanted_police_drones.mjs POLICE_HIT_DAMAGE, police_ground_units.mjs CAR_HIT
 // the zombies' and soldiers' colours (game_events.cpp / game_military.cpp)
 const Vec3 kZSkin[4] = {{0.54f, 0.6f, 0.47f}, {0.49f, 0.55f, 0.44f}, {0.58f, 0.63f, 0.51f}, {0.44f, 0.49f, 0.4f}};
@@ -289,7 +288,7 @@ bool Game::swarm_person_hit(i32 person, f32 damage) {
     for (RemoteUnit& u : sw.units) {
       if (u.person != person) continue;
       if (u.kind != net::SwarmKind::zombie && u.kind != net::SwarmKind::soldier) return true;  // (an officer, an enemy: People noted the hit - swarm_update sends it)
-      const f32 dmg = u.kind == net::SwarmKind::zombie ? kZombieHit : combat::kMilHit;
+      const f32 dmg = u.kind == net::SwarmKind::zombie ? combat::kZombieHit : combat::kMilHit;
       net_.send_swarm_hit(owner, u.id, u.kind, dmg);
       if (u.kind == net::SwarmKind::zombie) combat_.zombies.points += combat::kZombieHitPts;  // addPoints(HIT_PTS) for the shooter
       people_.at(person).hp = kRemoteHp;

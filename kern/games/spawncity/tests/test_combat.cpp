@@ -1,11 +1,31 @@
 // Combat and event rules with SpawnCity's numbers (combat_rules.h).
 #include "../src/combat_rules.h"
+#include "rule_blueprint.h"
 #include "test_util.h"
 
 using namespace sc;
 using namespace sc::combat;
 
+namespace {
+/// The five rule actors of the level, bound for a test.
+struct CombatBlueprints {
+  sc::RuleBlueprint military{"Military", [](kern::logic::Instance* i) { sc::combat::bind_military(i); }};
+  sc::RuleBlueprint zombies{"Zombies", [](kern::logic::Instance* i) { sc::combat::bind_zombies(i); }};
+  sc::RuleBlueprint sandbox{"Sandbox", [](kern::logic::Instance* i) { sc::combat::bind_sandbox(i); }};
+  sc::RuleBlueprint fun{"Fun", [](kern::logic::Instance* i) { sc::combat::bind_fun(i); }};
+  sc::RuleBlueprint race{"Race", [](kern::logic::Instance* i) { sc::combat::bind_race(i); }};
+};
+}  // namespace
+
 SC_TEST(combat_military_escalation) {
+  CombatBlueprints rules;
+  for (const sc::RuleBlueprint* bp : {&rules.military, &rules.zombies, &rules.sandbox, &rules.fun, &rules.race}) {
+    SC_CHECK(bp->inst && bp->problems.empty() && !bp->inst->disabled(), "a combat rule Blueprint of the level compiles and runs: %s", bp->problems.c_str());
+    SC_CHECK(bp->inst && std::string(bp->inst->tier()) == "native C++", "it runs as its C++ class");
+  }
+  SC_CHECK(sc::combat::bind_military(rules.military.inst) && sc::combat::bind_zombies(rules.zombies.inst) && sc::combat::bind_sandbox(rules.sandbox.inst) &&
+               sc::combat::bind_fun(rules.fun.inst) && sc::combat::bind_race(rules.race.inst),
+           "the game reads their tables");
   MilitaryClock m;
   SC_CHECK(m.update(0, 5, 40) == MilEvent::none, "five stars just reached: no army yet");
   SC_CHECK(m.update(39, 5, 40) == MilEvent::none, "held 39 s: still none");
@@ -22,6 +42,7 @@ SC_TEST(combat_military_escalation) {
 }
 
 SC_TEST(combat_flak_cells) {
+  CombatBlueprints rules;
   u32 seed = 0, seed2 = 0;
   int guns = 0;
   for (int x = -20; x < 20; ++x)
@@ -33,6 +54,7 @@ SC_TEST(combat_flak_cells) {
 }
 
 SC_TEST(combat_tempers) {
+  CombatBlueprints rules;
   int aggressive = 0, runner = 0, knife = 0, gun = 0;
   for (u32 i = 1; i <= 20000; ++i) {
     const u32 seed = i * 2654435761u;
@@ -50,6 +72,7 @@ SC_TEST(combat_tempers) {
 }
 
 SC_TEST(combat_zombie_rounds) {
+  CombatBlueprints rules;
   ZombieRounds z;
   SC_CHECK(z.update(0, false, 0) == ZombieEvent::none && !z.active, "day: nothing");
   SC_CHECK(z.update(1, true, 0) == ZombieEvent::night && z.round == 1 && z.to_spawn == 10, "night: round 1 with 6 + 4 zombies");
@@ -64,6 +87,7 @@ SC_TEST(combat_zombie_rounds) {
 }
 
 SC_TEST(combat_fun_bank) {
+  CombatBlueprints rules;
   Fun f;
   std::string l = f.apply(FunEvent::police_kill, 1, 2);
   SC_CHECK(f.at_risk == 650 && f.score == 0, "drone down at 2 stars: 430 x 1.5 = 650 at risk (%d)", f.at_risk);
@@ -80,6 +104,7 @@ SC_TEST(combat_fun_bank) {
 }
 
 SC_TEST(combat_chaos_combo) {
+  CombatBlueprints rules;
   Chaos c;
   c.award(250, 0);
   c.award(250, 1);
@@ -95,6 +120,7 @@ SC_TEST(combat_chaos_combo) {
 }
 
 SC_TEST(combat_race_gates) {
+  CombatBlueprints rules;
   Race r;
   const Gate& g0 = gate(0);
   Vec2 n, right;

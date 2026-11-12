@@ -1,5 +1,7 @@
 // The controls: curves, dead zones, latches and the touch controls against spawncity.de's numbers
 // (controls.h / touch_play.h, CONTROLS.md).
+#include <chrono>
+#include <cstdio>
 #include <string>
 
 #include "../src/controls.h"
@@ -257,4 +259,25 @@ SC_TEST(controls_aim_assist) {
   SC_CHECK(near(fps_aim_assist(0, 0, 8, 1, 1, 0, 1).slowdown, 0.7f), "on the target: slowdown 1 - .30");
   const AimAssist away = fps_aim_assist(0.05f, 0, 8, 1, -1, 0, 1);
   SC_CHECK(away.yaw < a.yaw, "moving away tracks less (%g < %g)", away.yaw, a.yaw);
+}
+
+// What asking the Blueprint costs (printed; `SC_TEST_RELEASE=1 run_tests.sh controls_call_cost` for
+// the times of a build like the game's): a single formula, a function with a loop and a second
+// function inside, and one that takes and returns a struct.
+SC_TEST(controls_call_cost) {
+  RuleBlueprint bp("Controls", &controls::bind);
+  auto ns = [](auto&& call) {
+    const int rounds = 20000;
+    f32 sum = 0;
+    const auto t0 = std::chrono::steady_clock::now();
+    for (int i = 0; i < rounds; ++i) sum += call(static_cast<f32>(i % 100) / 100);
+    const f64 each = std::chrono::duration<f64, std::nano>(std::chrono::steady_clock::now() - t0).count() / rounds;
+    return std::pair<f64, f32>(each, sum);
+  };
+  const auto axis = ns([](f32 x) { return gamepad_axis(x); });
+  const auto stick = ns([](f32 x) { return shape_fps_stick(x, 0.2f, 0.05f, 0.27f).x; });
+  GrenadeCook g;
+  const auto cook = ns([&g](f32 x) { return g.step(x) ? 1.0f : 0.0f; });
+  std::printf("     Controls as its C++ class, per call: GamepadAxis %.0f ns, ShapeFpsStick %.0f ns, GrenadeStep %.0f ns\n", axis.first, stick.first, cook.first);
+  SC_CHECK(axis.second > 0 && stick.second > 0 && axis.first < 1e6 && stick.first < 1e6 && cook.first < 1e6, "the calls answer");
 }

@@ -7,6 +7,10 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-12",time:"10:53",title:"Armee, Zombies, Gegner, Aufträge und Rennen als Blueprints",items:[
+    "Unter der Haube: Fünf weitere Regelwerke stehen jetzt als Blueprints im Level – „Military“ (wann die Armee kommt und geht, Trefferchancen, Flak, Jagdbomber, wie Passanten auf Gewalt reagieren), „Zombies“ (die Runden der Zombienächte), „Sandbox“ (die Gegner und der Chaos-Score), „Fun“ (Punkte auf Risiko und die Aufträge) und „Race“ (Tore, Runden, Bestzeit). Am Spiel ändert sich dadurch nichts.",
+    "Gegner, Aufträge und Renntore sind dabei Datentabellen, die sich im Kern-Editor als Tabelle bearbeiten lassen.",
+  ]},
   {date:"2026-11-12",time:"10:17",title:"Jetpack und Verkehrsregeln als Blueprint",items:[
     "Unter der Haube: Das Jetpack – Schubstoß, Halten, Steiggrenze, das Abfangen vor einer harten Landung und das Nachfüllen – steht jetzt als Blueprint „Jetpack“ im Level. Am Spiel ändert sich dadurch nichts.",
     "Ebenso die Gesetze des Verkehrs: Ampelphasen, wann ein Fahrer bei Gelb noch hält, wie weit er für Leute bremst, wann er hupt und welchen Abstand er hält – jetzt der Blueprint „Traffic“.",

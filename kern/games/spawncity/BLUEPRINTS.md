@@ -256,6 +256,23 @@ In dieser Reihenfolge (klein nach groß; jede Datei verschwindet, ihre Tests ble
   der Straßen und die Schleifen über Autos und Leute (wer wo ist, wer eine Kreuzung hält) und
   fragt die Gesetze je Auto; je Paar Auto–Passant wird kein Blueprint gerufen (das wären
   tausende Aufrufe je Bild). Diese Schleifen sind ein System (Stufe 4).
+- [x] **`combat_rules`** – fünf Actors:
+  **„Military“** (die Uhr der Armee als Funktion Update über der Struktur Clock, die
+  Trefferchancen von Hubschrauber, Soldat und Gangster, der Streufehler des Panzers, Flak,
+  Jagdbomber-Timing, wer von den Passanten flieht, rennt oder zurückschlägt – und 47 Zahlen als
+  Variablen), **„Zombies“** (die Runden der Zombienächte: Update, Spawned, NextRound, Hp, Speed),
+  **„Sandbox“** (die Gegner als Datentabelle Enemies, ChooseEnemy, Budget, EnemyHitChance und der
+  Chaos-Score mit Combo), **„Fun“** (Punkte auf Risiko: die Aufträge als Datentabelle Contracts,
+  die Struktur Run mit 18 Feldern, Apply für jedes der zwölf Ereignisse, Multiplier) und
+  **„Race“** (die Tore als Datentabelle Gates, GateAxes, Crossed, Update über Runden und
+  Bestzeit). `combat_rules.cpp` rechnet nichts mehr außer den Hashes, die einer Zelle oder einer
+  Person ihre eigene Zufallszahl geben. Die Zahlen, die das Spiel überall liest
+  (`combat::kJetSpeed` …), sind keine C++-Konstanten mehr, sondern die Variablen der Blueprints,
+  beim Binden gelesen. Eine doppelte Zahl (der Zombie-Treffer stand zweimal im C++) ist weg.
+- **Gemessen** (wie das Spiel gebaut, -O2, `SC_TEST_RELEASE=1 run_tests.sh controls_call_cost`):
+  Ein Aufruf einer Regel aus C++ kostet als Klasse rund 0,2 µs (eine Formel), 0,3 µs (mehrere
+  Knoten, eine Schleife, eine zweite Funktion) bis 0,7 µs (eine Struktur hinein und heraus). Je
+  Bild sind das für die Steuerung und den Verkehr zusammen weit unter einer Millisekunde.
 - Geschrieben wird so ein Regel-Blueprint als sein C++-Text und mit
   `tools/blueprint_cpp.sh --apply level.klevel <Actor> text.cpp` in das Level gelegt (dieselbe
   Lesart wie „Apply“ in der C++-Ansicht des Editors); das Level bleibt die eine Quelle.

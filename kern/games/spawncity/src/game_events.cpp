@@ -204,7 +204,7 @@ void Game::update_enemies(f32 dt) {
     if (e.person >= 0 && !e.retreat) { ++up; heavies += e.type == EnemyType::heavy; }
   if (stars > 0) {
     C.no_wanted_since = -1;
-    if (have && up < std::min(kMaxEnemies, kEnemyBudget[std::min(5, stars)]) && now - C.last_spawn > kEnemySpawnS) {
+    if (have && up < enemy_budget(stars) && now - C.last_spawn > kEnemySpawnS) {
       C.last_spawn = now;
       EnemyType type;
       choose_enemy(stars, rng_.unit(), heavies, type);

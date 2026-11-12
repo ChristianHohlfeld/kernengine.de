@@ -297,6 +297,13 @@ bool Game::start(kern::Engine& e) {
     kern::logic::Instance* traffic = logic ? logic->find(world_->find_actor("Traffic")) : nullptr;
     if (!traffic || traffic->disabled()) return kern::fail("the level's Blueprint \"Traffic\" is missing or has errors");
     TrafficRules::bind(traffic);
+    // the combat and event rules (combat_rules.h)
+    const struct { const char* actor; bool (*bind)(kern::logic::Instance*); } combat_rules[] = {
+        {"Military", &combat::bind_military}, {"Zombies", &combat::bind_zombies}, {"Sandbox", &combat::bind_sandbox}, {"Fun", &combat::bind_fun}, {"Race", &combat::bind_race}};
+    for (const auto& r : combat_rules) {
+      kern::logic::Instance* running = logic ? logic->find(world_->find_actor(r.actor)) : nullptr;
+      if (!running || running->disabled() || !r.bind(running)) return kern::fail("the level's Blueprint \"%s\" is missing, has errors or a table the game cannot read", r.actor);
+    }
   }
   ctl_.dev.platform(!coarse, coarse, coarse ? 5 : 0);  // the page reports the real device (game_controls.cpp)
   soldier_ = world_->find_actor("Player");

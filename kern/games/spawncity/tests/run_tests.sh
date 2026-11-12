@@ -3,11 +3,15 @@
 #   kern/games/spawncity/tests/run_tests.sh [name-filter]
 # CXX / CC override the compilers (default c++ / cc). Objects are cached in
 # $SC_TEST_OUT (default $TMPDIR/spawncity-tests); Kern itself is not modified.
+# SC_TEST_RELEASE=1 builds them as the game is built (-O2, no sanitizers; objects in
+# $SC_TEST_OUT-release): for the times a test prints, e.g. `SC_TEST_RELEASE=1 run_tests.sh details_blueprint`.
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 game="$(dirname "$here")"
 kern="$(cd "$game/../.." && pwd)"
 out="${SC_TEST_OUT:-${TMPDIR:-/tmp}/spawncity-tests}"
+build=(-O1 -g -fsanitize=address,undefined -fno-sanitize-recover=undefined) link=(-fsanitize=address,undefined)
+if [ "${SC_TEST_RELEASE:-}" = 1 ]; then build=(-O2) link=() out="$out-release"; fi
 cc="${CC:-cc}" cxx="${CXX:-c++}"
 mkdir -p "$out/box3d" "$out/musl" "$out/obj"
 objects=()
@@ -37,7 +41,7 @@ sources+=("$kern/tests/gl_stub.cpp")
 # Every game source that does not need GameWorld (not main.cpp, nothing that includes game.h).
 for f in "$game"/src/*.cpp; do [ "$(basename "$f")" = main.cpp ] || grep -q '#include "game.h"' "$f" || sources+=("$f"); done
 while IFS= read -r f; do sources+=("$f"); done < <(find "$here" -name 'test_*.cpp' | sort)
-flags=(-std=c++20 -O1 -g -ffp-contract=off -fno-exceptions -fno-rtti -fsanitize=address,undefined -fno-sanitize-recover=undefined
+flags=(-std=c++20 "${build[@]}" -ffp-contract=off -fno-exceptions -fno-rtti
        -Wall -Wextra -Wno-unused-parameter -I"$kern/include" -I"$kern/third_party/box3d/include" -I"$game/src" -I"$kern/tests")
 # Header changes rebuild everything (the cache key includes every header's content).
 key="$({ printf '%s ' "${flags[@]}"; find "$kern/include" "$game" -name '*.h' -o -name '*.hpp' | sort | xargs cat; } | sha256sum | cut -c1-12)"
@@ -48,7 +52,7 @@ printf '%s\n' "${sources[@]}" | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c '
   [ -f "$o" ] || "$cxx" "$@" -c "$src" -o "$o"' _ {} "${flags[@]}"
 cpp_objects=()
 for f in "${sources[@]}"; do cpp_objects+=("$out/obj/$(echo "$f" | sed "s|/|_|g")-$key-$(sha256sum "$f" | cut -c1-12).o"); done
-"$cxx" -fsanitize=address,undefined "${cpp_objects[@]}" "${objects[@]}" -lm -o "$out/spawncity_tests"
+"$cxx" "${link[@]}" "${cpp_objects[@]}" "${objects[@]}" -lm -o "$out/spawncity_tests"
 "$out/spawncity_tests" "$@"
 # The game's own sources - what includes game.h and is not linked into the tests - compile: a
 # rule's header that changed is caught here, not first by the game's build.
