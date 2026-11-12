@@ -10313,6 +10313,26 @@ TEST(studio_shortcuts_and_commands) {
   CHECK(!f.s->level().find(cube)->body.has_value());
   CHECK(f.cmd(R"({"cmd":"setWorld","path":"world.timeOfDay","value":0.5})")["ok"].as_bool());
   CHECK_NEAR(f.s->level().world.time_of_day, 0.5f, 1e-4f);
+  // Collision channels: the level names them, a collider's fields show the names (its bits are Box3D's category and mask).
+  CHECK(f.cmd(R"({"cmd":"setWorld","path":"world.channels","value":"World, Vehicle, Drone"})")["ok"].as_bool());
+  CHECK(f.s->level().world.channels == "World, Vehicle, Drone");
+  CHECK(f.cmd(R"({"cmd":"addComponent","type":"collider"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"set","path":"components.colliders.0.category","value":2})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"set","path":"components.colliders.0.mask","value":5})")["ok"].as_bool());
+  CHECK(f.s->level().find(cube)->colliders.size() == 1 && f.s->level().find(cube)->colliders[0].category == 2 && f.s->level().find(cube)->colliders[0].mask == 5);
+  {
+    const json::Value shown = f.s->state();
+    int channel_fields = 0;
+    for (const json::Value& sec : shown["details"]["sections"].items())
+      for (const json::Value& fd : sec["fields"].items())
+        if (fd["type"].as_string() == "channels") {
+          ++channel_fields;
+          CHECK(fd["names"].size() == 3 && fd["names"][1].as_string() == "Vehicle");
+          CHECK(fd["path"].as_string() == "components.colliders.0.category" ? fd["value"].as_number() == 2 : fd["value"].as_number() == 5);
+        }
+    CHECK(channel_fields == 2);
+  }
+  CHECK(f.cmd(R"({"cmd":"removeComponent","type":"collider","index":0})")["ok"].as_bool());
   // Details JSON lists the sections of the selection.
   const json::Value st = f.s->state();
   CHECK(st["details"]["sections"].size() >= 3);

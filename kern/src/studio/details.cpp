@@ -698,6 +698,7 @@ bool Studio::set_world_property(const std::string& path, const json::Value& valu
       return true;
     }
     json::Value w = game::world_to_json(l.world);
+    if (!w.find("channels")) w.set("channels", l.world.channels);  // (the level file leaves the default out)
     json::Value* target = at_path_mut(w, path.substr(6));
     if (!target) { error = "unknown world setting " + path; return false; }
     json::Value v = value;
