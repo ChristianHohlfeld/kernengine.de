@@ -1,12 +1,17 @@
-// The settings table: SpawnCity's defaults and ranges, the "set" parser, the stick curve.
+// The settings table: SpawnCity's defaults and ranges, the "set" parser.
 #include <string>
 
 #include "../src/settings.h"
+#include "rule_blueprint.h"
 #include "test_util.h"
 
 using namespace sc;
 
 SC_TEST(settings_defaults_and_ranges) {
+  RuleBlueprint bp("Settings", [](kern::logic::Instance* i) { bind_settings(i); });
+  SC_CHECK(bp.inst && bp.problems.empty() && !bp.inst->disabled(), "the level's Settings Blueprint compiles and runs: %s", bp.problems.c_str());
+  SC_CHECK(bp.inst && std::string(bp.inst->tier()) == "native C++", "it runs as its C++ class");
+  SC_CHECK(bind_settings(bp.inst), "its table has one row per setting");
   Settings s;
   SC_CHECK(s.get(Opt::mouse_sensitivity) == 100 && !s.on(Opt::mouse_invert_y), "mouse 100 %%, not inverted");
   SC_CHECK(s.get(Opt::drone_max_speed_kmh) == 90 && std::fabs(s.get(Opt::drone_hover_agl) - 1.2f) < 1e-6f, "drone 90 km/h, hover 1.2 m");
@@ -24,11 +29,4 @@ SC_TEST(settings_defaults_and_ranges) {
   SC_CHECK(s.get(Opt::mouse_sensitivity) == 100 && !s.on(Opt::world_people), "section reset keeps the others");
   const std::string schema = s.schema_json();
   SC_CHECK(schema.find("\"key\":\"world.jetpack\"") != std::string::npos && schema.front() == '[' && schema.back() == ']', "schema lists every row");
-}
-
-SC_TEST(settings_stick_curve) {
-  SC_CHECK(fineness_axis(1, 10) == 1 && fineness_axis(-1, 10) == -1, "full deflection stays full");
-  SC_CHECK(std::fabs(fineness_axis(0.5f, 1) - 0.5f) < 1e-6f, "level 1 is linear");
-  const f32 e = 0.70f * 0.38f;  // level 10
-  SC_CHECK(std::fabs(fineness_axis(0.5f, 10) - (0.5f * (1 - e) + 0.125f * e)) < 1e-6f, "phoneAxis at level 10");
 }

@@ -1,6 +1,9 @@
-// SpawnCity's player settings as one table (the game's single source): mouse, drone, on foot,
-// car, camera, audio and the WORLD options of the title menu. The page builds its menus from
-// `schema_json()` and sends changes as commands ("set <key> <value>"); it keeps a copy in
+// SpawnCity's player settings: mouse, drone, on foot, car, camera, audio and the WORLD options of
+// the title menu. The table is a Blueprint's: the level's actor "Settings" (level/spawncity.klevel,
+// open it in Kern Studio) has one row per setting in its variable Options - key, section, label,
+// help, range, step, default - and the functions Snap (a value as a setting takes it), Word and
+// InSection. Here: the values a player has, and what the page gets. The page builds its menus
+// from `schema_json()` and sends changes as commands ("set <key> <value>"); it keeps a copy in
 // localStorage only as a convenience and replays it with "set" at start. Values, ranges and the
 // one-line help come from SpawnCity:
 //   mouse_settings.mjs, drone_control_settings.mjs + control_semantics.mjs, first_person_control_settings.mjs,
@@ -12,9 +15,11 @@
 #include <string_view>
 
 #include "common.h"
+#include "kern/logic/logic.h"
 
 namespace sc {
 
+/// The settings, in the order of the rows of the Blueprint's table Options.
 enum class Opt : u8 {
   // mouse_settings.mjs
   mouse_sensitivity, mouse_invert_y,
@@ -48,11 +53,16 @@ struct OptSpec {
   bool live;            // false: a WORLD kind the game does not have yet (shown as "bald")
 };
 
+/// Takes the table from the running Blueprint of the actor "Settings" (the game binds it once its
+/// world has started; tests bind the one they run). False when it has not one row per Opt.
+bool bind_settings(kern::logic::Instance* blueprint);
+/// A setting's row (an empty one while no Blueprint is bound).
 const OptSpec& opt_spec(Opt o);
 bool find_opt(std::string_view key, Opt& out);
 
 class Settings {
  public:
+  /// Every setting at its default (as the table bound at this moment has it).
   Settings();
   f32 get(Opt o) const { return v_[static_cast<u32>(o)]; }
   bool on(Opt o) const { return get(o) > 0.5f; }
@@ -71,8 +81,5 @@ class Settings {
   f32 v_[static_cast<u32>(Opt::count)];
   u32 version_ = 1;
 };
-
-/// control_semantics.mjs phoneAxis: x (1 - e) + x^3 e with e = 0.70 (level - 1) / 9 * 0.38.
-f32 fineness_axis(f32 x, f32 fineness);
 
 }  // namespace sc

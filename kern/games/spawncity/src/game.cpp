@@ -288,6 +288,9 @@ bool Game::start(kern::Engine& e) {
     kern::logic::Instance* control_rules = logic ? logic->find(world_->find_actor("Controls")) : nullptr;
     if (!control_rules || control_rules->disabled()) return kern::fail("the level's Blueprint \"Controls\" is missing or has errors");
     controls::bind(control_rules);
+    kern::logic::Instance* settings = logic ? logic->find(world_->find_actor("Settings")) : nullptr;
+    if (!settings || settings->disabled() || !bind_settings(settings)) return kern::fail("the level's Blueprint \"Settings\" is missing, has errors or not one row per setting");
+    ui_.settings = Settings();  // every setting at the table's default (the page replays the player's own with "set")
   }
   ctl_.dev.platform(!coarse, coarse, coarse ? 5 : 0);  // the page reports the real device (game_controls.cpp)
   soldier_ = world_->find_actor("Player");

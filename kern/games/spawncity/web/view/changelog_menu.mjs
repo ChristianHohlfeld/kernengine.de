@@ -7,6 +7,9 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-12",time:"09:55",title:"Die Einstellungen sind eine Datentabelle im Level",items:[
+    "Unter der Haube: Alle 60 Einstellungen – Name, Hilfetext, Bereich, Schrittweite und Standardwert – stehen jetzt als Datentabelle im Blueprint „Settings“ des Levels und lassen sich im Kern-Editor als Tabelle bearbeiten. Am Spiel ändert sich dadurch nichts.",
+  ]},
   {date:"2026-11-12",time:"09:32",title:"Die Steuerung ist jetzt ein Blueprint",items:[
     "Unter der Haube: Die ganze Eingabe-Mathematik – Totzonen und Kurven der Sticks, Zielhilfe, Maus als Stick, Kopfblick, VIEW-Taste, Sprach-Tasten, das Abziehen und Werfen der Handgranate, welches Eingabegerät gerade gilt und die Tastenhilfe – steht jetzt als Blueprint „Controls“ im Level (40 Funktionen). Am Spiel ändert sich dadurch nichts.",
   ]},

@@ -16,7 +16,7 @@
   "ambienceVolume": 0.35,
   "reverb": 0.2
  },
- "nextId": 9,
+ "nextId": 10,
  "actors": [
   {
    "id": 1,
@@ -32254,6 +32254,1567 @@
          "name": "line",
          "type": "text",
          "value": ""
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": 9,
+   "name": "Settings",
+   "folder": "Rules",
+   "transform": {
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     1
+    ]
+   },
+   "components": {
+    "logic": {
+     "kind": "kern-logic",
+     "version": 1,
+     "nextId": 38,
+     "variables": [
+      {
+       "name": "Options",
+       "type": "struct_list",
+       "of": "Option",
+       "value": [
+        {
+         "Key": "mouse.sensitivity",
+         "Section": "maus",
+         "Label": "Maus-Empfindlichkeit",
+         "Help": "Drehgeschwindigkeit der Maus in allen Modi (zu Fuss, Drohne, Auto, Jet).",
+         "Min": 20,
+         "Max": 300,
+         "Step": 5,
+         "Default": 100,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "mouse.invertY",
+         "Section": "maus",
+         "Label": "Maus Y invertieren",
+         "Help": "Maus nach oben = nach unten schauen (Flugsimulator-Stil).",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 0,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "drone.leftFineness",
+         "Section": "drohne",
+         "Label": "Feinheit linker Stick",
+         "Help": "Kurve des linken Sticks (Fliegen vor/zurueck/seitwaerts). Hoeher = feiner um die Mitte, volle Geschwindigkeit erst am Anschlag.",
+         "Min": 1,
+         "Max": 10,
+         "Step": 1,
+         "Default": 10,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "drone.rightFineness",
+         "Section": "drohne",
+         "Label": "Feinheit rechter Stick",
+         "Help": "Kurve des rechten Sticks (Drehen und Neigen). Hoeher fuer ruhiges Schweben und Zielen, niedriger fuer schnelle Manoever.",
+         "Min": 1,
+         "Max": 10,
+         "Step": 1,
+         "Default": 10,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "drone.invertYaw",
+         "Section": "drohne",
+         "Label": "Rechts horizontal invertieren",
+         "Help": "Vertauscht links/rechts beim Drehen.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 0,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "drone.invertRoll",
+         "Section": "drohne",
+         "Label": "Links horizontal invertieren",
+         "Help": "Vertauscht links/rechts beim Seitwaertsflug.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 0,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "drone.invertPitch",
+         "Section": "drohne",
+         "Label": "Rechts vertikal invertieren",
+         "Help": "Neigung: Stick nach unten = Nase runter (Standard an).",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 1,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "drone.maxSpeedKmh",
+         "Section": "drohne",
+         "Label": "Hoechstgeschwindigkeit",
+         "Help": "Was der Flugregler im GAME-Modus erlaubt. Langsamer ist leichter zwischen Haeusern.",
+         "Min": 5,
+         "Max": 90,
+         "Step": 1,
+         "Default": 90,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "drone.hoverAgl",
+         "Section": "drohne",
+         "Label": "Schwebehoehe",
+         "Help": "Hoehe ueber Grund, auf der die Drohne nach dem Start von selbst haelt.",
+         "Min": 0.5,
+         "Max": 10,
+         "Step": 0.1,
+         "Default": 1.2,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "foot.moveFineness",
+         "Section": "fuss",
+         "Label": "Feinheit Laufen",
+         "Help": "Kurve des Lauf-Sticks. Hoeher macht langsames Gehen leicht; Sprint braucht vollen Ausschlag.",
+         "Min": 1,
+         "Max": 10,
+         "Step": 1,
+         "Default": 1,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "foot.lookFineness",
+         "Section": "fuss",
+         "Label": "Feinheit Umschauen",
+         "Help": "Kurve des Blick-Sticks. Hoeher macht kleine Zielkorrekturen leicht.",
+         "Min": 1,
+         "Max": 10,
+         "Step": 1,
+         "Default": 6,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "foot.lookH",
+         "Section": "fuss",
+         "Label": "Blick horizontal",
+         "Help": "Drehtempo links/rechts fuer Stick, Touch und Maus.",
+         "Min": 50,
+         "Max": 150,
+         "Step": 1,
+         "Default": 100,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "foot.lookV",
+         "Section": "fuss",
+         "Label": "Blick vertikal",
+         "Help": "Blicktempo hoch/runter fuer Stick, Touch und Maus.",
+         "Min": 50,
+         "Max": 150,
+         "Step": 1,
+         "Default": 100,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "foot.deadzone",
+         "Section": "fuss",
+         "Label": "Totzone rechter Stick",
+         "Help": "Nur Xbox: ignoriert kleines Stick-Driften. Erhoehen, wenn die Sicht von selbst wandert.",
+         "Min": 2,
+         "Max": 20,
+         "Step": 1,
+         "Default": 5,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "foot.invertMoveH",
+         "Section": "fuss",
+         "Label": "Seitwaerts invertieren",
+         "Help": "Vertauscht links/rechts beim Seitwaertsgehen.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 0,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "foot.invertLookH",
+         "Section": "fuss",
+         "Label": "Drehen invertieren",
+         "Help": "Vertauscht links/rechts beim Umschauen (Stick, Touch, Maus).",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 0,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "foot.invertLookV",
+         "Section": "fuss",
+         "Label": "Blick Y invertieren",
+         "Help": "Flugstil: nach oben druecken = nach unten schauen.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 0,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "car.steering",
+         "Section": "auto",
+         "Label": "Lenkung",
+         "Help": "Wie stark die Raeder Stick und Tasten folgen. Niedriger ist ruhiger bei Tempo.",
+         "Min": 55,
+         "Max": 150,
+         "Step": 1,
+         "Default": 100,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "car.throttle",
+         "Section": "auto",
+         "Label": "Gas / Bremse",
+         "Help": "Wie schnell Gas und Bremse aufbauen. Niedriger gibt sanfteres Anfahren.",
+         "Min": 55,
+         "Max": 150,
+         "Step": 1,
+         "Default": 100,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "car.maxKmh",
+         "Section": "auto",
+         "Label": "Hoechstgeschwindigkeit",
+         "Help": "Spitze deines Autos.",
+         "Min": 45,
+         "Max": 180,
+         "Step": 1,
+         "Default": 115,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "car.reverseKmh",
+         "Section": "auto",
+         "Label": "Rueckwaerts",
+         "Help": "Spitze im Rueckwaertsgang.",
+         "Min": 15,
+         "Max": 55,
+         "Step": 1,
+         "Default": 32,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "car.camDistance",
+         "Section": "auto",
+         "Label": "Kamera-Abstand",
+         "Help": "Wie weit die Verfolgerkamera hinter dem Auto sitzt.",
+         "Min": 3.5,
+         "Max": 8,
+         "Step": 0.1,
+         "Default": 5.4,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "car.camHeight",
+         "Section": "auto",
+         "Label": "Kamera-Hoehe",
+         "Help": "Wie hoch die Verfolgerkamera ueber dem Auto sitzt.",
+         "Min": 1.35,
+         "Max": 3.6,
+         "Step": 0.05,
+         "Default": 2.15,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "cam.fpvTilt",
+         "Section": "kamera",
+         "Label": "FPV-Neigung",
+         "Help": "Neigung der FPV-Kamera. Hoch (20-40 Grad) fuer schnelles Fliegen, runter fuer den Boden.",
+         "Min": -15,
+         "Max": 50,
+         "Step": 1,
+         "Default": -15,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "cam.fov",
+         "Section": "kamera",
+         "Label": "Sichtfeld",
+         "Help": "Sichtfeld der Drohnenkamera. Weit = Ueberblick und Tempogefuehl, eng = Zoom.",
+         "Min": 50,
+         "Max": 120,
+         "Step": 1,
+         "Default": 105,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "cam.thirdDistance",
+         "Section": "kamera",
+         "Label": "Third-Person-Abstand",
+         "Help": "Abstand der Third-Person-Kamera der Drohne.",
+         "Min": 1.5,
+         "Max": 6,
+         "Step": 0.1,
+         "Default": 1.5,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "cam.stereo",
+         "Section": "kamera",
+         "Label": "3D nebeneinander (Schielen)",
+         "Help": "Teilt das Bild fuer Kreuzblick-3D: schielen, bis beide Haelften zu einem scharfen Bild verschmelzen.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 0,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "audio.on",
+         "Section": "ton",
+         "Label": "Ton",
+         "Help": "Hauptschalter fuer alle Effekte.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 1,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "audio.drone",
+         "Section": "ton",
+         "Label": "Drohne",
+         "Help": "Motorgeraeusch der Drohne.",
+         "Min": 0,
+         "Max": 100,
+         "Step": 1,
+         "Default": 50,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "audio.shots",
+         "Section": "ton",
+         "Label": "Schuesse",
+         "Help": "Schuesse und Einschlaege.",
+         "Min": 0,
+         "Max": 100,
+         "Step": 1,
+         "Default": 82,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "audio.fx",
+         "Section": "ton",
+         "Label": "Effekte",
+         "Help": "Explosionen und andere Effekte.",
+         "Min": 0,
+         "Max": 100,
+         "Step": 1,
+         "Default": 72,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "audio.steps",
+         "Section": "ton",
+         "Label": "Schritte",
+         "Help": "Schritte, deine und die der anderen.",
+         "Min": 0,
+         "Max": 100,
+         "Step": 1,
+         "Default": 30,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "audio.vehicle",
+         "Section": "ton",
+         "Label": "Fahrzeuge",
+         "Help": "Motoren und Reifen.",
+         "Min": 0,
+         "Max": 100,
+         "Step": 1,
+         "Default": 58,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "audio.ambient",
+         "Section": "ton",
+         "Label": "Umgebung",
+         "Help": "Stadtgeraeusche und alles andere.",
+         "Min": 0,
+         "Max": 100,
+         "Step": 1,
+         "Default": 46,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "music.on",
+         "Section": "ton",
+         "Label": "Musik",
+         "Help": "Musik im Menue und Autoradio an oder aus.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 1,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "music.volume",
+         "Section": "ton",
+         "Label": "Musik-Lautstaerke",
+         "Help": "Lautstaerke von Menuemusik und Autoradio.",
+         "Min": 0,
+         "Max": 100,
+         "Step": 1,
+         "Default": 32,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "world.people",
+         "Section": "welt",
+         "Label": "Leute",
+         "Help": "Passanten, die zu ihren eigenen Zielen laufen.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 1,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "world.traffic",
+         "Section": "welt",
+         "Label": "Verkehr",
+         "Help": "Autos und Busse auf den Strassen.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 1,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "world.dogs",
+         "Section": "welt",
+         "Label": "Hunde",
+         "Help": "Hunde, die durch das Viertel streifen.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 1,
+         "Toggle": true,
+         "Live": false
+        },
+        {
+         "Key": "world.cats",
+         "Section": "welt",
+         "Label": "Katzen",
+         "Help": "Katzen, auch die schwarze.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 1,
+         "Toggle": true,
+         "Live": false
+        },
+        {
+         "Key": "world.birds",
+         "Section": "welt",
+         "Label": "Voegel",
+         "Help": "Schwaerme am Himmel.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 1,
+         "Toggle": true,
+         "Live": false
+        },
+        {
+         "Key": "world.zombies",
+         "Section": "welt",
+         "Label": "Zombies",
+         "Help": "Zombienaechte nach Einbruch der Dunkelheit.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 1,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "world.police",
+         "Section": "welt",
+         "Label": "Polizei",
+         "Help": "Polizeidrohnen und Beamte, wenn du gesucht wirst.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 1,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "world.military",
+         "Section": "welt",
+         "Label": "Militaer",
+         "Help": "Soldaten, Panzer und Hubschrauber bei hoher Fahndung.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 1,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "world.flak",
+         "Section": "welt",
+         "Label": "Flak",
+         "Help": "Ab und zu ein Flakgeschuetz, das auf Drohne und Jet feuert.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 0,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "world.jetpack",
+         "Section": "welt",
+         "Label": "Jetpack",
+         "Help": "Zweimal springen fuer einen kurzen Jetpack-Schub ueber Haeuser. Laedt sich am Boden auf.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 1,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "world.friendlyFire",
+         "Section": "welt",
+         "Label": "Friendly Fire",
+         "Help": "Spielerwaffen treffen andere Spieler.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 1,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "world.destructibleTerrain",
+         "Section": "welt",
+         "Label": "Zerstoerbares Gelaende",
+         "Help": "Explosionen reissen Krater in den Boden.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 0,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "world.guided",
+         "Section": "welt",
+         "Label": "Lenkraketen",
+         "Help": "Die Lenkrakete der Drohne (GUIDED). Aus: die Waffenwahl springt von ROCKETS zurueck zu GUN.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 1,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "world.alwaysDay",
+         "Section": "welt",
+         "Label": "Immer Tag",
+         "Help": "Keine Nacht: die Sonne bleibt am spaeten Vormittag stehen (keine Zombie-Naechte).",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 0,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "foot.aimAssist",
+         "Section": "fuss",
+         "Label": "Zielhilfe",
+         "Help": "Sanfter Zug zu Zielen nahe am Fadenkreuz mit Xbox-Pad und Touch. 0 schaltet sie aus.",
+         "Min": 0,
+         "Max": 100,
+         "Step": 1,
+         "Default": 55,
+         "Toggle": false,
+         "Live": true
+        },
+        {
+         "Key": "pad.aimScheme",
+         "Section": "drohne",
+         "Label": "Xbox-Schema AIM",
+         "Help": "Drohne mit dem Xbox-Pad: LB halten = rechter Stick schaut (Fadenkreuz) statt zu drehen. Aus = CLASSIC.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 0,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "view.grid",
+         "Section": "kamera",
+         "Label": "1-m-Raster",
+         "Help": "Zeichnet ein Referenzraster von 1 m. Nur Anzeige; hilft, Abstand und Hoehe zu schaetzen.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 0,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "view.keepLook",
+         "Section": "kamera",
+         "Label": "Blick halten",
+         "Help": "AUS: der Blick schwingt nach vorn zurueck, wenn du loslaesst. AN: er bleibt, wo du ihn gelassen hast.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 0,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "view.minimapNorth",
+         "Section": "kamera",
+         "Label": "Minimap nach Norden",
+         "Help": "Haelt die Minimap genordet, statt sie mit dir zu drehen.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 0,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "debug.colliders",
+         "Section": "kamera",
+         "Label": "Box3D-Kollision zeigen",
+         "Help": "Zeigt die Box3D-Kollisionsformen als Drahtgitter. Nur Anzeige, kostet Bildrate.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 0,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "vr.arms",
+         "Section": "kamera",
+         "Label": "VR: Laufen mit den Armen",
+         "Help": "AUS: klassisch mit den Sticks (links gehen, rechts in Schritten drehen). AN: wie Gorilla Tag, nur ohne Boden - mit dem linken Arm joggen = gehen, mit beiden Armen = rennen; die rechte Hand zielt und schiesst weiter, die Sticks bewegen nicht.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 0,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "vr.level",
+         "Section": "kamera",
+         "Label": "VR: Horizont halten",
+         "Help": "AN (Komfort): in Jet und FPV-Drohne bleibt der Horizont gerade, nur die Richtung dreht mit. AUS: du sitzt fest im Cockpit und kippst mit der Maschine (Loopings, Rollen).",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 1,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "vr.tunnel",
+         "Section": "kamera",
+         "Label": "VR: Komfort-Tunnel",
+         "Help": "Dunkelt den Rand des Blicks ab, waehrend du kuenstlich gedreht oder beschleunigt wirst (Sticks, Fahrzeuge) - gegen Uebelkeit.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 1,
+         "Toggle": true,
+         "Live": true
+        },
+        {
+         "Key": "vr.smoothTurn",
+         "Section": "kamera",
+         "Label": "VR: Weich drehen",
+         "Help": "AUS: der rechte Stick dreht in 30-Grad-Schritten (am angenehmsten). AN: er dreht stufenlos, bis 120 Grad pro Sekunde.",
+         "Min": 0,
+         "Max": 1,
+         "Step": 1,
+         "Default": 0,
+         "Toggle": true,
+         "Live": true
+        }
+       ],
+       "help": "Every setting, in the order the game counts them (mouse_settings.mjs, control_semantics.mjs, first_person_control_settings.mjs, vehicle_control_settings.mjs, camera_settings.mjs, stereo_sbs.mjs, audio_settings.mjs, world_options.mjs, settings_help.mjs)"
+      }
+     ],
+     "structs": [
+      {
+       "name": "Option",
+       "fields": [
+        {
+         "name": "Key",
+         "type": "text",
+         "value": ""
+        },
+        {
+         "name": "Section",
+         "type": "text",
+         "value": ""
+        },
+        {
+         "name": "Label",
+         "type": "text",
+         "value": ""
+        },
+        {
+         "name": "Help",
+         "type": "text",
+         "value": ""
+        },
+        {
+         "name": "Min",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "Max",
+         "type": "float",
+         "value": 1
+        },
+        {
+         "name": "Step",
+         "type": "float",
+         "value": 1
+        },
+        {
+         "name": "Default",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "Toggle",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "Live",
+         "type": "bool",
+         "value": true
+        }
+       ],
+       "help": "One setting of the player: its key (command and storage), the menu section (maus, drohne, fuss, auto, kamera, ton, welt), label and one line of help, its range, step and default. Toggle: on or off. Live: false for a kind of the WORLD the game does not have yet (shown as \"bald\")."
+      }
+     ],
+     "nodes": [
+      {
+       "id": 1,
+       "type": "func.entry",
+       "x": 0,
+       "y": 0,
+       "params": {
+        "function": "Snap"
+       }
+      },
+      {
+       "id": 2,
+       "type": "flow.branch",
+       "x": 280,
+       "y": 0
+      },
+      {
+       "id": 3,
+       "type": "struct.break",
+       "x": 160,
+       "y": 150,
+       "params": {
+        "struct": "Option"
+       }
+      },
+      {
+       "id": 4,
+       "type": "func.return",
+       "x": 560,
+       "y": 0,
+       "params": {
+        "function": "Snap"
+       }
+      },
+      {
+       "id": 5,
+       "type": "logic.select",
+       "x": 440,
+       "y": 150,
+       "params": {
+        "type": "float"
+       },
+       "values": {
+        "a": 1,
+        "b": 0
+       }
+      },
+      {
+       "id": 6,
+       "type": "math.compare",
+       "x": 440,
+       "y": 240,
+       "params": {
+        "op": ">"
+       },
+       "values": {
+        "b": 0.5
+       }
+      },
+      {
+       "id": 7,
+       "type": "math.clamp",
+       "x": 440,
+       "y": 330
+      },
+      {
+       "id": 8,
+       "type": "struct.break",
+       "x": 440,
+       "y": 420,
+       "params": {
+        "struct": "Option"
+       }
+      },
+      {
+       "id": 9,
+       "type": "struct.break",
+       "x": 440,
+       "y": 510,
+       "params": {
+        "struct": "Option"
+       }
+      },
+      {
+       "id": 10,
+       "type": "flow.branch",
+       "x": 840,
+       "y": 0
+      },
+      {
+       "id": 11,
+       "type": "math.compare",
+       "x": 720,
+       "y": 150,
+       "params": {
+        "op": "<="
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 12,
+       "type": "struct.break",
+       "x": 720,
+       "y": 240,
+       "params": {
+        "struct": "Option"
+       }
+      },
+      {
+       "id": 13,
+       "type": "func.return",
+       "x": 1120,
+       "y": 0,
+       "params": {
+        "function": "Snap"
+       }
+      },
+      {
+       "id": 14,
+       "type": "math.clamp",
+       "x": 1000,
+       "y": 150
+      },
+      {
+       "id": 15,
+       "type": "struct.break",
+       "x": 1000,
+       "y": 240,
+       "params": {
+        "struct": "Option"
+       }
+      },
+      {
+       "id": 16,
+       "type": "struct.break",
+       "x": 1000,
+       "y": 330,
+       "params": {
+        "struct": "Option"
+       }
+      },
+      {
+       "id": 17,
+       "type": "func.return",
+       "x": 1400,
+       "y": 0,
+       "params": {
+        "function": "Snap"
+       }
+      },
+      {
+       "id": 18,
+       "type": "math.formula",
+       "x": 1280,
+       "y": 150,
+       "params": {
+        "formula": "clamp(lo + round((clamp(v, lo, hi) - lo) / step) * step, lo, hi)"
+       }
+      },
+      {
+       "id": 19,
+       "type": "struct.break",
+       "x": 1280,
+       "y": 240,
+       "params": {
+        "struct": "Option"
+       }
+      },
+      {
+       "id": 20,
+       "type": "struct.break",
+       "x": 1280,
+       "y": 330,
+       "params": {
+        "struct": "Option"
+       }
+      },
+      {
+       "id": 21,
+       "type": "struct.break",
+       "x": 1280,
+       "y": 420,
+       "params": {
+        "struct": "Option"
+       }
+      },
+      {
+       "id": 22,
+       "type": "func.entry",
+       "x": 0,
+       "y": 650,
+       "params": {
+        "function": "Word"
+       }
+      },
+      {
+       "id": 23,
+       "type": "flow.branch",
+       "x": 280,
+       "y": 650
+      },
+      {
+       "id": 24,
+       "type": "logic.or",
+       "x": 160,
+       "y": 800
+      },
+      {
+       "id": 25,
+       "type": "text.equal",
+       "x": 160,
+       "y": 890,
+       "values": {
+        "b": "true"
+       }
+      },
+      {
+       "id": 26,
+       "type": "text.equal",
+       "x": 160,
+       "y": 980,
+       "values": {
+        "b": "on"
+       }
+      },
+      {
+       "id": 27,
+       "type": "func.return",
+       "x": 560,
+       "y": 650,
+       "params": {
+        "function": "Word"
+       },
+       "values": {
+        "known": true,
+        "value": 1
+       }
+      },
+      {
+       "id": 28,
+       "type": "func.return",
+       "x": 840,
+       "y": 650,
+       "params": {
+        "function": "Word"
+       },
+       "values": {
+        "value": 0
+       }
+      },
+      {
+       "id": 29,
+       "type": "logic.or",
+       "x": 720,
+       "y": 800
+      },
+      {
+       "id": 30,
+       "type": "text.equal",
+       "x": 720,
+       "y": 890,
+       "values": {
+        "b": "false"
+       }
+      },
+      {
+       "id": 31,
+       "type": "text.equal",
+       "x": 720,
+       "y": 980,
+       "values": {
+        "b": "off"
+       }
+      },
+      {
+       "id": 32,
+       "type": "func.entry",
+       "x": 0,
+       "y": 1120,
+       "params": {
+        "function": "InSection"
+       }
+      },
+      {
+       "id": 33,
+       "type": "func.return",
+       "x": 280,
+       "y": 1120,
+       "params": {
+        "function": "InSection"
+       }
+      },
+      {
+       "id": 34,
+       "type": "logic.or",
+       "x": 160,
+       "y": 1270
+      },
+      {
+       "id": 35,
+       "type": "text.equal",
+       "x": 160,
+       "y": 1360,
+       "values": {
+        "b": ""
+       }
+      },
+      {
+       "id": 36,
+       "type": "text.equal",
+       "x": 160,
+       "y": 1450
+      },
+      {
+       "id": 37,
+       "type": "struct.break",
+       "x": 160,
+       "y": 1540,
+       "params": {
+        "struct": "Option"
+       }
+      }
+     ],
+     "links": [
+      [
+       1,
+       "option",
+       3,
+       "value"
+      ],
+      [
+       1,
+       "option",
+       8,
+       "value"
+      ],
+      [
+       1,
+       "option",
+       9,
+       "value"
+      ],
+      [
+       1,
+       "option",
+       12,
+       "value"
+      ],
+      [
+       1,
+       "option",
+       15,
+       "value"
+      ],
+      [
+       1,
+       "option",
+       16,
+       "value"
+      ],
+      [
+       1,
+       "option",
+       19,
+       "value"
+      ],
+      [
+       1,
+       "option",
+       20,
+       "value"
+      ],
+      [
+       1,
+       "option",
+       21,
+       "value"
+      ],
+      [
+       1,
+       "then",
+       2,
+       "exec"
+      ],
+      [
+       1,
+       "value",
+       7,
+       "value"
+      ],
+      [
+       1,
+       "value",
+       14,
+       "value"
+      ],
+      [
+       1,
+       "value",
+       18,
+       "v"
+      ],
+      [
+       2,
+       "false",
+       10,
+       "exec"
+      ],
+      [
+       2,
+       "true",
+       4,
+       "exec"
+      ],
+      [
+       3,
+       "Toggle",
+       2,
+       "condition"
+      ],
+      [
+       5,
+       "result",
+       4,
+       "value"
+      ],
+      [
+       6,
+       "result",
+       5,
+       "pick"
+      ],
+      [
+       7,
+       "result",
+       6,
+       "a"
+      ],
+      [
+       8,
+       "Min",
+       7,
+       "min"
+      ],
+      [
+       9,
+       "Max",
+       7,
+       "max"
+      ],
+      [
+       10,
+       "false",
+       17,
+       "exec"
+      ],
+      [
+       10,
+       "true",
+       13,
+       "exec"
+      ],
+      [
+       11,
+       "result",
+       10,
+       "condition"
+      ],
+      [
+       12,
+       "Step",
+       11,
+       "a"
+      ],
+      [
+       14,
+       "result",
+       13,
+       "value"
+      ],
+      [
+       15,
+       "Min",
+       14,
+       "min"
+      ],
+      [
+       16,
+       "Max",
+       14,
+       "max"
+      ],
+      [
+       18,
+       "result",
+       17,
+       "value"
+      ],
+      [
+       19,
+       "Min",
+       18,
+       "lo"
+      ],
+      [
+       20,
+       "Max",
+       18,
+       "hi"
+      ],
+      [
+       21,
+       "Step",
+       18,
+       "step"
+      ],
+      [
+       22,
+       "text",
+       25,
+       "a"
+      ],
+      [
+       22,
+       "text",
+       26,
+       "a"
+      ],
+      [
+       22,
+       "text",
+       30,
+       "a"
+      ],
+      [
+       22,
+       "text",
+       31,
+       "a"
+      ],
+      [
+       22,
+       "then",
+       23,
+       "exec"
+      ],
+      [
+       23,
+       "false",
+       28,
+       "exec"
+      ],
+      [
+       23,
+       "true",
+       27,
+       "exec"
+      ],
+      [
+       24,
+       "result",
+       23,
+       "condition"
+      ],
+      [
+       25,
+       "result",
+       24,
+       "a"
+      ],
+      [
+       26,
+       "result",
+       24,
+       "b"
+      ],
+      [
+       29,
+       "result",
+       28,
+       "known"
+      ],
+      [
+       30,
+       "result",
+       29,
+       "a"
+      ],
+      [
+       31,
+       "result",
+       29,
+       "b"
+      ],
+      [
+       32,
+       "option",
+       37,
+       "value"
+      ],
+      [
+       32,
+       "section",
+       35,
+       "a"
+      ],
+      [
+       32,
+       "section",
+       36,
+       "a"
+      ],
+      [
+       32,
+       "then",
+       33,
+       "exec"
+      ],
+      [
+       34,
+       "result",
+       33,
+       "in"
+      ],
+      [
+       35,
+       "result",
+       34,
+       "a"
+      ],
+      [
+       36,
+       "result",
+       34,
+       "b"
+      ],
+      [
+       37,
+       "Section",
+       36,
+       "b"
+      ]
+     ],
+     "machines": [],
+     "functions": [
+      {
+       "name": "Snap",
+       "pure": true,
+       "help": "A value as the setting takes it: inside its range, on its step; a toggle is 0 or 1",
+       "inputs": [
+        {
+         "name": "option",
+         "type": "struct",
+         "of": "Option",
+         "value": {
+          "Key": "",
+          "Section": "",
+          "Label": "",
+          "Help": "",
+          "Min": 0,
+          "Max": 1,
+          "Step": 1,
+          "Default": 0,
+          "Toggle": false,
+          "Live": true
+         }
+        },
+        {
+         "name": "value",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "value",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "Word",
+       "pure": true,
+       "help": "A value given as a word: true / on is 1, false / off is 0",
+       "inputs": [
+        {
+         "name": "text",
+         "type": "text",
+         "value": ""
+        }
+       ],
+       "outputs": [
+        {
+         "name": "known",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "value",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "InSection",
+       "pure": true,
+       "help": "Is the setting in the section? (No section: every setting is.)",
+       "inputs": [
+        {
+         "name": "option",
+         "type": "struct",
+         "of": "Option",
+         "value": {
+          "Key": "",
+          "Section": "",
+          "Label": "",
+          "Help": "",
+          "Min": 0,
+          "Max": 1,
+          "Step": 1,
+          "Default": 0,
+          "Toggle": false,
+          "Live": true
+         }
+        },
+        {
+         "name": "section",
+         "type": "text",
+         "value": ""
+        }
+       ],
+       "outputs": [
+        {
+         "name": "in",
+         "type": "bool",
+         "value": false
         }
        ]
       }

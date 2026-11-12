@@ -238,6 +238,13 @@ In dieser Reihenfolge (klein nach groß; jede Datei verschwindet, ihre Tests ble
   behält, und ruft auf. Der Blueprint rechnet wie das JavaScript des Originals in 64 Bit; drei
   Prüfungen, die genau auf dem Rand einer Totzone standen (0,1 als 32-Bit-Zahl liegt knapp
   darüber), prüfen jetzt knapp darunter.
+- [x] **`settings`** – Actor „Settings“: die Tabelle aller 60 Einstellungen als Datentabelle
+  (Variable Options, eine Liste der Struktur Option: Key, Section, Label, Help, Min, Max, Step,
+  Default, Toggle, Live – im Editor als Tabelle zu bearbeiten) und die Funktionen Snap (ein Wert,
+  wie die Einstellung ihn nimmt), Word (true / on, false / off) und InSection. `settings.cpp` hat
+  keine Tabelle mehr: Es liest sie beim Start aus dem Blueprint, hält die Werte des Spielers und
+  schreibt das JSON für die Seite. Die Stick-Kurve `fineness_axis` gab es doppelt – sie ist
+  PhoneAxis in „Controls“.
 - Geschrieben wird so ein Regel-Blueprint als sein C++-Text und mit
   `tools/blueprint_cpp.sh --apply level.klevel <Actor> text.cpp` in das Level gelegt (dieselbe
   Lesart wie „Apply“ in der C++-Ansicht des Editors); das Level bleibt die eine Quelle.
