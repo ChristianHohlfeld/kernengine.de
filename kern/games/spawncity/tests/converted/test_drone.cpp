@@ -11,10 +11,32 @@
 #include "../../src/../firmware/Arondight45_FirmwareRuntime.hpp"
 #include "../converted.h"
 
+namespace kern {
+[[maybe_unused]] static ::kern::Quat draw_kern__Quat(::sc::converted::Draw& draw) {
+  ::kern::Quat s{};
+  s.x = draw.number();
+  s.y = draw.number();
+  s.z = draw.number();
+  s.w = draw.number();
+  return s;
+}
+[[maybe_unused]] static ::sc::converted::Value arg(const ::kern::Quat& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
+[[maybe_unused]] static bool same(const ::kern::Quat& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
+[[maybe_unused]] static ::kern::Quat near(::kern::Quat s, int k, int slot) { using ::sc::converted::near; s.x = near(s.x, k, slot * 7 + 0); s.y = near(s.y, k, slot * 7 + 1); s.z = near(s.z, k, slot * 7 + 2); s.w = near(s.w, k, slot * 7 + 3); return s; }
+[[maybe_unused]] static bool defined(const ::kern::Quat& s) { using ::sc::converted::defined; return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
+[[maybe_unused]] static void flat(const ::kern::Quat& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.x, o); flat(s.y, o); flat(s.z, o); flat(s.w, o); }
+[[maybe_unused]] static std::string text(const ::kern::Quat& s) { using ::sc::converted::text; return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
+}  // namespace kern
 namespace sc {
 namespace converted_drone {
 using namespace converted;
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::near; using converted::flat;
+using ::kern::arg;
+using ::kern::same;
+using ::kern::defined;
+using ::kern::text;
+using ::kern::near;
+using ::kern::flat;
 
 // ---- drone.cpp, as it stands ----
 #pragma GCC diagnostic push
@@ -27,6 +49,9 @@ f32 battery_ocv(f32 soc, f32 cells) {
 }
 f32 battery_under_load(f32 ocv, f32 amps, f32 r, f32 cells) {
   return clampf(ocv - std::fmax(0.0f, amps) * r, 3 * cells, 4.2f * cells);
+}
+f32 quat_yaw_deg(Quat q) {
+  return std::atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z)) / kDeg;
 }
 #pragma GCC diagnostic pop
 
@@ -45,6 +70,9 @@ f32 battery_ocv(f32 soc, f32 cells) {
 }
 f32 battery_under_load(f32 ocv, f32 amps, f32 r, f32 cells) {
   return clampf(ocv - std::fmax(0.0, amps) * r, 3 * cells, 4.2 * cells);
+}
+f32 quat_yaw_deg(Quat q) {
+  return std::atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z)) / kDeg;
 }
 f32 clearance_rate(f32 axis) {
   const f32 x = clampf(axis, -1, 1), m = std::fabs(x);
@@ -88,14 +116,24 @@ SC_TEST(converted_drone) {
       tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, wide::battery_under_load(wide_arg(a0), wide_arg(a1), wide_arg(a2), wide_arg(a3)), outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); }, [&]([[maybe_unused]] int k) { return battery_under_load(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2), near(a3, k, 3)); });
     }
   }
+  {  // quat_yaw_deg
+    converted::Tally tally("quat_yaw_deg");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::kern::Quat a0 = ::kern::draw_kern__Quat(draw);
+      const converted::Watch watch;
+      const auto want = quat_yaw_deg(a0);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0)}, want, wide::quat_yaw_deg(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return quat_yaw_deg(near(a0, k, 0)); });
+    }
+  }
   {  // clearance_rate
     converted::Tally tally("clearance_rate");
     for (int i = 0; i < converted::kCalls; ++i) {
       const float a0 = draw.number();
       const converted::Watch watch;
-      const auto want = clearance_rate(a0);
+      const auto want = ::sc::clearance_rate(a0);
       const bool outside = watch.outside();
-      tally.take(bp, {arg(a0)}, want, wide::clearance_rate(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return clearance_rate(near(a0, k, 0)); });
+      tally.take(bp, {arg(a0)}, want, wide::clearance_rate(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return ::sc::clearance_rate(near(a0, k, 0)); });
     }
   }
   {  // clearance_lead
@@ -103,9 +141,9 @@ SC_TEST(converted_drone) {
     for (int i = 0; i < converted::kCalls; ++i) {
       const float a0 = draw.number();
       const converted::Watch watch;
-      const auto want = clearance_lead(a0);
+      const auto want = ::sc::clearance_lead(a0);
       const bool outside = watch.outside();
-      tally.take(bp, {arg(a0)}, want, wide::clearance_lead(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return clearance_lead(near(a0, k, 0)); });
+      tally.take(bp, {arg(a0)}, want, wide::clearance_lead(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return ::sc::clearance_lead(near(a0, k, 0)); });
     }
   }
 }

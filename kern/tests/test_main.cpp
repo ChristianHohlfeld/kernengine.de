@@ -2000,6 +2000,12 @@ TEST(logic_formulas) {
   CHECK(value("min(3, 4) + max(3, 4) + clamp(9, 0, 5) + abs(-2) + sign(-3)") == 13);
   CHECK(value("floor(2.7) + ceil(2.1) + round(2.5) + trunc(-2.7)") == 6 && value("sqrt(16) + sqrt(-4) + log(-1)") == 4);
   CHECK(value("lerp(10, 20, 0.25)") == 12.5);
+  // whole numbers as a machine has them: bits, and arithmetic that wraps around at 32 bit
+  CHECK(value("band(12, 10)") == 8 && value("bor(12, 10)") == 14 && value("bxor(12, 10)") == 6 && value("band(-1, 255)") == 255);
+  CHECK(value("shl(1, 31)") == 2147483648.0 && value("shr(256, 4)") == 16 && value("shr(-16, 2)") == -4 && value("shl(1, 64)") == 0);
+  CHECK(value("wrap32(4294967296 + 5)") == 5 && value("wrap32(-1)") == 4294967295.0 && value("wrap32s(4294967295)") == -1 && value("wrap32s(2147483648)") == -2147483648.0);
+  CHECK(value("mul32(2654435769, 2654435769)") == static_cast<f64>(static_cast<u32>(2654435769u * 2654435769u)) && value("mul32(65536, 65536)") == 0);
+  CHECK(value("wrap32(shl(4294967295, 4))") == 4294967280.0 && value("band(7.9, 3.9)") == 3);
   CHECK_NEAR(value("sin(rad(90)) + cos(0) + deg(pi) + atan2(1, 1) * 4 / pi + exp(0) + pow(2, 10)"), 1 + 1 + 180 + 1 + 1 + 1024, 1e-12);
   // numbers are read as a compiler reads them
   CHECK(value("0.7 * 5") == 0.7 * 5 && value("1e3 + .5") == 1000.5 && value("2.5E-1") == 0.25 && value("16000 - 5 * 1300") == 9500);
@@ -3174,11 +3180,11 @@ struct Arena : kern::Blueprint {
   wrong.structs[1].fields.push_back(wrong.structs[1].fields[1]);
   problem(wrong, "struct \"Slot\" has two fields called \"Count\"");
   wrong = g;
-  for (int k = 0; k < 30; ++k) wrong.structs[1].fields.push_back({"F" + std::to_string(k), {PinType::number, ""}, json::Value(0.0)});
+  for (std::size_t k = wrong.structs[1].fields.size(); k < logic::StructType::kMaxFields; ++k) wrong.structs[1].fields.push_back({"F" + std::to_string(k), {PinType::number, ""}, json::Value(0.0)});
   CHECK(no_errors(logic::check(wrong)) && wrong.structs[1].fields.size() == logic::StructType::kMaxFields);
   notation_round_trip(wrong, "Arena");
   wrong.structs[1].fields.push_back({"OneMore", {PinType::number, ""}, json::Value(0.0)});
-  problem(wrong, "struct \"Slot\" has 33 fields (a struct has 32 at most)");
+  problem(wrong, "struct \"Slot\" has 97 fields (a struct has 96 at most)");
   wrong = g;
   wrong.structs.clear();
   problem(wrong, "variable \"Held\" is of the struct \"Weapon\", which this Blueprint does not have");

@@ -22,6 +22,30 @@ using converted::arg; using converted::same; using converted::defined; using con
 #pragma GCC diagnostic ignored "-Wunused-variable"
 f32 ragged(f32 a, f32 seed) { return 0.74f + 0.13f * std::sin(a * 5 + seed * 7) + 0.08f * std::sin(a * 11 + seed * 3) + 0.05f * std::sin(a * 23 + seed); }
 f32 fh(f32 n) { const f32 v = std::sin(n * 127.1f) * 43758.5453f; return v - std::floor(v); }
+bool facade_glass(f32 u, f32 len, f32 z, f32 H, u32 seed) {
+  if (len <= 0 || z < 0 || z > H) return false;
+  const f32 sdq = static_cast<f32>(seed % 997) / 997.0f;
+  const f32 floor_h = 3.1f + 0.5f * (static_cast<f32>((seed >> 12) % 1000) / 1000.0f);
+  const bool pil = !(u >= 0.38f && u <= len - 0.38f);
+  if (z < 4 && len > 3) {
+    const f32 sp = 4.4f, ns = std::fmax(1.0f, std::floor(len / sp)), sm = (len - ns * sp) * 0.5f;
+    const f32 su = (u - sm) / sp - std::floor((u - sm) / sp);
+    const bool in_s = u - sm >= 0 && u - sm <= ns * sp;
+    return in_s && su >= 0.08f && su <= 0.92f && z >= 0.35f && z <= 3.0f;
+  }
+  if (H >= 26) {
+    const f32 fz = (z - 4) / floor_h - std::floor((z - 4) / floor_h);
+    const f32 mu = u / 1.6f - std::floor(u / 1.6f);
+    return fz < 0.8f && mu < 0.95f && !pil;
+  }
+  const f32 pitch = 2.7f + (3.7f - 2.7f) * fh(sdq * 7.0f);
+  const f32 n_win = std::fmax(1.0f, std::floor((len - 0.8f) / pitch)), margin = (len - n_win * pitch) * 0.5f;
+  const f32 lu = (u - margin) / pitch, fu = lu - std::floor(lu);
+  if (lu < 0 || lu > n_win || z > H - 1.2f) return false;
+  const f32 fz = (z - 4) / floor_h - std::floor((z - 4) / floor_h);
+  const f32 ww = 0.38f + (0.6f - 0.38f) * fh(sdq * 5.0f), wh = 0.42f + (0.6f - 0.42f) * fh(sdq * 9.0f);
+  return fu >= 0.5f - ww * 0.5f && fu <= 0.5f + ww * 0.5f && fz >= 0.3f && fz <= 0.3f + wh;
+}
 #pragma GCC diagnostic pop
 
 
@@ -35,6 +59,30 @@ using f32 = double;
 #pragma GCC diagnostic ignored "-Wnarrowing"
 f32 ragged(f32 a, f32 seed) { return 0.74 + 0.13 * std::sin(a * 5 + seed * 7) + 0.08 * std::sin(a * 11 + seed * 3) + 0.05 * std::sin(a * 23 + seed); }
 f32 fh(f32 n) { const f32 v = std::sin(n * 127.1) * 43758.5453; return v - std::floor(v); }
+bool facade_glass(f32 u, f32 len, f32 z, f32 H, u32 seed) {
+  if (len <= 0 || z < 0 || z > H) return false;
+  const f32 sdq = static_cast<f32>(seed % 997) / 997.0;
+  const f32 floor_h = 3.1 + 0.5 * (static_cast<f32>((seed >> 12) % 1000) / 1000.0);
+  const bool pil = !(u >= 0.38 && u <= len - 0.38);
+  if (z < 4 && len > 3) {
+    const f32 sp = 4.4, ns = std::fmax(1.0, std::floor(len / sp)), sm = (len - ns * sp) * 0.5;
+    const f32 su = (u - sm) / sp - std::floor((u - sm) / sp);
+    const bool in_s = u - sm >= 0 && u - sm <= ns * sp;
+    return in_s && su >= 0.08 && su <= 0.92 && z >= 0.35 && z <= 3.0;
+  }
+  if (H >= 26) {
+    const f32 fz = (z - 4) / floor_h - std::floor((z - 4) / floor_h);
+    const f32 mu = u / 1.6 - std::floor(u / 1.6);
+    return fz < 0.8 && mu < 0.95 && !pil;
+  }
+  const f32 pitch = 2.7 + (3.7 - 2.7) * fh(sdq * 7.0);
+  const f32 n_win = std::fmax(1.0, std::floor((len - 0.8) / pitch)), margin = (len - n_win * pitch) * 0.5;
+  const f32 lu = (u - margin) / pitch, fu = lu - std::floor(lu);
+  if (lu < 0 || lu > n_win || z > H - 1.2) return false;
+  const f32 fz = (z - 4) / floor_h - std::floor((z - 4) / floor_h);
+  const f32 ww = 0.38 + (0.6 - 0.38) * fh(sdq * 5.0), wh = 0.42 + (0.6 - 0.42) * fh(sdq * 9.0);
+  return fu >= 0.5 - ww * 0.5 && fu <= 0.5 + ww * 0.5 && fz >= 0.3 && fz <= 0.3 + wh;
+}
 #pragma GCC diagnostic pop
 }  // namespace wide
 
@@ -60,6 +108,20 @@ SC_TEST(converted_world_marks) {
       const auto want = fh(a0);
       const bool outside = watch.outside();
       tally.take(bp, {arg(a0)}, want, wide::fh(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return fh(near(a0, k, 0)); });
+    }
+  }
+  {  // facade_glass
+    converted::Tally tally("facade_glass");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const float a0 = draw.number();
+      const float a1 = draw.number();
+      const float a2 = draw.number();
+      const float a3 = draw.number();
+      const unsigned int a4 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = facade_glass(a0, a1, a2, a3, a4);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)}, want, wide::facade_glass(wide_arg(a0), wide_arg(a1), wide_arg(a2), wide_arg(a3), wide_arg(a4)), outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); }, [&]([[maybe_unused]] int k) { return facade_glass(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2), near(a3, k, 3), near(a4, k, 4)); });
     }
   }
 }

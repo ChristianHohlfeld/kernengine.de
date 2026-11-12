@@ -1185,7 +1185,8 @@ void add_math(Library& lib) {
 void add_formula(Library& lib) {
   NodeDef d = make("math.formula", "Formula", "Math", NodeKind::pure,
                    "A formula as one node: every name in it becomes an input. Operators + - * / % ^, comparisons (1 when true), && || !, a ? b : c; "
-                   "functions min max clamp abs sign floor ceil round trunc sqrt pow exp log sin cos tan asin acos atan atan2 (radians; rad(), deg()) lerp; pi.");
+                   "functions min max clamp abs sign floor ceil round trunc sqrt pow exp log sin cos tan asin acos atan atan2 (radians; rad(), deg()) lerp; "
+                   "whole numbers as a machine has them: band bor bxor shl shr, wrap32 wrap32s mul32 (32 bit); pi.");
   d.params = {param("formula", "Formula", ParamDef::Kind::text, "a + b")};
   d.outputs = {data("result", "", PinType::number)};
   d.keywords = "math expression formula equation calculate compute";

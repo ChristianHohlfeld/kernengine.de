@@ -127,7 +127,7 @@ Ein achter Werttyp und ein achter Listentyp gehören den **Strukturen** des Blue
 Welche Struktur gemeint ist, steht als ihr Name neben dem Typ, in `of`, wie bei einer Aufzählung.
 Ein Feld ist von einem Wert-Typ, einer Aufzählung, einer Struktur, die über dieser deklariert
 ist, oder eine Liste von einem davon; so enthält keine Struktur sich selbst. Eine Struktur hat
-mindestens ein Feld und höchstens 32. Der `Value` hält einen Wert je Feld, in der Reihenfolge der
+mindestens ein Feld und höchstens 96. Der `Value` hält einen Wert je Feld, in der Reihenfolge der
 Felder (`Value::structure(fields)`, `field(i)`; eine Liste: `Value::structures`); Kopien teilen
 sich die Felder, bis eine von ihnen sich ändert. Die Datei hält einen Wert als Objekt seiner
 Felder bei ihren Namen:

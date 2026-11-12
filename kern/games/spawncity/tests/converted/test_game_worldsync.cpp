@@ -28,9 +28,8 @@ using i8 = std::int8_t;
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
 #pragma GCC diagnostic ignored "-Wunused-variable"
 inline f32 dist2d(Vec3 a, Vec3 b) { return std::hypot(a.x - b.x, a.y - b.y); }
-i16 q16(f32 v) { return static_cast<i16>(std::lround(clampf(v, -1, 1) * 32767)); }
 f32 uq16(i16 v) { return static_cast<f32>(v) / 32767; }
-i16 cms(f32 v) { return static_cast<i16>(std::lround(clampf(v * 100, -32000, 32000))); }
+u8 col8(f32 v) { return static_cast<u8>(std::lround(clampf(v, 0, 1) * 255)); }
 #pragma GCC diagnostic pop
 
 
@@ -43,9 +42,8 @@ using f32 = double;
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wnarrowing"
 inline f32 dist2d(Vec3 a, Vec3 b) { return std::hypot(a.x - b.x, a.y - b.y); }
-i16 q16(f32 v) { return static_cast<i16>(std::lround(clampf(v, -1, 1) * 32767)); }
 f32 uq16(i16 v) { return static_cast<f32>(v) / 32767; }
-i16 cms(f32 v) { return static_cast<i16>(std::lround(clampf(v * 100, -32000, 32000))); }
+u8 col8(f32 v) { return static_cast<u8>(std::lround(clampf(v, 0, 1) * 255)); }
 #pragma GCC diagnostic pop
 }  // namespace wide
 
@@ -55,22 +53,12 @@ SC_TEST(converted_game_worldsync) {
   {  // dist2d
     converted::Tally tally("dist2d");
     for (int i = 0; i < converted::kCalls; ++i) {
-      const kern::Vec3 a0 = draw.vector();
-      const kern::Vec3 a1 = draw.vector();
+      const ::kern::Vec3 a0 = draw.vector();
+      const ::kern::Vec3 a1 = draw.vector();
       const converted::Watch watch;
       const auto want = dist2d(a0, a1);
       const bool outside = watch.outside();
       tally.take(bp, {arg(a0), arg(a1)}, want, wide::dist2d(wide_arg(a0), wide_arg(a1)), outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return dist2d(near(a0, k, 0), near(a1, k, 1)); });
-    }
-  }
-  {  // q16
-    converted::Tally tally("q16");
-    for (int i = 0; i < converted::kCalls; ++i) {
-      const float a0 = draw.number();
-      const converted::Watch watch;
-      const auto want = q16(a0);
-      const bool outside = watch.outside();
-      tally.take(bp, {arg(a0)}, want, wide::q16(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return q16(near(a0, k, 0)); });
     }
   }
   {  // uq16
@@ -83,14 +71,14 @@ SC_TEST(converted_game_worldsync) {
       tally.take(bp, {arg(a0)}, want, wide::uq16(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return uq16(near(a0, k, 0)); });
     }
   }
-  {  // cms
-    converted::Tally tally("cms");
+  {  // col8
+    converted::Tally tally("col8");
     for (int i = 0; i < converted::kCalls; ++i) {
       const float a0 = draw.number();
       const converted::Watch watch;
-      const auto want = cms(a0);
+      const auto want = col8(a0);
       const bool outside = watch.outside();
-      tally.take(bp, {arg(a0)}, want, wide::cms(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return cms(near(a0, k, 0)); });
+      tally.take(bp, {arg(a0)}, want, wide::col8(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return col8(near(a0, k, 0)); });
     }
   }
 }

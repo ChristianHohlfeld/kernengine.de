@@ -10,24 +10,92 @@
 #include "../../src/look.h"
 #include "../converted.h"
 
+namespace kern {
+[[maybe_unused]] static ::kern::Quat draw_kern__Quat(::sc::converted::Draw& draw) {
+  ::kern::Quat s{};
+  s.x = draw.number();
+  s.y = draw.number();
+  s.z = draw.number();
+  s.w = draw.number();
+  return s;
+}
+[[maybe_unused]] static ::sc::converted::Value arg(const ::kern::Quat& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
+[[maybe_unused]] static bool same(const ::kern::Quat& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
+[[maybe_unused]] static ::kern::Quat near(::kern::Quat s, int k, int slot) { using ::sc::converted::near; s.x = near(s.x, k, slot * 7 + 0); s.y = near(s.y, k, slot * 7 + 1); s.z = near(s.z, k, slot * 7 + 2); s.w = near(s.w, k, slot * 7 + 3); return s; }
+[[maybe_unused]] static bool defined(const ::kern::Quat& s) { using ::sc::converted::defined; return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
+[[maybe_unused]] static void flat(const ::kern::Quat& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.x, o); flat(s.y, o); flat(s.z, o); flat(s.w, o); }
+[[maybe_unused]] static std::string text(const ::kern::Quat& s) { using ::sc::converted::text; return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
+[[maybe_unused]] static ::kern::Mat4 draw_kern__Mat4(::sc::converted::Draw& draw) {
+  ::kern::Mat4 s{};
+  for (auto& e : s.m) e = draw.number();
+  return s;
+}
+[[maybe_unused]] static ::sc::converted::Value arg(const ::kern::Mat4& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(std::vector<float>(std::begin(s.m), std::end(s.m)))}); }
+[[maybe_unused]] static bool same(const ::kern::Mat4& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 1 && same(std::vector<float>(std::begin(want.m), std::end(want.m)), (*got.rows)[0]); }
+[[maybe_unused]] static ::kern::Mat4 near(::kern::Mat4 s, int k, int slot) { using ::sc::converted::near; { const auto v = near(std::vector<float>(std::begin(s.m), std::end(s.m)), k, slot * 7 + 0); std::copy(v.begin(), v.end(), std::begin(s.m)); } return s; }
+[[maybe_unused]] static bool defined(const ::kern::Mat4& s) { using ::sc::converted::defined; return defined(std::vector<float>(std::begin(s.m), std::end(s.m))); }
+[[maybe_unused]] static void flat(const ::kern::Mat4& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(std::vector<float>(std::begin(s.m), std::end(s.m)), o); }
+[[maybe_unused]] static std::string text(const ::kern::Mat4& s) { using ::sc::converted::text; return std::string("{") + text(std::vector<float>(std::begin(s.m), std::end(s.m))) + "}"; }
+[[maybe_unused]] static ::kern::Camera draw_kern__Camera(::sc::converted::Draw& draw) {
+  ::kern::Camera s{};
+  s.eye = draw.vector();
+  s.target = draw.vector();
+  s.up = draw.vector();
+  s.fov = draw.number();
+  s.near = draw.number();
+  s.far = draw.number();
+  s.orthographic = draw.flag();
+  s.ortho_height = draw.number();
+  s.has_projection = draw.flag();
+  s.projection = ::kern::draw_kern__Mat4(draw);
+  return s;
+}
+[[maybe_unused]] static ::sc::converted::Value arg(const ::kern::Camera& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.eye), arg(s.target), arg(s.up), arg(s.fov), arg(s.near), arg(s.far), arg(s.orthographic), arg(s.ortho_height), arg(s.has_projection), arg(s.projection)}); }
+[[maybe_unused]] static bool same(const ::kern::Camera& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 10 && same(want.eye, (*got.rows)[0]) && same(want.target, (*got.rows)[1]) && same(want.up, (*got.rows)[2]) && same(want.fov, (*got.rows)[3]) && same(want.near, (*got.rows)[4]) && same(want.far, (*got.rows)[5]) && same(want.orthographic, (*got.rows)[6]) && same(want.ortho_height, (*got.rows)[7]) && same(want.has_projection, (*got.rows)[8]) && same(want.projection, (*got.rows)[9]); }
+[[maybe_unused]] static ::kern::Camera near(::kern::Camera s, int k, int slot) { using ::sc::converted::near; s.eye = near(s.eye, k, slot * 7 + 0); s.target = near(s.target, k, slot * 7 + 1); s.up = near(s.up, k, slot * 7 + 2); s.fov = near(s.fov, k, slot * 7 + 3); s.near = near(s.near, k, slot * 7 + 4); s.far = near(s.far, k, slot * 7 + 5); s.orthographic = near(s.orthographic, k, slot * 7 + 6); s.ortho_height = near(s.ortho_height, k, slot * 7 + 7); s.has_projection = near(s.has_projection, k, slot * 7 + 8); s.projection = near(s.projection, k, slot * 7 + 9); return s; }
+[[maybe_unused]] static bool defined(const ::kern::Camera& s) { using ::sc::converted::defined; return defined(s.eye) && defined(s.target) && defined(s.up) && defined(s.fov) && defined(s.near) && defined(s.far) && defined(s.orthographic) && defined(s.ortho_height) && defined(s.has_projection) && defined(s.projection); }
+[[maybe_unused]] static void flat(const ::kern::Camera& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.eye, o); flat(s.target, o); flat(s.up, o); flat(s.fov, o); flat(s.near, o); flat(s.far, o); flat(s.orthographic, o); flat(s.ortho_height, o); flat(s.has_projection, o); flat(s.projection, o); }
+[[maybe_unused]] static std::string text(const ::kern::Camera& s) { using ::sc::converted::text; return std::string("{") + text(s.eye) + ", " + text(s.target) + ", " + text(s.up) + ", " + text(s.fov) + ", " + text(s.near) + ", " + text(s.far) + ", " + text(s.orthographic) + ", " + text(s.ortho_height) + ", " + text(s.has_projection) + ", " + text(s.projection) + "}"; }
+}  // namespace kern
 namespace sc {
 namespace look {
-[[maybe_unused]] static ::sc::look::Shake draw_look__Shake(converted::Draw& draw) {
+[[maybe_unused]] static ::sc::look::Shake draw_look__Shake(::sc::converted::Draw& draw) {
   ::sc::look::Shake s{};
   s.trauma = draw.number();
   s.seed = draw.number();
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const ::sc::look::Shake& s) { using converted::arg; return converted::Value::structure({arg(s.trauma), arg(s.seed)}); }
-[[maybe_unused]] static bool same(const ::sc::look::Shake& want, const converted::Value& got) { using converted::same; return got.rows && got.rows->size() == 2 && same(want.trauma, (*got.rows)[0]) && same(want.seed, (*got.rows)[1]); }
-[[maybe_unused]] static ::sc::look::Shake near(::sc::look::Shake s, int k, int slot) { using converted::near; s.trauma = near(s.trauma, k, slot * 7 + 0); s.seed = near(s.seed, k, slot * 7 + 1); return s; }
-[[maybe_unused]] static bool defined(const ::sc::look::Shake& s) { using converted::defined; return defined(s.trauma) && defined(s.seed); }
-[[maybe_unused]] static void flat(const ::sc::look::Shake& s, std::vector<kern::f64>& o) { using converted::flat; flat(s.trauma, o); flat(s.seed, o); }
-[[maybe_unused]] static std::string text(const ::sc::look::Shake& s) { using converted::text; return std::string("{") + text(s.trauma) + ", " + text(s.seed) + "}"; }
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::look::Shake& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.trauma), arg(s.seed)}); }
+[[maybe_unused]] static bool same(const ::sc::look::Shake& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 2 && same(want.trauma, (*got.rows)[0]) && same(want.seed, (*got.rows)[1]); }
+[[maybe_unused]] static ::sc::look::Shake near(::sc::look::Shake s, int k, int slot) { using ::sc::converted::near; s.trauma = near(s.trauma, k, slot * 7 + 0); s.seed = near(s.seed, k, slot * 7 + 1); return s; }
+[[maybe_unused]] static bool defined(const ::sc::look::Shake& s) { using ::sc::converted::defined; return defined(s.trauma) && defined(s.seed); }
+[[maybe_unused]] static void flat(const ::sc::look::Shake& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.trauma, o); flat(s.seed, o); }
+[[maybe_unused]] static std::string text(const ::sc::look::Shake& s) { using ::sc::converted::text; return std::string("{") + text(s.trauma) + ", " + text(s.seed) + "}"; }
+[[maybe_unused]] static ::sc::look::Stabilizer draw_look__Stabilizer(::sc::converted::Draw& draw) {
+  ::sc::look::Stabilizer s{};
+  s.init = draw.flag();
+  s.pos = draw.vector();
+  s.target = draw.vector();
+  s.up = draw.vector();
+  s.lag = draw.number();
+  return s;
+}
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::look::Stabilizer& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.init), arg(s.pos), arg(s.target), arg(s.up), arg(s.lag)}); }
+[[maybe_unused]] static bool same(const ::sc::look::Stabilizer& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 5 && same(want.init, (*got.rows)[0]) && same(want.pos, (*got.rows)[1]) && same(want.target, (*got.rows)[2]) && same(want.up, (*got.rows)[3]) && same(want.lag, (*got.rows)[4]); }
+[[maybe_unused]] static ::sc::look::Stabilizer near(::sc::look::Stabilizer s, int k, int slot) { using ::sc::converted::near; s.init = near(s.init, k, slot * 7 + 0); s.pos = near(s.pos, k, slot * 7 + 1); s.target = near(s.target, k, slot * 7 + 2); s.up = near(s.up, k, slot * 7 + 3); s.lag = near(s.lag, k, slot * 7 + 4); return s; }
+[[maybe_unused]] static bool defined(const ::sc::look::Stabilizer& s) { using ::sc::converted::defined; return defined(s.init) && defined(s.pos) && defined(s.target) && defined(s.up) && defined(s.lag); }
+[[maybe_unused]] static void flat(const ::sc::look::Stabilizer& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.init, o); flat(s.pos, o); flat(s.target, o); flat(s.up, o); flat(s.lag, o); }
+[[maybe_unused]] static std::string text(const ::sc::look::Stabilizer& s) { using ::sc::converted::text; return std::string("{") + text(s.init) + ", " + text(s.pos) + ", " + text(s.target) + ", " + text(s.up) + ", " + text(s.lag) + "}"; }
 }  // namespace look
 namespace converted_look {
 using namespace converted;
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::near; using converted::flat;
+using ::kern::arg;
+using ::kern::same;
+using ::kern::defined;
+using ::kern::text;
+using ::kern::near;
+using ::kern::flat;
 using ::sc::look::arg;
 using ::sc::look::same;
 using ::sc::look::defined;
@@ -47,9 +115,10 @@ f32 smooth(f32 e0, f32 e1, f32 x) {
   return t * t * (3 - 2 * t);
 }
 f32 noise(f32 t, f32 o) { return std::sin(t + o) * 0.5f + std::sin(t * 2.31f + o * 1.7f) * 0.3f + std::sin(t * 4.17f + o * 2.3f) * 0.2f; }
+Vec3 rotate_about(Vec3 v, Vec3 axis, f32 a) { return Quat::axis_angle(axis, a).rotate(v); }
 #pragma GCC diagnostic pop
 
-struct Out_Shake_sample { ::sc::look::Shake Self; bool Result; kern::Vec3 angles; kern::Vec2 offset; };
+struct Out_Shake_sample { ::sc::look::Shake Self; bool Result; ::kern::Vec3 angles; ::kern::Vec2 offset; };
 [[maybe_unused]] static bool same(const Out_Shake_sample& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]) && same(want.angles, (*got.rows)[2]) && same(want.offset, (*got.rows)[3]); }
 [[maybe_unused]] static bool defined(const Out_Shake_sample& s) { return defined(s.Self) && defined(s.Result) && defined(s.angles) && defined(s.offset); }
 [[maybe_unused]] static void flat(const Out_Shake_sample& s, std::vector<kern::f64>& o) { flat(s.Self, o); flat(s.Result, o); flat(s.angles, o); flat(s.offset, o); }
@@ -59,6 +128,11 @@ struct Out_weapon_trauma { float Result; float cap; };
 [[maybe_unused]] static bool defined(const Out_weapon_trauma& s) { return defined(s.Result) && defined(s.cap); }
 [[maybe_unused]] static void flat(const Out_weapon_trauma& s, std::vector<kern::f64>& o) { flat(s.Result, o); flat(s.cap, o); }
 [[maybe_unused]] static std::string text(const Out_weapon_trauma& s) { return std::string("{") + text(s.Result) + ", " + text(s.cap) + "}"; }
+struct Out_Stabilizer_apply { ::sc::look::Stabilizer Self; ::kern::Camera c; };
+[[maybe_unused]] static bool same(const Out_Stabilizer_apply& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.c, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_Stabilizer_apply& s) { return defined(s.Self) && defined(s.c); }
+[[maybe_unused]] static void flat(const Out_Stabilizer_apply& s, std::vector<kern::f64>& o) { flat(s.Self, o); flat(s.c, o); }
+[[maybe_unused]] static std::string text(const Out_Stabilizer_apply& s) { return std::string("{") + text(s.Self) + ", " + text(s.c) + "}"; }
 
 // ---- the same functions with 64-bit numbers, as a Blueprint computes ----
 namespace wide {
@@ -74,6 +148,7 @@ f32 smooth(f32 e0, f32 e1, f32 x) {
   return t * t * (3 - 2 * t);
 }
 f32 noise(f32 t, f32 o) { return std::sin(t + o) * 0.5 + std::sin(t * 2.31 + o * 1.7) * 0.3 + std::sin(t * 4.17 + o * 2.3) * 0.2; }
+Vec3 rotate_about(Vec3 v, Vec3 axis, f32 a) { return Quat::axis_angle(axis, a).rotate(v); }
 f32 weapon_trauma(bool full_auto, bool heavy, bool drone, f32& cap) {
   // Full-auto builds up to a steady rumble (capped at 0.42), heavy weapons punch.
   if (full_auto) { cap = 0.42; return drone ? 0.07 : 0.035; }
@@ -87,6 +162,23 @@ f32 blast_trauma(f32 distance, f32 radius) {
   const f32 k = std::pow(1 - distance / reach, 1.6), size = clampf(radius / 12, 0.25, 0.9);
   return k * size;
 }
+void shake_camera(kern::Camera& c, Vec3 angles, Vec2 offset) {
+  const f32 dist = std::fmax(0.5, kern::length(c.target - c.eye));
+  Vec3 f = kern::normalize(c.target - c.eye, {1, 0, 0});
+  Vec3 r = kern::normalize(kern::cross(f, c.up), {0, -1, 0});
+  Vec3 u = kern::cross(r, f);
+  // three.js order: rotateX (pitch about the camera's right), rotateY (yaw about its up), rotateZ (roll).
+  f = rotate_about(f, r, angles.x);
+  u = rotate_about(u, r, angles.x);
+  f = rotate_about(f, u, angles.y);
+  r = rotate_about(r, u, angles.y);
+  u = rotate_about(u, f, angles.z);
+  r = rotate_about(r, f, angles.z);
+  c.eye += r * offset.x + u * offset.y;
+  c.target = c.eye + f * dist;
+  c.up = u;
+}
+inline f32 damp_alpha(f32 rate, f32 dt) { return rate > 0 && dt > 0 ? 1.0 - std::exp(-rate * dt) : 0.0; }
 f32 follow_phase(f32 mine, f32 authority) {
   f32 d = authority - mine;
   d -= std::round(d);
@@ -120,8 +212,8 @@ SC_TEST(converted_look) {
   {  // mix3
     converted::Tally tally("mix3");
     for (int i = 0; i < converted::kCalls; ++i) {
-      const kern::Vec3 a0 = draw.vector();
-      const kern::Vec3 a1 = draw.vector();
+      const ::kern::Vec3 a0 = draw.vector();
+      const ::kern::Vec3 a1 = draw.vector();
       const float a2 = draw.number();
       const converted::Watch watch;
       const auto want = mix3(a0, a1, a2);
@@ -152,11 +244,46 @@ SC_TEST(converted_look) {
       tally.take(bp, {arg(a0), arg(a1)}, want, wide::noise(wide_arg(a0), wide_arg(a1)), outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return noise(near(a0, k, 0), near(a1, k, 1)); });
     }
   }
+  {  // Quat::rotate
+    converted::Tally tally("Quat_rotate");
+    const auto run = [&](::kern::Quat a0, ::kern::Vec3 a1) { const auto r = a0.rotate(a1); return r; };
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::kern::Quat a0 = ::kern::draw_kern__Quat(draw);
+      const ::kern::Vec3 a1 = draw.vector();
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1)}, want, want, outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return run(near(a0, k, 0), near(a1, k, 1)); });
+    }
+  }
+  {  // Quat::axis_angle
+    converted::Tally tally("Quat_axis_angle");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::kern::Vec3 a0 = draw.vector();
+      const float a1 = draw.number();
+      const converted::Watch watch;
+      const auto want = ::kern::Quat::axis_angle(a0, a1);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1)}, want, want, outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return ::kern::Quat::axis_angle(near(a0, k, 0), near(a1, k, 1)); });
+    }
+  }
+  {  // rotate_about
+    converted::Tally tally("rotate_about");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::kern::Vec3 a0 = draw.vector();
+      const ::kern::Vec3 a1 = draw.vector();
+      const float a2 = draw.number();
+      const converted::Watch watch;
+      const auto want = rotate_about(a0, a1, a2);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, wide::rotate_about(wide_arg(a0), wide_arg(a1), wide_arg(a2)), outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, [&]([[maybe_unused]] int k) { return rotate_about(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2)); });
+    }
+  }
   {  // Shake::add
     converted::Tally tally("Shake_add");
     const auto run = [&](::sc::look::Shake a0, float a1, float a2) { a0.add(a1, a2); return a0; };
     for (int i = 0; i < converted::kCalls; ++i) {
-      const ::sc::look::Shake a0 = draw_look__Shake(draw);
+      const ::sc::look::Shake a0 = ::sc::look::draw_look__Shake(draw);
       const float a1 = draw.number();
       const float a2 = draw.number();
       const converted::Watch watch;
@@ -167,14 +294,14 @@ SC_TEST(converted_look) {
   }
   {  // Shake::sample
     converted::Tally tally("Shake_sample");
-    const auto run = [&](::sc::look::Shake a0, float a1, double a2, float a3, kern::Vec3 a4, kern::Vec2 a5) { const auto r = a0.sample(a1, a2, a3, a4, a5); return Out_Shake_sample{a0, r, a4, a5}; };
+    const auto run = [&](::sc::look::Shake a0, float a1, double a2, float a3, ::kern::Vec3 a4, ::kern::Vec2 a5) { const auto r = a0.sample(a1, a2, a3, a4, a5); return Out_Shake_sample{a0, r, a4, a5}; };
     for (int i = 0; i < converted::kCalls; ++i) {
-      const ::sc::look::Shake a0 = draw_look__Shake(draw);
+      const ::sc::look::Shake a0 = ::sc::look::draw_look__Shake(draw);
       const float a1 = draw.number();
       const double a2 = draw.number();
       const float a3 = draw.number();
-      const kern::Vec3 a4 = draw.vector();
-      const kern::Vec2 a5 = draw.vector2();
+      const ::kern::Vec3 a4 = draw.vector();
+      const ::kern::Vec2 a5 = draw.vector2();
       const converted::Watch watch;
       const auto want = run(a0, a1, a2, a3, a4, a5);
       const bool outside = watch.outside();
@@ -183,7 +310,7 @@ SC_TEST(converted_look) {
   }
   {  // weapon_trauma
     converted::Tally tally("weapon_trauma");
-    const auto run = [&](bool a0, bool a1, bool a2, float a3) { const auto r = weapon_trauma(a0, a1, a2, a3); return Out_weapon_trauma{r, a3}; };
+    const auto run = [&](bool a0, bool a1, bool a2, float a3) { const auto r = ::sc::look::weapon_trauma(a0, a1, a2, a3); return Out_weapon_trauma{r, a3}; };
     for (int i = 0; i < converted::kCalls; ++i) {
       const bool a0 = draw.flag();
       const bool a1 = draw.flag();
@@ -201,9 +328,46 @@ SC_TEST(converted_look) {
       const float a0 = draw.number();
       const float a1 = draw.number();
       const converted::Watch watch;
-      const auto want = blast_trauma(a0, a1);
+      const auto want = ::sc::look::blast_trauma(a0, a1);
       const bool outside = watch.outside();
-      tally.take(bp, {arg(a0), arg(a1)}, want, wide::blast_trauma(wide_arg(a0), wide_arg(a1)), outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return blast_trauma(near(a0, k, 0), near(a1, k, 1)); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, wide::blast_trauma(wide_arg(a0), wide_arg(a1)), outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return ::sc::look::blast_trauma(near(a0, k, 0), near(a1, k, 1)); });
+    }
+  }
+  {  // shake_camera
+    converted::Tally tally("shake_camera");
+    const auto run = [&](::kern::Camera a0, ::kern::Vec3 a1, ::kern::Vec2 a2) { ::sc::look::shake_camera(a0, a1, a2); return a0; };
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::kern::Camera a0 = ::kern::draw_kern__Camera(draw);
+      const ::kern::Vec3 a1 = draw.vector();
+      const ::kern::Vec2 a2 = draw.vector2();
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, want, outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, [&]([[maybe_unused]] int k) { return run(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2)); });
+    }
+  }
+  {  // damp_alpha
+    converted::Tally tally("damp_alpha");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const float a0 = draw.number();
+      const float a1 = draw.number();
+      const converted::Watch watch;
+      const auto want = ::sc::damp_alpha(a0, a1);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1)}, want, wide::damp_alpha(wide_arg(a0), wide_arg(a1)), outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return ::sc::damp_alpha(near(a0, k, 0), near(a1, k, 1)); });
+    }
+  }
+  {  // Stabilizer::apply
+    converted::Tally tally("Stabilizer_apply");
+    const auto run = [&](::sc::look::Stabilizer a0, ::kern::Camera a1, float a2) { a0.apply(a1, a2); return Out_Stabilizer_apply{a0, a1}; };
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::sc::look::Stabilizer a0 = ::sc::look::draw_look__Stabilizer(draw);
+      const ::kern::Camera a1 = ::kern::draw_kern__Camera(draw);
+      const float a2 = draw.number();
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, want, outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, [&]([[maybe_unused]] int k) { return run(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2)); });
     }
   }
   {  // follow_phase
@@ -212,9 +376,9 @@ SC_TEST(converted_look) {
       const float a0 = draw.number();
       const float a1 = draw.number();
       const converted::Watch watch;
-      const auto want = follow_phase(a0, a1);
+      const auto want = ::sc::look::follow_phase(a0, a1);
       const bool outside = watch.outside();
-      tally.take(bp, {arg(a0), arg(a1)}, want, wide::follow_phase(wide_arg(a0), wide_arg(a1)), outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return follow_phase(near(a0, k, 0), near(a1, k, 1)); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, wide::follow_phase(wide_arg(a0), wide_arg(a1)), outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return ::sc::look::follow_phase(near(a0, k, 0), near(a1, k, 1)); });
     }
   }
   {  // kern_intensity
@@ -224,9 +388,9 @@ SC_TEST(converted_look) {
       const float a1 = draw.number();
       const float a2 = draw.number();
       const converted::Watch watch;
-      const auto want = kern_intensity(a0, a1, a2);
+      const auto want = ::sc::look::kern_intensity(a0, a1, a2);
       const bool outside = watch.outside();
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, wide::kern_intensity(wide_arg(a0), wide_arg(a1), wide_arg(a2)), outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, [&]([[maybe_unused]] int k) { return kern_intensity(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2)); });
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, wide::kern_intensity(wide_arg(a0), wide_arg(a1), wide_arg(a2)), outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, [&]([[maybe_unused]] int k) { return ::sc::look::kern_intensity(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2)); });
     }
   }
   {  // police_flash
@@ -234,9 +398,9 @@ SC_TEST(converted_look) {
     for (int i = 0; i < converted::kCalls; ++i) {
       const float a0 = draw.number();
       const converted::Watch watch;
-      const auto want = police_flash(a0);
+      const auto want = ::sc::look::police_flash(a0);
       const bool outside = watch.outside();
-      tally.take(bp, {arg(a0)}, want, wide::police_flash(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return police_flash(near(a0, k, 0)); });
+      tally.take(bp, {arg(a0)}, want, wide::police_flash(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return ::sc::look::police_flash(near(a0, k, 0)); });
     }
   }
   {  // drone_flash
@@ -245,9 +409,9 @@ SC_TEST(converted_look) {
       const float a0 = draw.number();
       const int a1 = static_cast<int>(draw.whole());
       const converted::Watch watch;
-      const auto want = drone_flash(a0, a1);
+      const auto want = ::sc::look::drone_flash(a0, a1);
       const bool outside = watch.outside();
-      tally.take(bp, {arg(a0), arg(a1)}, want, wide::drone_flash(wide_arg(a0), wide_arg(a1)), outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return drone_flash(near(a0, k, 0), near(a1, k, 1)); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, wide::drone_flash(wide_arg(a0), wide_arg(a1)), outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return ::sc::look::drone_flash(near(a0, k, 0), near(a1, k, 1)); });
     }
   }
 }

@@ -10,7 +10,20 @@
 #include "../converted.h"
 
 namespace sc {
-[[maybe_unused]] static ::sc::CarInput draw_CarInput(converted::Draw& draw) {
+[[maybe_unused]] static ::sc::CarSpec::Wheel draw_CarSpec__Wheel(::sc::converted::Draw& draw) {
+  ::sc::CarSpec::Wheel s{};
+  s.x = draw.number();
+  s.y = draw.number();
+  s.front = draw.flag();
+  return s;
+}
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::CarSpec::Wheel& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.x), arg(s.y), arg(s.front)}); }
+[[maybe_unused]] static bool same(const ::sc::CarSpec::Wheel& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 3 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.front, (*got.rows)[2]); }
+[[maybe_unused]] static ::sc::CarSpec::Wheel near(::sc::CarSpec::Wheel s, int k, int slot) { using ::sc::converted::near; s.x = near(s.x, k, slot * 7 + 0); s.y = near(s.y, k, slot * 7 + 1); s.front = near(s.front, k, slot * 7 + 2); return s; }
+[[maybe_unused]] static bool defined(const ::sc::CarSpec::Wheel& s) { using ::sc::converted::defined; return defined(s.x) && defined(s.y) && defined(s.front); }
+[[maybe_unused]] static void flat(const ::sc::CarSpec::Wheel& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.x, o); flat(s.y, o); flat(s.front, o); }
+[[maybe_unused]] static std::string text(const ::sc::CarSpec::Wheel& s) { using ::sc::converted::text; return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.front) + "}"; }
+[[maybe_unused]] static ::sc::CarInput draw_CarInput(::sc::converted::Draw& draw) {
   ::sc::CarInput s{};
   s.pedal = draw.number();
   s.steer = draw.number();
@@ -19,12 +32,12 @@ namespace sc {
   s.max_reverse = draw.number();
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const ::sc::CarInput& s) { using converted::arg; return converted::Value::structure({arg(s.pedal), arg(s.steer), arg(s.handbrake), arg(s.max_speed), arg(s.max_reverse)}); }
-[[maybe_unused]] static bool same(const ::sc::CarInput& want, const converted::Value& got) { using converted::same; return got.rows && got.rows->size() == 5 && same(want.pedal, (*got.rows)[0]) && same(want.steer, (*got.rows)[1]) && same(want.handbrake, (*got.rows)[2]) && same(want.max_speed, (*got.rows)[3]) && same(want.max_reverse, (*got.rows)[4]); }
-[[maybe_unused]] static ::sc::CarInput near(::sc::CarInput s, int k, int slot) { using converted::near; s.pedal = near(s.pedal, k, slot * 7 + 0); s.steer = near(s.steer, k, slot * 7 + 1); s.handbrake = near(s.handbrake, k, slot * 7 + 2); s.max_speed = near(s.max_speed, k, slot * 7 + 3); s.max_reverse = near(s.max_reverse, k, slot * 7 + 4); return s; }
-[[maybe_unused]] static bool defined(const ::sc::CarInput& s) { using converted::defined; return defined(s.pedal) && defined(s.steer) && defined(s.handbrake) && defined(s.max_speed) && defined(s.max_reverse); }
-[[maybe_unused]] static void flat(const ::sc::CarInput& s, std::vector<kern::f64>& o) { using converted::flat; flat(s.pedal, o); flat(s.steer, o); flat(s.handbrake, o); flat(s.max_speed, o); flat(s.max_reverse, o); }
-[[maybe_unused]] static std::string text(const ::sc::CarInput& s) { using converted::text; return std::string("{") + text(s.pedal) + ", " + text(s.steer) + ", " + text(s.handbrake) + ", " + text(s.max_speed) + ", " + text(s.max_reverse) + "}"; }
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::CarInput& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.pedal), arg(s.steer), arg(s.handbrake), arg(s.max_speed), arg(s.max_reverse)}); }
+[[maybe_unused]] static bool same(const ::sc::CarInput& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 5 && same(want.pedal, (*got.rows)[0]) && same(want.steer, (*got.rows)[1]) && same(want.handbrake, (*got.rows)[2]) && same(want.max_speed, (*got.rows)[3]) && same(want.max_reverse, (*got.rows)[4]); }
+[[maybe_unused]] static ::sc::CarInput near(::sc::CarInput s, int k, int slot) { using ::sc::converted::near; s.pedal = near(s.pedal, k, slot * 7 + 0); s.steer = near(s.steer, k, slot * 7 + 1); s.handbrake = near(s.handbrake, k, slot * 7 + 2); s.max_speed = near(s.max_speed, k, slot * 7 + 3); s.max_reverse = near(s.max_reverse, k, slot * 7 + 4); return s; }
+[[maybe_unused]] static bool defined(const ::sc::CarInput& s) { using ::sc::converted::defined; return defined(s.pedal) && defined(s.steer) && defined(s.handbrake) && defined(s.max_speed) && defined(s.max_reverse); }
+[[maybe_unused]] static void flat(const ::sc::CarInput& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.pedal, o); flat(s.steer, o); flat(s.handbrake, o); flat(s.max_speed, o); flat(s.max_reverse, o); }
+[[maybe_unused]] static std::string text(const ::sc::CarInput& s) { using ::sc::converted::text; return std::string("{") + text(s.pedal) + ", " + text(s.steer) + ", " + text(s.handbrake) + ", " + text(s.max_speed) + ", " + text(s.max_reverse) + "}"; }
 namespace converted_car {
 using namespace converted;
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::near; using converted::flat;
@@ -40,7 +53,13 @@ using ::sc::flat;
 #pragma GCC diagnostic ignored "-Wunused-function"
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
 #pragma GCC diagnostic ignored "-Wunused-variable"
+f32 steer_torque_at(const CarSpec& s, f32 v) { const f32 x = v / s.steer_assist_speed; return s.steer_hand + s.steer_assist / (1 + x * x); }
 struct Tuning { f32 hertz, damping_ratio; };
+Tuning suspension_tuning(const CarSpec& s, f32 zeta, f32 k_share) {
+  const f32 q = s.mass / 4, m = s.wheel_mass * q / (s.wheel_mass + q), k = q * 9.81f / s.sag * k_share, w = std::sqrt(k / m);
+  const f32 c = 2 * zeta * std::sqrt(q * q * 9.81f / s.sag);
+  return {w / (2 * kPi), c / (2 * m * w)};
+}
 #pragma GCC diagnostic pop
 
 
@@ -52,6 +71,12 @@ using f32 = double;
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wnarrowing"
+f32 steer_torque_at(const CarSpec& s, f32 v) { const f32 x = v / s.steer_assist_speed; return s.steer_hand + s.steer_assist / (1 + x * x); }
+Tuning suspension_tuning(const CarSpec& s, f32 zeta, f32 k_share) {
+  const f32 q = s.mass / 4, m = s.wheel_mass * q / (s.wheel_mass + q), k = q * 9.81 / s.sag * k_share, w = std::sqrt(k / m);
+  const f32 c = 2 * zeta * std::sqrt(q * q * 9.81 / s.sag);
+  return {w / (2 * kPi), c / (2 * m * w)};
+}
 CarInput ai_drive(Vec3 position, Vec3 forward, f32 vf, Vec3 target, f32 target_speed) {
   CarInput in;
   const f32 dx = target.x - position.x, dy = target.y - position.y, dist = std::hypot(dx, dy);
@@ -83,15 +108,15 @@ SC_TEST(converted_car) {
   {  // ai_drive
     converted::Tally tally("ai_drive");
     for (int i = 0; i < converted::kCalls; ++i) {
-      const kern::Vec3 a0 = draw.vector();
-      const kern::Vec3 a1 = draw.vector();
+      const ::kern::Vec3 a0 = draw.vector();
+      const ::kern::Vec3 a1 = draw.vector();
       const float a2 = draw.number();
-      const kern::Vec3 a3 = draw.vector();
+      const ::kern::Vec3 a3 = draw.vector();
       const float a4 = draw.number();
       const converted::Watch watch;
-      const auto want = ai_drive(a0, a1, a2, a3, a4);
+      const auto want = ::sc::ai_drive(a0, a1, a2, a3, a4);
       const bool outside = watch.outside();
-      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)}, want, wide::ai_drive(wide_arg(a0), wide_arg(a1), wide_arg(a2), wide_arg(a3), wide_arg(a4)), outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); }, [&]([[maybe_unused]] int k) { return ai_drive(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2), near(a3, k, 3), near(a4, k, 4)); });
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)}, want, wide::ai_drive(wide_arg(a0), wide_arg(a1), wide_arg(a2), wide_arg(a3), wide_arg(a4)), outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); }, [&]([[maybe_unused]] int k) { return ::sc::ai_drive(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2), near(a3, k, 3), near(a4, k, 4)); });
     }
   }
 }

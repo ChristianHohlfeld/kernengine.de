@@ -16,7 +16,7 @@
 
 namespace sc {
 namespace mvt {
-[[maybe_unused]] static ::sc::mvt::Value draw_mvt__Value(converted::Draw& draw) {
+[[maybe_unused]] static ::sc::mvt::Value draw_mvt__Value(::sc::converted::Draw& draw) {
   ::sc::mvt::Value s{};
   s.kind = static_cast<::sc::mvt::Value::Kind>(draw.below(4));
   s.s = draw.word();
@@ -24,12 +24,12 @@ namespace mvt {
   s.b = draw.flag();
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const ::sc::mvt::Value& s) { using converted::arg; return converted::Value::structure({arg(s.kind), arg(s.s), arg(s.n), arg(s.b)}); }
-[[maybe_unused]] static bool same(const ::sc::mvt::Value& want, const converted::Value& got) { using converted::same; return got.rows && got.rows->size() == 4 && same(want.kind, (*got.rows)[0]) && same(want.s, (*got.rows)[1]) && same(want.n, (*got.rows)[2]) && same(want.b, (*got.rows)[3]); }
-[[maybe_unused]] static ::sc::mvt::Value near(::sc::mvt::Value s, int k, int slot) { using converted::near; s.kind = near(s.kind, k, slot * 7 + 0); s.s = near(s.s, k, slot * 7 + 1); s.n = near(s.n, k, slot * 7 + 2); s.b = near(s.b, k, slot * 7 + 3); return s; }
-[[maybe_unused]] static bool defined(const ::sc::mvt::Value& s) { using converted::defined; return defined(s.kind) && defined(s.s) && defined(s.n) && defined(s.b); }
-[[maybe_unused]] static void flat(const ::sc::mvt::Value& s, std::vector<kern::f64>& o) { using converted::flat; flat(s.kind, o); flat(s.s, o); flat(s.n, o); flat(s.b, o); }
-[[maybe_unused]] static std::string text(const ::sc::mvt::Value& s) { using converted::text; return std::string("{") + text(s.kind) + ", " + text(s.s) + ", " + text(s.n) + ", " + text(s.b) + "}"; }
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::mvt::Value& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.kind), arg(s.s), arg(s.n), arg(s.b)}); }
+[[maybe_unused]] static bool same(const ::sc::mvt::Value& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 4 && same(want.kind, (*got.rows)[0]) && same(want.s, (*got.rows)[1]) && same(want.n, (*got.rows)[2]) && same(want.b, (*got.rows)[3]); }
+[[maybe_unused]] static ::sc::mvt::Value near(::sc::mvt::Value s, int k, int slot) { using ::sc::converted::near; s.kind = near(s.kind, k, slot * 7 + 0); s.s = near(s.s, k, slot * 7 + 1); s.n = near(s.n, k, slot * 7 + 2); s.b = near(s.b, k, slot * 7 + 3); return s; }
+[[maybe_unused]] static bool defined(const ::sc::mvt::Value& s) { using ::sc::converted::defined; return defined(s.kind) && defined(s.s) && defined(s.n) && defined(s.b); }
+[[maybe_unused]] static void flat(const ::sc::mvt::Value& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.kind, o); flat(s.s, o); flat(s.n, o); flat(s.b, o); }
+[[maybe_unused]] static std::string text(const ::sc::mvt::Value& s) { using ::sc::converted::text; return std::string("{") + text(s.kind) + ", " + text(s.s) + ", " + text(s.n) + ", " + text(s.b) + "}"; }
 }  // namespace mvt
 namespace converted_mvt {
 using namespace converted;
@@ -47,11 +47,16 @@ using namespace ::sc::mvt;
 #pragma GCC diagnostic ignored "-Wunused-function"
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
 #pragma GCC diagnostic ignored "-Wunused-variable"
+i64 zigzag(u64 v) { return static_cast<i64>(v >> 1) ^ -static_cast<i64>(v & 1); }
 bool wanted_layer(const std::string& name, const std::vector<std::string>& wanted) {
   if (wanted.empty()) return true;
   for (const std::string& w : wanted)
     if (w == name) return true;
   return false;
+}
+void put_varint(std::vector<u8>& o, u64 v) {
+  while (v >= 0x80) { o.push_back(static_cast<u8>(v | 0x80)); v >>= 7; }
+  o.push_back(static_cast<u8>(v));
 }
 #pragma GCC diagnostic pop
 
@@ -64,11 +69,16 @@ using f32 = double;
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wnarrowing"
+i64 zigzag(u64 v) { return static_cast<i64>(v >> 1) ^ -static_cast<i64>(v & 1); }
 bool wanted_layer(const std::string& name, const std::vector<std::string>& wanted) {
   if (wanted.empty()) return true;
   for (const std::string& w : wanted)
     if (w == name) return true;
   return false;
+}
+void put_varint(std::vector<u8>& o, u64 v) {
+  while (v >= 0x80) { o.push_back(static_cast<u8>(v | 0x80)); v >>= 7; }
+  o.push_back(static_cast<u8>(v));
 }
 #pragma GCC diagnostic pop
 }  // namespace wide
@@ -76,6 +86,16 @@ bool wanted_layer(const std::string& name, const std::vector<std::string>& wante
 SC_TEST(converted_mvt) {
   converted::Blueprint bp("Mvt");
   converted::Draw draw;
+  {  // zigzag
+    converted::Tally tally("zigzag");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const unsigned long a0 = static_cast<unsigned long>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = zigzag(a0);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0)}, want, wide::zigzag(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return zigzag(near(a0, k, 0)); });
+    }
+  }
   {  // wanted_layer
     converted::Tally tally("wanted_layer");
     for (int i = 0; i < converted::kCalls; ++i) {
@@ -85,6 +105,18 @@ SC_TEST(converted_mvt) {
       const auto want = wanted_layer(a0, a1);
       const bool outside = watch.outside();
       tally.take(bp, {arg(a0), arg(a1)}, want, wide::wanted_layer(wide_arg(a0), wide_arg(a1)), outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return wanted_layer(near(a0, k, 0), near(a1, k, 1)); });
+    }
+  }
+  {  // put_varint
+    converted::Tally tally("put_varint");
+    const auto run = [&](std::vector<unsigned char> a0, unsigned long a1) { put_varint(a0, a1); return a0; };
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      const unsigned long a1 = static_cast<unsigned long>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1)}, want, want, outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return run(near(a0, k, 0), near(a1, k, 1)); });
     }
   }
 }

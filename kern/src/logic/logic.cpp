@@ -1036,7 +1036,7 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
         if (e.values[a] == e.values[b]) err(0, "enum \"" + e.name + "\" has two values called \"" + e.values[a] + "\"");
     }
   }
-  // The structs: each has fields (32 at most), no two of them the same name; a field is of a
+  // The structs: each has fields (96 at most), no two of them the same name; a field is of a
   // type there is - an enum, or a struct declared above its own (no struct contains itself).
   for (std::size_t at = 0; at < g.structs.size(); ++at) {
     const StructType& s = g.structs[at];

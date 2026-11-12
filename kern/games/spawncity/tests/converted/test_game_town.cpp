@@ -52,8 +52,8 @@ SC_TEST(converted_game_town) {
   {  // dist2d
     converted::Tally tally("dist2d");
     for (int i = 0; i < converted::kCalls; ++i) {
-      const kern::Vec3 a0 = draw.vector();
-      const kern::Vec3 a1 = draw.vector();
+      const ::kern::Vec3 a0 = draw.vector();
+      const ::kern::Vec3 a1 = draw.vector();
       const converted::Watch watch;
       const auto want = dist2d(a0, a1);
       const bool outside = watch.outside();
@@ -65,9 +65,9 @@ SC_TEST(converted_game_town) {
     for (int i = 0; i < converted::kCalls; ++i) {
       const float a0 = draw.number();
       const converted::Watch watch;
-      const auto want = wrap_pi(a0);
+      const auto want = ::sc::wrap_pi(a0);
       const bool outside = watch.outside();
-      tally.take(bp, {arg(a0)}, want, wide::wrap_pi(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return wrap_pi(near(a0, k, 0)); });
+      tally.take(bp, {arg(a0)}, want, wide::wrap_pi(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return ::sc::wrap_pi(near(a0, k, 0)); });
     }
   }
   {  // approach_angle

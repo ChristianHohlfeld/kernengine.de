@@ -24,6 +24,7 @@ using namespace ::sc::qr;
 #pragma GCC diagnostic ignored "-Wunused-variable"
 constexpr i32 kEccPerBlock[41] = {-1, 7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28, 28, 28, 30, 30, 26, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30};
 constexpr i32 kBlocks[41] = {-1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4, 4, 4, 4, 4, 6, 6, 6, 6, 7, 8, 8, 9, 9, 10, 12, 12, 12, 13, 14, 15, 16, 17, 18, 19, 19, 20, 21, 22, 24, 25};
+constexpr u32 kLevelL = 1;
 i32 raw_modules(i32 v) {
   i32 r = (16 * v + 128) * v + 64;
   if (v >= 2) {
@@ -34,6 +35,14 @@ i32 raw_modules(i32 v) {
   return r;
 }
 i32 data_codewords(i32 v) { return raw_modules(v) / 8 - kEccPerBlock[v] * kBlocks[v]; }
+u8 gf_mul(u8 x, u8 y) {
+  u32 z = 0;
+  for (i32 i = 7; i >= 0; --i) {
+    z = (z << 1) ^ ((z >> 7) * 0x11D);
+    z ^= ((y >> i) & 1u) * x;
+  }
+  return static_cast<u8>(z);
+}
 struct Grid {
   i32 size;
   std::vector<u8> m, fn;
@@ -52,6 +61,7 @@ using f32 = double;
 #pragma GCC diagnostic ignored "-Wnarrowing"
 constexpr i32 kEccPerBlock[41] = {-1, 7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28, 28, 28, 30, 30, 26, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30};
 constexpr i32 kBlocks[41] = {-1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4, 4, 4, 4, 4, 6, 6, 6, 6, 7, 8, 8, 9, 9, 10, 12, 12, 12, 13, 14, 15, 16, 17, 18, 19, 19, 20, 21, 22, 24, 25};
+constexpr u32 kLevelL = 1;
 i32 raw_modules(i32 v) {
   i32 r = (16 * v + 128) * v + 64;
   if (v >= 2) {
@@ -62,6 +72,14 @@ i32 raw_modules(i32 v) {
   return r;
 }
 i32 data_codewords(i32 v) { return raw_modules(v) / 8 - kEccPerBlock[v] * kBlocks[v]; }
+u8 gf_mul(u8 x, u8 y) {
+  u32 z = 0;
+  for (i32 i = 7; i >= 0; --i) {
+    z = (z << 1) ^ ((z >> 7) * 0x11D);
+    z ^= ((y >> i) & 1u) * x;
+  }
+  return static_cast<u8>(z);
+}
 #pragma GCC diagnostic pop
 }  // namespace wide
 

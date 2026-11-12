@@ -12,9 +12,45 @@
 #include "../converted.h"
 
 namespace sc {
+[[maybe_unused]] static ::sc::PoliceDrone draw_PoliceDrone(::sc::converted::Draw& draw) {
+  ::sc::PoliceDrone s{};
+  s.active = draw.flag();
+  s.sees = draw.flag();
+  s.emp = draw.flag();
+  s.retreating = draw.flag();
+  s.pos = draw.vector();
+  s.vel = draw.vector();
+  s.target = draw.vector();
+  s.retreat_goal = draw.vector();
+  s.hp = draw.number();
+  s.yaw = draw.number();
+  s.next_sensor = draw.number();
+  s.next_shot = draw.number();
+  s.sight_since = draw.number();
+  s.destroyed_until = draw.number();
+  s.retreat_until = draw.number();
+  s.distance = draw.number();
+  s.roof = draw.number();
+  s.roof_at = draw.number();
+  s.shots = static_cast<unsigned int>(draw.below(40));
+  s.serial = static_cast<unsigned int>(draw.below(40));
+  return s;
+}
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::PoliceDrone& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.active), arg(s.sees), arg(s.emp), arg(s.retreating), arg(s.pos), arg(s.vel), arg(s.target), arg(s.retreat_goal), arg(s.hp), arg(s.yaw), arg(s.next_sensor), arg(s.next_shot), arg(s.sight_since), arg(s.destroyed_until), arg(s.retreat_until), arg(s.distance), arg(s.roof), arg(s.roof_at), arg(s.shots), arg(s.serial)}); }
+[[maybe_unused]] static bool same(const ::sc::PoliceDrone& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 20 && same(want.active, (*got.rows)[0]) && same(want.sees, (*got.rows)[1]) && same(want.emp, (*got.rows)[2]) && same(want.retreating, (*got.rows)[3]) && same(want.pos, (*got.rows)[4]) && same(want.vel, (*got.rows)[5]) && same(want.target, (*got.rows)[6]) && same(want.retreat_goal, (*got.rows)[7]) && same(want.hp, (*got.rows)[8]) && same(want.yaw, (*got.rows)[9]) && same(want.next_sensor, (*got.rows)[10]) && same(want.next_shot, (*got.rows)[11]) && same(want.sight_since, (*got.rows)[12]) && same(want.destroyed_until, (*got.rows)[13]) && same(want.retreat_until, (*got.rows)[14]) && same(want.distance, (*got.rows)[15]) && same(want.roof, (*got.rows)[16]) && same(want.roof_at, (*got.rows)[17]) && same(want.shots, (*got.rows)[18]) && same(want.serial, (*got.rows)[19]); }
+[[maybe_unused]] static ::sc::PoliceDrone near(::sc::PoliceDrone s, int k, int slot) { using ::sc::converted::near; s.active = near(s.active, k, slot * 7 + 0); s.sees = near(s.sees, k, slot * 7 + 1); s.emp = near(s.emp, k, slot * 7 + 2); s.retreating = near(s.retreating, k, slot * 7 + 3); s.pos = near(s.pos, k, slot * 7 + 4); s.vel = near(s.vel, k, slot * 7 + 5); s.target = near(s.target, k, slot * 7 + 6); s.retreat_goal = near(s.retreat_goal, k, slot * 7 + 7); s.hp = near(s.hp, k, slot * 7 + 8); s.yaw = near(s.yaw, k, slot * 7 + 9); s.next_sensor = near(s.next_sensor, k, slot * 7 + 10); s.next_shot = near(s.next_shot, k, slot * 7 + 11); s.sight_since = near(s.sight_since, k, slot * 7 + 12); s.destroyed_until = near(s.destroyed_until, k, slot * 7 + 13); s.retreat_until = near(s.retreat_until, k, slot * 7 + 14); s.distance = near(s.distance, k, slot * 7 + 15); s.roof = near(s.roof, k, slot * 7 + 16); s.roof_at = near(s.roof_at, k, slot * 7 + 17); s.shots = near(s.shots, k, slot * 7 + 18); s.serial = near(s.serial, k, slot * 7 + 19); return s; }
+[[maybe_unused]] static bool defined(const ::sc::PoliceDrone& s) { using ::sc::converted::defined; return defined(s.active) && defined(s.sees) && defined(s.emp) && defined(s.retreating) && defined(s.pos) && defined(s.vel) && defined(s.target) && defined(s.retreat_goal) && defined(s.hp) && defined(s.yaw) && defined(s.next_sensor) && defined(s.next_shot) && defined(s.sight_since) && defined(s.destroyed_until) && defined(s.retreat_until) && defined(s.distance) && defined(s.roof) && defined(s.roof_at) && defined(s.shots) && defined(s.serial); }
+[[maybe_unused]] static void flat(const ::sc::PoliceDrone& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.active, o); flat(s.sees, o); flat(s.emp, o); flat(s.retreating, o); flat(s.pos, o); flat(s.vel, o); flat(s.target, o); flat(s.retreat_goal, o); flat(s.hp, o); flat(s.yaw, o); flat(s.next_sensor, o); flat(s.next_shot, o); flat(s.sight_since, o); flat(s.destroyed_until, o); flat(s.retreat_until, o); flat(s.distance, o); flat(s.roof, o); flat(s.roof_at, o); flat(s.shots, o); flat(s.serial, o); }
+[[maybe_unused]] static std::string text(const ::sc::PoliceDrone& s) { using ::sc::converted::text; return std::string("{") + text(s.active) + ", " + text(s.sees) + ", " + text(s.emp) + ", " + text(s.retreating) + ", " + text(s.pos) + ", " + text(s.vel) + ", " + text(s.target) + ", " + text(s.retreat_goal) + ", " + text(s.hp) + ", " + text(s.yaw) + ", " + text(s.next_sensor) + ", " + text(s.next_shot) + ", " + text(s.sight_since) + ", " + text(s.destroyed_until) + ", " + text(s.retreat_until) + ", " + text(s.distance) + ", " + text(s.roof) + ", " + text(s.roof_at) + ", " + text(s.shots) + ", " + text(s.serial) + "}"; }
 namespace converted_game_swarm {
 using namespace converted;
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::near; using converted::flat;
+using ::sc::arg;
+using ::sc::same;
+using ::sc::defined;
+using ::sc::text;
+using ::sc::near;
+using ::sc::flat;
 
 // ---- game_swarm.cpp, as it stands ----
 #pragma GCC diagnostic push
@@ -22,6 +58,7 @@ using converted::arg; using converted::same; using converted::defined; using con
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
 #pragma GCC diagnostic ignored "-Wunused-variable"
 bool falls(net::SwarmKind k) { return k == net::SwarmKind::officer || k == net::SwarmKind::enemy; }
+u16 drone_id(const PoliceDrone& d) { return static_cast<u16>(d.serial % 65535 + 1); }
 #pragma GCC diagnostic pop
 
 
@@ -34,6 +71,7 @@ using f32 = double;
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wnarrowing"
 bool falls(net::SwarmKind k) { return k == net::SwarmKind::officer || k == net::SwarmKind::enemy; }
+u16 drone_id(const PoliceDrone& d) { return static_cast<u16>(d.serial % 65535 + 1); }
 #pragma GCC diagnostic pop
 }  // namespace wide
 
@@ -48,6 +86,16 @@ SC_TEST(converted_game_swarm) {
       const auto want = falls(a0);
       const bool outside = watch.outside();
       tally.take(bp, {arg(a0)}, want, wide::falls(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return falls(near(a0, k, 0)); });
+    }
+  }
+  {  // drone_id
+    converted::Tally tally("drone_id");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::sc::PoliceDrone a0 = ::sc::draw_PoliceDrone(draw);
+      const converted::Watch watch;
+      const auto want = drone_id(a0);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0)}, want, wide::drone_id(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return drone_id(near(a0, k, 0)); });
     }
   }
 }

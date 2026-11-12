@@ -49,8 +49,8 @@ SC_TEST(converted_destruction) {
   {  // norm2
     converted::Tally tally("norm2");
     for (int i = 0; i < converted::kCalls; ++i) {
-      const kern::Vec2 a0 = draw.vector2();
-      const kern::Vec2 a1 = draw.vector2();
+      const ::kern::Vec2 a0 = draw.vector2();
+      const ::kern::Vec2 a1 = draw.vector2();
       const converted::Watch watch;
       const auto want = norm2(a0, a1);
       const bool outside = watch.outside();

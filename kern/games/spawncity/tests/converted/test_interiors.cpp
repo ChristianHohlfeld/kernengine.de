@@ -13,19 +13,19 @@
 #include "../converted.h"
 
 namespace sc {
-[[maybe_unused]] static ::sc::Interiors::Door draw_Interiors__Door(converted::Draw& draw) {
+[[maybe_unused]] static ::sc::Interiors::Door draw_Interiors__Door(::sc::converted::Draw& draw) {
   ::sc::Interiors::Door s{};
   s.c = draw.vector2();
   s.d = draw.vector2();
   s.n = draw.vector2();
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const ::sc::Interiors::Door& s) { using converted::arg; return converted::Value::structure({arg(s.c), arg(s.d), arg(s.n)}); }
-[[maybe_unused]] static bool same(const ::sc::Interiors::Door& want, const converted::Value& got) { using converted::same; return got.rows && got.rows->size() == 3 && same(want.c, (*got.rows)[0]) && same(want.d, (*got.rows)[1]) && same(want.n, (*got.rows)[2]); }
-[[maybe_unused]] static ::sc::Interiors::Door near(::sc::Interiors::Door s, int k, int slot) { using converted::near; s.c = near(s.c, k, slot * 7 + 0); s.d = near(s.d, k, slot * 7 + 1); s.n = near(s.n, k, slot * 7 + 2); return s; }
-[[maybe_unused]] static bool defined(const ::sc::Interiors::Door& s) { using converted::defined; return defined(s.c) && defined(s.d) && defined(s.n); }
-[[maybe_unused]] static void flat(const ::sc::Interiors::Door& s, std::vector<kern::f64>& o) { using converted::flat; flat(s.c, o); flat(s.d, o); flat(s.n, o); }
-[[maybe_unused]] static std::string text(const ::sc::Interiors::Door& s) { using converted::text; return std::string("{") + text(s.c) + ", " + text(s.d) + ", " + text(s.n) + "}"; }
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::Interiors::Door& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.c), arg(s.d), arg(s.n)}); }
+[[maybe_unused]] static bool same(const ::sc::Interiors::Door& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 3 && same(want.c, (*got.rows)[0]) && same(want.d, (*got.rows)[1]) && same(want.n, (*got.rows)[2]); }
+[[maybe_unused]] static ::sc::Interiors::Door near(::sc::Interiors::Door s, int k, int slot) { using ::sc::converted::near; s.c = near(s.c, k, slot * 7 + 0); s.d = near(s.d, k, slot * 7 + 1); s.n = near(s.n, k, slot * 7 + 2); return s; }
+[[maybe_unused]] static bool defined(const ::sc::Interiors::Door& s) { using ::sc::converted::defined; return defined(s.c) && defined(s.d) && defined(s.n); }
+[[maybe_unused]] static void flat(const ::sc::Interiors::Door& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.c, o); flat(s.d, o); flat(s.n, o); }
+[[maybe_unused]] static std::string text(const ::sc::Interiors::Door& s) { using ::sc::converted::text; return std::string("{") + text(s.c) + ", " + text(s.d) + ", " + text(s.n) + "}"; }
 namespace converted_interiors {
 using namespace converted;
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::near; using converted::flat;
@@ -43,6 +43,7 @@ using kern::Mat4;
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
 #pragma GCC diagnostic ignored "-Wunused-variable"
 constexpr f32 kActivate = 30, kDoorsRadius = 95, kDoorW = 1.8f;
+Vec3 rgb(u32 h) { return {((h >> 16) & 255) / 255.0f, ((h >> 8) & 255) / 255.0f, (h & 255) / 255.0f}; }
 std::vector<Vec2> clean(const std::vector<Vec2>& in) {
   std::vector<Vec2> r;
   for (Vec2 p : in) {
@@ -58,6 +59,12 @@ f32 seg_dist(Vec2 p, Vec2 a, Vec2 b) {
   const f32 l = std::fmax(1e-9f, d.x * d.x + d.y * d.y), t = clampf(((p.x - a.x) * d.x + (p.y - a.y) * d.y) / l, 0, 1);
   return std::hypot(p.x - a.x - d.x * t, p.y - a.y - d.y * t);
 }
+u32 hash_key(u32 seed, u32 salt) {
+  u32 x = seed * 0x9e3779b1u + salt * 0x85ebca6bu;
+  x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16;
+  return x;
+}
+f32 h01(u32 seed, u32 salt) { return static_cast<f32>(hash_key(seed, salt) >> 8) / 16777216.0f; }
 struct CoreFit { bool ok = false; Interiors::Core core; };
 bool door_gap(const std::vector<Interiors::Door>& doors, Vec2 a, Vec2 b, f32 inset, f32& t0, f32& t1) {
   const Vec2 d = b - a;
@@ -92,6 +99,7 @@ using f32 = double;
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wnarrowing"
 constexpr f32 kActivate = 30, kDoorsRadius = 95, kDoorW = 1.8;
+Vec3 rgb(u32 h) { return {((h >> 16) & 255) / 255.0, ((h >> 8) & 255) / 255.0, (h & 255) / 255.0}; }
 std::vector<Vec2> clean(const std::vector<Vec2>& in) {
   std::vector<Vec2> r;
   for (Vec2 p : in) {
@@ -107,6 +115,12 @@ f32 seg_dist(Vec2 p, Vec2 a, Vec2 b) {
   const f32 l = std::fmax(1e-9, d.x * d.x + d.y * d.y), t = clampf(((p.x - a.x) * d.x + (p.y - a.y) * d.y) / l, 0, 1);
   return std::hypot(p.x - a.x - d.x * t, p.y - a.y - d.y * t);
 }
+u32 hash_key(u32 seed, u32 salt) {
+  u32 x = seed * 0x9e3779b1u + salt * 0x85ebca6bu;
+  x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16;
+  return x;
+}
+f32 h01(u32 seed, u32 salt) { return static_cast<f32>(hash_key(seed, salt) >> 8) / 16777216.0; }
 bool door_gap(const std::vector<Interiors::Door>& doors, Vec2 a, Vec2 b, f32 inset, f32& t0, f32& t1) {
   const Vec2 d = b - a;
   const f32 len = std::hypot(d.x, d.y);
@@ -129,25 +143,57 @@ bool door_gap(const std::vector<Interiors::Door>& doors, Vec2 a, Vec2 b, f32 ins
 SC_TEST(converted_interiors) {
   converted::Blueprint bp("Interiors");
   converted::Draw draw;
+  {  // rgb
+    converted::Tally tally("rgb");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = rgb(a0);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0)}, want, wide::rgb(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return rgb(near(a0, k, 0)); });
+    }
+  }
   {  // seg_dist
     converted::Tally tally("seg_dist");
     for (int i = 0; i < converted::kCalls; ++i) {
-      const kern::Vec2 a0 = draw.vector2();
-      const kern::Vec2 a1 = draw.vector2();
-      const kern::Vec2 a2 = draw.vector2();
+      const ::kern::Vec2 a0 = draw.vector2();
+      const ::kern::Vec2 a1 = draw.vector2();
+      const ::kern::Vec2 a2 = draw.vector2();
       const converted::Watch watch;
       const auto want = seg_dist(a0, a1, a2);
       const bool outside = watch.outside();
       tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, wide::seg_dist(wide_arg(a0), wide_arg(a1), wide_arg(a2)), outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, [&]([[maybe_unused]] int k) { return seg_dist(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2)); });
     }
   }
+  {  // hash_key
+    converted::Tally tally("hash_key");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = hash_key(a0, a1);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1)}, want, wide::hash_key(wide_arg(a0), wide_arg(a1)), outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return hash_key(near(a0, k, 0), near(a1, k, 1)); });
+    }
+  }
+  {  // h01
+    converted::Tally tally("h01");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = h01(a0, a1);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1)}, want, wide::h01(wide_arg(a0), wide_arg(a1)), outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return h01(near(a0, k, 0), near(a1, k, 1)); });
+    }
+  }
   {  // door_gap
     converted::Tally tally("door_gap");
-    const auto run = [&](std::vector<::sc::Interiors::Door> a0, kern::Vec2 a1, kern::Vec2 a2, float a3, float a4, float a5) { const auto r = door_gap(a0, a1, a2, a3, a4, a5); return Out_door_gap{r, a4, a5}; };
+    const auto run = [&](std::vector<::sc::Interiors::Door> a0, ::kern::Vec2 a1, ::kern::Vec2 a2, float a3, float a4, float a5) { const auto r = door_gap(a0, a1, a2, a3, a4, a5); return Out_door_gap{r, a4, a5}; };
     for (int i = 0; i < converted::kCalls; ++i) {
-      const std::vector<::sc::Interiors::Door> a0 = draw_list(draw, [&]() -> ::sc::Interiors::Door { return draw_Interiors__Door(draw); });
-      const kern::Vec2 a1 = draw.vector2();
-      const kern::Vec2 a2 = draw.vector2();
+      const std::vector<::sc::Interiors::Door> a0 = draw_list(draw, [&]() -> ::sc::Interiors::Door { return ::sc::draw_Interiors__Door(draw); });
+      const ::kern::Vec2 a1 = draw.vector2();
+      const ::kern::Vec2 a2 = draw.vector2();
       const float a3 = draw.number();
       const float a4 = draw.number();
       const float a5 = draw.number();

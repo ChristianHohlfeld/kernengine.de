@@ -47,8 +47,8 @@ SC_TEST(converted_game_life) {
   {  // dist2d
     converted::Tally tally("dist2d");
     for (int i = 0; i < converted::kCalls; ++i) {
-      const kern::Vec3 a0 = draw.vector();
-      const kern::Vec3 a1 = draw.vector();
+      const ::kern::Vec3 a0 = draw.vector();
+      const ::kern::Vec3 a1 = draw.vector();
       const converted::Watch watch;
       const auto want = dist2d(a0, a1);
       const bool outside = watch.outside();

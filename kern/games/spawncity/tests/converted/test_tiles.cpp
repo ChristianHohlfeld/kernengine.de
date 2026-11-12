@@ -14,20 +14,35 @@
 #include "../../src/tiles.h"
 #include "../converted.h"
 
+namespace kern {
+[[maybe_unused]] static ::kern::GeoProjector draw_kern__GeoProjector(::sc::converted::Draw& draw) {
+  ::kern::GeoProjector s{};
+  s.lon0 = draw.number();
+  s.lat0 = draw.number();
+  s.cos_lat = draw.number();
+  return s;
+}
+[[maybe_unused]] static ::sc::converted::Value arg(const ::kern::GeoProjector& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.lon0), arg(s.lat0), arg(s.cos_lat)}); }
+[[maybe_unused]] static bool same(const ::kern::GeoProjector& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 3 && same(want.lon0, (*got.rows)[0]) && same(want.lat0, (*got.rows)[1]) && same(want.cos_lat, (*got.rows)[2]); }
+[[maybe_unused]] static ::kern::GeoProjector near(::kern::GeoProjector s, int k, int slot) { using ::sc::converted::near; s.lon0 = near(s.lon0, k, slot * 7 + 0); s.lat0 = near(s.lat0, k, slot * 7 + 1); s.cos_lat = near(s.cos_lat, k, slot * 7 + 2); return s; }
+[[maybe_unused]] static bool defined(const ::kern::GeoProjector& s) { using ::sc::converted::defined; return defined(s.lon0) && defined(s.lat0) && defined(s.cos_lat); }
+[[maybe_unused]] static void flat(const ::kern::GeoProjector& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.lon0, o); flat(s.lat0, o); flat(s.cos_lat, o); }
+[[maybe_unused]] static std::string text(const ::kern::GeoProjector& s) { using ::sc::converted::text; return std::string("{") + text(s.lon0) + ", " + text(s.lat0) + ", " + text(s.cos_lat) + "}"; }
+}  // namespace kern
 namespace sc {
-[[maybe_unused]] static ::sc::TileKey draw_TileKey(converted::Draw& draw) {
+[[maybe_unused]] static ::sc::TileKey draw_TileKey(::sc::converted::Draw& draw) {
   ::sc::TileKey s{};
   s.z = static_cast<int>(draw.whole());
   s.x = static_cast<int>(draw.whole());
   s.y = static_cast<int>(draw.whole());
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const ::sc::TileKey& s) { using converted::arg; return converted::Value::structure({arg(s.z), arg(s.x), arg(s.y)}); }
-[[maybe_unused]] static bool same(const ::sc::TileKey& want, const converted::Value& got) { using converted::same; return got.rows && got.rows->size() == 3 && same(want.z, (*got.rows)[0]) && same(want.x, (*got.rows)[1]) && same(want.y, (*got.rows)[2]); }
-[[maybe_unused]] static ::sc::TileKey near(::sc::TileKey s, int k, int slot) { using converted::near; s.z = near(s.z, k, slot * 7 + 0); s.x = near(s.x, k, slot * 7 + 1); s.y = near(s.y, k, slot * 7 + 2); return s; }
-[[maybe_unused]] static bool defined(const ::sc::TileKey& s) { using converted::defined; return defined(s.z) && defined(s.x) && defined(s.y); }
-[[maybe_unused]] static void flat(const ::sc::TileKey& s, std::vector<kern::f64>& o) { using converted::flat; flat(s.z, o); flat(s.x, o); flat(s.y, o); }
-[[maybe_unused]] static std::string text(const ::sc::TileKey& s) { using converted::text; return std::string("{") + text(s.z) + ", " + text(s.x) + ", " + text(s.y) + "}"; }
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::TileKey& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.z), arg(s.x), arg(s.y)}); }
+[[maybe_unused]] static bool same(const ::sc::TileKey& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 3 && same(want.z, (*got.rows)[0]) && same(want.x, (*got.rows)[1]) && same(want.y, (*got.rows)[2]); }
+[[maybe_unused]] static ::sc::TileKey near(::sc::TileKey s, int k, int slot) { using ::sc::converted::near; s.z = near(s.z, k, slot * 7 + 0); s.x = near(s.x, k, slot * 7 + 1); s.y = near(s.y, k, slot * 7 + 2); return s; }
+[[maybe_unused]] static bool defined(const ::sc::TileKey& s) { using ::sc::converted::defined; return defined(s.z) && defined(s.x) && defined(s.y); }
+[[maybe_unused]] static void flat(const ::sc::TileKey& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.z, o); flat(s.x, o); flat(s.y, o); }
+[[maybe_unused]] static std::string text(const ::sc::TileKey& s) { using ::sc::converted::text; return std::string("{") + text(s.z) + ", " + text(s.x) + ", " + text(s.y) + "}"; }
 namespace converted_tiles {
 using namespace converted;
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::near; using converted::flat;
@@ -37,6 +52,12 @@ using ::sc::defined;
 using ::sc::text;
 using ::sc::near;
 using ::sc::flat;
+using ::kern::arg;
+using ::kern::same;
+using ::kern::defined;
+using ::kern::text;
+using ::kern::near;
+using ::kern::flat;
 
 // ---- tiles.cpp, as it stands ----
 #pragma GCC diagnostic push
@@ -73,6 +94,16 @@ struct Out_tile_lonlat { double lon; double lat; };
 [[maybe_unused]] static bool defined(const Out_tile_lonlat& s) { return defined(s.lon) && defined(s.lat); }
 [[maybe_unused]] static void flat(const Out_tile_lonlat& s, std::vector<kern::f64>& o) { flat(s.lon, o); flat(s.lat, o); }
 [[maybe_unused]] static std::string text(const Out_tile_lonlat& s) { return std::string("{") + text(s.lon) + ", " + text(s.lat) + "}"; }
+struct Out_unproject { double lon; double lat; };
+[[maybe_unused]] static bool same(const Out_unproject& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.lon, (*got.rows)[0]) && same(want.lat, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_unproject& s) { return defined(s.lon) && defined(s.lat); }
+[[maybe_unused]] static void flat(const Out_unproject& s, std::vector<kern::f64>& o) { flat(s.lon, o); flat(s.lat, o); }
+[[maybe_unused]] static std::string text(const Out_unproject& s) { return std::string("{") + text(s.lon) + ", " + text(s.lat) + "}"; }
+struct Out_GeoProjector_project { double x; double y; };
+[[maybe_unused]] static bool same(const Out_GeoProjector_project& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_GeoProjector_project& s) { return defined(s.x) && defined(s.y); }
+[[maybe_unused]] static void flat(const Out_GeoProjector_project& s, std::vector<kern::f64>& o) { flat(s.x, o); flat(s.y, o); }
+[[maybe_unused]] static std::string text(const Out_GeoProjector_project& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + "}"; }
 
 // ---- the same functions with 64-bit numbers, as a Blueprint computes ----
 namespace wide {
@@ -98,6 +129,10 @@ void tile_lonlat(const TileKey& t, f64 fx, f64 fy, f64& lon, f64& lat) {
   lon = (t.x + fx) / n * 360 - 180;
   lat = std::atan(std::sinh(kPiD * (1 - 2 * (t.y + fy) / n))) * 180 / kPiD;
 }
+void unproject(const kern::GeoProjector& p, f64 x, f64 y, f64& lon, f64& lat) {
+  lon = p.lon0 + x / (kern::GeoProjector::kEarthRadius * p.cos_lat) / kern::GeoProjector::kRad;
+  lat = p.lat0 + y / kern::GeoProjector::kEarthRadius / kern::GeoProjector::kRad;
+}
 f32 road_width(RoadClass c) {
   switch (c) {
     case RoadClass::motorway: return 14;
@@ -118,6 +153,70 @@ f32 road_width(RoadClass c) {
 }
 bool road_is_water(RoadClass c) { return c == RoadClass::river || c == RoadClass::canal || c == RoadClass::stream; }
 bool road_drivable(RoadClass c) { return static_cast<u8>(c) <= static_cast<u8>(RoadClass::service); }
+void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out) {
+  // A walled-town grid with a market square: blocks of narrow terraced houses (3-6 storeys),
+  // a ring road, a park and a lake shore to the north. Nothing here comes from real map data.
+  Rng rng(seed);
+  out.procedural = true;
+  const f32 pitch = 76, street = 12;
+  const int blocks = std::max(3, static_cast<int>(size / pitch));
+  const f32 half = blocks * pitch * 0.5;
+  const f32 x0 = static_cast<f32>(cx) - half, y0 = static_cast<f32>(cy) - half;
+  for (int i = 0; i <= blocks; ++i) {
+    const f32 t = -half + i * pitch;
+    MapFeatures::Road a, b;
+    const bool ring = i == 0 || i == blocks;
+    a.cls = b.cls = ring ? RoadClass::secondary : (i == blocks / 2 ? RoadClass::tertiary : RoadClass::minor);
+    a.points = {{static_cast<f32>(cx) + t, static_cast<f32>(cy) - half}, {static_cast<f32>(cx) + t, static_cast<f32>(cy) + half}};
+    b.points = {{static_cast<f32>(cx) - half, static_cast<f32>(cy) + t}, {static_cast<f32>(cx) + half, static_cast<f32>(cy) + t}};
+    out.roads.push_back(a);
+    out.roads.push_back(b);
+  }
+  for (int bx = 0; bx < blocks; ++bx)
+    for (int by = 0; by < blocks; ++by) {
+      const f32 a0 = x0 + bx * pitch + street * 0.5 + 2, b0 = y0 + by * pitch + street * 0.5 + 2;
+      const f32 inner = pitch - street - 4;
+      const bool market = bx == blocks / 2 && by == blocks / 2;
+      const bool park = (bx == 1 && by == blocks - 2);
+      if (market || park) {
+        MapFeatures::Area a;
+        a.kind = market ? AreaKind::sand : AreaKind::park;
+        a.rings.push_back({{a0, b0}, {a0 + inner, b0}, {a0 + inner, b0 + inner}, {a0, b0 + inner}});
+        out.areas.push_back(a);
+        continue;
+      }
+      // Terraced houses along the four sides of the block, a courtyard in the middle.
+      const f32 depth = rng.range(10, 14);
+      for (int side = 0; side < 4; ++side) {
+        f32 along = 0;
+        while (along < inner - 4) {
+          const f32 w = std::fmin(rng.range(7, 13), inner - along);
+          f32 ax, ay, bx2, by2;
+          switch (side) {
+            case 0: ax = a0 + along; ay = b0; bx2 = ax + w; by2 = b0 + depth; break;
+            case 1: ax = a0 + inner - depth; ay = b0 + along; bx2 = a0 + inner; by2 = ay + w; break;
+            case 2: ax = a0 + inner - along - w; ay = b0 + inner - depth; bx2 = ax + w; by2 = b0 + inner; break;
+            default: ax = a0; ay = b0 + inner - along - w; bx2 = a0 + depth; by2 = ay + w; break;
+          }
+          // Skip the corner overlaps of side 1..3 with side 0 / 2.
+          if ((side == 1 || side == 3) && (ay < b0 + depth || by2 > b0 + inner - depth)) { along += w; continue; }
+          MapFeatures::Building b;
+          b.rings.push_back({{ax, ay}, {bx2, ay}, {bx2, by2}, {ax, by2}});
+          b.top = 3.2 * static_cast<f32>(3 + static_cast<int>(rng.unit() * 4)) + rng.range(0, 1.5);
+          b.seed = rng.next();
+          out.buildings.push_back(std::move(b));
+          along += w;
+        }
+      }
+    }
+  // Lake shore to the north (a stand-in for the Bodensee).
+  MapFeatures::Area lake;
+  lake.kind = AreaKind::water;
+  const f32 ly = static_cast<f32>(cy) + half + 30;
+  lake.rings.push_back({{static_cast<f32>(cx) - half * 2, ly}, {static_cast<f32>(cx) + half * 2, ly}, {static_cast<f32>(cx) + half * 2, ly + 900},
+                        {static_cast<f32>(cx) - half * 2, ly + 900}});
+  out.areas.push_back(lake);
+}
 #pragma GCC diagnostic pop
 }  // namespace wide
 
@@ -131,16 +230,31 @@ SC_TEST(converted_tiles) {
       const double a1 = draw.number();
       const int a2 = static_cast<int>(draw.whole());
       const converted::Watch watch;
-      const auto want = tile_at(a0, a1, a2);
+      const auto want = ::sc::tile_at(a0, a1, a2);
       const bool outside = watch.outside();
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, wide::tile_at(wide_arg(a0), wide_arg(a1), wide_arg(a2)), outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, [&]([[maybe_unused]] int k) { return tile_at(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2)); });
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, wide::tile_at(wide_arg(a0), wide_arg(a1), wide_arg(a2)), outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, [&]([[maybe_unused]] int k) { return ::sc::tile_at(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2)); });
     }
   }
   {  // tile_lonlat
     converted::Tally tally("tile_lonlat");
-    const auto run = [&](::sc::TileKey a0, double a1, double a2, double a3, double a4) { tile_lonlat(a0, a1, a2, a3, a4); return Out_tile_lonlat{a3, a4}; };
+    const auto run = [&](::sc::TileKey a0, double a1, double a2, double a3, double a4) { ::sc::tile_lonlat(a0, a1, a2, a3, a4); return Out_tile_lonlat{a3, a4}; };
     for (int i = 0; i < converted::kCalls; ++i) {
-      const ::sc::TileKey a0 = draw_TileKey(draw);
+      const ::sc::TileKey a0 = ::sc::draw_TileKey(draw);
+      const double a1 = draw.number();
+      const double a2 = draw.number();
+      const double a3 = draw.number();
+      const double a4 = draw.number();
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2, a3, a4);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)}, want, want, outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); }, [&]([[maybe_unused]] int k) { return run(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2), near(a3, k, 3), near(a4, k, 4)); });
+    }
+  }
+  {  // unproject
+    converted::Tally tally("unproject");
+    const auto run = [&](::kern::GeoProjector a0, double a1, double a2, double a3, double a4) { ::sc::unproject(a0, a1, a2, a3, a4); return Out_unproject{a3, a4}; };
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::kern::GeoProjector a0 = ::kern::draw_kern__GeoProjector(draw);
       const double a1 = draw.number();
       const double a2 = draw.number();
       const double a3 = draw.number();
@@ -156,9 +270,9 @@ SC_TEST(converted_tiles) {
     for (int i = 0; i < converted::kCalls; ++i) {
       const ::sc::RoadClass a0 = static_cast<::sc::RoadClass>(draw.below(13));
       const converted::Watch watch;
-      const auto want = road_width(a0);
+      const auto want = ::sc::road_width(a0);
       const bool outside = watch.outside();
-      tally.take(bp, {arg(a0)}, want, wide::road_width(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return road_width(near(a0, k, 0)); });
+      tally.take(bp, {arg(a0)}, want, wide::road_width(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return ::sc::road_width(near(a0, k, 0)); });
     }
   }
   {  // road_is_water
@@ -166,9 +280,9 @@ SC_TEST(converted_tiles) {
     for (int i = 0; i < converted::kCalls; ++i) {
       const ::sc::RoadClass a0 = static_cast<::sc::RoadClass>(draw.below(13));
       const converted::Watch watch;
-      const auto want = road_is_water(a0);
+      const auto want = ::sc::road_is_water(a0);
       const bool outside = watch.outside();
-      tally.take(bp, {arg(a0)}, want, wide::road_is_water(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return road_is_water(near(a0, k, 0)); });
+      tally.take(bp, {arg(a0)}, want, wide::road_is_water(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return ::sc::road_is_water(near(a0, k, 0)); });
     }
   }
   {  // road_drivable
@@ -176,9 +290,24 @@ SC_TEST(converted_tiles) {
     for (int i = 0; i < converted::kCalls; ++i) {
       const ::sc::RoadClass a0 = static_cast<::sc::RoadClass>(draw.below(13));
       const converted::Watch watch;
-      const auto want = road_drivable(a0);
+      const auto want = ::sc::road_drivable(a0);
       const bool outside = watch.outside();
-      tally.take(bp, {arg(a0)}, want, wide::road_drivable(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return road_drivable(near(a0, k, 0)); });
+      tally.take(bp, {arg(a0)}, want, wide::road_drivable(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return ::sc::road_drivable(near(a0, k, 0)); });
+    }
+  }
+  {  // GeoProjector::project
+    converted::Tally tally("GeoProjector_project");
+    const auto run = [&](::kern::GeoProjector a0, double a1, double a2, double a3, double a4) { a0.project(a1, a2, a3, a4); return Out_GeoProjector_project{a3, a4}; };
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::kern::GeoProjector a0 = ::kern::draw_kern__GeoProjector(draw);
+      const double a1 = draw.number();
+      const double a2 = draw.number();
+      const double a3 = draw.number();
+      const double a4 = draw.number();
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2, a3, a4);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)}, want, want, outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); }, [&]([[maybe_unused]] int k) { return run(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2), near(a3, k, 3), near(a4, k, 4)); });
     }
   }
 }

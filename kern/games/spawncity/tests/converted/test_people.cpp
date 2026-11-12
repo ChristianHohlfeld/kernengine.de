@@ -7,20 +7,181 @@
 #include <type_traits>
 #include <vector>
 #include <algorithm>
+// (the test sets the data of objects and calls methods a class keeps to itself: it reads the headers with private as public)
+#define private public
+#define protected public
 #include "../../src/people.h"
 #include "../../src/person_hit.h"
 #include "../converted.h"
 
 namespace sc {
+[[maybe_unused]] static ::sc::People::Person draw_People__Person(::sc::converted::Draw& draw) {
+  ::sc::People::Person s{};
+  s.kind = static_cast<::sc::People::Kind>(draw.below(5));
+  s.state = static_cast<::sc::People::State>(draw.below(7));
+  s.pos = draw.vector();
+  s.yaw = draw.number();
+  s.speed = draw.number();
+  s.v = draw.number();
+  s.hp = draw.number();
+  s.phase = draw.number();
+  s.shirt = draw.vector();
+  s.pants = draw.vector();
+  s.skin = draw.vector();
+  s.lane = static_cast<int>(draw.whole());
+  s.seg = static_cast<int>(draw.whole());
+  s.dir = static_cast<int>(draw.whole());
+  s.along = draw.number();
+  s.side = draw.number();
+  s.off = draw.number();
+  s.flee_until = draw.number();
+  s.burst_until = draw.number();
+  s.flee_speed = draw.number();
+  s.hands_up_until = draw.number();
+  s.shaken_until = draw.number();
+  s.wait_until = draw.number();
+  s.flee_dir = draw.vector2();
+  s.fitness = draw.number();
+  s.down_at = draw.number();
+  s.fall_dir = draw.vector();
+  s.unit = static_cast<int>(draw.whole());
+  s.aiming = draw.flag();
+  s.aim_pitch = draw.number();
+  s.held = static_cast<int>(draw.whole());
+  s.hands = draw.flag();
+  s.hand_l = draw.vector();
+  s.hand_r = draw.vector();
+  s.punch = static_cast<unsigned char>(draw.below(40));
+  s.seed = static_cast<unsigned int>(draw.below(40));
+  s.provoked_at = draw.number();
+  s.fight_until = draw.number();
+  s.last_attack = draw.number();
+  s.provoked_hit = draw.flag();
+  s.role = static_cast<unsigned char>(draw.below(40));
+  s.knocked_until = draw.number();
+  s.hurt_at = draw.number();
+  s.remote = draw.flag();
+  s.net = static_cast<int>(draw.whole());
+  s.net_to = draw.vector();
+  s.net_at = draw.number();
+  return s;
+}
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::People::Person& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.kind), arg(s.state), arg(s.pos), arg(s.yaw), arg(s.speed), arg(s.v), arg(s.hp), arg(s.phase), arg(s.shirt), arg(s.pants), arg(s.skin), arg(s.lane), arg(s.seg), arg(s.dir), arg(s.along), arg(s.side), arg(s.off), arg(s.flee_until), arg(s.burst_until), arg(s.flee_speed), arg(s.hands_up_until), arg(s.shaken_until), arg(s.wait_until), arg(s.flee_dir), arg(s.fitness), arg(s.down_at), arg(s.fall_dir), arg(s.unit), arg(s.aiming), arg(s.aim_pitch), arg(s.held), arg(s.hands), arg(s.hand_l), arg(s.hand_r), arg(s.punch), arg(s.seed), arg(s.provoked_at), arg(s.fight_until), arg(s.last_attack), arg(s.provoked_hit), arg(s.role), arg(s.knocked_until), arg(s.hurt_at), arg(s.remote), arg(s.net), arg(s.net_to), arg(s.net_at)}); }
+[[maybe_unused]] static bool same(const ::sc::People::Person& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 47 && same(want.kind, (*got.rows)[0]) && same(want.state, (*got.rows)[1]) && same(want.pos, (*got.rows)[2]) && same(want.yaw, (*got.rows)[3]) && same(want.speed, (*got.rows)[4]) && same(want.v, (*got.rows)[5]) && same(want.hp, (*got.rows)[6]) && same(want.phase, (*got.rows)[7]) && same(want.shirt, (*got.rows)[8]) && same(want.pants, (*got.rows)[9]) && same(want.skin, (*got.rows)[10]) && same(want.lane, (*got.rows)[11]) && same(want.seg, (*got.rows)[12]) && same(want.dir, (*got.rows)[13]) && same(want.along, (*got.rows)[14]) && same(want.side, (*got.rows)[15]) && same(want.off, (*got.rows)[16]) && same(want.flee_until, (*got.rows)[17]) && same(want.burst_until, (*got.rows)[18]) && same(want.flee_speed, (*got.rows)[19]) && same(want.hands_up_until, (*got.rows)[20]) && same(want.shaken_until, (*got.rows)[21]) && same(want.wait_until, (*got.rows)[22]) && same(want.flee_dir, (*got.rows)[23]) && same(want.fitness, (*got.rows)[24]) && same(want.down_at, (*got.rows)[25]) && same(want.fall_dir, (*got.rows)[26]) && same(want.unit, (*got.rows)[27]) && same(want.aiming, (*got.rows)[28]) && same(want.aim_pitch, (*got.rows)[29]) && same(want.held, (*got.rows)[30]) && same(want.hands, (*got.rows)[31]) && same(want.hand_l, (*got.rows)[32]) && same(want.hand_r, (*got.rows)[33]) && same(want.punch, (*got.rows)[34]) && same(want.seed, (*got.rows)[35]) && same(want.provoked_at, (*got.rows)[36]) && same(want.fight_until, (*got.rows)[37]) && same(want.last_attack, (*got.rows)[38]) && same(want.provoked_hit, (*got.rows)[39]) && same(want.role, (*got.rows)[40]) && same(want.knocked_until, (*got.rows)[41]) && same(want.hurt_at, (*got.rows)[42]) && same(want.remote, (*got.rows)[43]) && same(want.net, (*got.rows)[44]) && same(want.net_to, (*got.rows)[45]) && same(want.net_at, (*got.rows)[46]); }
+[[maybe_unused]] static ::sc::People::Person near(::sc::People::Person s, int k, int slot) { using ::sc::converted::near; s.kind = near(s.kind, k, slot * 7 + 0); s.state = near(s.state, k, slot * 7 + 1); s.pos = near(s.pos, k, slot * 7 + 2); s.yaw = near(s.yaw, k, slot * 7 + 3); s.speed = near(s.speed, k, slot * 7 + 4); s.v = near(s.v, k, slot * 7 + 5); s.hp = near(s.hp, k, slot * 7 + 6); s.phase = near(s.phase, k, slot * 7 + 7); s.shirt = near(s.shirt, k, slot * 7 + 8); s.pants = near(s.pants, k, slot * 7 + 9); s.skin = near(s.skin, k, slot * 7 + 10); s.lane = near(s.lane, k, slot * 7 + 11); s.seg = near(s.seg, k, slot * 7 + 12); s.dir = near(s.dir, k, slot * 7 + 13); s.along = near(s.along, k, slot * 7 + 14); s.side = near(s.side, k, slot * 7 + 15); s.off = near(s.off, k, slot * 7 + 16); s.flee_until = near(s.flee_until, k, slot * 7 + 17); s.burst_until = near(s.burst_until, k, slot * 7 + 18); s.flee_speed = near(s.flee_speed, k, slot * 7 + 19); s.hands_up_until = near(s.hands_up_until, k, slot * 7 + 20); s.shaken_until = near(s.shaken_until, k, slot * 7 + 21); s.wait_until = near(s.wait_until, k, slot * 7 + 22); s.flee_dir = near(s.flee_dir, k, slot * 7 + 23); s.fitness = near(s.fitness, k, slot * 7 + 24); s.down_at = near(s.down_at, k, slot * 7 + 25); s.fall_dir = near(s.fall_dir, k, slot * 7 + 26); s.unit = near(s.unit, k, slot * 7 + 27); s.aiming = near(s.aiming, k, slot * 7 + 28); s.aim_pitch = near(s.aim_pitch, k, slot * 7 + 29); s.held = near(s.held, k, slot * 7 + 30); s.hands = near(s.hands, k, slot * 7 + 31); s.hand_l = near(s.hand_l, k, slot * 7 + 32); s.hand_r = near(s.hand_r, k, slot * 7 + 33); s.punch = near(s.punch, k, slot * 7 + 34); s.seed = near(s.seed, k, slot * 7 + 35); s.provoked_at = near(s.provoked_at, k, slot * 7 + 36); s.fight_until = near(s.fight_until, k, slot * 7 + 37); s.last_attack = near(s.last_attack, k, slot * 7 + 38); s.provoked_hit = near(s.provoked_hit, k, slot * 7 + 39); s.role = near(s.role, k, slot * 7 + 40); s.knocked_until = near(s.knocked_until, k, slot * 7 + 41); s.hurt_at = near(s.hurt_at, k, slot * 7 + 42); s.remote = near(s.remote, k, slot * 7 + 43); s.net = near(s.net, k, slot * 7 + 44); s.net_to = near(s.net_to, k, slot * 7 + 45); s.net_at = near(s.net_at, k, slot * 7 + 46); return s; }
+[[maybe_unused]] static bool defined(const ::sc::People::Person& s) { using ::sc::converted::defined; return defined(s.kind) && defined(s.state) && defined(s.pos) && defined(s.yaw) && defined(s.speed) && defined(s.v) && defined(s.hp) && defined(s.phase) && defined(s.shirt) && defined(s.pants) && defined(s.skin) && defined(s.lane) && defined(s.seg) && defined(s.dir) && defined(s.along) && defined(s.side) && defined(s.off) && defined(s.flee_until) && defined(s.burst_until) && defined(s.flee_speed) && defined(s.hands_up_until) && defined(s.shaken_until) && defined(s.wait_until) && defined(s.flee_dir) && defined(s.fitness) && defined(s.down_at) && defined(s.fall_dir) && defined(s.unit) && defined(s.aiming) && defined(s.aim_pitch) && defined(s.held) && defined(s.hands) && defined(s.hand_l) && defined(s.hand_r) && defined(s.punch) && defined(s.seed) && defined(s.provoked_at) && defined(s.fight_until) && defined(s.last_attack) && defined(s.provoked_hit) && defined(s.role) && defined(s.knocked_until) && defined(s.hurt_at) && defined(s.remote) && defined(s.net) && defined(s.net_to) && defined(s.net_at); }
+[[maybe_unused]] static void flat(const ::sc::People::Person& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.kind, o); flat(s.state, o); flat(s.pos, o); flat(s.yaw, o); flat(s.speed, o); flat(s.v, o); flat(s.hp, o); flat(s.phase, o); flat(s.shirt, o); flat(s.pants, o); flat(s.skin, o); flat(s.lane, o); flat(s.seg, o); flat(s.dir, o); flat(s.along, o); flat(s.side, o); flat(s.off, o); flat(s.flee_until, o); flat(s.burst_until, o); flat(s.flee_speed, o); flat(s.hands_up_until, o); flat(s.shaken_until, o); flat(s.wait_until, o); flat(s.flee_dir, o); flat(s.fitness, o); flat(s.down_at, o); flat(s.fall_dir, o); flat(s.unit, o); flat(s.aiming, o); flat(s.aim_pitch, o); flat(s.held, o); flat(s.hands, o); flat(s.hand_l, o); flat(s.hand_r, o); flat(s.punch, o); flat(s.seed, o); flat(s.provoked_at, o); flat(s.fight_until, o); flat(s.last_attack, o); flat(s.provoked_hit, o); flat(s.role, o); flat(s.knocked_until, o); flat(s.hurt_at, o); flat(s.remote, o); flat(s.net, o); flat(s.net_to, o); flat(s.net_at, o); }
+[[maybe_unused]] static std::string text(const ::sc::People::Person& s) { using ::sc::converted::text; return std::string("{") + text(s.kind) + ", " + text(s.state) + ", " + text(s.pos) + ", " + text(s.yaw) + ", " + text(s.speed) + ", " + text(s.v) + ", " + text(s.hp) + ", " + text(s.phase) + ", " + text(s.shirt) + ", " + text(s.pants) + ", " + text(s.skin) + ", " + text(s.lane) + ", " + text(s.seg) + ", " + text(s.dir) + ", " + text(s.along) + ", " + text(s.side) + ", " + text(s.off) + ", " + text(s.flee_until) + ", " + text(s.burst_until) + ", " + text(s.flee_speed) + ", " + text(s.hands_up_until) + ", " + text(s.shaken_until) + ", " + text(s.wait_until) + ", " + text(s.flee_dir) + ", " + text(s.fitness) + ", " + text(s.down_at) + ", " + text(s.fall_dir) + ", " + text(s.unit) + ", " + text(s.aiming) + ", " + text(s.aim_pitch) + ", " + text(s.held) + ", " + text(s.hands) + ", " + text(s.hand_l) + ", " + text(s.hand_r) + ", " + text(s.punch) + ", " + text(s.seed) + ", " + text(s.provoked_at) + ", " + text(s.fight_until) + ", " + text(s.last_attack) + ", " + text(s.provoked_hit) + ", " + text(s.role) + ", " + text(s.knocked_until) + ", " + text(s.hurt_at) + ", " + text(s.remote) + ", " + text(s.net) + ", " + text(s.net_to) + ", " + text(s.net_at) + "}"; }
+[[maybe_unused]] static ::sc::CrimeReport draw_CrimeReport(::sc::converted::Draw& draw) {
+  ::sc::CrimeReport s{};
+  s.crime = static_cast<::sc::wanted::Crime>(draw.below(10));
+  s.at = draw.vector();
+  s.witnessed = draw.flag();
+  return s;
+}
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::CrimeReport& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.crime), arg(s.at), arg(s.witnessed)}); }
+[[maybe_unused]] static bool same(const ::sc::CrimeReport& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 3 && same(want.crime, (*got.rows)[0]) && same(want.at, (*got.rows)[1]) && same(want.witnessed, (*got.rows)[2]); }
+[[maybe_unused]] static ::sc::CrimeReport near(::sc::CrimeReport s, int k, int slot) { using ::sc::converted::near; s.crime = near(s.crime, k, slot * 7 + 0); s.at = near(s.at, k, slot * 7 + 1); s.witnessed = near(s.witnessed, k, slot * 7 + 2); return s; }
+[[maybe_unused]] static bool defined(const ::sc::CrimeReport& s) { using ::sc::converted::defined; return defined(s.crime) && defined(s.at) && defined(s.witnessed); }
+[[maybe_unused]] static void flat(const ::sc::CrimeReport& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.crime, o); flat(s.at, o); flat(s.witnessed, o); }
+[[maybe_unused]] static std::string text(const ::sc::CrimeReport& s) { using ::sc::converted::text; return std::string("{") + text(s.crime) + ", " + text(s.at) + ", " + text(s.witnessed) + "}"; }
+[[maybe_unused]] static ::sc::People::Death draw_People__Death(::sc::converted::Draw& draw) {
+  ::sc::People::Death s{};
+  s.index = static_cast<int>(draw.whole());
+  s.kind = static_cast<::sc::People::Kind>(draw.below(5));
+  s.by_player = draw.flag();
+  s.head = draw.flag();
+  return s;
+}
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::People::Death& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.index), arg(s.kind), arg(s.by_player), arg(s.head)}); }
+[[maybe_unused]] static bool same(const ::sc::People::Death& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 4 && same(want.index, (*got.rows)[0]) && same(want.kind, (*got.rows)[1]) && same(want.by_player, (*got.rows)[2]) && same(want.head, (*got.rows)[3]); }
+[[maybe_unused]] static ::sc::People::Death near(::sc::People::Death s, int k, int slot) { using ::sc::converted::near; s.index = near(s.index, k, slot * 7 + 0); s.kind = near(s.kind, k, slot * 7 + 1); s.by_player = near(s.by_player, k, slot * 7 + 2); s.head = near(s.head, k, slot * 7 + 3); return s; }
+[[maybe_unused]] static bool defined(const ::sc::People::Death& s) { using ::sc::converted::defined; return defined(s.index) && defined(s.kind) && defined(s.by_player) && defined(s.head); }
+[[maybe_unused]] static void flat(const ::sc::People::Death& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.index, o); flat(s.kind, o); flat(s.by_player, o); flat(s.head, o); }
+[[maybe_unused]] static std::string text(const ::sc::People::Death& s) { using ::sc::converted::text; return std::string("{") + text(s.index) + ", " + text(s.kind) + ", " + text(s.by_player) + ", " + text(s.head) + "}"; }
+[[maybe_unused]] static ::sc::People::Fall draw_People__Fall(::sc::converted::Draw& draw) {
+  ::sc::People::Fall s{};
+  s.index = static_cast<int>(draw.whole());
+  s.push = draw.vector();
+  s.car = draw.flag();
+  s.alive = draw.flag();
+  return s;
+}
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::People::Fall& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.index), arg(s.push), arg(s.car), arg(s.alive)}); }
+[[maybe_unused]] static bool same(const ::sc::People::Fall& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 4 && same(want.index, (*got.rows)[0]) && same(want.push, (*got.rows)[1]) && same(want.car, (*got.rows)[2]) && same(want.alive, (*got.rows)[3]); }
+[[maybe_unused]] static ::sc::People::Fall near(::sc::People::Fall s, int k, int slot) { using ::sc::converted::near; s.index = near(s.index, k, slot * 7 + 0); s.push = near(s.push, k, slot * 7 + 1); s.car = near(s.car, k, slot * 7 + 2); s.alive = near(s.alive, k, slot * 7 + 3); return s; }
+[[maybe_unused]] static bool defined(const ::sc::People::Fall& s) { using ::sc::converted::defined; return defined(s.index) && defined(s.push) && defined(s.car) && defined(s.alive); }
+[[maybe_unused]] static void flat(const ::sc::People::Fall& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.index, o); flat(s.push, o); flat(s.car, o); flat(s.alive, o); }
+[[maybe_unused]] static std::string text(const ::sc::People::Fall& s) { using ::sc::converted::text; return std::string("{") + text(s.index) + ", " + text(s.push) + ", " + text(s.car) + ", " + text(s.alive) + "}"; }
+[[maybe_unused]] static ::sc::People::RemoteHit draw_People__RemoteHit(::sc::converted::Draw& draw) {
+  ::sc::People::RemoteHit s{};
+  s.index = static_cast<int>(draw.whole());
+  s.damage = draw.number();
+  return s;
+}
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::People::RemoteHit& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.index), arg(s.damage)}); }
+[[maybe_unused]] static bool same(const ::sc::People::RemoteHit& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 2 && same(want.index, (*got.rows)[0]) && same(want.damage, (*got.rows)[1]); }
+[[maybe_unused]] static ::sc::People::RemoteHit near(::sc::People::RemoteHit s, int k, int slot) { using ::sc::converted::near; s.index = near(s.index, k, slot * 7 + 0); s.damage = near(s.damage, k, slot * 7 + 1); return s; }
+[[maybe_unused]] static bool defined(const ::sc::People::RemoteHit& s) { using ::sc::converted::defined; return defined(s.index) && defined(s.damage); }
+[[maybe_unused]] static void flat(const ::sc::People::RemoteHit& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.index, o); flat(s.damage, o); }
+[[maybe_unused]] static std::string text(const ::sc::People::RemoteHit& s) { using ::sc::converted::text; return std::string("{") + text(s.index) + ", " + text(s.damage) + "}"; }
+[[maybe_unused]] static ::sc::People::Hurt draw_People__Hurt(::sc::converted::Draw& draw) {
+  ::sc::People::Hurt s{};
+  s.net = static_cast<unsigned char>(draw.below(40));
+  s.seed = static_cast<unsigned int>(draw.below(40));
+  s.damage = draw.number();
+  s.by = static_cast<::sc::People::HurtBy>(draw.below(4));
+  s.push = draw.vector();
+  return s;
+}
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::People::Hurt& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.net), arg(s.seed), arg(s.damage), arg(s.by), arg(s.push)}); }
+[[maybe_unused]] static bool same(const ::sc::People::Hurt& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 5 && same(want.net, (*got.rows)[0]) && same(want.seed, (*got.rows)[1]) && same(want.damage, (*got.rows)[2]) && same(want.by, (*got.rows)[3]) && same(want.push, (*got.rows)[4]); }
+[[maybe_unused]] static ::sc::People::Hurt near(::sc::People::Hurt s, int k, int slot) { using ::sc::converted::near; s.net = near(s.net, k, slot * 7 + 0); s.seed = near(s.seed, k, slot * 7 + 1); s.damage = near(s.damage, k, slot * 7 + 2); s.by = near(s.by, k, slot * 7 + 3); s.push = near(s.push, k, slot * 7 + 4); return s; }
+[[maybe_unused]] static bool defined(const ::sc::People::Hurt& s) { using ::sc::converted::defined; return defined(s.net) && defined(s.seed) && defined(s.damage) && defined(s.by) && defined(s.push); }
+[[maybe_unused]] static void flat(const ::sc::People::Hurt& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.net, o); flat(s.seed, o); flat(s.damage, o); flat(s.by, o); flat(s.push, o); }
+[[maybe_unused]] static std::string text(const ::sc::People::Hurt& s) { using ::sc::converted::text; return std::string("{") + text(s.net) + ", " + text(s.seed) + ", " + text(s.damage) + ", " + text(s.by) + ", " + text(s.push) + "}"; }
+[[maybe_unused]] static ::sc::People draw_People(::sc::converted::Draw& draw) {
+  ::sc::People s{};
+  s.people_ = draw_list(draw, [&]() -> ::sc::People::Person { return ::sc::draw_People__Person(draw); });
+  s.reports_ = draw_list(draw, [&]() -> ::sc::CrimeReport { return ::sc::draw_CrimeReport(draw); });
+  s.deaths_ = draw_list(draw, [&]() -> ::sc::People::Death { return ::sc::draw_People__Death(draw); });
+  s.falls_ = draw_list(draw, [&]() -> ::sc::People::Fall { return ::sc::draw_People__Fall(draw); });
+  s.remote_hits_ = draw_list(draw, [&]() -> ::sc::People::RemoteHit { return ::sc::draw_People__RemoteHit(draw); });
+  s.hurts_ = draw_list(draw, [&]() -> ::sc::People::Hurt { return ::sc::draw_People__Hurt(draw); });
+  s.last_head_ = draw.flag();
+  s.puppets_ = draw.flag();
+  s.budget_ = static_cast<unsigned int>(draw.below(40));
+  s.serial_ = static_cast<unsigned int>(draw.below(40));
+  s.show_ = draw.number();
+  s.hide_ = draw.number();
+  return s;
+}
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::People& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.people_), arg(s.reports_), arg(s.deaths_), arg(s.falls_), arg(s.remote_hits_), arg(s.hurts_), arg(s.last_head_), arg(s.puppets_), arg(s.budget_), arg(s.serial_), arg(s.show_), arg(s.hide_)}); }
+[[maybe_unused]] static bool same(const ::sc::People& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 12 && same(want.people_, (*got.rows)[0]) && same(want.reports_, (*got.rows)[1]) && same(want.deaths_, (*got.rows)[2]) && same(want.falls_, (*got.rows)[3]) && same(want.remote_hits_, (*got.rows)[4]) && same(want.hurts_, (*got.rows)[5]) && same(want.last_head_, (*got.rows)[6]) && same(want.puppets_, (*got.rows)[7]) && same(want.budget_, (*got.rows)[8]) && same(want.serial_, (*got.rows)[9]) && same(want.show_, (*got.rows)[10]) && same(want.hide_, (*got.rows)[11]); }
+[[maybe_unused]] static ::sc::People near(::sc::People s, int k, int slot) { using ::sc::converted::near; s.people_ = near(s.people_, k, slot * 7 + 0); s.reports_ = near(s.reports_, k, slot * 7 + 1); s.deaths_ = near(s.deaths_, k, slot * 7 + 2); s.falls_ = near(s.falls_, k, slot * 7 + 3); s.remote_hits_ = near(s.remote_hits_, k, slot * 7 + 4); s.hurts_ = near(s.hurts_, k, slot * 7 + 5); s.last_head_ = near(s.last_head_, k, slot * 7 + 6); s.puppets_ = near(s.puppets_, k, slot * 7 + 7); s.budget_ = near(s.budget_, k, slot * 7 + 8); s.serial_ = near(s.serial_, k, slot * 7 + 9); s.show_ = near(s.show_, k, slot * 7 + 10); s.hide_ = near(s.hide_, k, slot * 7 + 11); return s; }
+[[maybe_unused]] static bool defined(const ::sc::People& s) { using ::sc::converted::defined; return defined(s.people_) && defined(s.reports_) && defined(s.deaths_) && defined(s.falls_) && defined(s.remote_hits_) && defined(s.hurts_) && defined(s.last_head_) && defined(s.puppets_) && defined(s.budget_) && defined(s.serial_) && defined(s.show_) && defined(s.hide_); }
+[[maybe_unused]] static void flat(const ::sc::People& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.people_, o); flat(s.reports_, o); flat(s.deaths_, o); flat(s.falls_, o); flat(s.remote_hits_, o); flat(s.hurts_, o); flat(s.last_head_, o); flat(s.puppets_, o); flat(s.budget_, o); flat(s.serial_, o); flat(s.show_, o); flat(s.hide_, o); }
+[[maybe_unused]] static std::string text(const ::sc::People& s) { using ::sc::converted::text; return std::string("{") + text(s.people_) + ", " + text(s.reports_) + ", " + text(s.deaths_) + ", " + text(s.falls_) + ", " + text(s.remote_hits_) + ", " + text(s.hurts_) + ", " + text(s.last_head_) + ", " + text(s.puppets_) + ", " + text(s.budget_) + ", " + text(s.serial_) + ", " + text(s.show_) + ", " + text(s.hide_) + "}"; }
 namespace converted_people {
 using namespace converted;
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::near; using converted::flat;
+using ::sc::arg;
+using ::sc::same;
+using ::sc::defined;
+using ::sc::text;
+using ::sc::near;
+using ::sc::flat;
 
 // ---- people.cpp, as it stands ----
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
 #pragma GCC diagnostic ignored "-Wunused-variable"
+constexpr f32 kWitness = 45;
+const Vec3 kShirts[] = {{0.62f, 0.12f, 0.1f}, {0.16f, 0.28f, 0.55f}, {0.85f, 0.82f, 0.74f}, {0.2f, 0.42f, 0.25f}, {0.9f, 0.62f, 0.15f},
+                        {0.35f, 0.35f, 0.38f}, {0.55f, 0.3f, 0.55f}, {0.1f, 0.1f, 0.12f}, {0.75f, 0.45f, 0.4f}, {0.3f, 0.6f, 0.7f}};
+const Vec3 kPants[] = {{0.12f, 0.14f, 0.22f}, {0.2f, 0.2f, 0.22f}, {0.38f, 0.3f, 0.22f}, {0.08f, 0.08f, 0.09f}, {0.45f, 0.45f, 0.48f}, {0.25f, 0.3f, 0.45f}};
+const Vec3 kSkins[] = {{0.94f, 0.76f, 0.62f}, {0.78f, 0.58f, 0.43f}, {0.66f, 0.44f, 0.32f}, {0.48f, 0.31f, 0.22f}, {0.86f, 0.66f, 0.5f}};
 f32 dist2d(Vec3 a, Vec3 b) { return std::hypot(a.x - b.x, a.y - b.y); }
 f32 approach_angle(f32 cur, f32 target, f32 max_step) { return cur + clampf(wrap_pi(target - cur), -max_step, max_step); }
 #pragma GCC diagnostic pop
@@ -34,6 +195,11 @@ using f32 = double;
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wnarrowing"
+constexpr f32 kWitness = 45;
+const Vec3 kShirts[] = {{0.62, 0.12, 0.1}, {0.16, 0.28, 0.55}, {0.85, 0.82, 0.74}, {0.2, 0.42, 0.25}, {0.9, 0.62, 0.15},
+                        {0.35, 0.35, 0.38}, {0.55, 0.3, 0.55}, {0.1, 0.1, 0.12}, {0.75, 0.45, 0.4}, {0.3, 0.6, 0.7}};
+const Vec3 kPants[] = {{0.12, 0.14, 0.22}, {0.2, 0.2, 0.22}, {0.38, 0.3, 0.22}, {0.08, 0.08, 0.09}, {0.45, 0.45, 0.48}, {0.25, 0.3, 0.45}};
+const Vec3 kSkins[] = {{0.94, 0.76, 0.62}, {0.78, 0.58, 0.43}, {0.66, 0.44, 0.32}, {0.48, 0.31, 0.22}, {0.86, 0.66, 0.5}};
 f32 dist2d(Vec3 a, Vec3 b) { return std::hypot(a.x - b.x, a.y - b.y); }
 inline f32 wrap_pi(f32 a) {
   while (a > kPi) a -= 2 * kPi;
@@ -50,8 +216,8 @@ SC_TEST(converted_people) {
   {  // dist2d
     converted::Tally tally("dist2d");
     for (int i = 0; i < converted::kCalls; ++i) {
-      const kern::Vec3 a0 = draw.vector();
-      const kern::Vec3 a1 = draw.vector();
+      const ::kern::Vec3 a0 = draw.vector();
+      const ::kern::Vec3 a1 = draw.vector();
       const converted::Watch watch;
       const auto want = dist2d(a0, a1);
       const bool outside = watch.outside();
@@ -63,9 +229,9 @@ SC_TEST(converted_people) {
     for (int i = 0; i < converted::kCalls; ++i) {
       const float a0 = draw.number();
       const converted::Watch watch;
-      const auto want = wrap_pi(a0);
+      const auto want = ::sc::wrap_pi(a0);
       const bool outside = watch.outside();
-      tally.take(bp, {arg(a0)}, want, wide::wrap_pi(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return wrap_pi(near(a0, k, 0)); });
+      tally.take(bp, {arg(a0)}, want, wide::wrap_pi(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return ::sc::wrap_pi(near(a0, k, 0)); });
     }
   }
   {  // approach_angle
@@ -78,6 +244,46 @@ SC_TEST(converted_people) {
       const auto want = approach_angle(a0, a1, a2);
       const bool outside = watch.outside();
       tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, wide::approach_angle(wide_arg(a0), wide_arg(a1), wide_arg(a2)), outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, [&]([[maybe_unused]] int k) { return approach_angle(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2)); });
+    }
+  }
+  {  // People::count
+    converted::Tally tally("People_count");
+    const auto run = [&](::sc::People a0, ::sc::People::Kind a1, bool a2) { const auto r = a0.count(a1, a2); return r; };
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::sc::People a0 = ::sc::draw_People(draw);
+      const ::sc::People::Kind a1 = static_cast<::sc::People::Kind>(draw.below(5));
+      const bool a2 = draw.flag();
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, want, outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, [&]([[maybe_unused]] int k) { return run(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2)); });
+    }
+  }
+  {  // People::witnessed
+    converted::Tally tally("People_witnessed");
+    const auto run = [&](::sc::People a0, ::kern::Vec3 a1) { const auto r = a0.witnessed(a1); return r; };
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::sc::People a0 = ::sc::draw_People(draw);
+      const ::kern::Vec3 a1 = draw.vector();
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1)}, want, want, outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return run(near(a0, k, 0), near(a1, k, 1)); });
+    }
+  }
+  {  // People::frighten
+    converted::Tally tally("People_frighten");
+    const auto run = [&](::sc::People a0, ::kern::Vec3 a1, float a2, float a3, float a4) { a0.frighten(a1, a2, a3, a4); return a0; };
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::sc::People a0 = ::sc::draw_People(draw);
+      const ::kern::Vec3 a1 = draw.vector();
+      const float a2 = draw.number();
+      const float a3 = draw.number();
+      const float a4 = draw.number();
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2, a3, a4);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)}, want, want, outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); }, [&]([[maybe_unused]] int k) { return run(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2), near(a3, k, 3), near(a4, k, 4)); });
     }
   }
 }

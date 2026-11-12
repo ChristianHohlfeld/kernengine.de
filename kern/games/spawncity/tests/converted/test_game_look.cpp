@@ -12,10 +12,63 @@
 #include "kern/geo/primitives.h"
 #include "../converted.h"
 
+namespace kern {
+[[maybe_unused]] static ::kern::Mat4 draw_kern__Mat4(::sc::converted::Draw& draw) {
+  ::kern::Mat4 s{};
+  for (auto& e : s.m) e = draw.number();
+  return s;
+}
+[[maybe_unused]] static ::sc::converted::Value arg(const ::kern::Mat4& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(std::vector<float>(std::begin(s.m), std::end(s.m)))}); }
+[[maybe_unused]] static bool same(const ::kern::Mat4& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 1 && same(std::vector<float>(std::begin(want.m), std::end(want.m)), (*got.rows)[0]); }
+[[maybe_unused]] static ::kern::Mat4 near(::kern::Mat4 s, int k, int slot) { using ::sc::converted::near; { const auto v = near(std::vector<float>(std::begin(s.m), std::end(s.m)), k, slot * 7 + 0); std::copy(v.begin(), v.end(), std::begin(s.m)); } return s; }
+[[maybe_unused]] static bool defined(const ::kern::Mat4& s) { using ::sc::converted::defined; return defined(std::vector<float>(std::begin(s.m), std::end(s.m))); }
+[[maybe_unused]] static void flat(const ::kern::Mat4& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(std::vector<float>(std::begin(s.m), std::end(s.m)), o); }
+[[maybe_unused]] static std::string text(const ::kern::Mat4& s) { using ::sc::converted::text; return std::string("{") + text(std::vector<float>(std::begin(s.m), std::end(s.m))) + "}"; }
+[[maybe_unused]] static ::kern::Camera draw_kern__Camera(::sc::converted::Draw& draw) {
+  ::kern::Camera s{};
+  s.eye = draw.vector();
+  s.target = draw.vector();
+  s.up = draw.vector();
+  s.fov = draw.number();
+  s.near = draw.number();
+  s.far = draw.number();
+  s.orthographic = draw.flag();
+  s.ortho_height = draw.number();
+  s.has_projection = draw.flag();
+  s.projection = ::kern::draw_kern__Mat4(draw);
+  return s;
+}
+[[maybe_unused]] static ::sc::converted::Value arg(const ::kern::Camera& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.eye), arg(s.target), arg(s.up), arg(s.fov), arg(s.near), arg(s.far), arg(s.orthographic), arg(s.ortho_height), arg(s.has_projection), arg(s.projection)}); }
+[[maybe_unused]] static bool same(const ::kern::Camera& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 10 && same(want.eye, (*got.rows)[0]) && same(want.target, (*got.rows)[1]) && same(want.up, (*got.rows)[2]) && same(want.fov, (*got.rows)[3]) && same(want.near, (*got.rows)[4]) && same(want.far, (*got.rows)[5]) && same(want.orthographic, (*got.rows)[6]) && same(want.ortho_height, (*got.rows)[7]) && same(want.has_projection, (*got.rows)[8]) && same(want.projection, (*got.rows)[9]); }
+[[maybe_unused]] static ::kern::Camera near(::kern::Camera s, int k, int slot) { using ::sc::converted::near; s.eye = near(s.eye, k, slot * 7 + 0); s.target = near(s.target, k, slot * 7 + 1); s.up = near(s.up, k, slot * 7 + 2); s.fov = near(s.fov, k, slot * 7 + 3); s.near = near(s.near, k, slot * 7 + 4); s.far = near(s.far, k, slot * 7 + 5); s.orthographic = near(s.orthographic, k, slot * 7 + 6); s.ortho_height = near(s.ortho_height, k, slot * 7 + 7); s.has_projection = near(s.has_projection, k, slot * 7 + 8); s.projection = near(s.projection, k, slot * 7 + 9); return s; }
+[[maybe_unused]] static bool defined(const ::kern::Camera& s) { using ::sc::converted::defined; return defined(s.eye) && defined(s.target) && defined(s.up) && defined(s.fov) && defined(s.near) && defined(s.far) && defined(s.orthographic) && defined(s.ortho_height) && defined(s.has_projection) && defined(s.projection); }
+[[maybe_unused]] static void flat(const ::kern::Camera& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.eye, o); flat(s.target, o); flat(s.up, o); flat(s.fov, o); flat(s.near, o); flat(s.far, o); flat(s.orthographic, o); flat(s.ortho_height, o); flat(s.has_projection, o); flat(s.projection, o); }
+[[maybe_unused]] static std::string text(const ::kern::Camera& s) { using ::sc::converted::text; return std::string("{") + text(s.eye) + ", " + text(s.target) + ", " + text(s.up) + ", " + text(s.fov) + ", " + text(s.near) + ", " + text(s.far) + ", " + text(s.orthographic) + ", " + text(s.ortho_height) + ", " + text(s.has_projection) + ", " + text(s.projection) + "}"; }
+[[maybe_unused]] static ::kern::Quat draw_kern__Quat(::sc::converted::Draw& draw) {
+  ::kern::Quat s{};
+  s.x = draw.number();
+  s.y = draw.number();
+  s.z = draw.number();
+  s.w = draw.number();
+  return s;
+}
+[[maybe_unused]] static ::sc::converted::Value arg(const ::kern::Quat& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
+[[maybe_unused]] static bool same(const ::kern::Quat& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
+[[maybe_unused]] static ::kern::Quat near(::kern::Quat s, int k, int slot) { using ::sc::converted::near; s.x = near(s.x, k, slot * 7 + 0); s.y = near(s.y, k, slot * 7 + 1); s.z = near(s.z, k, slot * 7 + 2); s.w = near(s.w, k, slot * 7 + 3); return s; }
+[[maybe_unused]] static bool defined(const ::kern::Quat& s) { using ::sc::converted::defined; return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
+[[maybe_unused]] static void flat(const ::kern::Quat& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.x, o); flat(s.y, o); flat(s.z, o); flat(s.w, o); }
+[[maybe_unused]] static std::string text(const ::kern::Quat& s) { using ::sc::converted::text; return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
+}  // namespace kern
 namespace sc {
 namespace converted_game_look {
 using namespace converted;
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::near; using converted::flat;
+using ::kern::arg;
+using ::kern::same;
+using ::kern::defined;
+using ::kern::text;
+using ::kern::near;
+using ::kern::flat;
 using kern::Mat4;
 using kern::MeshData;
 using perf::kTier;
@@ -25,6 +78,7 @@ using perf::kTier;
 #pragma GCC diagnostic ignored "-Wunused-function"
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
 #pragma GCC diagnostic ignored "-Wunused-variable"
+Vec3 srgb(u32 hex) { return {static_cast<f32>((hex >> 16) & 255) / 255, static_cast<f32>((hex >> 8) & 255) / 255, static_cast<f32>(hex & 255) / 255}; }
 int vm_index(weapons::Id id) {
   switch (id) {
     case weapons::Id::grenade_launcher: return 0;
@@ -33,6 +87,20 @@ int vm_index(weapons::Id id) {
     case weapons::Id::knife: return 3;
     default: return -1;
   }
+}
+Mat4 camera_frame(const kern::Camera& c) {
+  const Vec3 f = kern::normalize(c.target - c.eye, {1, 0, 0});
+  const Vec3 r = kern::normalize(kern::cross(f, c.up), {0, -1, 0});
+  const Vec3 u = kern::cross(r, f);
+  Mat4 m;
+  m.m[0] = r.x; m.m[1] = r.y; m.m[2] = r.z; m.m[3] = 0;
+  m.m[4] = u.x; m.m[5] = u.y; m.m[6] = u.z; m.m[7] = 0;
+  m.m[8] = -f.x; m.m[9] = -f.y; m.m[10] = -f.z; m.m[11] = 0;
+  m.m[12] = c.eye.x; m.m[13] = c.eye.y; m.m[14] = c.eye.z; m.m[15] = 1;
+  return m;
+}
+Mat4 euler(f32 x, f32 y, f32 z) {
+  return Mat4::trs({}, Quat::axis_angle({1, 0, 0}, x) * Quat::axis_angle({0, 1, 0}, y) * Quat::axis_angle({0, 0, 1}, z), {1, 1, 1});
 }
 #pragma GCC diagnostic pop
 
@@ -45,6 +113,7 @@ using f32 = double;
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wnarrowing"
+Vec3 srgb(u32 hex) { return {static_cast<f32>((hex >> 16) & 255) / 255, static_cast<f32>((hex >> 8) & 255) / 255, static_cast<f32>(hex & 255) / 255}; }
 int vm_index(weapons::Id id) {
   switch (id) {
     case weapons::Id::grenade_launcher: return 0;
@@ -54,12 +123,36 @@ int vm_index(weapons::Id id) {
     default: return -1;
   }
 }
+Mat4 camera_frame(const kern::Camera& c) {
+  const Vec3 f = kern::normalize(c.target - c.eye, {1, 0, 0});
+  const Vec3 r = kern::normalize(kern::cross(f, c.up), {0, -1, 0});
+  const Vec3 u = kern::cross(r, f);
+  Mat4 m;
+  m.m[0] = r.x; m.m[1] = r.y; m.m[2] = r.z; m.m[3] = 0;
+  m.m[4] = u.x; m.m[5] = u.y; m.m[6] = u.z; m.m[7] = 0;
+  m.m[8] = -f.x; m.m[9] = -f.y; m.m[10] = -f.z; m.m[11] = 0;
+  m.m[12] = c.eye.x; m.m[13] = c.eye.y; m.m[14] = c.eye.z; m.m[15] = 1;
+  return m;
+}
+Mat4 euler(f32 x, f32 y, f32 z) {
+  return Mat4::trs({}, Quat::axis_angle({1, 0, 0}, x) * Quat::axis_angle({0, 1, 0}, y) * Quat::axis_angle({0, 0, 1}, z), {1, 1, 1});
+}
 #pragma GCC diagnostic pop
 }  // namespace wide
 
 SC_TEST(converted_game_look) {
   converted::Blueprint bp("GameLook");
   converted::Draw draw;
+  {  // srgb
+    converted::Tally tally("srgb");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = srgb(a0);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0)}, want, wide::srgb(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return srgb(near(a0, k, 0)); });
+    }
+  }
   {  // vm_index
     converted::Tally tally("vm_index");
     for (int i = 0; i < converted::kCalls; ++i) {
@@ -68,6 +161,63 @@ SC_TEST(converted_game_look) {
       const auto want = vm_index(a0);
       const bool outside = watch.outside();
       tally.take(bp, {arg(a0)}, want, wide::vm_index(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return vm_index(near(a0, k, 0)); });
+    }
+  }
+  {  // camera_frame
+    converted::Tally tally("camera_frame");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::kern::Camera a0 = ::kern::draw_kern__Camera(draw);
+      const converted::Watch watch;
+      const auto want = camera_frame(a0);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0)}, want, wide::camera_frame(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return camera_frame(near(a0, k, 0)); });
+    }
+  }
+  {  // Mat4::trs
+    converted::Tally tally("Mat4_trs");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::kern::Vec3 a0 = draw.vector();
+      const ::kern::Quat a1 = ::kern::draw_kern__Quat(draw);
+      const ::kern::Vec3 a2 = draw.vector();
+      const converted::Watch watch;
+      const auto want = ::kern::Mat4::trs(a0, a1, a2);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, want, outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, [&]([[maybe_unused]] int k) { return ::kern::Mat4::trs(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2)); });
+    }
+  }
+  {  // Quat::operator*
+    converted::Tally tally("Quat_mul");
+    const auto run = [&](::kern::Quat a0, ::kern::Quat a1) { const auto r = a0.operator*(a1); return r; };
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::kern::Quat a0 = ::kern::draw_kern__Quat(draw);
+      const ::kern::Quat a1 = ::kern::draw_kern__Quat(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1)}, want, want, outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return run(near(a0, k, 0), near(a1, k, 1)); });
+    }
+  }
+  {  // Quat::axis_angle
+    converted::Tally tally("Quat_axis_angle");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::kern::Vec3 a0 = draw.vector();
+      const float a1 = draw.number();
+      const converted::Watch watch;
+      const auto want = ::kern::Quat::axis_angle(a0, a1);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1)}, want, want, outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return ::kern::Quat::axis_angle(near(a0, k, 0), near(a1, k, 1)); });
+    }
+  }
+  {  // euler
+    converted::Tally tally("euler");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const float a0 = draw.number();
+      const float a1 = draw.number();
+      const float a2 = draw.number();
+      const converted::Watch watch;
+      const auto want = euler(a0, a1, a2);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, wide::euler(wide_arg(a0), wide_arg(a1), wide_arg(a2)), outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, [&]([[maybe_unused]] int k) { return euler(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2)); });
     }
   }
 }

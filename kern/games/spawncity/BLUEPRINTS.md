@@ -360,22 +360,23 @@ und schreibt sie in der Schreibweise:
   alles, was sie aufruft. Die anderen bleiben C++, bis der Konverter oder die Sprache den Platz
   hat. Der Lauf nennt, worauf sie warten, nach Zeilen geordnet.
 
-Stand (12.11.2026): 137 von 1.428 Funktionen (670 von 28.607 Zeilen) aus 43 von 77 Dateien stehen
-als Blueprints im Level (43 Actors im Ordner „Source“). 110 Funktionen vergleicht der Test mit
-ihrem C++; nicht verglichen sind 38: 17 Methoden, die ihr Objekt nicht benutzen, 8, die ein Feld
-an einer berechneten Stelle lesen (das C++ liest daneben, wo der Blueprint den Nullwert gibt – der
-Test kennt den gültigen Bereich nicht), 6, deren Klasse der Test nicht bauen kann (kein
-Default-Konstruktor, eine Referenz als Feld), 7 mit festen Feldern, Listen in Listen oder `char*`
-als Ein- oder Ausgang. (Die Zählung der Tests schließt Hilfsfunktionen aus Headern ein, die in
-den Blueprints stehen.) Das Spiel führt für diese Dateien weiter ihr C++ aus (Stufe 5).
+Stand (12.11.2026): 207 von 1.428 Funktionen (1.178 von 28.607 Zeilen) aus 51 von 77 Dateien stehen
+als Blueprints im Level (51 Actors im Ordner „Source“). 189 Funktionen vergleicht der Test mit
+ihrem C++; nicht verglichen sind 53: 19, die ein Feld an einer berechneten Stelle lesen oder Bits
+um einen berechneten Betrag schieben (das C++ ist dort außerhalb seines Bereichs nicht bestimmt,
+der Blueprint schon – der Test kennt den Bereich nicht), 15, deren Klasse der Test nicht bauen kann
+(kein Default-Konstruktor, eine Referenz als Feld), 12 Methoden, die ihr Objekt nicht benutzen
+oder deren Klasse nicht geschrieben ist, 7 mit `char*` oder Listen in Listen. (Die Zählung der
+Tests schließt Funktionen aus Headern ein, die in den Blueprints stehen.) Das Spiel führt für
+diese Dateien weiter ihr C++ aus (Stufe 5).
 
-Worauf die anderen warten, nach Zeilen: Fast alles hängt am Zustand einer Klasse, der noch
-keine Struktur sein kann – `Game` (323 Funktionen, 13.534 Zeilen: besitzende Zeiger, Typen der
-Engine), Klassen mit einem Zeiger auf die Welt, den Renderer oder den Mixer der Engine (`Life`,
-`PeopleArt`, `Destruction`, `Interiors`, `Ragdolls` …: zusammen rund 3.500 Zeilen), `Terrain` und
-`CityStream` (Vec4: 2.000 Zeilen), `Session` (Netz der Engine: 664), Strukturen mit mehr als 32
-Feldern (`Person`, `JetSpec`: 774). Dazu Zeiger (735), Listen von Listen, Lambdas, 32-Bit-Überlauf
-und Bit-Arithmetik (381), Aufrufe der Regel-Blueprints (`logic::Value`: 468).
+Worauf die anderen warten, nach Zeilen: der Zustand von `Game` (328 Funktionen, 13.850 Zeilen:
+geteilte Zeiger, Typen der Engine mit eigenem Innenleben); Klassen mit einem Zeiger auf die Welt,
+den Renderer, den Mixer oder die Physik der Engine (`Life`, `PeopleArt`, `Car`, `Marks`,
+`Destruction`, `Drone`, `Interiors`, `Ragdolls` …: rund 4.500 Zeilen, dazu 821 Zeilen mit Zeigern
+im Rumpf); Maps und Sets (`Terrain`, `CityStream`: rund 2.400 Zeilen); `Session` (Netz der Engine:
+664); die Aufrufe der Regel-Blueprints (482); Listen, die ein Konstruktor baut (430); Lambdas
+(409); ganze Zahlen in 64 Bit (288).
 
 Aufruf (in `kern/games/spawncity`):
 
@@ -400,10 +401,21 @@ Was als Nächstes dazukommt, in der Reihenfolge der Zeilen, die darauf warten:
 3. [x] **Schleifen mit `break` / `continue`** (Flags, die den Rest des Durchlaufs überspringen),
    `do-while`, Schleifen, die die Einträge ihrer Liste ändern (der Eintrag ist eine lokale
    Variable und wird am Ende des Durchlaufs zurückgespeichert), `a = b = c`.
-4. [ ] **Sprache:** ganze Zahlen in 32 Bit mit Überlauf und Bit-Arithmetik (Hashes, Paketformate);
-   Drehung (Quat) und Matrix als Werte; Vec4; Maps; Text formatieren und zerlegen; Listen:
-   einfügen, löschen, sortieren, suchen, Listen von Listen; Strukturen mit mehr als 32 Feldern.
-   Zeiger: ein Zeiger auf ein Objekt des Spiels ist sein Platz in einer Liste oder ein Actor.
+4. **Sprache:**
+   - [x] Ganze Zahlen, wie eine Maschine sie hat: Die Formel hat `band`, `bor`, `bxor`, `shl`,
+     `shr` (Bits) und `wrap32`, `wrap32s`, `mul32` (Rechnen, das bei 32 Bit umbricht) – in jeder
+     Stufe dieselben Funktionen. Der Konverter schreibt vorzeichenlose 32-Bit-Arithmetik und
+     Bit-Operationen damit (Hashes, Paketformate).
+   - [x] Eine Struktur hat bis zu 96 Felder (vorher 32).
+   - [x] Die Typen der Engine: Der Konverter liest die Header der Engine mit (zweiter Lauf des
+     Compilers, dieselben Knoten-Namen) – was dort eine schlichte Struktur ist (Quat, Vec4, Mat4,
+     Camera, Aabb …), ist eine Struktur des Blueprints, und was die Header an Funktionen dazu
+     definieren (`Quat::rotate`, `Mat4::translation`), wird wie der Code des Spiels geschrieben.
+   - [ ] Ganze Zahlen in 64 Bit (Schlüssel aus zwei 32-Bit-Zahlen, FNV-Hash): Ein Int ist bis 2^53
+     exakt.
+   - [ ] Maps und Sets; Text formatieren und zerlegen; Listen: einfügen, löschen, sortieren, suchen.
+   - [ ] Zeiger: ein Zeiger auf ein Objekt des Spiels ist sein Platz in einer Liste oder ein Actor;
+     ein Zeiger auf die Welt, den Renderer oder den Mixer der Engine ist die Engine selbst (6).
 5. [ ] **Aufrufe zwischen Blueprints als Werte:** eine reine Funktion eines anderen Blueprints
    ohne Umweg über einen Schritt (heute: Call on Actor) – damit rufen umgeschriebene Funktionen die
    Regel-Blueprints der Stufe 3 direkt auf, wo das C++ heute über `blueprint_call.h` geht, und

@@ -34,6 +34,11 @@ const BoneDef kDefs[Ragdolls::kBones] = {
     {{0, 0.1f, 0.27f}, {0.06f, 0.06f, 0.24f}, true},    // shins
     {{0, -0.1f, 0.27f}, {0.06f, 0.06f, 0.24f}, true},
 };
+f32 hash_noise(u64 seed, u32 i) {
+  u32 x = static_cast<u32>(seed ^ (seed >> 32)) + (i + 1) * 0x9e3779b1u;
+  x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16;
+  return static_cast<f32>(x) / 4294967295.0f * 2 - 1;
+}
 f32 smooth(f32 t) { t = clampf(t, 0, 1); return t * t * (3 - 2 * t); }
 #pragma GCC diagnostic pop
 
@@ -59,6 +64,11 @@ const BoneDef kDefs[Ragdolls::kBones] = {
     {{0, 0.1, 0.27}, {0.06, 0.06, 0.24}, true},    // shins
     {{0, -0.1, 0.27}, {0.06, 0.06, 0.24}, true},
 };
+f32 hash_noise(u64 seed, u32 i) {
+  u32 x = static_cast<u32>(seed ^ (seed >> 32)) + (i + 1) * 0x9e3779b1u;
+  x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16;
+  return static_cast<f32>(x) / 4294967295.0 * 2 - 1;
+}
 f32 smooth(f32 t) { t = clampf(t, 0, 1); return t * t * (3 - 2 * t); }
 #pragma GCC diagnostic pop
 }  // namespace wide
@@ -66,6 +76,17 @@ f32 smooth(f32 t) { t = clampf(t, 0, 1); return t * t * (3 - 2 * t); }
 SC_TEST(converted_ragdoll) {
   converted::Blueprint bp("Ragdoll");
   converted::Draw draw;
+  {  // hash_noise
+    converted::Tally tally("hash_noise");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const unsigned long a0 = static_cast<unsigned long>(draw.below(40));
+      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = hash_noise(a0, a1);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1)}, want, wide::hash_noise(wide_arg(a0), wide_arg(a1)), outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return hash_noise(near(a0, k, 0), near(a1, k, 1)); });
+    }
+  }
   {  // smooth
     converted::Tally tally("smooth");
     for (int i = 0; i < converted::kCalls; ++i) {

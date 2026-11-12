@@ -13,9 +13,38 @@
 #include "../converted.h"
 
 namespace sc {
+namespace perf {
+[[maybe_unused]] static ::sc::perf::Governor draw_perf__Governor(::sc::converted::Draw& draw) {
+  ::sc::perf::Governor s{};
+  s.tier_ = static_cast<int>(draw.whole());
+  s.max_ = static_cast<int>(draw.whole());
+  s.auto_ = draw.flag();
+  s.avg_dt_ = draw.number();
+  s.clock_ = draw.number();
+  s.since_change_ = draw.number();
+  s.low_ = draw.number();
+  s.high_ = draw.number();
+  for (auto& e : s.block_until_) e = draw.number();
+  for (auto& e : s.block_len_) e = draw.number();
+  s.changes_ = static_cast<unsigned int>(draw.below(40));
+  return s;
+}
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::perf::Governor& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.tier_), arg(s.max_), arg(s.auto_), arg(s.avg_dt_), arg(s.clock_), arg(s.since_change_), arg(s.low_), arg(s.high_), arg(std::vector<float>(std::begin(s.block_until_), std::end(s.block_until_))), arg(std::vector<float>(std::begin(s.block_len_), std::end(s.block_len_))), arg(s.changes_)}); }
+[[maybe_unused]] static bool same(const ::sc::perf::Governor& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 11 && same(want.tier_, (*got.rows)[0]) && same(want.max_, (*got.rows)[1]) && same(want.auto_, (*got.rows)[2]) && same(want.avg_dt_, (*got.rows)[3]) && same(want.clock_, (*got.rows)[4]) && same(want.since_change_, (*got.rows)[5]) && same(want.low_, (*got.rows)[6]) && same(want.high_, (*got.rows)[7]) && same(std::vector<float>(std::begin(want.block_until_), std::end(want.block_until_)), (*got.rows)[8]) && same(std::vector<float>(std::begin(want.block_len_), std::end(want.block_len_)), (*got.rows)[9]) && same(want.changes_, (*got.rows)[10]); }
+[[maybe_unused]] static ::sc::perf::Governor near(::sc::perf::Governor s, int k, int slot) { using ::sc::converted::near; s.tier_ = near(s.tier_, k, slot * 7 + 0); s.max_ = near(s.max_, k, slot * 7 + 1); s.auto_ = near(s.auto_, k, slot * 7 + 2); s.avg_dt_ = near(s.avg_dt_, k, slot * 7 + 3); s.clock_ = near(s.clock_, k, slot * 7 + 4); s.since_change_ = near(s.since_change_, k, slot * 7 + 5); s.low_ = near(s.low_, k, slot * 7 + 6); s.high_ = near(s.high_, k, slot * 7 + 7); { const auto v = near(std::vector<float>(std::begin(s.block_until_), std::end(s.block_until_)), k, slot * 7 + 8); std::copy(v.begin(), v.end(), std::begin(s.block_until_)); } { const auto v = near(std::vector<float>(std::begin(s.block_len_), std::end(s.block_len_)), k, slot * 7 + 9); std::copy(v.begin(), v.end(), std::begin(s.block_len_)); } s.changes_ = near(s.changes_, k, slot * 7 + 10); return s; }
+[[maybe_unused]] static bool defined(const ::sc::perf::Governor& s) { using ::sc::converted::defined; return defined(s.tier_) && defined(s.max_) && defined(s.auto_) && defined(s.avg_dt_) && defined(s.clock_) && defined(s.since_change_) && defined(s.low_) && defined(s.high_) && defined(std::vector<float>(std::begin(s.block_until_), std::end(s.block_until_))) && defined(std::vector<float>(std::begin(s.block_len_), std::end(s.block_len_))) && defined(s.changes_); }
+[[maybe_unused]] static void flat(const ::sc::perf::Governor& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.tier_, o); flat(s.max_, o); flat(s.auto_, o); flat(s.avg_dt_, o); flat(s.clock_, o); flat(s.since_change_, o); flat(s.low_, o); flat(s.high_, o); flat(std::vector<float>(std::begin(s.block_until_), std::end(s.block_until_)), o); flat(std::vector<float>(std::begin(s.block_len_), std::end(s.block_len_)), o); flat(s.changes_, o); }
+[[maybe_unused]] static std::string text(const ::sc::perf::Governor& s) { using ::sc::converted::text; return std::string("{") + text(s.tier_) + ", " + text(s.max_) + ", " + text(s.auto_) + ", " + text(s.avg_dt_) + ", " + text(s.clock_) + ", " + text(s.since_change_) + ", " + text(s.low_) + ", " + text(s.high_) + ", " + text(std::vector<float>(std::begin(s.block_until_), std::end(s.block_until_))) + ", " + text(std::vector<float>(std::begin(s.block_len_), std::end(s.block_len_))) + ", " + text(s.changes_) + "}"; }
+}  // namespace perf
 namespace converted_perf {
 using namespace converted;
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::near; using converted::flat;
+using ::sc::perf::arg;
+using ::sc::perf::same;
+using ::sc::perf::defined;
+using ::sc::perf::text;
+using ::sc::perf::near;
+using ::sc::perf::flat;
 using namespace ::sc::perf;
 
 // ---- the same functions with 64-bit numbers, as a Blueprint computes ----
@@ -35,7 +64,6 @@ const char* slot_name(Slot s) {
     default: return "?";
   }
 }
-inline f32 damp_alpha(f32 rate, f32 dt) { return rate > 0 && dt > 0 ? 1.0 - std::exp(-rate * dt) : 0.0; }
 #pragma GCC diagnostic pop
 }  // namespace wide
 
@@ -47,20 +75,21 @@ SC_TEST(converted_perf) {
     for (int i = 0; i < converted::kCalls; ++i) {
       const ::sc::perf::Slot a0 = static_cast<::sc::perf::Slot>(draw.below(5));
       const converted::Watch watch;
-      const auto want = slot_name(a0);
+      const auto want = ::sc::perf::slot_name(a0);
       const bool outside = watch.outside();
-      tally.take(bp, {arg(a0)}, want, wide::slot_name(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return slot_name(near(a0, k, 0)); });
+      tally.take(bp, {arg(a0)}, want, wide::slot_name(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return ::sc::perf::slot_name(near(a0, k, 0)); });
     }
   }
-  {  // damp_alpha
-    converted::Tally tally("damp_alpha");
+  {  // Governor::set_fixed
+    converted::Tally tally("Governor_set_fixed");
+    const auto run = [&](::sc::perf::Governor a0, int a1) { a0.set_fixed(a1); return a0; };
     for (int i = 0; i < converted::kCalls; ++i) {
-      const float a0 = draw.number();
-      const float a1 = draw.number();
+      const ::sc::perf::Governor a0 = ::sc::perf::draw_perf__Governor(draw);
+      const int a1 = static_cast<int>(draw.whole());
       const converted::Watch watch;
-      const auto want = damp_alpha(a0, a1);
+      const auto want = run(a0, a1);
       const bool outside = watch.outside();
-      tally.take(bp, {arg(a0), arg(a1)}, want, wide::damp_alpha(wide_arg(a0), wide_arg(a1)), outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return damp_alpha(near(a0, k, 0), near(a1, k, 1)); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, want, outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return run(near(a0, k, 0), near(a1, k, 1)); });
     }
   }
 }

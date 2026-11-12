@@ -6,6 +6,9 @@
 #include <string>
 #include <type_traits>
 #include <vector>
+// (the test sets the data of objects and calls methods a class keeps to itself: it reads the headers with private as public)
+#define private public
+#define protected public
 #include "../../src/jet.h"
 #include "../converted.h"
 
@@ -19,6 +22,7 @@ using converted::arg; using converted::same; using converted::defined; using con
 #pragma GCC diagnostic ignored "-Wunused-function"
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
 #pragma GCC diagnostic ignored "-Wunused-variable"
+constexpr f32 kSound = 340;
 f32 wave_cd(f32 m) { const f32 x = (m - 1.02f) / 0.16f; return std::exp(-(x * x)) * 0.012f + (m > 1.02f ? 0.006f : 0.0f); }
 Vec3 nrm(Vec3 a) { const f32 l = kern::length(a); return l > 1e-9f ? a * (1.0f / l) : Vec3{}; }
 #pragma GCC diagnostic pop
@@ -32,6 +36,7 @@ using f32 = double;
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wnarrowing"
+constexpr f32 kSound = 340;
 f32 wave_cd(f32 m) { const f32 x = (m - 1.02) / 0.16; return std::exp(-(x * x)) * 0.012 + (m > 1.02 ? 0.006 : 0.0); }
 Vec3 nrm(Vec3 a) { const f32 l = kern::length(a); return l > 1e-9 ? a * (1.0 / l) : Vec3{}; }
 f32 air_density(f32 h) { return 1.225 * std::exp(-std::fmax(0.0, h) / 8500.0); }
@@ -54,7 +59,7 @@ SC_TEST(converted_jet) {
   {  // nrm
     converted::Tally tally("nrm");
     for (int i = 0; i < converted::kCalls; ++i) {
-      const kern::Vec3 a0 = draw.vector();
+      const ::kern::Vec3 a0 = draw.vector();
       const converted::Watch watch;
       const auto want = nrm(a0);
       const bool outside = watch.outside();
@@ -66,9 +71,9 @@ SC_TEST(converted_jet) {
     for (int i = 0; i < converted::kCalls; ++i) {
       const float a0 = draw.number();
       const converted::Watch watch;
-      const auto want = air_density(a0);
+      const auto want = ::sc::air_density(a0);
       const bool outside = watch.outside();
-      tally.take(bp, {arg(a0)}, want, wide::air_density(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return air_density(near(a0, k, 0)); });
+      tally.take(bp, {arg(a0)}, want, wide::air_density(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return ::sc::air_density(near(a0, k, 0)); });
     }
   }
 }

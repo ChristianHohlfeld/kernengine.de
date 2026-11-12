@@ -23,6 +23,7 @@ using converted::arg; using converted::same; using converted::defined; using con
 #pragma GCC diagnostic ignored "-Wunused-variable"
 f32 dist2d(Vec3 a, Vec3 b) { return std::hypot(a.x - b.x, a.y - b.y); }
 f32 dist2d(Vec2 a, Vec2 b) { return std::hypot(a.x - b.x, a.y - b.y); }
+Vec3 rgb(u32 h) { return {((h >> 16) & 255) / 255.0f, ((h >> 8) & 255) / 255.0f, (h & 255) / 255.0f}; }
 f32 seg_sphere(Vec3 a, Vec3 b, Vec3 c, f32 r) {
   const Vec3 d = b - a, m = a - c;
   const f32 A = kern::dot(d, d), B = kern::dot(m, d), C = kern::dot(m, m) - r * r;
@@ -45,6 +46,7 @@ using f32 = double;
 #pragma GCC diagnostic ignored "-Wnarrowing"
 f32 dist2d(Vec3 a, Vec3 b) { return std::hypot(a.x - b.x, a.y - b.y); }
 f32 dist2d(Vec2 a, Vec2 b) { return std::hypot(a.x - b.x, a.y - b.y); }
+Vec3 rgb(u32 h) { return {((h >> 16) & 255) / 255.0, ((h >> 8) & 255) / 255.0, (h & 255) / 255.0}; }
 f32 seg_sphere(Vec3 a, Vec3 b, Vec3 c, f32 r) {
   const Vec3 d = b - a, m = a - c;
   const f32 A = kern::dot(d, d), B = kern::dot(m, d), C = kern::dot(m, m) - r * r;
@@ -63,8 +65,8 @@ SC_TEST(converted_life) {
   {  // dist2d
     converted::Tally tally("dist2d");
     for (int i = 0; i < converted::kCalls; ++i) {
-      const kern::Vec3 a0 = draw.vector();
-      const kern::Vec3 a1 = draw.vector();
+      const ::kern::Vec3 a0 = draw.vector();
+      const ::kern::Vec3 a1 = draw.vector();
       const converted::Watch watch;
       const auto want = dist2d(a0, a1);
       const bool outside = watch.outside();
@@ -74,20 +76,30 @@ SC_TEST(converted_life) {
   {  // dist2d
     converted::Tally tally("dist2d_2");
     for (int i = 0; i < converted::kCalls; ++i) {
-      const kern::Vec2 a0 = draw.vector2();
-      const kern::Vec2 a1 = draw.vector2();
+      const ::kern::Vec2 a0 = draw.vector2();
+      const ::kern::Vec2 a1 = draw.vector2();
       const converted::Watch watch;
       const auto want = dist2d(a0, a1);
       const bool outside = watch.outside();
       tally.take(bp, {arg(a0), arg(a1)}, want, wide::dist2d(wide_arg(a0), wide_arg(a1)), outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return dist2d(near(a0, k, 0), near(a1, k, 1)); });
     }
   }
+  {  // rgb
+    converted::Tally tally("rgb");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = rgb(a0);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0)}, want, wide::rgb(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return rgb(near(a0, k, 0)); });
+    }
+  }
   {  // seg_sphere
     converted::Tally tally("seg_sphere");
     for (int i = 0; i < converted::kCalls; ++i) {
-      const kern::Vec3 a0 = draw.vector();
-      const kern::Vec3 a1 = draw.vector();
-      const kern::Vec3 a2 = draw.vector();
+      const ::kern::Vec3 a0 = draw.vector();
+      const ::kern::Vec3 a1 = draw.vector();
+      const ::kern::Vec3 a2 = draw.vector();
       const float a3 = draw.number();
       const converted::Watch watch;
       const auto want = seg_sphere(a0, a1, a2, a3);

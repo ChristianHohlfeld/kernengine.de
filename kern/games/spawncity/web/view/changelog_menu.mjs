@@ -7,7 +7,12 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
-  {date:"2026-11-12",time:"21:40",title:"Konverter: mehr Typen",items:[
+  {date:"2026-11-12",time:"22:17",title:"Kern-Blueprints: Bits, 32-Bit-Rechnen, größere Strukturen",items:[
+    "Kern-Blueprints: Formeln rechnen jetzt auch mit ganzen Zahlen, wie eine Maschine sie hat – band, bor, bxor, shl, shr für Bits und wrap32, wrap32s, mul32 für Rechnen, das bei 32 Bit umbricht (Hashes, Paketformate).",
+    "Eine Struktur kann jetzt bis zu 96 Felder haben (vorher 32).",
+    "Unter der Haube: Der Konverter kennt jetzt die Typen der Engine (Drehung, Matrix, Kamera …) und 32-Bit-Arithmetik. 207 Funktionen aus 51 Dateien des Spiels stehen als Blueprints im Level. Am Spiel ändert sich dadurch nichts.",
+  ]},
+  {date:"2026-11-12",time:"21:07",title:"Konverter: mehr Typen",items:[
     "Unter der Haube: Der Konverter kennt jetzt Paare, Listen in Listen, Werte, die da sein können oder nicht, und Aufzählungen mit eigenen Zahlen. 137 Funktionen aus 43 Dateien stehen als Blueprints im Level. Am Spiel ändert sich dadurch nichts.",
   ]},
   {date:"2026-11-12",time:"20:37",title:"Der Konverter schreibt jetzt auch Objekte",items:[

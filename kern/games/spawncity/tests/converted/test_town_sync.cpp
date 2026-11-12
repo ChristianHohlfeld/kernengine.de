@@ -13,19 +13,19 @@
 
 namespace sc {
 namespace town {
-[[maybe_unused]] static ::sc::town::LampRec draw_town__LampRec(converted::Draw& draw) {
+[[maybe_unused]] static ::sc::town::LampRec draw_town__LampRec(::sc::converted::Draw& draw) {
   ::sc::town::LampRec s{};
   s.key = static_cast<long>(draw.whole());
   s.state = static_cast<unsigned char>(draw.below(40));
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const ::sc::town::LampRec& s) { using converted::arg; return converted::Value::structure({arg(s.key), arg(s.state)}); }
-[[maybe_unused]] static bool same(const ::sc::town::LampRec& want, const converted::Value& got) { using converted::same; return got.rows && got.rows->size() == 2 && same(want.key, (*got.rows)[0]) && same(want.state, (*got.rows)[1]); }
-[[maybe_unused]] static ::sc::town::LampRec near(::sc::town::LampRec s, int k, int slot) { using converted::near; s.key = near(s.key, k, slot * 7 + 0); s.state = near(s.state, k, slot * 7 + 1); return s; }
-[[maybe_unused]] static bool defined(const ::sc::town::LampRec& s) { using converted::defined; return defined(s.key) && defined(s.state); }
-[[maybe_unused]] static void flat(const ::sc::town::LampRec& s, std::vector<kern::f64>& o) { using converted::flat; flat(s.key, o); flat(s.state, o); }
-[[maybe_unused]] static std::string text(const ::sc::town::LampRec& s) { using converted::text; return std::string("{") + text(s.key) + ", " + text(s.state) + "}"; }
-[[maybe_unused]] static ::sc::town::PlankRec draw_town__PlankRec(converted::Draw& draw) {
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::town::LampRec& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.key), arg(s.state)}); }
+[[maybe_unused]] static bool same(const ::sc::town::LampRec& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 2 && same(want.key, (*got.rows)[0]) && same(want.state, (*got.rows)[1]); }
+[[maybe_unused]] static ::sc::town::LampRec near(::sc::town::LampRec s, int k, int slot) { using ::sc::converted::near; s.key = near(s.key, k, slot * 7 + 0); s.state = near(s.state, k, slot * 7 + 1); return s; }
+[[maybe_unused]] static bool defined(const ::sc::town::LampRec& s) { using ::sc::converted::defined; return defined(s.key) && defined(s.state); }
+[[maybe_unused]] static void flat(const ::sc::town::LampRec& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.key, o); flat(s.state, o); }
+[[maybe_unused]] static std::string text(const ::sc::town::LampRec& s) { using ::sc::converted::text; return std::string("{") + text(s.key) + ", " + text(s.state) + "}"; }
+[[maybe_unused]] static ::sc::town::PlankRec draw_town__PlankRec(::sc::converted::Draw& draw) {
   ::sc::town::PlankRec s{};
   s.key = static_cast<long>(draw.whole());
   s.door = static_cast<unsigned char>(draw.below(40));
@@ -33,25 +33,25 @@ namespace town {
   s.planks = static_cast<unsigned char>(draw.below(40));
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const ::sc::town::PlankRec& s) { using converted::arg; return converted::Value::structure({arg(s.key), arg(s.door), arg(s.doors), arg(s.planks)}); }
-[[maybe_unused]] static bool same(const ::sc::town::PlankRec& want, const converted::Value& got) { using converted::same; return got.rows && got.rows->size() == 4 && same(want.key, (*got.rows)[0]) && same(want.door, (*got.rows)[1]) && same(want.doors, (*got.rows)[2]) && same(want.planks, (*got.rows)[3]); }
-[[maybe_unused]] static ::sc::town::PlankRec near(::sc::town::PlankRec s, int k, int slot) { using converted::near; s.key = near(s.key, k, slot * 7 + 0); s.door = near(s.door, k, slot * 7 + 1); s.doors = near(s.doors, k, slot * 7 + 2); s.planks = near(s.planks, k, slot * 7 + 3); return s; }
-[[maybe_unused]] static bool defined(const ::sc::town::PlankRec& s) { using converted::defined; return defined(s.key) && defined(s.door) && defined(s.doors) && defined(s.planks); }
-[[maybe_unused]] static void flat(const ::sc::town::PlankRec& s, std::vector<kern::f64>& o) { using converted::flat; flat(s.key, o); flat(s.door, o); flat(s.doors, o); flat(s.planks, o); }
-[[maybe_unused]] static std::string text(const ::sc::town::PlankRec& s) { using converted::text; return std::string("{") + text(s.key) + ", " + text(s.door) + ", " + text(s.doors) + ", " + text(s.planks) + "}"; }
-[[maybe_unused]] static ::sc::town::MarkRec draw_town__MarkRec(converted::Draw& draw) {
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::town::PlankRec& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.key), arg(s.door), arg(s.doors), arg(s.planks)}); }
+[[maybe_unused]] static bool same(const ::sc::town::PlankRec& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 4 && same(want.key, (*got.rows)[0]) && same(want.door, (*got.rows)[1]) && same(want.doors, (*got.rows)[2]) && same(want.planks, (*got.rows)[3]); }
+[[maybe_unused]] static ::sc::town::PlankRec near(::sc::town::PlankRec s, int k, int slot) { using ::sc::converted::near; s.key = near(s.key, k, slot * 7 + 0); s.door = near(s.door, k, slot * 7 + 1); s.doors = near(s.doors, k, slot * 7 + 2); s.planks = near(s.planks, k, slot * 7 + 3); return s; }
+[[maybe_unused]] static bool defined(const ::sc::town::PlankRec& s) { using ::sc::converted::defined; return defined(s.key) && defined(s.door) && defined(s.doors) && defined(s.planks); }
+[[maybe_unused]] static void flat(const ::sc::town::PlankRec& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.key, o); flat(s.door, o); flat(s.doors, o); flat(s.planks, o); }
+[[maybe_unused]] static std::string text(const ::sc::town::PlankRec& s) { using ::sc::converted::text; return std::string("{") + text(s.key) + ", " + text(s.door) + ", " + text(s.doors) + ", " + text(s.planks) + "}"; }
+[[maybe_unused]] static ::sc::town::MarkRec draw_town__MarkRec(::sc::converted::Draw& draw) {
   ::sc::town::MarkRec s{};
   s.at = draw.vector();
   s.radius = draw.number();
   s.strength = draw.number();
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const ::sc::town::MarkRec& s) { using converted::arg; return converted::Value::structure({arg(s.at), arg(s.radius), arg(s.strength)}); }
-[[maybe_unused]] static bool same(const ::sc::town::MarkRec& want, const converted::Value& got) { using converted::same; return got.rows && got.rows->size() == 3 && same(want.at, (*got.rows)[0]) && same(want.radius, (*got.rows)[1]) && same(want.strength, (*got.rows)[2]); }
-[[maybe_unused]] static ::sc::town::MarkRec near(::sc::town::MarkRec s, int k, int slot) { using converted::near; s.at = near(s.at, k, slot * 7 + 0); s.radius = near(s.radius, k, slot * 7 + 1); s.strength = near(s.strength, k, slot * 7 + 2); return s; }
-[[maybe_unused]] static bool defined(const ::sc::town::MarkRec& s) { using converted::defined; return defined(s.at) && defined(s.radius) && defined(s.strength); }
-[[maybe_unused]] static void flat(const ::sc::town::MarkRec& s, std::vector<kern::f64>& o) { using converted::flat; flat(s.at, o); flat(s.radius, o); flat(s.strength, o); }
-[[maybe_unused]] static std::string text(const ::sc::town::MarkRec& s) { using converted::text; return std::string("{") + text(s.at) + ", " + text(s.radius) + ", " + text(s.strength) + "}"; }
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::town::MarkRec& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.at), arg(s.radius), arg(s.strength)}); }
+[[maybe_unused]] static bool same(const ::sc::town::MarkRec& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 3 && same(want.at, (*got.rows)[0]) && same(want.radius, (*got.rows)[1]) && same(want.strength, (*got.rows)[2]); }
+[[maybe_unused]] static ::sc::town::MarkRec near(::sc::town::MarkRec s, int k, int slot) { using ::sc::converted::near; s.at = near(s.at, k, slot * 7 + 0); s.radius = near(s.radius, k, slot * 7 + 1); s.strength = near(s.strength, k, slot * 7 + 2); return s; }
+[[maybe_unused]] static bool defined(const ::sc::town::MarkRec& s) { using ::sc::converted::defined; return defined(s.at) && defined(s.radius) && defined(s.strength); }
+[[maybe_unused]] static void flat(const ::sc::town::MarkRec& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.at, o); flat(s.radius, o); flat(s.strength, o); }
+[[maybe_unused]] static std::string text(const ::sc::town::MarkRec& s) { using ::sc::converted::text; return std::string("{") + text(s.at) + ", " + text(s.radius) + ", " + text(s.strength) + "}"; }
 }  // namespace town
 namespace converted_town_sync {
 using namespace converted;
@@ -119,7 +119,7 @@ SC_TEST(converted_town_sync) {
   {  // vec_finite
     converted::Tally tally("vec_finite");
     for (int i = 0; i < converted::kCalls; ++i) {
-      const kern::Vec3 a0 = draw.vector();
+      const ::kern::Vec3 a0 = draw.vector();
       const converted::Watch watch;
       const auto want = vec_finite(a0);
       const bool outside = watch.outside();
@@ -129,7 +129,7 @@ SC_TEST(converted_town_sync) {
   {  // lamp_ok
     converted::Tally tally("lamp_ok");
     for (int i = 0; i < converted::kCalls; ++i) {
-      const ::sc::town::LampRec a0 = draw_town__LampRec(draw);
+      const ::sc::town::LampRec a0 = ::sc::town::draw_town__LampRec(draw);
       const converted::Watch watch;
       const auto want = lamp_ok(a0);
       const bool outside = watch.outside();
@@ -139,7 +139,7 @@ SC_TEST(converted_town_sync) {
   {  // plank_ok
     converted::Tally tally("plank_ok");
     for (int i = 0; i < converted::kCalls; ++i) {
-      const ::sc::town::PlankRec a0 = draw_town__PlankRec(draw);
+      const ::sc::town::PlankRec a0 = ::sc::town::draw_town__PlankRec(draw);
       const converted::Watch watch;
       const auto want = plank_ok(a0);
       const bool outside = watch.outside();
@@ -149,7 +149,7 @@ SC_TEST(converted_town_sync) {
   {  // mark_ok
     converted::Tally tally("mark_ok");
     for (int i = 0; i < converted::kCalls; ++i) {
-      const ::sc::town::MarkRec a0 = draw_town__MarkRec(draw);
+      const ::sc::town::MarkRec a0 = ::sc::town::draw_town__MarkRec(draw);
       const converted::Watch watch;
       const auto want = mark_ok(a0);
       const bool outside = watch.outside();
@@ -160,9 +160,9 @@ SC_TEST(converted_town_sync) {
     converted::Tally tally("pack_ask");
     for (int i = 0; i < converted::kCalls; ++i) {
       const converted::Watch watch;
-      const auto want = pack_ask();
+      const auto want = ::sc::town::pack_ask();
       const bool outside = watch.outside();
-      tally.take(bp, {}, want, wide::pack_ask(), outside, [&] { return std::string(); }, [&]([[maybe_unused]] int k) { return pack_ask(); });
+      tally.take(bp, {}, want, wide::pack_ask(), outside, [&] { return std::string(); }, [&]([[maybe_unused]] int k) { return ::sc::town::pack_ask(); });
     }
   }
 }

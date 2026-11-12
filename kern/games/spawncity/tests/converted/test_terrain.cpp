@@ -14,10 +14,32 @@
 #include "kern/core/jobs.h"
 #include "../converted.h"
 
+namespace kern {
+[[maybe_unused]] static ::kern::Vec4 draw_kern__Vec4(::sc::converted::Draw& draw) {
+  ::kern::Vec4 s{};
+  s.x = draw.number();
+  s.y = draw.number();
+  s.z = draw.number();
+  s.w = draw.number();
+  return s;
+}
+[[maybe_unused]] static ::sc::converted::Value arg(const ::kern::Vec4& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
+[[maybe_unused]] static bool same(const ::kern::Vec4& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
+[[maybe_unused]] static ::kern::Vec4 near(::kern::Vec4 s, int k, int slot) { using ::sc::converted::near; s.x = near(s.x, k, slot * 7 + 0); s.y = near(s.y, k, slot * 7 + 1); s.z = near(s.z, k, slot * 7 + 2); s.w = near(s.w, k, slot * 7 + 3); return s; }
+[[maybe_unused]] static bool defined(const ::kern::Vec4& s) { using ::sc::converted::defined; return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
+[[maybe_unused]] static void flat(const ::kern::Vec4& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.x, o); flat(s.y, o); flat(s.z, o); flat(s.w, o); }
+[[maybe_unused]] static std::string text(const ::kern::Vec4& s) { using ::sc::converted::text; return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
+}  // namespace kern
 namespace sc {
 namespace converted_terrain {
 using namespace converted;
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::near; using converted::flat;
+using ::kern::arg;
+using ::kern::same;
+using ::kern::defined;
+using ::kern::text;
+using ::kern::near;
+using ::kern::flat;
 
 // ---- terrain.cpp, as it stands ----
 #pragma GCC diagnostic push
@@ -34,6 +56,8 @@ f64 merc_y(f64 lat, i32 z) {
   return (1 - std::asinh(std::tan(r)) / kPiD) / 2 * std::ldexp(1.0, z);
 }
 f64 merc_x(f64 lon, i32 z) { return (lon + 180) / 360 * std::ldexp(1.0, z); }
+kern::Vec4 interior_of(f32 x0, f32 y0, f32 span, f32 margin) { return {x0 + margin, y0 + margin, x0 + span - margin, y0 + span - margin}; }
+bool rect_in(const kern::Vec4& in, const kern::Vec4& out) { return in.x >= out.x && in.y >= out.y && in.z <= out.z && in.w <= out.w; }
 Vec3 albedo(Vec3 c) {
   const f32 l = 0.2126f * c.x + 0.7152f * c.y + 0.0722f * c.z;
   const f32 target = std::fmin(0.24f, std::fmax(0.07f, l * 0.8f + 0.03f)), k = target / std::fmax(0.02f, l);
@@ -76,6 +100,8 @@ f32 crater_profile(f32 r, f32 radius, f32 depth, f32 rim) {
   const f32 x = (r - bowl) / (radius - bowl), k = (x - 0.12) / 0.14;
   return rim * std::exp(-(k * k)) * (1 - x);
 }
+kern::Vec4 interior_of(f32 x0, f32 y0, f32 span, f32 margin) { return {x0 + margin, y0 + margin, x0 + span - margin, y0 + span - margin}; }
+bool rect_in(const kern::Vec4& in, const kern::Vec4& out) { return in.x >= out.x && in.y >= out.y && in.z <= out.z && in.w <= out.w; }
 Vec3 albedo(Vec3 c) {
   const f32 l = 0.2126 * c.x + 0.7152 * c.y + 0.0722 * c.z;
   const f32 target = std::fmin(0.24, std::fmax(0.07, l * 0.8 + 0.03)), k = target / std::fmax(0.02, l);
@@ -141,15 +167,53 @@ SC_TEST(converted_terrain) {
       const float a2 = draw.number();
       const float a3 = draw.number();
       const converted::Watch watch;
-      const auto want = crater_profile(a0, a1, a2, a3);
+      const auto want = ::sc::crater_profile(a0, a1, a2, a3);
       const bool outside = watch.outside();
-      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, wide::crater_profile(wide_arg(a0), wide_arg(a1), wide_arg(a2), wide_arg(a3)), outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); }, [&]([[maybe_unused]] int k) { return crater_profile(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2), near(a3, k, 3)); });
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, wide::crater_profile(wide_arg(a0), wide_arg(a1), wide_arg(a2), wide_arg(a3)), outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); }, [&]([[maybe_unused]] int k) { return ::sc::crater_profile(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2), near(a3, k, 3)); });
+    }
+  }
+  {  // Vec4::Vec4
+    converted::Tally tally("Vec4_new");
+    const auto run = [&](float a0, float a1, float a2, float a3) { return ::kern::Vec4(a0, a1, a2, a3); };
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const float a0 = draw.number();
+      const float a1 = draw.number();
+      const float a2 = draw.number();
+      const float a3 = draw.number();
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2, a3);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, want, outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); }, [&]([[maybe_unused]] int k) { return run(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2), near(a3, k, 3)); });
+    }
+  }
+  {  // interior_of
+    converted::Tally tally("interior_of");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const float a0 = draw.number();
+      const float a1 = draw.number();
+      const float a2 = draw.number();
+      const float a3 = draw.number();
+      const converted::Watch watch;
+      const auto want = interior_of(a0, a1, a2, a3);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, wide::interior_of(wide_arg(a0), wide_arg(a1), wide_arg(a2), wide_arg(a3)), outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); }, [&]([[maybe_unused]] int k) { return interior_of(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2), near(a3, k, 3)); });
+    }
+  }
+  {  // rect_in
+    converted::Tally tally("rect_in");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::kern::Vec4 a0 = ::kern::draw_kern__Vec4(draw);
+      const ::kern::Vec4 a1 = ::kern::draw_kern__Vec4(draw);
+      const converted::Watch watch;
+      const auto want = rect_in(a0, a1);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1)}, want, wide::rect_in(wide_arg(a0), wide_arg(a1)), outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return rect_in(near(a0, k, 0), near(a1, k, 1)); });
     }
   }
   {  // albedo
     converted::Tally tally("albedo");
     for (int i = 0; i < converted::kCalls; ++i) {
-      const kern::Vec3 a0 = draw.vector();
+      const ::kern::Vec3 a0 = draw.vector();
       const converted::Watch watch;
       const auto want = albedo(a0);
       const bool outside = watch.outside();
@@ -189,7 +253,7 @@ SC_TEST(converted_terrain) {
   {  // to_linear
     converted::Tally tally("to_linear");
     for (int i = 0; i < converted::kCalls; ++i) {
-      const kern::Vec3 a0 = draw.vector();
+      const ::kern::Vec3 a0 = draw.vector();
       const converted::Watch watch;
       const auto want = to_linear(a0);
       const bool outside = watch.outside();
@@ -199,7 +263,7 @@ SC_TEST(converted_terrain) {
   {  // to_srgb
     converted::Tally tally("to_srgb");
     for (int i = 0; i < converted::kCalls; ++i) {
-      const kern::Vec3 a0 = draw.vector();
+      const ::kern::Vec3 a0 = draw.vector();
       const converted::Watch watch;
       const auto want = to_srgb(a0);
       const bool outside = watch.outside();

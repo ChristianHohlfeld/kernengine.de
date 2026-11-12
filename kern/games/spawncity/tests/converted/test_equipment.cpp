@@ -15,7 +15,7 @@
 #include "../converted.h"
 
 namespace sc {
-[[maybe_unused]] static ::sc::Flight draw_Flight(converted::Draw& draw) {
+[[maybe_unused]] static ::sc::Flight draw_Flight(::sc::converted::Draw& draw) {
   ::sc::Flight s{};
   s.id = static_cast<unsigned int>(draw.below(40));
   s.start = draw.number();
@@ -28,32 +28,32 @@ namespace sc {
   s.volts_end = draw.number();
   s.volts_min = draw.number();
   s.reason = draw.word();
-  s.path = draw_list(draw, [&]() -> kern::Vec3 { return draw.vector(); });
+  s.path = draw_list(draw, [&]() -> ::kern::Vec3 { return draw.vector(); });
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const ::sc::Flight& s) { using converted::arg; return converted::Value::structure({arg(s.id), arg(s.start), arg(s.duration), arg(s.distance), arg(s.max_speed), arg(s.max_agl), arg(s.max_alt), arg(s.volts_start), arg(s.volts_end), arg(s.volts_min), arg(s.reason), arg(s.path)}); }
-[[maybe_unused]] static bool same(const ::sc::Flight& want, const converted::Value& got) { using converted::same; return got.rows && got.rows->size() == 12 && same(want.id, (*got.rows)[0]) && same(want.start, (*got.rows)[1]) && same(want.duration, (*got.rows)[2]) && same(want.distance, (*got.rows)[3]) && same(want.max_speed, (*got.rows)[4]) && same(want.max_agl, (*got.rows)[5]) && same(want.max_alt, (*got.rows)[6]) && same(want.volts_start, (*got.rows)[7]) && same(want.volts_end, (*got.rows)[8]) && same(want.volts_min, (*got.rows)[9]) && same(want.reason, (*got.rows)[10]) && same(want.path, (*got.rows)[11]); }
-[[maybe_unused]] static ::sc::Flight near(::sc::Flight s, int k, int slot) { using converted::near; s.id = near(s.id, k, slot * 7 + 0); s.start = near(s.start, k, slot * 7 + 1); s.duration = near(s.duration, k, slot * 7 + 2); s.distance = near(s.distance, k, slot * 7 + 3); s.max_speed = near(s.max_speed, k, slot * 7 + 4); s.max_agl = near(s.max_agl, k, slot * 7 + 5); s.max_alt = near(s.max_alt, k, slot * 7 + 6); s.volts_start = near(s.volts_start, k, slot * 7 + 7); s.volts_end = near(s.volts_end, k, slot * 7 + 8); s.volts_min = near(s.volts_min, k, slot * 7 + 9); s.reason = near(s.reason, k, slot * 7 + 10); s.path = near(s.path, k, slot * 7 + 11); return s; }
-[[maybe_unused]] static bool defined(const ::sc::Flight& s) { using converted::defined; return defined(s.id) && defined(s.start) && defined(s.duration) && defined(s.distance) && defined(s.max_speed) && defined(s.max_agl) && defined(s.max_alt) && defined(s.volts_start) && defined(s.volts_end) && defined(s.volts_min) && defined(s.reason) && defined(s.path); }
-[[maybe_unused]] static void flat(const ::sc::Flight& s, std::vector<kern::f64>& o) { using converted::flat; flat(s.id, o); flat(s.start, o); flat(s.duration, o); flat(s.distance, o); flat(s.max_speed, o); flat(s.max_agl, o); flat(s.max_alt, o); flat(s.volts_start, o); flat(s.volts_end, o); flat(s.volts_min, o); flat(s.reason, o); flat(s.path, o); }
-[[maybe_unused]] static std::string text(const ::sc::Flight& s) { using converted::text; return std::string("{") + text(s.id) + ", " + text(s.start) + ", " + text(s.duration) + ", " + text(s.distance) + ", " + text(s.max_speed) + ", " + text(s.max_agl) + ", " + text(s.max_alt) + ", " + text(s.volts_start) + ", " + text(s.volts_end) + ", " + text(s.volts_min) + ", " + text(s.reason) + ", " + text(s.path) + "}"; }
-[[maybe_unused]] static ::sc::FlightLog::Event draw_FlightLog__Event(converted::Draw& draw) {
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::Flight& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.id), arg(s.start), arg(s.duration), arg(s.distance), arg(s.max_speed), arg(s.max_agl), arg(s.max_alt), arg(s.volts_start), arg(s.volts_end), arg(s.volts_min), arg(s.reason), arg(s.path)}); }
+[[maybe_unused]] static bool same(const ::sc::Flight& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 12 && same(want.id, (*got.rows)[0]) && same(want.start, (*got.rows)[1]) && same(want.duration, (*got.rows)[2]) && same(want.distance, (*got.rows)[3]) && same(want.max_speed, (*got.rows)[4]) && same(want.max_agl, (*got.rows)[5]) && same(want.max_alt, (*got.rows)[6]) && same(want.volts_start, (*got.rows)[7]) && same(want.volts_end, (*got.rows)[8]) && same(want.volts_min, (*got.rows)[9]) && same(want.reason, (*got.rows)[10]) && same(want.path, (*got.rows)[11]); }
+[[maybe_unused]] static ::sc::Flight near(::sc::Flight s, int k, int slot) { using ::sc::converted::near; s.id = near(s.id, k, slot * 7 + 0); s.start = near(s.start, k, slot * 7 + 1); s.duration = near(s.duration, k, slot * 7 + 2); s.distance = near(s.distance, k, slot * 7 + 3); s.max_speed = near(s.max_speed, k, slot * 7 + 4); s.max_agl = near(s.max_agl, k, slot * 7 + 5); s.max_alt = near(s.max_alt, k, slot * 7 + 6); s.volts_start = near(s.volts_start, k, slot * 7 + 7); s.volts_end = near(s.volts_end, k, slot * 7 + 8); s.volts_min = near(s.volts_min, k, slot * 7 + 9); s.reason = near(s.reason, k, slot * 7 + 10); s.path = near(s.path, k, slot * 7 + 11); return s; }
+[[maybe_unused]] static bool defined(const ::sc::Flight& s) { using ::sc::converted::defined; return defined(s.id) && defined(s.start) && defined(s.duration) && defined(s.distance) && defined(s.max_speed) && defined(s.max_agl) && defined(s.max_alt) && defined(s.volts_start) && defined(s.volts_end) && defined(s.volts_min) && defined(s.reason) && defined(s.path); }
+[[maybe_unused]] static void flat(const ::sc::Flight& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.id, o); flat(s.start, o); flat(s.duration, o); flat(s.distance, o); flat(s.max_speed, o); flat(s.max_agl, o); flat(s.max_alt, o); flat(s.volts_start, o); flat(s.volts_end, o); flat(s.volts_min, o); flat(s.reason, o); flat(s.path, o); }
+[[maybe_unused]] static std::string text(const ::sc::Flight& s) { using ::sc::converted::text; return std::string("{") + text(s.id) + ", " + text(s.start) + ", " + text(s.duration) + ", " + text(s.distance) + ", " + text(s.max_speed) + ", " + text(s.max_agl) + ", " + text(s.max_alt) + ", " + text(s.volts_start) + ", " + text(s.volts_end) + ", " + text(s.volts_min) + ", " + text(s.reason) + ", " + text(s.path) + "}"; }
+[[maybe_unused]] static ::sc::FlightLog::Event draw_FlightLog__Event(::sc::converted::Draw& draw) {
   ::sc::FlightLog::Event s{};
   s.t = draw.number();
   s.stage = draw.word();
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const ::sc::FlightLog::Event& s) { using converted::arg; return converted::Value::structure({arg(s.t), arg(s.stage)}); }
-[[maybe_unused]] static bool same(const ::sc::FlightLog::Event& want, const converted::Value& got) { using converted::same; return got.rows && got.rows->size() == 2 && same(want.t, (*got.rows)[0]) && same(want.stage, (*got.rows)[1]); }
-[[maybe_unused]] static ::sc::FlightLog::Event near(::sc::FlightLog::Event s, int k, int slot) { using converted::near; s.t = near(s.t, k, slot * 7 + 0); s.stage = near(s.stage, k, slot * 7 + 1); return s; }
-[[maybe_unused]] static bool defined(const ::sc::FlightLog::Event& s) { using converted::defined; return defined(s.t) && defined(s.stage); }
-[[maybe_unused]] static void flat(const ::sc::FlightLog::Event& s, std::vector<kern::f64>& o) { using converted::flat; flat(s.t, o); flat(s.stage, o); }
-[[maybe_unused]] static std::string text(const ::sc::FlightLog::Event& s) { using converted::text; return std::string("{") + text(s.t) + ", " + text(s.stage) + "}"; }
-[[maybe_unused]] static ::sc::FlightLog draw_FlightLog(converted::Draw& draw) {
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::FlightLog::Event& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.t), arg(s.stage)}); }
+[[maybe_unused]] static bool same(const ::sc::FlightLog::Event& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 2 && same(want.t, (*got.rows)[0]) && same(want.stage, (*got.rows)[1]); }
+[[maybe_unused]] static ::sc::FlightLog::Event near(::sc::FlightLog::Event s, int k, int slot) { using ::sc::converted::near; s.t = near(s.t, k, slot * 7 + 0); s.stage = near(s.stage, k, slot * 7 + 1); return s; }
+[[maybe_unused]] static bool defined(const ::sc::FlightLog::Event& s) { using ::sc::converted::defined; return defined(s.t) && defined(s.stage); }
+[[maybe_unused]] static void flat(const ::sc::FlightLog::Event& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.t, o); flat(s.stage, o); }
+[[maybe_unused]] static std::string text(const ::sc::FlightLog::Event& s) { using ::sc::converted::text; return std::string("{") + text(s.t) + ", " + text(s.stage) + "}"; }
+[[maybe_unused]] static ::sc::FlightLog draw_FlightLog(::sc::converted::Draw& draw) {
   ::sc::FlightLog s{};
-  s.flights_ = draw_list(draw, [&]() -> ::sc::Flight { return draw_Flight(draw); });
-  s.events_ = draw_list(draw, [&]() -> ::sc::FlightLog::Event { return draw_FlightLog__Event(draw); });
-  s.cur_ = draw_Flight(draw);
+  s.flights_ = draw_list(draw, [&]() -> ::sc::Flight { return ::sc::draw_Flight(draw); });
+  s.events_ = draw_list(draw, [&]() -> ::sc::FlightLog::Event { return ::sc::draw_FlightLog__Event(draw); });
+  s.cur_ = ::sc::draw_Flight(draw);
   s.active_ = draw.flag();
   s.have_last_ = draw.flag();
   s.last_ = draw.vector();
@@ -63,13 +63,13 @@ namespace sc {
   s.serial_ = static_cast<unsigned int>(draw.below(40));
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const ::sc::FlightLog& s) { using converted::arg; return converted::Value::structure({arg(s.flights_), arg(s.events_), arg(s.cur_), arg(s.active_), arg(s.have_last_), arg(s.last_), arg(s.last_t_), arg(s.last_path_), arg(s.next_id_), arg(s.serial_)}); }
-[[maybe_unused]] static bool same(const ::sc::FlightLog& want, const converted::Value& got) { using converted::same; return got.rows && got.rows->size() == 10 && same(want.flights_, (*got.rows)[0]) && same(want.events_, (*got.rows)[1]) && same(want.cur_, (*got.rows)[2]) && same(want.active_, (*got.rows)[3]) && same(want.have_last_, (*got.rows)[4]) && same(want.last_, (*got.rows)[5]) && same(want.last_t_, (*got.rows)[6]) && same(want.last_path_, (*got.rows)[7]) && same(want.next_id_, (*got.rows)[8]) && same(want.serial_, (*got.rows)[9]); }
-[[maybe_unused]] static ::sc::FlightLog near(::sc::FlightLog s, int k, int slot) { using converted::near; s.flights_ = near(s.flights_, k, slot * 7 + 0); s.events_ = near(s.events_, k, slot * 7 + 1); s.cur_ = near(s.cur_, k, slot * 7 + 2); s.active_ = near(s.active_, k, slot * 7 + 3); s.have_last_ = near(s.have_last_, k, slot * 7 + 4); s.last_ = near(s.last_, k, slot * 7 + 5); s.last_t_ = near(s.last_t_, k, slot * 7 + 6); s.last_path_ = near(s.last_path_, k, slot * 7 + 7); s.next_id_ = near(s.next_id_, k, slot * 7 + 8); s.serial_ = near(s.serial_, k, slot * 7 + 9); return s; }
-[[maybe_unused]] static bool defined(const ::sc::FlightLog& s) { using converted::defined; return defined(s.flights_) && defined(s.events_) && defined(s.cur_) && defined(s.active_) && defined(s.have_last_) && defined(s.last_) && defined(s.last_t_) && defined(s.last_path_) && defined(s.next_id_) && defined(s.serial_); }
-[[maybe_unused]] static void flat(const ::sc::FlightLog& s, std::vector<kern::f64>& o) { using converted::flat; flat(s.flights_, o); flat(s.events_, o); flat(s.cur_, o); flat(s.active_, o); flat(s.have_last_, o); flat(s.last_, o); flat(s.last_t_, o); flat(s.last_path_, o); flat(s.next_id_, o); flat(s.serial_, o); }
-[[maybe_unused]] static std::string text(const ::sc::FlightLog& s) { using converted::text; return std::string("{") + text(s.flights_) + ", " + text(s.events_) + ", " + text(s.cur_) + ", " + text(s.active_) + ", " + text(s.have_last_) + ", " + text(s.last_) + ", " + text(s.last_t_) + ", " + text(s.last_path_) + ", " + text(s.next_id_) + ", " + text(s.serial_) + "}"; }
-[[maybe_unused]] static ::sc::FlightSample draw_FlightSample(converted::Draw& draw) {
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::FlightLog& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.flights_), arg(s.events_), arg(s.cur_), arg(s.active_), arg(s.have_last_), arg(s.last_), arg(s.last_t_), arg(s.last_path_), arg(s.next_id_), arg(s.serial_)}); }
+[[maybe_unused]] static bool same(const ::sc::FlightLog& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 10 && same(want.flights_, (*got.rows)[0]) && same(want.events_, (*got.rows)[1]) && same(want.cur_, (*got.rows)[2]) && same(want.active_, (*got.rows)[3]) && same(want.have_last_, (*got.rows)[4]) && same(want.last_, (*got.rows)[5]) && same(want.last_t_, (*got.rows)[6]) && same(want.last_path_, (*got.rows)[7]) && same(want.next_id_, (*got.rows)[8]) && same(want.serial_, (*got.rows)[9]); }
+[[maybe_unused]] static ::sc::FlightLog near(::sc::FlightLog s, int k, int slot) { using ::sc::converted::near; s.flights_ = near(s.flights_, k, slot * 7 + 0); s.events_ = near(s.events_, k, slot * 7 + 1); s.cur_ = near(s.cur_, k, slot * 7 + 2); s.active_ = near(s.active_, k, slot * 7 + 3); s.have_last_ = near(s.have_last_, k, slot * 7 + 4); s.last_ = near(s.last_, k, slot * 7 + 5); s.last_t_ = near(s.last_t_, k, slot * 7 + 6); s.last_path_ = near(s.last_path_, k, slot * 7 + 7); s.next_id_ = near(s.next_id_, k, slot * 7 + 8); s.serial_ = near(s.serial_, k, slot * 7 + 9); return s; }
+[[maybe_unused]] static bool defined(const ::sc::FlightLog& s) { using ::sc::converted::defined; return defined(s.flights_) && defined(s.events_) && defined(s.cur_) && defined(s.active_) && defined(s.have_last_) && defined(s.last_) && defined(s.last_t_) && defined(s.last_path_) && defined(s.next_id_) && defined(s.serial_); }
+[[maybe_unused]] static void flat(const ::sc::FlightLog& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.flights_, o); flat(s.events_, o); flat(s.cur_, o); flat(s.active_, o); flat(s.have_last_, o); flat(s.last_, o); flat(s.last_t_, o); flat(s.last_path_, o); flat(s.next_id_, o); flat(s.serial_, o); }
+[[maybe_unused]] static std::string text(const ::sc::FlightLog& s) { using ::sc::converted::text; return std::string("{") + text(s.flights_) + ", " + text(s.events_) + ", " + text(s.cur_) + ", " + text(s.active_) + ", " + text(s.have_last_) + ", " + text(s.last_) + ", " + text(s.last_t_) + ", " + text(s.last_path_) + ", " + text(s.next_id_) + ", " + text(s.serial_) + "}"; }
+[[maybe_unused]] static ::sc::FlightSample draw_FlightSample(::sc::converted::Draw& draw) {
   ::sc::FlightSample s{};
   s.t = draw.number();
   s.pos = draw.vector();
@@ -79,13 +79,13 @@ namespace sc {
   s.armed = draw.flag();
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const ::sc::FlightSample& s) { using converted::arg; return converted::Value::structure({arg(s.t), arg(s.pos), arg(s.vel), arg(s.agl), arg(s.volts), arg(s.armed)}); }
-[[maybe_unused]] static bool same(const ::sc::FlightSample& want, const converted::Value& got) { using converted::same; return got.rows && got.rows->size() == 6 && same(want.t, (*got.rows)[0]) && same(want.pos, (*got.rows)[1]) && same(want.vel, (*got.rows)[2]) && same(want.agl, (*got.rows)[3]) && same(want.volts, (*got.rows)[4]) && same(want.armed, (*got.rows)[5]); }
-[[maybe_unused]] static ::sc::FlightSample near(::sc::FlightSample s, int k, int slot) { using converted::near; s.t = near(s.t, k, slot * 7 + 0); s.pos = near(s.pos, k, slot * 7 + 1); s.vel = near(s.vel, k, slot * 7 + 2); s.agl = near(s.agl, k, slot * 7 + 3); s.volts = near(s.volts, k, slot * 7 + 4); s.armed = near(s.armed, k, slot * 7 + 5); return s; }
-[[maybe_unused]] static bool defined(const ::sc::FlightSample& s) { using converted::defined; return defined(s.t) && defined(s.pos) && defined(s.vel) && defined(s.agl) && defined(s.volts) && defined(s.armed); }
-[[maybe_unused]] static void flat(const ::sc::FlightSample& s, std::vector<kern::f64>& o) { using converted::flat; flat(s.t, o); flat(s.pos, o); flat(s.vel, o); flat(s.agl, o); flat(s.volts, o); flat(s.armed, o); }
-[[maybe_unused]] static std::string text(const ::sc::FlightSample& s) { using converted::text; return std::string("{") + text(s.t) + ", " + text(s.pos) + ", " + text(s.vel) + ", " + text(s.agl) + ", " + text(s.volts) + ", " + text(s.armed) + "}"; }
-[[maybe_unused]] static ::sc::MusicSynth::Voice draw_MusicSynth__Voice(converted::Draw& draw) {
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::FlightSample& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.t), arg(s.pos), arg(s.vel), arg(s.agl), arg(s.volts), arg(s.armed)}); }
+[[maybe_unused]] static bool same(const ::sc::FlightSample& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 6 && same(want.t, (*got.rows)[0]) && same(want.pos, (*got.rows)[1]) && same(want.vel, (*got.rows)[2]) && same(want.agl, (*got.rows)[3]) && same(want.volts, (*got.rows)[4]) && same(want.armed, (*got.rows)[5]); }
+[[maybe_unused]] static ::sc::FlightSample near(::sc::FlightSample s, int k, int slot) { using ::sc::converted::near; s.t = near(s.t, k, slot * 7 + 0); s.pos = near(s.pos, k, slot * 7 + 1); s.vel = near(s.vel, k, slot * 7 + 2); s.agl = near(s.agl, k, slot * 7 + 3); s.volts = near(s.volts, k, slot * 7 + 4); s.armed = near(s.armed, k, slot * 7 + 5); return s; }
+[[maybe_unused]] static bool defined(const ::sc::FlightSample& s) { using ::sc::converted::defined; return defined(s.t) && defined(s.pos) && defined(s.vel) && defined(s.agl) && defined(s.volts) && defined(s.armed); }
+[[maybe_unused]] static void flat(const ::sc::FlightSample& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.t, o); flat(s.pos, o); flat(s.vel, o); flat(s.agl, o); flat(s.volts, o); flat(s.armed, o); }
+[[maybe_unused]] static std::string text(const ::sc::FlightSample& s) { using ::sc::converted::text; return std::string("{") + text(s.t) + ", " + text(s.pos) + ", " + text(s.vel) + ", " + text(s.agl) + ", " + text(s.volts) + ", " + text(s.armed) + "}"; }
+[[maybe_unused]] static ::sc::MusicSynth::Voice draw_MusicSynth__Voice(::sc::converted::Draw& draw) {
   ::sc::MusicSynth::Voice s{};
   s.phase = draw.number();
   s.freq = draw.number();
@@ -95,12 +95,44 @@ namespace sc {
   s.phase2 = draw.number();
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const ::sc::MusicSynth::Voice& s) { using converted::arg; return converted::Value::structure({arg(s.phase), arg(s.freq), arg(s.env), arg(s.decay), arg(s.amp), arg(s.phase2)}); }
-[[maybe_unused]] static bool same(const ::sc::MusicSynth::Voice& want, const converted::Value& got) { using converted::same; return got.rows && got.rows->size() == 6 && same(want.phase, (*got.rows)[0]) && same(want.freq, (*got.rows)[1]) && same(want.env, (*got.rows)[2]) && same(want.decay, (*got.rows)[3]) && same(want.amp, (*got.rows)[4]) && same(want.phase2, (*got.rows)[5]); }
-[[maybe_unused]] static ::sc::MusicSynth::Voice near(::sc::MusicSynth::Voice s, int k, int slot) { using converted::near; s.phase = near(s.phase, k, slot * 7 + 0); s.freq = near(s.freq, k, slot * 7 + 1); s.env = near(s.env, k, slot * 7 + 2); s.decay = near(s.decay, k, slot * 7 + 3); s.amp = near(s.amp, k, slot * 7 + 4); s.phase2 = near(s.phase2, k, slot * 7 + 5); return s; }
-[[maybe_unused]] static bool defined(const ::sc::MusicSynth::Voice& s) { using converted::defined; return defined(s.phase) && defined(s.freq) && defined(s.env) && defined(s.decay) && defined(s.amp) && defined(s.phase2); }
-[[maybe_unused]] static void flat(const ::sc::MusicSynth::Voice& s, std::vector<kern::f64>& o) { using converted::flat; flat(s.phase, o); flat(s.freq, o); flat(s.env, o); flat(s.decay, o); flat(s.amp, o); flat(s.phase2, o); }
-[[maybe_unused]] static std::string text(const ::sc::MusicSynth::Voice& s) { using converted::text; return std::string("{") + text(s.phase) + ", " + text(s.freq) + ", " + text(s.env) + ", " + text(s.decay) + ", " + text(s.amp) + ", " + text(s.phase2) + "}"; }
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::MusicSynth::Voice& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.phase), arg(s.freq), arg(s.env), arg(s.decay), arg(s.amp), arg(s.phase2)}); }
+[[maybe_unused]] static bool same(const ::sc::MusicSynth::Voice& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 6 && same(want.phase, (*got.rows)[0]) && same(want.freq, (*got.rows)[1]) && same(want.env, (*got.rows)[2]) && same(want.decay, (*got.rows)[3]) && same(want.amp, (*got.rows)[4]) && same(want.phase2, (*got.rows)[5]); }
+[[maybe_unused]] static ::sc::MusicSynth::Voice near(::sc::MusicSynth::Voice s, int k, int slot) { using ::sc::converted::near; s.phase = near(s.phase, k, slot * 7 + 0); s.freq = near(s.freq, k, slot * 7 + 1); s.env = near(s.env, k, slot * 7 + 2); s.decay = near(s.decay, k, slot * 7 + 3); s.amp = near(s.amp, k, slot * 7 + 4); s.phase2 = near(s.phase2, k, slot * 7 + 5); return s; }
+[[maybe_unused]] static bool defined(const ::sc::MusicSynth::Voice& s) { using ::sc::converted::defined; return defined(s.phase) && defined(s.freq) && defined(s.env) && defined(s.decay) && defined(s.amp) && defined(s.phase2); }
+[[maybe_unused]] static void flat(const ::sc::MusicSynth::Voice& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.phase, o); flat(s.freq, o); flat(s.env, o); flat(s.decay, o); flat(s.amp, o); flat(s.phase2, o); }
+[[maybe_unused]] static std::string text(const ::sc::MusicSynth::Voice& s) { using ::sc::converted::text; return std::string("{") + text(s.phase) + ", " + text(s.freq) + ", " + text(s.env) + ", " + text(s.decay) + ", " + text(s.amp) + ", " + text(s.phase2) + "}"; }
+[[maybe_unused]] static ::sc::MusicSynth draw_MusicSynth(::sc::converted::Draw& draw) {
+  ::sc::MusicSynth s{};
+  s.peak = draw.number();
+  s.rate_ = static_cast<unsigned int>(draw.below(40));
+  s.programme_ = static_cast<int>(draw.whole());
+  s.want_ = static_cast<int>(draw.whole());
+  s.gain_ = draw.number();
+  s.target_ = draw.number();
+  s.fade_ = draw.number();
+  s.sample_ = static_cast<unsigned long>(draw.below(40));
+  s.step_ = static_cast<unsigned int>(draw.below(40));
+  s.samples_per_step_ = static_cast<unsigned int>(draw.below(40));
+  s.until_step_ = static_cast<unsigned int>(draw.below(40));
+  s.rng_ = static_cast<unsigned int>(draw.below(40));
+  s.kick_ = ::sc::draw_MusicSynth__Voice(draw);
+  s.snare_ = ::sc::draw_MusicSynth__Voice(draw);
+  s.hat_ = ::sc::draw_MusicSynth__Voice(draw);
+  s.bass_ = ::sc::draw_MusicSynth__Voice(draw);
+  s.lead_ = ::sc::draw_MusicSynth__Voice(draw);
+  for (auto& e : s.pad_) e = ::sc::draw_MusicSynth__Voice(draw);
+  s.lp_ = draw.number();
+  s.bass_lp_ = draw.number();
+  for (auto& e : s.echo_) e = draw.number();
+  s.echo_at_ = static_cast<unsigned int>(draw.below(40));
+  return s;
+}
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::MusicSynth& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.peak), arg(s.rate_), arg(s.programme_), arg(s.want_), arg(s.gain_), arg(s.target_), arg(s.fade_), arg(s.sample_), arg(s.step_), arg(s.samples_per_step_), arg(s.until_step_), arg(s.rng_), arg(s.kick_), arg(s.snare_), arg(s.hat_), arg(s.bass_), arg(s.lead_), arg(std::vector<::sc::MusicSynth::Voice>(std::begin(s.pad_), std::end(s.pad_))), arg(s.lp_), arg(s.bass_lp_), arg(std::vector<float>(std::begin(s.echo_), std::end(s.echo_))), arg(s.echo_at_)}); }
+[[maybe_unused]] static bool same(const ::sc::MusicSynth& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 22 && same(want.peak, (*got.rows)[0]) && same(want.rate_, (*got.rows)[1]) && same(want.programme_, (*got.rows)[2]) && same(want.want_, (*got.rows)[3]) && same(want.gain_, (*got.rows)[4]) && same(want.target_, (*got.rows)[5]) && same(want.fade_, (*got.rows)[6]) && same(want.sample_, (*got.rows)[7]) && same(want.step_, (*got.rows)[8]) && same(want.samples_per_step_, (*got.rows)[9]) && same(want.until_step_, (*got.rows)[10]) && same(want.rng_, (*got.rows)[11]) && same(want.kick_, (*got.rows)[12]) && same(want.snare_, (*got.rows)[13]) && same(want.hat_, (*got.rows)[14]) && same(want.bass_, (*got.rows)[15]) && same(want.lead_, (*got.rows)[16]) && same(std::vector<::sc::MusicSynth::Voice>(std::begin(want.pad_), std::end(want.pad_)), (*got.rows)[17]) && same(want.lp_, (*got.rows)[18]) && same(want.bass_lp_, (*got.rows)[19]) && same(std::vector<float>(std::begin(want.echo_), std::end(want.echo_)), (*got.rows)[20]) && same(want.echo_at_, (*got.rows)[21]); }
+[[maybe_unused]] static ::sc::MusicSynth near(::sc::MusicSynth s, int k, int slot) { using ::sc::converted::near; s.peak = near(s.peak, k, slot * 7 + 0); s.rate_ = near(s.rate_, k, slot * 7 + 1); s.programme_ = near(s.programme_, k, slot * 7 + 2); s.want_ = near(s.want_, k, slot * 7 + 3); s.gain_ = near(s.gain_, k, slot * 7 + 4); s.target_ = near(s.target_, k, slot * 7 + 5); s.fade_ = near(s.fade_, k, slot * 7 + 6); s.sample_ = near(s.sample_, k, slot * 7 + 7); s.step_ = near(s.step_, k, slot * 7 + 8); s.samples_per_step_ = near(s.samples_per_step_, k, slot * 7 + 9); s.until_step_ = near(s.until_step_, k, slot * 7 + 10); s.rng_ = near(s.rng_, k, slot * 7 + 11); s.kick_ = near(s.kick_, k, slot * 7 + 12); s.snare_ = near(s.snare_, k, slot * 7 + 13); s.hat_ = near(s.hat_, k, slot * 7 + 14); s.bass_ = near(s.bass_, k, slot * 7 + 15); s.lead_ = near(s.lead_, k, slot * 7 + 16); { const auto v = near(std::vector<::sc::MusicSynth::Voice>(std::begin(s.pad_), std::end(s.pad_)), k, slot * 7 + 17); std::copy(v.begin(), v.end(), std::begin(s.pad_)); } s.lp_ = near(s.lp_, k, slot * 7 + 18); s.bass_lp_ = near(s.bass_lp_, k, slot * 7 + 19); { const auto v = near(std::vector<float>(std::begin(s.echo_), std::end(s.echo_)), k, slot * 7 + 20); std::copy(v.begin(), v.end(), std::begin(s.echo_)); } s.echo_at_ = near(s.echo_at_, k, slot * 7 + 21); return s; }
+[[maybe_unused]] static bool defined(const ::sc::MusicSynth& s) { using ::sc::converted::defined; return defined(s.peak) && defined(s.rate_) && defined(s.programme_) && defined(s.want_) && defined(s.gain_) && defined(s.target_) && defined(s.fade_) && defined(s.sample_) && defined(s.step_) && defined(s.samples_per_step_) && defined(s.until_step_) && defined(s.rng_) && defined(s.kick_) && defined(s.snare_) && defined(s.hat_) && defined(s.bass_) && defined(s.lead_) && defined(std::vector<::sc::MusicSynth::Voice>(std::begin(s.pad_), std::end(s.pad_))) && defined(s.lp_) && defined(s.bass_lp_) && defined(std::vector<float>(std::begin(s.echo_), std::end(s.echo_))) && defined(s.echo_at_); }
+[[maybe_unused]] static void flat(const ::sc::MusicSynth& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.peak, o); flat(s.rate_, o); flat(s.programme_, o); flat(s.want_, o); flat(s.gain_, o); flat(s.target_, o); flat(s.fade_, o); flat(s.sample_, o); flat(s.step_, o); flat(s.samples_per_step_, o); flat(s.until_step_, o); flat(s.rng_, o); flat(s.kick_, o); flat(s.snare_, o); flat(s.hat_, o); flat(s.bass_, o); flat(s.lead_, o); flat(std::vector<::sc::MusicSynth::Voice>(std::begin(s.pad_), std::end(s.pad_)), o); flat(s.lp_, o); flat(s.bass_lp_, o); flat(std::vector<float>(std::begin(s.echo_), std::end(s.echo_)), o); flat(s.echo_at_, o); }
+[[maybe_unused]] static std::string text(const ::sc::MusicSynth& s) { using ::sc::converted::text; return std::string("{") + text(s.peak) + ", " + text(s.rate_) + ", " + text(s.programme_) + ", " + text(s.want_) + ", " + text(s.gain_) + ", " + text(s.target_) + ", " + text(s.fade_) + ", " + text(s.sample_) + ", " + text(s.step_) + ", " + text(s.samples_per_step_) + ", " + text(s.until_step_) + ", " + text(s.rng_) + ", " + text(s.kick_) + ", " + text(s.snare_) + ", " + text(s.hat_) + ", " + text(s.bass_) + ", " + text(s.lead_) + ", " + text(std::vector<::sc::MusicSynth::Voice>(std::begin(s.pad_), std::end(s.pad_))) + ", " + text(s.lp_) + ", " + text(s.bass_lp_) + ", " + text(std::vector<float>(std::begin(s.echo_), std::end(s.echo_))) + ", " + text(s.echo_at_) + "}"; }
 namespace converted_equipment {
 using namespace converted;
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::near; using converted::flat;
@@ -154,8 +186,8 @@ SC_TEST(converted_equipment) {
     converted::Tally tally("FlightLog_record");
     const auto run = [&](::sc::FlightLog a0, ::sc::FlightSample a1, bool a2) { a0.record(a1, a2); return a0; };
     for (int i = 0; i < converted::kCalls; ++i) {
-      const ::sc::FlightLog a0 = draw_FlightLog(draw);
-      const ::sc::FlightSample a1 = draw_FlightSample(draw);
+      const ::sc::FlightLog a0 = ::sc::draw_FlightLog(draw);
+      const ::sc::FlightSample a1 = ::sc::draw_FlightSample(draw);
       const bool a2 = draw.flag();
       const converted::Watch watch;
       const auto want = run(a0, a1, a2);
@@ -171,6 +203,31 @@ SC_TEST(converted_equipment) {
       const auto want = midi(a0);
       const bool outside = watch.outside();
       tally.take(bp, {arg(a0)}, want, wide::midi(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return midi(near(a0, k, 0)); });
+    }
+  }
+  {  // MusicSynth::init
+    converted::Tally tally("MusicSynth_init");
+    const auto run = [&](::sc::MusicSynth a0, unsigned int a1) { a0.init(a1); return a0; };
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::sc::MusicSynth a0 = ::sc::draw_MusicSynth(draw);
+      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1)}, want, want, outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return run(near(a0, k, 0), near(a1, k, 1)); });
+    }
+  }
+  {  // MusicSynth::select
+    converted::Tally tally("MusicSynth_select");
+    const auto run = [&](::sc::MusicSynth a0, int a1, float a2) { a0.select(a1, a2); return a0; };
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::sc::MusicSynth a0 = ::sc::draw_MusicSynth(draw);
+      const int a1 = static_cast<int>(draw.whole());
+      const float a2 = draw.number();
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, want, outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, [&]([[maybe_unused]] int k) { return run(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2)); });
     }
   }
 }

@@ -68,7 +68,7 @@ SC_TEST(converted_net_session) {
   {  // sane
     converted::Tally tally("sane");
     for (int i = 0; i < converted::kCalls; ++i) {
-      const kern::Vec3 a0 = draw.vector();
+      const ::kern::Vec3 a0 = draw.vector();
       const converted::Watch watch;
       const auto want = sane(a0);
       const bool outside = watch.outside();

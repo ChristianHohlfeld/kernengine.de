@@ -348,7 +348,7 @@ struct StructField {
   json::Value value;     // default
 };
 struct StructType {
-  static constexpr std::size_t kMaxFields = 32;
+  static constexpr std::size_t kMaxFields = 96;
   std::string name;
   std::vector<StructField> fields;
   std::string help;

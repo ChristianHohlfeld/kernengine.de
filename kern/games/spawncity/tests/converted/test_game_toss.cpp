@@ -23,9 +23,7 @@ using converted::arg; using converted::same; using converted::defined; using con
 #pragma GCC diagnostic ignored "-Wunused-function"
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
 #pragma GCC diagnostic ignored "-Wunused-variable"
-kern::i16 q16(f32 v) { return static_cast<kern::i16>(std::lround(clampf(v, -1, 1) * 32767)); }
 f32 uq16(kern::i16 v) { return static_cast<f32>(v) / 32767; }
-kern::i16 cms(f32 v) { return static_cast<kern::i16>(std::lround(clampf(v * 100, -32000, 32000))); }
 struct Own { u8 kind = 0; u64 id = 0; i32 local = -1; f32 still = 0, born = 0; u8 done_sent = 0; };
 #pragma GCC diagnostic pop
 
@@ -38,25 +36,13 @@ using f32 = double;
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wnarrowing"
-kern::i16 q16(f32 v) { return static_cast<kern::i16>(std::lround(clampf(v, -1, 1) * 32767)); }
 f32 uq16(kern::i16 v) { return static_cast<f32>(v) / 32767; }
-kern::i16 cms(f32 v) { return static_cast<kern::i16>(std::lround(clampf(v * 100, -32000, 32000))); }
 #pragma GCC diagnostic pop
 }  // namespace wide
 
 SC_TEST(converted_game_toss) {
   converted::Blueprint bp("GameToss");
   converted::Draw draw;
-  {  // q16
-    converted::Tally tally("q16");
-    for (int i = 0; i < converted::kCalls; ++i) {
-      const float a0 = draw.number();
-      const converted::Watch watch;
-      const auto want = q16(a0);
-      const bool outside = watch.outside();
-      tally.take(bp, {arg(a0)}, want, wide::q16(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return q16(near(a0, k, 0)); });
-    }
-  }
   {  // uq16
     converted::Tally tally("uq16");
     for (int i = 0; i < converted::kCalls; ++i) {
@@ -65,16 +51,6 @@ SC_TEST(converted_game_toss) {
       const auto want = uq16(a0);
       const bool outside = watch.outside();
       tally.take(bp, {arg(a0)}, want, wide::uq16(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return uq16(near(a0, k, 0)); });
-    }
-  }
-  {  // cms
-    converted::Tally tally("cms");
-    for (int i = 0; i < converted::kCalls; ++i) {
-      const float a0 = draw.number();
-      const converted::Watch watch;
-      const auto want = cms(a0);
-      const bool outside = watch.outside();
-      tally.take(bp, {arg(a0)}, want, wide::cms(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return cms(near(a0, k, 0)); });
     }
   }
 }

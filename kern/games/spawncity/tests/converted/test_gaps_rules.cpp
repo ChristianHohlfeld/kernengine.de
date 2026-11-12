@@ -7,14 +7,83 @@
 #include <type_traits>
 #include <vector>
 #include <algorithm>
+// (the test sets the data of objects and calls methods a class keeps to itself: it reads the headers with private as public)
+#define private public
+#define protected public
 #include "../../src/gaps_rules.h"
 #include "../../src/blueprint_call.h"
 #include "../converted.h"
 
+namespace kern {
+[[maybe_unused]] static ::kern::Quat draw_kern__Quat(::sc::converted::Draw& draw) {
+  ::kern::Quat s{};
+  s.x = draw.number();
+  s.y = draw.number();
+  s.z = draw.number();
+  s.w = draw.number();
+  return s;
+}
+[[maybe_unused]] static ::sc::converted::Value arg(const ::kern::Quat& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
+[[maybe_unused]] static bool same(const ::kern::Quat& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
+[[maybe_unused]] static ::kern::Quat near(::kern::Quat s, int k, int slot) { using ::sc::converted::near; s.x = near(s.x, k, slot * 7 + 0); s.y = near(s.y, k, slot * 7 + 1); s.z = near(s.z, k, slot * 7 + 2); s.w = near(s.w, k, slot * 7 + 3); return s; }
+[[maybe_unused]] static bool defined(const ::kern::Quat& s) { using ::sc::converted::defined; return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
+[[maybe_unused]] static void flat(const ::kern::Quat& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.x, o); flat(s.y, o); flat(s.z, o); flat(s.w, o); }
+[[maybe_unused]] static std::string text(const ::kern::Quat& s) { using ::sc::converted::text; return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
+}  // namespace kern
 namespace sc {
+namespace gaps {
+[[maybe_unused]] static ::sc::gaps::Puff draw_gaps__Puff(::sc::converted::Draw& draw) {
+  ::sc::gaps::Puff s{};
+  s.alive = draw.flag();
+  s.ember = draw.flag();
+  s.pos = draw.vector();
+  s.vel = draw.vector();
+  s.born = draw.number();
+  s.expires = draw.number();
+  s.s0 = draw.number();
+  s.s1 = draw.number();
+  s.opacity = draw.number();
+  s.rotation = draw.number();
+  s.serial = static_cast<unsigned int>(draw.below(40));
+  s.color = draw.vector();
+  return s;
+}
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::gaps::Puff& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.alive), arg(s.ember), arg(s.pos), arg(s.vel), arg(s.born), arg(s.expires), arg(s.s0), arg(s.s1), arg(s.opacity), arg(s.rotation), arg(s.serial), arg(s.color)}); }
+[[maybe_unused]] static bool same(const ::sc::gaps::Puff& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 12 && same(want.alive, (*got.rows)[0]) && same(want.ember, (*got.rows)[1]) && same(want.pos, (*got.rows)[2]) && same(want.vel, (*got.rows)[3]) && same(want.born, (*got.rows)[4]) && same(want.expires, (*got.rows)[5]) && same(want.s0, (*got.rows)[6]) && same(want.s1, (*got.rows)[7]) && same(want.opacity, (*got.rows)[8]) && same(want.rotation, (*got.rows)[9]) && same(want.serial, (*got.rows)[10]) && same(want.color, (*got.rows)[11]); }
+[[maybe_unused]] static ::sc::gaps::Puff near(::sc::gaps::Puff s, int k, int slot) { using ::sc::converted::near; s.alive = near(s.alive, k, slot * 7 + 0); s.ember = near(s.ember, k, slot * 7 + 1); s.pos = near(s.pos, k, slot * 7 + 2); s.vel = near(s.vel, k, slot * 7 + 3); s.born = near(s.born, k, slot * 7 + 4); s.expires = near(s.expires, k, slot * 7 + 5); s.s0 = near(s.s0, k, slot * 7 + 6); s.s1 = near(s.s1, k, slot * 7 + 7); s.opacity = near(s.opacity, k, slot * 7 + 8); s.rotation = near(s.rotation, k, slot * 7 + 9); s.serial = near(s.serial, k, slot * 7 + 10); s.color = near(s.color, k, slot * 7 + 11); return s; }
+[[maybe_unused]] static bool defined(const ::sc::gaps::Puff& s) { using ::sc::converted::defined; return defined(s.alive) && defined(s.ember) && defined(s.pos) && defined(s.vel) && defined(s.born) && defined(s.expires) && defined(s.s0) && defined(s.s1) && defined(s.opacity) && defined(s.rotation) && defined(s.serial) && defined(s.color); }
+[[maybe_unused]] static void flat(const ::sc::gaps::Puff& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.alive, o); flat(s.ember, o); flat(s.pos, o); flat(s.vel, o); flat(s.born, o); flat(s.expires, o); flat(s.s0, o); flat(s.s1, o); flat(s.opacity, o); flat(s.rotation, o); flat(s.serial, o); flat(s.color, o); }
+[[maybe_unused]] static std::string text(const ::sc::gaps::Puff& s) { using ::sc::converted::text; return std::string("{") + text(s.alive) + ", " + text(s.ember) + ", " + text(s.pos) + ", " + text(s.vel) + ", " + text(s.born) + ", " + text(s.expires) + ", " + text(s.s0) + ", " + text(s.s1) + ", " + text(s.opacity) + ", " + text(s.rotation) + ", " + text(s.serial) + ", " + text(s.color) + "}"; }
+[[maybe_unused]] static ::sc::gaps::VisualPose draw_gaps__VisualPose(::sc::converted::Draw& draw) {
+  ::sc::gaps::VisualPose s{};
+  s.init_ = draw.flag();
+  s.mode_ = static_cast<int>(draw.whole());
+  s.offset_ = draw.vector();
+  s.q_ = ::kern::draw_kern__Quat(draw);
+  return s;
+}
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::gaps::VisualPose& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.init_), arg(s.mode_), arg(s.offset_), arg(s.q_)}); }
+[[maybe_unused]] static bool same(const ::sc::gaps::VisualPose& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 4 && same(want.init_, (*got.rows)[0]) && same(want.mode_, (*got.rows)[1]) && same(want.offset_, (*got.rows)[2]) && same(want.q_, (*got.rows)[3]); }
+[[maybe_unused]] static ::sc::gaps::VisualPose near(::sc::gaps::VisualPose s, int k, int slot) { using ::sc::converted::near; s.init_ = near(s.init_, k, slot * 7 + 0); s.mode_ = near(s.mode_, k, slot * 7 + 1); s.offset_ = near(s.offset_, k, slot * 7 + 2); s.q_ = near(s.q_, k, slot * 7 + 3); return s; }
+[[maybe_unused]] static bool defined(const ::sc::gaps::VisualPose& s) { using ::sc::converted::defined; return defined(s.init_) && defined(s.mode_) && defined(s.offset_) && defined(s.q_); }
+[[maybe_unused]] static void flat(const ::sc::gaps::VisualPose& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.init_, o); flat(s.mode_, o); flat(s.offset_, o); flat(s.q_, o); }
+[[maybe_unused]] static std::string text(const ::sc::gaps::VisualPose& s) { using ::sc::converted::text; return std::string("{") + text(s.init_) + ", " + text(s.mode_) + ", " + text(s.offset_) + ", " + text(s.q_) + "}"; }
+}  // namespace gaps
 namespace converted_gaps_rules {
 using namespace converted;
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::near; using converted::flat;
+using ::sc::gaps::arg;
+using ::sc::gaps::same;
+using ::sc::gaps::defined;
+using ::sc::gaps::text;
+using ::sc::gaps::near;
+using ::sc::gaps::flat;
+using ::kern::arg;
+using ::kern::same;
+using ::kern::defined;
+using ::kern::text;
+using ::kern::near;
+using ::kern::flat;
 using namespace ::sc::gaps;
 using kern::logic::Value;
 
@@ -23,9 +92,20 @@ using kern::logic::Value;
 #pragma GCC diagnostic ignored "-Wunused-function"
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
 #pragma GCC diagnostic ignored "-Wunused-variable"
+Vec3 rgb(u32 hex) { return {static_cast<f32>((hex >> 16) & 255) / 255, static_cast<f32>((hex >> 8) & 255) / 255, static_cast<f32>(hex & 255) / 255}; }
 f32 damping(f32 rate, f32 dt) { const f32 r = std::fmax(0.0f, rate), d = clampf(dt, 0, 0.1f); return r > 0 && d > 0 ? 1 - std::exp(-r * d) : 0; }
+Quat normalized(Quat q) {
+  const f32 l = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
+  if (!(l > 1e-9f)) return Quat{};
+  return Quat{q.x / l, q.y / l, q.z / l, q.w / l};
+}
 #pragma GCC diagnostic pop
 
+struct Out_VisualPose_update { ::sc::gaps::VisualPose Self; ::kern::Vec3 out_p; ::kern::Quat out_q; };
+[[maybe_unused]] static bool same(const Out_VisualPose_update& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Self, (*got.rows)[0]) && same(want.out_p, (*got.rows)[1]) && same(want.out_q, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const Out_VisualPose_update& s) { return defined(s.Self) && defined(s.out_p) && defined(s.out_q); }
+[[maybe_unused]] static void flat(const Out_VisualPose_update& s, std::vector<kern::f64>& o) { flat(s.Self, o); flat(s.out_p, o); flat(s.out_q, o); }
+[[maybe_unused]] static std::string text(const Out_VisualPose_update& s) { return std::string("{") + text(s.Self) + ", " + text(s.out_p) + ", " + text(s.out_q) + "}"; }
 
 // ---- the same functions with 64-bit numbers, as a Blueprint computes ----
 namespace wide {
@@ -35,13 +115,78 @@ using f32 = double;
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wnarrowing"
+f32 unit_hash(u32 x) {
+  x ^= x >> 16;
+  x *= 0x7feb352du;
+  x ^= x >> 15;
+  x *= 0x846ca68bu;
+  x ^= x >> 16;
+  return static_cast<f32>(static_cast<f64>(x) / 4294967295.0);
+}
+Vec3 rgb(u32 hex) { return {static_cast<f32>((hex >> 16) & 255) / 255, static_cast<f32>((hex >> 8) & 255) / 255, static_cast<f32>(hex & 255) / 255}; }
 f32 damping(f32 rate, f32 dt) { const f32 r = std::fmax(0.0, rate), d = clampf(dt, 0, 0.1); return r > 0 && d > 0 ? 1 - std::exp(-r * d) : 0; }
+Quat normalized(Quat q) {
+  const f32 l = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
+  if (!(l > 1e-9)) return Quat{};
+  return Quat{q.x / l, q.y / l, q.z / l, q.w / l};
+}
+Quat slerp(Quat a, Quat b, f32 t) {
+  f32 d = a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+  if (d < 0) { d = -d; b = Quat{-b.x, -b.y, -b.z, -b.w}; }
+  d = clampf(d, -1, 1);
+  if (d > 0.9995) return normalized(Quat{a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t, a.w + (b.w - a.w) * t});
+  const f32 th = std::acos(d), s = std::sin(th), wa = std::sin((1 - t) * th) / s, wb = std::sin(t * th) / s;
+  return normalized(Quat{a.x * wa + b.x * wb, a.y * wa + b.y * wb, a.z * wa + b.z * wb, a.w * wa + b.w * wb});
+}
+f32 quat_angle(Quat a, Quat b) { return 2 * std::acos(clampf(std::fabs(a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w), -1, 1)); }
 #pragma GCC diagnostic pop
 }  // namespace wide
 
 SC_TEST(converted_gaps_rules) {
   converted::Blueprint bp("GapsRules");
   converted::Draw draw;
+  {  // unit_hash
+    converted::Tally tally("unit_hash");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = ::sc::gaps::unit_hash(a0);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0)}, want, wide::unit_hash(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return ::sc::gaps::unit_hash(near(a0, k, 0)); });
+    }
+  }
+  {  // rgb
+    converted::Tally tally("rgb");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = rgb(a0);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0)}, want, wide::rgb(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return rgb(near(a0, k, 0)); });
+    }
+  }
+  {  // SmokeField::opacity
+    converted::Tally tally("SmokeField_opacity");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::sc::gaps::Puff a0 = ::sc::gaps::draw_gaps__Puff(draw);
+      const float a1 = draw.number();
+      const converted::Watch watch;
+      const auto want = ::sc::gaps::SmokeField::opacity(a0, a1);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1)}, want, want, outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return ::sc::gaps::SmokeField::opacity(near(a0, k, 0), near(a1, k, 1)); });
+    }
+  }
+  {  // SmokeField::size
+    converted::Tally tally("SmokeField_size");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::sc::gaps::Puff a0 = ::sc::gaps::draw_gaps__Puff(draw);
+      const float a1 = draw.number();
+      const converted::Watch watch;
+      const auto want = ::sc::gaps::SmokeField::size(a0, a1);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1)}, want, want, outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return ::sc::gaps::SmokeField::size(near(a0, k, 0), near(a1, k, 1)); });
+    }
+  }
   {  // damping
     converted::Tally tally("damping");
     for (int i = 0; i < converted::kCalls; ++i) {
@@ -51,6 +196,57 @@ SC_TEST(converted_gaps_rules) {
       const auto want = damping(a0, a1);
       const bool outside = watch.outside();
       tally.take(bp, {arg(a0), arg(a1)}, want, wide::damping(wide_arg(a0), wide_arg(a1)), outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return damping(near(a0, k, 0), near(a1, k, 1)); });
+    }
+  }
+  {  // normalized
+    converted::Tally tally("normalized");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::kern::Quat a0 = ::kern::draw_kern__Quat(draw);
+      const converted::Watch watch;
+      const auto want = normalized(a0);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0)}, want, wide::normalized(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return normalized(near(a0, k, 0)); });
+    }
+  }
+  {  // slerp
+    converted::Tally tally("slerp");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::kern::Quat a0 = ::kern::draw_kern__Quat(draw);
+      const ::kern::Quat a1 = ::kern::draw_kern__Quat(draw);
+      const float a2 = draw.number();
+      const converted::Watch watch;
+      const auto want = ::sc::gaps::slerp(a0, a1, a2);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, wide::slerp(wide_arg(a0), wide_arg(a1), wide_arg(a2)), outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, [&]([[maybe_unused]] int k) { return ::sc::gaps::slerp(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2)); });
+    }
+  }
+  {  // quat_angle
+    converted::Tally tally("quat_angle");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::kern::Quat a0 = ::kern::draw_kern__Quat(draw);
+      const ::kern::Quat a1 = ::kern::draw_kern__Quat(draw);
+      const converted::Watch watch;
+      const auto want = ::sc::gaps::quat_angle(a0, a1);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1)}, want, wide::quat_angle(wide_arg(a0), wide_arg(a1)), outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return ::sc::gaps::quat_angle(near(a0, k, 0), near(a1, k, 1)); });
+    }
+  }
+  {  // VisualPose::update
+    converted::Tally tally("VisualPose_update");
+    const auto run = [&](::sc::gaps::VisualPose a0, ::kern::Vec3 a1, ::kern::Quat a2, ::kern::Vec3 a3, int a4, float a5, ::kern::Vec3 a6, ::kern::Quat a7) { a0.update(a1, a2, a3, a4, a5, a6, a7); return Out_VisualPose_update{a0, a6, a7}; };
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::sc::gaps::VisualPose a0 = ::sc::gaps::draw_gaps__VisualPose(draw);
+      const ::kern::Vec3 a1 = draw.vector();
+      const ::kern::Quat a2 = ::kern::draw_kern__Quat(draw);
+      const ::kern::Vec3 a3 = draw.vector();
+      const int a4 = static_cast<int>(draw.whole());
+      const float a5 = draw.number();
+      const ::kern::Vec3 a6 = draw.vector();
+      const ::kern::Quat a7 = ::kern::draw_kern__Quat(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2, a3, a4, a5, a6, a7);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5), arg(a6), arg(a7)}, want, want, outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5) + ", " + text(a6) + ", " + text(a7); }, [&]([[maybe_unused]] int k) { return run(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2), near(a3, k, 3), near(a4, k, 4), near(a5, k, 5), near(a6, k, 6), near(a7, k, 7)); });
     }
   }
 }

@@ -17,6 +17,7 @@ enum Code : u8 {
   kConst, kInput, kAdd, kSub, kMul, kDiv, kMod, kPow, kNeg, kNot, kLt, kLe, kGt, kGe, kEq, kNe, kAnd, kOr, kSelect,
   kMin, kMax, kClamp, kAbs, kSign, kFloor, kCeil, kRound, kTrunc, kSqrt, kExp, kLog,
   kSin, kCos, kTan, kAsin, kAcos, kAtan, kAtan2, kRad, kDeg, kLerp,
+  kBand, kBor, kBxor, kShl, kShr, kWrap32, kWrap32s, kMul32,
 };
 
 struct Fn { const char* name; Code code; u8 args; };
@@ -25,6 +26,9 @@ constexpr Fn kFunctions[] = {
     {"round", kRound, 1}, {"trunc", kTrunc, 1}, {"sqrt", kSqrt, 1},   {"pow", kPow, 2},     {"exp", kExp, 1},     {"log", kLog, 1},     {"sin", kSin, 1},
     {"cos", kCos, 1},     {"tan", kTan, 1},     {"asin", kAsin, 1},   {"acos", kAcos, 1},   {"atan", kAtan, 1},   {"atan2", kAtan2, 2}, {"rad", kRad, 1},
     {"deg", kDeg, 1},     {"lerp", kLerp, 3},   {"div", kDiv, 2},     {"mod", kMod, 2},
+    // whole numbers as a machine has them: their bits, and arithmetic that wraps around at 32 bit
+    {"band", kBand, 2},   {"bor", kBor, 2},     {"bxor", kBxor, 2},   {"shl", kShl, 2},     {"shr", kShr, 2},     {"wrap32", kWrap32, 1}, {"wrap32s", kWrap32s, 1},
+    {"mul32", kMul32, 2},
 };
 constexpr f64 kPi = math::pi;
 constexpr int kMaxStack = 48;
@@ -398,6 +402,14 @@ f64 Formula::evaluate(const f64* values, std::size_t count) const {
       case kRad: r = math::rad(a); break;
       case kDeg: r = math::deg(a); break;
       case kLerp: r = math::lerp(a, b, c); break;
+      case kBand: r = math::band(a, b); break;
+      case kBor: r = math::bor(a, b); break;
+      case kBxor: r = math::bxor(a, b); break;
+      case kShl: r = math::shl(a, b); break;
+      case kShr: r = math::shr(a, b); break;
+      case kWrap32: r = math::wrap32(a); break;
+      case kWrap32s: r = math::wrap32s(a); break;
+      case kMul32: r = math::mul32(a, b); break;
     }
     st[n++] = r;
   }

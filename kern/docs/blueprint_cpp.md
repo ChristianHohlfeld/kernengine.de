@@ -402,7 +402,7 @@ struct Arena : kern::Blueprint {
   ist die Beschreibung der Struktur. Ein Feld steht da wie eine Variable: `Typ Name = Default;`.
 - **Ein Feld** ist ein Wert-Typ, eine Aufzählung des Blueprints, eine Struktur, die **über** dieser
   deklariert ist, oder eine Liste von einem davon. Keine Struktur enthält sich selbst – auch nicht
-  über andere. Eine Struktur hat mindestens ein Feld und höchstens 32.
+  über andere. Eine Struktur hat mindestens ein Feld und höchstens 96.
 - **Ein Wert steht mit jedem Feld da,** in der Reihenfolge der Deklaration:
   `Weapon{"Knife", Kind::Melee, 25.0, List<Float>{}}`; eine Struktur darin ebenso
   (`Slot{Weapon{...}, 1}`), eine Liste davon ist `List<Weapon>{Weapon{...}, Weapon{...}}`.
@@ -449,6 +449,9 @@ Die Knoten einer Struktur (`S` ist die Struktur):
 Eine Formel ist der Ausdruck selbst, als Lambda über ihre Eingänge. Operatoren, die in C++ etwas
 anderes bedeuten oder fehlen, sind dort Aufrufe: `/` ist `kern::math::div` (durch 0 ergibt 0), `%`
 ist `kern::math::mod`, `^` ist `kern::math::pow`; die Funktionen und `pi` stehen in `kern::math`.
+Für ganze Zahlen, wie eine Maschine sie hat, gibt es `band`, `bor`, `bxor`, `shl`, `shr` (die Bits
+einer Zahl) und `wrap32`, `wrap32s`, `mul32` (Rechnen, das bei 32 Bit umbricht) – in jeder Stufe
+dieselben Funktionen von `kern::math`.
 Zurückgelesen wird der Lambda-Rumpf als Formel, in ihrer einen kanonischen Schreibweise
 (`Formula::text()`).
 
@@ -554,7 +557,7 @@ Verstöße als Fehler am betroffenen Knoten; der Editor nimmt solche Namen gar n
   einer Struktur endet nicht auf `_list`, und sie heißt nicht wie eine Variable, eine Funktion
   oder eine Aufzählung. Keine zwei Felder einer Struktur heißen gleich, und kein Feld heißt wie
   eine Aufzählung oder Struktur des Blueprints. Eine Struktur hat mindestens ein Feld und
-  höchstens 32; ein Feld ist von einem Typ, der über der Struktur deklariert ist – keine Struktur
+  höchstens 96; ein Feld ist von einem Typ, der über der Struktur deklariert ist – keine Struktur
   enthält sich selbst.
 - **Ein Exec-Ausgang hat einen Draht.** Mehreres nacheinander ist eine Sequence.
 - **Return** liegt auf einem Weg seiner eigenen Funktion: nicht nach einem Warten, nicht in einem

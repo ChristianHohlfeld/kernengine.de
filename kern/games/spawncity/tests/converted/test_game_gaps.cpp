@@ -15,10 +15,29 @@
 #include "../../src/spawn_guard.h"
 #include "../converted.h"
 
+namespace kern {
+[[maybe_unused]] static ::kern::Mat4 draw_kern__Mat4(::sc::converted::Draw& draw) {
+  ::kern::Mat4 s{};
+  for (auto& e : s.m) e = draw.number();
+  return s;
+}
+[[maybe_unused]] static ::sc::converted::Value arg(const ::kern::Mat4& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(std::vector<float>(std::begin(s.m), std::end(s.m)))}); }
+[[maybe_unused]] static bool same(const ::kern::Mat4& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 1 && same(std::vector<float>(std::begin(want.m), std::end(want.m)), (*got.rows)[0]); }
+[[maybe_unused]] static ::kern::Mat4 near(::kern::Mat4 s, int k, int slot) { using ::sc::converted::near; { const auto v = near(std::vector<float>(std::begin(s.m), std::end(s.m)), k, slot * 7 + 0); std::copy(v.begin(), v.end(), std::begin(s.m)); } return s; }
+[[maybe_unused]] static bool defined(const ::kern::Mat4& s) { using ::sc::converted::defined; return defined(std::vector<float>(std::begin(s.m), std::end(s.m))); }
+[[maybe_unused]] static void flat(const ::kern::Mat4& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(std::vector<float>(std::begin(s.m), std::end(s.m)), o); }
+[[maybe_unused]] static std::string text(const ::kern::Mat4& s) { using ::sc::converted::text; return std::string("{") + text(std::vector<float>(std::begin(s.m), std::end(s.m))) + "}"; }
+}  // namespace kern
 namespace sc {
 namespace converted_game_gaps {
 using namespace converted;
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::near; using converted::flat;
+using ::kern::arg;
+using ::kern::same;
+using ::kern::defined;
+using ::kern::text;
+using ::kern::near;
+using ::kern::flat;
 using kern::Mat4;
 
 // ---- game_gaps.cpp, as it stands ----
@@ -44,9 +63,19 @@ struct Biquad {
 };
 enum class Osc : u8 { saw, square, triangle, sine };
 struct OscSpec { Osc type; f32 cents; f32 gain; };
+Mat4 billboard(Vec3 p, Vec3 right, Vec3 up, Vec3 normal, f32 size, f32 rotation) {
+  const f32 c = std::cos(rotation), s = std::sin(rotation);
+  const Vec3 r = (right * c + up * s) * size, u = (up * c - right * s) * size;
+  Mat4 m;
+  m.m[0] = r.x; m.m[1] = r.y; m.m[2] = r.z;
+  m.m[4] = u.x; m.m[5] = u.y; m.m[6] = u.z;
+  m.m[8] = normal.x; m.m[9] = normal.y; m.m[10] = normal.z;
+  m.m[12] = p.x; m.m[13] = p.y; m.m[14] = p.z;
+  return m;
+}
 #pragma GCC diagnostic pop
 
-[[maybe_unused]] static Biquad draw_Biquad(converted::Draw& draw) {
+[[maybe_unused]] static Biquad draw_Biquad(::sc::converted::Draw& draw) {
   Biquad s{};
   s.b0 = draw.number();
   s.b1 = draw.number();
@@ -57,12 +86,12 @@ struct OscSpec { Osc type; f32 cents; f32 gain; };
   s.z2 = draw.number();
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const Biquad& s) { using converted::arg; return converted::Value::structure({arg(s.b0), arg(s.b1), arg(s.b2), arg(s.a1), arg(s.a2), arg(s.z1), arg(s.z2)}); }
-[[maybe_unused]] static bool same(const Biquad& want, const converted::Value& got) { using converted::same; return got.rows && got.rows->size() == 7 && same(want.b0, (*got.rows)[0]) && same(want.b1, (*got.rows)[1]) && same(want.b2, (*got.rows)[2]) && same(want.a1, (*got.rows)[3]) && same(want.a2, (*got.rows)[4]) && same(want.z1, (*got.rows)[5]) && same(want.z2, (*got.rows)[6]); }
-[[maybe_unused]] static Biquad near(Biquad s, int k, int slot) { using converted::near; s.b0 = near(s.b0, k, slot * 7 + 0); s.b1 = near(s.b1, k, slot * 7 + 1); s.b2 = near(s.b2, k, slot * 7 + 2); s.a1 = near(s.a1, k, slot * 7 + 3); s.a2 = near(s.a2, k, slot * 7 + 4); s.z1 = near(s.z1, k, slot * 7 + 5); s.z2 = near(s.z2, k, slot * 7 + 6); return s; }
-[[maybe_unused]] static bool defined(const Biquad& s) { using converted::defined; return defined(s.b0) && defined(s.b1) && defined(s.b2) && defined(s.a1) && defined(s.a2) && defined(s.z1) && defined(s.z2); }
-[[maybe_unused]] static void flat(const Biquad& s, std::vector<kern::f64>& o) { using converted::flat; flat(s.b0, o); flat(s.b1, o); flat(s.b2, o); flat(s.a1, o); flat(s.a2, o); flat(s.z1, o); flat(s.z2, o); }
-[[maybe_unused]] static std::string text(const Biquad& s) { using converted::text; return std::string("{") + text(s.b0) + ", " + text(s.b1) + ", " + text(s.b2) + ", " + text(s.a1) + ", " + text(s.a2) + ", " + text(s.z1) + ", " + text(s.z2) + "}"; }
+[[maybe_unused]] static ::sc::converted::Value arg(const Biquad& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.b0), arg(s.b1), arg(s.b2), arg(s.a1), arg(s.a2), arg(s.z1), arg(s.z2)}); }
+[[maybe_unused]] static bool same(const Biquad& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 7 && same(want.b0, (*got.rows)[0]) && same(want.b1, (*got.rows)[1]) && same(want.b2, (*got.rows)[2]) && same(want.a1, (*got.rows)[3]) && same(want.a2, (*got.rows)[4]) && same(want.z1, (*got.rows)[5]) && same(want.z2, (*got.rows)[6]); }
+[[maybe_unused]] static Biquad near(Biquad s, int k, int slot) { using ::sc::converted::near; s.b0 = near(s.b0, k, slot * 7 + 0); s.b1 = near(s.b1, k, slot * 7 + 1); s.b2 = near(s.b2, k, slot * 7 + 2); s.a1 = near(s.a1, k, slot * 7 + 3); s.a2 = near(s.a2, k, slot * 7 + 4); s.z1 = near(s.z1, k, slot * 7 + 5); s.z2 = near(s.z2, k, slot * 7 + 6); return s; }
+[[maybe_unused]] static bool defined(const Biquad& s) { using ::sc::converted::defined; return defined(s.b0) && defined(s.b1) && defined(s.b2) && defined(s.a1) && defined(s.a2) && defined(s.z1) && defined(s.z2); }
+[[maybe_unused]] static void flat(const Biquad& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.b0, o); flat(s.b1, o); flat(s.b2, o); flat(s.a1, o); flat(s.a2, o); flat(s.z1, o); flat(s.z2, o); }
+[[maybe_unused]] static std::string text(const Biquad& s) { using ::sc::converted::text; return std::string("{") + text(s.b0) + ", " + text(s.b1) + ", " + text(s.b2) + ", " + text(s.a1) + ", " + text(s.a2) + ", " + text(s.z1) + ", " + text(s.z2) + "}"; }
 struct Out_Biquad_run { Biquad Self; float Result; };
 [[maybe_unused]] static bool same(const Out_Biquad_run& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_Biquad_run& s) { return defined(s.Self) && defined(s.Result); }
@@ -77,6 +106,16 @@ using f32 = double;
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wnarrowing"
+Mat4 billboard(Vec3 p, Vec3 right, Vec3 up, Vec3 normal, f32 size, f32 rotation) {
+  const f32 c = std::cos(rotation), s = std::sin(rotation);
+  const Vec3 r = (right * c + up * s) * size, u = (up * c - right * s) * size;
+  Mat4 m;
+  m.m[0] = r.x; m.m[1] = r.y; m.m[2] = r.z;
+  m.m[4] = u.x; m.m[5] = u.y; m.m[6] = u.z;
+  m.m[8] = normal.x; m.m[9] = normal.y; m.m[10] = normal.z;
+  m.m[12] = p.x; m.m[13] = p.y; m.m[14] = p.z;
+  return m;
+}
 #pragma GCC diagnostic pop
 }  // namespace wide
 
@@ -93,6 +132,46 @@ SC_TEST(converted_game_gaps) {
       const auto want = run(a0, a1);
       const bool outside = watch.outside();
       tally.take(bp, {arg(a0), arg(a1)}, want, want, outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return run(near(a0, k, 0), near(a1, k, 1)); });
+    }
+  }
+  {  // Biquad::lowpass
+    converted::Tally tally("Biquad_lowpass");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const float a0 = draw.number();
+      const float a1 = draw.number();
+      const float a2 = draw.number();
+      const converted::Watch watch;
+      const auto want = Biquad::lowpass(a0, a1, a2);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, want, outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, [&]([[maybe_unused]] int k) { return Biquad::lowpass(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2)); });
+    }
+  }
+  {  // Biquad::peaking
+    converted::Tally tally("Biquad_peaking");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const float a0 = draw.number();
+      const float a1 = draw.number();
+      const float a2 = draw.number();
+      const float a3 = draw.number();
+      const converted::Watch watch;
+      const auto want = Biquad::peaking(a0, a1, a2, a3);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, want, outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); }, [&]([[maybe_unused]] int k) { return Biquad::peaking(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2), near(a3, k, 3)); });
+    }
+  }
+  {  // billboard
+    converted::Tally tally("billboard");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::kern::Vec3 a0 = draw.vector();
+      const ::kern::Vec3 a1 = draw.vector();
+      const ::kern::Vec3 a2 = draw.vector();
+      const ::kern::Vec3 a3 = draw.vector();
+      const float a4 = draw.number();
+      const float a5 = draw.number();
+      const converted::Watch watch;
+      const auto want = billboard(a0, a1, a2, a3, a4, a5);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5)}, want, wide::billboard(wide_arg(a0), wide_arg(a1), wide_arg(a2), wide_arg(a3), wide_arg(a4), wide_arg(a5)), outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5); }, [&]([[maybe_unused]] int k) { return billboard(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2), near(a3, k, 3), near(a4, k, 4), near(a5, k, 5)); });
     }
   }
 }

@@ -13,7 +13,7 @@
 
 namespace sc {
 namespace combat {
-[[maybe_unused]] static ::sc::combat::Race draw_combat__Race(converted::Draw& draw) {
+[[maybe_unused]] static ::sc::combat::Race draw_combat__Race(::sc::converted::Draw& draw) {
   ::sc::combat::Race s{};
   s.started = draw.flag();
   s.finished = draw.flag();
@@ -29,12 +29,12 @@ namespace combat {
   s.prev = draw.vector();
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const ::sc::combat::Race& s) { using converted::arg; return converted::Value::structure({arg(s.started), arg(s.finished), arg(s.lap), arg(s.next), arg(s.race_start), arg(s.lap_start), arg(s.finish_time), arg(s.last_lap), arg(s.best_lap), arg(s.last_pass), arg(s.have_prev), arg(s.prev)}); }
-[[maybe_unused]] static bool same(const ::sc::combat::Race& want, const converted::Value& got) { using converted::same; return got.rows && got.rows->size() == 12 && same(want.started, (*got.rows)[0]) && same(want.finished, (*got.rows)[1]) && same(want.lap, (*got.rows)[2]) && same(want.next, (*got.rows)[3]) && same(want.race_start, (*got.rows)[4]) && same(want.lap_start, (*got.rows)[5]) && same(want.finish_time, (*got.rows)[6]) && same(want.last_lap, (*got.rows)[7]) && same(want.best_lap, (*got.rows)[8]) && same(want.last_pass, (*got.rows)[9]) && same(want.have_prev, (*got.rows)[10]) && same(want.prev, (*got.rows)[11]); }
-[[maybe_unused]] static ::sc::combat::Race near(::sc::combat::Race s, int k, int slot) { using converted::near; s.started = near(s.started, k, slot * 7 + 0); s.finished = near(s.finished, k, slot * 7 + 1); s.lap = near(s.lap, k, slot * 7 + 2); s.next = near(s.next, k, slot * 7 + 3); s.race_start = near(s.race_start, k, slot * 7 + 4); s.lap_start = near(s.lap_start, k, slot * 7 + 5); s.finish_time = near(s.finish_time, k, slot * 7 + 6); s.last_lap = near(s.last_lap, k, slot * 7 + 7); s.best_lap = near(s.best_lap, k, slot * 7 + 8); s.last_pass = near(s.last_pass, k, slot * 7 + 9); s.have_prev = near(s.have_prev, k, slot * 7 + 10); s.prev = near(s.prev, k, slot * 7 + 11); return s; }
-[[maybe_unused]] static bool defined(const ::sc::combat::Race& s) { using converted::defined; return defined(s.started) && defined(s.finished) && defined(s.lap) && defined(s.next) && defined(s.race_start) && defined(s.lap_start) && defined(s.finish_time) && defined(s.last_lap) && defined(s.best_lap) && defined(s.last_pass) && defined(s.have_prev) && defined(s.prev); }
-[[maybe_unused]] static void flat(const ::sc::combat::Race& s, std::vector<kern::f64>& o) { using converted::flat; flat(s.started, o); flat(s.finished, o); flat(s.lap, o); flat(s.next, o); flat(s.race_start, o); flat(s.lap_start, o); flat(s.finish_time, o); flat(s.last_lap, o); flat(s.best_lap, o); flat(s.last_pass, o); flat(s.have_prev, o); flat(s.prev, o); }
-[[maybe_unused]] static std::string text(const ::sc::combat::Race& s) { using converted::text; return std::string("{") + text(s.started) + ", " + text(s.finished) + ", " + text(s.lap) + ", " + text(s.next) + ", " + text(s.race_start) + ", " + text(s.lap_start) + ", " + text(s.finish_time) + ", " + text(s.last_lap) + ", " + text(s.best_lap) + ", " + text(s.last_pass) + ", " + text(s.have_prev) + ", " + text(s.prev) + "}"; }
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::combat::Race& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.started), arg(s.finished), arg(s.lap), arg(s.next), arg(s.race_start), arg(s.lap_start), arg(s.finish_time), arg(s.last_lap), arg(s.best_lap), arg(s.last_pass), arg(s.have_prev), arg(s.prev)}); }
+[[maybe_unused]] static bool same(const ::sc::combat::Race& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 12 && same(want.started, (*got.rows)[0]) && same(want.finished, (*got.rows)[1]) && same(want.lap, (*got.rows)[2]) && same(want.next, (*got.rows)[3]) && same(want.race_start, (*got.rows)[4]) && same(want.lap_start, (*got.rows)[5]) && same(want.finish_time, (*got.rows)[6]) && same(want.last_lap, (*got.rows)[7]) && same(want.best_lap, (*got.rows)[8]) && same(want.last_pass, (*got.rows)[9]) && same(want.have_prev, (*got.rows)[10]) && same(want.prev, (*got.rows)[11]); }
+[[maybe_unused]] static ::sc::combat::Race near(::sc::combat::Race s, int k, int slot) { using ::sc::converted::near; s.started = near(s.started, k, slot * 7 + 0); s.finished = near(s.finished, k, slot * 7 + 1); s.lap = near(s.lap, k, slot * 7 + 2); s.next = near(s.next, k, slot * 7 + 3); s.race_start = near(s.race_start, k, slot * 7 + 4); s.lap_start = near(s.lap_start, k, slot * 7 + 5); s.finish_time = near(s.finish_time, k, slot * 7 + 6); s.last_lap = near(s.last_lap, k, slot * 7 + 7); s.best_lap = near(s.best_lap, k, slot * 7 + 8); s.last_pass = near(s.last_pass, k, slot * 7 + 9); s.have_prev = near(s.have_prev, k, slot * 7 + 10); s.prev = near(s.prev, k, slot * 7 + 11); return s; }
+[[maybe_unused]] static bool defined(const ::sc::combat::Race& s) { using ::sc::converted::defined; return defined(s.started) && defined(s.finished) && defined(s.lap) && defined(s.next) && defined(s.race_start) && defined(s.lap_start) && defined(s.finish_time) && defined(s.last_lap) && defined(s.best_lap) && defined(s.last_pass) && defined(s.have_prev) && defined(s.prev); }
+[[maybe_unused]] static void flat(const ::sc::combat::Race& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.started, o); flat(s.finished, o); flat(s.lap, o); flat(s.next, o); flat(s.race_start, o); flat(s.lap_start, o); flat(s.finish_time, o); flat(s.last_lap, o); flat(s.best_lap, o); flat(s.last_pass, o); flat(s.have_prev, o); flat(s.prev, o); }
+[[maybe_unused]] static std::string text(const ::sc::combat::Race& s) { using ::sc::converted::text; return std::string("{") + text(s.started) + ", " + text(s.finished) + ", " + text(s.lap) + ", " + text(s.next) + ", " + text(s.race_start) + ", " + text(s.lap_start) + ", " + text(s.finish_time) + ", " + text(s.last_lap) + ", " + text(s.best_lap) + ", " + text(s.last_pass) + ", " + text(s.have_prev) + ", " + text(s.prev) + "}"; }
 }  // namespace combat
 namespace converted_combat_rules {
 using namespace converted;
@@ -56,17 +56,48 @@ using f32 = double;
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wnarrowing"
+f32 cell_rand(u32 seed, u32 i) {
+  u32 x = seed ^ ((i + 1) * 0x9e3779b1u);
+  x ^= x >> 16;
+  x *= 0x7feb352du;
+  x ^= x >> 15;
+  x *= 0x846ca68bu;
+  x ^= x >> 16;
+  return static_cast<f32>(static_cast<f64>(x) / 4294967296.0);
+}
+f32 agent_random(u32 seed) { return static_cast<f32>((seed * 2246822519u) >> 8) * (1.0 / 16777216.0); }
 #pragma GCC diagnostic pop
 }  // namespace wide
 
 SC_TEST(converted_combat_rules) {
   converted::Blueprint bp("CombatRules");
   converted::Draw draw;
+  {  // cell_rand
+    converted::Tally tally("cell_rand");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = ::sc::combat::cell_rand(a0, a1);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1)}, want, wide::cell_rand(wide_arg(a0), wide_arg(a1)), outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return ::sc::combat::cell_rand(near(a0, k, 0), near(a1, k, 1)); });
+    }
+  }
+  {  // agent_random
+    converted::Tally tally("agent_random");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = ::sc::combat::agent_random(a0);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0)}, want, wide::agent_random(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return ::sc::combat::agent_random(near(a0, k, 0)); });
+    }
+  }
   {  // Race::reset
     converted::Tally tally("Race_reset");
     const auto run = [&](::sc::combat::Race a0) { a0.reset(); return a0; };
     for (int i = 0; i < converted::kCalls; ++i) {
-      const ::sc::combat::Race a0 = draw_combat__Race(draw);
+      const ::sc::combat::Race a0 = ::sc::combat::draw_combat__Race(draw);
       const converted::Watch watch;
       const auto want = run(a0);
       const bool outside = watch.outside();

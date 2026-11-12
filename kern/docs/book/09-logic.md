@@ -124,7 +124,7 @@ An eighth value type and an eighth list type are for the Blueprint's **structs**
 and `structure_list` after `enumeration_list` (in JSON `struct` and `struct_list`). Which struct
 is meant stands beside the type as the struct's name, in `of`, as with an enum. A field is of a
 value type, an enum, a struct declared above this one, or a list of one of these; so no struct
-contains itself. A struct has at least one field and at most 32. The `Value` holds one value per
+contains itself. A struct has at least one field and at most 96. The `Value` holds one value per
 field, in the order of the fields (`Value::structure(fields)`, `field(i)`; a list:
 `Value::structures`); copies share the fields until one of them changes. The file holds a value
 as an object of its fields by their names:

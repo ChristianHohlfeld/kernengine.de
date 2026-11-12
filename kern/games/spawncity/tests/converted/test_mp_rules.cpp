@@ -14,61 +14,58 @@
 #include "../../src/blueprint_call.h"
 #include "../converted.h"
 
+namespace kern {
+[[maybe_unused]] static ::kern::Quat draw_kern__Quat(::sc::converted::Draw& draw) {
+  ::kern::Quat s{};
+  s.x = draw.number();
+  s.y = draw.number();
+  s.z = draw.number();
+  s.w = draw.number();
+  return s;
+}
+[[maybe_unused]] static ::sc::converted::Value arg(const ::kern::Quat& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
+[[maybe_unused]] static bool same(const ::kern::Quat& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
+[[maybe_unused]] static ::kern::Quat near(::kern::Quat s, int k, int slot) { using ::sc::converted::near; s.x = near(s.x, k, slot * 7 + 0); s.y = near(s.y, k, slot * 7 + 1); s.z = near(s.z, k, slot * 7 + 2); s.w = near(s.w, k, slot * 7 + 3); return s; }
+[[maybe_unused]] static bool defined(const ::kern::Quat& s) { using ::sc::converted::defined; return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
+[[maybe_unused]] static void flat(const ::kern::Quat& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.x, o); flat(s.y, o); flat(s.z, o); flat(s.w, o); }
+[[maybe_unused]] static std::string text(const ::kern::Quat& s) { using ::sc::converted::text; return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
+}  // namespace kern
 namespace sc {
 namespace mp {
-[[maybe_unused]] static ::sc::mp::NavTimeline::Snap draw_mp__NavTimeline__Snap(converted::Draw& draw) {
-  ::sc::mp::NavTimeline::Snap s{};
-  s.p = draw.vector();
-  s.heading = draw.number();
-  s.mode = static_cast<unsigned char>(draw.below(40));
-  s.at = draw.number();
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const ::sc::mp::NavTimeline::Snap& s) { using converted::arg; return converted::Value::structure({arg(s.p), arg(s.heading), arg(s.mode), arg(s.at)}); }
-[[maybe_unused]] static bool same(const ::sc::mp::NavTimeline::Snap& want, const converted::Value& got) { using converted::same; return got.rows && got.rows->size() == 4 && same(want.p, (*got.rows)[0]) && same(want.heading, (*got.rows)[1]) && same(want.mode, (*got.rows)[2]) && same(want.at, (*got.rows)[3]); }
-[[maybe_unused]] static ::sc::mp::NavTimeline::Snap near(::sc::mp::NavTimeline::Snap s, int k, int slot) { using converted::near; s.p = near(s.p, k, slot * 7 + 0); s.heading = near(s.heading, k, slot * 7 + 1); s.mode = near(s.mode, k, slot * 7 + 2); s.at = near(s.at, k, slot * 7 + 3); return s; }
-[[maybe_unused]] static bool defined(const ::sc::mp::NavTimeline::Snap& s) { using converted::defined; return defined(s.p) && defined(s.heading) && defined(s.mode) && defined(s.at); }
-[[maybe_unused]] static void flat(const ::sc::mp::NavTimeline::Snap& s, std::vector<kern::f64>& o) { using converted::flat; flat(s.p, o); flat(s.heading, o); flat(s.mode, o); flat(s.at, o); }
-[[maybe_unused]] static std::string text(const ::sc::mp::NavTimeline::Snap& s) { using converted::text; return std::string("{") + text(s.p) + ", " + text(s.heading) + ", " + text(s.mode) + ", " + text(s.at) + "}"; }
-[[maybe_unused]] static ::sc::mp::NavTimeline draw_mp__NavTimeline(converted::Draw& draw) {
-  ::sc::mp::NavTimeline s{};
-  s.snaps_ = draw_list(draw, [&]() -> ::sc::mp::NavTimeline::Snap { return draw_mp__NavTimeline__Snap(draw); });
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const ::sc::mp::NavTimeline& s) { using converted::arg; return converted::Value::structure({arg(s.snaps_)}); }
-[[maybe_unused]] static bool same(const ::sc::mp::NavTimeline& want, const converted::Value& got) { using converted::same; return got.rows && got.rows->size() == 1 && same(want.snaps_, (*got.rows)[0]); }
-[[maybe_unused]] static ::sc::mp::NavTimeline near(::sc::mp::NavTimeline s, int k, int slot) { using converted::near; s.snaps_ = near(s.snaps_, k, slot * 7 + 0); return s; }
-[[maybe_unused]] static bool defined(const ::sc::mp::NavTimeline& s) { using converted::defined; return defined(s.snaps_); }
-[[maybe_unused]] static void flat(const ::sc::mp::NavTimeline& s, std::vector<kern::f64>& o) { using converted::flat; flat(s.snaps_, o); }
-[[maybe_unused]] static std::string text(const ::sc::mp::NavTimeline& s) { using converted::text; return std::string("{") + text(s.snaps_) + "}"; }
-[[maybe_unused]] static ::sc::mp::Score draw_mp__Score(converted::Draw& draw) {
+[[maybe_unused]] static ::sc::mp::Score draw_mp__Score(::sc::converted::Draw& draw) {
   ::sc::mp::Score s{};
   s.slot = static_cast<unsigned char>(draw.below(40));
   s.kills = static_cast<unsigned short>(draw.below(40));
   s.deaths = static_cast<unsigned short>(draw.below(40));
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const ::sc::mp::Score& s) { using converted::arg; return converted::Value::structure({arg(s.slot), arg(s.kills), arg(s.deaths)}); }
-[[maybe_unused]] static bool same(const ::sc::mp::Score& want, const converted::Value& got) { using converted::same; return got.rows && got.rows->size() == 3 && same(want.slot, (*got.rows)[0]) && same(want.kills, (*got.rows)[1]) && same(want.deaths, (*got.rows)[2]); }
-[[maybe_unused]] static ::sc::mp::Score near(::sc::mp::Score s, int k, int slot) { using converted::near; s.slot = near(s.slot, k, slot * 7 + 0); s.kills = near(s.kills, k, slot * 7 + 1); s.deaths = near(s.deaths, k, slot * 7 + 2); return s; }
-[[maybe_unused]] static bool defined(const ::sc::mp::Score& s) { using converted::defined; return defined(s.slot) && defined(s.kills) && defined(s.deaths); }
-[[maybe_unused]] static void flat(const ::sc::mp::Score& s, std::vector<kern::f64>& o) { using converted::flat; flat(s.slot, o); flat(s.kills, o); flat(s.deaths, o); }
-[[maybe_unused]] static std::string text(const ::sc::mp::Score& s) { using converted::text; return std::string("{") + text(s.slot) + ", " + text(s.kills) + ", " + text(s.deaths) + "}"; }
-[[maybe_unused]] static ::sc::mp::Scoreboard draw_mp__Scoreboard(converted::Draw& draw) {
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::mp::Score& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.slot), arg(s.kills), arg(s.deaths)}); }
+[[maybe_unused]] static bool same(const ::sc::mp::Score& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 3 && same(want.slot, (*got.rows)[0]) && same(want.kills, (*got.rows)[1]) && same(want.deaths, (*got.rows)[2]); }
+[[maybe_unused]] static ::sc::mp::Score near(::sc::mp::Score s, int k, int slot) { using ::sc::converted::near; s.slot = near(s.slot, k, slot * 7 + 0); s.kills = near(s.kills, k, slot * 7 + 1); s.deaths = near(s.deaths, k, slot * 7 + 2); return s; }
+[[maybe_unused]] static bool defined(const ::sc::mp::Score& s) { using ::sc::converted::defined; return defined(s.slot) && defined(s.kills) && defined(s.deaths); }
+[[maybe_unused]] static void flat(const ::sc::mp::Score& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.slot, o); flat(s.kills, o); flat(s.deaths, o); }
+[[maybe_unused]] static std::string text(const ::sc::mp::Score& s) { using ::sc::converted::text; return std::string("{") + text(s.slot) + ", " + text(s.kills) + ", " + text(s.deaths) + "}"; }
+[[maybe_unused]] static ::sc::mp::Scoreboard draw_mp__Scoreboard(::sc::converted::Draw& draw) {
   ::sc::mp::Scoreboard s{};
-  s.rows_ = draw_list(draw, [&]() -> ::sc::mp::Score { return draw_mp__Score(draw); });
+  s.rows_ = draw_list(draw, [&]() -> ::sc::mp::Score { return ::sc::mp::draw_mp__Score(draw); });
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const ::sc::mp::Scoreboard& s) { using converted::arg; return converted::Value::structure({arg(s.rows_)}); }
-[[maybe_unused]] static bool same(const ::sc::mp::Scoreboard& want, const converted::Value& got) { using converted::same; return got.rows && got.rows->size() == 1 && same(want.rows_, (*got.rows)[0]); }
-[[maybe_unused]] static ::sc::mp::Scoreboard near(::sc::mp::Scoreboard s, int k, int slot) { using converted::near; s.rows_ = near(s.rows_, k, slot * 7 + 0); return s; }
-[[maybe_unused]] static bool defined(const ::sc::mp::Scoreboard& s) { using converted::defined; return defined(s.rows_); }
-[[maybe_unused]] static void flat(const ::sc::mp::Scoreboard& s, std::vector<kern::f64>& o) { using converted::flat; flat(s.rows_, o); }
-[[maybe_unused]] static std::string text(const ::sc::mp::Scoreboard& s) { using converted::text; return std::string("{") + text(s.rows_) + "}"; }
+[[maybe_unused]] static ::sc::converted::Value arg(const ::sc::mp::Scoreboard& s) { using ::sc::converted::arg; return ::sc::converted::Value::structure({arg(s.rows_)}); }
+[[maybe_unused]] static bool same(const ::sc::mp::Scoreboard& want, const ::sc::converted::Value& got) { using ::sc::converted::same; return got.rows && got.rows->size() == 1 && same(want.rows_, (*got.rows)[0]); }
+[[maybe_unused]] static ::sc::mp::Scoreboard near(::sc::mp::Scoreboard s, int k, int slot) { using ::sc::converted::near; s.rows_ = near(s.rows_, k, slot * 7 + 0); return s; }
+[[maybe_unused]] static bool defined(const ::sc::mp::Scoreboard& s) { using ::sc::converted::defined; return defined(s.rows_); }
+[[maybe_unused]] static void flat(const ::sc::mp::Scoreboard& s, std::vector<kern::f64>& o) { using ::sc::converted::flat; flat(s.rows_, o); }
+[[maybe_unused]] static std::string text(const ::sc::mp::Scoreboard& s) { using ::sc::converted::text; return std::string("{") + text(s.rows_) + "}"; }
 }  // namespace mp
 namespace converted_mp_rules {
 using namespace converted;
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::near; using converted::flat;
+using ::kern::arg;
+using ::kern::same;
+using ::kern::defined;
+using ::kern::text;
+using ::kern::near;
+using ::kern::flat;
 using ::sc::mp::arg;
 using ::sc::mp::same;
 using ::sc::mp::defined;
@@ -85,6 +82,7 @@ using kern::logic::Value;
 #pragma GCC diagnostic ignored "-Wunused-variable"
 f64 fmin2(f64 a, f64 b) { return a < b ? a : b; }
 f64 clampd(f64 v, f64 lo, f64 hi) { return v < lo ? lo : (v > hi ? hi : v); }
+Quat nlerp_slerp(Quat a, Quat b, f32 t) { return slerp(a, b, t); }
 struct Along { f32 along = 0, distance = 1e30f; };
 #pragma GCC diagnostic pop
 
@@ -99,10 +97,32 @@ using f32 = double;
 #pragma GCC diagnostic ignored "-Wnarrowing"
 f64 fmin2(f64 a, f64 b) { return a < b ? a : b; }
 f64 clampd(f64 v, f64 lo, f64 hi) { return v < lo ? lo : (v > hi ? hi : v); }
-inline f32 wrap_pi(f32 a) {
-  while (a > kPi) a -= 2 * kPi;
-  while (a < -kPi) a += 2 * kPi;
-  return a;
+inline Quat qnormalize(Quat q) {
+  const f32 l = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
+  return l > 1e-9 ? Quat{q.x / l, q.y / l, q.z / l, q.w / l} : Quat{};
+}
+inline Quat slerp(Quat a, Quat b, f32 t) {
+  f32 d = a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+  if (d < 0) { b = {-b.x, -b.y, -b.z, -b.w}; d = -d; }
+  if (d > 0.9995) return qnormalize({a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t, a.w + (b.w - a.w) * t});
+  const f32 th = std::acos(d), s = std::sin(th);
+  const f32 wa = std::sin((1 - t) * th) / s, wb = std::sin(t * th) / s;
+  return {a.x * wa + b.x * wb, a.y * wa + b.y * wb, a.z * wa + b.z * wb, a.w * wa + b.w * wb};
+}
+Quat nlerp_slerp(Quat a, Quat b, f32 t) { return slerp(a, b, t); }
+u8 encode_mulaw(f32 sample) {
+  const f32 v = clampf(sample, -1, 1);
+  i32 x = std::min<i32>(32635, static_cast<i32>(std::lround(std::fabs(v) * 32767)));
+  i32 exp = 7;
+  x += 132;
+  for (i32 mask = 0x4000; exp > 0 && !(x & mask); --exp, mask >>= 1) {}
+  const i32 mant = (x >> (exp + 3)) & 15;
+  return static_cast<u8>(((v < 0 ? 0x7f : 0xff) ^ (exp << 4 | mant)) & 255);
+}
+f32 decode_mulaw(u8 byte) {
+  const i32 x = (~byte) & 255, sign = x & 128, exp = (x >> 4) & 7, mant = x & 15;
+  const i32 pcm = ((mant << 3) + 132) << exp;
+  return static_cast<f32>(sign ? 132 - pcm : pcm - 132) / 32768.0;
 }
 #pragma GCC diagnostic pop
 }  // namespace wide
@@ -133,32 +153,45 @@ SC_TEST(converted_mp_rules) {
       tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, wide::clampd(wide_arg(a0), wide_arg(a1), wide_arg(a2)), outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, [&]([[maybe_unused]] int k) { return clampd(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2)); });
     }
   }
-  {  // NavTimeline::reset
-    converted::Tally tally("NavTimeline_reset");
-    const auto run = [&](::sc::mp::NavTimeline a0) { a0.reset(); return a0; };
+  {  // qnormalize
+    converted::Tally tally("qnormalize");
     for (int i = 0; i < converted::kCalls; ++i) {
-      const ::sc::mp::NavTimeline a0 = draw_mp__NavTimeline(draw);
+      const ::kern::Quat a0 = ::kern::draw_kern__Quat(draw);
       const converted::Watch watch;
-      const auto want = run(a0);
+      const auto want = ::sc::qnormalize(a0);
       const bool outside = watch.outside();
-      tally.take(bp, {arg(a0)}, want, want, outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return run(near(a0, k, 0)); });
+      tally.take(bp, {arg(a0)}, want, wide::qnormalize(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return ::sc::qnormalize(near(a0, k, 0)); });
     }
   }
-  {  // wrap_pi
-    converted::Tally tally("wrap_pi");
+  {  // slerp
+    converted::Tally tally("slerp");
     for (int i = 0; i < converted::kCalls; ++i) {
-      const float a0 = draw.number();
+      const ::kern::Quat a0 = ::kern::draw_kern__Quat(draw);
+      const ::kern::Quat a1 = ::kern::draw_kern__Quat(draw);
+      const float a2 = draw.number();
       const converted::Watch watch;
-      const auto want = wrap_pi(a0);
+      const auto want = ::sc::slerp(a0, a1, a2);
       const bool outside = watch.outside();
-      tally.take(bp, {arg(a0)}, want, wide::wrap_pi(wide_arg(a0)), outside, [&] { return text(a0); }, [&]([[maybe_unused]] int k) { return wrap_pi(near(a0, k, 0)); });
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, wide::slerp(wide_arg(a0), wide_arg(a1), wide_arg(a2)), outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, [&]([[maybe_unused]] int k) { return ::sc::slerp(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2)); });
+    }
+  }
+  {  // nlerp_slerp
+    converted::Tally tally("nlerp_slerp");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::kern::Quat a0 = ::kern::draw_kern__Quat(draw);
+      const ::kern::Quat a1 = ::kern::draw_kern__Quat(draw);
+      const float a2 = draw.number();
+      const converted::Watch watch;
+      const auto want = nlerp_slerp(a0, a1, a2);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, wide::nlerp_slerp(wide_arg(a0), wide_arg(a1), wide_arg(a2)), outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, [&]([[maybe_unused]] int k) { return nlerp_slerp(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2)); });
     }
   }
   {  // Scoreboard::ensure
     converted::Tally tally("Scoreboard_ensure");
     const auto run = [&](::sc::mp::Scoreboard a0, unsigned char a1) { a0.ensure(a1); return a0; };
     for (int i = 0; i < converted::kCalls; ++i) {
-      const ::sc::mp::Scoreboard a0 = draw_mp__Scoreboard(draw);
+      const ::sc::mp::Scoreboard a0 = ::sc::mp::draw_mp__Scoreboard(draw);
       const unsigned char a1 = static_cast<unsigned char>(draw.below(40));
       const converted::Watch watch;
       const auto want = run(a0, a1);
@@ -166,11 +199,24 @@ SC_TEST(converted_mp_rules) {
       tally.take(bp, {arg(a0), arg(a1)}, want, want, outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return run(near(a0, k, 0), near(a1, k, 1)); });
     }
   }
+  {  // Scoreboard::died
+    converted::Tally tally("Scoreboard_died");
+    const auto run = [&](::sc::mp::Scoreboard a0, unsigned char a1, int a2) { a0.died(a1, a2); return a0; };
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::sc::mp::Scoreboard a0 = ::sc::mp::draw_mp__Scoreboard(draw);
+      const unsigned char a1 = static_cast<unsigned char>(draw.below(40));
+      const int a2 = static_cast<int>(draw.whole());
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, want, outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, [&]([[maybe_unused]] int k) { return run(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2)); });
+    }
+  }
   {  // Scoreboard::of
     converted::Tally tally("Scoreboard_of");
     const auto run = [&](::sc::mp::Scoreboard a0, unsigned char a1) { const auto r = a0.of(a1); return r; };
     for (int i = 0; i < converted::kCalls; ++i) {
-      const ::sc::mp::Scoreboard a0 = draw_mp__Scoreboard(draw);
+      const ::sc::mp::Scoreboard a0 = ::sc::mp::draw_mp__Scoreboard(draw);
       const unsigned char a1 = static_cast<unsigned char>(draw.below(40));
       const converted::Watch watch;
       const auto want = run(a0, a1);
