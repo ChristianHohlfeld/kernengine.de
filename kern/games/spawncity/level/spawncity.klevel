@@ -16,7 +16,7 @@
   "ambienceVolume": 0.35,
   "reverb": 0.2
  },
- "nextId": 17,
+ "nextId": 18,
  "actors": [
   {
    "id": 1,
@@ -57132,6 +57132,5806 @@
          "name": "Passed",
          "type": "int",
          "value": -1
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": 17,
+   "name": "Multiplayer",
+   "folder": "Rules",
+   "transform": {
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     1
+    ]
+   },
+   "components": {
+    "logic": {
+     "kind": "kern-logic",
+     "version": 1,
+     "nextId": 301,
+     "variables": [
+      {
+       "name": "Palette",
+       "type": "int_list",
+       "value": [
+        2742015,
+        16739125,
+        9237567,
+        16732120,
+        16767037,
+        10189823,
+        2418337,
+        16728159,
+        4434175,
+        16752412,
+        8185855,
+        14090059
+       ],
+       "help": "vs_multiplayer.mjs PALETTE: the players' colours (0xRRGGBB)"
+      },
+      {
+       "name": "Weapons",
+       "type": "struct_list",
+       "of": "WeaponSpec",
+       "value": [
+        {
+         "Label": "",
+         "Damage": 20
+        },
+        {
+         "Label": "MP",
+         "Damage": 13
+        },
+        {
+         "Label": "GLOCK",
+         "Damage": 26
+        },
+        {
+         "Label": "SNIPER",
+         "Damage": 95
+        },
+        {
+         "Label": "FAEUSTE",
+         "Damage": 12
+        },
+        {
+         "Label": "MESSER",
+         "Damage": 20
+        },
+        {
+         "Label": "GRANATWERFER",
+         "Damage": 20
+        },
+        {
+         "Label": "RAKETE",
+         "Damage": 20
+        },
+        {
+         "Label": "GRANATE",
+         "Damage": 20
+        },
+        {
+         "Label": "DROHNE",
+         "Damage": 13
+        },
+        {
+         "Label": "RAKETE",
+         "Damage": 20
+        },
+        {
+         "Label": "BORDKANONE",
+         "Damage": 20
+        },
+        {
+         "Label": "RAKETE",
+         "Damage": 20
+        },
+        {
+         "Label": "BOMBE",
+         "Damage": 20
+        },
+        {
+         "Label": "EXPLOSION",
+         "Damage": 20
+        }
+       ],
+       "help": "A row for each Weapon, in its order"
+      },
+      {
+       "name": "ZoneNames",
+       "type": "text_list",
+       "value": [
+        "torso",
+        "head",
+        "legs"
+       ],
+       "help": "For each Zone, in its order: its name ..."
+      },
+      {
+       "name": "ZoneFactor",
+       "type": "float_list",
+       "value": [
+        1,
+        3,
+        0.65
+       ],
+       "help": "... and what a round there counts"
+      },
+      {
+       "name": "SpawnProtectMs",
+       "type": "float",
+       "value": 2500,
+       "help": "A player who just spawned cannot be hurt for this long (ms)"
+      },
+      {
+       "name": "RegenDelayMs",
+       "type": "float",
+       "value": 5000,
+       "help": "Health comes back this long (ms) after the last hit ..."
+      },
+      {
+       "name": "RegenHpPerS",
+       "type": "float",
+       "value": 12,
+       "help": "... at this rate"
+      },
+      {
+       "name": "RegenTickMs",
+       "type": "float",
+       "value": 500,
+       "help": "The authority counts it every this many ms"
+      },
+      {
+       "name": "RespawnCooldownMs",
+       "type": "float",
+       "value": 3000,
+       "help": "A player who went down comes back after this long (ms) ..."
+      },
+      {
+       "name": "RespawnRadiusMin",
+       "type": "float",
+       "value": 3,
+       "help": "... this far (m) from where he fell at least ..."
+      },
+      {
+       "name": "RespawnRadiusMax",
+       "type": "float",
+       "value": 5,
+       "help": "... and at most"
+      },
+      {
+       "name": "BallotMs",
+       "type": "float",
+       "value": 30000,
+       "help": "A ballot is open this long (ms)"
+      },
+      {
+       "name": "VoiceRadius",
+       "type": "float",
+       "value": 70,
+       "help": "proximity_voice.mjs: a voice is heard up to this far (m) ..."
+      },
+      {
+       "name": "VoiceFullM",
+       "type": "float",
+       "value": 5,
+       "help": "... and at full level within this"
+      },
+      {
+       "name": "RadioGain",
+       "type": "float",
+       "value": 0.85,
+       "help": "\"Everywhere\" (team radio): at least this level"
+      },
+      {
+       "name": "PingLifeMs",
+       "type": "float",
+       "value": 90000,
+       "help": "ping_marker.mjs: a ping stays this long (ms) ..."
+      },
+      {
+       "name": "PingFadeMs",
+       "type": "float",
+       "value": 4000,
+       "help": "... and fades over its last this many"
+      },
+      {
+       "name": "PingRemoveM",
+       "type": "float",
+       "value": 5,
+       "help": "Pinging this close (m) to the own marker removes it"
+      },
+      {
+       "name": "PingHoldMs",
+       "type": "float",
+       "value": 600,
+       "help": "A long press (ms) on a touch screen pings"
+      },
+      {
+       "name": "ScreenArrows",
+       "type": "text_list",
+       "value": [
+        "→",
+        "↘",
+        "↓",
+        "↙",
+        "←",
+        "↖",
+        "↑",
+        "↗"
+       ],
+       "help": "map_peer_edge.mjs: the eight arrows from east clockwise on the screen ..."
+      },
+      {
+       "name": "CompassArrows",
+       "type": "text_list",
+       "value": [
+        "↑",
+        "↗",
+        "→",
+        "↘",
+        "↓",
+        "↙",
+        "←",
+        "↖"
+       ],
+       "help": "... and from north clockwise on the map"
+      }
+     ],
+     "enums": [
+      {
+       "name": "Zone",
+       "values": [
+        "torso",
+        "head",
+        "legs"
+       ],
+       "help": "vs_multiplayer.mjs: where a round lands"
+      },
+      {
+       "name": "Weapon",
+       "values": [
+        "other",
+        "smg",
+        "glock",
+        "sniper",
+        "fists",
+        "knife",
+        "launcher",
+        "rocket",
+        "grenade",
+        "drone_gun",
+        "drone_rocket",
+        "jet_gun",
+        "jet_missile",
+        "jet_bomb",
+        "explosion"
+       ],
+       "help": "What hurt a player"
+      },
+      {
+       "name": "HitVerdict",
+       "values": [
+        "applied",
+        "unknown_player",
+        "friendly_fire_off",
+        "protected_target",
+        "already_down"
+       ],
+       "help": "What the authority decides for a damage request"
+      },
+      {
+       "name": "BallotStatus",
+       "values": [
+        "pending",
+        "approved",
+        "rejected",
+        "cancelled"
+       ],
+       "help": "rules_vote_engine.mjs: where a ballot stands"
+      }
+     ],
+     "structs": [
+      {
+       "name": "WeaponSpec",
+       "fields": [
+        {
+         "name": "Label",
+         "type": "text",
+         "value": ""
+        },
+        {
+         "name": "Damage",
+         "type": "float",
+         "value": 20
+        }
+       ],
+       "help": "A weapon as the kill feed names it (mp_fun_hud.mjs) and the damage of one of its rounds on a mate"
+      },
+      {
+       "name": "Ballot",
+       "fields": [
+        {
+         "name": "Id",
+         "type": "int",
+         "value": 0
+        },
+        {
+         "name": "Key",
+         "type": "int",
+         "value": 0
+        },
+        {
+         "name": "Value",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "Host",
+         "type": "int",
+         "value": 0
+        },
+        {
+         "name": "Members",
+         "type": "int_list",
+         "value": []
+        },
+        {
+         "name": "Yes",
+         "type": "int_list",
+         "value": []
+        },
+        {
+         "name": "ExpiresMs",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "Status",
+         "type": "enum",
+         "of": "BallotStatus",
+         "value": 0
+        }
+       ],
+       "help": "A unanimous vote of the roster on a rule (Key 0: friendly fire): who has to say yes, who did, until when"
+      }
+     ],
+     "nodes": [
+      {
+       "id": 10,
+       "type": "flow.for_each",
+       "x": 280,
+       "y": 0,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 11,
+       "type": "flow.for",
+       "x": 840,
+       "y": 0,
+       "values": {
+        "first": 1
+       }
+      },
+      {
+       "id": 20,
+       "type": "flow.for_each",
+       "x": 280,
+       "y": 5600,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 21,
+       "type": "func.entry",
+       "x": 0,
+       "y": 0,
+       "params": {
+        "function": "ColorSlots"
+       }
+      },
+      {
+       "id": 22,
+       "type": "var.set",
+       "x": 560,
+       "y": 0,
+       "params": {
+        "variable": "At",
+        "scope": "ColorSlots"
+       }
+      },
+      {
+       "id": 23,
+       "type": "math.round",
+       "x": 440,
+       "y": 150
+      },
+      {
+       "id": 24,
+       "type": "math.mod",
+       "x": 440,
+       "y": 240
+      },
+      {
+       "id": 25,
+       "type": "list.length",
+       "x": 440,
+       "y": 330,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 26,
+       "type": "var.get",
+       "x": 440,
+       "y": 420,
+       "params": {
+        "variable": "Palette"
+       }
+      },
+      {
+       "id": 27,
+       "type": "list.length",
+       "x": 720,
+       "y": 150,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 28,
+       "type": "var.get",
+       "x": 720,
+       "y": 240,
+       "params": {
+        "variable": "Palette"
+       }
+      },
+      {
+       "id": 29,
+       "type": "flow.branch",
+       "x": 1120,
+       "y": 0
+      },
+      {
+       "id": 30,
+       "type": "list.contains",
+       "x": 1000,
+       "y": 150,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 31,
+       "type": "var.get",
+       "x": 1000,
+       "y": 240,
+       "params": {
+        "variable": "Taken",
+        "scope": "ColorSlots"
+       }
+      },
+      {
+       "id": 32,
+       "type": "var.get",
+       "x": 1000,
+       "y": 330,
+       "params": {
+        "variable": "At",
+        "scope": "ColorSlots"
+       }
+      },
+      {
+       "id": 33,
+       "type": "var.set",
+       "x": 1400,
+       "y": 0,
+       "params": {
+        "variable": "At",
+        "scope": "ColorSlots"
+       }
+      },
+      {
+       "id": 34,
+       "type": "math.round",
+       "x": 1280,
+       "y": 150
+      },
+      {
+       "id": 35,
+       "type": "math.mod",
+       "x": 1280,
+       "y": 240
+      },
+      {
+       "id": 36,
+       "type": "math.add",
+       "x": 1280,
+       "y": 330,
+       "values": {
+        "b": 1
+       }
+      },
+      {
+       "id": 37,
+       "type": "var.get",
+       "x": 1280,
+       "y": 420,
+       "params": {
+        "variable": "At",
+        "scope": "ColorSlots"
+       }
+      },
+      {
+       "id": 38,
+       "type": "list.length",
+       "x": 1280,
+       "y": 510,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 39,
+       "type": "var.get",
+       "x": 1280,
+       "y": 600,
+       "params": {
+        "variable": "Palette"
+       }
+      },
+      {
+       "id": 40,
+       "type": "list.add",
+       "x": 1680,
+       "y": 0,
+       "params": {
+        "variable": "Taken",
+        "scope": "ColorSlots"
+       }
+      },
+      {
+       "id": 41,
+       "type": "var.get",
+       "x": 1560,
+       "y": 150,
+       "params": {
+        "variable": "At",
+        "scope": "ColorSlots"
+       }
+      },
+      {
+       "id": 42,
+       "type": "list.add",
+       "x": 1960,
+       "y": 0,
+       "params": {
+        "variable": "Colors",
+        "scope": "ColorSlots"
+       }
+      },
+      {
+       "id": 43,
+       "type": "list.get",
+       "x": 1840,
+       "y": 150,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 44,
+       "type": "var.get",
+       "x": 1840,
+       "y": 240,
+       "params": {
+        "variable": "Palette"
+       }
+      },
+      {
+       "id": 45,
+       "type": "var.get",
+       "x": 1840,
+       "y": 330,
+       "params": {
+        "variable": "At",
+        "scope": "ColorSlots"
+       }
+      },
+      {
+       "id": 46,
+       "type": "func.return",
+       "x": 2240,
+       "y": 0,
+       "params": {
+        "function": "ColorSlots"
+       }
+      },
+      {
+       "id": 47,
+       "type": "var.get",
+       "x": 2120,
+       "y": 150,
+       "params": {
+        "variable": "Colors",
+        "scope": "ColorSlots"
+       }
+      },
+      {
+       "id": 48,
+       "type": "func.entry",
+       "x": 0,
+       "y": 740,
+       "params": {
+        "function": "WeaponLabel"
+       }
+      },
+      {
+       "id": 49,
+       "type": "func.return",
+       "x": 280,
+       "y": 740,
+       "params": {
+        "function": "WeaponLabel"
+       }
+      },
+      {
+       "id": 50,
+       "type": "struct.break",
+       "x": 160,
+       "y": 890,
+       "params": {
+        "struct": "WeaponSpec"
+       }
+      },
+      {
+       "id": 51,
+       "type": "list.get",
+       "x": 160,
+       "y": 980,
+       "params": {
+        "type": "WeaponSpec"
+       }
+      },
+      {
+       "id": 52,
+       "type": "var.get",
+       "x": 160,
+       "y": 1070,
+       "params": {
+        "variable": "Weapons"
+       }
+      },
+      {
+       "id": 53,
+       "type": "enum.index",
+       "x": 160,
+       "y": 1160,
+       "params": {
+        "enum": "Weapon"
+       }
+      },
+      {
+       "id": 54,
+       "type": "func.entry",
+       "x": 0,
+       "y": 1300,
+       "params": {
+        "function": "ZoneName"
+       }
+      },
+      {
+       "id": 55,
+       "type": "func.return",
+       "x": 280,
+       "y": 1300,
+       "params": {
+        "function": "ZoneName"
+       }
+      },
+      {
+       "id": 56,
+       "type": "list.get",
+       "x": 160,
+       "y": 1450,
+       "params": {
+        "type": "text"
+       }
+      },
+      {
+       "id": 57,
+       "type": "var.get",
+       "x": 160,
+       "y": 1540,
+       "params": {
+        "variable": "ZoneNames"
+       }
+      },
+      {
+       "id": 58,
+       "type": "enum.index",
+       "x": 160,
+       "y": 1630,
+       "params": {
+        "enum": "Zone"
+       }
+      },
+      {
+       "id": 59,
+       "type": "func.entry",
+       "x": 0,
+       "y": 1770,
+       "params": {
+        "function": "RoundDamage"
+       }
+      },
+      {
+       "id": 60,
+       "type": "func.return",
+       "x": 280,
+       "y": 1770,
+       "params": {
+        "function": "RoundDamage"
+       }
+      },
+      {
+       "id": 61,
+       "type": "math.formula",
+       "x": 160,
+       "y": 1920,
+       "params": {
+        "formula": "clamp(round(base * k), 1, 100)"
+       }
+      },
+      {
+       "id": 62,
+       "type": "struct.break",
+       "x": 160,
+       "y": 2010,
+       "params": {
+        "struct": "WeaponSpec"
+       }
+      },
+      {
+       "id": 63,
+       "type": "list.get",
+       "x": 160,
+       "y": 2100,
+       "params": {
+        "type": "WeaponSpec"
+       }
+      },
+      {
+       "id": 64,
+       "type": "var.get",
+       "x": 160,
+       "y": 2190,
+       "params": {
+        "variable": "Weapons"
+       }
+      },
+      {
+       "id": 65,
+       "type": "enum.index",
+       "x": 160,
+       "y": 2280,
+       "params": {
+        "enum": "Weapon"
+       }
+      },
+      {
+       "id": 66,
+       "type": "list.get",
+       "x": 160,
+       "y": 2370,
+       "params": {
+        "type": "float"
+       }
+      },
+      {
+       "id": 67,
+       "type": "var.get",
+       "x": 160,
+       "y": 2460,
+       "params": {
+        "variable": "ZoneFactor"
+       }
+      },
+      {
+       "id": 68,
+       "type": "enum.index",
+       "x": 160,
+       "y": 2550,
+       "params": {
+        "enum": "Zone"
+       }
+      },
+      {
+       "id": 69,
+       "type": "func.entry",
+       "x": 0,
+       "y": 2690,
+       "params": {
+        "function": "BlastDamage"
+       }
+      },
+      {
+       "id": 70,
+       "type": "func.return",
+       "x": 280,
+       "y": 2690,
+       "params": {
+        "function": "BlastDamage"
+       }
+      },
+      {
+       "id": 71,
+       "type": "math.formula",
+       "x": 160,
+       "y": 2840,
+       "params": {
+        "formula": "d < 1 ? 0 : clamp(round(d), 1, 100)"
+       }
+      },
+      {
+       "id": 72,
+       "type": "func.entry",
+       "x": 0,
+       "y": 2980,
+       "params": {
+        "function": "JudgeHit"
+       }
+      },
+      {
+       "id": 73,
+       "type": "flow.branch",
+       "x": 280,
+       "y": 2980
+      },
+      {
+       "id": 74,
+       "type": "logic.not",
+       "x": 160,
+       "y": 3130
+      },
+      {
+       "id": 75,
+       "type": "logic.and",
+       "x": 160,
+       "y": 3220
+      },
+      {
+       "id": 76,
+       "type": "func.return",
+       "x": 560,
+       "y": 2980,
+       "params": {
+        "function": "JudgeHit"
+       },
+       "values": {
+        "verdict": 1
+       }
+      },
+      {
+       "id": 77,
+       "type": "flow.branch",
+       "x": 840,
+       "y": 2980
+      },
+      {
+       "id": 78,
+       "type": "logic.not",
+       "x": 720,
+       "y": 3130
+      },
+      {
+       "id": 79,
+       "type": "logic.or",
+       "x": 720,
+       "y": 3220
+      },
+      {
+       "id": 80,
+       "type": "func.return",
+       "x": 1120,
+       "y": 2980,
+       "params": {
+        "function": "JudgeHit"
+       },
+       "values": {
+        "verdict": 2
+       }
+      },
+      {
+       "id": 81,
+       "type": "flow.branch",
+       "x": 1400,
+       "y": 2980
+      },
+      {
+       "id": 82,
+       "type": "math.compare",
+       "x": 1280,
+       "y": 3130,
+       "params": {
+        "op": "<"
+       }
+      },
+      {
+       "id": 83,
+       "type": "func.return",
+       "x": 1680,
+       "y": 2980,
+       "params": {
+        "function": "JudgeHit"
+       },
+       "values": {
+        "verdict": 3
+       }
+      },
+      {
+       "id": 84,
+       "type": "flow.branch",
+       "x": 1960,
+       "y": 2980
+      },
+      {
+       "id": 85,
+       "type": "math.compare",
+       "x": 1840,
+       "y": 3130,
+       "params": {
+        "op": "<="
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 86,
+       "type": "func.return",
+       "x": 2240,
+       "y": 2980,
+       "params": {
+        "function": "JudgeHit"
+       },
+       "values": {
+        "verdict": 4
+       }
+      },
+      {
+       "id": 87,
+       "type": "func.return",
+       "x": 2520,
+       "y": 2980,
+       "params": {
+        "function": "JudgeHit"
+       },
+       "values": {
+        "verdict": 0
+       }
+      },
+      {
+       "id": 88,
+       "type": "func.entry",
+       "x": 0,
+       "y": 3360,
+       "params": {
+        "function": "Regen"
+       }
+      },
+      {
+       "id": 89,
+       "type": "func.return",
+       "x": 280,
+       "y": 3360,
+       "params": {
+        "function": "Regen"
+       }
+      },
+      {
+       "id": 90,
+       "type": "math.formula",
+       "x": 160,
+       "y": 3510,
+       "params": {
+        "formula": "hp <= 0 || hp >= 100 || now - hurt < delay ? hp : min(100, hp + rate * dt)"
+       }
+      },
+      {
+       "id": 91,
+       "type": "var.get",
+       "x": 160,
+       "y": 3600,
+       "params": {
+        "variable": "RegenDelayMs"
+       }
+      },
+      {
+       "id": 92,
+       "type": "var.get",
+       "x": 160,
+       "y": 3690,
+       "params": {
+        "variable": "RegenHpPerS"
+       }
+      },
+      {
+       "id": 93,
+       "type": "func.entry",
+       "x": 0,
+       "y": 3830,
+       "params": {
+        "function": "RespawnOffset"
+       }
+      },
+      {
+       "id": 94,
+       "type": "func.return",
+       "x": 280,
+       "y": 3830,
+       "params": {
+        "function": "RespawnOffset"
+       }
+      },
+      {
+       "id": 95,
+       "type": "math.formula",
+       "x": 160,
+       "y": 3980,
+       "params": {
+        "formula": "cos(r2 * 6.283185307179586) * sqrt(lo * lo + r1 * (hi * hi - lo * lo))"
+       }
+      },
+      {
+       "id": 96,
+       "type": "var.get",
+       "x": 160,
+       "y": 4070,
+       "params": {
+        "variable": "RespawnRadiusMin"
+       }
+      },
+      {
+       "id": 97,
+       "type": "var.get",
+       "x": 160,
+       "y": 4160,
+       "params": {
+        "variable": "RespawnRadiusMax"
+       }
+      },
+      {
+       "id": 98,
+       "type": "math.formula",
+       "x": 160,
+       "y": 4250,
+       "params": {
+        "formula": "sin(r2 * 6.283185307179586) * sqrt(lo * lo + r1 * (hi * hi - lo * lo))"
+       }
+      },
+      {
+       "id": 99,
+       "type": "var.get",
+       "x": 160,
+       "y": 4340,
+       "params": {
+        "variable": "RespawnRadiusMin"
+       }
+      },
+      {
+       "id": 100,
+       "type": "var.get",
+       "x": 160,
+       "y": 4430,
+       "params": {
+        "variable": "RespawnRadiusMax"
+       }
+      },
+      {
+       "id": 101,
+       "type": "func.entry",
+       "x": 0,
+       "y": 4570,
+       "params": {
+        "function": "SpawnRingOffset"
+       }
+      },
+      {
+       "id": 102,
+       "type": "func.return",
+       "x": 280,
+       "y": 4570,
+       "params": {
+        "function": "SpawnRingOffset"
+       }
+      },
+      {
+       "id": 103,
+       "type": "math.formula",
+       "x": 160,
+       "y": 4720,
+       "params": {
+        "formula": "cos(slot * 2.399963229728653) * (7 + slot % 3 * 3)"
+       }
+      },
+      {
+       "id": 104,
+       "type": "math.formula",
+       "x": 160,
+       "y": 4810,
+       "params": {
+        "formula": "sin(slot * 2.399963229728653) * (7 + slot % 3 * 3)"
+       }
+      },
+      {
+       "id": 105,
+       "type": "func.entry",
+       "x": 0,
+       "y": 4950,
+       "params": {
+        "function": "VoiceGain"
+       }
+      },
+      {
+       "id": 106,
+       "type": "func.return",
+       "x": 280,
+       "y": 4950,
+       "params": {
+        "function": "VoiceGain"
+       }
+      },
+      {
+       "id": 107,
+       "type": "math.formula",
+       "x": 160,
+       "y": 5100,
+       "params": {
+        "formula": "max(least, clamp((radius - d) / (radius - full), 0, 1))"
+       }
+      },
+      {
+       "id": 108,
+       "type": "logic.select",
+       "x": 160,
+       "y": 5190,
+       "params": {
+        "type": "float"
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 109,
+       "type": "var.get",
+       "x": 160,
+       "y": 5280,
+       "params": {
+        "variable": "RadioGain"
+       }
+      },
+      {
+       "id": 110,
+       "type": "var.get",
+       "x": 160,
+       "y": 5370,
+       "params": {
+        "variable": "VoiceRadius"
+       }
+      },
+      {
+       "id": 111,
+       "type": "var.get",
+       "x": 160,
+       "y": 5460,
+       "params": {
+        "variable": "VoiceFullM"
+       }
+      },
+      {
+       "id": 112,
+       "type": "func.entry",
+       "x": 0,
+       "y": 5600,
+       "params": {
+        "function": "Same"
+       }
+      },
+      {
+       "id": 113,
+       "type": "flow.branch",
+       "x": 560,
+       "y": 5600
+      },
+      {
+       "id": 114,
+       "type": "logic.not",
+       "x": 440,
+       "y": 5750
+      },
+      {
+       "id": 115,
+       "type": "list.contains",
+       "x": 440,
+       "y": 5840,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 116,
+       "type": "var.set",
+       "x": 840,
+       "y": 5600,
+       "params": {
+        "variable": "All",
+        "scope": "Same"
+       },
+       "values": {
+        "value": false
+       }
+      },
+      {
+       "id": 117,
+       "type": "func.return",
+       "x": 1120,
+       "y": 5600,
+       "params": {
+        "function": "Same"
+       }
+      },
+      {
+       "id": 118,
+       "type": "logic.and",
+       "x": 1000,
+       "y": 5750
+      },
+      {
+       "id": 119,
+       "type": "var.get",
+       "x": 1000,
+       "y": 5840,
+       "params": {
+        "variable": "All",
+        "scope": "Same"
+       }
+      },
+      {
+       "id": 120,
+       "type": "math.compare",
+       "x": 1000,
+       "y": 5930,
+       "params": {
+        "op": "=="
+       }
+      },
+      {
+       "id": 121,
+       "type": "list.length",
+       "x": 1000,
+       "y": 6020,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 122,
+       "type": "list.length",
+       "x": 1000,
+       "y": 6110,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 123,
+       "type": "func.entry",
+       "x": 0,
+       "y": 6250,
+       "params": {
+        "function": "CreateBallot"
+       }
+      },
+      {
+       "id": 124,
+       "type": "flow.branch",
+       "x": 280,
+       "y": 6250
+      },
+      {
+       "id": 125,
+       "type": "logic.or",
+       "x": 160,
+       "y": 6400
+      },
+      {
+       "id": 126,
+       "type": "logic.or",
+       "x": 160,
+       "y": 6490
+      },
+      {
+       "id": 127,
+       "type": "math.compare",
+       "x": 160,
+       "y": 6580,
+       "params": {
+        "op": "=="
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 128,
+       "type": "logic.not",
+       "x": 160,
+       "y": 6670
+      },
+      {
+       "id": 129,
+       "type": "list.contains",
+       "x": 160,
+       "y": 6760,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 130,
+       "type": "math.compare",
+       "x": 160,
+       "y": 6850,
+       "params": {
+        "op": "<"
+       },
+       "values": {
+        "b": 2
+       }
+      },
+      {
+       "id": 131,
+       "type": "list.length",
+       "x": 160,
+       "y": 6940,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 132,
+       "type": "func.return",
+       "x": 560,
+       "y": 6250,
+       "params": {
+        "function": "CreateBallot"
+       },
+       "values": {
+        "created": false,
+        "ballot": {
+         "Id": 0,
+         "Key": 0,
+         "Value": false,
+         "Host": 0,
+         "Members": [],
+         "Yes": [],
+         "ExpiresMs": 0,
+         "Status": 0
+        }
+       }
+      },
+      {
+       "id": 133,
+       "type": "func.return",
+       "x": 840,
+       "y": 6250,
+       "params": {
+        "function": "CreateBallot"
+       },
+       "values": {
+        "created": true
+       }
+      },
+      {
+       "id": 134,
+       "type": "struct.make",
+       "x": 720,
+       "y": 6400,
+       "params": {
+        "struct": "Ballot"
+       },
+       "values": {
+        "Status": 0
+       }
+      },
+      {
+       "id": 135,
+       "type": "list.make",
+       "x": 720,
+       "y": 6490,
+       "params": {
+        "type": "int",
+        "count": "1"
+       }
+      },
+      {
+       "id": 136,
+       "type": "math.add",
+       "x": 720,
+       "y": 6580
+      },
+      {
+       "id": 137,
+       "type": "var.get",
+       "x": 720,
+       "y": 6670,
+       "params": {
+        "variable": "BallotMs"
+       }
+      },
+      {
+       "id": 138,
+       "type": "func.entry",
+       "x": 0,
+       "y": 7080,
+       "params": {
+        "function": "CastVote"
+       }
+      },
+      {
+       "id": 139,
+       "type": "var.set",
+       "x": 280,
+       "y": 7080,
+       "params": {
+        "variable": "V",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 140,
+       "type": "flow.branch",
+       "x": 560,
+       "y": 7080
+      },
+      {
+       "id": 141,
+       "type": "logic.not",
+       "x": 440,
+       "y": 7230
+      },
+      {
+       "id": 142,
+       "type": "enum.equal",
+       "x": 440,
+       "y": 7320,
+       "params": {
+        "enum": "BallotStatus"
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 143,
+       "type": "struct.break",
+       "x": 440,
+       "y": 7410,
+       "params": {
+        "struct": "Ballot"
+       }
+      },
+      {
+       "id": 144,
+       "type": "var.get",
+       "x": 440,
+       "y": 7500,
+       "params": {
+        "variable": "V",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 145,
+       "type": "func.return",
+       "x": 840,
+       "y": 7080,
+       "params": {
+        "function": "CastVote"
+       }
+      },
+      {
+       "id": 146,
+       "type": "var.get",
+       "x": 720,
+       "y": 7230,
+       "params": {
+        "variable": "V",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 147,
+       "type": "flow.branch",
+       "x": 1120,
+       "y": 7080
+      },
+      {
+       "id": 148,
+       "type": "logic.or",
+       "x": 1000,
+       "y": 7230
+      },
+      {
+       "id": 149,
+       "type": "math.compare",
+       "x": 1000,
+       "y": 7320,
+       "params": {
+        "op": ">="
+       }
+      },
+      {
+       "id": 150,
+       "type": "struct.break",
+       "x": 1000,
+       "y": 7410,
+       "params": {
+        "struct": "Ballot"
+       }
+      },
+      {
+       "id": 151,
+       "type": "var.get",
+       "x": 1000,
+       "y": 7500,
+       "params": {
+        "variable": "V",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 152,
+       "type": "logic.not",
+       "x": 1000,
+       "y": 7590
+      },
+      {
+       "id": 153,
+       "type": "func.pure",
+       "x": 1000,
+       "y": 7680,
+       "params": {
+        "function": "Same"
+       }
+      },
+      {
+       "id": 154,
+       "type": "struct.break",
+       "x": 1000,
+       "y": 7770,
+       "params": {
+        "struct": "Ballot"
+       }
+      },
+      {
+       "id": 155,
+       "type": "var.get",
+       "x": 1000,
+       "y": 7860,
+       "params": {
+        "variable": "V",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 156,
+       "type": "struct.set_field",
+       "x": 1400,
+       "y": 7080,
+       "params": {
+        "variable": "V",
+        "field": "Status",
+        "scope": "CastVote"
+       },
+       "values": {
+        "value": 3
+       }
+      },
+      {
+       "id": 157,
+       "type": "func.return",
+       "x": 1680,
+       "y": 7080,
+       "params": {
+        "function": "CastVote"
+       }
+      },
+      {
+       "id": 158,
+       "type": "var.get",
+       "x": 1560,
+       "y": 7230,
+       "params": {
+        "variable": "V",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 159,
+       "type": "flow.branch",
+       "x": 1960,
+       "y": 7080
+      },
+      {
+       "id": 160,
+       "type": "logic.or",
+       "x": 1840,
+       "y": 7230
+      },
+      {
+       "id": 161,
+       "type": "logic.not",
+       "x": 1840,
+       "y": 7320
+      },
+      {
+       "id": 162,
+       "type": "list.contains",
+       "x": 1840,
+       "y": 7410,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 163,
+       "type": "struct.break",
+       "x": 1840,
+       "y": 7500,
+       "params": {
+        "struct": "Ballot"
+       }
+      },
+      {
+       "id": 164,
+       "type": "var.get",
+       "x": 1840,
+       "y": 7590,
+       "params": {
+        "variable": "V",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 165,
+       "type": "list.contains",
+       "x": 1840,
+       "y": 7680,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 166,
+       "type": "struct.break",
+       "x": 1840,
+       "y": 7770,
+       "params": {
+        "struct": "Ballot"
+       }
+      },
+      {
+       "id": 167,
+       "type": "var.get",
+       "x": 1840,
+       "y": 7860,
+       "params": {
+        "variable": "V",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 168,
+       "type": "func.return",
+       "x": 2240,
+       "y": 7080,
+       "params": {
+        "function": "CastVote"
+       }
+      },
+      {
+       "id": 169,
+       "type": "var.get",
+       "x": 2120,
+       "y": 7230,
+       "params": {
+        "variable": "V",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 170,
+       "type": "flow.branch",
+       "x": 2520,
+       "y": 7080
+      },
+      {
+       "id": 171,
+       "type": "logic.not",
+       "x": 2400,
+       "y": 7230
+      },
+      {
+       "id": 172,
+       "type": "struct.set_field",
+       "x": 2800,
+       "y": 7080,
+       "params": {
+        "variable": "V",
+        "field": "Status",
+        "scope": "CastVote"
+       },
+       "values": {
+        "value": 2
+       }
+      },
+      {
+       "id": 173,
+       "type": "func.return",
+       "x": 3080,
+       "y": 7080,
+       "params": {
+        "function": "CastVote"
+       }
+      },
+      {
+       "id": 174,
+       "type": "var.get",
+       "x": 2960,
+       "y": 7230,
+       "params": {
+        "variable": "V",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 175,
+       "type": "var.set",
+       "x": 3360,
+       "y": 7080,
+       "params": {
+        "variable": "Yes",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 176,
+       "type": "struct.break",
+       "x": 3240,
+       "y": 7230,
+       "params": {
+        "struct": "Ballot"
+       }
+      },
+      {
+       "id": 177,
+       "type": "var.get",
+       "x": 3240,
+       "y": 7320,
+       "params": {
+        "variable": "V",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 178,
+       "type": "list.add",
+       "x": 3640,
+       "y": 7080,
+       "params": {
+        "variable": "Yes",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 179,
+       "type": "struct.set_field",
+       "x": 3920,
+       "y": 7080,
+       "params": {
+        "variable": "V",
+        "field": "Yes",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 180,
+       "type": "var.get",
+       "x": 3800,
+       "y": 7230,
+       "params": {
+        "variable": "Yes",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 181,
+       "type": "flow.branch",
+       "x": 4200,
+       "y": 7080
+      },
+      {
+       "id": 182,
+       "type": "math.compare",
+       "x": 4080,
+       "y": 7230,
+       "params": {
+        "op": "=="
+       }
+      },
+      {
+       "id": 183,
+       "type": "list.length",
+       "x": 4080,
+       "y": 7320,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 184,
+       "type": "var.get",
+       "x": 4080,
+       "y": 7410,
+       "params": {
+        "variable": "Yes",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 185,
+       "type": "list.length",
+       "x": 4080,
+       "y": 7500,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 186,
+       "type": "struct.break",
+       "x": 4080,
+       "y": 7590,
+       "params": {
+        "struct": "Ballot"
+       }
+      },
+      {
+       "id": 187,
+       "type": "var.get",
+       "x": 4080,
+       "y": 7680,
+       "params": {
+        "variable": "V",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 188,
+       "type": "struct.set_field",
+       "x": 4480,
+       "y": 7080,
+       "params": {
+        "variable": "V",
+        "field": "Status",
+        "scope": "CastVote"
+       },
+       "values": {
+        "value": 1
+       }
+      },
+      {
+       "id": 189,
+       "type": "func.return",
+       "x": 4760,
+       "y": 7080,
+       "params": {
+        "function": "CastVote"
+       }
+      },
+      {
+       "id": 190,
+       "type": "var.get",
+       "x": 4640,
+       "y": 7230,
+       "params": {
+        "variable": "V",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 191,
+       "type": "func.entry",
+       "x": 0,
+       "y": 8000,
+       "params": {
+        "function": "BearingArrow"
+       }
+      },
+      {
+       "id": 192,
+       "type": "func.return",
+       "x": 280,
+       "y": 8000,
+       "params": {
+        "function": "BearingArrow"
+       }
+      },
+      {
+       "id": 193,
+       "type": "list.get",
+       "x": 160,
+       "y": 8150,
+       "params": {
+        "type": "text"
+       }
+      },
+      {
+       "id": 194,
+       "type": "var.get",
+       "x": 160,
+       "y": 8240,
+       "params": {
+        "variable": "CompassArrows"
+       }
+      },
+      {
+       "id": 195,
+       "type": "math.round",
+       "x": 160,
+       "y": 8330
+      },
+      {
+       "id": 196,
+       "type": "math.formula",
+       "x": 160,
+       "y": 8420,
+       "params": {
+        "formula": "(round(atan2(sin(b), cos(b)) / 0.7853981633974483) + 8) % 8"
+       }
+      },
+      {
+       "id": 197,
+       "type": "func.entry",
+       "x": 0,
+       "y": 8560,
+       "params": {
+        "function": "LocateMapPeer"
+       }
+      },
+      {
+       "id": 198,
+       "type": "flow.branch",
+       "x": 280,
+       "y": 8560
+      },
+      {
+       "id": 199,
+       "type": "logic.or",
+       "x": 160,
+       "y": 8710
+      },
+      {
+       "id": 200,
+       "type": "math.compare",
+       "x": 160,
+       "y": 8800,
+       "params": {
+        "op": "<="
+       }
+      },
+      {
+       "id": 201,
+       "type": "math.mul",
+       "x": 160,
+       "y": 8890,
+       "values": {
+        "b": 2
+       }
+      },
+      {
+       "id": 202,
+       "type": "math.compare",
+       "x": 160,
+       "y": 8980,
+       "params": {
+        "op": "<="
+       }
+      },
+      {
+       "id": 203,
+       "type": "math.add",
+       "x": 160,
+       "y": 9070
+      },
+      {
+       "id": 204,
+       "type": "func.return",
+       "x": 560,
+       "y": 8560,
+       "params": {
+        "function": "LocateMapPeer"
+       },
+       "values": {
+        "valid": false,
+        "x": 0,
+        "y": 0,
+        "offmap": false,
+        "rotationDeg": 0,
+        "arrow": ""
+       }
+      },
+      {
+       "id": 205,
+       "type": "flow.branch",
+       "x": 840,
+       "y": 8560
+      },
+      {
+       "id": 206,
+       "type": "logic.and",
+       "x": 720,
+       "y": 8710
+      },
+      {
+       "id": 207,
+       "type": "logic.and",
+       "x": 720,
+       "y": 8800
+      },
+      {
+       "id": 208,
+       "type": "math.compare",
+       "x": 720,
+       "y": 8890,
+       "params": {
+        "op": ">="
+       }
+      },
+      {
+       "id": 209,
+       "type": "math.compare",
+       "x": 720,
+       "y": 8980,
+       "params": {
+        "op": "<="
+       }
+      },
+      {
+       "id": 210,
+       "type": "math.sub",
+       "x": 720,
+       "y": 9070
+      },
+      {
+       "id": 211,
+       "type": "logic.and",
+       "x": 720,
+       "y": 9160
+      },
+      {
+       "id": 212,
+       "type": "math.compare",
+       "x": 720,
+       "y": 9250,
+       "params": {
+        "op": ">="
+       }
+      },
+      {
+       "id": 213,
+       "type": "math.compare",
+       "x": 720,
+       "y": 9340,
+       "params": {
+        "op": "<="
+       }
+      },
+      {
+       "id": 214,
+       "type": "math.sub",
+       "x": 720,
+       "y": 9430
+      },
+      {
+       "id": 215,
+       "type": "func.return",
+       "x": 1120,
+       "y": 8560,
+       "params": {
+        "function": "LocateMapPeer"
+       },
+       "values": {
+        "valid": true,
+        "offmap": false,
+        "rotationDeg": 0,
+        "arrow": ""
+       }
+      },
+      {
+       "id": 216,
+       "type": "var.set",
+       "x": 1400,
+       "y": 8560,
+       "params": {
+        "variable": "Cx",
+        "scope": "LocateMapPeer"
+       }
+      },
+      {
+       "id": 217,
+       "type": "math.div",
+       "x": 1280,
+       "y": 8710,
+       "values": {
+        "b": 2
+       }
+      },
+      {
+       "id": 218,
+       "type": "var.set",
+       "x": 1680,
+       "y": 8560,
+       "params": {
+        "variable": "Cy",
+        "scope": "LocateMapPeer"
+       }
+      },
+      {
+       "id": 219,
+       "type": "math.formula",
+       "x": 1560,
+       "y": 8710,
+       "params": {
+        "formula": "(top + h - bottom) / 2"
+       }
+      },
+      {
+       "id": 220,
+       "type": "var.set",
+       "x": 1960,
+       "y": 8560,
+       "params": {
+        "variable": "T",
+        "scope": "LocateMapPeer"
+       }
+      },
+      {
+       "id": 221,
+       "type": "math.formula",
+       "x": 1840,
+       "y": 8710,
+       "params": {
+        "formula": "max(0, min(x - cx > 0 ? (w - ix - cx) / (x - cx) : x - cx < 0 ? (ix - cx) / (x - cx) : 1e+30, y - cy > 0 ? (h - ib - cy) / (y - cy) : y - cy < 0 ? (it - cy) / (y - cy) : 1e+30))"
+       }
+      },
+      {
+       "id": 222,
+       "type": "var.get",
+       "x": 1840,
+       "y": 8800,
+       "params": {
+        "variable": "Cx",
+        "scope": "LocateMapPeer"
+       }
+      },
+      {
+       "id": 223,
+       "type": "var.get",
+       "x": 1840,
+       "y": 8890,
+       "params": {
+        "variable": "Cy",
+        "scope": "LocateMapPeer"
+       }
+      },
+      {
+       "id": 224,
+       "type": "var.set",
+       "x": 2240,
+       "y": 8560,
+       "params": {
+        "variable": "Angle",
+        "scope": "LocateMapPeer"
+       }
+      },
+      {
+       "id": 225,
+       "type": "math.atan2",
+       "x": 2120,
+       "y": 8710
+      },
+      {
+       "id": 226,
+       "type": "math.sub",
+       "x": 2120,
+       "y": 8800
+      },
+      {
+       "id": 227,
+       "type": "var.get",
+       "x": 2120,
+       "y": 8890,
+       "params": {
+        "variable": "Cy",
+        "scope": "LocateMapPeer"
+       }
+      },
+      {
+       "id": 228,
+       "type": "math.sub",
+       "x": 2120,
+       "y": 8980
+      },
+      {
+       "id": 229,
+       "type": "var.get",
+       "x": 2120,
+       "y": 9070,
+       "params": {
+        "variable": "Cx",
+        "scope": "LocateMapPeer"
+       }
+      },
+      {
+       "id": 230,
+       "type": "func.return",
+       "x": 2520,
+       "y": 8560,
+       "params": {
+        "function": "LocateMapPeer"
+       },
+       "values": {
+        "valid": true,
+        "offmap": true
+       }
+      },
+      {
+       "id": 231,
+       "type": "math.clamp",
+       "x": 2400,
+       "y": 8710
+      },
+      {
+       "id": 232,
+       "type": "math.add",
+       "x": 2400,
+       "y": 8800
+      },
+      {
+       "id": 233,
+       "type": "var.get",
+       "x": 2400,
+       "y": 8890,
+       "params": {
+        "variable": "Cx",
+        "scope": "LocateMapPeer"
+       }
+      },
+      {
+       "id": 234,
+       "type": "math.mul",
+       "x": 2400,
+       "y": 8980
+      },
+      {
+       "id": 235,
+       "type": "math.sub",
+       "x": 2400,
+       "y": 9070
+      },
+      {
+       "id": 236,
+       "type": "var.get",
+       "x": 2400,
+       "y": 9160,
+       "params": {
+        "variable": "Cx",
+        "scope": "LocateMapPeer"
+       }
+      },
+      {
+       "id": 237,
+       "type": "var.get",
+       "x": 2400,
+       "y": 9250,
+       "params": {
+        "variable": "T",
+        "scope": "LocateMapPeer"
+       }
+      },
+      {
+       "id": 238,
+       "type": "math.sub",
+       "x": 2400,
+       "y": 9340
+      },
+      {
+       "id": 239,
+       "type": "math.clamp",
+       "x": 2400,
+       "y": 9430
+      },
+      {
+       "id": 240,
+       "type": "math.add",
+       "x": 2400,
+       "y": 9520
+      },
+      {
+       "id": 241,
+       "type": "var.get",
+       "x": 2400,
+       "y": 9610,
+       "params": {
+        "variable": "Cy",
+        "scope": "LocateMapPeer"
+       }
+      },
+      {
+       "id": 242,
+       "type": "math.mul",
+       "x": 2400,
+       "y": 9700
+      },
+      {
+       "id": 243,
+       "type": "math.sub",
+       "x": 2400,
+       "y": 9790
+      },
+      {
+       "id": 244,
+       "type": "var.get",
+       "x": 2400,
+       "y": 9880,
+       "params": {
+        "variable": "Cy",
+        "scope": "LocateMapPeer"
+       }
+      },
+      {
+       "id": 245,
+       "type": "var.get",
+       "x": 2400,
+       "y": 9970,
+       "params": {
+        "variable": "T",
+        "scope": "LocateMapPeer"
+       }
+      },
+      {
+       "id": 246,
+       "type": "math.sub",
+       "x": 2400,
+       "y": 10060
+      },
+      {
+       "id": 247,
+       "type": "math.formula",
+       "x": 2400,
+       "y": 10150,
+       "params": {
+        "formula": "a * 57.29577951308232 + 90"
+       }
+      },
+      {
+       "id": 248,
+       "type": "var.get",
+       "x": 2400,
+       "y": 10240,
+       "params": {
+        "variable": "Angle",
+        "scope": "LocateMapPeer"
+       }
+      },
+      {
+       "id": 249,
+       "type": "list.get",
+       "x": 2400,
+       "y": 10330,
+       "params": {
+        "type": "text"
+       }
+      },
+      {
+       "id": 250,
+       "type": "var.get",
+       "x": 2400,
+       "y": 10420,
+       "params": {
+        "variable": "ScreenArrows"
+       }
+      },
+      {
+       "id": 251,
+       "type": "math.round",
+       "x": 2400,
+       "y": 10510
+      },
+      {
+       "id": 252,
+       "type": "math.formula",
+       "x": 2400,
+       "y": 10600,
+       "params": {
+        "formula": "(round(a / 0.7853981633974483) + 8) % 8"
+       }
+      },
+      {
+       "id": 253,
+       "type": "var.get",
+       "x": 2400,
+       "y": 10690,
+       "params": {
+        "variable": "Angle",
+        "scope": "LocateMapPeer"
+       }
+      },
+      {
+       "id": 254,
+       "type": "func.entry",
+       "x": 0,
+       "y": 10830,
+       "params": {
+        "function": "SafeMobileMarkerPoint"
+       }
+      },
+      {
+       "id": 255,
+       "type": "flow.branch",
+       "x": 280,
+       "y": 10830
+      },
+      {
+       "id": 256,
+       "type": "logic.or",
+       "x": 160,
+       "y": 10980
+      },
+      {
+       "id": 257,
+       "type": "logic.not",
+       "x": 160,
+       "y": 11070
+      },
+      {
+       "id": 258,
+       "type": "logic.or",
+       "x": 160,
+       "y": 11160
+      },
+      {
+       "id": 259,
+       "type": "math.compare",
+       "x": 160,
+       "y": 11250,
+       "params": {
+        "op": "<="
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 260,
+       "type": "math.compare",
+       "x": 160,
+       "y": 11340,
+       "params": {
+        "op": "<="
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 261,
+       "type": "func.return",
+       "x": 560,
+       "y": 10830,
+       "params": {
+        "function": "SafeMobileMarkerPoint"
+       }
+      },
+      {
+       "id": 262,
+       "type": "var.set",
+       "x": 840,
+       "y": 10830,
+       "params": {
+        "variable": "Px",
+        "scope": "SafeMobileMarkerPoint"
+       }
+      },
+      {
+       "id": 263,
+       "type": "math.formula",
+       "x": 720,
+       "y": 10980,
+       "params": {
+        "formula": "clamp(x, 38, w - 38)"
+       }
+      },
+      {
+       "id": 264,
+       "type": "var.set",
+       "x": 1120,
+       "y": 10830,
+       "params": {
+        "variable": "Py",
+        "scope": "SafeMobileMarkerPoint"
+       }
+      },
+      {
+       "id": 265,
+       "type": "math.formula",
+       "x": 1000,
+       "y": 10980,
+       "params": {
+        "formula": "clamp(y, min(115, h * 0.34), max(min(115, h * 0.34), h - clamp(h * 0.27, 88, 116)))"
+       }
+      },
+      {
+       "id": 266,
+       "type": "flow.branch",
+       "x": 1400,
+       "y": 10830
+      },
+      {
+       "id": 267,
+       "type": "logic.and",
+       "x": 1280,
+       "y": 10980
+      },
+      {
+       "id": 268,
+       "type": "logic.and",
+       "x": 1280,
+       "y": 11070
+      },
+      {
+       "id": 269,
+       "type": "math.compare",
+       "x": 1280,
+       "y": 11160,
+       "params": {
+        "op": "<"
+       },
+       "values": {
+        "b": 192
+       }
+      },
+      {
+       "id": 270,
+       "type": "var.get",
+       "x": 1280,
+       "y": 11250,
+       "params": {
+        "variable": "Px",
+        "scope": "SafeMobileMarkerPoint"
+       }
+      },
+      {
+       "id": 271,
+       "type": "math.compare",
+       "x": 1280,
+       "y": 11340,
+       "params": {
+        "op": "<"
+       },
+       "values": {
+        "b": 160
+       }
+      },
+      {
+       "id": 272,
+       "type": "var.get",
+       "x": 1280,
+       "y": 11430,
+       "params": {
+        "variable": "Py",
+        "scope": "SafeMobileMarkerPoint"
+       }
+      },
+      {
+       "id": 273,
+       "type": "math.compare",
+       "x": 1280,
+       "y": 11520,
+       "params": {
+        "op": ">="
+       },
+       "values": {
+        "b": 520
+       }
+      },
+      {
+       "id": 274,
+       "type": "var.set",
+       "x": 1680,
+       "y": 10830,
+       "params": {
+        "variable": "Px",
+        "scope": "SafeMobileMarkerPoint"
+       },
+       "values": {
+        "value": 192
+       }
+      },
+      {
+       "id": 275,
+       "type": "flow.branch",
+       "x": 1960,
+       "y": 10830
+      },
+      {
+       "id": 276,
+       "type": "logic.and",
+       "x": 1840,
+       "y": 10980
+      },
+      {
+       "id": 277,
+       "type": "logic.and",
+       "x": 1840,
+       "y": 11070
+      },
+      {
+       "id": 278,
+       "type": "math.compare",
+       "x": 1840,
+       "y": 11160,
+       "params": {
+        "op": ">"
+       }
+      },
+      {
+       "id": 279,
+       "type": "var.get",
+       "x": 1840,
+       "y": 11250,
+       "params": {
+        "variable": "Px",
+        "scope": "SafeMobileMarkerPoint"
+       }
+      },
+      {
+       "id": 280,
+       "type": "math.sub",
+       "x": 1840,
+       "y": 11340,
+       "values": {
+        "b": 152
+       }
+      },
+      {
+       "id": 281,
+       "type": "math.compare",
+       "x": 1840,
+       "y": 11430,
+       "params": {
+        "op": "<"
+       },
+       "values": {
+        "b": 100
+       }
+      },
+      {
+       "id": 282,
+       "type": "var.get",
+       "x": 1840,
+       "y": 11520,
+       "params": {
+        "variable": "Py",
+        "scope": "SafeMobileMarkerPoint"
+       }
+      },
+      {
+       "id": 283,
+       "type": "math.compare",
+       "x": 1840,
+       "y": 11610,
+       "params": {
+        "op": ">="
+       },
+       "values": {
+        "b": 520
+       }
+      },
+      {
+       "id": 284,
+       "type": "var.set",
+       "x": 2240,
+       "y": 10830,
+       "params": {
+        "variable": "Py",
+        "scope": "SafeMobileMarkerPoint"
+       },
+       "values": {
+        "value": 100
+       }
+      },
+      {
+       "id": 285,
+       "type": "func.return",
+       "x": 2520,
+       "y": 10830,
+       "params": {
+        "function": "SafeMobileMarkerPoint"
+       }
+      },
+      {
+       "id": 286,
+       "type": "var.get",
+       "x": 2400,
+       "y": 10980,
+       "params": {
+        "variable": "Px",
+        "scope": "SafeMobileMarkerPoint"
+       }
+      },
+      {
+       "id": 287,
+       "type": "var.get",
+       "x": 2400,
+       "y": 11070,
+       "params": {
+        "variable": "Py",
+        "scope": "SafeMobileMarkerPoint"
+       }
+      },
+      {
+       "id": 288,
+       "type": "func.entry",
+       "x": 0,
+       "y": 11750,
+       "params": {
+        "function": "PingFade"
+       }
+      },
+      {
+       "id": 289,
+       "type": "func.return",
+       "x": 280,
+       "y": 11750,
+       "params": {
+        "function": "PingFade"
+       }
+      },
+      {
+       "id": 290,
+       "type": "math.formula",
+       "x": 160,
+       "y": 11900,
+       "params": {
+        "formula": "clamp((life - age) / fade, 0, 1)"
+       }
+      },
+      {
+       "id": 291,
+       "type": "var.get",
+       "x": 160,
+       "y": 11990,
+       "params": {
+        "variable": "PingLifeMs"
+       }
+      },
+      {
+       "id": 292,
+       "type": "var.get",
+       "x": 160,
+       "y": 12080,
+       "params": {
+        "variable": "PingFadeMs"
+       }
+      },
+      {
+       "id": 293,
+       "type": "func.entry",
+       "x": 0,
+       "y": 12220,
+       "params": {
+        "function": "PingToggles"
+       }
+      },
+      {
+       "id": 294,
+       "type": "func.return",
+       "x": 280,
+       "y": 12220,
+       "params": {
+        "function": "PingToggles"
+       }
+      },
+      {
+       "id": 295,
+       "type": "math.compare",
+       "x": 160,
+       "y": 12370,
+       "params": {
+        "op": "<"
+       }
+      },
+      {
+       "id": 296,
+       "type": "var.get",
+       "x": 160,
+       "y": 12460,
+       "params": {
+        "variable": "PingRemoveM"
+       }
+      },
+      {
+       "id": 297,
+       "type": "func.entry",
+       "x": 0,
+       "y": 12600,
+       "params": {
+        "function": "PingExpired"
+       }
+      },
+      {
+       "id": 298,
+       "type": "func.return",
+       "x": 280,
+       "y": 12600,
+       "params": {
+        "function": "PingExpired"
+       }
+      },
+      {
+       "id": 299,
+       "type": "math.compare",
+       "x": 160,
+       "y": 12750,
+       "params": {
+        "op": ">"
+       }
+      },
+      {
+       "id": 300,
+       "type": "var.get",
+       "x": 160,
+       "y": 12840,
+       "params": {
+        "variable": "PingLifeMs"
+       }
+      }
+     ],
+     "links": [
+      [
+       10,
+       "body",
+       22,
+       "exec"
+      ],
+      [
+       10,
+       "completed",
+       46,
+       "exec"
+      ],
+      [
+       10,
+       "item",
+       24,
+       "a"
+      ],
+      [
+       11,
+       "body",
+       29,
+       "exec"
+      ],
+      [
+       11,
+       "completed",
+       40,
+       "exec"
+      ],
+      [
+       20,
+       "body",
+       113,
+       "exec"
+      ],
+      [
+       20,
+       "completed",
+       117,
+       "exec"
+      ],
+      [
+       20,
+       "item",
+       115,
+       "item"
+      ],
+      [
+       21,
+       "numbers",
+       10,
+       "list"
+      ],
+      [
+       21,
+       "then",
+       10,
+       "exec"
+      ],
+      [
+       22,
+       "then",
+       11,
+       "exec"
+      ],
+      [
+       23,
+       "result",
+       22,
+       "value"
+      ],
+      [
+       24,
+       "result",
+       23,
+       "a"
+      ],
+      [
+       25,
+       "length",
+       24,
+       "b"
+      ],
+      [
+       26,
+       "value",
+       25,
+       "list"
+      ],
+      [
+       27,
+       "length",
+       11,
+       "last"
+      ],
+      [
+       28,
+       "value",
+       27,
+       "list"
+      ],
+      [
+       29,
+       "true",
+       33,
+       "exec"
+      ],
+      [
+       30,
+       "result",
+       29,
+       "condition"
+      ],
+      [
+       31,
+       "value",
+       30,
+       "list"
+      ],
+      [
+       32,
+       "value",
+       30,
+       "item"
+      ],
+      [
+       34,
+       "result",
+       33,
+       "value"
+      ],
+      [
+       35,
+       "result",
+       34,
+       "a"
+      ],
+      [
+       36,
+       "result",
+       35,
+       "a"
+      ],
+      [
+       37,
+       "value",
+       36,
+       "a"
+      ],
+      [
+       38,
+       "length",
+       35,
+       "b"
+      ],
+      [
+       39,
+       "value",
+       38,
+       "list"
+      ],
+      [
+       40,
+       "then",
+       42,
+       "exec"
+      ],
+      [
+       41,
+       "value",
+       40,
+       "item"
+      ],
+      [
+       43,
+       "item",
+       42,
+       "item"
+      ],
+      [
+       44,
+       "value",
+       43,
+       "list"
+      ],
+      [
+       45,
+       "value",
+       43,
+       "index"
+      ],
+      [
+       47,
+       "value",
+       46,
+       "colors"
+      ],
+      [
+       48,
+       "then",
+       49,
+       "exec"
+      ],
+      [
+       48,
+       "weapon",
+       53,
+       "value"
+      ],
+      [
+       50,
+       "Label",
+       49,
+       "label"
+      ],
+      [
+       51,
+       "item",
+       50,
+       "value"
+      ],
+      [
+       52,
+       "value",
+       51,
+       "list"
+      ],
+      [
+       53,
+       "index",
+       51,
+       "index"
+      ],
+      [
+       54,
+       "then",
+       55,
+       "exec"
+      ],
+      [
+       54,
+       "zone",
+       58,
+       "value"
+      ],
+      [
+       56,
+       "item",
+       55,
+       "name"
+      ],
+      [
+       57,
+       "value",
+       56,
+       "list"
+      ],
+      [
+       58,
+       "index",
+       56,
+       "index"
+      ],
+      [
+       59,
+       "then",
+       60,
+       "exec"
+      ],
+      [
+       59,
+       "weapon",
+       65,
+       "value"
+      ],
+      [
+       59,
+       "zone",
+       68,
+       "value"
+      ],
+      [
+       61,
+       "result",
+       60,
+       "damage"
+      ],
+      [
+       62,
+       "Damage",
+       61,
+       "base"
+      ],
+      [
+       63,
+       "item",
+       62,
+       "value"
+      ],
+      [
+       64,
+       "value",
+       63,
+       "list"
+      ],
+      [
+       65,
+       "index",
+       63,
+       "index"
+      ],
+      [
+       66,
+       "item",
+       61,
+       "k"
+      ],
+      [
+       67,
+       "value",
+       66,
+       "list"
+      ],
+      [
+       68,
+       "index",
+       66,
+       "index"
+      ],
+      [
+       69,
+       "damage",
+       71,
+       "d"
+      ],
+      [
+       69,
+       "then",
+       70,
+       "exec"
+      ],
+      [
+       71,
+       "result",
+       70,
+       "damage"
+      ],
+      [
+       72,
+       "friendlyFire",
+       79,
+       "b"
+      ],
+      [
+       72,
+       "nowMs",
+       82,
+       "a"
+      ],
+      [
+       72,
+       "protectedUntilMs",
+       82,
+       "b"
+      ],
+      [
+       72,
+       "selfDamage",
+       79,
+       "a"
+      ],
+      [
+       72,
+       "shooterKnown",
+       75,
+       "b"
+      ],
+      [
+       72,
+       "targetHp",
+       85,
+       "a"
+      ],
+      [
+       72,
+       "targetKnown",
+       75,
+       "a"
+      ],
+      [
+       72,
+       "then",
+       73,
+       "exec"
+      ],
+      [
+       73,
+       "false",
+       77,
+       "exec"
+      ],
+      [
+       73,
+       "true",
+       76,
+       "exec"
+      ],
+      [
+       74,
+       "result",
+       73,
+       "condition"
+      ],
+      [
+       75,
+       "result",
+       74,
+       "a"
+      ],
+      [
+       77,
+       "false",
+       81,
+       "exec"
+      ],
+      [
+       77,
+       "true",
+       80,
+       "exec"
+      ],
+      [
+       78,
+       "result",
+       77,
+       "condition"
+      ],
+      [
+       79,
+       "result",
+       78,
+       "a"
+      ],
+      [
+       81,
+       "false",
+       84,
+       "exec"
+      ],
+      [
+       81,
+       "true",
+       83,
+       "exec"
+      ],
+      [
+       82,
+       "result",
+       81,
+       "condition"
+      ],
+      [
+       84,
+       "false",
+       87,
+       "exec"
+      ],
+      [
+       84,
+       "true",
+       86,
+       "exec"
+      ],
+      [
+       85,
+       "result",
+       84,
+       "condition"
+      ],
+      [
+       88,
+       "dt",
+       90,
+       "dt"
+      ],
+      [
+       88,
+       "hp",
+       90,
+       "hp"
+      ],
+      [
+       88,
+       "lastHurtMs",
+       90,
+       "hurt"
+      ],
+      [
+       88,
+       "nowMs",
+       90,
+       "now"
+      ],
+      [
+       88,
+       "then",
+       89,
+       "exec"
+      ],
+      [
+       90,
+       "result",
+       89,
+       "hp"
+      ],
+      [
+       91,
+       "value",
+       90,
+       "delay"
+      ],
+      [
+       92,
+       "value",
+       90,
+       "rate"
+      ],
+      [
+       93,
+       "r1",
+       95,
+       "r1"
+      ],
+      [
+       93,
+       "r1",
+       98,
+       "r1"
+      ],
+      [
+       93,
+       "r2",
+       95,
+       "r2"
+      ],
+      [
+       93,
+       "r2",
+       98,
+       "r2"
+      ],
+      [
+       93,
+       "then",
+       94,
+       "exec"
+      ],
+      [
+       95,
+       "result",
+       94,
+       "x"
+      ],
+      [
+       96,
+       "value",
+       95,
+       "lo"
+      ],
+      [
+       97,
+       "value",
+       95,
+       "hi"
+      ],
+      [
+       98,
+       "result",
+       94,
+       "y"
+      ],
+      [
+       99,
+       "value",
+       98,
+       "lo"
+      ],
+      [
+       100,
+       "value",
+       98,
+       "hi"
+      ],
+      [
+       101,
+       "slot",
+       103,
+       "slot"
+      ],
+      [
+       101,
+       "slot",
+       104,
+       "slot"
+      ],
+      [
+       101,
+       "then",
+       102,
+       "exec"
+      ],
+      [
+       103,
+       "result",
+       102,
+       "x"
+      ],
+      [
+       104,
+       "result",
+       102,
+       "y"
+      ],
+      [
+       105,
+       "distance",
+       107,
+       "d"
+      ],
+      [
+       105,
+       "everywhere",
+       108,
+       "pick"
+      ],
+      [
+       105,
+       "then",
+       106,
+       "exec"
+      ],
+      [
+       107,
+       "result",
+       106,
+       "gain"
+      ],
+      [
+       108,
+       "result",
+       107,
+       "least"
+      ],
+      [
+       109,
+       "value",
+       108,
+       "a"
+      ],
+      [
+       110,
+       "value",
+       107,
+       "radius"
+      ],
+      [
+       111,
+       "value",
+       107,
+       "full"
+      ],
+      [
+       112,
+       "a",
+       20,
+       "list"
+      ],
+      [
+       112,
+       "a",
+       121,
+       "list"
+      ],
+      [
+       112,
+       "b",
+       115,
+       "list"
+      ],
+      [
+       112,
+       "b",
+       122,
+       "list"
+      ],
+      [
+       112,
+       "then",
+       20,
+       "exec"
+      ],
+      [
+       113,
+       "true",
+       116,
+       "exec"
+      ],
+      [
+       114,
+       "result",
+       113,
+       "condition"
+      ],
+      [
+       115,
+       "result",
+       114,
+       "a"
+      ],
+      [
+       118,
+       "result",
+       117,
+       "same"
+      ],
+      [
+       119,
+       "value",
+       118,
+       "a"
+      ],
+      [
+       120,
+       "result",
+       118,
+       "b"
+      ],
+      [
+       121,
+       "length",
+       120,
+       "a"
+      ],
+      [
+       122,
+       "length",
+       120,
+       "b"
+      ],
+      [
+       123,
+       "host",
+       129,
+       "item"
+      ],
+      [
+       123,
+       "host",
+       134,
+       "Host"
+      ],
+      [
+       123,
+       "host",
+       135,
+       "item0"
+      ],
+      [
+       123,
+       "id",
+       127,
+       "a"
+      ],
+      [
+       123,
+       "id",
+       134,
+       "Id"
+      ],
+      [
+       123,
+       "key",
+       134,
+       "Key"
+      ],
+      [
+       123,
+       "members",
+       129,
+       "list"
+      ],
+      [
+       123,
+       "members",
+       131,
+       "list"
+      ],
+      [
+       123,
+       "members",
+       134,
+       "Members"
+      ],
+      [
+       123,
+       "nowMs",
+       136,
+       "a"
+      ],
+      [
+       123,
+       "then",
+       124,
+       "exec"
+      ],
+      [
+       123,
+       "value",
+       134,
+       "Value"
+      ],
+      [
+       124,
+       "false",
+       133,
+       "exec"
+      ],
+      [
+       124,
+       "true",
+       132,
+       "exec"
+      ],
+      [
+       125,
+       "result",
+       124,
+       "condition"
+      ],
+      [
+       126,
+       "result",
+       125,
+       "a"
+      ],
+      [
+       127,
+       "result",
+       126,
+       "a"
+      ],
+      [
+       128,
+       "result",
+       126,
+       "b"
+      ],
+      [
+       129,
+       "result",
+       128,
+       "a"
+      ],
+      [
+       130,
+       "result",
+       125,
+       "b"
+      ],
+      [
+       131,
+       "length",
+       130,
+       "a"
+      ],
+      [
+       134,
+       "value",
+       133,
+       "ballot"
+      ],
+      [
+       135,
+       "list",
+       134,
+       "Yes"
+      ],
+      [
+       136,
+       "result",
+       134,
+       "ExpiresMs"
+      ],
+      [
+       137,
+       "value",
+       136,
+       "b"
+      ],
+      [
+       138,
+       "approve",
+       171,
+       "a"
+      ],
+      [
+       138,
+       "ballot",
+       139,
+       "value"
+      ],
+      [
+       138,
+       "current",
+       153,
+       "a"
+      ],
+      [
+       138,
+       "nowMs",
+       149,
+       "a"
+      ],
+      [
+       138,
+       "then",
+       139,
+       "exec"
+      ],
+      [
+       138,
+       "voter",
+       162,
+       "item"
+      ],
+      [
+       138,
+       "voter",
+       165,
+       "item"
+      ],
+      [
+       138,
+       "voter",
+       178,
+       "item"
+      ],
+      [
+       139,
+       "then",
+       140,
+       "exec"
+      ],
+      [
+       140,
+       "false",
+       147,
+       "exec"
+      ],
+      [
+       140,
+       "true",
+       145,
+       "exec"
+      ],
+      [
+       141,
+       "result",
+       140,
+       "condition"
+      ],
+      [
+       142,
+       "result",
+       141,
+       "a"
+      ],
+      [
+       143,
+       "Status",
+       142,
+       "a"
+      ],
+      [
+       144,
+       "value",
+       143,
+       "value"
+      ],
+      [
+       146,
+       "value",
+       145,
+       "ballot"
+      ],
+      [
+       147,
+       "false",
+       159,
+       "exec"
+      ],
+      [
+       147,
+       "true",
+       156,
+       "exec"
+      ],
+      [
+       148,
+       "result",
+       147,
+       "condition"
+      ],
+      [
+       149,
+       "result",
+       148,
+       "a"
+      ],
+      [
+       150,
+       "ExpiresMs",
+       149,
+       "b"
+      ],
+      [
+       151,
+       "value",
+       150,
+       "value"
+      ],
+      [
+       152,
+       "result",
+       148,
+       "b"
+      ],
+      [
+       153,
+       "same",
+       152,
+       "a"
+      ],
+      [
+       154,
+       "Members",
+       153,
+       "b"
+      ],
+      [
+       155,
+       "value",
+       154,
+       "value"
+      ],
+      [
+       156,
+       "then",
+       157,
+       "exec"
+      ],
+      [
+       158,
+       "value",
+       157,
+       "ballot"
+      ],
+      [
+       159,
+       "false",
+       170,
+       "exec"
+      ],
+      [
+       159,
+       "true",
+       168,
+       "exec"
+      ],
+      [
+       160,
+       "result",
+       159,
+       "condition"
+      ],
+      [
+       161,
+       "result",
+       160,
+       "a"
+      ],
+      [
+       162,
+       "result",
+       161,
+       "a"
+      ],
+      [
+       163,
+       "Members",
+       162,
+       "list"
+      ],
+      [
+       164,
+       "value",
+       163,
+       "value"
+      ],
+      [
+       165,
+       "result",
+       160,
+       "b"
+      ],
+      [
+       166,
+       "Yes",
+       165,
+       "list"
+      ],
+      [
+       167,
+       "value",
+       166,
+       "value"
+      ],
+      [
+       169,
+       "value",
+       168,
+       "ballot"
+      ],
+      [
+       170,
+       "false",
+       175,
+       "exec"
+      ],
+      [
+       170,
+       "true",
+       172,
+       "exec"
+      ],
+      [
+       171,
+       "result",
+       170,
+       "condition"
+      ],
+      [
+       172,
+       "then",
+       173,
+       "exec"
+      ],
+      [
+       174,
+       "value",
+       173,
+       "ballot"
+      ],
+      [
+       175,
+       "then",
+       178,
+       "exec"
+      ],
+      [
+       176,
+       "Yes",
+       175,
+       "value"
+      ],
+      [
+       177,
+       "value",
+       176,
+       "value"
+      ],
+      [
+       178,
+       "then",
+       179,
+       "exec"
+      ],
+      [
+       179,
+       "then",
+       181,
+       "exec"
+      ],
+      [
+       180,
+       "value",
+       179,
+       "value"
+      ],
+      [
+       181,
+       "false",
+       189,
+       "exec"
+      ],
+      [
+       181,
+       "true",
+       188,
+       "exec"
+      ],
+      [
+       182,
+       "result",
+       181,
+       "condition"
+      ],
+      [
+       183,
+       "length",
+       182,
+       "a"
+      ],
+      [
+       184,
+       "value",
+       183,
+       "list"
+      ],
+      [
+       185,
+       "length",
+       182,
+       "b"
+      ],
+      [
+       186,
+       "Members",
+       185,
+       "list"
+      ],
+      [
+       187,
+       "value",
+       186,
+       "value"
+      ],
+      [
+       188,
+       "then",
+       189,
+       "exec"
+      ],
+      [
+       190,
+       "value",
+       189,
+       "ballot"
+      ],
+      [
+       191,
+       "bearing",
+       196,
+       "b"
+      ],
+      [
+       191,
+       "then",
+       192,
+       "exec"
+      ],
+      [
+       193,
+       "item",
+       192,
+       "arrow"
+      ],
+      [
+       194,
+       "value",
+       193,
+       "list"
+      ],
+      [
+       195,
+       "result",
+       193,
+       "index"
+      ],
+      [
+       196,
+       "result",
+       195,
+       "a"
+      ],
+      [
+       197,
+       "height",
+       202,
+       "a"
+      ],
+      [
+       197,
+       "height",
+       214,
+       "a"
+      ],
+      [
+       197,
+       "height",
+       219,
+       "h"
+      ],
+      [
+       197,
+       "height",
+       221,
+       "h"
+      ],
+      [
+       197,
+       "height",
+       246,
+       "a"
+      ],
+      [
+       197,
+       "insetBottom",
+       203,
+       "b"
+      ],
+      [
+       197,
+       "insetBottom",
+       214,
+       "b"
+      ],
+      [
+       197,
+       "insetBottom",
+       219,
+       "bottom"
+      ],
+      [
+       197,
+       "insetBottom",
+       221,
+       "ib"
+      ],
+      [
+       197,
+       "insetBottom",
+       246,
+       "b"
+      ],
+      [
+       197,
+       "insetTop",
+       203,
+       "a"
+      ],
+      [
+       197,
+       "insetTop",
+       212,
+       "b"
+      ],
+      [
+       197,
+       "insetTop",
+       219,
+       "top"
+      ],
+      [
+       197,
+       "insetTop",
+       221,
+       "it"
+      ],
+      [
+       197,
+       "insetTop",
+       239,
+       "min"
+      ],
+      [
+       197,
+       "insetX",
+       201,
+       "a"
+      ],
+      [
+       197,
+       "insetX",
+       208,
+       "b"
+      ],
+      [
+       197,
+       "insetX",
+       210,
+       "b"
+      ],
+      [
+       197,
+       "insetX",
+       221,
+       "ix"
+      ],
+      [
+       197,
+       "insetX",
+       231,
+       "min"
+      ],
+      [
+       197,
+       "insetX",
+       238,
+       "b"
+      ],
+      [
+       197,
+       "then",
+       198,
+       "exec"
+      ],
+      [
+       197,
+       "width",
+       200,
+       "a"
+      ],
+      [
+       197,
+       "width",
+       210,
+       "a"
+      ],
+      [
+       197,
+       "width",
+       217,
+       "a"
+      ],
+      [
+       197,
+       "width",
+       221,
+       "w"
+      ],
+      [
+       197,
+       "width",
+       238,
+       "a"
+      ],
+      [
+       197,
+       "x",
+       208,
+       "a"
+      ],
+      [
+       197,
+       "x",
+       209,
+       "a"
+      ],
+      [
+       197,
+       "x",
+       215,
+       "x"
+      ],
+      [
+       197,
+       "x",
+       221,
+       "x"
+      ],
+      [
+       197,
+       "x",
+       228,
+       "a"
+      ],
+      [
+       197,
+       "x",
+       235,
+       "a"
+      ],
+      [
+       197,
+       "y",
+       212,
+       "a"
+      ],
+      [
+       197,
+       "y",
+       213,
+       "a"
+      ],
+      [
+       197,
+       "y",
+       215,
+       "y"
+      ],
+      [
+       197,
+       "y",
+       221,
+       "y"
+      ],
+      [
+       197,
+       "y",
+       226,
+       "a"
+      ],
+      [
+       197,
+       "y",
+       243,
+       "a"
+      ],
+      [
+       198,
+       "false",
+       205,
+       "exec"
+      ],
+      [
+       198,
+       "true",
+       204,
+       "exec"
+      ],
+      [
+       199,
+       "result",
+       198,
+       "condition"
+      ],
+      [
+       200,
+       "result",
+       199,
+       "a"
+      ],
+      [
+       201,
+       "result",
+       200,
+       "b"
+      ],
+      [
+       202,
+       "result",
+       199,
+       "b"
+      ],
+      [
+       203,
+       "result",
+       202,
+       "b"
+      ],
+      [
+       205,
+       "false",
+       216,
+       "exec"
+      ],
+      [
+       205,
+       "true",
+       215,
+       "exec"
+      ],
+      [
+       206,
+       "result",
+       205,
+       "condition"
+      ],
+      [
+       207,
+       "result",
+       206,
+       "a"
+      ],
+      [
+       208,
+       "result",
+       207,
+       "a"
+      ],
+      [
+       209,
+       "result",
+       207,
+       "b"
+      ],
+      [
+       210,
+       "result",
+       209,
+       "b"
+      ],
+      [
+       211,
+       "result",
+       206,
+       "b"
+      ],
+      [
+       212,
+       "result",
+       211,
+       "a"
+      ],
+      [
+       213,
+       "result",
+       211,
+       "b"
+      ],
+      [
+       214,
+       "result",
+       213,
+       "b"
+      ],
+      [
+       216,
+       "then",
+       218,
+       "exec"
+      ],
+      [
+       217,
+       "result",
+       216,
+       "value"
+      ],
+      [
+       218,
+       "then",
+       220,
+       "exec"
+      ],
+      [
+       219,
+       "result",
+       218,
+       "value"
+      ],
+      [
+       220,
+       "then",
+       224,
+       "exec"
+      ],
+      [
+       221,
+       "result",
+       220,
+       "value"
+      ],
+      [
+       222,
+       "value",
+       221,
+       "cx"
+      ],
+      [
+       223,
+       "value",
+       221,
+       "cy"
+      ],
+      [
+       224,
+       "then",
+       230,
+       "exec"
+      ],
+      [
+       225,
+       "result",
+       224,
+       "value"
+      ],
+      [
+       226,
+       "result",
+       225,
+       "y"
+      ],
+      [
+       227,
+       "value",
+       226,
+       "b"
+      ],
+      [
+       228,
+       "result",
+       225,
+       "x"
+      ],
+      [
+       229,
+       "value",
+       228,
+       "b"
+      ],
+      [
+       231,
+       "result",
+       230,
+       "x"
+      ],
+      [
+       232,
+       "result",
+       231,
+       "value"
+      ],
+      [
+       233,
+       "value",
+       232,
+       "a"
+      ],
+      [
+       234,
+       "result",
+       232,
+       "b"
+      ],
+      [
+       235,
+       "result",
+       234,
+       "a"
+      ],
+      [
+       236,
+       "value",
+       235,
+       "b"
+      ],
+      [
+       237,
+       "value",
+       234,
+       "b"
+      ],
+      [
+       238,
+       "result",
+       231,
+       "max"
+      ],
+      [
+       239,
+       "result",
+       230,
+       "y"
+      ],
+      [
+       240,
+       "result",
+       239,
+       "value"
+      ],
+      [
+       241,
+       "value",
+       240,
+       "a"
+      ],
+      [
+       242,
+       "result",
+       240,
+       "b"
+      ],
+      [
+       243,
+       "result",
+       242,
+       "a"
+      ],
+      [
+       244,
+       "value",
+       243,
+       "b"
+      ],
+      [
+       245,
+       "value",
+       242,
+       "b"
+      ],
+      [
+       246,
+       "result",
+       239,
+       "max"
+      ],
+      [
+       247,
+       "result",
+       230,
+       "rotationDeg"
+      ],
+      [
+       248,
+       "value",
+       247,
+       "a"
+      ],
+      [
+       249,
+       "item",
+       230,
+       "arrow"
+      ],
+      [
+       250,
+       "value",
+       249,
+       "list"
+      ],
+      [
+       251,
+       "result",
+       249,
+       "index"
+      ],
+      [
+       252,
+       "result",
+       251,
+       "a"
+      ],
+      [
+       253,
+       "value",
+       252,
+       "a"
+      ],
+      [
+       254,
+       "height",
+       260,
+       "a"
+      ],
+      [
+       254,
+       "height",
+       265,
+       "h"
+      ],
+      [
+       254,
+       "mobile",
+       257,
+       "a"
+      ],
+      [
+       254,
+       "then",
+       255,
+       "exec"
+      ],
+      [
+       254,
+       "width",
+       259,
+       "a"
+      ],
+      [
+       254,
+       "width",
+       263,
+       "w"
+      ],
+      [
+       254,
+       "width",
+       273,
+       "a"
+      ],
+      [
+       254,
+       "width",
+       280,
+       "a"
+      ],
+      [
+       254,
+       "width",
+       283,
+       "a"
+      ],
+      [
+       254,
+       "x",
+       261,
+       "x"
+      ],
+      [
+       254,
+       "x",
+       263,
+       "x"
+      ],
+      [
+       254,
+       "y",
+       261,
+       "y"
+      ],
+      [
+       254,
+       "y",
+       265,
+       "y"
+      ],
+      [
+       255,
+       "false",
+       262,
+       "exec"
+      ],
+      [
+       255,
+       "true",
+       261,
+       "exec"
+      ],
+      [
+       256,
+       "result",
+       255,
+       "condition"
+      ],
+      [
+       257,
+       "result",
+       256,
+       "a"
+      ],
+      [
+       258,
+       "result",
+       256,
+       "b"
+      ],
+      [
+       259,
+       "result",
+       258,
+       "a"
+      ],
+      [
+       260,
+       "result",
+       258,
+       "b"
+      ],
+      [
+       262,
+       "then",
+       264,
+       "exec"
+      ],
+      [
+       263,
+       "result",
+       262,
+       "value"
+      ],
+      [
+       264,
+       "then",
+       266,
+       "exec"
+      ],
+      [
+       265,
+       "result",
+       264,
+       "value"
+      ],
+      [
+       266,
+       "false",
+       275,
+       "exec"
+      ],
+      [
+       266,
+       "true",
+       274,
+       "exec"
+      ],
+      [
+       267,
+       "result",
+       266,
+       "condition"
+      ],
+      [
+       268,
+       "result",
+       267,
+       "a"
+      ],
+      [
+       269,
+       "result",
+       268,
+       "a"
+      ],
+      [
+       270,
+       "value",
+       269,
+       "a"
+      ],
+      [
+       271,
+       "result",
+       268,
+       "b"
+      ],
+      [
+       272,
+       "value",
+       271,
+       "a"
+      ],
+      [
+       273,
+       "result",
+       267,
+       "b"
+      ],
+      [
+       274,
+       "then",
+       275,
+       "exec"
+      ],
+      [
+       275,
+       "false",
+       285,
+       "exec"
+      ],
+      [
+       275,
+       "true",
+       284,
+       "exec"
+      ],
+      [
+       276,
+       "result",
+       275,
+       "condition"
+      ],
+      [
+       277,
+       "result",
+       276,
+       "a"
+      ],
+      [
+       278,
+       "result",
+       277,
+       "a"
+      ],
+      [
+       279,
+       "value",
+       278,
+       "a"
+      ],
+      [
+       280,
+       "result",
+       278,
+       "b"
+      ],
+      [
+       281,
+       "result",
+       277,
+       "b"
+      ],
+      [
+       282,
+       "value",
+       281,
+       "a"
+      ],
+      [
+       283,
+       "result",
+       276,
+       "b"
+      ],
+      [
+       284,
+       "then",
+       285,
+       "exec"
+      ],
+      [
+       286,
+       "value",
+       285,
+       "x"
+      ],
+      [
+       287,
+       "value",
+       285,
+       "y"
+      ],
+      [
+       288,
+       "ageMs",
+       290,
+       "age"
+      ],
+      [
+       288,
+       "then",
+       289,
+       "exec"
+      ],
+      [
+       290,
+       "result",
+       289,
+       "fade"
+      ],
+      [
+       291,
+       "value",
+       290,
+       "life"
+      ],
+      [
+       292,
+       "value",
+       290,
+       "fade"
+      ],
+      [
+       293,
+       "distance",
+       295,
+       "a"
+      ],
+      [
+       293,
+       "then",
+       294,
+       "exec"
+      ],
+      [
+       295,
+       "result",
+       294,
+       "removes"
+      ],
+      [
+       296,
+       "value",
+       295,
+       "b"
+      ],
+      [
+       297,
+       "ageMs",
+       299,
+       "a"
+      ],
+      [
+       297,
+       "then",
+       298,
+       "exec"
+      ],
+      [
+       299,
+       "result",
+       298,
+       "expired"
+      ],
+      [
+       300,
+       "value",
+       299,
+       "b"
+      ]
+     ],
+     "machines": [],
+     "functions": [
+      {
+       "name": "ColorSlots",
+       "pure": true,
+       "help": "The colours of a roster (each player's own number, in the roster's order): his number picks a place in the palette, the next free one when it is taken",
+       "inputs": [
+        {
+         "name": "numbers",
+         "type": "int_list",
+         "value": []
+        }
+       ],
+       "outputs": [
+        {
+         "name": "colors",
+         "type": "int_list",
+         "value": []
+        }
+       ],
+       "locals": [
+        {
+         "name": "Taken",
+         "type": "int_list",
+         "value": []
+        },
+        {
+         "name": "Colors",
+         "type": "int_list",
+         "value": []
+        },
+        {
+         "name": "At",
+         "type": "int",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "WeaponLabel",
+       "pure": true,
+       "inputs": [
+        {
+         "name": "weapon",
+         "type": "enum",
+         "of": "Weapon",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "label",
+         "type": "text",
+         "value": ""
+        }
+       ]
+      },
+      {
+       "name": "ZoneName",
+       "pure": true,
+       "inputs": [
+        {
+         "name": "zone",
+         "type": "enum",
+         "of": "Zone",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "name",
+         "type": "text",
+         "value": "torso"
+        }
+       ]
+      },
+      {
+       "name": "RoundDamage",
+       "pure": true,
+       "help": "Damage of one round on a mate: the weapon's, times where it lands, 1 .. 100",
+       "inputs": [
+        {
+         "name": "weapon",
+         "type": "enum",
+         "of": "Weapon",
+         "value": 0
+        },
+        {
+         "name": "zone",
+         "type": "enum",
+         "of": "Zone",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "damage",
+         "type": "float",
+         "value": 20
+        }
+       ]
+      },
+      {
+       "name": "BlastDamage",
+       "pure": true,
+       "help": "A blast on a mate: its damage rounded to 1 .. 100, nothing below 1",
+       "inputs": [
+        {
+         "name": "damage",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "damage",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "JudgeHit",
+       "pure": true,
+       "help": "What the authority decides for a damage request",
+       "inputs": [
+        {
+         "name": "targetKnown",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "shooterKnown",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "selfDamage",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "friendlyFire",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "nowMs",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "protectedUntilMs",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "targetHp",
+         "type": "float",
+         "value": 100
+        }
+       ],
+       "outputs": [
+        {
+         "name": "verdict",
+         "type": "enum",
+         "of": "HitVerdict",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "Regen",
+       "pure": true,
+       "help": "Health after dt seconds: nothing while down, full, or hurt within RegenDelayMs",
+       "inputs": [
+        {
+         "name": "hp",
+         "type": "float",
+         "value": 100
+        },
+        {
+         "name": "nowMs",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "lastHurtMs",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "dt",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "hp",
+         "type": "float",
+         "value": 100
+        }
+       ]
+      },
+      {
+       "name": "RespawnOffset",
+       "pure": true,
+       "help": "Where a player comes back around where he fell: uniform over the ring's area (two random numbers 0..1)",
+       "inputs": [
+        {
+         "name": "r1",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "r2",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "x",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "y",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "SpawnRingOffset",
+       "pure": true,
+       "help": "Where a joining player stands around the group: the golden angle on, 7 / 10 / 13 m out",
+       "inputs": [
+        {
+         "name": "slot",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "x",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "y",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "VoiceGain",
+       "pure": true,
+       "help": "How loud a voice is at a distance: full within VoiceFullM, silent from VoiceRadius; \"everywhere\" (team radio) at least RadioGain",
+       "inputs": [
+        {
+         "name": "distance",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "everywhere",
+         "type": "bool",
+         "value": false
+        }
+       ],
+       "outputs": [
+        {
+         "name": "gain",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "Same",
+       "pure": true,
+       "help": "Do two rosters have the same players?",
+       "inputs": [
+        {
+         "name": "a",
+         "type": "int_list",
+         "value": []
+        },
+        {
+         "name": "b",
+         "type": "int_list",
+         "value": []
+        }
+       ],
+       "outputs": [
+        {
+         "name": "same",
+         "type": "bool",
+         "value": false
+        }
+       ],
+       "locals": [
+        {
+         "name": "All",
+         "type": "bool",
+         "value": true
+        }
+       ]
+      },
+      {
+       "name": "CreateBallot",
+       "pure": true,
+       "help": "The host puts a rule to the vote of the roster (each player once, at least two, the host among them); he has said yes",
+       "inputs": [
+        {
+         "name": "id",
+         "type": "int",
+         "value": 0
+        },
+        {
+         "name": "key",
+         "type": "int",
+         "value": 0
+        },
+        {
+         "name": "value",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "host",
+         "type": "int",
+         "value": 0
+        },
+        {
+         "name": "members",
+         "type": "int_list",
+         "value": []
+        },
+        {
+         "name": "nowMs",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "created",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "ballot",
+         "type": "struct",
+         "of": "Ballot",
+         "value": {
+          "Id": 0,
+          "Key": 0,
+          "Value": false,
+          "Host": 0,
+          "Members": [],
+          "Yes": [],
+          "ExpiresMs": 0,
+          "Status": 0
+         }
+        }
+       ]
+      },
+      {
+       "name": "CastVote",
+       "pure": true,
+       "help": "One vote. The ballot is cancelled when it ran out or the roster changed; a no rejects it; everybody's yes approves it. A vote of somebody who is not asked or has voted changes nothing.",
+       "inputs": [
+        {
+         "name": "ballot",
+         "type": "struct",
+         "of": "Ballot",
+         "value": {
+          "Id": 0,
+          "Key": 0,
+          "Value": false,
+          "Host": 0,
+          "Members": [],
+          "Yes": [],
+          "ExpiresMs": 0,
+          "Status": 0
+         }
+        },
+        {
+         "name": "voter",
+         "type": "int",
+         "value": 0
+        },
+        {
+         "name": "approve",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "current",
+         "type": "int_list",
+         "value": []
+        },
+        {
+         "name": "nowMs",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "ballot",
+         "type": "struct",
+         "of": "Ballot",
+         "value": {
+          "Id": 0,
+          "Key": 0,
+          "Value": false,
+          "Host": 0,
+          "Members": [],
+          "Yes": [],
+          "ExpiresMs": 0,
+          "Status": 0
+         }
+        }
+       ],
+       "locals": [
+        {
+         "name": "V",
+         "type": "struct",
+         "of": "Ballot",
+         "value": {
+          "Id": 0,
+          "Key": 0,
+          "Value": false,
+          "Host": 0,
+          "Members": [],
+          "Yes": [],
+          "ExpiresMs": 0,
+          "Status": 0
+         }
+        },
+        {
+         "name": "Yes",
+         "type": "int_list",
+         "value": []
+        }
+       ]
+      },
+      {
+       "name": "BearingArrow",
+       "pure": true,
+       "help": "The compass arrow for a bearing (radians clockwise from north)",
+       "inputs": [
+        {
+         "name": "bearing",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "arrow",
+         "type": "text",
+         "value": "↑"
+        }
+       ]
+      },
+      {
+       "name": "LocateMapPeer",
+       "pure": true,
+       "help": "A peer on the big map (px): inside the drawn area as he is, outside at its edge with an arrow towards where he really is",
+       "inputs": [
+        {
+         "name": "x",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "y",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "width",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "height",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "insetX",
+         "type": "float",
+         "value": 16
+        },
+        {
+         "name": "insetTop",
+         "type": "float",
+         "value": 16
+        },
+        {
+         "name": "insetBottom",
+         "type": "float",
+         "value": 30
+        }
+       ],
+       "outputs": [
+        {
+         "name": "valid",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "x",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "y",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "offmap",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "rotationDeg",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "arrow",
+         "type": "text",
+         "value": ""
+        }
+       ],
+       "locals": [
+        {
+         "name": "Cx",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "Cy",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "T",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "Angle",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "SafeMobileMarkerPoint",
+       "pure": true,
+       "help": "A nameplate on a phone (px): kept off the thumb sticks at the bottom and the tool bars at the top",
+       "inputs": [
+        {
+         "name": "x",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "y",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "width",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "height",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "mobile",
+         "type": "bool",
+         "value": false
+        }
+       ],
+       "outputs": [
+        {
+         "name": "x",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "y",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "locals": [
+        {
+         "name": "Px",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "Py",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "PingFade",
+       "pure": true,
+       "help": "A ping of this age (ms): 1 while fresh, fading at the end of its life",
+       "inputs": [
+        {
+         "name": "ageMs",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "fade",
+         "type": "float",
+         "value": 1
+        }
+       ]
+      },
+      {
+       "name": "PingToggles",
+       "pure": true,
+       "help": "Pinging this close to the own marker takes it away",
+       "inputs": [
+        {
+         "name": "distance",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "removes",
+         "type": "bool",
+         "value": false
+        }
+       ]
+      },
+      {
+       "name": "PingExpired",
+       "pure": true,
+       "inputs": [
+        {
+         "name": "ageMs",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "expired",
+         "type": "bool",
+         "value": false
         }
        ]
       }

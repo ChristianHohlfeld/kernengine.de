@@ -2,9 +2,48 @@
 #include "mp_rules.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 
+#include "blueprint_call.h"
+
 namespace sc::mp {
+
+// The Blueprint of the level's actor "Multiplayer" and its numbers (read when it is bound).
+f64 kSpawnProtectMs = 0, kRegenDelayMs = 0, kRegenTickMs = 0, kRespawnCooldownMs = 0, kBallotMs = 0, kPingLifeMs = 0, kPingHoldMs = 0;
+f32 kRegenHpPerS = 0, kRespawnRadiusMin = 0, kRespawnRadiusMax = 0, kVoiceRadius = 0, kPingRemoveM = 0;
+namespace {
+using kern::logic::Value;
+rules::Blueprint g_rules;
+std::vector<u32> g_palette;
+f32 num(const char* function, const std::vector<Value>& args) { return static_cast<f32>(g_rules.number(function, args)); }
+Vec2 pair(const char* function, const std::vector<Value>& args) {
+  std::vector<Value> r;
+  if (!g_rules.call(function, args, r) || r.size() < 2) return {};
+  return {static_cast<f32>(r[0].as_number()), static_cast<f32>(r[1].as_number())};
+}
+}  // namespace
+
+void bind(kern::logic::Instance* blueprint) {
+  g_rules.running = blueprint;
+  g_palette.clear();
+  kSpawnProtectMs = g_rules.variable("SpawnProtectMs");
+  kRegenDelayMs = g_rules.variable("RegenDelayMs");
+  kRegenTickMs = g_rules.variable("RegenTickMs");
+  kRespawnCooldownMs = g_rules.variable("RespawnCooldownMs");
+  kBallotMs = g_rules.variable("BallotMs");
+  kPingLifeMs = g_rules.variable("PingLifeMs");
+  kPingHoldMs = g_rules.variable("PingHoldMs");
+  kRegenHpPerS = static_cast<f32>(g_rules.variable("RegenHpPerS"));
+  kRespawnRadiusMin = static_cast<f32>(g_rules.variable("RespawnRadiusMin"));
+  kRespawnRadiusMax = static_cast<f32>(g_rules.variable("RespawnRadiusMax"));
+  kVoiceRadius = static_cast<f32>(g_rules.variable("VoiceRadius"));
+  kPingRemoveM = static_cast<f32>(g_rules.variable("PingRemoveM"));
+  if (!blueprint) return;
+  const Value colors = blueprint->get("Palette");
+  for (std::size_t k = 0; k < colors.size(); ++k) g_palette.push_back(static_cast<u32>(colors.item(k).i));
+}
+const std::vector<u32>& palette() { return g_palette; }
 
 namespace {
 f64 fmin2(f64 a, f64 b) { return a < b ? a : b; }
@@ -124,74 +163,47 @@ u32 hash_id(const std::string& id) {
 }
 
 std::vector<u32> assign_colors(const std::vector<std::string>& ids) {
+  std::vector<i64> numbers;
+  for (const std::string& id : ids) numbers.push_back(hash_id(id));
+  std::vector<Value> r;
   std::vector<u32> out;
-  bool used[kPalette.size()] = {};
-  for (const std::string& id : ids) {
-    u32 i = hash_id(id) % kPalette.size();
-    for (u32 guard = 0; used[i] && guard < kPalette.size(); ++guard) i = (i + 1) % kPalette.size();
-    used[i] = true;
-    out.push_back(kPalette[i]);
-  }
+  if (!g_rules.call("ColorSlots", {Value::of(std::move(numbers))}, r) || r.empty()) return out;
+  for (std::size_t k = 0; k < r[0].size(); ++k) out.push_back(static_cast<u32>(r[0].item(k).i));
   return out;
+}
+u32 color_of(const std::string& id) {
+  const std::vector<u32> one = assign_colors({id});
+  return one.empty() ? 0 : one[0];
 }
 
 // ---- combat -------------------------------------------------------------------------------------
 
-const char* weapon_label(Weapon w) {
-  switch (w) {
-    case Weapon::smg: return "MP";
-    case Weapon::glock: return "GLOCK";
-    case Weapon::sniper: return "SNIPER";
-    case Weapon::fists: return "FAEUSTE";
-    case Weapon::knife: return "MESSER";
-    case Weapon::launcher: return "GRANATWERFER";
-    case Weapon::rocket: return "RAKETE";
-    case Weapon::grenade: return "GRANATE";
-    case Weapon::drone_gun: return "DROHNE";
-    case Weapon::drone_rocket: return "RAKETE";
-    case Weapon::jet_gun: return "BORDKANONE";
-    case Weapon::jet_missile: return "RAKETE";
-    case Weapon::jet_bomb: return "BOMBE";
-    case Weapon::explosion: return "EXPLOSION";
-    default: return "";
-  }
+std::string weapon_label(Weapon w) {
+  std::vector<Value> r;
+  return g_rules.call("WeaponLabel", {rules::of_enum(w)}, r) && !r.empty() ? r[0].as_text() : std::string();
 }
-
-const char* zone_name(Zone z) { return z == Zone::head ? "head" : z == Zone::legs ? "legs" : "torso"; }
-
-f32 round_damage(Weapon w, Zone z) {
-  f32 base = 20;  // VS_WEAPON_DAMAGE default
-  switch (w) {
-    case Weapon::smg: case Weapon::drone_gun: base = 13; break;  // smg / gun / 5.56
-    case Weapon::glock: base = 26; break;
-    case Weapon::sniper: base = 95; break;
-    case Weapon::fists: base = 12; break;
-    default: break;
-  }
-  const f32 k = z == Zone::head ? 3.0f : z == Zone::legs ? 0.65f : 1.0f;
-  return clampf(std::round(base * k), 1, 100);
+std::string zone_name(Zone z) {
+  std::vector<Value> r;
+  return g_rules.call("ZoneName", {rules::of_enum(z)}, r) && !r.empty() ? r[0].as_text() : std::string();
 }
-
-f32 blast_damage(f32 damage) { return damage < 1 ? 0 : clampf(std::round(damage), 1, 100); }
+f32 round_damage(Weapon w, Zone z) { return num("RoundDamage", {rules::of_enum(w), rules::of_enum(z)}); }
+f32 blast_damage(f32 damage) { return num("BlastDamage", {Value::number(damage)}); }
 
 HitVerdict judge_hit(bool target_known, bool shooter_known, bool self_damage, bool friendly_fire, f64 now, f64 protected_until, f32 hp) {
-  if (!target_known || !shooter_known) return HitVerdict::unknown_player;
-  if (!self_damage && !friendly_fire) return HitVerdict::friendly_fire_off;
-  if (now < protected_until) return HitVerdict::protected_target;
-  if (hp <= 0) return HitVerdict::already_down;
-  return HitVerdict::applied;
+  std::vector<Value> r;
+  if (!g_rules.call("JudgeHit", {Value::boolean(target_known), Value::boolean(shooter_known), Value::boolean(self_damage), Value::boolean(friendly_fire), Value::number(now),
+                                 Value::number(protected_until), Value::number(hp)},
+                    r) ||
+      r.empty())
+    return HitVerdict::unknown_player;
+  return static_cast<HitVerdict>(r[0].i);
 }
 
-f32 regen(f32 hp, f64 now, f64 last_hurt, f32 dt) {
-  if (hp <= 0 || hp >= 100) return hp;
-  if (now - last_hurt < kRegenDelayMs) return hp;
-  return std::fmin(100.0f, hp + kRegenHpPerS * dt);
-}
+f32 regen(f32 hp, f64 now, f64 last_hurt, f32 dt) { return num("Regen", {Value::number(hp), Value::number(now), Value::number(last_hurt), Value::number(dt)}); }
 
 Vec2 respawn_offset(Rng& rng) {
-  const f32 a2 = kRespawnRadiusMin * kRespawnRadiusMin, b2 = kRespawnRadiusMax * kRespawnRadiusMax;
-  const f32 r = std::sqrt(a2 + rng.unit() * (b2 - a2)), a = rng.unit() * 2 * kPi;
-  return {std::cos(a) * r, std::sin(a) * r};
+  const f32 r1 = rng.unit(), r2 = rng.unit();  // (how far out, then which way)
+  return pair("RespawnOffset", {Value::number(r1), Value::number(r2)});
 }
 
 void Scoreboard::ensure(u8 slot) {
@@ -244,32 +256,51 @@ bool group_spawn_center(const std::vector<Vec2>& pts, Vec2& out, f32 link) {
   return true;
 }
 
-Vec2 spawn_ring_offset(u32 slot) {
-  const f32 a = static_cast<f32>(slot) * 2.399963229728653f, r = 7.0f + static_cast<f32>(slot % 3) * 3.0f;
-  return {std::cos(a) * r, std::sin(a) * r};
-}
+Vec2 spawn_ring_offset(u32 slot) { return pair("SpawnRingOffset", {Value::integer(slot)}); }
 
 // ---- vote -----------------------------------------------------------------------------------------
-
-bool create_ballot(Ballot& b, u32 id, u8 key, bool value, u8 host, std::vector<u8> members, f64 now) {
+namespace {
+Value ints(const std::vector<u8>& v) { return Value::of(std::vector<i64>(v.begin(), v.end())); }
+std::vector<u8> bytes(const Value& v) {
+  std::vector<u8> out;
+  for (std::size_t k = 0; k < v.size(); ++k) out.push_back(static_cast<u8>(v.item(k).i));
+  return out;
+}
+Value to_value(const Ballot& b) {
+  return Value::structure({Value::integer(b.id), Value::integer(b.key), Value::boolean(b.value), Value::integer(b.host), ints(b.members), ints(b.yes), Value::number(b.expires_ms),
+                           rules::of_enum(b.status)});
+}
+bool take(const Value& v, Ballot& b) {
+  if (v.fields() < 8) return false;
+  b.id = static_cast<u32>(v.field(0)->i);
+  b.key = static_cast<u8>(v.field(1)->i);
+  b.value = v.field(2)->b;
+  b.host = static_cast<u8>(v.field(3)->i);
+  b.members = bytes(*v.field(4));
+  b.yes = bytes(*v.field(5));
+  b.expires_ms = v.field(6)->as_number();
+  b.status = static_cast<Ballot::Status>(v.field(7)->i);
+  return true;
+}
+/// A roster as the vote compares it: in order, each player once.
+void roster(std::vector<u8>& members) {
   std::sort(members.begin(), members.end());
   members.erase(std::unique(members.begin(), members.end()), members.end());
-  if (!id || std::find(members.begin(), members.end(), host) == members.end() || members.size() < 2) return false;
-  b = Ballot{};
-  b.id = id; b.key = key; b.value = value; b.host = host; b.members = members; b.yes = {host};
-  b.expires_ms = now + kBallotMs;
-  return true;
+}
+}  // namespace
+
+bool create_ballot(Ballot& b, u32 id, u8 key, bool value, u8 host, std::vector<u8> members, f64 now) {
+  roster(members);
+  std::vector<Value> r;
+  if (!g_rules.call("CreateBallot", {Value::integer(id), Value::integer(key), Value::boolean(value), Value::integer(host), ints(members), Value::number(now)}, r) || r.size() < 2 || !r[0].b)
+    return false;
+  return take(r[1], b);
 }
 
 Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now) {
-  if (b.status != Ballot::Status::pending) return b.status;
-  std::sort(current.begin(), current.end());
-  if (now >= b.expires_ms || current != b.members) return b.status = Ballot::Status::cancelled;
-  if (std::find(b.members.begin(), b.members.end(), voter) == b.members.end() || std::find(b.yes.begin(), b.yes.end(), voter) != b.yes.end())
-    return b.status;  // ignored
-  if (!approve) return b.status = Ballot::Status::rejected;
-  b.yes.push_back(voter);
-  if (b.yes.size() == b.members.size()) b.status = Ballot::Status::approved;
+  roster(current);
+  std::vector<Value> r;
+  if (g_rules.call("CastVote", {to_value(b), Value::integer(voter), Value::boolean(approve), ints(current), Value::number(now)}, r) && !r.empty()) take(r[0], b);
   return b.status;
 }
 
@@ -291,7 +322,8 @@ f32 decode_mulaw(u8 byte) {
   return static_cast<f32>(sign ? 132 - pcm : pcm - 132) / 32768.0f;
 }
 
-f32 proximity_gain(f32 d) { return std::isfinite(d) ? clampf((kVoiceRadius - d) / (kVoiceRadius - 5), 0, 1) : 0; }
+f32 proximity_gain(f32 d) { return voice_gain(d, false); }
+f32 voice_gain(f32 d, bool everywhere) { return std::isfinite(d) ? num("VoiceGain", {Value::number(d), Value::boolean(everywhere)}) : everywhere ? voice_gain(1e9f, true) : 0; }
 
 bool VoiceStream::push(u32 seq, const std::vector<u8>& mulaw, f32 gain) {
   if (gain <= 0 || mulaw.empty() || mulaw.size() > 800) return false;
@@ -442,38 +474,27 @@ f32 route_left(const std::vector<Vec2>& pts, Vec2 pos) {
   return cum.back() - a.along + a.distance;
 }
 
-const char* bearing_arrow(f32 b) {
-  static const char* arrows[] = {"\xe2\x86\x91", "\xe2\x86\x97", "\xe2\x86\x92", "\xe2\x86\x98", "\xe2\x86\x93", "\xe2\x86\x99", "\xe2\x86\x90", "\xe2\x86\x96"};
-  i32 i = static_cast<i32>(std::lround(wrap_pi(b) / (kPi / 4)));
-  return arrows[((i % 8) + 8) % 8];
+std::string bearing_arrow(f32 b) {
+  std::vector<Value> r;
+  return g_rules.call("BearingArrow", {Value::number(b)}, r) && !r.empty() ? r[0].as_text() : std::string();
 }
 
 MapEdge locate_map_peer(Vec2 p, f32 w, f32 h, f32 ix, f32 it, f32 ib) {
   MapEdge out;
-  if (!(std::isfinite(p.x) && std::isfinite(p.y)) || w <= 2 * ix || h <= it + ib) return out;
-  out.valid = true;
-  const f32 minx = ix, maxx = w - ix, miny = it, maxy = h - ib;
-  if (p.x >= minx && p.x <= maxx && p.y >= miny && p.y <= maxy) { out.p = p; return out; }
-  const f32 cx = (minx + maxx) / 2, cy = (miny + maxy) / 2, dx = p.x - cx, dy = p.y - cy;
-  const f32 tx = dx > 0 ? (maxx - cx) / dx : dx < 0 ? (minx - cx) / dx : 1e30f;
-  const f32 ty = dy > 0 ? (maxy - cy) / dy : dy < 0 ? (miny - cy) / dy : 1e30f;
-  const f32 t = std::fmax(0.0f, std::fmin(tx, ty)), angle = std::atan2(dy, dx);
-  static const char* arrows[] = {"\xe2\x86\x92", "\xe2\x86\x98", "\xe2\x86\x93", "\xe2\x86\x99", "\xe2\x86\x90", "\xe2\x86\x96", "\xe2\x86\x91", "\xe2\x86\x97"};
-  out.arrow = arrows[((static_cast<i32>(std::lround(angle / (kPi / 4))) + 8) % 8 + 8) % 8];
-  out.p = {clampf(cx + dx * t, minx, maxx), clampf(cy + dy * t, miny, maxy)};
-  out.offmap = true;
-  out.rotation_deg = angle / kDeg + 90;
+  if (!(std::isfinite(p.x) && std::isfinite(p.y))) return out;
+  std::vector<Value> r;
+  if (!g_rules.call("LocateMapPeer", {Value::number(p.x), Value::number(p.y), Value::number(w), Value::number(h), Value::number(ix), Value::number(it), Value::number(ib)}, r) || r.size() < 6)
+    return out;
+  out.valid = r[0].b;
+  out.p = {static_cast<f32>(r[1].as_number()), static_cast<f32>(r[2].as_number())};
+  out.offmap = r[3].b;
+  out.rotation_deg = static_cast<f32>(r[4].as_number());
+  out.arrow = r[5].as_text();
   return out;
 }
 
 Vec2 safe_mobile_marker_point(Vec2 p, f32 w, f32 h, bool mobile) {
-  if (!mobile || w <= 0 || h <= 0) return p;
-  const f32 bottom_reserve = clampf(h * 0.27f, 88, 116), top_reserve = std::fmin(115.0f, h * 0.34f);
-  const f32 bottom = std::fmax(top_reserve, h - bottom_reserve);
-  f32 px = clampf(p.x, 38, w - 38), py = clampf(p.y, top_reserve, bottom);
-  if (px < 192 && py < 160 && w >= 520) px = 192;
-  if (px > w - 152 && py < 100 && w >= 520) py = 100;
-  return {px, py};
+  return pair("SafeMobileMarkerPoint", {Value::number(p.x), Value::number(p.y), Value::number(w), Value::number(h), Value::boolean(mobile)});
 }
 
 std::string format_distance(f32 m) {
@@ -491,7 +512,7 @@ std::string format_distance(f32 m) {
 
 bool PingBoard::toggle(u8 owner, Vec3 p, u32 color, f64 now) {
   for (const Ping& q : pings_)
-    if (q.owner == owner && std::hypot(q.p.x - p.x, q.p.y - p.y) < kPingRemoveM) { clear(owner); return false; }
+    if (q.owner == owner && g_rules.flag("PingToggles", {Value::number(std::hypot(q.p.x - p.x, q.p.y - p.y))})) { clear(owner); return false; }
   set(owner, p, color, now);
   return true;
 }
@@ -501,6 +522,8 @@ void PingBoard::set(u8 owner, Vec3 p, u32 color, f64 now) {
   pings_.push_back({owner, p, color, now});
 }
 void PingBoard::clear(u8 owner) { pings_.erase(std::remove_if(pings_.begin(), pings_.end(), [&](const Ping& q) { return q.owner == owner; }), pings_.end()); }
-void PingBoard::expire(f64 now) { pings_.erase(std::remove_if(pings_.begin(), pings_.end(), [&](const Ping& q) { return now - q.at_ms > kPingLifeMs; }), pings_.end()); }
+void PingBoard::expire(f64 now) { pings_.erase(std::remove_if(pings_.begin(), pings_.end(), [&](const Ping& q) { return g_rules.flag("PingExpired", {Value::number(now - q.at_ms)}); }), pings_.end()); }
+
+f32 PingBoard::fade(const Ping& p, f64 now_ms) { return num("PingFade", {Value::number(now_ms - p.at_ms)}); }
 
 }  // namespace sc::mp

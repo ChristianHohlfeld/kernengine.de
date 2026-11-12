@@ -922,7 +922,7 @@ std::string Game::mp_hud_json() {
     if (t.dir != mp::Turn::Dir::none)
       turn = std::string(t.dir == mp::Turn::Dir::left ? "links" : t.dir == mp::Turn::Dir::right ? "rechts" : "wenden") + " in " + mp::format_distance(t.distance);
     add(",\"nav\":{\"name\":\"%s\",\"dist\":\"%s\",\"arrow\":\"%s\",\"turn\":\"%s\",\"x\":%.0f,\"y\":%.0f,\"on\":%s,\"angle\":%.0f,\"streets\":%s}",
-        esc(m.dest_name).c_str(), mp::format_distance(left).c_str(), mp::bearing_arrow(rel), turn.c_str(), cx, cy, on ? "true" : "false", ca,
+        esc(m.dest_name).c_str(), mp::format_distance(left).c_str(), mp::bearing_arrow(rel).c_str(), turn.c_str(), cx, cy, on ? "true" : "false", ca,
         m.route_streets ? "true" : "false");
   }
   if (!m.fetch_json.empty()) s += ",\"navFetch\":" + m.fetch_json;
@@ -982,7 +982,7 @@ std::string Game::mp_hud_json() {
       add("%s{\"by\":%u,\"byColor\":\"%s\",\"bySelf\":%s,\"victim\":%u,\"victimColor\":\"%s\",\"victimSelf\":%s,\"weapon\":\"%s\",\"head\":%s,\"accident\":%s,\"age\":%.0f}",
           first ? "" : ",", accident ? 0 : net_.index_of(k.by), accident ? "#ffffff" : hex(net_.color_of(k.by)).c_str(), k.by == self ? "true" : "false",
           net_.index_of(k.victim), hex(net_.color_of(k.victim)).c_str(), k.victim == self ? "true" : "false",
-          mp::weapon_label(static_cast<mp::Weapon>(k.weapon)), k.zone == static_cast<u8>(mp::Zone::head) ? "true" : "false", accident ? "true" : "false", now - it->at);
+          mp::weapon_label(static_cast<mp::Weapon>(k.weapon)).c_str(), k.zone == static_cast<u8>(mp::Zone::head) ? "true" : "false", accident ? "true" : "false", now - it->at);
       first = false;
     }
     s += "]";

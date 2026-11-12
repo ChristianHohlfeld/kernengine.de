@@ -18,6 +18,7 @@
 using namespace sc;
 
 SC_TEST(mp_pose_timeline_interpolates_on_sender_clock) {
+  RuleBlueprint mp_rules("Multiplayer", &mp::bind);
   mp::PoseTimeline t;
   // 30 Hz poses moving 1 m per packet along x, received with 40 ms latency and some jitter.
   for (int i = 0; i < 12; ++i) {
@@ -36,6 +37,7 @@ SC_TEST(mp_pose_timeline_interpolates_on_sender_clock) {
 }
 
 SC_TEST(mp_rules_damage_regen_spawn_vote) {
+  RuleBlueprint mp_rules("Multiplayer", &mp::bind);
   SC_CHECK(mp::round_damage(mp::Weapon::glock, mp::Zone::torso) == 26, "glock");
   SC_CHECK(mp::round_damage(mp::Weapon::glock, mp::Zone::head) == 78, "glock head");
   SC_CHECK(mp::round_damage(mp::Weapon::smg, mp::Zone::legs) == 8, "smg legs");
@@ -65,6 +67,7 @@ SC_TEST(mp_rules_damage_regen_spawn_vote) {
 }
 
 SC_TEST(mp_voice_codec_and_stream) {
+  RuleBlueprint mp_rules("Multiplayer", &mp::bind);
   for (f32 v : {0.0f, 0.1f, -0.3f, 0.7f, -0.99f}) SC_CHECK(std::fabs(mp::decode_mulaw(mp::encode_mulaw(v)) - v) < 0.02f + std::fabs(v) * 0.04f, "mu-law %.2f", v);
   SC_CHECK(mp::proximity_gain(3) == 1 && mp::proximity_gain(70) == 0 && std::fabs(mp::proximity_gain(37.5f) - 0.5f) < 0.01f, "gain");
   SC_CHECK(mp::voice_gain(500, true) >= 0.85f, "everywhere");
@@ -85,6 +88,7 @@ SC_TEST(mp_voice_codec_and_stream) {
 }
 
 SC_TEST(mp_navigation_math) {
+  RuleBlueprint mp_rules("Multiplayer", &mp::bind);
   const std::vector<Vec2> route = {{0, 0}, {0, 100}, {100, 100}};
   const mp::Turn t = mp::upcoming_turn(route, {0, 10});
   SC_CHECK(t.dir == mp::Turn::Dir::right && std::fabs(t.distance - 90) < 1, "right turn in 90 m (%d %.1f)", static_cast<int>(t.dir), t.distance);
@@ -153,6 +157,7 @@ net::PlayerState pose_at(Vec3 p, f32 hp = 100) {
 }  // namespace
 
 SC_TEST(mp_sessions_host_two_clients) {
+  RuleBlueprint mp_rules("Multiplayer", &mp::bind);
   net::Session host, a, b;
   Wire w;
   w.peers = {{11, &host}, {22, &a}, {33, &b}};
@@ -253,6 +258,7 @@ SC_TEST(mp_sessions_host_two_clients) {
 // lan_vs.mjs authority handover: the host goes, both clients see it, agree on the successor (the
 // lowest slot left), he hosts on, the other joins him.
 SC_TEST(mp_host_leaves_the_oldest_takes_over) {
+  RuleBlueprint mp_rules("Multiplayer", &mp::bind);
   net::Session host, a, b;
   Wire w;
   w.peers = {{11, &host}, {22, &a}, {33, &b}};
@@ -289,6 +295,7 @@ SC_TEST(mp_host_leaves_the_oldest_takes_over) {
 }
 
 SC_TEST(mp_qr_code_structure) {
+  RuleBlueprint mp_rules("Multiplayer", &mp::bind);
   // Decoded with OpenCV during development (versions 1, 5, 10, 11); here the structure.
   qr::Code c;
   SC_CHECK(qr::encode("HELLO", c) && c.version == 1 && c.size == 21, "v1 %d", c.version);
@@ -304,6 +311,7 @@ SC_TEST(mp_qr_code_structure) {
 // One world, gap 1: a player's police and sandbox enemies are part of his swarm - the others see
 // them with the right kind and state, and what they do to them goes to him alone.
 SC_TEST(mp_swarm_police_and_enemies_are_seen_by_the_others) {
+  RuleBlueprint mp_rules("Multiplayer", &mp::bind);
   Trio s;
   SC_CHECK(s.a.connected() && s.b.connected() && s.host.remotes().size() == 2, "all in");
   const u8 officer_flags = static_cast<u8>(net::kOfficerAims | (3 << net::kOfficerSkinShift));
@@ -355,6 +363,7 @@ SC_TEST(mp_swarm_police_and_enemies_are_seen_by_the_others) {
 
 // ... and a hit on a mate's unit is noted here for him by the unit's own rule, never applied here.
 SC_TEST(mp_people_note_hits_on_a_mates_unit) {
+  RuleBlueprint mp_rules("Multiplayer", &mp::bind);
   People town;
   const i32 officer = town.add_officer({0, 0, 0}, 0, -1, 7);
   town.at(officer).hp = 1e6f;
@@ -391,6 +400,7 @@ SC_TEST(mp_people_note_hits_on_a_mates_unit) {
 // More units than one message carries arrive complete - in numbered parts, never a list with
 // units missing.
 SC_TEST(mp_swarm_larger_than_one_message_arrives_whole) {
+  RuleBlueprint mp_rules("Multiplayer", &mp::bind);
   Trio s;
   std::vector<net::SwarmUnit> units;
   for (u16 i = 1; i <= 190; ++i) units.push_back({i, static_cast<net::SwarmKind>(i % 8), static_cast<u8>(i % 3), {i * 0.5f, -1.0f * i, 2}, 0.1f, 0.2f});
@@ -435,6 +445,7 @@ SC_TEST(mp_swarm_larger_than_one_message_arrives_whole) {
 // One world, gap 2: what a client does to a car or a passer-by of the host's town reaches the host
 // (reliably, with who did it), the host applies it, and the result comes back in his world list.
 SC_TEST(mp_town_a_clients_hits_reach_the_host) {
+  RuleBlueprint mp_rules("Multiplayer", &mp::bind);
   Trio s;
   // a's rounds on the host's car 7 (30 a round) and a blast on car 9
   s.a.town_to_host(town::pack(town::CarHit{7, 30, town::Cause::round}));
@@ -528,6 +539,7 @@ SC_TEST(mp_town_a_clients_hits_reach_the_host) {
 // One world, gaps 3 and 4: broken lamps, barricade planks and the blasts that left marks are the
 // host's state - a late joiner gets all of it, changes go round reliably.
 SC_TEST(mp_town_state_for_a_late_joiner) {
+  RuleBlueprint mp_rules("Multiplayer", &mp::bind);
   RuleBlueprint lamp_rules("Lamps", &lamps::bind);  // (what breaks a lamp, and that it only gets worse)
   net::Session host, a, b;
   Wire w;

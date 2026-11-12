@@ -269,6 +269,15 @@ In dieser Reihenfolge (klein nach groß; jede Datei verschwindet, ihre Tests ble
   Person ihre eigene Zufallszahl geben. Die Zahlen, die das Spiel überall liest
   (`combat::kJetSpeed` …), sind keine C++-Konstanten mehr, sondern die Variablen der Blueprints,
   beim Binden gelesen. Eine doppelte Zahl (der Zombie-Treffer stand zweimal im C++) ist weg.
+- [x] **`mp_rules`, die Regeln** – Actor „Multiplayer“: die Farben der Spieler (Palette,
+  ColorSlots), Schaden je Waffe und Körperzone (Datentabelle Weapons), JudgeHit, Regen,
+  RespawnOffset, SpawnRingOffset, die einstimmige Abstimmung (CreateBallot, CastVote), VoiceGain,
+  die Pfeile und Plätze der Marker (BearingArrow, LocateMapPeer, SafeMobileMarkerPoint) und die
+  Pings (PingFade, PingToggles, PingExpired). In `mp_rules.cpp` bleibt, was Daten bewegt: die
+  Zeitleisten der Posen, der Sprach-Codec und seine Ströme, die Geometrie der Routen, die
+  Punktetafel, die dichteste Gruppe für den Einstieg – Systeme (Stufe 4).
+- **Damit sind die Regeln aller dreizehn Dateien Blueprints** (17 Actors im Ordner „Rules“ des
+  Levels). Was in den Dateien noch steht, sind Brücken und Systeme.
 - **Gemessen** (wie das Spiel gebaut, -O2, `SC_TEST_RELEASE=1 run_tests.sh controls_call_cost`):
   Ein Aufruf einer Regel aus C++ kostet als Klasse rund 0,2 µs (eine Formel), 0,3 µs (mehrere
   Knoten, eine Schleife, eine zweite Funktion) bis 0,7 µs (eine Struktur hinein und heraus). Je

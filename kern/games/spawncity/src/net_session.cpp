@@ -254,7 +254,7 @@ u32 Session::color_of(u8 slot) const {
   for (u8 s : r) ids.push_back(std::to_string(s));
   const std::vector<u32> c = mp::assign_colors(ids);
   for (std::size_t i = 0; i < r.size(); ++i) if (r[i] == slot) return c[i];
-  return mp::kPalette[mp::hash_id(std::to_string(slot)) % mp::kPalette.size()];
+  return mp::color_of(std::to_string(slot));
 }
 
 u32 Session::index_of(u8 slot) const {

@@ -7,6 +7,9 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-12",time:"11:22",title:"Die Mehrspieler-Regeln sind ein Blueprint",items:[
+    "Unter der Haube: Spielerfarben, Schaden je Waffe und Körperzone, Spawn-Schutz, Heilung, Wiedereinstieg, die Abstimmung über Spielregeln, die Reichweite der Stimme, Kartenpfeile und Pings stehen jetzt als Blueprint „Multiplayer“ im Level. Damit sind alle Spielregeln von SpawnCity Blueprints (17 Stück) – am Spiel ändert sich dadurch nichts.",
+  ]},
   {date:"2026-11-12",time:"10:53",title:"Armee, Zombies, Gegner, Aufträge und Rennen als Blueprints",items:[
     "Unter der Haube: Fünf weitere Regelwerke stehen jetzt als Blueprints im Level – „Military“ (wann die Armee kommt und geht, Trefferchancen, Flak, Jagdbomber, wie Passanten auf Gewalt reagieren), „Zombies“ (die Runden der Zombienächte), „Sandbox“ (die Gegner und der Chaos-Score), „Fun“ (Punkte auf Risiko und die Aufträge) und „Race“ (Tore, Runden, Bestzeit). Am Spiel ändert sich dadurch nichts.",
     "Gegner, Aufträge und Renntore sind dabei Datentabellen, die sich im Kern-Editor als Tabelle bearbeiten lassen.",

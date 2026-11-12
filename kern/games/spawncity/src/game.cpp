@@ -297,6 +297,9 @@ bool Game::start(kern::Engine& e) {
     kern::logic::Instance* traffic = logic ? logic->find(world_->find_actor("Traffic")) : nullptr;
     if (!traffic || traffic->disabled()) return kern::fail("the level's Blueprint \"Traffic\" is missing or has errors");
     TrafficRules::bind(traffic);
+    kern::logic::Instance* multiplayer = logic ? logic->find(world_->find_actor("Multiplayer")) : nullptr;
+    if (!multiplayer || multiplayer->disabled()) return kern::fail("the level's Blueprint \"Multiplayer\" is missing or has errors");
+    mp::bind(multiplayer);
     // the combat and event rules (combat_rules.h)
     const struct { const char* actor; bool (*bind)(kern::logic::Instance*); } combat_rules[] = {
         {"Military", &combat::bind_military}, {"Zombies", &combat::bind_zombies}, {"Sandbox", &combat::bind_sandbox}, {"Fun", &combat::bind_fun}, {"Race", &combat::bind_race}};

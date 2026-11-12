@@ -10,6 +10,13 @@
 //   * navigation: route breadcrumbs and the next turn (nav_ar_route_math.mjs), map edge arrows
 //     (map_peer_edge.mjs), safe nameplate positions on phones (mobile_peer_marker_layout.mjs)
 //   * ping markers (ping_marker.mjs)
+//
+// What is a rule of the game - who gets which colour, what a hit costs, when a hit counts, how
+// health comes back, where a player comes back and joins, the vote, how far a voice carries, where
+// a marker is drawn, how long a ping lasts - is a Blueprint: the level's actor "Multiplayer"
+// (level/spawncity.klevel, open it in Kern Studio). Its numbers are the k... marked "the
+// Blueprint's" below, read when it is bound (0 before). What moves data - the pose and navigation
+// timelines, the voice codec and its streams, the routes' geometry, the scoreboard - is here.
 #pragma once
 
 #include <array>
@@ -17,8 +24,13 @@
 #include <vector>
 
 #include "common.h"
+#include "kern/logic/logic.h"
 
 namespace sc::mp {
+
+/// The running Blueprint of the actor "Multiplayer" (the game binds it once its world has
+/// started; tests bind the one they run).
+void bind(kern::logic::Instance* blueprint);
 
 // ---- pose timeline (vs_pose_sync.mjs) ----------------------------------------------------------
 constexpr f64 kInterpolationDelayMs = 90;    // VS_POSE_INTERPOLATION_DELAY_MS
@@ -75,32 +87,31 @@ class NavTimeline {
 
 // ---- players -----------------------------------------------------------------------------------
 constexpr u32 kMaxPlayers = 9;                 // vs_multiplayer.mjs MAX_PLAYERS
-/// vs_multiplayer.mjs PALETTE (0xRRGGBB).
-constexpr std::array<u32, 12> kPalette = {0x29d6ff, 0xff6b35, 0x8cf43f, 0xff4fd8, 0xffd83d, 0x9b7bff,
-                                          0x24e6a1, 0xff405f, 0x43a8ff, 0xff9f1c, 0x7ce7ff, 0xd6ff4b};
+/// vs_multiplayer.mjs PALETTE (0xRRGGBB): the Blueprint's list Palette.
+const std::vector<u32>& palette();
 inline Vec3 rgb(u32 c) { return {((c >> 16) & 255) / 255.0f, ((c >> 8) & 255) / 255.0f, (c & 255) / 255.0f}; }
 /// FNV-1a over the player's id text, as vs_multiplayer.mjs hashId.
 u32 hash_id(const std::string& id);
 /// Colours of a roster (sorted ids, each its hash slot, the next free one on a collision).
 std::vector<u32> assign_colors(const std::vector<std::string>& sorted_ids);
+/// The colour of one player by himself (his hash slot).
+u32 color_of(const std::string& id);
 
 // ---- combat (vs_multiplayer.mjs) ---------------------------------------------------------------
 enum class Zone : u8 { torso, head, legs };
 enum class Weapon : u8 { other, smg, glock, sniper, fists, knife, launcher, rocket, grenade, drone_gun, drone_rocket, jet_gun, jet_missile, jet_bomb, explosion };
-const char* weapon_label(Weapon w);   // mp_fun_hud.mjs WEAPON_LABEL (German)
-const char* zone_name(Zone z);
+std::string weapon_label(Weapon w);   // mp_fun_hud.mjs WEAPON_LABEL (German)
+std::string zone_name(Zone z);
 /// Damage of one round on a mate: by weapon (smg 13, glock 26, sniper 95, fists 12, other 20)
 /// times where it lands (head x3, legs x0.65), 1..100 (VS_WEAPON_DAMAGE, VS_ZONE).
 f32 round_damage(Weapon w, Zone z);
 /// A blast on a mate: its damage rounded to 1..100 (blastHit), nothing below 1.
 f32 blast_damage(f32 damage);
 
-constexpr f64 kSpawnProtectMs = 2500;   // SPAWN_PROTECT_MS
-constexpr f64 kRegenDelayMs = 5000;     // REGEN_DELAY_MS
-constexpr f32 kRegenHpPerS = 12;        // REGEN_HP_PER_S
-constexpr f64 kRegenTickMs = 500;       // authorityRegen runs every 0.5 s
-constexpr f64 kRespawnCooldownMs = 3000;  // vs_combat_presentation.mjs RESPAWN_COOLDOWN_MS
-constexpr f32 kRespawnRadiusMin = 3, kRespawnRadiusMax = 5;  // RESPAWN_RADIUS_MIN_M / MAX_M
+// The Blueprint's SpawnProtectMs, RegenDelayMs, RegenHpPerS, RegenTickMs, RespawnCooldownMs,
+// RespawnRadiusMin and RespawnRadiusMax.
+extern f64 kSpawnProtectMs, kRegenDelayMs, kRegenTickMs, kRespawnCooldownMs;
+extern f32 kRegenHpPerS, kRespawnRadiusMin, kRespawnRadiusMax;
 
 /// What the authority decides for a damage request (authorityHit).
 enum class HitVerdict : u8 { applied, unknown_player, friendly_fire_off, protected_target, already_down };
@@ -138,7 +149,7 @@ bool group_spawn_center(const std::vector<Vec2>& points, Vec2& out, f32 link_m =
 Vec2 spawn_ring_offset(u32 slot);
 
 // ---- unanimous rule vote (rules_vote_engine.mjs) -----------------------------------------------
-constexpr f64 kBallotMs = 30000;
+extern f64 kBallotMs;  // the Blueprint's
 struct Ballot {
   u32 id = 0;
   u8 key = 0;            // 0: friendly fire (the only game rule, world_options.mjs)
@@ -156,13 +167,13 @@ Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> curr
 // ---- proximity voice (voice_codec.mjs, proximity_voice.mjs) -------------------------------------
 constexpr u32 kVoiceRate = 8000;        // VOICE_RATE
 constexpr u32 kVoiceFrame = 640;        // 80 ms per packet (proximity_voice.mjs onAudio)
-constexpr f32 kVoiceRadius = 70;        // VOICE_RADIUS_M
+extern f32 kVoiceRadius;                // VOICE_RADIUS_M: the Blueprint's
 u8 encode_mulaw(f32 sample);
 f32 decode_mulaw(u8 byte);
 /// 1 within 5 m, 0 from 70 m (linear in between).
 f32 proximity_gain(f32 distance);
 /// "Ueberall hoerbar" (team radio): at least 0.85.
-inline f32 voice_gain(f32 distance, bool everywhere) { return everywhere ? std::fmax(0.85f, proximity_gain(distance)) : proximity_gain(distance); }
+f32 voice_gain(f32 distance, bool everywhere);
 
 /// Incoming voice of one player, scheduled on a playhead 30..150 ms ahead (proximity_voice.mjs
 /// receive) and rendered into the game's audio output with linear resampling.
@@ -207,21 +218,21 @@ struct Turn { enum class Dir : u8 { none, left, right, u_turn } dir = Dir::none;
 Turn upcoming_turn(const std::vector<Vec2>& route, Vec2 position, f32 scan = 250, f32 window = 12, f32 min_angle = 38);
 /// Distance along the route that is left from the player to the end.
 f32 route_left(const std::vector<Vec2>& route, Vec2 position);
-struct MapEdge { Vec2 p; bool offmap = false; f32 rotation_deg = 0; const char* arrow = ""; bool valid = false; };
+struct MapEdge { Vec2 p; bool offmap = false; f32 rotation_deg = 0; std::string arrow; bool valid = false; };
 /// A peer on the big map: inside the drawn area as is, outside clipped to its edge with an arrow
 /// toward the real bearing (insets 16 / 16 / 30 px).
 MapEdge locate_map_peer(Vec2 p, f32 width, f32 height, f32 inset_x = 16, f32 inset_top = 16, f32 inset_bottom = 30);
 /// A nameplate on a phone: kept off the thumb sticks (bottom) and the tool bar (top).
 Vec2 safe_mobile_marker_point(Vec2 p, f32 width, f32 height, bool mobile);
 /// Compass arrow for a bearing (radians clockwise from north).
-const char* bearing_arrow(f32 bearing);
+std::string bearing_arrow(f32 bearing);
 /// "1,2 km" / "340 m" as the map labels distances (world_map_full.mjs fmtDist).
 std::string format_distance(f32 m);
 
 // ---- ping markers (ping_marker.mjs) -------------------------------------------------------------
-constexpr f64 kPingLifeMs = 90000;   // LIFE_MS
-constexpr f32 kPingRemoveM = 5;      // REMOVE_R
-constexpr f64 kPingHoldMs = 600;     // HOLD_MS (touch long press)
+// The Blueprint's PingLifeMs (LIFE_MS), PingRemoveM (REMOVE_R) and PingHoldMs (HOLD_MS, touch long press).
+extern f64 kPingLifeMs, kPingHoldMs;
+extern f32 kPingRemoveM;
 struct Ping { u8 owner = 0; Vec3 p; u32 color = 0; f64 at_ms = 0; };
 class PingBoard {
  public:
@@ -233,7 +244,7 @@ class PingBoard {
   void clear_all() { pings_.clear(); }
   const std::vector<Ping>& all() const { return pings_; }
   /// 1 while fresh, fading over the last 4 s.
-  static f32 fade(const Ping& p, f64 now_ms) { return clampf(static_cast<f32>((kPingLifeMs - (now_ms - p.at_ms)) / 4000.0), 0, 1); }
+  static f32 fade(const Ping& p, f64 now_ms);
 
  private:
   std::vector<Ping> pings_;
