@@ -50,6 +50,15 @@ cpp_objects=()
 for f in "${sources[@]}"; do cpp_objects+=("$out/obj/$(echo "$f" | sed "s|/|_|g")-$key-$(sha256sum "$f" | cut -c1-12).o"); done
 "$cxx" -fsanitize=address,undefined "${cpp_objects[@]}" "${objects[@]}" -lm -o "$out/spawncity_tests"
 "$out/spawncity_tests" "$@"
+# The game's own sources - what includes game.h and is not linked into the tests - compile: a
+# rule's header that changed is caught here, not first by the game's build.
+if [ $# -eq 0 ]; then
+  rest=()
+  for f in "$game"/src/*.cpp; do if [ "$(basename "$f")" = main.cpp ] || grep -q '#include "game.h"' "$f"; then rest+=("$f"); fi; done
+  printf '%s\n' "${rest[@]}" | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} "$cxx" -std=c++20 -fsyntax-only -fno-exceptions -fno-rtti -Wall -Wextra -Wno-unused-parameter \
+    -I"$kern/include" -I"$kern/third_party/box3d/include" -I"$game/src" {}
+  echo "ok   the game's own sources compile (${#rest[@]} files)"
+fi
 # The rules' Blueprint as its C++ text, compiled as it is by the host compiler (nothing looked up
 # at run time), gives what the interpreter gives: every call, value for value.
 if [ $# -eq 0 ]; then
