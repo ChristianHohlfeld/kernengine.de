@@ -245,6 +245,17 @@ In dieser Reihenfolge (klein nach groß; jede Datei verschwindet, ihre Tests ble
   keine Tabelle mehr: Es liest sie beim Start aus dem Blueprint, hält die Werte des Spielers und
   schreibt das JSON für die Seite. Die Stick-Kurve `fineness_axis` gab es doppelt – sie ist
   PhoneAxis in „Controls“.
+- [x] **`equipment`, Teil Jetpack** – Actor „Jetpack“: Schub, Treibstoff und Zeiten als
+  Variablen, die Struktur Pack, die Funktionen Ignite und Update (Schubstoß, Halten, Steiggrenze,
+  das Abfangen vor einer harten Landung, Nachfüllen). Offen aus `equipment`: Flugbuch und
+  Musik-Synthesizer – Aufzeichnung und Klangerzeugung, also Systeme (Stufe 4).
+- [x] **`world_traffic`, die Gesetze** – Actor „Traffic“: Ampelzeiten, Abstände und Wartezeiten
+  als Variablen und elf Funktionen – JunctionLights, JunctionRadius, Light (welche Phase für
+  welche Richtung), MustStop (Rot; Gelb, wenn es noch reicht), StopSpeed, YieldReach,
+  YieldHalfWidth, Honk, SideReach, Bodies, GapSpeed. `world_traffic.cpp` behält die Kreuzungen
+  der Straßen und die Schleifen über Autos und Leute (wer wo ist, wer eine Kreuzung hält) und
+  fragt die Gesetze je Auto; je Paar Auto–Passant wird kein Blueprint gerufen (das wären
+  tausende Aufrufe je Bild). Diese Schleifen sind ein System (Stufe 4).
 - Geschrieben wird so ein Regel-Blueprint als sein C++-Text und mit
   `tools/blueprint_cpp.sh --apply level.klevel <Actor> text.cpp` in das Level gelegt (dieselbe
   Lesart wie „Apply“ in der C++-Ansicht des Editors); das Level bleibt die eine Quelle.

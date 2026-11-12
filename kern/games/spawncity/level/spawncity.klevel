@@ -16,7 +16,7 @@
   "ambienceVolume": 0.35,
   "reverb": 0.2
  },
- "nextId": 10,
+ "nextId": 12,
  "actors": [
   {
    "id": 1,
@@ -33815,6 +33815,4090 @@
          "name": "in",
          "type": "bool",
          "value": false
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": 10,
+   "name": "Jetpack",
+   "folder": "Rules",
+   "transform": {
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     1
+    ]
+   },
+   "components": {
+    "logic": {
+     "kind": "kern-logic",
+     "version": 1,
+     "nextId": 118,
+     "variables": [
+      {
+       "name": "Acc",
+       "type": "float",
+       "value": 21,
+       "help": "player_walk_mode_v4.mjs: the thrust of the cushion before a hard landing (m/s2)"
+      },
+      {
+       "name": "Burst",
+       "type": "float",
+       "value": 0.6,
+       "help": "Seconds a burst lasts after the second jump"
+      },
+      {
+       "name": "FuelPerS",
+       "type": "float",
+       "value": 0.2,
+       "help": "Fuel a second of full thrust takes"
+      },
+      {
+       "name": "Recharge",
+       "type": "float",
+       "value": 4,
+       "help": "Seconds an empty pack takes to fill"
+      },
+      {
+       "name": "AirAccel",
+       "type": "float",
+       "value": 14,
+       "help": "How fast the player steers in the air (m/s2)"
+      },
+      {
+       "name": "CushionFuel",
+       "type": "float",
+       "value": 0.02,
+       "help": "The cushion needs more fuel than this"
+      },
+      {
+       "name": "AirRegenDelay",
+       "type": "float",
+       "value": 0.35,
+       "help": "In the air the pack fills again this long after it last burnt (s)"
+      },
+      {
+       "name": "GroundRegenDelay",
+       "type": "float",
+       "value": 0.4,
+       "help": "On the ground it fills after standing this long (s)"
+      },
+      {
+       "name": "ClimbAcc",
+       "type": "float",
+       "value": 13.8,
+       "help": "The thrust while climbing is at most this (m/s2)"
+      },
+      {
+       "name": "MaxClimb",
+       "type": "float",
+       "value": 8,
+       "help": "The pack climbs at most this fast (m/s)"
+      },
+      {
+       "name": "Gravity",
+       "type": "float",
+       "value": 9.81
+      },
+      {
+       "name": "FallSafe",
+       "type": "float",
+       "value": 7.7,
+       "help": "Falling faster than this hurts (m/s); the cushion fires from 80 % of it"
+      },
+      {
+       "name": "MinFuel",
+       "type": "float",
+       "value": 0.06,
+       "help": "Lighting the pack needs this much fuel"
+      },
+      {
+       "name": "IgnitionDamp",
+       "type": "float",
+       "value": 0.35,
+       "help": "A falling player is caught at ignition: his fall is scaled by this"
+      }
+     ],
+     "structs": [
+      {
+       "name": "Pack",
+       "fields": [
+        {
+         "name": "Fuel",
+         "type": "float",
+         "value": 1
+        },
+        {
+         "name": "Thrusting",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "Used",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "Ignitions",
+         "type": "int",
+         "value": 0
+        },
+        {
+         "name": "BurstLeft",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "GroundSince",
+         "type": "float",
+         "value": -1
+        },
+        {
+         "name": "LastThrust",
+         "type": "float",
+         "value": -99
+        }
+       ],
+       "help": "A player's jetpack: fuel 0..1, whether it burns this frame, whether it was lit in this jump, how often it was lit, what is left of the burst (s), since when the player stands (below 0: in the air), when it last burnt"
+      }
+     ],
+     "nodes": [
+      {
+       "id": 1,
+       "type": "func.entry",
+       "x": 0,
+       "y": 0,
+       "params": {
+        "function": "Ignite"
+       }
+      },
+      {
+       "id": 2,
+       "type": "var.set",
+       "x": 280,
+       "y": 0,
+       "params": {
+        "variable": "P",
+        "scope": "Ignite"
+       }
+      },
+      {
+       "id": 3,
+       "type": "flow.branch",
+       "x": 560,
+       "y": 0
+      },
+      {
+       "id": 4,
+       "type": "math.compare",
+       "x": 440,
+       "y": 150,
+       "params": {
+        "op": "<"
+       }
+      },
+      {
+       "id": 5,
+       "type": "struct.break",
+       "x": 440,
+       "y": 240,
+       "params": {
+        "struct": "Pack"
+       }
+      },
+      {
+       "id": 6,
+       "type": "var.get",
+       "x": 440,
+       "y": 330,
+       "params": {
+        "variable": "P",
+        "scope": "Ignite"
+       }
+      },
+      {
+       "id": 7,
+       "type": "var.get",
+       "x": 440,
+       "y": 420,
+       "params": {
+        "variable": "MinFuel"
+       }
+      },
+      {
+       "id": 8,
+       "type": "func.return",
+       "x": 840,
+       "y": 0,
+       "params": {
+        "function": "Ignite"
+       },
+       "values": {
+        "lit": false
+       }
+      },
+      {
+       "id": 9,
+       "type": "var.get",
+       "x": 720,
+       "y": 150,
+       "params": {
+        "variable": "P",
+        "scope": "Ignite"
+       }
+      },
+      {
+       "id": 10,
+       "type": "struct.set_field",
+       "x": 1120,
+       "y": 0,
+       "params": {
+        "variable": "P",
+        "field": "BurstLeft",
+        "scope": "Ignite"
+       }
+      },
+      {
+       "id": 11,
+       "type": "var.get",
+       "x": 1000,
+       "y": 150,
+       "params": {
+        "variable": "Burst"
+       }
+      },
+      {
+       "id": 12,
+       "type": "struct.set_field",
+       "x": 1400,
+       "y": 0,
+       "params": {
+        "variable": "P",
+        "field": "Used",
+        "scope": "Ignite"
+       },
+       "values": {
+        "value": true
+       }
+      },
+      {
+       "id": 13,
+       "type": "struct.set_field",
+       "x": 1680,
+       "y": 0,
+       "params": {
+        "variable": "P",
+        "field": "Ignitions",
+        "scope": "Ignite"
+       }
+      },
+      {
+       "id": 14,
+       "type": "math.round",
+       "x": 1560,
+       "y": 150
+      },
+      {
+       "id": 15,
+       "type": "math.add",
+       "x": 1560,
+       "y": 240,
+       "values": {
+        "b": 1
+       }
+      },
+      {
+       "id": 16,
+       "type": "struct.break",
+       "x": 1560,
+       "y": 330,
+       "params": {
+        "struct": "Pack"
+       }
+      },
+      {
+       "id": 17,
+       "type": "var.get",
+       "x": 1560,
+       "y": 420,
+       "params": {
+        "variable": "P",
+        "scope": "Ignite"
+       }
+      },
+      {
+       "id": 18,
+       "type": "func.return",
+       "x": 1960,
+       "y": 0,
+       "params": {
+        "function": "Ignite"
+       },
+       "values": {
+        "lit": true
+       }
+      },
+      {
+       "id": 19,
+       "type": "var.get",
+       "x": 1840,
+       "y": 150,
+       "params": {
+        "variable": "P",
+        "scope": "Ignite"
+       }
+      },
+      {
+       "id": 20,
+       "type": "func.entry",
+       "x": 0,
+       "y": 560,
+       "params": {
+        "function": "Update"
+       }
+      },
+      {
+       "id": 21,
+       "type": "var.set",
+       "x": 280,
+       "y": 560,
+       "params": {
+        "variable": "P",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 22,
+       "type": "struct.set_field",
+       "x": 560,
+       "y": 560,
+       "params": {
+        "variable": "P",
+        "field": "Thrusting",
+        "scope": "Update"
+       },
+       "values": {
+        "value": false
+       }
+      },
+      {
+       "id": 23,
+       "type": "flow.branch",
+       "x": 840,
+       "y": 560
+      },
+      {
+       "id": 24,
+       "type": "logic.not",
+       "x": 720,
+       "y": 710
+      },
+      {
+       "id": 25,
+       "type": "struct.set_field",
+       "x": 1120,
+       "y": 560,
+       "params": {
+        "variable": "P",
+        "field": "Used",
+        "scope": "Update"
+       },
+       "values": {
+        "value": false
+       }
+      },
+      {
+       "id": 26,
+       "type": "struct.set_field",
+       "x": 1400,
+       "y": 560,
+       "params": {
+        "variable": "P",
+        "field": "BurstLeft",
+        "scope": "Update"
+       },
+       "values": {
+        "value": 0
+       }
+      },
+      {
+       "id": 27,
+       "type": "flow.branch",
+       "x": 1680,
+       "y": 560
+      },
+      {
+       "id": 28,
+       "type": "math.compare",
+       "x": 1560,
+       "y": 710,
+       "params": {
+        "op": "<"
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 29,
+       "type": "struct.break",
+       "x": 1560,
+       "y": 800,
+       "params": {
+        "struct": "Pack"
+       }
+      },
+      {
+       "id": 30,
+       "type": "var.get",
+       "x": 1560,
+       "y": 890,
+       "params": {
+        "variable": "P",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 31,
+       "type": "struct.set_field",
+       "x": 1960,
+       "y": 560,
+       "params": {
+        "variable": "P",
+        "field": "GroundSince",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 32,
+       "type": "flow.branch",
+       "x": 2240,
+       "y": 560
+      },
+      {
+       "id": 33,
+       "type": "math.compare",
+       "x": 2120,
+       "y": 710,
+       "params": {
+        "op": ">"
+       }
+      },
+      {
+       "id": 34,
+       "type": "math.sub",
+       "x": 2120,
+       "y": 800
+      },
+      {
+       "id": 35,
+       "type": "struct.break",
+       "x": 2120,
+       "y": 890,
+       "params": {
+        "struct": "Pack"
+       }
+      },
+      {
+       "id": 36,
+       "type": "var.get",
+       "x": 2120,
+       "y": 980,
+       "params": {
+        "variable": "P",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 37,
+       "type": "var.get",
+       "x": 2120,
+       "y": 1070,
+       "params": {
+        "variable": "GroundRegenDelay"
+       }
+      },
+      {
+       "id": 38,
+       "type": "struct.set_field",
+       "x": 2520,
+       "y": 560,
+       "params": {
+        "variable": "P",
+        "field": "Fuel",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 39,
+       "type": "math.formula",
+       "x": 2400,
+       "y": 710,
+       "params": {
+        "formula": "min(1, fuel + dt / recharge)"
+       }
+      },
+      {
+       "id": 40,
+       "type": "struct.break",
+       "x": 2400,
+       "y": 800,
+       "params": {
+        "struct": "Pack"
+       }
+      },
+      {
+       "id": 41,
+       "type": "var.get",
+       "x": 2400,
+       "y": 890,
+       "params": {
+        "variable": "P",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 42,
+       "type": "var.get",
+       "x": 2400,
+       "y": 980,
+       "params": {
+        "variable": "Recharge"
+       }
+      },
+      {
+       "id": 43,
+       "type": "func.return",
+       "x": 2800,
+       "y": 560,
+       "params": {
+        "function": "Update"
+       },
+       "values": {
+        "thrust": 0
+       }
+      },
+      {
+       "id": 44,
+       "type": "var.get",
+       "x": 2680,
+       "y": 710,
+       "params": {
+        "variable": "P",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 45,
+       "type": "struct.set_field",
+       "x": 3080,
+       "y": 560,
+       "params": {
+        "variable": "P",
+        "field": "GroundSince",
+        "scope": "Update"
+       },
+       "values": {
+        "value": -1
+       }
+      },
+      {
+       "id": 46,
+       "type": "flow.branch",
+       "x": 3360,
+       "y": 560
+      },
+      {
+       "id": 47,
+       "type": "math.compare",
+       "x": 3240,
+       "y": 710,
+       "params": {
+        "op": ">"
+       }
+      },
+      {
+       "id": 48,
+       "type": "math.sub",
+       "x": 3240,
+       "y": 800
+      },
+      {
+       "id": 49,
+       "type": "struct.break",
+       "x": 3240,
+       "y": 890,
+       "params": {
+        "struct": "Pack"
+       }
+      },
+      {
+       "id": 50,
+       "type": "var.get",
+       "x": 3240,
+       "y": 980,
+       "params": {
+        "variable": "P",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 51,
+       "type": "var.get",
+       "x": 3240,
+       "y": 1070,
+       "params": {
+        "variable": "AirRegenDelay"
+       }
+      },
+      {
+       "id": 52,
+       "type": "struct.set_field",
+       "x": 3640,
+       "y": 560,
+       "params": {
+        "variable": "P",
+        "field": "Fuel",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 53,
+       "type": "math.formula",
+       "x": 3520,
+       "y": 710,
+       "params": {
+        "formula": "min(1, fuel + dt / recharge)"
+       }
+      },
+      {
+       "id": 54,
+       "type": "struct.break",
+       "x": 3520,
+       "y": 800,
+       "params": {
+        "struct": "Pack"
+       }
+      },
+      {
+       "id": 55,
+       "type": "var.get",
+       "x": 3520,
+       "y": 890,
+       "params": {
+        "variable": "P",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 56,
+       "type": "var.get",
+       "x": 3520,
+       "y": 980,
+       "params": {
+        "variable": "Recharge"
+       }
+      },
+      {
+       "id": 57,
+       "type": "flow.branch",
+       "x": 3920,
+       "y": 560
+      },
+      {
+       "id": 58,
+       "type": "math.compare",
+       "x": 3800,
+       "y": 710,
+       "params": {
+        "op": "<="
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 59,
+       "type": "struct.break",
+       "x": 3800,
+       "y": 800,
+       "params": {
+        "struct": "Pack"
+       }
+      },
+      {
+       "id": 60,
+       "type": "var.get",
+       "x": 3800,
+       "y": 890,
+       "params": {
+        "variable": "P",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 61,
+       "type": "func.return",
+       "x": 4200,
+       "y": 560,
+       "params": {
+        "function": "Update"
+       },
+       "values": {
+        "thrust": 0
+       }
+      },
+      {
+       "id": 62,
+       "type": "var.get",
+       "x": 4080,
+       "y": 710,
+       "params": {
+        "variable": "P",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 63,
+       "type": "var.set",
+       "x": 4480,
+       "y": 560,
+       "params": {
+        "variable": "Bursting",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 64,
+       "type": "logic.or",
+       "x": 4360,
+       "y": 710
+      },
+      {
+       "id": 65,
+       "type": "math.compare",
+       "x": 4360,
+       "y": 800,
+       "params": {
+        "op": ">"
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 66,
+       "type": "struct.break",
+       "x": 4360,
+       "y": 890,
+       "params": {
+        "struct": "Pack"
+       }
+      },
+      {
+       "id": 67,
+       "type": "var.get",
+       "x": 4360,
+       "y": 980,
+       "params": {
+        "variable": "P",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 68,
+       "type": "logic.and",
+       "x": 4360,
+       "y": 1070
+      },
+      {
+       "id": 69,
+       "type": "struct.break",
+       "x": 4360,
+       "y": 1160,
+       "params": {
+        "struct": "Pack"
+       }
+      },
+      {
+       "id": 70,
+       "type": "var.get",
+       "x": 4360,
+       "y": 1250,
+       "params": {
+        "variable": "P",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 71,
+       "type": "var.set",
+       "x": 4760,
+       "y": 560,
+       "params": {
+        "variable": "Cushion",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 72,
+       "type": "logic.and",
+       "x": 4640,
+       "y": 710
+      },
+      {
+       "id": 73,
+       "type": "logic.and",
+       "x": 4640,
+       "y": 800
+      },
+      {
+       "id": 74,
+       "type": "math.compare",
+       "x": 4640,
+       "y": 890,
+       "params": {
+        "op": "<"
+       }
+      },
+      {
+       "id": 75,
+       "type": "math.mul",
+       "x": 4640,
+       "y": 980,
+       "values": {
+        "b": -0.8
+       }
+      },
+      {
+       "id": 76,
+       "type": "var.get",
+       "x": 4640,
+       "y": 1070,
+       "params": {
+        "variable": "FallSafe"
+       }
+      },
+      {
+       "id": 77,
+       "type": "math.compare",
+       "x": 4640,
+       "y": 1160,
+       "params": {
+        "op": ">"
+       }
+      },
+      {
+       "id": 78,
+       "type": "struct.break",
+       "x": 4640,
+       "y": 1250,
+       "params": {
+        "struct": "Pack"
+       }
+      },
+      {
+       "id": 79,
+       "type": "var.get",
+       "x": 4640,
+       "y": 1340,
+       "params": {
+        "variable": "P",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 80,
+       "type": "var.get",
+       "x": 4640,
+       "y": 1430,
+       "params": {
+        "variable": "CushionFuel"
+       }
+      },
+      {
+       "id": 81,
+       "type": "math.compare",
+       "x": 4640,
+       "y": 1520,
+       "params": {
+        "op": "<"
+       }
+      },
+      {
+       "id": 82,
+       "type": "math.formula",
+       "x": 4640,
+       "y": 1610,
+       "params": {
+        "formula": "(vz < 0 ? vz * vz / (2 * (acc - g)) : 0) + 0.6"
+       }
+      },
+      {
+       "id": 83,
+       "type": "var.get",
+       "x": 4640,
+       "y": 1700,
+       "params": {
+        "variable": "Acc"
+       }
+      },
+      {
+       "id": 84,
+       "type": "var.get",
+       "x": 4640,
+       "y": 1790,
+       "params": {
+        "variable": "Gravity"
+       }
+      },
+      {
+       "id": 85,
+       "type": "flow.branch",
+       "x": 5040,
+       "y": 560
+      },
+      {
+       "id": 86,
+       "type": "logic.not",
+       "x": 4920,
+       "y": 710
+      },
+      {
+       "id": 87,
+       "type": "logic.or",
+       "x": 4920,
+       "y": 800
+      },
+      {
+       "id": 88,
+       "type": "var.get",
+       "x": 4920,
+       "y": 890,
+       "params": {
+        "variable": "Bursting",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 89,
+       "type": "var.get",
+       "x": 4920,
+       "y": 980,
+       "params": {
+        "variable": "Cushion",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 90,
+       "type": "func.return",
+       "x": 5320,
+       "y": 560,
+       "params": {
+        "function": "Update"
+       },
+       "values": {
+        "thrust": 0
+       }
+      },
+      {
+       "id": 91,
+       "type": "var.get",
+       "x": 5200,
+       "y": 710,
+       "params": {
+        "variable": "P",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 92,
+       "type": "struct.set_field",
+       "x": 5600,
+       "y": 560,
+       "params": {
+        "variable": "P",
+        "field": "Thrusting",
+        "scope": "Update"
+       },
+       "values": {
+        "value": true
+       }
+      },
+      {
+       "id": 93,
+       "type": "struct.set_field",
+       "x": 5880,
+       "y": 560,
+       "params": {
+        "variable": "P",
+        "field": "LastThrust",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 94,
+       "type": "var.set",
+       "x": 6160,
+       "y": 560,
+       "params": {
+        "variable": "Thrust",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 95,
+       "type": "logic.select",
+       "x": 6040,
+       "y": 710,
+       "params": {
+        "type": "float"
+       }
+      },
+      {
+       "id": 96,
+       "type": "var.get",
+       "x": 6040,
+       "y": 800,
+       "params": {
+        "variable": "Cushion",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 97,
+       "type": "var.get",
+       "x": 6040,
+       "y": 890,
+       "params": {
+        "variable": "Acc"
+       }
+      },
+      {
+       "id": 98,
+       "type": "math.formula",
+       "x": 6040,
+       "y": 980,
+       "params": {
+        "formula": "clamp(g + (climb - vz) * 3, 0, most)"
+       }
+      },
+      {
+       "id": 99,
+       "type": "var.get",
+       "x": 6040,
+       "y": 1070,
+       "params": {
+        "variable": "Gravity"
+       }
+      },
+      {
+       "id": 100,
+       "type": "var.get",
+       "x": 6040,
+       "y": 1160,
+       "params": {
+        "variable": "MaxClimb"
+       }
+      },
+      {
+       "id": 101,
+       "type": "var.get",
+       "x": 6040,
+       "y": 1250,
+       "params": {
+        "variable": "ClimbAcc"
+       }
+      },
+      {
+       "id": 102,
+       "type": "struct.set_field",
+       "x": 6440,
+       "y": 560,
+       "params": {
+        "variable": "P",
+        "field": "Fuel",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 103,
+       "type": "math.formula",
+       "x": 6320,
+       "y": 710,
+       "params": {
+        "formula": "max(0, fuel - per * dt * thrust / acc)"
+       }
+      },
+      {
+       "id": 104,
+       "type": "struct.break",
+       "x": 6320,
+       "y": 800,
+       "params": {
+        "struct": "Pack"
+       }
+      },
+      {
+       "id": 105,
+       "type": "var.get",
+       "x": 6320,
+       "y": 890,
+       "params": {
+        "variable": "P",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 106,
+       "type": "var.get",
+       "x": 6320,
+       "y": 980,
+       "params": {
+        "variable": "FuelPerS"
+       }
+      },
+      {
+       "id": 107,
+       "type": "var.get",
+       "x": 6320,
+       "y": 1070,
+       "params": {
+        "variable": "Thrust",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 108,
+       "type": "var.get",
+       "x": 6320,
+       "y": 1160,
+       "params": {
+        "variable": "Acc"
+       }
+      },
+      {
+       "id": 109,
+       "type": "flow.branch",
+       "x": 6720,
+       "y": 560
+      },
+      {
+       "id": 110,
+       "type": "var.get",
+       "x": 6600,
+       "y": 710,
+       "params": {
+        "variable": "Bursting",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 111,
+       "type": "struct.set_field",
+       "x": 7000,
+       "y": 560,
+       "params": {
+        "variable": "P",
+        "field": "BurstLeft",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 112,
+       "type": "math.sub",
+       "x": 6880,
+       "y": 710
+      },
+      {
+       "id": 113,
+       "type": "struct.break",
+       "x": 6880,
+       "y": 800,
+       "params": {
+        "struct": "Pack"
+       }
+      },
+      {
+       "id": 114,
+       "type": "var.get",
+       "x": 6880,
+       "y": 890,
+       "params": {
+        "variable": "P",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 115,
+       "type": "func.return",
+       "x": 7280,
+       "y": 560,
+       "params": {
+        "function": "Update"
+       }
+      },
+      {
+       "id": 116,
+       "type": "var.get",
+       "x": 7160,
+       "y": 710,
+       "params": {
+        "variable": "P",
+        "scope": "Update"
+       }
+      },
+      {
+       "id": 117,
+       "type": "var.get",
+       "x": 7160,
+       "y": 800,
+       "params": {
+        "variable": "Thrust",
+        "scope": "Update"
+       }
+      }
+     ],
+     "links": [
+      [
+       1,
+       "pack",
+       2,
+       "value"
+      ],
+      [
+       1,
+       "then",
+       2,
+       "exec"
+      ],
+      [
+       2,
+       "then",
+       3,
+       "exec"
+      ],
+      [
+       3,
+       "false",
+       10,
+       "exec"
+      ],
+      [
+       3,
+       "true",
+       8,
+       "exec"
+      ],
+      [
+       4,
+       "result",
+       3,
+       "condition"
+      ],
+      [
+       5,
+       "Fuel",
+       4,
+       "a"
+      ],
+      [
+       6,
+       "value",
+       5,
+       "value"
+      ],
+      [
+       7,
+       "value",
+       4,
+       "b"
+      ],
+      [
+       9,
+       "value",
+       8,
+       "pack"
+      ],
+      [
+       10,
+       "then",
+       12,
+       "exec"
+      ],
+      [
+       11,
+       "value",
+       10,
+       "value"
+      ],
+      [
+       12,
+       "then",
+       13,
+       "exec"
+      ],
+      [
+       13,
+       "then",
+       18,
+       "exec"
+      ],
+      [
+       14,
+       "result",
+       13,
+       "value"
+      ],
+      [
+       15,
+       "result",
+       14,
+       "a"
+      ],
+      [
+       16,
+       "Ignitions",
+       15,
+       "a"
+      ],
+      [
+       17,
+       "value",
+       16,
+       "value"
+      ],
+      [
+       19,
+       "value",
+       18,
+       "pack"
+      ],
+      [
+       20,
+       "airborne",
+       24,
+       "a"
+      ],
+      [
+       20,
+       "dt",
+       39,
+       "dt"
+      ],
+      [
+       20,
+       "dt",
+       53,
+       "dt"
+      ],
+      [
+       20,
+       "dt",
+       103,
+       "dt"
+      ],
+      [
+       20,
+       "dt",
+       112,
+       "b"
+      ],
+      [
+       20,
+       "height",
+       81,
+       "a"
+      ],
+      [
+       20,
+       "hold",
+       68,
+       "b"
+      ],
+      [
+       20,
+       "now",
+       31,
+       "value"
+      ],
+      [
+       20,
+       "now",
+       34,
+       "a"
+      ],
+      [
+       20,
+       "now",
+       48,
+       "a"
+      ],
+      [
+       20,
+       "now",
+       93,
+       "value"
+      ],
+      [
+       20,
+       "pack",
+       21,
+       "value"
+      ],
+      [
+       20,
+       "then",
+       21,
+       "exec"
+      ],
+      [
+       20,
+       "vz",
+       74,
+       "a"
+      ],
+      [
+       20,
+       "vz",
+       82,
+       "vz"
+      ],
+      [
+       20,
+       "vz",
+       98,
+       "vz"
+      ],
+      [
+       21,
+       "then",
+       22,
+       "exec"
+      ],
+      [
+       22,
+       "then",
+       23,
+       "exec"
+      ],
+      [
+       23,
+       "false",
+       45,
+       "exec"
+      ],
+      [
+       23,
+       "true",
+       25,
+       "exec"
+      ],
+      [
+       24,
+       "result",
+       23,
+       "condition"
+      ],
+      [
+       25,
+       "then",
+       26,
+       "exec"
+      ],
+      [
+       26,
+       "then",
+       27,
+       "exec"
+      ],
+      [
+       27,
+       "false",
+       32,
+       "exec"
+      ],
+      [
+       27,
+       "true",
+       31,
+       "exec"
+      ],
+      [
+       28,
+       "result",
+       27,
+       "condition"
+      ],
+      [
+       29,
+       "GroundSince",
+       28,
+       "a"
+      ],
+      [
+       30,
+       "value",
+       29,
+       "value"
+      ],
+      [
+       31,
+       "then",
+       32,
+       "exec"
+      ],
+      [
+       32,
+       "false",
+       43,
+       "exec"
+      ],
+      [
+       32,
+       "true",
+       38,
+       "exec"
+      ],
+      [
+       33,
+       "result",
+       32,
+       "condition"
+      ],
+      [
+       34,
+       "result",
+       33,
+       "a"
+      ],
+      [
+       35,
+       "GroundSince",
+       34,
+       "b"
+      ],
+      [
+       36,
+       "value",
+       35,
+       "value"
+      ],
+      [
+       37,
+       "value",
+       33,
+       "b"
+      ],
+      [
+       38,
+       "then",
+       43,
+       "exec"
+      ],
+      [
+       39,
+       "result",
+       38,
+       "value"
+      ],
+      [
+       40,
+       "Fuel",
+       39,
+       "fuel"
+      ],
+      [
+       41,
+       "value",
+       40,
+       "value"
+      ],
+      [
+       42,
+       "value",
+       39,
+       "recharge"
+      ],
+      [
+       44,
+       "value",
+       43,
+       "pack"
+      ],
+      [
+       45,
+       "then",
+       46,
+       "exec"
+      ],
+      [
+       46,
+       "false",
+       57,
+       "exec"
+      ],
+      [
+       46,
+       "true",
+       52,
+       "exec"
+      ],
+      [
+       47,
+       "result",
+       46,
+       "condition"
+      ],
+      [
+       48,
+       "result",
+       47,
+       "a"
+      ],
+      [
+       49,
+       "LastThrust",
+       48,
+       "b"
+      ],
+      [
+       50,
+       "value",
+       49,
+       "value"
+      ],
+      [
+       51,
+       "value",
+       47,
+       "b"
+      ],
+      [
+       52,
+       "then",
+       57,
+       "exec"
+      ],
+      [
+       53,
+       "result",
+       52,
+       "value"
+      ],
+      [
+       54,
+       "Fuel",
+       53,
+       "fuel"
+      ],
+      [
+       55,
+       "value",
+       54,
+       "value"
+      ],
+      [
+       56,
+       "value",
+       53,
+       "recharge"
+      ],
+      [
+       57,
+       "false",
+       63,
+       "exec"
+      ],
+      [
+       57,
+       "true",
+       61,
+       "exec"
+      ],
+      [
+       58,
+       "result",
+       57,
+       "condition"
+      ],
+      [
+       59,
+       "Fuel",
+       58,
+       "a"
+      ],
+      [
+       60,
+       "value",
+       59,
+       "value"
+      ],
+      [
+       62,
+       "value",
+       61,
+       "pack"
+      ],
+      [
+       63,
+       "then",
+       71,
+       "exec"
+      ],
+      [
+       64,
+       "result",
+       63,
+       "value"
+      ],
+      [
+       65,
+       "result",
+       64,
+       "a"
+      ],
+      [
+       66,
+       "BurstLeft",
+       65,
+       "a"
+      ],
+      [
+       67,
+       "value",
+       66,
+       "value"
+      ],
+      [
+       68,
+       "result",
+       64,
+       "b"
+      ],
+      [
+       69,
+       "Used",
+       68,
+       "a"
+      ],
+      [
+       70,
+       "value",
+       69,
+       "value"
+      ],
+      [
+       71,
+       "then",
+       85,
+       "exec"
+      ],
+      [
+       72,
+       "result",
+       71,
+       "value"
+      ],
+      [
+       73,
+       "result",
+       72,
+       "a"
+      ],
+      [
+       74,
+       "result",
+       73,
+       "a"
+      ],
+      [
+       75,
+       "result",
+       74,
+       "b"
+      ],
+      [
+       76,
+       "value",
+       75,
+       "a"
+      ],
+      [
+       77,
+       "result",
+       73,
+       "b"
+      ],
+      [
+       78,
+       "Fuel",
+       77,
+       "a"
+      ],
+      [
+       79,
+       "value",
+       78,
+       "value"
+      ],
+      [
+       80,
+       "value",
+       77,
+       "b"
+      ],
+      [
+       81,
+       "result",
+       72,
+       "b"
+      ],
+      [
+       82,
+       "result",
+       81,
+       "b"
+      ],
+      [
+       83,
+       "value",
+       82,
+       "acc"
+      ],
+      [
+       84,
+       "value",
+       82,
+       "g"
+      ],
+      [
+       85,
+       "false",
+       92,
+       "exec"
+      ],
+      [
+       85,
+       "true",
+       90,
+       "exec"
+      ],
+      [
+       86,
+       "result",
+       85,
+       "condition"
+      ],
+      [
+       87,
+       "result",
+       86,
+       "a"
+      ],
+      [
+       88,
+       "value",
+       87,
+       "a"
+      ],
+      [
+       89,
+       "value",
+       87,
+       "b"
+      ],
+      [
+       91,
+       "value",
+       90,
+       "pack"
+      ],
+      [
+       92,
+       "then",
+       93,
+       "exec"
+      ],
+      [
+       93,
+       "then",
+       94,
+       "exec"
+      ],
+      [
+       94,
+       "then",
+       102,
+       "exec"
+      ],
+      [
+       95,
+       "result",
+       94,
+       "value"
+      ],
+      [
+       96,
+       "value",
+       95,
+       "pick"
+      ],
+      [
+       97,
+       "value",
+       95,
+       "a"
+      ],
+      [
+       98,
+       "result",
+       95,
+       "b"
+      ],
+      [
+       99,
+       "value",
+       98,
+       "g"
+      ],
+      [
+       100,
+       "value",
+       98,
+       "climb"
+      ],
+      [
+       101,
+       "value",
+       98,
+       "most"
+      ],
+      [
+       102,
+       "then",
+       109,
+       "exec"
+      ],
+      [
+       103,
+       "result",
+       102,
+       "value"
+      ],
+      [
+       104,
+       "Fuel",
+       103,
+       "fuel"
+      ],
+      [
+       105,
+       "value",
+       104,
+       "value"
+      ],
+      [
+       106,
+       "value",
+       103,
+       "per"
+      ],
+      [
+       107,
+       "value",
+       103,
+       "thrust"
+      ],
+      [
+       108,
+       "value",
+       103,
+       "acc"
+      ],
+      [
+       109,
+       "false",
+       115,
+       "exec"
+      ],
+      [
+       109,
+       "true",
+       111,
+       "exec"
+      ],
+      [
+       110,
+       "value",
+       109,
+       "condition"
+      ],
+      [
+       111,
+       "then",
+       115,
+       "exec"
+      ],
+      [
+       112,
+       "result",
+       111,
+       "value"
+      ],
+      [
+       113,
+       "BurstLeft",
+       112,
+       "a"
+      ],
+      [
+       114,
+       "value",
+       113,
+       "value"
+      ],
+      [
+       116,
+       "value",
+       115,
+       "pack"
+      ],
+      [
+       117,
+       "value",
+       115,
+       "thrust"
+      ]
+     ],
+     "machines": [],
+     "functions": [
+      {
+       "name": "Ignite",
+       "pure": true,
+       "help": "The second JUMP in the air lights the pack - not without fuel",
+       "inputs": [
+        {
+         "name": "pack",
+         "type": "struct",
+         "of": "Pack",
+         "value": {
+          "Fuel": 1,
+          "Thrusting": false,
+          "Used": false,
+          "Ignitions": 0,
+          "BurstLeft": 0,
+          "GroundSince": -1,
+          "LastThrust": -99
+         }
+        }
+       ],
+       "outputs": [
+        {
+         "name": "pack",
+         "type": "struct",
+         "of": "Pack",
+         "value": {
+          "Fuel": 1,
+          "Thrusting": false,
+          "Used": false,
+          "Ignitions": 0,
+          "BurstLeft": 0,
+          "GroundSince": -1,
+          "LastThrust": -99
+         }
+        },
+        {
+         "name": "lit",
+         "type": "bool",
+         "value": false
+        }
+       ],
+       "locals": [
+        {
+         "name": "P",
+         "type": "struct",
+         "of": "Pack",
+         "value": {
+          "Fuel": 1,
+          "Thrusting": false,
+          "Used": false,
+          "Ignitions": 0,
+          "BurstLeft": 0,
+          "GroundSince": -1,
+          "LastThrust": -99
+         }
+        }
+       ]
+      },
+      {
+       "name": "Update",
+       "pure": true,
+       "help": "One frame: the upward acceleration of the thrust (0: not burning). It burns during the burst and while JUMP is held, climbs at most MaxClimb, and fires by itself just before a hard landing; it fills on the ground and, a moment after burning, in the air.",
+       "inputs": [
+        {
+         "name": "pack",
+         "type": "struct",
+         "of": "Pack",
+         "value": {
+          "Fuel": 1,
+          "Thrusting": false,
+          "Used": false,
+          "Ignitions": 0,
+          "BurstLeft": 0,
+          "GroundSince": -1,
+          "LastThrust": -99
+         }
+        },
+        {
+         "name": "dt",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "now",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "airborne",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "vz",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "height",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "hold",
+         "type": "bool",
+         "value": false
+        }
+       ],
+       "outputs": [
+        {
+         "name": "pack",
+         "type": "struct",
+         "of": "Pack",
+         "value": {
+          "Fuel": 1,
+          "Thrusting": false,
+          "Used": false,
+          "Ignitions": 0,
+          "BurstLeft": 0,
+          "GroundSince": -1,
+          "LastThrust": -99
+         }
+        },
+        {
+         "name": "thrust",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "locals": [
+        {
+         "name": "P",
+         "type": "struct",
+         "of": "Pack",
+         "value": {
+          "Fuel": 1,
+          "Thrusting": false,
+          "Used": false,
+          "Ignitions": 0,
+          "BurstLeft": 0,
+          "GroundSince": -1,
+          "LastThrust": -99
+         }
+        },
+        {
+         "name": "Bursting",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "Cushion",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "Thrust",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": 11,
+   "name": "Traffic",
+   "folder": "Rules",
+   "transform": {
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     1
+    ]
+   },
+   "components": {
+    "logic": {
+     "kind": "kern-logic",
+     "version": 1,
+     "nextId": 88,
+     "variables": [
+      {
+       "name": "Green",
+       "type": "float",
+       "value": 14,
+       "help": "Traffic lights: seconds of green ..."
+      },
+      {
+       "name": "Amber",
+       "type": "float",
+       "value": 3,
+       "help": "... of amber ..."
+      },
+      {
+       "name": "AllRed",
+       "type": "float",
+       "value": 2,
+       "help": "... and with every arm red, for each of the two groups (arms along the junction's axis, arms across it)"
+      },
+      {
+       "name": "LightsFromWidth",
+       "type": "float",
+       "value": 9,
+       "help": "A junction with an arm at least this wide (m) has lights; the others are first come, first served"
+      },
+      {
+       "name": "Decel",
+       "type": "float",
+       "value": 3.5,
+       "help": "Comfortable braking to a stop line (m/s2)"
+      },
+      {
+       "name": "AmberDecel",
+       "type": "float",
+       "value": 4,
+       "help": "At amber a driver stops if this braking (m/s2) gets him to the line"
+      },
+      {
+       "name": "StopLineM",
+       "type": "float",
+       "value": 1.5,
+       "help": "The stop line is this far (m) before the junction's edge"
+      },
+      {
+       "name": "FirstComeM",
+       "type": "float",
+       "value": 14,
+       "help": "Without lights a driver looks at the junction from this far (m)"
+      },
+      {
+       "name": "ClaimS",
+       "type": "float",
+       "value": 8,
+       "help": "A car holds a junction at most this long (s)"
+      },
+      {
+       "name": "PatienceS",
+       "type": "float",
+       "value": 4,
+       "help": "Right before left: a driver waits this long (s) for cars from the right, then goes"
+      },
+      {
+       "name": "YieldReachM",
+       "type": "float",
+       "value": 6,
+       "help": "world_procedural_population.mjs yieldsToPedestrian: a driver brakes for people this far ahead (m) ..."
+      },
+      {
+       "name": "YieldReachBusM",
+       "type": "float",
+       "value": 9,
+       "help": "... a bus this far"
+      },
+      {
+       "name": "YieldHalfM",
+       "type": "float",
+       "value": 1.6,
+       "help": "... and this far to each side (m) ..."
+      },
+      {
+       "name": "YieldHalfBusM",
+       "type": "float",
+       "value": 1.95,
+       "help": "... a bus this far"
+      },
+      {
+       "name": "HonkPlayerS",
+       "type": "float",
+       "value": 2.6,
+       "help": "honkCheck: blocked by the player a driver honks after this many seconds ..."
+      },
+      {
+       "name": "HonkPersonS",
+       "type": "float",
+       "value": 7,
+       "help": "... by a pedestrian after this many ..."
+      },
+      {
+       "name": "HonkGapS",
+       "type": "float",
+       "value": 9,
+       "help": "... and again after this long at least (s) ..."
+      },
+      {
+       "name": "HonkSpreadS",
+       "type": "float",
+       "value": 7,
+       "help": "... plus up to this (s)"
+      },
+      {
+       "name": "HalfWidthM",
+       "type": "float",
+       "value": 1.25,
+       "help": "driveSpeed: half a car's width (m) ..."
+      },
+      {
+       "name": "HalfWidthBusM",
+       "type": "float",
+       "value": 1.6,
+       "help": "... a bus's ..."
+      },
+      {
+       "name": "HalfLengthM",
+       "type": "float",
+       "value": 1.9,
+       "help": "... half a car's length ..."
+      },
+      {
+       "name": "HalfLengthBusM",
+       "type": "float",
+       "value": 4,
+       "help": "... a bus's"
+      },
+      {
+       "name": "SideMarginM",
+       "type": "float",
+       "value": 0.6,
+       "help": "A vehicle ahead counts when it is no further to the side than half the own body plus this (m)"
+      },
+      {
+       "name": "AheadMinM",
+       "type": "float",
+       "value": 1,
+       "help": "... and its centre lies at least this far ahead (m) ..."
+      },
+      {
+       "name": "AheadMaxM",
+       "type": "float",
+       "value": 40,
+       "help": "... and at most this far"
+      },
+      {
+       "name": "GapKeepM",
+       "type": "float",
+       "value": 2.5,
+       "help": "Of the gap to the vehicle ahead this much (m) is kept ..."
+      },
+      {
+       "name": "HeadwayS",
+       "type": "float",
+       "value": 1.6,
+       "help": "... the rest is driven at this headway (s)"
+      }
+     ],
+     "nodes": [
+      {
+       "id": 1,
+       "type": "func.entry",
+       "x": 0,
+       "y": 0,
+       "params": {
+        "function": "JunctionLights"
+       }
+      },
+      {
+       "id": 2,
+       "type": "func.return",
+       "x": 280,
+       "y": 0,
+       "params": {
+        "function": "JunctionLights"
+       }
+      },
+      {
+       "id": 3,
+       "type": "math.compare",
+       "x": 160,
+       "y": 150,
+       "params": {
+        "op": ">="
+       }
+      },
+      {
+       "id": 4,
+       "type": "var.get",
+       "x": 160,
+       "y": 240,
+       "params": {
+        "variable": "LightsFromWidth"
+       }
+      },
+      {
+       "id": 5,
+       "type": "func.entry",
+       "x": 0,
+       "y": 380,
+       "params": {
+        "function": "JunctionRadius"
+       }
+      },
+      {
+       "id": 6,
+       "type": "func.return",
+       "x": 280,
+       "y": 380,
+       "params": {
+        "function": "JunctionRadius"
+       }
+      },
+      {
+       "id": 7,
+       "type": "math.max",
+       "x": 160,
+       "y": 530,
+       "values": {
+        "a": 6
+       }
+      },
+      {
+       "id": 8,
+       "type": "math.add",
+       "x": 160,
+       "y": 620,
+       "values": {
+        "b": 3.5
+       }
+      },
+      {
+       "id": 9,
+       "type": "math.mul",
+       "x": 160,
+       "y": 710,
+       "values": {
+        "b": 0.5
+       }
+      },
+      {
+       "id": 10,
+       "type": "func.entry",
+       "x": 0,
+       "y": 850,
+       "params": {
+        "function": "Light"
+       }
+      },
+      {
+       "id": 11,
+       "type": "var.set",
+       "x": 280,
+       "y": 850,
+       "params": {
+        "variable": "T",
+        "scope": "Light"
+       }
+      },
+      {
+       "id": 12,
+       "type": "math.formula",
+       "x": 160,
+       "y": 1000,
+       "params": {
+        "formula": "(time + offset + (abs(dot) > 0.7071 ? 0 : green + amber + red)) % (2 * (green + amber + red))"
+       }
+      },
+      {
+       "id": 13,
+       "type": "var.get",
+       "x": 160,
+       "y": 1090,
+       "params": {
+        "variable": "Green"
+       }
+      },
+      {
+       "id": 14,
+       "type": "var.get",
+       "x": 160,
+       "y": 1180,
+       "params": {
+        "variable": "Amber"
+       }
+      },
+      {
+       "id": 15,
+       "type": "var.get",
+       "x": 160,
+       "y": 1270,
+       "params": {
+        "variable": "AllRed"
+       }
+      },
+      {
+       "id": 16,
+       "type": "flow.branch",
+       "x": 560,
+       "y": 850
+      },
+      {
+       "id": 17,
+       "type": "math.compare",
+       "x": 440,
+       "y": 1000,
+       "params": {
+        "op": "<"
+       }
+      },
+      {
+       "id": 18,
+       "type": "var.get",
+       "x": 440,
+       "y": 1090,
+       "params": {
+        "variable": "T",
+        "scope": "Light"
+       }
+      },
+      {
+       "id": 19,
+       "type": "var.get",
+       "x": 440,
+       "y": 1180,
+       "params": {
+        "variable": "Green"
+       }
+      },
+      {
+       "id": 20,
+       "type": "func.return",
+       "x": 840,
+       "y": 850,
+       "params": {
+        "function": "Light"
+       },
+       "values": {
+        "light": 0
+       }
+      },
+      {
+       "id": 21,
+       "type": "flow.branch",
+       "x": 1120,
+       "y": 850
+      },
+      {
+       "id": 22,
+       "type": "math.compare",
+       "x": 1000,
+       "y": 1000,
+       "params": {
+        "op": "<"
+       }
+      },
+      {
+       "id": 23,
+       "type": "var.get",
+       "x": 1000,
+       "y": 1090,
+       "params": {
+        "variable": "T",
+        "scope": "Light"
+       }
+      },
+      {
+       "id": 24,
+       "type": "math.add",
+       "x": 1000,
+       "y": 1180
+      },
+      {
+       "id": 25,
+       "type": "var.get",
+       "x": 1000,
+       "y": 1270,
+       "params": {
+        "variable": "Green"
+       }
+      },
+      {
+       "id": 26,
+       "type": "var.get",
+       "x": 1000,
+       "y": 1360,
+       "params": {
+        "variable": "Amber"
+       }
+      },
+      {
+       "id": 27,
+       "type": "func.return",
+       "x": 1400,
+       "y": 850,
+       "params": {
+        "function": "Light"
+       },
+       "values": {
+        "light": 1
+       }
+      },
+      {
+       "id": 28,
+       "type": "func.return",
+       "x": 1680,
+       "y": 850,
+       "params": {
+        "function": "Light"
+       },
+       "values": {
+        "light": 2
+       }
+      },
+      {
+       "id": 29,
+       "type": "func.entry",
+       "x": 0,
+       "y": 1500,
+       "params": {
+        "function": "MustStop"
+       }
+      },
+      {
+       "id": 30,
+       "type": "func.return",
+       "x": 280,
+       "y": 1500,
+       "params": {
+        "function": "MustStop"
+       }
+      },
+      {
+       "id": 31,
+       "type": "logic.or",
+       "x": 160,
+       "y": 1650
+      },
+      {
+       "id": 32,
+       "type": "math.compare",
+       "x": 160,
+       "y": 1740,
+       "params": {
+        "op": "=="
+       },
+       "values": {
+        "b": 2
+       }
+      },
+      {
+       "id": 33,
+       "type": "logic.and",
+       "x": 160,
+       "y": 1830
+      },
+      {
+       "id": 34,
+       "type": "math.compare",
+       "x": 160,
+       "y": 1920,
+       "params": {
+        "op": "=="
+       },
+       "values": {
+        "b": 1
+       }
+      },
+      {
+       "id": 35,
+       "type": "math.compare",
+       "x": 160,
+       "y": 2010,
+       "params": {
+        "op": ">"
+       }
+      },
+      {
+       "id": 36,
+       "type": "math.formula",
+       "x": 160,
+       "y": 2100,
+       "params": {
+        "formula": "v * v / (2 * decel)"
+       }
+      },
+      {
+       "id": 37,
+       "type": "var.get",
+       "x": 160,
+       "y": 2190,
+       "params": {
+        "variable": "AmberDecel"
+       }
+      },
+      {
+       "id": 38,
+       "type": "func.entry",
+       "x": 0,
+       "y": 2330,
+       "params": {
+        "function": "StopSpeed"
+       }
+      },
+      {
+       "id": 39,
+       "type": "func.return",
+       "x": 280,
+       "y": 2330,
+       "params": {
+        "function": "StopSpeed"
+       }
+      },
+      {
+       "id": 40,
+       "type": "math.formula",
+       "x": 160,
+       "y": 2480,
+       "params": {
+        "formula": "sqrt(2 * decel * max(0, stop))"
+       }
+      },
+      {
+       "id": 41,
+       "type": "var.get",
+       "x": 160,
+       "y": 2570,
+       "params": {
+        "variable": "Decel"
+       }
+      },
+      {
+       "id": 42,
+       "type": "func.entry",
+       "x": 0,
+       "y": 2710,
+       "params": {
+        "function": "YieldReach"
+       }
+      },
+      {
+       "id": 43,
+       "type": "func.return",
+       "x": 280,
+       "y": 2710,
+       "params": {
+        "function": "YieldReach"
+       }
+      },
+      {
+       "id": 44,
+       "type": "math.formula",
+       "x": 160,
+       "y": 2860,
+       "params": {
+        "formula": "reach + max(0, v) * 0.5 + max(0, v) * max(0, v) / 9"
+       }
+      },
+      {
+       "id": 45,
+       "type": "logic.select",
+       "x": 160,
+       "y": 2950,
+       "params": {
+        "type": "float"
+       }
+      },
+      {
+       "id": 46,
+       "type": "var.get",
+       "x": 160,
+       "y": 3040,
+       "params": {
+        "variable": "YieldReachBusM"
+       }
+      },
+      {
+       "id": 47,
+       "type": "var.get",
+       "x": 160,
+       "y": 3130,
+       "params": {
+        "variable": "YieldReachM"
+       }
+      },
+      {
+       "id": 48,
+       "type": "func.entry",
+       "x": 0,
+       "y": 3270,
+       "params": {
+        "function": "YieldHalfWidth"
+       }
+      },
+      {
+       "id": 49,
+       "type": "func.return",
+       "x": 280,
+       "y": 3270,
+       "params": {
+        "function": "YieldHalfWidth"
+       }
+      },
+      {
+       "id": 50,
+       "type": "logic.select",
+       "x": 160,
+       "y": 3420,
+       "params": {
+        "type": "float"
+       }
+      },
+      {
+       "id": 51,
+       "type": "var.get",
+       "x": 160,
+       "y": 3510,
+       "params": {
+        "variable": "YieldHalfBusM"
+       }
+      },
+      {
+       "id": 52,
+       "type": "var.get",
+       "x": 160,
+       "y": 3600,
+       "params": {
+        "variable": "YieldHalfM"
+       }
+      },
+      {
+       "id": 53,
+       "type": "func.entry",
+       "x": 0,
+       "y": 3740,
+       "params": {
+        "function": "Honk"
+       }
+      },
+      {
+       "id": 54,
+       "type": "flow.branch",
+       "x": 280,
+       "y": 3740
+      },
+      {
+       "id": 55,
+       "type": "logic.and",
+       "x": 160,
+       "y": 3890
+      },
+      {
+       "id": 56,
+       "type": "math.compare",
+       "x": 160,
+       "y": 3980,
+       "params": {
+        "op": ">"
+       }
+      },
+      {
+       "id": 57,
+       "type": "math.sub",
+       "x": 160,
+       "y": 4070
+      },
+      {
+       "id": 58,
+       "type": "logic.select",
+       "x": 160,
+       "y": 4160,
+       "params": {
+        "type": "float"
+       }
+      },
+      {
+       "id": 59,
+       "type": "var.get",
+       "x": 160,
+       "y": 4250,
+       "params": {
+        "variable": "HonkPlayerS"
+       }
+      },
+      {
+       "id": 60,
+       "type": "var.get",
+       "x": 160,
+       "y": 4340,
+       "params": {
+        "variable": "HonkPersonS"
+       }
+      },
+      {
+       "id": 61,
+       "type": "math.compare",
+       "x": 160,
+       "y": 4430,
+       "params": {
+        "op": ">="
+       }
+      },
+      {
+       "id": 62,
+       "type": "func.return",
+       "x": 560,
+       "y": 3740,
+       "params": {
+        "function": "Honk"
+       },
+       "values": {
+        "honk": true
+       }
+      },
+      {
+       "id": 63,
+       "type": "math.formula",
+       "x": 440,
+       "y": 3890,
+       "params": {
+        "formula": "now + gap + roll * spread"
+       }
+      },
+      {
+       "id": 64,
+       "type": "var.get",
+       "x": 440,
+       "y": 3980,
+       "params": {
+        "variable": "HonkGapS"
+       }
+      },
+      {
+       "id": 65,
+       "type": "var.get",
+       "x": 440,
+       "y": 4070,
+       "params": {
+        "variable": "HonkSpreadS"
+       }
+      },
+      {
+       "id": 66,
+       "type": "func.return",
+       "x": 840,
+       "y": 3740,
+       "params": {
+        "function": "Honk"
+       },
+       "values": {
+        "honk": false
+       }
+      },
+      {
+       "id": 67,
+       "type": "func.entry",
+       "x": 0,
+       "y": 4570,
+       "params": {
+        "function": "SideReach"
+       }
+      },
+      {
+       "id": 68,
+       "type": "func.return",
+       "x": 280,
+       "y": 4570,
+       "params": {
+        "function": "SideReach"
+       }
+      },
+      {
+       "id": 69,
+       "type": "math.add",
+       "x": 160,
+       "y": 4720
+      },
+      {
+       "id": 70,
+       "type": "logic.select",
+       "x": 160,
+       "y": 4810,
+       "params": {
+        "type": "float"
+       }
+      },
+      {
+       "id": 71,
+       "type": "var.get",
+       "x": 160,
+       "y": 4900,
+       "params": {
+        "variable": "HalfWidthBusM"
+       }
+      },
+      {
+       "id": 72,
+       "type": "var.get",
+       "x": 160,
+       "y": 4990,
+       "params": {
+        "variable": "HalfWidthM"
+       }
+      },
+      {
+       "id": 73,
+       "type": "var.get",
+       "x": 160,
+       "y": 5080,
+       "params": {
+        "variable": "SideMarginM"
+       }
+      },
+      {
+       "id": 74,
+       "type": "func.entry",
+       "x": 0,
+       "y": 5220,
+       "params": {
+        "function": "Bodies"
+       }
+      },
+      {
+       "id": 75,
+       "type": "func.return",
+       "x": 280,
+       "y": 5220,
+       "params": {
+        "function": "Bodies"
+       }
+      },
+      {
+       "id": 76,
+       "type": "math.add",
+       "x": 160,
+       "y": 5370
+      },
+      {
+       "id": 77,
+       "type": "logic.select",
+       "x": 160,
+       "y": 5460,
+       "params": {
+        "type": "float"
+       }
+      },
+      {
+       "id": 78,
+       "type": "var.get",
+       "x": 160,
+       "y": 5550,
+       "params": {
+        "variable": "HalfLengthBusM"
+       }
+      },
+      {
+       "id": 79,
+       "type": "var.get",
+       "x": 160,
+       "y": 5640,
+       "params": {
+        "variable": "HalfLengthM"
+       }
+      },
+      {
+       "id": 80,
+       "type": "logic.select",
+       "x": 160,
+       "y": 5730,
+       "params": {
+        "type": "float"
+       }
+      },
+      {
+       "id": 81,
+       "type": "var.get",
+       "x": 160,
+       "y": 5820,
+       "params": {
+        "variable": "HalfLengthBusM"
+       }
+      },
+      {
+       "id": 82,
+       "type": "var.get",
+       "x": 160,
+       "y": 5910,
+       "params": {
+        "variable": "HalfLengthM"
+       }
+      },
+      {
+       "id": 83,
+       "type": "func.entry",
+       "x": 0,
+       "y": 6050,
+       "params": {
+        "function": "GapSpeed"
+       }
+      },
+      {
+       "id": 84,
+       "type": "func.return",
+       "x": 280,
+       "y": 6050,
+       "params": {
+        "function": "GapSpeed"
+       }
+      },
+      {
+       "id": 85,
+       "type": "math.formula",
+       "x": 160,
+       "y": 6200,
+       "params": {
+        "formula": "max(0, gap - keep) / headway"
+       }
+      },
+      {
+       "id": 86,
+       "type": "var.get",
+       "x": 160,
+       "y": 6290,
+       "params": {
+        "variable": "GapKeepM"
+       }
+      },
+      {
+       "id": 87,
+       "type": "var.get",
+       "x": 160,
+       "y": 6380,
+       "params": {
+        "variable": "HeadwayS"
+       }
+      }
+     ],
+     "links": [
+      [
+       1,
+       "then",
+       2,
+       "exec"
+      ],
+      [
+       1,
+       "widest",
+       3,
+       "a"
+      ],
+      [
+       3,
+       "result",
+       2,
+       "lights"
+      ],
+      [
+       4,
+       "value",
+       3,
+       "b"
+      ],
+      [
+       5,
+       "then",
+       6,
+       "exec"
+      ],
+      [
+       5,
+       "widest",
+       9,
+       "a"
+      ],
+      [
+       7,
+       "result",
+       6,
+       "radius"
+      ],
+      [
+       8,
+       "result",
+       7,
+       "b"
+      ],
+      [
+       9,
+       "result",
+       8,
+       "a"
+      ],
+      [
+       10,
+       "headingDot",
+       12,
+       "dot"
+      ],
+      [
+       10,
+       "offset",
+       12,
+       "offset"
+      ],
+      [
+       10,
+       "then",
+       11,
+       "exec"
+      ],
+      [
+       10,
+       "time",
+       12,
+       "time"
+      ],
+      [
+       11,
+       "then",
+       16,
+       "exec"
+      ],
+      [
+       12,
+       "result",
+       11,
+       "value"
+      ],
+      [
+       13,
+       "value",
+       12,
+       "green"
+      ],
+      [
+       14,
+       "value",
+       12,
+       "amber"
+      ],
+      [
+       15,
+       "value",
+       12,
+       "red"
+      ],
+      [
+       16,
+       "false",
+       21,
+       "exec"
+      ],
+      [
+       16,
+       "true",
+       20,
+       "exec"
+      ],
+      [
+       17,
+       "result",
+       16,
+       "condition"
+      ],
+      [
+       18,
+       "value",
+       17,
+       "a"
+      ],
+      [
+       19,
+       "value",
+       17,
+       "b"
+      ],
+      [
+       21,
+       "false",
+       28,
+       "exec"
+      ],
+      [
+       21,
+       "true",
+       27,
+       "exec"
+      ],
+      [
+       22,
+       "result",
+       21,
+       "condition"
+      ],
+      [
+       23,
+       "value",
+       22,
+       "a"
+      ],
+      [
+       24,
+       "result",
+       22,
+       "b"
+      ],
+      [
+       25,
+       "value",
+       24,
+       "a"
+      ],
+      [
+       26,
+       "value",
+       24,
+       "b"
+      ],
+      [
+       29,
+       "light",
+       32,
+       "a"
+      ],
+      [
+       29,
+       "light",
+       34,
+       "a"
+      ],
+      [
+       29,
+       "speed",
+       36,
+       "v"
+      ],
+      [
+       29,
+       "stop",
+       35,
+       "a"
+      ],
+      [
+       29,
+       "then",
+       30,
+       "exec"
+      ],
+      [
+       31,
+       "result",
+       30,
+       "stop"
+      ],
+      [
+       32,
+       "result",
+       31,
+       "a"
+      ],
+      [
+       33,
+       "result",
+       31,
+       "b"
+      ],
+      [
+       34,
+       "result",
+       33,
+       "a"
+      ],
+      [
+       35,
+       "result",
+       33,
+       "b"
+      ],
+      [
+       36,
+       "result",
+       35,
+       "b"
+      ],
+      [
+       37,
+       "value",
+       36,
+       "decel"
+      ],
+      [
+       38,
+       "stop",
+       40,
+       "stop"
+      ],
+      [
+       38,
+       "then",
+       39,
+       "exec"
+      ],
+      [
+       40,
+       "result",
+       39,
+       "speed"
+      ],
+      [
+       41,
+       "value",
+       40,
+       "decel"
+      ],
+      [
+       42,
+       "bus",
+       45,
+       "pick"
+      ],
+      [
+       42,
+       "speed",
+       44,
+       "v"
+      ],
+      [
+       42,
+       "then",
+       43,
+       "exec"
+      ],
+      [
+       44,
+       "result",
+       43,
+       "reach"
+      ],
+      [
+       45,
+       "result",
+       44,
+       "reach"
+      ],
+      [
+       46,
+       "value",
+       45,
+       "a"
+      ],
+      [
+       47,
+       "value",
+       45,
+       "b"
+      ],
+      [
+       48,
+       "bus",
+       50,
+       "pick"
+      ],
+      [
+       48,
+       "then",
+       49,
+       "exec"
+      ],
+      [
+       50,
+       "result",
+       49,
+       "half"
+      ],
+      [
+       51,
+       "value",
+       50,
+       "a"
+      ],
+      [
+       52,
+       "value",
+       50,
+       "b"
+      ],
+      [
+       53,
+       "byPlayer",
+       58,
+       "pick"
+      ],
+      [
+       53,
+       "next",
+       61,
+       "b"
+      ],
+      [
+       53,
+       "next",
+       66,
+       "next"
+      ],
+      [
+       53,
+       "now",
+       57,
+       "a"
+      ],
+      [
+       53,
+       "now",
+       61,
+       "a"
+      ],
+      [
+       53,
+       "now",
+       63,
+       "now"
+      ],
+      [
+       53,
+       "roll",
+       63,
+       "roll"
+      ],
+      [
+       53,
+       "since",
+       57,
+       "b"
+      ],
+      [
+       53,
+       "then",
+       54,
+       "exec"
+      ],
+      [
+       54,
+       "false",
+       66,
+       "exec"
+      ],
+      [
+       54,
+       "true",
+       62,
+       "exec"
+      ],
+      [
+       55,
+       "result",
+       54,
+       "condition"
+      ],
+      [
+       56,
+       "result",
+       55,
+       "a"
+      ],
+      [
+       57,
+       "result",
+       56,
+       "a"
+      ],
+      [
+       58,
+       "result",
+       56,
+       "b"
+      ],
+      [
+       59,
+       "value",
+       58,
+       "a"
+      ],
+      [
+       60,
+       "value",
+       58,
+       "b"
+      ],
+      [
+       61,
+       "result",
+       55,
+       "b"
+      ],
+      [
+       63,
+       "result",
+       62,
+       "next"
+      ],
+      [
+       64,
+       "value",
+       63,
+       "gap"
+      ],
+      [
+       65,
+       "value",
+       63,
+       "spread"
+      ],
+      [
+       67,
+       "bus",
+       70,
+       "pick"
+      ],
+      [
+       67,
+       "then",
+       68,
+       "exec"
+      ],
+      [
+       69,
+       "result",
+       68,
+       "reach"
+      ],
+      [
+       70,
+       "result",
+       69,
+       "a"
+      ],
+      [
+       71,
+       "value",
+       70,
+       "a"
+      ],
+      [
+       72,
+       "value",
+       70,
+       "b"
+      ],
+      [
+       73,
+       "value",
+       69,
+       "b"
+      ],
+      [
+       74,
+       "bus",
+       77,
+       "pick"
+      ],
+      [
+       74,
+       "otherBus",
+       80,
+       "pick"
+      ],
+      [
+       74,
+       "then",
+       75,
+       "exec"
+      ],
+      [
+       76,
+       "result",
+       75,
+       "length"
+      ],
+      [
+       77,
+       "result",
+       76,
+       "a"
+      ],
+      [
+       78,
+       "value",
+       77,
+       "a"
+      ],
+      [
+       79,
+       "value",
+       77,
+       "b"
+      ],
+      [
+       80,
+       "result",
+       76,
+       "b"
+      ],
+      [
+       81,
+       "value",
+       80,
+       "a"
+      ],
+      [
+       82,
+       "value",
+       80,
+       "b"
+      ],
+      [
+       83,
+       "gap",
+       85,
+       "gap"
+      ],
+      [
+       83,
+       "then",
+       84,
+       "exec"
+      ],
+      [
+       85,
+       "result",
+       84,
+       "speed"
+      ],
+      [
+       86,
+       "value",
+       85,
+       "keep"
+      ],
+      [
+       87,
+       "value",
+       85,
+       "headway"
+      ]
+     ],
+     "machines": [],
+     "functions": [
+      {
+       "name": "JunctionLights",
+       "pure": true,
+       "help": "Does a junction whose widest arm is this wide have traffic lights?",
+       "inputs": [
+        {
+         "name": "widest",
+         "type": "float",
+         "value": 6
+        }
+       ],
+       "outputs": [
+        {
+         "name": "lights",
+         "type": "bool",
+         "value": false
+        }
+       ]
+      },
+      {
+       "name": "JunctionRadius",
+       "pure": true,
+       "help": "A junction's edge (the stop lines) from its widest arm",
+       "inputs": [
+        {
+         "name": "widest",
+         "type": "float",
+         "value": 6
+        }
+       ],
+       "outputs": [
+        {
+         "name": "radius",
+         "type": "float",
+         "value": 8
+        }
+       ]
+      },
+      {
+       "name": "Light",
+       "pure": true,
+       "help": "The light (0 green, 1 amber, 2 red) for traffic into a junction at a time: the junction's own offset, and which group the traffic is in - along the junction's axis (headingDot: the heading against the axis) or across it, half a cycle later",
+       "inputs": [
+        {
+         "name": "time",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "offset",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "headingDot",
+         "type": "float",
+         "value": 1
+        }
+       ],
+       "outputs": [
+        {
+         "name": "light",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "locals": [
+        {
+         "name": "T",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "MustStop",
+       "pure": true,
+       "help": "At red a driver stops; at amber if he still can before the line (stop: metres to it)",
+       "inputs": [
+        {
+         "name": "light",
+         "type": "int",
+         "value": 0
+        },
+        {
+         "name": "stop",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "speed",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "stop",
+         "type": "bool",
+         "value": false
+        }
+       ]
+      },
+      {
+       "name": "StopSpeed",
+       "pure": true,
+       "help": "The speed from which comfortable braking stops at the line",
+       "inputs": [
+        {
+         "name": "stop",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "speed",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "YieldReach",
+       "pure": true,
+       "help": "How far ahead a driver brakes for people: the reach, half a second of his way and his braking distance",
+       "inputs": [
+        {
+         "name": "bus",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "speed",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "reach",
+         "type": "float",
+         "value": 6
+        }
+       ]
+      },
+      {
+       "name": "YieldHalfWidth",
+       "pure": true,
+       "inputs": [
+        {
+         "name": "bus",
+         "type": "bool",
+         "value": false
+        }
+       ],
+       "outputs": [
+        {
+         "name": "half",
+         "type": "float",
+         "value": 1.6
+        }
+       ]
+      },
+      {
+       "name": "Honk",
+       "pure": true,
+       "help": "A blocked driver honks: after HonkPlayerS in front of the player (HonkPersonS for a pedestrian), then HonkGapS and up to HonkSpreadS more apart (roll 0..1 says how much)",
+       "inputs": [
+        {
+         "name": "byPlayer",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "since",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "next",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "now",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "roll",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "honk",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "next",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "SideReach",
+       "pure": true,
+       "help": "How far to the side a vehicle ahead still is in the way",
+       "inputs": [
+        {
+         "name": "bus",
+         "type": "bool",
+         "value": false
+        }
+       ],
+       "outputs": [
+        {
+         "name": "reach",
+         "type": "float",
+         "value": 1.85
+        }
+       ]
+      },
+      {
+       "name": "Bodies",
+       "pure": true,
+       "help": "What of the distance between two vehicles' centres is their bodies",
+       "inputs": [
+        {
+         "name": "bus",
+         "type": "bool",
+         "value": false
+        },
+        {
+         "name": "otherBus",
+         "type": "bool",
+         "value": false
+        }
+       ],
+       "outputs": [
+        {
+         "name": "length",
+         "type": "float",
+         "value": 3.8
+        }
+       ]
+      },
+      {
+       "name": "GapSpeed",
+       "pure": true,
+       "help": "The speed a free gap (m, bumper to bumper) allows",
+       "inputs": [
+        {
+         "name": "gap",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "speed",
+         "type": "float",
+         "value": 0
         }
        ]
       }

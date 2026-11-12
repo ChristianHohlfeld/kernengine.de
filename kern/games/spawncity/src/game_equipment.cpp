@@ -190,7 +190,7 @@ void Game::ui_jetpack(f32 dt) {
   const f32 now = world_->sim_time();
   if ((pressed || ui_.jet_pending) && airborne && j.ignite(v.z)) {
     ui_.jet_pending = false;
-    if (v.z < 0) { v.z *= Jetpack::kIgnitionDamp; world_->set_actor_velocity(soldier_, v); }
+    if (v.z < 0) { v.z *= Jetpack::ignition_damp(); world_->set_actor_velocity(soldier_, v); }
     if (mixer_.ready() && ui_.whoomp_clip) {
       kern::audio::PlayParams p;
       p.volume = 0.8f;
@@ -210,7 +210,7 @@ void Game::ui_jetpack(f32 dt) {
     const Vec2 want = (f * play_in_.move_y + r * play_in_.move_x) * 8.1f;
     v = world_->actor_velocity(soldier_);
     Vec2 dv{want.x - v.x, want.y - v.y};
-    const f32 l = std::hypot(dv.x, dv.y), cap = Jetpack::kAirAccel * dt;
+    const f32 l = std::hypot(dv.x, dv.y), cap = Jetpack::air_accel() * dt;
     if (l > cap) dv = dv * (cap / l);
     if (l > 1e-3f) world_->set_actor_velocity(soldier_, {v.x + dv.x, v.y + dv.y, v.z});
   }

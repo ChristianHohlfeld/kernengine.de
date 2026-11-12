@@ -3,11 +3,15 @@
 #include <vector>
 
 #include "../src/equipment.h"
+#include "rule_blueprint.h"
 #include "test_util.h"
 
 using namespace sc;
 
 SC_TEST(equipment_jetpack) {
+  RuleBlueprint bp("Jetpack", &Jetpack::bind);
+  SC_CHECK(bp.inst && bp.problems.empty() && !bp.inst->disabled(), "the level's Jetpack Blueprint compiles and runs: %s", bp.problems.c_str());
+  SC_CHECK(bp.inst && std::string(bp.inst->tier()) == "native C++", "it runs as its C++ class");
   Jetpack j;
   SC_CHECK(j.update(0.1f, 0, false, 0, 0, false) == 0 && j.fuel == 1, "on the ground: nothing");
   SC_CHECK(j.ignite(1), "ignition in the air");
@@ -15,22 +19,22 @@ SC_TEST(equipment_jetpack) {
   f32 z = 1, vz = 1, t = 0;
   for (int i = 0; i < 120; ++i) {  // 2 s
     const f32 acc = j.update(1.0f / 60, t, true, vz, z, true);
-    vz += (acc - Jetpack::kGravity) / 60;
+    vz += (acc - Jetpack::gravity()) / 60;
     z += vz / 60;
     t += 1.0f / 60;
   }
-  SC_CHECK(z > 10 && vz <= Jetpack::kMaxClimb + 0.5f, "climbs over a house at most 8 m/s (z %.1f, vz %.1f)", z, vz);
+  SC_CHECK(z > 10 && vz <= Jetpack::max_climb() + 0.5f, "climbs over a house at most 8 m/s (z %.1f, vz %.1f)", z, vz);
   SC_CHECK(j.fuel < 0.75f && j.fuel > 0.4f, "2 s burn uses fuel (%.2f)", j.fuel);
   // Let go, fall: the cushion fires before touchdown.
   bool cushion = false;
   for (int i = 0; i < 600 && z > 0; ++i) {
     const f32 acc = j.update(1.0f / 60, t, true, vz, z, false);
-    if (acc >= Jetpack::kAcc) cushion = true;
-    vz += (acc - Jetpack::kGravity) / 60;
+    if (acc >= Jetpack::acc()) cushion = true;
+    vz += (acc - Jetpack::gravity()) / 60;
     z += vz / 60;
     t += 1.0f / 60;
   }
-  SC_CHECK(cushion && vz > -Jetpack::kFallSafe, "the cushion catches the fall (%.1f m/s)", vz);
+  SC_CHECK(cushion && vz > -Jetpack::fall_safe(), "the cushion catches the fall (%.1f m/s)", vz);
   const f32 f0 = j.fuel;
   for (int i = 0; i < 240; ++i) j.update(1.0f / 60, t + i / 60.0f, false, 0, 0, false);
   SC_CHECK(j.fuel > f0 + 0.8f || j.fuel == 1, "refills on the ground (%.2f -> %.2f)", f0, j.fuel);

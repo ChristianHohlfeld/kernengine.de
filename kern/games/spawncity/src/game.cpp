@@ -291,6 +291,12 @@ bool Game::start(kern::Engine& e) {
     kern::logic::Instance* settings = logic ? logic->find(world_->find_actor("Settings")) : nullptr;
     if (!settings || settings->disabled() || !bind_settings(settings)) return kern::fail("the level's Blueprint \"Settings\" is missing, has errors or not one row per setting");
     ui_.settings = Settings();  // every setting at the table's default (the page replays the player's own with "set")
+    kern::logic::Instance* jetpack = logic ? logic->find(world_->find_actor("Jetpack")) : nullptr;
+    if (!jetpack || jetpack->disabled()) return kern::fail("the level's Blueprint \"Jetpack\" is missing or has errors");
+    Jetpack::bind(jetpack);
+    kern::logic::Instance* traffic = logic ? logic->find(world_->find_actor("Traffic")) : nullptr;
+    if (!traffic || traffic->disabled()) return kern::fail("the level's Blueprint \"Traffic\" is missing or has errors");
+    TrafficRules::bind(traffic);
   }
   ctl_.dev.platform(!coarse, coarse, coarse ? 5 : 0);  // the page reports the real device (game_controls.cpp)
   soldier_ = world_->find_actor("Player");

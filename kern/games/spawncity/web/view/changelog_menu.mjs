@@ -7,6 +7,10 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-12",time:"10:17",title:"Jetpack und Verkehrsregeln als Blueprint",items:[
+    "Unter der Haube: Das Jetpack – Schubstoß, Halten, Steiggrenze, das Abfangen vor einer harten Landung und das Nachfüllen – steht jetzt als Blueprint „Jetpack“ im Level. Am Spiel ändert sich dadurch nichts.",
+    "Ebenso die Gesetze des Verkehrs: Ampelphasen, wann ein Fahrer bei Gelb noch hält, wie weit er für Leute bremst, wann er hupt und welchen Abstand er hält – jetzt der Blueprint „Traffic“.",
+  ]},
   {date:"2026-11-12",time:"09:55",title:"Die Einstellungen sind eine Datentabelle im Level",items:[
     "Unter der Haube: Alle 60 Einstellungen – Name, Hilfetext, Bereich, Schrittweite und Standardwert – stehen jetzt als Datentabelle im Blueprint „Settings“ des Levels und lassen sich im Kern-Editor als Tabelle bearbeiten. Am Spiel ändert sich dadurch nichts.",
   ]},

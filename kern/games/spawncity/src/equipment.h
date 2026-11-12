@@ -12,14 +12,26 @@
 #include <vector>
 
 #include "common.h"
+#include "kern/logic/logic.h"
 
 namespace sc {
 
+/// The jetpack. Its rules are a Blueprint: the level's actor "Jetpack" (level/spawncity.klevel) -
+/// thrust, fuel and times as variables, the functions Ignite and Update. Here is a player's pack
+/// (the Blueprint's struct Pack) and how the game's C++ asks.
 class Jetpack {
  public:
-  // player_walk_mode_v4.mjs
-  static constexpr f32 kAcc = 21, kBurst = 0.6f, kFuelPerS = 0.2f, kRecharge = 4, kAirAccel = 14, kCushionFuel = 0.02f, kAirRegenDelay = 0.35f;
-  static constexpr f32 kClimbAcc = 13.8f, kMaxClimb = 8, kGravity = 9.81f, kFallSafe = 7.7f, kMinFuel = 0.06f;
+  /// The running Blueprint of the actor "Jetpack" (the game binds it once its world has started;
+  /// tests bind the one they run).
+  static void bind(kern::logic::Instance* blueprint);
+  // The Blueprint's variables Acc, AirAccel, MaxClimb, Gravity, FallSafe and IgnitionDamp.
+  static f32 acc();
+  static f32 air_accel();
+  static f32 max_climb();
+  static f32 gravity();
+  static f32 fall_safe();
+  /// vz is scaled by this at ignition (a falling player is caught: `jump.vz *= .35`).
+  static f32 ignition_damp();
   /// The second JUMP press in the air: ignition (false without fuel).
   bool ignite(f32 vz);
   /// One frame. `airborne`, vertical speed, height of the feet above what is below, jump held.
@@ -28,10 +40,10 @@ class Jetpack {
   f32 fuel = 1;
   bool thrusting = false, used = false;
   u32 ignitions = 0;
-  /// vz is scaled by this at ignition (a falling player is caught: `jump.vz *= .35`).
-  static constexpr f32 kIgnitionDamp = 0.35f;
 
  private:
+  kern::logic::Value pack() const;
+  void take(const kern::logic::Value& v);
   f32 burst_left_ = 0, ground_since_ = -1, last_thrust_ = -99;
 };
 

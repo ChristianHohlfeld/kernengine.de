@@ -2,6 +2,7 @@
 // served at unsignalled junctions, braking for people in the corridor.
 #include "../src/world_traffic.h"
 
+#include "rule_blueprint.h"
 #include "test_util.h"
 
 using namespace sc;
@@ -19,6 +20,7 @@ const std::vector<Vec2> kNobody;
 }  // namespace
 
 SC_TEST(traffic_junctions_and_lights) {
+  RuleBlueprint traffic_rules("Traffic", &TrafficRules::bind);
   TrafficRules t;
   t.rebuild(streets());
   SC_CHECK(t.junctions().size() == 2, "two junctions (%zu)", t.junctions().size());
@@ -55,6 +57,7 @@ SC_TEST(traffic_junctions_and_lights) {
 }
 
 SC_TEST(traffic_first_come_and_people) {
+  RuleBlueprint traffic_rules("Traffic", &TrafficRules::bind);
   TrafficRules t;
   t.rebuild(streets());
   // Car 0 is inside the T junction, car 1 arrives from the south: it waits.
@@ -81,6 +84,7 @@ SC_TEST(traffic_first_come_and_people) {
 }
 
 SC_TEST(traffic_keeps_its_distance) {
+  RuleBlueprint traffic_rules("Traffic", &TrafficRules::bind);
   // driveSpeed: the nearest vehicle in the own corridor ahead - the centres' distance less both
   // half lengths less 2.5 m, at 1.6 s headway; a speed to aim for (0 = stop), never a reverse
   using V = TrafficRules::Vehicle;
@@ -108,6 +112,7 @@ SC_TEST(traffic_keeps_its_distance) {
 }
 
 SC_TEST(traffic_pursuit_point) {
+  RuleBlueprint traffic_rules("Traffic", &TrafficRules::bind);
   // the driver's target: `look` metres on along the lane from where the car is, on its right
   Lane l{{{0, 0}, {100, 0}, {100, 50}}, 8, 1, true};
   // on the first stretch, 30 m along, 3 m beside the line: 10 m on, 2 m to the right (-y)

@@ -13,12 +13,18 @@
 //  * every driver keeps his distance to the vehicle ahead (driveSpeed: the nearest one in his
 //    corridor 1..40 m ahead, bumper to bumper less 2.5 m, at 1.6 s headway) - by the speed he
 //    aims for, never by backing off
+//
+// The laws - when a junction has lights and how they run, when a driver stops, how far he looks
+// for people, when he honks, what a gap allows - are a Blueprint: the level's actor "Traffic"
+// (level/spawncity.klevel, open it in Kern Studio). Here are the streets' junctions, who is where,
+// and who holds a junction: the loops over cars and people that ask the laws.
 #pragma once
 
 #include <unordered_map>
 #include <vector>
 
 #include "city_stream.h"
+#include "kern/logic/logic.h"
 
 namespace sc {
 
@@ -41,6 +47,9 @@ class TrafficRules {
     bool wait = false, yielding = false, honk = false;
   };
 
+  /// The running Blueprint of the actor "Traffic" (the game binds it once its world has started;
+  /// tests bind the one they run).
+  static void bind(kern::logic::Instance* blueprint);
   void rebuild(const std::vector<Lane>& lanes);
   u64 built_from = ~0ull;
   /// The signals' clock (seconds; the game sets it every frame from the wall clock - in a session

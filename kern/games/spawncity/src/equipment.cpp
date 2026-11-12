@@ -1,6 +1,8 @@
 // SpawnCity's equipment: jetpack, flight logbook, procedural music (see equipment.h).
 #include "equipment.h"
 
+#include "blueprint_call.h"
+
 #include <cmath>
 #include <algorithm>
 #include <cstdio>
@@ -12,38 +14,45 @@ namespace sc {
 // JET_AIR_ACCEL 14, JET_CUSHION_FUEL .02, JET_AIR_REGEN_DELAY_MS 350, JET_CLIMB_ACC 13.8,
 // JET_MAX_CLIMB_MPS 8; a full tank is ~5 s of thrust, it refills in ~4 s on the ground)
 
+namespace {
+using kern::logic::Value;
+rules::Blueprint g_jetpack;
+}  // namespace
+void Jetpack::bind(kern::logic::Instance* blueprint) { g_jetpack.running = blueprint; }
+f32 Jetpack::acc() { return static_cast<f32>(g_jetpack.variable("Acc")); }
+f32 Jetpack::air_accel() { return static_cast<f32>(g_jetpack.variable("AirAccel")); }
+f32 Jetpack::max_climb() { return static_cast<f32>(g_jetpack.variable("MaxClimb")); }
+f32 Jetpack::gravity() { return static_cast<f32>(g_jetpack.variable("Gravity")); }
+f32 Jetpack::fall_safe() { return static_cast<f32>(g_jetpack.variable("FallSafe")); }
+f32 Jetpack::ignition_damp() { return static_cast<f32>(g_jetpack.variable("IgnitionDamp")); }
+
 bool Jetpack::ignite(f32 vz) {
   (void)vz;
-  if (fuel < kMinFuel) return false;
-  burst_left_ = kBurst;
-  used = true;
-  ++ignitions;
-  return true;
+  std::vector<Value> r;
+  return g_jetpack.call("Ignite", {pack()}, r) && r.size() >= 2 && (take(r[0]), r[1].b);
 }
 
 f32 Jetpack::update(f32 dt, f32 now, bool airborne, f32 vz, f32 height, bool hold) {
-  thrusting = false;
-  if (!airborne) {
-    used = false;
-    burst_left_ = 0;
-    if (ground_since_ < 0) ground_since_ = now;
-    if (now - ground_since_ > 0.4f) fuel = std::fmin(1.0f, fuel + dt / kRecharge);
+  std::vector<Value> r;
+  if (!g_jetpack.call("Update", {pack(), Value::number(dt), Value::number(now), Value::boolean(airborne), Value::number(vz), Value::number(height), Value::boolean(hold)}, r) || r.size() < 2)
     return 0;
-  }
-  ground_since_ = -1;
-  if (now - last_thrust_ > kAirRegenDelay) fuel = std::fmin(1.0f, fuel + dt / kRecharge);
-  if (fuel <= 0) return 0;
-  const bool burst = burst_left_ > 0 || (used && hold);
-  // Falling fast with fuel left, the pack fires by itself just before touchdown (no splat).
-  const f32 stop = vz < 0 ? vz * vz / (2 * (kAcc - kGravity)) : 0;
-  const bool cushion = vz < -kFallSafe * 0.8f && fuel > kCushionFuel && height < stop + 0.6f;
-  if (!burst && !cushion) return 0;
-  thrusting = true;
-  last_thrust_ = now;
-  const f32 acc = cushion ? kAcc : clampf(kGravity + (kMaxClimb - vz) * 3, 0, kClimbAcc);
-  fuel = std::fmax(0.0f, fuel - kFuelPerS * dt * acc / kAcc);
-  if (burst) burst_left_ -= dt;
-  return acc;
+  take(r[0]);
+  return static_cast<f32>(r[1].as_number());
+}
+
+kern::logic::Value Jetpack::pack() const {
+  return Value::structure({Value::number(fuel), Value::boolean(thrusting), Value::boolean(used), Value::integer(ignitions), Value::number(burst_left_), Value::number(ground_since_),
+                           Value::number(last_thrust_)});
+}
+void Jetpack::take(const kern::logic::Value& v) {
+  if (v.fields() < 7) return;
+  fuel = static_cast<f32>(v.field(0)->as_number());
+  thrusting = v.field(1)->b;
+  used = v.field(2)->b;
+  ignitions = static_cast<u32>(v.field(3)->i);
+  burst_left_ = static_cast<f32>(v.field(4)->as_number());
+  ground_since_ = static_cast<f32>(v.field(5)->as_number());
+  last_thrust_ = static_cast<f32>(v.field(6)->as_number());
 }
 
 // ---------------------------------------------------------------------------------------------

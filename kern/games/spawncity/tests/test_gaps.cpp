@@ -16,6 +16,7 @@
 using namespace sc;
 
 SC_TEST(gaps_crossing_junctions) {
+  RuleBlueprint traffic_rules("Traffic", &TrafficRules::bind);
   // two streets laid across each other without a shared vertex still meet in a junction
   std::vector<Lane> lanes(2);
   lanes[0].points = {{-100, 0}, {100, 0}};
