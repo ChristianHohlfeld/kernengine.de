@@ -1,4 +1,6 @@
 // SpawnCity on Kern: world, modes, fixed-step hook, cameras (see game.h).
+#include "jet_seats.h"
+#include "spawn_guard.h"
 #include "game.h"
 #include "world_traffic.h"
 #include "game_world.h"  // WorldLife (M3 world state)
