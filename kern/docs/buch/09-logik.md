@@ -158,6 +158,14 @@ ist –, der Standardwert der Struktur; in einer Liste gilt das Eintrag für Ein
 Blueprints ist eine Struktur `KERN_STRUCT(Weapon) { Text Name = ""; Float Damage = 10.0; };`
 ([blueprint_cpp.md](../blueprint_cpp.md)).
 
+**Typen des Projekts.** Eine Aufzählung oder Struktur gehört dem Blueprint, der sie erklärt
+(`EnumType`, `StructType`). Haben mehrere Blueprints eines Levels denselben Typ, ist er ein Typ des
+Projekts (`project = true`, im C++ `KERN_PROJECT_ENUM` / `KERN_PROJECT_STRUCT`): Jeder hat ihn als
+eigene, gleiche Erklärung (`logic::same_type`), und der Editor ändert ihn in allen zugleich. Ein
+Blueprint bleibt damit für sich lesbar und ausführbar – Interpreter, JIT und Klasse sehen einen
+gewöhnlichen Typ –, und ein Wert des Typs bedeutet in jedem dasselbe, wenn ein Blueprint die
+Funktion eines anderen ruft.
+
 Eine ganze Zahl (`integer`) ist überall dieselbe: so, wie ein Blueprint sie hält (`logic::normal`).
 Unter jeder Zahl liegt ein `double` – in den Variablen des Interpreters, im JIT –, also sind
 ganze Zahlen bis 2^53 exakt, eine größere ist die nächste, die ein `double` hält, und keine geht

@@ -7,6 +7,10 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-12",time:"17:05",title:"Kern-Blueprints: Typen des Projekts",items:[
+    "Kern-Blueprints: Eine Aufzählung oder Struktur kann jetzt mehreren Blueprints eines Levels gehören – ein „Typ des Projekts“, in allen gleich. Unter Enums und Structures holt „+ An enum / A struct of another Blueprint…“ den Typ eines anderen Blueprints; wer eine Funktion eines anderen Blueprints erklärt, bekommt die Typen ihrer Ein- und Ausgänge von selbst.",
+    "Eine Änderung an so einem Typ – ein Wert mehr, ein Feld mehr, ein neuer Name – geschieht in allen Blueprints zugleich und lässt sich mit einem Undo zurücknehmen. Als C++: KERN_PROJECT_ENUM und KERN_PROJECT_STRUCT.",
+  ]},
   {date:"2026-11-12",time:"15:19",title:"Mehrspieler: Wer nicht sofort hineinkommt, bleibt nicht draußen",items:[
     "Behoben: Kam ein beitretender Spieler nicht innerhalb von sechs Sekunden zum Host durch – etwa weil dessen Seite noch lud oder im Hintergrund lag –, blieb er für immer bei „Verbinde ...“ stehen. Er fragt jetzt jede Sekunde erneut an und ist drin, sobald der Host antwortet.",
     "Unter der Haube: Die Abstimmung über Spielregeln gab es zweimal; sie steht jetzt einmal, im Blueprint „Multiplayer“.",

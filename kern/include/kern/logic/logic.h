@@ -321,6 +321,10 @@ struct EnumType {
   std::string name;
   std::vector<std::string> values;
   std::string help;
+  /// A type of the project: every Blueprint of the level that has a project type of this name has
+  /// it the same (the editor keeps them so; a level in which they differ does not check). Such a
+  /// value means the same in every Blueprint that takes or gives it.
+  bool project = false;
 };
 
 /// A type as pins, variables and settings name it: the pin type, and for an enum or a struct
@@ -348,9 +352,14 @@ struct StructType {
   std::string name;
   std::vector<StructField> fields;
   std::string help;
+  bool project = false;  // a type of the project (see EnumType::project)
   /// The place of the field called `name`, or -1.
   int field(std::string_view name) const;
 };
+/// The same declaration: the name, and the values / the fields with their types and defaults, in
+/// their order (the help text may differ).
+bool same_type(const EnumType& a, const EnumType& b);
+bool same_type(const StructType& a, const StructType& b);
 
 /// A state machine in the style of the digitalisierungsplanung.de editor.
 enum class TriggerKind : u8 { event, timer, condition, automatic };

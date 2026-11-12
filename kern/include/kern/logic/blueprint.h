@@ -375,6 +375,9 @@ struct Blueprint : game::BlueprintNodesOf<BlueprintCore> {};
   enum class Name : ::kern::i64 { __VA_ARGS__ };                                              \
   friend constexpr ::std::string_view kern_enum_names(Name) { return #__VA_ARGS__; }         \
   static_assert(true)
+/// KERN_PROJECT_ENUM(Mode, ...) is an enum of the project: declared like one of the Blueprint's,
+/// and the same in every Blueprint of the level that has it (see EnumType::project, logic.h).
+#define KERN_PROJECT_ENUM(Name, ...) KERN_ENUM(Name, __VA_ARGS__)
 /// KERN_STRUCT(Weapon) { Text Name = ""; Float Damage = 10.0; }; declares a struct of the
 /// Blueprint: the type Weapon with these fields, each with its default. It is a plain aggregate -
 /// Weapon{"Knife", 25.0} gives every field in their order - and two of them are equal when all
@@ -383,6 +386,8 @@ struct Blueprint : game::BlueprintNodesOf<BlueprintCore> {};
   struct Name;                                                                                         \
   friend bool operator==(const Name& a, const Name& b) { return ::kern::logic::structs::equal(a, b); } \
   struct Name
+/// KERN_PROJECT_STRUCT(Weapon) { ... }; is a struct of the project (see KERN_PROJECT_ENUM).
+#define KERN_PROJECT_STRUCT(Name) KERN_STRUCT(Name)
 /// A function that is offered as a value node (no exec pins).
 #define KERN_PURE
 /// KERN_EXTERN FnResult Fn(Float x = 0.0); says what a function of another Blueprint looks like:

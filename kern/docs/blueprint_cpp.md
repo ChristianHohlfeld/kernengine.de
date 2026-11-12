@@ -168,6 +168,7 @@ KERN_LAYOUT(Demo) {
 | Funktion mit Ausgängen | `struct FnResult { Float y = 0.0; };` und `FnResult Fn(Float x = 1.5) { ... }` |
 | Funktion ohne Ausgänge | `void Fn(...) { ... }` |
 | Funktion „pure“ (als Wert-Knoten angeboten) | `KERN_PURE` vor der Funktion |
+| Typ des Projekts (mehrere Blueprints des Levels haben ihn, alle gleich) | `KERN_PROJECT_ENUM(Mode, Closed, Open);` · `KERN_PROJECT_STRUCT(Door) { Mode State = Mode::Closed; };` – sonst wie `KERN_ENUM` / `KERN_STRUCT` |
 | Funktion eines anderen Blueprints | `KERN_EXTERN FnResult Fn(Float x = 1.5);` – wie sie aussieht, ohne Rumpf (mit `struct FnResult { ... };` darüber, wenn sie Ausgänge hat) |
 | Call on Actor | `func_call_on<"Fn">(target, kern::out(n7.y), x);` – erst das Target (`Actor{0}`: der Blueprint des Levels), dann `kern::out(...)` mit allen Ausgängen in ihrer Reihenfolge als Felder des Members `n7` (oder `kern::out()`, wenn niemand sie liest), dann die Eingänge |
 | Function Entry | der Anfang des Funktionsrumpfs; seine Ausgänge sind die Parameter |

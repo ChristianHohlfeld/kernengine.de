@@ -465,6 +465,30 @@ sie **auf einem Actor** auf.
   selbst auf ihrem eigenen Actor): Jeder Aufruf hat seine eigenen Parameter und lokalen Variablen.
   Tiefer als 64 ineinander geht es nicht – der Aufruf entfällt dann und wird gemeldet.
 
+### Typen des Projekts (Aufzählungen und Strukturen, die mehrere Blueprints haben)
+
+Eine Aufzählung oder Struktur gehört zuerst dem Blueprint, der sie erklärt. Brauchen mehrere
+Blueprints eines Levels denselben Typ – einer gibt eine „Door“ an eine Funktion des anderen –, wird
+er ein **Typ des Projekts**: Jeder Blueprint, der ihn hat, hat ihn gleich.
+
+- **Holen:** In My Blueprint steht unter *Enums* und *Structures* die Auswahl „+ An enum / A struct
+  of another Blueprint…“ mit den Typen der anderen Blueprints des Levels. Gewählt, hat dieser
+  Blueprint den Typ auch – samt der Typen, aus denen seine Felder sind –, und er ist in beiden ein
+  Typ des Projekts (Kennzeichen **P**). Wer mit „+ A function of another Blueprint…“ eine Funktion
+  erklärt, bekommt die Typen ihrer Ein- und Ausgänge von selbst dazu.
+- **Selbst erklären:** in Details eines Typs **Of the project** ankreuzen. Abwählen geht, solange
+  kein anderer Blueprint den Typ hat.
+- **Ändern:** Eine Änderung an einem Typ des Projekts – ein Wert mehr, ein Feld mehr, ein neuer
+  Name, eine andere Reihenfolge – geschieht in **allen** Blueprints des Levels, die ihn haben, als
+  ein Schritt (ein Undo nimmt sie überall zurück). Kann einer nicht folgen (der neue Name ist dort
+  vergeben), wird die Änderung als Ganzes abgelehnt und sagt, welcher Blueprint es ist. Ein Feld
+  einer Projekt-Struktur ist selbst ein Typ des Projekts: Der Feldtyp geht mit.
+- **Löschen** nimmt den Typ nur aus diesem Blueprint; die anderen behalten ihn.
+- Als C++ heißt so ein Typ `KERN_PROJECT_ENUM(...)` bzw. `KERN_PROJECT_STRUCT(...) { ... };`. Ein
+  Text, der einen Typ des Projekts nur hier anders erklärt, wird beim Apply abgelehnt; stimmen die
+  Blueprints eines Levels einmal nicht überein (eine von Hand geänderte Datei), zeigt der Editor
+  das als Fehler des Blueprints.
+
 ### Kollisionskanäle (Box3Ds Filter)
 
 Was womit kollidiert und was ein Strahl trifft, folgt genau Box3D (Erin Catto, *Filtering* und

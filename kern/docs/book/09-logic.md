@@ -154,6 +154,14 @@ struct's default; in a list that holds item by item. In a Blueprint's C++ a stru
 `KERN_STRUCT(Weapon) { Text Name = ""; Float Damage = 10.0; };`
 ([blueprint_cpp.md](../blueprint_cpp.md)).
 
+**Types of the project.** An enum or a struct belongs to the Blueprint that declares it
+(`EnumType`, `StructType`). When several Blueprints of a level have the same type, it is a type of
+the project (`project = true`, in C++ `KERN_PROJECT_ENUM` / `KERN_PROJECT_STRUCT`): each has it as
+a declaration of its own that is the same (`logic::same_type`), and the editor changes it in all of
+them at once. A Blueprint stays readable and runnable by itself – interpreter, JIT and class see an
+ordinary type – and a value of the type means the same in each when one Blueprint calls a function
+of another.
+
 A whole number (`integer`) is the same everywhere: as a Blueprint holds it (`logic::normal`).
 Every number is a `double` underneath – in the interpreter's variables, in the JIT – so whole
 numbers are exact up to 2^53, a larger one is the nearest a `double` holds, and none is past the

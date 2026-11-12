@@ -626,7 +626,7 @@ export class LogicEditor {
   renderMy(data) {
     const live = this.trace?.variables || {};
     const q = this.el.myq.value.trim().toLowerCase();
-    const k = JSON.stringify([data.owner, data.view, data.variables, data.functions, data.otherFunctions, data.enums, data.structs, data.events, data.machines?.map(m => [m.id, m.name]), live, q, [...this.collapsed], this.selVar, this.selFn, this.selEnum, this.selStruct]);
+    const k = JSON.stringify([data.owner, data.view, data.variables, data.functions, data.otherFunctions, data.otherTypes, data.enums, data.structs, data.events, data.machines?.map(m => [m.id, m.name]), live, q, [...this.collapsed], this.selVar, this.selFn, this.selEnum, this.selStruct]);
     if (k === this.myKey) return;
     this.myKey = k;
     const match = s => !q || s.toLowerCase().includes(q);
@@ -654,22 +654,28 @@ export class LogicEditor {
         <option value="">+ A function of another Blueprint…</option>${others.map(f => `<option value="${f.owner}:${lgEsc(f.name)}">${lgEsc(f.ownerName)}: ${lgEsc(f.name)}</option>`).join("")}</select></div>` : "";
     // an enum: a type of this Blueprint with named values
     const enums = (data.enums || []).filter(e => match(e.name)).map(e => `
-        <div class="lg-item lg-enum${this.selEnum === e.name ? " on" : ""}" data-enum="${lgEsc(e.name)}" title="${lgEsc(e.help || "An enum: a type of this Blueprint with named values")}">
-          <i class="lg-pill" style="--c:${LG_ENUM_COLOR}"></i><span class="lg-vn">${lgEsc(e.name)}</span><span class="lg-vt">${lgEsc(e.values.join(", "))}</span>
+        <div class="lg-item lg-enum${this.selEnum === e.name ? " on" : ""}" data-enum="${lgEsc(e.name)}" title="${lgEsc(e.help || (e.project ? "An enum of the project: the same in every Blueprint of the level that has it" : "An enum: a type of this Blueprint with named values"))}">
+          <i class="lg-pill" style="--c:${LG_ENUM_COLOR}"></i><span class="lg-vn">${lgEsc(e.name)}</span>${e.project ? '<i class="lg-proj" title="A type of the project">P</i>' : ""}<span class="lg-vt">${lgEsc(e.values.join(", "))}</span>
           <span class="lg-acts"><button data-switch title="Add a Switch on the enum">Switch</button></span>
         </div>`).join("") || `<div class="lg-none">No enums${q ? " match" : " yet: + adds one"}</div>`;
     // a struct: a type of this Blueprint with named fields
     const structs = (data.structs || []).filter(s => match(s.name)).map(s => `
-        <div class="lg-item lg-st${this.selStruct === s.name ? " on" : ""}" data-struct="${lgEsc(s.name)}" title="${lgEsc(s.help || "A struct: a type of this Blueprint with named fields")}">
-          <i class="lg-pill" style="--c:${LG_STRUCT_COLOR}"></i><span class="lg-vn">${lgEsc(s.name)}</span><span class="lg-vt">${lgEsc(s.fields.map(f => f.name).join(", "))}</span>
+        <div class="lg-item lg-st${this.selStruct === s.name ? " on" : ""}" data-struct="${lgEsc(s.name)}" title="${lgEsc(s.help || (s.project ? "A struct of the project: the same in every Blueprint of the level that has it" : "A struct: a type of this Blueprint with named fields"))}">
+          <i class="lg-pill" style="--c:${LG_STRUCT_COLOR}"></i><span class="lg-vn">${lgEsc(s.name)}</span>${s.project ? '<i class="lg-proj" title="A type of the project">P</i>' : ""}<span class="lg-vt">${lgEsc(s.fields.map(f => f.name).join(", "))}</span>
           <span class="lg-acts"><button data-make title="Add a Make node of the struct">Make</button><button data-break title="Add a Break node of the struct">Break</button></span>
         </div>`).join("") || `<div class="lg-none">No structs${q ? " match" : " yet: + adds one"}</div>`;
+    // the types of the level's other Blueprints: had here too, they are types of the project
+    const adopt = kind => {
+      const types = (data.otherTypes || []).filter(t => t.kind === kind && match(t.name));
+      return types.length ? `<div class="lg-declare"><select data-adopt="${kind}" title="This Blueprint gets a type another Blueprint of this level has. It is a type of the project then: the same in both, and changed in both at once">
+        <option value="">+ ${kind === "enum" ? "An enum" : "A struct"} of another Blueprint…</option>${types.map(t => `<option value="${t.owner}:${lgEsc(t.name)}">${lgEsc(t.ownerName)}: ${lgEsc(t.name)}</option>`).join("")}</select></div>` : "";
+    };
     const events = (data.events || []).filter(match).map(e => `
         <div class="lg-item lg-ev" draggable="true" data-ev="${lgEsc(e)}" title="Drag into the graph: the event; Ctrl = Call">${lgIco("event", "red")}<span class="lg-vn">${lgEsc(e)}</span>
           <span class="lg-acts"><button data-on title="Add the event node">Event</button><button data-call title="Add a Call node">Call</button></span></div>`).join("") ||
       `<div class="lg-none">Custom events you add appear here</div>`;
     this.el.mylist.innerHTML = section("graphs", "Graphs", "Add a state machine", graphs) + section("vars", "Variables", "Add a variable", vars) +
-      section("fns", "Functions", "Add a function", fns + declare) + section("enums", "Enums", "Add an enum", enums) + section("structs", "Structures", "Add a struct", structs) +
+      section("fns", "Functions", "Add a function", fns + declare) + section("enums", "Enums", "Add an enum", enums + adopt("enum")) + section("structs", "Structures", "Add a struct", structs + adopt("struct")) +
       section("events", "Events", "Add a custom event", events);
     for (const s of this.el.mylist.querySelectorAll(".lg-sec")) {
       s.querySelector(".lg-sec-t").onclick = () => { const id = s.dataset.sec; if (this.collapsed.has(id)) this.collapsed.delete(id); else this.collapsed.add(id); this.myKey = ""; this.renderMy(this.data); };
@@ -699,6 +705,14 @@ export class LogicEditor {
       row.ondragstart = e => { e.dataTransfer.setData("text/x-kern-function", name); e.dataTransfer.effectAllowed = "copy"; };
       row.oncontextmenu = e => { e.preventDefault(); this.functionMenu(name, e.clientX, e.clientY); };
     }
+    for (const sel of this.el.mylist.querySelectorAll("[data-adopt]")) sel.onchange = () => {
+      const at = sel.value.indexOf(":");
+      if (at < 0) return;
+      const name = sel.value.slice(at + 1), kind = sel.dataset.adopt;
+      const r = this.cmd({cmd: kind === "enum" ? "logicEnum" : "logicStruct", op: "adopt", name, from: +sel.value.slice(0, at)});
+      sel.value = "";
+      if (r?.ok !== false) { if (kind === "enum") this.selectEnum(name); else this.selectStruct(name); }
+    };
     const declareSel = this.el.mylist.querySelector("[data-declare]");
     if (declareSel) declareSel.onchange = () => {
       const at = declareSel.value.indexOf(":");
@@ -1318,10 +1332,11 @@ export class LogicEditor {
         <input data-ev="name" class="lg-fname" value="${lgEsc(name)}" spellcheck="false" title="The value's name">
         <button data-ev="up" title="Move up"${i === 0 ? " disabled" : ""}>↑</button><button data-ev="down" title="Move down"${i === e.values.length - 1 ? " disabled" : ""}>↓</button>
         <button data-ev="remove" title="Remove this value"${e.values.length === 1 ? " disabled" : ""}>×</button></div>`).join("");
-    return `<div class="lg-dh"><i class="lg-pill big" style="--c:${LG_ENUM_COLOR}"></i>${lgEsc(e.name)}</div><div class="lg-dsub">Enum</div>
+    return `<div class="lg-dh"><i class="lg-pill big" style="--c:${LG_ENUM_COLOR}"></i>${lgEsc(e.name)}</div><div class="lg-dsub">${e.project ? "Enum of the project" : "Enum"}</div>
       <div class="lg-dsec"><div class="lg-dst">Enum</div>
         <div class="lg-drow"><label>Name</label><div><input data-ek="name" value="${lgEsc(e.name)}" spellcheck="false"></div></div>
         <div class="lg-drow"><label>Description</label><div><input data-ek="help" value="${lgEsc(e.help || "")}"></div></div>
+        <div class="lg-drow"><label title="A type of the project: every Blueprint of this level that has it has it the same, and a change here changes it in all of them. A function another Blueprint calls can take and give it.">Of the project</label><div><input type="checkbox" data-ek="project"${e.project ? " checked" : ""}></div></div>
       </div>
       <div class="lg-dsec"><div class="lg-dst">Values</div>${rows}<div class="lg-dacts"><button data-act="enum-value">+ Value</button></div>
         <div class="lg-dtxt">A variable or a pin of this enum holds one of these values. Moving a value keeps what is set and wired with it; removing one turns what was that value into the first.</div></div>
@@ -1348,10 +1363,11 @@ export class LogicEditor {
         <button data-sf="remove" title="Remove this field"${s.fields.length === 1 ? " disabled" : ""}>×</button></div>` +
         (this.structOf(f.type) ? `<div class="lg-lsub lg-vsub" data-sfield="${lgEsc(f.name)}">${this.partsEditor(f.type, f.value)}</div>`
           : lgIsList(f.type) ? `<div class="lg-lsub" data-sfield="${lgEsc(f.name)}">${lgListEditor(f.type, f.value, this.data)}</div>` : "")).join("");
-    return `<div class="lg-dh"><i class="lg-pill big" style="--c:${LG_STRUCT_COLOR}"></i>${lgEsc(s.name)}</div><div class="lg-dsub">Struct</div>
+    return `<div class="lg-dh"><i class="lg-pill big" style="--c:${LG_STRUCT_COLOR}"></i>${lgEsc(s.name)}</div><div class="lg-dsub">${s.project ? "Struct of the project" : "Struct"}</div>
       <div class="lg-dsec"><div class="lg-dst">Struct</div>
         <div class="lg-drow"><label>Name</label><div><input data-stk="name" value="${lgEsc(s.name)}" spellcheck="false"></div></div>
         <div class="lg-drow"><label>Description</label><div><input data-stk="help" value="${lgEsc(s.help || "")}"></div></div>
+        <div class="lg-drow"><label title="A type of the project: every Blueprint of this level that has it has it the same, and a change here changes it in all of them. A function another Blueprint calls can take and give it.">Of the project</label><div><input type="checkbox" data-stk="project"${s.project ? " checked" : ""}></div></div>
       </div>
       <div class="lg-dsec"><div class="lg-dst">Fields</div>${rows}<div class="lg-dacts"><button data-act="struct-field">+ Field</button></div>
         <div class="lg-dtxt">A variable or a pin of this struct holds a value for each field. Make gives one from its fields, Break gives its fields, Set Field changes one of a variable. A renamed field keeps its values and wires; a removed one takes them along.</div></div>
@@ -1476,6 +1492,7 @@ export class LogicEditor {
       for (const f of b.querySelectorAll("[data-ek]")) {
         f.onchange = () => {
           if (f.dataset.ek === "help") { edit({op: "help", text: f.value}); return; }
+          if (f.dataset.ek === "project") { if (edit({op: f.checked ? "share" : "local"})?.ok === false) f.checked = !f.checked; return; }
           const to = f.value.trim();
           if (edit({op: "rename", to})?.ok !== false) this.selEnum = to;
           else f.value = en.name;
@@ -1500,6 +1517,7 @@ export class LogicEditor {
       for (const f of b.querySelectorAll("[data-stk]")) {
         f.onchange = () => {
           if (f.dataset.stk === "help") { edit({op: "help", text: f.value}); return; }
+          if (f.dataset.stk === "project") { if (edit({op: f.checked ? "share" : "local"})?.ok === false) f.checked = !f.checked; return; }
           const to = f.value.trim();
           if (edit({op: "rename", to})?.ok !== false) this.selStruct = to;
           else f.value = st.name;
@@ -2687,6 +2705,7 @@ select.lg-par,select.lg-lit{padding:0 2px}
 .lg-dissue{display:flex;gap:6px;align-items:flex-start;padding:5px 7px;border-radius:4px;margin:4px 0;line-height:1.4}
 .lg-dissue.err{background:rgba(210,59,59,.15);color:#ffb3ae}.lg-dissue.warn{background:rgba(201,146,30,.14);color:#f5d27f}
 .lg-fni{width:14px;text-align:center;font:italic 600 13px Georgia,serif;color:#b79cff;flex:none}
+.lg-proj{font:600 9px/14px var(--lg-font,system-ui,sans-serif);font-style:normal;width:14px;height:14px;border-radius:3px;text-align:center;background:#2c4a6e;color:#9fd0ff;flex:none;margin-left:4px}
 .lg-frow{display:flex;align-items:center;gap:4px;min-height:28px}
 .lg-frow input:not([type=checkbox]),.lg-frow select{height:24px;min-width:0;background:#0f0f0f;border:1px solid #3c3c3c;border-radius:3px;color:#fff;padding:0 5px;font:inherit}
 .lg-frow .lg-fname{flex:1 1 0}

@@ -531,6 +531,16 @@ const StateMachine* Graph::machine(std::string_view name) const {
   for (const StateMachine& m : machines) if (m.name == name) return &m;
   return nullptr;
 }
+bool same_type(const EnumType& a, const EnumType& b) { return a.name == b.name && a.values == b.values; }
+bool same_type(const StructType& a, const StructType& b) {
+  if (a.name != b.name || a.fields.size() != b.fields.size()) return false;
+  for (std::size_t k = 0; k < a.fields.size(); ++k) {
+    const StructField &x = a.fields[k], &y = b.fields[k];
+    if (x.name != y.name || x.type.type != y.type.type || x.type.of != y.type.of || json::stringify(x.value) != json::stringify(y.value)) return false;
+  }
+  return true;
+}
+
 int StructType::field(std::string_view n) const {
   for (std::size_t k = 0; k < fields.size(); ++k) if (fields[k].name == n) return static_cast<int>(k);
   return -1;
@@ -602,6 +612,7 @@ json::Value graph_to_json(const Graph& g) {
       for (const std::string& v : e.values) values.push(v);
       o.set("values", std::move(values));
       if (!e.help.empty()) o.set("help", e.help);
+      if (e.project) o.set("project", true);
       enums.push(std::move(o));
     }
     root.set("enums", std::move(enums));
@@ -622,6 +633,7 @@ json::Value graph_to_json(const Graph& g) {
       }
       o.set("fields", std::move(fields));
       if (!s.help.empty()) o.set("help", s.help);
+      if (s.project) o.set("project", true);
       structs.push(std::move(o));
     }
     root.set("structs", std::move(structs));
@@ -757,6 +769,7 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
     if (g.enumeration(e.name)) return bad("enum \"" + e.name + "\" is declared twice");
     for (const json::Value& x : v["values"].items()) e.values.push_back(x.as_string());
     e.help = v["help"].as_string();
+    e.project = v["project"].as_bool();
     g.enums.push_back(std::move(e));
   }
   // A type in the file: its name, and for an enum's or a struct's values which one ("of").
@@ -782,6 +795,7 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
       s.fields.push_back(std::move(f));
     }
     s.help = v["help"].as_string();
+    s.project = v["project"].as_bool();
     g.structs.push_back(std::move(s));
   }
   for (const json::Value& v : j["variables"].items()) {

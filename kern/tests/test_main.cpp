@@ -9138,6 +9138,91 @@ TEST(studio_logic_call_on_actor) {
   }
   CHECK(call_stays && st["logic"]["functions"][0]["external"].as_bool());
 }
+TEST(studio_logic_project_types) {
+  // An enum and a struct that two Blueprints of a level have: types of the project - the same in
+  // both, changed in both by one edit, refused where one of them cannot follow.
+  StudioFixture f;
+  CHECK(f.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
+  auto cmd = [&](std::initializer_list<std::pair<const char*, json::Value>> fields) {
+    json::Value c = json::Value::object();
+    for (const auto& [k, v] : fields) c.set(k, v);
+    return f.s->command(c);
+  };
+  // the Level declares Mode, the struct Door (a Mode in it) and a function that takes a Door
+  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Level : kern::Blueprint {\n  KERN_ENUM(Mode, Closed, Open);\n  KERN_STRUCT(Door) {\n    Mode State = Mode::Closed;\n    Float Width = 1.0;\n  };\n\n"
+                                                "  struct IsOpenResult { Bool open = false; };\n  KERN_PURE IsOpenResult IsOpen(Door door = Door{Mode::Closed, 1.0}) {\n"
+                                                "    return {enum_equal<Mode>(struct_break<Door>(door).State, Mode::Open)};\n  }\n};\n"}})["ok"].as_bool());
+  CHECK(!f.s->level().actors.empty());
+  if (f.s->level().actors.empty()) return;
+  const game::ActorId actor = f.s->level().actors.front().id;
+  auto type = [&](const char* kind, const std::string& name) {
+    const json::Value st = f.s->state();
+    for (const json::Value& t : st["logic"][kind].items())
+      if (t["name"].as_string() == name) return t;
+    return json::Value();
+  };
+  CHECK(!type("enums", "Mode")["project"].as_bool() && !type("structs", "Door")["project"].as_bool());
+  // the actor's Blueprint is offered the Level's types
+  CHECK(cmd({{"cmd", "logicOpen"}, {"owner", static_cast<f64>(actor)}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Seen"}, {"type", "float"}})["ok"].as_bool());
+  json::Value st = f.s->state();
+  CHECK(st["logic"]["otherTypes"].size() == 2 && st["logic"]["otherTypes"][0]["name"].as_string() == "Mode" && st["logic"]["otherTypes"][1]["kind"].as_string() == "struct" &&
+        st["logic"]["otherTypes"][0]["ownerName"].as_string() == "Level");
+  // declaring the Level's function brings the types its pins are of: Door, and with it Mode
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "declare"}, {"name", "IsOpen"}, {"from", 0}})["ok"].as_bool());
+  CHECK(type("structs", "Door")["project"].as_bool() && type("enums", "Mode")["project"].as_bool() && type("structs", "Door")["fields"].size() == 2);
+  CHECK(f.s->state()["logic"]["otherTypes"].size() == 0);
+  CHECK(cmd({{"cmd", "logicOpen"}, {"owner", 0}})["ok"].as_bool());
+  CHECK(type("structs", "Door")["project"].as_bool() && type("enums", "Mode")["project"].as_bool());  // (in the Level too)
+  // one edit changes both: a value more, a field more, a new name
+  CHECK(cmd({{"cmd", "logicEnum"}, {"op", "addValue"}, {"name", "Mode"}, {"value", "Opening"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicStruct"}, {"op", "addField"}, {"name", "Door"}, {"field", "Height"}, {"type", "float"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicEnum"}, {"op", "rename"}, {"name", "Mode"}, {"to", "DoorMode"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicOpen"}, {"owner", static_cast<f64>(actor)}})["ok"].as_bool());
+  CHECK(type("enums", "DoorMode")["values"].size() == 3 && type("structs", "Door")["fields"].size() == 3 && type("structs", "Door")["fields"][0]["of"].as_string() == "DoorMode");
+  st = f.s->state();
+  bool problems = false;
+  for (const json::Value& i : st["logic"]["issues"].items()) problems = problems || i["error"].as_bool();
+  CHECK(!problems);
+  // undo takes the rename back in both
+  CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
+  CHECK(type("enums", "Mode")["values"].size() == 3 && type("enums", "DoorMode").is_null());
+  CHECK(cmd({{"cmd", "logicOpen"}, {"owner", 0}})["ok"].as_bool());
+  CHECK(type("enums", "Mode")["values"].size() == 3 && type("enums", "DoorMode").is_null());
+  // an edit one of them cannot follow is refused as a whole: the actor has a variable called Gate
+  CHECK(cmd({{"cmd", "logicOpen"}, {"owner", static_cast<f64>(actor)}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Gate"}, {"type", "float"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicOpen"}, {"owner", 0}})["ok"].as_bool());
+  const json::Value refused = cmd({{"cmd", "logicStruct"}, {"op", "rename"}, {"name", "Door"}, {"to", "Gate"}});
+  CHECK(!refused["ok"].as_bool() && refused["error"].as_string().find("the Blueprint of ") == 0);
+  CHECK(!type("structs", "Door").is_null() && type("structs", "Gate").is_null());
+  // a field of a project struct is of a project type: a new enum of the Level goes along
+  CHECK(cmd({{"cmd", "logicEnum"}, {"op", "add"}, {"name", "Lock"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicStruct"}, {"op", "addField"}, {"name", "Door"}, {"field", "Bolt"}, {"type", "Lock"}})["ok"].as_bool());
+  CHECK(type("enums", "Lock")["project"].as_bool());
+  CHECK(cmd({{"cmd", "logicOpen"}, {"owner", static_cast<f64>(actor)}})["ok"].as_bool());
+  CHECK(type("enums", "Lock")["project"].as_bool() && type("structs", "Door")["fields"].size() == 4);
+  // it stays the project's while another Blueprint has it; the C++ says which types are the project's,
+  // and a text that changes one of them here alone is refused
+  CHECK(!cmd({{"cmd", "logicEnum"}, {"op", "local"}, {"name", "Lock"}})["ok"].as_bool());
+  const std::string text = cmd({{"cmd", "logicCpp"}})["text"].as_string();
+  CHECK(text.find("KERN_PROJECT_ENUM(Mode, Closed, Open, Opening);") != std::string::npos && text.find("KERN_PROJECT_STRUCT(Door) {") != std::string::npos);
+  std::string changed = text;
+  changed.replace(changed.find("KERN_PROJECT_ENUM(Mode, Closed, Open, Opening);"), 47, "KERN_PROJECT_ENUM(Mode, Closed, Open, Opening, Ajar);");
+  const json::Value apply = cmd({{"cmd", "logicCppApply"}, {"text", changed}});
+  CHECK(!apply["ok"].as_bool() && apply["error"].as_string().find("Mode is an enum of the project") == 0);
+  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", text}})["ok"].as_bool());
+  // a type of its own can become the project's, and be this Blueprint's own again while nobody else has it
+  CHECK(cmd({{"cmd", "logicEnum"}, {"op", "add"}, {"name", "Own"}})["ok"].as_bool() && cmd({{"cmd", "logicEnum"}, {"op", "share"}, {"name", "Own"}})["ok"].as_bool() && type("enums", "Own")["project"].as_bool());
+  CHECK(cmd({{"cmd", "logicEnum"}, {"op", "local"}, {"name", "Own"}})["ok"].as_bool() && !type("enums", "Own")["project"].as_bool());
+  // the other way: the Level takes a type of the actor
+  CHECK(cmd({{"cmd", "logicOpen"}, {"owner", 0}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicEnum"}, {"op", "adopt"}, {"name", "Own"}, {"from", static_cast<f64>(actor)}})["ok"].as_bool() && type("enums", "Own")["project"].as_bool());
+  // the level plays: the actor asks the Level with a Door it made itself
+  CHECK(f.cmd(R"({"cmd":"play"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"stop"})")["ok"].as_bool());
+}
 
 TEST(studio_logic_cpp_view) {
   // The editor's C++ view: a Blueprint written as C++ from nothing, played, changed in the text.

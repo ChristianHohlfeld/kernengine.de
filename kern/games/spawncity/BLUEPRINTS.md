@@ -185,7 +185,7 @@ Vor allen weiteren Regeln. Ein Blueprint und sein C++ sind dasselbe in zwei Schr
 - [x] Lokale Variablen in Funktionen: je Funktion eigene Variablen, die bei jedem Aufruf mit ihrem Default beginnen – in C++ die lokalen Variablen am Anfang des Rumpfs (`Float Total = 0.0;`), gelesen und gesetzt mit denselben Knoten wie jede Variable. Nur auf einem Weg der eigenen Funktion (wie Return).
 - **Entschieden: Eine Funktion ruft sich nicht selbst auf** – weder direkt noch über andere; Wiederholen ist Sache der Schleifen. Das bleibt eine Regel der Sprache, kein offener Punkt: Was ein Knoten sich merkt (Schleifenstand, Do Once, Wartezeit), gehört dem Knoten des Blueprints, nicht einem Aufruf – deshalb ist ein Blueprint in Graph, JIT und Klasse dasselbe und im Editor Schritt für Schritt zu verfolgen. Keiner der 17 Regel-Blueprints von SpawnCity hat es gebraucht (die Umkehrung einer Kurve und die Farbvergabe sind Schleifen).
 - [x] Blueprint-Bibliotheken: Funktionen eines Actors von anderen Blueprints aus aufrufen. Ein Blueprint sagt, wie die Funktion aussieht (`KERN_EXTERN StarsResult Stars(Actor who = Actor{0});` – kein Rumpf), und ruft sie mit **Call on Actor** auf dem Blueprint eines Actors auf, ohne Target auf dem des Levels: `func_call_on<"Stars">(target, kern::out(n7.stars), who);`. Das Level-Blueprint ist damit die Bibliothek für alle. Hat das Ziel die Funktion nicht, gelten die erklärten Defaults; Aufrufe liegen höchstens 64 tief. In Interpreter, JIT und Klasse dasselbe (Tier-Fall `call_on`).
-- [ ] Typen (Aufzählungen, Strukturen), die mehrere Blueprints eines Projekts teilen – heute erklärt jeder Blueprint seine eigenen, und ein Aufruf über Blueprints hinweg gibt sie nach Platz bzw. Feld für Feld weiter.
+- [x] Typen des Projekts: Aufzählungen und Strukturen, die mehrere Blueprints eines Levels haben – in jedem gleich. Ein Blueprint holt sich den Typ eines anderen („+ An enum / A struct of another Blueprint…“; wer eine Funktion eines anderen erklärt, bekommt die Typen ihrer Pins von selbst), oder ein eigener Typ wird in Details zum Typ des Projekts. Eine Änderung daran geschieht in allen Blueprints, die ihn haben, als ein Schritt, und wird als Ganzes abgelehnt, wenn einer nicht folgen kann. Jeder Blueprint trägt die Erklärung selbst (`project`, im C++ `KERN_PROJECT_ENUM` / `KERN_PROJECT_STRUCT`): Er bleibt für sich lesbar und ausführbar, die drei Ausführungsarten sehen einen gewöhnlichen Typ. Editor-Test `studio_logic_project_types`, Browser-Test Abschnitt 1i.
 
 ### 3 – Die reinen Regeln als Blueprints
 In dieser Reihenfolge (klein nach groß; jede Datei verschwindet, ihre Tests bleiben):
@@ -308,6 +308,10 @@ In dieser Reihenfolge (klein nach groß; jede Datei verschwindet, ihre Tests ble
   zwei Kernen verlieren sich die Spieler wieder (eine Session lebt in echter Zeit), deshalb läuft
   er nicht in der CI. Was eine Session tut – Treffer, Abstimmung, Kill, Effekte, Pings, Stimme,
   Übergabe des Hosts –, prüft `tests/test_mp.cpp` ohne Browser.
+- **Der wackelnde Browser-Test** (ein Klick im Blueprint-Test lief selten in Playwrights 30 s):
+  kein Fehler der Seite. Mit Software-WebGL liefert der Browser zeitweise sekundenlang kein Bild
+  (gemessen im hängenden Zustand: der Thread der Seite zu 97 % untätig, zwei Bilder in zwölf
+  Sekunden); ein Klick wartet auf zwei ruhige Bilder. Der Test gibt der Seite jetzt zwei Minuten.
 - **Eine Abstimmung statt zwei.** Die einstimmige Abstimmung über eine Spielregel
   (rules_vote_engine.mjs) gab es im C++ zweimal – für die Session und für die Konsole – und
   dadurch zuerst auch in zwei Blueprints. Sie steht jetzt einmal, in „Multiplayer“: CreateBallot,

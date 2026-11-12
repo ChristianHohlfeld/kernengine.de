@@ -1239,12 +1239,12 @@ struct Writer {
         doc(1, e.help);
         std::string values;
         for (const std::string& v : e.values) values += ", " + v;
-        line(1, "KERN_ENUM(" + e.name + values + ");");
+        line(1, std::string(e.project ? "KERN_PROJECT_ENUM(" : "KERN_ENUM(") + e.name + values + ");");
       }
       // (the structs after the enums: a field is of a type declared above it)
       for (const StructType& st : g.structs) {
         doc(1, st.help);
-        line(1, "KERN_STRUCT(" + st.name + ") {");
+        line(1, std::string(st.project ? "KERN_PROJECT_STRUCT(" : "KERN_STRUCT(") + st.name + ") {");
         for (const StructField& f : st.fields) line(2, cpp_type(f.type) + " " + f.name + " = " + literal(Value::from_json(f.value, f.type.type, g, f.type.of), f.type.of, g) + ";");
         line(1, "};");
       }
@@ -1957,9 +1957,12 @@ struct Reader {
       if (is("}")) break;
       if (t.kind == Tok::end) return fail(p, "\"};\" is missing at the end of the struct");
       const std::size_t at = p;
-      if (accept("KERN_ENUM")) {
+      if (is("KERN_ENUM") || is("KERN_PROJECT_ENUM")) {
         // KERN_ENUM(Mode, Closed, Opening, Open);   an enum of the Blueprint
+        // KERN_PROJECT_ENUM(Mode, ...);             one of the project: the same in every Blueprint that has it
         EnumType e;
+        e.project = is("KERN_PROJECT_ENUM");
+        ++p;
         if (!expect("(") || !word(e.name, "the enum's name")) return false;
         if (g.enumeration(e.name) || g.structure(e.name) || g.variable(e.name) || g.function(e.name)) return fail(at + 2, "the name " + e.name + " is declared twice");
         while (accept(",")) {
@@ -1975,9 +1978,12 @@ struct Reader {
         g.enums.push_back(std::move(e));
         continue;
       }
-      if (accept("KERN_STRUCT")) {
+      if (is("KERN_STRUCT") || is("KERN_PROJECT_STRUCT")) {
         // KERN_STRUCT(Weapon) { Text Name = ""; Float Damage = 10.0; };   a struct of the Blueprint
+        // KERN_PROJECT_STRUCT(Weapon) { ... };                            one of the project
         StructType s;
+        s.project = is("KERN_PROJECT_STRUCT");
+        ++p;
         if (!expect("(") || !word(s.name, "the struct's name")) return false;
         if (g.enumeration(s.name) || g.structure(s.name) || g.variable(s.name) || g.function(s.name)) return fail(at + 2, "the name " + s.name + " is declared twice");
         if (!expect(")") || !expect("{")) return false;

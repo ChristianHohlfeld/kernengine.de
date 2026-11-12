@@ -22,6 +22,11 @@ let failures = 0;
 const check = (ok, what) => { if (!ok) failures++; console.log(ok ? "ok  " : "FAIL", what); };
 const browser = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"]});
 const page = await (await browser.newContext({viewport: {width: 1280, height: 800}})).newPage();
+// A click waits until its target stands still for two animation frames. With software WebGL the
+// browser now and then delivers no frame for seconds (the page's own thread is idle meanwhile -
+// measured: 97 % idle, two frames in twelve seconds): a click then needs longer than Playwright's
+// 30 s on a slow machine. The page has two minutes.
+page.setDefaultTimeout(120000);
 const errors = [];
 page.on("pageerror", e => errors.push(e.message));
 await page.goto(base + "/kern/web/studio/index.html");
@@ -564,6 +569,35 @@ await cmd({cmd: "logicClose"});
 await cmd({cmd: "play"});
 check(await until(async () => (await status()).hud?.message === "42", 60000), `Play: the actor's Blueprint calls the Level's function (${(await status()).hud?.message})`);
 await cmd({cmd: "stop"});
+
+// ---- 1i. a type of the project: an enum two Blueprints have, the same in both -----------------------
+await cmd({cmd: "new", template: "basic"});
+await cmd({cmd: "logicOpen", owner: 0});
+await until(async () => await page.locator("#logicEditor:not([hidden]) .lg-canvas").count() === 1);
+check((await cmd({cmd: "logicCppApply", text: `struct Level : kern::Blueprint {
+  KERN_ENUM(Mode, Closed, Open);
+  Mode State = Mode::Closed;
+};
+`})).ok, "the Level's Blueprint has an enum");
+const taker = (await state()).actors?.[0]?.[0];
+await cmd({cmd: "logicOpen", owner: taker});
+await cmd({cmd: "logicVariable", op: "add", name: "Seen", type: "float"});
+check(await until(async () => await page.locator('.lg-declare [data-adopt="enum"] option[value="0:Mode"]').count() === 1), "an actor's Blueprint is offered the enums of the level's other Blueprints");
+await page.selectOption('.lg-declare [data-adopt="enum"]', "0:Mode");
+const modeOf = async () => (await logic()).enums.find(e => e.name === "Mode");
+check(await until(async () => (await modeOf())?.project === true) && (await modeOf()).values.join() === "Closed,Open", "chosen there, this Blueprint has the enum: a type of the project");
+check(await until(async () => await page.locator('.lg-enum[data-enum="Mode"] .lg-proj').count() === 1) && await until(async () => await page.locator('.lg-dbody [data-ek="project"]').isChecked().catch(() => false)),
+      "My Blueprint marks it and Details says it is the project's");
+// a value more, added here: the Level's enum has it too
+await page.click('.lg-dbody [data-act="enum-value"]');
+check(await until(async () => (await modeOf())?.values.length === 3), "+ Value adds a value here");
+await cmd({cmd: "logicOpen", owner: 0});
+check(await until(async () => (await modeOf())?.values.length === 3 && (await modeOf()).project === true), "and in the Level's Blueprint: one change for all");
+await page.click(".lg-cpp");
+check(await until(async () => (await page.locator(".lg-cpptext").inputValue()).includes("KERN_PROJECT_ENUM(Mode, Closed, Open, Value);")), "the C++ view says it is an enum of the project");
+await page.click(".lg-cppclose");
+check(errorsOf(await logic()).length === 0, "both compile" + (errorsOf(await logic()).length ? ": " + errorsOf(await logic()).join(" | ") : ""));
+await cmd({cmd: "logicClose"});
 
 // ---- 2. SpawnCity's level file -------------------------------------------------------------------
 const text = await (await fetch(base + "/kern/games/spawncity/level/spawncity.klevel")).text();

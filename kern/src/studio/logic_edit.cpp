@@ -118,6 +118,64 @@ std::vector<std::tuple<u32, std::string, const logic::Graph*>> other_blueprints(
     if (a.id != owner && a.logic && !a.logic->empty()) r.emplace_back(a.id, a.name, &*a.logic);
   return r;
 }
+/// Every Blueprint of the level but the graph `g`: its owner's name and its graph, to change.
+std::vector<std::pair<std::string, logic::Graph*>> other_graphs(game::Level& l, const logic::Graph* g) {
+  std::vector<std::pair<std::string, logic::Graph*>> r;
+  if (&l.logic != g && !l.logic.empty()) r.emplace_back("Level", &l.logic);
+  for (game::Actor& a : l.actors)
+    if (a.logic && &*a.logic != g && !a.logic->empty()) r.emplace_back(a.name, &*a.logic);
+  return r;
+}
+// ---- types of the project: an enum or a struct that several Blueprints of the level have, the same in each ----
+bool is_project_type(const logic::Graph& g, const std::string& name) {
+  if (const logic::EnumType* e = g.enumeration(name)) return e->project;
+  const logic::StructType* s = g.structure(name);
+  return s && s->project;
+}
+/// The type `name` of `g` is one of the project - and so are the types its fields are of.
+void make_project_type(logic::Graph& g, const std::string& name) {
+  if (logic::EnumType* e = g.enumeration(name)) { e->project = true; return; }
+  logic::StructType* s = g.structure(name);
+  if (!s || s->project) return;
+  s->project = true;
+  std::vector<std::string> of;
+  for (const logic::StructField& f : s->fields) if (!f.type.of.empty()) of.push_back(f.type.of);
+  for (const std::string& n : of) make_project_type(g, n);
+}
+/// The Blueprint `to` gets the type `name` of `from` - a type of the project from now on - with
+/// the types its fields are of. "" when it has it, else why not.
+std::string adopt_project_type(logic::Graph& to, logic::Graph& from, const std::string& name) {
+  make_project_type(from, name);
+  auto differs = [&] { return "this Blueprint has a type " + name + " that is not the project's: rename one of them, or make them the same"; };
+  if (const logic::EnumType* e = from.enumeration(name)) {
+    if (const logic::EnumType* mine = to.enumeration(name)) return mine->project && logic::same_type(*mine, *e) ? std::string() : differs();
+    if (to.structure(name) || to.variable(name) || to.function(name)) return "this Blueprint has something called " + name + " already";
+    to.enums.push_back(*e);
+    return {};
+  }
+  const logic::StructType* s = from.structure(name);
+  if (!s) return "there is no type " + name;
+  if (const logic::StructType* mine = to.structure(name)) return mine->project && logic::same_type(*mine, *s) ? std::string() : differs();
+  if (to.enumeration(name) || to.variable(name) || to.function(name)) return "this Blueprint has something called " + name + " already";
+  const logic::StructType copy = *s;  // (the fields' types first: a struct stands after the structs it holds)
+  for (const logic::StructField& f : copy.fields)
+    if (!f.type.of.empty())
+      if (const std::string why = adopt_project_type(to, from, f.type.of); !why.empty()) return why;
+  to.structs.push_back(copy);
+  return {};
+}
+/// Where a type of the project that `g` has is not the same in another Blueprint of the level: "" when nowhere.
+std::string project_type_conflict(const game::Level& l, u32 owner, const logic::Graph& g) {
+  for (const auto& [id, name, other] : other_blueprints(l, owner)) {
+    for (const logic::EnumType& e : g.enums)
+      if (const logic::EnumType* x = e.project ? other->enumeration(e.name) : nullptr; x && x->project && !logic::same_type(e, *x))
+        return e.name + " is an enum of the project, and the Blueprint of " + name + " has it with other values: a type of the project is the same in every Blueprint";
+    for (const logic::StructType& t : g.structs)
+      if (const logic::StructType* x = t.project ? other->structure(t.name) : nullptr; x && x->project && !logic::same_type(t, *x))
+        return t.name + " is a struct of the project, and the Blueprint of " + name + " has it with other fields: a type of the project is the same in every Blueprint";
+  }
+  return {};
+}
 /// Does `other` have a function this declaration describes: of that name, with inputs and
 /// outputs of the same types in the same order?
 bool declares(const logic::Function& f, const logic::Function& other) {
@@ -520,10 +578,37 @@ json::Value Studio::logic_json() const {
         offered.push(std::move(x));
       }
     o.set("otherFunctions", std::move(offered));
+    // (the types of the level's other Blueprints this one does not have: it can have them too -
+    // they are types of the project then)
+    json::Value types = json::Value::array();
+    auto offer = [&](u32 id, const std::string& owner, const std::string& type, const char* kind, bool project, const std::string& help) {
+      if (g->enumeration(type) || g->structure(type) || types.size() >= 200) return;
+      for (const json::Value& have : types.items()) if (have["name"].as_string() == type) return;
+      json::Value x = json::Value::object();
+      x.set("owner", id);
+      x.set("ownerName", owner);
+      x.set("name", type);
+      x.set("kind", kind);
+      x.set("project", project);
+      if (!help.empty()) x.set("help", help);
+      types.push(std::move(x));
+    };
+    for (const auto& [id, name, other] : other_blueprints(level_, logic_owner_)) {
+      for (const logic::EnumType& e : other->enums) offer(id, name, e.name, "enum", e.project, e.help);
+      for (const logic::StructType& t : other->structs) offer(id, name, t.name, "struct", t.project, t.help);
+    }
+    o.set("otherTypes", std::move(types));
   }
   o.set("machines", graph["machines"]);
   o.set("comments", graph["comments"].is_array() ? graph["comments"] : json::Value::array());
   json::Value iss = json::Value::array();
+  if (const std::string conflict = project_type_conflict(level_, logic_owner_, *g); !conflict.empty()) {
+    json::Value x = json::Value::object();
+    x.set("node", 0);
+    x.set("error", true);
+    x.set("text", conflict);
+    iss.push(std::move(x));
+  }
   for (const logic::Issue& i : issues) {
     json::Value x = json::Value::object();
     x.set("node", i.node);
@@ -1069,12 +1154,63 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     result.set("ok", done || error.empty());
     return result;
   };
+  // An edit of an enum or a struct. A type of the project is changed in every Blueprint of the
+  // level that has it - one step, refused as a whole when one of them cannot follow.
+  //   share   the type becomes one of the project (and the types its fields are of)
+  //   local   it is this Blueprint's own again (while no other Blueprint has it)
+  //   adopt   this Blueprint gets the type `name` of the Blueprint `from`
+  auto type_edit = [&](const char* label, auto&& body) {
+    const std::string op = str("op"), which = str("name");
+    return graph_edit(label, [&](logic::Graph& g, game::Level& level) {
+      if (op == "adopt") {
+        logic::Graph* from = graph_of(level, static_cast<u32>(num("from")), false);
+        if (!from || from == &g) { error = "that Blueprint has no type " + which; return false; }
+        if (const std::string why = adopt_project_type(g, *from, which); !why.empty()) { error = why; return false; }
+        result.set("name", which);
+        return true;
+      }
+      if (op == "share" || op == "local") {
+        if (!g.enumeration(which) && !g.structure(which)) { error = "no type " + which; return false; }
+        if (op == "share") {
+          make_project_type(g, which);
+          if (const std::string conflict = project_type_conflict(level, owner, g); !conflict.empty()) { error = conflict; return false; }
+          return true;
+        }
+        for (const auto& [other_name, other] : other_graphs(level, &g))
+          if (is_project_type(*other, which)) { error = "the Blueprint of " + other_name + " has " + which + " too: it stays a type of the project"; return false; }
+        for (const logic::StructType& t : g.structs)
+          if (t.project && t.name != which)
+            for (const logic::StructField& f : t.fields)
+              if (f.type.of == which) { error = which + " is a field's type in " + t.name + ", a struct of the project"; return false; }
+        if (logic::EnumType* e = g.enumeration(which)) e->project = false;
+        if (logic::StructType* t = g.structure(which)) t->project = false;
+        return true;
+      }
+      const bool everywhere = op != "add" && op != "remove" && is_project_type(g, which);
+      if (!body(g, level)) return false;
+      if (!everywhere) return true;
+      // (a field of a project struct is of a type of the project)
+      std::string field_of = str("type");
+      if (field_of.size() > 5 && field_of.compare(field_of.size() - 5, 5, "_list") == 0) field_of.resize(field_of.size() - 5);
+      const bool brings = (op == "addField" || op == "fieldType") && (g.enumeration(field_of) || g.structure(field_of));
+      if (brings) make_project_type(g, field_of);
+      for (const auto& [other_name, other] : other_graphs(level, &g)) {
+        if (!is_project_type(*other, which)) continue;
+        if (brings)
+          if (const std::string why = adopt_project_type(*other, g, field_of); !why.empty()) { error = "the Blueprint of " + other_name + ": " + why; return false; }
+        if (!body(*other, level)) { error = "the Blueprint of " + other_name + ": " + (error.empty() ? "it cannot follow" : error); return false; }
+      }
+      if (const std::string conflict = project_type_conflict(level, owner, g); !conflict.empty()) { error = conflict; return false; }
+      return true;
+    });
+  };
   if (name == "logicCppApply") {
     // The Blueprint becomes what the C++ says: one undo step. The nodes the text still has keep
     // their ids and places; what cannot be read is refused with its line and the reason.
     const logic::Graph* g = graph_of(level_, owner);
     logic::Graph now;
     if (!logic::apply_cpp(str("text"), g ? *g : logic::Graph(), now, &error)) return fail_result(error);
+    if (const std::string conflict = project_type_conflict(level_, owner, now); !conflict.empty()) return fail_result(conflict + " (change it in one of them: the others follow)");
     bool applied = false;
     graph_edit("Edit C++", [&](logic::Graph& graph, game::Level&) {
       graph = std::move(now);
@@ -1357,7 +1493,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       if (op == "declare") {
         // A function of another Blueprint of the level, declared here as it is there: this
         // Blueprint can then call it on an actor. Its pins' types are types this Blueprint has.
-        const logic::Graph* from = graph_of(level, static_cast<u32>(num("from")));
+        logic::Graph* from = graph_of(level, static_cast<u32>(num("from")), false);
         const logic::Function* of = from && from != &g ? from->function(fname) : nullptr;
         if (!of || of->external) { error = "that Blueprint has no function " + fname; return false; }
         if (g.function(fname) || g.variable(fname) || g.enumeration(fname) || g.structure(fname) || is_local(g, fname)) { error = "this Blueprint has something called " + fname + " already"; return false; }
@@ -1371,9 +1507,9 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         for (const auto* pins : {&f.inputs, &f.outputs})
           for (const logic::FunctionPin& p : *pins) {
             if (p.of.empty()) continue;
-            const bool is_enum = logic::element_of(p.type) == logic::PinType::enumeration;
-            if (is_enum ? !g.enumeration(p.of) : !g.structure(p.of)) {
-              error = "\"" + p.name + "\" of " + fname + " is of the type " + p.of + ", which this Blueprint does not have: declare that " + (is_enum ? "enum" : "struct") + " here first, as it is there";
+            // (its types come along: they are types of the project then, the same here and there)
+            if (const std::string why = adopt_project_type(g, *from, p.of); !why.empty()) {
+              error = "\"" + p.name + "\" of " + fname + " is of the type " + p.of + ": " + why;
               return false;
             }
           }
@@ -1607,7 +1743,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     // An enum of the Blueprint: its name, its values (their order is their meaning: a value is
     // its place among them - what is typed into variables and pins follows when values move).
     const std::string op = str("op");
-    return graph_edit("Edit Enum", [&](logic::Graph& g, game::Level&) {
+    return type_edit("Edit Enum", [&](logic::Graph& g, game::Level&) {
       const std::string which = str("name");
       auto taken = [&](const std::string& n) { return g.variable(n) || g.function(n) || g.enumeration(n) || g.structure(n) || is_local(g, n); };
       if (op == "add") {
@@ -1715,7 +1851,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     // renamed field keeps its values and its wires on Make and Break, a field that goes takes
     // them along, and a field that moves changes nothing but its place.
     const std::string op = str("op");
-    return graph_edit("Edit Struct", [&](logic::Graph& g, game::Level&) {
+    return type_edit("Edit Struct", [&](logic::Graph& g, game::Level&) {
       const std::string which = str("name");
       auto taken = [&](const std::string& n) { return g.variable(n) || g.function(n) || g.enumeration(n) || g.structure(n) || is_local(g, n); };
       if (op == "add") {
