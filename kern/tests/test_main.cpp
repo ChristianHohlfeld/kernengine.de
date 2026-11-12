@@ -2006,6 +2006,7 @@ TEST(logic_formulas) {
   CHECK(value("wrap32(4294967296 + 5)") == 5 && value("wrap32(-1)") == 4294967295.0 && value("wrap32s(4294967295)") == -1 && value("wrap32s(2147483648)") == -2147483648.0);
   CHECK(value("mul32(2654435769, 2654435769)") == static_cast<f64>(static_cast<u32>(2654435769u * 2654435769u)) && value("mul32(65536, 65536)") == 0);
   CHECK(value("wrap32(shl(4294967295, 4))") == 4294967280.0 && value("band(7.9, 3.9)") == 3);
+  CHECK(value("single(0.1)") == static_cast<f64>(0.1f) && value("single(0.5)") == 0.5);
   CHECK_NEAR(value("sin(rad(90)) + cos(0) + deg(pi) + atan2(1, 1) * 4 / pi + exp(0) + pow(2, 10)"), 1 + 1 + 180 + 1 + 1 + 1024, 1e-12);
   // numbers are read as a compiler reads them
   CHECK(value("0.7 * 5") == 0.7 * 5 && value("1e3 + .5") == 1000.5 && value("2.5E-1") == 0.25 && value("16000 - 5 * 1300") == 9500);

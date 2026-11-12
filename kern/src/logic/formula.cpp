@@ -17,7 +17,7 @@ enum Code : u8 {
   kConst, kInput, kAdd, kSub, kMul, kDiv, kMod, kPow, kNeg, kNot, kLt, kLe, kGt, kGe, kEq, kNe, kAnd, kOr, kSelect,
   kMin, kMax, kClamp, kAbs, kSign, kFloor, kCeil, kRound, kTrunc, kSqrt, kExp, kLog,
   kSin, kCos, kTan, kAsin, kAcos, kAtan, kAtan2, kRad, kDeg, kLerp,
-  kBand, kBor, kBxor, kShl, kShr, kWrap32, kWrap32s, kMul32,
+  kBand, kBor, kBxor, kShl, kShr, kWrap32, kWrap32s, kMul32, kSingle,
 };
 
 struct Fn { const char* name; Code code; u8 args; };
@@ -28,7 +28,7 @@ constexpr Fn kFunctions[] = {
     {"deg", kDeg, 1},     {"lerp", kLerp, 3},   {"div", kDiv, 2},     {"mod", kMod, 2},
     // whole numbers as a machine has them: their bits, and arithmetic that wraps around at 32 bit
     {"band", kBand, 2},   {"bor", kBor, 2},     {"bxor", kBxor, 2},   {"shl", kShl, 2},     {"shr", kShr, 2},     {"wrap32", kWrap32, 1}, {"wrap32s", kWrap32s, 1},
-    {"mul32", kMul32, 2},
+    {"mul32", kMul32, 2}, {"single", kSingle, 1},
 };
 constexpr f64 kPi = math::pi;
 constexpr int kMaxStack = 48;
@@ -410,6 +410,7 @@ f64 Formula::evaluate(const f64* values, std::size_t count) const {
       case kWrap32: r = math::wrap32(a); break;
       case kWrap32s: r = math::wrap32s(a); break;
       case kMul32: r = math::mul32(a, b); break;
+      case kSingle: r = math::single(a); break;
     }
     st[n++] = r;
   }

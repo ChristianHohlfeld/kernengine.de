@@ -340,43 +340,52 @@ und schreibt sie in der Schreibweise:
   (`inline`) stehen in jedem Blueprint, der sie benutzt – wie in C++ in jeder Übersetzungseinheit.
 - Gerechnet wird mit der Arithmetik der Blueprint-Sprache: Zahlen in 64 Bit, ganze Zahlen exakt,
   eine Division durch null ergibt 0, Vektoren in 32 Bit. Das ist in Interpreter, JIT und Klasse
-  und auf jeder Maschine gleich. Wo das C++ in 32 Bit rechnete, ist der Blueprint mindestens so
-  genau. Eine Stelle, deren Bedeutung sich ändern würde (Überlauf in 32 Bit, Bit-Arithmetik),
-  wird nicht geschrieben, solange die Sprache keinen Knoten dafür hat.
-- **Der Beweis je Funktion:** `--test` schreibt zu jeder Datei einen Test (`tests/converted/`),
-  der jede umgeschriebene Funktion mit denselben Argumenten aufruft – das C++, aus dem sie gelesen
-  wurde, den Blueprint im Interpreter und den Blueprint als kompilierte Klasse – und die
-  Ergebnisse vergleicht (300 Aufrufe je Funktion; Interpreter und Klasse müssen dasselbe geben).
-  Als gleich gilt, was das C++ gibt – in 32 Bit, wie es dasteht, oder mit 64-Bit-Zahlen, wie ein
-  Blueprint rechnet (der Test übersetzt die Funktion dafür ein zweites Mal mit `f32` als
-  `double`): Wo der 32-Bit-Lauf unterwegs Stellen verliert (eine Schleife, die aufaddiert, ein
-  Produkt mit einer großen Zahl), ist der Blueprint der 64-Bit-Lauf. Verlässt das C++ die Zahlen
-  (Division durch null, Wurzel aus Negativem), wird nichts verglichen; und wo das
-  letzte Bit eines Arguments im C++ selbst das Ergebnis verschiebt (an einer Schwelle, am Umbruch
-  eines Winkels, im Sinus einer großen Zahl), gilt als gleich, was dort liegt, wo die
-  C++-Ergebnisse der Nachbarn des Arguments liegen. Methoden werden auf einem gewürfelten Objekt
-  ihrer Klasse aufgerufen; verglichen wird alles, was der Aufruf gibt und ändert.
+  und auf jeder Maschine gleich. Wo das C++ eine Zahl ausdrücklich auf 32 Bit bringt (das Kreuzprodukt
+  zweier 2D-Vektoren, ein Vektor geteilt durch eine Zahl), tut es der Blueprint auch (`single` in der
+  Formel). Vorzeichenlose 32-Bit-Arithmetik und Bit-Operationen haben eigene Formel-Funktionen.
+- **Der Beweis je Funktion, Bit für Bit:** `--test` schreibt zu jeder Datei einen Test
+  (`tests/converted/`). In ihm steht der Quelltext jeder umgeschriebenen Funktion noch einmal, wie er
+  ist – mit allem, was er nennt (Klassen, Konstanten, Aufzählungen, Typnamen, Hilfsfunktionen), in der
+  Reihenfolge der Übersetzungseinheit – und wird mit den Zahlen der Blueprint-Sprache übersetzt:
+  `f32` ist `double`, Zahlen ohne das `f`, das sie auf 32 Bit bringt, die Funktionen der Zahlen
+  (`sin`, `pow`, `sqrt` …) sind die der Formel (`kern::math`), und ein Vektor hält seine Komponenten
+  in 32 Bit, gelesen sind sie Zahlen wie alle anderen (`converted::wide` in `tests/converted.h`); was
+  Vektoren als Ganzes tun, tun die Funktionen der Engine, wie in den Knoten. Dieser Quelltext steht in
+  einem eigenen Namensraum: Vom Programm selbst ist dort nichts erreichbar – was er nennt und der
+  Test nicht hält, übersetzt nicht, statt still auf die 32-Bit-Funktion des Programms zu fallen.
+  Jede Funktion wird 300-mal mit denselben Argumenten aufgerufen: dieser Quelltext, der Blueprint im
+  Interpreter und der Blueprint als kompilierte Klasse. Alle drei Ergebnisse müssen **dieselben Bits**
+  haben (auch 0.0 und −0.0 sind zwei Ergebnisse); es gibt keine Toleranz. Methoden werden auf einem
+  gewürfelten Objekt ihrer Klasse aufgerufen; verglichen wird alles, was der Aufruf gibt und ändert.
+- Was nicht verglichen werden kann, weil C++ dort nichts festlegt, zählt der Test und vergleicht es
+  nicht: einen Aufruf, in dem der Quelltext durch null teilt oder die Zahlen verlässt (Wurzel aus
+  Negativem), und einen, in dem er einen Eintrag außerhalb einer Liste liest oder schreibt, ganze
+  Zahlen durch null teilt oder Bits um die Breite der Zahl schiebt. Dafür führt der Test diese Stellen
+  im Quelltext durch Funktionen (`converted::at`, `quot`, `shl` …), die den Wert geben, wo es einen
+  gibt, und den Aufruf sonst markieren. Je Funktion müssen mindestens 20 Aufrufe verglichen sein.
+- Ein Stück Quelltext, das mit den Zahlen der Sprache nicht übersetzt (es ruft etwas, das nicht
+  umgeschrieben ist), nimmt der Konverter aus dem Test und nennt die Funktion als nicht verglichen.
 - Eine Funktion wird geschrieben, wenn alles in ihr einen Platz in der Schreibweise hat – und
   alles, was sie aufruft. Die anderen bleiben C++, bis der Konverter oder die Sprache den Platz
   hat. Der Lauf nennt, worauf sie warten, nach Zeilen geordnet.
 
-Stand (12.11.2026): 207 von 1.428 Funktionen (1.178 von 28.607 Zeilen) aus 51 von 77 Dateien stehen
-als Blueprints im Level (51 Actors im Ordner „Source“). 189 Funktionen vergleicht der Test mit
-ihrem C++; nicht verglichen sind 53: 19, die ein Feld an einer berechneten Stelle lesen oder Bits
-um einen berechneten Betrag schieben (das C++ ist dort außerhalb seines Bereichs nicht bestimmt,
-der Blueprint schon – der Test kennt den Bereich nicht), 15, deren Klasse der Test nicht bauen kann
-(kein Default-Konstruktor, eine Referenz als Feld), 12 Methoden, die ihr Objekt nicht benutzen
-oder deren Klasse nicht geschrieben ist, 7 mit `char*` oder Listen in Listen. (Die Zählung der
-Tests schließt Funktionen aus Headern ein, die in den Blueprints stehen.) Das Spiel führt für
-diese Dateien weiter ihr C++ aus (Stufe 5).
+**Was der Beweis sagt und was nicht.** Er sagt: Der Blueprint rechnet genau das, was der Quelltext
+sagt, in den Zahlen der Sprache – überall gleich. Er sagt nicht, dass das dieselben Bits sind wie im
+heutigen Programm: Das rechnet dieselben Formeln mit `f32` in 32 Bit, die Sprache in 64 Bit (wie das
+JavaScript-Original). Das ist die Festlegung der Sprache, kein Spielraum des Tests.
 
-Worauf die anderen warten, nach Zeilen: der Zustand von `Game` (328 Funktionen, 13.850 Zeilen:
+Stand (13.11.2026): 231 von 1.428 Funktionen (1.435 von 28.544 Zeilen) aus 52 von 77 Dateien stehen
+als Blueprints im Level (52 Actors im Ordner „Source“). Der Test vergleicht jede davon, die etwas
+gibt, Bit für Bit mit ihrem Quelltext – 269 Vergleiche, weil Funktionen aus Headern in jedem
+Blueprint stehen, der sie benutzt; keine ist ausgenommen. Das Spiel führt für diese Dateien weiter
+ihr C++ aus (Stufe 5).
+
+Worauf die anderen warten, nach Zeilen: der Zustand von `Game` (328 Funktionen, 13.818 Zeilen:
 geteilte Zeiger, Typen der Engine mit eigenem Innenleben); Klassen mit einem Zeiger auf die Welt,
 den Renderer, den Mixer oder die Physik der Engine (`Life`, `PeopleArt`, `Car`, `Marks`,
-`Destruction`, `Drone`, `Interiors`, `Ragdolls` …: rund 4.500 Zeilen, dazu 821 Zeilen mit Zeigern
-im Rumpf); Maps und Sets (`Terrain`, `CityStream`: rund 2.400 Zeilen); `Session` (Netz der Engine:
-664); die Aufrufe der Regel-Blueprints (482); Listen, die ein Konstruktor baut (430); Lambdas
-(409); ganze Zahlen in 64 Bit (288).
+`Destruction`, `Drone`, `Interiors`, `Ragdolls` …: rund 4.500 Zeilen, dazu 812 Zeilen mit Zeigern
+im Rumpf); Maps und Sets (`Terrain`, `CityStream`: rund 2.300 Zeilen); `Session` (Netz der Engine:
+664); die Aufrufe der Regel-Blueprints (482); ganze Zahlen in 64 Bit (383); Text formatieren.
 
 Aufruf (in `kern/games/spawncity`):
 
@@ -391,8 +400,11 @@ Was als Nächstes dazukommt, in der Reihenfolge der Zeilen, die darauf warten:
    geändert hat – auch in ein Feld, eine Komponente eines Vektors oder einen Eintrag einer Liste,
    Ebene für Ebene. Konstruktoren sind Funktionen, die den Wert bauen (`Projector_new`);
    Default-Argumente stehen beim Aufruf.
-2. [ ] **Lambdas:** eine lokale Funktion wird eine Funktion des Blueprints; was sie fängt, sind
-   ihre Eingänge, was sie davon ändert, ihre Ergebnisse.
+2. [x] **Lambdas:** eine lokale Funktion (`auto f = [&](…) { … };`) ist eine Funktion des
+   Blueprints; was sie von ihrer Umgebung benutzt, sind ihre ersten Eingänge, was sie davon ändert,
+   weitere Ergebnisse – bei jedem Aufruf zurückgespeichert. Per Wert gefangen: die Werte, wie sie
+   bei der Deklaration sind. Sie wird mit der Funktion verglichen, in der sie steht.
+   - [ ] Lambdas als Argumente (`std::sort`, `remove_if`, `find_if`) und `std::function`.
 2a. [x] **Typen:** Namen, die das Programm Typen gibt (`using Bytes32 = …`); Aufzählungen mit
    eigenen Zahlen (die Zahlen stehen als Liste in einer Variablen, wo ein Wert als Zahl gebraucht
    wird); `std::pair` als Struktur; eine Liste in einer Liste als Struktur, die sie hält;
@@ -413,7 +425,10 @@ Was als Nächstes dazukommt, in der Reihenfolge der Zeilen, die darauf warten:
      definieren (`Quat::rotate`, `Mat4::translation`), wird wie der Code des Spiels geschrieben.
    - [ ] Ganze Zahlen in 64 Bit (Schlüssel aus zwei 32-Bit-Zahlen, FNV-Hash): Ein Int ist bis 2^53
      exakt.
-   - [ ] Maps und Sets; Text formatieren und zerlegen; Listen: einfügen, löschen, sortieren, suchen.
+   - [x] Listen: einfügen und löschen an einer Stelle oder über einen Bereich (`erase`, `insert`),
+     `resize`, `assign`, Listen, die ein Konstruktor baut (`std::vector<T> v(n, x)`, aus einem
+     Bereich), `std::swap`.
+   - [ ] Maps und Sets; Text formatieren und zerlegen; Listen sortieren und durchsuchen.
    - [ ] Zeiger: ein Zeiger auf ein Objekt des Spiels ist sein Platz in einer Liste oder ein Actor;
      ein Zeiger auf die Welt, den Renderer oder den Mixer der Engine ist die Engine selbst (6).
 5. [ ] **Aufrufe zwischen Blueprints als Werte:** eine reine Funktion eines anderen Blueprints

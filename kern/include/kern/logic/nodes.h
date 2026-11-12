@@ -76,6 +76,8 @@ inline f64 shl(f64 a, f64 n) { return n >= 0 && n < 64 ? static_cast<f64>(static
 inline f64 shr(f64 a, f64 n) { return n >= 0 && n < 64 ? static_cast<f64>(bits_of(a) >> static_cast<int>(n)) : (bits_of(a) < 0 ? -1 : 0); }
 inline f64 wrap32(f64 a) { return static_cast<f64>(static_cast<u32>(static_cast<u64>(bits_of(a)))); }
 inline f64 wrap32s(f64 a) { return static_cast<f64>(static_cast<i32>(static_cast<u32>(static_cast<u64>(bits_of(a))))); }
+/// The number as a 32-bit float holds it (a formula's single): what a vector's component is.
+inline f64 single(f64 a) { return static_cast<f64>(static_cast<f32>(a)); }
 inline f64 mul32(f64 a, f64 b) { return static_cast<f64>(static_cast<u32>(static_cast<u32>(static_cast<u64>(bits_of(a))) * static_cast<u32>(static_cast<u64>(bits_of(b))))); }
 }  // namespace math
 

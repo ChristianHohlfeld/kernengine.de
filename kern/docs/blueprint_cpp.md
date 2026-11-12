@@ -450,7 +450,8 @@ Eine Formel ist der Ausdruck selbst, als Lambda über ihre Eingänge. Operatoren
 anderes bedeuten oder fehlen, sind dort Aufrufe: `/` ist `kern::math::div` (durch 0 ergibt 0), `%`
 ist `kern::math::mod`, `^` ist `kern::math::pow`; die Funktionen und `pi` stehen in `kern::math`.
 Für ganze Zahlen, wie eine Maschine sie hat, gibt es `band`, `bor`, `bxor`, `shl`, `shr` (die Bits
-einer Zahl) und `wrap32`, `wrap32s`, `mul32` (Rechnen, das bei 32 Bit umbricht) – in jeder Stufe
+einer Zahl) und `wrap32`, `wrap32s`, `mul32` (Rechnen, das bei 32 Bit umbricht), dazu `single` (die Zahl, wie
+eine 32-Bit-Kommazahl sie hält) – in jeder Stufe
 dieselben Funktionen von `kern::math`.
 Zurückgelesen wird der Lambda-Rumpf als Formel, in ihrer einen kanonischen Schreibweise
 (`Formula::text()`).

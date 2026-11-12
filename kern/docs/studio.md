@@ -677,7 +677,7 @@ Compile-Fehler mit Stelle und Grund.
 | Vergleiche | `< <= > >= == !=` ergeben 1 oder 0; `&&`, `||`; `a ? b : c` |
 | Funktionen | `min max clamp(x, lo, hi) abs sign floor ceil round trunc sqrt pow(x, y) exp log lerp(a, b, t)` |
 | Winkel | `sin cos tan asin acos atan atan2(y, x)` in Radiant; `rad(grad)`, `deg(radiant)`; `pi` |
-| Ganze Zahlen, wie eine Maschine sie hat | Bits: `band(a, b)`, `bor(a, b)`, `bxor(a, b)`, `shl(a, n)`, `shr(a, n)`; 32 Bit: `wrap32(x)` (was eine vorzeichenlose 32-Bit-Zahl davon hält: 0 … 4294967295), `wrap32s(x)` (mit Vorzeichen), `mul32(a, b)` (das Produkt, wie 32 Bit es halten) – für Hashes und Paketformate |
+| Ganze Zahlen, wie eine Maschine sie hat | Bits: `band(a, b)`, `bor(a, b)`, `bxor(a, b)`, `shl(a, n)`, `shr(a, n)`; 32 Bit: `wrap32(x)` (was eine vorzeichenlose 32-Bit-Zahl davon hält: 0 … 4294967295), `wrap32s(x)` (mit Vorzeichen), `mul32(a, b)` (das Produkt, wie 32 Bit es halten) – für Hashes und Paketformate; `single(x)`: die Zahl, wie eine 32-Bit-Kommazahl sie hält (was die Komponente eines Vektors ist) |
 
 Gerechnet wird wie in den Mathe-Knoten (f64, dieselben Funktionen auf jeder Plattform); eine
 Division durch 0 ergibt 0.

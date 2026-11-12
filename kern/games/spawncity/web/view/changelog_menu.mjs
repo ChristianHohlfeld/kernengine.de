@@ -7,6 +7,11 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-13",time:"00:47",title:"Blueprints und Quelltext: verglichen Bit für Bit",items:[
+    "Unter der Haube: Jede umgeschriebene Funktion wird jetzt Bit für Bit mit ihrem Quelltext verglichen – ohne jede Toleranz, auch 0 und −0 gelten als verschieden. Der Quelltext wird dafür mit den Zahlen der Blueprint-Sprache übersetzt (64 Bit, Vektoren in 32 Bit) und steht im Test für sich: Er kann nichts vom Spiel aufrufen, was der Test nicht selbst hält.",
+    "Der Konverter schreibt jetzt auch lokale Funktionen (Lambdas) und Listen, in die eingefügt, aus denen gelöscht oder deren Länge gesetzt wird. 231 Funktionen aus 52 Dateien stehen als Blueprints im Level. Am Spiel ändert sich dadurch nichts.",
+    "Kern-Blueprints: Die Formel hat single – eine Zahl, auf 32 Bit gebracht.",
+  ]},
   {date:"2026-11-12",time:"22:17",title:"Kern-Blueprints: Bits, 32-Bit-Rechnen, größere Strukturen",items:[
     "Kern-Blueprints: Formeln rechnen jetzt auch mit ganzen Zahlen, wie eine Maschine sie hat – band, bor, bxor, shl, shr für Bits und wrap32, wrap32s, mul32 für Rechnen, das bei 32 Bit umbricht (Hashes, Paketformate).",
     "Eine Struktur kann jetzt bis zu 96 Felder haben (vorher 32).",
