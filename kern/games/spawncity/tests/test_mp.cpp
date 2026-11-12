@@ -57,6 +57,19 @@ SC_TEST(mp_rules_damage_regen_spawn_vote) {
   Vec2 c;
   SC_CHECK(mp::group_spawn_center({{0, 0}, {30, 0}, {60, 0}, {1000, 0}}, c) && c.x == 30, "medoid of the big group %.0f", c.x);
   mp::Ballot b;
+  // rules_vote_engine.mjs: no ballot with one voter, a host outside the roster or without an id
+  SC_CHECK(!mp::create_ballot(b, 1, 0, true, 1, {1}, 0) && b.status == mp::Ballot::Status::invalid, "one voter: invalid");
+  SC_CHECK(!mp::create_ballot(b, 1, 0, true, 9, {1, 2}, 0) && !mp::create_ballot(b, 0, 0, true, 1, {1, 2}, 0), "host not in the roster, no id: invalid");
+  SC_CHECK(mp::ballot_name(mp::Ballot::Status::pending) == "pending" && mp::ballot_name(b.status) == "invalid", "a ballot's status by its name");
+  SC_CHECK(mp::create_ballot(b, 7, 0, true, 2, {3, 1, 2, 2}, 0) && b.members.size() == 3 && b.expires_ms == 30000 && b.yes.size() == 1, "pending, each player once, the host has said yes");
+  mp::Ballot::Status did = mp::Ballot::Status::pending;
+  SC_CHECK(mp::cast_vote(b, 2, true, {1, 2, 3}, 1000, &did) == mp::Ballot::Status::pending && did == mp::Ballot::Status::ignored, "the host has voted: ignored");
+  SC_CHECK(mp::cast_vote(b, 7, true, {1, 2, 3}, 1000, &did) == mp::Ballot::Status::pending && did == mp::Ballot::Status::ignored, "a stranger: ignored");
+  SC_CHECK(!mp::ballot_stale(b, {3, 2, 1}, 1000) && mp::ballot_stale(b, {1, 2}, 1000) && mp::ballot_stale(b, {1, 2, 3}, 30000), "stale: the roster changed or the time is up");
+  SC_CHECK(mp::cast_vote(b, 1, true, {3, 2, 1}, 2000, &did) == mp::Ballot::Status::pending && did == mp::Ballot::Status::pending, "one more yes");
+  SC_CHECK(mp::cast_vote(b, 3, true, {1, 2, 3}, 3000, &did) == mp::Ballot::Status::approved && did == mp::Ballot::Status::approved, "unanimous: approved");
+  SC_CHECK(mp::create_ballot(b, 8, 0, false, 1, {1, 2}, 0) && mp::cast_vote(b, 2, true, {1, 2, 4}, 1000) == mp::Ballot::Status::cancelled, "roster changed: cancelled");
+  SC_CHECK(mp::create_ballot(b, 9, 0, false, 1, {1, 2}, 0) && mp::cast_vote(b, 2, true, {1, 2}, 30000) == mp::Ballot::Status::cancelled, "expired after 30 s");
   SC_CHECK(mp::create_ballot(b, 1, 0, true, 255, {3, 255, 1}, 0), "ballot");
   SC_CHECK(mp::cast_vote(b, 1, true, {1, 3, 255}, 10) == mp::Ballot::Status::pending, "pending");
   SC_CHECK(mp::cast_vote(b, 3, true, {1, 3, 255}, 20) == mp::Ballot::Status::approved, "unanimous");
@@ -253,6 +266,31 @@ SC_TEST(mp_sessions_host_two_clients) {
   // The pose timeline shows a mate where he is.
   const net::Remote* ra = b.remote(a.self_slot());
   SC_CHECK(ra && std::fabs(ra->body.sample(b.now_ms()).p.x - 5) < 0.2f, "a seen at x=5");
+}
+
+// A client that does not reach the host in time - the host's page is still loading, its tab is in
+// the background - asks again every second and gets in as soon as the host answers.
+SC_TEST(mp_a_client_keeps_asking_until_the_host_answers) {
+  RuleBlueprint mp_rules("Multiplayer", &mp::bind);
+  net::Session host, a;
+  Wire w;
+  w.peers = {{11, &host}, {22, &a}};
+  host.host(11, 9.1766, 47.66);
+  a.join(22, 11);
+  f64 t = 0;
+  auto step = [&](bool with_host) {
+    if (with_host) host.update(t, 1.0f / 60, pose_at({0, 0, 1}));
+    a.update(t, 1.0f / 60, pose_at({5, 0, 1}));
+    w.pump();
+    t += 1.0 / 60;
+  };
+  for (int i = 0; i < 15 * 60; ++i) step(false);  // fifteen seconds of a host that does not answer (a try gives up after six)
+  SC_CHECK(!a.connected() && a.connects() >= 3, "not in, and it asked again (%u times)", a.connects());
+  for (int i = 0; i < 3 * 60 && !a.connected(); ++i) step(true);
+  SC_CHECK(a.connected(), "in once the host answers (after %u tries)", a.connects());
+  const u32 tries = a.connects();
+  for (int i = 0; i < 5 * 60; ++i) step(true);
+  SC_CHECK(a.connected() && a.connects() == tries, "and it stays in without asking again");
 }
 
 // lan_vs.mjs authority handover: the host goes, both clients see it, agree on the successor (the

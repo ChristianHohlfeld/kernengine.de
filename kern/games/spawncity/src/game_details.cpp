@@ -85,7 +85,7 @@ void Game::details_hud(std::string& s) {
   for (const detail::CriticalClock& c : pd_crit_) smoking += c.armed() ? 1 : 0;
   char b[200];
   std::snprintf(b, sizeof b, ",\"details\":{\"droneCritical\":%s,\"pdSmoking\":%d,\"critBlasts\":%u,\"bulletPushes\":%u,\"ballot\":\"%s\"}",
-                drone_crit_.armed() ? "true" : "false", smoking, crit_blasts_, bullet_pushes_, detail::ballot_name(ballot_.status).c_str());
+                drone_crit_.armed() ? "true" : "false", smoking, crit_blasts_, bullet_pushes_, mp::ballot_name(ballot_.status).c_str());
   s += b;
 }
 
@@ -112,23 +112,27 @@ bool Game::details_command(const std::string& cmd, std::string& out) {
     std::istringstream in(cmd.substr(6));
     std::string op;
     in >> op;
-    std::vector<u32> members;
+    // (a ballot of its own, beside a session's - the same rules: mp_rules.h; KEY is only its label)
+    std::vector<u8> members;
+    const f64 now_ms = static_cast<f64>(world_->sim_time()) * 1000;
     if (op == "new") {
       std::string key;
       int value = 0;
       u32 host = 0, m = 0;
       in >> key >> value >> host;
-      while (in >> m) members.push_back(m);
-      ballot_ = detail::create_ballot("local-" + key, key, value != 0, host, members, world_->sim_time());
+      while (in >> m) members.push_back(static_cast<u8>(m));
+      mp::create_ballot(ballot_, key.empty() ? 0 : ++ballot_serial_, 0, value != 0, static_cast<u8>(host), members, now_ms);
     } else if (op == "vote") {
       u32 peer = 0, m = 0;
       int yes = 0;
       in >> peer >> yes;
-      while (in >> m) members.push_back(m);
-      out = detail::ballot_name(detail::cast_vote(ballot_, peer, yes != 0, members, world_->sim_time()));
+      while (in >> m) members.push_back(static_cast<u8>(m));
+      mp::Ballot::Status did = ballot_.status;
+      mp::cast_vote(ballot_, static_cast<u8>(peer), yes != 0, members, now_ms, &did);
+      out = mp::ballot_name(did);
       return true;
     }
-    out = detail::ballot_name(ballot_.status);
+    out = mp::ballot_name(ballot_.status);
     return true;
   }
   return false;

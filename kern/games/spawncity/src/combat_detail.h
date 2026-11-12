@@ -1,8 +1,8 @@
 // Small combat rules of SpawnCity, used by game_details.cpp:
 //  * critical_damage_logic.mjs: when a car, bus, police drone or drone turns critical, how long
 //    until it blows, and how a further hit brings that forward,
-//  * ballistics.mjs: what a bullet hands to the body it hits (p = m * v along its path),
-//  * rules_vote_engine.mjs: the unanimous ballot over a game rule (the network carries the votes).
+//  * ballistics.mjs: what a bullet hands to the body it hits (p = m * v along its path).
+// (The vote on a game rule is the Blueprint "Multiplayer"'s: mp_rules.h.)
 //
 // The rules themselves are a Blueprint: the level's actor "CombatDetail" (level/spawncity.klevel,
 // open it in Kern Studio). Its enums, tables and functions hold every number and formula. This
@@ -47,23 +47,5 @@ f32 momentum_ns(Round r);
 /// The impulse (N*s) a bullet that stops in a body hands over, along its flight direction.
 Vec3 bullet_impulse(Vec3 direction, Round r);
 f32 projectile_gravity();
-
-// ---------------------------------------------------------------- rules_vote_engine.mjs
-/// The Blueprint's enum Ballot (the same order) and its struct Vote (the same fields).
-enum class Ballot : u8 { pending, approved, rejected, cancelled, ignored, invalid };
-struct Vote {
-  std::string id, key;
-  bool value = false;
-  u32 host = 0;
-  std::vector<u32> members, yes;
-  f64 expires = 0;
-  Ballot status = Ballot::invalid;
-};
-// The Blueprint's functions CreateBallot, CastVote and BallotName.
-/// Invalid (status invalid) without id/key, a host outside the roster or < 2 voters.
-Vote create_ballot(const std::string& id, const std::string& key, bool value, u32 host, std::vector<u32> members, f64 now);
-/// The new status (ignored for a stranger or a second yes).
-Ballot cast_vote(Vote& b, u32 peer, bool approve, std::vector<u32> current_members, f64 now);
-std::string ballot_name(Ballot b);
 
 }  // namespace sc::detail

@@ -183,7 +183,7 @@ Vor allen weiteren Regeln. Ein Blueprint und sein C++ sind dasselbe in zwei Schr
 - [x] Datentabellen: Eine Tabelle ist eine Variable, die eine Liste einer Struktur ist – eine Zeile je Eintrag, eine Spalte je Feld; der Editor zeigt und bearbeitet sie als Tabelle. **Find Row** holt die Zeile, deren Feld ein Wert ist (`list_find_row<&Item::Key>(Shop, key)` gibt `.found`, `.row`, `.index`). Kein eigener Begriff neben Listen und Strukturen; die Daten stehen im Blueprint des Levels und werden mit ihm kompiliert.
 - [x] Aufzählungen (Enum) als Pin-Typ mit Auswahl: `KERN_ENUM(Mode, Closed, Open)`, Variablen, Listen und Funktions-Pins des Typs, „Switch on Enum“ (`case Mode::Open:`), Namen und Plätze der Werte als Knoten.
 - [x] Lokale Variablen in Funktionen: je Funktion eigene Variablen, die bei jedem Aufruf mit ihrem Default beginnen – in C++ die lokalen Variablen am Anfang des Rumpfs (`Float Total = 0.0;`), gelesen und gesetzt mit denselben Knoten wie jede Variable. Nur auf einem Weg der eigenen Funktion (wie Return).
-- [ ] Funktionen, die sich selbst aufrufen dürfen (heute eine Regel: Wiederholen ist Sache der Schleifen).
+- **Entschieden: Eine Funktion ruft sich nicht selbst auf** – weder direkt noch über andere; Wiederholen ist Sache der Schleifen. Das bleibt eine Regel der Sprache, kein offener Punkt: Was ein Knoten sich merkt (Schleifenstand, Do Once, Wartezeit), gehört dem Knoten des Blueprints, nicht einem Aufruf – deshalb ist ein Blueprint in Graph, JIT und Klasse dasselbe und im Editor Schritt für Schritt zu verfolgen. Keiner der 17 Regel-Blueprints von SpawnCity hat es gebraucht (die Umkehrung einer Kurve und die Farbvergabe sind Schleifen).
 - [x] Blueprint-Bibliotheken: Funktionen eines Actors von anderen Blueprints aus aufrufen. Ein Blueprint sagt, wie die Funktion aussieht (`KERN_EXTERN StarsResult Stars(Actor who = Actor{0});` – kein Rumpf), und ruft sie mit **Call on Actor** auf dem Blueprint eines Actors auf, ohne Target auf dem des Levels: `func_call_on<"Stars">(target, kern::out(n7.stars), who);`. Das Level-Blueprint ist damit die Bibliothek für alle. Hat das Ziel die Funktion nicht, gelten die erklärten Defaults; Aufrufe liegen höchstens 64 tief. In Interpreter, JIT und Klasse dasselbe (Tier-Fall `call_on`).
 - [ ] Typen (Aufzählungen, Strukturen), die mehrere Blueprints eines Projekts teilen – heute erklärt jeder Blueprint seine eigenen, und ein Aufruf über Blueprints hinweg gibt sie nach Platz bzw. Feld für Feld weiter.
 
@@ -192,10 +192,11 @@ In dieser Reihenfolge (klein nach groß; jede Datei verschwindet, ihre Tests ble
 `combat_detail`, `spawn_guard`, `guided`, `jet_seats`, `lamps`, `gaps_rules`, `controls`,
 `settings` (Datentabelle), `world_traffic`, `equipment`, `combat_rules`, `mp_rules`.
 
-- [x] **`combat_detail`** – Actor „CombatDetail“ im Level: die Aufzählungen Critical, Round und
-  Ballot, die Tabellen Profiles und Rounds (Listen der Strukturen CriticalProfile und RoundSpec),
-  die Struktur Vote und zwölf Funktionen (IsCritical, DetonationAt, Accelerate, ClockUpdate,
-  MomentumNs, BulletImpulse, CreateBallot, CastVote, BallotName …). `combat_detail.cpp` rechnet
+- [x] **`combat_detail`** – Actor „CombatDetail“ im Level: die Aufzählungen Critical und Round,
+  die Tabellen Profiles und Rounds (Listen der Strukturen CriticalProfile und RoundSpec) und
+  sieben Funktionen (IsCritical, DetonationAt, Accelerate, ClockUpdate, MomentumNs,
+  BulletImpulse …). (Die Abstimmung über eine Spielregel stand zuerst auch hier; sie ist jetzt
+  allein in „Multiplayer“.) `combat_detail.cpp` rechnet
   nichts mehr: Es ruft den Blueprint auf, wie `wanted.cpp`. Die Tests sind dieselben; dazu läuft
   der Blueprint als seine Klasse gegen den Interpreter (1007 Aufrufe, Wert für Wert gleich).
   **Gemessen** (Test `details_blueprint`, Build mit Speicherprüfung): ein Aufruf von ClockUpdate
@@ -290,6 +291,29 @@ In dieser Reihenfolge (klein nach groß; jede Datei verschwindet, ihre Tests ble
   unter der Schwelle“ prüften, prüfen wieder genau auf ihr. Was eine Regel aus mehreren Zahlen
   *ausrechnet*, rechnet sie in 64 Bit – in Interpreter, JIT und Klasse und auf jeder Plattform
   Bit für Bit gleich (die Vergleichsläufe der Stufen prüfen das mit jedem Aufruf).
+- **Entschieden: Die Blueprint-Sprache rechnet weiter in 64 Bit, nicht in 32.** Das Maß ist
+  spawncity.de, nicht der C++-Port dazwischen. Das Original ist JavaScript und rechnet jede
+  Regel in 64 Bit: In keiner seiner 251 Dateien unter `sim/` (Stand 9108537) steht ein
+  `Math.fround`. Wo das alte C++ Zwischenergebnisse auf 32 Bit rundete, wich *es* vom Original
+  ab; ein Blueprint rechnet dort jetzt, was das Original rechnet. Eine Sprache in 32 Bit wäre
+  zudem nicht in sich stimmig: Ganze Zahlen wären nur bis 2^24 genau (heute 2^53), die Zeiten
+  des Mehrspielers in Millisekunden passten nicht mehr hinein, und es bräuchte einen zweiten
+  Zahlentyp in allen drei Ausführungsarten.
+- **Zwei Spieler im Browser.** `tests/smoke.mjs` (`SC_SMOKE=mp`) spielt Host und Client in zwei
+  Tabs. Dabei gefunden und behoben: Ein Client, der nicht binnen sechs Sekunden zum Host
+  durchkam, blieb für immer draußen – er fragt jetzt jede Sekunde erneut (Test
+  `mp_a_client_keeps_asking_until_the_host_answers`). Zwei veraltete Erwartungen des Tests sind
+  berichtigt (die Antwort auf einen Treffer nennt die Zone; Friendly Fire ist an, nicht aus).
+  Der Test selbst braucht eine Maschine, die zwei Tabs flüssig zeichnet: Mit Software-WebGL auf
+  zwei Kernen verlieren sich die Spieler wieder (eine Session lebt in echter Zeit), deshalb läuft
+  er nicht in der CI. Was eine Session tut – Treffer, Abstimmung, Kill, Effekte, Pings, Stimme,
+  Übergabe des Hosts –, prüft `tests/test_mp.cpp` ohne Browser.
+- **Eine Abstimmung statt zwei.** Die einstimmige Abstimmung über eine Spielregel
+  (rules_vote_engine.mjs) gab es im C++ zweimal – für die Session und für die Konsole – und
+  dadurch zuerst auch in zwei Blueprints. Sie steht jetzt einmal, in „Multiplayer“: CreateBallot,
+  CastVote (mit dem, was die einzelne Stimme bewirkt hat: auch „ignored“), Stale, BallotName.
+  Auch ob die laufende Abstimmung der Session verfallen ist, fragt die Session dort (vorher ein
+  eigener Vergleich im C++).
 - **Gemessen** (wie das Spiel gebaut, -O2, `SC_TEST_RELEASE=1 run_tests.sh controls_call_cost`):
   Ein Aufruf einer Regel aus C++ kostet als Klasse rund 0,2 µs (eine Formel), 0,3 µs (mehrere
   Knoten, eine Schleife, eine zweite Funktion) bis 0,7 µs (eine Struktur hinein und heraus). Je

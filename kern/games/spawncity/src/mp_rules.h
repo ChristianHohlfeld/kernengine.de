@@ -157,12 +157,19 @@ struct Ballot {
   u8 host = 0;
   std::vector<u8> members, yes;
   f64 expires_ms = 0;
-  enum class Status : u8 { pending, approved, rejected, cancelled } status = Status::pending;
+  /// (the Blueprint's enum BallotStatus, in its order; ignored: what a vote did that changed
+  /// nothing; invalid: no ballot)
+  enum class Status : u8 { pending, approved, rejected, cancelled, ignored, invalid } status = Status::pending;
 };
-/// A ballot from the host over the current roster (at least two players).
+/// A ballot from the host over the current roster (at least two players, each once, the host
+/// among them; no ballot without an id). False - and `b` invalid - when there is none.
 bool create_ballot(Ballot& b, u32 id, u8 key, bool value, u8 host, std::vector<u8> members, f64 now_ms);
-/// One vote; returns the ballot's status after it ("ignored" votes return pending).
-Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current_members, f64 now_ms);
+/// One vote; returns the ballot's status after it. `did`: what this vote did - the same, or
+/// ignored for somebody who is not asked or has voted.
+Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current_members, f64 now_ms, Ballot::Status* did = nullptr);
+/// A ballot is over without a result: it ran out, or the roster is no longer the one that was asked.
+bool ballot_stale(const Ballot& b, const std::vector<u8>& current_members, f64 now_ms);
+std::string ballot_name(Ballot::Status s);
 
 // ---- proximity voice (voice_codec.mjs, proximity_voice.mjs) -------------------------------------
 constexpr u32 kVoiceRate = 8000;        // VOICE_RATE

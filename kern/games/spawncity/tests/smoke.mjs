@@ -1,7 +1,12 @@
 // Browser smoke test of SpawnCity on Kern (Playwright + Chromium, software WebGL):
 // loads the page, waits for the world, steers every mode for 3 s and takes screenshots.
 //
-//   node kern/games/spawncity/tests/smoke.mjs [shots-dir]      (SC_SMOKE=desktop|phone: one run only)
+//   node kern/games/spawncity/tests/smoke.mjs [shots-dir]      (SC_SMOKE=desktop|phone|mp: one run only)
+//
+// The multiplayer run plays two tabs of one browser at once. A session lives on real time (a
+// player silent for six seconds is gone): it needs a machine that renders both tabs at more than
+// a few frames per second - with software WebGL on two cores it does not, and the players lose
+// each other. (What a session does is tested without a browser: tests/test_mp.cpp.)
 //
 // Serves the repository root itself (python3 -m http.server). Two runs:
 //   * desktop with map data: the page's TileJSON and tile requests are answered by the test with
@@ -644,15 +649,20 @@ async function runMultiplayer() {
   const ha = await hud(A), hb = await hud(B);
   check(ha.mp.index === 1 && hb.mp.index === 2 && ha.mp.color !== hb.mp.color, `[mp] P1 / P2 in their colours (${ha.mp.color} ${hb.mp.color})`);
   check(await A.evaluate(() => document.querySelectorAll(".mp-plate").length) === 1, "[mp] nameplate of the mate");
-  // Friendly fire is off (world_options.mjs default): a hit does nothing ...
+  // Friendly fire is on (world_options.mjs default); a rule changes only when everybody agrees
+  // (unanimous vote): the client proposes to turn it off and votes yes, the host proposed it.
+  check(await cmd(B, "mp ff off") === "proposed", "[mp] rule change proposed");
+  check(await until(B, () => window.SpawnCity.hud().mp.votePending), "[mp] the ballot reaches the client");
+  await cmd(B, "mp vote yes");
+  check(await until(A, () => !window.SpawnCity.hud().mp.ff) && await until(B, () => !window.SpawnCity.hud().mp.ff), "[mp] friendly fire off for both");
+  // Off: a hit does nothing ...
   const hp0 = (await hud(B)).health;
   await cmd(A, "weapon 2");
-  check(await cmd(A, "net hit 30") === "hit", "[mp] the round reaches the mate");
+  check((await cmd(A, "net hit 30")).startsWith("hit"), "[mp] the round reaches the mate");  // ("hit torso": the zone it struck)
   await A.waitForTimeout(2500);
   check((await hud(B)).health === hp0, "[mp] friendly fire off: no damage");
-  // ... until everybody agrees (unanimous vote): the client proposes, votes yes; the host proposed it.
-  check(await cmd(B, "mp ff on") === "proposed", "[mp] rule change proposed");
-  check(await until(B, () => window.SpawnCity.hud().mp.votePending), "[mp] the ballot reaches the client");
+  // ... and on again, by the same vote.
+  check(await cmd(B, "mp ff on") === "proposed" && await until(B, () => window.SpawnCity.hud().mp.votePending), "[mp] the second ballot reaches the client");
   await cmd(B, "mp vote yes");
   check(await until(A, () => window.SpawnCity.hud().mp.ff) && await until(B, () => window.SpawnCity.hud().mp.ff), "[mp] friendly fire on for both");
   await cmd(A, "net hit 30");

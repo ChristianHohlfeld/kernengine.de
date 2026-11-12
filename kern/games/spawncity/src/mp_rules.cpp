@@ -291,17 +291,30 @@ void roster(std::vector<u8>& members) {
 
 bool create_ballot(Ballot& b, u32 id, u8 key, bool value, u8 host, std::vector<u8> members, f64 now) {
   roster(members);
+  b = Ballot{};
+  b.status = Ballot::Status::invalid;
   std::vector<Value> r;
-  if (!g_rules.call("CreateBallot", {Value::integer(id), Value::integer(key), Value::boolean(value), Value::integer(host), ints(members), rules::number(now)}, r) || r.size() < 2 || !r[0].b)
-    return false;
-  return take(r[1], b);
+  if (!g_rules.call("CreateBallot", {Value::integer(id), Value::integer(key), Value::boolean(value), Value::integer(host), ints(members), rules::number(now)}, r) || r.size() < 2) return false;
+  take(r[1], b);
+  return r[0].b;
 }
 
-Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now) {
+Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now, Ballot::Status* did) {
   roster(current);
   std::vector<Value> r;
-  if (g_rules.call("CastVote", {to_value(b), Value::integer(voter), Value::boolean(approve), ints(current), rules::number(now)}, r) && !r.empty()) take(r[0], b);
+  if (did) *did = b.status;
+  if (g_rules.call("CastVote", {to_value(b), Value::integer(voter), Value::boolean(approve), ints(current), rules::number(now)}, r) && r.size() >= 2) {
+    take(r[0], b);
+    if (did) *did = static_cast<Ballot::Status>(r[1].i);
+  }
   return b.status;
+}
+
+bool ballot_stale(const Ballot& b, const std::vector<u8>& current, f64 now) { return g_rules.flag("Stale", {to_value(b), ints(current), rules::number(now)}); }
+
+std::string ballot_name(Ballot::Status s) {
+  std::vector<Value> r;
+  return g_rules.call("BallotName", {rules::of_enum(s)}, r) && !r.empty() ? r[0].as_text() : std::string();
 }
 
 // ---- voice ----------------------------------------------------------------------------------------

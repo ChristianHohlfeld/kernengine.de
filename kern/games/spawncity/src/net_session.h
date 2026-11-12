@@ -254,6 +254,8 @@ class Session {
   bool vote_pending() const { return remote_ballot_.id != 0; }
   std::string status() const;
   u32 sent_poses() const { return sent_poses_; }
+  /// How often this client asked the host to let it in (1: it got in at the first try).
+  u32 connects() const { return connects_; }
   /// Messages the transport did not take (too large, queue full): must stay 0.
   u32 send_refused() const { return send_refused_; }
 
@@ -293,6 +295,9 @@ class Session {
   std::vector<u8> pending_anchor_;  // host: clients waiting for their anchor (first pose)
   f64 lon_ = 0, lat_ = 0, time_ = 0, send_clock_ = 0, scores_clock_ = 0, rules_clock_ = 0;
   bool have_origin_ = false, connect_pending_ = false, anchor_ready_ = false, ever_in_ = false;
+  static constexpr f64 kReconnectS = 1.0;  // a client that is not in asks again this often
+  f64 connect_at_ = 0;                      // when the client last asked the host
+  u32 connects_ = 0;                        // how often it asked (1: it got in at once)
   f64 in_since_ = 0;
   std::vector<u8> mates_;  // the clients we last heard while the host was there (successor())
   Vec3 anchor_;

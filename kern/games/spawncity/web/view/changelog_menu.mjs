@@ -7,6 +7,10 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-12",time:"15:19",title:"Mehrspieler: Wer nicht sofort hineinkommt, bleibt nicht draußen",items:[
+    "Behoben: Kam ein beitretender Spieler nicht innerhalb von sechs Sekunden zum Host durch – etwa weil dessen Seite noch lud oder im Hintergrund lag –, blieb er für immer bei „Verbinde ...“ stehen. Er fragt jetzt jede Sekunde erneut an und ist drin, sobald der Host antwortet.",
+    "Unter der Haube: Die Abstimmung über Spielregeln gab es zweimal; sie steht jetzt einmal, im Blueprint „Multiplayer“.",
+  ]},
   {date:"2026-11-12",time:"11:30",title:"Regeln rechnen an Schwellen exakt wie zuvor",items:[
     "Unter der Haube: Die Blueprints rechnen mit 64-Bit-Zahlen, das Spiel hält seinen Zustand in 32 Bit. Jede Zahl des Spiels geht jetzt als genau die Dezimalzahl in eine Regel, für die sie steht – so entscheidet jede Schwelle (Totzonen, Abstände, Zeiten) exakt wie vorher, auch wenn ein Wert genau auf ihr liegt.",
   ]},

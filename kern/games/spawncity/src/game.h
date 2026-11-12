@@ -702,7 +702,8 @@ class Game {
   // game_details.cpp: critical countdowns (critical_damage_logic.mjs), the rule ballot
   std::vector<f32> car_last_hp_, car_burn_seen_;
   detail::CriticalClock pd_crit_[5], drone_crit_;
-  detail::Vote ballot_;
+  mp::Ballot ballot_{0, 0, false, 0, {}, {}, 0, mp::Ballot::Status::invalid};  // the console's ballot ("ballot ...", game_details.cpp)
+  u32 ballot_serial_ = 0;
   u32 bullet_pushes_ = 0, crit_blasts_ = 0;
   u32 sfx_cursor_[16] = {};
   bool combat_audio_ready_ = false;

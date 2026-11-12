@@ -833,10 +833,14 @@ void Session::update(f64 time, f32 dt, const PlayerState& me, bool send_pose) {
     if (time - scores_clock_ > kScoresEvery) { scores_clock_ = time; send_scores(); }
     if (time - rules_clock_ > kRulesEvery) { rules_clock_ = time; send_rules(); }
     if (time - seats_clock_ > kSeatsEvery) { seats_clock_ = time; send_seats(); }
-    if (ballot_.id && (now_ms() >= ballot_.expires_ms || roster() != ballot_.members)) finish_ballot(mp::Ballot::Status::cancelled);
+    if (ballot_.id && mp::ballot_stale(ballot_, roster(), now_ms())) finish_ballot(mp::Ballot::Status::cancelled);
     server_->send_packets();
   } else {
-    if (connect_pending_) { client_->connect(server_addr_, time); connect_pending_ = false; }
+    // A client whose way to the host broke - it never came about in time, or the host went quiet
+    // (a tab in the background, a phone that loads) - asks again, once a second, as the original's
+    // peers say hello every second (mqtt_data_relay.mjs HELLO_MS): it does not stay outside for good.
+    if (!connect_pending_ && client_->state() < kern::net::ClientState::disconnected && time - connect_at_ >= kReconnectS) connect_pending_ = true;
+    if (connect_pending_) { client_->connect(server_addr_, time); connect_pending_ = false; connect_at_ = time; ++connects_; }
     client_->advance_time(time);
     client_->receive_packets();
     for (int ch : {kReliable, kUnreliable})

@@ -1,4 +1,4 @@
-// GUIDED missile, critical damage clocks, bullet momentum and the rule ballot (guided.h,
+// GUIDED missile, critical damage clocks, bullet momentum (guided.h,
 // combat_detail.h) with SpawnCity's numbers.
 #include "../src/combat_audio.h"
 #include "../src/combat_detail.h"
@@ -28,10 +28,9 @@ SC_TEST(details_blueprint) {
   SC_CHECK(!bp.inst->disabled() && bp.host.errors.empty(), "it runs (%s)", bp.host.errors.c_str());
   // as in the game: its compiled C++ class (src/level_blueprints.cpp, written from the level by the build)
   SC_CHECK(std::string(bp.inst->tier()) == "native C++", "the CombatDetail Blueprint runs as its C++ class (it runs: %s)", bp.inst->tier());
-  for (const char* f : {"IsCritical", "DetonationAt", "Accelerate", "ClockUpdate", "MomentumNs", "BulletImpulse", "CreateBallot", "CastVote", "BallotName"})
+  for (const char* f : {"IsCritical", "DetonationAt", "Accelerate", "ClockUpdate", "MomentumNs", "BulletImpulse"})
     SC_CHECK(bp.inst->has_function(f), "function %s", f);
   SC_CHECK(std::fabs(detail::projectile_gravity() - 9.80665f) < 1e-6f, "the constants are its variables");
-  SC_CHECK(detail::ballot_name(detail::Ballot::pending) == "pending" && detail::ballot_name(detail::Ballot::invalid) == "invalid", "a ballot's status by its name");
   SC_CHECK(detail::bullet_impulse({0, 0, 0}, detail::Round::nine_mm).x > 2.8f, "a bullet without a direction pushes along x");
   // How long a rule takes when the game asks the Blueprint for it - the clock of one vehicle,
   // asked every frame - as the class and in the interpreter.
@@ -146,25 +145,6 @@ SC_TEST(details_bullet_momentum) {
   SC_CHECK(std::fabs(momentum_ns(Round::fifty_bmg) - 40.762f) < 1e-2f, ".50 BMG ~41 N*s");
   const Vec3 j = bullet_impulse({0, 3, 0}, Round::five_five_six);
   SC_CHECK(std::fabs(j.y - 3.76f) < 1e-3f && j.x == 0 && j.z == 0, "along the path, no upward bias");
-}
-
-SC_TEST(details_rule_ballot) {
-  using namespace detail;
-  CombatDetailBlueprint bp;
-  SC_CHECK(create_ballot("b", "friendlyFire", true, 1, {1}, 0).status == Ballot::invalid, "one voter: invalid");
-  SC_CHECK(create_ballot("b", "friendlyFire", true, 9, {1, 2}, 0).status == Ballot::invalid, "host not in roster: invalid");
-  Vote b = create_ballot("b", "friendlyFire", true, 2, {3, 1, 2, 2}, 0);
-  SC_CHECK(b.status == Ballot::pending && b.members.size() == 3 && b.expires == 30, "pending, roster sorted and unique");
-  SC_CHECK(cast_vote(b, 2, true, {1, 2, 3}, 1) == Ballot::ignored, "host already voted");
-  SC_CHECK(cast_vote(b, 7, true, {1, 2, 3}, 1) == Ballot::ignored, "stranger ignored");
-  SC_CHECK(cast_vote(b, 1, true, {3, 2, 1}, 2) == Ballot::pending, "one more yes");
-  SC_CHECK(cast_vote(b, 3, true, {1, 2, 3}, 3) == Ballot::approved, "unanimous: approved");
-  Vote n = create_ballot("n", "zombies", false, 1, {1, 2}, 0);
-  SC_CHECK(cast_vote(n, 2, false, {1, 2}, 1) == Ballot::rejected, "one no rejects");
-  Vote x = create_ballot("x", "zombies", false, 1, {1, 2}, 0);
-  SC_CHECK(cast_vote(x, 2, true, {1, 2, 4}, 1) == Ballot::cancelled, "roster changed: cancelled");
-  Vote e = create_ballot("e", "zombies", false, 1, {1, 2}, 0);
-  SC_CHECK(cast_vote(e, 2, true, {1, 2}, 30) == Ballot::cancelled, "expired after 30 s");
 }
 
 SC_TEST(details_combat_audio_bank) {

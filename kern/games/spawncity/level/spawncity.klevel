@@ -1874,12 +1874,6 @@
        "name": "ProjectileGravity",
        "type": "float",
        "value": 9.80665
-      },
-      {
-       "name": "BallotSeconds",
-       "type": "float",
-       "value": 30,
-       "help": "How long a ballot is open"
       }
      ],
      "enums": [
@@ -1901,18 +1895,6 @@
         "FiftyBmg"
        ],
        "help": "The rounds a bullet can be (ballistics.mjs)"
-      },
-      {
-       "name": "Ballot",
-       "values": [
-        "pending",
-        "approved",
-        "rejected",
-        "cancelled",
-        "ignored",
-        "invalid"
-       ],
-       "help": "How a ballot over a game rule stands (rules_vote_engine.mjs)"
       }
      ],
      "structs": [
@@ -1956,74 +1938,9 @@
          "value": 0
         }
        ]
-      },
-      {
-       "name": "Vote",
-       "fields": [
-        {
-         "name": "Id",
-         "type": "text",
-         "value": ""
-        },
-        {
-         "name": "Key",
-         "type": "text",
-         "value": ""
-        },
-        {
-         "name": "Value",
-         "type": "bool",
-         "value": false
-        },
-        {
-         "name": "Host",
-         "type": "int",
-         "value": 0
-        },
-        {
-         "name": "Members",
-         "type": "int_list",
-         "value": []
-        },
-        {
-         "name": "Yes",
-         "type": "int_list",
-         "value": []
-        },
-        {
-         "name": "Expires",
-         "type": "float",
-         "value": 0
-        },
-        {
-         "name": "Status",
-         "type": "enum",
-         "of": "Ballot",
-         "value": 5
-        }
-       ],
-       "help": "A unanimous ballot over a game rule: only the roster of its start votes, the host has voted yes"
       }
      ],
      "nodes": [
-      {
-       "id": 40,
-       "type": "flow.for_each",
-       "x": 280,
-       "y": 4280,
-       "params": {
-        "type": "int"
-       }
-      },
-      {
-       "id": 45,
-       "type": "flow.for_each",
-       "x": 280,
-       "y": 4750,
-       "params": {
-        "type": "int"
-       }
-      },
       {
        "id": 46,
        "type": "func.entry",
@@ -2623,910 +2540,9 @@
        "params": {
         "function": "MomentumNs"
        }
-      },
-      {
-       "id": 113,
-       "type": "func.entry",
-       "x": 0,
-       "y": 4280,
-       "params": {
-        "function": "Unique"
-       }
-      },
-      {
-       "id": 114,
-       "type": "flow.branch",
-       "x": 560,
-       "y": 4280
-      },
-      {
-       "id": 115,
-       "type": "logic.not",
-       "x": 440,
-       "y": 4430
-      },
-      {
-       "id": 116,
-       "type": "list.contains",
-       "x": 440,
-       "y": 4520,
-       "params": {
-        "type": "int"
-       }
-      },
-      {
-       "id": 117,
-       "type": "var.get",
-       "x": 440,
-       "y": 4610,
-       "params": {
-        "variable": "Out",
-        "scope": "Unique"
-       }
-      },
-      {
-       "id": 118,
-       "type": "list.add",
-       "x": 840,
-       "y": 4280,
-       "params": {
-        "variable": "Out",
-        "scope": "Unique"
-       }
-      },
-      {
-       "id": 119,
-       "type": "func.return",
-       "x": 1120,
-       "y": 4280,
-       "params": {
-        "function": "Unique"
-       }
-      },
-      {
-       "id": 120,
-       "type": "var.get",
-       "x": 1000,
-       "y": 4430,
-       "params": {
-        "variable": "Out",
-        "scope": "Unique"
-       }
-      },
-      {
-       "id": 121,
-       "type": "func.entry",
-       "x": 0,
-       "y": 4750,
-       "params": {
-        "function": "Within"
-       }
-      },
-      {
-       "id": 122,
-       "type": "flow.branch",
-       "x": 560,
-       "y": 4750
-      },
-      {
-       "id": 123,
-       "type": "logic.not",
-       "x": 440,
-       "y": 4900
-      },
-      {
-       "id": 124,
-       "type": "list.contains",
-       "x": 440,
-       "y": 4990,
-       "params": {
-        "type": "int"
-       }
-      },
-      {
-       "id": 125,
-       "type": "var.set",
-       "x": 840,
-       "y": 4750,
-       "params": {
-        "variable": "All",
-        "scope": "Within"
-       },
-       "values": {
-        "value": false
-       }
-      },
-      {
-       "id": 126,
-       "type": "func.return",
-       "x": 1120,
-       "y": 4750,
-       "params": {
-        "function": "Within"
-       }
-      },
-      {
-       "id": 127,
-       "type": "var.get",
-       "x": 1000,
-       "y": 4900,
-       "params": {
-        "variable": "All",
-        "scope": "Within"
-       }
-      },
-      {
-       "id": 128,
-       "type": "func.entry",
-       "x": 0,
-       "y": 5130,
-       "params": {
-        "function": "CreateBallot"
-       }
-      },
-      {
-       "id": 129,
-       "type": "var.set",
-       "x": 280,
-       "y": 5130,
-       "params": {
-        "variable": "Roster",
-        "scope": "CreateBallot"
-       }
-      },
-      {
-       "id": 130,
-       "type": "func.pure",
-       "x": 160,
-       "y": 5280,
-       "params": {
-        "function": "Unique"
-       }
-      },
-      {
-       "id": 131,
-       "type": "flow.branch",
-       "x": 560,
-       "y": 5130
-      },
-      {
-       "id": 132,
-       "type": "logic.or",
-       "x": 440,
-       "y": 5280
-      },
-      {
-       "id": 133,
-       "type": "logic.or",
-       "x": 440,
-       "y": 5370
-      },
-      {
-       "id": 134,
-       "type": "text.equal",
-       "x": 440,
-       "y": 5460,
-       "values": {
-        "b": ""
-       }
-      },
-      {
-       "id": 135,
-       "type": "text.equal",
-       "x": 440,
-       "y": 5550,
-       "values": {
-        "b": ""
-       }
-      },
-      {
-       "id": 136,
-       "type": "logic.or",
-       "x": 440,
-       "y": 5640
-      },
-      {
-       "id": 137,
-       "type": "logic.not",
-       "x": 440,
-       "y": 5730
-      },
-      {
-       "id": 138,
-       "type": "list.contains",
-       "x": 440,
-       "y": 5820,
-       "params": {
-        "type": "int"
-       }
-      },
-      {
-       "id": 139,
-       "type": "var.get",
-       "x": 440,
-       "y": 5910,
-       "params": {
-        "variable": "Roster",
-        "scope": "CreateBallot"
-       }
-      },
-      {
-       "id": 140,
-       "type": "math.compare",
-       "x": 440,
-       "y": 6000,
-       "params": {
-        "op": "<"
-       },
-       "values": {
-        "b": 2
-       }
-      },
-      {
-       "id": 141,
-       "type": "list.length",
-       "x": 440,
-       "y": 6090,
-       "params": {
-        "type": "int"
-       }
-      },
-      {
-       "id": 142,
-       "type": "var.get",
-       "x": 440,
-       "y": 6180,
-       "params": {
-        "variable": "Roster",
-        "scope": "CreateBallot"
-       }
-      },
-      {
-       "id": 143,
-       "type": "func.return",
-       "x": 840,
-       "y": 5130,
-       "params": {
-        "function": "CreateBallot"
-       }
-      },
-      {
-       "id": 144,
-       "type": "struct.make",
-       "x": 720,
-       "y": 5280,
-       "params": {
-        "struct": "Vote"
-       },
-       "values": {
-        "Id": "",
-        "Key": "",
-        "Value": false,
-        "Host": 0,
-        "Expires": 0,
-        "Status": 5
-       }
-      },
-      {
-       "id": 145,
-       "type": "list.make",
-       "x": 720,
-       "y": 5370,
-       "params": {
-        "type": "int",
-        "count": "0"
-       }
-      },
-      {
-       "id": 146,
-       "type": "list.make",
-       "x": 720,
-       "y": 5460,
-       "params": {
-        "type": "int",
-        "count": "0"
-       }
-      },
-      {
-       "id": 147,
-       "type": "func.return",
-       "x": 1120,
-       "y": 5130,
-       "params": {
-        "function": "CreateBallot"
-       }
-      },
-      {
-       "id": 148,
-       "type": "struct.make",
-       "x": 1000,
-       "y": 5280,
-       "params": {
-        "struct": "Vote"
-       },
-       "values": {
-        "Status": 0
-       }
-      },
-      {
-       "id": 149,
-       "type": "var.get",
-       "x": 1000,
-       "y": 5370,
-       "params": {
-        "variable": "Roster",
-        "scope": "CreateBallot"
-       }
-      },
-      {
-       "id": 150,
-       "type": "list.make",
-       "x": 1000,
-       "y": 5460,
-       "params": {
-        "type": "int",
-        "count": "1"
-       }
-      },
-      {
-       "id": 151,
-       "type": "math.add",
-       "x": 1000,
-       "y": 5550
-      },
-      {
-       "id": 152,
-       "type": "var.get",
-       "x": 1000,
-       "y": 5640,
-       "params": {
-        "variable": "BallotSeconds"
-       }
-      },
-      {
-       "id": 153,
-       "type": "func.entry",
-       "x": 0,
-       "y": 6320,
-       "params": {
-        "function": "CastVote"
-       }
-      },
-      {
-       "id": 154,
-       "type": "flow.branch",
-       "x": 280,
-       "y": 6320
-      },
-      {
-       "id": 155,
-       "type": "logic.not",
-       "x": 160,
-       "y": 6470
-      },
-      {
-       "id": 156,
-       "type": "enum.equal",
-       "x": 160,
-       "y": 6560,
-       "params": {
-        "enum": "Ballot"
-       },
-       "values": {
-        "b": 0
-       }
-      },
-      {
-       "id": 157,
-       "type": "struct.break",
-       "x": 160,
-       "y": 6650,
-       "params": {
-        "struct": "Vote"
-       }
-      },
-      {
-       "id": 158,
-       "type": "func.return",
-       "x": 560,
-       "y": 6320,
-       "params": {
-        "function": "CastVote"
-       }
-      },
-      {
-       "id": 159,
-       "type": "struct.break",
-       "x": 440,
-       "y": 6470,
-       "params": {
-        "struct": "Vote"
-       }
-      },
-      {
-       "id": 160,
-       "type": "var.set",
-       "x": 840,
-       "y": 6320,
-       "params": {
-        "variable": "B",
-        "scope": "CastVote"
-       }
-      },
-      {
-       "id": 161,
-       "type": "var.set",
-       "x": 1120,
-       "y": 6320,
-       "params": {
-        "variable": "Now",
-        "scope": "CastVote"
-       }
-      },
-      {
-       "id": 162,
-       "type": "func.pure",
-       "x": 1000,
-       "y": 6470,
-       "params": {
-        "function": "Unique"
-       }
-      },
-      {
-       "id": 163,
-       "type": "flow.branch",
-       "x": 1400,
-       "y": 6320
-      },
-      {
-       "id": 164,
-       "type": "logic.or",
-       "x": 1280,
-       "y": 6470
-      },
-      {
-       "id": 165,
-       "type": "math.compare",
-       "x": 1280,
-       "y": 6560,
-       "params": {
-        "op": ">="
-       }
-      },
-      {
-       "id": 166,
-       "type": "struct.break",
-       "x": 1280,
-       "y": 6650,
-       "params": {
-        "struct": "Vote"
-       }
-      },
-      {
-       "id": 167,
-       "type": "logic.not",
-       "x": 1280,
-       "y": 6740
-      },
-      {
-       "id": 168,
-       "type": "logic.and",
-       "x": 1280,
-       "y": 6830
-      },
-      {
-       "id": 169,
-       "type": "func.pure",
-       "x": 1280,
-       "y": 6920,
-       "params": {
-        "function": "Within"
-       }
-      },
-      {
-       "id": 170,
-       "type": "var.get",
-       "x": 1280,
-       "y": 7010,
-       "params": {
-        "variable": "Now",
-        "scope": "CastVote"
-       }
-      },
-      {
-       "id": 171,
-       "type": "struct.break",
-       "x": 1280,
-       "y": 7100,
-       "params": {
-        "struct": "Vote"
-       }
-      },
-      {
-       "id": 172,
-       "type": "func.pure",
-       "x": 1280,
-       "y": 7190,
-       "params": {
-        "function": "Within"
-       }
-      },
-      {
-       "id": 173,
-       "type": "struct.break",
-       "x": 1280,
-       "y": 7280,
-       "params": {
-        "struct": "Vote"
-       }
-      },
-      {
-       "id": 174,
-       "type": "var.get",
-       "x": 1280,
-       "y": 7370,
-       "params": {
-        "variable": "Now",
-        "scope": "CastVote"
-       }
-      },
-      {
-       "id": 175,
-       "type": "struct.set_field",
-       "x": 1680,
-       "y": 6320,
-       "params": {
-        "variable": "B",
-        "field": "Status",
-        "scope": "CastVote"
-       },
-       "values": {
-        "value": 3
-       }
-      },
-      {
-       "id": 176,
-       "type": "func.return",
-       "x": 1960,
-       "y": 6320,
-       "params": {
-        "function": "CastVote"
-       },
-       "values": {
-        "status": 3
-       }
-      },
-      {
-       "id": 177,
-       "type": "var.get",
-       "x": 1840,
-       "y": 6470,
-       "params": {
-        "variable": "B",
-        "scope": "CastVote"
-       }
-      },
-      {
-       "id": 178,
-       "type": "flow.branch",
-       "x": 2240,
-       "y": 6320
-      },
-      {
-       "id": 179,
-       "type": "logic.or",
-       "x": 2120,
-       "y": 6470
-      },
-      {
-       "id": 180,
-       "type": "logic.not",
-       "x": 2120,
-       "y": 6560
-      },
-      {
-       "id": 181,
-       "type": "list.contains",
-       "x": 2120,
-       "y": 6650,
-       "params": {
-        "type": "int"
-       }
-      },
-      {
-       "id": 182,
-       "type": "struct.break",
-       "x": 2120,
-       "y": 6740,
-       "params": {
-        "struct": "Vote"
-       }
-      },
-      {
-       "id": 183,
-       "type": "list.contains",
-       "x": 2120,
-       "y": 6830,
-       "params": {
-        "type": "int"
-       }
-      },
-      {
-       "id": 184,
-       "type": "struct.break",
-       "x": 2120,
-       "y": 6920,
-       "params": {
-        "struct": "Vote"
-       }
-      },
-      {
-       "id": 185,
-       "type": "func.return",
-       "x": 2520,
-       "y": 6320,
-       "params": {
-        "function": "CastVote"
-       },
-       "values": {
-        "status": 4
-       }
-      },
-      {
-       "id": 186,
-       "type": "flow.branch",
-       "x": 2800,
-       "y": 6320
-      },
-      {
-       "id": 187,
-       "type": "logic.not",
-       "x": 2680,
-       "y": 6470
-      },
-      {
-       "id": 188,
-       "type": "struct.set_field",
-       "x": 3080,
-       "y": 6320,
-       "params": {
-        "variable": "B",
-        "field": "Status",
-        "scope": "CastVote"
-       },
-       "values": {
-        "value": 2
-       }
-      },
-      {
-       "id": 189,
-       "type": "func.return",
-       "x": 3360,
-       "y": 6320,
-       "params": {
-        "function": "CastVote"
-       },
-       "values": {
-        "status": 2
-       }
-      },
-      {
-       "id": 190,
-       "type": "var.get",
-       "x": 3240,
-       "y": 6470,
-       "params": {
-        "variable": "B",
-        "scope": "CastVote"
-       }
-      },
-      {
-       "id": 191,
-       "type": "var.set",
-       "x": 3640,
-       "y": 6320,
-       "params": {
-        "variable": "Yes",
-        "scope": "CastVote"
-       }
-      },
-      {
-       "id": 192,
-       "type": "struct.break",
-       "x": 3520,
-       "y": 6470,
-       "params": {
-        "struct": "Vote"
-       }
-      },
-      {
-       "id": 193,
-       "type": "list.add",
-       "x": 3920,
-       "y": 6320,
-       "params": {
-        "variable": "Yes",
-        "scope": "CastVote"
-       }
-      },
-      {
-       "id": 194,
-       "type": "struct.set_field",
-       "x": 4200,
-       "y": 6320,
-       "params": {
-        "variable": "B",
-        "field": "Yes",
-        "scope": "CastVote"
-       }
-      },
-      {
-       "id": 195,
-       "type": "var.get",
-       "x": 4080,
-       "y": 6470,
-       "params": {
-        "variable": "Yes",
-        "scope": "CastVote"
-       }
-      },
-      {
-       "id": 196,
-       "type": "flow.branch",
-       "x": 4480,
-       "y": 6320
-      },
-      {
-       "id": 197,
-       "type": "func.pure",
-       "x": 4360,
-       "y": 6470,
-       "params": {
-        "function": "Within"
-       }
-      },
-      {
-       "id": 198,
-       "type": "struct.break",
-       "x": 4360,
-       "y": 6560,
-       "params": {
-        "struct": "Vote"
-       }
-      },
-      {
-       "id": 199,
-       "type": "var.get",
-       "x": 4360,
-       "y": 6650,
-       "params": {
-        "variable": "Yes",
-        "scope": "CastVote"
-       }
-      },
-      {
-       "id": 200,
-       "type": "struct.set_field",
-       "x": 4760,
-       "y": 6320,
-       "params": {
-        "variable": "B",
-        "field": "Status",
-        "scope": "CastVote"
-       },
-       "values": {
-        "value": 1
-       }
-      },
-      {
-       "id": 201,
-       "type": "func.return",
-       "x": 5040,
-       "y": 6320,
-       "params": {
-        "function": "CastVote"
-       }
-      },
-      {
-       "id": 202,
-       "type": "var.get",
-       "x": 4920,
-       "y": 6470,
-       "params": {
-        "variable": "B",
-        "scope": "CastVote"
-       }
-      },
-      {
-       "id": 203,
-       "type": "struct.break",
-       "x": 4920,
-       "y": 6560,
-       "params": {
-        "struct": "Vote"
-       }
-      },
-      {
-       "id": 204,
-       "type": "var.get",
-       "x": 4920,
-       "y": 6650,
-       "params": {
-        "variable": "B",
-        "scope": "CastVote"
-       }
-      },
-      {
-       "id": 205,
-       "type": "func.entry",
-       "x": 0,
-       "y": 7510,
-       "params": {
-        "function": "BallotName"
-       }
-      },
-      {
-       "id": 206,
-       "type": "func.return",
-       "x": 280,
-       "y": 7510,
-       "params": {
-        "function": "BallotName"
-       }
-      },
-      {
-       "id": 207,
-       "type": "enum.name",
-       "x": 160,
-       "y": 7660,
-       "params": {
-        "enum": "Ballot"
-       }
       }
      ],
      "links": [
-      [
-       40,
-       "body",
-       114,
-       "exec"
-      ],
-      [
-       40,
-       "completed",
-       119,
-       "exec"
-      ],
-      [
-       40,
-       "item",
-       116,
-       "item"
-      ],
-      [
-       40,
-       "item",
-       118,
-       "item"
-      ],
-      [
-       45,
-       "body",
-       122,
-       "exec"
-      ],
-      [
-       45,
-       "completed",
-       126,
-       "exec"
-      ],
-      [
-       45,
-       "item",
-       124,
-       "item"
-      ],
       [
        46,
        "kind",
@@ -4108,732 +3124,6 @@
        "ns",
        107,
        "b"
-      ],
-      [
-       113,
-       "list",
-       40,
-       "list"
-      ],
-      [
-       113,
-       "then",
-       40,
-       "exec"
-      ],
-      [
-       114,
-       "true",
-       118,
-       "exec"
-      ],
-      [
-       115,
-       "result",
-       114,
-       "condition"
-      ],
-      [
-       116,
-       "result",
-       115,
-       "a"
-      ],
-      [
-       117,
-       "value",
-       116,
-       "list"
-      ],
-      [
-       120,
-       "value",
-       119,
-       "list"
-      ],
-      [
-       121,
-       "list",
-       45,
-       "list"
-      ],
-      [
-       121,
-       "other",
-       124,
-       "list"
-      ],
-      [
-       121,
-       "then",
-       45,
-       "exec"
-      ],
-      [
-       122,
-       "true",
-       125,
-       "exec"
-      ],
-      [
-       123,
-       "result",
-       122,
-       "condition"
-      ],
-      [
-       124,
-       "result",
-       123,
-       "a"
-      ],
-      [
-       127,
-       "value",
-       126,
-       "all"
-      ],
-      [
-       128,
-       "host",
-       138,
-       "item"
-      ],
-      [
-       128,
-       "host",
-       148,
-       "Host"
-      ],
-      [
-       128,
-       "host",
-       150,
-       "item0"
-      ],
-      [
-       128,
-       "id",
-       134,
-       "a"
-      ],
-      [
-       128,
-       "id",
-       148,
-       "Id"
-      ],
-      [
-       128,
-       "key",
-       135,
-       "a"
-      ],
-      [
-       128,
-       "key",
-       148,
-       "Key"
-      ],
-      [
-       128,
-       "members",
-       130,
-       "list"
-      ],
-      [
-       128,
-       "now",
-       151,
-       "a"
-      ],
-      [
-       128,
-       "then",
-       129,
-       "exec"
-      ],
-      [
-       128,
-       "value",
-       148,
-       "Value"
-      ],
-      [
-       129,
-       "then",
-       131,
-       "exec"
-      ],
-      [
-       130,
-       "list",
-       129,
-       "value"
-      ],
-      [
-       131,
-       "false",
-       147,
-       "exec"
-      ],
-      [
-       131,
-       "true",
-       143,
-       "exec"
-      ],
-      [
-       132,
-       "result",
-       131,
-       "condition"
-      ],
-      [
-       133,
-       "result",
-       132,
-       "a"
-      ],
-      [
-       134,
-       "result",
-       133,
-       "a"
-      ],
-      [
-       135,
-       "result",
-       133,
-       "b"
-      ],
-      [
-       136,
-       "result",
-       132,
-       "b"
-      ],
-      [
-       137,
-       "result",
-       136,
-       "a"
-      ],
-      [
-       138,
-       "result",
-       137,
-       "a"
-      ],
-      [
-       139,
-       "value",
-       138,
-       "list"
-      ],
-      [
-       140,
-       "result",
-       136,
-       "b"
-      ],
-      [
-       141,
-       "length",
-       140,
-       "a"
-      ],
-      [
-       142,
-       "value",
-       141,
-       "list"
-      ],
-      [
-       144,
-       "value",
-       143,
-       "vote"
-      ],
-      [
-       145,
-       "list",
-       144,
-       "Members"
-      ],
-      [
-       146,
-       "list",
-       144,
-       "Yes"
-      ],
-      [
-       148,
-       "value",
-       147,
-       "vote"
-      ],
-      [
-       149,
-       "value",
-       148,
-       "Members"
-      ],
-      [
-       150,
-       "list",
-       148,
-       "Yes"
-      ],
-      [
-       151,
-       "result",
-       148,
-       "Expires"
-      ],
-      [
-       152,
-       "value",
-       151,
-       "b"
-      ],
-      [
-       153,
-       "approve",
-       187,
-       "a"
-      ],
-      [
-       153,
-       "current",
-       162,
-       "list"
-      ],
-      [
-       153,
-       "now",
-       165,
-       "a"
-      ],
-      [
-       153,
-       "peer",
-       181,
-       "item"
-      ],
-      [
-       153,
-       "peer",
-       183,
-       "item"
-      ],
-      [
-       153,
-       "peer",
-       193,
-       "item"
-      ],
-      [
-       153,
-       "then",
-       154,
-       "exec"
-      ],
-      [
-       153,
-       "vote",
-       157,
-       "value"
-      ],
-      [
-       153,
-       "vote",
-       158,
-       "vote"
-      ],
-      [
-       153,
-       "vote",
-       159,
-       "value"
-      ],
-      [
-       153,
-       "vote",
-       160,
-       "value"
-      ],
-      [
-       153,
-       "vote",
-       166,
-       "value"
-      ],
-      [
-       153,
-       "vote",
-       171,
-       "value"
-      ],
-      [
-       153,
-       "vote",
-       173,
-       "value"
-      ],
-      [
-       153,
-       "vote",
-       182,
-       "value"
-      ],
-      [
-       153,
-       "vote",
-       184,
-       "value"
-      ],
-      [
-       153,
-       "vote",
-       185,
-       "vote"
-      ],
-      [
-       153,
-       "vote",
-       192,
-       "value"
-      ],
-      [
-       153,
-       "vote",
-       198,
-       "value"
-      ],
-      [
-       154,
-       "false",
-       160,
-       "exec"
-      ],
-      [
-       154,
-       "true",
-       158,
-       "exec"
-      ],
-      [
-       155,
-       "result",
-       154,
-       "condition"
-      ],
-      [
-       156,
-       "result",
-       155,
-       "a"
-      ],
-      [
-       157,
-       "Status",
-       156,
-       "a"
-      ],
-      [
-       159,
-       "Status",
-       158,
-       "status"
-      ],
-      [
-       160,
-       "then",
-       161,
-       "exec"
-      ],
-      [
-       161,
-       "then",
-       163,
-       "exec"
-      ],
-      [
-       162,
-       "list",
-       161,
-       "value"
-      ],
-      [
-       163,
-       "false",
-       178,
-       "exec"
-      ],
-      [
-       163,
-       "true",
-       175,
-       "exec"
-      ],
-      [
-       164,
-       "result",
-       163,
-       "condition"
-      ],
-      [
-       165,
-       "result",
-       164,
-       "a"
-      ],
-      [
-       166,
-       "Expires",
-       165,
-       "b"
-      ],
-      [
-       167,
-       "result",
-       164,
-       "b"
-      ],
-      [
-       168,
-       "result",
-       167,
-       "a"
-      ],
-      [
-       169,
-       "all",
-       168,
-       "a"
-      ],
-      [
-       170,
-       "value",
-       169,
-       "list"
-      ],
-      [
-       171,
-       "Members",
-       169,
-       "other"
-      ],
-      [
-       172,
-       "all",
-       168,
-       "b"
-      ],
-      [
-       173,
-       "Members",
-       172,
-       "list"
-      ],
-      [
-       174,
-       "value",
-       172,
-       "other"
-      ],
-      [
-       175,
-       "then",
-       176,
-       "exec"
-      ],
-      [
-       177,
-       "value",
-       176,
-       "vote"
-      ],
-      [
-       178,
-       "false",
-       186,
-       "exec"
-      ],
-      [
-       178,
-       "true",
-       185,
-       "exec"
-      ],
-      [
-       179,
-       "result",
-       178,
-       "condition"
-      ],
-      [
-       180,
-       "result",
-       179,
-       "a"
-      ],
-      [
-       181,
-       "result",
-       180,
-       "a"
-      ],
-      [
-       182,
-       "Members",
-       181,
-       "list"
-      ],
-      [
-       183,
-       "result",
-       179,
-       "b"
-      ],
-      [
-       184,
-       "Yes",
-       183,
-       "list"
-      ],
-      [
-       186,
-       "false",
-       191,
-       "exec"
-      ],
-      [
-       186,
-       "true",
-       188,
-       "exec"
-      ],
-      [
-       187,
-       "result",
-       186,
-       "condition"
-      ],
-      [
-       188,
-       "then",
-       189,
-       "exec"
-      ],
-      [
-       190,
-       "value",
-       189,
-       "vote"
-      ],
-      [
-       191,
-       "then",
-       193,
-       "exec"
-      ],
-      [
-       192,
-       "Yes",
-       191,
-       "value"
-      ],
-      [
-       193,
-       "then",
-       194,
-       "exec"
-      ],
-      [
-       194,
-       "then",
-       196,
-       "exec"
-      ],
-      [
-       195,
-       "value",
-       194,
-       "value"
-      ],
-      [
-       196,
-       "false",
-       201,
-       "exec"
-      ],
-      [
-       196,
-       "true",
-       200,
-       "exec"
-      ],
-      [
-       197,
-       "all",
-       196,
-       "condition"
-      ],
-      [
-       198,
-       "Members",
-       197,
-       "list"
-      ],
-      [
-       199,
-       "value",
-       197,
-       "other"
-      ],
-      [
-       200,
-       "then",
-       201,
-       "exec"
-      ],
-      [
-       202,
-       "value",
-       201,
-       "vote"
-      ],
-      [
-       203,
-       "Status",
-       201,
-       "status"
-      ],
-      [
-       204,
-       "value",
-       203,
-       "value"
-      ],
-      [
-       205,
-       "status",
-       207,
-       "value"
-      ],
-      [
-       205,
-       "then",
-       206,
-       "exec"
-      ],
-      [
-       207,
-       "name",
-       206,
-       "name"
       ]
      ],
      "machines": [],
@@ -5059,235 +3349,6 @@
           0,
           0
          ]
-        }
-       ]
-      },
-      {
-       "name": "Unique",
-       "pure": true,
-       "help": "Every number of a list once",
-       "inputs": [
-        {
-         "name": "list",
-         "type": "int_list",
-         "value": []
-        }
-       ],
-       "outputs": [
-        {
-         "name": "list",
-         "type": "int_list",
-         "value": []
-        }
-       ],
-       "locals": [
-        {
-         "name": "Out",
-         "type": "int_list",
-         "value": []
-        }
-       ]
-      },
-      {
-       "name": "Within",
-       "pure": true,
-       "help": "Is every number of a list in another one?",
-       "inputs": [
-        {
-         "name": "list",
-         "type": "int_list",
-         "value": []
-        },
-        {
-         "name": "other",
-         "type": "int_list",
-         "value": []
-        }
-       ],
-       "outputs": [
-        {
-         "name": "all",
-         "type": "bool",
-         "value": true
-        }
-       ],
-       "locals": [
-        {
-         "name": "All",
-         "type": "bool",
-         "value": true
-        }
-       ]
-      },
-      {
-       "name": "CreateBallot",
-       "pure": true,
-       "help": "A new ballot. Invalid without id or key, with a host outside the roster or with fewer than two voters.",
-       "inputs": [
-        {
-         "name": "id",
-         "type": "text",
-         "value": ""
-        },
-        {
-         "name": "key",
-         "type": "text",
-         "value": ""
-        },
-        {
-         "name": "value",
-         "type": "bool",
-         "value": false
-        },
-        {
-         "name": "host",
-         "type": "int",
-         "value": 0
-        },
-        {
-         "name": "members",
-         "type": "int_list",
-         "value": []
-        },
-        {
-         "name": "now",
-         "type": "float",
-         "value": 0
-        }
-       ],
-       "outputs": [
-        {
-         "name": "vote",
-         "type": "struct",
-         "of": "Vote",
-         "value": {
-          "Id": "",
-          "Key": "",
-          "Value": false,
-          "Host": 0,
-          "Members": [],
-          "Yes": [],
-          "Expires": 0,
-          "Status": 5
-         }
-        }
-       ],
-       "locals": [
-        {
-         "name": "Roster",
-         "type": "int_list",
-         "value": []
-        }
-       ]
-      },
-      {
-       "name": "CastVote",
-       "pure": true,
-       "help": "A vote. The ballot as it stands afterwards and what this vote did: ignored for a stranger or a second yes, cancelled when it has expired or the roster has changed.",
-       "inputs": [
-        {
-         "name": "vote",
-         "type": "struct",
-         "of": "Vote",
-         "value": {
-          "Id": "",
-          "Key": "",
-          "Value": false,
-          "Host": 0,
-          "Members": [],
-          "Yes": [],
-          "Expires": 0,
-          "Status": 5
-         }
-        },
-        {
-         "name": "peer",
-         "type": "int",
-         "value": 0
-        },
-        {
-         "name": "approve",
-         "type": "bool",
-         "value": true
-        },
-        {
-         "name": "current",
-         "type": "int_list",
-         "value": []
-        },
-        {
-         "name": "now",
-         "type": "float",
-         "value": 0
-        }
-       ],
-       "outputs": [
-        {
-         "name": "vote",
-         "type": "struct",
-         "of": "Vote",
-         "value": {
-          "Id": "",
-          "Key": "",
-          "Value": false,
-          "Host": 0,
-          "Members": [],
-          "Yes": [],
-          "Expires": 0,
-          "Status": 5
-         }
-        },
-        {
-         "name": "status",
-         "type": "enum",
-         "of": "Ballot",
-         "value": 5
-        }
-       ],
-       "locals": [
-        {
-         "name": "B",
-         "type": "struct",
-         "of": "Vote",
-         "value": {
-          "Id": "",
-          "Key": "",
-          "Value": false,
-          "Host": 0,
-          "Members": [],
-          "Yes": [],
-          "Expires": 0,
-          "Status": 5
-         }
-        },
-        {
-         "name": "Now",
-         "type": "int_list",
-         "value": []
-        },
-        {
-         "name": "Yes",
-         "type": "int_list",
-         "value": []
-        }
-       ]
-      },
-      {
-       "name": "BallotName",
-       "pure": true,
-       "inputs": [
-        {
-         "name": "status",
-         "type": "enum",
-         "of": "Ballot",
-         "value": 5
-        }
-       ],
-       "outputs": [
-        {
-         "name": "name",
-         "type": "text",
-         "value": ""
         }
        ]
       }
@@ -57164,7 +55225,7 @@
     "logic": {
      "kind": "kern-logic",
      "version": 1,
-     "nextId": 301,
+     "nextId": 341,
      "variables": [
       {
        "name": "Palette",
@@ -57322,6 +55383,19 @@
        "help": "A ballot is open this long (ms)"
       },
       {
+       "name": "BallotNames",
+       "type": "text_list",
+       "value": [
+        "pending",
+        "approved",
+        "rejected",
+        "cancelled",
+        "ignored",
+        "invalid"
+       ],
+       "help": "A row for each BallotStatus, in its order"
+      },
+      {
        "name": "VoiceRadius",
        "type": "float",
        "value": 70,
@@ -57442,9 +55516,11 @@
         "pending",
         "approved",
         "rejected",
-        "cancelled"
+        "cancelled",
+        "ignored",
+        "invalid"
        ],
-       "help": "rules_vote_engine.mjs: where a ballot stands"
+       "help": "rules_vote_engine.mjs: where a ballot stands - and, for a single vote, that it changed nothing (ignored) or, for a new ballot, that there is none (invalid)"
       }
      ],
      "structs": [
@@ -57542,11 +55618,11 @@
       },
       {
        "id": 21,
-       "type": "func.entry",
-       "x": 0,
-       "y": 0,
+       "type": "flow.for_each",
+       "x": 288,
+       "y": 5656,
        "params": {
-        "function": "ColorSlots"
+        "type": "int"
        }
       },
       {
@@ -58357,7 +56433,7 @@
        "x": 0,
        "y": 5600,
        "params": {
-        "function": "Same"
+        "function": "Within"
        }
       },
       {
@@ -58388,7 +56464,7 @@
        "y": 5600,
        "params": {
         "variable": "All",
-        "scope": "Same"
+        "scope": "Within"
        },
        "values": {
         "value": false
@@ -58400,14 +56476,8 @@
        "x": 1120,
        "y": 5600,
        "params": {
-        "function": "Same"
+        "function": "Within"
        }
-      },
-      {
-       "id": 118,
-       "type": "logic.and",
-       "x": 1000,
-       "y": 5750
       },
       {
        "id": 119,
@@ -58416,34 +56486,7 @@
        "y": 5840,
        "params": {
         "variable": "All",
-        "scope": "Same"
-       }
-      },
-      {
-       "id": 120,
-       "type": "math.compare",
-       "x": 1000,
-       "y": 5930,
-       "params": {
-        "op": "=="
-       }
-      },
-      {
-       "id": 121,
-       "type": "list.length",
-       "x": 1000,
-       "y": 6020,
-       "params": {
-        "type": "int"
-       }
-      },
-      {
-       "id": 122,
-       "type": "list.length",
-       "x": 1000,
-       "y": 6110,
-       "params": {
-        "type": "int"
+        "scope": "Within"
        }
       },
       {
@@ -58530,17 +56573,7 @@
         "function": "CreateBallot"
        },
        "values": {
-        "created": false,
-        "ballot": {
-         "Id": 0,
-         "Key": 0,
-         "Value": false,
-         "Host": 0,
-         "Members": [],
-         "Yes": [],
-         "ExpiresMs": 0,
-         "Status": 0
-        }
+        "created": false
        }
       },
       {
@@ -58674,27 +56707,6 @@
        }
       },
       {
-       "id": 147,
-       "type": "flow.branch",
-       "x": 1120,
-       "y": 7080
-      },
-      {
-       "id": 148,
-       "type": "logic.or",
-       "x": 1000,
-       "y": 7230
-      },
-      {
-       "id": 149,
-       "type": "math.compare",
-       "x": 1000,
-       "y": 7320,
-       "params": {
-        "op": ">="
-       }
-      },
-      {
        "id": 150,
        "type": "struct.break",
        "x": 1000,
@@ -58714,27 +56726,12 @@
        }
       },
       {
-       "id": 152,
-       "type": "logic.not",
-       "x": 1000,
-       "y": 7590
-      },
-      {
        "id": 153,
        "type": "func.pure",
        "x": 1000,
        "y": 7680,
        "params": {
-        "function": "Same"
-       }
-      },
-      {
-       "id": 154,
-       "type": "struct.break",
-       "x": 1000,
-       "y": 7770,
-       "params": {
-        "struct": "Ballot"
+        "function": "Stale"
        }
       },
       {
@@ -58768,6 +56765,9 @@
        "y": 7080,
        "params": {
         "function": "CastVote"
+       },
+       "values": {
+        "did": 3
        }
       },
       {
@@ -58861,6 +56861,9 @@
        "y": 7080,
        "params": {
         "function": "CastVote"
+       },
+       "values": {
+        "did": 4
        }
       },
       {
@@ -58906,6 +56909,9 @@
        "y": 7080,
        "params": {
         "function": "CastVote"
+       },
+       "values": {
+        "did": 2
        }
       },
       {
@@ -58983,43 +56989,6 @@
        "type": "flow.branch",
        "x": 4200,
        "y": 7080
-      },
-      {
-       "id": 182,
-       "type": "math.compare",
-       "x": 4080,
-       "y": 7230,
-       "params": {
-        "op": "=="
-       }
-      },
-      {
-       "id": 183,
-       "type": "list.length",
-       "x": 4080,
-       "y": 7320,
-       "params": {
-        "type": "int"
-       }
-      },
-      {
-       "id": 184,
-       "type": "var.get",
-       "x": 4080,
-       "y": 7410,
-       "params": {
-        "variable": "Yes",
-        "scope": "CastVote"
-       }
-      },
-      {
-       "id": 185,
-       "type": "list.length",
-       "x": 4080,
-       "y": 7500,
-       "params": {
-        "type": "int"
-       }
       },
       {
        "id": 186,
@@ -60031,6 +58000,367 @@
        "params": {
         "variable": "PingLifeMs"
        }
+      },
+      {
+       "id": 301,
+       "type": "func.entry",
+       "x": 0,
+       "y": 13120,
+       "params": {
+        "function": "ColorSlots"
+       }
+      },
+      {
+       "id": 302,
+       "type": "func.entry",
+       "x": 0,
+       "y": 13400,
+       "params": {
+        "function": "Unique"
+       }
+      },
+      {
+       "id": 303,
+       "type": "flow.branch",
+       "x": 568,
+       "y": 5656
+      },
+      {
+       "id": 304,
+       "type": "logic.not",
+       "x": 520,
+       "y": 5808
+      },
+      {
+       "id": 305,
+       "type": "list.contains",
+       "x": 520,
+       "y": 5912,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 306,
+       "type": "var.get",
+       "x": 520,
+       "y": 6016,
+       "params": {
+        "variable": "Out",
+        "scope": "Unique"
+       }
+      },
+      {
+       "id": 307,
+       "type": "list.add",
+       "x": 856,
+       "y": 5712,
+       "params": {
+        "variable": "Out",
+        "scope": "Unique"
+       }
+      },
+      {
+       "id": 308,
+       "type": "func.return",
+       "x": 1144,
+       "y": 5768,
+       "params": {
+        "function": "Unique"
+       }
+      },
+      {
+       "id": 309,
+       "type": "var.get",
+       "x": 1096,
+       "y": 5920,
+       "params": {
+        "variable": "Out",
+        "scope": "Unique"
+       }
+      },
+      {
+       "id": 310,
+       "type": "func.entry",
+       "x": 0,
+       "y": 13680,
+       "params": {
+        "function": "BallotName"
+       }
+      },
+      {
+       "id": 311,
+       "type": "func.return",
+       "x": 288,
+       "y": 13736,
+       "params": {
+        "function": "BallotName"
+       }
+      },
+      {
+       "id": 312,
+       "type": "list.get",
+       "x": 240,
+       "y": 13888,
+       "params": {
+        "type": "text"
+       }
+      },
+      {
+       "id": 313,
+       "type": "var.get",
+       "x": 240,
+       "y": 13992,
+       "params": {
+        "variable": "BallotNames"
+       }
+      },
+      {
+       "id": 314,
+       "type": "enum.index",
+       "x": 240,
+       "y": 14096,
+       "params": {
+        "enum": "BallotStatus"
+       }
+      },
+      {
+       "id": 315,
+       "type": "var.set",
+       "x": 288,
+       "y": 6304,
+       "params": {
+        "variable": "Roster",
+        "scope": "CreateBallot"
+       }
+      },
+      {
+       "id": 316,
+       "type": "func.pure",
+       "x": 240,
+       "y": 6456,
+       "params": {
+        "function": "Unique"
+       }
+      },
+      {
+       "id": 317,
+       "type": "var.get",
+       "x": 232,
+       "y": 6400,
+       "params": {
+        "variable": "Roster",
+        "scope": "CreateBallot"
+       }
+      },
+      {
+       "id": 318,
+       "type": "var.get",
+       "x": 232,
+       "y": 6504,
+       "params": {
+        "variable": "Roster",
+        "scope": "CreateBallot"
+       }
+      },
+      {
+       "id": 319,
+       "type": "struct.make",
+       "x": 512,
+       "y": 6400,
+       "params": {
+        "struct": "Ballot"
+       },
+       "values": {
+        "Id": 0,
+        "Key": 0,
+        "Value": false,
+        "Host": 0,
+        "ExpiresMs": 0,
+        "Status": 5
+       }
+      },
+      {
+       "id": 320,
+       "type": "list.make",
+       "x": 512,
+       "y": 6504,
+       "params": {
+        "type": "int",
+        "count": "0"
+       }
+      },
+      {
+       "id": 321,
+       "type": "list.make",
+       "x": 512,
+       "y": 6608,
+       "params": {
+        "type": "int",
+        "count": "0"
+       }
+      },
+      {
+       "id": 322,
+       "type": "var.get",
+       "x": 792,
+       "y": 6400,
+       "params": {
+        "variable": "Roster",
+        "scope": "CreateBallot"
+       }
+      },
+      {
+       "id": 323,
+       "type": "func.entry",
+       "x": 0,
+       "y": 14376,
+       "params": {
+        "function": "Stale"
+       }
+      },
+      {
+       "id": 324,
+       "type": "func.return",
+       "x": 288,
+       "y": 14432,
+       "params": {
+        "function": "Stale"
+       }
+      },
+      {
+       "id": 325,
+       "type": "logic.or",
+       "x": 240,
+       "y": 14584
+      },
+      {
+       "id": 326,
+       "type": "math.compare",
+       "x": 240,
+       "y": 14688,
+       "params": {
+        "op": ">="
+       }
+      },
+      {
+       "id": 327,
+       "type": "struct.break",
+       "x": 240,
+       "y": 14792,
+       "params": {
+        "struct": "Ballot"
+       }
+      },
+      {
+       "id": 328,
+       "type": "logic.not",
+       "x": 240,
+       "y": 14896
+      },
+      {
+       "id": 329,
+       "type": "logic.and",
+       "x": 240,
+       "y": 15000
+      },
+      {
+       "id": 330,
+       "type": "func.pure",
+       "x": 240,
+       "y": 15104,
+       "params": {
+        "function": "Within"
+       }
+      },
+      {
+       "id": 331,
+       "type": "func.pure",
+       "x": 240,
+       "y": 15208,
+       "params": {
+        "function": "Unique"
+       }
+      },
+      {
+       "id": 332,
+       "type": "struct.break",
+       "x": 240,
+       "y": 15312,
+       "params": {
+        "struct": "Ballot"
+       }
+      },
+      {
+       "id": 333,
+       "type": "func.pure",
+       "x": 240,
+       "y": 15416,
+       "params": {
+        "function": "Within"
+       }
+      },
+      {
+       "id": 334,
+       "type": "struct.break",
+       "x": 240,
+       "y": 15520,
+       "params": {
+        "struct": "Ballot"
+       }
+      },
+      {
+       "id": 335,
+       "type": "func.pure",
+       "x": 240,
+       "y": 15624,
+       "params": {
+        "function": "Unique"
+       }
+      },
+      {
+       "id": 336,
+       "type": "flow.branch",
+       "x": 1128,
+       "y": 7136
+      },
+      {
+       "id": 337,
+       "type": "func.pure",
+       "x": 4152,
+       "y": 7232,
+       "params": {
+        "function": "Within"
+       }
+      },
+      {
+       "id": 338,
+       "type": "var.get",
+       "x": 4152,
+       "y": 7336,
+       "params": {
+        "variable": "Yes",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 339,
+       "type": "var.get",
+       "x": 4712,
+       "y": 7232,
+       "params": {
+        "variable": "V",
+        "scope": "CastVote"
+       }
+      },
+      {
+       "id": 340,
+       "type": "struct.break",
+       "x": 4712,
+       "y": 7336,
+       "params": {
+        "struct": "Ballot"
+       }
       }
      ],
      "links": [
@@ -60067,32 +58397,44 @@
       [
        20,
        "body",
-       113,
+       303,
        "exec"
       ],
       [
        20,
        "completed",
-       117,
+       308,
        "exec"
       ],
       [
        20,
        "item",
-       115,
+       305,
+       "item"
+      ],
+      [
+       20,
+       "item",
+       307,
        "item"
       ],
       [
        21,
-       "numbers",
-       10,
-       "list"
+       "body",
+       113,
+       "exec"
       ],
       [
        21,
-       "then",
-       10,
+       "completed",
+       117,
        "exec"
+      ],
+      [
+       21,
+       "item",
+       115,
+       "item"
       ],
       [
        22,
@@ -60708,32 +59050,20 @@
       ],
       [
        112,
-       "a",
-       20,
+       "list",
+       21,
        "list"
       ],
       [
        112,
-       "a",
-       121,
-       "list"
-      ],
-      [
-       112,
-       "b",
+       "other",
        115,
        "list"
       ],
       [
        112,
-       "b",
-       122,
-       "list"
-      ],
-      [
-       112,
        "then",
-       20,
+       21,
        "exec"
       ],
       [
@@ -60755,34 +59085,10 @@
        "a"
       ],
       [
-       118,
-       "result",
-       117,
-       "same"
-      ],
-      [
        119,
        "value",
-       118,
-       "a"
-      ],
-      [
-       120,
-       "result",
-       118,
-       "b"
-      ],
-      [
-       121,
-       "length",
-       120,
-       "a"
-      ],
-      [
-       122,
-       "length",
-       120,
-       "b"
+       117,
+       "all"
       ],
       [
        123,
@@ -60823,20 +59129,8 @@
       [
        123,
        "members",
-       129,
+       316,
        "list"
-      ],
-      [
-       123,
-       "members",
-       131,
-       "list"
-      ],
-      [
-       123,
-       "members",
-       134,
-       "Members"
       ],
       [
        123,
@@ -60847,7 +59141,7 @@
       [
        123,
        "then",
-       124,
+       315,
        "exec"
       ],
       [
@@ -60950,13 +59244,13 @@
        138,
        "current",
        153,
-       "a"
+       "current"
       ],
       [
        138,
        "nowMs",
-       149,
-       "a"
+       153,
+       "nowMs"
       ],
       [
        138,
@@ -60991,7 +59285,7 @@
       [
        140,
        "false",
-       147,
+       336,
        "exec"
       ],
       [
@@ -61031,34 +59325,10 @@
        "ballot"
       ],
       [
-       147,
-       "false",
-       159,
-       "exec"
-      ],
-      [
-       147,
-       "true",
-       156,
-       "exec"
-      ],
-      [
-       148,
-       "result",
-       147,
-       "condition"
-      ],
-      [
-       149,
-       "result",
-       148,
-       "a"
-      ],
-      [
        150,
-       "ExpiresMs",
-       149,
-       "b"
+       "Status",
+       145,
+       "did"
       ],
       [
        151,
@@ -61067,28 +59337,16 @@
        "value"
       ],
       [
-       152,
-       "result",
-       148,
-       "b"
-      ],
-      [
        153,
-       "same",
-       152,
-       "a"
-      ],
-      [
-       154,
-       "Members",
-       153,
-       "b"
+       "stale",
+       336,
+       "condition"
       ],
       [
        155,
        "value",
-       154,
-       "value"
+       153,
+       "ballot"
       ],
       [
        156,
@@ -61247,33 +59505,9 @@
        "exec"
       ],
       [
-       182,
-       "result",
-       181,
-       "condition"
-      ],
-      [
-       183,
-       "length",
-       182,
-       "a"
-      ],
-      [
-       184,
-       "value",
-       183,
-       "list"
-      ],
-      [
-       185,
-       "length",
-       182,
-       "b"
-      ],
-      [
        186,
        "Members",
-       185,
+       337,
        "list"
       ],
       [
@@ -61291,8 +59525,8 @@
       [
        190,
        "value",
-       189,
-       "ballot"
+       340,
+       "value"
       ],
       [
        191,
@@ -62253,6 +60487,282 @@
        "value",
        299,
        "b"
+      ],
+      [
+       301,
+       "numbers",
+       10,
+       "list"
+      ],
+      [
+       301,
+       "then",
+       10,
+       "exec"
+      ],
+      [
+       302,
+       "list",
+       20,
+       "list"
+      ],
+      [
+       302,
+       "then",
+       20,
+       "exec"
+      ],
+      [
+       303,
+       "true",
+       307,
+       "exec"
+      ],
+      [
+       304,
+       "result",
+       303,
+       "condition"
+      ],
+      [
+       305,
+       "result",
+       304,
+       "a"
+      ],
+      [
+       306,
+       "value",
+       305,
+       "list"
+      ],
+      [
+       309,
+       "value",
+       308,
+       "list"
+      ],
+      [
+       310,
+       "status",
+       314,
+       "value"
+      ],
+      [
+       310,
+       "then",
+       311,
+       "exec"
+      ],
+      [
+       312,
+       "item",
+       311,
+       "name"
+      ],
+      [
+       313,
+       "value",
+       312,
+       "list"
+      ],
+      [
+       314,
+       "index",
+       312,
+       "index"
+      ],
+      [
+       315,
+       "then",
+       124,
+       "exec"
+      ],
+      [
+       316,
+       "list",
+       315,
+       "value"
+      ],
+      [
+       317,
+       "value",
+       129,
+       "list"
+      ],
+      [
+       318,
+       "value",
+       131,
+       "list"
+      ],
+      [
+       319,
+       "value",
+       132,
+       "ballot"
+      ],
+      [
+       320,
+       "list",
+       319,
+       "Members"
+      ],
+      [
+       321,
+       "list",
+       319,
+       "Yes"
+      ],
+      [
+       322,
+       "value",
+       134,
+       "Members"
+      ],
+      [
+       323,
+       "ballot",
+       327,
+       "value"
+      ],
+      [
+       323,
+       "ballot",
+       332,
+       "value"
+      ],
+      [
+       323,
+       "ballot",
+       334,
+       "value"
+      ],
+      [
+       323,
+       "current",
+       331,
+       "list"
+      ],
+      [
+       323,
+       "current",
+       335,
+       "list"
+      ],
+      [
+       323,
+       "nowMs",
+       326,
+       "a"
+      ],
+      [
+       323,
+       "then",
+       324,
+       "exec"
+      ],
+      [
+       325,
+       "result",
+       324,
+       "stale"
+      ],
+      [
+       326,
+       "result",
+       325,
+       "a"
+      ],
+      [
+       327,
+       "ExpiresMs",
+       326,
+       "b"
+      ],
+      [
+       328,
+       "result",
+       325,
+       "b"
+      ],
+      [
+       329,
+       "result",
+       328,
+       "a"
+      ],
+      [
+       330,
+       "all",
+       329,
+       "a"
+      ],
+      [
+       331,
+       "list",
+       330,
+       "list"
+      ],
+      [
+       332,
+       "Members",
+       330,
+       "other"
+      ],
+      [
+       333,
+       "all",
+       329,
+       "b"
+      ],
+      [
+       334,
+       "Members",
+       333,
+       "list"
+      ],
+      [
+       335,
+       "list",
+       333,
+       "other"
+      ],
+      [
+       336,
+       "false",
+       159,
+       "exec"
+      ],
+      [
+       336,
+       "true",
+       156,
+       "exec"
+      ],
+      [
+       337,
+       "all",
+       181,
+       "condition"
+      ],
+      [
+       338,
+       "value",
+       337,
+       "other"
+      ],
+      [
+       339,
+       "value",
+       189,
+       "ballot"
+      ],
+      [
+       340,
+       "Status",
+       189,
+       "did"
       ]
      ],
      "machines": [],
@@ -62538,26 +61048,52 @@
        ]
       },
       {
-       "name": "Same",
+       "name": "Unique",
        "pure": true,
-       "help": "Do two rosters have the same players?",
+       "help": "Every number of a list once",
        "inputs": [
         {
-         "name": "a",
-         "type": "int_list",
-         "value": []
-        },
-        {
-         "name": "b",
+         "name": "list",
          "type": "int_list",
          "value": []
         }
        ],
        "outputs": [
         {
-         "name": "same",
+         "name": "list",
+         "type": "int_list",
+         "value": []
+        }
+       ],
+       "locals": [
+        {
+         "name": "Out",
+         "type": "int_list",
+         "value": []
+        }
+       ]
+      },
+      {
+       "name": "Within",
+       "pure": true,
+       "help": "Is every number of a list in another one?",
+       "inputs": [
+        {
+         "name": "list",
+         "type": "int_list",
+         "value": []
+        },
+        {
+         "name": "other",
+         "type": "int_list",
+         "value": []
+        }
+       ],
+       "outputs": [
+        {
+         "name": "all",
          "type": "bool",
-         "value": false
+         "value": true
         }
        ],
        "locals": [
@@ -62569,9 +61105,28 @@
        ]
       },
       {
+       "name": "BallotName",
+       "pure": true,
+       "inputs": [
+        {
+         "name": "status",
+         "type": "enum",
+         "of": "BallotStatus",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "name",
+         "type": "text",
+         "value": ""
+        }
+       ]
+      },
+      {
        "name": "CreateBallot",
        "pure": true,
-       "help": "The host puts a rule to the vote of the roster (each player once, at least two, the host among them); he has said yes",
+       "help": "The host puts a rule to the vote of the roster (each player once, at least two, the host among them); he has said yes. No ballot without an id.",
        "inputs": [
         {
          "name": "id",
@@ -62625,12 +61180,58 @@
           "Status": 0
          }
         }
+       ],
+       "locals": [
+        {
+         "name": "Roster",
+         "type": "int_list",
+         "value": []
+        }
+       ]
+      },
+      {
+       "name": "Stale",
+       "pure": true,
+       "help": "A ballot is over without a result when it ran out or the roster is no longer the one that was asked",
+       "inputs": [
+        {
+         "name": "ballot",
+         "type": "struct",
+         "of": "Ballot",
+         "value": {
+          "Id": 0,
+          "Key": 0,
+          "Value": false,
+          "Host": 0,
+          "Members": [],
+          "Yes": [],
+          "ExpiresMs": 0,
+          "Status": 0
+         }
+        },
+        {
+         "name": "current",
+         "type": "int_list",
+         "value": []
+        },
+        {
+         "name": "nowMs",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "stale",
+         "type": "bool",
+         "value": false
+        }
        ]
       },
       {
        "name": "CastVote",
        "pure": true,
-       "help": "One vote. The ballot is cancelled when it ran out or the roster changed; a no rejects it; everybody's yes approves it. A vote of somebody who is not asked or has voted changes nothing.",
+       "help": "One vote: the ballot as it stands afterwards and what this vote did. A stale ballot is cancelled; a no rejects it; everybody's yes approves it. The vote of somebody who is not asked or has voted is ignored.",
        "inputs": [
         {
          "name": "ballot",
@@ -62683,6 +61284,12 @@
           "ExpiresMs": 0,
           "Status": 0
          }
+        },
+        {
+         "name": "did",
+         "type": "enum",
+         "of": "BallotStatus",
+         "value": 5
         }
        ],
        "locals": [

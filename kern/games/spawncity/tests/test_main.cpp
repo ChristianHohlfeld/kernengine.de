@@ -89,13 +89,20 @@ static blueprint_native::Case rule_case(const char* actor) {
   return c;
 }
 
+static blueprint_native::Case multiplayer_case() {
+  using kern::logic::Value;
+  blueprint_native::Case c = rule_case("Multiplayer");
+  // a ballot from its start, and one that is none
+  auto ints = [](std::initializer_list<kern::i64> v) { return Value::of(std::vector<kern::i64>(v)); };
+  c.calls.push_back({"CreateBallot", {Value::integer(7), Value::integer(0), Value::boolean(true), Value::integer(2), ints({3, 1, 2, 2}), Value::number(0)}});
+  c.calls.push_back({"CreateBallot", {Value::integer(7), Value::integer(0), Value::boolean(true), Value::integer(9), ints({1, 2}), Value::number(0)}});
+  return c;
+}
+
 static blueprint_native::Case combat_detail_case() {
   using kern::logic::Value;
   blueprint_native::Case c = rule_case("CombatDetail");
-  // a ballot from its start to unanimous, and the clock of a drone that turns critical and blows
-  auto ints = [](std::initializer_list<kern::i64> v) { return Value::of(std::vector<kern::i64>(v)); };
-  c.calls.push_back({"CreateBallot", {Value::text("b"), Value::text("friendlyFire"), Value::boolean(true), Value::integer(2), ints({3, 1, 2, 2}), Value::number(0)}});
-  c.calls.push_back({"CreateBallot", {Value::text("b"), Value::text("friendlyFire"), Value::boolean(true), Value::integer(9), ints({1, 2}), Value::number(0)}});
+  // the clock of a drone that turns critical and blows
   for (double hp : {100.0, 28.0, 20.0, 20.0})
     c.calls.push_back({"ClockUpdate", {Value::enumeration(3), Value::number(hp), Value::number(100), Value::number(1.5), Value::number(hp < 25 ? 3.05 : -1), Value::number(hp < 25 ? 28 : 100)}});
   return c;
@@ -149,7 +156,7 @@ int main(int argc, char** argv) {
   // the interpreter's answers (run_tests.sh compiles them into wanted_native_test).
   if (argc > 2 && std::strcmp(argv[1], "--emit-native") == 0) {
     std::string error;
-    if (!blueprint_native::emit(argv[2], {wanted_case(), combat_detail_case(), guided_case(), rule_case("SpawnGuard"), jet_seats_case(), rule_case("Lamps"), rule_case("Sirens"), rule_case("Controls"), rule_case("Settings"), rule_case("Jetpack"), rule_case("Traffic"), rule_case("Military"), rule_case("Zombies"), rule_case("Sandbox"), rule_case("Fun"), rule_case("Race"), rule_case("Multiplayer")}, &error)) {
+    if (!blueprint_native::emit(argv[2], {wanted_case(), combat_detail_case(), guided_case(), rule_case("SpawnGuard"), jet_seats_case(), rule_case("Lamps"), rule_case("Sirens"), rule_case("Controls"), rule_case("Settings"), rule_case("Jetpack"), rule_case("Traffic"), rule_case("Military"), rule_case("Zombies"), rule_case("Sandbox"), rule_case("Fun"), rule_case("Race"), multiplayer_case()}, &error)) {
       std::printf("FAIL --emit-native: %s\n", error.c_str());
       return 1;
     }
