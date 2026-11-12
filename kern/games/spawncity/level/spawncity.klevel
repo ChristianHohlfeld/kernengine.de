@@ -16,7 +16,7 @@
   "ambienceVolume": 0.35,
   "reverb": 0.2
  },
- "nextId": 59,
+ "nextId": 61,
  "actors": [
   {
    "id": 1,
@@ -62791,7 +62791,7 @@
     "logic": {
      "kind": "kern-logic",
      "version": 1,
-     "nextId": 47,
+     "nextId": 53,
      "variables": [],
      "nodes": [
       {
@@ -63238,6 +63238,62 @@
         "variable": "e",
         "scope": "clearance_lead"
        }
+      },
+      {
+       "id": 47,
+       "type": "func.entry",
+       "x": 0,
+       "y": 1912,
+       "params": {
+        "function": "battery_ocv"
+       }
+      },
+      {
+       "id": 48,
+       "type": "var.set",
+       "x": 288,
+       "y": 1968,
+       "params": {
+        "variable": "s",
+        "scope": "battery_ocv"
+       }
+      },
+      {
+       "id": 49,
+       "type": "math.formula",
+       "x": 240,
+       "y": 2120,
+       "params": {
+        "formula": "soc < 0 ? 0 : 1 < soc ? 1 : soc"
+       }
+      },
+      {
+       "id": 50,
+       "type": "func.return",
+       "x": 576,
+       "y": 2024,
+       "params": {
+        "function": "battery_ocv"
+       }
+      },
+      {
+       "id": 51,
+       "type": "math.formula",
+       "x": 528,
+       "y": 2176,
+       "params": {
+        "formula": "cells * min(4.2, 3.2625 + 0.9 * s + 0.0375 * ((exp(2 * ((s - 0.12) * 18)) - 1) / (exp(2 * ((s - 0.12) * 18)) + 1)))"
+       }
+      },
+      {
+       "id": 52,
+       "type": "var.get",
+       "x": 528,
+       "y": 2280,
+       "params": {
+        "variable": "s",
+        "scope": "battery_ocv"
+       }
       }
      ],
      "links": [
@@ -63546,10 +63602,82 @@
        "value",
        44,
        "e"
+      ],
+      [
+       47,
+       "cells",
+       51,
+       "cells"
+      ],
+      [
+       47,
+       "soc",
+       49,
+       "soc"
+      ],
+      [
+       47,
+       "then",
+       48,
+       "exec"
+      ],
+      [
+       48,
+       "then",
+       50,
+       "exec"
+      ],
+      [
+       49,
+       "result",
+       48,
+       "value"
+      ],
+      [
+       51,
+       "result",
+       50,
+       "Result"
+      ],
+      [
+       52,
+       "value",
+       51,
+       "s"
       ]
      ],
      "machines": [],
      "functions": [
+      {
+       "name": "battery_ocv",
+       "pure": true,
+       "inputs": [
+        {
+         "name": "soc",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "cells",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "Result",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "locals": [
+        {
+         "name": "s",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
       {
        "name": "battery_under_load",
        "pure": true,
@@ -75862,7 +75990,7 @@
     "logic": {
      "kind": "kern-logic",
      "version": 1,
-     "nextId": 192,
+     "nextId": 193,
      "variables": [
       {
        "name": "kDoorW",
@@ -76021,21 +76149,12 @@
        }
       },
       {
-       "id": 12,
+       "id": 13,
        "type": "flow.for_each",
        "x": 2304,
        "y": 5312,
        "params": {
         "type": "Door"
-       }
-      },
-      {
-       "id": 13,
-       "type": "math.formula",
-       "x": 720,
-       "y": 330,
-       "params": {
-        "formula": "((x - x_2) * x_3 + (y - y_2) * y_3) / l"
        }
       },
       {
@@ -77592,6 +77711,15 @@
         "variable": "t1_",
         "scope": "door_gap"
        }
+      },
+      {
+       "id": 192,
+       "type": "math.formula",
+       "x": 800,
+       "y": 208,
+       "params": {
+        "formula": "((x - x_2) * x_3 + (y - y_2) * y_3) / l"
+       }
       }
      ],
      "links": [
@@ -77758,63 +77886,57 @@
        "value"
       ],
       [
-       12,
+       13,
        "body",
        134,
        "exec"
       ],
       [
-       12,
+       13,
        "completed",
        188,
        "exec"
       ],
       [
-       12,
+       13,
        "item",
        137,
        "value"
       ],
       [
-       12,
+       13,
        "item",
        139,
        "value"
       ],
       [
-       12,
+       13,
        "item",
        155,
        "value"
       ],
       [
-       12,
+       13,
        "item",
        159,
        "value"
       ],
       [
-       13,
-       "result",
-       110,
-       "v"
-      ],
-      [
        14,
        "x",
-       13,
+       192,
        "x"
       ],
       [
        15,
        "x",
-       13,
+       192,
        "x_2"
       ],
       [
        16,
        "x",
-       13,
+       192,
        "x_3"
       ],
       [
@@ -77826,19 +77948,19 @@
       [
        18,
        "y",
-       13,
+       192,
        "y"
       ],
       [
        19,
        "y",
-       13,
+       192,
        "y_2"
       ],
       [
        20,
        "y",
-       13,
+       192,
        "y_3"
       ],
       [
@@ -77850,7 +77972,7 @@
       [
        22,
        "value",
-       13,
+       192,
        "l"
       ],
       [
@@ -78426,7 +78548,7 @@
       [
        111,
        "doors",
-       12,
+       13,
        "list"
       ],
       [
@@ -78564,7 +78686,7 @@
       [
        129,
        "then",
-       12,
+       13,
        "exec"
       ],
       [
@@ -78938,6 +79060,12 @@
        "value",
        189,
        "t1"
+      ],
+      [
+       192,
+       "result",
+       110,
+       "v"
       ]
      ],
      "machines": [],
@@ -85969,8 +86097,111 @@
     "logic": {
      "kind": "kern-logic",
      "version": 1,
-     "nextId": 20,
+     "nextId": 38,
      "variables": [],
+     "enums": [
+      {
+       "name": "Kind",
+       "values": [
+        "none",
+        "string",
+        "number",
+        "boolean"
+       ]
+      }
+     ],
+     "structs": [
+      {
+       "name": "Value",
+       "fields": [
+        {
+         "name": "kind",
+         "type": "enum",
+         "of": "Kind",
+         "value": 0
+        },
+        {
+         "name": "s",
+         "type": "text",
+         "value": ""
+        },
+        {
+         "name": "n",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "b",
+         "type": "bool",
+         "value": false
+        }
+       ]
+      },
+      {
+       "name": "Int_row",
+       "fields": [
+        {
+         "name": "items",
+         "type": "int_list",
+         "value": []
+        }
+       ]
+      },
+      {
+       "name": "PendingLayer",
+       "fields": [
+        {
+         "name": "name",
+         "type": "text",
+         "value": ""
+        },
+        {
+         "name": "extent",
+         "type": "int",
+         "value": 4096
+        },
+        {
+         "name": "keys",
+         "type": "text_list",
+         "value": []
+        },
+        {
+         "name": "values",
+         "type": "struct_list",
+         "of": "Value",
+         "value": []
+        },
+        {
+         "name": "features",
+         "type": "struct_list",
+         "of": "Int_row",
+         "value": []
+        }
+       ]
+      },
+      {
+       "name": "Writer",
+       "fields": [
+        {
+         "name": "layer_",
+         "type": "struct",
+         "of": "PendingLayer",
+         "value": {
+          "name": "",
+          "extent": 4096,
+          "keys": [],
+          "values": [],
+          "features": []
+         }
+        },
+        {
+         "name": "out_",
+         "type": "int_list",
+         "value": []
+        }
+       ]
+      }
+     ],
      "nodes": [
       {
        "id": 10,
@@ -86064,6 +86295,193 @@
        "values": {
         "Result": false
        }
+      },
+      {
+       "id": 20,
+       "type": "func.entry",
+       "x": 0,
+       "y": 520,
+       "params": {
+        "function": "Writer_begin_layer"
+       }
+      },
+      {
+       "id": 21,
+       "type": "var.set",
+       "x": 288,
+       "y": 576,
+       "params": {
+        "variable": "self_",
+        "scope": "Writer_begin_layer"
+       }
+      },
+      {
+       "id": 22,
+       "type": "struct.set_field",
+       "x": 576,
+       "y": 632,
+       "params": {
+        "variable": "self_",
+        "field": "layer_",
+        "scope": "Writer_begin_layer"
+       }
+      },
+      {
+       "id": 23,
+       "type": "struct.make",
+       "x": 528,
+       "y": 784,
+       "params": {
+        "struct": "PendingLayer"
+       },
+       "values": {
+        "name": "",
+        "extent": 4096,
+        "keys": [],
+        "values": [],
+        "features": []
+       }
+      },
+      {
+       "id": 24,
+       "type": "var.set",
+       "x": 864,
+       "y": 688,
+       "params": {
+        "variable": "t",
+        "scope": "Writer_begin_layer"
+       }
+      },
+      {
+       "id": 25,
+       "type": "struct.break",
+       "x": 816,
+       "y": 840,
+       "params": {
+        "struct": "Writer"
+       }
+      },
+      {
+       "id": 26,
+       "type": "var.get",
+       "x": 816,
+       "y": 944,
+       "params": {
+        "variable": "self_",
+        "scope": "Writer_begin_layer"
+       }
+      },
+      {
+       "id": 27,
+       "type": "struct.set_field",
+       "x": 1152,
+       "y": 744,
+       "params": {
+        "variable": "t",
+        "field": "name",
+        "scope": "Writer_begin_layer"
+       }
+      },
+      {
+       "id": 28,
+       "type": "struct.set_field",
+       "x": 1440,
+       "y": 800,
+       "params": {
+        "variable": "self_",
+        "field": "layer_",
+        "scope": "Writer_begin_layer"
+       }
+      },
+      {
+       "id": 29,
+       "type": "var.get",
+       "x": 1392,
+       "y": 952,
+       "params": {
+        "variable": "t",
+        "scope": "Writer_begin_layer"
+       }
+      },
+      {
+       "id": 30,
+       "type": "var.set",
+       "x": 1728,
+       "y": 856,
+       "params": {
+        "variable": "t_2",
+        "scope": "Writer_begin_layer"
+       }
+      },
+      {
+       "id": 31,
+       "type": "struct.break",
+       "x": 1680,
+       "y": 1008,
+       "params": {
+        "struct": "Writer"
+       }
+      },
+      {
+       "id": 32,
+       "type": "var.get",
+       "x": 1680,
+       "y": 1112,
+       "params": {
+        "variable": "self_",
+        "scope": "Writer_begin_layer"
+       }
+      },
+      {
+       "id": 33,
+       "type": "struct.set_field",
+       "x": 2016,
+       "y": 912,
+       "params": {
+        "variable": "t_2",
+        "field": "extent",
+        "scope": "Writer_begin_layer"
+       }
+      },
+      {
+       "id": 34,
+       "type": "struct.set_field",
+       "x": 2304,
+       "y": 968,
+       "params": {
+        "variable": "self_",
+        "field": "layer_",
+        "scope": "Writer_begin_layer"
+       }
+      },
+      {
+       "id": 35,
+       "type": "var.get",
+       "x": 2256,
+       "y": 1120,
+       "params": {
+        "variable": "t_2",
+        "scope": "Writer_begin_layer"
+       }
+      },
+      {
+       "id": 36,
+       "type": "func.return",
+       "x": 2592,
+       "y": 1024,
+       "params": {
+        "function": "Writer_begin_layer"
+       }
+      },
+      {
+       "id": 37,
+       "type": "var.get",
+       "x": 2544,
+       "y": 1176,
+       "params": {
+        "variable": "self_",
+        "scope": "Writer_begin_layer"
+       }
       }
      ],
      "links": [
@@ -86144,6 +86562,126 @@
        "result",
        16,
        "condition"
+      ],
+      [
+       20,
+       "extent",
+       33,
+       "value"
+      ],
+      [
+       20,
+       "name",
+       27,
+       "value"
+      ],
+      [
+       20,
+       "self",
+       21,
+       "value"
+      ],
+      [
+       20,
+       "then",
+       21,
+       "exec"
+      ],
+      [
+       21,
+       "then",
+       22,
+       "exec"
+      ],
+      [
+       22,
+       "then",
+       24,
+       "exec"
+      ],
+      [
+       23,
+       "value",
+       22,
+       "value"
+      ],
+      [
+       24,
+       "then",
+       27,
+       "exec"
+      ],
+      [
+       25,
+       "layer_",
+       24,
+       "value"
+      ],
+      [
+       26,
+       "value",
+       25,
+       "value"
+      ],
+      [
+       27,
+       "then",
+       28,
+       "exec"
+      ],
+      [
+       28,
+       "then",
+       30,
+       "exec"
+      ],
+      [
+       29,
+       "value",
+       28,
+       "value"
+      ],
+      [
+       30,
+       "then",
+       33,
+       "exec"
+      ],
+      [
+       31,
+       "layer_",
+       30,
+       "value"
+      ],
+      [
+       32,
+       "value",
+       31,
+       "value"
+      ],
+      [
+       33,
+       "then",
+       34,
+       "exec"
+      ],
+      [
+       34,
+       "then",
+       36,
+       "exec"
+      ],
+      [
+       35,
+       "value",
+       34,
+       "value"
+      ],
+      [
+       37,
+       "value",
+       36,
+       "Result"
       ]
      ],
      "machines": [],
@@ -86168,6 +86706,95 @@
          "name": "Result",
          "type": "bool",
          "value": false
+        }
+       ]
+      },
+      {
+       "name": "Writer_begin_layer",
+       "pure": true,
+       "inputs": [
+        {
+         "name": "self",
+         "type": "struct",
+         "of": "Writer",
+         "value": {
+          "layer_": {
+           "name": "",
+           "extent": 4096,
+           "keys": [],
+           "values": [],
+           "features": []
+          },
+          "out_": []
+         }
+        },
+        {
+         "name": "name",
+         "type": "text",
+         "value": ""
+        },
+        {
+         "name": "extent",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "Result",
+         "type": "struct",
+         "of": "Writer",
+         "value": {
+          "layer_": {
+           "name": "",
+           "extent": 4096,
+           "keys": [],
+           "values": [],
+           "features": []
+          },
+          "out_": []
+         }
+        }
+       ],
+       "locals": [
+        {
+         "name": "self_",
+         "type": "struct",
+         "of": "Writer",
+         "value": {
+          "layer_": {
+           "name": "",
+           "extent": 4096,
+           "keys": [],
+           "values": [],
+           "features": []
+          },
+          "out_": []
+         }
+        },
+        {
+         "name": "t",
+         "type": "struct",
+         "of": "PendingLayer",
+         "value": {
+          "name": "",
+          "extent": 4096,
+          "keys": [],
+          "values": [],
+          "features": []
+         }
+        },
+        {
+         "name": "t_2",
+         "type": "struct",
+         "of": "PendingLayer",
+         "value": {
+          "name": "",
+          "extent": 4096,
+          "keys": [],
+          "values": [],
+          "features": []
+         }
         }
        ]
       }
@@ -87281,7 +87908,7 @@
     "logic": {
      "kind": "kern-logic",
      "version": 1,
-     "nextId": 108,
+     "nextId": 133,
      "variables": [
       {
        "name": "kTiers",
@@ -88472,6 +89099,244 @@
        "params": {
         "formula": "rate > 0 && dt > 0 ? 1 - exp(-rate * dt) : 0"
        }
+      },
+      {
+       "id": 108,
+       "type": "func.entry",
+       "x": 0,
+       "y": 4464,
+       "params": {
+        "function": "Meter_lap"
+       }
+      },
+      {
+       "id": 109,
+       "type": "var.set",
+       "x": 288,
+       "y": 4520,
+       "params": {
+        "variable": "self_",
+        "scope": "Meter_lap"
+       }
+      },
+      {
+       "id": 110,
+       "type": "flow.branch",
+       "x": 576,
+       "y": 4576
+      },
+      {
+       "id": 111,
+       "type": "math.compare",
+       "x": 528,
+       "y": 4728,
+       "params": {
+        "op": ">="
+       }
+      },
+      {
+       "id": 112,
+       "type": "enum.index",
+       "x": 528,
+       "y": 4832,
+       "params": {
+        "enum": "Slot"
+       }
+      },
+      {
+       "id": 113,
+       "type": "enum.index",
+       "x": 528,
+       "y": 4936,
+       "params": {
+        "enum": "Slot"
+       },
+       "values": {
+        "value": 4
+       }
+      },
+      {
+       "id": 114,
+       "type": "func.return",
+       "x": 864,
+       "y": 4632,
+       "params": {
+        "function": "Meter_lap"
+       }
+      },
+      {
+       "id": 115,
+       "type": "var.get",
+       "x": 816,
+       "y": 4784,
+       "params": {
+        "variable": "self_",
+        "scope": "Meter_lap"
+       }
+      },
+      {
+       "id": 116,
+       "type": "var.set",
+       "x": 1152,
+       "y": 4688,
+       "params": {
+        "variable": "t",
+        "scope": "Meter_lap"
+       }
+      },
+      {
+       "id": 117,
+       "type": "struct.break",
+       "x": 1104,
+       "y": 4840,
+       "params": {
+        "struct": "Meter"
+       }
+      },
+      {
+       "id": 118,
+       "type": "var.get",
+       "x": 1104,
+       "y": 4944,
+       "params": {
+        "variable": "self_",
+        "scope": "Meter_lap"
+       }
+      },
+      {
+       "id": 119,
+       "type": "list.set",
+       "x": 1440,
+       "y": 4744,
+       "params": {
+        "variable": "t",
+        "scope": "Meter_lap"
+       }
+      },
+      {
+       "id": 120,
+       "type": "enum.index",
+       "x": 1392,
+       "y": 4896,
+       "params": {
+        "enum": "Slot"
+       }
+      },
+      {
+       "id": 121,
+       "type": "math.formula",
+       "x": 1392,
+       "y": 5000,
+       "params": {
+        "formula": "a + (now_ms - last_)"
+       }
+      },
+      {
+       "id": 122,
+       "type": "list.get",
+       "x": 1392,
+       "y": 5104,
+       "params": {
+        "type": "float"
+       }
+      },
+      {
+       "id": 123,
+       "type": "struct.break",
+       "x": 1392,
+       "y": 5208,
+       "params": {
+        "struct": "Meter"
+       }
+      },
+      {
+       "id": 124,
+       "type": "var.get",
+       "x": 1392,
+       "y": 5312,
+       "params": {
+        "variable": "self_",
+        "scope": "Meter_lap"
+       }
+      },
+      {
+       "id": 125,
+       "type": "enum.index",
+       "x": 1392,
+       "y": 5416,
+       "params": {
+        "enum": "Slot"
+       }
+      },
+      {
+       "id": 126,
+       "type": "struct.break",
+       "x": 1392,
+       "y": 5520,
+       "params": {
+        "struct": "Meter"
+       }
+      },
+      {
+       "id": 127,
+       "type": "var.get",
+       "x": 1392,
+       "y": 5624,
+       "params": {
+        "variable": "self_",
+        "scope": "Meter_lap"
+       }
+      },
+      {
+       "id": 128,
+       "type": "struct.set_field",
+       "x": 1728,
+       "y": 4800,
+       "params": {
+        "variable": "self_",
+        "field": "cur_",
+        "scope": "Meter_lap"
+       }
+      },
+      {
+       "id": 129,
+       "type": "var.get",
+       "x": 1680,
+       "y": 4952,
+       "params": {
+        "variable": "t",
+        "scope": "Meter_lap"
+       }
+      },
+      {
+       "id": 130,
+       "type": "struct.set_field",
+       "x": 2016,
+       "y": 4856,
+       "params": {
+        "variable": "self_",
+        "field": "last_",
+        "scope": "Meter_lap"
+       }
+      },
+      {
+       "id": 131,
+       "type": "func.return",
+       "x": 2304,
+       "y": 4912,
+       "params": {
+        "function": "Meter_lap"
+       }
+      },
+      {
+       "id": 132,
+       "type": "var.get",
+       "x": 2256,
+       "y": 5064,
+       "params": {
+        "variable": "self_",
+        "scope": "Meter_lap"
+       }
       }
      ],
      "links": [
@@ -89200,6 +90065,186 @@
        "result",
        106,
        "Result"
+      ],
+      [
+       108,
+       "now_ms",
+       121,
+       "now_ms"
+      ],
+      [
+       108,
+       "now_ms",
+       130,
+       "value"
+      ],
+      [
+       108,
+       "s",
+       112,
+       "value"
+      ],
+      [
+       108,
+       "s",
+       120,
+       "value"
+      ],
+      [
+       108,
+       "s",
+       125,
+       "value"
+      ],
+      [
+       108,
+       "self",
+       109,
+       "value"
+      ],
+      [
+       108,
+       "then",
+       109,
+       "exec"
+      ],
+      [
+       109,
+       "then",
+       110,
+       "exec"
+      ],
+      [
+       110,
+       "false",
+       116,
+       "exec"
+      ],
+      [
+       110,
+       "true",
+       114,
+       "exec"
+      ],
+      [
+       111,
+       "result",
+       110,
+       "condition"
+      ],
+      [
+       112,
+       "index",
+       111,
+       "a"
+      ],
+      [
+       113,
+       "index",
+       111,
+       "b"
+      ],
+      [
+       115,
+       "value",
+       114,
+       "Result"
+      ],
+      [
+       116,
+       "then",
+       119,
+       "exec"
+      ],
+      [
+       117,
+       "cur_",
+       116,
+       "value"
+      ],
+      [
+       118,
+       "value",
+       117,
+       "value"
+      ],
+      [
+       119,
+       "then",
+       128,
+       "exec"
+      ],
+      [
+       120,
+       "index",
+       119,
+       "index"
+      ],
+      [
+       121,
+       "result",
+       119,
+       "item"
+      ],
+      [
+       122,
+       "item",
+       121,
+       "a"
+      ],
+      [
+       123,
+       "cur_",
+       122,
+       "list"
+      ],
+      [
+       124,
+       "value",
+       123,
+       "value"
+      ],
+      [
+       125,
+       "index",
+       122,
+       "index"
+      ],
+      [
+       126,
+       "last_",
+       121,
+       "last_"
+      ],
+      [
+       127,
+       "value",
+       126,
+       "value"
+      ],
+      [
+       128,
+       "then",
+       130,
+       "exec"
+      ],
+      [
+       129,
+       "value",
+       128,
+       "value"
+      ],
+      [
+       130,
+       "then",
+       131,
+       "exec"
+      ],
+      [
+       132,
+       "value",
+       131,
+       "Result"
       ]
      ],
      "machines": [],
@@ -89220,6 +90265,74 @@
          "name": "Result",
          "type": "text",
          "value": ""
+        }
+       ]
+      },
+      {
+       "name": "Meter_lap",
+       "pure": true,
+       "inputs": [
+        {
+         "name": "self",
+         "type": "struct",
+         "of": "Meter",
+         "value": {
+          "start_": 0,
+          "last_": 0,
+          "cur_": [],
+          "avg_": [],
+          "update_": 0,
+          "render_": 0,
+          "gpu_": -1
+         }
+        },
+        {
+         "name": "s",
+         "type": "enum",
+         "of": "Slot",
+         "value": 0
+        },
+        {
+         "name": "now_ms",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "Result",
+         "type": "struct",
+         "of": "Meter",
+         "value": {
+          "start_": 0,
+          "last_": 0,
+          "cur_": [],
+          "avg_": [],
+          "update_": 0,
+          "render_": 0,
+          "gpu_": -1
+         }
+        }
+       ],
+       "locals": [
+        {
+         "name": "self_",
+         "type": "struct",
+         "of": "Meter",
+         "value": {
+          "start_": 0,
+          "last_": 0,
+          "cur_": [],
+          "avg_": [],
+          "update_": 0,
+          "render_": 0,
+          "gpu_": -1
+         }
+        },
+        {
+         "name": "t",
+         "type": "float_list",
+         "value": []
         }
        ]
       },
@@ -90872,8 +91985,14 @@
     "logic": {
      "kind": "kern-logic",
      "version": 1,
-     "nextId": 134,
-     "variables": [],
+     "nextId": 145,
+     "variables": [
+      {
+       "name": "kPiD",
+       "type": "float",
+       "value": 3.141592653589793
+      }
+     ],
      "nodes": [
       {
        "id": 1,
@@ -92072,6 +93191,107 @@
        "type": "vector.break",
        "x": 160,
        "y": 4520
+      },
+      {
+       "id": 134,
+       "type": "func.entry",
+       "x": 0,
+       "y": 4800,
+       "params": {
+        "function": "merc_y"
+       }
+      },
+      {
+       "id": 135,
+       "type": "var.set",
+       "x": 288,
+       "y": 4856,
+       "params": {
+        "variable": "r",
+        "scope": "merc_y"
+       }
+      },
+      {
+       "id": 136,
+       "type": "math.formula",
+       "x": 240,
+       "y": 5008,
+       "params": {
+        "formula": "lat * kPiD / 180"
+       }
+      },
+      {
+       "id": 137,
+       "type": "var.get",
+       "x": 240,
+       "y": 5112,
+       "params": {
+        "variable": "kPiD"
+       }
+      },
+      {
+       "id": 138,
+       "type": "func.return",
+       "x": 576,
+       "y": 4912,
+       "params": {
+        "function": "merc_y"
+       }
+      },
+      {
+       "id": 139,
+       "type": "math.formula",
+       "x": 528,
+       "y": 5064,
+       "params": {
+        "formula": "(1 - log(tan(r) + sqrt(tan(r) * tan(r) + 1)) / kPiD) / 2 * (1 * 2 ^ z)"
+       }
+      },
+      {
+       "id": 140,
+       "type": "var.get",
+       "x": 528,
+       "y": 5168,
+       "params": {
+        "variable": "r",
+        "scope": "merc_y"
+       }
+      },
+      {
+       "id": 141,
+       "type": "var.get",
+       "x": 528,
+       "y": 5272,
+       "params": {
+        "variable": "kPiD"
+       }
+      },
+      {
+       "id": 142,
+       "type": "func.entry",
+       "x": 0,
+       "y": 5552,
+       "params": {
+        "function": "merc_x"
+       }
+      },
+      {
+       "id": 143,
+       "type": "func.return",
+       "x": 288,
+       "y": 5608,
+       "params": {
+        "function": "merc_x"
+       }
+      },
+      {
+       "id": 144,
+       "type": "math.formula",
+       "x": 240,
+       "y": 5760,
+       "params": {
+        "formula": "(lon + 180) / 360 * (1 * 2 ^ z)"
+       }
       }
      ],
      "links": [
@@ -93016,6 +94236,84 @@
        "z",
        132,
        "v"
+      ],
+      [
+       134,
+       "lat",
+       136,
+       "lat"
+      ],
+      [
+       134,
+       "then",
+       135,
+       "exec"
+      ],
+      [
+       134,
+       "z",
+       139,
+       "z"
+      ],
+      [
+       135,
+       "then",
+       138,
+       "exec"
+      ],
+      [
+       136,
+       "result",
+       135,
+       "value"
+      ],
+      [
+       137,
+       "value",
+       136,
+       "kPiD"
+      ],
+      [
+       139,
+       "result",
+       138,
+       "Result"
+      ],
+      [
+       140,
+       "value",
+       139,
+       "r"
+      ],
+      [
+       141,
+       "value",
+       139,
+       "kPiD"
+      ],
+      [
+       142,
+       "lon",
+       144,
+       "lon"
+      ],
+      [
+       142,
+       "then",
+       143,
+       "exec"
+      ],
+      [
+       142,
+       "z",
+       144,
+       "z"
+      ],
+      [
+       144,
+       "result",
+       143,
+       "Result"
       ]
      ],
      "machines": [],
@@ -93070,6 +94368,59 @@
         },
         {
          "name": "dy",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "merc_y",
+       "pure": true,
+       "inputs": [
+        {
+         "name": "lat",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "z",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "Result",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "locals": [
+        {
+         "name": "r",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "merc_x",
+       "pure": true,
+       "inputs": [
+        {
+         "name": "lon",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "z",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "Result",
          "type": "float",
          "value": 0
         }
@@ -93336,8 +94687,13 @@
     "logic": {
      "kind": "kern-logic",
      "version": 1,
-     "nextId": 54,
+     "nextId": 96,
      "variables": [
+      {
+       "name": "kPiD",
+       "type": "float",
+       "value": 3.141592653589793
+      },
       {
        "name": "kCell",
        "type": "float",
@@ -93365,6 +94721,41 @@
       }
      ],
      "structs": [
+      {
+       "name": "TileKey",
+       "fields": [
+        {
+         "name": "z",
+         "type": "int",
+         "value": 14
+        },
+        {
+         "name": "x",
+         "type": "int",
+         "value": 0
+        },
+        {
+         "name": "y",
+         "type": "int",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "tile_lonlat_out",
+       "fields": [
+        {
+         "name": "lon",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "lat",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
       {
        "name": "Projector",
        "fields": [
@@ -93397,6 +94788,26 @@
          "name": "inv_extent",
          "type": "float",
          "value": 0
+        }
+       ]
+      },
+      {
+       "name": "Rng",
+       "fields": [
+        {
+         "name": "s",
+         "type": "int",
+         "value": 0
+        },
+        {
+         "name": "spare_",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "has_spare_",
+         "type": "bool",
+         "value": false
         }
        ]
       }
@@ -93923,6 +95334,416 @@
         "variable": "y",
         "scope": "Projector_call"
        }
+      },
+      {
+       "id": 54,
+       "type": "func.entry",
+       "x": 0,
+       "y": 3016,
+       "params": {
+        "function": "tile_at"
+       }
+      },
+      {
+       "id": 55,
+       "type": "var.set",
+       "x": 288,
+       "y": 3072,
+       "params": {
+        "variable": "n",
+        "scope": "tile_at"
+       }
+      },
+      {
+       "id": 56,
+       "type": "math.formula",
+       "x": 240,
+       "y": 3224,
+       "params": {
+        "formula": "1 * 2 ^ z"
+       }
+      },
+      {
+       "id": 57,
+       "type": "var.set",
+       "x": 576,
+       "y": 3128,
+       "params": {
+        "variable": "lr",
+        "scope": "tile_at"
+       }
+      },
+      {
+       "id": 58,
+       "type": "math.formula",
+       "x": 528,
+       "y": 3280,
+       "params": {
+        "formula": "lat * kPiD / 180"
+       }
+      },
+      {
+       "id": 59,
+       "type": "var.get",
+       "x": 528,
+       "y": 3384,
+       "params": {
+        "variable": "kPiD"
+       }
+      },
+      {
+       "id": 60,
+       "type": "var.set",
+       "x": 864,
+       "y": 3184,
+       "params": {
+        "variable": "t",
+        "scope": "tile_at"
+       },
+       "values": {
+        "value": {
+         "z": 14,
+         "x": 0,
+         "y": 0
+        }
+       }
+      },
+      {
+       "id": 61,
+       "type": "struct.set_field",
+       "x": 1152,
+       "y": 3240,
+       "params": {
+        "variable": "t",
+        "field": "z",
+        "scope": "tile_at"
+       }
+      },
+      {
+       "id": 62,
+       "type": "struct.set_field",
+       "x": 1440,
+       "y": 3296,
+       "params": {
+        "variable": "t",
+        "field": "x",
+        "scope": "tile_at"
+       }
+      },
+      {
+       "id": 63,
+       "type": "math.formula",
+       "x": 1392,
+       "y": 3448,
+       "params": {
+        "formula": "trunc(floor((lon + 180) / 360 * n))"
+       }
+      },
+      {
+       "id": 64,
+       "type": "var.get",
+       "x": 1392,
+       "y": 3552,
+       "params": {
+        "variable": "n",
+        "scope": "tile_at"
+       }
+      },
+      {
+       "id": 65,
+       "type": "struct.set_field",
+       "x": 1728,
+       "y": 3352,
+       "params": {
+        "variable": "t",
+        "field": "y",
+        "scope": "tile_at"
+       }
+      },
+      {
+       "id": 66,
+       "type": "math.formula",
+       "x": 1680,
+       "y": 3504,
+       "params": {
+        "formula": "trunc(floor((1 - log(tan(lr) + sqrt(tan(lr) * tan(lr) + 1)) / kPiD) / 2 * n))"
+       }
+      },
+      {
+       "id": 67,
+       "type": "var.get",
+       "x": 1680,
+       "y": 3608,
+       "params": {
+        "variable": "lr",
+        "scope": "tile_at"
+       }
+      },
+      {
+       "id": 68,
+       "type": "var.get",
+       "x": 1680,
+       "y": 3712,
+       "params": {
+        "variable": "kPiD"
+       }
+      },
+      {
+       "id": 69,
+       "type": "var.get",
+       "x": 1680,
+       "y": 3816,
+       "params": {
+        "variable": "n",
+        "scope": "tile_at"
+       }
+      },
+      {
+       "id": 70,
+       "type": "func.return",
+       "x": 2016,
+       "y": 3408,
+       "params": {
+        "function": "tile_at"
+       }
+      },
+      {
+       "id": 71,
+       "type": "var.get",
+       "x": 1968,
+       "y": 3560,
+       "params": {
+        "variable": "t",
+        "scope": "tile_at"
+       }
+      },
+      {
+       "id": 72,
+       "type": "func.entry",
+       "x": 0,
+       "y": 4096,
+       "params": {
+        "function": "tile_lonlat"
+       }
+      },
+      {
+       "id": 73,
+       "type": "var.set",
+       "x": 288,
+       "y": 4152,
+       "params": {
+        "variable": "lon_",
+        "scope": "tile_lonlat"
+       }
+      },
+      {
+       "id": 74,
+       "type": "var.set",
+       "x": 576,
+       "y": 4208,
+       "params": {
+        "variable": "lat_",
+        "scope": "tile_lonlat"
+       }
+      },
+      {
+       "id": 75,
+       "type": "var.set",
+       "x": 864,
+       "y": 4264,
+       "params": {
+        "variable": "n",
+        "scope": "tile_lonlat"
+       }
+      },
+      {
+       "id": 76,
+       "type": "math.formula",
+       "x": 816,
+       "y": 4416,
+       "params": {
+        "formula": "1 * 2 ^ a"
+       }
+      },
+      {
+       "id": 77,
+       "type": "struct.break",
+       "x": 816,
+       "y": 4520,
+       "params": {
+        "struct": "TileKey"
+       }
+      },
+      {
+       "id": 78,
+       "type": "var.set",
+       "x": 1152,
+       "y": 4320,
+       "params": {
+        "variable": "lon_",
+        "scope": "tile_lonlat"
+       }
+      },
+      {
+       "id": 79,
+       "type": "math.formula",
+       "x": 1104,
+       "y": 4472,
+       "params": {
+        "formula": "(a + fx) / n * 360 - 180"
+       }
+      },
+      {
+       "id": 80,
+       "type": "struct.break",
+       "x": 1104,
+       "y": 4576,
+       "params": {
+        "struct": "TileKey"
+       }
+      },
+      {
+       "id": 81,
+       "type": "var.get",
+       "x": 1104,
+       "y": 4680,
+       "params": {
+        "variable": "n",
+        "scope": "tile_lonlat"
+       }
+      },
+      {
+       "id": 82,
+       "type": "var.set",
+       "x": 1440,
+       "y": 4376,
+       "params": {
+        "variable": "lat_",
+        "scope": "tile_lonlat"
+       }
+      },
+      {
+       "id": 83,
+       "type": "math.formula",
+       "x": 1392,
+       "y": 4528,
+       "params": {
+        "formula": "atan((exp(kPiD * (1 - 2 * (a + fy) / n)) - exp(-(kPiD * (1 - 2 * (a + fy) / n)))) * 0.5) * 180 / kPiD"
+       }
+      },
+      {
+       "id": 84,
+       "type": "var.get",
+       "x": 1392,
+       "y": 4632,
+       "params": {
+        "variable": "kPiD"
+       }
+      },
+      {
+       "id": 85,
+       "type": "struct.break",
+       "x": 1392,
+       "y": 4736,
+       "params": {
+        "struct": "TileKey"
+       }
+      },
+      {
+       "id": 86,
+       "type": "var.get",
+       "x": 1392,
+       "y": 4840,
+       "params": {
+        "variable": "n",
+        "scope": "tile_lonlat"
+       }
+      },
+      {
+       "id": 87,
+       "type": "func.return",
+       "x": 1728,
+       "y": 4432,
+       "params": {
+        "function": "tile_lonlat"
+       }
+      },
+      {
+       "id": 88,
+       "type": "struct.make",
+       "x": 1680,
+       "y": 4584,
+       "params": {
+        "struct": "tile_lonlat_out"
+       }
+      },
+      {
+       "id": 89,
+       "type": "var.get",
+       "x": 1680,
+       "y": 4688,
+       "params": {
+        "variable": "lon_",
+        "scope": "tile_lonlat"
+       }
+      },
+      {
+       "id": 90,
+       "type": "var.get",
+       "x": 1680,
+       "y": 4792,
+       "params": {
+        "variable": "lat_",
+        "scope": "tile_lonlat"
+       }
+      },
+      {
+       "id": 91,
+       "type": "func.entry",
+       "x": 0,
+       "y": 5120,
+       "params": {
+        "function": "Rng_new"
+       }
+      },
+      {
+       "id": 92,
+       "type": "struct.set_field",
+       "x": 288,
+       "y": 5176,
+       "params": {
+        "variable": "self",
+        "field": "s",
+        "scope": "Rng_new"
+       }
+      },
+      {
+       "id": 93,
+       "type": "math.formula",
+       "x": 240,
+       "y": 5328,
+       "params": {
+        "formula": "seed != 0 ? seed : 2654435769"
+       }
+      },
+      {
+       "id": 94,
+       "type": "func.return",
+       "x": 576,
+       "y": 5232,
+       "params": {
+        "function": "Rng_new"
+       }
+      },
+      {
+       "id": 95,
+       "type": "var.get",
+       "x": 528,
+       "y": 5384,
+       "params": {
+        "variable": "self",
+        "scope": "Rng_new"
+       }
       }
      ],
      "links": [
@@ -94303,10 +96124,435 @@
        "value",
        48,
        "y"
+      ],
+      [
+       54,
+       "lat",
+       58,
+       "lat"
+      ],
+      [
+       54,
+       "lon",
+       63,
+       "lon"
+      ],
+      [
+       54,
+       "then",
+       55,
+       "exec"
+      ],
+      [
+       54,
+       "z",
+       56,
+       "z"
+      ],
+      [
+       54,
+       "z",
+       61,
+       "value"
+      ],
+      [
+       55,
+       "then",
+       57,
+       "exec"
+      ],
+      [
+       56,
+       "result",
+       55,
+       "value"
+      ],
+      [
+       57,
+       "then",
+       60,
+       "exec"
+      ],
+      [
+       58,
+       "result",
+       57,
+       "value"
+      ],
+      [
+       59,
+       "value",
+       58,
+       "kPiD"
+      ],
+      [
+       60,
+       "then",
+       61,
+       "exec"
+      ],
+      [
+       61,
+       "then",
+       62,
+       "exec"
+      ],
+      [
+       62,
+       "then",
+       65,
+       "exec"
+      ],
+      [
+       63,
+       "result",
+       62,
+       "value"
+      ],
+      [
+       64,
+       "value",
+       63,
+       "n"
+      ],
+      [
+       65,
+       "then",
+       70,
+       "exec"
+      ],
+      [
+       66,
+       "result",
+       65,
+       "value"
+      ],
+      [
+       67,
+       "value",
+       66,
+       "lr"
+      ],
+      [
+       68,
+       "value",
+       66,
+       "kPiD"
+      ],
+      [
+       69,
+       "value",
+       66,
+       "n"
+      ],
+      [
+       71,
+       "value",
+       70,
+       "Result"
+      ],
+      [
+       72,
+       "fx",
+       79,
+       "fx"
+      ],
+      [
+       72,
+       "fy",
+       83,
+       "fy"
+      ],
+      [
+       72,
+       "lat",
+       74,
+       "value"
+      ],
+      [
+       72,
+       "lon",
+       73,
+       "value"
+      ],
+      [
+       72,
+       "t",
+       77,
+       "value"
+      ],
+      [
+       72,
+       "t",
+       80,
+       "value"
+      ],
+      [
+       72,
+       "t",
+       85,
+       "value"
+      ],
+      [
+       72,
+       "then",
+       73,
+       "exec"
+      ],
+      [
+       73,
+       "then",
+       74,
+       "exec"
+      ],
+      [
+       74,
+       "then",
+       75,
+       "exec"
+      ],
+      [
+       75,
+       "then",
+       78,
+       "exec"
+      ],
+      [
+       76,
+       "result",
+       75,
+       "value"
+      ],
+      [
+       77,
+       "z",
+       76,
+       "a"
+      ],
+      [
+       78,
+       "then",
+       82,
+       "exec"
+      ],
+      [
+       79,
+       "result",
+       78,
+       "value"
+      ],
+      [
+       80,
+       "x",
+       79,
+       "a"
+      ],
+      [
+       81,
+       "value",
+       79,
+       "n"
+      ],
+      [
+       82,
+       "then",
+       87,
+       "exec"
+      ],
+      [
+       83,
+       "result",
+       82,
+       "value"
+      ],
+      [
+       84,
+       "value",
+       83,
+       "kPiD"
+      ],
+      [
+       85,
+       "y",
+       83,
+       "a"
+      ],
+      [
+       86,
+       "value",
+       83,
+       "n"
+      ],
+      [
+       88,
+       "value",
+       87,
+       "Result"
+      ],
+      [
+       89,
+       "value",
+       88,
+       "lon"
+      ],
+      [
+       90,
+       "value",
+       88,
+       "lat"
+      ],
+      [
+       91,
+       "seed",
+       93,
+       "seed"
+      ],
+      [
+       91,
+       "then",
+       92,
+       "exec"
+      ],
+      [
+       92,
+       "then",
+       94,
+       "exec"
+      ],
+      [
+       93,
+       "result",
+       92,
+       "value"
+      ],
+      [
+       95,
+       "value",
+       94,
+       "Result"
       ]
      ],
      "machines": [],
      "functions": [
+      {
+       "name": "tile_at",
+       "pure": true,
+       "inputs": [
+        {
+         "name": "lon",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "lat",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "z",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "Result",
+         "type": "struct",
+         "of": "TileKey",
+         "value": {
+          "z": 14,
+          "x": 0,
+          "y": 0
+         }
+        }
+       ],
+       "locals": [
+        {
+         "name": "n",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "lr",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "t",
+         "type": "struct",
+         "of": "TileKey",
+         "value": {
+          "z": 14,
+          "x": 0,
+          "y": 0
+         }
+        }
+       ]
+      },
+      {
+       "name": "tile_lonlat",
+       "pure": true,
+       "inputs": [
+        {
+         "name": "t",
+         "type": "struct",
+         "of": "TileKey",
+         "value": {
+          "z": 14,
+          "x": 0,
+          "y": 0
+         }
+        },
+        {
+         "name": "fx",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "fy",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "lon",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "lat",
+         "type": "float",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "Result",
+         "type": "struct",
+         "of": "tile_lonlat_out",
+         "value": {
+          "lon": 0,
+          "lat": 0
+         }
+        }
+       ],
+       "locals": [
+        {
+         "name": "lon_",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "lat_",
+         "type": "float",
+         "value": 0
+        },
+        {
+         "name": "n",
+         "type": "float",
+         "value": 0
+        }
+       ]
+      },
       {
        "name": "road_width",
        "pure": true,
@@ -94435,6 +96681,41 @@
          "name": "Result",
          "type": "int",
          "value": 0
+        }
+       ]
+      },
+      {
+       "name": "Rng_new",
+       "pure": true,
+       "inputs": [
+        {
+         "name": "seed",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "Result",
+         "type": "struct",
+         "of": "Rng",
+         "value": {
+          "s": 0,
+          "spare_": 0,
+          "has_spare_": false
+         }
+        }
+       ],
+       "locals": [
+        {
+         "name": "self",
+         "type": "struct",
+         "of": "Rng",
+         "value": {
+          "s": 0,
+          "spare_": 0,
+          "has_spare_": false
+         }
         }
        ]
       }
@@ -108381,6 +110662,790 @@
          "name": "Result",
          "type": "text",
          "value": ""
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": 59,
+   "name": "GameSwarm",
+   "folder": "Source",
+   "transform": {
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     1
+    ]
+   },
+   "components": {
+    "logic": {
+     "kind": "kern-logic",
+     "version": 1,
+     "nextId": 6,
+     "variables": [],
+     "enums": [
+      {
+       "name": "SwarmKind",
+       "values": [
+        "zombie",
+        "heli",
+        "tank",
+        "soldier",
+        "officer",
+        "cruiser",
+        "police_drone",
+        "enemy",
+        "kLast"
+       ]
+      }
+     ],
+     "nodes": [
+      {
+       "id": 1,
+       "type": "func.entry",
+       "x": 0,
+       "y": 0,
+       "params": {
+        "function": "falls"
+       }
+      },
+      {
+       "id": 2,
+       "type": "func.return",
+       "x": 280,
+       "y": 0,
+       "params": {
+        "function": "falls"
+       }
+      },
+      {
+       "id": 3,
+       "type": "logic.or",
+       "x": 160,
+       "y": 150
+      },
+      {
+       "id": 4,
+       "type": "enum.equal",
+       "x": 160,
+       "y": 240,
+       "params": {
+        "enum": "SwarmKind"
+       },
+       "values": {
+        "b": 4
+       }
+      },
+      {
+       "id": 5,
+       "type": "enum.equal",
+       "x": 160,
+       "y": 330,
+       "params": {
+        "enum": "SwarmKind"
+       },
+       "values": {
+        "b": 7
+       }
+      }
+     ],
+     "links": [
+      [
+       1,
+       "k",
+       4,
+       "a"
+      ],
+      [
+       1,
+       "k",
+       5,
+       "a"
+      ],
+      [
+       1,
+       "then",
+       2,
+       "exec"
+      ],
+      [
+       3,
+       "result",
+       2,
+       "Result"
+      ],
+      [
+       4,
+       "result",
+       3,
+       "a"
+      ],
+      [
+       5,
+       "result",
+       3,
+       "b"
+      ]
+     ],
+     "machines": [],
+     "functions": [
+      {
+       "name": "falls",
+       "pure": true,
+       "help": "the kinds whose death is shown: the unit goes on for a moment with kUnitDead",
+       "inputs": [
+        {
+         "name": "k",
+         "type": "enum",
+         "of": "SwarmKind",
+         "value": 0
+        }
+       ],
+       "outputs": [
+        {
+         "name": "Result",
+         "type": "bool",
+         "value": false
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": 60,
+   "name": "Nostr",
+   "folder": "Source",
+   "transform": {
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     1,
+     1,
+     1
+    ]
+   },
+   "components": {
+    "logic": {
+     "kind": "kern-logic",
+     "version": 1,
+     "nextId": 42,
+     "variables": [],
+     "structs": [
+      {
+       "name": "U256",
+       "fields": [
+        {
+         "name": "w",
+         "type": "int_list",
+         "value": []
+        }
+       ]
+      }
+     ],
+     "nodes": [
+      {
+       "id": 10,
+       "type": "flow.for_each",
+       "x": 280,
+       "y": 830,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 11,
+       "type": "func.entry",
+       "x": 0,
+       "y": 0,
+       "params": {
+        "function": "cmp"
+       }
+      },
+      {
+       "id": 12,
+       "type": "var.set",
+       "x": 280,
+       "y": 0,
+       "params": {
+        "variable": "i",
+        "scope": "cmp"
+       },
+       "values": {
+        "value": 7
+       }
+      },
+      {
+       "id": 13,
+       "type": "flow.while",
+       "x": 560,
+       "y": 0
+      },
+      {
+       "id": 14,
+       "type": "math.compare",
+       "x": 440,
+       "y": 150,
+       "params": {
+        "op": ">="
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 15,
+       "type": "var.get",
+       "x": 440,
+       "y": 240,
+       "params": {
+        "variable": "i",
+        "scope": "cmp"
+       }
+      },
+      {
+       "id": 16,
+       "type": "flow.branch",
+       "x": 840,
+       "y": 0
+      },
+      {
+       "id": 17,
+       "type": "math.compare",
+       "x": 720,
+       "y": 150,
+       "params": {
+        "op": "!="
+       }
+      },
+      {
+       "id": 18,
+       "type": "list.get",
+       "x": 720,
+       "y": 240,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 19,
+       "type": "struct.break",
+       "x": 720,
+       "y": 330,
+       "params": {
+        "struct": "U256"
+       }
+      },
+      {
+       "id": 20,
+       "type": "var.get",
+       "x": 720,
+       "y": 420,
+       "params": {
+        "variable": "i",
+        "scope": "cmp"
+       }
+      },
+      {
+       "id": 21,
+       "type": "list.get",
+       "x": 720,
+       "y": 510,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 22,
+       "type": "struct.break",
+       "x": 720,
+       "y": 600,
+       "params": {
+        "struct": "U256"
+       }
+      },
+      {
+       "id": 23,
+       "type": "var.get",
+       "x": 720,
+       "y": 690,
+       "params": {
+        "variable": "i",
+        "scope": "cmp"
+       }
+      },
+      {
+       "id": 24,
+       "type": "func.return",
+       "x": 1120,
+       "y": 0,
+       "params": {
+        "function": "cmp"
+       }
+      },
+      {
+       "id": 25,
+       "type": "math.formula",
+       "x": 1000,
+       "y": 150,
+       "params": {
+        "formula": "a < a_2 ? -1 : 1"
+       }
+      },
+      {
+       "id": 26,
+       "type": "list.get",
+       "x": 1000,
+       "y": 240,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 27,
+       "type": "struct.break",
+       "x": 1000,
+       "y": 330,
+       "params": {
+        "struct": "U256"
+       }
+      },
+      {
+       "id": 28,
+       "type": "var.get",
+       "x": 1000,
+       "y": 420,
+       "params": {
+        "variable": "i",
+        "scope": "cmp"
+       }
+      },
+      {
+       "id": 29,
+       "type": "list.get",
+       "x": 1000,
+       "y": 510,
+       "params": {
+        "type": "int"
+       }
+      },
+      {
+       "id": 30,
+       "type": "struct.break",
+       "x": 1000,
+       "y": 600,
+       "params": {
+        "struct": "U256"
+       }
+      },
+      {
+       "id": 31,
+       "type": "var.get",
+       "x": 1000,
+       "y": 690,
+       "params": {
+        "variable": "i",
+        "scope": "cmp"
+       }
+      },
+      {
+       "id": 32,
+       "type": "var.set",
+       "x": 1400,
+       "y": 0,
+       "params": {
+        "variable": "i",
+        "scope": "cmp"
+       }
+      },
+      {
+       "id": 33,
+       "type": "math.formula",
+       "x": 1280,
+       "y": 150,
+       "params": {
+        "formula": "i - 1"
+       }
+      },
+      {
+       "id": 34,
+       "type": "var.get",
+       "x": 1280,
+       "y": 240,
+       "params": {
+        "variable": "i",
+        "scope": "cmp"
+       }
+      },
+      {
+       "id": 35,
+       "type": "func.return",
+       "x": 1680,
+       "y": 0,
+       "params": {
+        "function": "cmp"
+       },
+       "values": {
+        "Result": 0
+       }
+      },
+      {
+       "id": 36,
+       "type": "func.entry",
+       "x": 0,
+       "y": 830,
+       "params": {
+        "function": "is_zero"
+       }
+      },
+      {
+       "id": 37,
+       "type": "struct.break",
+       "x": 160,
+       "y": 980,
+       "params": {
+        "struct": "U256"
+       }
+      },
+      {
+       "id": 38,
+       "type": "flow.branch",
+       "x": 560,
+       "y": 830
+      },
+      {
+       "id": 39,
+       "type": "math.compare",
+       "x": 440,
+       "y": 980,
+       "params": {
+        "op": "!="
+       },
+       "values": {
+        "b": 0
+       }
+      },
+      {
+       "id": 40,
+       "type": "func.return",
+       "x": 840,
+       "y": 830,
+       "params": {
+        "function": "is_zero"
+       },
+       "values": {
+        "Result": false
+       }
+      },
+      {
+       "id": 41,
+       "type": "func.return",
+       "x": 1120,
+       "y": 830,
+       "params": {
+        "function": "is_zero"
+       },
+       "values": {
+        "Result": true
+       }
+      }
+     ],
+     "links": [
+      [
+       10,
+       "body",
+       38,
+       "exec"
+      ],
+      [
+       10,
+       "completed",
+       41,
+       "exec"
+      ],
+      [
+       10,
+       "item",
+       39,
+       "a"
+      ],
+      [
+       11,
+       "a",
+       19,
+       "value"
+      ],
+      [
+       11,
+       "a",
+       27,
+       "value"
+      ],
+      [
+       11,
+       "b",
+       22,
+       "value"
+      ],
+      [
+       11,
+       "b",
+       30,
+       "value"
+      ],
+      [
+       11,
+       "then",
+       12,
+       "exec"
+      ],
+      [
+       12,
+       "then",
+       13,
+       "exec"
+      ],
+      [
+       13,
+       "body",
+       16,
+       "exec"
+      ],
+      [
+       13,
+       "completed",
+       35,
+       "exec"
+      ],
+      [
+       14,
+       "result",
+       13,
+       "condition"
+      ],
+      [
+       15,
+       "value",
+       14,
+       "a"
+      ],
+      [
+       16,
+       "false",
+       32,
+       "exec"
+      ],
+      [
+       16,
+       "true",
+       24,
+       "exec"
+      ],
+      [
+       17,
+       "result",
+       16,
+       "condition"
+      ],
+      [
+       18,
+       "item",
+       17,
+       "a"
+      ],
+      [
+       19,
+       "w",
+       18,
+       "list"
+      ],
+      [
+       20,
+       "value",
+       18,
+       "index"
+      ],
+      [
+       21,
+       "item",
+       17,
+       "b"
+      ],
+      [
+       22,
+       "w",
+       21,
+       "list"
+      ],
+      [
+       23,
+       "value",
+       21,
+       "index"
+      ],
+      [
+       25,
+       "result",
+       24,
+       "Result"
+      ],
+      [
+       26,
+       "item",
+       25,
+       "a"
+      ],
+      [
+       27,
+       "w",
+       26,
+       "list"
+      ],
+      [
+       28,
+       "value",
+       26,
+       "index"
+      ],
+      [
+       29,
+       "item",
+       25,
+       "a_2"
+      ],
+      [
+       30,
+       "w",
+       29,
+       "list"
+      ],
+      [
+       31,
+       "value",
+       29,
+       "index"
+      ],
+      [
+       33,
+       "result",
+       32,
+       "value"
+      ],
+      [
+       34,
+       "value",
+       33,
+       "i"
+      ],
+      [
+       36,
+       "a",
+       37,
+       "value"
+      ],
+      [
+       36,
+       "then",
+       10,
+       "exec"
+      ],
+      [
+       37,
+       "w",
+       10,
+       "list"
+      ],
+      [
+       38,
+       "true",
+       40,
+       "exec"
+      ],
+      [
+       39,
+       "result",
+       38,
+       "condition"
+      ]
+     ],
+     "machines": [],
+     "functions": [
+      {
+       "name": "cmp",
+       "pure": true,
+       "inputs": [
+        {
+         "name": "a",
+         "type": "struct",
+         "of": "U256",
+         "value": {
+          "w": []
+         }
+        },
+        {
+         "name": "b",
+         "type": "struct",
+         "of": "U256",
+         "value": {
+          "w": []
+         }
+        }
+       ],
+       "outputs": [
+        {
+         "name": "Result",
+         "type": "int",
+         "value": 0
+        }
+       ],
+       "locals": [
+        {
+         "name": "i",
+         "type": "int",
+         "value": 0
+        }
+       ]
+      },
+      {
+       "name": "is_zero",
+       "pure": true,
+       "inputs": [
+        {
+         "name": "a",
+         "type": "struct",
+         "of": "U256",
+         "value": {
+          "w": []
+         }
+        }
+       ],
+       "outputs": [
+        {
+         "name": "Result",
+         "type": "bool",
+         "value": false
         }
        ]
       }

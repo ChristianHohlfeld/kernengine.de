@@ -360,14 +360,14 @@ und schreibt sie in der Schreibweise:
   alles, was sie aufruft. Die anderen bleiben C++, bis der Konverter oder die Sprache den Platz
   hat. Der Lauf nennt, worauf sie warten, nach Zeilen geordnet.
 
-Stand (12.11.2026, mit Objekten): 127 von 1.428 Funktionen (631 von 28.607 Zeilen) aus 41 von 77
-Dateien stehen als Blueprints im Level (41 Actors im Ordner „Source“). 104 Funktionen vergleicht
-der Test mit ihrem C++; nicht verglichen sind 33: 17 Methoden, die ihr Objekt nicht benutzen, 6,
-die ein Feld an einer berechneten Stelle lesen (das C++ liest daneben, wo der Blueprint den
-Nullwert gibt – der Test kennt den gültigen Bereich nicht), 5, deren Klasse der Test nicht bauen
-kann (kein Default-Konstruktor, eine Referenz als Feld), 5 mit festen Feldern oder `char*` als
-Ein- oder Ausgang. (Die Zählung der Tests schließt Hilfsfunktionen aus Headern ein, die in den
-Blueprints stehen.) Das Spiel führt für diese Dateien weiter ihr C++ aus (Stufe 5).
+Stand (12.11.2026): 137 von 1.428 Funktionen (670 von 28.607 Zeilen) aus 43 von 77 Dateien stehen
+als Blueprints im Level (43 Actors im Ordner „Source“). 110 Funktionen vergleicht der Test mit
+ihrem C++; nicht verglichen sind 38: 17 Methoden, die ihr Objekt nicht benutzen, 8, die ein Feld
+an einer berechneten Stelle lesen (das C++ liest daneben, wo der Blueprint den Nullwert gibt – der
+Test kennt den gültigen Bereich nicht), 6, deren Klasse der Test nicht bauen kann (kein
+Default-Konstruktor, eine Referenz als Feld), 7 mit festen Feldern, Listen in Listen oder `char*`
+als Ein- oder Ausgang. (Die Zählung der Tests schließt Hilfsfunktionen aus Headern ein, die in
+den Blueprints stehen.) Das Spiel führt für diese Dateien weiter ihr C++ aus (Stufe 5).
 
 Worauf die anderen warten, nach Zeilen: Fast alles hängt am Zustand einer Klasse, der noch
 keine Struktur sein kann – `Game` (323 Funktionen, 13.534 Zeilen: besitzende Zeiger, Typen der
@@ -392,6 +392,11 @@ Was als Nächstes dazukommt, in der Reihenfolge der Zeilen, die darauf warten:
    Default-Argumente stehen beim Aufruf.
 2. [ ] **Lambdas:** eine lokale Funktion wird eine Funktion des Blueprints; was sie fängt, sind
    ihre Eingänge, was sie davon ändert, ihre Ergebnisse.
+2a. [x] **Typen:** Namen, die das Programm Typen gibt (`using Bytes32 = …`); Aufzählungen mit
+   eigenen Zahlen (die Zahlen stehen als Liste in einer Variablen, wo ein Wert als Zahl gebraucht
+   wird); `std::pair` als Struktur; eine Liste in einer Liste als Struktur, die sie hält;
+   `std::unique_ptr` und `std::optional` als Liste mit keinem oder einem Eintrag (`p->x`,
+   `p.reset()`, `if (p)`, `std::make_unique`, `std::move`); `++i` in einem Ausdruck.
 3. [x] **Schleifen mit `break` / `continue`** (Flags, die den Rest des Durchlaufs überspringen),
    `do-while`, Schleifen, die die Einträge ihrer Liste ändern (der Eintrag ist eine lokale
    Variable und wird am Ende des Durchlaufs zurückgespeichert), `a = b = c`.

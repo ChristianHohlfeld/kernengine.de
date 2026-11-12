@@ -69,6 +69,10 @@ using namespace ::sc::town;
 #pragma GCC diagnostic ignored "-Wunused-function"
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
 #pragma GCC diagnostic ignored "-Wunused-variable"
+struct Out {
+  std::vector<u8> b;
+  template <class T> Out& put(T v) { const auto* p = reinterpret_cast<const u8*>(&v); b.insert(b.end(), p, p + sizeof(T)); return *this; }
+};
 struct In {
   const std::vector<u8>& b;
   std::size_t at = 0;

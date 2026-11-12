@@ -15,15 +15,35 @@
 #include "../converted.h"
 
 namespace sc {
+[[maybe_unused]] static ::sc::TileKey draw_TileKey(converted::Draw& draw) {
+  ::sc::TileKey s{};
+  s.z = static_cast<int>(draw.whole());
+  s.x = static_cast<int>(draw.whole());
+  s.y = static_cast<int>(draw.whole());
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const ::sc::TileKey& s) { using converted::arg; return converted::Value::structure({arg(s.z), arg(s.x), arg(s.y)}); }
+[[maybe_unused]] static bool same(const ::sc::TileKey& want, const converted::Value& got) { using converted::same; return got.rows && got.rows->size() == 3 && same(want.z, (*got.rows)[0]) && same(want.x, (*got.rows)[1]) && same(want.y, (*got.rows)[2]); }
+[[maybe_unused]] static ::sc::TileKey near(::sc::TileKey s, int k, int slot) { using converted::near; s.z = near(s.z, k, slot * 7 + 0); s.x = near(s.x, k, slot * 7 + 1); s.y = near(s.y, k, slot * 7 + 2); return s; }
+[[maybe_unused]] static bool defined(const ::sc::TileKey& s) { using converted::defined; return defined(s.z) && defined(s.x) && defined(s.y); }
+[[maybe_unused]] static void flat(const ::sc::TileKey& s, std::vector<kern::f64>& o) { using converted::flat; flat(s.z, o); flat(s.x, o); flat(s.y, o); }
+[[maybe_unused]] static std::string text(const ::sc::TileKey& s) { using converted::text; return std::string("{") + text(s.z) + ", " + text(s.x) + ", " + text(s.y) + "}"; }
 namespace converted_tiles {
 using namespace converted;
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::near; using converted::flat;
+using ::sc::arg;
+using ::sc::same;
+using ::sc::defined;
+using ::sc::text;
+using ::sc::near;
+using ::sc::flat;
 
 // ---- tiles.cpp, as it stands ----
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
 #pragma GCC diagnostic ignored "-Wunused-variable"
+constexpr f64 kPiD = 3.14159265358979323846;
 struct Projector {
   f64 x0, x1, y0, ym, y1, inv_extent;
   Projector(const TileKey& key, const kern::GeoProjector& proj, f64 extent) : inv_extent(1.0 / extent) {
@@ -48,6 +68,11 @@ static constexpr f32 kCell = 20;
 struct Seg { Vec2 a, b; f32 half; u32 road; bool paved; };
 #pragma GCC diagnostic pop
 
+struct Out_tile_lonlat { double lon; double lat; };
+[[maybe_unused]] static bool same(const Out_tile_lonlat& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.lon, (*got.rows)[0]) && same(want.lat, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_tile_lonlat& s) { return defined(s.lon) && defined(s.lat); }
+[[maybe_unused]] static void flat(const Out_tile_lonlat& s, std::vector<kern::f64>& o) { flat(s.lon, o); flat(s.lat, o); }
+[[maybe_unused]] static std::string text(const Out_tile_lonlat& s) { return std::string("{") + text(s.lon) + ", " + text(s.lat) + "}"; }
 
 // ---- the same functions with 64-bit numbers, as a Blueprint computes ----
 namespace wide {
@@ -57,7 +82,22 @@ using f32 = double;
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wnarrowing"
+constexpr f64 kPiD = 3.14159265358979323846;
 static constexpr f32 kCell = 20;
+TileKey tile_at(f64 lon, f64 lat, i32 z) {
+  const f64 n = std::ldexp(1.0, z);
+  const f64 lr = lat * kPiD / 180;
+  TileKey t;
+  t.z = z;
+  t.x = static_cast<i32>(std::floor((lon + 180) / 360 * n));
+  t.y = static_cast<i32>(std::floor((1 - std::asinh(std::tan(lr)) / kPiD) / 2 * n));
+  return t;
+}
+void tile_lonlat(const TileKey& t, f64 fx, f64 fy, f64& lon, f64& lat) {
+  const f64 n = std::ldexp(1.0, t.z);
+  lon = (t.x + fx) / n * 360 - 180;
+  lat = std::atan(std::sinh(kPiD * (1 - 2 * (t.y + fy) / n))) * 180 / kPiD;
+}
 f32 road_width(RoadClass c) {
   switch (c) {
     case RoadClass::motorway: return 14;
@@ -84,6 +124,33 @@ bool road_drivable(RoadClass c) { return static_cast<u8>(c) <= static_cast<u8>(R
 SC_TEST(converted_tiles) {
   converted::Blueprint bp("Tiles");
   converted::Draw draw;
+  {  // tile_at
+    converted::Tally tally("tile_at");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const double a0 = draw.number();
+      const double a1 = draw.number();
+      const int a2 = static_cast<int>(draw.whole());
+      const converted::Watch watch;
+      const auto want = tile_at(a0, a1, a2);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, wide::tile_at(wide_arg(a0), wide_arg(a1), wide_arg(a2)), outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, [&]([[maybe_unused]] int k) { return tile_at(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2)); });
+    }
+  }
+  {  // tile_lonlat
+    converted::Tally tally("tile_lonlat");
+    const auto run = [&](::sc::TileKey a0, double a1, double a2, double a3, double a4) { tile_lonlat(a0, a1, a2, a3, a4); return Out_tile_lonlat{a3, a4}; };
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const ::sc::TileKey a0 = draw_TileKey(draw);
+      const double a1 = draw.number();
+      const double a2 = draw.number();
+      const double a3 = draw.number();
+      const double a4 = draw.number();
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2, a3, a4);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)}, want, want, outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); }, [&]([[maybe_unused]] int k) { return run(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2), near(a3, k, 3), near(a4, k, 4)); });
+    }
+  }
   {  // road_width
     converted::Tally tally("road_width");
     for (int i = 0; i < converted::kCalls; ++i) {

@@ -21,6 +21,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 #pragma GCC diagnostic ignored "-Wunused-function"
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
 #pragma GCC diagnostic ignored "-Wunused-variable"
+f32 battery_ocv(f32 soc, f32 cells) {
+  const f32 s = clampf(soc, 0, 1);
+  return cells * std::fmin(4.2f, 3.2625f + 0.9f * s + 0.0375f * std::tanh((s - 0.12f) * 18));
+}
 f32 battery_under_load(f32 ocv, f32 amps, f32 r, f32 cells) {
   return clampf(ocv - std::fmax(0.0f, amps) * r, 3 * cells, 4.2f * cells);
 }
@@ -35,6 +39,10 @@ using f32 = double;
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wnarrowing"
+f32 battery_ocv(f32 soc, f32 cells) {
+  const f32 s = clampf(soc, 0, 1);
+  return cells * std::fmin(4.2, 3.2625 + 0.9 * s + 0.0375 * std::tanh((s - 0.12) * 18));
+}
 f32 battery_under_load(f32 ocv, f32 amps, f32 r, f32 cells) {
   return clampf(ocv - std::fmax(0.0, amps) * r, 3 * cells, 4.2 * cells);
 }
@@ -56,6 +64,17 @@ f32 clearance_lead(f32 v) {
 SC_TEST(converted_drone) {
   converted::Blueprint bp("Drone");
   converted::Draw draw;
+  {  // battery_ocv
+    converted::Tally tally("battery_ocv");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const float a0 = draw.number();
+      const float a1 = draw.number();
+      const converted::Watch watch;
+      const auto want = battery_ocv(a0, a1);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1)}, want, wide::battery_ocv(wide_arg(a0), wide_arg(a1)), outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return battery_ocv(near(a0, k, 0), near(a1, k, 1)); });
+    }
+  }
   {  // battery_under_load
     converted::Tally tally("battery_under_load");
     for (int i = 0; i < converted::kCalls; ++i) {

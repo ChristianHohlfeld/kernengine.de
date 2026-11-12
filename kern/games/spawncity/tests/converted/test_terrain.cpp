@@ -29,6 +29,11 @@ f32 rect_distance(f32 x, f32 y, f32 x0, f32 y0, f32 x1, f32 y1) {
   const f32 dx = std::fmax(0.0f, std::fmax(x0 - x, x - x1)), dy = std::fmax(0.0f, std::fmax(y0 - y, y - y1));
   return std::sqrt(dx * dx + dy * dy);
 }
+f64 merc_y(f64 lat, i32 z) {
+  const f64 r = lat * kPiD / 180;
+  return (1 - std::asinh(std::tan(r)) / kPiD) / 2 * std::ldexp(1.0, z);
+}
+f64 merc_x(f64 lon, i32 z) { return (lon + 180) / 360 * std::ldexp(1.0, z); }
 Vec3 albedo(Vec3 c) {
   const f32 l = 0.2126f * c.x + 0.7152f * c.y + 0.0722f * c.z;
   const f32 target = std::fmin(0.24f, std::fmax(0.07f, l * 0.8f + 0.03f)), k = target / std::fmax(0.02f, l);
@@ -59,6 +64,11 @@ f32 rect_distance(f32 x, f32 y, f32 x0, f32 y0, f32 x1, f32 y1) {
   const f32 dx = std::fmax(0.0, std::fmax(x0 - x, x - x1)), dy = std::fmax(0.0, std::fmax(y0 - y, y - y1));
   return std::sqrt(dx * dx + dy * dy);
 }
+f64 merc_y(f64 lat, i32 z) {
+  const f64 r = lat * kPiD / 180;
+  return (1 - std::asinh(std::tan(r)) / kPiD) / 2 * std::ldexp(1.0, z);
+}
+f64 merc_x(f64 lon, i32 z) { return (lon + 180) / 360 * std::ldexp(1.0, z); }
 f32 crater_profile(f32 r, f32 radius, f32 depth, f32 rim) {
   const f32 bowl = radius * 0.5;
   if (r < bowl) return -depth * (1 - (r / bowl) * (r / bowl));
@@ -99,6 +109,28 @@ SC_TEST(converted_terrain) {
       const auto want = rect_distance(a0, a1, a2, a3, a4, a5);
       const bool outside = watch.outside();
       tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5)}, want, wide::rect_distance(wide_arg(a0), wide_arg(a1), wide_arg(a2), wide_arg(a3), wide_arg(a4), wide_arg(a5)), outside, [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5); }, [&]([[maybe_unused]] int k) { return rect_distance(near(a0, k, 0), near(a1, k, 1), near(a2, k, 2), near(a3, k, 3), near(a4, k, 4), near(a5, k, 5)); });
+    }
+  }
+  {  // merc_y
+    converted::Tally tally("merc_y");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const double a0 = draw.number();
+      const int a1 = static_cast<int>(draw.whole());
+      const converted::Watch watch;
+      const auto want = merc_y(a0, a1);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1)}, want, wide::merc_y(wide_arg(a0), wide_arg(a1)), outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return merc_y(near(a0, k, 0), near(a1, k, 1)); });
+    }
+  }
+  {  // merc_x
+    converted::Tally tally("merc_x");
+    for (int i = 0; i < converted::kCalls; ++i) {
+      const double a0 = draw.number();
+      const int a1 = static_cast<int>(draw.whole());
+      const converted::Watch watch;
+      const auto want = merc_x(a0, a1);
+      const bool outside = watch.outside();
+      tally.take(bp, {arg(a0), arg(a1)}, want, wide::merc_x(wide_arg(a0), wide_arg(a1)), outside, [&] { return text(a0) + ", " + text(a1); }, [&]([[maybe_unused]] int k) { return merc_x(near(a0, k, 0), near(a1, k, 1)); });
     }
   }
   {  // crater_profile

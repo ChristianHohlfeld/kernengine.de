@@ -42,6 +42,8 @@ struct Biquad {
     return b;
   }
 };
+enum class Osc : u8 { saw, square, triangle, sine };
+struct OscSpec { Osc type; f32 cents; f32 gain; };
 #pragma GCC diagnostic pop
 
 [[maybe_unused]] static Biquad draw_Biquad(converted::Draw& draw) {

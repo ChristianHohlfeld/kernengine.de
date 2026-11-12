@@ -7,14 +7,39 @@
 #include <type_traits>
 #include <vector>
 #include <cstring>
+// (the test sets the data of objects and calls methods a class keeps to itself: it reads the headers with private as public)
+#define private public
+#define protected public
 #include "../../src/mvt.h"
 #include "kern/core/base.h"
 #include "../converted.h"
 
 namespace sc {
+namespace mvt {
+[[maybe_unused]] static ::sc::mvt::Value draw_mvt__Value(converted::Draw& draw) {
+  ::sc::mvt::Value s{};
+  s.kind = static_cast<::sc::mvt::Value::Kind>(draw.below(4));
+  s.s = draw.word();
+  s.n = draw.number();
+  s.b = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const ::sc::mvt::Value& s) { using converted::arg; return converted::Value::structure({arg(s.kind), arg(s.s), arg(s.n), arg(s.b)}); }
+[[maybe_unused]] static bool same(const ::sc::mvt::Value& want, const converted::Value& got) { using converted::same; return got.rows && got.rows->size() == 4 && same(want.kind, (*got.rows)[0]) && same(want.s, (*got.rows)[1]) && same(want.n, (*got.rows)[2]) && same(want.b, (*got.rows)[3]); }
+[[maybe_unused]] static ::sc::mvt::Value near(::sc::mvt::Value s, int k, int slot) { using converted::near; s.kind = near(s.kind, k, slot * 7 + 0); s.s = near(s.s, k, slot * 7 + 1); s.n = near(s.n, k, slot * 7 + 2); s.b = near(s.b, k, slot * 7 + 3); return s; }
+[[maybe_unused]] static bool defined(const ::sc::mvt::Value& s) { using converted::defined; return defined(s.kind) && defined(s.s) && defined(s.n) && defined(s.b); }
+[[maybe_unused]] static void flat(const ::sc::mvt::Value& s, std::vector<kern::f64>& o) { using converted::flat; flat(s.kind, o); flat(s.s, o); flat(s.n, o); flat(s.b, o); }
+[[maybe_unused]] static std::string text(const ::sc::mvt::Value& s) { using converted::text; return std::string("{") + text(s.kind) + ", " + text(s.s) + ", " + text(s.n) + ", " + text(s.b) + "}"; }
+}  // namespace mvt
 namespace converted_mvt {
 using namespace converted;
 using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::near; using converted::flat;
+using ::sc::mvt::arg;
+using ::sc::mvt::same;
+using ::sc::mvt::defined;
+using ::sc::mvt::text;
+using ::sc::mvt::near;
+using ::sc::mvt::flat;
 using namespace ::sc::mvt;
 
 // ---- mvt.cpp, as it stands ----
