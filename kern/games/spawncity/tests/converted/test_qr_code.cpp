@@ -187,7 +187,7 @@ SC_TEST(converted_qr_code) {
       const auto want = run(a0);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
     }
   }
   {  // data_codewords
@@ -203,7 +203,7 @@ SC_TEST(converted_qr_code) {
       const auto want = run(a0);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
     }
   }
   {  // gf_mul
@@ -220,7 +220,7 @@ SC_TEST(converted_qr_code) {
       const auto want = run(a0, a1);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
     }
   }
   {  // rs_divisor
@@ -236,7 +236,7 @@ SC_TEST(converted_qr_code) {
       const auto want = run(a0);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
     }
   }
   {  // rs_remainder
@@ -253,7 +253,7 @@ SC_TEST(converted_qr_code) {
       const auto want = run(a0, a1);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
     }
   }
   {  // alignment_positions
@@ -269,7 +269,7 @@ SC_TEST(converted_qr_code) {
       const auto want = run(a0);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
     }
   }
   {  // Grid::set
@@ -288,7 +288,7 @@ SC_TEST(converted_qr_code) {
       const auto want = run(a0, a1, a2, a3);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); });
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); }, {});
     }
   }
   {  // finder
@@ -306,7 +306,7 @@ SC_TEST(converted_qr_code) {
       const auto want = run(a0, a1, a2);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
     }
   }
   {  // format_bits
@@ -323,7 +323,7 @@ SC_TEST(converted_qr_code) {
       const auto want = run(a0, a1);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
     }
   }
   {  // Code::dark
@@ -341,7 +341,7 @@ SC_TEST(converted_qr_code) {
       const auto want = run(a0, a1, a2);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
     }
   }
   {  // read_format
@@ -359,7 +359,7 @@ SC_TEST(converted_qr_code) {
       const auto want = run(a0, a1, a2);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {0, 1, 2});
     }
   }
 }

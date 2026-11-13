@@ -483,6 +483,7 @@ class Function:
         self.cpp = name
         self.pure = True
         self.params = []      # (name, type)
+        self.kinds = []       # per parameter: "" an input by value, "ref" a reference the function changes (T& x), "const" one it reads (const T& x)
         self.result = None    # type, None: no result
         self.text = None
         self.wait = None
@@ -494,11 +495,16 @@ class Function:
         self.mutates = False  # a method that changes its object
         self.refs = []        # the parameters (by place) it writes through
         self.value = None     # the type of what the C++ returns
-        self.out = None       # the struct of its results, when it gives more than one
-        self.out_fields = []  # (field, type, "self" | "result" | ("ref", place of the parameter))
+        self.out_fields = []  # what a call changes or gives, as its test compares it: (name, type, "self" | "result" | ("ref", place of the parameter))
         self.ctor = False     # a constructor: it gives the object it makes
         self.lifted = False   # a function a function declares in itself (a lambda): compared with the function it is in
         self.file = ""
+
+    def order(self):
+        """The parameters in the order the Blueprint function has its inputs: those by reference first, then those
+        by value - each group as the C++ has them. (An input by value is written with its default, a reference has
+        none, and in C++ every parameter after one with a default has one.)"""
+        return sorted(range(len(self.params)), key=lambda i: (0 if self.kinds[i] else 1, i))
 
 
 class Unit:
@@ -1209,7 +1215,6 @@ class Emit:
         self.index = {}       # decl id of a loop's counter -> "n12.index"
         self.pre = []         # steps to run before the statement being written
         self.loops = []       # the loops around the statement being written: their flags for break and continue
-        self.ref_names = {}
         self.result_struct = None
         self.homes = {}       # decl id of an iterator (or of what insert() gave) -> the list it goes through
         self.serial = 0       # the number of the statement being written (see `slot`)
@@ -1298,7 +1303,8 @@ class Emit:
         if "&" in ret and not re.search(r"\bconst\b", ret):
             raise Wait("a function that gives a reference to something to change")
         body = next(c for c in kids(d) if c.get("kind") == "CompoundStmt")
-        # a method: its object is a value of the struct its class's data is, the first parameter
+        # a method: its object is the first parameter - a reference to a value of the struct its class's data is:
+        # the place the call names, changed where it stands (a const method reads it there)
         if d.get("kind") == "CXXMethodDecl" and d.get("storageClass") != "static" and any(x.get("kind") == "CXXThisExpr" for x in walk(d)):
             owner = self.tree.owner.get(d["id"])
             if owner is None:
@@ -1311,6 +1317,7 @@ class Emit:
             name = u.fresh("self", self.taken)
             self.taken.add(name)
             f.params.append((name, f.self_type))
+            f.kinds.append("ref" if f.mutates else "const")
             self.self_name = name
         assigned = self.assigned(body)
         copies = []
@@ -1318,18 +1325,27 @@ class Emit:
             if p.get("kind") != "ParmVarDecl":
                 continue
             raw = qtype(p)
-            ref = "&" in raw and "&&" not in raw and not re.search(r"\bconst\b", raw) and not u.object_of(raw)
             t = u.btype(raw)
+            # A reference of C++ is a reference input: the place the call names. T& - the function changes it
+            # there; const T& - it reads it there (a struct, a list, a text: a number, a vector, an enum's value
+            # or a handle is read by value either way). Nothing is copied in or out.
+            by_ref = "&" in raw and "&&" not in raw and not u.object_of(raw)
+            const = bool(re.search(r"\bconst\b", raw))
+            kind = "ref" if by_ref and not const else "const" if by_ref and (t in u.struct_fields or t.startswith("List<") or t == "Text") else ""
             name = u.fresh(p.get("name") or f"arg{len(f.params) + 1}", self.taken)
             self.taken.add(name)
-            if ref:
+            if kind == "ref":
                 f.refs.append(len(f.params))
             f.params.append((name, t))
+            f.kinds.append(kind)
             self.names[p["id"]] = name
             self.types[p["id"]] = t
-            if ref or p["id"] in assigned:  # (a function's input is not a variable: what the body changes is a local copy)
+            if not kind and p["id"] in assigned:  # (an input by value is not a variable: what the body changes is a local copy)
                 copies.append((p, name, t))
-        # what it gives back: its changed object, what the C++ returns, what it wrote through its parameters
+        if "ref" in f.kinds:
+            f.pure = False   # (it changes a place of its caller: a step, not a value)
+        # what a call changes or gives, as the test compares it: the object, what the C++ returns, what it wrote
+        # through its parameters. The function itself gives what the C++ returns (a constructor: the object).
         if f.mutates:
             f.out_fields.append(("Self", f.self_type, "self"))
         if f.value is not None:
@@ -1339,14 +1355,7 @@ class Emit:
             field = u.fresh(f.params[place][0], taken)
             taken.add(field)
             f.out_fields.append((field, f.params[place][1], ("ref", place)))
-        if len(f.out_fields) > 1:
-            f.out = u.fresh(f.name + "_out")
-            u.names.add(f.out)
-            u.struct_fields[f.out] = [(n, t, u.zero(t), None) for n, t, _ in f.out_fields]
-            u.types.append(f"  KERN_STRUCT({f.out}) {{ " + " ".join(f"{t} {n} = {u.zero(t)};" for n, t, _ in f.out_fields) + " };")
-            f.result = f.out
-        else:
-            f.result = f.out_fields[0][1] if f.out_fields else None
+        f.result = f.self_type if f.ctor else f.value
         lines = []
         if f.ctor:
             self.self_name = self.temp("self", f.self_type)
@@ -1363,20 +1372,12 @@ class Emit:
                 text = self.ex(e, ft)
                 lines += self.pre + [f"{self.self_name}.{fname} = {text};"]
                 self.pre = saved
-        elif f.mutates:
-            c = self.temp(self.self_name + "_", f.self_type)
-            lines.append(f"{c} = {self.self_name};")
-            self.self_name = c
-        self.ref_names = {}
         for p, name, t in copies:
             c = self.temp(name + "_", t)
             self.names[p["id"]] = c
             lines.append(f"{c} = {name};")
-        for place in f.refs:
-            pid = [p["id"] for p in kids(d) if p.get("kind") == "ParmVarDecl"][place - (1 if f.self_type else 0)]
-            self.ref_names[place] = self.names[pid]
         lines += self.block(kids(body))
-        if not self.ends(kids(body)) and f.out_fields and f.value is None:
+        if not self.ends(kids(body)) and f.ctor:
             lines.append(self.ret_line(None))
         head = []
         doc = u.comment_of(d)
@@ -1384,21 +1385,19 @@ class Emit:
             head.append(f"  struct {f.name}Result {{ {f.result} Result = {u.zero(f.result)}; }};")
         if doc:
             head.append(f"  /// {doc}")
-        params = ", ".join(f"{t} {n} = {u.zero(t)}" for n, t in f.params)
+        params = ", ".join(f"{t}& {n}" if kind == "ref" else f"const {t}& {n}" if kind == "const" else f"{t} {n} = {u.zero(t)}"
+                           for (n, t), kind in ((f.params[i], f.kinds[i]) for i in f.order()))
         head.append(f"  {'KERN_PURE ' if f.pure else ''}{f.name + 'Result' if f.result is not None else 'void'} {f.name}({params}) {{")
         out = head + [f"    {t} {n} = {u.zero(t)};" for n, t in self.locals] + ["    " + ln for ln in lines] + ["  }"]
         f.text = "\n".join(out)
 
     def ret_line(self, value):
-        """The return of the function: everything it gives back, as it is at this place."""
-        vals = []
-        for _, _, src in self.f.out_fields:
-            vals.append(self.self_name if src == "self" else value if src == "result" else self.ref_names[src[1]])
-        if not vals:
+        """The return of the function: what the C++ returns as it is at this place (a constructor: the object)."""
+        if self.f.ctor:
+            return f"return {{{self.self_name}}};"
+        if self.f.value is None:
             return "return;"
-        if len(vals) == 1:
-            return f"return {{{vals[0]}}};"
-        return f"return {{struct_make<{self.f.out}>({', '.join(vals)})}};"
+        return f"return {{{value}}};"
 
     def self_var(self):
         if not self.f.mutates:
@@ -2782,8 +2781,28 @@ class Emit:
         return n
 
     def is_local(self, name):
-        """Is this the name of a variable of the function being written (not an input, not what a node gives)?"""
-        return any(name == n for n, _ in self.locals)
+        """Is this a name a place can start at in the function being written: one of its variables or one of
+        its inputs (not what a node gives)?"""
+        return any(name == n for n, _ in self.locals) or any(name == n for n, _ in self.f.params)
+
+    def writable(self, place):
+        """Can this place be changed: does it start at a variable of the function or at a reference input
+        that is not const? (An input by value and a const reference are read.)"""
+        root = re.match(r"\w+", place).group(0)
+        return any(root == n for n, _ in self.locals) or any(root == n and kind == "ref" for (n, _), kind in zip(self.f.params, self.f.kinds))
+
+    def place_arg(self, n, t, kind, after):
+        """What a call gives a reference input: the place the argument is. Where the argument is none of the
+        notation's places (a value, a map's row by its key ...), a variable holds it for the call - and is
+        stored back after it, when the function changes it (`after`: the lines for that)."""
+        got = self.spot(n)
+        if got is not None and got[1] == t and (kind != "ref" or self.writable(got[0])):
+            return got[0]
+        held = self.temp("a", t)
+        self.hoist([f"{held} = {self.ex(n, t)};"])
+        if kind == "ref":
+            after.append(lambda: self.store(n, self.typed(held, t)))
+        return held
 
     def spot(self, n):
         """The place an lvalue is, as the notation writes one - a variable of the function and from it
@@ -2872,7 +2891,7 @@ class Emit:
         if self.plain_variable(b):
             return [], self.lvalue(b), []
         got = self.spot(n)
-        if got is not None:
+        if got is not None and self.writable(got[0]):
             return [], got[0], []
         tmp = self.temp("t", t)
         return [f"{tmp} = {self.ex(n, t)};"], tmp, self.store(n, self.typed(tmp, t))
@@ -2937,7 +2956,7 @@ class Emit:
         if k == "DeclRefExpr":
             return [f"{self.lvalue(t)} = {value(self.tp(t))};"]
         got = self.spot(t)
-        if got is not None:   # a place of the notation: set where it stands
+        if got is not None and self.writable(got[0]):   # a place of the notation: set where it stands
             return [f"{got[0]} = {value(got[1])};"]
         if k == "CXXOperatorCallExpr":
             at_iterator = self.entry_of(t)
@@ -3003,11 +3022,12 @@ class Emit:
 
     def invoke(self, g, args, obj=None):
         """A call of one of the program's functions: (text, type) of what the C++ call returns, or
-        (None, None). What it changes - its object, what it writes through its parameters - is stored
-        back by steps before the statement being written."""
+        (None, None). What it changes - its object, what it writes through its parameters - it changes
+        where it stands: the call names those places (place_arg). A function that changes something is
+        called by a step before the statement being written."""
         self.f.calls.append(g)
         self.f.indexes = self.f.indexes or g.indexes
-        texts, backs = [], {}
+        texts = []
         params = g.params
         if any(x.get("kind") == "CXXDefaultArgExpr" for x in args):
             # an argument the call leaves out: the default the function's declaration gives it
@@ -3030,56 +3050,42 @@ class Emit:
                     raise Wait("a call with a default argument that is declared elsewhere")
                 filled.append(default)
             args = filled
+        kinds = g.kinds
+        after = []   # (what is stored back after the call: reference arguments that are no places of the notation)
         if g.self_type is not None and not g.ctor:
             if obj is None or self.is_this(obj):
                 if self.f.self_type != g.self_type:
                     raise Wait("a method of another object is called as its own")
+                if kinds[0] == "ref":
+                    self.self_var()   # (a method that only reads its object does not call one that changes it)
                 texts.append(self.self_name)
-                if g.mutates:
-                    backs["self"] = lambda v: [f"{self.self_var()} = {v};"]
             else:
-                texts.append(self.ex(obj, g.self_type))
-                if g.mutates:
-                    backs["self"] = lambda v, o=obj: self.store(o, self.typed(v, g.self_type))
+                texts.append(self.place_arg(obj, g.self_type, kinds[0], after))
             params = params[1:]
+            kinds = kinds[1:]
         if len(args) != len(params):
             raise Wait("a call with default arguments")
-        for i, (a, (_, pt)) in enumerate(zip(args, params)):
-            texts.append(self.ex(a, pt))
-            place = i + (1 if g.self_type is not None else 0)
-            if place in g.refs:
-                backs[("ref", place)] = lambda v, o=a, t_=pt: self.store(o, self.typed(v, t_))
+        for a, (_, pt), kind in zip(args, params, kinds):
+            texts.append(self.place_arg(a, pt, kind, after) if kind else self.ex(a, pt))
+        gives = g.self_type if g.ctor else g.value
+        texts = [texts[i] for i in g.order()]   # (as the Blueprint function has its inputs: those by reference first)
         call = f"{g.name}({', '.join(texts)}).Result"
         if not g.pure:
-            # a function that changes something outside itself (it calls a step of the engine) is called as a
-            # step: the call keeps what it gave (n12 = F(...); n12.Result), and who calls it is such a function too
+            # a function that changes something outside itself (a place of its caller, a step of the engine) is
+            # called as a step: the call keeps what it gave (n12 = F(...); n12.Result), and who calls it is such a
+            # function too
             self.f.pure = False
-            if not g.out_fields:
+            if gives is None:
                 self.hoist([f"{g.name}({', '.join(texts)});"])
-                return None, None
-            node = self.u.next_node
-            self.u.next_node += 1
-            self.u.members.append(f"  {g.name}Result n{node};")
-            self.hoist([f"n{node} = {g.name}({', '.join(texts)});"])
-            call = f"n{node}.Result"
-        if not g.out_fields:
-            return None, None
-        if g.out is None:
-            _, t, src = g.out_fields[0]
-            if src == "result" or g.ctor:
-                return call, t
-            self.hoist(backs[src](call))
-            return None, None
-        tmp = self.temp("r", g.out)
-        self.hoist([f"{tmp} = {call};"])
-        got = (None, None)
-        for field, t, src in g.out_fields:
-            part = f"struct_break<{g.out}>({tmp}).{field}"
-            if src == "result":
-                got = (part, t)
             else:
-                self.hoist(backs[src](part))
-        return got
+                node = self.u.next_node
+                self.u.next_node += 1
+                self.u.members.append(f"  {g.name}Result n{node};")
+                self.hoist([f"n{node} = {g.name}({', '.join(texts)});"])
+                call = f"n{node}.Result"
+        for lines in after:
+            self.hoist(lines())
+        return (call, gives) if gives is not None else (None, None)
 
     # ---- expressions ----
     def conv(self, text, have, want):
@@ -5230,7 +5236,7 @@ class TestWriter:
             elif owner and owner not in self.names:
                 skipped.append((f, "a method of a class that is not written"))
                 continue
-            if f.result is None:
+            if not f.out_fields:
                 skipped.append((f, "it gives nothing"))
                 continue
             if f.indexes and id(f) in unguarded:
@@ -5267,7 +5273,7 @@ class TestWriter:
                 want_type = ""   # (how the test spells what the call gives, see `wrap`)
                 if f.ctor:
                     give = f"return {target};"
-                elif f.out is not None:
+                elif len(f.out_fields) > 1:
                     fields = [(n, types[0] if src_ == "self" else self.spell(ret) if src_ == "result" else types[src_[1]]) for n, _, src_ in f.out_fields]
                     out_lines = self.plain_struct(f"Out_{f.name}", fields)
                     give = f"{'const auto r = ' if f.value is not None else ''}{target}; return Out_{f.name}{{{', '.join(parts[src_] for _, _, src_ in f.out_fields)}}};"
@@ -5278,6 +5284,12 @@ class TestWriter:
             except Wait as w:
                 skipped.append((f, str(w)))
                 continue
+            # where the Blueprint's call has what is compared: what it returns, then what it made of its
+            # reference inputs that are not const, in their order (Instance::call)
+            layout = (["result"] if f.value is not None else []) + (["self"] if f.mutates and not f.ctor else []) + [("ref", place_) for place_ in f.refs]
+            order = [layout.index(src_) for _, _, src_ in f.out_fields] if len(f.out_fields) > 1 else []
+            # the arguments as the Blueprint function has its inputs (those by reference first)
+            given = f.order() if len(names) == len(f.params) else list(range(len(names)))
             shown = ' + ", " + '.join(f"text({n})" for n in names) if names else 'std::string()'
             case_of[d["id"]] = f
             outs.append((("case", d["id"]), "\n".join(out_lines)))
@@ -5295,7 +5307,7 @@ class TestWriter:
                 f"      const auto want = {self.wrap('run(' + ', '.join(names) + ')', want_type)};",
                 "      converted::g_can_bail = false;",
                 "      converted::may_bail(false);",
-                f"      tally.take(bp, {{{', '.join(f'arg({self.wrap(n, t)})' for n, t in zip(names, types))}}}, want, watch.left(), [&] {{ return {shown}; }});",
+                f"      tally.take(bp, {{{', '.join(f'arg({self.wrap(names[i], types[i])})' for i in given)}}}, want, watch.left(), [&] {{ return {shown}; }}, {{{', '.join(str(k) for k in order)}}});",
                 "    }",
                 "  }"])))
         if not cases:
@@ -5635,7 +5647,8 @@ def apply_to_level(level, folder, blueprints, prune=False):
             kept = os.path.join(os.path.dirname(tmp), f"kern-cpp-to-blueprint-{name}.cpp")   # (the text that was refused: to look at)
             open(kept, "w").write(text)
             sys.stderr.write(f"{name}: {(r.stderr or r.stdout).strip()[:1500]}\n  (its text: {kept})\n")
-    os.unlink(tmp)
+    if os.path.exists(tmp):   # (no Blueprint was written: nothing was put there)
+        os.unlink(tmp)
     if failed:
         raise SystemExit(f"{failed} Blueprint(s) were not read")
 

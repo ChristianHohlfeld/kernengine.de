@@ -437,7 +437,7 @@ SC_TEST(converted_jet) {
       const auto want = run(a0);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
     }
   }
   {  // nrm
@@ -453,7 +453,7 @@ SC_TEST(converted_jet) {
       const auto want = run(a0);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
     }
   }
   {  // air_density
@@ -469,7 +469,7 @@ SC_TEST(converted_jet) {
       const auto want = run(a0);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
     }
   }
   {  // Jet::rigid_spec
@@ -485,7 +485,7 @@ SC_TEST(converted_jet) {
       const auto want = run(a0);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
     }
   }
   {  // Jet::reset
@@ -501,7 +501,7 @@ SC_TEST(converted_jet) {
       const auto want = run(a0);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
     }
   }
   {  // Jet::set_mode
@@ -518,7 +518,7 @@ SC_TEST(converted_jet) {
       const auto want = run(a0, a1);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
     }
   }
   {  // Jet::aero
@@ -541,7 +541,7 @@ SC_TEST(converted_jet) {
       const auto want = run(a0, a1, a2, a3, a4, a5, a6, a7);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5), arg(a6), arg(a7)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5) + ", " + text(a6) + ", " + text(a7); });
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5), arg(a6), arg(a7)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5) + ", " + text(a6) + ", " + text(a7); }, {});
     }
   }
 }

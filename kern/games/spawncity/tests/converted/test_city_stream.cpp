@@ -201,7 +201,7 @@ SC_TEST(converted_city_stream) {
       const auto want = run();
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });
+      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); }, {});
     }
   }
   {  // road_palette
@@ -216,7 +216,7 @@ SC_TEST(converted_city_stream) {
       const auto want = run();
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });
+      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); }, {});
     }
   }
   {  // signed_area
@@ -232,7 +232,7 @@ SC_TEST(converted_city_stream) {
       const auto want = run(a0);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
     }
   }
   {  // rect_distance_to
@@ -250,7 +250,7 @@ SC_TEST(converted_city_stream) {
       const auto want = run(a0, a1, a2);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
     }
   }
   {  // w64_from_number
@@ -266,7 +266,7 @@ SC_TEST(converted_city_stream) {
       const auto want = run(a0);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
     }
   }
   {  // w64_shift_left
@@ -283,7 +283,7 @@ SC_TEST(converted_city_stream) {
       const auto want = run(a0, a1);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
     }
   }
   {  // w64_bit_or
@@ -300,7 +300,7 @@ SC_TEST(converted_city_stream) {
       const auto want = run(a0, a1);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
     }
   }
   {  // cell_key
@@ -317,7 +317,7 @@ SC_TEST(converted_city_stream) {
       const auto want = converted::shaped<converted::Whole>(run(a0, a1));
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
     }
   }
   {  // cell_of
@@ -333,7 +333,7 @@ SC_TEST(converted_city_stream) {
       const auto want = converted::shaped<converted::Whole>(run(a0));
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
     }
   }
   {  // building_options
@@ -348,7 +348,7 @@ SC_TEST(converted_city_stream) {
       const auto want = run();
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });
+      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); }, {});
     }
   }
 }

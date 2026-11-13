@@ -1726,6 +1726,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         it->ref = how == "ref" || how == "const";
         it->constant = how == "const";
         if (it->ref == was) return true;
+        logic::order_inputs(*f);  // (the inputs by reference come first: it goes behind the last of them, or before the first value)
         // (the pin is gone or back: so are its wires and typed-in values - and the places the calls named for it)
         drop_links([&](const logic::Link& l) { bool in; return on_pin(l, in) || (g.find(l.to) && uses(*g.find(l.to)) && l.in.rfind(pin + ".", 0) == 0); });
         for (logic::Node& n : g.nodes) {
@@ -1751,6 +1752,11 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       if (op == "pinMove") {
         const std::ptrdiff_t at = it - pins.begin(), to = at + (num("by") < 0 ? -1 : 1);
         if (to < 0 || to >= static_cast<std::ptrdiff_t>(pins.size())) return false;
+        // (the inputs by reference come first: a value does not go before one, nor a reference behind a value)
+        if (input_side && !locals && pins[static_cast<std::size_t>(at)].ref != pins[static_cast<std::size_t>(to)].ref) {
+          error = "the inputs by reference come first (a value has a default, and in C++ every input after one with a default has one)";
+          return false;
+        }
         std::swap(pins[static_cast<std::size_t>(at)], pins[static_cast<std::size_t>(to)]);
         return true;
       }

@@ -269,7 +269,7 @@ SC_TEST(converted_destruction) {
       const auto want = run(a0, a1);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
     }
   }
   {  // Rng::next
@@ -285,7 +285,7 @@ SC_TEST(converted_destruction) {
       const auto want = run(a0);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {1, 0});
     }
   }
   {  // Rng::unit
@@ -301,7 +301,7 @@ SC_TEST(converted_destruction) {
       const auto want = run(a0);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {1, 0});
     }
   }
   {  // Rng::range
@@ -319,7 +319,7 @@ SC_TEST(converted_destruction) {
       const auto want = run(a0, a1, a2);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {1, 0});
     }
   }
   {  // Destruction::spawn
@@ -341,7 +341,7 @@ SC_TEST(converted_destruction) {
       const auto want = run(a0, a1, a2, a3, a4, a5, a6);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5), arg(a6)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5) + ", " + text(a6); });
+      tally.take(bp, {arg(a0), arg(a6), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5) + ", " + text(a6); }, {0, 1});
     }
   }
   {  // Destruction::free_torn
@@ -358,7 +358,7 @@ SC_TEST(converted_destruction) {
       const auto want = run(a0, a1);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {0, 1});
     }
   }
 }

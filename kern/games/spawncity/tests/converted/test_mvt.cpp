@@ -193,7 +193,7 @@ SC_TEST(converted_mvt) {
       const auto want = run(a0, a1);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
     }
   }
   {  // w64_bit_and
@@ -210,7 +210,7 @@ SC_TEST(converted_mvt) {
       const auto want = run(a0, a1);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
     }
   }
   {  // w64_subtract
@@ -227,7 +227,7 @@ SC_TEST(converted_mvt) {
       const auto want = run(a0, a1);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
     }
   }
   {  // w64_negate
@@ -243,7 +243,7 @@ SC_TEST(converted_mvt) {
       const auto want = run(a0);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
     }
   }
   {  // w64_bit_xor
@@ -260,7 +260,7 @@ SC_TEST(converted_mvt) {
       const auto want = run(a0, a1);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
     }
   }
   {  // zigzag
@@ -276,7 +276,7 @@ SC_TEST(converted_mvt) {
       const auto want = converted::shaped<converted::Whole>(run(a0));
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(converted::shaped<converted::Whole>(a0))}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(converted::shaped<converted::Whole>(a0))}, want, watch.left(), [&] { return text(a0); }, {});
     }
   }
   {  // ring_area
@@ -292,7 +292,7 @@ SC_TEST(converted_mvt) {
       const auto want = run(a0);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
     }
   }
   {  // wanted_layer
@@ -309,7 +309,7 @@ SC_TEST(converted_mvt) {
       const auto want = run(a0, a1);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
     }
   }
   {  // w64_less
@@ -326,7 +326,7 @@ SC_TEST(converted_mvt) {
       const auto want = run(a0, a1);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
     }
   }
   {  // w64_bit_or
@@ -343,7 +343,7 @@ SC_TEST(converted_mvt) {
       const auto want = run(a0, a1);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
     }
   }
   {  // put_varint
@@ -360,7 +360,7 @@ SC_TEST(converted_mvt) {
       const auto want = run(a0, a1);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(converted::shaped<converted::Whole>(a1))}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(a0), arg(converted::shaped<converted::Whole>(a1))}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
     }
   }
   {  // w64_from_number
@@ -376,7 +376,7 @@ SC_TEST(converted_mvt) {
       const auto want = run(a0);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
     }
   }
   {  // w64_shift_left
@@ -393,7 +393,7 @@ SC_TEST(converted_mvt) {
       const auto want = run(a0, a1);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
     }
   }
   {  // put_key
@@ -411,7 +411,7 @@ SC_TEST(converted_mvt) {
       const auto want = run(a0, a1, a2);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
     }
   }
   {  // w64_shift_right_signed
@@ -428,7 +428,7 @@ SC_TEST(converted_mvt) {
       const auto want = run(a0, a1);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
     }
   }
   {  // zz
@@ -444,7 +444,7 @@ SC_TEST(converted_mvt) {
       const auto want = converted::shaped<converted::Whole>(run(a0));
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(converted::shaped<converted::Whole>(a0))}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(converted::shaped<converted::Whole>(a0))}, want, watch.left(), [&] { return text(a0); }, {});
     }
   }
   {  // Writer::begin_layer
@@ -462,7 +462,7 @@ SC_TEST(converted_mvt) {
       const auto want = run(a0, a1, a2);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
     }
   }
 }

@@ -661,6 +661,10 @@ struct Shape {
         stack.pop_back();
       }
     }
+    // the inputs by reference come first: an input by value is written with its default, and in
+    // C++ every input after one with a default has one
+    for (const Function& f : g.functions)
+      if (const FunctionPin* early = input_before_reference(f)) return fail(input_order_problem(f, *early), -1);
     // a function read as a value only computes; so does every function it calls
     std::vector<int> todo;
     std::vector<std::string> because(count);

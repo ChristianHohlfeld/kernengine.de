@@ -105,6 +105,8 @@ struct NativeBlueprint : converted::EngineObject {
 };
 struct Instance : converted::EngineObject {
 };
+struct Spot : converted::EngineObject {
+};
 struct CNode : converted::EngineObject {
 };
 struct Machine : converted::EngineObject {
@@ -508,7 +510,7 @@ SC_TEST(converted_mp_rules) {
       const auto want = run(a0, a1);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
     }
   }
   {  // clampd
@@ -526,7 +528,7 @@ SC_TEST(converted_mp_rules) {
       const auto want = run(a0, a1, a2);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
     }
   }
   {  // qnormalize
@@ -542,7 +544,7 @@ SC_TEST(converted_mp_rules) {
       const auto want = run(a0);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
     }
   }
   {  // slerp
@@ -560,7 +562,7 @@ SC_TEST(converted_mp_rules) {
       const auto want = run(a0, a1, a2);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
     }
   }
   {  // nlerp_slerp
@@ -578,7 +580,7 @@ SC_TEST(converted_mp_rules) {
       const auto want = run(a0, a1, a2);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
     }
   }
   {  // NavTimeline::reset
@@ -594,7 +596,7 @@ SC_TEST(converted_mp_rules) {
       const auto want = run(a0);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
     }
   }
   {  // wrap_pi
@@ -610,7 +612,7 @@ SC_TEST(converted_mp_rules) {
       const auto want = run(a0);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
     }
   }
   {  // NavTimeline::push
@@ -630,7 +632,7 @@ SC_TEST(converted_mp_rules) {
       const auto want = run(a0, a1, a2, a3, a4);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); });
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); }, {1, 0});
     }
   }
   {  // NavTimeline::sample
@@ -649,7 +651,7 @@ SC_TEST(converted_mp_rules) {
       const auto want = run(a0, a1, a2, a3);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); });
+      tally.take(bp, {arg(a0), arg(a2), arg(a3), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); }, {0, 1, 2});
     }
   }
   {  // Scoreboard::ensure
@@ -666,7 +668,7 @@ SC_TEST(converted_mp_rules) {
       const auto want = run(a0, a1);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
     }
   }
   {  // Scoreboard::died
@@ -684,7 +686,7 @@ SC_TEST(converted_mp_rules) {
       const auto want = run(a0, a1, a2);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
     }
   }
   {  // Scoreboard::of
@@ -701,7 +703,7 @@ SC_TEST(converted_mp_rules) {
       const auto want = run(a0, a1);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
     }
   }
   {  // encode_mulaw
@@ -717,7 +719,7 @@ SC_TEST(converted_mp_rules) {
       const auto want = run(a0);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
     }
   }
   {  // decode_mulaw
@@ -733,7 +735,7 @@ SC_TEST(converted_mp_rules) {
       const auto want = run(a0);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
     }
   }
   {  // VoiceStream::push
@@ -752,7 +754,7 @@ SC_TEST(converted_mp_rules) {
       const auto want = run(a0, a1, a2, a3);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); });
+      tally.take(bp, {arg(a0), arg(a2), arg(a1), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); }, {1, 0});
     }
   }
   {  // VoiceCapture::take
@@ -769,7 +771,7 @@ SC_TEST(converted_mp_rules) {
       const auto want = run(a0, a1);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {1, 0, 2});
     }
   }
   {  // project_on
@@ -787,7 +789,7 @@ SC_TEST(converted_mp_rules) {
       const auto want = run(a0, a1, a2);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+      tally.take(bp, {arg(a0), arg(a2), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {0, 1});
     }
   }
   {  // point_at
@@ -805,7 +807,7 @@ SC_TEST(converted_mp_rules) {
       const auto want = run(a0, a1, a2);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
     }
   }
   {  // sample_breadcrumbs
@@ -825,7 +827,7 @@ SC_TEST(converted_mp_rules) {
       const auto want = run(a0, a1, a2, a3, a4);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); });
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); }, {});
     }
   }
   {  // upcoming_turn
@@ -845,7 +847,7 @@ SC_TEST(converted_mp_rules) {
       const auto want = run(a0, a1, a2, a3, a4);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); });
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); }, {});
     }
   }
   {  // route_left
@@ -862,7 +864,7 @@ SC_TEST(converted_mp_rules) {
       const auto want = run(a0, a1);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
     }
   }
 }

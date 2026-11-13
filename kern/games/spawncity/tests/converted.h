@@ -776,9 +776,19 @@ struct Tally {
   double seconds() const { return std::chrono::duration<double>(std::chrono::steady_clock::now() - began).count(); }
   /// One call. `want`: what the source gives, computed with the Blueprint language's numbers;
   /// `left`: the source divided by zero or left the numbers on the way - nothing to compare.
-  template <class Want, class Describe> void take(Blueprint& bp, const std::vector<Value>& args, const Want& want, bool left, Describe describe) {
+  /// `order`: where the Blueprint's call has what `want` holds, part by part. A call by name gives what
+  /// the function returns and then what it made of its reference inputs that are not const, in their
+  /// order (Instance::call); the test compares the object first, then what the C++ returns, then what was
+  /// written through the parameters. Empty: the call gives the one thing that is compared.
+  template <class Want, class Describe> void take(Blueprint& bp, const std::vector<Value>& args, const Want& want, bool left, Describe describe, const std::vector<int>& order = {}) {
     if (!bp.interpreted.inst || !bp.compiled.inst) return;
     if (left || !defined(want)) { ++outside; return; }
+    const auto parts = [&](std::vector<Value>& given) {
+      if (order.empty() || given.size() != order.size()) return;
+      std::vector<Value> fields;
+      for (int k : order) fields.push_back(given[static_cast<std::size_t>(k)]);
+      given = {Value::structure(std::move(fields))};
+    };
     // The compiled class first. A call that takes it long (a sound of a hundred thousand samples, a number
     // raised to a 256-bit power) would take the interpreter minutes: such a call is compared with the class
     // alone, and the function's line says so (~Tally).
@@ -804,6 +814,8 @@ struct Tally {
       }
       return;
     }
+    parts(b);
+    if (both) parts(a);
     if (!both) {
       a = b;
       ++class_only;

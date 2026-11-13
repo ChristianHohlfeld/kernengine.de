@@ -72,6 +72,7 @@ struct ConnectionConfig {
   EndpointConfig endpoint;
 };
 struct Connection : converted::EngineObject {
+  bool send(const int& channel, const unsigned short& type, const std::vector<unsigned char>& data) const;
 };
 struct Transport : converted::EngineObject {
 };
@@ -186,6 +187,7 @@ bool sane(Vec3 v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfi
 [[maybe_unused]] static std::string text(const ClientServerConfig& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.protocol_id)) + ", " + text(s.max_clients) + ", " + text(s.timeout) + ", " + text(s.request_interval) + ", " + text(s.connect_timeout) + ", " + text(s.keepalive_interval) + ", " + text(s.connection) + "}"; }
 [[maybe_unused]] static void take(ClientServerConfig& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<converted::Whole>(s.protocol_id, (*v.rows)[0]); converted::take_as<int>(s.max_clients, (*v.rows)[1]); converted::take_as<double>(s.timeout, (*v.rows)[2]); converted::take_as<double>(s.request_interval, (*v.rows)[3]); converted::take_as<double>(s.connect_timeout, (*v.rows)[4]); converted::take_as<double>(s.keepalive_interval, (*v.rows)[5]); converted::take_as<ConnectionConfig>(s.connection, (*v.rows)[6]); }
 inline void Client::disconnect() const { const std::vector<converted::Value> out = converted::engine_call("engine.client.disconnect", {arg(*this)}); }
+inline bool Connection::send(const int& channel, const unsigned short& type, const std::vector<unsigned char>& data) const { const std::vector<converted::Value> out = converted::engine_call("engine.connection.send", {arg(*this), arg(channel), arg(type), arg(data)}); bool result{}; converted::take_as<bool>(result, out[0]); return result; }
 
 SC_TEST(converted_net_session) {
   converted::Blueprint bp("NetSession");
@@ -201,7 +203,7 @@ SC_TEST(converted_net_session) {
       const auto want = run();
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });
+      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); }, {});
     }
   }
   {  // sane
@@ -217,7 +219,7 @@ SC_TEST(converted_net_session) {
       const auto want = run(a0);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
     }
   }
 }

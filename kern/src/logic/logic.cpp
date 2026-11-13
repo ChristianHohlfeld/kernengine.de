@@ -592,6 +592,21 @@ std::size_t path_indices(std::string_view path) {
 }
 std::string path_pin(std::size_t k) { return "path" + std::to_string(k); }
 std::string ref_key(std::string_view input, std::string_view what) { return std::string(input) + "." + std::string(what); }
+const FunctionPin* input_before_reference(const Function& f) {
+  const FunctionPin* early = nullptr;
+  for (const FunctionPin& in : f.inputs) {
+    if (in.ref && early) return early;
+    if (!in.ref && !early) early = &in;
+  }
+  return nullptr;
+}
+std::string input_order_problem(const Function& f, const FunctionPin& early) {
+  return "function \"" + f.name + "\": the input \"" + early.name +
+         "\" is a value with a default and stands before a reference - the inputs by reference come first (in C++ every input after one with a default has one)";
+}
+void order_inputs(Function& f) {
+  std::stable_partition(f.inputs.begin(), f.inputs.end(), [](const FunctionPin& in) { return in.ref; });
+}
 bool is_path_pin(std::string_view id) {
   if (id.size() < 5 || id.substr(0, 4) != "path") return false;
   for (char c : id.substr(4))
@@ -1295,6 +1310,8 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
   }
   // Reference inputs (FunctionPin::ref): a call names a place for each, and the function works
   // on it where it stands.
+  for (const Function& f : g.functions)
+    if (const FunctionPin* early = input_before_reference(f)) err(0, input_order_problem(f, *early));
   for (const Function& f : g.functions)
     for (const FunctionPin& in : f.inputs) {
       if (!in.ref) continue;

@@ -121,7 +121,7 @@ SC_TEST(converted_facades) {
       const auto want = run();
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });
+      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); }, {});
     }
   }
   {  // Facades::vertex
@@ -136,7 +136,7 @@ SC_TEST(converted_facades) {
       const auto want = run();
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });
+      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); }, {});
     }
   }
   {  // Facades::fragment_declarations
@@ -151,7 +151,7 @@ SC_TEST(converted_facades) {
       const auto want = run();
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });
+      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); }, {});
     }
   }
   {  // Facades::fragment_surface
@@ -166,7 +166,7 @@ SC_TEST(converted_facades) {
       const auto want = run();
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });
+      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); }, {});
     }
   }
 }

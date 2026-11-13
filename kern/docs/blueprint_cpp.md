@@ -546,6 +546,10 @@ void on1(Float delta) {
   nur; so ein Eingang kann auch ein Platz sein, der selbst nur gelesen wird (ein Eingang als
   Wert, eine andere const-Referenz), und eine Funktion, die als Wert gelesen wird (`KERN_PURE`),
   hat nur solche. Ein Referenz-Eingang hat keinen Default: Der Aufruf nennt seinen Platz.
+- **Die Referenzen stehen vor den Werten** (Regel, `check()`): Ein Eingang als Wert steht mit
+  seinem Default im Kopf (`Float by = 0.5`), und in C++ hat nach einem Parameter mit Default jeder
+  weitere einen. Der Editor hält diese Reihenfolge (ein Eingang, der Referenz wird, rückt hinter
+  die letzte Referenz), der Leser meldet einen Kopf, der sie nicht hat.
 - **In der Funktion ist er wie eine Variable benannt:** gelesen `car`, `car.Speed`,
   `car.Wheels[i].Slip`; gesetzt und geändert wie jeder Platz. Im Graphen sind das die
   Variablen-Knoten mit den Einstellungen „variable“ (der Eingang) und „scope“ (die Funktion); der
@@ -728,7 +732,8 @@ Verstöße als Fehler am betroffenen Knoten; der Editor nimmt solche Namen gar n
   nicht const ist und der Platz geändert werden darf (kein Eingang als Wert, keine
   const-Referenz). Ein Eingang als Wert und eine const-Referenz werden gelesen, nicht gesetzt.
   Eine Funktion, die als Wert gelesen wird, hat nur const-Referenzen; eine Funktion eines
-  anderen Blueprints (`KERN_EXTERN`) keine.
+  anderen Blueprints (`KERN_EXTERN`) keine. Die Referenzen stehen vor den Eingängen als Wert
+  (die haben einen Default, und in C++ hat nach einem Parameter mit Default jeder weitere einen).
 - **Ein Eintrag, der gehalten wird, bleibt, wo er ist:** Solange ein Aufruf einen Platz in einer
   Liste hält, ändert nichts in ihm die Länge dieser Liste oder ersetzt sie, und nichts in ihm
   kann Handler starten (siehe „Referenz-Eingänge“).

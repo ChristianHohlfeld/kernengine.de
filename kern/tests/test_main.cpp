@@ -4091,6 +4091,9 @@ TEST(logic_notation_refuses_with_place_and_reason) {
     CHECK(says("  void Set(const Car car) {\n  }", "a const input is a reference: const Car& name"));
     CHECK(says("  void Set(Car& car = Car{1.0, List<Float>{}}) {\n  }", "car is a reference: the call names its place, it has no default"));
     CHECK(says("  struct GetResult { Float speed = 0.0; };\n  KERN_PURE GetResult Get(Car& car) {\n    return {car.Speed};\n  }", "a function that is read as a value changes nothing"));
+    // the inputs by reference come first: a value has a default, and in C++ every input after one with a default has one
+    CHECK(says("  void Late(Float by = 1.0, Car& car) {\n    car.Speed += by;\n  }", "the input \"by\" is a value with a default and stands before a reference - the inputs by reference come first"));
+    CHECK(wrong("  void Early(Car& car, const Car& other, Float by = 1.0) {\n    car.Speed += by;\n  }").empty());
     // an entry of a list that is held stays where it is
     CHECK(says("  void Grow(Car& car) {\n    list_add(Cars, car);\n  }\n" + in_event("    Grow(Cars[0]);"), "while Grow holds it, the length of Cars is changed"));
     CHECK(says("  void Swap(Car& car) {\n    Cars = List<Car>{};\n    car.Speed = 1.0;\n  }\n" + in_event("    Swap(Cars[0]);"), "while Swap holds it, what stands at Cars is changed"));
@@ -9138,6 +9141,48 @@ TEST(studio_logic_local_variables) {
   CHECK(cmd({{"cmd", "logicFunction"}, {"op", "remove"}, {"name", "Plus"}})["ok"].as_bool());
   st = f.s->state();
   for (const json::Value& n : st["logic"]["nodes"].items()) CHECK(n["type"].as_string() != "var.add");
+}
+
+TEST(studio_logic_reference_inputs) {
+  // How a function takes an input, with the editor's commands: its value, or the place the call
+  // names. The inputs by reference come first - a value has a default, and in C++ every input
+  // after one with a default has one.
+  StudioFixture f;
+  CHECK(f.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
+  auto cmd = [&](std::initializer_list<std::pair<const char*, json::Value>> fields) {
+    json::Value c = json::Value::object();
+    for (const auto& [k, v] : fields) c.set(k, v);
+    return f.s->command(c);
+  };
+  auto inputs = [&] {
+    std::string names;
+    const json::Value st = f.s->state();
+    for (const json::Value& in : st["logic"]["functions"][0]["inputs"].items()) names += in["name"].as_string() + (in["ref"].as_string() == "const" ? ":const " : in["ref"].as_bool() ? ":ref " : " ");
+    return names;
+  };
+  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Level : kern::Blueprint {\n  Float Sum = 0.0;\n\n  void Bump(Float by = 1.0, Float scale = 2.0, Float x = 0.0) {\n  }\n};\n"}})["ok"].as_bool());
+  CHECK(inputs() == "by scale x ");
+  // a reference goes before the values, behind the references that are there
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinRef"}, {"name", "Bump"}, {"side", "in"}, {"pin", "x"}, {"ref", "ref"}})["ok"].as_bool());
+  CHECK(inputs() == "x:ref by scale ");
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinRef"}, {"name", "Bump"}, {"side", "in"}, {"pin", "scale"}, {"ref", "const"}})["ok"].as_bool());
+  CHECK(inputs() == "x:ref scale:const by ");
+  CHECK(cmd({{"cmd", "logicCpp"}})["text"].as_string().find("  void Bump(Float& x, const Float& scale, Float by = 1.0) {\n") != std::string::npos);
+  // moving keeps that order: among the references and among the values
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinMove"}, {"name", "Bump"}, {"side", "in"}, {"pin", "by"}, {"by", -1}})["error"].as_string().find("the inputs by reference come first") != std::string::npos);
+  CHECK(inputs() == "x:ref scale:const by ");
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinMove"}, {"name", "Bump"}, {"side", "in"}, {"pin", "scale"}, {"by", -1}})["ok"].as_bool());
+  CHECK(inputs() == "scale:const x:ref by ");
+  // a value again: behind the references
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinRef"}, {"name", "Bump"}, {"side", "in"}, {"pin", "scale"}, {"ref", ""}})["ok"].as_bool());
+  CHECK(inputs() == "x:ref scale by ");
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinMove"}, {"name", "Bump"}, {"side", "in"}, {"pin", "by"}, {"by", -1}})["ok"].as_bool());
+  CHECK(inputs() == "x:ref by scale ");
+  // an output is no reference
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", "Bump"}, {"side", "out"}, {"pin", "result"}, {"type", "float"}})["ok"].as_bool());
+  CHECK(!cmd({{"cmd", "logicFunction"}, {"op", "pinRef"}, {"name", "Bump"}, {"side", "out"}, {"pin", "result"}, {"ref", "ref"}})["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicCompile"})")["ok"].as_bool());
 }
 
 TEST(studio_logic_call_on_actor) {

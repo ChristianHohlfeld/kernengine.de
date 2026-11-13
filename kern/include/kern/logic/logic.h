@@ -821,6 +821,16 @@ class NativeBlueprint {
   virtual bool set(std::string_view variable, const Value& value) = 0;
 };
 using NativeBlueprintFactory = std::unique_ptr<NativeBlueprint> (*)();
+/// The order of a function's inputs: those by reference come first. An input by value has a
+/// default (`Float by = 0.5`), a reference has none (the call names its place) - and in C++ every
+/// input after one with a default has one. The first input by value that stands before a
+/// reference, or null: the order is right.
+const FunctionPin* input_before_reference(const Function& f);
+/// What is wrong then, as check() and the notation say it.
+std::string input_order_problem(const Function& f, const FunctionPin& early);
+/// Puts a function's inputs in that order, keeping the order among the references and among
+/// the values.
+void order_inputs(Function& f);
 /// The engine goes into a Blueprint's class (Instance::call, a handler). What a class holds only
 /// while it runs - the entries beside its lists (kern::List, nodes.h) - is that visit's: it stays
 /// until the engine is out again, and is gone the next time it goes in. The engine may be in a

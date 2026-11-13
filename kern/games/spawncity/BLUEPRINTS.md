@@ -395,8 +395,7 @@ Eine Form, die Gestalt oder Kosten ändert, ist keine von beiden.
    Eintrag jeder Liste ist ein Platz, auch ein `Bool`. Der Konverter schreibt seit
    19:30 Plätze statt Kopien, wo eine Funktion auf ihren eigenen Variablen arbeitet
    (`self_.cur_.path[i].x = v;`, `list_add(self_.pieces_, p);`, gelesen `self_.cur_.t`): im Level
-   stehen damit 1.414 statt 2.471 `struct_break` und 243 statt 367 `list_get`. Die 98 Methoden, die
-   ihr Objekt hinein- und herausbekommen, löst Schritt 2 ab.
+   stehen damit 1.414 statt 2.471 `struct_break` und 243 statt 367 `list_get`.
 2. **Referenz-Parameter.** *(In der Engine seit 13.11.2026, 21:13 – `kern/docs/blueprint_cpp.md`,
    „Referenz-Eingänge“.)* Ein Eingang einer Funktion ist ein Wert oder eine Referenz: `Car& self`
    – der Aufruf nennt einen Platz, die Funktion liest und ändert ihn dort – oder `const Car& self`
@@ -408,7 +407,16 @@ Eine Form, die Gestalt oder Kosten ändert, ist keine von beiden.
    damit es in jeder Stufe dasselbe ist: Einen Platz zu nennen ändert nirgends etwas – jede
    Nennung neben einer Liste hat ihren eigenen Eintrag (zuerst war es einer je Typ, den jede
    Nennung zurücksetzte: was eine Funktion davon hielt, hing in der Klasse von der Reihenfolge ab,
-   in der ein Compiler eine Anweisung ausrechnet).
+   in der ein Compiler eine Anweisung ausrechnet). Und die Regel von C++ für Defaults: Die
+   Referenzen stehen vor den Eingängen als Wert.
+   Der Konverter schreibt seit 22:20 Referenzen: Eine Methode bekommt ihr Objekt als `T& self`
+   (98 Methoden) oder `const T& self` (46), ein Parameter `T&` ist ein Referenz-Eingang, ein
+   `const T&` einer Struktur, Liste oder eines Texts eine const-Referenz – 315 Referenz-Eingänge im
+   Level. Kein Objekt wird mehr hinein- und herausgegeben (vorher 98 Kopien `self_ = self;` und
+   ein Ergebnis-Struct je Methode): Der Aufruf nennt den Platz (`RoadGraph_rebuild_link(self, len,
+   a, b);`, `Rng_range(rng, -1.0, 1.0)`). Im Level stehen 333 statt 1.414 `struct_break` und 69
+   statt 243 `list_get`. Der Test vergleicht weiter alles, was eine Funktion gibt und ändert: was
+   sie zurückgibt und was sie aus ihren Referenzen gemacht hat.
 3. **Kosten in der Klasse.** Was nur liest, kopiert nicht: Eingänge von Listen und Strukturen sind
    `const&`, Get Item und Break geben den Eintrag, wie er dasteht, For Each geht ohne Kopie durch
    eine Liste, die sein Rumpf nicht ändert. Die Bedeutung bleibt die von Werten.
@@ -520,7 +528,7 @@ sagt, in den Zahlen der Sprache – überall gleich. Er sagt nicht, dass das die
 heutigen Programm: Das rechnet dieselben Formeln mit `f32` in 32 Bit, die Sprache in 64 Bit (wie das
 JavaScript-Original). Das ist die Festlegung der Sprache, kein Spielraum des Tests.
 
-Stand (13.11.2026, 19:30): 356 von 1.428 Funktionen (2.713 von 28.544 Zeilen) aus 58 von 77 Dateien stehen
+Stand (13.11.2026, 22:20): 356 von 1.428 Funktionen (2.713 von 28.544 Zeilen) aus 58 von 77 Dateien stehen
 als Blueprints im Level (58 Actors im Ordner „Source“). Der Test vergleicht jede davon, die etwas
 gibt, Bit für Bit mit ihrem Quelltext – 514 Vergleiche, weil Funktionen aus Headern (und die der
 64-Bit-Zahlen) in jedem Blueprint stehen, der sie benutzt; keine ist ausgenommen. Das Spiel führt für diese Dateien weiter

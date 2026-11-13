@@ -47,6 +47,8 @@ struct NativeBlueprint : converted::EngineObject {
 };
 struct Instance : converted::EngineObject {
 };
+struct Spot : converted::EngineObject {
+};
 struct CNode : converted::EngineObject {
 };
 struct Machine : converted::EngineObject {
@@ -117,7 +119,7 @@ SC_TEST(converted_combat_rules) {
       const auto want = run(a0, a1);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
     }
   }
   {  // agent_random
@@ -133,7 +135,7 @@ SC_TEST(converted_combat_rules) {
       const auto want = run(a0);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
     }
   }
   {  // Race::reset
@@ -149,7 +151,7 @@ SC_TEST(converted_combat_rules) {
       const auto want = run(a0);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
     }
   }
 }

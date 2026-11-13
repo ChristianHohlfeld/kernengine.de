@@ -7,6 +7,9 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-13",time:"22:20",title:"Konverter: Referenzen statt Kopien",items:[
+    "Unter der Haube: Eine Methode des Spiels bekommt ihr Objekt jetzt als Referenz und ändert es, wo es steht – vorher wurde es bei jedem Aufruf hinein- und wieder herauskopiert (98 Methoden). 356 von 1.428 Funktionen stehen als Blueprints im Level, 514 Vergleiche Bit für Bit mit dem Quelltext. Am Spiel ändert sich nichts.",
+  ]},
   {date:"2026-11-13",time:"21:13",title:"Sprache: Referenz-Eingänge",items:[
     "Unter der Haube: Eine Funktion der Blueprint-Sprache kann jetzt auf dem arbeiten, was ihr Aufruf nennt (Car& car, const Car& car) – ein Auto in einer Liste, ein Rad darin –, ohne es hinein- und herauszukopieren. Im Editor wie im Export dasselbe, mit einer Regel, die verhindert, dass so ein Eintrag währenddessen verschwindet. Am Spiel ändert sich nichts.",
   ]},
