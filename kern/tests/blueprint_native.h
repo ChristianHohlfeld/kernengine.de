@@ -17,6 +17,7 @@
 #include "kern/game/logic_nodes.h"
 #include "kern/logic/logic.h"
 #include "kern/logic/nodes.h"
+#include "engine_case.gen.h"
 #include "logic_cases.h"
 #include "native_show.h"
 
@@ -1038,6 +1039,12 @@ inline std::vector<Case> cases() {
     c.calls.push_back({"Label", {T("Kern")}});
   }
   all.push_back(nodes_case());
+  {
+    // The engine's functions (kern/logic/engine_api.h): a Blueprint that calls every one of them, against
+    // the host's stand-in - what each gives is in a variable of the Blueprint.
+    Case& c = read("Engine", engine_case::kEngine);
+    for (const char* run : engine_case::kRuns) c.calls.push_back({run, {}});
+  }
   // The tier cases a compiler runs as they stand: their events are handlers of the class, the
   // runtime is the same for every tier.
   for (const logic_cases::Case& t : logic_cases::cases()) {

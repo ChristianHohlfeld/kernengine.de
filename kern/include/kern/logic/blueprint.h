@@ -21,6 +21,7 @@
 #include <type_traits>
 #include <vector>
 
+#include "kern/logic/engine_nodes.gen.h"
 #include "kern/logic/nodes.h"
 
 namespace kern {
@@ -364,7 +365,7 @@ namespace kern {
 /// What a Blueprint's C++ derives from: every node of the library as a function - the core's
 /// (BlueprintCore) and the game's (game::BlueprintNodesOf; they need the game only where a
 /// Blueprint uses them).
-struct Blueprint : game::BlueprintNodesOf<BlueprintCore> {};
+struct Blueprint : game::BlueprintNodesOf<logic::EngineNodesOf<BlueprintCore>> {};
 
 }  // namespace kern
 

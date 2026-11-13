@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "kern/core/dmath.h"
+#include "kern/logic/engine_api.h"
 #include "kern/logic/logic.h"
 #include "kern/logic/nodes.h"
 
@@ -1345,6 +1346,7 @@ Library& Library::core() {
     add_functions(lib);
     // Every node of the core library is a function of blueprint.h (BlueprintCore) or a form of the
     // notation; the native Blueprint test compiles each of them.
+    add_engine_nodes(lib);   // (the engine's functions: kern/logic/engine_api.h)
     for (const auto& d : lib.defs_) d->native = true;
   }
   return lib;

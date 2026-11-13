@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "kern/logic/engine_api.h"
 #include "kern/logic/logic.h"
 
 inline std::string native_show(const kern::logic::Value& v) {
@@ -40,9 +41,12 @@ inline std::string native_show(const kern::logic::Value& v) {
 }
 
 /// The host of the native Blueprint test: time stands still, errors are kept; its random numbers
-/// are one fixed sequence (a Blueprint draws its seed from it).
+/// are one fixed sequence (a Blueprint draws its seed from it). Its engine is the stand-in: every
+/// function answers by its outputs' forms, the same in every tier.
 struct NativeTestHost : kern::logic::Host {
   std::vector<std::string> errors;
+  kern::logic::EngineStandIn stand_in;
+  bool engine(std::string_view function, const std::vector<kern::logic::Value>& in, std::vector<kern::logic::Value>& out) override { return stand_in.engine(function, in, out); }
   kern::f64 time() const override { return 0; }
   void print(const std::string&, bool) override {}
   void error(const std::string& text) override { errors.push_back(text); }

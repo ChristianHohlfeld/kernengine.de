@@ -655,6 +655,10 @@ class Host {
   virtual u32 random() = 0;
   /// The game world behind this host (gameplay nodes), or null.
   virtual void* game() { return nullptr; }
+  /// A function of the engine, by the name of its node - what the engine's nodes do in every tier
+  /// (kern/logic/engine_api.h). `in`: the node's inputs in their order; `out`: its outputs, given as
+  /// their zeros. False: this host has no such function (the outputs stay as they are).
+  virtual bool engine(std::string_view function, const std::vector<Value>& in, std::vector<Value>& out);
   /// Native code: the host compiles the WebAssembly module of an instance (asynchronously)
   /// and calls jit_ready(id, function) when it is linked. False: no compiler here (interpreter).
   virtual bool jit_compile(const std::vector<u8>& module, i32 id);

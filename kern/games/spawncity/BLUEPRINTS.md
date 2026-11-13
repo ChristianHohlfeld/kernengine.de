@@ -523,15 +523,43 @@ Was als Nächstes dazukommt, in der Reihenfolge der Zeilen, die darauf warten:
      Tests der Engine; (b) der Generator über alle Header; (c) der Konverter: Handles, Aufrufe als
      Knoten, Stellvertreter im Test; (d) der Verteiler auf die echte Engine – Voraussetzung für
      Stufe 5.
-   - Stand: `tools/engine_api.py --list` liest die Header (17 Dateien: Physik, Renderer, Meshes,
-     Ton, Netz, Spielwelt, Jobs, App) und nennt die Knoten: 540 Funktionen bekommen einen, 54
-     warten (Zeiger, durch die die Engine schreibt; Typen mit eigenem Innenleben als Wert). Ein
-     Zeiger auf Daten, die nur gelesen werden (`const Vec3* rotation`, `const f32* samples` mit
-     ihrer Anzahl daneben), ist die Liste dieser Daten – leer für `nullptr`. Noch nicht eingebunden:
-     Die Dateien, die der Generator schreibt, braucht Schritt (a).
-   - Die Engine prüft jeden Knoten ihrer Bibliothek in jeder Stufe (`kern/tests`: kein Knoten ohne
-     Fall). Für die erzeugten Knoten erzeugt der Generator auch den Fall: einen Blueprint, der jede
-     Funktion einmal ruft, gegen einen Host, der aufzeichnet – im Interpreter und als Klasse.
+   - **Stand (13.11.2026, 12:45).**
+     - [x] (a) + (b): Die Engine hat die Knoten. `tools/engine_api.py` liest 17 Header (Physik,
+       Renderer, Meshes, Ton, Netz, Spielwelt, Jobs, App) und schreibt die Tabelle
+       (`kern/src/logic/engine_api.gen.cpp`), die Funktionen der Blueprint-Klasse
+       (`kern/include/kern/logic/engine_nodes.gen.h`) und den Fall der Engine-Tests
+       (`kern/tests/engine_case.gen.h`): 540 Funktionen sind Knoten, 54 warten (Zeiger, durch die
+       die Engine schreibt; Typen mit eigenem Innenleben als Wert). Ein Zeiger auf Daten, die nur
+       gelesen werden (`const Vec3* rotation`, `const f32* samples` mit ihrer Anzahl daneben), ist
+       die Liste dieser Daten – leer für `nullptr`. Die Tür ist `logic::Host::engine`; der
+       Stellvertreter der Tests ist `logic::EngineStandIn` (antwortet aus der Form der Ausgänge,
+       abhängig vom Aufruf und davon, wie viele vor ihm kamen, und hält jeden Aufruf fest). Die
+       Engine prüft jeden Knoten ihrer Bibliothek in jeder Stufe: Der erzeugte Blueprint „Engine"
+       ruft jede der 540 Funktionen einmal, im Interpreter und als kompilierte Klasse.
+     - [ ] (c) Der Konverter schreibt Engine-Aufrufe als diese Knoten – geschrieben, aber
+       abgeschaltet (`ENGINE_NODES=1` schaltet es zur Probe ein: 359 statt 286 Funktionen, 3.003
+       statt 1.986 Zeilen), bis der Vergleichstest die Stellvertreter hat. Was der Konverter dabei
+       tut: Ein Zeiger oder eine Referenz auf ein Objekt der Engine, dessen Daten keine Struktur
+       sein können, ist ein `Int` (Handle; `nullptr` ist 0). Jeder Engine-Aufruf ist ein eigener
+       Schritt vor der Anweisung, in der er steht – er läuft genau einmal, wo C++ ihn ruft; ein
+       Wert geht in eine lokale Variable, ein Schritt mit Ausgängen in das Glied des Knotens
+       (`struct { RayHit result = …; } n12;`). Steht er in einem Teil eines Ausdrucks, den C++
+       nicht immer auswertet (`a && w->valid(b)`, `c ? x : y`), wird daraus ein `if`, das eine
+       Variable setzt. Die Pins müssen die der Tabelle der Engine sein, sonst wartet die Funktion.
+     - [ ] (c) Der Test dazu, noch zu schreiben (`TestWriter` und `tests/converted.h`): für jede
+       Klasse der Engine, die der Quelltext ruft, eine Stellvertreter-Klasse mit genau den
+       gerufenen Methoden (Signatur aus dem Header, in den Typen des Tests); jede Methode gibt
+       ihre Argumente als Werte an denselben `EngineStandIn` und nimmt die Antwort zurück
+       (`take` je Struktur, wie `arg`). Zeiger auf solche Objekte würfelt der Test aus einem
+       kleinen Vorrat (Handle 1..6). `RuleBlueprint::Host` bekommt denselben Stellvertreter.
+       Verglichen werden das Ergebnis und die drei Aufzeichnungen (Quelltext, Interpreter,
+       Klasse): dieselben Aufrufe in derselben Reihenfolge mit denselben Bits.
+     - [ ] (d) **Volle Geschwindigkeit im Export:** In der exportierten Klasse ruft die Funktion
+       eines Engine-Knotens die Funktion der Engine direkt und typisiert
+       (`world_of(welt)->cast_ray(a, b)`), ohne Werte zu verpacken; die Tür bleibt für Interpreter
+       und Tests. Derselbe Generator schreibt das. Vor dem Umschalten der ersten Datei.
+   - **Kein Zwischenspeicher im Konverter.** Jeder Lauf liest den Syntaxbaum frisch vom Compiler
+     und übersetzt jeden Test neu – ein Baum zu einem anderen Stand der Header ist ein anderer Baum.
 
 ### 5 – Umschalten
 Eine Datei schaltet um, sobald sie ganz durchläuft: Ihr C++ wird gelöscht, das Spiel läuft auf

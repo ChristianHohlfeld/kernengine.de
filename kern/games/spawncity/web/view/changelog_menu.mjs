@@ -7,6 +7,9 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-13",time:"12:45",title:"Engine: ihre Funktionen als Knoten",items:[
+    "Unter der Haube: 540 Funktionen der Engine (Physik, Renderer, Ton, Netz, Spielwelt, Meshes) sind jetzt Knoten der Blueprint-Sprache, erzeugt aus den Headern der Engine – je Funktion einer, für jedes Spiel. Das ist die Voraussetzung dafür, dass der Konverter auch den Code umschreiben kann, der die Engine ruft (rund 21.000 der 28.544 Zeilen). Am Spiel ändert sich dadurch nichts.",
+  ]},
   {date:"2026-11-13",time:"11:05",title:"Konverter: Maps, Sets und Iteratoren",items:[
     "Unter der Haube: Eine Map ist im Blueprint die Liste ihrer Zeilen (Schlüssel und Wert), ein Set die Liste seiner Schlüssel – in der Reihenfolge, in der sie hineinkamen. Ein Iterator ist die Stelle, an der er steht. Der Konverter schreibt find, insert, emplace, erase, m[k], Schleifen über Maps und auto [a, b]. 286 Funktionen aus 54 Dateien stehen als Blueprints im Level (397 Vergleiche, Bit für Bit). Am Spiel ändert sich dadurch nichts.",
   ]},

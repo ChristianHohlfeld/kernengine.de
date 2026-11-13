@@ -47,17 +47,20 @@ stand, the part is written out.
 
 only counts: how many functions are written, and what the others wait for.
 
+Nothing is kept between runs: every run reads the compiler's tree fresh and compiles every test it
+writes anew.
+
 Needs clang++ (CLANGXX overrides the binary).
 """
 import collections
-import gzip
-import hashlib
 import json
 import os
 import re
+import shutil
 import struct
 import subprocess
 import sys
+import tempfile
 
 ROOT = os.environ.get("KERN_ROOT") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -106,6 +109,16 @@ MATH = {"sqrt": "sqrt", "sqrtf": "sqrt", "fabs": "abs", "fabsf": "abs", "abs": "
 
 VECTOR_FUNCTIONS = ("length", "dot", "cross", "distance", "normalize", "lerp", "length_sq", "distance_sq", "finite", "min_of", "max_of", "clamp", "hex_color", "vmin", "vmax")
 MORE_MATH = ("hypot", "clampf", "lerp", "sign0", "hash_u32", "ldexp", "ldexpf", "tanh", "tanhf", "sinh", "sinhf", "cosh", "coshf", "asinh", "asinhf", "log2", "log2f", "log10", "log10f", "cbrt", "cbrtf")
+
+
+# The engine's functions as nodes in converted code (BLUEPRINTS.md, 6c): handles for the engine's objects,
+# calls as nodes, steps inside conditional parts of an expression. Off until the generated tests have the
+# engine's stand-ins - a function is only written when its test can compare it.
+ENGINE_NODES = os.environ.get("ENGINE_NODES") == "1"
+
+
+class Hoists(Wait):
+    """A part of an expression that C++ does not always evaluate needs steps of its own (see Emit.hoist)."""
 
 
 def flit(x):
@@ -182,31 +195,16 @@ def c_string(v):
 
 # ---- the syntax tree ---------------------------------------------------------------------------
 def run_clang(path, namespace, flags):
-    h = hashlib.sha1()
-    h.update(open(path, "rb").read())
-    d = os.path.dirname(os.path.abspath(path))
-    for name in sorted(os.listdir(d)):
-        if name.endswith(".h"):
-            h.update(f"{name}:{os.path.getmtime(os.path.join(d, name))}".encode())
-    h.update(" ".join([namespace, "steady" if STEADY else "", *flags]).encode())
-    h.update(open(W64_HEADER, "rb").read())
-    cache = os.path.join(os.environ.get("TMPDIR", "/tmp"), "kern-cpp-to-blueprint")
-    os.makedirs(cache, exist_ok=True)
-    cached = os.path.join(cache, h.hexdigest()[:20] + ".json.gz")
-    if os.path.exists(cached):
-        s = gzip.open(cached, "rt").read()
-    else:
-        cmd = [os.environ.get("CLANGXX", "clang++"), "-std=c++20", "-fsyntax-only", "-Xclang", "-ast-dump=json", "-Xclang", f"-ast-dump-filter={namespace}::", *flags, path]
-        if STEADY:
-            cmd = ["setarch", "-R", *cmd]
-        r = subprocess.run(cmd, capture_output=True, text=True)
-        if r.returncode != 0 and not r.stdout:
-            sys.stderr.write(f"{path}: clang failed\n{r.stderr[:2000]}\n")
-            return []
-        s = r.stdout
-        with gzip.open(cached + ".tmp", "wt", compresslevel=3) as f:
-            f.write(s)
-        os.replace(cached + ".tmp", cached)
+    """The compiler's tree of the declarations of a namespace, as it reads the file now (nothing is kept
+    between runs: a tree of another state of the sources is another tree)."""
+    cmd = [os.environ.get("CLANGXX", "clang++"), "-std=c++20", "-fsyntax-only", "-Xclang", "-ast-dump=json", "-Xclang", f"-ast-dump-filter={namespace}::", *flags, path]
+    if STEADY:
+        cmd = ["setarch", "-R", *cmd]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0 and not r.stdout:
+        sys.stderr.write(f"{path}: clang failed\n{r.stderr[:2000]}\n")
+        return []
+    s = r.stdout
     out, dec, i = [], json.JSONDecoder(), 0
     while True:
         j = s.find("{", i)
@@ -226,29 +224,14 @@ STEADY = subprocess.run(["setarch", "-R", "true"], capture_output=True).returnco
 def unit_order(path, flags):
     """Where every line of every file stands in the translation unit: {file: [(line, place)]}, from the
     marks the preprocessor leaves (`# 12 "file"`: the next line is line 12 of that file)."""
-    h = hashlib.sha1(open(path, "rb").read())
-    d = os.path.dirname(os.path.abspath(path))
-    for name in sorted(os.listdir(d)):
-        if name.endswith(".h"):
-            h.update(f"{name}:{os.path.getmtime(os.path.join(d, name))}".encode())
-    h.update(" ".join(["order", *flags]).encode())
-    cache = os.path.join(os.environ.get("TMPDIR", "/tmp"), "kern-cpp-to-blueprint")
-    os.makedirs(cache, exist_ok=True)
-    cached = os.path.join(cache, h.hexdigest()[:20] + ".order.gz")
-    if os.path.exists(cached):
-        marks = json.loads(gzip.open(cached, "rt").read())
-    else:
-        r = subprocess.run([os.environ.get("CLANGXX", "clang++"), "-std=c++20", "-E", *flags, path], capture_output=True, text=True, errors="replace")
-        marks, place = [], 0
-        for line in r.stdout.split("\n"):
-            m = re.match(r'# (\d+) "([^"]*)"', line)
-            if m:
-                marks.append((m.group(2), int(m.group(1)), place))
-            else:
-                place += 1
-        with gzip.open(cached + ".tmp", "wt", compresslevel=3) as f:
-            f.write(json.dumps(marks))
-        os.replace(cached + ".tmp", cached)
+    r = subprocess.run([os.environ.get("CLANGXX", "clang++"), "-std=c++20", "-E", *flags, path], capture_output=True, text=True, errors="replace")
+    marks, place = [], 0
+    for line in r.stdout.split("\n"):
+        m = re.match(r'# (\d+) "([^"]*)"', line)
+        if m:
+            marks.append((m.group(2), int(m.group(1)), place))
+        else:
+            place += 1
     out = {}
     for file, line, place in marks:
         out.setdefault(os.path.abspath(file), []).append((line, place))
@@ -541,6 +524,8 @@ class Unit:
         self.members = []
         self.next_node = 10
         self.lambdas = {}           # a local function (the id of its call operator) -> how it is called (see Emit.local_function)
+        self.engine = None          # the engine's functions as nodes (Api), made when the first one is called
+        self.engine_calls = {}      # the engine's functions this Blueprint calls: decl id -> its node (Api.function)
         self.working = set()
         self.short = collections.defaultdict(list)
         for q in list(tree.records) + list(tree.enums):
@@ -622,10 +607,56 @@ class Unit:
             self.types.append(f"  KERN_STRUCT({name}) {{ {a} first = {self.zero(a)}; {b} second = {self.zero(b)}; }};")
         return self.structs[key]
 
+    def api(self):
+        if self.engine is None:
+            self.engine = Api(self.tree, self)
+        return self.engine
+
+    def object_of(self, raw, by_value=False):
+        """The class of the engine a type hands on as an object with a life of its own - the physics world,
+        the renderer, the mixer: a pointer or a reference to it (by_value: the object itself, where an
+        expression names it). In a Blueprint that is a handle, a whole number the host gives."""
+        r = raw.strip()
+        if not ENGINE_NODES:
+            return None
+        if r.endswith("&") or re.search(r"\*\s*(const)?$", r):
+            r = re.sub(r"(&|\*\s*(const)?)$", "", r).strip()
+        elif not by_value:
+            return None
+        if any(ch in r for ch in "*&<["):
+            return None
+        try:
+            q = self.find_type(self.clean(r))
+        except Wait:
+            return None
+        if q is None or not q.startswith(ENGINE + "::") or q not in self.tree.records or q in (ENGINE + "::Vec3", ENGINE + "::Vec2"):
+            return None
+        try:
+            self.struct(q)
+            return None   # (plain data: a struct of the Blueprint)
+        except Wait:
+            return q
+
+    def engine_table(self):
+        """The engine's nodes as the engine has them (kern/src/logic/engine_api.gen.cpp): type -> (is it a
+        value, its inputs, its outputs - each (pin, type, the struct or enum it names))."""
+        if not hasattr(self, "_table"):
+            self._table = {}
+            try:
+                text = open(os.path.join(ROOT, "kern", "src", "logic", "engine_api.gen.cpp")).read()
+            except OSError:
+                text = ""
+            pins = lambda t: [(m.group(1), m.group(2), m.group(3)) for m in re.finditer(r'\{"(\w+)", PinType::(\w+), "(\w*)", "[^"]*"\}', t)]
+            for m in re.finditer(r'\{"(engine\.[\w.]+)", (?:"(?:\\.|[^"\\])*", ){4}(true|false),\n\s*\{(.*)\},\n\s*\{(.*)\}\},', text):
+                self._table[m.group(1)] = (m.group(2) == "true", pins(m.group(3)), pins(m.group(4)))
+        return self._table
+
     def btype(self, raw):
         """The Blueprint type of a C++ type."""
         if raw.strip() in ("const char *", "const char *const"):
             return "Text"
+        if self.object_of(raw):
+            return "Int"
         t = self.clean(raw)
         if t in NUMBER:
             return NUMBER[t]
@@ -642,9 +673,10 @@ class Unit:
         if ITERATOR.match(t):
             return "Int"
         if "*" in t:
-            if os.environ.get("HANDLES") and re.fullmatch(r"(const )?kern::[\w:]+ \*(const)?", t):
-                return "Int"
             raise Wait("a pointer")
+        m = re.match(r"(?:kern::)?Span<\s*(.+)>$", t)
+        if m and ENGINE_NODES:   # (a view of a list: the list)
+            return f"List<{self.element(self.btype(m.group(1)))}>"
         m = KEYED.match(t)
         if m:
             a = template_args(t)
@@ -680,11 +712,6 @@ class Unit:
         if q in self.tree.enums:
             return self.enum(q)
         if q in self.tree.records:
-            if os.environ.get("HANDLES") and q.startswith("kern::"):
-                try:
-                    return self.struct(q)
-                except Wait:
-                    return "Int"
             return self.struct(q)
         if t.startswith("kern::"):
             raise Wait(f"the engine's {t.split('<')[0]}")
@@ -1026,7 +1053,7 @@ class Const:
             raise Wait(f"a constant computed with {name}()")
         if k == "CXXDefaultInitExpr" or k == "ImplicitValueInitExpr" or k == "CXXScalarValueInitExpr":
             return 0.0
-        if k in ("CXXNullPtrLiteralExpr", "GNUNullExpr") and os.environ.get("HANDLES"):
+        if k in ("CXXNullPtrLiteralExpr", "GNUNullExpr") and ENGINE_NODES:   # (no object of the engine: the handle 0)
             return 0
         raise Wait(f"a constant written as {k}")
 
@@ -1179,6 +1206,8 @@ class Emit:
         t = self.held_type(n)
         if t is not None:
             return self.u.rows.get(t, t)   # (a list inside a list is held as a struct of that list: here, the list)
+        if n.get("kind") not in ("VarDecl", "ParmVarDecl", "FieldDecl") and self.u.object_of(qtype(n), by_value=True):
+            return "Int"   # (an object of the engine, named by an expression: its handle)
         return self.u.btype(qtype(n))
 
     def held_type(self, n):
@@ -1274,7 +1303,7 @@ class Emit:
             if p.get("kind") != "ParmVarDecl":
                 continue
             raw = qtype(p)
-            ref = "&" in raw and "&&" not in raw and not re.search(r"\bconst\b", raw)
+            ref = "&" in raw and "&&" not in raw and not re.search(r"\bconst\b", raw) and not u.object_of(raw)
             t = u.btype(raw)
             name = u.fresh(p.get("name") or f"arg{len(f.params) + 1}", self.taken)
             self.taken.add(name)
@@ -1386,8 +1415,32 @@ class Emit:
     def hoist(self, lines):
         """Steps that run before the statement being written (a call that gives several things)."""
         if self.cond_depth:
-            raise Wait("a call that changes something, in a part of an expression that does not always run")
+            raise Hoists("a call that changes something, in a part of an expression that does not always run")
         self.pre += lines
+
+    def lazily(self, fn):
+        """Writes a part of an expression apart from the statement it stands in: (the steps it needs, its text)."""
+        saved, self.pre = self.pre, []
+        depth, self.cond_depth = self.cond_depth, 0
+        try:
+            text = fn()
+            return self.pre, text
+        finally:
+            self.pre, self.cond_depth = saved, depth
+
+    def either(self, op, left, y):
+        """a && b, a || b where b needs steps of its own: they run only when C++ would evaluate b."""
+        pre, right = self.lazily(lambda: self.bx(y))
+        t = self.temp("both" if op == "&&" else "either", "Bool")
+        self.hoist([f"{t} = {left};", f"if ({t if op == '&&' else f'logic_not({t})'}) {{", *["  " + ln for ln in pre + [f"{t} = {right};"]], "}"])
+        return t, "Bool"
+
+    def chosen(self, cond, x, y, t):
+        """c ? x : y where a branch needs steps of its own: an if that sets a variable."""
+        (px, tx), (py, ty) = self.lazily(lambda: self.ex(x, t)), self.lazily(lambda: self.ex(y, t))
+        tmp = self.temp("chosen", t)
+        self.hoist([f"if ({cond}) {{", *["  " + ln for ln in px + [f"{tmp} = {tx};"]], "} else {", *["  " + ln for ln in py + [f"{tmp} = {ty};"]], "}"])
+        return tmp, t
 
     def sometimes(self, fn):
         """Writes a part of an expression that C++ does not always evaluate (the right of && and ||, a branch of ?:)."""
@@ -1466,7 +1519,7 @@ class Emit:
             return
         for v in kids(s):
             raw = qtype(v)
-            if v.get("kind") not in ("VarDecl", "DecompositionDecl") or self.init_of(v) is None or "&" not in raw or "&&" in raw or v.get("id") in self.named_places:
+            if v.get("kind") not in ("VarDecl", "DecompositionDecl") or self.init_of(v) is None or "&" not in raw or "&&" in raw or v.get("id") in self.named_places or self.u.object_of(raw):
                 continue
             init = self.init_of(v)
             if self.lambda_of(init) is not None:
@@ -1609,7 +1662,7 @@ class Emit:
                         out += self.take_pre()
                     continue
                 raw = qtype(v)
-                if "&" in raw and not re.search(r"\bconst\b", raw):
+                if "&" in raw and not re.search(r"\bconst\b", raw) and not self.u.object_of(raw):
                     raise Wait("a reference to something it changes")
                 wide_init = kids(v) and v.get("init") and self.u.clean(raw) in ("unsigned long", "long", "unsigned long long", "long long") and self.is64(kids(v)[-1])
                 init = kids(v)[-1] if kids(v) and v.get("init") else None
@@ -2015,6 +2068,9 @@ class Emit:
         if k == "CallExpr":
             name = callee_name(n)
             ref = callee(n).get("referencedDecl", {})
+            d = self.engine_decl(ref.get("id")) if ref.get("id") not in self.tree.body else None
+            if d is not None:
+                return self.engine(d, None, kids(n)[1:])[0]
             if self.own(ref.get("id")):
                 self.invoke(self.u.function(ref["id"]), kids(n)[1:])
                 return []  # (what it changes is written back by steps before this place; a value nobody reads is not computed)
@@ -2041,6 +2097,9 @@ class Emit:
             m = callee(n)
             base = kids(m)[0] if kids(m) else None
             name = m.get("name")
+            d = self.engine_decl(m.get("referencedMemberDecl"))
+            if d is not None:
+                return self.engine(d, base, kids(n)[1:])[0]
             if self.own(m.get("referencedMemberDecl")):
                 if m.get("isArrow") and not self.is_this(base) and self.box(base) is None:
                     raise Wait("a pointer")
@@ -2162,6 +2221,109 @@ class Emit:
 
     def is_local_call(self, n):
         return n.get("kind") == "CXXOperatorCallExpr" and callee_name(n) == "operator()" and callee(n).get("referencedDecl", {}).get("id") in self.u.lambdas
+
+    # ---- the engine: what only it can do is a node ----
+    def engine_decl(self, decl_id):
+        """The declaration of a function only the engine can do (a header declares it, the engine defines it), or None."""
+        d = self.tree.decl.get(decl_id) if ENGINE_NODES else None
+        return d if d is not None and self.u.api().declared_only(d) else None
+
+    def as_list(self, a, bt):
+        """Data handed to the engine by a pointer or as a view (Span): the list of it."""
+        it = bt[5:-1]
+        b = self.unwrap(a)
+        while b.get("kind") in ("CXXConstructExpr", "CXXFunctionalCastExpr", "CXXBindTemporaryExpr", "MaterializeTemporaryExpr", "CXXMemberCallExpr") and self.tp_or_none(b) != bt:
+            if b.get("kind") == "CXXMemberCallExpr":
+                if callee(b).get("name") != "data" or not kids(callee(b)):
+                    break
+                b = self.unwrap(kids(callee(b))[0])
+            elif len(kids(b)) == 1:
+                b = self.unwrap(kids(b)[0])
+            elif not kids(b):
+                return bt + "{}"
+            else:
+                break
+        if self.nothing(b):
+            return bt + "{}"
+        if b.get("kind") == "UnaryOperator" and b.get("opcode") == "&":
+            return f'list_make<{it}, "1">({self.ex(kids(b)[0], it)})'
+        raw = bare(a)
+        while raw.get("kind") == "ImplicitCastExpr" and raw.get("castKind") != "ArrayToPointerDecay" and kids(raw):
+            raw = bare(kids(raw)[0])
+        if raw.get("kind") == "ImplicitCastExpr" and raw.get("castKind") == "ArrayToPointerDecay" and self.tp_or_none(kids(raw)[0]) == bt:
+            return self.ex(kids(raw)[0], bt)
+        if self.tp_or_none(b) == bt:
+            return self.ex(b, bt)
+        raise Wait("data handed to the engine in another shape")
+
+    def engine(self, d, obj, args):
+        """A call of a function of the engine: its node. Every call is a step of its own before the statement
+        it stands in - it runs once, where C++ calls it. Gives (the steps, the text and the type of what the
+        call returns - or None, None)."""
+        u = self.u
+        try:
+            f = u.api().function(d)
+        except Wait as w:
+            raise Wait(f"the engine's {d.get('name')}() (it has no node: {w})")
+        known = u.engine_table().get(f["type"])
+        mine = (f["value"], [(n, *u.api().pin(bt)) for n, bt, _ in f["ins"]], [(n, *u.api().pin(bt)) for n, bt, _ in f["outs"]])
+        if known != mine:
+            raise Wait(f"the engine's {d.get('name')}() (its node is another one in the engine: {'none' if known is None else 'its pins differ'})")
+        u.engine_calls[d["id"]] = f
+        ins, texts, own = list(f["ins"]), [], None
+        if d.get("kind") == "CXXMethodDecl" and d.get("storageClass") != "static":
+            _, bt, handle = ins.pop(0)
+            if obj is None or self.is_this(obj):
+                raise Wait("a call of the engine on its own object")
+            texts.append(self.ex(obj, bt))
+            own = obj
+        params = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
+        nodes = []
+        for i, (name, bt, handle) in enumerate(ins):
+            a = args[i] if i < len(args) else None
+            if a is None or a.get("kind") == "CXXDefaultArgExpr":   # (left out: the default the header gives it)
+                a = kids(params[i])[-1] if kids(params[i]) else None
+                if a is None:
+                    raise Wait("a call of the engine with a default argument that is declared elsewhere")
+            nodes.append(a)
+            raw = qtype(params[i]).strip()
+            made = self.unwrap(a)
+            while made.get("kind") in ("MaterializeTemporaryExpr", "CXXBindTemporaryExpr", "CXXFunctionalCastExpr") and len(kids(made)) == 1:
+                made = self.unwrap(kids(made)[0])
+            if bt in u.struct_fields and made.get("kind") in ("CXXConstructExpr", "InitListExpr", "CXXTemporaryObjectExpr") and not [x for x in kids(made) if x.get("kind") != "CXXDefaultArgExpr"]:
+                texts.append(u.zero(bt))   # ({} - the struct with its defaults)
+            elif bt.startswith("List<") and (re.search(r"\*\s*(const)?$", raw) or "Span<" in raw):
+                texts.append(self.as_list(a, bt))
+            else:
+                texts.append(self.ex(a, bt))
+        fn = f["type"].replace(".", "_")
+        outs = f["outs"]
+        if f["value"]:
+            tmp = self.temp(d["name"], outs[0][1])
+            return [f"{tmp} = {fn}({', '.join(texts)});"], tmp, outs[0][1]
+        if not outs:
+            return [f"{fn}({', '.join(texts)});"], None, None
+        node = u.next_node
+        u.next_node += 1
+        u.members.append("  struct { " + " ".join(f"{bt} {o} = {u.zero(bt)};" for o, bt, _ in outs) + f" }} n{node};")
+        lines, got = [f"{fn}({', '.join([f'n{node}'] + texts)});"], (None, None)
+        for o, bt, _ in outs:
+            if o == "result":
+                tmp = self.temp(d["name"], bt)
+                lines.append(f"{tmp} = n{node}.result;")
+                got = (tmp, bt)
+            elif o == "self":
+                lines += self.store(own, self.typed(f"n{node}.self", bt))
+            else:
+                lines += self.store(nodes[[x[0] for x in ins].index(o)], self.typed(f"n{node}.{o}", bt))
+        return lines, *got
+
+    def engine_value(self, d, obj, args):
+        lines, text, t = self.engine(d, obj, args)
+        if text is None:
+            raise Wait("a call without a result as a value")
+        self.hoist(lines)
+        return text, t
 
     # ---- maps and sets: lists of rows by their keys; iterators: places ----
     def keyed(self, n):
@@ -2921,14 +3083,25 @@ class Emit:
         if k == "StringLiteral":
             return text_literal(c_string(b["value"])), "Text"
         if k in ("CXXNullPtrLiteralExpr", "GNUNullExpr"):
-            if os.environ.get("HANDLES"):
-                return "0", "Int"
             raise Wait("a pointer")
         if self.arithmetic(b):
+            if k in ("ConditionalOperator", "BinaryOperator") and (k == "ConditionalOperator" or b.get("opcode") in ("&&", "||")):
+                mark = len(self.pre)
+                try:
+                    return self.formula(b)
+                except Hoists:
+                    if not ENGINE_NODES:
+                        raise
+                    del self.pre[mark:]
+                    if k == "ConditionalOperator":
+                        return self.chosen(self.bx(kids(b)[0]), kids(b)[1], kids(b)[2], self.tp(b))
+                    return self.either(b["opcode"], self.bx(kids(b)[0]), kids(b)[1])
             return self.formula(b)
         if k in CAST:
             inner = kids(b)[-1]
             ck = b.get("castKind", "")
+            if ck == "NullToPointer" and self.u.object_of(qtype(b)):
+                return "0", "Int"   # (no object of the engine: the handle 0)
             if ck in ("FunctionToPointerDecay", "BuiltinFnToFnPtr"):
                 raise Wait("a function as a value")
             if ck == "ToVoid":
@@ -2993,6 +3166,8 @@ class Emit:
                 return f"logic_not({self.bx(kids(b)[0])})", "Bool"
             if op == "*" and self.is_this(b) and self.f.self_type is not None:
                 return self.self_name, self.f.self_type
+            if op in ("*", "&") and (self.u.object_of(qtype(b), by_value=True) or self.u.object_of(qtype(kids(b)[0]), by_value=True)):
+                return self.ex(kids(b)[0], "Int"), "Int"   # (an object of the engine and a pointer to it: one handle)
             if op in ("*", "&"):
                 raise Wait("a pointer")
             if op == "~":
@@ -3015,10 +3190,14 @@ class Emit:
         if k == "BinaryOperator":
             op = b.get("opcode")
             x, y = kids(b)
-            if op == "&&":
-                return f"logic_and({self.bx(x)}, {self.sometimes(lambda: self.bx(y))})", "Bool"
-            if op == "||":
-                return f"logic_or({self.bx(x)}, {self.sometimes(lambda: self.bx(y))})", "Bool"
+            if op in ("&&", "||"):
+                left = self.bx(x)
+                try:
+                    return f"logic_{'and' if op == '&&' else 'or'}({left}, {self.sometimes(lambda: self.bx(y))})", "Bool"
+                except Hoists:
+                    if not ENGINE_NODES:
+                        raise
+                    return self.either(op, left, y)
             if op in COMPARE:
                 tx, ty = self.tp(x), self.tp(y)
                 if op in ("==", "!=") and "Float" in (tx, ty) and tx in ("Float", "Int") and ty in ("Float", "Int"):
@@ -3053,7 +3232,13 @@ class Emit:
             t = self.tp(b)
             if t is None:
                 raise Wait("a choice between nothing")
-            return f"logic_select<{t}>({self.bx(c)}, {self.sometimes(lambda: self.ex(x, t))}, {self.sometimes(lambda: self.ex(y, t))})", t
+            cond = self.bx(c)
+            try:
+                return f"logic_select<{t}>({cond}, {self.sometimes(lambda: self.ex(x, t))}, {self.sometimes(lambda: self.ex(y, t))})", t
+            except Hoists:
+                if not ENGINE_NODES:
+                    raise
+                return self.chosen(cond, x, y, t)
         if k == "CallExpr":
             return self.call(b)
         if k == "CXXOperatorCallExpr":
@@ -3513,6 +3698,9 @@ class Emit:
             if got[0] is None:
                 raise Wait("a call without a result as a value")
             return got
+        d = self.engine_decl(ref.get("id"))
+        if d is not None:
+            return self.engine_value(d, None, kids(b)[1:])
         vec = [self.is_vec(x) for x in a]
         if name == "isfinite" and len(a) == 1 and self.numeric(a[0]):
             x = self.ex(a[0], "Float")
@@ -3778,6 +3966,9 @@ class Emit:
         m = callee(b)
         base = kids(m)[0] if kids(m) else None
         name = m.get("name")
+        d = self.engine_decl(m.get("referencedMemberDecl"))
+        if d is not None:
+            return self.engine_value(d, base, kids(b)[1:])
         if self.own(m.get("referencedMemberDecl")):
             if m.get("isArrow") and not self.is_this(base) and self.box(base) is None:
                 raise Wait("a pointer")
@@ -3832,6 +4023,181 @@ class Emit:
                 return self.ex(base, "Text"), "Text"
             raise Wait(f"text: {name}()")
         raise Wait(f"call: {name}() of a {bt}")
+
+
+# ---- the engine as nodes -----------------------------------------------------------------------------
+# Not the engine a game calls: the Blueprint language itself, the engine's own helpers.
+ENGINE_SKIP = ("kern::logic::", "kern::json::", "kern::detail::", "kern::dm::", "kern::game::nodes::")
+# Functions that give something and change something (the rule below would call them values).
+ENGINE_STEPS = {"kern::jobs::submit", "kern::jobs::take"}
+ENGINE_PIN = {"Bool": "boolean", "Int": "integer", "Float": "number", "Vector": "vector", "Text": "text"}
+
+
+def snake(name):
+    return re.sub(r"(?<=[a-z0-9])([A-Z])", r"_\1", name).lower()
+
+
+class Api:
+    """The engine's functions as nodes, from a compiler's tree that holds the engine's headers. (The
+    converter asks the same object: a call in a game's source and the node it becomes have one name.)"""
+
+    def __init__(self, tree, unit):
+        self.tree, self.u = tree, unit
+        self.by_class = {}   # a class or a namespace -> its functions that are declared only, in their order
+
+    def opaque(self, q):
+        """Is this class an object of the engine with a life of its own (a handle in a Blueprint)?"""
+        d = self.tree.records.get(q)
+        if d is None or not q.startswith(ENGINE + "::") or q in (ENGINE + "::Vec3", ENGINE + "::Vec2"):
+            return False
+        if d.get("tagUsed") == "class":
+            return True
+        try:
+            self.u.struct(q)
+            return False
+        except Wait:
+            return True
+
+    def handed(self, raw):
+        """How a parameter is handed over: (its Blueprint type, does the function write through it, the
+        engine class it is a handle of or None)."""
+        r = raw.strip()
+        if r.replace(" ", "") in ("constchar*", "constchar*const"):
+            return "Text", False, None
+        writes = pointer = False
+        if r.endswith("&&"):
+            r = r[:-2].strip()
+        elif r.endswith("&"):
+            r = r[:-1].strip()
+            writes = not re.match(r"const\b", r)
+        elif re.search(r"\*\s*(const)?$", r):
+            r = re.sub(r"\*\s*(const)?$", "", r).strip()
+            writes, pointer = not re.match(r"const\b", r), True
+        r = re.sub(r"^const\s+", "", r)
+        c = self.u.clean(r)
+        m = re.match(r"(?:kern::)?Span<\s*(.+)>$", c)
+        if m:   # a view of a list: the list
+            return f"List<{self.u.element(self.u.btype(m.group(1)))}>", False, None
+        q = None
+        try:
+            q = self.u.find_type(c)
+        except Wait:
+            pass
+        if q is not None and q in self.tree.records and self.opaque(q):
+            return "Int", False, q
+        if pointer:
+            # a pointer to data the function only reads: a value that may be missing (teleport's rotation) or
+            # the first of several (samples, with their count beside them) - the list of them, none for null
+            if writes:
+                raise Wait("a pointer it writes through")
+            inner = self.u.btype(r)
+            if inner is None:
+                raise Wait("a pointer to anything (void*)")
+            return f"List<{self.u.element(inner)}>", False, None
+        return self.u.btype(r), writes, None
+
+    def pin(self, bt):
+        """(pin type, the struct or enum it names) of a Blueprint type."""
+        if bt in ENGINE_PIN:
+            return ENGINE_PIN[bt], ""
+        if bt in self.u.enum_values:
+            return "enumeration", bt
+        if bt in self.u.struct_fields:
+            return "structure", bt
+        if bt.startswith("List<"):
+            t, of = self.pin(bt[5:-1])
+            if t.endswith("_list"):
+                raise Wait("a list in a list")
+            return t + "_list", of
+        raise Wait(f"a {bt}")
+
+    def shape(self, bt):
+        """A value's form, written out: n i b v t, e<values>, {fields}, [items]."""
+        if bt in ENGINE_PIN:
+            return {"Bool": "b", "Int": "i", "Float": "n", "Vector": "v", "Text": "t"}[bt]
+        if bt in self.u.enum_values:
+            return f"e{len(self.u.enum_values[bt])}"
+        if bt in self.u.struct_fields:
+            return "{" + "".join(self.shape(t) for _, t, _, _ in self.u.struct_fields[bt]) + "}"
+        if bt.startswith("List<"):
+            return "[" + self.shape(bt[5:-1]) + "]"
+        raise Wait(f"a {bt}")
+
+    def home(self, d):
+        """The class of a method, else the namespace a function stands in."""
+        return self.tree.owner.get(d["id"]) or self.tree.scope_of.get(d["id"], "").rstrip(":")
+
+    def declared_only(self, d):
+        """Is this a function only the engine can do: declared in a header, defined in the engine?"""
+        if d.get("kind") not in ("FunctionDecl", "CXXMethodDecl") or d["id"] in self.tree.body or d.get("isImplicit") or d.get("explicitlyDeleted"):
+            return False
+        scope = self.tree.scope_of.get(d["id"], "")
+        if not scope.startswith(ENGINE + "::") or any((scope + "::").startswith(s) or scope.startswith(s) for s in ENGINE_SKIP):
+            return False
+        if d.get("previousDecl") or d["id"] in self.tree.template_of or not d.get("name") or d["name"].startswith("operator") or "(anonymous" in scope:
+            return False
+        return not (d.get("kind") == "CXXMethodDecl" and d.get("access", "public") != "public")
+
+    def siblings(self, d):
+        home = self.home(d)
+        if home not in self.by_class:
+            self.by_class[home] = [x for x in self.tree.decl.values() if self.declared_only(x) and self.home(x) == home]
+        return self.by_class[home]
+
+    def type_of(self, d):
+        """The node's type: engine.<class or namespace>.<function> (an overload: _2, _3 in the header's order)."""
+        home = self.home(d)
+        group = snake(home.split("::")[-1]) if home != ENGINE else ""
+        same = [x for x in self.siblings(d) if x["name"] == d["name"]]
+        nth = same.index(d) + 1 if d in same else 1
+        return "engine." + (group + "." if group else "") + d["name"] + (f"_{nth}" if nth > 1 else "")
+
+    def function(self, d):
+        """The node of a declared function of the engine: a dict - or Wait, when its types have no place."""
+        tree, u = self.tree, self.u
+        if d.get("variadic"):
+            raise Wait("a variadic function")
+        owner = tree.owner.get(d["id"])
+        method = d.get("kind") == "CXXMethodDecl" and d.get("storageClass") != "static"
+        const = qtype(d).rstrip().endswith("const")
+        ins, outs, taken = [], [], {"exec", "then", "result"}
+
+        def name_of(want):
+            name = re.sub(r"\W", "_", want) or "value"
+            if name in CPP_WORDS or name in taken:
+                k = 2
+                while f"{name}_{k}" in taken:
+                    k += 1
+                name = f"{name}_{k}"
+            taken.add(name)
+            return name
+        if method:
+            if self.opaque(owner):
+                ins.append((name_of(snake(owner.split("::")[-1])), "Int", owner))
+            else:
+                st = u.struct(owner)
+                ins.append((name_of("self"), st, None))
+                if not const:
+                    outs.append(("self", st, None))
+        for i, p in enumerate(x for x in kids(d) if x.get("kind") == "ParmVarDecl"):
+            bt, writes, handle = self.handed(qtype(p))
+            name = name_of(p.get("name") or f"value{i + 1}")
+            ins.append((name, bt, handle))
+            if writes:
+                outs.append((name, bt, None))
+        ret = qtype(d).split("(")[0].strip()
+        if ret != "void":
+            bt, _, handle = self.handed(ret)
+            outs.insert(0, ("result", bt, handle))
+        qualified = self.home(d) + "::" + d["name"]
+        value = ret != "void" and len(outs) == 1 and (const or not method) and qualified not in ENGINE_STEPS
+        for _, bt, _ in ins + outs:
+            self.pin(bt)
+            self.shape(bt)
+        words = d["name"].replace("_", " ").title()
+        return {"type": self.type_of(d), "cpp": qualified, "label": words, "category": "Engine: " + self.home(d).split("::")[-1].replace("kern", "Engine"),
+                "help": u.comment_of(d), "value": value, "ins": ins, "outs": outs, "decl": d}
+
 
 
 # ---- the test: the Blueprint next to its source ------------------------------------------------------
@@ -4817,12 +5183,7 @@ class TestWriter:
 
     def compiles(self, text, stem):
         """What the compiler complains of in the test: [(line, complaint)], empty when it compiles."""
-        d = os.path.join(os.environ.get("TMPDIR", "/tmp"), "kern-cpp-to-blueprint", "check", "converted")
-        os.makedirs(d, exist_ok=True)
-        key = hashlib.sha1(text.encode()).hexdigest()[:16]
-        mark = os.path.join(d, f"{stem}.{key}.json")
-        if os.path.exists(mark):
-            return [tuple(x) for x in json.load(open(mark))]
+        d = tempfile.mkdtemp(prefix="kern-converted-check-")   # (nothing is kept between runs)
         path = os.path.join(d, f"test_{stem}.cpp")
         head = text.split("\n")
         full = text.replace('#include "../converted.h"', f'#include "{os.path.abspath(os.path.join(self.test_dir, "..", "converted.h"))}"').replace(f'#include "{self.source_dir}/', f'#include "{os.path.dirname(self.path)}/')
@@ -4853,7 +5214,7 @@ class TestWriter:
                 errors.append((at or 0, e.group(1)[:200]))
             if not errors:
                 errors = [(0, r.stderr.strip().split("\n")[0][:200])]
-        json.dump(errors, open(mark, "w"))
+        shutil.rmtree(d, ignore_errors=True)
         return errors
 
 
