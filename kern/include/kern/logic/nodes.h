@@ -113,7 +113,8 @@ template <class T> struct List : std::vector<T> {
   typename std::vector<T>::reference operator[](I index) {
     const i64 at = static_cast<i64>(index);
     if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return std::vector<T>::operator[](static_cast<std::size_t>(at));
-    static thread_local std::vector<T> beside(1);
+    // (one for every Blueprint of the program: Blueprints run on one thread, and nothing is kept there)
+    static std::vector<T> beside(1);
     beside[0] = T{};
     return beside[0];
   }
