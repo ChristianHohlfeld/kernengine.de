@@ -14,7 +14,7 @@
 
 namespace converted_combat_rules {
 namespace converted = ::sc::converted;
-using converted::arg; using converted::same; using converted::defined; using converted::text;
+using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
@@ -83,6 +83,7 @@ void Race::reset() { *this = Race{}; }
 [[maybe_unused]] static bool same(const Race& want, const converted::Value& got) { return got.rows && got.rows->size() == 12 && same(want.started, (*got.rows)[0]) && same(want.finished, (*got.rows)[1]) && same(want.lap, (*got.rows)[2]) && same(want.next, (*got.rows)[3]) && same(want.race_start, (*got.rows)[4]) && same(want.lap_start, (*got.rows)[5]) && same(want.finish_time, (*got.rows)[6]) && same(want.last_lap, (*got.rows)[7]) && same(want.best_lap, (*got.rows)[8]) && same(want.last_pass, (*got.rows)[9]) && same(want.have_prev, (*got.rows)[10]) && same(want.prev, (*got.rows)[11]); }
 [[maybe_unused]] static bool defined(const Race& s) { return defined(s.started) && defined(s.finished) && defined(s.lap) && defined(s.next) && defined(s.race_start) && defined(s.lap_start) && defined(s.finish_time) && defined(s.last_lap) && defined(s.best_lap) && defined(s.last_pass) && defined(s.have_prev) && defined(s.prev); }
 [[maybe_unused]] static std::string text(const Race& s) { return std::string("{") + text(s.started) + ", " + text(s.finished) + ", " + text(s.lap) + ", " + text(s.next) + ", " + text(s.race_start) + ", " + text(s.lap_start) + ", " + text(s.finish_time) + ", " + text(s.last_lap) + ", " + text(s.best_lap) + ", " + text(s.last_pass) + ", " + text(s.have_prev) + ", " + text(s.prev) + "}"; }
+[[maybe_unused]] static void take(Race& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 12) return; converted::take_as<bool>(s.started, (*v.rows)[0]); converted::take_as<bool>(s.finished, (*v.rows)[1]); converted::take_as<int>(s.lap, (*v.rows)[2]); converted::take_as<int>(s.next, (*v.rows)[3]); converted::take_as<double>(s.race_start, (*v.rows)[4]); converted::take_as<double>(s.lap_start, (*v.rows)[5]); converted::take_as<double>(s.finish_time, (*v.rows)[6]); converted::take_as<double>(s.last_lap, (*v.rows)[7]); converted::take_as<double>(s.best_lap, (*v.rows)[8]); converted::take_as<double>(s.last_pass, (*v.rows)[9]); converted::take_as<bool>(s.have_prev, (*v.rows)[10]); converted::take_as<Vec3>(s.prev, (*v.rows)[11]); }
 
 SC_TEST(converted_combat_rules) {
   converted::Blueprint bp("CombatRules");

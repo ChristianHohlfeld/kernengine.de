@@ -18,7 +18,7 @@
 
 namespace converted_game_gaps {
 namespace converted = ::sc::converted;
-using converted::arg; using converted::same; using converted::defined; using converted::text;
+using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
@@ -230,6 +230,7 @@ MeshData smoke_disc() {
 [[maybe_unused]] static bool same(const Biquad& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.b0, (*got.rows)[0]) && same(want.b1, (*got.rows)[1]) && same(want.b2, (*got.rows)[2]) && same(want.a1, (*got.rows)[3]) && same(want.a2, (*got.rows)[4]) && same(want.z1, (*got.rows)[5]) && same(want.z2, (*got.rows)[6]); }
 [[maybe_unused]] static bool defined(const Biquad& s) { return defined(s.b0) && defined(s.b1) && defined(s.b2) && defined(s.a1) && defined(s.a2) && defined(s.z1) && defined(s.z2); }
 [[maybe_unused]] static std::string text(const Biquad& s) { return std::string("{") + text(s.b0) + ", " + text(s.b1) + ", " + text(s.b2) + ", " + text(s.a1) + ", " + text(s.a2) + ", " + text(s.z1) + ", " + text(s.z2) + "}"; }
+[[maybe_unused]] static void take(Biquad& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<double>(s.b0, (*v.rows)[0]); converted::take_as<double>(s.b1, (*v.rows)[1]); converted::take_as<double>(s.b2, (*v.rows)[2]); converted::take_as<double>(s.a1, (*v.rows)[3]); converted::take_as<double>(s.a2, (*v.rows)[4]); converted::take_as<double>(s.z1, (*v.rows)[5]); converted::take_as<double>(s.z2, (*v.rows)[6]); }
 [[maybe_unused]] static Mat4 draw_kern__Mat4(converted::Draw& draw) {
   Mat4 s{};
   for (auto& e : s.m) e = draw.number();
@@ -239,6 +240,7 @@ MeshData smoke_disc() {
 [[maybe_unused]] static bool same(const Mat4& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(std::vector<double>(std::begin(want.m), std::end(want.m)), (*got.rows)[0]); }
 [[maybe_unused]] static bool defined(const Mat4& s) { return defined(std::vector<double>(std::begin(s.m), std::end(s.m))); }
 [[maybe_unused]] static std::string text(const Mat4& s) { return std::string("{") + text(std::vector<double>(std::begin(s.m), std::end(s.m))) + "}"; }
+[[maybe_unused]] static void take(Mat4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[0]); for (std::size_t k = 0; k < items.size() && k < std::size(s.m); ++k) s.m[k] = items[k]; } }
 [[maybe_unused]] static MeshData draw_kern__MeshData(converted::Draw& draw) {
   MeshData s{};
   s.positions = draw_list(draw, [&]() -> double { return draw.number(); });
@@ -254,6 +256,7 @@ MeshData smoke_disc() {
 [[maybe_unused]] static bool same(const MeshData& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.positions, (*got.rows)[0]) && same(want.normals, (*got.rows)[1]) && same(want.colors, (*got.rows)[2]) && same(want.uvs, (*got.rows)[3]) && same(want.extra, (*got.rows)[4]) && same(want.extra_size, (*got.rows)[5]) && same(want.indices, (*got.rows)[6]); }
 [[maybe_unused]] static bool defined(const MeshData& s) { return defined(s.positions) && defined(s.normals) && defined(s.colors) && defined(s.uvs) && defined(s.extra) && defined(s.extra_size) && defined(s.indices); }
 [[maybe_unused]] static std::string text(const MeshData& s) { return std::string("{") + text(s.positions) + ", " + text(s.normals) + ", " + text(s.colors) + ", " + text(s.uvs) + ", " + text(s.extra) + ", " + text(s.extra_size) + ", " + text(s.indices) + "}"; }
+[[maybe_unused]] static void take(MeshData& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<std::vector<double>>(s.positions, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.normals, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.colors, (*v.rows)[2]); converted::take_as<std::vector<double>>(s.uvs, (*v.rows)[3]); converted::take_as<std::vector<double>>(s.extra, (*v.rows)[4]); converted::take_as<unsigned int>(s.extra_size, (*v.rows)[5]); converted::take_as<std::vector<unsigned int>>(s.indices, (*v.rows)[6]); }
 struct Out_Biquad_run { Biquad Self; double Result; };
 [[maybe_unused]] static bool same(const Out_Biquad_run& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_Biquad_run& s) { return defined(s.Self) && defined(s.Result); }

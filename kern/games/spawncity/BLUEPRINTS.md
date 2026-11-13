@@ -546,14 +546,26 @@ Was als Nächstes dazukommt, in der Reihenfolge der Zeilen, die darauf warten:
        (`struct { RayHit result = …; } n12;`). Steht er in einem Teil eines Ausdrucks, den C++
        nicht immer auswertet (`a && w->valid(b)`, `c ? x : y`), wird daraus ein `if`, das eine
        Variable setzt. Die Pins müssen die der Tabelle der Engine sein, sonst wartet die Funktion.
-     - [ ] (c) Der Test dazu, noch zu schreiben (`TestWriter` und `tests/converted.h`): für jede
-       Klasse der Engine, die der Quelltext ruft, eine Stellvertreter-Klasse mit genau den
-       gerufenen Methoden (Signatur aus dem Header, in den Typen des Tests); jede Methode gibt
-       ihre Argumente als Werte an denselben `EngineStandIn` und nimmt die Antwort zurück
-       (`take` je Struktur, wie `arg`). Zeiger auf solche Objekte würfelt der Test aus einem
-       kleinen Vorrat (Handle 1..6). `RuleBlueprint::Host` bekommt denselben Stellvertreter.
-       Verglichen werden das Ergebnis und die drei Aufzeichnungen (Quelltext, Interpreter,
-       Klasse): dieselben Aufrufe in derselben Reihenfolge mit denselben Bits.
+     - [x] (c) Der Test dazu ist geschrieben: Für jede Klasse der Engine, von der der Quelltext
+       ein Objekt hält, hat der Test eine Stellvertreter-Klasse (`TestWriter.stand_ins`) mit genau
+       den gerufenen Methoden – Signatur aus dem Header, in den Typen des Tests. Jede Methode gibt
+       ihre Argumente als Werte an den Stellvertreter der Engine (`converted::engine_call`) und
+       nimmt die Antwort zurück (`take` je Struktur, das Gegenstück zu `arg`). Objekte würfelt der
+       Test aus einem kleinen Vorrat (`converted::engine_object`, Handle 1..6). Der Host der
+       Blueprints im Test hat denselben Stellvertreter. `Tally::take` vergleicht zusätzlich die
+       drei Aufzeichnungen (Quelltext, Interpreter, Klasse): dieselben Aufrufe in derselben
+       Reihenfolge mit denselben Bits; die erste Abweichung nennt er.
+     - [ ] (c) Einschalten. Der Probelauf mit `ENGINE_NODES=1` über alle Dateien schreibt rund 359
+       Funktionen; 14 davon vergleicht der Test noch nicht. Bevor es eingeschaltet wird:
+       1. **Was nicht verglichen werden kann, wird nicht geschrieben.** Heute nennt der Konverter
+          so eine Funktion nur („not compared"); er muss sie (und was sie ruft) warten lassen.
+       2. Freie Funktionen der Engine in Namensräumen (`primitives::box`, `audio::…`): Der
+          Stellvertreter steht im Test im gleichnamigen Namensraum, der Quelltext findet ihn noch
+          nicht („is not a member of").
+       3. Default-Argumente der Stellvertreter, deren Text der Baum nicht hergibt, und Werte für
+          `std::initializer_list<…>` im Test.
+       4. Methoden schlichter Engine-Strukturen, die nur die Engine definiert
+          (`MeshData::as_input`), und Engine-Objekte, die eine Klasse als Wert hält.
      - [ ] (d) **Volle Geschwindigkeit im Export:** In der exportierten Klasse ruft die Funktion
        eines Engine-Knotens die Funktion der Engine direkt und typisiert
        (`world_of(welt)->cast_ray(a, b)`), ohne Werte zu verpacken; die Tür bleibt für Interpreter

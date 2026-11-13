@@ -14,7 +14,7 @@
 
 namespace converted_qr_code {
 namespace converted = ::sc::converted;
-using converted::arg; using converted::same; using converted::defined; using converted::text;
+using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
@@ -141,6 +141,7 @@ bool read_format(const Code& c, u32& level_bits, u32& mask) {
 [[maybe_unused]] static bool same(const Grid& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.size, (*got.rows)[0]) && same(want.m, (*got.rows)[1]) && same(want.fn, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const Grid& s) { return defined(s.size) && defined(s.m) && defined(s.fn); }
 [[maybe_unused]] static std::string text(const Grid& s) { return std::string("{") + text(s.size) + ", " + text(s.m) + ", " + text(s.fn) + "}"; }
+[[maybe_unused]] static void take(Grid& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<int>(s.size, (*v.rows)[0]); converted::take_as<std::vector<unsigned char>>(s.m, (*v.rows)[1]); converted::take_as<std::vector<unsigned char>>(s.fn, (*v.rows)[2]); }
 [[maybe_unused]] static Code draw_qr__Code(converted::Draw& draw) {
   Code s{};
   s.version = static_cast<int>(draw.whole());
@@ -152,6 +153,7 @@ bool read_format(const Code& c, u32& level_bits, u32& mask) {
 [[maybe_unused]] static bool same(const Code& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.version, (*got.rows)[0]) && same(want.size, (*got.rows)[1]) && same(want.modules, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const Code& s) { return defined(s.version) && defined(s.size) && defined(s.modules); }
 [[maybe_unused]] static std::string text(const Code& s) { return std::string("{") + text(s.version) + ", " + text(s.size) + ", " + text(s.modules) + "}"; }
+[[maybe_unused]] static void take(Code& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<int>(s.version, (*v.rows)[0]); converted::take_as<int>(s.size, (*v.rows)[1]); converted::take_as<std::vector<unsigned char>>(s.modules, (*v.rows)[2]); }
 struct Out_read_format { bool Result; unsigned int level_bits; unsigned int mask; };
 [[maybe_unused]] static bool same(const Out_read_format& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Result, (*got.rows)[0]) && same(want.level_bits, (*got.rows)[1]) && same(want.mask, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const Out_read_format& s) { return defined(s.Result) && defined(s.level_bits) && defined(s.mask); }

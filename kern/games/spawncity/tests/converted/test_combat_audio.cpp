@@ -12,7 +12,7 @@
 
 namespace converted_combat_audio {
 namespace converted = ::sc::converted;
-using converted::arg; using converted::same; using converted::defined; using converted::text;
+using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
@@ -203,6 +203,7 @@ std::vector<f32> cue(u32 rate, std::vector<int> notes, std::vector<double> lengt
 [[maybe_unused]] static bool same(const Random& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(want.s, (*got.rows)[0]); }
 [[maybe_unused]] static bool defined(const Random& s) { return defined(s.s); }
 [[maybe_unused]] static std::string text(const Random& s) { return std::string("{") + text(s.s) + "}"; }
+[[maybe_unused]] static void take(Random& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<unsigned int>(s.s, (*v.rows)[0]); }
 struct Out_Random_call { Random Self; double Result; };
 [[maybe_unused]] static bool same(const Out_Random_call& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_Random_call& s) { return defined(s.Self) && defined(s.Result); }

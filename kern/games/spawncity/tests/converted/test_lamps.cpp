@@ -14,7 +14,7 @@
 
 namespace converted_lamps {
 namespace converted = ::sc::converted;
-using converted::arg; using converted::same; using converted::defined; using converted::text;
+using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
@@ -147,6 +147,7 @@ std::vector<i32> Field::near(f32 x, f32 y, f32 r) const {
 [[maybe_unused]] static bool same(const Whole64& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.high, (*got.rows)[0]) && same(want.low, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Whole64& s) { return defined(s.high) && defined(s.low); }
 [[maybe_unused]] static std::string text(const Whole64& s) { return std::string("{") + text(s.high) + ", " + text(s.low) + "}"; }
+[[maybe_unused]] static void take(Whole64& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<unsigned int>(s.high, (*v.rows)[0]); converted::take_as<unsigned int>(s.low, (*v.rows)[1]); }
 [[maybe_unused]] static Lamp draw_lamps__Lamp(converted::Draw& draw) {
   Lamp s{};
   s.foot = draw.vector();
@@ -161,6 +162,7 @@ std::vector<i32> Field::near(f32 x, f32 y, f32 r) const {
 [[maybe_unused]] static bool same(const Lamp& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.foot, (*got.rows)[0]) && same(want.yaw, (*got.rows)[1]) && same(want.head, (*got.rows)[2]) && same(want.state, (*got.rows)[3]) && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[4]) && same(want.lane, (*got.rows)[5]); }
 [[maybe_unused]] static bool defined(const Lamp& s) { return defined(s.foot) && defined(s.yaw) && defined(s.head) && defined(s.state) && defined(converted::shaped<converted::Whole>(s.key)) && defined(s.lane); }
 [[maybe_unused]] static std::string text(const Lamp& s) { return std::string("{") + text(s.foot) + ", " + text(s.yaw) + ", " + text(s.head) + ", " + text(s.state) + ", " + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(s.lane) + "}"; }
+[[maybe_unused]] static void take(Lamp& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<Vec3>(s.foot, (*v.rows)[0]); converted::take_as<double>(s.yaw, (*v.rows)[1]); converted::take_as<Vec2>(s.head, (*v.rows)[2]); converted::take_as<unsigned char>(s.state, (*v.rows)[3]); converted::take_as<converted::Whole>(s.key, (*v.rows)[4]); converted::take_as<unsigned int>(s.lane, (*v.rows)[5]); }
 [[maybe_unused]] static Field draw_lamps__Field(converted::Draw& draw) {
   Field s{};
   s.lamps_ = draw_list(draw, [&]() -> Lamp { return draw_lamps__Lamp(draw); });
@@ -173,6 +175,7 @@ std::vector<i32> Field::near(f32 x, f32 y, f32 r) const {
 [[maybe_unused]] static bool same(const Field& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.lamps_, (*got.rows)[0]) && same(converted::shaped<converted::wide::Set<converted::Whole>>(want.seen_), (*got.rows)[1]) && same(converted::shaped<converted::wide::Map<converted::Whole, unsigned char>>(want.broken_), (*got.rows)[2]) && same(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(want.grid_), (*got.rows)[3]); }
 [[maybe_unused]] static bool defined(const Field& s) { return defined(s.lamps_) && defined(converted::shaped<converted::wide::Set<converted::Whole>>(s.seen_)) && defined(converted::shaped<converted::wide::Map<converted::Whole, unsigned char>>(s.broken_)) && defined(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_)); }
 [[maybe_unused]] static std::string text(const Field& s) { return std::string("{") + text(s.lamps_) + ", " + text(converted::shaped<converted::wide::Set<converted::Whole>>(s.seen_)) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, unsigned char>>(s.broken_)) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_)) + "}"; }
+[[maybe_unused]] static void take(Field& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<std::vector<Lamp>>(s.lamps_, (*v.rows)[0]); converted::take_as<converted::wide::Set<converted::Whole>>(s.seen_, (*v.rows)[1]); converted::take_as<converted::wide::Map<converted::Whole, unsigned char>>(s.broken_, (*v.rows)[2]); converted::take_as<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_, (*v.rows)[3]); }
 
 SC_TEST(converted_lamps) {
   converted::Blueprint bp("LampsSource");

@@ -14,7 +14,7 @@
 
 namespace converted_road_graph {
 namespace converted = ::sc::converted;
-using converted::arg; using converted::same; using converted::defined; using converted::text;
+using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
@@ -194,6 +194,7 @@ Vec2 RoadGraph::pursuit_point(const std::vector<Vec2>& path, Vec2 p, f32 look) {
 [[maybe_unused]] static bool same(const Whole64& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.high, (*got.rows)[0]) && same(want.low, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Whole64& s) { return defined(s.high) && defined(s.low); }
 [[maybe_unused]] static std::string text(const Whole64& s) { return std::string("{") + text(s.high) + ", " + text(s.low) + "}"; }
+[[maybe_unused]] static void take(Whole64& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<unsigned int>(s.high, (*v.rows)[0]); converted::take_as<unsigned int>(s.low, (*v.rows)[1]); }
 [[maybe_unused]] static Lane draw_Lane(converted::Draw& draw) {
   Lane s{};
   s.points = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
@@ -206,6 +207,7 @@ Vec2 RoadGraph::pursuit_point(const std::vector<Vec2>& path, Vec2 p, f32 look) {
 [[maybe_unused]] static bool same(const Lane& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.points, (*got.rows)[0]) && same(want.width, (*got.rows)[1]) && same(converted::shaped<converted::Whole>(want.tile), (*got.rows)[2]) && same(want.alive, (*got.rows)[3]); }
 [[maybe_unused]] static bool defined(const Lane& s) { return defined(s.points) && defined(s.width) && defined(converted::shaped<converted::Whole>(s.tile)) && defined(s.alive); }
 [[maybe_unused]] static std::string text(const Lane& s) { return std::string("{") + text(s.points) + ", " + text(s.width) + ", " + text(converted::shaped<converted::Whole>(s.tile)) + ", " + text(s.alive) + "}"; }
+[[maybe_unused]] static void take(Lane& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<std::vector<Vec2>>(s.points, (*v.rows)[0]); converted::take_as<double>(s.width, (*v.rows)[1]); converted::take_as<converted::Whole>(s.tile, (*v.rows)[2]); converted::take_as<bool>(s.alive, (*v.rows)[3]); }
 [[maybe_unused]] static RoadGraph::Node draw_RoadGraph__Node(converted::Draw& draw) {
   RoadGraph::Node s{};
   s.p = draw.vector2();
@@ -216,6 +218,7 @@ Vec2 RoadGraph::pursuit_point(const std::vector<Vec2>& path, Vec2 p, f32 look) {
 [[maybe_unused]] static bool same(const RoadGraph::Node& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.p, (*got.rows)[0]) && same(want.edges, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const RoadGraph::Node& s) { return defined(s.p) && defined(s.edges); }
 [[maybe_unused]] static std::string text(const RoadGraph::Node& s) { return std::string("{") + text(s.p) + ", " + text(s.edges) + "}"; }
+[[maybe_unused]] static void take(RoadGraph::Node& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<Vec2>(s.p, (*v.rows)[0]); converted::take_as<std::vector<std::pair<int, double>>>(s.edges, (*v.rows)[1]); }
 [[maybe_unused]] static RoadGraph draw_RoadGraph(converted::Draw& draw) {
   RoadGraph s{};
   s.built_from = static_cast<u64>(draw.bits());
@@ -227,6 +230,7 @@ Vec2 RoadGraph::pursuit_point(const std::vector<Vec2>& path, Vec2 p, f32 look) {
 [[maybe_unused]] static bool same(const RoadGraph& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(converted::shaped<converted::Whole>(want.built_from), (*got.rows)[0]) && same(want.nodes_, (*got.rows)[1]) && same(converted::shaped<converted::wide::Map<converted::Whole, int>>(want.cells_), (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const RoadGraph& s) { return defined(converted::shaped<converted::Whole>(s.built_from)) && defined(s.nodes_) && defined(converted::shaped<converted::wide::Map<converted::Whole, int>>(s.cells_)); }
 [[maybe_unused]] static std::string text(const RoadGraph& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.built_from)) + ", " + text(s.nodes_) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, int>>(s.cells_)) + "}"; }
+[[maybe_unused]] static void take(RoadGraph& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<converted::Whole>(s.built_from, (*v.rows)[0]); converted::take_as<std::vector<RoadGraph::Node>>(s.nodes_, (*v.rows)[1]); converted::take_as<converted::wide::Map<converted::Whole, int>>(s.cells_, (*v.rows)[2]); }
 struct Out_RoadGraph_node_at { RoadGraph Self; int Result; };
 [[maybe_unused]] static bool same(const Out_RoadGraph_node_at& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_RoadGraph_node_at& s) { return defined(s.Self) && defined(s.Result); }

@@ -30,6 +30,7 @@
 #include <vector>
 
 #include "../src/blueprint_call.h"
+#include "kern/logic/engine_api.h"
 #include "../src/common.h"
 #include "kern/logic/nodes.h"
 #include "rule_blueprint.h"
@@ -412,6 +413,34 @@ template <class S, class Key> S draw_set(Draw& draw, Key key) {
   return out;
 }
 
+// ---- the engine in a test ----
+// A converted function that calls the engine calls a node of the engine in its Blueprint (kern/logic/
+// engine_api.h). In a test both go to a stand-in that answers from the call itself and keeps every call:
+// the source through the stand-in classes the test has for the engine's (they derive from EngineObject -
+// an object of the engine is a handle in the Blueprint), the Blueprint through its host. The two must
+// have asked the same, call for call (Tally::take).
+struct EngineObject {
+  long long kern_handle = 0;
+};
+/// One of the few objects of an engine class a test keeps, by its handle.
+template <class T> T* engine_object(long long handle) {
+  static T kept[8];
+  T* object = &kept[static_cast<unsigned long long>(handle) % 8];
+  object->kern_handle = static_cast<long long>(static_cast<unsigned long long>(handle) % 8);
+  return object;
+}
+/// What the source asked the engine in the call being compared.
+inline kern::logic::EngineStandIn g_source_engine;
+inline std::vector<Value> engine_call(const char* function, const std::vector<Value>& in) {
+  std::vector<Value> out;
+  if (const kern::logic::EngineFunction* f = kern::logic::engine_function(function))
+    for (const kern::logic::EnginePin& p : f->outputs) out.push_back(Value::zero(p.type));
+  g_source_engine.engine(function, in, out);
+  return out;
+}
+inline Value arg(const EngineObject* object) { return Value::integer(object ? object->kern_handle : 0); }
+inline Value arg(const EngineObject& object) { return Value::integer(object.kern_handle); }
+
 // ---- a C++ value as the Blueprint gets it ----
 template <class T> inline constexpr bool is_list = false;
 template <class T> inline constexpr bool is_list<std::vector<T>> = true;
@@ -487,6 +516,8 @@ inline bool same(Whole want, const Value& got) {
 }
 inline bool same(wide::Vec3 want, const Value& got) { return same(kern::Vec3(want), got); }
 inline bool same(wide::Vec2 want, const Value& got) { return same(kern::Vec2(want), got); }
+inline bool same(const EngineObject* want, const Value& got) { return got.as_int() == (want ? want->kern_handle : 0); }
+inline bool same(const EngineObject& want, const Value& got) { return got.as_int() == want.kern_handle; }
 inline bool same(const char* want, const Value& got) { return got.as_text() == (want ? want : ""); }
 inline bool same(const std::string& want, const Value& got) { return got.as_text() == want; }
 template <class T>
@@ -548,6 +579,8 @@ inline bool defined(wide::Vec2 v) { return defined(kern::Vec2(v)); }
 inline bool defined(bool) { return true; }
 inline bool defined(const std::string&) { return true; }
 inline bool defined(const char*) { return true; }
+inline bool defined(const EngineObject*) { return true; }
+inline bool defined(const EngineObject&) { return true; }
 template <class T>
   requires((std::is_integral_v<T> && !std::is_same_v<T, bool>) || std::is_enum_v<T>)
 bool defined(T) { return true; }
@@ -571,6 +604,8 @@ inline std::string text(Whole w) {
 inline std::string text(wide::Vec3 v) { return text(kern::Vec3(v)); }
 inline std::string text(wide::Vec2 v) { return text(kern::Vec2(v)); }
 inline std::string text(const char* s) { return std::string("\"") + (s ? s : "") + "\""; }
+inline std::string text(const EngineObject* object) { return "object " + std::to_string(object ? object->kern_handle : 0); }
+inline std::string text(const EngineObject& object) { return text(&object); }
 inline std::string text(const std::string& s) { return "\"" + s + "\""; }
 template <class T>
   requires(std::is_integral_v<T> && !std::is_same_v<T, bool>)
@@ -584,6 +619,89 @@ template <class T> std::string text(const std::vector<T>& v) {
   for (std::size_t i = 0; i < v.size(); ++i) out += (i ? ", " : "") + text(static_cast<T>(v[i]));
   return out + "]";
 }
+
+// ---- a value the engine's stand-in answered, as the source gets it ----
+inline void take(f64& to, const Value& v) { to = v.as_number(); }
+inline void take(bool& to, const Value& v) { to = v.as_bool(); }
+inline void take(wide::Vec3& to, const Value& v) { to = wide::Vec3(v.as_vector()); }
+inline void take(wide::Vec2& to, const Value& v) { to = wide::Vec2(v.as_vector().x, v.as_vector().y); }
+inline void take(std::string& to, const Value& v) { to = v.as_text(); }
+inline void take(const char*& to, const Value& v) {
+  static std::deque<std::string> kept;   // (a text the source holds by a pointer: kept for it)
+  kept.push_back(v.as_text());
+  to = kept.back().c_str();
+}
+template <class T>
+  requires(std::is_integral_v<T> && !std::is_same_v<T, bool>)
+void take(T& to, const Value& v) { to = static_cast<T>(v.as_int()); }
+template <class E>
+  requires std::is_enum_v<E>
+void take(E& to, const Value& v) { to = static_cast<E>(v.i); }
+template <class T>
+  requires std::is_base_of_v<EngineObject, T>
+void take(T*& to, const Value& v) { to = engine_object<T>(v.as_int()); }
+template <class T> void take(std::vector<T>& to, const Value& v);
+/// By the type as the program spells it (S, with Whole where it says u64 or i64 - see shaped).
+template <class S> struct Take {
+  template <class T> static void to(T& target, const Value& v) { take(target, v); }
+};
+template <> struct Take<Whole> {
+  template <class T> static void to(T& target, const Value& v) {
+    target = v.rows && v.rows->size() == 2 ? static_cast<T>((static_cast<unsigned long long>((*v.rows)[0].as_int()) << 32) | static_cast<unsigned long long>((*v.rows)[1].as_int())) : T{};
+  }
+};
+template <class S> struct Take<std::vector<S>> {
+  template <class T> static void to(std::vector<T>& target, const Value& v) {
+    target.clear();
+    for (std::size_t k = 0; k < v.size(); ++k) {
+      T item{};
+      Take<S>::to(item, v.item(k));
+      target.push_back(std::move(item));
+    }
+  }
+};
+template <class A, class B> struct Take<std::pair<A, B>> {
+  template <class X, class Y> static void to(std::pair<X, Y>& target, const Value& v) {
+    if (!v.rows || v.rows->size() != 2) return;
+    Take<A>::to(const_cast<std::remove_const_t<X>&>(target.first), (*v.rows)[0]);
+    Take<B>::to(target.second, (*v.rows)[1]);
+  }
+};
+/// A map from its rows, a set from its keys.
+template <class SK, class SV, class M> void take_rows(M& target, const Value& v) {
+  target.clear();
+  for (std::size_t k = 0; k < v.size(); ++k) {
+    const Value row = v.item(k);
+    if (!row.rows || row.rows->size() != 2) continue;
+    typename M::key_type key{};
+    typename M::mapped_type held{};
+    Take<SK>::to(key, (*row.rows)[0]);
+    Take<SV>::to(held, (*row.rows)[1]);
+    target.insert_or_assign(std::move(key), std::move(held));
+  }
+}
+template <class SK, class M> void take_keys(M& target, const Value& v) {
+  target.clear();
+  for (std::size_t k = 0; k < v.size(); ++k) {
+    typename M::key_type key{};
+    Take<SK>::to(key, v.item(k));
+    target.insert(std::move(key));
+  }
+}
+template <class K, class V> struct Take<wide::Map<K, V>> {
+  template <class M> static void to(M& target, const Value& v) { take_rows<K, V>(target, v); }
+};
+template <class K, class V> struct Take<wide::SortedMap<K, V>> {
+  template <class M> static void to(M& target, const Value& v) { take_rows<K, V>(target, v); }
+};
+template <class K> struct Take<wide::Set<K>> {
+  template <class M> static void to(M& target, const Value& v) { take_keys<K>(target, v); }
+};
+template <class K> struct Take<std::set<K>> {
+  template <class M> static void to(M& target, const Value& v) { take_keys<K>(target, v); }
+};
+template <class S, class T> void take_as(T& target, const Value& v) { Take<S>::to(target, v); }
+template <class T> void take(std::vector<T>& to, const Value& v) { Take<std::vector<T>>::to(to, v); }
 
 /// A value of the Blueprint as text, every number with all its digits.
 inline std::string shown(const Value& v) {
@@ -648,11 +766,27 @@ struct Tally {
     // raised to a 256-bit power) would take the interpreter minutes: such a call is compared with the class
     // alone, and the function's line says so (~Tally).
     std::vector<Value> a, b;
+    bp.compiled.host.stand_in.calls.clear();
+    bp.interpreted.host.stand_in.calls.clear();
     const auto before = std::chrono::steady_clock::now();
     const bool ib = bp.compiled.inst->call(function, args, b);
     const double took = std::chrono::duration<double>(std::chrono::steady_clock::now() - before).count();
     const bool both = took < 0.005;
     const bool ia = both ? bp.interpreted.inst->call(function, args, a) : ib;
+    // what the three asked the engine: the same calls, in the same order, with the same values
+    const std::vector<std::string>& asked = g_source_engine.calls;
+    const bool engine_same = bp.compiled.host.stand_in.calls == asked && (!both || bp.interpreted.host.stand_in.calls == asked);
+    if (!engine_same) {
+      ++compared;
+      if (++wrong <= 3) {
+        const std::vector<std::string>& got = bp.compiled.host.stand_in.calls == asked ? bp.interpreted.host.stand_in.calls : bp.compiled.host.stand_in.calls;
+        std::size_t k = 0;
+        while (k < asked.size() && k < got.size() && asked[k] == got[k]) ++k;
+        std::printf("  %s(%s): call %zu of the engine - the source asks %s, the Blueprint %s (%zu and %zu calls)\n", function, describe().c_str(), k + 1,
+                    k < asked.size() ? asked[k].c_str() : "nothing more", k < got.size() ? got[k].c_str() : "nothing more", asked.size(), got.size());
+      }
+      return;
+    }
     if (!both) {
       a = b;
       ++class_only;
@@ -937,6 +1071,7 @@ struct Watch {
   Watch() {
     std::feclearexcept(FE_ALL_EXCEPT);
     g_open = false;
+    g_source_engine.calls.clear();
   }
   bool left() const { return g_open || std::fetestexcept(FE_DIVBYZERO | FE_INVALID) != 0; }
 };

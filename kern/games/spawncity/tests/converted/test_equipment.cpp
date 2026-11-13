@@ -14,7 +14,7 @@
 
 namespace converted_equipment {
 namespace converted = ::sc::converted;
-using converted::arg; using converted::same; using converted::defined; using converted::text;
+using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
@@ -295,6 +295,7 @@ f32 midi(f32 n) { return 440.0 * kern::math::pow(2.0, (n - 69) / 12); }
 [[maybe_unused]] static bool same(const Flight& want, const converted::Value& got) { return got.rows && got.rows->size() == 12 && same(want.id, (*got.rows)[0]) && same(want.start, (*got.rows)[1]) && same(want.duration, (*got.rows)[2]) && same(want.distance, (*got.rows)[3]) && same(want.max_speed, (*got.rows)[4]) && same(want.max_agl, (*got.rows)[5]) && same(want.max_alt, (*got.rows)[6]) && same(want.volts_start, (*got.rows)[7]) && same(want.volts_end, (*got.rows)[8]) && same(want.volts_min, (*got.rows)[9]) && same(want.reason, (*got.rows)[10]) && same(want.path, (*got.rows)[11]); }
 [[maybe_unused]] static bool defined(const Flight& s) { return defined(s.id) && defined(s.start) && defined(s.duration) && defined(s.distance) && defined(s.max_speed) && defined(s.max_agl) && defined(s.max_alt) && defined(s.volts_start) && defined(s.volts_end) && defined(s.volts_min) && defined(s.reason) && defined(s.path); }
 [[maybe_unused]] static std::string text(const Flight& s) { return std::string("{") + text(s.id) + ", " + text(s.start) + ", " + text(s.duration) + ", " + text(s.distance) + ", " + text(s.max_speed) + ", " + text(s.max_agl) + ", " + text(s.max_alt) + ", " + text(s.volts_start) + ", " + text(s.volts_end) + ", " + text(s.volts_min) + ", " + text(s.reason) + ", " + text(s.path) + "}"; }
+[[maybe_unused]] static void take(Flight& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 12) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<double>(s.start, (*v.rows)[1]); converted::take_as<double>(s.duration, (*v.rows)[2]); converted::take_as<double>(s.distance, (*v.rows)[3]); converted::take_as<double>(s.max_speed, (*v.rows)[4]); converted::take_as<double>(s.max_agl, (*v.rows)[5]); converted::take_as<double>(s.max_alt, (*v.rows)[6]); converted::take_as<double>(s.volts_start, (*v.rows)[7]); converted::take_as<double>(s.volts_end, (*v.rows)[8]); converted::take_as<double>(s.volts_min, (*v.rows)[9]); converted::take_as<std::string>(s.reason, (*v.rows)[10]); converted::take_as<std::vector<Vec3>>(s.path, (*v.rows)[11]); }
 [[maybe_unused]] static FlightLog::Event draw_FlightLog__Event(converted::Draw& draw) {
   FlightLog::Event s{};
   s.t = draw.number();
@@ -305,6 +306,7 @@ f32 midi(f32 n) { return 440.0 * kern::math::pow(2.0, (n - 69) / 12); }
 [[maybe_unused]] static bool same(const FlightLog::Event& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.t, (*got.rows)[0]) && same(want.stage, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const FlightLog::Event& s) { return defined(s.t) && defined(s.stage); }
 [[maybe_unused]] static std::string text(const FlightLog::Event& s) { return std::string("{") + text(s.t) + ", " + text(s.stage) + "}"; }
+[[maybe_unused]] static void take(FlightLog::Event& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<double>(s.t, (*v.rows)[0]); converted::take_as<std::string>(s.stage, (*v.rows)[1]); }
 [[maybe_unused]] static FlightLog draw_FlightLog(converted::Draw& draw) {
   FlightLog s{};
   s.flights_ = draw_list(draw, [&]() -> Flight { return draw_Flight(draw); });
@@ -323,6 +325,7 @@ f32 midi(f32 n) { return 440.0 * kern::math::pow(2.0, (n - 69) / 12); }
 [[maybe_unused]] static bool same(const FlightLog& want, const converted::Value& got) { return got.rows && got.rows->size() == 10 && same(want.flights_, (*got.rows)[0]) && same(want.events_, (*got.rows)[1]) && same(want.cur_, (*got.rows)[2]) && same(want.active_, (*got.rows)[3]) && same(want.have_last_, (*got.rows)[4]) && same(want.last_, (*got.rows)[5]) && same(want.last_t_, (*got.rows)[6]) && same(want.last_path_, (*got.rows)[7]) && same(want.next_id_, (*got.rows)[8]) && same(want.serial_, (*got.rows)[9]); }
 [[maybe_unused]] static bool defined(const FlightLog& s) { return defined(s.flights_) && defined(s.events_) && defined(s.cur_) && defined(s.active_) && defined(s.have_last_) && defined(s.last_) && defined(s.last_t_) && defined(s.last_path_) && defined(s.next_id_) && defined(s.serial_); }
 [[maybe_unused]] static std::string text(const FlightLog& s) { return std::string("{") + text(s.flights_) + ", " + text(s.events_) + ", " + text(s.cur_) + ", " + text(s.active_) + ", " + text(s.have_last_) + ", " + text(s.last_) + ", " + text(s.last_t_) + ", " + text(s.last_path_) + ", " + text(s.next_id_) + ", " + text(s.serial_) + "}"; }
+[[maybe_unused]] static void take(FlightLog& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 10) return; converted::take_as<std::vector<Flight>>(s.flights_, (*v.rows)[0]); converted::take_as<std::vector<FlightLog::Event>>(s.events_, (*v.rows)[1]); converted::take_as<Flight>(s.cur_, (*v.rows)[2]); converted::take_as<bool>(s.active_, (*v.rows)[3]); converted::take_as<bool>(s.have_last_, (*v.rows)[4]); converted::take_as<Vec3>(s.last_, (*v.rows)[5]); converted::take_as<double>(s.last_t_, (*v.rows)[6]); converted::take_as<double>(s.last_path_, (*v.rows)[7]); converted::take_as<unsigned int>(s.next_id_, (*v.rows)[8]); converted::take_as<unsigned int>(s.serial_, (*v.rows)[9]); }
 [[maybe_unused]] static FlightSample draw_FlightSample(converted::Draw& draw) {
   FlightSample s{};
   s.t = draw.number();
@@ -337,6 +340,7 @@ f32 midi(f32 n) { return 440.0 * kern::math::pow(2.0, (n - 69) / 12); }
 [[maybe_unused]] static bool same(const FlightSample& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.t, (*got.rows)[0]) && same(want.pos, (*got.rows)[1]) && same(want.vel, (*got.rows)[2]) && same(want.agl, (*got.rows)[3]) && same(want.volts, (*got.rows)[4]) && same(want.armed, (*got.rows)[5]); }
 [[maybe_unused]] static bool defined(const FlightSample& s) { return defined(s.t) && defined(s.pos) && defined(s.vel) && defined(s.agl) && defined(s.volts) && defined(s.armed); }
 [[maybe_unused]] static std::string text(const FlightSample& s) { return std::string("{") + text(s.t) + ", " + text(s.pos) + ", " + text(s.vel) + ", " + text(s.agl) + ", " + text(s.volts) + ", " + text(s.armed) + "}"; }
+[[maybe_unused]] static void take(FlightSample& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<double>(s.t, (*v.rows)[0]); converted::take_as<Vec3>(s.pos, (*v.rows)[1]); converted::take_as<Vec3>(s.vel, (*v.rows)[2]); converted::take_as<double>(s.agl, (*v.rows)[3]); converted::take_as<double>(s.volts, (*v.rows)[4]); converted::take_as<bool>(s.armed, (*v.rows)[5]); }
 [[maybe_unused]] static Prog draw_Prog(converted::Draw& draw) {
   Prog s{};
   s.genre = static_cast<Genre>(draw.below(5));
@@ -350,6 +354,7 @@ f32 midi(f32 n) { return 440.0 * kern::math::pow(2.0, (n - 69) / 12); }
 [[maybe_unused]] static bool same(const Prog& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.genre, (*got.rows)[0]) && same(want.bpm, (*got.rows)[1]) && same(want.seed, (*got.rows)[2]) && same(want.root, (*got.rows)[3]) && same(want.minor, (*got.rows)[4]); }
 [[maybe_unused]] static bool defined(const Prog& s) { return defined(s.genre) && defined(s.bpm) && defined(s.seed) && defined(s.root) && defined(s.minor); }
 [[maybe_unused]] static std::string text(const Prog& s) { return std::string("{") + text(s.genre) + ", " + text(s.bpm) + ", " + text(s.seed) + ", " + text(s.root) + ", " + text(s.minor) + "}"; }
+[[maybe_unused]] static void take(Prog& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<Genre>(s.genre, (*v.rows)[0]); converted::take_as<double>(s.bpm, (*v.rows)[1]); converted::take_as<unsigned int>(s.seed, (*v.rows)[2]); converted::take_as<int>(s.root, (*v.rows)[3]); converted::take_as<bool>(s.minor, (*v.rows)[4]); }
 
 SC_TEST(converted_equipment) {
   converted::Blueprint bp("Equipment");

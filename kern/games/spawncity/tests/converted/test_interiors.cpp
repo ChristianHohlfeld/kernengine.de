@@ -15,7 +15,7 @@
 
 namespace converted_interiors {
 namespace converted = ::sc::converted;
-using converted::arg; using converted::same; using converted::defined; using converted::text;
+using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
@@ -122,11 +122,12 @@ bool door_gap(const std::vector<Interiors::Door>& doors, Vec2 a, Vec2 b, f32 ins
   s.n = draw.vector2();
   return s;
 }
-namespace Interiors { using converted::arg; using converted::same; using converted::defined; using converted::text;
+namespace Interiors { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const Interiors::Door& s) { return converted::Value::structure({arg(s.c), arg(s.d), arg(s.n)}); }
 [[maybe_unused]] static bool same(const Interiors::Door& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.c, (*got.rows)[0]) && same(want.d, (*got.rows)[1]) && same(want.n, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const Interiors::Door& s) { return defined(s.c) && defined(s.d) && defined(s.n); }
 [[maybe_unused]] static std::string text(const Interiors::Door& s) { return std::string("{") + text(s.c) + ", " + text(s.d) + ", " + text(s.n) + "}"; }
+[[maybe_unused]] static void take(Interiors::Door& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<Vec2>(s.c, (*v.rows)[0]); converted::take_as<Vec2>(s.d, (*v.rows)[1]); converted::take_as<Vec2>(s.n, (*v.rows)[2]); }
 }
 struct Out_door_gap { bool Result; double t0; double t1; };
 [[maybe_unused]] static bool same(const Out_door_gap& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Result, (*got.rows)[0]) && same(want.t0, (*got.rows)[1]) && same(want.t1, (*got.rows)[2]); }

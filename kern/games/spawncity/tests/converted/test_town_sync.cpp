@@ -14,7 +14,7 @@
 
 namespace converted_town_sync {
 namespace converted = ::sc::converted;
-using converted::arg; using converted::same; using converted::defined; using converted::text;
+using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
@@ -84,6 +84,7 @@ std::vector<u8> pack_ask() { return {static_cast<u8>(Kind::ask)}; }
 [[maybe_unused]] static bool same(const In& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.b, (*got.rows)[0]) && same(want.at, (*got.rows)[1]) && same(want.ok, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const In& s) { return defined(s.b) && defined(s.at) && defined(s.ok); }
 [[maybe_unused]] static std::string text(const In& s) { return std::string("{") + text(s.b) + ", " + text(s.at) + ", " + text(s.ok) + "}"; }
+[[maybe_unused]] static void take(In& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned long>(s.at, (*v.rows)[1]); converted::take_as<bool>(s.ok, (*v.rows)[2]); }
 [[maybe_unused]] static LampRec draw_town__LampRec(converted::Draw& draw) {
   LampRec s{};
   s.key = static_cast<i64>(draw.bits());
@@ -94,6 +95,7 @@ std::vector<u8> pack_ask() { return {static_cast<u8>(Kind::ask)}; }
 [[maybe_unused]] static bool same(const LampRec& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]) && same(want.state, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const LampRec& s) { return defined(converted::shaped<converted::Whole>(s.key)) && defined(s.state); }
 [[maybe_unused]] static std::string text(const LampRec& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(s.state) + "}"; }
+[[maybe_unused]] static void take(LampRec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<converted::Whole>(s.key, (*v.rows)[0]); converted::take_as<unsigned char>(s.state, (*v.rows)[1]); }
 [[maybe_unused]] static PlankRec draw_town__PlankRec(converted::Draw& draw) {
   PlankRec s{};
   s.key = static_cast<i64>(draw.bits());
@@ -106,6 +108,7 @@ std::vector<u8> pack_ask() { return {static_cast<u8>(Kind::ask)}; }
 [[maybe_unused]] static bool same(const PlankRec& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]) && same(want.door, (*got.rows)[1]) && same(want.doors, (*got.rows)[2]) && same(want.planks, (*got.rows)[3]); }
 [[maybe_unused]] static bool defined(const PlankRec& s) { return defined(converted::shaped<converted::Whole>(s.key)) && defined(s.door) && defined(s.doors) && defined(s.planks); }
 [[maybe_unused]] static std::string text(const PlankRec& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(s.door) + ", " + text(s.doors) + ", " + text(s.planks) + "}"; }
+[[maybe_unused]] static void take(PlankRec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<converted::Whole>(s.key, (*v.rows)[0]); converted::take_as<unsigned char>(s.door, (*v.rows)[1]); converted::take_as<unsigned char>(s.doors, (*v.rows)[2]); converted::take_as<unsigned char>(s.planks, (*v.rows)[3]); }
 [[maybe_unused]] static MarkRec draw_town__MarkRec(converted::Draw& draw) {
   MarkRec s{};
   s.at = draw.vector();
@@ -117,6 +120,7 @@ std::vector<u8> pack_ask() { return {static_cast<u8>(Kind::ask)}; }
 [[maybe_unused]] static bool same(const MarkRec& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.at, (*got.rows)[0]) && same(want.radius, (*got.rows)[1]) && same(want.strength, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const MarkRec& s) { return defined(s.at) && defined(s.radius) && defined(s.strength); }
 [[maybe_unused]] static std::string text(const MarkRec& s) { return std::string("{") + text(s.at) + ", " + text(s.radius) + ", " + text(s.strength) + "}"; }
+[[maybe_unused]] static void take(MarkRec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<Vec3>(s.at, (*v.rows)[0]); converted::take_as<double>(s.radius, (*v.rows)[1]); converted::take_as<double>(s.strength, (*v.rows)[2]); }
 
 SC_TEST(converted_town_sync) {
   converted::Blueprint bp("TownSync");

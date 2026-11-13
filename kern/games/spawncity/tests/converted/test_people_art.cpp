@@ -14,7 +14,7 @@
 
 namespace converted_people_art {
 namespace converted = ::sc::converted;
-using converted::arg; using converted::same; using converted::defined; using converted::text;
+using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
@@ -170,6 +170,7 @@ namespace PeopleArt { inline void put(Part& p, const Mat4& m, Vec3 tint) {
 [[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
 [[maybe_unused]] static bool defined(const Quat& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
 [[maybe_unused]] static std::string text(const Quat& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
+[[maybe_unused]] static void take(Quat& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
 [[maybe_unused]] static Mat4 draw_kern__Mat4(converted::Draw& draw) {
   Mat4 s{};
   for (auto& e : s.m) e = draw.number();
@@ -179,6 +180,7 @@ namespace PeopleArt { inline void put(Part& p, const Mat4& m, Vec3 tint) {
 [[maybe_unused]] static bool same(const Mat4& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(std::vector<double>(std::begin(want.m), std::end(want.m)), (*got.rows)[0]); }
 [[maybe_unused]] static bool defined(const Mat4& s) { return defined(std::vector<double>(std::begin(s.m), std::end(s.m))); }
 [[maybe_unused]] static std::string text(const Mat4& s) { return std::string("{") + text(std::vector<double>(std::begin(s.m), std::end(s.m))) + "}"; }
+[[maybe_unused]] static void take(Mat4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[0]); for (std::size_t k = 0; k < items.size() && k < std::size(s.m); ++k) s.m[k] = items[k]; } }
 [[maybe_unused]] static PeopleArt::Part draw_PeopleArt__Part(converted::Draw& draw) {
   PeopleArt::Part s{};
   s.id = static_cast<unsigned int>(draw.below(40));
@@ -187,11 +189,12 @@ namespace PeopleArt { inline void put(Part& p, const Mat4& m, Vec3 tint) {
   s.tinted = draw.flag();
   return s;
 }
-namespace PeopleArt { using converted::arg; using converted::same; using converted::defined; using converted::text;
+namespace PeopleArt { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const PeopleArt::Part& s) { return converted::Value::structure({arg(s.id), arg(s.transforms), arg(s.tints), arg(s.tinted)}); }
 [[maybe_unused]] static bool same(const PeopleArt::Part& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.id, (*got.rows)[0]) && same(want.transforms, (*got.rows)[1]) && same(want.tints, (*got.rows)[2]) && same(want.tinted, (*got.rows)[3]); }
 [[maybe_unused]] static bool defined(const PeopleArt::Part& s) { return defined(s.id) && defined(s.transforms) && defined(s.tints) && defined(s.tinted); }
 [[maybe_unused]] static std::string text(const PeopleArt::Part& s) { return std::string("{") + text(s.id) + ", " + text(s.transforms) + ", " + text(s.tints) + ", " + text(s.tinted) + "}"; }
+[[maybe_unused]] static void take(PeopleArt::Part& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.transforms, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.tints, (*v.rows)[2]); converted::take_as<bool>(s.tinted, (*v.rows)[3]); }
 }
 
 SC_TEST(converted_people_art) {

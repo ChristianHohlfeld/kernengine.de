@@ -14,7 +14,7 @@
 
 namespace converted_mp_rules {
 namespace converted = ::sc::converted;
-using converted::arg; using converted::same; using converted::defined; using converted::text;
+using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
@@ -322,6 +322,7 @@ f32 route_left(const std::vector<Vec2>& pts, Vec2 pos) {
 [[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
 [[maybe_unused]] static bool defined(const Quat& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
 [[maybe_unused]] static std::string text(const Quat& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
+[[maybe_unused]] static void take(Quat& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
 [[maybe_unused]] static NavTimeline::Snap draw_mp__NavTimeline__Snap(converted::Draw& draw) {
   NavTimeline::Snap s{};
   s.p = draw.vector();
@@ -334,6 +335,7 @@ f32 route_left(const std::vector<Vec2>& pts, Vec2 pos) {
 [[maybe_unused]] static bool same(const NavTimeline::Snap& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.p, (*got.rows)[0]) && same(want.heading, (*got.rows)[1]) && same(want.mode, (*got.rows)[2]) && same(want.at, (*got.rows)[3]); }
 [[maybe_unused]] static bool defined(const NavTimeline::Snap& s) { return defined(s.p) && defined(s.heading) && defined(s.mode) && defined(s.at); }
 [[maybe_unused]] static std::string text(const NavTimeline::Snap& s) { return std::string("{") + text(s.p) + ", " + text(s.heading) + ", " + text(s.mode) + ", " + text(s.at) + "}"; }
+[[maybe_unused]] static void take(NavTimeline::Snap& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<Vec3>(s.p, (*v.rows)[0]); converted::take_as<double>(s.heading, (*v.rows)[1]); converted::take_as<unsigned char>(s.mode, (*v.rows)[2]); converted::take_as<double>(s.at, (*v.rows)[3]); }
 [[maybe_unused]] static NavTimeline draw_mp__NavTimeline(converted::Draw& draw) {
   NavTimeline s{};
   s.snaps_ = draw_list(draw, [&]() -> NavTimeline::Snap { return draw_mp__NavTimeline__Snap(draw); });
@@ -343,6 +345,7 @@ f32 route_left(const std::vector<Vec2>& pts, Vec2 pos) {
 [[maybe_unused]] static bool same(const NavTimeline& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(want.snaps_, (*got.rows)[0]); }
 [[maybe_unused]] static bool defined(const NavTimeline& s) { return defined(s.snaps_); }
 [[maybe_unused]] static std::string text(const NavTimeline& s) { return std::string("{") + text(s.snaps_) + "}"; }
+[[maybe_unused]] static void take(NavTimeline& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<std::vector<NavTimeline::Snap>>(s.snaps_, (*v.rows)[0]); }
 [[maybe_unused]] static Score draw_mp__Score(converted::Draw& draw) {
   Score s{};
   s.slot = static_cast<unsigned char>(draw.below(40));
@@ -354,6 +357,7 @@ f32 route_left(const std::vector<Vec2>& pts, Vec2 pos) {
 [[maybe_unused]] static bool same(const Score& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.slot, (*got.rows)[0]) && same(want.kills, (*got.rows)[1]) && same(want.deaths, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const Score& s) { return defined(s.slot) && defined(s.kills) && defined(s.deaths); }
 [[maybe_unused]] static std::string text(const Score& s) { return std::string("{") + text(s.slot) + ", " + text(s.kills) + ", " + text(s.deaths) + "}"; }
+[[maybe_unused]] static void take(Score& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned char>(s.slot, (*v.rows)[0]); converted::take_as<unsigned short>(s.kills, (*v.rows)[1]); converted::take_as<unsigned short>(s.deaths, (*v.rows)[2]); }
 [[maybe_unused]] static Scoreboard draw_mp__Scoreboard(converted::Draw& draw) {
   Scoreboard s{};
   s.rows_ = draw_list(draw, [&]() -> Score { return draw_mp__Score(draw); });
@@ -363,6 +367,7 @@ f32 route_left(const std::vector<Vec2>& pts, Vec2 pos) {
 [[maybe_unused]] static bool same(const Scoreboard& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(want.rows_, (*got.rows)[0]); }
 [[maybe_unused]] static bool defined(const Scoreboard& s) { return defined(s.rows_); }
 [[maybe_unused]] static std::string text(const Scoreboard& s) { return std::string("{") + text(s.rows_) + "}"; }
+[[maybe_unused]] static void take(Scoreboard& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<std::vector<Score>>(s.rows_, (*v.rows)[0]); }
 [[maybe_unused]] static VoiceStream::Chunk draw_mp__VoiceStream__Chunk(converted::Draw& draw) {
   VoiceStream::Chunk s{};
   s.pcm = draw_list(draw, [&]() -> double { return draw.number(); });
@@ -373,6 +378,7 @@ f32 route_left(const std::vector<Vec2>& pts, Vec2 pos) {
 [[maybe_unused]] static bool same(const VoiceStream::Chunk& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.pcm, (*got.rows)[0]) && same(want.gain, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const VoiceStream::Chunk& s) { return defined(s.pcm) && defined(s.gain); }
 [[maybe_unused]] static std::string text(const VoiceStream::Chunk& s) { return std::string("{") + text(s.pcm) + ", " + text(s.gain) + "}"; }
+[[maybe_unused]] static void take(VoiceStream::Chunk& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<std::vector<double>>(s.pcm, (*v.rows)[0]); converted::take_as<double>(s.gain, (*v.rows)[1]); }
 [[maybe_unused]] static VoiceStream draw_mp__VoiceStream(converted::Draw& draw) {
   VoiceStream s{};
   s.queue_ = draw_list(draw, [&]() -> VoiceStream::Chunk { return draw_mp__VoiceStream__Chunk(draw); });
@@ -386,6 +392,7 @@ f32 route_left(const std::vector<Vec2>& pts, Vec2 pos) {
 [[maybe_unused]] static bool same(const VoiceStream& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.queue_, (*got.rows)[0]) && same(want.pos_, (*got.rows)[1]) && same(want.lead_, (*got.rows)[2]) && same(want.last_seq_, (*got.rows)[3]) && same(want.have_seq_, (*got.rows)[4]); }
 [[maybe_unused]] static bool defined(const VoiceStream& s) { return defined(s.queue_) && defined(s.pos_) && defined(s.lead_) && defined(s.last_seq_) && defined(s.have_seq_); }
 [[maybe_unused]] static std::string text(const VoiceStream& s) { return std::string("{") + text(s.queue_) + ", " + text(s.pos_) + ", " + text(s.lead_) + ", " + text(s.last_seq_) + ", " + text(s.have_seq_) + "}"; }
+[[maybe_unused]] static void take(VoiceStream& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<std::vector<VoiceStream::Chunk>>(s.queue_, (*v.rows)[0]); converted::take_as<double>(s.pos_, (*v.rows)[1]); converted::take_as<double>(s.lead_, (*v.rows)[2]); converted::take_as<unsigned int>(s.last_seq_, (*v.rows)[3]); converted::take_as<bool>(s.have_seq_, (*v.rows)[4]); }
 [[maybe_unused]] static VoiceCapture draw_mp__VoiceCapture(converted::Draw& draw) {
   VoiceCapture s{};
   s.pending_ = draw_list(draw, [&]() -> double { return draw.number(); });
@@ -397,6 +404,7 @@ f32 route_left(const std::vector<Vec2>& pts, Vec2 pos) {
 [[maybe_unused]] static bool same(const VoiceCapture& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.pending_, (*got.rows)[0]) && same(want.frames_, (*got.rows)[1]) && same(want.phase_, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const VoiceCapture& s) { return defined(s.pending_) && defined(s.frames_) && defined(s.phase_); }
 [[maybe_unused]] static std::string text(const VoiceCapture& s) { return std::string("{") + text(s.pending_) + ", " + text(s.frames_) + ", " + text(s.phase_) + "}"; }
+[[maybe_unused]] static void take(VoiceCapture& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<std::vector<double>>(s.pending_, (*v.rows)[0]); converted::take_as<std::vector<std::vector<unsigned char>>>(s.frames_, (*v.rows)[1]); converted::take_as<double>(s.phase_, (*v.rows)[2]); }
 [[maybe_unused]] static Along draw_mp__Along(converted::Draw& draw) {
   Along s{};
   s.along = draw.number();
@@ -407,6 +415,7 @@ f32 route_left(const std::vector<Vec2>& pts, Vec2 pos) {
 [[maybe_unused]] static bool same(const Along& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.along, (*got.rows)[0]) && same(want.distance, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Along& s) { return defined(s.along) && defined(s.distance); }
 [[maybe_unused]] static std::string text(const Along& s) { return std::string("{") + text(s.along) + ", " + text(s.distance) + "}"; }
+[[maybe_unused]] static void take(Along& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<double>(s.along, (*v.rows)[0]); converted::take_as<double>(s.distance, (*v.rows)[1]); }
 [[maybe_unused]] static Crumb draw_mp__Crumb(converted::Draw& draw) {
   Crumb s{};
   s.p = draw.vector2();
@@ -418,6 +427,7 @@ f32 route_left(const std::vector<Vec2>& pts, Vec2 pos) {
 [[maybe_unused]] static bool same(const Crumb& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.p, (*got.rows)[0]) && same(want.bearing, (*got.rows)[1]) && same(want.left_m, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const Crumb& s) { return defined(s.p) && defined(s.bearing) && defined(s.left_m); }
 [[maybe_unused]] static std::string text(const Crumb& s) { return std::string("{") + text(s.p) + ", " + text(s.bearing) + ", " + text(s.left_m) + "}"; }
+[[maybe_unused]] static void take(Crumb& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<Vec2>(s.p, (*v.rows)[0]); converted::take_as<double>(s.bearing, (*v.rows)[1]); converted::take_as<double>(s.left_m, (*v.rows)[2]); }
 [[maybe_unused]] static Turn draw_mp__Turn(converted::Draw& draw) {
   Turn s{};
   s.dir = static_cast<Turn::Dir>(draw.below(4));
@@ -429,6 +439,7 @@ f32 route_left(const std::vector<Vec2>& pts, Vec2 pos) {
 [[maybe_unused]] static bool same(const Turn& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.dir, (*got.rows)[0]) && same(want.distance, (*got.rows)[1]) && same(want.angle_deg, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const Turn& s) { return defined(s.dir) && defined(s.distance) && defined(s.angle_deg); }
 [[maybe_unused]] static std::string text(const Turn& s) { return std::string("{") + text(s.dir) + ", " + text(s.distance) + ", " + text(s.angle_deg) + "}"; }
+[[maybe_unused]] static void take(Turn& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<Turn::Dir>(s.dir, (*v.rows)[0]); converted::take_as<double>(s.distance, (*v.rows)[1]); converted::take_as<double>(s.angle_deg, (*v.rows)[2]); }
 struct Out_NavTimeline_push { NavTimeline Self; bool Result; };
 [[maybe_unused]] static bool same(const Out_NavTimeline_push& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_NavTimeline_push& s) { return defined(s.Self) && defined(s.Result); }

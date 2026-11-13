@@ -7,6 +7,9 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-13",time:"13:34",title:"Konverter: Beweis für Engine-Aufrufe",items:[
+    "Unter der Haube: Der Vergleichstest kann jetzt auch Funktionen prüfen, die die Engine rufen. Quelltext und Blueprint laufen gegen denselben Stellvertreter der Engine, der jeden Aufruf aufzeichnet; verglichen werden das Ergebnis und die Aufzeichnung, Bit für Bit. Der Konverter schreibt solche Funktionen schon zur Probe (rund 359 statt 286), ins Level kommen sie erst, wenn jede einzelne verglichen ist. Am Spiel ändert sich dadurch nichts.",
+  ]},
   {date:"2026-11-13",time:"12:45",title:"Engine: ihre Funktionen als Knoten",items:[
     "Unter der Haube: 540 Funktionen der Engine (Physik, Renderer, Ton, Netz, Spielwelt, Meshes) sind jetzt Knoten der Blueprint-Sprache, erzeugt aus den Headern der Engine – je Funktion einer, für jedes Spiel. Das ist die Voraussetzung dafür, dass der Konverter auch den Code umschreiben kann, der die Engine ruft (rund 21.000 der 28.544 Zeilen). Am Spiel ändert sich dadurch nichts.",
   ]},

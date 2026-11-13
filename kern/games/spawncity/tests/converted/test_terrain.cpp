@@ -17,7 +17,7 @@
 
 namespace converted_terrain {
 namespace converted = ::sc::converted;
-using converted::arg; using converted::same; using converted::defined; using converted::text;
+using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
@@ -136,6 +136,7 @@ Vec3 to_srgb(Vec3 c) { return {linear_to_srgb(c.x), linear_to_srgb(c.y), linear_
 [[maybe_unused]] static bool same(const Whole64& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.high, (*got.rows)[0]) && same(want.low, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Whole64& s) { return defined(s.high) && defined(s.low); }
 [[maybe_unused]] static std::string text(const Whole64& s) { return std::string("{") + text(s.high) + ", " + text(s.low) + "}"; }
+[[maybe_unused]] static void take(Whole64& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<unsigned int>(s.high, (*v.rows)[0]); converted::take_as<unsigned int>(s.low, (*v.rows)[1]); }
 [[maybe_unused]] static Vec4 draw_kern__Vec4(converted::Draw& draw) {
   if (draw.flag()) return Vec4(draw.number(), draw.number(), draw.number(), draw.number());
   Vec4 s{};
@@ -149,6 +150,7 @@ Vec3 to_srgb(Vec3 c) { return {linear_to_srgb(c.x), linear_to_srgb(c.y), linear_
 [[maybe_unused]] static bool same(const Vec4& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
 [[maybe_unused]] static bool defined(const Vec4& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
 [[maybe_unused]] static std::string text(const Vec4& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
+[[maybe_unused]] static void take(Vec4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
 [[maybe_unused]] static Terrain::Grid draw_Terrain__Grid(converted::Draw& draw) {
   Terrain::Grid s{};
   s.x0 = draw.number();
@@ -160,11 +162,12 @@ Vec3 to_srgb(Vec3 c) { return {linear_to_srgb(c.x), linear_to_srgb(c.y), linear_
   s.cy = draw.number();
   return s;
 }
-namespace Terrain { using converted::arg; using converted::same; using converted::defined; using converted::text;
+namespace Terrain { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const Terrain::Grid& s) { return converted::Value::structure({arg(s.x0), arg(s.y0), arg(s.step), arg(s.n), arg(s.h), arg(s.cx), arg(s.cy)}); }
 [[maybe_unused]] static bool same(const Terrain::Grid& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.x0, (*got.rows)[0]) && same(want.y0, (*got.rows)[1]) && same(want.step, (*got.rows)[2]) && same(want.n, (*got.rows)[3]) && same(want.h, (*got.rows)[4]) && same(want.cx, (*got.rows)[5]) && same(want.cy, (*got.rows)[6]); }
 [[maybe_unused]] static bool defined(const Terrain::Grid& s) { return defined(s.x0) && defined(s.y0) && defined(s.step) && defined(s.n) && defined(s.h) && defined(s.cx) && defined(s.cy); }
 [[maybe_unused]] static std::string text(const Terrain::Grid& s) { return std::string("{") + text(s.x0) + ", " + text(s.y0) + ", " + text(s.step) + ", " + text(s.n) + ", " + text(s.h) + ", " + text(s.cx) + ", " + text(s.cy) + "}"; }
+[[maybe_unused]] static void take(Terrain::Grid& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<double>(s.x0, (*v.rows)[0]); converted::take_as<double>(s.y0, (*v.rows)[1]); converted::take_as<double>(s.step, (*v.rows)[2]); converted::take_as<unsigned int>(s.n, (*v.rows)[3]); converted::take_as<std::vector<double>>(s.h, (*v.rows)[4]); converted::take_as<double>(s.cx, (*v.rows)[5]); converted::take_as<double>(s.cy, (*v.rows)[6]); }
 }
 struct Out_unkey3 { int level; int i; int j; };
 [[maybe_unused]] static bool same(const Out_unkey3& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.level, (*got.rows)[0]) && same(want.i, (*got.rows)[1]) && same(want.j, (*got.rows)[2]); }

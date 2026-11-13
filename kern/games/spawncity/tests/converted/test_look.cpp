@@ -13,7 +13,7 @@
 
 namespace converted_look {
 namespace converted = ::sc::converted;
-using converted::arg; using converted::same; using converted::defined; using converted::text;
+using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
@@ -418,6 +418,7 @@ int drone_flash(f32 now_s, int index) {
 [[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
 [[maybe_unused]] static bool defined(const Quat& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
 [[maybe_unused]] static std::string text(const Quat& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
+[[maybe_unused]] static void take(Quat& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
 [[maybe_unused]] static Shake draw_look__Shake(converted::Draw& draw) {
   Shake s{};
   s.trauma = draw.number();
@@ -428,6 +429,7 @@ int drone_flash(f32 now_s, int index) {
 [[maybe_unused]] static bool same(const Shake& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.trauma, (*got.rows)[0]) && same(want.seed, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Shake& s) { return defined(s.trauma) && defined(s.seed); }
 [[maybe_unused]] static std::string text(const Shake& s) { return std::string("{") + text(s.trauma) + ", " + text(s.seed) + "}"; }
+[[maybe_unused]] static void take(Shake& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<double>(s.trauma, (*v.rows)[0]); converted::take_as<double>(s.seed, (*v.rows)[1]); }
 [[maybe_unused]] static Mat4 draw_kern__Mat4(converted::Draw& draw) {
   Mat4 s{};
   for (auto& e : s.m) e = draw.number();
@@ -437,6 +439,7 @@ int drone_flash(f32 now_s, int index) {
 [[maybe_unused]] static bool same(const Mat4& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(std::vector<double>(std::begin(want.m), std::end(want.m)), (*got.rows)[0]); }
 [[maybe_unused]] static bool defined(const Mat4& s) { return defined(std::vector<double>(std::begin(s.m), std::end(s.m))); }
 [[maybe_unused]] static std::string text(const Mat4& s) { return std::string("{") + text(std::vector<double>(std::begin(s.m), std::end(s.m))) + "}"; }
+[[maybe_unused]] static void take(Mat4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[0]); for (std::size_t k = 0; k < items.size() && k < std::size(s.m); ++k) s.m[k] = items[k]; } }
 [[maybe_unused]] static Camera draw_kern__Camera(converted::Draw& draw) {
   Camera s{};
   s.eye = draw.vector();
@@ -455,6 +458,7 @@ int drone_flash(f32 now_s, int index) {
 [[maybe_unused]] static bool same(const Camera& want, const converted::Value& got) { return got.rows && got.rows->size() == 10 && same(want.eye, (*got.rows)[0]) && same(want.target, (*got.rows)[1]) && same(want.up, (*got.rows)[2]) && same(want.fov, (*got.rows)[3]) && same(want.near, (*got.rows)[4]) && same(want.far, (*got.rows)[5]) && same(want.orthographic, (*got.rows)[6]) && same(want.ortho_height, (*got.rows)[7]) && same(want.has_projection, (*got.rows)[8]) && same(want.projection, (*got.rows)[9]); }
 [[maybe_unused]] static bool defined(const Camera& s) { return defined(s.eye) && defined(s.target) && defined(s.up) && defined(s.fov) && defined(s.near) && defined(s.far) && defined(s.orthographic) && defined(s.ortho_height) && defined(s.has_projection) && defined(s.projection); }
 [[maybe_unused]] static std::string text(const Camera& s) { return std::string("{") + text(s.eye) + ", " + text(s.target) + ", " + text(s.up) + ", " + text(s.fov) + ", " + text(s.near) + ", " + text(s.far) + ", " + text(s.orthographic) + ", " + text(s.ortho_height) + ", " + text(s.has_projection) + ", " + text(s.projection) + "}"; }
+[[maybe_unused]] static void take(Camera& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 10) return; converted::take_as<Vec3>(s.eye, (*v.rows)[0]); converted::take_as<Vec3>(s.target, (*v.rows)[1]); converted::take_as<Vec3>(s.up, (*v.rows)[2]); converted::take_as<double>(s.fov, (*v.rows)[3]); converted::take_as<double>(s.near, (*v.rows)[4]); converted::take_as<double>(s.far, (*v.rows)[5]); converted::take_as<bool>(s.orthographic, (*v.rows)[6]); converted::take_as<double>(s.ortho_height, (*v.rows)[7]); converted::take_as<bool>(s.has_projection, (*v.rows)[8]); converted::take_as<Mat4>(s.projection, (*v.rows)[9]); }
 [[maybe_unused]] static Stabilizer draw_look__Stabilizer(converted::Draw& draw) {
   Stabilizer s{};
   s.init = draw.flag();
@@ -468,6 +472,7 @@ int drone_flash(f32 now_s, int index) {
 [[maybe_unused]] static bool same(const Stabilizer& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.init, (*got.rows)[0]) && same(want.pos, (*got.rows)[1]) && same(want.target, (*got.rows)[2]) && same(want.up, (*got.rows)[3]) && same(want.lag, (*got.rows)[4]); }
 [[maybe_unused]] static bool defined(const Stabilizer& s) { return defined(s.init) && defined(s.pos) && defined(s.target) && defined(s.up) && defined(s.lag); }
 [[maybe_unused]] static std::string text(const Stabilizer& s) { return std::string("{") + text(s.init) + ", " + text(s.pos) + ", " + text(s.target) + ", " + text(s.up) + ", " + text(s.lag) + "}"; }
+[[maybe_unused]] static void take(Stabilizer& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<bool>(s.init, (*v.rows)[0]); converted::take_as<Vec3>(s.pos, (*v.rows)[1]); converted::take_as<Vec3>(s.target, (*v.rows)[2]); converted::take_as<Vec3>(s.up, (*v.rows)[3]); converted::take_as<double>(s.lag, (*v.rows)[4]); }
 [[maybe_unused]] static Lighting draw_kern__Lighting(converted::Draw& draw) {
   Lighting s{};
   s.sun_direction = draw.vector();
@@ -490,6 +495,7 @@ int drone_flash(f32 now_s, int index) {
 [[maybe_unused]] static bool same(const Lighting& want, const converted::Value& got) { return got.rows && got.rows->size() == 14 && same(want.sun_direction, (*got.rows)[0]) && same(want.sun_color, (*got.rows)[1]) && same(want.sky_color, (*got.rows)[2]) && same(want.ground_color, (*got.rows)[3]) && same(want.fog_color, (*got.rows)[4]) && same(want.fog_density, (*got.rows)[5]) && same(want.exposure, (*got.rows)[6]) && same(want.env_intensity, (*got.rows)[7]) && same(want.env_zenith, (*got.rows)[8]) && same(want.env_horizon, (*got.rows)[9]) && same(want.env_ground, (*got.rows)[10]) && same(want.fog_height_falloff, (*got.rows)[11]) && same(want.fog_sun_scatter, (*got.rows)[12]) && same(want.fog_horizon, (*got.rows)[13]); }
 [[maybe_unused]] static bool defined(const Lighting& s) { return defined(s.sun_direction) && defined(s.sun_color) && defined(s.sky_color) && defined(s.ground_color) && defined(s.fog_color) && defined(s.fog_density) && defined(s.exposure) && defined(s.env_intensity) && defined(s.env_zenith) && defined(s.env_horizon) && defined(s.env_ground) && defined(s.fog_height_falloff) && defined(s.fog_sun_scatter) && defined(s.fog_horizon); }
 [[maybe_unused]] static std::string text(const Lighting& s) { return std::string("{") + text(s.sun_direction) + ", " + text(s.sun_color) + ", " + text(s.sky_color) + ", " + text(s.ground_color) + ", " + text(s.fog_color) + ", " + text(s.fog_density) + ", " + text(s.exposure) + ", " + text(s.env_intensity) + ", " + text(s.env_zenith) + ", " + text(s.env_horizon) + ", " + text(s.env_ground) + ", " + text(s.fog_height_falloff) + ", " + text(s.fog_sun_scatter) + ", " + text(s.fog_horizon) + "}"; }
+[[maybe_unused]] static void take(Lighting& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 14) return; converted::take_as<Vec3>(s.sun_direction, (*v.rows)[0]); converted::take_as<Vec3>(s.sun_color, (*v.rows)[1]); converted::take_as<Vec3>(s.sky_color, (*v.rows)[2]); converted::take_as<Vec3>(s.ground_color, (*v.rows)[3]); converted::take_as<Vec3>(s.fog_color, (*v.rows)[4]); converted::take_as<double>(s.fog_density, (*v.rows)[5]); converted::take_as<double>(s.exposure, (*v.rows)[6]); converted::take_as<double>(s.env_intensity, (*v.rows)[7]); converted::take_as<Vec3>(s.env_zenith, (*v.rows)[8]); converted::take_as<Vec3>(s.env_horizon, (*v.rows)[9]); converted::take_as<Vec3>(s.env_ground, (*v.rows)[10]); converted::take_as<double>(s.fog_height_falloff, (*v.rows)[11]); converted::take_as<double>(s.fog_sun_scatter, (*v.rows)[12]); converted::take_as<double>(s.fog_horizon, (*v.rows)[13]); }
 [[maybe_unused]] static SkyState draw_kern__SkyState(converted::Draw& draw) {
   SkyState s{};
   s.sun = draw.vector();
@@ -505,6 +511,7 @@ int drone_flash(f32 now_s, int index) {
 [[maybe_unused]] static bool same(const SkyState& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.sun, (*got.rows)[0]) && same(want.moon, (*got.rows)[1]) && same(want.night, (*got.rows)[2]) && same(want.clouds, (*got.rows)[3]) && same(want.blast_direction, (*got.rows)[4]) && same(want.blast_age, (*got.rows)[5]) && same(want.wind, (*got.rows)[6]); }
 [[maybe_unused]] static bool defined(const SkyState& s) { return defined(s.sun) && defined(s.moon) && defined(s.night) && defined(s.clouds) && defined(s.blast_direction) && defined(s.blast_age) && defined(s.wind); }
 [[maybe_unused]] static std::string text(const SkyState& s) { return std::string("{") + text(s.sun) + ", " + text(s.moon) + ", " + text(s.night) + ", " + text(s.clouds) + ", " + text(s.blast_direction) + ", " + text(s.blast_age) + ", " + text(s.wind) + "}"; }
+[[maybe_unused]] static void take(SkyState& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<Vec3>(s.sun, (*v.rows)[0]); converted::take_as<Vec3>(s.moon, (*v.rows)[1]); converted::take_as<double>(s.night, (*v.rows)[2]); converted::take_as<bool>(s.clouds, (*v.rows)[3]); converted::take_as<Vec3>(s.blast_direction, (*v.rows)[4]); converted::take_as<double>(s.blast_age, (*v.rows)[5]); converted::take_as<Vec2>(s.wind, (*v.rows)[6]); }
 [[maybe_unused]] static Whole64 draw_w64__Whole64(converted::Draw& draw) {
   Whole64 s{};
   s.high = static_cast<unsigned int>(draw.below(40));
@@ -515,6 +522,7 @@ int drone_flash(f32 now_s, int index) {
 [[maybe_unused]] static bool same(const Whole64& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.high, (*got.rows)[0]) && same(want.low, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Whole64& s) { return defined(s.high) && defined(s.low); }
 [[maybe_unused]] static std::string text(const Whole64& s) { return std::string("{") + text(s.high) + ", " + text(s.low) + "}"; }
+[[maybe_unused]] static void take(Whole64& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<unsigned int>(s.high, (*v.rows)[0]); converted::take_as<unsigned int>(s.low, (*v.rows)[1]); }
 [[maybe_unused]] static Whole64Divided draw_w64__Whole64Divided(converted::Draw& draw) {
   Whole64Divided s{};
   s.quotient = draw_w64__Whole64(draw);
@@ -525,6 +533,7 @@ int drone_flash(f32 now_s, int index) {
 [[maybe_unused]] static bool same(const Whole64Divided& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.quotient, (*got.rows)[0]) && same(want.remainder, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Whole64Divided& s) { return defined(s.quotient) && defined(s.remainder); }
 [[maybe_unused]] static std::string text(const Whole64Divided& s) { return std::string("{") + text(s.quotient) + ", " + text(s.remainder) + "}"; }
+[[maybe_unused]] static void take(Whole64Divided& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<Whole64>(s.quotient, (*v.rows)[0]); converted::take_as<Whole64>(s.remainder, (*v.rows)[1]); }
 struct Out_Shake_sample { Shake Self; bool Result; Vec3 angles; Vec2 offset; };
 [[maybe_unused]] static bool same(const Out_Shake_sample& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]) && same(want.angles, (*got.rows)[2]) && same(want.offset, (*got.rows)[3]); }
 [[maybe_unused]] static bool defined(const Out_Shake_sample& s) { return defined(s.Self) && defined(s.Result) && defined(s.angles) && defined(s.offset); }

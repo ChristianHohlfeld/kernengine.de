@@ -14,7 +14,7 @@
 
 namespace converted_game_barricades {
 namespace converted = ::sc::converted;
-using converted::arg; using converted::same; using converted::defined; using converted::text;
+using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
@@ -126,6 +126,7 @@ i64 building_key(const Interiors::Plan& p) {
 [[maybe_unused]] static bool same(const Whole64& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.high, (*got.rows)[0]) && same(want.low, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Whole64& s) { return defined(s.high) && defined(s.low); }
 [[maybe_unused]] static std::string text(const Whole64& s) { return std::string("{") + text(s.high) + ", " + text(s.low) + "}"; }
+[[maybe_unused]] static void take(Whole64& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<unsigned int>(s.high, (*v.rows)[0]); converted::take_as<unsigned int>(s.low, (*v.rows)[1]); }
 [[maybe_unused]] static Interiors::Door draw_Interiors__Door(converted::Draw& draw) {
   Interiors::Door s{};
   s.c = draw.vector2();
@@ -133,11 +134,12 @@ i64 building_key(const Interiors::Plan& p) {
   s.n = draw.vector2();
   return s;
 }
-namespace Interiors { using converted::arg; using converted::same; using converted::defined; using converted::text;
+namespace Interiors { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const Interiors::Door& s) { return converted::Value::structure({arg(s.c), arg(s.d), arg(s.n)}); }
 [[maybe_unused]] static bool same(const Interiors::Door& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.c, (*got.rows)[0]) && same(want.d, (*got.rows)[1]) && same(want.n, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const Interiors::Door& s) { return defined(s.c) && defined(s.d) && defined(s.n); }
 [[maybe_unused]] static std::string text(const Interiors::Door& s) { return std::string("{") + text(s.c) + ", " + text(s.d) + ", " + text(s.n) + "}"; }
+[[maybe_unused]] static void take(Interiors::Door& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<Vec2>(s.c, (*v.rows)[0]); converted::take_as<Vec2>(s.d, (*v.rows)[1]); converted::take_as<Vec2>(s.n, (*v.rows)[2]); }
 }
 [[maybe_unused]] static Interiors::Core draw_Interiors__Core(converted::Draw& draw) {
   Interiors::Core s{};
@@ -146,11 +148,12 @@ namespace Interiors { using converted::arg; using converted::same; using convert
   s.v = draw.vector2();
   return s;
 }
-namespace Interiors { using converted::arg; using converted::same; using converted::defined; using converted::text;
+namespace Interiors { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const Interiors::Core& s) { return converted::Value::structure({arg(s.o), arg(s.u), arg(s.v)}); }
 [[maybe_unused]] static bool same(const Interiors::Core& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.o, (*got.rows)[0]) && same(want.u, (*got.rows)[1]) && same(want.v, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const Interiors::Core& s) { return defined(s.o) && defined(s.u) && defined(s.v); }
 [[maybe_unused]] static std::string text(const Interiors::Core& s) { return std::string("{") + text(s.o) + ", " + text(s.u) + ", " + text(s.v) + "}"; }
+[[maybe_unused]] static void take(Interiors::Core& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<Vec2>(s.o, (*v.rows)[0]); converted::take_as<Vec2>(s.u, (*v.rows)[1]); converted::take_as<Vec2>(s.v, (*v.rows)[2]); }
 }
 [[maybe_unused]] static MeshData draw_kern__MeshData(converted::Draw& draw) {
   MeshData s{};
@@ -167,6 +170,7 @@ namespace Interiors { using converted::arg; using converted::same; using convert
 [[maybe_unused]] static bool same(const MeshData& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.positions, (*got.rows)[0]) && same(want.normals, (*got.rows)[1]) && same(want.colors, (*got.rows)[2]) && same(want.uvs, (*got.rows)[3]) && same(want.extra, (*got.rows)[4]) && same(want.extra_size, (*got.rows)[5]) && same(want.indices, (*got.rows)[6]); }
 [[maybe_unused]] static bool defined(const MeshData& s) { return defined(s.positions) && defined(s.normals) && defined(s.colors) && defined(s.uvs) && defined(s.extra) && defined(s.extra_size) && defined(s.indices); }
 [[maybe_unused]] static std::string text(const MeshData& s) { return std::string("{") + text(s.positions) + ", " + text(s.normals) + ", " + text(s.colors) + ", " + text(s.uvs) + ", " + text(s.extra) + ", " + text(s.extra_size) + ", " + text(s.indices) + "}"; }
+[[maybe_unused]] static void take(MeshData& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<std::vector<double>>(s.positions, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.normals, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.colors, (*v.rows)[2]); converted::take_as<std::vector<double>>(s.uvs, (*v.rows)[3]); converted::take_as<std::vector<double>>(s.extra, (*v.rows)[4]); converted::take_as<unsigned int>(s.extra_size, (*v.rows)[5]); converted::take_as<std::vector<unsigned int>>(s.indices, (*v.rows)[6]); }
 [[maybe_unused]] static Interiors::Plan draw_Interiors__Plan(converted::Draw& draw) {
   Interiors::Plan s{};
   s.outer = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
@@ -190,11 +194,12 @@ namespace Interiors { using converted::arg; using converted::same; using convert
   s.furniture = static_cast<unsigned int>(draw.below(40));
   return s;
 }
-namespace Interiors { using converted::arg; using converted::same; using converted::defined; using converted::text;
+namespace Interiors { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const Interiors::Plan& s) { return converted::Value::structure({arg(s.outer), arg(s.inner), arg(s.holes), arg(s.inner_holes), arg(s.doors), arg(s.levels), arg(s.base), arg(s.top), arg(s.floor_h), arg(s.area), arg(s.has_core), arg(s.roof_access), arg(s.core), arg(s.mesh), arg(s.glass), arg(s.points), arg(s.indices), arg(s.lamps), arg(s.furniture)}); }
 [[maybe_unused]] static bool same(const Interiors::Plan& want, const converted::Value& got) { return got.rows && got.rows->size() == 19 && same(want.outer, (*got.rows)[0]) && same(want.inner, (*got.rows)[1]) && same(want.holes, (*got.rows)[2]) && same(want.inner_holes, (*got.rows)[3]) && same(want.doors, (*got.rows)[4]) && same(want.levels, (*got.rows)[5]) && same(want.base, (*got.rows)[6]) && same(want.top, (*got.rows)[7]) && same(want.floor_h, (*got.rows)[8]) && same(want.area, (*got.rows)[9]) && same(want.has_core, (*got.rows)[10]) && same(want.roof_access, (*got.rows)[11]) && same(want.core, (*got.rows)[12]) && same(want.mesh, (*got.rows)[13]) && same(want.glass, (*got.rows)[14]) && same(want.points, (*got.rows)[15]) && same(want.indices, (*got.rows)[16]) && same(want.lamps, (*got.rows)[17]) && same(want.furniture, (*got.rows)[18]); }
 [[maybe_unused]] static bool defined(const Interiors::Plan& s) { return defined(s.outer) && defined(s.inner) && defined(s.holes) && defined(s.inner_holes) && defined(s.doors) && defined(s.levels) && defined(s.base) && defined(s.top) && defined(s.floor_h) && defined(s.area) && defined(s.has_core) && defined(s.roof_access) && defined(s.core) && defined(s.mesh) && defined(s.glass) && defined(s.points) && defined(s.indices) && defined(s.lamps) && defined(s.furniture); }
 [[maybe_unused]] static std::string text(const Interiors::Plan& s) { return std::string("{") + text(s.outer) + ", " + text(s.inner) + ", " + text(s.holes) + ", " + text(s.inner_holes) + ", " + text(s.doors) + ", " + text(s.levels) + ", " + text(s.base) + ", " + text(s.top) + ", " + text(s.floor_h) + ", " + text(s.area) + ", " + text(s.has_core) + ", " + text(s.roof_access) + ", " + text(s.core) + ", " + text(s.mesh) + ", " + text(s.glass) + ", " + text(s.points) + ", " + text(s.indices) + ", " + text(s.lamps) + ", " + text(s.furniture) + "}"; }
+[[maybe_unused]] static void take(Interiors::Plan& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 19) return; converted::take_as<std::vector<Vec2>>(s.outer, (*v.rows)[0]); converted::take_as<std::vector<Vec2>>(s.inner, (*v.rows)[1]); converted::take_as<std::vector<std::vector<Vec2>>>(s.holes, (*v.rows)[2]); converted::take_as<std::vector<std::vector<Vec2>>>(s.inner_holes, (*v.rows)[3]); converted::take_as<std::vector<Interiors::Door>>(s.doors, (*v.rows)[4]); converted::take_as<std::vector<double>>(s.levels, (*v.rows)[5]); converted::take_as<double>(s.base, (*v.rows)[6]); converted::take_as<double>(s.top, (*v.rows)[7]); converted::take_as<double>(s.floor_h, (*v.rows)[8]); converted::take_as<double>(s.area, (*v.rows)[9]); converted::take_as<bool>(s.has_core, (*v.rows)[10]); converted::take_as<bool>(s.roof_access, (*v.rows)[11]); converted::take_as<Interiors::Core>(s.core, (*v.rows)[12]); converted::take_as<MeshData>(s.mesh, (*v.rows)[13]); converted::take_as<MeshData>(s.glass, (*v.rows)[14]); converted::take_as<std::vector<Vec3>>(s.points, (*v.rows)[15]); converted::take_as<std::vector<unsigned int>>(s.indices, (*v.rows)[16]); converted::take_as<std::vector<Vec3>>(s.lamps, (*v.rows)[17]); converted::take_as<unsigned int>(s.furniture, (*v.rows)[18]); }
 }
 
 SC_TEST(converted_game_barricades) {

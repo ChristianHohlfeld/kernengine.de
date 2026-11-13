@@ -526,6 +526,7 @@ class Unit:
         self.lambdas = {}           # a local function (the id of its call operator) -> how it is called (see Emit.local_function)
         self.engine = None          # the engine's functions as nodes (Api), made when the first one is called
         self.engine_calls = {}      # the engine's functions this Blueprint calls: decl id -> its node (Api.function)
+        self.objects_seen = set()   # the engine's classes it holds handles of
         self.working = set()
         self.short = collections.defaultdict(list)
         for q in list(tree.records) + list(tree.enums):
@@ -635,6 +636,7 @@ class Unit:
             self.struct(q)
             return None   # (plain data: a struct of the Blueprint)
         except Wait:
+            self.objects_seen.add(q)
             return q
 
     def engine_table(self):
@@ -2273,6 +2275,8 @@ class Emit:
         ins, texts, own = list(f["ins"]), [], None
         if d.get("kind") == "CXXMethodDecl" and d.get("storageClass") != "static":
             _, bt, handle = ins.pop(0)
+            if not handle:
+                raise Wait(f"the engine's {d.get('name')}() (a method of plain data that only the engine defines)")
             if obj is None or self.is_this(obj):
                 raise Wait("a call of the engine on its own object")
             texts.append(self.ex(obj, bt))
@@ -4236,6 +4240,7 @@ class TestWriter:
         self.edits = {}        # a file -> the guards in it (see `guard`), in the order of the file
         self.enum_names = {}   # an enum (qualified) -> its name in the test
         self.made = {}         # a class the test makes by a constructor -> (the constructor, the line that makes it without)
+        self.objects = {}      # a class of the engine the source holds objects of -> its stand-in's name in the test
 
     # ---- the source, with a Blueprint's numbers ----
     QUOTED = re.compile(r'''(R"([^()\\\s]{0,16})\((?:.|\n)*?\)\2"|"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])+'|//[^\n]*|/\*(?:.|\n)*?\*/)''')
@@ -4488,10 +4493,26 @@ class TestWriter:
             return expr
         return f"converted::shaped<{re.sub(r'\b[ui]64\b', 'converted::Whole', spelled)}>({expr})"
 
+    def object_name(self, q):
+        """The stand-in of a class of the engine in the test (its objects are handles in the Blueprint)."""
+        if q not in self.objects:
+            name = q.split("::")[-1]
+            if name in self.names.values() or name in self.enum_names.values() or name in self.objects.values():
+                name = "Engine" + name
+            self.objects[q] = self.names[q] = name
+        return self.objects[q]
+
     def spell(self, raw):
         c = self.u.clean(raw)
         if raw.replace(" ", "") in ("constchar*", "constchar*const"):
             return "const char*"
+        q = self.u.object_of(raw)
+        if q:
+            r = raw.strip()
+            return ("const " if re.match(r"const\b", r) else "") + self.object_name(q) + ("&" if r.endswith("&") else "*")
+        m = re.match(r"(?:kern::)?Span<\s*(.+)>$", c)
+        if m:
+            return f"std::vector<{self.spell(m.group(1))}>"
         if c in W64:
             return "u64" if c == "whole64u" else "i64"
         if c in ("float", "double", "long double"):
@@ -4531,6 +4552,9 @@ class TestWriter:
         c = self.u.clean(raw)
         if raw.replace(" ", "") in ("constchar*", "constchar*const"):
             return "draw.c_word()"
+        q = self.u.object_of(raw)
+        if q:   # (an object of the engine: one of a few the test keeps, by its handle)
+            return ("*" if raw.strip().endswith("&") else "") + f"converted::engine_object<{self.object_name(q)}>(1 + draw.below(6))"
         if c in W64:
             return f"static_cast<{self.spell(raw)}>(draw.bits())"
         if c in ("float", "double", "long double"):
@@ -4651,6 +4675,16 @@ class TestWriter:
                      + "".join(f" && same({of(f, 'want')}, (*got.rows)[{i}])" for i, (f, _) in enumerate(fields)) + "; }")
         lines.append(f"[[maybe_unused]] static bool defined(const {t}& s) {{ return " + " && ".join(f"defined({of(f)})" for f, _ in fields) + "; }")
         lines.append(f"[[maybe_unused]] static std::string text(const {t}& s) {{ return std::string(\"{{\") + " + ' + ", " + '.join(f"text({of(f)})" for f, _ in fields) + ' + "}"; }')
+        shape = lambda x: re.sub(r"\b[ui]64\b", "converted::Whole", x)
+        takes = []
+        for i, (f, _) in enumerate(fields):
+            if f in held:
+                continue
+            if f in arrays:
+                takes.append(f"{{ {spelled[f]} items; converted::take_as<{shape(spelled[f])}>(items, (*v.rows)[{i}]); for (std::size_t k = 0; k < items.size() && k < std::size(s.{f}); ++k) s.{f}[k] = items[k]; }}")
+            else:
+                takes.append(f"converted::take_as<{shape(spelled[f])}>(s.{f}, (*v.rows)[{i}]);")
+        lines.append(f"[[maybe_unused]] static void take({t}& s, const converted::Value& v) {{ if (!v.rows || v.rows->size() != {len(fields)}) return; {' '.join(takes)} }}")
         self.helped[q] = lines
         self.helped.move_to_end(q)   # (after the helpers of the classes it is made of)
         return name
@@ -4664,6 +4698,99 @@ class TestWriter:
         lines.append(f"[[maybe_unused]] static std::string text(const {name}& s) {{ return std::string(\"{{\") + " + ' + ", " + '.join(f"text(s.{f})" for f, _ in fields) + ' + "}"; }')
         return lines
 
+    # ---- the engine in the test: stand-ins that keep every call ----
+    def stand_in(self, f, cls):
+        """A function of the engine as the test's source calls it: (its declaration, its definition). It hands
+        its arguments to the stand-in of the engine as the values the Blueprint's node gets, and takes what
+        the stand-in answers."""
+        d = f["decl"]
+        shape = lambda x: re.sub(r"\b[ui]64\b", "converted::Whole", x)
+        params, values, takes = [], (["arg(*this)"] if cls else []), []
+        ps = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
+        for i, (p, (name, _, _)) in enumerate(zip(ps, f["ins"][1:] if cls else f["ins"])):
+            raw = qtype(p).strip()
+            default = self.tree.source(kids(p)[-1]).strip() if kids(p) else ""
+            default = " = " + default if default else ""
+            if not self.u.object_of(raw) and raw.replace(" ", "") not in ("constchar*", "constchar*const"):
+                self.result_ok(re.sub(r"\*\s*(const)?$", "", raw))   # (the helpers of the structs it is made of)
+            if self.u.object_of(raw):
+                params.append((f"{self.spell(raw)} {name}", default))
+                values.append(f"arg({name})")
+            elif re.search(r"\*\s*(const)?$", raw) and raw.replace(" ", "") not in ("constchar*", "constchar*const"):
+                # a pointer to data: one value that may be missing, or the first of as many as the count beside it says
+                inner = self.spell(re.sub(r"\*\s*(const)?$", "", raw))
+                after = ps[i + 1] if i + 1 < len(ps) else None
+                counted = after is not None and NUMBER.get(self.u.clean(qtype(after))) == "Int" and re.search(r"count|size|len|num|^n$", after.get("name", ""))
+                data = f"std::vector<{inner}>({name}, {name} + {after['name']})" if counted else f"({name} ? std::vector<{inner}>{{*{name}}} : std::vector<{inner}>{{}})"
+                params.append((f"const {inner}* {name}", default))
+                values.append(f"arg({self.wrap(data, f'std::vector<{inner}>')})")
+            else:
+                t = self.spell(raw)
+                writes = raw.endswith("&") and not raw.endswith("&&") and not re.match(r"const\b", raw)
+                params.append(((f"{t}& {name}" if writes else f"const {t}& {name}"), default))
+                values.append(f"arg({self.wrap(name, t)})")
+                if writes:
+                    takes.append((name, t))
+        ret_raw = qtype(d).split("(")[0].strip()
+        ret = "void" if ret_raw == "void" else self.spell(ret_raw)
+        if ret_raw != "void" and not self.u.object_of(ret_raw):
+            self.result_ok(ret_raw)
+        body = [f'const std::vector<converted::Value> out = converted::engine_call("{f["type"]}", {{{", ".join(values)}}});']
+        k = 0
+        if ret != "void":
+            body.append(f"{ret} result{{}}; converted::take_as<{shape(ret)}>(result, out[0]);")
+            k = 1
+        for name, t in takes:
+            body.append(f"converted::take_as<{shape(t)}>({name}, out[{k}]);")
+            k += 1
+        if ret != "void":
+            body.append("return result;")
+        const = " const" if cls else ""
+        return (f"{ret} {d['name']}({', '.join(a + b for a, b in params)}){const};",
+                f"inline {ret} {cls + '::' if cls else ''}{d['name']}({', '.join(a for a, _ in params)}){const} {{ {' '.join(body)} }}")
+
+    def stand_ins(self, pairs):
+        """The engine as the test's source sees it: for every class of the engine the source holds an object of,
+        a class of that name with the functions the source calls; for every free function it calls, that
+        function. (Their declarations where the engine's header has them, their definitions after the helpers
+        of the test's structs.)"""
+        u, tree = self.u, self.tree
+        by_class, free = collections.defaultdict(list), []
+        for f in u.engine_calls.values():
+            d = f["decl"]
+            owner = tree.owner.get(d["id"])
+            if owner and d.get("kind") == "CXXMethodDecl" and d.get("storageClass") != "static":
+                by_class[owner].append(f)
+            else:
+                free.append(f)
+        chunks, defs = [], []
+        for q in sorted(u.objects_seen | set(by_class)):
+            if q not in tree.records:
+                continue
+            name = self.object_name(q)
+            pairs.append((self.absolute(q), name))
+            decls = []
+            for f in by_class.get(q, []):
+                try:
+                    a, b = self.stand_in(f, name)
+                except Wait:
+                    continue   # (what it takes the test has no values of: a function that calls it is not compared)
+                decls.append("  " + a)
+                defs.append((("object", q), b))
+            chunks.append((tree.place(tree.records[q]), ("object", q), "\n".join([f"struct {name} : converted::EngineObject {{", *decls, "};"])))
+        for f in free:
+            d = f["decl"]
+            try:
+                a, b = self.stand_in(f, None)
+            except Wait:
+                continue
+            spaces = [x for x in tree.scope_of.get(d["id"], "").strip(":").split("::") if x][1:]
+            head, tail = "".join(f"namespace {x} {{ " for x in spaces), " }" * len(spaces)
+            chunks.append((tree.place(d), ("engine", d["id"]), head + a + tail))
+            defs.append((("engine", d["id"]), head + b + tail))
+            pairs.append(("::" + tree.scope_of.get(d["id"], "") + d["name"], "::".join(spaces + [d["name"]])))
+        return chunks, defs
+
     # ---- the test ----
     def chain(self, d, decls):
         """The name of a declaration in the test: with the classes compiled along that it stands in."""
@@ -4676,12 +4803,20 @@ class TestWriter:
 
     def renamer(self, pairs):
         """What is compiled along is the test's own: a name of the program or the engine written out in
-        full (`kern::Camera`, `sc::Game::Mode`) means the test's (`Camera`, `Mode`)."""
+        full (`kern::Camera`, `sc::Game::Mode`) means the test's (`Camera`, `Mode`). A namespace the
+        source gives another name (`namespace ph = kern::physics;`) is that namespace."""
         table = {}
+        other = {}   # kern::physics -> [ph]
+        for file in [self.path, *self.tree.texts]:
+            for name, what in re.findall(r"\bnamespace\s+(\w+)\s*=\s*(?:::)?([\w:]+)\s*;", self.tree.text(file)):
+                other.setdefault(what if what.startswith(ENGINE + "::") or what.startswith(self.tree.namespace + "::") else self.tree.namespace + "::" + what, set()).add(name)
         for absolute, local in pairs:
             parts, keep = absolute.strip(":").split("::"), len(local.split("::"))
             for i in range(len(parts) - keep):
                 table.setdefault("::".join(parts[i:]), local)
+            for k in range(1, len(parts)):
+                for name in other.get("::".join(parts[:k]), ()):
+                    table.setdefault("::".join([name, *parts[k:]]), local)
         if not table:
             return lambda text: text
         pattern = re.compile(r"(?<![\w:])(?:::)?(" + "|".join(re.escape(k) for k in sorted(table, key=len, reverse=True)) + r")\b")
@@ -4727,8 +4862,8 @@ class TestWriter:
         def want_record(q):
             t = top_of(q)
             d = tree.records.get(t)
-            if q in vectors or d is None or t in records or d.get("_at", (None, None))[1] is None:
-                return
+            if q in vectors or d is None or t in records or d.get("_at", (None, None))[1] is None or t in u.objects_seen:
+                return   # (of the engine's classes with a life of their own the test has stand-ins: see stand_ins)
             records.add(t)
             todo.append(("record", d))
         def want_enum(q):
@@ -4960,7 +5095,7 @@ class TestWriter:
                 first = len(names)
                 for p in params:
                     types.append(self.spell(qtype(p)))
-                    decl_lines.append(f"{'' if types[-1].startswith('const ') else 'const '}{types[-1]} a{len(names)} = {self.draw(qtype(p))};")
+                    decl_lines.append(f"{'' if types[-1].startswith('const ') or self.u.object_of(qtype(p)) else 'const '}{types[-1]} a{len(names)} = {self.draw(qtype(p))};")
                     names.append(f"a{len(names)}")
                 ret = qtype(d).split("(")[0].strip()
                 if f.value is not None:
@@ -5053,13 +5188,14 @@ class TestWriter:
                 words.update(re.findall(r"[A-Za-z_]\w*", text))
                 alias_chunks.append((tree.place(o), ("alias", o["id"]), text + ";"))
                 pairs.append((absolute(o, o["name"]), o["name"]))
+        object_chunks, object_defs = self.stand_ins(pairs)
         rename = self.renamer(pairs)
         wide = lambda text: rename(self.widen(text))
         # a name of the program or the engine that is still written out in full: not the test's own
         foreign = re.compile(r"(?<![\w:])(?:::)?(?:" + re.escape(tree.namespace) + "|" + re.escape(ENGINE) + r")::(?!math::)(\w+)")
 
         # all of it in the order of the translation unit: what a piece uses stands before it there
-        source = sorted([*enum_chunks, *[(tree.place(tree.records[q]), ("record", q), None) for q in top], *const_chunks, *fn_chunks, *alias_chunks], key=lambda c: c[0])
+        source = sorted([*enum_chunks, *[(tree.place(tree.records[q]), ("record", q), None) for q in top], *const_chunks, *fn_chunks, *alias_chunks, *object_chunks], key=lambda c: c[0])
 
         def assemble(dropped):
             """The test without the pieces in `dropped`, and the lines each of its pieces has."""
@@ -5076,7 +5212,7 @@ class TestWriter:
                 "// and the mathematics of the Blueprint language; the Blueprint must give exactly what it gives (../converted.h).",
                 *system, *own, '#include "../converted.h"', "",
                 f"namespace {ns} {{", f"namespace converted = ::{tree.namespace}::converted;",
-                "using converted::arg; using converted::same; using converted::defined; using converted::text;",
+                "using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;",
                 WIDE_PRELUDE, *usings, "",
                 f"// ---- {os.path.basename(self.path)} and what it uses, as it stands ----",
                 '#pragma GCC diagnostic push', '#pragma GCC diagnostic ignored "-Wunused-function"', '#pragma GCC diagnostic ignored "-Wunused-const-variable"',
@@ -5116,9 +5252,12 @@ class TestWriter:
                     hl = hl if not made or ("member", made[0]) not in dropped else [hl[0], made[1], *hl[2:]]
                     spaces = self.names[q].split("::")[:-1] if top_of(q) == q else []
                     if spaces:   # (of a class in a namespace: there, where a call from converted.h looks for them)
-                        hl = [*hl[:-4], "".join(f"namespace {c} {{ " for c in spaces) + "using converted::arg; using converted::same; using converted::defined; using converted::text;",
-                              *hl[-4:], "}" * len(spaces)]
+                        hl = [*hl[:-5], "".join(f"namespace {c} {{ " for c in spaces) + "using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;",
+                              *hl[-5:], "}" * len(spaces)]
                     add(("helper", q), "\n".join(hl))
+            for key, text in object_defs:
+                if key not in dropped:
+                    add(key, wide(text))
             for key, text in outs:
                 if key not in dropped and text:
                     add(key, text)

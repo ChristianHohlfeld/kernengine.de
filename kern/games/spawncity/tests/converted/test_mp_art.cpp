@@ -13,7 +13,7 @@
 
 namespace converted_mp_art {
 namespace converted = ::sc::converted;
-using converted::arg; using converted::same; using converted::defined; using converted::text;
+using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
@@ -137,11 +137,12 @@ namespace MpArt { inline void put(Part& p, const Mat4& m, Vec3 t) {
   s.tints = draw_list(draw, [&]() -> double { return draw.number(); });
   return s;
 }
-namespace MpArt { using converted::arg; using converted::same; using converted::defined; using converted::text;
+namespace MpArt { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const MpArt::Part& s) { return converted::Value::structure({arg(s.id), arg(s.transforms), arg(s.tints)}); }
 [[maybe_unused]] static bool same(const MpArt::Part& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.id, (*got.rows)[0]) && same(want.transforms, (*got.rows)[1]) && same(want.tints, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const MpArt::Part& s) { return defined(s.id) && defined(s.transforms) && defined(s.tints); }
 [[maybe_unused]] static std::string text(const MpArt::Part& s) { return std::string("{") + text(s.id) + ", " + text(s.transforms) + ", " + text(s.tints) + "}"; }
+[[maybe_unused]] static void take(MpArt::Part& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.transforms, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.tints, (*v.rows)[2]); }
 }
 [[maybe_unused]] static Mat4 draw_kern__Mat4(converted::Draw& draw) {
   Mat4 s{};
@@ -152,6 +153,7 @@ namespace MpArt { using converted::arg; using converted::same; using converted::
 [[maybe_unused]] static bool same(const Mat4& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(std::vector<double>(std::begin(want.m), std::end(want.m)), (*got.rows)[0]); }
 [[maybe_unused]] static bool defined(const Mat4& s) { return defined(std::vector<double>(std::begin(s.m), std::end(s.m))); }
 [[maybe_unused]] static std::string text(const Mat4& s) { return std::string("{") + text(std::vector<double>(std::begin(s.m), std::end(s.m))) + "}"; }
+[[maybe_unused]] static void take(Mat4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[0]); for (std::size_t k = 0; k < items.size() && k < std::size(s.m); ++k) s.m[k] = items[k]; } }
 
 SC_TEST(converted_mp_art) {
   converted::Blueprint bp("MpArt");

@@ -18,7 +18,7 @@
 
 namespace converted_city_stream {
 namespace converted = ::sc::converted;
-using converted::arg; using converted::same; using converted::defined; using converted::text;
+using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
@@ -130,6 +130,7 @@ BuildingOptions building_options() {
 [[maybe_unused]] static bool same(const Rgb& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.r, (*got.rows)[0]) && same(want.g, (*got.rows)[1]) && same(want.b, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const Rgb& s) { return defined(s.r) && defined(s.g) && defined(s.b); }
 [[maybe_unused]] static std::string text(const Rgb& s) { return std::string("{") + text(s.r) + ", " + text(s.g) + ", " + text(s.b) + "}"; }
+[[maybe_unused]] static void take(Rgb& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<double>(s.r, (*v.rows)[0]); converted::take_as<double>(s.g, (*v.rows)[1]); converted::take_as<double>(s.b, (*v.rows)[2]); }
 [[maybe_unused]] static BuildingStyle draw_kern__BuildingStyle(converted::Draw& draw) {
   BuildingStyle s{};
   s.walls = draw_list(draw, [&]() -> Rgb { return draw_kern__Rgb(draw); });
@@ -142,6 +143,7 @@ BuildingOptions building_options() {
 [[maybe_unused]] static bool same(const BuildingStyle& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.walls, (*got.rows)[0]) && same(want.roofs, (*got.rows)[1]) && same(want.trim, (*got.rows)[2]) && same(want.trim_mix, (*got.rows)[3]); }
 [[maybe_unused]] static bool defined(const BuildingStyle& s) { return defined(s.walls) && defined(s.roofs) && defined(s.trim) && defined(s.trim_mix); }
 [[maybe_unused]] static std::string text(const BuildingStyle& s) { return std::string("{") + text(s.walls) + ", " + text(s.roofs) + ", " + text(s.trim) + ", " + text(s.trim_mix) + "}"; }
+[[maybe_unused]] static void take(BuildingStyle& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<std::vector<Rgb>>(s.walls, (*v.rows)[0]); converted::take_as<std::vector<Rgb>>(s.roofs, (*v.rows)[1]); converted::take_as<Rgb>(s.trim, (*v.rows)[2]); converted::take_as<double>(s.trim_mix, (*v.rows)[3]); }
 [[maybe_unused]] static Vec4 draw_kern__Vec4(converted::Draw& draw) {
   Vec4 s{};
   s.x = draw.number();
@@ -154,6 +156,7 @@ BuildingOptions building_options() {
 [[maybe_unused]] static bool same(const Vec4& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
 [[maybe_unused]] static bool defined(const Vec4& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
 [[maybe_unused]] static std::string text(const Vec4& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
+[[maybe_unused]] static void take(Vec4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
 [[maybe_unused]] static Whole64 draw_w64__Whole64(converted::Draw& draw) {
   Whole64 s{};
   s.high = static_cast<unsigned int>(draw.below(40));
@@ -164,6 +167,7 @@ BuildingOptions building_options() {
 [[maybe_unused]] static bool same(const Whole64& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.high, (*got.rows)[0]) && same(want.low, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Whole64& s) { return defined(s.high) && defined(s.low); }
 [[maybe_unused]] static std::string text(const Whole64& s) { return std::string("{") + text(s.high) + ", " + text(s.low) + "}"; }
+[[maybe_unused]] static void take(Whole64& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<unsigned int>(s.high, (*v.rows)[0]); converted::take_as<unsigned int>(s.low, (*v.rows)[1]); }
 [[maybe_unused]] static BuildingOptions draw_kern__BuildingOptions(converted::Draw& draw) {
   BuildingOptions s{};
   s.chunk_size = draw.number();
@@ -177,6 +181,7 @@ BuildingOptions building_options() {
 [[maybe_unused]] static bool same(const BuildingOptions& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.chunk_size, (*got.rows)[0]) && same(want.max_buildings, (*got.rows)[1]) && same(want.cornice, (*got.rows)[2]) && same(want.wall_records, (*got.rows)[3]) && same(want.style, (*got.rows)[4]); }
 [[maybe_unused]] static bool defined(const BuildingOptions& s) { return defined(s.chunk_size) && defined(s.max_buildings) && defined(s.cornice) && defined(s.wall_records) && defined(s.style); }
 [[maybe_unused]] static std::string text(const BuildingOptions& s) { return std::string("{") + text(s.chunk_size) + ", " + text(s.max_buildings) + ", " + text(s.cornice) + ", " + text(s.wall_records) + ", " + text(s.style) + "}"; }
+[[maybe_unused]] static void take(BuildingOptions& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<double>(s.chunk_size, (*v.rows)[0]); converted::take_as<unsigned int>(s.max_buildings, (*v.rows)[1]); converted::take_as<bool>(s.cornice, (*v.rows)[2]); converted::take_as<bool>(s.wall_records, (*v.rows)[3]); converted::take_as<BuildingStyle>(s.style, (*v.rows)[4]); }
 
 SC_TEST(converted_city_stream) {
   converted::Blueprint bp("CityStream");

@@ -17,7 +17,7 @@
 
 namespace converted_tiles {
 namespace converted = ::sc::converted;
-using converted::arg; using converted::same; using converted::defined; using converted::text;
+using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
@@ -290,6 +290,7 @@ void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out) {
 [[maybe_unused]] static bool same(const TileKey& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.z, (*got.rows)[0]) && same(want.x, (*got.rows)[1]) && same(want.y, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const TileKey& s) { return defined(s.z) && defined(s.x) && defined(s.y); }
 [[maybe_unused]] static std::string text(const TileKey& s) { return std::string("{") + text(s.z) + ", " + text(s.x) + ", " + text(s.y) + "}"; }
+[[maybe_unused]] static void take(TileKey& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<int>(s.z, (*v.rows)[0]); converted::take_as<int>(s.x, (*v.rows)[1]); converted::take_as<int>(s.y, (*v.rows)[2]); }
 [[maybe_unused]] static GeoProjector draw_kern__GeoProjector(converted::Draw& draw) {
   GeoProjector s{};
   s.lon0 = draw.number();
@@ -301,6 +302,7 @@ void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out) {
 [[maybe_unused]] static bool same(const GeoProjector& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.lon0, (*got.rows)[0]) && same(want.lat0, (*got.rows)[1]) && same(want.cos_lat, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const GeoProjector& s) { return defined(s.lon0) && defined(s.lat0) && defined(s.cos_lat); }
 [[maybe_unused]] static std::string text(const GeoProjector& s) { return std::string("{") + text(s.lon0) + ", " + text(s.lat0) + ", " + text(s.cos_lat) + "}"; }
+[[maybe_unused]] static void take(GeoProjector& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<double>(s.lon0, (*v.rows)[0]); converted::take_as<double>(s.lat0, (*v.rows)[1]); converted::take_as<double>(s.cos_lat, (*v.rows)[2]); }
 [[maybe_unused]] static Projector draw_Projector(converted::Draw& draw) {
   Projector s = Projector(draw_TileKey(draw), draw_kern__GeoProjector(draw), draw.number());
   s.x0 = draw.number();
@@ -315,6 +317,7 @@ void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out) {
 [[maybe_unused]] static bool same(const Projector& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.x0, (*got.rows)[0]) && same(want.x1, (*got.rows)[1]) && same(want.y0, (*got.rows)[2]) && same(want.ym, (*got.rows)[3]) && same(want.y1, (*got.rows)[4]) && same(want.inv_extent, (*got.rows)[5]); }
 [[maybe_unused]] static bool defined(const Projector& s) { return defined(s.x0) && defined(s.x1) && defined(s.y0) && defined(s.ym) && defined(s.y1) && defined(s.inv_extent); }
 [[maybe_unused]] static std::string text(const Projector& s) { return std::string("{") + text(s.x0) + ", " + text(s.x1) + ", " + text(s.y0) + ", " + text(s.ym) + ", " + text(s.y1) + ", " + text(s.inv_extent) + "}"; }
+[[maybe_unused]] static void take(Projector& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<double>(s.x0, (*v.rows)[0]); converted::take_as<double>(s.x1, (*v.rows)[1]); converted::take_as<double>(s.y0, (*v.rows)[2]); converted::take_as<double>(s.ym, (*v.rows)[3]); converted::take_as<double>(s.y1, (*v.rows)[4]); converted::take_as<double>(s.inv_extent, (*v.rows)[5]); }
 [[maybe_unused]] static Whole64 draw_w64__Whole64(converted::Draw& draw) {
   Whole64 s{};
   s.high = static_cast<unsigned int>(draw.below(40));
@@ -325,6 +328,7 @@ void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out) {
 [[maybe_unused]] static bool same(const Whole64& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.high, (*got.rows)[0]) && same(want.low, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Whole64& s) { return defined(s.high) && defined(s.low); }
 [[maybe_unused]] static std::string text(const Whole64& s) { return std::string("{") + text(s.high) + ", " + text(s.low) + "}"; }
+[[maybe_unused]] static void take(Whole64& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<unsigned int>(s.high, (*v.rows)[0]); converted::take_as<unsigned int>(s.low, (*v.rows)[1]); }
 [[maybe_unused]] static Rng draw_Rng(converted::Draw& draw) {
   Rng s = Rng(static_cast<unsigned int>(draw.below(40)));
   s.s = static_cast<unsigned int>(draw.below(40));
@@ -336,6 +340,7 @@ void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out) {
 [[maybe_unused]] static bool same(const Rng& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.s, (*got.rows)[0]) && same(want.spare_, (*got.rows)[1]) && same(want.has_spare_, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const Rng& s) { return defined(s.s) && defined(s.spare_) && defined(s.has_spare_); }
 [[maybe_unused]] static std::string text(const Rng& s) { return std::string("{") + text(s.s) + ", " + text(s.spare_) + ", " + text(s.has_spare_) + "}"; }
+[[maybe_unused]] static void take(Rng& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned int>(s.s, (*v.rows)[0]); converted::take_as<double>(s.spare_, (*v.rows)[1]); converted::take_as<bool>(s.has_spare_, (*v.rows)[2]); }
 [[maybe_unused]] static MapFeatures::Building draw_MapFeatures__Building(converted::Draw& draw) {
   MapFeatures::Building s{};
   s.rings = draw_list(draw, [&]() -> std::vector<Vec2> { return draw_list(draw, [&]() -> Vec2 { return draw.vector2(); }); });
@@ -350,6 +355,7 @@ void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out) {
 [[maybe_unused]] static bool same(const MapFeatures::Building& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.rings, (*got.rows)[0]) && same(want.base, (*got.rows)[1]) && same(want.top, (*got.rows)[2]) && same(want.seed, (*got.rows)[3]) && same(want.full_top, (*got.rows)[4]) && same(want.leveled, (*got.rows)[5]); }
 [[maybe_unused]] static bool defined(const MapFeatures::Building& s) { return defined(s.rings) && defined(s.base) && defined(s.top) && defined(s.seed) && defined(s.full_top) && defined(s.leveled); }
 [[maybe_unused]] static std::string text(const MapFeatures::Building& s) { return std::string("{") + text(s.rings) + ", " + text(s.base) + ", " + text(s.top) + ", " + text(s.seed) + ", " + text(s.full_top) + ", " + text(s.leveled) + "}"; }
+[[maybe_unused]] static void take(MapFeatures::Building& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<std::vector<std::vector<Vec2>>>(s.rings, (*v.rows)[0]); converted::take_as<double>(s.base, (*v.rows)[1]); converted::take_as<double>(s.top, (*v.rows)[2]); converted::take_as<unsigned int>(s.seed, (*v.rows)[3]); converted::take_as<double>(s.full_top, (*v.rows)[4]); converted::take_as<bool>(s.leveled, (*v.rows)[5]); }
 [[maybe_unused]] static MapFeatures::Road draw_MapFeatures__Road(converted::Draw& draw) {
   MapFeatures::Road s{};
   s.points = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
@@ -361,6 +367,7 @@ void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out) {
 [[maybe_unused]] static bool same(const MapFeatures::Road& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.points, (*got.rows)[0]) && same(want.cls, (*got.rows)[1]) && same(want.bridge, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const MapFeatures::Road& s) { return defined(s.points) && defined(s.cls) && defined(s.bridge); }
 [[maybe_unused]] static std::string text(const MapFeatures::Road& s) { return std::string("{") + text(s.points) + ", " + text(s.cls) + ", " + text(s.bridge) + "}"; }
+[[maybe_unused]] static void take(MapFeatures::Road& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<std::vector<Vec2>>(s.points, (*v.rows)[0]); converted::take_as<RoadClass>(s.cls, (*v.rows)[1]); converted::take_as<bool>(s.bridge, (*v.rows)[2]); }
 [[maybe_unused]] static MapFeatures::Area draw_MapFeatures__Area(converted::Draw& draw) {
   MapFeatures::Area s{};
   s.rings = draw_list(draw, [&]() -> std::vector<Vec2> { return draw_list(draw, [&]() -> Vec2 { return draw.vector2(); }); });
@@ -371,6 +378,7 @@ void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out) {
 [[maybe_unused]] static bool same(const MapFeatures::Area& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.rings, (*got.rows)[0]) && same(want.kind, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const MapFeatures::Area& s) { return defined(s.rings) && defined(s.kind); }
 [[maybe_unused]] static std::string text(const MapFeatures::Area& s) { return std::string("{") + text(s.rings) + ", " + text(s.kind) + "}"; }
+[[maybe_unused]] static void take(MapFeatures::Area& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<std::vector<std::vector<Vec2>>>(s.rings, (*v.rows)[0]); converted::take_as<AreaKind>(s.kind, (*v.rows)[1]); }
 [[maybe_unused]] static MapFeatures::Spot draw_MapFeatures__Spot(converted::Draw& draw) {
   MapFeatures::Spot s{};
   s.p = draw.vector2();
@@ -381,6 +389,7 @@ void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out) {
 [[maybe_unused]] static bool same(const MapFeatures::Spot& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.p, (*got.rows)[0]) && same(want.a, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const MapFeatures::Spot& s) { return defined(s.p) && defined(s.a); }
 [[maybe_unused]] static std::string text(const MapFeatures::Spot& s) { return std::string("{") + text(s.p) + ", " + text(s.a) + "}"; }
+[[maybe_unused]] static void take(MapFeatures::Spot& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<Vec2>(s.p, (*v.rows)[0]); converted::take_as<double>(s.a, (*v.rows)[1]); }
 [[maybe_unused]] static MapFeatures draw_MapFeatures(converted::Draw& draw) {
   MapFeatures s{};
   s.buildings = draw_list(draw, [&]() -> MapFeatures::Building { return draw_MapFeatures__Building(draw); });
@@ -395,6 +404,7 @@ void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out) {
 [[maybe_unused]] static bool same(const MapFeatures& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.buildings, (*got.rows)[0]) && same(want.roads, (*got.rows)[1]) && same(want.areas, (*got.rows)[2]) && same(want.trees, (*got.rows)[3]) && same(want.lamps, (*got.rows)[4]) && same(want.procedural, (*got.rows)[5]); }
 [[maybe_unused]] static bool defined(const MapFeatures& s) { return defined(s.buildings) && defined(s.roads) && defined(s.areas) && defined(s.trees) && defined(s.lamps) && defined(s.procedural); }
 [[maybe_unused]] static std::string text(const MapFeatures& s) { return std::string("{") + text(s.buildings) + ", " + text(s.roads) + ", " + text(s.areas) + ", " + text(s.trees) + ", " + text(s.lamps) + ", " + text(s.procedural) + "}"; }
+[[maybe_unused]] static void take(MapFeatures& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<std::vector<MapFeatures::Building>>(s.buildings, (*v.rows)[0]); converted::take_as<std::vector<MapFeatures::Road>>(s.roads, (*v.rows)[1]); converted::take_as<std::vector<MapFeatures::Area>>(s.areas, (*v.rows)[2]); converted::take_as<std::vector<MapFeatures::Spot>>(s.trees, (*v.rows)[3]); converted::take_as<std::vector<MapFeatures::Spot>>(s.lamps, (*v.rows)[4]); converted::take_as<bool>(s.procedural, (*v.rows)[5]); }
 struct Out_tile_lonlat { double lon; double lat; };
 [[maybe_unused]] static bool same(const Out_tile_lonlat& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.lon, (*got.rows)[0]) && same(want.lat, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_tile_lonlat& s) { return defined(s.lon) && defined(s.lat); }

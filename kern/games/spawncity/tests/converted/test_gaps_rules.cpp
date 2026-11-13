@@ -14,7 +14,7 @@
 
 namespace converted_gaps_rules {
 namespace converted = ::sc::converted;
-using converted::arg; using converted::same; using converted::defined; using converted::text;
+using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
@@ -214,6 +214,7 @@ void VisualPose::update(Vec3 position, Quat rotation, Vec3 anchor, i32 mode, f32
 [[maybe_unused]] static bool same(const SmokeEffect& want, const converted::Value& got) { return got.rows && got.rows->size() == 8 && same(want.id, (*got.rows)[0]) && same(want.at, (*got.rows)[1]) && same(want.scale, (*got.rows)[2]) && same(want.started, (*got.rows)[3]) && same(want.expires, (*got.rows)[4]) && same(want.last_emit, (*got.rows)[5]) && same(want.serial, (*got.rows)[6]) && same(want.seed, (*got.rows)[7]); }
 [[maybe_unused]] static bool defined(const SmokeEffect& s) { return defined(s.id) && defined(s.at) && defined(s.scale) && defined(s.started) && defined(s.expires) && defined(s.last_emit) && defined(s.serial) && defined(s.seed); }
 [[maybe_unused]] static std::string text(const SmokeEffect& s) { return std::string("{") + text(s.id) + ", " + text(s.at) + ", " + text(s.scale) + ", " + text(s.started) + ", " + text(s.expires) + ", " + text(s.last_emit) + ", " + text(s.serial) + ", " + text(s.seed) + "}"; }
+[[maybe_unused]] static void take(SmokeEffect& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 8) return; converted::take_as<std::string>(s.id, (*v.rows)[0]); converted::take_as<Vec3>(s.at, (*v.rows)[1]); converted::take_as<double>(s.scale, (*v.rows)[2]); converted::take_as<double>(s.started, (*v.rows)[3]); converted::take_as<double>(s.expires, (*v.rows)[4]); converted::take_as<double>(s.last_emit, (*v.rows)[5]); converted::take_as<unsigned int>(s.serial, (*v.rows)[6]); converted::take_as<unsigned int>(s.seed, (*v.rows)[7]); }
 [[maybe_unused]] static Puff draw_gaps__Puff(converted::Draw& draw) {
   Puff s{};
   s.alive = draw.flag();
@@ -234,6 +235,7 @@ void VisualPose::update(Vec3 position, Quat rotation, Vec3 anchor, i32 mode, f32
 [[maybe_unused]] static bool same(const Puff& want, const converted::Value& got) { return got.rows && got.rows->size() == 12 && same(want.alive, (*got.rows)[0]) && same(want.ember, (*got.rows)[1]) && same(want.pos, (*got.rows)[2]) && same(want.vel, (*got.rows)[3]) && same(want.born, (*got.rows)[4]) && same(want.expires, (*got.rows)[5]) && same(want.s0, (*got.rows)[6]) && same(want.s1, (*got.rows)[7]) && same(want.opacity, (*got.rows)[8]) && same(want.rotation, (*got.rows)[9]) && same(want.serial, (*got.rows)[10]) && same(want.color, (*got.rows)[11]); }
 [[maybe_unused]] static bool defined(const Puff& s) { return defined(s.alive) && defined(s.ember) && defined(s.pos) && defined(s.vel) && defined(s.born) && defined(s.expires) && defined(s.s0) && defined(s.s1) && defined(s.opacity) && defined(s.rotation) && defined(s.serial) && defined(s.color); }
 [[maybe_unused]] static std::string text(const Puff& s) { return std::string("{") + text(s.alive) + ", " + text(s.ember) + ", " + text(s.pos) + ", " + text(s.vel) + ", " + text(s.born) + ", " + text(s.expires) + ", " + text(s.s0) + ", " + text(s.s1) + ", " + text(s.opacity) + ", " + text(s.rotation) + ", " + text(s.serial) + ", " + text(s.color) + "}"; }
+[[maybe_unused]] static void take(Puff& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 12) return; converted::take_as<bool>(s.alive, (*v.rows)[0]); converted::take_as<bool>(s.ember, (*v.rows)[1]); converted::take_as<Vec3>(s.pos, (*v.rows)[2]); converted::take_as<Vec3>(s.vel, (*v.rows)[3]); converted::take_as<double>(s.born, (*v.rows)[4]); converted::take_as<double>(s.expires, (*v.rows)[5]); converted::take_as<double>(s.s0, (*v.rows)[6]); converted::take_as<double>(s.s1, (*v.rows)[7]); converted::take_as<double>(s.opacity, (*v.rows)[8]); converted::take_as<double>(s.rotation, (*v.rows)[9]); converted::take_as<unsigned int>(s.serial, (*v.rows)[10]); converted::take_as<Vec3>(s.color, (*v.rows)[11]); }
 [[maybe_unused]] static SmokeField draw_gaps__SmokeField(converted::Draw& draw) {
   SmokeField s{};
   s.effects_ = draw_list(draw, [&]() -> SmokeEffect { return draw_gaps__SmokeEffect(draw); });
@@ -244,6 +246,7 @@ void VisualPose::update(Vec3 position, Quat rotation, Vec3 anchor, i32 mode, f32
 [[maybe_unused]] static bool same(const SmokeField& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.effects_, (*got.rows)[0]) && same(want.puffs_, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const SmokeField& s) { return defined(s.effects_) && defined(s.puffs_); }
 [[maybe_unused]] static std::string text(const SmokeField& s) { return std::string("{") + text(s.effects_) + ", " + text(s.puffs_) + "}"; }
+[[maybe_unused]] static void take(SmokeField& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<std::vector<SmokeEffect>>(s.effects_, (*v.rows)[0]); converted::take_as<std::vector<Puff>>(s.puffs_, (*v.rows)[1]); }
 [[maybe_unused]] static Quat draw_kern__Quat(converted::Draw& draw) {
   Quat s{};
   s.x = draw.number();
@@ -256,6 +259,7 @@ void VisualPose::update(Vec3 position, Quat rotation, Vec3 anchor, i32 mode, f32
 [[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
 [[maybe_unused]] static bool defined(const Quat& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
 [[maybe_unused]] static std::string text(const Quat& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
+[[maybe_unused]] static void take(Quat& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
 [[maybe_unused]] static VisualPose draw_gaps__VisualPose(converted::Draw& draw) {
   VisualPose s{};
   s.init_ = draw.flag();
@@ -268,6 +272,7 @@ void VisualPose::update(Vec3 position, Quat rotation, Vec3 anchor, i32 mode, f32
 [[maybe_unused]] static bool same(const VisualPose& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.init_, (*got.rows)[0]) && same(want.mode_, (*got.rows)[1]) && same(want.offset_, (*got.rows)[2]) && same(want.q_, (*got.rows)[3]); }
 [[maybe_unused]] static bool defined(const VisualPose& s) { return defined(s.init_) && defined(s.mode_) && defined(s.offset_) && defined(s.q_); }
 [[maybe_unused]] static std::string text(const VisualPose& s) { return std::string("{") + text(s.init_) + ", " + text(s.mode_) + ", " + text(s.offset_) + ", " + text(s.q_) + "}"; }
+[[maybe_unused]] static void take(VisualPose& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<bool>(s.init_, (*v.rows)[0]); converted::take_as<int>(s.mode_, (*v.rows)[1]); converted::take_as<Vec3>(s.offset_, (*v.rows)[2]); converted::take_as<Quat>(s.q_, (*v.rows)[3]); }
 struct Out_VisualPose_update { VisualPose Self; Vec3 out_p; Quat out_q; };
 [[maybe_unused]] static bool same(const Out_VisualPose_update& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Self, (*got.rows)[0]) && same(want.out_p, (*got.rows)[1]) && same(want.out_q, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const Out_VisualPose_update& s) { return defined(s.Self) && defined(s.out_p) && defined(s.out_q); }

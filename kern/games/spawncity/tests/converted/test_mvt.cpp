@@ -14,7 +14,7 @@
 
 namespace converted_mvt {
 namespace converted = ::sc::converted;
-using converted::arg; using converted::same; using converted::defined; using converted::text;
+using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 // the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
@@ -137,6 +137,7 @@ void Writer::begin_layer(const std::string& name, u32 extent) {
 [[maybe_unused]] static bool same(const Whole64& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.high, (*got.rows)[0]) && same(want.low, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Whole64& s) { return defined(s.high) && defined(s.low); }
 [[maybe_unused]] static std::string text(const Whole64& s) { return std::string("{") + text(s.high) + ", " + text(s.low) + "}"; }
+[[maybe_unused]] static void take(Whole64& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<unsigned int>(s.high, (*v.rows)[0]); converted::take_as<unsigned int>(s.low, (*v.rows)[1]); }
 [[maybe_unused]] static Value draw_mvt__Value(converted::Draw& draw) {
   Value s{};
   s.kind = static_cast<Value::Kind>(draw.below(4));
@@ -149,6 +150,7 @@ void Writer::begin_layer(const std::string& name, u32 extent) {
 [[maybe_unused]] static bool same(const Value& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.kind, (*got.rows)[0]) && same(want.s, (*got.rows)[1]) && same(want.n, (*got.rows)[2]) && same(want.b, (*got.rows)[3]); }
 [[maybe_unused]] static bool defined(const Value& s) { return defined(s.kind) && defined(s.s) && defined(s.n) && defined(s.b); }
 [[maybe_unused]] static std::string text(const Value& s) { return std::string("{") + text(s.kind) + ", " + text(s.s) + ", " + text(s.n) + ", " + text(s.b) + "}"; }
+[[maybe_unused]] static void take(Value& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<Value::Kind>(s.kind, (*v.rows)[0]); converted::take_as<std::string>(s.s, (*v.rows)[1]); converted::take_as<double>(s.n, (*v.rows)[2]); converted::take_as<bool>(s.b, (*v.rows)[3]); }
 [[maybe_unused]] static Writer::PendingLayer draw_mvt__Writer__PendingLayer(converted::Draw& draw) {
   Writer::PendingLayer s{};
   s.name = draw.word();
@@ -162,6 +164,7 @@ void Writer::begin_layer(const std::string& name, u32 extent) {
 [[maybe_unused]] static bool same(const Writer::PendingLayer& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.name, (*got.rows)[0]) && same(want.extent, (*got.rows)[1]) && same(want.keys, (*got.rows)[2]) && same(want.values, (*got.rows)[3]) && same(want.features, (*got.rows)[4]); }
 [[maybe_unused]] static bool defined(const Writer::PendingLayer& s) { return defined(s.name) && defined(s.extent) && defined(s.keys) && defined(s.values) && defined(s.features); }
 [[maybe_unused]] static std::string text(const Writer::PendingLayer& s) { return std::string("{") + text(s.name) + ", " + text(s.extent) + ", " + text(s.keys) + ", " + text(s.values) + ", " + text(s.features) + "}"; }
+[[maybe_unused]] static void take(Writer::PendingLayer& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<std::string>(s.name, (*v.rows)[0]); converted::take_as<unsigned int>(s.extent, (*v.rows)[1]); converted::take_as<std::vector<std::string>>(s.keys, (*v.rows)[2]); converted::take_as<std::vector<Value>>(s.values, (*v.rows)[3]); converted::take_as<std::vector<std::vector<unsigned char>>>(s.features, (*v.rows)[4]); }
 [[maybe_unused]] static Writer draw_mvt__Writer(converted::Draw& draw) {
   Writer s{};
   s.layer_ = draw_mvt__Writer__PendingLayer(draw);
@@ -172,6 +175,7 @@ void Writer::begin_layer(const std::string& name, u32 extent) {
 [[maybe_unused]] static bool same(const Writer& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.layer_, (*got.rows)[0]) && same(want.out_, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Writer& s) { return defined(s.layer_) && defined(s.out_); }
 [[maybe_unused]] static std::string text(const Writer& s) { return std::string("{") + text(s.layer_) + ", " + text(s.out_) + "}"; }
+[[maybe_unused]] static void take(Writer& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<Writer::PendingLayer>(s.layer_, (*v.rows)[0]); converted::take_as<std::vector<unsigned char>>(s.out_, (*v.rows)[1]); }
 
 SC_TEST(converted_mvt) {
   converted::Blueprint bp("Mvt");

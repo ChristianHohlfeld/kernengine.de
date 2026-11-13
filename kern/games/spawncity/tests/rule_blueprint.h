@@ -3,6 +3,7 @@
 #include <string>
 
 #include "../src/rules.h"
+#include "kern/logic/engine_api.h"
 #include "kern/logic/logic.h"
 
 namespace sc {
@@ -15,6 +16,9 @@ struct RuleBlueprint {
     void print(const std::string&, bool) override {}
     void error(const std::string& text) override { errors += text + "\n"; }
     kern::u32 random() override { return 4; }
+    /// The engine of a test: the stand-in, which answers by the outputs' forms and keeps every call.
+    kern::logic::EngineStandIn stand_in;
+    bool engine(std::string_view function, const std::vector<kern::logic::Value>& in, std::vector<kern::logic::Value>& out) override { return stand_in.engine(function, in, out); }
   } host;
   kern::logic::Runtime rt{host};
   kern::logic::Instance* inst = nullptr;
