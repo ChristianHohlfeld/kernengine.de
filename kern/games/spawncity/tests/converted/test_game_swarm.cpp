@@ -88,11 +88,11 @@ u16 drone_id(const PoliceDrone& d) { return static_cast<u16>(d.serial % 65535 + 
 
 SC_TEST(converted_game_swarm) {
   converted::Blueprint bp("GameSwarm");
-  converted::Draw draw;
   {  // falls
     converted::Tally tally("falls");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] SwarmKind a0) { return converted_game_swarm::falls(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const SwarmKind a0 = static_cast<SwarmKind>(draw.below(9));
       const converted::Watch watch;
       const auto want = run(a0);
@@ -101,8 +101,9 @@ SC_TEST(converted_game_swarm) {
   }
   {  // drone_id
     converted::Tally tally("drone_id");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] PoliceDrone a0) { return converted_game_swarm::drone_id(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const PoliceDrone a0 = draw_PoliceDrone(draw);
       const converted::Watch watch;
       const auto want = run(a0);

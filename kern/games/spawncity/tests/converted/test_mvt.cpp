@@ -41,6 +41,7 @@ struct Value {
   f64 n = 0;
   bool b = false;
 };
+f64 ring_area(const std::vector<Vec2>& ring);
 struct Writer {
  public:
   void begin_layer(const std::string& name, u32 extent = 4096);
@@ -60,7 +61,13 @@ struct Writer {
   PendingLayer layer_;
   std::vector<u8> out_;
 };
-i64 zigzag(u64 v) { return static_cast<i64>(v >> 1) ^ -static_cast<i64>(v & 1); }
+i64 zigzag(u64 v) { return static_cast<i64>(converted::shr(v, 1)) ^ -static_cast<i64>(v & 1); }
+f64 ring_area(const std::vector<Vec2>& ring) {
+  f64 a = 0;
+  const std::size_t n = ring.size();
+  for (std::size_t i = 0, j = n ? converted::minus(n, 1) : 0; i < n; j = converted::post_inc(i)) a += static_cast<f64>(converted::at(ring, j).x) * converted::at(ring, i).y - static_cast<f64>(converted::at(ring, i).x) * converted::at(ring, j).y;
+  return a * 0.5;
+}
 bool wanted_layer(const std::string& name, const std::vector<std::string>& wanted) {
   if (wanted.empty()) return true;
   for (const std::string& w : wanted)
@@ -68,7 +75,7 @@ bool wanted_layer(const std::string& name, const std::vector<std::string>& wante
   return false;
 }
 void put_varint(std::vector<u8>& o, u64 v) {
-  while (v >= 0x80) { o.push_back(static_cast<u8>(v | 0x80)); v >>= 7; }
+  while (v >= 0x80) { o.push_back(static_cast<u8>(v | 0x80)); converted::shr_to(v, 7); }
   o.push_back(static_cast<u8>(v));
 }
 void Writer::begin_layer(const std::string& name, u32 extent) {
@@ -118,12 +125,23 @@ void Writer::begin_layer(const std::string& name, u32 extent) {
 
 SC_TEST(converted_mvt) {
   converted::Blueprint bp("Mvt");
-  converted::Draw draw;
   {  // zigzag
     converted::Tally tally("zigzag");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned long a0) { return converted_mvt::zigzag(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const unsigned long a0 = static_cast<unsigned long>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = run(a0);
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
+  {  // ring_area
+    converted::Tally tally("ring_area");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0) { return converted_mvt::ring_area(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       const converted::Watch watch;
       const auto want = run(a0);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
@@ -131,8 +149,9 @@ SC_TEST(converted_mvt) {
   }
   {  // wanted_layer
     converted::Tally tally("wanted_layer");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] std::string a0, [[maybe_unused]] std::vector<std::string> a1) { return converted_mvt::wanted_layer(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const std::string a0 = draw.word();
       const std::vector<std::string> a1 = draw_list(draw, [&]() -> std::string { return draw.word(); });
       const converted::Watch watch;
@@ -142,8 +161,9 @@ SC_TEST(converted_mvt) {
   }
   {  // put_varint
     converted::Tally tally("put_varint");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] unsigned long a1) { converted_mvt::put_varint(a0, a1); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       const unsigned long a1 = static_cast<unsigned long>(draw.below(40));
       const converted::Watch watch;
@@ -153,8 +173,9 @@ SC_TEST(converted_mvt) {
   }
   {  // Writer::begin_layer
     converted::Tally tally("Writer_begin_layer");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Writer a0, [[maybe_unused]] std::string a1, [[maybe_unused]] unsigned int a2) { a0.begin_layer(a1, a2); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Writer a0 = draw_mvt__Writer(draw);
       const std::string a1 = draw.word();
       const unsigned int a2 = static_cast<unsigned int>(draw.below(40));

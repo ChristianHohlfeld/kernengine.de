@@ -61,7 +61,7 @@ bool plank_ok(const PlankRec& r) { return r.doors >= 1 && r.doors <= kDoorsMax &
 bool mark_ok(const MarkRec& m) { return vec_finite(m.at) && std::fabs(m.at.x) < 1e6 && std::fabs(m.at.y) < 1e6 && m.radius > 0 && m.radius < 200 && m.strength >= 0 && m.strength <= 4; }
 Kind kind_of(const std::vector<u8>& blob) {
   if (blob.empty() || converted::at(blob, 0) < 1 || converted::at(blob, 0) > static_cast<u8>(Kind::ask)) return Kind::none;
-  return static_cast<Kind>(converted::at(blob, 0));
+  return static_cast<Kind>(converted::among({0, 1, 2, 3, 4, 5, 6, 7}, converted::at(blob, 0)));
 }
 std::vector<u8> pack_ask() { return {static_cast<u8>(Kind::ask)}; }
 #undef private
@@ -116,11 +116,11 @@ std::vector<u8> pack_ask() { return {static_cast<u8>(Kind::ask)}; }
 
 SC_TEST(converted_town_sync) {
   converted::Blueprint bp("TownSync");
-  converted::Draw draw;
   {  // In::done
     converted::Tally tally("In_done");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] In a0) { return a0.done(); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const In a0 = draw_town__In(draw);
       const converted::Watch watch;
       const auto want = run(a0);
@@ -129,8 +129,9 @@ SC_TEST(converted_town_sync) {
   }
   {  // vec_finite
     converted::Tally tally("vec_finite");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted_town_sync::vec_finite(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const converted::Watch watch;
       const auto want = run(a0);
@@ -139,8 +140,9 @@ SC_TEST(converted_town_sync) {
   }
   {  // lamp_ok
     converted::Tally tally("lamp_ok");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] LampRec a0) { return converted_town_sync::lamp_ok(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const LampRec a0 = draw_town__LampRec(draw);
       const converted::Watch watch;
       const auto want = run(a0);
@@ -149,8 +151,9 @@ SC_TEST(converted_town_sync) {
   }
   {  // plank_ok
     converted::Tally tally("plank_ok");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] PlankRec a0) { return converted_town_sync::plank_ok(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const PlankRec a0 = draw_town__PlankRec(draw);
       const converted::Watch watch;
       const auto want = run(a0);
@@ -159,8 +162,9 @@ SC_TEST(converted_town_sync) {
   }
   {  // mark_ok
     converted::Tally tally("mark_ok");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] MarkRec a0) { return converted_town_sync::mark_ok(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const MarkRec a0 = draw_town__MarkRec(draw);
       const converted::Watch watch;
       const auto want = run(a0);
@@ -169,8 +173,9 @@ SC_TEST(converted_town_sync) {
   }
   {  // kind_of
     converted::Tally tally("kind_of");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0) { return converted_town_sync::kind_of(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       const converted::Watch watch;
       const auto want = run(a0);
@@ -179,8 +184,9 @@ SC_TEST(converted_town_sync) {
   }
   {  // pack_ask
     converted::Tally tally("pack_ask");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]() { return converted_town_sync::pack_ask(); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       const auto want = run();
       tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });

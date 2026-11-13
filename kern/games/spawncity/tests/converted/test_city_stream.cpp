@@ -78,6 +78,11 @@ std::vector<Rgb> road_palette() {
   auto rgb = [](u32 h) { return Rgb{((h >> 16) & 255) / 255.0, ((h >> 8) & 255) / 255.0, (h & 255) / 255.0}; };
   return {rgb(0x3c3f44), rgb(0x34373c), rgb(0xe6e4dc), rgb(0x86837c), rgb(0x2f5f86), rgb(0x9a948a)};
 }
+f64 signed_area(const std::vector<Vec2>& r) {
+  f64 a = 0;
+  for (std::size_t i = 0, j = converted::minus(r.size(), 1); i < r.size(); j = converted::post_inc(i)) a += static_cast<f64>(converted::at(r, j).x) * converted::at(r, i).y - static_cast<f64>(converted::at(r, i).x) * converted::at(r, j).y;
+  return a * 0.5;
+}
 f32 rect_distance_to(const Vec4& r, f32 x, f32 y) {
   const f32 dx = std::fmax(std::fmax(r.x - x, x - r.z), 0.0), dy = std::fmax(std::fmax(r.y - y, y - r.w), 0.0);
   return hypot_bp(dx, dy);
@@ -145,11 +150,11 @@ BuildingOptions building_options() {
 
 SC_TEST(converted_city_stream) {
   converted::Blueprint bp("CityStream");
-  converted::Draw draw;
   {  // konstanz_style
     converted::Tally tally("konstanz_style");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]() { return converted_city_stream::konstanz_style(); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       const auto want = run();
       tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });
@@ -157,17 +162,30 @@ SC_TEST(converted_city_stream) {
   }
   {  // road_palette
     converted::Tally tally("road_palette");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]() { return converted_city_stream::road_palette(); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       const auto want = run();
       tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });
     }
   }
+  {  // signed_area
+    converted::Tally tally("signed_area");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0) { return converted_city_stream::signed_area(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+      const converted::Watch watch;
+      const auto want = run(a0);
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
   {  // rect_distance_to
     converted::Tally tally("rect_distance_to");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec4 a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted_city_stream::rect_distance_to(a0, a1, a2); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec4 a0 = draw_kern__Vec4(draw);
       const double a1 = draw.number();
       const double a2 = draw.number();
@@ -178,8 +196,9 @@ SC_TEST(converted_city_stream) {
   }
   {  // building_options
     converted::Tally tally("building_options");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]() { return converted_city_stream::building_options(); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       const auto want = run();
       tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });

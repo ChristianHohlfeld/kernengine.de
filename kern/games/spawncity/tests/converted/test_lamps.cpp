@@ -38,8 +38,8 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 enum class Surface : u8 { none, cloth, tpu, floor };
 constexpr f32 kSpacing = 34, kPoleH = 6.2, kGridM = 10;
 i64 cell_key(f32 x, f32 y);
-i64 grid_key(f32 x, f32 y) { return (static_cast<i64>(std::floor(x / kGridM)) << 32) ^ (static_cast<i64>(std::floor(y / kGridM)) & 0xffffffffll); }
-i64 cell_key(f32 x, f32 y) { return (static_cast<i64>(std::lround(x / 8)) << 32) ^ (static_cast<i64>(std::lround(y / 8)) & 0xffffffffll); }
+i64 grid_key(f32 x, f32 y) { return (converted::shl(static_cast<i64>(converted::fits<long>(std::floor(x / kGridM))), 32)) ^ (static_cast<i64>(converted::fits<long>(std::floor(y / kGridM))) & 0xffffffffll); }
+i64 cell_key(f32 x, f32 y) { return (converted::shl(static_cast<i64>(std::lround(x / 8)), 32)) ^ (static_cast<i64>(std::lround(y / 8)) & 0xffffffffll); }
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
@@ -47,11 +47,11 @@ i64 cell_key(f32 x, f32 y) { return (static_cast<i64>(std::lround(x / 8)) << 32)
 
 SC_TEST(converted_lamps) {
   converted::Blueprint bp("LampsSource");
-  converted::Draw draw;
   {  // grid_key
     converted::Tally tally("grid_key");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted_lamps::grid_key(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const converted::Watch watch;
@@ -61,8 +61,9 @@ SC_TEST(converted_lamps) {
   }
   {  // cell_key
     converted::Tally tally("cell_key");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted_lamps::cell_key(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const converted::Watch watch;

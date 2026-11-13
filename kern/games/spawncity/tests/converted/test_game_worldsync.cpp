@@ -57,11 +57,11 @@ u8 col8(f32 v) { return static_cast<u8>(std::lround(clampf(v, 0, 1) * 255)); }
 
 SC_TEST(converted_game_worldsync) {
   converted::Blueprint bp("GameWorldsync");
-  converted::Draw draw;
   {  // dist2d
     converted::Tally tally("dist2d");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1) { return converted_game_worldsync::dist2d(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const Vec3 a1 = draw.vector();
       const converted::Watch watch;
@@ -71,8 +71,9 @@ SC_TEST(converted_game_worldsync) {
   }
   {  // uq16
     converted::Tally tally("uq16");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] short a0) { return converted_game_worldsync::uq16(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const short a0 = static_cast<short>(draw.whole());
       const converted::Watch watch;
       const auto want = run(a0);
@@ -81,8 +82,9 @@ SC_TEST(converted_game_worldsync) {
   }
   {  // col8
     converted::Tally tally("col8");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0) { return converted_game_worldsync::col8(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
       const auto want = run(a0);

@@ -48,23 +48,40 @@ std::vector<f32> finish(Buf& d, double target) {
   double peak = 1e-6;
   for (double v : d) peak = std::fmax(peak, std::fabs(v));
   const double gain = target / peak;
-  std::vector<f32> out(d.size());
-  for (std::size_t i = 0; i < d.size(); ++i) converted::at(out, i) = static_cast<f32>(tanh_bp(converted::at(d, i) * gain * 1.35));  // softClip
+  std::vector<f32> out(converted::count(d.size()));
+  for (std::size_t i = 0; i < d.size(); converted::pre_inc(i)) converted::at(out, i) = static_cast<f32>(tanh_bp(converted::at(d, i) * gain * 1.35));  // softClip
   return out;
 }
-std::size_t samples(double duration, u32 rate) { return static_cast<std::size_t>(std::ceil(duration * rate)); }
+std::size_t samples(double duration, u32 rate) { return static_cast<std::size_t>(converted::fits<unsigned long>(std::ceil(duration * rate))); }
 double nwave_at(double t, double rise, double fall) {
   if (t < rise) return t / rise;
   if (t < rise + fall) return 1 - 1.6 * (t - rise) / fall;
   if (t < rise + fall * 1.9) return -0.6 * (1 - (t - rise - fall) / (fall * 0.9));
   return 0;
 }
+std::vector<f32> hit(u32 rate, u32 v) {
+  const double duration = 0.105 + v * 0.009;
+  Buf data(converted::count(samples(duration, rate)));
+  Random random(0x91cdef + v * 733);
+  const std::size_t delay = static_cast<std::size_t>(converted::fits<unsigned long>(rate * (0.008 + v * 0.001)));
+  double low = 0, phase = 0;
+  for (std::size_t i = 0; i < data.size(); converted::pre_inc(i)) {
+    const double t = static_cast<double>(i) / rate, white = random() * 2 - 1;
+    low += 0.20 * (white - low);
+    const double surface = (white * 0.35 + low * 0.65) * kern::math::exp(-t * (37.0 - v * 2.0));
+    const double frequency = (112 + v * 9) * kern::math::exp(-t * 13) + 46;
+    phase += TAU * frequency / rate;
+    const double thud = kern::math::sin(phase) * kern::math::exp(-t * 30), slap = i >= delay ? converted::at(data, converted::minus(i, delay)) * 0.16 : 0;
+    converted::at(data, i) = surface * 0.78 + thud * 0.58 + slap;
+  }
+  return finish(data, 0.82);
+}
 std::vector<f32> crack(u32 rate, u32 v) {
   const double duration = 0.082 + v * 0.006;
-  Buf data(samples(duration, rate));
+  Buf data(converted::count(samples(duration, rate)));
   Random random(0xc12ac7 + v * 991);
   double low = 0, phase = 0;
-  for (std::size_t i = 0; i < data.size(); ++i) {
+  for (std::size_t i = 0; i < data.size(); converted::pre_inc(i)) {
     const double t = static_cast<double>(i) / rate, white = random() * 2 - 1;
     low += 0.08 * (white - low);
     const double snap = (white - low) * kern::math::exp(-t * (92.0 - v * 4.0));
@@ -77,10 +94,10 @@ std::vector<f32> crack(u32 rate, u32 v) {
 }
 std::vector<f32> damage(u32 rate, u32 v) {
   const double duration = 0.21 + v * 0.035;
-  Buf data(samples(duration, rate));
+  Buf data(converted::count(samples(duration, rate)));
   Random random(0x7ad0b1 + v * 811);
   double low = 0, phase = 0;
-  for (std::size_t i = 0; i < data.size(); ++i) {
+  for (std::size_t i = 0; i < data.size(); converted::pre_inc(i)) {
     const double t = static_cast<double>(i) / rate, white = random() * 2 - 1;
     low += 0.065 * (white - low);
     const double frequency = (92 + v * 12) * kern::math::exp(-t * 8) + 31;
@@ -93,10 +110,10 @@ std::vector<f32> damage(u32 rate, u32 v) {
 double gaussian(double value, double center, double width) { const double x = (value - center) / width; return kern::math::exp(-0.5 * x * x); }
 std::vector<f32> explosion(u32 rate, u32 v) {
   const double duration = 0.76 + v * 0.08;
-  Buf data(samples(duration, rate));
+  Buf data(converted::count(samples(duration, rate)));
   Random random(0xb0057 + v * 1901);
   double rumble = 0, phase = 0;
-  for (std::size_t i = 0; i < data.size(); ++i) {
+  for (std::size_t i = 0; i < data.size(); converted::pre_inc(i)) {
     const double t = static_cast<double>(i) / rate, white = random() * 2 - 1;
     rumble += 0.035 * (white - rumble);
     const double crk = (white - rumble) * kern::math::exp(-t * 24), frequency = (88 + v * 13) * kern::math::exp(-t * 5.7) + 22;
@@ -108,10 +125,10 @@ std::vector<f32> explosion(u32 rate, u32 v) {
 }
 std::vector<f32> step(u32 rate, u32 v) {
   const double duration = 0.075 + v * 0.008;
-  Buf data(samples(duration, rate));
+  Buf data(converted::count(samples(duration, rate)));
   Random random(0x57e9 + v * 431);
   double low = 0, phase = 0;
-  for (std::size_t i = 0; i < data.size(); ++i) {
+  for (std::size_t i = 0; i < data.size(); converted::pre_inc(i)) {
     const double t = static_cast<double>(i) / rate, white = random() * 2 - 1;
     low += 0.09 * (white - low);
     phase += TAU * (78 + v * 9) * kern::math::exp(-t * 12) / rate;
@@ -122,11 +139,11 @@ std::vector<f32> step(u32 rate, u32 v) {
 std::vector<f32> bounce(u32 rate, u32 v) {
   // A 40 mm grenade hitting the ground: a hard, dry "dock", short hollow knock, a little ring.
   const double duration = 0.16 + v * 0.01;
-  Buf data(samples(duration, rate));
+  Buf data(converted::count(samples(duration, rate)));
   Random random(0xd0c4 + v * 977);
   double lp = 0, phase = 0, ring = 0;
   const double f0 = 150 + v * 18, fr = 1850 + v * 240;
-  for (std::size_t i = 0; i < data.size(); ++i) {
+  for (std::size_t i = 0; i < data.size(); converted::pre_inc(i)) {
     const double t = static_cast<double>(i) / rate, white = random() * 2 - 1;
     lp += 0.35 * (white - lp);
     const double click = (white - lp) * kern::math::exp(-t / 0.0022);
@@ -139,13 +156,46 @@ std::vector<f32> bounce(u32 rate, u32 v) {
   }
   return finish(data, 0.82);
 }
+constexpr double kSixteenth = 60.0 / 176 / 4;
 double note_hz(int n) { return 440 * kern::math::pow(2.0, (n - 69) / 12.0); }
+std::vector<f32> cue(u32 rate, std::vector<int> notes, std::vector<double> lengths, double cutoff, double echo, double level) {
+  double total = 0;
+  for (double l : lengths) total += l;
+  total *= kSixteenth;
+  Buf dry(converted::count(samples(total + kSixteenth * 6, rate)));
+  double t0 = 0;
+  for (std::size_t n = 0; n < notes.size(); converted::pre_inc(n)) {
+    const double len = converted::at(lengths, n) * kSixteenth;
+    if (converted::at(notes, n) < 0) { t0 += len; continue; }  // a rest
+    const double f = note_hz(converted::at(notes, n)), dur = len * 1.6;
+    const std::size_t start = static_cast<std::size_t>(converted::fits<unsigned long>(t0 * rate)), count = static_cast<std::size_t>(converted::fits<unsigned long>(dur * rate));
+    double phase = 0, sub = 0, lp = 0;
+    for (std::size_t i = 0; i < count && converted::plus(start, i) < dry.size(); converted::pre_inc(i)) {
+      const double t = static_cast<double>(i) / rate, env = std::fmin(1.0, t / 0.006) * kern::math::exp(-t / (len * 0.75));
+      phase += f / rate;
+      sub += f * 0.5 / rate;
+      const double pulse = kern::math::mod(phase, 1.0) < 0.5 ? 1 : -1, alpha = std::fmin(1.0, TAU * cutoff * (1 - 0.5 * t / dur) / rate);
+      lp += alpha * (pulse - lp);
+      converted::at(dry, converted::plus(start, i)) += (lp * 0.55 + kern::math::sin(TAU * sub) * 0.28) * env;
+    }
+    t0 += len;
+  }
+  Buf data(converted::count(dry.size()));
+  const std::size_t delay = static_cast<std::size_t>(converted::fits<unsigned long>(kSixteenth * 3 * rate));
+  for (std::size_t i = 0; i < data.size(); converted::pre_inc(i)) {
+    const double e1 = i >= delay ? converted::at(dry, converted::minus(i, delay)) * echo : 0, e2 = i >= converted::times(2, delay) ? converted::at(dry, converted::minus(i, converted::times(2, delay))) * echo * echo : 0;
+    converted::at(data, i) = converted::at(dry, i) + e1 + e2;
+  }
+  const std::size_t fade = static_cast<std::size_t>(converted::fits<unsigned long>(0.04 * rate));
+  for (std::size_t i = 0; i < fade && i < data.size(); converted::pre_inc(i)) converted::at(data, converted::minus(converted::minus(data.size(), 1), i)) *= static_cast<double>(i) / fade;
+  return finish(data, level);
+}
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
 
 [[maybe_unused]] static Random draw_combat_audio__Random(converted::Draw& draw) {
-  Random s(static_cast<unsigned int>(draw.below(40)));
+  Random s = Random(static_cast<unsigned int>(draw.below(40)));
   s.s = static_cast<unsigned int>(draw.below(40));
   return s;
 }
@@ -164,11 +214,11 @@ struct Out_finish { std::vector<double> Result; std::vector<double> d; };
 
 SC_TEST(converted_combat_audio) {
   converted::Blueprint bp("CombatAudio");
-  converted::Draw draw;
   {  // Random::Random
     converted::Tally tally("Random_new");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0) { return Random(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
       const auto want = run(a0);
@@ -177,8 +227,9 @@ SC_TEST(converted_combat_audio) {
   }
   {  // Random::operator()
     converted::Tally tally("Random_call");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Random a0) { const auto r = a0.operator()(); return Out_Random_call{a0, r}; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Random a0 = draw_combat_audio__Random(draw);
       const converted::Watch watch;
       const auto want = run(a0);
@@ -187,8 +238,9 @@ SC_TEST(converted_combat_audio) {
   }
   {  // envelope
     converted::Tally tally("envelope");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return converted_combat_audio::envelope(a0, a1, a2, a3); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const double a2 = draw.number();
@@ -200,8 +252,9 @@ SC_TEST(converted_combat_audio) {
   }
   {  // finish
     converted::Tally tally("finish");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] std::vector<double> a0, [[maybe_unused]] double a1) { const auto r = converted_combat_audio::finish(a0, a1); return Out_finish{r, a0}; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const std::vector<double> a0 = draw_list(draw, [&]() -> double { return draw.number(); });
       const double a1 = draw.number();
       const converted::Watch watch;
@@ -211,8 +264,9 @@ SC_TEST(converted_combat_audio) {
   }
   {  // samples
     converted::Tally tally("samples");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] unsigned int a1) { return converted_combat_audio::samples(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
@@ -222,8 +276,9 @@ SC_TEST(converted_combat_audio) {
   }
   {  // nwave_at
     converted::Tally tally("nwave_at");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted_combat_audio::nwave_at(a0, a1, a2); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const double a2 = draw.number();
@@ -232,10 +287,23 @@ SC_TEST(converted_combat_audio) {
       tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
     }
   }
+  {  // hit
+    converted::Tally tally("hit");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted_combat_audio::hit(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
   {  // crack
     converted::Tally tally("crack");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted_combat_audio::crack(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
@@ -245,8 +313,9 @@ SC_TEST(converted_combat_audio) {
   }
   {  // damage
     converted::Tally tally("damage");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted_combat_audio::damage(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
@@ -256,8 +325,9 @@ SC_TEST(converted_combat_audio) {
   }
   {  // gaussian
     converted::Tally tally("gaussian");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted_combat_audio::gaussian(a0, a1, a2); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const double a2 = draw.number();
@@ -268,8 +338,9 @@ SC_TEST(converted_combat_audio) {
   }
   {  // explosion
     converted::Tally tally("explosion");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted_combat_audio::explosion(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
@@ -279,8 +350,9 @@ SC_TEST(converted_combat_audio) {
   }
   {  // step
     converted::Tally tally("step");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted_combat_audio::step(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
@@ -290,8 +362,9 @@ SC_TEST(converted_combat_audio) {
   }
   {  // bounce
     converted::Tally tally("bounce");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted_combat_audio::bounce(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
@@ -301,12 +374,29 @@ SC_TEST(converted_combat_audio) {
   }
   {  // note_hz
     converted::Tally tally("note_hz");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] int a0) { return converted_combat_audio::note_hz(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const int a0 = static_cast<int>(draw.whole());
       const converted::Watch watch;
       const auto want = run(a0);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
+  {  // cue
+    converted::Tally tally("cue");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] std::vector<int> a1, [[maybe_unused]] std::vector<double> a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { return converted_combat_audio::cue(a0, a1, a2, a3, a4, a5); };
+    for (int i = 0; tally.more(i); ++i) {
+      const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      const std::vector<int> a1 = draw_list(draw, [&]() -> int { return static_cast<int>(draw.whole()); });
+      const std::vector<double> a2 = draw_list(draw, [&]() -> double { return draw.number(); });
+      const double a3 = draw.number();
+      const double a4 = draw.number();
+      const double a5 = draw.number();
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2, a3, a4, a5);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5); });
     }
   }
 }

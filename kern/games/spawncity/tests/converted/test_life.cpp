@@ -74,6 +74,14 @@ namespace Life { struct Cow {
 f32 dist2d(Vec3 a, Vec3 b) { return hypot_bp(a.x - b.x, a.y - b.y); }
 f32 dist2d(Vec2 a, Vec2 b) { return hypot_bp(a.x - b.x, a.y - b.y); }
 Vec3 rgb(u32 h) { return {((h >> 16) & 255) / 255.0, ((h >> 8) & 255) / 255.0, (h & 255) / 255.0}; }
+bool in_ring(const std::vector<Vec2>& r, Vec2 p) {
+  bool c = false;
+  for (std::size_t i = 0, j = converted::minus(r.size(), 1); i < r.size(); j = converted::post_inc(i)) {
+    const Vec2 a = converted::at(r, i), b = converted::at(r, j);
+    if ((a.y > p.y) != (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y + 1e-12) + a.x) c = !c;
+  }
+  return c;
+}
 f32 seg_sphere(Vec3 a, Vec3 b, Vec3 c, f32 r) {
   const Vec3 d = b - a, m = a - c;
   const f32 A = dot(d, d), B = dot(m, d), C = dot(m, m) - r * r;
@@ -83,6 +91,17 @@ f32 seg_sphere(Vec3 a, Vec3 b, Vec3 c, f32 r) {
   const f32 t = (-B - kern::math::sqrt(disc)) / A;
   return t >= 0 && t <= 1 ? t : (C < 0 ? 0.0 : -1.0);
 }
+namespace Life { inline bool in_rings(const std::vector<std::vector<Vec2>>& rings, Vec2 p) {
+  if (rings.empty() || !in_ring(converted::at(rings, 0), p)) return false;
+  for (std::size_t i = 1; i < rings.size(); converted::pre_inc(i))
+    if (converted::at(rings, i).size() > 2 && in_ring(converted::at(rings, i), p)) return false;
+  return true;
+} }
+namespace Life { inline f32 ring_area(const std::vector<Vec2>& r) {
+  f32 a = 0;
+  for (std::size_t i = 0, j = converted::minus(r.size(), 1); i < r.size(); j = converted::post_inc(i)) a += (converted::at(r, j).x + converted::at(r, i).x) * (converted::at(r, j).y - converted::at(r, i).y);
+  return std::fabs(a) * 0.5;
+} }
 namespace Life { inline void scare_cow(Cow& c, Vec2 from, f32 now, f32 secs) {
   if (c.dead) return;
   Vec2 d{c.pos.x - from.x, c.pos.y - from.y};
@@ -154,11 +173,11 @@ namespace Life { using converted::arg; using converted::same; using converted::d
 
 SC_TEST(converted_life) {
   converted::Blueprint bp("Life");
-  converted::Draw draw;
   {  // dist2d
     converted::Tally tally("dist2d");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1) { return converted_life::dist2d(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const Vec3 a1 = draw.vector();
       const converted::Watch watch;
@@ -168,8 +187,9 @@ SC_TEST(converted_life) {
   }
   {  // dist2d
     converted::Tally tally("dist2d_2");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec2 a0, [[maybe_unused]] Vec2 a1) { return converted_life::dist2d(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec2 a0 = draw.vector2();
       const Vec2 a1 = draw.vector2();
       const converted::Watch watch;
@@ -179,18 +199,32 @@ SC_TEST(converted_life) {
   }
   {  // rgb
     converted::Tally tally("rgb");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted_life::rgb(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
       const auto want = run(a0);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
+  {  // in_ring
+    converted::Tally tally("in_ring");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] Vec2 a1) { return converted_life::in_ring(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+      const Vec2 a1 = draw.vector2();
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
   {  // seg_sphere
     converted::Tally tally("seg_sphere");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3) { return converted_life::seg_sphere(a0, a1, a2, a3); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const Vec3 a1 = draw.vector();
       const Vec3 a2 = draw.vector();
@@ -200,10 +234,34 @@ SC_TEST(converted_life) {
       tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); });
     }
   }
+  {  // Life::in_rings
+    converted::Tally tally("Life_in_rings");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<std::vector<Vec2>> a0, [[maybe_unused]] Vec2 a1) { return converted_life::Life::in_rings(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const std::vector<std::vector<Vec2>> a0 = draw_list(draw, [&]() -> std::vector<Vec2> { return draw_list(draw, [&]() -> Vec2 { return draw.vector2(); }); });
+      const Vec2 a1 = draw.vector2();
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // Life::ring_area
+    converted::Tally tally("Life_ring_area");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0) { return converted_life::Life::ring_area(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+      const converted::Watch watch;
+      const auto want = run(a0);
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
   {  // Life::scare_cow
     converted::Tally tally("Life_scare_cow");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Life::Cow a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { converted_life::Life::scare_cow(a0, a1, a2, a3); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Life::Cow a0 = draw_Life__Cow(draw);
       const Vec2 a1 = draw.vector2();
       const double a2 = draw.number();

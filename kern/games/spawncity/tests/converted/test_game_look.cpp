@@ -231,11 +231,11 @@ Mat4 euler(f32 x, f32 y, f32 z) {
 
 SC_TEST(converted_game_look) {
   converted::Blueprint bp("GameLook");
-  converted::Draw draw;
   {  // srgb
     converted::Tally tally("srgb");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted_game_look::srgb(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
       const auto want = run(a0);
@@ -244,8 +244,9 @@ SC_TEST(converted_game_look) {
   }
   {  // vm_index
     converted::Tally tally("vm_index");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Id a0) { return converted_game_look::vm_index(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Id a0 = static_cast<Id>(draw.below(14));
       const converted::Watch watch;
       const auto want = run(a0);
@@ -254,8 +255,9 @@ SC_TEST(converted_game_look) {
   }
   {  // camera_frame
     converted::Tally tally("camera_frame");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Camera a0) { return converted_game_look::camera_frame(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Camera a0 = draw_kern__Camera(draw);
       const converted::Watch watch;
       const auto want = run(a0);
@@ -264,8 +266,9 @@ SC_TEST(converted_game_look) {
   }
   {  // Mat4::trs
     converted::Tally tally("Mat4_trs");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Quat a1, [[maybe_unused]] Vec3 a2) { return Mat4::trs(a0, a1, a2); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const Quat a1 = draw_kern__Quat(draw);
       const Vec3 a2 = draw.vector();
@@ -276,8 +279,9 @@ SC_TEST(converted_game_look) {
   }
   {  // Quat::operator*
     converted::Tally tally("Quat_mul");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Quat a0, [[maybe_unused]] Quat a1) { return a0.operator*(a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Quat a0 = draw_kern__Quat(draw);
       const Quat a1 = draw_kern__Quat(draw);
       const converted::Watch watch;
@@ -287,8 +291,9 @@ SC_TEST(converted_game_look) {
   }
   {  // Quat::axis_angle
     converted::Tally tally("Quat_axis_angle");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return Quat::axis_angle(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const double a1 = draw.number();
       const converted::Watch watch;
@@ -298,8 +303,9 @@ SC_TEST(converted_game_look) {
   }
   {  // euler
     converted::Tally tally("euler");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted_game_look::euler(a0, a1, a2); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const double a2 = draw.number();

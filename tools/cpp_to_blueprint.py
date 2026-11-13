@@ -25,8 +25,9 @@ How the Blueprint computes is the Blueprint language's own arithmetic: numbers a
 whole numbers exact, a division by zero gives 0, a vector's components are 32-bit. It is the same
 in the interpreter, in the JIT and in the compiled class, on every machine. Where the C++ brings a
 number to 32 bit in so many words, so does the Blueprint (the formula's `single`); unsigned 32-bit
-arithmetic and bit operations have formula functions of their own. A number literal is the decimal
-the source spells (0.1f is 0.1).
+arithmetic and bit operations have formula functions of their own. A 64-bit whole number is exact
+while it is within 2^53 of zero; an unsigned one is held read with its sign (WIDE_UNSIGNED). A number
+literal is the decimal the source spells (0.1f is 0.1).
 
   tools/cpp_to_blueprint.py --check <namespace> <include flags...> -- <file.cpp>...
 
@@ -63,6 +64,10 @@ NODE_NAME = re.compile(r"^(math|logic|flow|list|text|vector|struct|enum|value|fu
 NUMBER = {"bool": "Bool", "float": "Float", "double": "Float", "long double": "Float", "int": "Int", "long": "Int", "long long": "Int", "short": "Int", "signed char": "Int",
           "unsigned char": "Int", "unsigned short": "Int", "unsigned int": "Int", "char": "Int", "unsigned long": "Int", "unsigned long long": "Int"}
 UNSIGNED = {"unsigned char", "unsigned short", "unsigned int", "unsigned long", "unsigned long long"}
+# An unsigned 64-bit whole number is, in a Blueprint, the whole number its bits are read with a sign
+# (2^64 - 1 is -1): what C++ adds, subtracts and multiplies around 2^64 comes out the same, exactly,
+# while the numbers are within 2^53 of zero; comparisons and the conversion to a number say it.
+WIDE_UNSIGNED = {"unsigned long", "unsigned long long"}
 TEXT = {"const char *", "std::basic_string<char>", "std::string", "std::basic_string_view<char>", "std::string_view", "std::basic_string<char, std::char_traits<char>, std::allocator<char>>",
         "std::basic_string_view<char, std::char_traits<char>>"}
 # (the names the engine writes these types with, where clang gives the name as written)
@@ -670,7 +675,7 @@ class Unit:
                 fname = self.fresh(c.get("name", "field"), taken)
                 taken.add(fname)
                 init = kids(c)[-1] if kids(c) and c.get("hasInClassInitializer") else None
-                default = self.zero(ft)
+                default = self.zeros(qtype(c), ft)
                 if init is not None:
                     try:
                         default = Const(self).literal(init, ft)
@@ -690,6 +695,21 @@ class Unit:
         self.struct_fields[name] = fields
         self.types.append(f"  KERN_STRUCT({name}) {{ " + " ".join(f"{t} {f} = {d};" for f, t, d, _ in fields) + " };")
         return name
+
+    def entries(self, raw):
+        """How many entries a list of fixed length has (`f32 m[16]`, std::array<u8, 32>); None: a list of any length."""
+        c = self.clean(raw)
+        m = re.search(r"\[(\d+)\]$", c) or re.match(r"std::array<.*,\s*(\d+)U?L?L?>$", c)
+        return int(m.group(1)) if m else None
+
+    def zeros(self, raw, t):
+        """The zero of a C++ type: of a list of fixed length, that many zeros."""
+        n = self.entries(raw)
+        if n is None or not t.startswith("List<"):
+            return self.zero(t)
+        if n > 256:
+            raise Wait("a list of more than 256 entries of fixed length")
+        return t + "{" + ", ".join([self.zero(t[5:-1])] * n) + "}"
 
     def zero(self, t):
         if t in ZERO:
@@ -848,6 +868,21 @@ class Const:
     def __init__(self, unit):
         self.unit = unit
 
+    BITS = {"unsigned char": 8, "signed char": 8, "char": 8, "unsigned short": 16, "short": 16, "unsigned int": 32, "int": 32,
+            "long": 64, "unsigned long": 64, "long long": 64, "unsigned long long": 64}
+
+    def fit(self, v, n):
+        """A whole number as the C++ type of `n` holds it (it wraps around at the type's width); a 64-bit
+        one as a Blueprint holds it: read with its sign (see WIDE_UNSIGNED)."""
+        t = self.unit.clean(qtype(n))
+        bits = self.BITS.get(t)
+        if bits is None:
+            return v
+        i = int(v) & ((1 << bits) - 1)
+        if (t not in UNSIGNED or bits == 64) and i >= 1 << (bits - 1):
+            i -= 1 << bits
+        return i
+
     def number(self, n):
         n = bare(n)
         k = n.get("kind")
@@ -855,7 +890,7 @@ class Const:
             v = self.number(kids(n)[-1])
             t = self.unit.clean(qtype(n))
             if NUMBER.get(t) == "Int":
-                return float(int(v))
+                return self.fit(int(v), n)
             if t == "bool":
                 return 1.0 if v != 0 else 0.0
             return v
@@ -865,13 +900,17 @@ class Const:
             # (a literal is the decimal the source spells: 43758.5453f is 43758.5453, as a Blueprint's 64-bit number has it)
             return float(m.group(0).replace("'", "")) if m and m.group(0) not in (".", "") else float(n["value"])
         if k == "IntegerLiteral":
-            return float(int(n["value"]))
+            return self.fit(int(n["value"]), n)
         if k == "CXXBoolLiteralExpr":
             return 1.0 if n.get("value") else 0.0
         if k == "CharacterLiteral":
             return float(n["value"])
-        if k == "UnaryOperator" and n.get("opcode") in ("-", "+", "!"):
+        if k == "UnaryOperator" and n.get("opcode") in ("-", "+", "!", "~"):
             v = self.number(kids(n)[0])
+            if n["opcode"] == "~":
+                return self.fit(~int(v), n)
+            if n["opcode"] == "-" and NUMBER.get(self.unit.clean(qtype(n))) == "Int":
+                return self.fit(-int(v), n)
             return -v if n["opcode"] == "-" else v if n["opcode"] == "+" else (0.0 if v else 1.0)
         if k == "BinaryOperator":
             a, b = (self.number(c) for c in kids(n))
@@ -885,15 +924,15 @@ class Const:
                 if b == 0:
                     raise Wait("a constant divided by zero")
                 r = float(int(a / b)) if isint else a / b
-            elif op == "<<" and isint: r = float(int(a) << int(b))
-            elif op == ">>" and isint: r = float(int(a) >> int(b))
-            elif op == "|" and isint: r = float(int(a) | int(b))
-            elif op == "&" and isint: r = float(int(a) & int(b))
-            elif op == "^" and isint: r = float(int(a) ^ int(b))
-            elif op == "%" and isint and b != 0: r = float(int(a) - int(a / b) * int(b))
+            elif op == "<<" and isint: r = int(a) << int(b)
+            elif op == ">>" and isint: r = int(a) >> int(b)
+            elif op == "|" and isint: r = int(a) | int(b)
+            elif op == "&" and isint: r = int(a) & int(b)
+            elif op == "^" and isint: r = int(a) ^ int(b)
+            elif op == "%" and isint and b != 0: r = int(a) - int(a / b) * int(b)
             else:
                 raise Wait(f"a constant computed with {op}")
-            return r
+            return self.fit(r, n) if isint else r
         if k == "DeclRefExpr":
             ref = n.get("referencedDecl", {})
             d = self.unit.tree.body.get(ref.get("id"), self.unit.tree.decl.get(ref.get("id")))
@@ -1012,7 +1051,13 @@ class Const:
                         return self.literal(args[0], t)
                     if args:
                         raise Wait("a list constant made by a constructor")
-                return t + "{" + ", ".join(self.literal(c, it) for c in args) + "}"
+                vals = [self.literal(c, it) for c in args]
+                fixed = u.entries(qtype(n)) if k == "InitListExpr" else None
+                if fixed is not None and fixed > len(vals):   # (a list of fixed length: what is not written is zero)
+                    if fixed > 256:
+                        raise Wait("a list of more than 256 entries of fixed length")
+                    vals += [u.zero(it)] * (fixed - len(vals))
+                return t + "{" + ", ".join(vals) + "}"
             if k == "CXXStdInitializerListExpr":
                 return self.literal(kids(n)[0], t)
             raise Wait(f"a list constant written as {k}")
@@ -1301,9 +1346,56 @@ class Emit:
         return out
 
     # ---- statements ----
+    def name_references(self, stmts, i):
+        """`T& x = a.b[i];` - a name for a place: in what follows, x is written out as a.b[i]. (A const
+        reference is a copy of the value as long as what it names does not change while it lives.)"""
+        s = stmts[i]
+        if s.get("kind") != "DeclStmt":
+            return
+        for v in kids(s):
+            raw = qtype(v)
+            if v.get("kind") != "VarDecl" or not (kids(v) and v.get("init")) or "&" not in raw or "&&" in raw or v.get("id") in self.named_places:
+                continue
+            init = kids(v)[-1]
+            if self.lambda_of(init) is not None:
+                continue
+            target, root, own = self.unwrap(init), None, False
+            while target is not None:   # (the variable the place is a part of - or the object of the method itself)
+                target = bare(target)
+                if target.get("kind") == "DeclRefExpr":
+                    root = target.get("referencedDecl", {}).get("id")
+                    break
+                if target.get("kind") == "CXXThisExpr":
+                    own = True
+                    break
+                if target.get("kind") in ("MemberExpr", "ArraySubscriptExpr", "ImplicitCastExpr") and kids(target):
+                    target = kids(target)[0]
+                elif target.get("kind") == "CXXOperatorCallExpr" and callee_name(target) == "operator[]":
+                    target = kids(target)[1]
+                else:
+                    target = None
+            if not own and (root is None or root not in self.names):
+                continue
+            rest = {"kind": "CompoundStmt", "inner": stmts[i + 1:]}
+            changed = self.assigned(rest)
+            if re.search(r"\bconst\b", raw) and not own and root not in changed:
+                continue
+            if (self.reads(init) - {root}) & changed:
+                raise Wait("a reference to an entry at a place that changes while the reference lives")
+            for n in walk(rest):
+                if n.get("kind") == "DeclRefExpr" and n.get("referencedDecl", {}).get("id") == v["id"]:
+                    n.clear()
+                    n.update(init)
+            self.named_places.add(v["id"])
+
+    named_places = frozenset()
+
     def block(self, stmts):
         out = []
         for i, s in enumerate(stmts):
+            if not isinstance(self.named_places, set):
+                self.named_places = set()
+            self.name_references(stmts, i)
             lines, ends = self.stmt(s)
             out += lines
             if ends or s.get("kind") in ("BreakStmt", "ContinueStmt"):
@@ -1380,6 +1472,8 @@ class Emit:
                 if lam is not None:
                     out += self.local_function(v, lam)
                     continue
+                if v.get("id") in self.named_places:
+                    continue   # (a name for a place: written out where it is used)
                 raw = qtype(v)
                 if "&" in raw and not re.search(r"\bconst\b", raw):
                     raise Wait("a reference to something it changes")
@@ -1388,7 +1482,8 @@ class Emit:
                 if init is not None:
                     out.append(f"{name} = {self.ex(init, self.types[v['id']])};")
                 else:
-                    out.append(f"{name} = {self.u.zero(self.types[v['id']])};")
+                    value = self.zero_value(raw, self.types[v["id"]])
+                    out += self.take_pre() + [f"{name} = {value};"]
             return out, False
         if k == "ReturnStmt":
             c = kids(s)
@@ -1755,6 +1850,19 @@ class Emit:
             if self.own(ref.get("id")):
                 self.invoke(self.u.function(ref["id"]), kids(n)[1:])
                 return []  # (what it changes is written back by steps before this place; a value nobody reads is not computed)
+            if name == "reverse" and len(kids(n)) == 3:
+                (l0, first), (l1, last) = self.place(kids(n)[1]), self.place(kids(n)[2])
+                if not self.same_list(l0, l1):
+                    raise Wait("call: reverse() between two lists")
+                lt = self.tp(l0)
+                it = lt[5:-1]
+                before, lv, after = self.variable_of(l0, lt)
+                a, b, held = self.temp("first", "Int"), self.temp("last", "Int"), self.temp("held", it)
+                lines = [f"{a} = {first};", f"{b} = {self.whole_math('-', last, '1')};",
+                         f'while (loop(math_compare<"<">(kern::to<Float>({a}), kern::to<Float>({b})))) {{',
+                         f"  {held} = list_get<{it}>({lv}, {a});", f"  list_set({lv}, {a}, list_get<{it}>({lv}, {b}));", f"  list_set({lv}, {b}, {held});",
+                         f"  {a} += 1;", f"  {b} = {self.whole_math('-', b, '1')};", "}"]
+                return before + lines + after
             if name == "swap" and len(kids(n)) == 3:
                 a, b = kids(n)[1:]
                 t = self.tp(a)
@@ -1789,6 +1897,18 @@ class Emit:
                 return before + self.list_step(name, base, lv, it, args) + after
             raise Wait(f"call: {name}() of an object")
         raise Wait(f"a statement: {k}")
+
+    def zero_value(self, raw, t):
+        """The zero of a C++ type as a value: of a list of fixed length, that many zeros."""
+        n = self.u.entries(raw)
+        if n is None or not t.startswith("List<"):
+            return self.u.zero(t)
+        it = t[5:-1]
+        if n <= 16:
+            return f'list_make<{it}, "{n}">({", ".join([self.u.zero(it)] * n)})'
+        made = self.temp("made", t)
+        self.hoist([f"list_clear({made});", f'while (loop(math_compare<"<">(kern::to<Float>(list_length<{it}>({made})), {flit(float(n))}))) {{', f"  list_add({made}, {self.u.zero(it)});", "}"])
+        return made
 
     # ---- a function a function declares in itself (a lambda) ----
     def lambda_of(self, n):
@@ -2401,6 +2521,8 @@ class Emit:
                 tx, ty = self.tp(x), self.tp(y)
                 if op in ("==", "!=") and "Float" in (tx, ty) and tx in ("Float", "Int") and ty in ("Float", "Int"):
                     return self.formula(b)   # (exactly equal, as C++ compares: the Compare node's == has a margin)
+                if op not in ("==", "!=") and self.ctype(x) in WIDE_UNSIGNED and self.ctype(y) in WIDE_UNSIGNED and not (self.never_negative(x) and self.never_negative(y)):
+                    return self.formula(b)   # (two unsigned 64-bit numbers: which is less, the formula says - see fx)
                 if tx in ("Float", "Int") and ty in ("Float", "Int") or (tx in ("Float", "Int", "Bool") and ty in ("Float", "Int", "Bool") and op not in ("==", "!=")):
                     return f'math_compare<"{op}">({self.ex(x, "Float")}, {self.ex(y, "Float")})', "Bool"
                 if op in ("==", "!="):
@@ -2522,6 +2644,8 @@ class Emit:
         k = b.get("kind")
         if k in ("FloatingLiteral", "IntegerLiteral", "CXXBoolLiteralExpr", "CharacterLiteral"):
             v = Const(self.u).decimal(b)
+            if k == "IntegerLiteral" and v >= 2.0 ** 63 and self.ctype(b) in WIDE_UNSIGNED:
+                v -= 2.0 ** 64   # (read with its sign, as a Blueprint holds a 64-bit number)
             if k == "IntegerLiteral" and abs(v) >= 2.0 ** 53:
                 raise Wait("a 64-bit whole number that wraps around or is shifted (a Blueprint's are exact up to 2^53)")
             return flit(v) if v >= 0 else f"({flit(v)})"
@@ -2532,28 +2656,37 @@ class Emit:
                 return f"kern::math::trunc({self.fx(inner, leaves)})"
             if want == "Bool" and have != "Bool":
                 return f"({self.fx(inner, leaves)} != 0.0)"
+            if want == "Float" and self.ctype(inner) in WIDE_UNSIGNED:
+                # an unsigned 64-bit number as a number: a Blueprint holds it read with its sign
+                x = self.once(inner, leaves)
+                return f"({x} < 0.0 ? {x} + 18446744073709551616.0 : {x})"
             return self.narrow(self.fx(inner, leaves), self.ctype(inner), self.ctype(b), inner)
         if not self.numeric(b):
             raise Wait("a value that is not a number in a computation")
         if k == "UnaryOperator" and b.get("opcode") in ("-", "+", "!"):
             x = self.fx(kids(b)[0], leaves)
+            if b["opcode"] == "-" and self.ctype(b) in WIDE_UNSIGNED:
+                return f"(-{x})"   # (64 bit: the number read with its sign, see WIDE_UNSIGNED)
             if b["opcode"] == "-" and self.ctype(b) in UNSIGNED:
-                self.no_64(b)
                 return f"kern::math::wrap32(-{x})"
             return x if b["opcode"] == "+" else f"({'-' if b['opcode'] == '-' else '!'}{x})"
         if k == "UnaryOperator" and b.get("opcode") == "~":
             x = self.fx(kids(b)[0], leaves)
+            if self.ctype(b) in WIDE_UNSIGNED:
+                return f"(-{x} - 1.0)"
             if self.ctype(b) in UNSIGNED:
-                self.no_64(b)
                 return f"kern::math::wrap32(kern::math::bxor({x}, -1.0))"
             return f"kern::math::bxor({x}, -1.0)"
         if k == "BinaryOperator":
             op = b.get("opcode")
             x, y = kids(b)
+            if op == "/" and self.entries_of(b) is not None:
+                return flit(float(self.entries_of(b)))
             if op in ("+", "-", "*"):
+                if self.ctype(b) in WIDE_UNSIGNED:
+                    return f"({self.fx(x, leaves)} {op} {self.fx(y, leaves)})"
                 if self.ctype(b) in UNSIGNED:
                     # unsigned arithmetic wraps around at 32 bit: the formula's wrap32 and mul32
-                    self.no_64(b)
                     if op == "*":
                         return f"kern::math::mul32({self.fx(x, leaves)}, {self.fx(y, leaves)})"
                     return f"kern::math::wrap32({self.fx(x, leaves)} {op} {self.fx(y, leaves)})"
@@ -2566,6 +2699,12 @@ class Emit:
                 return f"kern::math::div({self.fx(x, leaves)}, {self.fx(y, leaves)})"
             if op == "%":
                 return f"kern::math::mod({self.fx(x, leaves)}, {self.fx(y, leaves)})"
+            if op in ("<", ">", "<=", ">=") and self.ctype(x) in WIDE_UNSIGNED and self.ctype(y) in WIDE_UNSIGNED and not (self.never_negative(x) and self.never_negative(y)):
+                # two unsigned 64-bit numbers, held read with their signs: one that reads negative is the larger
+                l, r = (x, y) if op in ("<", ">=") else (y, x)
+                lt, rt = self.once(l, leaves), self.once(r, leaves)
+                less = f"(({lt} < 0.0) != ({rt} < 0.0) ? ({rt} < 0.0) : ({lt} < {rt}))"
+                return less if op in ("<", ">") else f"(!{less})"
             if op in COMPARE and self.numeric(x) and self.numeric(y):
                 return f"({self.fx(x, leaves)} {op} {self.fx(y, leaves)})"
             if op in ("&&", "||"):
@@ -2577,9 +2716,20 @@ class Emit:
             if op == ">>":
                 return f"kern::math::shr({self.fx(x, leaves)}, {self.fx(y, leaves)})"
             if op == "<<":
-                self.no_64(b)
+                if self.ctype(b) in WIDE_UNSIGNED:
+                    # an unsigned 64-bit number shifted up: within what a Blueprint holds only when the bits it has
+                    # and the shift stay below 53 together - otherwise it is a bit pattern (a key, a hash)
+                    inner = self.unwrap(x)
+                    while inner.get("kind") in CAST and kids(inner) and self.ctype(inner) in WIDE_UNSIGNED and self.ctype(kids(inner)[-1]) in WIDE_UNSIGNED:
+                        inner = self.unwrap(kids(inner)[-1])
+                    has = {"unsigned int": 32, "unsigned short": 16, "unsigned char": 8, "bool": 1}.get(self.ctype(kids(inner)[-1]) if inner.get("kind") in CAST and kids(inner) else "", 64)
+                    by = bare(y)
+                    while by.get("kind") in CAST and kids(by):
+                        by = bare(kids(by)[-1])
+                    if by.get("kind") != "IntegerLiteral" or has + int(by["value"]) > 53:
+                        raise Wait("a 64-bit whole number that wraps around or is shifted (a Blueprint's are exact up to 2^53)")
                 shifted = f"kern::math::shl({self.fx(x, leaves)}, {self.fx(y, leaves)})"
-                if self.ctype(b) in ("long", "long long"):
+                if self.ctype(b) in ("long", "long long") or self.ctype(b) in WIDE_UNSIGNED:
                     return shifted   # (a 64-bit number: what is shifted stays whole while it is below 2^53)
                 return f"kern::math::wrap32({shifted})" if self.ctype(b) in UNSIGNED else f"kern::math::wrap32s({shifted})"
         if k == "ConditionalOperator":
@@ -2650,9 +2800,39 @@ class Emit:
             return self.fb(kids(b)[-1], leaves)
         return f"({self.leaf(b, leaves, self.conv(self.bx(b), 'Bool', 'Float'))} != 0.0)"
 
-    def no_64(self, n):
-        if self.ctype(n) in ("unsigned long", "unsigned long long"):
-            raise Wait("a 64-bit whole number that wraps around or is shifted (a Blueprint's are exact up to 2^53)")
+    def entries_of(self, b):
+        """`sizeof a / sizeof a[0]`: how many entries the array a has (its type says it)."""
+        x, y = (bare(c) for c in kids(b))
+        while x.get("kind") in CAST and kids(x):
+            x = bare(kids(x)[-1])
+        while y.get("kind") in CAST and kids(y):
+            y = bare(kids(y)[-1])
+        if x.get("kind") != "UnaryExprOrTypeTraitExpr" or y.get("kind") != "UnaryExprOrTypeTraitExpr" or x.get("name") != "sizeof" or y.get("name") != "sizeof" or not kids(x) or not kids(y):
+            return None
+        m = re.search(r"\[(\d+)\]\s*$", qtype(bare(kids(x)[0])))
+        return int(m.group(1)) if m and bare(kids(y)[0]).get("kind") == "ArraySubscriptExpr" else None
+
+    def once(self, n, leaves):
+        """A part of a formula that the formula names several times: a variable or a number itself, anything
+        else as a value of its own (computed once)."""
+        b = self.unwrap(n)
+        while b.get("kind") in CAST and kids(b) and self.ctype(b) == self.ctype(kids(b)[-1]):
+            b = self.unwrap(kids(b)[-1])
+        if b.get("kind") in ("DeclRefExpr", "IntegerLiteral"):
+            return self.fx(n, leaves)
+        return self.leaf(None, leaves, self.ex(n, "Float"))
+
+    def never_negative(self, n):
+        """Is this unsigned 64-bit value one that never reads negative: a list's length, a whole number
+        written out, a smaller unsigned number made wider?"""
+        b = self.unwrap(n)
+        if b.get("kind") == "IntegerLiteral":
+            return True
+        if b.get("kind") == "CXXMemberCallExpr" and callee(b).get("name") in ("size", "length", "count"):
+            return True
+        if b.get("kind") in CAST and kids(b) and self.ctype(kids(b)[-1]) in ("unsigned int", "unsigned short", "unsigned char", "bool"):
+            return True
+        return False
 
     def narrow(self, text, have, want, inner):
         """A whole number converted to a C++ type that holds less of it: what that type keeps."""
@@ -2661,9 +2841,7 @@ class Emit:
         if self.known_positive(inner) and int(bare(inner)["value"]) < {"unsigned char": 256, "unsigned short": 65536}.get(want, 2 ** 31):
             return text
         size = {"unsigned char": 8, "signed char": 8, "char": 8, "unsigned short": 16, "short": 16, "unsigned int": 32, "int": 32}
-        if want not in size:   # (64 bit: holds every whole number a Blueprint has - but not a negative one as unsigned)
-            if want in ("unsigned long", "unsigned long long") and have not in UNSIGNED:
-                raise Wait("a 64-bit whole number that wraps around or is shifted (a Blueprint's are exact up to 2^53)")
+        if want not in size:   # (64 bit: holds every whole number a Blueprint has; an unsigned one is held read with its sign)
             return text
         if have in size and size[have] < size[want] and (have in UNSIGNED or want not in UNSIGNED):
             return text   # (everything of the smaller type fits)
@@ -2903,9 +3081,13 @@ class Emit:
                 return t + "{}", t
             if b.get("kind") == "InitListExpr" or (len(a) == 1 and bare(a[0]).get("kind") in ("CXXStdInitializerListExpr", "InitListExpr")):
                 items = a if b.get("kind") == "InitListExpr" else kids(bare(a[0]) if bare(a[0]).get("kind") == "InitListExpr" else bare(kids(bare(a[0]))[0]))
-                if len(items) > 16:
+                vals = [self.ex(x, it) for x in items]
+                fixed = u.entries(qtype(b)) if b.get("kind") == "InitListExpr" else None
+                if fixed is not None and fixed > len(vals):   # (a list of fixed length: what is not written is zero)
+                    vals += [u.zero(it)] * (fixed - len(vals))
+                if len(vals) > 16:
                     raise Wait("a list made of more than 16 values")
-                return f'list_make<{it}, "{len(items)}">({", ".join(self.ex(x, it) for x in items)})', t
+                return f'list_make<{it}, "{len(vals)}">({", ".join(vals)})', t
             if len(a) == 1 and self.tp_or_none(a[0]) == t:
                 return self.ex(a[0], t), t
             if len(a) in (1, 2) and self.tp_or_none(a[0]) in ("Int", "Float") and (len(a) == 1 or self.tp_or_none(a[1]) is not None):
@@ -3089,13 +3271,20 @@ class TestWriter:
         def whole(n):
             c = self.u.clean(qtype(n))
             return NUMBER.get(c) == "Int" or self.u.find_type(c) in self.tree.enums
+        def wide(n):
+            return self.u.clean(qtype(n)) in ("long", "unsigned long", "long long", "unsigned long long")
         def fixed(n):
             n = bare(n)
             while n.get("kind") in ("ImplicitCastExpr", "CStyleCastExpr", "CXXStaticCastExpr", "CXXFunctionalCastExpr") and kids(n):
                 n = bare(kids(n)[-1])
             return n.get("kind") == "IntegerLiteral" and n.get("value") not in ("0", None)
+        visited = set()
         def visit(n, depth):
             k, ks = n.get("kind"), kids(n)
+            if n.get("id") is not None:
+                if n["id"] in visited:
+                    return   # (a place with a name of its own - `T& x = a[i];` - is in the tree wherever x is used: guarded once, where it is written)
+                visited.add(n["id"])
             if k == "LambdaExpr":   # (a local function: its body once - the tree has it in its class as well)
                 for c in ks[-1:]:
                     visit(c, depth + 1)
@@ -3129,6 +3318,26 @@ class TestWriter:
                     swap(ib, b, ")", ")")
                 else:
                     swap(bb, b, f".{ks[0]['name']}()", ")")
+            elif n.get("castKind") == "FloatingToIntegral" and ks and self.u.clean(qtype(n)) in Const.BITS:
+                # a number as a whole number of a type that does not hold it
+                ca, cb = span(ks[-1])
+                edits.append((ca, 2, depth, ca, f"converted::fits<{self.u.clean(qtype(n))}>("))
+                edits.append((cb, 0, -depth, cb, ")"))
+            elif (k in ("CXXStaticCastExpr", "CStyleCastExpr", "CXXFunctionalCastExpr") and ks and n.get("castKind") == "IntegralCast"
+                  and self.u.find_type(self.u.clean(qtype(n))) in self.tree.enums and NUMBER.get(self.u.clean(qtype(ks[-1]))) == "Int"):
+                # a whole number as a value of an enum that has no such value
+                ca, cb = span(ks[-1])
+                valid = ", ".join(str(v) for _, v in enum_numbers(self.tree.enums[self.u.find_type(self.u.clean(qtype(n)))]))
+                edits.append((ca, 2, depth, ca, f"converted::among({{{valid}}}, "))
+                edits.append((cb, 0, -depth, cb, ")"))
+            elif ((k == "CXXConstructExpr" and re.match(r"(const )?std::vector<", self.u.clean(qtype(n))) and ks and whole(ks[0]) and not n.get("list"))
+                  or (k == "CXXMemberCallExpr" and len(ks) > 1 and ks[0].get("kind") == "MemberExpr" and ks[0].get("name") in ("resize", "assign", "reserve") and kids(ks[0])
+                      and re.match(r"(const )?std::vector<", self.u.clean(qtype(kids(ks[0])[0]))) and whole(ks[1]))):
+                # a list of so many entries: a count the test does not build (a negative one, read without its sign) marks the call
+                count = ks[0] if k == "CXXConstructExpr" else ks[1]
+                ca, cb = span(count)
+                edits.append((ca, 2, depth, ca, "converted::count("))
+                edits.append((cb, 0, -depth, cb, ")"))
             elif (k == "CXXMemberCallExpr" and ks and ks[0].get("kind") == "MemberExpr" and ks[0].get("name") in ("erase", "pop_back") and kids(ks[0])
                   and re.match(r"(const )?std::vector<", self.u.clean(qtype(kids(ks[0])[0])))):
                 # taking an entry out of a list that does not have it
@@ -3141,7 +3350,23 @@ class TestWriter:
                     swap(bb, span(ks[1])[0], f".{ks[0]['name']}(", ", ")
                 else:
                     swap(bb, b, f".{ks[0]['name']}()", ")")
-            elif k in ("BinaryOperator", "CompoundAssignOperator") and n.get("opcode") in ("/", "%", "<<", ">>", "/=", "%=", "<<=", ">>=") and len(ks) == 2 and whole(ks[0]) and whole(ks[1]) and not fixed(ks[1]):
+            elif k in ("BinaryOperator", "CompoundAssignOperator") and n.get("opcode") in ("+", "-", "*", "+=", "-=", "*=") and len(ks) == 2 and wide(n) and whole(ks[0]) and whole(ks[1]):
+                # a 64-bit whole number: a Blueprint holds it while it is within 2^53 of zero (read with its sign)
+                op = n["opcode"]
+                (a, b), (xa, xb), (ya, yb) = span(n), span(ks[0]), span(ks[1])
+                edits.append((a, 2, depth, a, "converted::" + {"+": "plus", "-": "minus", "*": "times"}[op.rstrip("=")] + ("_to(" if op.endswith("=") else "(")))
+                swap(xb, ya, op, ", ")
+                edits.append((b, 0, -depth, b, ")"))
+            elif k == "UnaryOperator" and n.get("opcode") in ("++", "--") and len(ks) == 1 and wide(ks[0]):
+                (a, b), (xa, xb) = span(n), span(ks[0])
+                name = ("post_" if n.get("isPostfix") else "pre_") + ("inc" if n["opcode"] == "++" else "dec")
+                if n.get("isPostfix"):
+                    edits.append((a, 2, depth, a, f"converted::{name}("))
+                    swap(xb, b, n["opcode"], ")")
+                else:
+                    swap(a, xa, n["opcode"], f"converted::{name}(")
+                    edits.append((b, 0, -depth, b, ")"))
+            elif k in ("BinaryOperator", "CompoundAssignOperator") and n.get("opcode") in ("/", "%", "<<", ">>", "/=", "%=", "<<=", ">>=") and len(ks) == 2 and whole(ks[0]) and whole(ks[1]) and (not fixed(ks[1]) or wide(n)):
                 op = n["opcode"]
                 (a, b), (xa, xb), (ya, yb) = span(n), span(ks[0]), span(ks[1])
                 edits.append((a, 2, depth, a, "converted::" + {"/": "quot", "%": "rem", "<<": "shl", ">>": "shr"}[op.rstrip("=")] + ("_to(" if op.endswith("=") else "(")))
@@ -3273,18 +3498,27 @@ class TestWriter:
         ctors = [c for c in kids(o) if c.get("kind") == "CXXConstructorDecl" and not c.get("isImplicit")]
         self.helped[q] = None
         try:
-            make = f"  {t} s{{}};"
+            make, built = f"  {t} s{{}};", None
+            for c in ctors:   # (the first constructor with arguments the test has values for)
+                params = [p for p in kids(c) if p.get("kind") == "ParmVarDecl"]
+                if not params or (len(params) == 1 and self.u.find_type(self.u.clean(qtype(params[0]))) == q):
+                    continue
+                try:
+                    built = (c["id"], f"{t}({', '.join(self.draw(qtype(p)) for p in params)})")
+                    break
+                except Wait:
+                    continue
             if ctors and not any(not [p for p in kids(c) if p.get("kind") == "ParmVarDecl"] for c in ctors):
-                # (no constructor without arguments: made by the first one the test has arguments for, then filled)
-                for c in ctors:
-                    try:
-                        make = f"  {t} s({', '.join(self.draw(qtype(p)) for p in kids(c) if p.get('kind') == 'ParmVarDecl')});"
-                        self.made[q] = (c["id"], f"  {t} s{{}};")
-                        break
-                    except Wait:
-                        continue
-                else:
+                # (no constructor without arguments: made by that one, then filled)
+                if built is None:
                     raise Wait("the test cannot make an object of a class without a default constructor")
+                make = f"  {t} s = {built[1]};"
+                self.made[q] = (built[0], f"  {t} s{{}};")
+            elif built is not None:
+                # a class with a constructor may keep its parts in step (a grid: its size and its cells): every
+                # other object is the one the constructor makes, the others have every field drawn on its own
+                make = f"  if (draw.flag()) return {built[1]};\n" + make
+                self.made[q] = (built[0], f"  {t} s{{}};")
             fields = [(c["name"], qtype(c)) for c in kids(o) if c.get("kind") == "FieldDecl"]
             arrays, lines = {}, [f"[[maybe_unused]] static {t} {name}(converted::Draw& draw) {{", make]
             held = []
@@ -3660,8 +3894,9 @@ class TestWriter:
             cases.append((("case", d["id"]), "\n".join([
                 f"  {{  // {f.cpp}",
                 f'    converted::Tally tally("{f.name}");',
+                "    converted::Draw draw;   // (every function its own arguments, the same in every run)",
                 f"    const auto run = [&]({', '.join(f'[[maybe_unused]] {t} {n}' for t, n in zip(types, names))}) {{ {give} }};",
-                "    for (int i = 0; i < converted::kCalls; ++i) {",
+                "    for (int i = 0; tally.more(i); ++i) {",
                 *[f"      {x}" for x in decl_lines],
                 "      const converted::Watch watch;",
                 f"      const auto want = run({', '.join(names)});",
@@ -3784,7 +4019,7 @@ class TestWriter:
             for key, text in outs:
                 if key not in dropped and text:
                     add(key, text)
-            add(None, "\n".join(["", f"SC_TEST(converted_{stem}) {{", f'  converted::Blueprint bp("{u.name}");', "  converted::Draw draw;"]))
+            add(None, "\n".join(["", f"SC_TEST(converted_{stem}) {{", f'  converted::Blueprint bp("{u.name}");']))
             for key, text in cases:
                 if key not in dropped:
                     add(key, text)

@@ -37,7 +37,6 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #define protected public
 enum class Surface : u8 { none, cloth, tpu, floor };
 enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter };
-inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
 enum class Type : u8 { null, boolean, number, string, array, object };
 using ActorRef = u32;
 enum class PinType : u8 {
@@ -222,35 +221,8 @@ struct FlightLog {
   f32 last_t_ = 0, last_path_ = -1e9;
   u32 next_id_ = 1, serial_ = 0;
 };
-struct MusicSynth {
- public:
-  struct Station { const char* name; const char* genre; f32 bpm; u32 seed; };
-  static constexpr i32 kMenu = -1;
-  static const Station kStations[];
-  
-
-  void init(u32 rate);
-  /// The programme to play (kMenu, a station index, or -2 = silence) and its level 0..1.
-  void select(i32 programme, f32 level);
-  /// Adds `frames` stereo frames into `out` (interleaved).
-  
-  
-  
-  f32 peak = 0;  // of the last block (tests)
-
- private:
-  struct Voice { f32 phase = 0, freq = 0, env = 0, decay = 0.9995, amp = 0, phase2 = 0; };
-  
-  
-  u32 rate_ = 0;
-  i32 programme_ = -2, want_ = -2;
-  f32 gain_ = 0, target_ = 0, fade_ = 1;  // fade: 1 = the current programme fully in
-  u64 sample_ = 0;
-  u32 step_ = 0, samples_per_step_ = 1, until_step_ = 0, rng_ = 1;
-  Voice kick_, snare_, hat_, bass_, lead_, pad_[3];
-  f32 lp_ = 0, bass_lp_ = 0, echo_[24000] = {};
-  u32 echo_at_ = 0;
-};
+namespace MusicSynth { struct Station { const char* name; const char* genre; f32 bpm; u32 seed; }; }
+namespace MusicSynth { static constexpr i32 kMenu = -1; }
 void FlightLog::record(const FlightSample& s, bool force) {
   if (have_last_) {
     const f32 step = length(s.pos - last_);
@@ -275,35 +247,30 @@ void FlightLog::finish(const char* reason) {
   active_ = false;
   cur_.reason = reason;
   flights_.insert(flights_.begin(), cur_);
-  if (flights_.size() > kMaxFlights) flights_.resize(kMaxFlights);
+  if (flights_.size() > kMaxFlights) flights_.resize(converted::count(kMaxFlights));
   ++serial_;
 }
 void FlightLog::network(const std::string& stage, f32 t) {
   events_.insert(events_.begin(), Event{t, stage});
-  if (events_.size() > kMaxEvents) events_.resize(kMaxEvents);
+  if (events_.size() > kMaxEvents) events_.resize(converted::count(kMaxEvents));
   ++serial_;
 }
-const MusicSynth::Station MusicSynth::kStations[] = {
+namespace MusicSynth { const MusicSynth::Station kStations[] = {
     {"KERN FM", "Synthwave", 100, 11},
     {"BODENSEE BEATS", "House", 124, 23},
     {"LOFI LAGUNE", "Lo-Fi", 78, 37},
     {"8-BIT RADIO", "Chiptune", 144, 41},
     {"NACHTSCHICHT", "Techno", 132, 53},
-};
+}; }
 enum Genre { synthwave, house, lofi, chip, techno };
 struct Prog { Genre genre; f32 bpm; u32 seed; i32 root; bool minor; };
 Prog prog_of(i32 p) {
   if (p == MusicSynth::kMenu) return {chip, 140, 7, 57, true};  // the title: 8 bits, A minor
   const MusicSynth::Station& s = converted::at(MusicSynth::kStations, p);
-  const Genre g = static_cast<Genre>(p % 5);
+  const Genre g = static_cast<Genre>(converted::among({0, 1, 2, 3, 4}, p % 5));
   return {g, s.bpm, s.seed, g == house ? 53 : g == lofi ? 55 : g == techno ? 50 : 52, g != house};
 }
 f32 midi(f32 n) { return 440.0 * kern::math::pow(2.0, (n - 69) / 12); }
-void MusicSynth::init(u32 rate) { rate_ = rate; }
-void MusicSynth::select(i32 programme, f32 level) {
-  want_ = programme;
-  target_ = clampf(level, 0, 1);
-}
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
@@ -383,58 +350,14 @@ void MusicSynth::select(i32 programme, f32 level) {
 [[maybe_unused]] static bool same(const Prog& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.genre, (*got.rows)[0]) && same(want.bpm, (*got.rows)[1]) && same(want.seed, (*got.rows)[2]) && same(want.root, (*got.rows)[3]) && same(want.minor, (*got.rows)[4]); }
 [[maybe_unused]] static bool defined(const Prog& s) { return defined(s.genre) && defined(s.bpm) && defined(s.seed) && defined(s.root) && defined(s.minor); }
 [[maybe_unused]] static std::string text(const Prog& s) { return std::string("{") + text(s.genre) + ", " + text(s.bpm) + ", " + text(s.seed) + ", " + text(s.root) + ", " + text(s.minor) + "}"; }
-[[maybe_unused]] static MusicSynth::Voice draw_MusicSynth__Voice(converted::Draw& draw) {
-  MusicSynth::Voice s{};
-  s.phase = draw.number();
-  s.freq = draw.number();
-  s.env = draw.number();
-  s.decay = draw.number();
-  s.amp = draw.number();
-  s.phase2 = draw.number();
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const MusicSynth::Voice& s) { return converted::Value::structure({arg(s.phase), arg(s.freq), arg(s.env), arg(s.decay), arg(s.amp), arg(s.phase2)}); }
-[[maybe_unused]] static bool same(const MusicSynth::Voice& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.phase, (*got.rows)[0]) && same(want.freq, (*got.rows)[1]) && same(want.env, (*got.rows)[2]) && same(want.decay, (*got.rows)[3]) && same(want.amp, (*got.rows)[4]) && same(want.phase2, (*got.rows)[5]); }
-[[maybe_unused]] static bool defined(const MusicSynth::Voice& s) { return defined(s.phase) && defined(s.freq) && defined(s.env) && defined(s.decay) && defined(s.amp) && defined(s.phase2); }
-[[maybe_unused]] static std::string text(const MusicSynth::Voice& s) { return std::string("{") + text(s.phase) + ", " + text(s.freq) + ", " + text(s.env) + ", " + text(s.decay) + ", " + text(s.amp) + ", " + text(s.phase2) + "}"; }
-[[maybe_unused]] static MusicSynth draw_MusicSynth(converted::Draw& draw) {
-  MusicSynth s{};
-  s.peak = draw.number();
-  s.rate_ = static_cast<unsigned int>(draw.below(40));
-  s.programme_ = static_cast<int>(draw.whole());
-  s.want_ = static_cast<int>(draw.whole());
-  s.gain_ = draw.number();
-  s.target_ = draw.number();
-  s.fade_ = draw.number();
-  s.sample_ = static_cast<unsigned long>(draw.below(40));
-  s.step_ = static_cast<unsigned int>(draw.below(40));
-  s.samples_per_step_ = static_cast<unsigned int>(draw.below(40));
-  s.until_step_ = static_cast<unsigned int>(draw.below(40));
-  s.rng_ = static_cast<unsigned int>(draw.below(40));
-  s.kick_ = draw_MusicSynth__Voice(draw);
-  s.snare_ = draw_MusicSynth__Voice(draw);
-  s.hat_ = draw_MusicSynth__Voice(draw);
-  s.bass_ = draw_MusicSynth__Voice(draw);
-  s.lead_ = draw_MusicSynth__Voice(draw);
-  for (auto& e : s.pad_) e = draw_MusicSynth__Voice(draw);
-  s.lp_ = draw.number();
-  s.bass_lp_ = draw.number();
-  for (auto& e : s.echo_) e = draw.number();
-  s.echo_at_ = static_cast<unsigned int>(draw.below(40));
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const MusicSynth& s) { return converted::Value::structure({arg(s.peak), arg(s.rate_), arg(s.programme_), arg(s.want_), arg(s.gain_), arg(s.target_), arg(s.fade_), arg(s.sample_), arg(s.step_), arg(s.samples_per_step_), arg(s.until_step_), arg(s.rng_), arg(s.kick_), arg(s.snare_), arg(s.hat_), arg(s.bass_), arg(s.lead_), arg(std::vector<MusicSynth::Voice>(std::begin(s.pad_), std::end(s.pad_))), arg(s.lp_), arg(s.bass_lp_), arg(std::vector<double>(std::begin(s.echo_), std::end(s.echo_))), arg(s.echo_at_)}); }
-[[maybe_unused]] static bool same(const MusicSynth& want, const converted::Value& got) { return got.rows && got.rows->size() == 22 && same(want.peak, (*got.rows)[0]) && same(want.rate_, (*got.rows)[1]) && same(want.programme_, (*got.rows)[2]) && same(want.want_, (*got.rows)[3]) && same(want.gain_, (*got.rows)[4]) && same(want.target_, (*got.rows)[5]) && same(want.fade_, (*got.rows)[6]) && same(want.sample_, (*got.rows)[7]) && same(want.step_, (*got.rows)[8]) && same(want.samples_per_step_, (*got.rows)[9]) && same(want.until_step_, (*got.rows)[10]) && same(want.rng_, (*got.rows)[11]) && same(want.kick_, (*got.rows)[12]) && same(want.snare_, (*got.rows)[13]) && same(want.hat_, (*got.rows)[14]) && same(want.bass_, (*got.rows)[15]) && same(want.lead_, (*got.rows)[16]) && same(std::vector<MusicSynth::Voice>(std::begin(want.pad_), std::end(want.pad_)), (*got.rows)[17]) && same(want.lp_, (*got.rows)[18]) && same(want.bass_lp_, (*got.rows)[19]) && same(std::vector<double>(std::begin(want.echo_), std::end(want.echo_)), (*got.rows)[20]) && same(want.echo_at_, (*got.rows)[21]); }
-[[maybe_unused]] static bool defined(const MusicSynth& s) { return defined(s.peak) && defined(s.rate_) && defined(s.programme_) && defined(s.want_) && defined(s.gain_) && defined(s.target_) && defined(s.fade_) && defined(s.sample_) && defined(s.step_) && defined(s.samples_per_step_) && defined(s.until_step_) && defined(s.rng_) && defined(s.kick_) && defined(s.snare_) && defined(s.hat_) && defined(s.bass_) && defined(s.lead_) && defined(std::vector<MusicSynth::Voice>(std::begin(s.pad_), std::end(s.pad_))) && defined(s.lp_) && defined(s.bass_lp_) && defined(std::vector<double>(std::begin(s.echo_), std::end(s.echo_))) && defined(s.echo_at_); }
-[[maybe_unused]] static std::string text(const MusicSynth& s) { return std::string("{") + text(s.peak) + ", " + text(s.rate_) + ", " + text(s.programme_) + ", " + text(s.want_) + ", " + text(s.gain_) + ", " + text(s.target_) + ", " + text(s.fade_) + ", " + text(s.sample_) + ", " + text(s.step_) + ", " + text(s.samples_per_step_) + ", " + text(s.until_step_) + ", " + text(s.rng_) + ", " + text(s.kick_) + ", " + text(s.snare_) + ", " + text(s.hat_) + ", " + text(s.bass_) + ", " + text(s.lead_) + ", " + text(std::vector<MusicSynth::Voice>(std::begin(s.pad_), std::end(s.pad_))) + ", " + text(s.lp_) + ", " + text(s.bass_lp_) + ", " + text(std::vector<double>(std::begin(s.echo_), std::end(s.echo_))) + ", " + text(s.echo_at_) + "}"; }
 
 SC_TEST(converted_equipment) {
   converted::Blueprint bp("Equipment");
-  converted::Draw draw;
   {  // FlightLog::record
     converted::Tally tally("FlightLog_record");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] FlightLog a0, [[maybe_unused]] FlightSample a1, [[maybe_unused]] bool a2) { a0.record(a1, a2); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const FlightLog a0 = draw_FlightLog(draw);
       const FlightSample a1 = draw_FlightSample(draw);
       const bool a2 = draw.flag();
@@ -445,8 +368,9 @@ SC_TEST(converted_equipment) {
   }
   {  // FlightLog::finish
     converted::Tally tally("FlightLog_finish");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] FlightLog a0, [[maybe_unused]] const char* a1) { a0.finish(a1); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const FlightLog a0 = draw_FlightLog(draw);
       const char* a1 = draw.c_word();
       const converted::Watch watch;
@@ -456,8 +380,9 @@ SC_TEST(converted_equipment) {
   }
   {  // FlightLog::network
     converted::Tally tally("FlightLog_network");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] FlightLog a0, [[maybe_unused]] std::string a1, [[maybe_unused]] double a2) { a0.network(a1, a2); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const FlightLog a0 = draw_FlightLog(draw);
       const std::string a1 = draw.word();
       const double a2 = draw.number();
@@ -468,8 +393,9 @@ SC_TEST(converted_equipment) {
   }
   {  // prog_of
     converted::Tally tally("prog_of");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] int a0) { return converted_equipment::prog_of(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const int a0 = static_cast<int>(draw.whole());
       const converted::Watch watch;
       const auto want = run(a0);
@@ -478,35 +404,13 @@ SC_TEST(converted_equipment) {
   }
   {  // midi
     converted::Tally tally("midi");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0) { return converted_equipment::midi(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
       const auto want = run(a0);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
-    }
-  }
-  {  // MusicSynth::init
-    converted::Tally tally("MusicSynth_init");
-    const auto run = [&]([[maybe_unused]] MusicSynth a0, [[maybe_unused]] unsigned int a1) { a0.init(a1); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
-      const MusicSynth a0 = draw_MusicSynth(draw);
-      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
-      const converted::Watch watch;
-      const auto want = run(a0, a1);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
-    }
-  }
-  {  // MusicSynth::select
-    converted::Tally tally("MusicSynth_select");
-    const auto run = [&]([[maybe_unused]] MusicSynth a0, [[maybe_unused]] int a1, [[maybe_unused]] double a2) { a0.select(a1, a2); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
-      const MusicSynth a0 = draw_MusicSynth(draw);
-      const int a1 = static_cast<int>(draw.whole());
-      const double a2 = draw.number();
-      const converted::Watch watch;
-      const auto want = run(a0, a1, a2);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
     }
   }
 }

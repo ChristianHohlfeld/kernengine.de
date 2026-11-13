@@ -44,11 +44,11 @@ bool hitscan_on_foot(Id id) { return id == Id::smg || id == Id::glock || id == I
 
 SC_TEST(converted_game_weapons) {
   converted::Blueprint bp("GameWeapons");
-  converted::Draw draw;
   {  // hitscan_on_foot
     converted::Tally tally("hitscan_on_foot");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Id a0) { return converted_game_weapons::hitscan_on_foot(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Id a0 = static_cast<Id>(draw.below(14));
       const converted::Watch watch;
       const auto want = run(a0);

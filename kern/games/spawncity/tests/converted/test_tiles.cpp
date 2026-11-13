@@ -121,8 +121,8 @@ TileKey tile_at(f64 lon, f64 lat, i32 z) {
   const f64 lr = lat * kPiD / 180;
   TileKey t;
   t.z = z;
-  t.x = static_cast<i32>(std::floor((lon + 180) / 360 * n));
-  t.y = static_cast<i32>(std::floor((1 - asinh_bp(kern::math::tan(lr)) / kPiD) / 2 * n));
+  t.x = static_cast<i32>(converted::fits<int>(std::floor((lon + 180) / 360 * n)));
+  t.y = static_cast<i32>(converted::fits<int>(std::floor((1 - asinh_bp(kern::math::tan(lr)) / kPiD) / 2 * n)));
   return t;
 }
 void tile_lonlat(const TileKey& t, f64 fx, f64 fy, f64& lon, f64& lat) {
@@ -175,14 +175,14 @@ struct Projector {
   }
 };
 namespace FurnishIndex { static constexpr f32 kCell = 20; }
-namespace FurnishIndex { inline i32 cell(f32 v) { return static_cast<i32>(std::floor(v / kCell)); } }
+namespace FurnishIndex { inline i32 cell(f32 v) { return static_cast<i32>(converted::fits<int>(std::floor(v / kCell))); } }
 void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out) {
   // A walled-town grid with a market square: blocks of narrow terraced houses (3-6 storeys),
   // a ring road, a park and a lake shore to the north. Nothing here comes from real map data.
   Rng rng(seed);
   out.procedural = true;
   const f32 pitch = 76, street = 12;
-  const int blocks = std::max(3, static_cast<int>(size / pitch));
+  const int blocks = std::max(3, static_cast<int>(converted::fits<int>(size / pitch)));
   const f32 half = blocks * pitch * 0.5;
   const f32 x0 = static_cast<f32>(cx) - half, y0 = static_cast<f32>(cy) - half;
   for (int i = 0; i <= blocks; ++i) {
@@ -225,7 +225,7 @@ void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out) {
           if ((side == 1 || side == 3) && (ay < b0 + depth || by2 > b0 + inner - depth)) { along += w; continue; }
           MapFeatures::Building b;
           b.rings.push_back({{ax, ay}, {bx2, ay}, {bx2, by2}, {ax, by2}});
-          b.top = 3.2 * static_cast<f32>(3 + static_cast<int>(rng.unit() * 4)) + rng.range(0, 1.5);
+          b.top = 3.2 * static_cast<f32>(3 + static_cast<int>(converted::fits<int>(rng.unit() * 4))) + rng.range(0, 1.5);
           b.seed = rng.next();
           out.buildings.push_back(std::move(b));
           along += w;
@@ -267,7 +267,7 @@ void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out) {
 [[maybe_unused]] static bool defined(const GeoProjector& s) { return defined(s.lon0) && defined(s.lat0) && defined(s.cos_lat); }
 [[maybe_unused]] static std::string text(const GeoProjector& s) { return std::string("{") + text(s.lon0) + ", " + text(s.lat0) + ", " + text(s.cos_lat) + "}"; }
 [[maybe_unused]] static Projector draw_Projector(converted::Draw& draw) {
-  Projector s(draw_TileKey(draw), draw_kern__GeoProjector(draw), draw.number());
+  Projector s = Projector(draw_TileKey(draw), draw_kern__GeoProjector(draw), draw.number());
   s.x0 = draw.number();
   s.x1 = draw.number();
   s.y0 = draw.number();
@@ -281,7 +281,7 @@ void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out) {
 [[maybe_unused]] static bool defined(const Projector& s) { return defined(s.x0) && defined(s.x1) && defined(s.y0) && defined(s.ym) && defined(s.y1) && defined(s.inv_extent); }
 [[maybe_unused]] static std::string text(const Projector& s) { return std::string("{") + text(s.x0) + ", " + text(s.x1) + ", " + text(s.y0) + ", " + text(s.ym) + ", " + text(s.y1) + ", " + text(s.inv_extent) + "}"; }
 [[maybe_unused]] static Rng draw_Rng(converted::Draw& draw) {
-  Rng s(static_cast<unsigned int>(draw.below(40)));
+  Rng s = Rng(static_cast<unsigned int>(draw.below(40)));
   s.s = static_cast<unsigned int>(draw.below(40));
   s.spare_ = draw.number();
   s.has_spare_ = draw.flag();
@@ -377,11 +377,11 @@ struct Out_Rng_range { Rng Self; double Result; };
 
 SC_TEST(converted_tiles) {
   converted::Blueprint bp("Tiles");
-  converted::Draw draw;
   {  // tile_at
     converted::Tally tally("tile_at");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] int a2) { return converted_tiles::tile_at(a0, a1, a2); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const int a2 = static_cast<int>(draw.whole());
@@ -392,8 +392,9 @@ SC_TEST(converted_tiles) {
   }
   {  // tile_lonlat
     converted::Tally tally("tile_lonlat");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] TileKey a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { converted_tiles::tile_lonlat(a0, a1, a2, a3, a4); return Out_tile_lonlat{a3, a4}; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const TileKey a0 = draw_TileKey(draw);
       const double a1 = draw.number();
       const double a2 = draw.number();
@@ -406,8 +407,9 @@ SC_TEST(converted_tiles) {
   }
   {  // unproject
     converted::Tally tally("unproject");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] GeoProjector a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { converted_tiles::unproject(a0, a1, a2, a3, a4); return Out_unproject{a3, a4}; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const GeoProjector a0 = draw_kern__GeoProjector(draw);
       const double a1 = draw.number();
       const double a2 = draw.number();
@@ -420,8 +422,9 @@ SC_TEST(converted_tiles) {
   }
   {  // road_width
     converted::Tally tally("road_width");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] RoadClass a0) { return converted_tiles::road_width(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const RoadClass a0 = static_cast<RoadClass>(draw.below(13));
       const converted::Watch watch;
       const auto want = run(a0);
@@ -430,8 +433,9 @@ SC_TEST(converted_tiles) {
   }
   {  // road_is_water
     converted::Tally tally("road_is_water");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] RoadClass a0) { return converted_tiles::road_is_water(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const RoadClass a0 = static_cast<RoadClass>(draw.below(13));
       const converted::Watch watch;
       const auto want = run(a0);
@@ -440,8 +444,9 @@ SC_TEST(converted_tiles) {
   }
   {  // road_drivable
     converted::Tally tally("road_drivable");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] RoadClass a0) { return converted_tiles::road_drivable(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const RoadClass a0 = static_cast<RoadClass>(draw.below(13));
       const converted::Watch watch;
       const auto want = run(a0);
@@ -450,8 +455,9 @@ SC_TEST(converted_tiles) {
   }
   {  // GeoProjector::project
     converted::Tally tally("GeoProjector_project");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] GeoProjector a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { a0.project(a1, a2, a3, a4); return Out_GeoProjector_project{a3, a4}; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const GeoProjector a0 = draw_kern__GeoProjector(draw);
       const double a1 = draw.number();
       const double a2 = draw.number();
@@ -464,8 +470,9 @@ SC_TEST(converted_tiles) {
   }
   {  // Projector::Projector
     converted::Tally tally("Projector_new");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] TileKey a0, [[maybe_unused]] GeoProjector a1, [[maybe_unused]] double a2) { return Projector(a0, a1, a2); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const TileKey a0 = draw_TileKey(draw);
       const GeoProjector a1 = draw_kern__GeoProjector(draw);
       const double a2 = draw.number();
@@ -476,8 +483,9 @@ SC_TEST(converted_tiles) {
   }
   {  // Projector::operator()
     converted::Tally tally("Projector_call");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Projector a0, [[maybe_unused]] Vec2 a1) { return a0.operator()(a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Projector a0 = draw_Projector(draw);
       const Vec2 a1 = draw.vector2();
       const converted::Watch watch;
@@ -487,8 +495,9 @@ SC_TEST(converted_tiles) {
   }
   {  // FurnishIndex::cell
     converted::Tally tally("FurnishIndex_cell");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0) { return converted_tiles::FurnishIndex::cell(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
       const auto want = run(a0);
@@ -497,8 +506,9 @@ SC_TEST(converted_tiles) {
   }
   {  // Rng::Rng
     converted::Tally tally("Rng_new");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0) { return Rng(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
       const auto want = run(a0);
@@ -507,8 +517,9 @@ SC_TEST(converted_tiles) {
   }
   {  // Rng::next
     converted::Tally tally("Rng_next");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Rng a0) { const auto r = a0.next(); return Out_Rng_next{a0, r}; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Rng a0 = draw_Rng(draw);
       const converted::Watch watch;
       const auto want = run(a0);
@@ -517,8 +528,9 @@ SC_TEST(converted_tiles) {
   }
   {  // Rng::unit
     converted::Tally tally("Rng_unit");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Rng a0) { const auto r = a0.unit(); return Out_Rng_unit{a0, r}; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Rng a0 = draw_Rng(draw);
       const converted::Watch watch;
       const auto want = run(a0);
@@ -527,8 +539,9 @@ SC_TEST(converted_tiles) {
   }
   {  // Rng::range
     converted::Tally tally("Rng_range");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Rng a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { const auto r = a0.range(a1, a2); return Out_Rng_range{a0, r}; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Rng a0 = draw_Rng(draw);
       const double a1 = draw.number();
       const double a2 = draw.number();
@@ -539,8 +552,9 @@ SC_TEST(converted_tiles) {
   }
   {  // procedural_city
     converted::Tally tally("procedural_city");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] unsigned int a3, [[maybe_unused]] MapFeatures a4) { converted_tiles::procedural_city(a0, a1, a2, a3, a4); return a4; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const double a2 = draw.number();

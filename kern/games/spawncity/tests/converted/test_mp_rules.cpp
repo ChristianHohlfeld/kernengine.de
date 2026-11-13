@@ -53,7 +53,9 @@ struct Quat {
 
 };
 enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
+enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter };
 constexpr f32 kPi = 3.14159265358979323846;
+constexpr f32 kDeg = kPi / 180.0;
 inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
 inline f32 wrap_pi(f32 a) {
   while (a > kPi) a -= 2 * kPi;
@@ -76,13 +78,14 @@ enum class PinType : u8 {
   exec, boolean, integer, number, vector, text, actor, enumeration, structure,
   boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, count
 };
+constexpr f64 kInterpolationDelayMs = 90;
 constexpr f32 kTeleportM = 35;
 namespace PoseTimeline { struct Snap { Vec3 p; Quat q; Vec3 v; f64 received, source; }; }
 struct NavTimeline {
  public:
   void reset() { snaps_.clear(); }
   bool push(Vec3 p, f32 heading, u8 mode, f64 at_ms);
-  
+  bool sample(f64 now_ms, Vec3& p, f32& heading) const;
 
  private:
   struct Snap { Vec3 p; f32 heading; u8 mode; f64 at; };
@@ -137,6 +140,11 @@ struct VoiceCapture {
   std::vector<std::vector<u8>> frames_;
   f64 phase_ = 0;
 };
+struct Crumb { Vec2 p; f32 bearing = 0; f32 left_m = 0; };
+std::vector<Crumb> sample_breadcrumbs(const std::vector<Vec2>& route, Vec2 position, u32 count = 5, f32 spacing = 18, f32 start = 9);
+struct Turn { enum class Dir : u8 { none, left, right, u_turn } dir = Dir::none; f32 distance = 0, angle_deg = 0; };
+Turn upcoming_turn(const std::vector<Vec2>& route, Vec2 position, f32 scan = 250, f32 window = 12, f32 min_angle = 38);
+f32 route_left(const std::vector<Vec2>& route, Vec2 position);
 f64 fmin2(f64 a, f64 b) { return a < b ? a : b; }
 f64 clampd(f64 v, f64 lo, f64 hi) { return v < lo ? lo : (v > hi ? hi : v); }
 Quat nlerp_slerp(Quat a, Quat b, f32 t) { return slerp(a, b, t); }
@@ -145,6 +153,23 @@ bool NavTimeline::push(Vec3 p, f32 heading, u8 mode, f64 at) {
   if (!snaps_.empty() && (converted::back(snaps_).mode != mode || length(converted::back(snaps_).p - p) > kTeleportM)) reset();
   snaps_.push_back({p, wrap_pi(heading), mode, at});
   while (snaps_.size() > 10) converted::erase(snaps_, snaps_.begin());
+  return true;
+}
+bool NavTimeline::sample(f64 now, Vec3& p, f32& heading) const {
+  if (snaps_.empty()) return false;
+  const f64 at = now - kInterpolationDelayMs;
+  if (at <= converted::at(snaps_, 0).at) { p = converted::at(snaps_, 0).p; heading = converted::at(snaps_, 0).heading; return true; }
+  for (std::size_t i = 1; i < snaps_.size(); converted::pre_inc(i)) {
+    const Snap& b = converted::at(snaps_, i);
+    if (at > b.at) continue;
+    const Snap& a = converted::at(snaps_, converted::minus(i, 1));
+    const f32 t = static_cast<f32>(clampd((at - a.at) / (b.at - a.at), 0, 1));
+    p = a.p + (b.p - a.p) * t;
+    heading = wrap_pi(a.heading + wrap_pi(b.heading - a.heading) * t);
+    return true;
+  }
+  p = converted::back(snaps_).p;  // no blind prediction: hold
+  heading = converted::back(snaps_).heading;
   return true;
 }
 void Scoreboard::ensure(u8 slot) {
@@ -194,8 +219,8 @@ bool VoiceStream::push(u32 seq, const std::vector<u8>& mulaw, f32 gain) {
   }
   Chunk c;
   c.gain = gain;
-  c.pcm.resize(mulaw.size());
-  for (std::size_t i = 0; i < mulaw.size(); ++i) converted::at(c.pcm, i) = decode_mulaw(converted::at(mulaw, i));
+  c.pcm.resize(converted::count(mulaw.size()));
+  for (std::size_t i = 0; i < mulaw.size(); converted::pre_inc(i)) converted::at(c.pcm, i) = decode_mulaw(converted::at(mulaw, i));
   queue_.push_back(std::move(c));
   return true;
 }
@@ -204,6 +229,82 @@ bool VoiceCapture::take(std::vector<u8>& frame) {
   frame = std::move(converted::front(frames_));
   converted::erase(frames_, frames_.begin());
   return true;
+}
+struct Along { f32 along = 0, distance = 1e30; };
+Along project_on(const std::vector<Vec2>& pts, Vec2 pos, std::vector<f32>& cum) {
+  cum.assign(converted::count(1), 0);
+  for (std::size_t i = 0; converted::plus(i, 1) < pts.size(); converted::pre_inc(i)) cum.push_back(converted::back(cum) + hypot_bp(converted::at(pts, converted::plus(i, 1)).x - converted::at(pts, i).x, converted::at(pts, converted::plus(i, 1)).y - converted::at(pts, i).y));
+  Along best;
+  for (std::size_t i = 0; converted::plus(i, 1) < pts.size(); converted::pre_inc(i)) {
+    const f32 len = converted::at(cum, converted::plus(i, 1)) - converted::at(cum, i);
+    if (len < 0.001) continue;
+    const Vec2 a = converted::at(pts, i), b = converted::at(pts, converted::plus(i, 1));
+    const f32 t = clampf(((pos.x - a.x) * (b.x - a.x) + (pos.y - a.y) * (b.y - a.y)) / (len * len), 0, 1);
+    const f32 d = hypot_bp(pos.x - (a.x + (b.x - a.x) * t), pos.y - (a.y + (b.y - a.y) * t));
+    if (d < best.distance) { best.distance = d; best.along = converted::at(cum, i) + len * t; }
+  }
+  return best;
+}
+Vec2 point_at(const std::vector<Vec2>& pts, const std::vector<f32>& cum, f32 d) {
+  d = clampf(d, 0, converted::back(cum));
+  std::size_t i = 0;
+  while (converted::plus(i, 2) < cum.size() && converted::at(cum, converted::plus(i, 1)) < d) converted::pre_inc(i);
+  const f32 len = converted::at(cum, converted::plus(i, 1)) - converted::at(cum, i);
+  const f32 t = len > 1e-6 ? clampf((d - converted::at(cum, i)) / len, 0, 1) : 0;
+  return {converted::at(pts, i).x + (converted::at(pts, converted::plus(i, 1)).x - converted::at(pts, i).x) * t, converted::at(pts, i).y + (converted::at(pts, converted::plus(i, 1)).y - converted::at(pts, i).y) * t};
+}
+std::vector<Crumb> sample_breadcrumbs(const std::vector<Vec2>& pts, Vec2 pos, u32 count, f32 spacing, f32 start) {
+  std::vector<Crumb> out;
+  if (pts.size() < 2) return out;
+  std::vector<f32> cum;
+  const Along a = project_on(pts, pos, cum);
+  const f32 total = converted::back(cum);
+  if (total < 0.01) return out;
+  const u32 n = std::min<u32>(count, 8);
+  const f32 step = clampf(spacing, 2, 500), first = clampf(start, 1, 500);
+  for (u32 j = 0; j < n; ++j) {
+    const f32 at = a.along + first + static_cast<f32>(j) * step;
+    if (at > total + 0.001) break;
+    for (std::size_t i = 0; converted::plus(i, 1) < pts.size(); converted::pre_inc(i)) {
+      const f32 len = converted::at(cum, converted::plus(i, 1)) - converted::at(cum, i);
+      if (at > converted::at(cum, converted::plus(i, 1)) + 0.0001 || len < 0.001) continue;
+      const f32 t = clampf((at - converted::at(cum, i)) / len, 0, 1);
+      const Vec2 p0 = converted::at(pts, i), p1 = converted::at(pts, converted::plus(i, 1));
+      out.push_back({{p0.x + (p1.x - p0.x) * t, p0.y + (p1.y - p0.y) * t}, kern::math::atan2(p1.x - p0.x, p1.y - p0.y), total - at});
+      break;
+    }
+  }
+  return out;
+}
+Turn upcoming_turn(const std::vector<Vec2>& pts, Vec2 pos, f32 scan, f32 window, f32 min_angle) {
+  Turn out;
+  if (pts.size() < 3) return out;
+  std::vector<f32> cum;
+  const Along a = project_on(pts, pos, cum);
+  if (converted::back(cum) < 2) return out;
+  scan = clampf(scan, 5, 1000);
+  window = clampf(window, 3, 80);
+  min_angle = clampf(min_angle, 15, 160);
+  for (std::size_t i = 1; converted::plus(i, 1) < pts.size(); converted::pre_inc(i)) {
+    const f32 away = converted::at(cum, i) - a.along;
+    if (away < 1 || away > scan) continue;
+    const Vec2 c = converted::at(pts, i), prev = point_at(pts, cum, converted::at(cum, i) - window), next = point_at(pts, cum, converted::at(cum, i) + window);
+    const f32 bx = c.x - prev.x, by = c.y - prev.y, ax = next.x - c.x, ay = next.y - c.y;
+    if (hypot_bp(bx, by) < 2 || hypot_bp(ax, ay) < 2) continue;
+    const f32 angle = kern::math::atan2(bx * ay - by * ax, bx * ax + by * ay) / kDeg;
+    if (std::fabs(angle) < min_angle) continue;
+    out.dir = std::fabs(angle) > 155 ? Turn::Dir::u_turn : angle < 0 ? Turn::Dir::right : Turn::Dir::left;
+    out.distance = away;
+    out.angle_deg = std::fabs(angle);
+    return out;
+  }
+  return out;
+}
+f32 route_left(const std::vector<Vec2>& pts, Vec2 pos) {
+  if (pts.size() < 2) return pts.empty() ? 0 : hypot_bp(converted::at(pts, 0).x - pos.x, converted::at(pts, 0).y - pos.y);
+  std::vector<f32> cum;
+  const Along a = project_on(pts, pos, cum);
+  return converted::back(cum) - a.along + a.distance;
 }
 #undef private
 #undef protected
@@ -296,10 +397,46 @@ bool VoiceCapture::take(std::vector<u8>& frame) {
 [[maybe_unused]] static bool same(const VoiceCapture& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.pending_, (*got.rows)[0]) && same(want.frames_, (*got.rows)[1]) && same(want.phase_, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const VoiceCapture& s) { return defined(s.pending_) && defined(s.frames_) && defined(s.phase_); }
 [[maybe_unused]] static std::string text(const VoiceCapture& s) { return std::string("{") + text(s.pending_) + ", " + text(s.frames_) + ", " + text(s.phase_) + "}"; }
+[[maybe_unused]] static Along draw_mp__Along(converted::Draw& draw) {
+  Along s{};
+  s.along = draw.number();
+  s.distance = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Along& s) { return converted::Value::structure({arg(s.along), arg(s.distance)}); }
+[[maybe_unused]] static bool same(const Along& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.along, (*got.rows)[0]) && same(want.distance, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Along& s) { return defined(s.along) && defined(s.distance); }
+[[maybe_unused]] static std::string text(const Along& s) { return std::string("{") + text(s.along) + ", " + text(s.distance) + "}"; }
+[[maybe_unused]] static Crumb draw_mp__Crumb(converted::Draw& draw) {
+  Crumb s{};
+  s.p = draw.vector2();
+  s.bearing = draw.number();
+  s.left_m = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Crumb& s) { return converted::Value::structure({arg(s.p), arg(s.bearing), arg(s.left_m)}); }
+[[maybe_unused]] static bool same(const Crumb& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.p, (*got.rows)[0]) && same(want.bearing, (*got.rows)[1]) && same(want.left_m, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const Crumb& s) { return defined(s.p) && defined(s.bearing) && defined(s.left_m); }
+[[maybe_unused]] static std::string text(const Crumb& s) { return std::string("{") + text(s.p) + ", " + text(s.bearing) + ", " + text(s.left_m) + "}"; }
+[[maybe_unused]] static Turn draw_mp__Turn(converted::Draw& draw) {
+  Turn s{};
+  s.dir = static_cast<Turn::Dir>(draw.below(4));
+  s.distance = draw.number();
+  s.angle_deg = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Turn& s) { return converted::Value::structure({arg(s.dir), arg(s.distance), arg(s.angle_deg)}); }
+[[maybe_unused]] static bool same(const Turn& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.dir, (*got.rows)[0]) && same(want.distance, (*got.rows)[1]) && same(want.angle_deg, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const Turn& s) { return defined(s.dir) && defined(s.distance) && defined(s.angle_deg); }
+[[maybe_unused]] static std::string text(const Turn& s) { return std::string("{") + text(s.dir) + ", " + text(s.distance) + ", " + text(s.angle_deg) + "}"; }
 struct Out_NavTimeline_push { NavTimeline Self; bool Result; };
 [[maybe_unused]] static bool same(const Out_NavTimeline_push& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_NavTimeline_push& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_NavTimeline_push& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
+struct Out_NavTimeline_sample { bool Result; Vec3 p; double heading; };
+[[maybe_unused]] static bool same(const Out_NavTimeline_sample& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Result, (*got.rows)[0]) && same(want.p, (*got.rows)[1]) && same(want.heading, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const Out_NavTimeline_sample& s) { return defined(s.Result) && defined(s.p) && defined(s.heading); }
+[[maybe_unused]] static std::string text(const Out_NavTimeline_sample& s) { return std::string("{") + text(s.Result) + ", " + text(s.p) + ", " + text(s.heading) + "}"; }
 struct Out_VoiceStream_push { VoiceStream Self; bool Result; };
 [[maybe_unused]] static bool same(const Out_VoiceStream_push& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_VoiceStream_push& s) { return defined(s.Self) && defined(s.Result); }
@@ -308,14 +445,18 @@ struct Out_VoiceCapture_take { VoiceCapture Self; bool Result; std::vector<unsig
 [[maybe_unused]] static bool same(const Out_VoiceCapture_take& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]) && same(want.frame, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const Out_VoiceCapture_take& s) { return defined(s.Self) && defined(s.Result) && defined(s.frame); }
 [[maybe_unused]] static std::string text(const Out_VoiceCapture_take& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + ", " + text(s.frame) + "}"; }
+struct Out_project_on { Along Result; std::vector<double> cum; };
+[[maybe_unused]] static bool same(const Out_project_on& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.cum, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_project_on& s) { return defined(s.Result) && defined(s.cum); }
+[[maybe_unused]] static std::string text(const Out_project_on& s) { return std::string("{") + text(s.Result) + ", " + text(s.cum) + "}"; }
 
 SC_TEST(converted_mp_rules) {
   converted::Blueprint bp("MpRules");
-  converted::Draw draw;
   {  // fmin2
     converted::Tally tally("fmin2");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted_mp_rules::fmin2(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const converted::Watch watch;
@@ -325,8 +466,9 @@ SC_TEST(converted_mp_rules) {
   }
   {  // clampd
     converted::Tally tally("clampd");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted_mp_rules::clampd(a0, a1, a2); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const double a2 = draw.number();
@@ -337,8 +479,9 @@ SC_TEST(converted_mp_rules) {
   }
   {  // qnormalize
     converted::Tally tally("qnormalize");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Quat a0) { return converted_mp_rules::qnormalize(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Quat a0 = draw_kern__Quat(draw);
       const converted::Watch watch;
       const auto want = run(a0);
@@ -347,8 +490,9 @@ SC_TEST(converted_mp_rules) {
   }
   {  // slerp
     converted::Tally tally("slerp");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Quat a0, [[maybe_unused]] Quat a1, [[maybe_unused]] double a2) { return converted_mp_rules::slerp(a0, a1, a2); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Quat a0 = draw_kern__Quat(draw);
       const Quat a1 = draw_kern__Quat(draw);
       const double a2 = draw.number();
@@ -359,8 +503,9 @@ SC_TEST(converted_mp_rules) {
   }
   {  // nlerp_slerp
     converted::Tally tally("nlerp_slerp");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Quat a0, [[maybe_unused]] Quat a1, [[maybe_unused]] double a2) { return converted_mp_rules::nlerp_slerp(a0, a1, a2); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Quat a0 = draw_kern__Quat(draw);
       const Quat a1 = draw_kern__Quat(draw);
       const double a2 = draw.number();
@@ -371,8 +516,9 @@ SC_TEST(converted_mp_rules) {
   }
   {  // NavTimeline::reset
     converted::Tally tally("NavTimeline_reset");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] NavTimeline a0) { a0.reset(); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const NavTimeline a0 = draw_mp__NavTimeline(draw);
       const converted::Watch watch;
       const auto want = run(a0);
@@ -381,8 +527,9 @@ SC_TEST(converted_mp_rules) {
   }
   {  // wrap_pi
     converted::Tally tally("wrap_pi");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0) { return converted_mp_rules::wrap_pi(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
       const auto want = run(a0);
@@ -391,8 +538,9 @@ SC_TEST(converted_mp_rules) {
   }
   {  // NavTimeline::push
     converted::Tally tally("NavTimeline_push");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] NavTimeline a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] unsigned char a3, [[maybe_unused]] double a4) { const auto r = a0.push(a1, a2, a3, a4); return Out_NavTimeline_push{a0, r}; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const NavTimeline a0 = draw_mp__NavTimeline(draw);
       const Vec3 a1 = draw.vector();
       const double a2 = draw.number();
@@ -403,10 +551,25 @@ SC_TEST(converted_mp_rules) {
       tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); });
     }
   }
+  {  // NavTimeline::sample
+    converted::Tally tally("NavTimeline_sample");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] NavTimeline a0, [[maybe_unused]] double a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3) { const auto r = a0.sample(a1, a2, a3); return Out_NavTimeline_sample{r, a2, a3}; };
+    for (int i = 0; tally.more(i); ++i) {
+      const NavTimeline a0 = draw_mp__NavTimeline(draw);
+      const double a1 = draw.number();
+      const Vec3 a2 = draw.vector();
+      const double a3 = draw.number();
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2, a3);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); });
+    }
+  }
   {  // Scoreboard::ensure
     converted::Tally tally("Scoreboard_ensure");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Scoreboard a0, [[maybe_unused]] unsigned char a1) { a0.ensure(a1); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Scoreboard a0 = draw_mp__Scoreboard(draw);
       const unsigned char a1 = static_cast<unsigned char>(draw.below(40));
       const converted::Watch watch;
@@ -416,8 +579,9 @@ SC_TEST(converted_mp_rules) {
   }
   {  // Scoreboard::died
     converted::Tally tally("Scoreboard_died");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Scoreboard a0, [[maybe_unused]] unsigned char a1, [[maybe_unused]] int a2) { a0.died(a1, a2); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Scoreboard a0 = draw_mp__Scoreboard(draw);
       const unsigned char a1 = static_cast<unsigned char>(draw.below(40));
       const int a2 = static_cast<int>(draw.whole());
@@ -428,8 +592,9 @@ SC_TEST(converted_mp_rules) {
   }
   {  // Scoreboard::of
     converted::Tally tally("Scoreboard_of");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Scoreboard a0, [[maybe_unused]] unsigned char a1) { return a0.of(a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Scoreboard a0 = draw_mp__Scoreboard(draw);
       const unsigned char a1 = static_cast<unsigned char>(draw.below(40));
       const converted::Watch watch;
@@ -439,8 +604,9 @@ SC_TEST(converted_mp_rules) {
   }
   {  // encode_mulaw
     converted::Tally tally("encode_mulaw");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0) { return converted_mp_rules::encode_mulaw(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
       const auto want = run(a0);
@@ -449,8 +615,9 @@ SC_TEST(converted_mp_rules) {
   }
   {  // decode_mulaw
     converted::Tally tally("decode_mulaw");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned char a0) { return converted_mp_rules::decode_mulaw(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const unsigned char a0 = static_cast<unsigned char>(draw.below(40));
       const converted::Watch watch;
       const auto want = run(a0);
@@ -459,8 +626,9 @@ SC_TEST(converted_mp_rules) {
   }
   {  // VoiceStream::push
     converted::Tally tally("VoiceStream_push");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] VoiceStream a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] std::vector<unsigned char> a2, [[maybe_unused]] double a3) { const auto r = a0.push(a1, a2, a3); return Out_VoiceStream_push{a0, r}; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const VoiceStream a0 = draw_mp__VoiceStream(draw);
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const std::vector<unsigned char> a2 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
@@ -472,10 +640,79 @@ SC_TEST(converted_mp_rules) {
   }
   {  // VoiceCapture::take
     converted::Tally tally("VoiceCapture_take");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] VoiceCapture a0, [[maybe_unused]] std::vector<unsigned char> a1) { const auto r = a0.take(a1); return Out_VoiceCapture_take{a0, r, a1}; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const VoiceCapture a0 = draw_mp__VoiceCapture(draw);
       const std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // project_on
+    converted::Tally tally("project_on");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] std::vector<double> a2) { const auto r = converted_mp_rules::project_on(a0, a1, a2); return Out_project_on{r, a2}; };
+    for (int i = 0; tally.more(i); ++i) {
+      const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+      const Vec2 a1 = draw.vector2();
+      const std::vector<double> a2 = draw_list(draw, [&]() -> double { return draw.number(); });
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+    }
+  }
+  {  // point_at
+    converted::Tally tally("point_at");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] std::vector<double> a1, [[maybe_unused]] double a2) { return converted_mp_rules::point_at(a0, a1, a2); };
+    for (int i = 0; tally.more(i); ++i) {
+      const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+      const std::vector<double> a1 = draw_list(draw, [&]() -> double { return draw.number(); });
+      const double a2 = draw.number();
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+    }
+  }
+  {  // sample_breadcrumbs
+    converted::Tally tally("sample_breadcrumbs");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] unsigned int a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { return converted_mp_rules::sample_breadcrumbs(a0, a1, a2, a3, a4); };
+    for (int i = 0; tally.more(i); ++i) {
+      const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+      const Vec2 a1 = draw.vector2();
+      const unsigned int a2 = static_cast<unsigned int>(draw.below(40));
+      const double a3 = draw.number();
+      const double a4 = draw.number();
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2, a3, a4);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); });
+    }
+  }
+  {  // upcoming_turn
+    converted::Tally tally("upcoming_turn");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { return converted_mp_rules::upcoming_turn(a0, a1, a2, a3, a4); };
+    for (int i = 0; tally.more(i); ++i) {
+      const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+      const Vec2 a1 = draw.vector2();
+      const double a2 = draw.number();
+      const double a3 = draw.number();
+      const double a4 = draw.number();
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2, a3, a4);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); });
+    }
+  }
+  {  // route_left
+    converted::Tally tally("route_left");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] Vec2 a1) { return converted_mp_rules::route_left(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+      const Vec2 a1 = draw.vector2();
       const converted::Watch watch;
       const auto want = run(a0, a1);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });

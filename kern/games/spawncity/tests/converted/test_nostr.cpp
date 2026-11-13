@@ -41,10 +41,43 @@ int cmp(const U256& a, const U256& b) {
   return 0;
 }
 bool is_zero(const U256& a) { for (u32 x : a.w) if (x) return false; return true; }
+u32 add(U256& r, const U256& a, const U256& b) {
+  u64 c = 0;
+  for (int i = 0; i < 8; ++i) { converted::plus_to(c, converted::plus(u64{converted::at(a.w, i)}, converted::at(b.w, i))); converted::at(r.w, i) = static_cast<u32>(c); converted::shr_to(c, 32); }
+  return static_cast<u32>(c);
+}
 u32 sub(U256& r, const U256& a, const U256& b) {
   i64 c = 0;
-  for (int i = 0; i < 8; ++i) { c += static_cast<i64>(converted::at(a.w, i)) - converted::at(b.w, i); converted::at(r.w, i) = static_cast<u32>(c); c >>= 32; }
+  for (int i = 0; i < 8; ++i) { converted::plus_to(c, converted::minus(static_cast<i64>(converted::at(a.w, i)), converted::at(b.w, i))); converted::at(r.w, i) = static_cast<u32>(c); converted::shr_to(c, 32); }
   return c < 0 ? 1 : 0;
+}
+U256 addm(const U256& a, const U256& b, const U256& m) {
+  U256 r;
+  const u32 carry = add(r, a, b);
+  if (carry || cmp(r, m) >= 0) sub(r, r, m);
+  return r;
+}
+U256 subm(const U256& a, const U256& b, const U256& m) {
+  U256 r;
+  if (sub(r, a, b)) add(r, r, m);
+  return r;
+}
+U256 mulm(const U256& a, const U256& b, const U256& m) {
+  U256 r;
+  for (int i = 255; i >= 0; --i) {
+    r = addm(r, r, m);
+    if ((converted::shr(converted::at(b.w, i / 32), (i % 32))) & 1) r = addm(r, a, m);
+  }
+  return r;
+}
+U256 powm(const U256& a, const U256& e, const U256& m) {
+  U256 r;
+  converted::at(r.w, 0) = 1;
+  for (int i = 255; i >= 0; --i) {
+    r = mulm(r, r, m);
+    if ((converted::shr(converted::at(e.w, i / 32), (i % 32))) & 1) r = mulm(r, a, m);
+  }
+  return r;
 }
 U256 reduce(const U256& a, const U256& m) {  // a < 2m for the moduli here
   U256 r = a;
@@ -64,6 +97,10 @@ U256 reduce(const U256& a, const U256& m) {  // a < 2m for the moduli here
 [[maybe_unused]] static bool same(const U256& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(std::vector<unsigned int>(std::begin(want.w), std::end(want.w)), (*got.rows)[0]); }
 [[maybe_unused]] static bool defined(const U256& s) { return defined(std::vector<unsigned int>(std::begin(s.w), std::end(s.w))); }
 [[maybe_unused]] static std::string text(const U256& s) { return std::string("{") + text(std::vector<unsigned int>(std::begin(s.w), std::end(s.w))) + "}"; }
+struct Out_add { unsigned int Result; U256 r; };
+[[maybe_unused]] static bool same(const Out_add& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.r, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_add& s) { return defined(s.Result) && defined(s.r); }
+[[maybe_unused]] static std::string text(const Out_add& s) { return std::string("{") + text(s.Result) + ", " + text(s.r) + "}"; }
 struct Out_sub { unsigned int Result; U256 r; };
 [[maybe_unused]] static bool same(const Out_sub& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.r, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_sub& s) { return defined(s.Result) && defined(s.r); }
@@ -71,11 +108,11 @@ struct Out_sub { unsigned int Result; U256 r; };
 
 SC_TEST(converted_nostr) {
   converted::Blueprint bp("Nostr");
-  converted::Draw draw;
   {  // rotr
     converted::Tally tally("rotr");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted_nostr::rotr(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
@@ -85,8 +122,9 @@ SC_TEST(converted_nostr) {
   }
   {  // cmp
     converted::Tally tally("cmp");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] U256 a0, [[maybe_unused]] U256 a1) { return converted_nostr::cmp(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const U256 a0 = draw_nostr__U256(draw);
       const U256 a1 = draw_nostr__U256(draw);
       const converted::Watch watch;
@@ -96,18 +134,85 @@ SC_TEST(converted_nostr) {
   }
   {  // is_zero
     converted::Tally tally("is_zero");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] U256 a0) { return converted_nostr::is_zero(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const U256 a0 = draw_nostr__U256(draw);
       const converted::Watch watch;
       const auto want = run(a0);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
+  {  // add
+    converted::Tally tally("add");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] U256 a0, [[maybe_unused]] U256 a1, [[maybe_unused]] U256 a2) { const auto r = converted_nostr::add(a0, a1, a2); return Out_add{r, a0}; };
+    for (int i = 0; tally.more(i); ++i) {
+      const U256 a0 = draw_nostr__U256(draw);
+      const U256 a1 = draw_nostr__U256(draw);
+      const U256 a2 = draw_nostr__U256(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+    }
+  }
   {  // sub
     converted::Tally tally("sub");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] U256 a0, [[maybe_unused]] U256 a1, [[maybe_unused]] U256 a2) { const auto r = converted_nostr::sub(a0, a1, a2); return Out_sub{r, a0}; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
+      const U256 a0 = draw_nostr__U256(draw);
+      const U256 a1 = draw_nostr__U256(draw);
+      const U256 a2 = draw_nostr__U256(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+    }
+  }
+  {  // addm
+    converted::Tally tally("addm");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] U256 a0, [[maybe_unused]] U256 a1, [[maybe_unused]] U256 a2) { return converted_nostr::addm(a0, a1, a2); };
+    for (int i = 0; tally.more(i); ++i) {
+      const U256 a0 = draw_nostr__U256(draw);
+      const U256 a1 = draw_nostr__U256(draw);
+      const U256 a2 = draw_nostr__U256(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+    }
+  }
+  {  // subm
+    converted::Tally tally("subm");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] U256 a0, [[maybe_unused]] U256 a1, [[maybe_unused]] U256 a2) { return converted_nostr::subm(a0, a1, a2); };
+    for (int i = 0; tally.more(i); ++i) {
+      const U256 a0 = draw_nostr__U256(draw);
+      const U256 a1 = draw_nostr__U256(draw);
+      const U256 a2 = draw_nostr__U256(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+    }
+  }
+  {  // mulm
+    converted::Tally tally("mulm");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] U256 a0, [[maybe_unused]] U256 a1, [[maybe_unused]] U256 a2) { return converted_nostr::mulm(a0, a1, a2); };
+    for (int i = 0; tally.more(i); ++i) {
+      const U256 a0 = draw_nostr__U256(draw);
+      const U256 a1 = draw_nostr__U256(draw);
+      const U256 a2 = draw_nostr__U256(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+    }
+  }
+  {  // powm
+    converted::Tally tally("powm");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] U256 a0, [[maybe_unused]] U256 a1, [[maybe_unused]] U256 a2) { return converted_nostr::powm(a0, a1, a2); };
+    for (int i = 0; tally.more(i); ++i) {
       const U256 a0 = draw_nostr__U256(draw);
       const U256 a1 = draw_nostr__U256(draw);
       const U256 a2 = draw_nostr__U256(draw);
@@ -118,8 +223,9 @@ SC_TEST(converted_nostr) {
   }
   {  // reduce
     converted::Tally tally("reduce");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] U256 a0, [[maybe_unused]] U256 a1) { return converted_nostr::reduce(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const U256 a0 = draw_nostr__U256(draw);
       const U256 a1 = draw_nostr__U256(draw);
       const converted::Watch watch;

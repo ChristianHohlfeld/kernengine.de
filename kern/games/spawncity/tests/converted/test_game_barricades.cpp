@@ -92,7 +92,7 @@ namespace Interiors { struct Plan {
   }; }
 i64 building_key(const Interiors::Plan& p) {
   if (p.outer.empty()) return 0;
-  return (static_cast<i64>(std::lround(converted::at(p.outer, 0).x * 10)) << 32) ^ (static_cast<i64>(std::lround(converted::at(p.outer, 0).y * 10)) & 0xffffffffll) ^ static_cast<i64>(p.outer.size());
+  return (converted::shl(static_cast<i64>(std::lround(converted::at(p.outer, 0).x * 10)), 32)) ^ (static_cast<i64>(std::lround(converted::at(p.outer, 0).y * 10)) & 0xffffffffll) ^ static_cast<i64>(p.outer.size());
 }
 #undef private
 #undef protected
@@ -171,11 +171,11 @@ namespace Interiors { using converted::arg; using converted::same; using convert
 
 SC_TEST(converted_game_barricades) {
   converted::Blueprint bp("GameBarricades");
-  converted::Draw draw;
   {  // building_key
     converted::Tally tally("building_key");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Interiors::Plan a0) { return converted_game_barricades::building_key(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Interiors::Plan a0 = draw_Interiors__Plan(draw);
       const converted::Watch watch;
       const auto want = run(a0);

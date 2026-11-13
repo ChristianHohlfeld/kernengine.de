@@ -155,11 +155,11 @@ namespace MpArt { using converted::arg; using converted::same; using converted::
 
 SC_TEST(converted_mp_art) {
   converted::Blueprint bp("MpArt");
-  converted::Draw draw;
   {  // MpArt::put
     converted::Tally tally("MpArt_put");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] MpArt::Part a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { converted_mp_art::MpArt::put(a0, a1, a2); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const MpArt::Part a0 = draw_MpArt__Part(draw);
       const Mat4 a1 = draw_kern__Mat4(draw);
       const Vec3 a2 = draw.vector();

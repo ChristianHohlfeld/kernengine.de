@@ -59,11 +59,11 @@ f32 approach_angle(f32 cur, f32 target, f32 max_step) { return cur + clampf(wrap
 
 SC_TEST(converted_game_town) {
   converted::Blueprint bp("GameTown");
-  converted::Draw draw;
   {  // dist2d
     converted::Tally tally("dist2d");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1) { return converted_game_town::dist2d(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const Vec3 a1 = draw.vector();
       const converted::Watch watch;
@@ -73,8 +73,9 @@ SC_TEST(converted_game_town) {
   }
   {  // wrap_pi
     converted::Tally tally("wrap_pi");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0) { return converted_game_town::wrap_pi(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
       const auto want = run(a0);
@@ -83,8 +84,9 @@ SC_TEST(converted_game_town) {
   }
   {  // approach_angle
     converted::Tally tally("approach_angle");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted_game_town::approach_angle(a0, a1, a2); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const double a2 = draw.number();

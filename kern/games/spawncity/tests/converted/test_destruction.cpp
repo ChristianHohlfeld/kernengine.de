@@ -46,11 +46,11 @@ Vec2 norm2(Vec2 v, Vec2 fallback) {
 
 SC_TEST(converted_destruction) {
   converted::Blueprint bp("Destruction");
-  converted::Draw draw;
   {  // norm2
     converted::Tally tally("norm2");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec2 a0, [[maybe_unused]] Vec2 a1) { return converted_destruction::norm2(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec2 a0 = draw.vector2();
       const Vec2 a1 = draw.vector2();
       const converted::Watch watch;

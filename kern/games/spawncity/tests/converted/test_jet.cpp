@@ -415,11 +415,11 @@ Jet::Aero Jet::aero(Vec3 vb, Vec3 wb, f32 V, f32 rho, f32 de, f32 da, f32 dr) co
 
 SC_TEST(converted_jet) {
   converted::Blueprint bp("Jet");
-  converted::Draw draw;
   {  // wave_cd
     converted::Tally tally("wave_cd");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0) { return converted_jet::wave_cd(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
       const auto want = run(a0);
@@ -428,8 +428,9 @@ SC_TEST(converted_jet) {
   }
   {  // nrm
     converted::Tally tally("nrm");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted_jet::nrm(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const converted::Watch watch;
       const auto want = run(a0);
@@ -438,8 +439,9 @@ SC_TEST(converted_jet) {
   }
   {  // air_density
     converted::Tally tally("air_density");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0) { return converted_jet::air_density(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
       const auto want = run(a0);
@@ -448,8 +450,9 @@ SC_TEST(converted_jet) {
   }
   {  // Jet::rigid_spec
     converted::Tally tally("Jet_rigid_spec");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] JetSpec a0) { return Jet::rigid_spec(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const JetSpec a0 = draw_JetSpec(draw);
       const converted::Watch watch;
       const auto want = run(a0);
@@ -458,8 +461,9 @@ SC_TEST(converted_jet) {
   }
   {  // Jet::reset
     converted::Tally tally("Jet_reset");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Jet a0) { a0.reset(); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Jet a0 = draw_Jet(draw);
       const converted::Watch watch;
       const auto want = run(a0);
@@ -468,8 +472,9 @@ SC_TEST(converted_jet) {
   }
   {  // Jet::set_mode
     converted::Tally tally("Jet_set_mode");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Jet a0, [[maybe_unused]] Jet::Mode a1) { a0.set_mode(a1); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Jet a0 = draw_Jet(draw);
       const Jet::Mode a1 = static_cast<Jet::Mode>(draw.below(2));
       const converted::Watch watch;
@@ -479,8 +484,9 @@ SC_TEST(converted_jet) {
   }
   {  // Jet::aero
     converted::Tally tally("Jet_aero");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Jet a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5, [[maybe_unused]] double a6, [[maybe_unused]] double a7) { return a0.aero(a1, a2, a3, a4, a5, a6, a7); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Jet a0 = draw_Jet(draw);
       const Vec3 a1 = draw.vector();
       const Vec3 a2 = draw.vector();

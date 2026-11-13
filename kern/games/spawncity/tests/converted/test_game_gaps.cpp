@@ -261,11 +261,11 @@ struct Out_Biquad_run { Biquad Self; double Result; };
 
 SC_TEST(converted_game_gaps) {
   converted::Blueprint bp("GameGaps");
-  converted::Draw draw;
   {  // Biquad::run
     converted::Tally tally("Biquad_run");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Biquad a0, [[maybe_unused]] double a1) { const auto r = a0.run(a1); return Out_Biquad_run{a0, r}; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Biquad a0 = draw_Biquad(draw);
       const double a1 = draw.number();
       const converted::Watch watch;
@@ -275,8 +275,9 @@ SC_TEST(converted_game_gaps) {
   }
   {  // Biquad::lowpass
     converted::Tally tally("Biquad_lowpass");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return Biquad::lowpass(a0, a1, a2); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const double a2 = draw.number();
@@ -287,8 +288,9 @@ SC_TEST(converted_game_gaps) {
   }
   {  // Biquad::peaking
     converted::Tally tally("Biquad_peaking");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return Biquad::peaking(a0, a1, a2, a3); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const double a2 = draw.number();
@@ -300,8 +302,9 @@ SC_TEST(converted_game_gaps) {
   }
   {  // billboard
     converted::Tally tally("billboard");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { return converted_game_gaps::billboard(a0, a1, a2, a3, a4, a5); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const Vec3 a1 = draw.vector();
       const Vec3 a2 = draw.vector();
@@ -315,8 +318,9 @@ SC_TEST(converted_game_gaps) {
   }
   {  // MeshData::push
     converted::Tally tally("MeshData_push");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] MeshData a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] Vec2 a4) { a0.push(a1, a2, a3, a4); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const MeshData a0 = draw_kern__MeshData(draw);
       const Vec3 a1 = draw.vector();
       const Vec3 a2 = draw.vector();
@@ -329,8 +333,9 @@ SC_TEST(converted_game_gaps) {
   }
   {  // smoke_disc
     converted::Tally tally("smoke_disc");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]() { return converted_game_gaps::smoke_disc(); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       const auto want = run();
       tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });

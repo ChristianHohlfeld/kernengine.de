@@ -359,10 +359,22 @@ und schreibt sie in der Schreibweise:
   gewürfelten Objekt ihrer Klasse aufgerufen; verglichen wird alles, was der Aufruf gibt und ändert.
 - Was nicht verglichen werden kann, weil C++ dort nichts festlegt, zählt der Test und vergleicht es
   nicht: einen Aufruf, in dem der Quelltext durch null teilt oder die Zahlen verlässt (Wurzel aus
-  Negativem), und einen, in dem er einen Eintrag außerhalb einer Liste liest oder schreibt, ganze
-  Zahlen durch null teilt oder Bits um die Breite der Zahl schiebt. Dafür führt der Test diese Stellen
-  im Quelltext durch Funktionen (`converted::at`, `quot`, `shl` …), die den Wert geben, wo es einen
-  gibt, und den Aufruf sonst markieren. Je Funktion müssen mindestens 20 Aufrufe verglichen sein.
+  Negativem), und einen, in dem er einen Eintrag außerhalb einer Liste liest oder schreibt, aus einer
+  leeren Liste nimmt, ganze Zahlen durch null teilt, Bits um die Breite der Zahl schiebt, eine Zahl
+  in einen ganzzahligen Typ bringt, der sie nicht hält, oder eine in einen Aufzählungswert, den es
+  nicht gibt. Dafür führt der Test diese Stellen im Quelltext durch Funktionen (`converted::at`,
+  `quot`, `shl`, `fits` …), die den Wert geben, wo es einen gibt, und den Aufruf sonst markieren.
+  Für einen markierten Aufruf werden neue Argumente gewürfelt (bis zum Zwanzigfachen); je Funktion
+  müssen mindestens 20 Aufrufe verglichen sein, sonst schlägt der Test fehl. Objekte einer Klasse
+  mit Konstruktor baut der Test zur Hälfte mit dem Konstruktor (ihre Teile passen dann zusammen),
+  zur Hälfte Feld für Feld.
+- Die Schleifengrenze einer Laufzeit (`Runtime::budget`, 200.000 Durchläufe je Schritt) ist Sache
+  des Programms: Der Test setzt sie hoch, weil Funktionen des Spiels lange schleifen (ein Klang,
+  Abtastwert für Abtastwert gerechnet; eine Zahl hoch 256 Bit). Das Spiel muss das beim Umschalten
+  (Stufe 5) ebenso tun. Eine Funktion, die lange rechnet, wird so oft verglichen, wie zwei Sekunden
+  Platz lassen – mindestens 20-mal. Braucht die kompilierte Klasse für einen Aufruf länger als 5 ms,
+  wird dieser Aufruf nur mit der Klasse verglichen: Der Interpreter bräuchte dafür Minuten (er löst
+  jeden Schritt über Namen auf). Der Test nennt jede solche Funktion in seiner Ausgabe (`note:`).
 - Ein Stück Quelltext, das mit den Zahlen der Sprache nicht übersetzt (es ruft etwas, das nicht
   umgeschrieben ist), nimmt der Konverter aus dem Test und nennt die Funktion als nicht verglichen.
 - Eine Funktion wird geschrieben, wenn alles in ihr einen Platz in der Schreibweise hat – und
@@ -374,18 +386,19 @@ sagt, in den Zahlen der Sprache – überall gleich. Er sagt nicht, dass das die
 heutigen Programm: Das rechnet dieselben Formeln mit `f32` in 32 Bit, die Sprache in 64 Bit (wie das
 JavaScript-Original). Das ist die Festlegung der Sprache, kein Spielraum des Tests.
 
-Stand (13.11.2026): 231 von 1.428 Funktionen (1.435 von 28.544 Zeilen) aus 52 von 77 Dateien stehen
-als Blueprints im Level (52 Actors im Ordner „Source“). Der Test vergleicht jede davon, die etwas
-gibt, Bit für Bit mit ihrem Quelltext – 269 Vergleiche, weil Funktionen aus Headern in jedem
+Stand (13.11.2026): 263 von 1.428 Funktionen (1.859 von 28.544 Zeilen) aus 54 von 77 Dateien stehen
+als Blueprints im Level (54 Actors im Ordner „Source“). Der Test vergleicht jede davon, die etwas
+gibt, Bit für Bit mit ihrem Quelltext – 303 Vergleiche, weil Funktionen aus Headern in jedem
 Blueprint stehen, der sie benutzt; keine ist ausgenommen. Das Spiel führt für diese Dateien weiter
 ihr C++ aus (Stufe 5).
 
 Worauf die anderen warten, nach Zeilen: der Zustand von `Game` (328 Funktionen, 13.818 Zeilen:
 geteilte Zeiger, Typen der Engine mit eigenem Innenleben); Klassen mit einem Zeiger auf die Welt,
 den Renderer, den Mixer oder die Physik der Engine (`Life`, `PeopleArt`, `Car`, `Marks`,
-`Destruction`, `Drone`, `Interiors`, `Ragdolls` …: rund 4.500 Zeilen, dazu 812 Zeilen mit Zeigern
-im Rumpf); Maps und Sets (`Terrain`, `CityStream`: rund 2.300 Zeilen); `Session` (Netz der Engine:
-664); die Aufrufe der Regel-Blueprints (482); ganze Zahlen in 64 Bit (383); Text formatieren.
+`Destruction`, `Drone`, `Interiors`, `Ragdolls` …: rund 4.500 Zeilen, dazu rund 1.000 Zeilen mit
+Zeigern im Rumpf); Maps und Sets (`Terrain`, `CityStream`, `TrafficRules`, `RoadGraph`: rund 2.700
+Zeilen); `Session` (Netz der Engine: 664); die Aufrufe der Regel-Blueprints (482); Text formatieren
+und zeichenweise lesen; 64-Bit-Zahlen als Bitmuster (Hashes, Schlüssel aus zwei 32-Bit-Zahlen).
 
 Aufruf (in `kern/games/spawncity`):
 
@@ -409,7 +422,9 @@ Was als Nächstes dazukommt, in der Reihenfolge der Zeilen, die darauf warten:
    eigenen Zahlen (die Zahlen stehen als Liste in einer Variablen, wo ein Wert als Zahl gebraucht
    wird); `std::pair` als Struktur; eine Liste in einer Liste als Struktur, die sie hält;
    `std::unique_ptr` und `std::optional` als Liste mit keinem oder einem Eintrag (`p->x`,
-   `p.reset()`, `if (p)`, `std::make_unique`, `std::move`); `++i` in einem Ausdruck.
+   `p.reset()`, `if (p)`, `std::make_unique`, `std::move`); `++i` in einem Ausdruck; eine
+   Referenz als Name für eine Stelle (`T& x = a.b[i];` – wo `x` steht, steht `a.b[i]`); ein `if`,
+   das eine Variable deklariert; `sizeof a / sizeof a[0]`.
 3. [x] **Schleifen mit `break` / `continue`** (Flags, die den Rest des Durchlaufs überspringen),
    `do-while`, Schleifen, die die Einträge ihrer Liste ändern (der Eintrag ist eine lokale
    Variable und wird am Ende des Durchlaufs zurückgespeichert), `a = b = c`.
@@ -423,11 +438,17 @@ Was als Nächstes dazukommt, in der Reihenfolge der Zeilen, die darauf warten:
      Compilers, dieselben Knoten-Namen) – was dort eine schlichte Struktur ist (Quat, Vec4, Mat4,
      Camera, Aabb …), ist eine Struktur des Blueprints, und was die Header an Funktionen dazu
      definieren (`Quat::rotate`, `Mat4::translation`), wird wie der Code des Spiels geschrieben.
-   - [ ] Ganze Zahlen in 64 Bit (Schlüssel aus zwei 32-Bit-Zahlen, FNV-Hash): Ein Int ist bis 2^53
-     exakt.
+   - [x] Ganze Zahlen in 64 Bit, mit denen gezählt wird (`size_t`, Längen, Indizes): Eine
+     vorzeichenlose 64-Bit-Zahl ist im Blueprint die ganze Zahl, die ihre Bits mit Vorzeichen
+     gelesen sind (2^64 − 1 ist −1). Was C++ um 2^64 herum addiert, subtrahiert und multipliziert,
+     kommt so exakt gleich heraus, solange die Zahlen innerhalb von 2^53 um null liegen; Vergleiche
+     und die Umwandlung in eine Zahl sagen es aus. Der Test markiert einen Aufruf, in dem der
+     Quelltext diesen Bereich verlässt.
+   - [ ] 64-Bit-Zahlen als Bitmuster (Schlüssel aus zwei 32-Bit-Zahlen, FNV-Hash): Ein Int ist bis
+     2^53 exakt – dafür braucht es zwei 32-Bit-Hälften.
    - [x] Listen: einfügen und löschen an einer Stelle oder über einen Bereich (`erase`, `insert`),
      `resize`, `assign`, Listen, die ein Konstruktor baut (`std::vector<T> v(n, x)`, aus einem
-     Bereich), `std::swap`.
+     Bereich), `std::swap`, `std::reverse`.
    - [ ] Maps und Sets; Text formatieren und zerlegen; Listen sortieren und durchsuchen.
    - [ ] Zeiger: ein Zeiger auf ein Objekt des Spiels ist sein Platz in einer Liste oder ein Actor;
      ein Zeiger auf die Welt, den Renderer oder den Mixer der Engine ist die Engine selbst (6).

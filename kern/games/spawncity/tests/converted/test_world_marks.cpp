@@ -69,11 +69,11 @@ bool facade_glass(f32 u, f32 len, f32 z, f32 H, u32 seed) {
 
 SC_TEST(converted_world_marks) {
   converted::Blueprint bp("WorldMarks");
-  converted::Draw draw;
   {  // ragged
     converted::Tally tally("ragged");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted_world_marks::ragged(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const converted::Watch watch;
@@ -83,8 +83,9 @@ SC_TEST(converted_world_marks) {
   }
   {  // fh
     converted::Tally tally("fh");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0) { return converted_world_marks::fh(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
       const auto want = run(a0);
@@ -93,8 +94,9 @@ SC_TEST(converted_world_marks) {
   }
   {  // facade_glass
     converted::Tally tally("facade_glass");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] unsigned int a4) { return converted_world_marks::facade_glass(a0, a1, a2, a3, a4); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const double a2 = draw.number();

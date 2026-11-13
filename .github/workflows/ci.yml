@@ -32,6 +32,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: Native unit tests (ASan/UBSan)
         run: CXX=g++ CC=gcc kern/tests/run.sh
+
+  # The game's own suite, next to the engine's (each builds the engine for itself: side by side they
+  # take as long as the longer one). It holds the converted Blueprints' comparison with their source.
+  native-spawncity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
       - name: SpawnCity native tests (ASan/UBSan)
         run: CXX=g++ CC=gcc kern/games/spawncity/tests/run_tests.sh
 

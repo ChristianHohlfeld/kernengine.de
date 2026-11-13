@@ -109,11 +109,11 @@ namespace Facades { inline const char* fragment_surface()  {
 
 SC_TEST(converted_facades) {
   converted::Blueprint bp("Facades");
-  converted::Draw draw;
   {  // Facades::vertex_declarations
     converted::Tally tally("Facades_vertex_declarations");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]() { return converted_facades::Facades::vertex_declarations(); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       const auto want = run();
       tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });
@@ -121,8 +121,9 @@ SC_TEST(converted_facades) {
   }
   {  // Facades::vertex
     converted::Tally tally("Facades_vertex");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]() { return converted_facades::Facades::vertex(); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       const auto want = run();
       tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });
@@ -130,8 +131,9 @@ SC_TEST(converted_facades) {
   }
   {  // Facades::fragment_declarations
     converted::Tally tally("Facades_fragment_declarations");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]() { return converted_facades::Facades::fragment_declarations(); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       const auto want = run();
       tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });
@@ -139,8 +141,9 @@ SC_TEST(converted_facades) {
   }
   {  // Facades::fragment_surface
     converted::Tally tally("Facades_fragment_surface");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]() { return converted_facades::Facades::fragment_surface(); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       const auto want = run();
       tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });

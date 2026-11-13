@@ -73,11 +73,11 @@ const char* mode_name(Mode m) {
 
 SC_TEST(converted_game) {
   converted::Blueprint bp("Game");
-  converted::Draw draw;
   {  // mode_name
     converted::Tally tally("mode_name");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Mode a0) { return converted_game::mode_name(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Mode a0 = static_cast<Mode>(draw.below(5));
       const converted::Watch watch;
       const auto want = run(a0);

@@ -45,11 +45,11 @@ bool foot_round(Id id) { return id == Id::grenade_launcher || id == Id::rocket |
 
 SC_TEST(converted_game_foot_rounds) {
   converted::Blueprint bp("GameFootRounds");
-  converted::Draw draw;
   {  // foot_round
     converted::Tally tally("foot_round");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Id a0) { return converted_game_foot_rounds::foot_round(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Id a0 = static_cast<Id>(draw.below(14));
       const converted::Watch watch;
       const auto want = run(a0);

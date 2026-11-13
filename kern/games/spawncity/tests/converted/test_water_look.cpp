@@ -75,11 +75,11 @@ namespace WaterLook { inline const char* fragment_surface()  {
 
 SC_TEST(converted_water_look) {
   converted::Blueprint bp("WaterLook");
-  converted::Draw draw;
   {  // WaterLook::vertex_declarations
     converted::Tally tally("WaterLook_vertex_declarations");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]() { return converted_water_look::WaterLook::vertex_declarations(); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       const auto want = run();
       tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });
@@ -87,8 +87,9 @@ SC_TEST(converted_water_look) {
   }
   {  // WaterLook::vertex
     converted::Tally tally("WaterLook_vertex");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]() { return converted_water_look::WaterLook::vertex(); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       const auto want = run();
       tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });
@@ -96,8 +97,9 @@ SC_TEST(converted_water_look) {
   }
   {  // WaterLook::fragment_declarations
     converted::Tally tally("WaterLook_fragment_declarations");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]() { return converted_water_look::WaterLook::fragment_declarations(); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       const auto want = run();
       tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });
@@ -105,8 +107,9 @@ SC_TEST(converted_water_look) {
   }
   {  // WaterLook::fragment_surface
     converted::Tally tally("WaterLook_fragment_surface");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]() { return converted_water_look::WaterLook::fragment_surface(); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       const auto want = run();
       tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });

@@ -157,11 +157,11 @@ enum class Result : u8 { ok, unchanged, invalid, owner_only_pilot, already_seate
 Mat4 yaw_at(Vec3 p, f32 yaw) { return Mat4::trs(p, Quat::axis_angle({0, 0, 1}, yaw), {1, 1, 1}); }
 Vec3 rgb(u32 hex) { return {static_cast<f32>((hex >> 16) & 255) / 255, static_cast<f32>((hex >> 8) & 255) / 255, static_cast<f32>(hex & 255) / 255}; }
 std::vector<f32> glass_pcm(u32 rate) {
-  std::vector<f32> out(static_cast<std::size_t>(rate * 0.4));
+  std::vector<f32> out(converted::count(static_cast<std::size_t>(converted::fits<unsigned long>(rate * 0.4))));
   u32 s = 0x9e3779b9u;
   f32 prev_x = 0, prev_y = 0;
   const f32 rc = 1.0 / (2 * kPi * 3200), dt = 1.0 / static_cast<f32>(rate), a = rc / (rc + dt);
-  for (std::size_t i = 0; i < out.size(); ++i) {
+  for (std::size_t i = 0; i < out.size(); converted::pre_inc(i)) {
     s = s * 1664525u + 1013904223u;
     const f32 r = static_cast<f32>(s >> 8) / 16777216.0;
     s = s * 1664525u + 1013904223u;
@@ -175,9 +175,9 @@ std::vector<f32> glass_pcm(u32 rate) {
   return out;
 }
 std::vector<f32> clang_pcm(u32 rate) {
-  std::vector<f32> out(static_cast<std::size_t>(rate * 1.2));
+  std::vector<f32> out(converted::count(static_cast<std::size_t>(converted::fits<unsigned long>(rate * 1.2))));
   for (f32 f : {180.0, 412.0, 733.0})
-    for (std::size_t i = 0; i < out.size(); ++i) {
+    for (std::size_t i = 0; i < out.size(); converted::pre_inc(i)) {
       const f32 t = static_cast<f32>(i) / static_cast<f32>(rate), p = kern::math::mod(t * f, 1.0);
       const f32 env = 0.32 * kern::math::exp(kern::math::log(0.001 / 0.32) * std::fmin(1.0, t / 1.1));
       converted::at(out, i) += (1 - 4 * std::fabs(p - 0.5)) * env;
@@ -212,11 +212,11 @@ std::vector<f32> clang_pcm(u32 rate) {
 
 SC_TEST(converted_game_lamps) {
   converted::Blueprint bp("GameLamps");
-  converted::Draw draw;
   {  // Mat4::trs
     converted::Tally tally("Mat4_trs");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Quat a1, [[maybe_unused]] Vec3 a2) { return Mat4::trs(a0, a1, a2); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const Quat a1 = draw_kern__Quat(draw);
       const Vec3 a2 = draw.vector();
@@ -227,8 +227,9 @@ SC_TEST(converted_game_lamps) {
   }
   {  // Quat::axis_angle
     converted::Tally tally("Quat_axis_angle");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return Quat::axis_angle(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const double a1 = draw.number();
       const converted::Watch watch;
@@ -238,8 +239,9 @@ SC_TEST(converted_game_lamps) {
   }
   {  // yaw_at
     converted::Tally tally("yaw_at");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return converted_game_lamps::yaw_at(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const double a1 = draw.number();
       const converted::Watch watch;
@@ -249,8 +251,9 @@ SC_TEST(converted_game_lamps) {
   }
   {  // rgb
     converted::Tally tally("rgb");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted_game_lamps::rgb(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
       const auto want = run(a0);
@@ -259,8 +262,9 @@ SC_TEST(converted_game_lamps) {
   }
   {  // glass_pcm
     converted::Tally tally("glass_pcm");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted_game_lamps::glass_pcm(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
       const auto want = run(a0);
@@ -269,8 +273,9 @@ SC_TEST(converted_game_lamps) {
   }
   {  // clang_pcm
     converted::Tally tally("clang_pcm");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted_game_lamps::clang_pcm(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
       const auto want = run(a0);

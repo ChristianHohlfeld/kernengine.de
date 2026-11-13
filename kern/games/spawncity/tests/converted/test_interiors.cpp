@@ -40,6 +40,11 @@ inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v
 namespace Interiors { struct Door { Vec2 c, d, n; }; }
 constexpr f32 kActivate = 30, kDoorsRadius = 95, kDoorW = 1.8;
 Vec3 rgb(u32 h) { return {((h >> 16) & 255) / 255.0, ((h >> 8) & 255) / 255.0, (h & 255) / 255.0}; }
+f32 signed_area(const std::vector<Vec2>& r) {
+  f32 a = 0;
+  for (std::size_t i = 0, j = converted::minus(r.size(), 1); i < r.size(); j = converted::post_inc(i)) a += converted::at(r, j).x * converted::at(r, i).y - converted::at(r, i).x * converted::at(r, j).y;
+  return a * 0.5;
+}
 std::vector<Vec2> clean(const std::vector<Vec2>& in) {
   std::vector<Vec2> r;
   for (Vec2 p : in) {
@@ -50,10 +55,39 @@ std::vector<Vec2> clean(const std::vector<Vec2>& in) {
   if (r.size() > 2 && hypot_bp(converted::at(r, 0).x - converted::back(r).x, converted::at(r, 0).y - converted::back(r).y) < 0.05) converted::pop_back(r);
   return r;
 }
+bool pip(Vec2 p, const std::vector<Vec2>& r) {
+  bool c = false;
+  for (std::size_t i = 0, j = converted::minus(r.size(), 1); i < r.size(); j = converted::post_inc(i)) {
+    const Vec2 a = converted::at(r, i), b = converted::at(r, j);
+    if ((a.y > p.y) != (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / ((b.y - a.y) == 0 ? 1e-9 : (b.y - a.y)) + a.x) c = !c;
+  }
+  return c;
+}
 f32 seg_dist(Vec2 p, Vec2 a, Vec2 b) {
   const Vec2 d = b - a;
   const f32 l = std::fmax(1e-9, d.x * d.x + d.y * d.y), t = clampf(((p.x - a.x) * d.x + (p.y - a.y) * d.y) / l, 0, 1);
   return hypot_bp(p.x - a.x - d.x * t, p.y - a.y - d.y * t);
+}
+f32 ring_dist(Vec2 p, const std::vector<Vec2>& r) {
+  f32 d = 1e9;
+  for (std::size_t i = 0, j = converted::minus(r.size(), 1); i < r.size(); j = converted::post_inc(i)) d = std::fmin(d, seg_dist(p, converted::at(r, j), converted::at(r, i)));
+  return d;
+}
+std::vector<Vec2> offset_ring(const std::vector<Vec2>& r, f32 d) {
+  const std::size_t n = r.size();
+  std::vector<Vec2> out;
+  for (std::size_t i = 0; i < n; converted::pre_inc(i)) {
+    const Vec2 p = converted::at(r, converted::rem((converted::minus(converted::plus(i, n), 1)), n)), c = converted::at(r, i), q = converted::at(r, converted::rem((converted::plus(i, 1)), n));
+    Vec2 a = c - p, b = q - c;
+    const f32 la = std::fmax(1e-6, hypot_bp(a.x, a.y)), lb = std::fmax(1e-6, hypot_bp(b.x, b.y));
+    a = a * (1 / la);
+    b = b * (1 / lb);
+    const Vec2 n0{-a.y, a.x}, n1{-b.y, b.x};
+    const f32 dot = n0.x * n1.x + n0.y * n1.y;
+    const f32 k = 1 / std::fmax(0.25, 1 + dot);
+    out.push_back(c + (n0 + n1) * (k * d));
+  }
+  return out;
 }
 u32 hash_key(u32 seed, u32 salt) {
   u32 x = seed * 0x9e3779b1u + salt * 0x85ebca6bu;
@@ -101,12 +135,23 @@ struct Out_door_gap { bool Result; double t0; double t1; };
 
 SC_TEST(converted_interiors) {
   converted::Blueprint bp("Interiors");
-  converted::Draw draw;
   {  // rgb
     converted::Tally tally("rgb");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted_interiors::rgb(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = run(a0);
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
+  {  // signed_area
+    converted::Tally tally("signed_area");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0) { return converted_interiors::signed_area(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       const converted::Watch watch;
       const auto want = run(a0);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
@@ -114,18 +159,32 @@ SC_TEST(converted_interiors) {
   }
   {  // clean
     converted::Tally tally("clean");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0) { return converted_interiors::clean(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       const converted::Watch watch;
       const auto want = run(a0);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
+  {  // pip
+    converted::Tally tally("pip");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Vec2 a0, [[maybe_unused]] std::vector<Vec2> a1) { return converted_interiors::pip(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Vec2 a0 = draw.vector2();
+      const std::vector<Vec2> a1 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
   {  // seg_dist
     converted::Tally tally("seg_dist");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec2 a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] Vec2 a2) { return converted_interiors::seg_dist(a0, a1, a2); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec2 a0 = draw.vector2();
       const Vec2 a1 = draw.vector2();
       const Vec2 a2 = draw.vector2();
@@ -134,10 +193,35 @@ SC_TEST(converted_interiors) {
       tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
     }
   }
+  {  // ring_dist
+    converted::Tally tally("ring_dist");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Vec2 a0, [[maybe_unused]] std::vector<Vec2> a1) { return converted_interiors::ring_dist(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Vec2 a0 = draw.vector2();
+      const std::vector<Vec2> a1 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // offset_ring
+    converted::Tally tally("offset_ring");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] double a1) { return converted_interiors::offset_ring(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+      const double a1 = draw.number();
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
   {  // hash_key
     converted::Tally tally("hash_key");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted_interiors::hash_key(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
@@ -147,8 +231,9 @@ SC_TEST(converted_interiors) {
   }
   {  // h01
     converted::Tally tally("h01");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted_interiors::h01(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
@@ -158,8 +243,9 @@ SC_TEST(converted_interiors) {
   }
   {  // door_gap
     converted::Tally tally("door_gap");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] std::vector<Interiors::Door> a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] Vec2 a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { const auto r = converted_interiors::door_gap(a0, a1, a2, a3, a4, a5); return Out_door_gap{r, a4, a5}; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const std::vector<Interiors::Door> a0 = draw_list(draw, [&]() -> Interiors::Door { return draw_Interiors__Door(draw); });
       const Vec2 a1 = draw.vector2();
       const Vec2 a2 = draw.vector2();

@@ -51,7 +51,7 @@ const BoneDef kDefs[Ragdolls::kBones] = {
     {{0, -0.1, 0.27}, {0.06, 0.06, 0.24}, true},
 };
 f32 hash_noise(u64 seed, u32 i) {
-  u32 x = static_cast<u32>(seed ^ (seed >> 32)) + (i + 1) * 0x9e3779b1u;
+  u32 x = static_cast<u32>(seed ^ (converted::shr(seed, 32))) + (i + 1) * 0x9e3779b1u;
   x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16;
   return static_cast<f32>(x) / 4294967295.0 * 2 - 1;
 }
@@ -65,11 +65,11 @@ namespace Ragdolls { inline Vec3 rest_half(u32 b) { return converted::at(kDefs, 
 
 SC_TEST(converted_ragdoll) {
   converted::Blueprint bp("Ragdoll");
-  converted::Draw draw;
   {  // hash_noise
     converted::Tally tally("hash_noise");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned long a0, [[maybe_unused]] unsigned int a1) { return converted_ragdoll::hash_noise(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const unsigned long a0 = static_cast<unsigned long>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
@@ -79,8 +79,9 @@ SC_TEST(converted_ragdoll) {
   }
   {  // smooth
     converted::Tally tally("smooth");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0) { return converted_ragdoll::smooth(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
       const auto want = run(a0);
@@ -89,8 +90,9 @@ SC_TEST(converted_ragdoll) {
   }
   {  // Ragdolls::rest_center
     converted::Tally tally("Ragdolls_rest_center");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted_ragdoll::Ragdolls::rest_center(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
       const auto want = run(a0);
@@ -99,8 +101,9 @@ SC_TEST(converted_ragdoll) {
   }
   {  // Ragdolls::rest_half
     converted::Tally tally("Ragdolls_rest_half");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted_ragdoll::Ragdolls::rest_half(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
       const auto want = run(a0);

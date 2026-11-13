@@ -91,6 +91,7 @@ Vec3 to_srgb(Vec3 c) { return {linear_to_srgb(c.x), linear_to_srgb(c.y), linear_
 #pragma GCC diagnostic pop
 
 [[maybe_unused]] static Vec4 draw_kern__Vec4(converted::Draw& draw) {
+  if (draw.flag()) return Vec4(draw.number(), draw.number(), draw.number(), draw.number());
   Vec4 s{};
   s.x = draw.number();
   s.y = draw.number();
@@ -122,11 +123,11 @@ namespace Terrain { using converted::arg; using converted::same; using converted
 
 SC_TEST(converted_terrain) {
   converted::Blueprint bp("Terrain");
-  converted::Draw draw;
   {  // rect_distance
     converted::Tally tally("rect_distance");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { return converted_terrain::rect_distance(a0, a1, a2, a3, a4, a5); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const double a2 = draw.number();
@@ -140,8 +141,9 @@ SC_TEST(converted_terrain) {
   }
   {  // merc_y
     converted::Tally tally("merc_y");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] int a1) { return converted_terrain::merc_y(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const int a1 = static_cast<int>(draw.whole());
       const converted::Watch watch;
@@ -151,8 +153,9 @@ SC_TEST(converted_terrain) {
   }
   {  // merc_x
     converted::Tally tally("merc_x");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] int a1) { return converted_terrain::merc_x(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const int a1 = static_cast<int>(draw.whole());
       const converted::Watch watch;
@@ -162,8 +165,9 @@ SC_TEST(converted_terrain) {
   }
   {  // crater_profile
     converted::Tally tally("crater_profile");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return converted_terrain::crater_profile(a0, a1, a2, a3); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const double a2 = draw.number();
@@ -175,8 +179,9 @@ SC_TEST(converted_terrain) {
   }
   {  // Vec4::Vec4
     converted::Tally tally("Vec4_new");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return Vec4(a0, a1, a2, a3); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const double a2 = draw.number();
@@ -188,8 +193,9 @@ SC_TEST(converted_terrain) {
   }
   {  // interior_of
     converted::Tally tally("interior_of");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return converted_terrain::interior_of(a0, a1, a2, a3); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const double a2 = draw.number();
@@ -201,8 +207,9 @@ SC_TEST(converted_terrain) {
   }
   {  // rect_in
     converted::Tally tally("rect_in");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec4 a0, [[maybe_unused]] Vec4 a1) { return converted_terrain::rect_in(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec4 a0 = draw_kern__Vec4(draw);
       const Vec4 a1 = draw_kern__Vec4(draw);
       const converted::Watch watch;
@@ -212,8 +219,9 @@ SC_TEST(converted_terrain) {
   }
   {  // Terrain::interior
     converted::Tally tally("Terrain_interior");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Terrain::Grid a0) { return converted_terrain::Terrain::interior(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Terrain::Grid a0 = draw_Terrain__Grid(draw);
       const converted::Watch watch;
       const auto want = run(a0);
@@ -222,8 +230,9 @@ SC_TEST(converted_terrain) {
   }
   {  // albedo
     converted::Tally tally("albedo");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted_terrain::albedo(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const converted::Watch watch;
       const auto want = run(a0);
@@ -232,8 +241,9 @@ SC_TEST(converted_terrain) {
   }
   {  // srgb_lin8
     converted::Tally tally("srgb_lin8");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned char a0) { return converted_terrain::srgb_lin8(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const unsigned char a0 = static_cast<unsigned char>(draw.below(40));
       const converted::Watch watch;
       const auto want = run(a0);
@@ -242,8 +252,9 @@ SC_TEST(converted_terrain) {
   }
   {  // srgb_to_linear
     converted::Tally tally("srgb_to_linear");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0) { return converted_terrain::srgb_to_linear(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
       const auto want = run(a0);
@@ -252,8 +263,9 @@ SC_TEST(converted_terrain) {
   }
   {  // linear_to_srgb
     converted::Tally tally("linear_to_srgb");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0) { return converted_terrain::linear_to_srgb(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
       const auto want = run(a0);
@@ -262,8 +274,9 @@ SC_TEST(converted_terrain) {
   }
   {  // to_linear
     converted::Tally tally("to_linear");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted_terrain::to_linear(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const converted::Watch watch;
       const auto want = run(a0);
@@ -272,8 +285,9 @@ SC_TEST(converted_terrain) {
   }
   {  // to_srgb
     converted::Tally tally("to_srgb");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted_terrain::to_srgb(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const converted::Watch watch;
       const auto want = run(a0);

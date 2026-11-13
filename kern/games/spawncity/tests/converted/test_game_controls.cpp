@@ -62,11 +62,11 @@ const char* hint_weapon(Mode m, Id foot, i32 drone) {
 
 SC_TEST(converted_game_controls) {
   converted::Blueprint bp("GameControls");
-  converted::Draw draw;
   {  // hint_weapon
     converted::Tally tally("hint_weapon");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Mode a0, [[maybe_unused]] Id a1, [[maybe_unused]] int a2) { return converted_game_controls::hint_weapon(a0, a1, a2); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Mode a0 = static_cast<Mode>(draw.below(5));
       const Id a1 = static_cast<Id>(draw.below(14));
       const int a2 = static_cast<int>(draw.whole());

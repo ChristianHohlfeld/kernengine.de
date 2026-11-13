@@ -43,11 +43,11 @@ bool sane(Vec3 v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfi
 
 SC_TEST(converted_net_session) {
   converted::Blueprint bp("NetSession");
-  converted::Draw draw;
   {  // sane
     converted::Tally tally("sane");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted_net_session::sane(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const converted::Watch watch;
       const auto want = run(a0);

@@ -52,11 +52,11 @@ f32 uq16(i16 v) { return static_cast<f32>(v) / 32767; }
 
 SC_TEST(converted_game_toss) {
   converted::Blueprint bp("GameToss");
-  converted::Draw draw;
   {  // uq16
     converted::Tally tally("uq16");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] short a0) { return converted_game_toss::uq16(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const short a0 = static_cast<short>(draw.whole());
       const converted::Watch watch;
       const auto want = run(a0);

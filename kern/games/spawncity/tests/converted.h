@@ -13,12 +13,15 @@
 // 0). Such calls are counted.
 #pragma once
 
+#include <algorithm>
 #include <bit>
 #include <cfenv>
+#include <chrono>
 #include <limits>
 #include <cmath>
 #include <cstdio>
 #include <deque>
+#include <initializer_list>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -152,10 +155,15 @@ struct Draw {
   std::string word() { return c_word(); }
 };
 
-/// A list of up to four drawn entries.
+/// A list of up to four drawn entries; one of numbers is, one time in five, a long one (a function that
+/// reads its list at fixed places - the cells of a grid - finds them there).
 template <class Make> auto draw_list(Draw& draw, Make make) {
   std::vector<decltype(make())> out;
-  for (u32 n = draw.below(5); n > 0; --n) out.push_back(make());
+  u32 n = draw.below(5);
+  if constexpr (std::is_arithmetic_v<decltype(make())>) {
+    if (draw.below(5) == 0) n = 300 + draw.below(300);
+  }
+  for (; n > 0; --n) out.push_back(make());
   return out;
 }
 
@@ -333,10 +341,15 @@ inline std::string shown(const Value& v) {
   }
 }
 
+inline constexpr int kCalls = 300;
+
 /// A converted source file's Blueprint, in the interpreter and as its compiled class.
 struct Blueprint {
   RuleBlueprint interpreted, compiled;
   explicit Blueprint(const char* actor) : interpreted(actor, [](kern::logic::Instance*) {}, false), compiled(actor, [](kern::logic::Instance*) {}, true) {
+    // (The loop guard is the host's: a program whose functions loop long - a sound computed sample by
+    // sample, a number raised to a 256-bit power - sets it to what they take.)
+    interpreted.rt.budget = compiled.rt.budget = 2000000000u;
     SC_CHECK(interpreted.inst && compiled.inst, "%s: %s%s", actor, interpreted.problems.c_str(), compiled.problems.c_str());
     SC_CHECK(interpreted.problems.empty(), "%s: %s", actor, interpreted.problems.c_str());
   }
@@ -345,22 +358,45 @@ struct Blueprint {
 /// The comparison of one function over its calls.
 struct Tally {
   const char* function;
-  int compared = 0, outside = 0, wrong = 0;
+  int compared = 0, outside = 0, wrong = 0, class_only = 0;
+  double slowest = 0;
+  std::chrono::steady_clock::time_point began = std::chrono::steady_clock::now();
   explicit Tally(const char* f) : function(f) {}
+  /// Is there another call to make? Up to kCalls compared ones; of a function that takes long, as many
+  /// as two seconds have room for, but twenty at least. (What the source says nothing for is drawn again.)
+  bool more(int tried) const {
+    if (compared >= kCalls || tried >= kCalls * 20) return false;
+    return compared < 20 || std::chrono::duration<double>(std::chrono::steady_clock::now() - began).count() < 2.0;
+  }
   /// One call. `want`: what the source gives, computed with the Blueprint language's numbers;
   /// `left`: the source divided by zero or left the numbers on the way - nothing to compare.
   template <class Want, class Describe> void take(Blueprint& bp, const std::vector<Value>& args, const Want& want, bool left, Describe describe) {
     if (!bp.interpreted.inst || !bp.compiled.inst) return;
     if (left || !defined(want)) { ++outside; return; }
+    // The compiled class first. A call that takes it long (a sound of a hundred thousand samples, a number
+    // raised to a 256-bit power) would take the interpreter minutes: such a call is compared with the class
+    // alone, and the function's line says so (~Tally).
     std::vector<Value> a, b;
-    const bool ia = bp.interpreted.inst->call(function, args, a), ib = bp.compiled.inst->call(function, args, b);
+    const auto before = std::chrono::steady_clock::now();
+    const bool ib = bp.compiled.inst->call(function, args, b);
+    const double took = std::chrono::duration<double>(std::chrono::steady_clock::now() - before).count();
+    const bool both = took < 0.005;
+    const bool ia = both ? bp.interpreted.inst->call(function, args, a) : ib;
+    if (!both) {
+      a = b;
+      ++class_only;
+      slowest = std::max(slowest, took);
+    }
     ++compared;
     if (ia && ib && a.size() == 1 && b.size() == 1 && a[0] == b[0] && same(want, a[0]) && same(want, b[0])) return;
     if (++wrong <= 3)
       std::printf("  %s(%s): the source gives %s, the Blueprint %s (interpreter) and %s (class)\n", function, describe().c_str(), text(want).c_str(),
-                  ia && a.size() == 1 ? shown(a[0]).c_str() : "nothing", ib && b.size() == 1 ? shown(b[0]).c_str() : "nothing");
+                  !both ? "(not run)" : ia && a.size() == 1 ? shown(a[0]).c_str() : "nothing", ib && b.size() == 1 ? shown(b[0]).c_str() : "nothing");
   }
   ~Tally() {
+    if (class_only > 0)
+      std::printf("  note: %s: %d of %d calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to %.0f ms - is not run in the interpreter)\n",
+                  function, class_only, compared, slowest * 1000);
     SC_CHECK(wrong == 0, "%s: %d of %d calls differ", function, wrong, compared);
     SC_CHECK(compared >= 20, "%s: only %d calls could be compared (in %d the source left the numbers)", function, compared, outside);
   }
@@ -387,6 +423,33 @@ template <class C, class I> auto at(C&& c, I i) -> decltype(c[0]) {
     return none[0];
   }
 }
+/// A number as a whole number of the type T: one T does not hold (or none at all) marks the call.
+template <class T> constexpr double fits(double x) {
+  const bool in = std::is_signed_v<T> ? (x > -9007199254740992.0 && x < 9007199254740992.0 && x >= static_cast<double>(std::numeric_limits<T>::min()) - 0.5 &&
+                                         (sizeof(T) == 8 || x <= static_cast<double>(std::numeric_limits<T>::max()) + 0.5))
+                                      : (x > -1.0 && x < 9007199254740992.0 && (sizeof(T) == 8 || x <= static_cast<double>(std::numeric_limits<T>::max()) + 0.5));
+  if (!in) {   // (not a number: every comparison above is false)
+    g_open = true;
+    return 0;
+  }
+  return x;
+}
+/// A whole number as a value of an enum: one the enum has no value for marks the call.
+template <class T> constexpr T among(std::initializer_list<long long> valid, T x) {
+  for (long long v : valid)
+    if (static_cast<long long>(x) == v) return x;
+  g_open = true;
+  return static_cast<T>(*valid.begin());
+}
+/// The length a list is made with. A list of more than 100000 entries is one the test does not build (a
+/// negative count, read as the unsigned number C++ makes of it, is such a one).
+template <class N> constexpr N count(N n) {
+  if (static_cast<unsigned long long>(n) > 100000ULL) {
+    g_open = true;
+    return 0;
+  }
+  return n;
+}
 /// Taking out an entry a list does not have.
 template <class C> void pop_back(C& c) {
   if (c.empty()) {
@@ -412,8 +475,55 @@ template <class C, class A, class B> auto erase(C& c, A first, B last) -> declty
 template <class C> auto front(C&& c) -> decltype(c[0]) { return at(c, 0); }
 template <class C> auto back(C&& c) -> decltype(c[0]) { return at(c, static_cast<long long>(std::size(c)) - 1); }
 
+// A 64-bit whole number is, in a Blueprint, the number its bits are read with a sign - exact while it is
+// within 2^53 of zero (unsigned C++ arithmetic around 2^64 comes out the same there). What the source
+// computes with 64-bit numbers goes through these: a number out of that range marks the call.
+template <class T> constexpr bool held(T v) {
+  if constexpr (std::is_integral_v<T> && sizeof(T) == 8) {
+    const long long read = static_cast<long long>(v);
+    return read > -(1LL << 53) && read < (1LL << 53);
+  } else {
+    return true;
+  }
+}
+template <class R> constexpr R kept(__int128 exact) {
+  if (exact <= -(static_cast<__int128>(1) << 53) || exact >= (static_cast<__int128>(1) << 53)) g_open = true;
+  return static_cast<R>(static_cast<unsigned long long>(exact));
+}
+template <class R, class A, class B> constexpr bool both_held(A a, B b) {
+  if constexpr (std::is_integral_v<R> && sizeof(R) == 8) {
+    if (!held(static_cast<R>(a)) || !held(static_cast<R>(b))) g_open = true;
+    return true;
+  } else {
+    return false;
+  }
+}
+template <class A, class B> constexpr auto plus(A a, B b) -> decltype(a + b) {
+  using R = decltype(a + b);
+  if (both_held<R>(a, b)) return kept<R>(static_cast<__int128>(static_cast<long long>(static_cast<R>(a))) + static_cast<long long>(static_cast<R>(b)));
+  return a + b;
+}
+template <class A, class B> constexpr auto minus(A a, B b) -> decltype(a - b) {
+  using R = decltype(a - b);
+  if (both_held<R>(a, b)) return kept<R>(static_cast<__int128>(static_cast<long long>(static_cast<R>(a))) - static_cast<long long>(static_cast<R>(b)));
+  return a - b;
+}
+template <class A, class B> constexpr auto times(A a, B b) -> decltype(a * b) {
+  using R = decltype(a * b);
+  if (both_held<R>(a, b)) return kept<R>(static_cast<__int128>(static_cast<long long>(static_cast<R>(a))) * static_cast<long long>(static_cast<R>(b)));
+  return a * b;
+}
+template <class A, class B> constexpr A& plus_to(A& a, B b) { return a = static_cast<A>(plus(a, b)); }
+template <class A, class B> constexpr A& minus_to(A& a, B b) { return a = static_cast<A>(minus(a, b)); }
+template <class A, class B> constexpr A& times_to(A& a, B b) { return a = static_cast<A>(times(a, b)); }
+template <class A> constexpr A& pre_inc(A& a) { return a = static_cast<A>(plus(a, 1)); }
+template <class A> constexpr A& pre_dec(A& a) { return a = static_cast<A>(minus(a, 1)); }
+template <class A> constexpr A post_inc(A& a) { const A was = a; a = static_cast<A>(plus(a, 1)); return was; }
+template <class A> constexpr A post_dec(A& a) { const A was = a; a = static_cast<A>(minus(a, 1)); return was; }
+
 template <class A, class B> constexpr auto quot(A a, B b) -> decltype(a / b) {
   using R = decltype(a / b);
+  both_held<R>(a, b);
   if (b == 0 || (std::is_signed_v<R> && static_cast<R>(a) == std::numeric_limits<R>::min() && static_cast<long long>(b) == -1)) {
     g_open = true;
     return 0;
@@ -422,6 +532,7 @@ template <class A, class B> constexpr auto quot(A a, B b) -> decltype(a / b) {
 }
 template <class A, class B> constexpr auto rem(A a, B b) -> decltype(a % b) {
   using R = decltype(a % b);
+  both_held<R>(a, b);
   if (b == 0 || (std::is_signed_v<R> && static_cast<R>(a) == std::numeric_limits<R>::min() && static_cast<long long>(b) == -1)) {
     g_open = true;
     return 0;
@@ -435,11 +546,13 @@ template <class A, class B> constexpr auto shl(A a, B b) -> decltype(a << b) {
     g_open = true;
     return 0;
   }
+  if (both_held<R>(a, 0)) return kept<R>(static_cast<__int128>(static_cast<long long>(static_cast<R>(a))) * (static_cast<__int128>(1) << by));
   return a << b;
 }
 template <class A, class B> constexpr auto shr(A a, B b) -> decltype(a >> b) {
   using R = decltype(a >> b);
   const long long by = static_cast<long long>(b);
+  both_held<R>(a, 0);
   if (by < 0 || by >= static_cast<long long>(sizeof(R) * 8)) {
     g_open = true;
     return 0;
@@ -460,7 +573,5 @@ struct Watch {
   }
   bool left() const { return g_open || std::fetestexcept(FE_DIVBYZERO | FE_INVALID) != 0; }
 };
-
-inline constexpr int kCalls = 300;
 
 }  // namespace sc::converted

@@ -45,6 +45,12 @@ inline f32 wrap_pi(f32 a) {
   return a;
 }
 enum class GeomType : u8 { unknown = 0, point = 1, line = 2, polygon = 3 };
+struct Lane {
+  std::vector<Vec2> points;
+  f32 width = 6;
+  u64 tile = 0;
+  bool alive = true;
+};
 enum class PinType : u8 {
   exec, boolean, integer, number, vector, text, actor, enumeration, structure,
   boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, count
@@ -137,7 +143,7 @@ struct People {
   
   /// A citizen put somewhere in plain sight (a driver who gets out of his car); the caller sets
   /// his pavement route (lane, seg, along, side, off) and what he does.
-  
+  i32 add_citizen(Vec3 at, f32 yaw, u32 seed);
   
   
   /// A free step along `dir` that does not go through walls (tries turned directions).
@@ -146,7 +152,7 @@ struct People {
   bool witnessed(Vec3 at) const;
   u32 count(Kind k, bool alive_only = true) const;
   /// A scripted person (soldier, zombie, enemy) at `at`; returns its index.
-  
+  i32 add_scripted(Kind k, Vec3 at, f32 yaw, f32 hp, u32 seed, Vec3 shirt, Vec3 pants, Vec3 skin, u8 role);
   /// Damage to person `i` from somewhere else (a mate's round on our zombie): down at 0.
   
 
@@ -202,7 +208,7 @@ struct People {
 
 
 
-  
+  bool route_point(const Person& p, const std::vector<Lane>& lanes, Vec3& out, f32& heading) const;
   std::vector<Person> people_;
   std::vector<CrimeReport> reports_;
   std::vector<Death> deaths_;
@@ -221,6 +227,53 @@ const Vec3 kPants[] = {{0.12, 0.14, 0.22}, {0.2, 0.2, 0.22}, {0.38, 0.3, 0.22}, 
 const Vec3 kSkins[] = {{0.94, 0.76, 0.62}, {0.78, 0.58, 0.43}, {0.66, 0.44, 0.32}, {0.48, 0.31, 0.22}, {0.86, 0.66, 0.5}};
 f32 dist2d(Vec3 a, Vec3 b) { return hypot_bp(a.x - b.x, a.y - b.y); }
 f32 approach_angle(f32 cur, f32 target, f32 max_step) { return cur + clampf(wrap_pi(target - cur), -max_step, max_step); }
+bool People::route_point(const Person& p, const std::vector<Lane>& lanes, Vec3& out, f32& heading) const {
+  if (p.lane < 0 || p.lane >= static_cast<i32>(lanes.size())) return false;
+  const Lane& L = converted::at(lanes, p.lane);
+  if (!L.alive || p.seg < 0 || p.seg + 1 >= static_cast<i32>(L.points.size())) return false;
+  const Vec2 a = converted::at(L.points, p.seg), b = converted::at(L.points, p.seg + 1);
+  const Vec2 d = b - a;
+  const f32 len = std::fmax(1e-3, hypot_bp(d.x, d.y));
+  const Vec2 u = d * (1.0 / len), walk = u * static_cast<f32>(p.dir), right{walk.y, -walk.x};
+  const Vec2 c = a + u * clampf(p.along, 0, len) + right * (p.side * p.off);
+  out = {c.x, c.y, 0};
+  heading = kern::math::atan2(walk.y, walk.x);
+  return true;
+}
+i32 People::add_citizen(Vec3 at, f32 yaw, u32 seed) {
+  Person p;
+  p.kind = Kind::citizen;
+  p.state = State::walk;
+  p.pos = at;
+  p.yaw = yaw;
+  p.seed = seed;
+  p.speed = 1.0 + static_cast<f32>((seed >> 7) % 66) / 100;
+  p.fitness = 0.75 + static_cast<f32>((seed >> 11) % 51) / 100;
+  p.shirt = converted::at(kShirts, (seed >> 3) % 10);
+  p.pants = converted::at(kPants, (seed >> 9) % 6);
+  p.skin = converted::at(kSkins, (seed >> 13) % 5);
+  for (std::size_t i = 0; i < people_.size(); converted::pre_inc(i))
+    if (converted::at(people_, i).state == State::gone) { converted::at(people_, i) = p; return static_cast<i32>(i); }
+  people_.push_back(p);
+  return static_cast<i32>(converted::minus(people_.size(), 1));
+}
+i32 People::add_scripted(Kind k, Vec3 at, f32 yaw, f32 hp, u32 seed, Vec3 shirt, Vec3 pants, Vec3 skin, u8 role) {
+  Person p;
+  p.kind = k;
+  p.state = State::officer;  // moved by its owner, not by walk()
+  p.pos = at;
+  p.yaw = yaw;
+  p.hp = hp;
+  p.seed = seed;
+  p.shirt = shirt;
+  p.pants = pants;
+  p.skin = skin;
+  p.role = role;
+  for (std::size_t i = 0; i < people_.size(); converted::pre_inc(i))
+    if (converted::at(people_, i).state == State::gone) { converted::at(people_, i) = p; return static_cast<i32>(i); }
+  people_.push_back(p);
+  return static_cast<i32>(converted::minus(people_.size(), 1));
+}
 u32 People::count(Kind k, bool alive_only) const {
   u32 n = 0;
   for (const Person& p : people_)
@@ -246,7 +299,7 @@ void People::frighten(Vec3 at, f32 radius, f32 now, f32 strength) {
     const f32 d = dist2d(p.pos, at);
     if (d > radius) continue;
     // Close by everyone runs; further out about half do (pedestrian_agents.mjs frighten).
-    const u32 roll_bits = (p.seed ^ static_cast<u32>(now * 1000)) * 2246822519u;
+    const u32 roll_bits = (p.seed ^ static_cast<u32>(converted::fits<unsigned int>(now * 1000))) * 2246822519u;
     const f32 roll = static_cast<f32>(roll_bits >> 8) / 16777216.0;
     if (d > radius * 0.45 && roll < 0.5) continue;
     Vec2 away{p.pos.x - at.x, p.pos.y - at.y};
@@ -323,6 +376,18 @@ void People::frighten(Vec3 at, f32 radius, f32 now, f32 strength) {
 [[maybe_unused]] static bool same(const People::Person& want, const converted::Value& got) { return got.rows && got.rows->size() == 47 && same(want.kind, (*got.rows)[0]) && same(want.state, (*got.rows)[1]) && same(want.pos, (*got.rows)[2]) && same(want.yaw, (*got.rows)[3]) && same(want.speed, (*got.rows)[4]) && same(want.v, (*got.rows)[5]) && same(want.hp, (*got.rows)[6]) && same(want.phase, (*got.rows)[7]) && same(want.shirt, (*got.rows)[8]) && same(want.pants, (*got.rows)[9]) && same(want.skin, (*got.rows)[10]) && same(want.lane, (*got.rows)[11]) && same(want.seg, (*got.rows)[12]) && same(want.dir, (*got.rows)[13]) && same(want.along, (*got.rows)[14]) && same(want.side, (*got.rows)[15]) && same(want.off, (*got.rows)[16]) && same(want.flee_until, (*got.rows)[17]) && same(want.burst_until, (*got.rows)[18]) && same(want.flee_speed, (*got.rows)[19]) && same(want.hands_up_until, (*got.rows)[20]) && same(want.shaken_until, (*got.rows)[21]) && same(want.wait_until, (*got.rows)[22]) && same(want.flee_dir, (*got.rows)[23]) && same(want.fitness, (*got.rows)[24]) && same(want.down_at, (*got.rows)[25]) && same(want.fall_dir, (*got.rows)[26]) && same(want.unit, (*got.rows)[27]) && same(want.aiming, (*got.rows)[28]) && same(want.aim_pitch, (*got.rows)[29]) && same(want.held, (*got.rows)[30]) && same(want.hands, (*got.rows)[31]) && same(want.hand_l, (*got.rows)[32]) && same(want.hand_r, (*got.rows)[33]) && same(want.punch, (*got.rows)[34]) && same(want.seed, (*got.rows)[35]) && same(want.provoked_at, (*got.rows)[36]) && same(want.fight_until, (*got.rows)[37]) && same(want.last_attack, (*got.rows)[38]) && same(want.provoked_hit, (*got.rows)[39]) && same(want.role, (*got.rows)[40]) && same(want.knocked_until, (*got.rows)[41]) && same(want.hurt_at, (*got.rows)[42]) && same(want.remote, (*got.rows)[43]) && same(want.net, (*got.rows)[44]) && same(want.net_to, (*got.rows)[45]) && same(want.net_at, (*got.rows)[46]); }
 [[maybe_unused]] static bool defined(const People::Person& s) { return defined(s.kind) && defined(s.state) && defined(s.pos) && defined(s.yaw) && defined(s.speed) && defined(s.v) && defined(s.hp) && defined(s.phase) && defined(s.shirt) && defined(s.pants) && defined(s.skin) && defined(s.lane) && defined(s.seg) && defined(s.dir) && defined(s.along) && defined(s.side) && defined(s.off) && defined(s.flee_until) && defined(s.burst_until) && defined(s.flee_speed) && defined(s.hands_up_until) && defined(s.shaken_until) && defined(s.wait_until) && defined(s.flee_dir) && defined(s.fitness) && defined(s.down_at) && defined(s.fall_dir) && defined(s.unit) && defined(s.aiming) && defined(s.aim_pitch) && defined(s.held) && defined(s.hands) && defined(s.hand_l) && defined(s.hand_r) && defined(s.punch) && defined(s.seed) && defined(s.provoked_at) && defined(s.fight_until) && defined(s.last_attack) && defined(s.provoked_hit) && defined(s.role) && defined(s.knocked_until) && defined(s.hurt_at) && defined(s.remote) && defined(s.net) && defined(s.net_to) && defined(s.net_at); }
 [[maybe_unused]] static std::string text(const People::Person& s) { return std::string("{") + text(s.kind) + ", " + text(s.state) + ", " + text(s.pos) + ", " + text(s.yaw) + ", " + text(s.speed) + ", " + text(s.v) + ", " + text(s.hp) + ", " + text(s.phase) + ", " + text(s.shirt) + ", " + text(s.pants) + ", " + text(s.skin) + ", " + text(s.lane) + ", " + text(s.seg) + ", " + text(s.dir) + ", " + text(s.along) + ", " + text(s.side) + ", " + text(s.off) + ", " + text(s.flee_until) + ", " + text(s.burst_until) + ", " + text(s.flee_speed) + ", " + text(s.hands_up_until) + ", " + text(s.shaken_until) + ", " + text(s.wait_until) + ", " + text(s.flee_dir) + ", " + text(s.fitness) + ", " + text(s.down_at) + ", " + text(s.fall_dir) + ", " + text(s.unit) + ", " + text(s.aiming) + ", " + text(s.aim_pitch) + ", " + text(s.held) + ", " + text(s.hands) + ", " + text(s.hand_l) + ", " + text(s.hand_r) + ", " + text(s.punch) + ", " + text(s.seed) + ", " + text(s.provoked_at) + ", " + text(s.fight_until) + ", " + text(s.last_attack) + ", " + text(s.provoked_hit) + ", " + text(s.role) + ", " + text(s.knocked_until) + ", " + text(s.hurt_at) + ", " + text(s.remote) + ", " + text(s.net) + ", " + text(s.net_to) + ", " + text(s.net_at) + "}"; }
+[[maybe_unused]] static Lane draw_Lane(converted::Draw& draw) {
+  Lane s{};
+  s.points = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+  s.width = draw.number();
+  s.tile = static_cast<unsigned long>(draw.below(40));
+  s.alive = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Lane& s) { return converted::Value::structure({arg(s.points), arg(s.width), arg(s.tile), arg(s.alive)}); }
+[[maybe_unused]] static bool same(const Lane& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.points, (*got.rows)[0]) && same(want.width, (*got.rows)[1]) && same(want.tile, (*got.rows)[2]) && same(want.alive, (*got.rows)[3]); }
+[[maybe_unused]] static bool defined(const Lane& s) { return defined(s.points) && defined(s.width) && defined(s.tile) && defined(s.alive); }
+[[maybe_unused]] static std::string text(const Lane& s) { return std::string("{") + text(s.points) + ", " + text(s.width) + ", " + text(s.tile) + ", " + text(s.alive) + "}"; }
 [[maybe_unused]] static CrimeReport draw_CrimeReport(converted::Draw& draw) {
   CrimeReport s{};
   s.crime = static_cast<Crime>(draw.below(10));
@@ -401,14 +466,26 @@ void People::frighten(Vec3 at, f32 radius, f32 now, f32 strength) {
 [[maybe_unused]] static bool same(const People& want, const converted::Value& got) { return got.rows && got.rows->size() == 12 && same(want.people_, (*got.rows)[0]) && same(want.reports_, (*got.rows)[1]) && same(want.deaths_, (*got.rows)[2]) && same(want.falls_, (*got.rows)[3]) && same(want.remote_hits_, (*got.rows)[4]) && same(want.hurts_, (*got.rows)[5]) && same(want.last_head_, (*got.rows)[6]) && same(want.puppets_, (*got.rows)[7]) && same(want.budget_, (*got.rows)[8]) && same(want.serial_, (*got.rows)[9]) && same(want.show_, (*got.rows)[10]) && same(want.hide_, (*got.rows)[11]); }
 [[maybe_unused]] static bool defined(const People& s) { return defined(s.people_) && defined(s.reports_) && defined(s.deaths_) && defined(s.falls_) && defined(s.remote_hits_) && defined(s.hurts_) && defined(s.last_head_) && defined(s.puppets_) && defined(s.budget_) && defined(s.serial_) && defined(s.show_) && defined(s.hide_); }
 [[maybe_unused]] static std::string text(const People& s) { return std::string("{") + text(s.people_) + ", " + text(s.reports_) + ", " + text(s.deaths_) + ", " + text(s.falls_) + ", " + text(s.remote_hits_) + ", " + text(s.hurts_) + ", " + text(s.last_head_) + ", " + text(s.puppets_) + ", " + text(s.budget_) + ", " + text(s.serial_) + ", " + text(s.show_) + ", " + text(s.hide_) + "}"; }
+struct Out_People_route_point { bool Result; Vec3 out; double heading; };
+[[maybe_unused]] static bool same(const Out_People_route_point& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Result, (*got.rows)[0]) && same(want.out, (*got.rows)[1]) && same(want.heading, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const Out_People_route_point& s) { return defined(s.Result) && defined(s.out) && defined(s.heading); }
+[[maybe_unused]] static std::string text(const Out_People_route_point& s) { return std::string("{") + text(s.Result) + ", " + text(s.out) + ", " + text(s.heading) + "}"; }
+struct Out_People_add_citizen { People Self; int Result; };
+[[maybe_unused]] static bool same(const Out_People_add_citizen& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_People_add_citizen& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_People_add_citizen& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
+struct Out_People_add_scripted { People Self; int Result; };
+[[maybe_unused]] static bool same(const Out_People_add_scripted& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_People_add_scripted& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_People_add_scripted& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 
 SC_TEST(converted_people) {
   converted::Blueprint bp("People");
-  converted::Draw draw;
   {  // dist2d
     converted::Tally tally("dist2d");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1) { return converted_people::dist2d(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const Vec3 a1 = draw.vector();
       const converted::Watch watch;
@@ -418,8 +495,9 @@ SC_TEST(converted_people) {
   }
   {  // wrap_pi
     converted::Tally tally("wrap_pi");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0) { return converted_people::wrap_pi(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
       const auto want = run(a0);
@@ -428,8 +506,9 @@ SC_TEST(converted_people) {
   }
   {  // approach_angle
     converted::Tally tally("approach_angle");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted_people::approach_angle(a0, a1, a2); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const double a2 = draw.number();
@@ -438,10 +517,59 @@ SC_TEST(converted_people) {
       tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
     }
   }
+  {  // People::route_point
+    converted::Tally tally("People_route_point");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] People::Person a0, [[maybe_unused]] std::vector<Lane> a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3) { const auto r = People{}.route_point(a0, a1, a2, a3); return Out_People_route_point{r, a2, a3}; };
+    for (int i = 0; tally.more(i); ++i) {
+      const People::Person a0 = draw_People__Person(draw);
+      const std::vector<Lane> a1 = draw_list(draw, [&]() -> Lane { return draw_Lane(draw); });
+      const Vec3 a2 = draw.vector();
+      const double a3 = draw.number();
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2, a3);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); });
+    }
+  }
+  {  // People::add_citizen
+    converted::Tally tally("People_add_citizen");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] unsigned int a3) { const auto r = a0.add_citizen(a1, a2, a3); return Out_People_add_citizen{a0, r}; };
+    for (int i = 0; tally.more(i); ++i) {
+      const People a0 = draw_People(draw);
+      const Vec3 a1 = draw.vector();
+      const double a2 = draw.number();
+      const unsigned int a3 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2, a3);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); });
+    }
+  }
+  {  // People::add_scripted
+    converted::Tally tally("People_add_scripted");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] People::Kind a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] unsigned int a5, [[maybe_unused]] Vec3 a6, [[maybe_unused]] Vec3 a7, [[maybe_unused]] Vec3 a8, [[maybe_unused]] unsigned char a9) { const auto r = a0.add_scripted(a1, a2, a3, a4, a5, a6, a7, a8, a9); return Out_People_add_scripted{a0, r}; };
+    for (int i = 0; tally.more(i); ++i) {
+      const People a0 = draw_People(draw);
+      const People::Kind a1 = static_cast<People::Kind>(draw.below(5));
+      const Vec3 a2 = draw.vector();
+      const double a3 = draw.number();
+      const double a4 = draw.number();
+      const unsigned int a5 = static_cast<unsigned int>(draw.below(40));
+      const Vec3 a6 = draw.vector();
+      const Vec3 a7 = draw.vector();
+      const Vec3 a8 = draw.vector();
+      const unsigned char a9 = static_cast<unsigned char>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5), arg(a6), arg(a7), arg(a8), arg(a9)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5) + ", " + text(a6) + ", " + text(a7) + ", " + text(a8) + ", " + text(a9); });
+    }
+  }
   {  // People::count
     converted::Tally tally("People_count");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] People::Kind a1, [[maybe_unused]] bool a2) { return a0.count(a1, a2); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const People a0 = draw_People(draw);
       const People::Kind a1 = static_cast<People::Kind>(draw.below(5));
       const bool a2 = draw.flag();
@@ -452,8 +580,9 @@ SC_TEST(converted_people) {
   }
   {  // People::witnessed
     converted::Tally tally("People_witnessed");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] Vec3 a1) { return a0.witnessed(a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const People a0 = draw_People(draw);
       const Vec3 a1 = draw.vector();
       const converted::Watch watch;
@@ -463,8 +592,9 @@ SC_TEST(converted_people) {
   }
   {  // People::dress
     converted::Tally tally("People_dress");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] People::Person a0) { People::dress(a0); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const People::Person a0 = draw_People__Person(draw);
       const converted::Watch watch;
       const auto want = run(a0);
@@ -473,8 +603,9 @@ SC_TEST(converted_people) {
   }
   {  // People::frighten
     converted::Tally tally("People_frighten");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { a0.frighten(a1, a2, a3, a4); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const People a0 = draw_People(draw);
       const Vec3 a1 = draw.vector();
       const double a2 = draw.number();

@@ -181,11 +181,11 @@ struct Out_GpsLive_fix { GpsLive Self; bool Result; };
 
 SC_TEST(converted_gps_live) {
   converted::Blueprint bp("GpsLive");
-  converted::Draw draw;
   {  // GpsLive::start
     converted::Tally tally("GpsLive_start");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] GpsLive a0, [[maybe_unused]] double a1) { a0.start(a1); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const GpsLive a0 = draw_GpsLive(draw);
       const double a1 = draw.number();
       const converted::Watch watch;
@@ -195,8 +195,9 @@ SC_TEST(converted_gps_live) {
   }
   {  // GpsLive::fix
     converted::Tally tally("GpsLive_fix");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] GpsLive a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5, [[maybe_unused]] double a6) { const auto r = a0.fix(a1, a2, a3, a4, a5, a6); return Out_GpsLive_fix{a0, r}; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const GpsLive a0 = draw_GpsLive(draw);
       const double a1 = draw.number();
       const double a2 = draw.number();
@@ -211,8 +212,9 @@ SC_TEST(converted_gps_live) {
   }
   {  // GpsLive::frame
     converted::Tally tally("GpsLive_frame");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] GpsLive a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { a0.frame(a1, a2); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const GpsLive a0 = draw_GpsLive(draw);
       const double a1 = draw.number();
       const double a2 = draw.number();
@@ -223,8 +225,9 @@ SC_TEST(converted_gps_live) {
   }
   {  // GpsLive::activity
     converted::Tally tally("GpsLive_activity");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] GpsLive a0) { return a0.activity(); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const GpsLive a0 = draw_GpsLive(draw);
       const converted::Watch watch;
       const auto want = run(a0);
@@ -233,8 +236,9 @@ SC_TEST(converted_gps_live) {
   }
   {  // GpsLive::activity_label
     converted::Tally tally("GpsLive_activity_label");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] GpsLive a0) { return a0.activity_label(); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const GpsLive a0 = draw_GpsLive(draw);
       const converted::Watch watch;
       const auto want = run(a0);

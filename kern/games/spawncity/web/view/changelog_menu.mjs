@@ -7,6 +7,10 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-13",time:"02:35",title:"Konverter: Zählen in 64 Bit, Namen für Stellen",items:[
+    "Unter der Haube: Der Konverter schreibt jetzt auch Rechnen mit Längen und Indizes (64-Bit-Zahlen, mit denen gezählt wird), Referenzen als Namen für eine Stelle, std::reverse und Listen fester Länge. 263 Funktionen aus 54 Dateien stehen als Blueprints im Level. Am Spiel ändert sich dadurch nichts.",
+    "Der Vergleich Bit für Bit kennt jetzt alle Stellen, an denen C++ nichts festlegt (eine Zahl, die ihr Typ nicht hält; ein Eintrag aus einer leeren Liste; ein Aufzählungswert, den es nicht gibt): Für solche Argumente wird neu gewürfelt, statt sie zu vergleichen.",
+  ]},
   {date:"2026-11-13",time:"00:47",title:"Blueprints und Quelltext: verglichen Bit für Bit",items:[
     "Unter der Haube: Jede umgeschriebene Funktion wird jetzt Bit für Bit mit ihrem Quelltext verglichen – ohne jede Toleranz, auch 0 und −0 gelten als verschieden. Der Quelltext wird dafür mit den Zahlen der Blueprint-Sprache übersetzt (64 Bit, Vektoren in 32 Bit) und steht im Test für sich: Er kann nichts vom Spiel aufrufen, was der Test nicht selbst hält.",
     "Der Konverter schreibt jetzt auch lokale Funktionen (Lambdas) und Listen, in die eingefügt, aus denen gelöscht oder deren Länge gesetzt wird. 231 Funktionen aus 52 Dateien stehen als Blueprints im Level. Am Spiel ändert sich dadurch nichts.",

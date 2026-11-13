@@ -335,11 +335,11 @@ Vec3 hex_linear(u32 rgb) {
   return {lin(static_cast<f32>((rgb >> 16) & 255) / 255), lin(static_cast<f32>((rgb >> 8) & 255) / 255), lin(static_cast<f32>(rgb & 255) / 255)};
 }
 int police_flash(f32 now_s) {
-  const i64 slot = static_cast<i64>(std::floor(now_s * 1000 / 110)) % 6;
+  const i64 slot = converted::rem(static_cast<i64>(converted::fits<long>(std::floor(now_s * 1000 / 110))), 6);
   return slot == 0 || slot == 2 ? 1 : slot == 3 || slot == 5 ? 2 : 0;
 }
 int drone_flash(f32 now_s, int index) {
-  const i64 slot = ((static_cast<i64>(std::floor((now_s * 1000 + index * 37) / 92)) % 8) + 8) % 8;
+  const i64 slot = converted::rem((converted::plus((converted::rem(static_cast<i64>(converted::fits<long>(std::floor((now_s * 1000 + index * 37) / 92))), 8)), 8)), 8);
   return slot <= 1 ? 1 : slot == 4 || slot == 5 ? 2 : 0;
 }
 #undef private
@@ -464,11 +464,11 @@ struct Out_day_lighting { double Result; Lighting l; SkyState sky; };
 
 SC_TEST(converted_look) {
   converted::Blueprint bp("Look");
-  converted::Draw draw;
   {  // mix3
     converted::Tally tally("mix3");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2) { return converted_look::mix3(a0, a1, a2); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const Vec3 a1 = draw.vector();
       const double a2 = draw.number();
@@ -479,8 +479,9 @@ SC_TEST(converted_look) {
   }
   {  // smooth
     converted::Tally tally("smooth");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted_look::smooth(a0, a1, a2); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const double a2 = draw.number();
@@ -491,8 +492,9 @@ SC_TEST(converted_look) {
   }
   {  // noise
     converted::Tally tally("noise");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted_look::noise(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const converted::Watch watch;
@@ -502,8 +504,9 @@ SC_TEST(converted_look) {
   }
   {  // Quat::rotate
     converted::Tally tally("Quat_rotate");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Quat a0, [[maybe_unused]] Vec3 a1) { return a0.rotate(a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Quat a0 = draw_kern__Quat(draw);
       const Vec3 a1 = draw.vector();
       const converted::Watch watch;
@@ -513,8 +516,9 @@ SC_TEST(converted_look) {
   }
   {  // Quat::axis_angle
     converted::Tally tally("Quat_axis_angle");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return Quat::axis_angle(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const double a1 = draw.number();
       const converted::Watch watch;
@@ -524,8 +528,9 @@ SC_TEST(converted_look) {
   }
   {  // rotate_about
     converted::Tally tally("rotate_about");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2) { return converted_look::rotate_about(a0, a1, a2); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const Vec3 a1 = draw.vector();
       const double a2 = draw.number();
@@ -536,8 +541,9 @@ SC_TEST(converted_look) {
   }
   {  // Shake::add
     converted::Tally tally("Shake_add");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Shake a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { a0.add(a1, a2); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Shake a0 = draw_look__Shake(draw);
       const double a1 = draw.number();
       const double a2 = draw.number();
@@ -548,8 +554,9 @@ SC_TEST(converted_look) {
   }
   {  // Shake::sample
     converted::Tally tally("Shake_sample");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Shake a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] Vec3 a4, [[maybe_unused]] Vec2 a5) { const auto r = a0.sample(a1, a2, a3, a4, a5); return Out_Shake_sample{a0, r, a4, a5}; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Shake a0 = draw_look__Shake(draw);
       const double a1 = draw.number();
       const double a2 = draw.number();
@@ -563,8 +570,9 @@ SC_TEST(converted_look) {
   }
   {  // weapon_trauma
     converted::Tally tally("weapon_trauma");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] bool a0, [[maybe_unused]] bool a1, [[maybe_unused]] bool a2, [[maybe_unused]] double a3) { const auto r = converted_look::weapon_trauma(a0, a1, a2, a3); return Out_weapon_trauma{r, a3}; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const bool a0 = draw.flag();
       const bool a1 = draw.flag();
       const bool a2 = draw.flag();
@@ -576,8 +584,9 @@ SC_TEST(converted_look) {
   }
   {  // blast_trauma
     converted::Tally tally("blast_trauma");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted_look::blast_trauma(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const converted::Watch watch;
@@ -587,8 +596,9 @@ SC_TEST(converted_look) {
   }
   {  // shake_camera
     converted::Tally tally("shake_camera");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Camera a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec2 a2) { converted_look::shake_camera(a0, a1, a2); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Camera a0 = draw_kern__Camera(draw);
       const Vec3 a1 = draw.vector();
       const Vec2 a2 = draw.vector2();
@@ -599,8 +609,9 @@ SC_TEST(converted_look) {
   }
   {  // damp_alpha
     converted::Tally tally("damp_alpha");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted_look::damp_alpha(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const converted::Watch watch;
@@ -610,8 +621,9 @@ SC_TEST(converted_look) {
   }
   {  // Stabilizer::apply
     converted::Tally tally("Stabilizer_apply");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Stabilizer a0, [[maybe_unused]] Camera a1, [[maybe_unused]] double a2) { a0.apply(a1, a2); return Out_Stabilizer_apply{a0, a1}; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Stabilizer a0 = draw_look__Stabilizer(draw);
       const Camera a1 = draw_kern__Camera(draw);
       const double a2 = draw.number();
@@ -622,8 +634,9 @@ SC_TEST(converted_look) {
   }
   {  // day_lighting
     converted::Tally tally("day_lighting");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] Lighting a4, [[maybe_unused]] SkyState a5) { const auto r = converted_look::day_lighting(a0, a1, a2, a3, a4, a5); return Out_day_lighting{r, a4, a5}; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const double a2 = draw.number();
@@ -637,8 +650,9 @@ SC_TEST(converted_look) {
   }
   {  // follow_phase
     converted::Tally tally("follow_phase");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted_look::follow_phase(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const converted::Watch watch;
@@ -648,8 +662,9 @@ SC_TEST(converted_look) {
   }
   {  // kern_intensity
     converted::Tally tally("Kern_intensity");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted_look::kern_intensity(a0, a1, a2); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const double a2 = draw.number();
@@ -660,8 +675,9 @@ SC_TEST(converted_look) {
   }
   {  // hex_linear
     converted::Tally tally("hex_linear");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted_look::hex_linear(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
       const auto want = run(a0);
@@ -670,8 +686,9 @@ SC_TEST(converted_look) {
   }
   {  // police_flash
     converted::Tally tally("police_flash");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0) { return converted_look::police_flash(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
       const auto want = run(a0);
@@ -680,8 +697,9 @@ SC_TEST(converted_look) {
   }
   {  // drone_flash
     converted::Tally tally("drone_flash");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] int a1) { return converted_look::drone_flash(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const int a1 = static_cast<int>(draw.whole());
       const converted::Watch watch;

@@ -196,11 +196,11 @@ namespace PeopleArt { using converted::arg; using converted::same; using convert
 
 SC_TEST(converted_people_art) {
   converted::Blueprint bp("PeopleArt");
-  converted::Draw draw;
   {  // Mat4::trs
     converted::Tally tally("Mat4_trs");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Quat a1, [[maybe_unused]] Vec3 a2) { return Mat4::trs(a0, a1, a2); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const Quat a1 = draw_kern__Quat(draw);
       const Vec3 a2 = draw.vector();
@@ -211,8 +211,9 @@ SC_TEST(converted_people_art) {
   }
   {  // Quat::axis_angle
     converted::Tally tally("Quat_axis_angle");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return Quat::axis_angle(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const double a1 = draw.number();
       const converted::Watch watch;
@@ -222,8 +223,9 @@ SC_TEST(converted_people_art) {
   }
   {  // rot
     converted::Tally tally("rot");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return converted_people_art::rot(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const double a1 = draw.number();
       const converted::Watch watch;
@@ -233,8 +235,9 @@ SC_TEST(converted_people_art) {
   }
   {  // Mat4::translate
     converted::Tally tally("Mat4_translate");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0) { return Mat4::translate(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const converted::Watch watch;
       const auto want = run(a0);
@@ -243,8 +246,9 @@ SC_TEST(converted_people_art) {
   }
   {  // at
     converted::Tally tally("at");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted_people_art::at(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const converted::Watch watch;
       const auto want = run(a0);
@@ -253,8 +257,9 @@ SC_TEST(converted_people_art) {
   }
   {  // PeopleArt::put
     converted::Tally tally("PeopleArt_put");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] PeopleArt::Part a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { converted_people_art::PeopleArt::put(a0, a1, a2); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const PeopleArt::Part a0 = draw_PeopleArt__Part(draw);
       const Mat4 a1 = draw_kern__Mat4(draw);
       const Vec3 a2 = draw.vector();

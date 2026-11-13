@@ -35,7 +35,31 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
+enum class RoadClass : u8 { motorway, trunk, primary, secondary, tertiary, minor, service, track, path, pedestrian, river, canal, stream };
 f32 dist(Vec2 a, Vec2 b) { return hypot_bp(a.x - b.x, a.y - b.y); }
+namespace RoadGraph { inline Vec2 pursuit_point(const std::vector<Vec2>& path, Vec2 p, f32 look) {
+  if (path.empty()) return p;
+  if (path.size() < 2) return converted::at(path, 0);
+  std::size_t bi = 0;
+  f32 bt = 0, bd = 1e30;
+  for (std::size_t i = 0; converted::plus(i, 1) < path.size(); converted::pre_inc(i)) {
+    const Vec2 a = converted::at(path, i), b = converted::at(path, converted::plus(i, 1)), d = b - a;
+    const f32 l2 = std::fmax(1e-6, d.x * d.x + d.y * d.y);
+    const f32 t = clampf(((p.x - a.x) * d.x + (p.y - a.y) * d.y) / l2, 0, 1);
+    const f32 dd = dist(p, a + d * t);
+    if (dd < bd) { bd = dd; bi = i; bt = t; }
+  }
+  f32 left = look, t = bt;
+  for (std::size_t i = bi; converted::plus(i, 1) < path.size(); converted::pre_inc(i)) {
+    const Vec2 a = converted::at(path, i), b = converted::at(path, converted::plus(i, 1));
+    const f32 l = std::fmax(1e-6, dist(a, b)), rest = (1 - t) * l;
+    if (rest >= left) return a + (b - a) * (t + left / l);
+    left -= rest;
+    t = 0;
+  }
+  return converted::back(path);
+} }
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
@@ -43,16 +67,29 @@ f32 dist(Vec2 a, Vec2 b) { return hypot_bp(a.x - b.x, a.y - b.y); }
 
 SC_TEST(converted_road_graph) {
   converted::Blueprint bp("RoadGraph");
-  converted::Draw draw;
   {  // dist
     converted::Tally tally("dist");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec2 a0, [[maybe_unused]] Vec2 a1) { return converted_road_graph::dist(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec2 a0 = draw.vector2();
       const Vec2 a1 = draw.vector2();
       const converted::Watch watch;
       const auto want = run(a0, a1);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // RoadGraph::pursuit_point
+    converted::Tally tally("RoadGraph_pursuit_point");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2) { return converted_road_graph::RoadGraph::pursuit_point(a0, a1, a2); };
+    for (int i = 0; tally.more(i); ++i) {
+      const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+      const Vec2 a1 = draw.vector2();
+      const double a2 = draw.number();
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
     }
   }
 }

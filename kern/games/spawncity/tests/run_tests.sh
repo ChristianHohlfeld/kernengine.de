@@ -43,15 +43,19 @@ for f in "$game"/src/*.cpp; do [ "$(basename "$f")" = main.cpp ] || grep -q '#in
 while IFS= read -r f; do sources+=("$f"); done < <(find "$here" -name 'test_*.cpp' | sort)
 flags=(-std=c++20 "${build[@]}" -ffp-contract=off -fno-exceptions -fno-rtti
        -Wall -Wextra -Wno-unused-parameter -I"$kern/include" -I"$kern/third_party/box3d/include" -I"$game/src" -I"$kern/tests")
-# Header changes rebuild everything (the cache key includes every header's content).
-key="$({ printf '%s ' "${flags[@]}"; find "$kern/include" "$game" -name '*.h' -o -name '*.hpp' | sort | xargs cat; } | sha256sum | cut -c1-12)"
-export cxx out key
+# Header changes rebuild what includes them (the cache key includes every header's content): a header
+# of the engine or the game everything, a header of the tests only the tests.
+key="$({ printf '%s ' "${flags[@]}"; find "$kern/include" "$game" -path "$here" -prune -o \( -name '*.h' -o -name '*.hpp' \) -print | sort | xargs cat; } | sha256sum | cut -c1-12)"
+test_key="$({ printf '%s ' "$key"; find "$here" -name '*.h' -o -name '*.hpp' | sort | xargs cat; } | sha256sum | cut -c1-12)"
+export cxx out key test_key here
+object_of() { case "$1" in "$here"/*) k="$test_key" ;; *) k="$key" ;; esac; echo "$out/obj/$(echo "$1" | sed "s|/|_|g")-$k-$(sha256sum "$1" | cut -c1-12).o"; }
+export -f object_of
 printf '%s\n' "${sources[@]}" | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c '
   src="$1"; shift
-  o="$out/obj/$(echo "$src" | sed "s|/|_|g")-$key-$(sha256sum "$src" | cut -c1-12).o"
+  o="$(object_of "$src")"
   [ -f "$o" ] || "$cxx" "$@" -c "$src" -o "$o"' _ {} "${flags[@]}"
 cpp_objects=()
-for f in "${sources[@]}"; do cpp_objects+=("$out/obj/$(echo "$f" | sed "s|/|_|g")-$key-$(sha256sum "$f" | cut -c1-12).o"); done
+for f in "${sources[@]}"; do cpp_objects+=("$(object_of "$f")"); done
 "$cxx" "${link[@]}" "${cpp_objects[@]}" "${objects[@]}" -lm -o "$out/spawncity_tests"
 "$out/spawncity_tests" "$@"
 # The game's own sources - what includes game.h and is not linked into the tests - compile: a

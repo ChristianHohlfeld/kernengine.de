@@ -195,11 +195,11 @@ CarInput ai_drive(Vec3 position, Vec3 forward, f32 vf, Vec3 target, f32 target_s
 
 SC_TEST(converted_car) {
   converted::Blueprint bp("Car");
-  converted::Draw draw;
   {  // steer_torque_at
     converted::Tally tally("steer_torque_at");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] CarSpec a0, [[maybe_unused]] double a1) { return converted_car::steer_torque_at(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const CarSpec a0 = draw_CarSpec(draw);
       const double a1 = draw.number();
       const converted::Watch watch;
@@ -209,8 +209,9 @@ SC_TEST(converted_car) {
   }
   {  // CarSpec::bus
     converted::Tally tally("CarSpec_bus");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]() { return CarSpec::bus(); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       const auto want = run();
       tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });
@@ -218,8 +219,9 @@ SC_TEST(converted_car) {
   }
   {  // suspension_tuning
     converted::Tally tally("suspension_tuning");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] CarSpec a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted_car::suspension_tuning(a0, a1, a2); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const CarSpec a0 = draw_CarSpec(draw);
       const double a1 = draw.number();
       const double a2 = draw.number();
@@ -230,8 +232,9 @@ SC_TEST(converted_car) {
   }
   {  // ai_drive
     converted::Tally tally("ai_drive");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] double a4) { return converted_car::ai_drive(a0, a1, a2, a3, a4); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const Vec3 a1 = draw.vector();
       const double a2 = draw.number();

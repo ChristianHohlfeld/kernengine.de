@@ -169,11 +169,11 @@ namespace People { using converted::arg; using converted::same; using converted:
 
 SC_TEST(converted_game_guided) {
   converted::Blueprint bp("GameGuided");
-  converted::Draw draw;
   {  // person_up
     converted::Tally tally("person_up");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] People::Person a0) { return converted_game_guided::person_up(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const People::Person a0 = draw_People__Person(draw);
       const converted::Watch watch;
       const auto want = run(a0);
@@ -182,8 +182,9 @@ SC_TEST(converted_game_guided) {
   }
   {  // person_label
     converted::Tally tally("person_label");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] People::Person a0) { return converted_game_guided::person_label(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const People::Person a0 = draw_People__Person(draw);
       const converted::Watch watch;
       const auto want = run(a0);

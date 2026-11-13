@@ -68,11 +68,11 @@ Weapon mp_weapon(Id id) {
 
 SC_TEST(converted_game_net) {
   converted::Blueprint bp("GameNet");
-  converted::Draw draw;
   {  // mp_weapon
     converted::Tally tally("mp_weapon");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Id a0) { return converted_game_net::mp_weapon(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Id a0 = static_cast<Id>(draw.below(14));
       const converted::Watch watch;
       const auto want = run(a0);

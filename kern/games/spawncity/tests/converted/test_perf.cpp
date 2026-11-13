@@ -33,12 +33,20 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+inline f32 damp_alpha(f32 rate, f32 dt) { return rate > 0 && dt > 0 ? 1.0 - kern::math::exp(-rate * dt) : 0.0; }
 enum class Slot : u8 { logic, physics, stream, draw, count };
 const char* slot_name(Slot s);
 constexpr i32 kTiers = 5;
 constexpr i32 kDesktopStart = 4, kMobileStart = 2, kMobileMax = 3;
+constexpr f32 kAverageTau = 1.0;
+constexpr f32 kDownFps = 50;
+constexpr f32 kDownHold = 2.0;
+constexpr f32 kUpFps = 57;
+constexpr f32 kUpHold = 8.0;
 constexpr f32 kSettle = 3.0;
 constexpr f32 kWarmup = 3.0;
+constexpr f32 kBlockFirst = 30.0;
+constexpr f32 kBlockMax = 240.0;
 struct Meter {
  public:
   
@@ -62,7 +70,7 @@ struct Governor {
   /// Starts at `tier` with `max_tier` as the ceiling (phones: kMobileMax).
   void reset(i32 tier, i32 max_tier);
   /// One display frame of `dt` seconds. Returns true when the level changed.
-  
+  bool update(f32 dt);
   
   
   
@@ -119,6 +127,37 @@ void Governor::set_fixed(i32 tier) {
   auto_ = false;
   tier_ = tier < 0 ? 0 : (tier >= kTiers ? kTiers - 1 : tier);
 }
+bool Governor::update(f32 dt) {
+  if (!(dt > 0)) return false;
+  clock_ += dt;
+  since_change_ += dt;
+  // Frame-time average (the rate is its inverse): robust against single long frames.
+  avg_dt_ += (dt - avg_dt_) * damp_alpha(1.0 / kAverageTau, dt);
+  if (!auto_) return false;
+  if (since_change_ < kSettle) { low_ = high_ = 0; return false; }
+  const f32 fps = 1.0 / avg_dt_;
+  low_ = fps < kDownFps ? low_ + dt : 0;
+  high_ = fps >= kUpFps ? high_ + dt : 0;
+  if (low_ >= kDownHold && tier_ > 0) {
+    // The level we leave was too heavy: block it for a while, longer each time.
+    f32& len = converted::at(block_len_, tier_);
+    len = len <= 0 ? kBlockFirst : std::fmin(kBlockMax, len * 2);
+    converted::at(block_until_, tier_) = clock_ + len;
+    --tier_;
+    since_change_ = 0;
+    low_ = high_ = 0;
+    ++changes_;
+    return true;
+  }
+  if (high_ >= kUpHold && tier_ < max_ && clock_ >= converted::at(block_until_, tier_ + 1)) {
+    ++tier_;
+    since_change_ = 0;
+    low_ = high_ = 0;
+    ++changes_;
+    return true;
+  }
+  return false;
+}
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
@@ -157,14 +196,18 @@ void Governor::set_fixed(i32 tier) {
 [[maybe_unused]] static bool same(const Governor& want, const converted::Value& got) { return got.rows && got.rows->size() == 11 && same(want.tier_, (*got.rows)[0]) && same(want.max_, (*got.rows)[1]) && same(want.auto_, (*got.rows)[2]) && same(want.avg_dt_, (*got.rows)[3]) && same(want.clock_, (*got.rows)[4]) && same(want.since_change_, (*got.rows)[5]) && same(want.low_, (*got.rows)[6]) && same(want.high_, (*got.rows)[7]) && same(std::vector<double>(std::begin(want.block_until_), std::end(want.block_until_)), (*got.rows)[8]) && same(std::vector<double>(std::begin(want.block_len_), std::end(want.block_len_)), (*got.rows)[9]) && same(want.changes_, (*got.rows)[10]); }
 [[maybe_unused]] static bool defined(const Governor& s) { return defined(s.tier_) && defined(s.max_) && defined(s.auto_) && defined(s.avg_dt_) && defined(s.clock_) && defined(s.since_change_) && defined(s.low_) && defined(s.high_) && defined(std::vector<double>(std::begin(s.block_until_), std::end(s.block_until_))) && defined(std::vector<double>(std::begin(s.block_len_), std::end(s.block_len_))) && defined(s.changes_); }
 [[maybe_unused]] static std::string text(const Governor& s) { return std::string("{") + text(s.tier_) + ", " + text(s.max_) + ", " + text(s.auto_) + ", " + text(s.avg_dt_) + ", " + text(s.clock_) + ", " + text(s.since_change_) + ", " + text(s.low_) + ", " + text(s.high_) + ", " + text(std::vector<double>(std::begin(s.block_until_), std::end(s.block_until_))) + ", " + text(std::vector<double>(std::begin(s.block_len_), std::end(s.block_len_))) + ", " + text(s.changes_) + "}"; }
+struct Out_Governor_update { Governor Self; bool Result; };
+[[maybe_unused]] static bool same(const Out_Governor_update& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_Governor_update& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_Governor_update& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 
 SC_TEST(converted_perf) {
   converted::Blueprint bp("Perf");
-  converted::Draw draw;
   {  // slot_name
     converted::Tally tally("slot_name");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Slot a0) { return converted_perf::slot_name(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Slot a0 = static_cast<Slot>(draw.below(5));
       const converted::Watch watch;
       const auto want = run(a0);
@@ -173,8 +216,9 @@ SC_TEST(converted_perf) {
   }
   {  // Meter::lap
     converted::Tally tally("Meter_lap");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Meter a0, [[maybe_unused]] Slot a1, [[maybe_unused]] double a2) { a0.lap(a1, a2); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Meter a0 = draw_perf__Meter(draw);
       const Slot a1 = static_cast<Slot>(draw.below(5));
       const double a2 = draw.number();
@@ -185,8 +229,9 @@ SC_TEST(converted_perf) {
   }
   {  // Meter::end_frame
     converted::Tally tally("Meter_end_frame");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Meter a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { a0.end_frame(a1, a2, a3); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Meter a0 = draw_perf__Meter(draw);
       const double a1 = draw.number();
       const double a2 = draw.number();
@@ -198,8 +243,9 @@ SC_TEST(converted_perf) {
   }
   {  // Governor::reset
     converted::Tally tally("Governor_reset");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Governor a0, [[maybe_unused]] int a1, [[maybe_unused]] int a2) { a0.reset(a1, a2); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Governor a0 = draw_perf__Governor(draw);
       const int a1 = static_cast<int>(draw.whole());
       const int a2 = static_cast<int>(draw.whole());
@@ -210,10 +256,35 @@ SC_TEST(converted_perf) {
   }
   {  // Governor::set_fixed
     converted::Tally tally("Governor_set_fixed");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Governor a0, [[maybe_unused]] int a1) { a0.set_fixed(a1); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Governor a0 = draw_perf__Governor(draw);
       const int a1 = static_cast<int>(draw.whole());
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // damp_alpha
+    converted::Tally tally("damp_alpha");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted_perf::damp_alpha(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const double a0 = draw.number();
+      const double a1 = draw.number();
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // Governor::update
+    converted::Tally tally("Governor_update");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Governor a0, [[maybe_unused]] double a1) { const auto r = a0.update(a1); return Out_Governor_update{a0, r}; };
+    for (int i = 0; tally.more(i); ++i) {
+      const Governor a0 = draw_perf__Governor(draw);
+      const double a1 = draw.number();
       const converted::Watch watch;
       const auto want = run(a0, a1);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });

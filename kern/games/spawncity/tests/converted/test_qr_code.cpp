@@ -35,8 +35,16 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
+struct Code {
+  i32 version = 0, size = 0;
+  std::vector<u8> modules;  // size * size, 1 = dark, row major
+  bool dark(i32 x, i32 y) const { return x >= 0 && y >= 0 && x < size && y < size && converted::at(modules, static_cast<std::size_t>(y * size + x)); }
+};
+bool read_format(const Code& c, u32& level_bits, u32& mask);
 constexpr i32 kEccPerBlock[41] = {-1, 7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28, 28, 28, 30, 30, 26, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30};
 constexpr i32 kBlocks[41] = {-1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4, 4, 4, 4, 4, 6, 6, 6, 6, 7, 8, 8, 9, 9, 10, 12, 12, 12, 13, 14, 15, 16, 17, 18, 19, 19, 20, 21, 22, 24, 25};
+constexpr u32 kLevelL = 1;
 i32 raw_modules(i32 v) {
   i32 r = (16 * v + 128) * v + 64;
   if (v >= 2) {
@@ -56,27 +64,106 @@ u8 gf_mul(u8 x, u8 y) {
   return static_cast<u8>(z);
 }
 std::vector<u8> rs_remainder(const std::vector<u8>& data, const std::vector<u8>& div) {
-  std::vector<u8> r(div.size(), 0);
+  std::vector<u8> r(converted::count(div.size()), 0);
   for (u8 b : data) {
     const u8 f = b ^ converted::at(r, 0);
     converted::erase(r, r.begin());
     r.push_back(0);
-    for (std::size_t i = 0; i < r.size(); ++i) converted::at(r, i) ^= gf_mul(converted::at(div, i), f);
+    for (std::size_t i = 0; i < r.size(); converted::pre_inc(i)) converted::at(r, i) ^= gf_mul(converted::at(div, i), f);
   }
   return r;
+}
+std::vector<i32> alignment_positions(i32 v) {
+  if (v == 1) return {};
+  const i32 n = v / 7 + 2, size = v * 4 + 17;
+  const i32 step = v == 32 ? 26 : converted::quot((v * 4 + n * 2 + 1), (n * 2 - 2)) * 2;
+  std::vector<i32> r(converted::count(static_cast<std::size_t>(n)));
+  converted::at(r, 0) = 6;
+  for (i32 i = n - 1, pos = size - 7; i >= 1; --i, pos -= step) converted::at(r, static_cast<std::size_t>(i)) = pos;
+  return r;
+}
+struct Grid {
+  i32 size;
+  std::vector<u8> m, fn;
+  void set(i32 x, i32 y, bool dark) { converted::at(m, static_cast<std::size_t>(y * size + x)) = dark; converted::at(fn, static_cast<std::size_t>(y * size + x)) = 1; }
+};
+void finder(Grid& g, i32 cx, i32 cy) {
+  for (i32 dy = -4; dy <= 4; ++dy)
+    for (i32 dx = -4; dx <= 4; ++dx) {
+      const i32 x = cx + dx, y = cy + dy;
+      if (x < 0 || y < 0 || x >= g.size || y >= g.size) continue;
+      const i32 d = std::max(std::abs(dx), std::abs(dy));
+      g.set(x, y, d != 2 && d != 4);
+    }
+}
+void format_bits(Grid& g, u32 mask) {
+  const u32 data = kLevelL << 3 | mask;
+  u32 rem = data;
+  for (i32 i = 0; i < 10; ++i) rem = (rem << 1) ^ ((rem >> 9) * 0x537);
+  const u32 bits = (data << 10 | rem) ^ 0x5412;
+  auto bit = [&](i32 i) { return ((converted::shr(bits, i)) & 1) != 0; };
+  for (i32 i = 0; i <= 5; ++i) g.set(8, i, bit(i));
+  g.set(8, 7, bit(6));
+  g.set(8, 8, bit(7));
+  g.set(7, 8, bit(8));
+  for (i32 i = 9; i < 15; ++i) g.set(14 - i, 8, bit(i));
+  for (i32 i = 0; i < 8; ++i) g.set(g.size - 1 - i, 8, bit(i));
+  for (i32 i = 8; i < 15; ++i) g.set(8, g.size - 15 + i, bit(i));
+  g.set(8, g.size - 8, true);  // the dark module
+}
+bool read_format(const Code& c, u32& level_bits, u32& mask) {
+  u32 bits = 0;
+  for (i32 i = 0; i <= 5; ++i) bits |= converted::shl(static_cast<u32>(c.dark(8, i)), i);
+  bits |= static_cast<u32>(c.dark(8, 7)) << 6;
+  bits |= static_cast<u32>(c.dark(8, 8)) << 7;
+  bits |= static_cast<u32>(c.dark(7, 8)) << 8;
+  for (i32 i = 9; i < 15; ++i) bits |= converted::shl(static_cast<u32>(c.dark(14 - i, 8)), i);
+  bits ^= 0x5412;
+  level_bits = bits >> 13;
+  mask = (bits >> 10) & 7;
+  // The 10 BCH bits must match.
+  u32 rem = bits >> 10;
+  for (i32 i = 0; i < 10; ++i) rem = (rem << 1) ^ ((rem >> 9) * 0x537);
+  return (rem & 0x3ff) == (bits & 0x3ff);
 }
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
 
+[[maybe_unused]] static Grid draw_qr__Grid(converted::Draw& draw) {
+  Grid s{};
+  s.size = static_cast<int>(draw.whole());
+  s.m = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+  s.fn = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Grid& s) { return converted::Value::structure({arg(s.size), arg(s.m), arg(s.fn)}); }
+[[maybe_unused]] static bool same(const Grid& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.size, (*got.rows)[0]) && same(want.m, (*got.rows)[1]) && same(want.fn, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const Grid& s) { return defined(s.size) && defined(s.m) && defined(s.fn); }
+[[maybe_unused]] static std::string text(const Grid& s) { return std::string("{") + text(s.size) + ", " + text(s.m) + ", " + text(s.fn) + "}"; }
+[[maybe_unused]] static Code draw_qr__Code(converted::Draw& draw) {
+  Code s{};
+  s.version = static_cast<int>(draw.whole());
+  s.size = static_cast<int>(draw.whole());
+  s.modules = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Code& s) { return converted::Value::structure({arg(s.version), arg(s.size), arg(s.modules)}); }
+[[maybe_unused]] static bool same(const Code& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.version, (*got.rows)[0]) && same(want.size, (*got.rows)[1]) && same(want.modules, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const Code& s) { return defined(s.version) && defined(s.size) && defined(s.modules); }
+[[maybe_unused]] static std::string text(const Code& s) { return std::string("{") + text(s.version) + ", " + text(s.size) + ", " + text(s.modules) + "}"; }
+struct Out_read_format { bool Result; unsigned int level_bits; unsigned int mask; };
+[[maybe_unused]] static bool same(const Out_read_format& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Result, (*got.rows)[0]) && same(want.level_bits, (*got.rows)[1]) && same(want.mask, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const Out_read_format& s) { return defined(s.Result) && defined(s.level_bits) && defined(s.mask); }
+[[maybe_unused]] static std::string text(const Out_read_format& s) { return std::string("{") + text(s.Result) + ", " + text(s.level_bits) + ", " + text(s.mask) + "}"; }
 
 SC_TEST(converted_qr_code) {
   converted::Blueprint bp("QrCode");
-  converted::Draw draw;
   {  // raw_modules
     converted::Tally tally("raw_modules");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] int a0) { return converted_qr_code::raw_modules(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const int a0 = static_cast<int>(draw.whole());
       const converted::Watch watch;
       const auto want = run(a0);
@@ -85,8 +172,9 @@ SC_TEST(converted_qr_code) {
   }
   {  // data_codewords
     converted::Tally tally("data_codewords");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] int a0) { return converted_qr_code::data_codewords(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const int a0 = static_cast<int>(draw.whole());
       const converted::Watch watch;
       const auto want = run(a0);
@@ -95,8 +183,9 @@ SC_TEST(converted_qr_code) {
   }
   {  // gf_mul
     converted::Tally tally("gf_mul");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned char a0, [[maybe_unused]] unsigned char a1) { return converted_qr_code::gf_mul(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const unsigned char a0 = static_cast<unsigned char>(draw.below(40));
       const unsigned char a1 = static_cast<unsigned char>(draw.below(40));
       const converted::Watch watch;
@@ -106,13 +195,90 @@ SC_TEST(converted_qr_code) {
   }
   {  // rs_remainder
     converted::Tally tally("rs_remainder");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] std::vector<unsigned char> a1) { return converted_qr_code::rs_remainder(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       const std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       const converted::Watch watch;
       const auto want = run(a0, a1);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // alignment_positions
+    converted::Tally tally("alignment_positions");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] int a0) { return converted_qr_code::alignment_positions(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      const int a0 = static_cast<int>(draw.whole());
+      const converted::Watch watch;
+      const auto want = run(a0);
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
+  {  // Grid::set
+    converted::Tally tally("Grid_set");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Grid a0, [[maybe_unused]] int a1, [[maybe_unused]] int a2, [[maybe_unused]] bool a3) { a0.set(a1, a2, a3); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      const Grid a0 = draw_qr__Grid(draw);
+      const int a1 = static_cast<int>(draw.whole());
+      const int a2 = static_cast<int>(draw.whole());
+      const bool a3 = draw.flag();
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2, a3);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); });
+    }
+  }
+  {  // finder
+    converted::Tally tally("finder");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Grid a0, [[maybe_unused]] int a1, [[maybe_unused]] int a2) { converted_qr_code::finder(a0, a1, a2); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      const Grid a0 = draw_qr__Grid(draw);
+      const int a1 = static_cast<int>(draw.whole());
+      const int a2 = static_cast<int>(draw.whole());
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+    }
+  }
+  {  // format_bits
+    converted::Tally tally("format_bits");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Grid a0, [[maybe_unused]] unsigned int a1) { converted_qr_code::format_bits(a0, a1); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      const Grid a0 = draw_qr__Grid(draw);
+      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // Code::dark
+    converted::Tally tally("Code_dark");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Code a0, [[maybe_unused]] int a1, [[maybe_unused]] int a2) { return a0.dark(a1, a2); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Code a0 = draw_qr__Code(draw);
+      const int a1 = static_cast<int>(draw.whole());
+      const int a2 = static_cast<int>(draw.whole());
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+    }
+  }
+  {  // read_format
+    converted::Tally tally("read_format");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Code a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] unsigned int a2) { const auto r = converted_qr_code::read_format(a0, a1, a2); return Out_read_format{r, a1, a2}; };
+    for (int i = 0; tally.more(i); ++i) {
+      const Code a0 = draw_qr__Code(draw);
+      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const unsigned int a2 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
     }
   }
 }

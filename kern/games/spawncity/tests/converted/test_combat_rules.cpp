@@ -86,11 +86,11 @@ void Race::reset() { *this = Race{}; }
 
 SC_TEST(converted_combat_rules) {
   converted::Blueprint bp("CombatRules");
-  converted::Draw draw;
   {  // cell_rand
     converted::Tally tally("cell_rand");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted_combat_rules::cell_rand(a0, a1); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
@@ -100,8 +100,9 @@ SC_TEST(converted_combat_rules) {
   }
   {  // agent_random
     converted::Tally tally("agent_random");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted_combat_rules::agent_random(a0); };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
       const auto want = run(a0);
@@ -110,8 +111,9 @@ SC_TEST(converted_combat_rules) {
   }
   {  // Race::reset
     converted::Tally tally("Race_reset");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Race a0) { a0.reset(); return a0; };
-    for (int i = 0; i < converted::kCalls; ++i) {
+    for (int i = 0; tally.more(i); ++i) {
       const Race a0 = draw_combat__Race(draw);
       const converted::Watch watch;
       const auto want = run(a0);
