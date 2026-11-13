@@ -518,17 +518,26 @@ Variable* Graph::variable(std::string_view name) {
   for (Variable& v : variables) if (v.name == name) return &v;
   return nullptr;
 }
-bool Graph::variable_of(const Node& n, Variable& out) const {
-  const std::string name = n.param("variable"), scope = n.param("scope");
-  if (scope.empty()) {
-    const Variable* v = variable(name);
-    if (v) out = *v;
-    return v != nullptr;
+bool Graph::variable_of(const Node& n, Variable& out) const { return root_of(n, out) != Root::none; }
+Graph::Root Graph::root_of(const Node& n, Variable& out, std::string_view prefix) const {
+  const std::string name = n.param(std::string(prefix) + "variable"), scope = n.param("scope");
+  const Function* f = scope.empty() ? nullptr : function(scope);
+  // (in a function: its local variables and its inputs come before the Blueprint's variables -
+  // a variable node of a local variable says so with "scope", a call's place may be any of them)
+  if (const FunctionPin* l = f ? f->local(name) : nullptr) {
+    out = Variable{l->name, l->type, l->value, {}, l->of};
+    return Root::local;
   }
-  const Function* f = function(scope);
-  const FunctionPin* l = f ? f->local(name) : nullptr;
-  if (l) out = Variable{l->name, l->type, l->value, {}, l->of};
-  return l != nullptr;
+  if (const FunctionPin* in = f ? f->input(name) : nullptr) {
+    out = Variable{in->name, in->type, in->value, {}, in->of};
+    return !in->ref ? Root::input : in->constant ? Root::constant_reference : Root::reference;
+  }
+  // (the variable nodes name a variable of the Blueprint without "scope"; a call that stands in a
+  // function names one where the function has no local variable or input of that name)
+  if (!scope.empty() && prefix.empty()) return Root::none;
+  const Variable* v = variable(name);
+  if (v) out = *v;
+  return v ? Root::variable : Root::none;
 }
 bool path_steps(std::string_view path, std::vector<std::string>& steps) {
   steps.clear();
@@ -555,10 +564,10 @@ std::string path_text(const std::vector<std::string>& steps) {
   for (const std::string& step : steps) r += step.empty() ? std::string("[]") : "." + step;
   return r;
 }
-bool Graph::path_of(const Node& n, std::vector<std::string>& steps, std::vector<std::string>& owners) const {
+bool Graph::path_of(const Node& n, std::vector<std::string>& steps, std::vector<std::string>& owners, std::string_view prefix) const {
   owners.clear();
   Variable var;
-  if (!path_steps(n.param("path"), steps) || !variable_of(n, var)) return false;
+  if (!path_steps(n.param(std::string(prefix) + "path"), steps) || root_of(n, var, prefix) == Root::none) return false;
   TypeRef at{var.type, var.of};
   bool fits = true;
   for (const std::string& step : steps) {
@@ -582,18 +591,19 @@ std::size_t path_indices(std::string_view path) {
   return n;
 }
 std::string path_pin(std::size_t k) { return "path" + std::to_string(k); }
+std::string ref_key(std::string_view input, std::string_view what) { return std::string(input) + "." + std::string(what); }
 bool is_path_pin(std::string_view id) {
   if (id.size() < 5 || id.substr(0, 4) != "path") return false;
   for (char c : id.substr(4))
     if (c < '0' || c > '9') return false;
   return true;
 }
-bool Graph::place_of(const Node& n, Variable& out, std::string* why) const {
-  if (!variable_of(n, out)) {
-    if (why) *why = "no variable \"" + n.param("variable") + "\"";
+bool Graph::place_of(const Node& n, Variable& out, std::string* why, std::string_view prefix) const {
+  if (root_of(n, out, prefix) == Root::none) {
+    if (why) *why = "no variable \"" + n.param(std::string(prefix) + "variable") + "\"";
     return false;
   }
-  const std::string path = n.param("path");
+  const std::string path = n.param(std::string(prefix) + "path");
   if (path.empty()) return true;
   std::vector<std::string> steps;
   if (!path_steps(path, steps)) {
@@ -636,6 +646,39 @@ bool Graph::place_of(const Node& n, Variable& out, std::string* why) const {
   out.type = at.type;
   out.of = at.of;
   return true;
+}
+std::string Graph::body_of(u32 node, const Library& lib) const {
+  std::string body;
+  for (const Node& entry : nodes) {
+    if (entry.type != "func.entry") continue;
+    // the steps the entry leads to along exec wires, then the values they read
+    std::vector<u32> todo{entry.id}, seen{entry.id};
+    auto take = [&](u32 id) {
+      if (std::find(seen.begin(), seen.end(), id) != seen.end()) return;
+      seen.push_back(id);
+      todo.push_back(id);
+    };
+    while (!todo.empty()) {
+      const u32 at = todo.back();
+      todo.pop_back();
+      const Node* n = find(at);
+      if (!n) continue;
+      std::vector<PinDef> in, out;
+      lib.pins(*n, *this, in, out);
+      for (const Link& l : links) {
+        if (l.from == at)
+          for (const PinDef& p : out)
+            if (p.id == l.out && p.type == PinType::exec) take(l.to);
+        if (l.to == at)
+          for (const PinDef& p : in)
+            if (p.id == l.in && p.type != PinType::exec) take(l.from);
+      }
+    }
+    if (std::find(seen.begin(), seen.end(), node) == seen.end()) continue;
+    if (!body.empty() && body != entry.param("function")) return {};
+    body = entry.param("function");
+  }
+  return body;
 }
 StateMachine* Graph::machine(u32 id) {
   for (StateMachine& m : machines) if (m.id == id) return &m;
@@ -825,6 +868,7 @@ json::Value graph_to_json(const Graph& g) {
         x.set("name", p.name);
         x.set("type", pin_type_name(p.type));
         if (!p.of.empty()) x.set("of", p.of);
+        if (p.ref) x.set("ref", p.constant ? json::Value("const") : json::Value(true));  // (a reference input: Car& car, const Car& car)
         x.set("value", p.value);
         a.push(std::move(x));
       }
@@ -1018,6 +1062,8 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
         for (const FunctionPin& q : out) if (q.name == p.name) return bad("function \"" + f.name + "\": " + what + " \"" + p.name + "\" exists twice");
         if (!type_of(x, p.type, p.of)) return bad("function \"" + f.name + "\": \"" + p.name + "\" has an unknown type");
         p.value = Value::from_json(x["value"], p.type, g, p.of).to_json(g, p.of);
+        p.constant = x["ref"].is_string() && x["ref"].as_string() == "const";
+        p.ref = p.constant || x["ref"].as_bool();
         out.push_back(std::move(p));
       }
       return true;
@@ -1246,6 +1292,53 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
     if (entries == 0) err(0, "function \"" + f.name + "\" has no Function Entry node");
     if (entries > 1) err(0, "function \"" + f.name + "\" has " + std::to_string(entries) + " Function Entry nodes (one is its start)");
     if (entries == 1 && returns == 0 && !f.outputs.empty()) warn(0, "function \"" + f.name + "\" has no Return node: it gives its outputs' defaults");
+  }
+  // Reference inputs (FunctionPin::ref): a call names a place for each, and the function works
+  // on it where it stands.
+  for (const Function& f : g.functions)
+    for (const FunctionPin& in : f.inputs) {
+      if (!in.ref) continue;
+      const std::string shown = "function \"" + f.name + "\": the input \"" + in.name + "\"";
+      if (f.external) err(0, shown + " cannot be a reference - a call on another actor's Blueprint gives values, no places");
+      else if (f.pure && !in.constant) err(0, shown + " is a reference the function could change, but a function that is read as a value changes nothing: a const reference reads a place where it stands");
+    }
+  for (const Node& n : g.nodes) {
+    const NodeDef* d = lib.find(n.type);
+    if (!d) continue;
+    bool names = false;
+    for (const ParamDef& pd : d->params) names = names || pd.kind == ParamDef::Kind::variable;
+    Variable v;
+    if (names) {
+      // (an input of the function, named like a variable: by value and by const reference it is read)
+      const Graph::Root root = g.root_of(n, v);
+      const bool reads = n.type == "var.get";
+      if (!reads && (root == Graph::Root::input || root == Graph::Root::constant_reference))
+        err(n.id, lib.title(n) + ": " + v.name + " is " + (root == Graph::Root::input ? "an input by value" : "a const reference") + " of " + n.param("scope") +
+                      " - it is read, not changed (an input that is changed where the caller has it is a reference: " + type_text({v.type, v.of}) + "& " + v.name + ")");
+      if (reads && root == Graph::Root::input && n.param("path").empty())
+        err(n.id, lib.title(n) + ": an input by value is read from the Function Entry; a Get names a place in it (" + v.name + ".Field, " + v.name + "[index])");
+    }
+    if (n.type != "func.call" && n.type != "func.pure" && n.type != "func.call_on") continue;
+    const Function* f = g.function(n.param("function"));
+    if (!f) continue;
+    for (const FunctionPin& in : f->inputs) {
+      if (!in.ref) continue;
+      const std::string prefix = ref_key(in.name, ""), what = lib.title(n) + ": the reference input \"" + in.name + "\"";
+      std::string why;
+      if (n.type == "func.call_on") {
+        err(n.id, what + " needs a place, and a call on another actor's Blueprint gives values");
+      } else if (n.param(prefix + "variable").empty()) {
+        err(n.id, what + " needs a place: a variable, or a field or a list entry in one (" + n.param("function") + "(Variable.Field, ...))");
+      } else if (!n.param("scope").empty() && !g.function(n.param("scope"))) {
+        err(n.id, what + ": no function \"" + n.param("scope") + "\" (in which the call would stand)");
+      } else if (!g.place_of(n, v, &why, prefix)) {
+        err(n.id, what + ": " + why);
+      } else if (v.type != in.type || v.of != in.of) {
+        err(n.id, what + " is " + type_text({in.type, in.of}) + ", but " + v.name + " is " + type_text({v.type, v.of}) + " - a reference is the place itself, nothing converts");
+      } else if (Variable root; !in.constant && !Graph::writable(g.root_of(n, root, prefix))) {
+        err(n.id, what + " is changed by the function, but " + root.name + " is only read here (an input by value or a const reference)");
+      }
+    }
   }
   auto find_pin = [&](u32 node, const std::string& id, bool input) -> const PinDef* {
     auto it = pins.find(node);
@@ -1527,6 +1620,16 @@ Instance::Instance(Runtime& rt, const Graph& graph, ActorRef self, std::string n
         }
         locals_[f].push_back({key, init});
       }
+    // A reference input has a variable of its own too, under the same kind of key: a call from
+    // outside (Instance::call) gives a value, not a place - the input is then this variable.
+    refs_.resize(graph_.functions.size());
+    for (const Function& f : graph_.functions)
+      for (const FunctionPin& in : f.inputs) {
+        if (!in.ref) continue;
+        const std::string key = f.name + "." + in.name;
+        var_types_[key] = {in.type, in.of};
+        vars_[key] = zero_of({in.type, in.of}, graph_);
+      }
   }
   nodes_.resize(graph_.nodes.size());
   for (std::size_t i = 0; i < graph_.nodes.size(); ++i) {
@@ -1641,7 +1744,10 @@ Instance::Instance(Runtime& rt, const Graph& graph, ActorRef self, std::string n
 bool Instance::call(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results) { return call_function(function, args, results, false); }
 bool Instance::call_inside(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results) { return call_function(function, args, results, true); }
 
-bool Instance::call_function(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results, bool inside) {
+bool Instance::call_inside(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results, const std::vector<Spot>& places) {
+  return call_function(function, args, results, true, &places);
+}
+bool Instance::call_function(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results, bool inside, const std::vector<Spot>* places) {
   results.clear();
   if (blueprint_) {
     if (disabled_) return false;
@@ -1649,6 +1755,7 @@ bool Instance::call_function(std::string_view function, const std::vector<Value>
     rt_.counters_[1] = static_cast<i32>(min_of<u64>(rt_.budget, 0x7fffffff));
     ++rt_.depth_;
     ++active_;
+    const beside::Visit visit;  // (the entries beside the lists that the class names are this visit's)
     const bool known = blueprint_->call(function, args, results);
     rt_.chain_ends(*this);
     --rt_.depth_;
@@ -1666,12 +1773,27 @@ bool Instance::call_function(std::string_view function, const std::vector<Value>
   // handler that calls it again while it runs: a call like any other, as in the Blueprint's C++.
   // Its parameters are the inner call's then; Runtime::fire gives the outer call its own back.)
   CNode& e = nodes_[static_cast<std::size_t>(entry)];
-  std::size_t k = 0;
-  for (std::size_t o = 0; o < e.out.size() && k < fn.inputs.size(); ++o) {
-    if (e.out[o].type == PinType::exec) continue;
-    e.outputs[o] = k < args.size() ? from_outside(args[k], {e.out[o].type, e.out[o].of}, graph_) : Value::from_json(fn.inputs[k].value, fn.inputs[k].type, graph_, fn.inputs[k].of).converted(e.out[o].type);
-    ++k;
+  // The inputs by value are the entry node's outputs. A reference input is the place the call
+  // names (`places`) - or, called from outside, a variable of its own that starts as the argument.
+  std::vector<Spot> bound(fn.inputs.size());
+  for (std::size_t k = 0; k < fn.inputs.size(); ++k) {
+    const FunctionPin& in = fn.inputs[k];
+    if (in.ref) {
+      if (places && k < places->size()) {
+        bound[k] = (*places)[k];
+      } else {
+        bound[k].key = fn.name + "." + in.name;
+        vars_[bound[k].key] = k < args.size() ? from_outside(args[k], {in.type, in.of}, graph_) : zero_of({in.type, in.of}, graph_);
+      }
+      continue;
+    }
+    for (std::size_t o = 0; o < e.out.size(); ++o) {
+      if (e.out[o].type == PinType::exec || e.out[o].id != in.name) continue;
+      e.outputs[o] = k < args.size() ? from_outside(args[k], {e.out[o].type, e.out[o].of}, graph_) : Value::from_json(in.value, in.type, graph_, in.of).converted(e.out[o].type);
+    }
   }
+  std::vector<Spot> outer = std::move(refs_[static_cast<std::size_t>(f)]);
+  refs_[static_cast<std::size_t>(f)] = std::move(bound);
   // A call from outside any chain (the engine's C++ asking a rule) is a step of its own for the
   // loop guard: the budget counts what one step runs, and a paused world has no ticks to start
   // a new count while its systems keep asking.
@@ -1686,6 +1808,11 @@ bool Instance::call_function(std::string_view function, const std::vector<Value>
   rt_.run_from(*this, entry, 0, inside ? Runtime::Chain::call_inside : Runtime::Chain::call);
   results = std::move(frames_.back().results);
   frames_.pop_back();
+  // (from outside: what the function made of its reference inputs stands behind its outputs)
+  if (!places)
+    for (const FunctionPin& in : fn.inputs)
+      if (in.ref && !in.constant) results.push_back(held(fn.name + "." + in.name));
+  refs_[static_cast<std::size_t>(f)] = std::move(outer);
   return true;
 }
 
@@ -1765,79 +1892,187 @@ void set_item(Value& list, std::size_t at, const Value& x) {
 }
 /// What `steps` (from `k` on) lead to in `v`, a value of type `t`. Beside a list: an entry with
 /// the defaults.
-Value value_at(const Value& v, const TypeRef& t, const std::vector<std::string>& steps, std::size_t k, const std::vector<i64>& indices, std::size_t ik, const Graph& g) {
+Value value_at(const Value& v, const TypeRef& t, const std::vector<Instance::Spot::Step>& steps, std::size_t k, const Graph& g) {
   if (k == steps.size()) return v;
-  if (steps[k].empty()) {
-    const i64 at = ik < indices.size() ? indices[ik] : -1;
+  if (steps[k].field.empty()) {
+    const i64 at = steps[k].index;
     const TypeRef item{element_of(t.type), t.of};
-    const bool there = at >= 0 && static_cast<std::size_t>(at) < v.size();
-    return value_at(there ? v.item(static_cast<std::size_t>(at)) : zero_of(item, g), item, steps, k + 1, indices, ik + 1, g);
+    const bool there = is_list(t.type) && at >= 0 && static_cast<std::size_t>(at) < v.size();
+    return value_at(there ? v.item(static_cast<std::size_t>(at)) : zero_of(item, g), item, steps, k + 1, g);
   }
   const StructType* s = t.type == PinType::structure ? g.structure(t.of) : nullptr;
-  const int f = s ? s->field(steps[k]) : -1;
+  const int f = s ? s->field(steps[k].field) : -1;
   if (f < 0) return Value();
-  return value_at(field_of(v, *s, static_cast<std::size_t>(f), g), s->fields[static_cast<std::size_t>(f)].type, steps, k + 1, indices, ik, g);
+  return value_at(field_of(v, *s, static_cast<std::size_t>(f), g), s->fields[static_cast<std::size_t>(f)].type, steps, k + 1, g);
 }
 /// The same to change it: `change` gets the value there, in its place - every value on the way
 /// is the variable's own (Value::edit, own_rows). Beside a list `change` gets an entry with the
 /// defaults, and nothing of it is kept.
-void change_at(Value& v, const TypeRef& t, const std::vector<std::string>& steps, std::size_t k, const std::vector<i64>& indices, std::size_t ik, const Graph& g,
-               const std::function<void(Value&)>& change) {
+void change_at(Value& v, const TypeRef& t, const std::vector<Instance::Spot::Step>& steps, std::size_t k, const Graph& g, const std::function<void(Value&)>& change) {
   if (k == steps.size()) {
     change(v);
     return;
   }
-  if (steps[k].empty()) {
-    const i64 at = ik < indices.size() ? indices[ik] : -1;
+  if (steps[k].field.empty()) {
+    const i64 at = steps[k].index;
     const TypeRef item{element_of(t.type), t.of};
-    const bool there = at >= 0 && static_cast<std::size_t>(at) < v.size();
+    const bool there = is_list(t.type) && at >= 0 && static_cast<std::size_t>(at) < v.size();
     if (!there) {
       Value beside = zero_of(item, g);
-      change_at(beside, item, steps, k + 1, indices, ik + 1, g, change);
+      change_at(beside, item, steps, k + 1, g, change);
       return;
     }
     if (t.type == PinType::structure_list) {
-      change_at(v.edit<Value>()[static_cast<std::size_t>(at)], item, steps, k + 1, indices, ik + 1, g, change);
+      change_at(v.edit<Value>()[static_cast<std::size_t>(at)], item, steps, k + 1, g, change);
       return;
     }
     Value entry = v.item(static_cast<std::size_t>(at));
-    change_at(entry, item, steps, k + 1, indices, ik + 1, g, change);
+    change_at(entry, item, steps, k + 1, g, change);
     set_item(v, static_cast<std::size_t>(at), entry);
     return;
   }
   const StructType* s = t.type == PinType::structure ? g.structure(t.of) : nullptr;
-  const int f = s ? s->field(steps[k]) : -1;
+  const int f = s ? s->field(steps[k].field) : -1;
   if (f < 0) return;
   hold_fields(v, *s, g);
-  change_at(v.own_rows()[static_cast<std::size_t>(f)], s->fields[static_cast<std::size_t>(f)].type, steps, k + 1, indices, ik, g, change);
+  change_at(v.own_rows()[static_cast<std::size_t>(f)], s->fields[static_cast<std::size_t>(f)].type, steps, k + 1, g, change);
 }
 }  // namespace
-Value Instance::place(const Node& n, const std::vector<i64>& indices) const {
-  if (blueprint_) return Value();
-  const std::string path = n.param("path");
-  if (path.empty()) return held(key_of(n));
+bool Instance::spot(const Node& n, std::string_view prefix, const std::vector<i64>& indices, Spot& out) const {
+  out = Spot();
+  const std::string name = n.param(std::string(prefix) + "variable"), scope = n.param("scope");
+  auto fn = scope.empty() ? fn_index_.end() : fn_index_.find(scope);
+  const Function* f = fn == fn_index_.end() ? nullptr : &graph_.functions[static_cast<std::size_t>(fn->second)];
+  if (f && f->local(name)) {
+    out.key = scope + "." + name;
+  } else if (const FunctionPin* in = f ? f->input(name) : nullptr) {
+    const std::size_t k = static_cast<std::size_t>(in - f->inputs.data());
+    if (in->ref) {
+      // (a reference input: the place the running call was given)
+      const std::vector<Spot>& bound = refs_[static_cast<std::size_t>(fn->second)];
+      if (k >= bound.size()) return false;
+      out = bound[k];
+    } else {
+      // (an input by value: what the entry node holds of the running call)
+      out.entry = fn_entry_[static_cast<std::size_t>(fn->second)];
+      if (out.entry < 0) return false;
+      const CNode& e = nodes_[static_cast<std::size_t>(out.entry)];
+      for (std::size_t o = 0; o < e.out.size(); ++o)
+        if (e.out[o].type != PinType::exec && e.out[o].id == name) out.output = static_cast<int>(o);
+      if (out.output < 0) return false;
+    }
+  } else if (scope.empty() || !prefix.empty()) {
+    out.key = name;
+  } else {
+    return false;
+  }
   std::vector<std::string> steps;
-  Variable var;
-  if (!path_steps(path, steps) || !graph_.variable_of(n, var)) return Value();
-  return value_at(held(key_of(n)), {var.type, var.of}, steps, 0, indices, 0, graph_);
+  if (!path_steps(n.param(std::string(prefix) + "path"), steps)) return false;
+  std::size_t entry = 0;
+  const std::size_t first = out.steps.size();  // (a reference input's own steps have been walked when it was bound)
+  for (std::string& step : steps) {
+    Spot::Step st;
+    if (step.empty()) st.index = entry < indices.size() ? indices[entry] : -1, ++entry;
+    else st.field = std::move(step);
+    out.steps.push_back(std::move(st));
+  }
+  // Naming the place finds it. Where a list entry lies beside its list, the place goes on in an
+  // entry of its own with the zero of the items' type, as in a Blueprint's class (kern::List).
+  TypeRef t;
+  Value at;
+  if (out.beside) {
+    t = out.beside->type;
+    at = out.beside->value;
+  } else if (out.entry >= 0) {
+    const CNode& e = nodes_[static_cast<std::size_t>(out.entry)];
+    t = {e.out[static_cast<std::size_t>(out.output)].type, e.out[static_cast<std::size_t>(out.output)].of};
+    at = e.outputs[static_cast<std::size_t>(out.output)];
+  } else {
+    auto type = var_types_.find(out.key);
+    if (type == var_types_.end()) return false;
+    t = type->second;
+    at = held(out.key);
+  }
+  for (std::size_t k = 0; k < first && k < out.steps.size(); ++k) {
+    // (the steps it came with: the same way as when it was bound)
+    const Spot::Step& st = out.steps[k];
+    if (st.field.empty()) {
+      const TypeRef item{element_of(t.type), t.of};
+      at = st.index >= 0 && static_cast<std::size_t>(st.index) < at.size() ? at.item(static_cast<std::size_t>(st.index)) : zero_of(item, graph_);
+      t = item;
+    } else {
+      const StructType* s = t.type == PinType::structure ? graph_.structure(t.of) : nullptr;
+      const int f = s ? s->field(st.field) : -1;
+      if (f < 0) return false;
+      at = field_of(at, *s, static_cast<std::size_t>(f), graph_);
+      t = s->fields[static_cast<std::size_t>(f)].type;
+    }
+  }
+  for (std::size_t k = first; k < out.steps.size(); ++k) {
+    const Spot::Step st = out.steps[k];
+    if (!st.field.empty()) {
+      const StructType* s = t.type == PinType::structure ? graph_.structure(t.of) : nullptr;
+      const int f = s ? s->field(st.field) : -1;
+      if (f < 0) return false;
+      at = field_of(at, *s, static_cast<std::size_t>(f), graph_);
+      t = s->fields[static_cast<std::size_t>(f)].type;
+      continue;
+    }
+    if (!is_list(t.type)) return false;
+    const TypeRef item{element_of(t.type), t.of};
+    if (st.index >= 0 && static_cast<std::size_t>(st.index) < at.size()) {
+      at = at.item(static_cast<std::size_t>(st.index));
+      t = item;
+      continue;
+    }
+    // beside the list: from here on the place is in an entry of its own
+    at = zero_of(item, graph_);
+    out.beside = std::make_shared<Spot::Beside>(Spot::Beside{item, at});
+    out.key.clear();
+    out.entry = out.output = -1;
+    out.steps.erase(out.steps.begin(), out.steps.begin() + static_cast<std::ptrdiff_t>(k) + 1);
+    k = static_cast<std::size_t>(-1);  // (the steps that are left start at that entry)
+    t = item;
+  }
+  return true;
+}
+Value Instance::read(const Spot& s) const {
+  if (s.beside) return value_at(s.beside->value, s.beside->type, s.steps, 0, graph_);
+  if (s.entry >= 0) {
+    const CNode& e = nodes_[static_cast<std::size_t>(s.entry)];
+    const std::size_t o = static_cast<std::size_t>(s.output);
+    return value_at(e.outputs[o], {e.out[o].type, e.out[o].of}, s.steps, 0, graph_);
+  }
+  auto t = var_types_.find(s.key);
+  if (t == var_types_.end()) return Value();
+  return s.steps.empty() ? held(s.key) : value_at(held(s.key), t->second, s.steps, 0, graph_);
+}
+bool Instance::write(const Spot& s, const std::function<void(Value&)>& change) {
+  if (s.beside) {
+    change_at(s.beside->value, s.beside->type, s.steps, 0, graph_, change);
+    return true;
+  }
+  auto t = var_types_.find(s.key);
+  if (s.entry >= 0 || t == var_types_.end()) return false;
+  if (var_slot(s.key) >= 0) {
+    // (a number of the Blueprint lives in a slot: there is no way into it)
+    if (!s.steps.empty()) return false;
+    Value v = held(s.key);
+    change(v);
+    return hold(s.key, v);
+  }
+  auto it = vars_.find(s.key);
+  if (it == vars_.end()) return false;
+  change_at(it->second, t->second, s.steps, 0, graph_, change);
+  return true;
+}
+Value Instance::place(const Node& n, const std::vector<i64>& indices) const {
+  Spot s;
+  return !blueprint_ && spot(n, {}, indices, s) ? read(s) : Value();
 }
 bool Instance::change(const Node& n, const std::vector<i64>& indices, const std::function<void(Value&)>& change) {
-  if (blueprint_) return false;
-  const std::string key = key_of(n);
-  std::vector<std::string> steps;
-  Variable var;
-  if (!path_steps(n.param("path"), steps) || !graph_.variable_of(n, var)) return false;
-  if (var_slot(key) >= 0) {
-    // (a number of the Blueprint lives in a slot: there is no way into it)
-    if (!steps.empty()) return false;
-    Value v = held(key);
-    change(v);
-    return hold(key, v);
-  }
-  auto it = vars_.find(key);
-  if (it == vars_.end()) return false;
-  change_at(it->second, {var.type, var.of}, steps, 0, indices, 0, graph_, change);
-  return true;
+  Spot s;
+  return !blueprint_ && spot(n, {}, indices, s) && write(s, change);
 }
 std::vector<Value> Instance::locals() const {
   std::vector<Value> r;
@@ -1849,10 +2084,12 @@ Instance::Held Instance::held_calls() const {
   Held h;
   for (int entry : fn_entry_) h.parameters.push_back(entry >= 0 ? nodes_[static_cast<std::size_t>(entry)].outputs : std::vector<Value>());
   h.locals = locals();
+  h.refs = refs_;
   return h;
 }
 void Instance::set_held_calls(Held held) {
   set_locals(held.locals);
+  refs_ = std::move(held.refs);
   for (std::size_t f = 0; f < held.parameters.size() && f < fn_entry_.size(); ++f)
     if (fn_entry_[f] >= 0) nodes_[static_cast<std::size_t>(fn_entry_[f])].outputs = std::move(held.parameters[f]);
 }
@@ -2201,6 +2438,7 @@ void Runtime::run_from(Instance& inst, int start, int entry, Chain chain) {
     }
     counters_[1] = static_cast<i32>(min_of<u64>(budget, 0x7fffffff));  // (the class reads the limit there)
     ++inst.active_;
+    const beside::Visit visit;
     if (due) inst.blueprint_->run(start, entry);
     chain_ends(inst);
     --depth_;
@@ -2290,6 +2528,24 @@ std::vector<i64> Context::path() {
   for (std::size_t k = 0; k < count; ++k)
     if (is_path_pin(inst_.nodes_[static_cast<std::size_t>(node_)].in[k].id)) r.push_back(in(k).as_int());
   return r;
+}
+
+Instance::Spot Context::spot(std::string_view prefix) {
+  std::vector<i64> indices;
+  const std::size_t count = inst_.nodes_[static_cast<std::size_t>(node_)].in.size();
+  for (std::size_t k = 0;; ++k) {
+    const std::string pin = std::string(prefix) + path_pin(k);
+    bool found = false;
+    for (std::size_t i = 0; i < count && !found; ++i)
+      if (inst_.nodes_[static_cast<std::size_t>(node_)].in[i].id == pin) {
+        indices.push_back(in(i).as_int());
+        found = true;
+      }
+    if (!found) break;
+  }
+  Instance::Spot s;
+  inst_.spot(node(), prefix, indices, s);
+  return s;
 }
 
 Value Context::in(std::string_view pin) {

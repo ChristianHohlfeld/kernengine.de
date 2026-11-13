@@ -4034,6 +4034,75 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused(weapon + in_event("    Heat = Held.Damage[0];"), "Held.Damage is Float: it has no entries");
   refused(weapon + in_event("    list_set(Held, 0, 1.0);"), "an entry of a list is set at its place: List[index] = value;");
   refused(in_event("    Heat = Count.Damage;"), "Count is Int: it has no fields");
+
+  // ---- reference inputs: the call names a place, the function works on it where it stands ----
+  {
+    const std::string car = "  KERN_STRUCT(Car) {\n    Float Speed = 0.0;\n    List<Float> Marks = List<Float>{};\n  };\n  List<Car> Cars = List<Car>{};\n  Car Mine = Car{1.0, List<Float>{}};\n";
+    // what is wrong with a text: what the reader says, or the check of the Blueprint it read
+    auto wrong = [&](const std::string& body) {
+      logic::Graph g;
+      std::string error;
+      if (!logic::from_cpp("struct B : kern::Blueprint {\n  Float Heat = 0.0;\n  Int Count = 0;\n" + car + body + "\n};\n", g, nullptr, &error)) return error;
+      for (const logic::Issue& i : logic::check(g)) error += i.text + "\n";
+      return error + logic::cpp_problem(g);
+    };
+    auto says = [&](const std::string& body, const char* why) {
+      const std::string got = wrong(body);
+      if (got.find(why) == std::string::npos) std::printf("expected \"%s\", got: %s\n", why, got.empty() ? "(nothing wrong)" : got.c_str());
+      return got.find(why) != std::string::npos;
+    };
+    const std::string bump = "  void Bump(Float& x, Float by = 1.0) {\n    x += by;\n  }\n";
+    const std::string drive = "  void Drive(Car& car, Float by = 1.0) {\n    car.Speed += by;\n    list_add(car.Marks, car.Speed);\n    Bump(car.Speed, by);\n  }\n";
+    const std::string read = "  struct ReadResult { Float speed = 0.0; Int marks = 0; };\n  KERN_PURE ReadResult Read(const Car& car) {\n    return {car.Speed, list_length<Float>(car.Marks)};\n  }\n";
+    const std::string go = "  KERN_EVENT(on1, event_begin)\n  void on1() {\n    list_add(Cars, Mine);\n    Drive(Cars[0], 2.0);\n    Drive(Mine, 0.5);\n    Bump(Heat, Read(Cars[0]).speed);\n    Count = Read(Mine).marks;\n  }\n";
+    CHECK(wrong(bump + drive + read + go).empty());
+    // the same Blueprint: its one text, its file, and what it does - in the interpreter and with the JIT's nodes
+    logic::Graph g, back, again;
+    std::string error, text, twice;
+    CHECK(logic::from_cpp("struct B : kern::Blueprint {\n  Float Heat = 0.0;\n  Int Count = 0;\n" + car + bump + drive + read + go + "};\n", g, nullptr, &error) && no_errors(logic::check(g)));
+    CHECK(logic::to_cpp(g, "B", text) && text.find("void Bump(Float& x, Float by = 1.0) {") != std::string::npos && text.find("KERN_PURE ReadResult Read(const Car& car) {") != std::string::npos);
+    CHECK(text.find("    Drive(Cars[0], 2.0);") != std::string::npos && text.find("    Bump(car.Speed, by);") != std::string::npos && text.find("Read(Cars[0]).speed") != std::string::npos);
+    CHECK(logic::from_cpp(text, again, nullptr, &error) && logic::to_cpp(again, "B", twice) && twice == text);
+    CHECK(logic::graph_from_json(logic::graph_to_json(g), back) && back == g && back.function("Bump")->inputs[0].ref && !back.function("Bump")->inputs[0].constant && back.function("Read")->inputs[0].constant);
+    for (bool jit : {false, true}) {
+      FakeLogicHost host;
+      logic::Runtime rt(host);
+      rt.jit = jit;
+      rt.native = false;
+      logic::Instance* inst = rt.add(g, 0, "Level");
+      rt.begin();
+      // Cars[0]: 1 + 2, then Bump + 2 = 5, one mark (3); Mine: 1 + 0.5 + 0.5 = 2, one mark; Heat = 0 + 5
+      CHECK(inst->get("Heat").as_number() == 5 && inst->get("Count").as_int() == 1 && host.errors.empty());
+      CHECK(inst->get("Cars").size() == 1 && inst->get("Mine").field(0)->as_number() == 2);
+      // from outside: a reference input takes a value; what the function made of it stands behind its outputs
+      std::vector<logic::Value> out;
+      CHECK(inst->call("Bump", {logic::Value::number(1.5), logic::Value::number(2)}, out) && out.size() == 1 && out[0].as_number() == 3.5);
+      CHECK(inst->call("Drive", {inst->get("Mine"), logic::Value::number(1)}, out) && out.size() == 1 && out[0].field(0)->as_number() == 4 && out[0].field(1)->size() == 2);
+      CHECK(inst->get("Mine").field(0)->as_number() == 2);  // (the variable itself was not the place)
+      CHECK(inst->call("Read", {inst->get("Mine")}, out) && out.size() == 2 && out[0].as_number() == 2);
+    }
+    // what is no place, what is only read, what does not fit
+    CHECK(says(bump + in_event("    Bump(1.0, 2.0);"), "its input x is a reference - a place stands there"));
+    CHECK(says(bump + in_event("    Bump(Count, 2.0);"), "a reference is the place itself, nothing converts"));
+    CHECK(says(bump + in_event("    Bump(Mine.Marks[0].Speed, 2.0);"), "Mine.Marks[] is Float: only a struct has fields"));
+    CHECK(says("  void Set(Car car = Car{1.0, List<Float>{}}) {\n    car.Speed = 2.0;\n  }", "car is an input by value: it is read, not changed"));
+    CHECK(says("  void Set(const Car& car) {\n    car.Speed = 2.0;\n  }", "car is a const reference: it is read, not changed"));
+    CHECK(says(bump + "  void Set(const Car& car) {\n    Bump(car.Speed, 1.0);\n  }", "car is a const reference: it is read, not changed"));
+    CHECK(says("  void Set(const Car car) {\n  }", "a const input is a reference: const Car& name"));
+    CHECK(says("  void Set(Car& car = Car{1.0, List<Float>{}}) {\n  }", "car is a reference: the call names its place, it has no default"));
+    CHECK(says("  struct GetResult { Float speed = 0.0; };\n  KERN_PURE GetResult Get(Car& car) {\n    return {car.Speed};\n  }", "a function that is read as a value changes nothing"));
+    // an entry of a list that is held stays where it is
+    CHECK(says("  void Grow(Car& car) {\n    list_add(Cars, car);\n  }\n" + in_event("    Grow(Cars[0]);"), "while Grow holds it, the length of Cars is changed"));
+    CHECK(says("  void Swap(Car& car) {\n    Cars = List<Car>{};\n    car.Speed = 1.0;\n  }\n" + in_event("    Swap(Cars[0]);"), "while Swap holds it, what stands at Cars is changed"));
+    CHECK(says(bump + "  void Clear(Car& car) {\n    list_clear(car.Marks);\n  }\n  void Both(Car& car) {\n    Clear(car);\n  }\n  void Mark(Float& mark, Car& car) {\n    Both(car);\n    mark += 1.0;\n  }\n" +
+                   in_event("    Mark(Mine.Marks[0], Mine);"),
+               "while Mark holds it, the length of Mine.Marks is changed"));
+    CHECK(says("  void Shout(Car& car) {\n    flow_call<\"Go\">(Actor{0}, Actor{0}, car.Speed, \"\");\n  }\n" + in_event("    Shout(Cars[0]);"), "may run handlers while it holds it"));
+    // ... and what is fine: the list itself, another list, a field of the entry, a variable that is no entry
+    CHECK(wrong("  void Grow(List<Car>& cars, Car& car) {\n    car.Speed = 1.0;\n    list_add(car.Marks, 2.0);\n  }\n  void More(List<Float>& marks) {\n    list_add(marks, 1.0);\n  }\n" +
+                in_event("    Grow(Cars, Mine);\n    More(Cars[0].Marks);\n    More(Mine.Marks);"))
+              .empty());
+  }
   refused(weapon + in_event("    Heat = struct_break<Weapon>(Held);"), "struct_break gives several values: say which one (.Label, Type, Damage)");
   refused(solo + in_event("    Heat = struct_break<Solo>(One);"), "which field: struct_break<Solo>(...).A");
   refused(weapon + in_event("    Heat = struct_break<Weapon>(Held).Range;"), "struct_break has no output \"Range\" (Label, Type, Damage)");

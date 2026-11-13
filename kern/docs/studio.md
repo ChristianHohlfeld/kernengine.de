@@ -424,6 +424,13 @@ Eine Funktion hat einen Namen, typisierte Eingänge und typisierte Ausgänge. An
   dahinter erreicht ihn nicht mehr. Eine Funktion ruft sich nicht selbst auf, auch nicht über
   andere Funktionen: Das ist ein Compile-Fehler am aufrufenden Knoten (Wiederholen ist Sache der
   Schleifen-Knoten). Nach einem Delay ist sie zu Ende – sich dann aufzurufen, ist ein Timer.
+- **Referenz-Eingänge:** In den Details der Funktion steht bei jedem Eingang, wie die Funktion ihn
+  nimmt – *value* (sein Wert beim Aufruf), *&* (der Platz, den der Aufruf nennt: die Funktion
+  ändert ihn dort) oder *const &* (sie liest ihn dort). Eine Referenz hat keinen Pin: Am Call-Knoten
+  stehen stattdessen die Variable und der *Path* zum Platz (`Cars` und `[].Wheels[]`, je `[]` ein
+  Index-Pin), in der Funktion legen *Get* und *Set* in der Zeile des Eingangs die Knoten in den
+  Graphen. Nichts wird kopiert – in keiner Stufe. Solange ein Aufruf einen Eintrag einer Liste
+  hält, ändert nichts in ihm die Länge dieser Liste: sonst ist es ein Compile-Fehler am Call-Knoten.
 - **Lokale Variablen** gehören einer Funktion allein: Details der Funktion, Abschnitt *Local
   Variables* – **+ Local Variable**, dann Name, Typ und Default wie bei einem Pin; *Get* und *Set*
   in der Zeile legen den Knoten in den Graphen, das Aktionsmenü bietet sie unter „Local Variables

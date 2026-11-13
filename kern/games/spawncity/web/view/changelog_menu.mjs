@@ -7,6 +7,9 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-13",time:"21:13",title:"Sprache: Referenz-Eingänge",items:[
+    "Unter der Haube: Eine Funktion der Blueprint-Sprache kann jetzt auf dem arbeiten, was ihr Aufruf nennt (Car& car, const Car& car) – ein Auto in einer Liste, ein Rad darin –, ohne es hinein- und herauszukopieren. Im Editor wie im Export dasselbe, mit einer Regel, die verhindert, dass so ein Eintrag währenddessen verschwindet. Am Spiel ändert sich nichts.",
+  ]},
   {date:"2026-11-13",time:"19:30",title:"Konverter: Plätze statt Kopien",items:[
     "Unter der Haube: Der Konverter schreibt Felder und Listeneinträge jetzt dort, wo sie stehen, statt sie herauszulesen und zurückzuschreiben. 356 von 1.428 Funktionen stehen als Blueprints im Level, 514 Vergleiche Bit für Bit mit dem Quelltext. Am Spiel selbst ändert sich nichts.",
   ]},

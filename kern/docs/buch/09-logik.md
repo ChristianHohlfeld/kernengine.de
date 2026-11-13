@@ -52,8 +52,14 @@ Aus dem Kopfkommentar von `logic.h` (Unreal-Blueprint-Semantik):
   beliebig tief: `Held.Damage`, `Scores[i]`, `Cars[i].Wheels[j].Slip`. Jeder Knoten, der eine
   Variable nennt, kann einen Platz in ihr nennen (Einstellung Path, mit einem Index-Pin je
   Listeneintrag): Get, Set und Add und die Schritte, die eine Liste ändern. Geändert wird, wo es
-  steht – nichts wird herausgelesen und zurückgeschrieben, in keiner Stufe. Neben einer Liste
-  steht ein Eintrag mit den Defaults, der nichts behält: Kein Index führt ins Leere.
+  steht – nichts wird herausgelesen und zurückgeschrieben, in keiner Stufe. Ein Platz neben einer
+  Liste ist ein eigener Eintrag mit den Defaults, von dem nichts bleibt: Kein Index führt ins
+  Leere, und einen Platz zu nennen ändert nirgends etwas.
+- **Referenz-Eingänge**: Ein Eingang einer Funktion ist ein Wert – oder eine Referenz: Dann nennt
+  der Aufruf statt eines Werts einen Platz (`Drive(Cars[i], 0.5)`), und die Funktion arbeitet auf
+  diesem Platz, wo er steht – um ihn zu ändern (`Car& car`) oder nur zu lesen (`const Car& car`).
+  Nichts wird hinein- oder herauskopiert. Solange ein Aufruf einen Eintrag einer Liste hält,
+  ändert nichts in ihm die Länge dieser Liste – darauf achtet die Prüfung.
 - **Aufzählungen** (Enums): Ein Blueprint kann eigene Typen mit benannten Werten deklarieren,
   etwa `Mode` mit den Werten `Closed`, `Opening`, `Open`. Ein Wert einer Aufzählung ist genau
   einer ihrer Werte, gehalten als seine Stelle unter ihnen (die erste ist 0). Er ist weder Zahl

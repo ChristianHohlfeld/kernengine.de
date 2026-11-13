@@ -1304,8 +1304,8 @@ export class LogicEditor {
       : `<input data-pf="value" class="lg-fval" value="${lgEsc(p.type === "vector" ? (p.value || [0, 0, 0]).join(", ") : p.type === "text" ? (p.value ?? "") : lgNum(p.value))}" title="Default" spellcheck="false">`;
     const rows = (list, side) => list.map((p, i) => `<div class="lg-frow" data-side="${side}" data-pin="${lgEsc(p.name)}">
         <i class="lg-pill" style="--c:${lgColor(p.type)}"></i><input data-pf="name" class="lg-fname" value="${lgEsc(p.name)}" spellcheck="false" title="Name">
-        <select data-pf="type" title="Type">${this.typeOptions(p.type)}</select>${value(p)}
-        ${side === "local" ? `<button data-pf="get" title="Add a Get node">Get</button><button data-pf="set" title="Add a Set node">Set</button>` : ""}<button data-pf="up" title="Move up"${i === 0 ? " disabled" : ""}>↑</button><button data-pf="remove" title="Remove">×</button></div>` +
+        <select data-pf="type" title="Type">${this.typeOptions(p.type)}</select>${side === "in" ? `<select data-pf="ref" class="lg-fref" title="How the function takes it: its value - or the place the call names, to change it (&amp;) or to read it where it stands (const &amp;). Nothing is copied for a reference.">${[["", "value"], ["ref", "&"], ["const", "const &"]].map(([v, l]) => `<option value="${v}"${v === (p.ref === "const" ? "const" : p.ref ? "ref" : "") ? " selected" : ""}>${l}</option>`).join("")}</select>` : ""}${side === "in" && p.ref ? "" : value(p)}
+        ${side === "local" || (side === "in" && p.ref) ? `<button data-pf="get" title="Add a Get node">Get</button>${side === "in" && p.ref === "const" ? "" : `<button data-pf="set" title="Add a Set node">Set</button>`}` : ""}<button data-pf="up" title="Move up"${i === 0 ? " disabled" : ""}>↑</button><button data-pf="remove" title="Remove">×</button></div>` +
         (this.structOf(p.type) ? `<div class="lg-lsub lg-vsub" data-side="${side}" data-fpin="${lgEsc(p.name)}">${this.partsEditor(p.type, p.value)}</div>`
           : lgIsList(p.type) ? `<div class="lg-lsub" data-side="${side}" data-fpin="${lgEsc(p.name)}">${lgListEditor(p.type, p.value, this.data)}</div>` : "")).join("") ||
       `<div class="lg-none">${side === "in" ? "No inputs" : side === "out" ? "No outputs" : "No local variables"}</div>`;
@@ -1480,6 +1480,7 @@ export class LogicEditor {
           else f.onchange = () => {
             if (k === "name") edit({op: "pinRename", side, pin, to: f.value.trim()});
             else if (k === "type") edit({op: "pinType", side, pin, type: f.value});
+            else if (k === "ref") edit({op: "pinRef", side, pin, ref: f.value});
             else edit({op: "pinValue", side, pin, value: f.type === "checkbox" ? f.checked : def.type === "vector" ? f.value.split(/[,\s]+/).filter(Boolean).map(v => +v || 0) : def.type === "text" ? f.value : (+f.value || 0)});
           };
         }

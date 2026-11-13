@@ -75,10 +75,15 @@ tools/export_game.sh, .mjs           der native Export: ein Level als Spiel, die
   eine Liste, die Ein- und Ausgänge einer Funktion und Pins können von so einem Typ sein. Make
   baut einen Wert aus seinen Feldern, Break gibt die Felder – in beiden Schreibweisen und in
   jeder Stufe gleich (siehe „Strukturen“).
+- **Fertig: Referenz-Eingänge.** Ein Eingang einer Funktion kann der Platz sein, den der Aufruf
+  nennt – `void Skid(Wheel& wheel)`, aufgerufen `Skid(Cars[i].Wheels[j]);` –, zum Ändern oder
+  (`const Wheel&`) zum Lesen, ohne Kopie; mit der Regel, dass ein gehaltener Eintrag bleibt, wo er
+  ist (siehe „Referenz-Eingänge“).
 - **Fertig: Plätze.** Eine Variable, ein Feld davon, ein Eintrag einer Liste darin – beliebig
   tief – wird gelesen, gesetzt, erhöht und als Liste geändert, wo es steht:
-  `Cars[i].Wheels[j].Slip += 0.1;`. Kein Herauslesen und Zurückschreiben, in keiner Stufe; neben
-  einer Liste steht ein Eintrag mit den Defaults, der nichts behält (siehe „Plätze“).
+  `Cars[i].Wheels[j].Slip += 0.1;`. Kein Herauslesen und Zurückschreiben, in keiner Stufe; ein
+  Platz neben einer Liste ist ein eigener Eintrag mit den Defaults, von dem nichts bleibt (siehe
+  „Plätze“).
 - **Die Stufen stimmen überein:** Was Interpreter, JIT und Klasse verschieden taten – Funktionen,
   die über Events wieder aufgerufen werden, die Tiefe von Events und Werten, ganze Zahlen an
   ihren Enden, der Stapel des JIT –, ist gleichgezogen (21 Tier-Fälle, in jeder Stufe dasselbe).
@@ -172,6 +177,8 @@ KERN_LAYOUT(Demo) {
 | Funktion mit Ausgängen | `struct FnResult { Float y = 0.0; };` und `FnResult Fn(Float x = 1.5) { ... }` |
 | Funktion ohne Ausgänge | `void Fn(...) { ... }` |
 | Funktion „pure“ (als Wert-Knoten angeboten) | `KERN_PURE` vor der Funktion |
+| Eingang einer Funktion als Wert | `Float by = 1.0` – mit seinem Default |
+| Eingang einer Funktion als Referenz (der Aufruf nennt einen Platz) | `Car& car` – die Funktion ändert den Platz; `const Car& car` – sie liest ihn nur. Im Aufruf steht der Platz: `Drive(Cars[i], 0.5);` (siehe „Referenz-Eingänge“) |
 | Typ des Projekts (mehrere Blueprints des Levels haben ihn, alle gleich) | `KERN_PROJECT_ENUM(Mode, Closed, Open);` · `KERN_PROJECT_STRUCT(Door) { Mode State = Mode::Closed; };` – sonst wie `KERN_ENUM` / `KERN_STRUCT` |
 | Funktion eines anderen Blueprints | `KERN_EXTERN FnResult Fn(Float x = 1.5);` – wie sie aussieht, ohne Rumpf (mit `struct FnResult { ... };` darüber, wenn sie Ausgänge hat) |
 | Call on Actor | `func_call_on<"Fn">(target, kern::out(n7.y), x);` – erst das Target (`Actor{0}`: der Blueprint des Levels), dann `kern::out(...)` mit allen Ausgängen in ihrer Reihenfolge als Felder des Members `n7` (oder `kern::out()`, wenn niemand sie liest), dann die Eingänge |
@@ -238,7 +245,9 @@ für den Wert einer Struktur gilt dasselbe (siehe „Strukturen“).
 
 Eine Liste hält Werte **eines** Typs, in ihrer Reihenfolge; der erste Eintrag hat den Index 0. In
 C++ ist `List<Float>` ein `std::vector`, dessen `[]` nie neben die Liste greift (`kern::List`,
-siehe „Plätze“) – eine Listen-Variable ist ein Member wie jede andere:
+siehe „Plätze“) – eine Listen-Variable ist ein Member wie jede andere. Jeder Eintrag ist ein
+eigenes Objekt, auch ein `Bool` (`std::vector<bool>` packt seine Einträge in Bits, und auf ein Bit
+kann nichts zeigen): Darum ist jeder Eintrag jeder Liste ein Platz.
 
 ```cpp
 List<Float> Scores = List<Float>{1.0, 2.5};
@@ -264,7 +273,8 @@ void on1(Actor actor, Float value, Text text) {
   die Funktion genau diese Liste ändert. Eine ganze Liste setzt man wie jede Variable
   (`Scores = werte;`), einen Eintrag an seinem Platz (`Scores[i] = wert;`).
 - **Kein Index führt ins Leere.** Get Item jenseits der Liste gibt den Nullwert des Typs, ein
-  Platz neben der Liste (`Scores[99]`) ist ein Eintrag mit den Defaults, der nichts behält,
+  Platz neben der Liste (`Scores[99]`) ist ein eigener Eintrag mit den Defaults, von dem nichts
+  bleibt,
   Remove Index tut dort nichts, Insert fügt vor dem ersten bzw. hinter dem letzten Eintrag ein,
   Find gibt −1. Es gibt kein Lesen oder Schreiben neben der Liste – in keiner Stufe.
 - **For Each geht durch die Liste, wie sie beim Start der Schleife war.** Was der Rumpf mit der
@@ -480,13 +490,20 @@ void Skid(Int car = 0, Int wheel = 0, Float by = 0.1) {
 - **Geändert wird am Platz.** Nichts wird herausgelesen und zurückgeschrieben: In der Klasse ist
   `Cars[car].Wheels[wheel].Slip += by;` genau diese Zeile C++ auf den Membern; der Interpreter
   ändert den Wert der Variablen an derselben Stelle (`Instance::change`).
-- **Neben einer Liste steht ein Eintrag mit den Defaults, der nichts behält.** Führt ein Index
-  des Wegs neben seine Liste, wird dort gelesen, was ein Eintrag mit den Defaults seines Typs
-  hat – eine Struktur mit den Defaults ihrer Felder –, und was dort geschrieben wird, bleibt
-  nirgends. Was ein Schritt gibt, ist, was er auf diesem Eintrag gibt (`n5.value = (Cars[99].Speed
-  += 1.0);` gibt den Default plus 1). In jeder Stufe dasselbe: in der Klasse durch `kern::List`
-  (`kern/logic/nodes.h`), deren `[]` neben der Liste diesen Eintrag gibt; im Interpreter durch
-  `Instance::place` und `Instance::change`.
+- **Ein Platz neben einer Liste ist ein eigener Eintrag mit den Defaults, von dem nichts
+  bleibt.** Führt ein Index des Wegs neben seine Liste, geht der Platz dort in einem eigenen
+  Eintrag weiter, der die Defaults seines Typs hat – eine Struktur die Defaults ihrer Felder.
+  Gelesen wird dort dieser Default; was dort geschrieben wird, liest niemand; eine Funktion, die
+  den Platz als Referenz bekommt, arbeitet auf diesem Eintrag, und nach dem Aufruf ist er weg.
+  Was ein Schritt gibt, ist, was er auf diesem Eintrag gibt (`n5.value = (Cars[99].Speed +=
+  1.0);` gibt den Default plus 1).
+- **Einen Platz zu nennen ändert nichts.** Jede Nennung neben einer Liste hat ihren eigenen
+  Eintrag: Zwei solche Plätze sind zwei Einträge, und was eine Funktion hält, bleibt, was es
+  ist, wenn irgendwo ein anderer Platz genannt wird – auch in derselben Anweisung, gleich in
+  welcher Reihenfolge ein Compiler sie ausrechnet. In jeder Stufe dasselbe: in der Klasse durch
+  `kern::List` (`kern/logic/nodes.h`), deren `[]` neben der Liste einen solchen Eintrag gibt (er
+  bleibt, bis die Engine die Klasse wieder verlassen hat – `beside::Visit`); im Interpreter durch
+  `Instance::spot`. Wo der Eintrag da ist, kostet `[]` in der Klasse einen Vergleich.
 - **Ein Platz ist vom Typ dessen, was dort steht.** Die Pins des Knotens haben diesen Typ (der
   Wert eines Set, die Menge eines Add, der Eintrag eines Listen-Schritts); Add zählt Zahlen, ein
   Listen-Schritt braucht eine Liste. Führt der Weg durch etwas, das die Variable nicht hat –
@@ -494,6 +511,72 @@ void Skid(Int car = 0, Int wheel = 0, Float by = 0.1) {
   mit der Stelle (`Held.Damage is float: it has no entries`).
 - **Dokumente von früher:** Set Field und Set List Item waren eigene Knoten. Beim Laden wird
   jeder zu dem Set an seinem Platz, das er ist (`Held.Damage = wert;`, `Scores[index] = wert;`).
+
+### Referenz-Eingänge
+
+Ein Eingang einer Funktion ist ein **Wert** – der Wert, den er beim Aufruf hatte – oder eine
+**Referenz**: Dann gibt der Aufruf keinen Wert, sondern nennt einen Platz (eine Variable, ein
+Feld, einen Listeneintrag – siehe „Plätze“), und die Funktion arbeitet auf diesem Platz, wo er
+steht. Nichts wird hinein- oder herauskopiert.
+
+```cpp
+/// Ändert das Rad, das der Aufruf nennt.
+void Skid(Wheel& wheel, Float by = 0.5) {
+  wheel.Slip += by;
+  list_add(wheel.Marks, wheel.Slip);
+}
+/// Liest das Auto, wo es steht.
+KERN_PURE WearResult Wear(const Car& car, Int wheel = 0) {
+  return {car.Wheels[wheel].Slip, car.Name};
+}
+
+void Drive(Car& car, Int wheel = 0) {
+  car.Speed += 1.0;
+  Skid(car.Wheels[wheel], 0.25);          // ein Platz in dem, was die Funktion selbst bekommen hat
+}
+
+KERN_EVENT(on1, event_tick)
+void on1(Float delta) {
+  Drive(Cars[2], 0);                       // der Platz: ein Eintrag einer Liste
+  Heat = Wear(Mine, 1).slip;
+}
+```
+
+- **`Car& car`** – die Funktion liest und ändert den Platz. **`const Car& car`** – sie liest ihn
+  nur; so ein Eingang kann auch ein Platz sein, der selbst nur gelesen wird (ein Eingang als
+  Wert, eine andere const-Referenz), und eine Funktion, die als Wert gelesen wird (`KERN_PURE`),
+  hat nur solche. Ein Referenz-Eingang hat keinen Default: Der Aufruf nennt seinen Platz.
+- **In der Funktion ist er wie eine Variable benannt:** gelesen `car`, `car.Speed`,
+  `car.Wheels[i].Slip`; gesetzt und geändert wie jeder Platz. Im Graphen sind das die
+  Variablen-Knoten mit den Einstellungen „variable“ (der Eingang) und „scope“ (die Funktion); der
+  Function Entry hat für einen Referenz-Eingang keinen Pin. Auch in einem Eingang als Wert kann
+  ein Platz gelesen werden (`given.Wheels[0].Slip`) – geändert wird er nicht.
+- **Der Aufruf nennt den Platz** statt eines Werts: eine Variable des Blueprints, eine lokale
+  Variable oder ein Eingang der Funktion, in der der Aufruf steht, und von dort Felder und
+  Listeneinträge. Im Graphen sind das Einstellungen des Call-Knotens (`<Eingang>.variable`,
+  `<Eingang>.path`, je Listeneintrag ein Index-Eingang `<Eingang>.path0` …; „scope“ nennt die
+  Funktion, in der der Aufruf steht). Der Platz hat genau den Typ des Eingangs – nichts wandelt
+  sich um.
+- **In jeder Stufe dasselbe.** In der Klasse ist der Eingang eine Referenz von C++. Im
+  Interpreter ist er für die Dauer des Aufrufs der Platz, den der Aufruf genannt hat
+  (`Instance::Spot`): Jeder Knoten, der ihn liest oder ändert, tut es dort. Nennt der Aufruf
+  einen Platz neben einer Liste, arbeitet die Funktion auf dessen eigenem Eintrag (siehe
+  „Plätze“) – und wem sie ihn weitergibt, auf demselben.
+- **Ein Eintrag, der gehalten wird, bleibt, wo er ist** (Regel, `check()`): Nennt ein Aufruf
+  einen Platz in einer Liste (`Cars[i]`, `Cars[i].Wheels[j]`), dann ändert nichts, was die
+  Funktion tut – sie selbst oder was sie aufruft –, die Länge dieser Liste oder setzt eine andere
+  an ihre Stelle; und sie führt keinen Schritt aus, der Handler starten kann (Call Event, Call on
+  Actor, ein Gameplay-Schritt: `NodeDef::raises`) – ein Handler könnte dasselbe tun. So bleibt
+  „kein Index führt ins Leere“ auch dort wahr, wo die Referenz eine
+  Referenz von C++ ist. Die Liste selbst als Referenz zu geben und zu ändern
+  (`Fill(Cars[i].Marks)`), ein Feld des Eintrags zu ändern oder eine andere Liste – das alles
+  geht.
+- **Von außen** (`Instance::call`, der Kleber der Klasse) nimmt ein Referenz-Eingang einen Wert:
+  Er ist dann eine eigene Variable des Aufrufs, die mit diesem Wert beginnt, und was die
+  Funktion aus ihr gemacht hat, steht hinter den Ausgängen in `results` – für jeden
+  Referenz-Eingang, der nicht const ist, in der Reihenfolge der Eingänge.
+- **Call on Actor gibt Werte:** Eine Funktion eines anderen Blueprints (`KERN_EXTERN`) hat keine
+  Referenz-Eingänge.
 
 ### Formeln
 
@@ -641,6 +724,14 @@ Verstöße als Fehler am betroffenen Knoten; der Editor nimmt solche Namen gar n
   Warten, kein Do Once, Gate oder Flip Flop, keine Aktion – und was sie als Schritt aufruft,
   rechnet ebenfalls nur. Verzweigen, Schleifen und andere Werte lesen darf sie. So ist es gleich,
   wie oft und in welcher Reihenfolge ein Wert gelesen wird.
+- **Ein Referenz-Eingang** nennt im Aufruf einen Platz seines Typs; geändert wird er nur, wenn er
+  nicht const ist und der Platz geändert werden darf (kein Eingang als Wert, keine
+  const-Referenz). Ein Eingang als Wert und eine const-Referenz werden gelesen, nicht gesetzt.
+  Eine Funktion, die als Wert gelesen wird, hat nur const-Referenzen; eine Funktion eines
+  anderen Blueprints (`KERN_EXTERN`) keine.
+- **Ein Eintrag, der gehalten wird, bleibt, wo er ist:** Solange ein Aufruf einen Platz in einer
+  Liste hält, ändert nichts in ihm die Länge dieser Liste oder ersetzt sie, und nichts in ihm
+  kann Handler starten (siehe „Referenz-Eingänge“).
 - **Add to Variable** zählt Zahlen: Integer oder Float. Menge und Ergebnis haben den Typ der
   Variablen – eine ganze Zahl wird ganzzahlig erhöht (`Count += 1;`).
 

@@ -526,6 +526,39 @@ json::Value Studio::logic_json() const {
         pj.set("choices", std::move(choices));
         params.push(std::move(pj));
       }
+      // A call of a function with reference inputs: for each, the place the call gives it - a
+      // variable (of the Blueprint, or of the function the call stands in) and the path from it.
+      if (const logic::Function* called = n.type == "func.call" || n.type == "func.pure" ? g->function(n.param("function")) : nullptr) {
+        const logic::Function* body = g->function(g->body_of(n.id, lib));
+        for (const logic::FunctionPin& in : called->inputs) {
+          if (!in.ref) continue;
+          json::Value variable = json::Value::object(), path = json::Value::object(), choices = json::Value::array();
+          auto offer = [&](const std::string& name, logic::PinType type, const std::string& type_of) {
+            json::Value c = json::Value::array();
+            c.push(name);
+            c.push(name + " (" + logic::type_label(logic::TypeRef{type, type_of}) + ")");
+            choices.push(std::move(c));
+          };
+          if (body) {
+            for (const logic::FunctionPin& l : body->locals) offer(l.name, l.type, l.of);
+            for (const logic::FunctionPin& i : body->inputs)
+              if (in.constant || (i.ref && !i.constant)) offer(i.name, i.type, i.of);  // (what is only read here goes into a const reference)
+          }
+          for (const logic::Variable& v : g->variables) offer(v.name, v.type, v.of);
+          variable.set("key", logic::ref_key(in.name, "variable"));
+          variable.set("label", in.name);
+          variable.set("kind", "variable");
+          variable.set("value", n.param(logic::ref_key(in.name, "variable")));
+          variable.set("choices", std::move(choices));
+          params.push(std::move(variable));
+          path.set("key", logic::ref_key(in.name, "path"));
+          path.set("label", in.name + " path");
+          path.set("kind", "path");
+          path.set("value", n.param(logic::ref_key(in.name, "path")));
+          path.set("choices", json::Value::array());
+          params.push(std::move(path));
+        }
+      }
       x.set("params", std::move(params));
     }
     if (auto it = by_node.find(n.id); it != by_node.end()) {
@@ -1457,6 +1490,14 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         logic::Variable held;
         if (!g.place_of(*n, held)) n->set_param("path", "");
       }
+      // The place a call gives a reference input ("<input>.variable", "<input>.path"): it is
+      // looked up in the function the call stands in, and another variable starts its path again.
+      if (const std::string key = str("key"); (n->type == "func.call" || n->type == "func.pure") && key.find('.') != std::string::npos) {
+        const std::string prefix = key.substr(0, key.find('.') + 1);
+        n->set_param("scope", g.body_of(n->id, logic::library()));
+        logic::Variable held;
+        if (key == prefix + "variable" && !n->param(prefix + "path").empty() && !g.place_of(*n, held, nullptr, prefix)) n->set_param(prefix + "path", "");
+      }
       // A changed variable / count can remove pins: drop wires to pins that no longer exist.
       std::vector<logic::PinDef> in, out;
       logic::library().pins(*n, g, in, out);
@@ -1640,6 +1681,12 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         for (logic::Node& n : g.nodes)
           if (!locals && uses(n) && is_input_pin_of(n, input_side))
             n.values.erase(std::remove_if(n.values.begin(), n.values.end(), [&](const auto& v) { return v.first == pin; }), n.values.end());
+        // (a reference input: the places the calls named for it go with it)
+        if (input_side && it->ref) {
+          drop_links([&](const logic::Link& l) { return g.find(l.to) && uses(*g.find(l.to)) && l.in.rfind(pin + ".", 0) == 0; });
+          for (logic::Node& n : g.nodes)
+            if (uses(n)) std::erase_if(n.params, [&](const auto& p) { return p.first.rfind(pin + ".", 0) == 0; });
+        }
         pins.erase(it);
         return true;
       }
@@ -1655,8 +1702,37 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
           if (locals) { if (of_local(n, pin)) n.set_param("variable", to); continue; }
           if (uses(n) && is_input_pin_of(n, input_side))
             for (auto& v : n.values) if (v.first == pin) v.first = to;
+          if (!input_side) continue;
+          // an input named like a variable in the function (a reference, a place in an input by
+          // value), the places the function's own calls name in it, and what calls name for it
+          if (of_local(n, pin)) n.set_param("variable", to);
+          if (n.param("scope") == fname)
+            for (auto& p : n.params)
+              if (p.first.size() > 9 && p.first.compare(p.first.size() - 9, 9, ".variable") == 0 && p.second == pin) p.second = to;
+          if (!uses(n)) continue;
+          for (auto& p : n.params) if (p.first.rfind(pin + ".", 0) == 0) p.first = to + p.first.substr(pin.size());
+          for (auto& v : n.values) if (v.first.rfind(pin + ".", 0) == 0) v.first = to + v.first.substr(pin.size());
+          for (logic::Link& l : g.links) if (l.to == n.id && l.in.rfind(pin + ".", 0) == 0) l.in = to + l.in.substr(pin.size());
         }
         it->name = to;
+        return true;
+      }
+      if (op == "pinRef") {
+        // How the function takes an input: its value ("") - or the place the call names, to change
+        // it ("ref": Car& car) or to read it where it stands ("const": const Car& car).
+        if (!input_side) { error = "a reference is an input: the place a call names"; return false; }
+        const std::string how = str("ref");
+        const bool was = it->ref;
+        it->ref = how == "ref" || how == "const";
+        it->constant = how == "const";
+        if (it->ref == was) return true;
+        // (the pin is gone or back: so are its wires and typed-in values - and the places the calls named for it)
+        drop_links([&](const logic::Link& l) { bool in; return on_pin(l, in) || (g.find(l.to) && uses(*g.find(l.to)) && l.in.rfind(pin + ".", 0) == 0); });
+        for (logic::Node& n : g.nodes) {
+          if (!uses(n)) continue;
+          std::erase_if(n.values, [&](const auto& v) { return v.first == pin || v.first.rfind(pin + ".", 0) == 0; });
+          std::erase_if(n.params, [&](const auto& p) { return p.first.rfind(pin + ".", 0) == 0; });
+        }
         return true;
       }
       if (op == "pinType") {

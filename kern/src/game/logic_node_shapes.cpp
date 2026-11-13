@@ -50,6 +50,9 @@ NodeDef make(std::string type, std::string label, std::string category, NodeKind
   d.kind = kind;
   d.help = std::move(help);
   d.keywords = std::move(keywords);
+  // (a step of the game may raise an event at once - damage, a spawned actor's Begin Play ... -
+  // and so run handlers of Blueprints before it goes on: NodeDef::raises)
+  d.raises = kind == NodeKind::action || kind == NodeKind::flow;
   return d;
 }
 /// A step: exec in -> what it does -> exec out. (Every node here is a function of a Blueprint's

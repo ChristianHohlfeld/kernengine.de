@@ -7,9 +7,11 @@
 
 #include <cmath>
 #include <cstddef>
+#include <deque>
 #include <initializer_list>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -98,32 +100,61 @@ struct Whole {
   }
 };
 
-/// A list in a Blueprint's C++ (List<Float>, List<Weapon> ...): a std::vector whose [] never
-/// reaches beside the list. Beside it stands an entry with the zero of the items' type - a struct
-/// with its defaults - that keeps nothing: read, it is that zero; what is written there is gone
-/// with the next step. So a place like Cars[i].Wheels[j].Slip is one in every tier - the
-/// interpreter does the same there (Instance::place, Instance::change).
-template <class T> struct List : std::vector<T> {
-  using std::vector<T>::vector;
+/// What a list of a Blueprint's class holds of an item: the item - every entry of a list is an
+/// object of its own, so that it is a place (Flags[i] = true; Toggle(Flags[i]);). A Bool is held
+/// as a Truth: std::vector<bool> packs its entries into bits, and nothing can refer to a bit.
+struct Truth {
+  bool value = false;
+  Truth() = default;
+  Truth(bool v) : value(v) {}                      // NOLINT (implicit: it is the Bool)
+  operator bool&() { return value; }               // NOLINT
+  operator const bool&() const { return value; }   // NOLINT
+};
+namespace detail {
+template <class T> struct Entry { using type = T; };
+template <> struct Entry<bool> { using type = Truth; };
+}  // namespace detail
+
+/// Beside the lists. A place that is named beside a list (Cars[9] of two cars) is an entry of
+/// its own, with the zero of the items' type - a struct with its defaults: read, it is that
+/// zero; what is written there nobody reads; a function that is given it as a reference works on
+/// it. One for every time such a place is named, so naming a place changes nothing anywhere -
+/// in whatever order a compiler works a statement out. The entries stay while the engine is in
+/// a Blueprint's class (beside::Visit, logic.h) and are gone the next time it goes in. (One
+/// store for every Blueprint of the program: Blueprints run on one thread.)
+namespace beside {
+template <class T> T& entry() {
+  static std::deque<T> entries;  // (a deque: an entry stays where it is when more come)
+  static u64 of = 0;
+  if (of != visit()) entries.clear(), of = visit();
+  return entries.emplace_back();
+}
+}  // namespace beside
+
+/// A list in a Blueprint's C++ (List<Float>, List<Weapon> ...): a std::vector of its entries
+/// whose [] never reaches beside the list - there it gives an entry of its own (beside). So a
+/// place like Cars[i].Wheels[j].Slip is one in every tier, and what it costs where the entry is
+/// there is one comparison: the interpreter does the same (Instance::spot).
+template <class T> struct List : std::vector<typename detail::Entry<T>::type> {
+  using Item = typename detail::Entry<T>::type;
+  using Items = std::vector<Item>;
+  using Items::Items;
   List() = default;
-  List(const std::vector<T>& items) : std::vector<T>(items) {}                 // NOLINT (implicit: the vector of its items is the list)
-  List(std::vector<T>&& items) noexcept : std::vector<T>(std::move(items)) {}  // NOLINT
+  List(const Items& items) : Items(items) {}                 // NOLINT (implicit: the vector of its items is the list)
+  List(Items&& items) noexcept : Items(std::move(items)) {}  // NOLINT
   template <class I>
     requires std::is_integral_v<I> || std::is_same_v<I, Whole>
-  typename std::vector<T>::reference operator[](I index) {
+  Item& operator[](I index) {
     const i64 at = static_cast<i64>(index);
-    if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return std::vector<T>::operator[](static_cast<std::size_t>(at));
-    // (one for every Blueprint of the program: Blueprints run on one thread, and nothing is kept there)
-    static std::vector<T> beside(1);
-    beside[0] = T{};
-    return beside[0];
+    if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return Items::operator[](static_cast<std::size_t>(at));
+    return beside::entry<Item>();
   }
   template <class I>
     requires std::is_integral_v<I> || std::is_same_v<I, Whole>
-  typename std::vector<T>::const_reference operator[](I index) const {
+  const Item& operator[](I index) const {
     const i64 at = static_cast<i64>(index);
-    if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return std::vector<T>::operator[](static_cast<std::size_t>(at));
-    static const T zero{};
+    if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return Items::operator[](static_cast<std::size_t>(at));
+    static const Item zero{};
     return zero;
   }
 };
@@ -181,6 +212,13 @@ template <> struct Held<std::vector<Whole>> {
     return std::vector<Whole>(items.begin(), items.end());
   }
 };
+template <> struct Held<std::vector<Truth>> {
+  static constexpr PinType type = PinType::boolean_list;
+  static std::vector<Truth> from(const Value& v) {
+    const std::vector<bool>& items = v.items<bool>();
+    return std::vector<Truth>(items.begin(), items.end());
+  }
+};
 /// How many values an enum of a Blueprint's class has (KERN_ENUM states their names).
 template <class E> constexpr std::size_t enum_count() {
   const std::string_view names = kern_enum_names(E{});
@@ -233,8 +271,8 @@ template <NativeStruct S> struct Held<std::vector<S>> {
   }
 };
 // A list of a Blueprint's class (List<Float>, List<Weapon> ...): held as the vector of its items.
-template <class T> struct Held<List<T>> : Held<std::vector<T>> {
-  static List<T> from(const Value& v) { return List<T>(Held<std::vector<T>>::from(v)); }
+template <class T> struct Held<List<T>> : Held<typename List<T>::Items> {
+  static List<T> from(const Value& v) { return List<T>(Held<typename List<T>::Items>::from(v)); }
 };
 }  // namespace detail
 template <class T> T from_value(const Value& v) { return detail::Held<T>::from(v); }
@@ -286,6 +324,7 @@ Value to_value(std::vector<E> v) {
   return Value::enumerations(std::move(places));
 }
 inline Value to_value(const std::vector<Whole>& v) { return Value::of(std::vector<i64>(v.begin(), v.end())); }
+inline Value to_value(const std::vector<Truth>& v) { return Value::of(std::vector<bool>(v.begin(), v.end())); }
 
 /// What the list nodes do, for a list of any item type - the node library and a Blueprint's C++
 /// call these. Every one is defined for every index: there is no reading or writing past a
@@ -536,6 +575,13 @@ inline std::vector<std::string> setting_cases(std::string_view s) {
 
 /// What the engine passes by position to a function of a Blueprint's class, as the C++ type of
 /// that input (the conversion of Instance::call); a missing one is the input's default.
+namespace detail {
+template <class C, class R, class... A> std::tuple<std::remove_cvref_t<A>...> params_of(R (C::*)(A...));
+}  // namespace detail
+/// The type a function of a Blueprint's class takes as its K-th input, without const and &:
+/// NativeParam<&Door::Tune, 0>. What holds a reference input for a call by name - a variable of
+/// exactly the class's type, so the function's reference binds to it (logic::native_glue).
+template <auto Function, std::size_t K> using NativeParam = std::tuple_element_t<K, decltype(detail::params_of(Function))>;
 template <class T> T native_arg(const std::vector<Value>& args, std::size_t i, const T& fallback) {
   return i < args.size() ? from_value<T>(args[i].converted(pin_type_of<T>())) : fallback;
 }

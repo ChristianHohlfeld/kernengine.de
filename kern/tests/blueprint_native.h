@@ -155,6 +155,133 @@ struct Places : kern::Blueprint {
 };
 )kn";
 
+// References: an input of a function that is a place of the caller - changed where it stands
+// (Car& car) or read there (const Car& car), nothing copied. A number, a Bool, a struct, a list;
+// a field and a list entry of what the function was given, handed on to other functions; a local
+// variable and an input by value as the place. An entry beside its list is one of its own: two
+// of them are two, and naming another changes nothing of the one a function has.
+inline const char* kReferences = R"kn(
+struct References : kern::Blueprint {
+  KERN_STRUCT(Wheel) {
+    Float Slip = 0.5;
+    List<Float> Marks = List<Float>{};
+  };
+  KERN_STRUCT(Car) {
+    Text Name = "car";
+    Float Speed = 3.0;
+    Int Laps = 0;
+    List<Wheel> Wheels = List<Wheel>{};
+  };
+
+  List<Car> Cars = List<Car>{Car{"a", 1.0, 0, List<Wheel>{Wheel{0.25, List<Float>{}}, Wheel{0.5, List<Float>{1.0}}}}, Car{"b", 2.0, 5, List<Wheel>{}}};
+  Car Mine = Car{"mine", 5.0, 1, List<Wheel>{Wheel{0.75, List<Float>{}}}};
+  Float Total = 0.0;
+  Int Count = 0;
+  List<Float> Scores = List<Float>{1.0, 2.0};
+  List<Bool> Flags = List<Bool>{true, false};
+
+  /// A reference to a number: changed where the caller has it.
+  void Bump(Float& x, Float by = 1.0) {
+    x += by;
+  }
+  void Tick(Int& n) {
+    n += 1;
+  }
+  /// A reference to a struct: its fields are places.
+  void Skid(Wheel& wheel, Float by = 0.5) {
+    wheel.Slip += by;
+    list_add(wheel.Marks, wheel.Slip);
+    Bump(wheel.Slip, 0.125);
+  }
+  struct DriveResult { Float speed = 0.0; Int wheels = 0; };
+  /// A reference handed on: a field, an entry of a list in what the function was given.
+  DriveResult Drive(Car& car, Int wheel = 0, Float by = 1.0) {
+    car.Speed += by;
+    Tick(car.Laps);
+    car.Name = text_append(car.Name, "+", "");
+    Skid(car.Wheels[wheel], by);
+    Bump(car.Speed, 0.5);
+    return {car.Speed, list_length<Wheel>(car.Wheels)};
+  }
+  struct WearResult { Float slip = 0.0; Int marks = 0; Text name = ""; };
+  /// A const reference: read where it stands - also by a function that is read as a value.
+  KERN_PURE WearResult Wear(const Car& car, Int wheel = 0) {
+    return {car.Wheels[wheel].Slip, list_length<Float>(car.Wheels[wheel].Marks), car.Name};
+  }
+  /// A list by reference: the steps that change a list work on it.
+  void Fill(List<Float>& items, Int count = 2, Float value = 1.5) {
+    for (auto it30 = flow_for(n30, 1, count); it30.next();) {
+      list_add(items, math_mul(value, kern::to<Float>(n30.index)));
+    }
+    items[0] = -1.0;
+  }
+
+  /// A reference to a Bool: an entry of a list of them is a place like any other.
+  void Toggle(Bool& flag) {
+    flag = logic_not(flag);
+  }
+  /// Two places at once. Beside a list each is an entry of its own: what goes to one is not in
+  /// the other.
+  void Trade(Wheel& a, Wheel& b, Float by = 1.0) {
+    a.Slip += by;
+    b.Slip += math_mul(a.Slip, 2.0);
+    list_add(a.Marks, b.Slip);
+  }
+  struct MixResult { Float sum = 0.0; Float slip = 0.0; };
+  /// What a function was given stays what it is while other places are named - beside a list
+  /// too, and in the same statement, in whatever order it is worked out.
+  MixResult Mix(Wheel& wheel, Int car = 0, Int at = 0, Float by = 1.0) {
+    wheel.Slip += by;
+    return {math_add(Cars[car].Wheels[at].Slip, wheel.Slip), wheel.Slip};
+  }
+  struct LitResult { Int on = 0; Int found = 0; Bool first = false; Text shown = ""; };
+  /// A list of Bools: the steps on it, a loop over it, its entries as values.
+  LitResult Lit(Bool add = true, Int at = 0) {
+    Int On = 0;
+    list_add(Flags, add);
+    Toggle(Flags[at]);
+    Flags[0] = logic_and(Flags[at], add);
+    for (auto it50 = flow_for_each<Bool>(n50, Flags); it50.next();) {
+      On += kern::to<Int>(n50.item);
+    }
+    return {On, list_find<Bool>(Flags, add), Flags[0], kern::to<Text>(Flags[at])};
+  }
+
+  struct RunResult { Float speed = 0.0; Int wheels = 0; Float slip = 0.0; Int marks = 0; Text name = ""; Float total = 0.0; Int scores = 0; Float mine = 0.0; Int count = 0; Float sum = 0.0; Float mixed = 0.0; Bool flag = false; };
+  /// Calls with places: an entry of a list (also beside it), a variable, a field, a number in a
+  /// list; what a function read as a value reads of a place.
+  RunResult Run(Int car = 0, Int wheel = 0, Float by = 1.0) {
+    n40 = Drive(Cars[car], wheel, by);
+    Drive(Mine, 0, by);
+    Bump(Total, by);
+    Tick(Count);
+    Bump(Cars[car].Wheels[wheel].Slip, by);
+    Bump(Scores[wheel], by);
+    Fill(Scores, 2, by);
+    Fill(Cars[car].Wheels[wheel].Marks, 1, by);
+    Toggle(Flags[wheel]);
+    Toggle(Flags[car]);
+    Trade(Cars[car].Wheels[wheel], Cars[wheel].Wheels[car], by);
+    n41 = Mix(Cars[car].Wheels[wheel], wheel, car, by);
+    return {n40.speed, n40.wheels, Wear(Cars[car], wheel).slip, Wear(Cars[car], wheel).marks, Wear(Mine, 0).name, Total, list_length<Float>(Scores), Mine.Speed, Count, n41.sum, n41.slip, Flags[wheel]};
+  }
+  struct LocalResult { Float speed = 0.0; Float slip = 0.0; Text name = ""; Float first = 0.0; };
+  /// A local variable as the place a call names; an input by value read at a place and handed on
+  /// as a const reference.
+  LocalResult Local(Car given = Car{"given", 1.0, 0, List<Wheel>{Wheel{0.5, List<Float>{}}}}, Float by = 1.0) {
+    Car Work = Car{"work", 0.0, 0, List<Wheel>{}};
+    Work = given;
+    Drive(Work, 0, by);
+    return {Work.Speed, Wear(given, 0).slip, Wear(Work, 0).name, given.Wheels[0].Slip};
+  }
+
+  struct : kern::Node<30> { Int index = 0; } n30;
+  DriveResult n40;
+  MixResult n41;
+  struct : kern::Node<50> { Bool item = false; Int index = 0; } n50;
+};
+)kn";
+
 // Branches, loops, the flow nodes that keep something, switches, steps several wires lead to.
 inline const char* kFlow = R"kn(
 struct Flow : kern::Blueprint {
@@ -1169,6 +1296,32 @@ inline std::vector<Case> cases() {
     read_all();
   }
   {
+    Case& c = read("References", kReferences);
+    const logic::Graph& g = c.graph;
+    const i64 most = std::numeric_limits<i64>::max();
+    for (i64 car : {i64{0}, i64{1}, i64{2}, i64{-1}, most})
+      for (i64 wheel : {i64{0}, i64{1}, i64{5}, i64{-1}}) c.calls.push_back({"Run", {I(car), I(wheel), N(static_cast<f64>(wheel % 3) + 0.5)}});
+    for (const Value& car : samples({PinType::structure, "Car"}, g)) c.calls.push_back({"Local", {car, N(2.5)}});
+    c.calls.push_back({"Run", {I(0), I(0), N(-1.0)}});
+    for (i64 at : {i64{0}, i64{1}, i64{9}, i64{-1}}) {
+      c.calls.push_back({"Lit", {Value::boolean(at != 1), I(at)}});
+      c.calls.push_back({"Toggle", {Value::boolean(at == 0)}});
+    }
+    c.calls.push_back({"Trade", {samples({PinType::structure, "Wheel"}, g).front(), samples({PinType::structure, "Wheel"}, g).back(), N(0.5)}});
+    // From outside a reference input takes a value, and what the function made of it stands
+    // behind the outputs: Bump gives the number, Drive its outputs and then the car.
+    c.calls.push_back({"Bump", {N(1.5), N(2.0)}});
+    c.calls.push_back({"Tick", {I(41)}});
+    for (const Value& car : samples({PinType::structure, "Car"}, g)) {
+      c.calls.push_back({"Drive", {car, I(0), N(0.5)}});
+      c.calls.push_back({"Wear", {car, I(0)}});
+    }
+    c.calls.push_back({"Fill", {Value::of(std::vector<f64>{4, 5}), I(3), N(0.5)}});
+    c.outside.push_back({"Drive", {N(3), I(0)}});
+    c.outside.push_back({"Bump", {}});
+    c.outside.push_back({"Fill", {T("no list")}});
+  }
+  {
     all.push_back({"Functions", {}, {}});
     Case& c = all.back();
     json::Value j;
@@ -1237,6 +1390,10 @@ inline std::string play(const Case& c, std::vector<std::string>* errors = nullpt
     std::vector<std::pair<std::string, std::string>> results, variables;
     for (const Value& a : call.args) args.push_back(native_show(a));
     for (std::size_t k = 0; f && k < f->outputs.size() && k < out.size(); ++k) results.push_back({f->outputs[k].name, native_show(out[k])});
+    // (a reference input, called by name: what the function made of it stands behind the outputs)
+    std::size_t behind = f ? f->outputs.size() : 0;
+    for (std::size_t k = 0; f && k < f->inputs.size(); ++k)
+      if (f->inputs[k].ref && !f->inputs[k].constant) results.push_back({f->inputs[k].name, native_show(behind < out.size() ? out[behind] : Value())}), ++behind;
     for (const logic::Variable& v : c.graph.variables) variables.push_back({v.name, native_show(inst->get(v.name))});
     text += line(call.function, args, results, variables);
   }
@@ -1421,21 +1578,34 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
       body += "    };\n    for (const auto& r : rows) {\n      (void)r;\n      ";
       std::string call = "b." + f.name + "(";
       std::string shown = "std::string(\"" + f.name + "(\")";
+      // (a reference input is a place: the class is given a variable that starts as the value,
+      // and what the function made of it is shown behind the outputs - as a call by name gives it)
+      std::string places, changed, changed_by_name;
+      std::size_t behind = f.outputs.size();
       for (std::size_t i = 0; i < f.inputs.size(); ++i) {
-        call += (i ? ", r.a" : "r.a") + std::to_string(i);
-        shown += std::string(i ? " + \", \"" : "") + " + show(r.a" + std::to_string(i) + ")";
+        const std::string k = std::to_string(i);
+        if (f.inputs[i].ref) {
+          places += "kern::logic::NativeParam<&" + c.name + "::" + f.name + ", " + k + "> p" + k + " = r.a" + k + ";\n      ";
+          if (!f.inputs[i].constant) {
+            changed += " + \" " + f.inputs[i].name + "=\" + show(p" + k + ")";
+            changed_by_name += " + \" " + f.inputs[i].name + "=\" + native_show(results.size() > " + std::to_string(behind) + " ? results[" + std::to_string(behind) + "] : kern::logic::Value())";
+            ++behind;
+          }
+        }
+        call += std::string(i ? ", " : "") + (f.inputs[i].ref ? "p" : "r.a") + k;
+        shown += std::string(i ? " + \", \"" : "") + " + show(r.a" + k + ")";
       }
       call += ")";
-      body += (f.outputs.empty() ? "" : "const auto out = ") + call + ";\n      got += " + shown + " + \") ->\"";
+      body += places + (f.outputs.empty() ? "" : "const auto out = ") + call + ";\n      got += " + shown + " + \") ->\"";
       for (const logic::FunctionPin& o : f.outputs) body += " + \" " + o.name + "=\" + show(out." + o.name + ")";
-      body += " + variables() + \"\\n\";\n";
+      body += changed + " + variables() + \"\\n\";\n";
       // ... and the same call by name
       body += "      std::vector<kern::logic::Value> results;\n      if (!inst->call(\"" + f.name + "\", {";
       for (std::size_t i = 0; i < f.inputs.size(); ++i) body += std::string(i ? ", " : "") + "kern::logic::to_value(r.a" + std::to_string(i) + ")";
       body += "}, results)) hosted += \"(no call) \";\n      hosted += " + shown + " + \") ->\"";
       for (std::size_t k = 0; k < f.outputs.size(); ++k)
         body += " + \" " + f.outputs[k].name + "=\" + native_show(results.size() > " + std::to_string(k) + " ? results[" + std::to_string(k) + "] : kern::logic::Value())";
-      body += " + hosted_variables() + \"\\n\";\n    }\n  }\n";
+      body += changed_by_name + " + hosted_variables() + \"\\n\";\n    }\n  }\n";
       at = end;
     }
     // The calls with values from outside: the class takes them as the engine gives them - each
@@ -1447,17 +1617,28 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
         given += (i ? ", " : "") + value_source(call.args[i]);
         shown += std::string(i ? " + \", \"" : "") + " + native_show(given[" + std::to_string(i) + "])";
       }
+      std::string places, changed, changed_by_name;
+      std::size_t behind = f.outputs.size();
       for (std::size_t i = 0; i < f.inputs.size(); ++i) {
         const logic::FunctionPin& in = f.inputs[i];
-        direct += std::string(i ? ", " : "") + "kern::logic::native_arg<" + cpp_type(in.type, in.of, c.name) + ">(given, " + std::to_string(i) + ", " +
-                  cpp_value(Value::from_json(in.value, in.type, c.graph, in.of), in.of, c.name, &c.graph) + ")";
+        const std::string k = std::to_string(i);
+        const std::string taken = "kern::logic::native_arg<" + cpp_type(in.type, in.of, c.name) + ">(given, " + k + ", " + cpp_value(Value::from_json(in.value, in.type, c.graph, in.of), in.of, c.name, &c.graph) + ")";
+        if (in.ref) {
+          places += "    kern::logic::NativeParam<&" + c.name + "::" + f.name + ", " + k + "> p" + k + " = " + taken + ";\n";
+          if (!in.constant) {
+            changed += " + \" " + in.name + "=\" + show(p" + k + ")";
+            changed_by_name += " + \" " + in.name + "=\" + native_show(results.size() > " + std::to_string(behind) + " ? results[" + std::to_string(behind) + "] : kern::logic::Value())";
+            ++behind;
+          }
+        }
+        direct += std::string(i ? ", " : "") + (in.ref ? "p" + k : taken);
       }
-      body += "  {\n    const std::vector<kern::logic::Value> given = {" + given + "};\n    " + (f.outputs.empty() ? "" : "const auto out = ") + direct + ");\n    got += " + shown + " + \") ->\"";
+      body += "  {\n    const std::vector<kern::logic::Value> given = {" + given + "};\n" + places + "    " + (f.outputs.empty() ? "" : "const auto out = ") + direct + ");\n    got += " + shown + " + \") ->\"";
       for (const logic::FunctionPin& o : f.outputs) body += " + \" " + o.name + "=\" + show(out." + o.name + ")";
-      body += " + variables() + \"\\n\";\n    std::vector<kern::logic::Value> results;\n    if (!inst->call(\"" + f.name + "\", given, results)) hosted += \"(no call) \";\n    hosted += " + shown + " + \") ->\"";
+      body += changed + " + variables() + \"\\n\";\n    std::vector<kern::logic::Value> results;\n    if (!inst->call(\"" + f.name + "\", given, results)) hosted += \"(no call) \";\n    hosted += " + shown + " + \") ->\"";
       for (std::size_t k = 0; k < f.outputs.size(); ++k)
         body += " + \" " + f.outputs[k].name + "=\" + native_show(results.size() > " + std::to_string(k) + " ? results[" + std::to_string(k) + "] : kern::logic::Value())";
-      body += " + hosted_variables() + \"\\n\";\n  }\n";
+      body += changed_by_name + " + hosted_variables() + \"\\n\";\n  }\n";
     }
     runs += body + "}\n\n";
   }

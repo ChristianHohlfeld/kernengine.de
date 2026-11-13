@@ -399,6 +399,14 @@ struct FunctionPin {
   PinType type = PinType::number;
   json::Value value;     // default: an input nobody wired, an output no Return node set
   std::string of = {};   // a value of an enum or a struct (or a list of them): its name
+  /// An input that is a reference: the call gives no value but names a place - a variable, a
+  /// field or a list entry in one (logic::ref_key) -, and the function works on that place where
+  /// it stands. It changes it (Car& car), or - `constant` - only reads it (const Car& car):
+  /// nothing is copied in either case. In the function the input is named like a local variable
+  /// (the settings "variable" and "scope" of the variable nodes); the Function Entry has no pin
+  /// for it. An input by value is the value it had when the call was made.
+  bool ref = false;
+  bool constant = false;
 };
 
 struct Function {
@@ -451,18 +459,31 @@ struct Graph {
   /// The variable a node's settings name: a variable of the Blueprint, or - with the setting
   /// "scope" - a local variable of that function. `out` holds it (a local as a Variable).
   bool variable_of(const Node& n, Variable& out) const;
+  /// What a node's variable is, where its settings name one under `prefix` ("": the node's own
+  /// - "variable", "scope", "path" -; "<input>.": the place a call gives the reference input of
+  /// that name, logic::ref_key): a variable of the Blueprint, a local variable of the function
+  /// the node stands in, or one of that function's inputs. `out` holds it.
+  enum class Root : u8 { none, variable, local, reference, constant_reference, input };
+  Root root_of(const Node& n, Variable& out, std::string_view prefix = {}) const;
+  /// Can what the node names there be changed (a variable, a local variable, a reference input
+  /// that is not const)?
+  static bool writable(Root r) { return r == Root::variable || r == Root::local || r == Root::reference; }
   /// The place a node's settings name: its variable (variable_of) and from there the path of the
   /// setting "path" - fields and list entries (logic::path_steps). `out` holds what is there, as
   /// a Variable: its type, its default (a field's declared one, the zero of a list's entry), and
   /// as its name the place as C++ writes it ("Cars[].Speed").
   /// A node without a path names its variable. False: no such variable, or the path leads
   /// through something the variable has not - `why` then says what.
-  bool place_of(const Node& n, Variable& out, std::string* why = nullptr) const;
+  bool place_of(const Node& n, Variable& out, std::string* why = nullptr, std::string_view prefix = {}) const;
   /// A node's path as its steps (logic::path_steps), and for every step that is a field the
   /// struct that has it (its name) - empty for a list entry, and from where the path stops
   /// leading through the variable's type. What renaming a field has to go by. False: the node
   /// names no variable, or its path is none.
-  bool path_of(const Node& n, std::vector<std::string>& steps, std::vector<std::string>& owners) const;
+  bool path_of(const Node& n, std::vector<std::string>& steps, std::vector<std::string>& owners, std::string_view prefix = {}) const;
+  /// The function in whose body a node stands: the one whose Function Entry leads to it along
+  /// exec wires - or to a step that reads it. Empty: none does (an event's path, nothing), or
+  /// more than one. Where the places a call names are looked up (the call's setting "scope").
+  std::string body_of(u32 node, const class Library& lib) const;
   StateMachine* machine(u32 id);
   const StateMachine* machine(std::string_view name) const;
   const Function* function(std::string_view name) const;
@@ -481,6 +502,12 @@ std::size_t path_indices(std::string_view path);
 std::string path_pin(std::size_t k);
 /// Is `id` such an input's?
 bool is_path_pin(std::string_view id);
+/// How a call names the place it gives a reference input (FunctionPin::ref) of the function it
+/// calls: its settings "<input>.variable" and "<input>.path" - a variable or a local variable of
+/// the function the call stands in (the call's setting "scope"), or one of that function's
+/// inputs, and the path from it - and, for the path's list entries, its index inputs
+/// "<input>.path0", "<input>.path1" ... `what`: "variable", "path", or such an index input's id.
+std::string ref_key(std::string_view input, std::string_view what);
 
 json::Value graph_to_json(const Graph& g);
 bool graph_from_json(const json::Value& j, Graph& out, std::string* error = nullptr);
@@ -619,6 +646,9 @@ struct NodeDef {
                          // (Tween's Update runs with Play); the others always run later
   bool native = false;   // a Blueprint's C++ has it as a function (blueprint.h): a C++ compiler runs a
                          // Blueprint whose nodes all have one (native_ready)
+  bool raises = false;   // a step that may run handlers of Blueprints before it goes on (Call Event, Call on
+                         // Actor, a gameplay step that raises an event at once): whatever a Blueprint holds may
+                         // have changed after it - no call holds a place inside a list across it
   std::vector<PinDef> inputs, outputs;  // exec pins included, in drawing order
   std::vector<ParamDef> params;
   std::string keywords;
@@ -791,6 +821,29 @@ class NativeBlueprint {
   virtual bool set(std::string_view variable, const Value& value) = 0;
 };
 using NativeBlueprintFactory = std::unique_ptr<NativeBlueprint> (*)();
+/// The engine goes into a Blueprint's class (Instance::call, a handler). What a class holds only
+/// while it runs - the entries beside its lists (kern::List, nodes.h) - is that visit's: it stays
+/// until the engine is out again, and is gone the next time it goes in. The engine may be in a
+/// class already - a step of the class that makes the engine run a handler -: that is the same
+/// visit.
+namespace beside {
+inline u64& visit() {
+  static u64 count = 0;
+  return count;
+}
+inline int& depth() {
+  static int inside = 0;
+  return inside;
+}
+struct Visit {
+  Visit() {
+    if (depth()++ == 0) ++visit();
+  }
+  ~Visit() { --depth(); }
+  Visit(const Visit&) = delete;
+  Visit& operator=(const Visit&) = delete;
+};
+}  // namespace beside
 /// Code compiled into the binary: the class of the Blueprint with this content hash. A graph with
 /// that hash then runs as this class (Runtime::native), not in the interpreter or the JIT.
 void register_native_blueprint(u64 hash, NativeBlueprintFactory make);
@@ -813,6 +866,26 @@ class Runtime;
 /// One graph running for one owner (an actor, or the level).
 class Instance {
  public:
+  /// A place as the interpreter finds it: the variable that holds it and the steps from there -
+  /// the indices as they were when the place was named. A reference input of a function is such
+  /// a place for as long as its call runs (the place the caller named).
+  struct Spot {
+    std::string key;              // the variable's key (a local variable's: "<function>.<name>")
+    int entry = -1, output = -1;  // or - an input by value, read only - that output of the function's entry node
+    /// Or - the path led beside a list - the entry of its own that stands there, with the zero of
+    /// the items' type. Whoever has the place has that entry: a function that was given it as a
+    /// reference, and whatever that function gives it to.
+    struct Beside {
+      TypeRef type;
+      Value value;
+    };
+    std::shared_ptr<Beside> beside;
+    struct Step {
+      std::string field;          // a field by its name; empty: a list entry
+      i64 index = 0;
+    };
+    std::vector<Step> steps;
+  };
   Instance(Runtime& rt, const Graph& graph, ActorRef self, std::string name);
   ~Instance();
   Instance(const Instance&) = delete;
@@ -831,11 +904,17 @@ class Instance {
   /// inputs' defaults. False: no such function or no entry node - `results` then holds the
   /// defaults. (A function cannot call itself - a rule, check() - but an event it raises may
   /// call it again while it runs: that is a call like any other, as in the Blueprint's C++.)
+  /// A reference input (FunctionPin::ref) takes its argument as the value the function starts
+  /// from; what the function made of it stands behind the outputs in `results`, for every
+  /// reference input that is not const, in the inputs' order.
   bool call(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results);
   /// The same from a call node of this graph (Call Function, Function Value). The call belongs to
   /// the chain it is made in: it is no chain of its own for how deep events may nest - in the
   /// Blueprint's C++ it is a call like any other.
   bool call_inside(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results);
+  /// The same for a function with reference inputs: `places[k]` is the place the call gives the
+  /// function's k-th input, if that one is a reference (its entry in `args` is not read).
+  bool call_inside(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results, const std::vector<Spot>& places);
   /// A variable's value, to change it in place (a list: Value::edit). Null for a number - those
   /// live in the slots, use set -, for a name that is none, and for a Blueprint that runs as its
   /// class (its variables are that class's members).
@@ -846,6 +925,12 @@ class Instance {
   Value get(const Node& n) const;
   bool set(const Node& n, const Value& v);
   Value* variable(const Node& n);
+  /// The place a node names under `prefix` ("": its own; "<input>.": what a call gives that
+  /// reference input), with the path's list entries at `indices`. Naming it finds it: where the
+  /// path leads beside a list, the place goes on in an entry of its own (Spot::beside) - what
+  /// kern::List gives there in a Blueprint's class. Naming a place changes nothing. False: it
+  /// names none.
+  bool spot(const Node& n, std::string_view prefix, const std::vector<i64>& indices, Spot& out) const;
   /// What is at the place a node names (Graph::place_of) - its variable, or what the node's path
   /// leads to in it. `indices`: the path's list entries, in its order. Beside a list there is an
   /// entry with the defaults.
@@ -940,7 +1025,10 @@ class Instance {
     u32 state = 0;
     f64 entered = 0;
   };
-  bool call_function(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results, bool inside);
+  bool call_function(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results, bool inside, const std::vector<Spot>* places = nullptr);
+  Value read(const Spot& s) const;
+  bool write(const Spot& s, const std::function<void(Value&)>& change);
+  std::vector<std::vector<Spot>> refs_;                   // per function: where its reference inputs are, for the call that runs
   Value held(const std::string& key) const;
   bool hold(const std::string& key, const Value& v);
   /// The local variables of every function, as they are now - and back (Runtime::fire: a handler
@@ -949,7 +1037,7 @@ class Instance {
   void set_locals(const std::vector<Value>& values);
   /// What its functions hold of their calls - parameters and local variables - as it is now,
   /// and back: for a call that starts while the Blueprint is in the middle of one.
-  struct Held { std::vector<std::vector<Value>> parameters; std::vector<Value> locals; };
+  struct Held { std::vector<std::vector<Value>> parameters; std::vector<Value> locals; std::vector<std::vector<Spot>> refs; };
   Held held_calls() const;
   void set_held_calls(Held held);
   struct Local { std::string key; Value init; };
@@ -1115,6 +1203,8 @@ class Context {
   /// The list entries of the node's path (the setting "path"): its index inputs, each read once,
   /// in the path's order - what Instance::place and Instance::change take.
   std::vector<i64> path();
+  /// The place the node names under `prefix` (Instance::spot), its index inputs read here.
+  Instance::Spot spot(std::string_view prefix);
   std::size_t input_count() const { return inst_.nodes_[node_].in.size(); }
   const PinDef& input(std::size_t i) const { return inst_.nodes_[node_].in[i]; }
   const PinDef& output(std::size_t i) const { return inst_.nodes_[node_].out[i]; }

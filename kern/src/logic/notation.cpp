@@ -691,6 +691,130 @@ struct Shape {
           return fail(because[f] + ": " + title(x) + (d.latent ? " waits" : " changes something") + ". Call the function as a step instead (My Blueprint: untick Pure)", x);
       }
     }
+    return places_ok(steps, calls);
+  }
+
+  /// A call that gives a function a place inside a list - Cars[i], Cars[i].Wheels[j] - holds that
+  /// place while the function runs (in the Blueprint's C++ the function has a reference into the
+  /// list). So nothing the function does, itself or through what it calls, changes how long
+  /// that list is or puts another list where it stands: an entry that is held stays where it is.
+  /// That keeps "no index leads beside a list" true in every tier.
+  bool places_ok(const std::vector<std::vector<int>>& steps, const std::vector<std::vector<std::pair<int, int>>>& calls) {
+    const std::size_t count = g.functions.size();
+    struct Write {
+      Graph::Root kind = Graph::Root::none;  // what `root` is where the write is seen from: a variable of the Blueprint, a reference input or a local variable of the function
+      std::string root;
+      std::vector<std::string> path;
+      bool resizes = false;                  // a step that changes a list's length (else: a Set - what stands there is replaced)
+      int node = -1;
+    };
+    std::vector<std::vector<Write>> writes(count);
+    std::vector<int> raises(count, -1);      // a step of the function that may run handlers (NodeDef::raises): anything the Blueprint holds may change
+    auto writes_place = [](const std::string& t) { return t == "var.set" || t == "list.add" || t == "list.insert" || t == "list.remove_at" || t == "list.remove" || t == "list.clear"; };
+    // what a call's function does, as the caller sees it: a write through one of its reference
+    // inputs is a write at the place the call gave that input
+    auto through = [&](std::size_t callee, int call) {
+      std::vector<Write> seen;
+      for (const Write& w : writes[callee]) {
+        if (w.kind == Graph::Root::variable) {
+          seen.push_back(w);
+          seen.back().node = call;
+          continue;
+        }
+        if (w.kind != Graph::Root::reference) continue;  // (its own local variables are gone with it)
+        const std::string prefix = ref_key(w.root, "");
+        Variable named;
+        Write mapped;
+        mapped.kind = g.root_of(*at(call).node, named, prefix);
+        mapped.root = at(call).node->param(prefix + "variable");
+        if (!path_steps(at(call).node->param(prefix + "path"), mapped.path)) continue;
+        mapped.path.insert(mapped.path.end(), w.path.begin(), w.path.end());
+        mapped.resizes = w.resizes;
+        mapped.node = call;
+        seen.push_back(std::move(mapped));
+      }
+      return seen;
+    };
+    // (callees first: no function calls itself, functions_ok has seen to that)
+    std::vector<u8> done(count, 0);
+    std::vector<std::size_t> order;
+    for (std::size_t start = 0; start < count; ++start) {
+      std::vector<std::pair<std::size_t, std::size_t>> stack{{start, 0}};
+      if (done[start]) continue;
+      done[start] = 1;
+      while (!stack.empty()) {
+        const std::size_t f = stack.back().first;
+        if (stack.back().second < calls[f].size()) {
+          const std::size_t callee = static_cast<std::size_t>(calls[f][stack.back().second++].first);
+          if (!done[callee]) {
+            done[callee] = 1;
+            stack.push_back({callee, 0});
+          }
+          continue;
+        }
+        order.push_back(f);
+        stack.pop_back();
+      }
+    }
+    for (std::size_t f : order) {
+      for (int x : steps[f]) {
+        const std::string& t = at(x).def->type;
+        if (at(x).def->raises && raises[f] < 0) raises[f] = x;
+        if (!writes_place(t)) continue;
+        Variable named;
+        Write w;
+        w.kind = g.root_of(*at(x).node, named);
+        w.root = at(x).node->param("variable");
+        if (w.kind == Graph::Root::none || !path_steps(at(x).node->param("path"), w.path)) continue;
+        w.resizes = t != "var.set";
+        w.node = x;
+        writes[f].push_back(std::move(w));
+      }
+      for (const auto& [callee, call] : calls[f]) {
+        for (Write& w : through(static_cast<std::size_t>(callee), call)) writes[f].push_back(std::move(w));
+        if (raises[static_cast<std::size_t>(callee)] >= 0 && raises[f] < 0) raises[f] = call;
+      }
+    }
+    // every call - in a function, in an event -: the places it holds against what its function does
+    for (int call : by_id) {
+      if (at(call).def->type != "func.call" && at(call).def->type != "func.pure") continue;
+      int callee = -1;
+      for (std::size_t f = 0; f < count; ++f)
+        if (g.functions[f].name == at(call).node->param("function")) callee = static_cast<int>(f);
+      if (callee < 0) continue;
+      {
+        const Function& fn = g.functions[static_cast<std::size_t>(callee)];
+        const std::vector<Write> during = through(static_cast<std::size_t>(callee), call);
+        for (const FunctionPin& in : fn.inputs) {
+          if (!in.ref) continue;
+          const std::string prefix = ref_key(in.name, "");
+          std::vector<std::string> held;
+          Variable named;
+          const Graph::Root kind = g.root_of(*at(call).node, named, prefix);
+          const std::string root = at(call).node->param(prefix + "variable");
+          if (!path_steps(at(call).node->param(prefix + "path"), held)) continue;
+          if (std::find(held.begin(), held.end(), std::string()) == held.end()) continue;  // (no entry of a list on the way: nothing to hold)
+          const std::string place = root + at(call).node->param(prefix + "path");
+          (void)kind;
+          if (raises[static_cast<std::size_t>(callee)] >= 0)
+            return fail(title(call) + " gives " + fn.name + " the place " + place + " - an entry of a list -, and " + fn.name + " may run handlers while it holds it (" +
+                            title(raises[static_cast<std::size_t>(callee)]) + "): they could change how long the list is. Give it the entry's index instead, or the value",
+                        call);
+          for (const Write& w : during) {
+            if (w.kind != kind || w.root != root || w.path.size() > held.size() || !std::equal(w.path.begin(), w.path.end(), held.begin())) continue;
+            // (the write stands at or above the place that is held: does it reach a list the place goes through?)
+            bool reaches = false;
+            if (w.resizes) reaches = w.path.size() < held.size() && held[w.path.size()].empty();
+            else reaches = std::find(held.begin() + static_cast<std::ptrdiff_t>(w.path.size()), held.end(), std::string()) != held.end();
+            if (!reaches) continue;
+            return fail(title(call) + " gives " + fn.name + " the place " + place + " - an entry of a list -, and while " + fn.name + " holds it, " +
+                            (w.resizes ? "the length of " : "what stands at ") + root + path_text(w.path) + " is changed: an entry that is held stays where it is. " +
+                            "Give the function the entry's index instead, or change the list after the call",
+                        call);
+          }
+        }
+      }
+    }
     return true;
   }
 
@@ -810,19 +934,28 @@ struct Shape {
       for (const ParamDef& pd : x.def->params) names_variable = names_variable || pd.kind == ParamDef::Kind::variable;
       if (names_variable) {
         Variable named;
-        if (!g.variable_of(*x.node, named)) return fail(title(i) + " names a variable that is not there", i);
+        const Graph::Root root = g.root_of(*x.node, named);
+        if (root == Graph::Root::none) return fail(title(i) + " names a variable that is not there", i);
         // A local variable is there while its function's call runs: on a path of that function,
-        // in that function's own body.
+        // in that function's own body. So is an input of the function that is named like one.
         if (const std::string scope = x.node->param("scope"); !scope.empty()) {
+          const std::string what = root == Graph::Root::local ? "local variable" : "input";
           const int where = place_of(i);
           const int owner = where >= 0 && ctx[static_cast<std::size_t>(where)].first == kCallable && !(x.own && !x.pure) ? ctx[static_cast<std::size_t>(where)].second : -1;
           if (where == detached)
-            return fail(title(i) + " reads the local variable \"" + named.name + "\" of " + scope + ", and nothing reads it: wire it on a path of that function, or remove it", i);
+            return fail(title(i) + " reads the " + what + " \"" + named.name + "\" of " + scope + ", and nothing reads it: wire it on a path of that function, or remove it", i);
           if (owner < 0 || at(owner).def->type != "func.entry" || at(owner).node->param("function") != scope)
-            return fail(title(i) + " uses the local variable \"" + named.name + "\" of " + scope + " outside a path of that function: a local variable is there while the function's call "
+            return fail(title(i) + " uses the " + what + " \"" + named.name + "\" of " + scope + " outside a path of that function: a local variable is there while the function's call "
                             "runs - not after a wait (Delay), not in an event or another function, and paths that meet before it must all come from one Branch or Switch",
                         i);
         }
+      } else if (const std::string scope = x.node->param("scope"); !scope.empty() && (t == "func.call" || t == "func.pure")) {
+        // A call that names places of a function - its local variables, its inputs - stands on a
+        // path of that function, like a node of one of its local variables.
+        const int where = place_of(i);
+        const int owner = where >= 0 && ctx[static_cast<std::size_t>(where)].first == kCallable && !(x.own && !x.pure) ? ctx[static_cast<std::size_t>(where)].second : -1;
+        if (where != detached && (owner < 0 || at(owner).def->type != "func.entry" || at(owner).node->param("function") != scope))
+          return fail(title(i) + " names places of " + scope + " outside a path of that function: its local variables and inputs are there while the function's call runs", i);
       }
       if (x.def->problem)
         if (const std::string why = x.def->problem(*x.node, g); !why.empty()) return fail(title(i) + ": " + why, i);
@@ -917,10 +1050,12 @@ struct Writer {
 
   /// The place a node names, as C++ writes it: its variable and from there its path - a field
   /// by its name, a list entry by the value of its index input: Cars[n4.index].Wheels[0].
-  std::string place_text(int x, int c) {
-    std::string r = at(x).node->param("variable");
+  /// `prefix`: "" for the node's own place; "<input>." for the place a call gives that reference
+  /// input of its function (logic::ref_key).
+  std::string place_text(int x, int c, const std::string& prefix = {}) {
+    std::string r = at(x).node->param(prefix + "variable");
     std::vector<std::string> steps;
-    if (!names_place(*at(x).def) || !path_steps(at(x).node->param("path"), steps)) return r;
+    if ((prefix.empty() && !names_place(*at(x).def)) || !path_steps(at(x).node->param(prefix + "path"), steps)) return r;
     std::size_t entry = 0;
     for (const std::string& step : steps) {
       if (!step.empty()) {
@@ -930,10 +1065,31 @@ struct Writer {
       int pin = -1;
       const std::vector<int> pins = at(x).data_in;
       for (int k : pins)
-        if (at(x).in[static_cast<std::size_t>(k)].id == path_pin(entry)) pin = k;
+        if (at(x).in[static_cast<std::size_t>(k)].id == prefix + path_pin(entry)) pin = k;
       const std::string index = pin >= 0 ? value(x, pin, c) : std::string("0");
       r += "[" + index + "]";
       ++entry;
+    }
+    return r;
+  }
+  /// What a call gives its function's inputs, in their order: a value for an input by value,
+  /// the place for a reference - Car_step(Cars[n4.index], 0.5).
+  std::string call_args(int x, int c) {
+    const Function* f = s.g.function(at(x).node->param("function"));
+    if (!f) return inputs(x, c);
+    std::string r;
+    for (const FunctionPin& in : f->inputs) {
+      std::string a;
+      if (in.ref) {
+        a = place_text(x, c, ref_key(in.name, ""));
+      } else {
+        int pin = -1;
+        const std::vector<int> pins = at(x).data_in;
+        for (int k : pins)
+          if (at(x).in[static_cast<std::size_t>(k)].id == in.name) pin = k;
+        if (pin >= 0) a = value(x, pin, c);
+      }
+      r += (r.empty() ? "" : ", ") + a;
     }
     return r;
   }
@@ -958,7 +1114,7 @@ struct Writer {
     const std::string t = at(x).def->type;
     if (t == "var.get") return place_text(x, c);
     if (t == "func.pure") {
-      const std::string args = inputs(x, c);
+      const std::string args = call_args(x, c);
       return at(x).node->param("function") + "(" + args + ")";
     }
     if (t == "math.formula") {
@@ -1183,7 +1339,7 @@ struct Writer {
       return 0;
     }
     if (t == "func.call") {
-      const std::string args = inputs(x, c);
+      const std::string args = call_args(x, c);
       line(ind, (X.member ? "n" + id(x) + " = " : std::string()) + X.node->param("function") + "(" + args + ");");
       return 0;
     }
@@ -1328,7 +1484,11 @@ struct Writer {
         }
         doc(1, f.help);
         std::string args;
-        for (const FunctionPin& p : f.inputs) args += (args.empty() ? "" : ", ") + cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type, g, p.of), p.of, g);
+        // (an input by value has its default; a reference is the place the call names: Car& car, const Car& car)
+        for (const FunctionPin& p : f.inputs)
+          args += (args.empty() ? "" : ", ") +
+                  (p.ref ? std::string(p.constant ? "const " : "") + cpp_type(TypeRef{p.type, p.of}) + "& " + p.name
+                         : cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type, g, p.of), p.of, g));
         if (f.external) {
           // (a function of another Blueprint: what it looks like - it is called on an actor)
           line(1, "KERN_EXTERN " + (f.outputs.empty() ? std::string("void") : f.name + "Result") + " " + f.name + "(" + args + ");");
@@ -2187,11 +2347,15 @@ struct Reader {
         while (!is(")")) {
           FunctionPin in;
           TypeRef in_type;
+          in.constant = accept("const");
           if (!type_here(in_type)) return fail(p, kTypes + shown(peek()));
           in.type = in_type.type;
           in.of = in_type.of;
+          in.ref = accept("&");
+          if (in.constant && !in.ref) return fail(p, "a const input is a reference: const " + cpp_type(in_type) + "& name (an input by value is " + cpp_type(in_type) + " name = value)");
           if (!word(in.name, "the input's name")) return false;
           Value v = zero_of(in_type, g);
+          if (in.ref && is("=")) return fail(p, in.name + " is a reference: the call names its place, it has no default");
           if (accept("=") && !typed_literal(in_type, v, in.name)) return false;
           in.value = v.to_json(g, in.of);
           f.inputs.push_back(std::move(in));
@@ -2247,19 +2411,31 @@ struct Reader {
   // ---- nodes ----
   /// The variable a name means here: in a function's own body one of its local variables,
   /// everywhere a variable of the Blueprint.
-  bool variable_here(const std::string& name, Variable& out) const {
+  /// What a name is where the text stands: a local variable or an input of the function whose
+  /// body it is, or a variable of the Blueprint (Graph::Root).
+  Graph::Root root_here(const std::string& name, Variable& out) const {
     if (const FunctionPin* l = scope.function ? scope.function->local(name) : nullptr) {
       out = Variable{l->name, l->type, l->value, {}, l->of};
-      return true;
+      return Graph::Root::local;
+    }
+    if (const FunctionPin* in = scope.function ? scope.function->input(name) : nullptr) {
+      out = Variable{in->name, in->type, in->value, {}, in->of};
+      return !in->ref ? Graph::Root::input : in->constant ? Graph::Root::constant_reference : Graph::Root::reference;
     }
     const Variable* v = g.variable(name);
     if (v) out = *v;
-    return v != nullptr;
+    return v ? Graph::Root::variable : Graph::Root::none;
   }
-  /// The settings of a node that names it (a local variable: with its function as "scope").
+  /// Is `name` read and set like a variable here: a variable, a local variable, a reference
+  /// input of the function? (An input by value is the function's own value: its parameter.)
+  bool variable_here(const std::string& name, Variable& out) const {
+    const Graph::Root root = root_here(name, out);
+    return root != Graph::Root::none && root != Graph::Root::input;
+  }
+  /// The settings of a node that names it (a local variable or an input: with its function as "scope").
   std::vector<std::pair<std::string, std::string>> naming(const std::string& variable) const {
     std::vector<std::pair<std::string, std::string>> r{{"variable", variable}};
-    if (scope.function && scope.function->local(variable)) r.push_back({"scope", scope.function->name});
+    if (scope.function && (scope.function->local(variable) || scope.function->input(variable))) r.push_back({"scope", scope.function->name});
     return r;
   }
   int make(const NodeDef* def, std::size_t tok, std::vector<std::pair<std::string, std::string>> params = {}) {
@@ -2357,7 +2533,7 @@ struct Reader {
         if (!path.empty()) params.push_back({pd.key, path});
       } else if (pd.kind != ParamDef::Kind::scope) {
         params.push_back({pd.key, pd.kind == ParamDef::Kind::variable ? names[v_at++] : given[g_at++]});
-      } else if (scope.function && !names.empty() && scope.function->local(names.front())) {
+      } else if (scope.function && !names.empty() && (scope.function->local(names.front()) || scope.function->input(names.front()))) {
         params.push_back({pd.key, scope.function->name});
       }
     }
@@ -2392,7 +2568,11 @@ struct Reader {
   /// `set`: the place is about to be changed field by field (the words of the refusal).
   bool place_fits(const std::string& var, const std::string& path, std::size_t tok, bool set, TypeRef* type = nullptr) {
     Variable named;
-    if (!variable_here(var, named)) return fail(tok, "\"" + var + "\" is no variable");
+    const Graph::Root root = root_here(var, named);
+    if (root == Graph::Root::none) return fail(tok, "\"" + var + "\" is no variable");
+    if (set && !Graph::writable(root))
+      return fail(tok, var + " is " + (root == Graph::Root::input ? "an input by value" : "a const reference") + ": it is read, not changed (an input that is changed where the caller has it: " +
+                           cpp_type(TypeRef{named.type, named.of}) + "& " + var + ")");
     TypeRef at{named.type, named.of};
     std::string name = var;
     std::vector<std::string> steps;
@@ -2427,7 +2607,7 @@ struct Reader {
   }
   /// What follows the variable's name in a place - .Field and [index] - for the node that names
   /// the place (path_ahead has read its shape): every index is the node's next index input.
-  bool place_rest(int node) {
+  bool place_rest(int node, const std::string& prefix = {}) {
     for (std::size_t entry = 0;;) {
       if (is(".") && peek(1).kind == Tok::id) {
         p += 2;
@@ -2440,7 +2620,7 @@ struct Reader {
       int pin = -1;
       const Made& m = made[static_cast<std::size_t>(node)];
       for (std::size_t k = 0; k < m.in.size(); ++k)
-        if (m.in[k].id == path_pin(entry)) pin = static_cast<int>(k);
+        if (m.in[k].id == prefix + path_pin(entry)) pin = static_cast<int>(k);
       if (pin < 0) return fail(p, "this place has no entry here");
       if (!bind(node, pin, s) || !expect("]", "(a list's entry is List[index])")) return false;
       ++entry;
@@ -2460,8 +2640,9 @@ struct Reader {
     std::vector<int> r;
     const Made& m = made[static_cast<std::size_t>(node)];
     const bool place = names_place(*m.def);  // (the indices of its path stand in the place, not among its values)
+    const bool call = m.def->type == "func.call" || m.def->type == "func.pure";  // (so do those of the places a call names: "<input>.path0")
     for (std::size_t k = 0; k < m.in.size(); ++k)
-      if (m.in[k].type != PinType::exec && !(place && is_path_pin(m.in[k].id))) r.push_back(static_cast<int>(k));
+      if (m.in[k].type != PinType::exec && !(place && is_path_pin(m.in[k].id)) && !(call && m.in[k].id.find('.') != std::string::npos)) r.push_back(static_cast<int>(k));
     return r;
   }
   std::vector<std::string> exec_pins(int node, bool inputs) const {
@@ -2610,6 +2791,19 @@ struct Reader {
       const Made& root = made[static_cast<std::size_t>(scope.root)];
       for (const PinDef& pd : root.out)
         if (pd.type != PinType::exec && pd.id == t.s) {
+          if ((is(".") || is("[")) && scope.function && scope.function->input(t.s)) {
+            // a place in an input by value, read where it stands: car.Wheels[i].Slip
+            std::size_t q = 0;
+            std::string path;
+            if (!path_ahead(q, path) || !place_fits(t.s, path, p - 1, false)) return s;
+            std::vector<std::pair<std::string, std::string>> params = naming(t.s);
+            params.push_back({"path", path});
+            const int node = make("var.get", s.tok, std::move(params));
+            if (node < 0 || !place_rest(node)) return s;
+            s.node = node;
+            s.root = true;
+            return s;
+          }
           s.node = scope.root;
           s.pin = pd.id;
           return s;
@@ -2618,10 +2812,13 @@ struct Reader {
     if (const Function* f = g.function(t.s)) {
       const std::string fname = f->name;
       const std::size_t inputs = f->inputs.size();
-      if (!accept("(")) { fail(s.tok, fname + " is a function: " + fname + "(...)"); return s; }
-      const int node = make("func.pure", s.tok, {{"function", fname}});
+      if (!is("(")) { fail(s.tok, fname + " is a function: " + fname + "(...)"); return s; }
+      std::vector<std::pair<std::string, std::string>> params{{"function", fname}};
+      if (!ref_places(*f, 1, params)) return s;
+      ++p;
+      const int node = make("func.pure", s.tok, std::move(params));
       Args a{*this};
-      if (node < 0 || !args_of(node, a, fname)) return s;
+      if (node < 0 || !call_args(node, fname, a)) return s;
       if (!expect(")", "(" + fname + " takes " + std::to_string(inputs) + " value(s))")) return s;
       s.node = node;
       if (accept(".")) word(s.pin, "the result's name");
@@ -3072,8 +3269,8 @@ struct Reader {
       if (!f) { fail(name, "\"" + fn + "\" is no function of this Blueprint (n<id> = Function(...); keeps what a called function gave)"); return {}; }
       return call_function(std::move(in), f->name, id, at);
     }
-    if (Variable named; variable_here(t.s, named)) {
-      // Variable = value;   Variable += value;   Variable.Field = value;
+    if (Variable named; root_here(t.s, named) != Graph::Root::none) {
+      // Variable = value;   Variable += value;   Variable.Field = value;   (an input that is only read: place_step says so)
       const std::string var = named.name;
       p += 1;
       const int node = place_step(var, at);
@@ -3182,13 +3379,79 @@ struct Reader {
     return {out(node, 0)};
   }
   /// [n<id> = ]Function(...);   (the function's name has been read)
+  /// The places a call gives the reference inputs of `f`, read ahead (the call's "(" stands
+  /// `q` - 1 tokens ahead): the settings that name them (logic::ref_key) - the node's index inputs
+  /// depend on them, so they are known before the node is made. call_args reads the values.
+  bool ref_places(const Function& f, std::size_t q, std::vector<std::pair<std::string, std::string>>& params) {
+    bool any = false;
+    for (const FunctionPin& in : f.inputs) {
+      if (is(")", q) || peek(q).kind == Tok::end) break;  // (fewer values than inputs: call_args says so)
+      if (in.ref) {
+        Variable named;
+        if (peek(q).kind != Tok::id || root_here(peek(q).s, named) == Graph::Root::none)
+          return fail(p + q, f.name + ": its input " + in.name + " is a reference - a place stands there, a variable or a field or a list entry in one, not " + shown(peek(q)));
+        const std::string var = peek(q).s;
+        const std::size_t name = q;
+        std::string path;
+        ++q;
+        if (!path_ahead(q, path) || !place_fits(var, path, p + name, !in.constant)) return false;
+        params.push_back({ref_key(in.name, "variable"), var});
+        if (!path.empty()) params.push_back({ref_key(in.name, "path"), path});
+        any = true;
+      }
+      // on behind the next comma that stands in no bracket (a node's settings stand in <>: outside a formula's braces nothing else does)
+      int depth = 0, braces = 0;
+      for (;; ++q) {
+        const Tok& t = peek(q);
+        if (t.kind == Tok::end) break;
+        if (t.kind != Tok::punct) continue;
+        if (t.s == "{") ++braces;
+        else if (t.s == "}") --braces;
+        if (t.s == "(" || t.s == "[" || t.s == "{" || (t.s == "<" && braces == 0)) ++depth;
+        else if (t.s == ")" || t.s == "]" || t.s == "}" || (t.s == ">" && braces == 0)) {
+          if (depth == 0) break;
+          --depth;
+        } else if (t.s == "," && depth == 0) {
+          ++q;
+          break;
+        }
+      }
+    }
+    if (any && scope.function) params.push_back({"scope", scope.function->name});
+    return true;
+  }
+  /// The values of a call of the function `fn`, in the order of its inputs: a value for an input
+  /// by value, the place (ref_places has read its shape) for a reference.
+  bool call_args(int node, const std::string& fn, Args& a) {
+    const Function* f = g.function(fn);
+    if (!f) return false;
+    for (const FunctionPin& in : f->inputs) {
+      if (!a.more()) return fail(p, takes(node, fn));
+      if (in.ref) {
+        ++p;  // (the variable's name)
+        if (!place_rest(node, ref_key(in.name, ""))) return false;
+        continue;
+      }
+      int pin = -1;
+      const Made& m = made[static_cast<std::size_t>(node)];
+      for (std::size_t k = 0; k < m.in.size(); ++k)
+        if (m.in[k].type != PinType::exec && m.in[k].id == in.name) pin = static_cast<int>(k);
+      const Src v = value();
+      if (failed() || pin < 0 || !bind(node, pin, v)) return false;
+    }
+    return true;
+  }
   Ends call_function(Ends in, const std::string& fn, u32 id, std::size_t at) {
-    const int node = step(make("func.call", at, {{"function", fn}}), at);
+    std::vector<std::pair<std::string, std::string>> params{{"function", fn}};
+    const Function* f = g.function(fn);
+    if (!is("(")) { expect("("); return {}; }
+    if (f && !ref_places(*f, 1, params)) return {};
+    const int node = step(make("func.call", at, std::move(params)), at);
     if (node < 0 || !expect("(")) return {};
     if (id && !declare(id, node, at)) return {};
     enter(in, node, "", at);
     Args a{*this};
-    if (!args_of(node, a, fn)) return {};
+    if (!call_args(node, fn, a)) return {};
     if (!expect(")", "(" + takes(node, fn) + ")") || !expect(";")) return {};
     return {out(node, 0)};
   }
@@ -4058,11 +4321,21 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
                   "    using kern::logic::native_arg;\n    using kern::logic::to_value;\n    (void)args;\n    results.clear();\n";
   for (const Function& f : g.functions) {
     if (f.external) continue;  // (a function of another Blueprint: nothing of it is here to call)
-    std::string call = "self." + f.name + "(";
-    for (std::size_t k = 0; k < f.inputs.size(); ++k)
-      call += std::string(k ? ", " : "") + "native_arg<" + type(f.inputs[k].type, f.inputs[k].of) + ">(args, " + std::to_string(k) + ", " + value(f.inputs[k].value, f.inputs[k].type, f.inputs[k].of) + ")";
+    // (a reference input: called by name it is a variable of the call that starts as the argument;
+    // what the function made of it stands behind the outputs - Instance::call)
+    std::string call = "self." + f.name + "(", places, changed;
+    for (std::size_t k = 0; k < f.inputs.size(); ++k) {
+      const std::string given = "native_arg<" + type(f.inputs[k].type, f.inputs[k].of) + ">(args, " + std::to_string(k) + ", " + value(f.inputs[k].value, f.inputs[k].type, f.inputs[k].of) + ")";
+      if (f.inputs[k].ref) {
+        // (a variable of exactly the type the function takes: its reference binds to it)
+        const std::string held = "kern::logic::NativeParam<&" + name + "::" + f.name + ", " + std::to_string(k) + ">";
+        places += "      " + held + " place" + std::to_string(k) + " = native_arg<" + held + ">(args, " + std::to_string(k) + ", " + held + "{});\n";
+        if (!f.inputs[k].constant) changed += "      results.push_back(to_value(place" + std::to_string(k) + "));\n";
+      }
+      call += std::string(k ? ", " : "") + (f.inputs[k].ref ? "place" + std::to_string(k) : given);
+    }
     call += ")";
-    s += "    if (function == \"" + f.name + "\") {\n";
+    s += "    if (function == \"" + f.name + "\") {\n" + places;
     if (f.outputs.empty()) {
       s += "      " + call + ";\n";
     } else {
@@ -4070,7 +4343,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
       for (std::size_t k = 0; k < f.outputs.size(); ++k) s += std::string(k ? ", " : "") + "to_value(out." + f.outputs[k].name + ")";
       s += "};\n";
     }
-    s += "      return true;\n    }\n";
+    s += changed + "      return true;\n    }\n";
   }
   s += "    return false;\n  }\n"
        "  bool get(std::string_view variable, kern::logic::Value& out) const override {\n    (void)out;\n";

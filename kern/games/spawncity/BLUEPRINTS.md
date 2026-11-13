@@ -390,17 +390,25 @@ Eine Form, die Gestalt oder Kosten ändert, ist keine von beiden.
    eines Platzes, einen Eintrag einer Liste an einem Platz – gelesen, gesetzt, erhöht und als Liste
    geändert, wo er steht: `Cars[i].Wheels[j].Slip += x;`, `list_add(Log.Cur.Path, p);`. Es gibt
    ein Set für jeden Platz; „Set Field“ und „Set List Item“ waren Sonderfälle davon und sind als
-   eigene Knoten entfallen (alte Dokumente werden beim Laden umgestellt). Neben einer Liste steht
-   in jeder Stufe ein Eintrag mit den Defaults, der nichts behält. Der Konverter schreibt seit
+   eigene Knoten entfallen (alte Dokumente werden beim Laden umgestellt). Ein Platz neben einer
+   Liste ist in jeder Stufe ein eigener Eintrag mit den Defaults, von dem nichts bleibt; jeder
+   Eintrag jeder Liste ist ein Platz, auch ein `Bool`. Der Konverter schreibt seit
    19:30 Plätze statt Kopien, wo eine Funktion auf ihren eigenen Variablen arbeitet
    (`self_.cur_.path[i].x = v;`, `list_add(self_.pieces_, p);`, gelesen `self_.cur_.t`): im Level
    stehen damit 1.414 statt 2.471 `struct_break` und 243 statt 367 `list_get`. Die 98 Methoden, die
    ihr Objekt hinein- und herausbekommen, löst Schritt 2 ab.
-2. **Referenz-Parameter.** Ein Eingang einer Funktion kann eine Referenz sein (`Car& self`): Der
-   Aufruf nennt einen Platz, die Funktion liest und ändert ihn dort; in ihr ist er wie eine lokale
-   Variable. Dazu eine Regel (`check`): Solange ein Aufruf einen Platz in einer Liste hält, ändert
-   nichts in ihm die Länge dieser Liste – so bleibt „kein Index führt ins Leere“ in jeder Stufe
-   wahr, auch in der Klasse, wo die Referenz eine Referenz von C++ ist.
+2. **Referenz-Parameter.** *(In der Engine seit 13.11.2026, 21:13 – `kern/docs/blueprint_cpp.md`,
+   „Referenz-Eingänge“.)* Ein Eingang einer Funktion ist ein Wert oder eine Referenz: `Car& self`
+   – der Aufruf nennt einen Platz, die Funktion liest und ändert ihn dort – oder `const Car& self`
+   – sie liest ihn dort. In ihr ist er wie eine Variable benannt; nichts wird hinein- oder
+   herauskopiert, in keiner Stufe (Klasse: eine Referenz von C++; Interpreter: der Platz, den der
+   Aufruf genannt hat). Dazu eine Regel (`check`): Solange ein Aufruf einen Platz in einer Liste
+   hält, ändert nichts in ihm die Länge dieser Liste, und nichts in ihm startet Handler – so
+   bleibt „kein Index führt ins Leere“ in jeder Stufe wahr, auch in der Klasse. Dabei festgelegt,
+   damit es in jeder Stufe dasselbe ist: Einen Platz zu nennen ändert nirgends etwas – jede
+   Nennung neben einer Liste hat ihren eigenen Eintrag (zuerst war es einer je Typ, den jede
+   Nennung zurücksetzte: was eine Funktion davon hielt, hing in der Klasse von der Reihenfolge ab,
+   in der ein Compiler eine Anweisung ausrechnet).
 3. **Kosten in der Klasse.** Was nur liest, kopiert nicht: Eingänge von Listen und Strukturen sind
    `const&`, Get Item und Break geben den Eintrag, wie er dasteht, For Each geht ohne Kopie durch
    eine Liste, die sein Rumpf nicht ändert. Die Bedeutung bleibt die von Werten.

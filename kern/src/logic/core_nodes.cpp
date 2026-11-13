@@ -425,6 +425,7 @@ void add_flow(Library& lib) {
       c.runtime().call(c.param("name", "MyEvent"), c.in_actor("target"), std::move(args));
       return 0;
     };
+    d.raises = true;
     lib.add(std::move(d));
   }
 }
@@ -1192,8 +1193,19 @@ void add_functions(Library& lib) {
     return [which](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
       const Function* f = g.function(n.param("function"));
       if (!f) return;
+      // (a reference input has no pin: in the function it is named like a variable, and a call
+      // names the place it is - with an index input for every list entry of that place's path)
       if (which == 0 || which == 2)
-        for (const FunctionPin& p : f->inputs) (which == 0 ? out : in).push_back({p.name, p.name, p.type, p.value, false, p.of});
+        for (const FunctionPin& p : f->inputs) {
+          if (!p.ref) {
+            (which == 0 ? out : in).push_back({p.name, p.name, p.type, p.value, false, p.of});
+            continue;
+          }
+          if (which != 2) continue;
+          const std::size_t entries = path_indices(n.param(ref_key(p.name, "path")));
+          for (std::size_t k = 0; k < entries; ++k)
+            in.push_back({ref_key(p.name, path_pin(k)), p.name + (entries > 1 ? " index " + std::to_string(k + 1) : std::string(" index")), PinType::integer, json::Value(0), false, {}});
+        }
       if (which == 1 || which == 2)
         for (const FunctionPin& p : f->outputs) (which == 1 ? in : out).push_back({p.name, p.name, p.type, p.value, false, p.of});
     };
@@ -1206,9 +1218,14 @@ void add_functions(Library& lib) {
     const Function* f = c.instance().graph().function(c.param("function"));
     if (!f) return;
     std::vector<Value> args, results;
+    std::vector<Instance::Spot> places(f->inputs.size());
     args.reserve(f->inputs.size());
-    for (const FunctionPin& p : f->inputs) args.push_back(c.in(p.name));
-    c.instance().call_inside(f->name, args, results);
+    for (std::size_t k = 0; k < f->inputs.size(); ++k) {
+      const FunctionPin& p = f->inputs[k];
+      if (p.ref) places[k] = c.spot(ref_key(p.name, ""));  // (the place the call names for it, as it is now)
+      args.push_back(p.ref ? Value() : c.in(p.name));
+    }
+    c.instance().call_inside(f->name, args, results, places);
     for (std::size_t k = 0; k < f->outputs.size() && k < results.size(); ++k) c.out(f->outputs[k].name, results[k]);
   };
   {
@@ -1244,7 +1261,7 @@ void add_functions(Library& lib) {
   {
     NodeDef d = make("func.call", "Call Function", "Functions", NodeKind::action,
                      "Runs a function of this Blueprint to its end, then continues. Its results stay on the outputs until the next call.");
-    d.params = {param("function", "Function", ParamDef::Kind::function)};
+    d.params = {param("function", "Function", ParamDef::Kind::function), local_of()};  // ("scope": the function the call stands in - where the places it names are looked up)
     d.inputs = {exec_in()};
     d.outputs = {exec_out()};
     d.shape = shape(2);
@@ -1267,6 +1284,7 @@ void add_functions(Library& lib) {
     d.outputs = {exec_out()};
     d.shape = shape(2);
     d.title = [](const NodeDef&, const Node& n) { return n.param("function", "?") + " on Actor"; };
+    d.raises = true;
     d.color = 0x2f6fd0;
     d.keywords = "call run invoke function other blueprint actor library remote interface message";
     d.run = [](Context& c) {

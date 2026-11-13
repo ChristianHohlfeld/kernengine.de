@@ -51,8 +51,14 @@ From the header comment of `logic.h` (Unreal Blueprint semantics):
   `Held.Damage`, `Scores[i]`, `Cars[i].Wheels[j].Slip`. Every node that names a variable can name
   a place in it (the setting Path, with an index pin for every list entry): Get, Set and Add,
   and the steps that change a list. What is changed is changed where it stands – nothing is read
-  out and written back, in any tier. Beside a list stands an entry with the defaults that keeps
-  nothing: no index leads into the void.
+  out and written back, in any tier. A place beside a list is an entry of its own with the
+  defaults, of which nothing stays: no index leads into the void, and naming a place changes
+  nothing anywhere.
+- **Reference inputs**: an input of a function is a value – or a reference: then the call names
+  a place instead of giving a value (`Drive(Cars[i], 0.5)`), and the function works on that
+  place where it stands, to change it (`Car& car`) or only to read it (`const Car& car`).
+  Nothing is copied in or out. While a call holds an entry of a list, nothing in it changes how
+  long that list is – the check sees to that.
 - **Enums**: a Blueprint may declare enums – a type of its own with named values, for example
   `Mode` with the values `Closed`, `Opening`, `Open`. A value of an enum is exactly one of its
   values, held as its place among them (the first is 0). It is neither a number nor a text: it
