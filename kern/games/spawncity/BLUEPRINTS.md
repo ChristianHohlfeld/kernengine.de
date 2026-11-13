@@ -331,6 +331,99 @@ In dieser Reihenfolge (klein nach groß; jede Datei verschwindet, ihre Tests ble
   Lesart wie „Apply“ in der C++-Ansicht des Editors); das Level bleibt die eine Quelle.
 
 ### 4 – Der Konverter: C++ zu Blueprints
+
+#### Der Weg ab hier (festgelegt 13.11.2026): die Sprache trägt, der Konverter bildet ab
+
+**Warum.** Der Konverter hat drei Dinge, die die Sprache nicht kann, durch Ersatzformen
+ausgedrückt: ein Objekt als Struktur, die jede Methode hinein- und wieder herausbekommt; eine Map
+als Liste; eine 64-Bit-Zahl als Struktur aus zwei Hälften. Sie rechnen bitgleich, aber:
+
+- Sie kosten mehr als der Quelltext. In der Klasse (dem nativen Export) kopiert jede Methode ihr
+  Objekt (98 Stellen), jedes Anhängen an eine Liste in einem Objekt kopiert die Liste zweimal,
+  jedes Lesen eines Listeneintrags kopiert den Eintrag (`list_get` gibt einen Wert), For Each
+  kopiert die Liste und jeden Eintrag noch einmal, eine Map wird durchsucht.
+- Der Blueprint hat nicht mehr die Gestalt des Quelltexts (2.471-mal `struct_break`).
+- `Game` tragen sie nicht: 248 Felder (eine Struktur hat höchstens 96), 329 Funktionen mit 13.917
+  Zeilen – mehr als die Hälfte dessen, was wartet. Weitere rund 5.000 Zeilen warten auf Zeiger.
+
+**Grundsatz.** Die Sprache ist der erlaubte Teil von C++. Für jeden ihrer Bausteine gilt:
+
+1. Er hat einen Knoten (Blueprint und C++ sind dasselbe, `kern/docs/blueprint_cpp.md`).
+2. Er bedeutet in jeder Stufe dasselbe (Interpreter, JIT, Klasse).
+3. In der Klasse kostet er, was das C++ kostet, das er darstellt.
+
+Der Konverter bildet Baustein auf Baustein ab, jede Stelle für sich. Für alles, was die Sprache
+nicht hat, gibt es genau zwei Antworten:
+
+- **Die Sprache bekommt den Baustein** – allgemein, in jeder Stufe, mit Knoten, Schreibweise,
+  Regeln (`check`) und den Tests der Engine.
+- **Die Stelle wird in erlaubtes, gewöhnliches C++ gleicher Kosten umgeschrieben** – eine Regel
+  des Konverters, etwa eine Methode als Funktion mit einer Referenz auf ihr Objekt.
+
+Eine Form, die Gestalt oder Kosten ändert, ist keine von beiden.
+
+**Die Abbildung.**
+
+| C++ des Spiels | Blueprint |
+|---|---|
+| Klasse mit Feldern | Struktur des Projekts |
+| Methode `Car::step(dt)` | Funktion `Car_step(Car& self, Float dt)`: eine Referenz auf das Objekt, geändert am Platz |
+| das eine Objekt mit dem Zustand des Spiels (`Game`, über alle seine Dateien) | ein Blueprint: seine Felder sind die Variablen, seine Methoden die Funktionen |
+| Quelldatei | Blueprint im Ordner „Source“; hält er keinen Zustand, ist er eine Bibliothek: jede Funktion steht einmal im Projekt, jeder ruft sie direkt |
+| `a.b[i].c = x;`, `a.items.push_back(x);` | derselbe Schritt auf demselben Platz |
+| Parameter `T&` | Referenz-Parameter |
+| Parameter `const T&` oder Wert | Eingang |
+| Zeiger auf ein Objekt der Engine | Handle (`Int`) |
+| Zeiger als Parameter | Referenz-Parameter |
+| Zeiger als Feld auf ein Objekt des Spiels (fünf Felder: dreimal die Stadt, die Firmware der Drohne, eine Liste) | Parameter der Funktionen, die es brauchen |
+| `std::vector` | Liste; eine Liste von Listen ist eine Liste von Strukturen mit einem Feld |
+| `std::map`, `std::set`, `std::unordered_map`, `std::unordered_set` | Map, Set – in der Reihenfolge, die der Quelltext festlegt (Schlüssel) oder offen lässt (dann: des Einfügens) |
+| `float`, `double` | `Float` (64 Bit – die Festlegung der Sprache) |
+| ganze Zahlen, mit denen gezählt wird | `Int` |
+| `u64`, `i64` als Bitmuster | `Int64` |
+| Funktion der Engine | Knoten der Engine; in der Klasse der Aufruf selbst |
+
+**Was die Sprache dafür bekommt.**
+
+1. **Plätze.** Ein Schritt, der etwas ändert (Set, Add, Set Field, die Listen-Schritte), nennt
+   einen Platz: eine Variable, ein Feld eines Platzes, einen Eintrag einer Liste an einem Platz –
+   `Cars[i].Wheels[j].Slip = x;`, `list_add(Log.Cur.Path, p);`. Ein Index neben der Liste: Der
+   Schritt tut nichts (wie Set Item heute).
+2. **Referenz-Parameter.** Ein Eingang einer Funktion kann eine Referenz sein (`Car& self`): Der
+   Aufruf nennt einen Platz, die Funktion liest und ändert ihn dort; in ihr ist er wie eine lokale
+   Variable. Dazu eine Regel (`check`): Solange ein Aufruf einen Platz in einer Liste hält, ändert
+   nichts in ihm die Länge dieser Liste – so bleibt „kein Index führt ins Leere“ in jeder Stufe
+   wahr, auch in der Klasse, wo die Referenz eine Referenz von C++ ist.
+3. **Kosten in der Klasse.** Was nur liest, kopiert nicht: Eingänge von Listen und Strukturen sind
+   `const&`, Get Item und Break geben den Eintrag, wie er dasteht, For Each geht ohne Kopie durch
+   eine Liste, die sein Rumpf nicht ändert. Die Bedeutung bleibt die von Werten.
+4. **Bibliotheken.** Eine Funktion eines Blueprints ohne Zustand ruft jeder andere Blueprint
+   direkt – in der Klasse ein gewöhnlicher Aufruf. Damit steht jede Funktion einmal im Projekt
+   (heute: in jedem Blueprint, der sie benutzt).
+5. **Map und Set** als Typen, mit ihren Knoten.
+6. **`Int64`**: die ganze Zahl mit 64 Bit, die bei 2^64 umbricht, mit ihren Rechen- und Bit-Knoten.
+7. **Engine-Aufrufe direkt** in der Klasse (heute: durch `Host::engine`, beim Namen, mit
+   eingepackten Werten), und der Host des Spiels, der sie im Interpreter an die echte Engine gibt.
+8. **Der Rest** in der Reihenfolge des Protokolls („worauf die anderen warten“): Text formatieren,
+   lokale Funktionen (Lambdas), der Zustand einer Datei, Rückrufe der Engine als Events … – jede
+   Stelle mit einer der zwei Antworten.
+
+**Der Beweis je Schritt.**
+
+- **Bitgleich** wie bisher: Quelltext, Interpreter und Klasse, ohne Toleranz.
+- **Kosten:** Derselbe Test zählt für jeden verglichenen Aufruf, wie oft Quelltext und Klasse
+  Speicher anfordern; fordert die Klasse öfter an, ist das ein Fehler. Die Zeit misst ein
+  Export-Build (ohne Prüfwerkzeuge) für dieselben Aufrufe gegen den Quelltext.
+- **Gestalt:** Nach 1 bis 3 steht im Level keine Methode mehr, die ihr Objekt hinein- und
+  herausbekommt; nach 5 und 6 keine Map als Liste und kein `Whole64`.
+
+**Reihenfolge.** 1 bis 4, dann `Game` als Blueprint, dann 5 bis 7, dann 8. Nach jedem Schritt wird
+der Konverter um die Ersatzform kürzer, alles wird neu gewandelt, verglichen und gepusht.
+
+Was unten zu `Whole64`, zu „Maps und Sets sind Listen“ und zu Methoden auf einem Objekt steht,
+beschreibt den Stand davor und wird Schritt für Schritt ersetzt.
+
+#### Der Konverter heute
 `tools/cpp_to_blueprint.py` liest die Quellen mit dem Parser des Compilers (clangs Syntaxbaum)
 und schreibt sie in der Schreibweise:
 
