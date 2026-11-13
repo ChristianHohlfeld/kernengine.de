@@ -71,6 +71,12 @@ struct ConnectionConfig {
   int max_message_types = 256;
   EndpointConfig endpoint;
 };
+struct Connection : converted::EngineObject {
+};
+struct Transport : converted::EngineObject {
+};
+struct HostTransport : converted::EngineObject {
+};
 struct ClientServerConfig {
   u64 protocol_id = 0x4b45524e30303031ull;  // "KERN0001": different games / versions do not talk
   int max_clients = 16;
@@ -79,6 +85,11 @@ struct ClientServerConfig {
   f64 connect_timeout = 6;
   f64 keepalive_interval = 0.1;              // payload packets go out at least this often
   ConnectionConfig connection;
+};
+struct Client : converted::EngineObject {
+  void disconnect() const;
+};
+struct Server : converted::EngineObject {
 };
 enum class PacketType : u8 { request = 1, denied, challenge, response, keepalive, payload, disconnect };
 enum class PinType : u8 {
@@ -174,6 +185,7 @@ bool sane(Vec3 v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfi
 [[maybe_unused]] static bool defined(const ClientServerConfig& s) { return defined(converted::shaped<converted::Whole>(s.protocol_id)) && defined(s.max_clients) && defined(s.timeout) && defined(s.request_interval) && defined(s.connect_timeout) && defined(s.keepalive_interval) && defined(s.connection); }
 [[maybe_unused]] static std::string text(const ClientServerConfig& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.protocol_id)) + ", " + text(s.max_clients) + ", " + text(s.timeout) + ", " + text(s.request_interval) + ", " + text(s.connect_timeout) + ", " + text(s.keepalive_interval) + ", " + text(s.connection) + "}"; }
 [[maybe_unused]] static void take(ClientServerConfig& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<converted::Whole>(s.protocol_id, (*v.rows)[0]); converted::take_as<int>(s.max_clients, (*v.rows)[1]); converted::take_as<double>(s.timeout, (*v.rows)[2]); converted::take_as<double>(s.request_interval, (*v.rows)[3]); converted::take_as<double>(s.connect_timeout, (*v.rows)[4]); converted::take_as<double>(s.keepalive_interval, (*v.rows)[5]); converted::take_as<ConnectionConfig>(s.connection, (*v.rows)[6]); }
+inline void Client::disconnect() const { const std::vector<converted::Value> out = converted::engine_call("engine.client.disconnect", {arg(*this)}); }
 
 SC_TEST(converted_net_session) {
   converted::Blueprint bp("NetSession");

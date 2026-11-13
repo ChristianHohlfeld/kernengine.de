@@ -51,6 +51,7 @@ struct PoliceDrone {
   f32 hp = 100, yaw = 0, next_sensor = 0, next_shot = 0, sight_since = 0, destroyed_until = -1, retreat_until = -1, distance = 0, roof = 0, roof_at = -1;
   u32 shots = 0, serial = 0;
 };
+bool is_person(SwarmKind k) { return k == SwarmKind::zombie || k == SwarmKind::soldier || k == SwarmKind::officer || k == SwarmKind::enemy; }
 bool falls(SwarmKind k) { return k == SwarmKind::officer || k == SwarmKind::enemy; }
 u16 drone_id(const PoliceDrone& d) { return static_cast<u16>(d.serial % 65535 + 1); }
 #undef private
@@ -89,12 +90,28 @@ u16 drone_id(const PoliceDrone& d) { return static_cast<u16>(d.serial % 65535 + 
 
 SC_TEST(converted_game_swarm) {
   converted::Blueprint bp("GameSwarm");
+  {  // is_person
+    converted::Tally tally("is_person");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] SwarmKind a0) { return converted_game_swarm::is_person(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      const SwarmKind a0 = static_cast<SwarmKind>(draw.below(8));
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
   {  // falls
     converted::Tally tally("falls");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] SwarmKind a0) { return converted_game_swarm::falls(a0); };
     for (int i = 0; tally.more(i); ++i) {
-      const SwarmKind a0 = static_cast<SwarmKind>(draw.below(9));
+      const SwarmKind a0 = static_cast<SwarmKind>(draw.below(8));
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;

@@ -523,6 +523,7 @@ class Unit:
         self.order = []             # the written functions, callees first
         self.members = []
         self.next_node = 10
+        self.enum_aliases = {}      # (enum, a value's name) -> the earlier value of the same number it is
         self.lambdas = {}           # a local function (the id of its call operator) -> how it is called (see Emit.local_function)
         self.engine = None          # the engine's functions as nodes (Api), made when the first one is called
         self.engine_calls = {}      # the engine's functions this Blueprint calls: decl id -> its node (Api.function)
@@ -613,13 +614,16 @@ class Unit:
             self.engine = Api(self.tree, self)
         return self.engine
 
-    def object_of(self, raw, by_value=False):
-        """The class of the engine a type hands on as an object with a life of its own - the physics world,
-        the renderer, the mixer: a pointer or a reference to it (by_value: the object itself, where an
-        expression names it). In a Blueprint that is a handle, a whole number the host gives."""
+    def object_of(self, raw, by_value=True):
+        """The class of the engine a type holds as an object with a life of its own - the physics world, the
+        renderer, the mixer: however it is held - by a pointer, a reference, as a value or owned
+        (std::unique_ptr). In a Blueprint that is a handle, a whole number the host gives (0: none)."""
         r = raw.strip()
         if not ENGINE_NODES:
             return None
+        m = re.match(r"(?:const\s+)?std::unique_ptr<(.+)>$", self.clean(r))
+        if m and by_value:
+            r = template_args(self.clean(r))[0]
         if r.endswith("&") or re.search(r"\*\s*(const)?$", r):
             r = re.sub(r"(&|\*\s*(const)?)$", "", r).strip()
         elif not by_value:
@@ -627,7 +631,7 @@ class Unit:
         if any(ch in r for ch in "*&<["):
             return None
         try:
-            q = self.find_type(self.clean(r))
+            q = self.find_type(self.clean(r).replace("const ", "").strip())
         except Wait:
             return None
         if q is None or not q.startswith(ENGINE + "::") or q not in self.tree.records or q in (ENGINE + "::Vec3", ENGINE + "::Vec2"):
@@ -723,7 +727,14 @@ class Unit:
         if q in self.enums:
             return self.enums[q]
         o = self.tree.enums[q]
-        numbered = enum_numbers(o)
+        numbered, first = [], {}
+        for n, x in enum_numbers(o):
+            # a value with the number of an earlier one is that value under another name (`kLast = vehicle`)
+            if x in first:
+                self.enum_aliases[(q, n)] = first[x]
+                continue
+            first[x] = n
+            numbered.append((n, x))
         values = [n for n, _ in numbered]
         if not values:
             raise Wait("an enum without values")
@@ -736,8 +747,6 @@ class Unit:
         self.enum_values[name] = vals
         self.types.append(f"  KERN_ENUM({name}, {', '.join(vals)});")
         if [x for _, x in numbered] != list(range(len(numbered))):
-            if len(set(x for _, x in numbered)) != len(numbered):
-                raise Wait(f"the enum {name} (two of its values are the same number)")
             # the numbers C++ gives the values, where a value is used as a number: a variable of the Blueprint
             table = self.fresh(name + "_numbers")
             self.names.add(table)
@@ -1166,6 +1175,8 @@ class Const:
 
 
 def enum_value(unit, enum_name, cpp_value):
+    q = next((k for k, v in unit.enums.items() if v == enum_name), None)
+    cpp_value = unit.enum_aliases.get((q, cpp_value), cpp_value)
     return cpp_value + "_" if cpp_value in CPP_WORDS or NODE_NAME.match(cpp_value) else cpp_value
 
 
@@ -1210,8 +1221,8 @@ class Emit:
         t = self.held_type(n)
         if t is not None:
             return self.u.rows.get(t, t)   # (a list inside a list is held as a struct of that list: here, the list)
-        if n.get("kind") not in ("VarDecl", "ParmVarDecl", "FieldDecl") and self.u.object_of(qtype(n), by_value=True):
-            return "Int"   # (an object of the engine, named by an expression: its handle)
+        if self.u.object_of(qtype(n)):
+            return "Int"   # (an object of the engine: its handle)
         return self.u.btype(qtype(n))
 
     def held_type(self, n):
@@ -1670,6 +1681,8 @@ class Emit:
                     raise Wait("a reference to something it changes")
                 wide_init = kids(v) and v.get("init") and self.u.clean(raw) in ("unsigned long", "long", "unsigned long long", "long long") and self.is64(kids(v)[-1])
                 init = kids(v)[-1] if kids(v) and v.get("init") else None
+                if init is None and self.u.object_of(raw) and not ("&" in raw or "*" in raw):
+                    raise Wait("an object of the engine made here (the engine makes them: a node that gives its handle)")
                 kept = None
                 if init is not None and "auto" in v.get("type", {}).get("qualType", "") and not wide_init:
                     # (auto: the type is the value's - as the Blueprint holds it)
@@ -2795,7 +2808,7 @@ class Emit:
 
     def is_box(self, n):
         c = self.ctype(n)
-        return c.startswith("std::unique_ptr<") or c.startswith("std::optional<")
+        return (c.startswith("std::unique_ptr<") or c.startswith("std::optional<")) and not self.u.object_of(qtype(n))
 
     def boxed(self, holder):
         """The value an owned or optional value holds, as an expression of its own."""
@@ -3796,6 +3809,8 @@ class Emit:
         ref = callee(b).get("referencedDecl", {}) if not b.get("_op") else {}
         if self.is_slot(b):
             return self.value(self.held_by(b))
+        if ops and not b.get("_op") and name in ("operator->", "operator*") and len(ops) == 1 and self.u.object_of(qtype(ops[0])):
+            return self.ex(ops[0], "Int"), "Int"   # (an owned object of the engine: its handle)
         if ops and not b.get("_op") and self.is_iter(ops[0]):
             # an iterator is the place it stands at
             if name in ("operator*", "operator->") and len(ops) == 1:
@@ -3883,6 +3898,11 @@ class Emit:
 
     def construct(self, b):
         u = self.u
+        if u.object_of(qtype(b)):
+            a = [x for x in kids(b) if x.get("kind") != "CXXDefaultArgExpr"]
+            if len(a) == 1 and u.object_of(qtype(a[0])):
+                return self.ex(a[0], "Int"), "Int"   # (a handle handed on)
+            raise Wait("an object of the engine made here (the engine makes them: a node that gives its handle)")
         t = self.tp(b)
         a = [x for x in kids(b) if x.get("kind") != "CXXDefaultArgExpr"]
         if self.is_box(b):
@@ -4522,9 +4542,12 @@ class TestWriter:
         if raw.replace(" ", "") in ("constchar*", "constchar*const"):
             return "const char*"
         q = self.u.object_of(raw)
-        if q:
-            r = raw.strip()
-            return ("const " if re.match(r"const\b", r) else "") + self.object_name(q) + ("&" if r.endswith("&") else "*")
+        if q:   # (held as the program holds it: the stand-in by a pointer, a reference, as a value or owned)
+            r, name = raw.strip(), self.object_name(q)
+            if re.match(r"(?:const\s+)?std::unique_ptr<", self.u.clean(r)):
+                return f"std::unique_ptr<{name}>"
+            const = "const " if re.match(r"const\b", r) else ""
+            return const + name + ("&" if r.endswith("&") else "*" if re.search(r"\*\s*(const)?$", r) else "")
         m = re.match(r"(?:kern::)?Span<\s*(.+)>$", c)
         if m:
             return f"std::vector<{self.spell(m.group(1))}>"
@@ -4569,7 +4592,11 @@ class TestWriter:
             return "draw.c_word()"
         q = self.u.object_of(raw)
         if q:   # (an object of the engine: one of a few the test keeps, by its handle)
-            return ("*" if raw.strip().endswith("&") else "") + f"converted::engine_object<{self.object_name(q)}>(1 + draw.below(6))"
+            one = f"converted::engine_object<{self.object_name(q)}>(1 + draw.below(6))"
+            r = raw.strip()
+            if re.match(r"(?:const\s+)?std::unique_ptr<", self.u.clean(r)):
+                return f"std::make_unique<{self.object_name(q)}>(*{one})"
+            return one if re.search(r"\*\s*(const)?$", r) else "*" + one
         if c in W64:
             return f"static_cast<{self.spell(raw)}>(draw.bits())"
         if c in ("float", "double", "long double"):

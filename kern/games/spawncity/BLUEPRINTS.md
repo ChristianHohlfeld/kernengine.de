@@ -412,9 +412,9 @@ sagt, in den Zahlen der Sprache – überall gleich. Er sagt nicht, dass das die
 heutigen Programm: Das rechnet dieselben Formeln mit `f32` in 32 Bit, die Sprache in 64 Bit (wie das
 JavaScript-Original). Das ist die Festlegung der Sprache, kein Spielraum des Tests.
 
-Stand (13.11.2026): 353 von 1.428 Funktionen (2.682 von 28.544 Zeilen) aus 58 von 77 Dateien stehen
+Stand (13.11.2026, 17:22): 355 von 1.428 Funktionen (2.700 von 28.544 Zeilen) aus 58 von 77 Dateien stehen
 als Blueprints im Level (58 Actors im Ordner „Source“). Der Test vergleicht jede davon, die etwas
-gibt, Bit für Bit mit ihrem Quelltext – 511 Vergleiche, weil Funktionen aus Headern (und die der
+gibt, Bit für Bit mit ihrem Quelltext – 513 Vergleiche, weil Funktionen aus Headern (und die der
 64-Bit-Zahlen) in jedem Blueprint stehen, der sie benutzt; keine ist ausgenommen. Das Spiel führt für diese Dateien weiter
 ihr C++ aus (Stufe 5).
 

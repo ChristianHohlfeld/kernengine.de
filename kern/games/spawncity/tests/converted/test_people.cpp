@@ -146,7 +146,7 @@ struct People {
   
 
   // officers (Police places and moves them; they share hits and drawing with everybody else)
-  
+  i32 add_officer(Vec3 at, f32 yaw, i32 unit, u32 seed);
   /// A citizen put somewhere in plain sight (a driver who gets out of his car); the caller sets
   /// his pavement route (lane, seg, along, side, off) and what he does.
   i32 add_citizen(Vec3 at, f32 yaw, u32 seed);
@@ -245,6 +245,23 @@ bool People::route_point(const Person& p, const std::vector<Lane>& lanes, Vec3& 
   out = {c.x, c.y, 0};
   heading = kern::math::atan2(walk.y, walk.x);
   return true;
+}
+i32 People::add_officer(Vec3 at, f32 yaw, i32 unit, u32 seed) {
+  Person p;
+  p.kind = Kind::officer;
+  p.state = State::officer;
+  p.pos = at;
+  p.yaw = yaw;
+  p.hp = 100;  // police_ground_units.mjs COP_HP
+  p.unit = unit;
+  p.seed = seed;
+  p.shirt = {0.14, 0.19, 0.31};
+  p.pants = {0.1, 0.13, 0.19};
+  p.skin = converted::at(kSkins, seed % 5);
+  for (std::size_t i = 0; i < people_.size(); converted::pre_inc(i))
+    if (converted::at(people_, i).state == State::gone) { converted::at(people_, i) = p; return static_cast<i32>(i); }
+  people_.push_back(p);
+  return static_cast<i32>(converted::minus(people_.size(), 1));
 }
 i32 People::add_citizen(Vec3 at, f32 yaw, u32 seed) {
   Person p;
@@ -450,7 +467,7 @@ void People::frighten(Vec3 at, f32 radius, f32 now, f32 strength) {
   s.net = static_cast<unsigned char>(draw.below(40));
   s.seed = static_cast<unsigned int>(draw.below(40));
   s.damage = draw.number();
-  s.by = static_cast<People::HurtBy>(draw.below(4));
+  s.by = static_cast<People::HurtBy>(draw.below(3));
   s.push = draw.vector();
   return s;
 }
@@ -484,6 +501,10 @@ struct Out_People_route_point { bool Result; Vec3 out; double heading; };
 [[maybe_unused]] static bool same(const Out_People_route_point& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Result, (*got.rows)[0]) && same(want.out, (*got.rows)[1]) && same(want.heading, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const Out_People_route_point& s) { return defined(s.Result) && defined(s.out) && defined(s.heading); }
 [[maybe_unused]] static std::string text(const Out_People_route_point& s) { return std::string("{") + text(s.Result) + ", " + text(s.out) + ", " + text(s.heading) + "}"; }
+struct Out_People_add_officer { People Self; int Result; };
+[[maybe_unused]] static bool same(const Out_People_add_officer& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_People_add_officer& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_People_add_officer& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_People_add_citizen { People Self; int Result; };
 [[maybe_unused]] static bool same(const Out_People_add_citizen& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_People_add_citizen& s) { return defined(s.Self) && defined(s.Result); }
@@ -563,6 +584,26 @@ SC_TEST(converted_people) {
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); });
+    }
+  }
+  {  // People::add_officer
+    converted::Tally tally("People_add_officer");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] int a3, [[maybe_unused]] unsigned int a4) { const auto r = a0.add_officer(a1, a2, a3, a4); return Out_People_add_officer{a0, r}; };
+    for (int i = 0; tally.more(i); ++i) {
+      const People a0 = draw_People(draw);
+      const Vec3 a1 = draw.vector();
+      const double a2 = draw.number();
+      const int a3 = static_cast<int>(draw.whole());
+      const unsigned int a4 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0, a1, a2, a3, a4);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); });
     }
   }
   {  // People::add_citizen

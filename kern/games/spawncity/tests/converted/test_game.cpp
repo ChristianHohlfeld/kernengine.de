@@ -47,6 +47,14 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+struct Value : converted::EngineObject {
+};
+struct TextureAsset : converted::EngineObject {
+};
+struct SoundAsset : converted::EngineObject {
+};
+struct MotionAsset : converted::EngineObject {
+};
 enum class Key : u8 {
   unknown = 0,
   a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,

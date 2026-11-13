@@ -51,6 +51,8 @@ inline Whole64 w64_shift_left(Whole64 a, u32 by) {
   if (by >= 32) return {converted::shl(a.low, (by - 32)), 0};
   return {(converted::shl(a.high, by)) | (converted::shr(a.low, (32 - by))), converted::shl(a.low, by)};
 }
+struct EngineNode : converted::EngineObject {
+};
 enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
 enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
 enum class Surface : u8 { none, cloth, tpu, floor };
@@ -63,14 +65,40 @@ struct Lane {
   u64 tile = 0;
   bool alive = true;
 };
+struct Value : converted::EngineObject {
+};
 enum class PinType : u8 {
   exec, boolean, integer, number, vector, text, actor, enumeration, structure,
   boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, count
 };
+struct EngineValue : converted::EngineObject {
+};
+struct Node {
+  u32 id = 0;
+  std::string type;                                   // registry key, e.g. "flow.branch"
+  f32 x = 0, y = 0;                                   // canvas position (px)
+  std::vector<std::pair<std::string, Value>> values;  // literals of unlinked inputs, by pin id
+  std::vector<std::pair<std::string, std::string>> params;  // node settings (variable name, event name, key...)
+  std::string comment;
+  
+  
+  
+  
+};
 namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope }; }
+enum class NodeKind : u8 { event, action, pure, flow };
+struct NodeDef : converted::EngineObject {
+};
+struct Host : converted::EngineObject {
+};
+struct NativeBlueprint : converted::EngineObject {
+};
 struct Instance : converted::EngineObject {
 };
-namespace Runtime { enum class Chain : u8 { event, call, call_inside }; }
+struct CNode : converted::EngineObject {
+};
+struct Machine : converted::EngineObject {
+};
 struct TrafficRules {
  public:
   struct Arm { Vec2 dir; f32 width = 6; Vec2 pole; bool has_pole = false; };  // pole: the signal's post, on the kerb corner right of the incoming traffic (relative to the junction)

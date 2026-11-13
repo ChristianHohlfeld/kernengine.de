@@ -25,6 +25,7 @@
 #include <initializer_list>
 #include <list>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <type_traits>
@@ -440,6 +441,9 @@ inline std::vector<Value> engine_call(const char* function, const std::vector<Va
   return out;
 }
 inline Value arg(const EngineObject* object) { return Value::integer(object ? object->kern_handle : 0); }
+template <class T>
+  requires std::is_base_of_v<EngineObject, T>
+Value arg(const std::unique_ptr<T>& object) { return arg(static_cast<const EngineObject*>(object.get())); }
 inline Value arg(const EngineObject& object) { return Value::integer(object.kern_handle); }
 
 // ---- a C++ value as the Blueprint gets it ----
@@ -519,6 +523,9 @@ inline bool same(wide::Vec3 want, const Value& got) { return same(kern::Vec3(wan
 inline bool same(wide::Vec2 want, const Value& got) { return same(kern::Vec2(want), got); }
 inline bool same(const EngineObject* want, const Value& got) { return got.as_int() == (want ? want->kern_handle : 0); }
 inline bool same(const EngineObject& want, const Value& got) { return got.as_int() == want.kern_handle; }
+template <class T>
+  requires std::is_base_of_v<EngineObject, T>
+bool same(const std::unique_ptr<T>& want, const Value& got) { return same(static_cast<const EngineObject*>(want.get()), got); }
 inline bool same(const char* want, const Value& got) { return got.as_text() == (want ? want : ""); }
 inline bool same(const std::string& want, const Value& got) { return got.as_text() == want; }
 template <class T>
@@ -583,6 +590,9 @@ inline bool defined(const char*) { return true; }
 inline bool defined(const EngineObject*) { return true; }
 inline bool defined(const EngineObject&) { return true; }
 template <class T>
+  requires std::is_base_of_v<EngineObject, T>
+bool defined(const std::unique_ptr<T>&) { return true; }
+template <class T>
   requires((std::is_integral_v<T> && !std::is_same_v<T, bool>) || std::is_enum_v<T>)
 bool defined(T) { return true; }
 template <class A, class B> bool defined(const std::pair<A, B>& p) { return defined(p.first) && defined(p.second); }
@@ -607,6 +617,9 @@ inline std::string text(wide::Vec2 v) { return text(kern::Vec2(v)); }
 inline std::string text(const char* s) { return std::string("\"") + (s ? s : "") + "\""; }
 inline std::string text(const EngineObject* object) { return "object " + std::to_string(object ? object->kern_handle : 0); }
 inline std::string text(const EngineObject& object) { return text(&object); }
+template <class T>
+  requires std::is_base_of_v<EngineObject, T>
+std::string text(const std::unique_ptr<T>& object) { return text(static_cast<const EngineObject*>(object.get())); }
 inline std::string text(const std::string& s) { return "\"" + s + "\""; }
 template <class T>
   requires(std::is_integral_v<T> && !std::is_same_v<T, bool>)
@@ -641,6 +654,9 @@ void take(E& to, const Value& v) { to = static_cast<E>(v.i); }
 template <class T>
   requires std::is_base_of_v<EngineObject, T>
 void take(T*& to, const Value& v) { to = engine_object<T>(v.as_int()); }
+template <class T>
+  requires std::is_base_of_v<EngineObject, T>
+void take(T& to, const Value& v) { to = *engine_object<T>(v.as_int()); }
 template <class T> void take(std::vector<T>& to, const Value& v);
 /// By the type as the program spells it (S, with Whole where it says u64 or i64 - see shaped).
 template <class S> struct Take {

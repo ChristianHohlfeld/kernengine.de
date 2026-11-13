@@ -35,16 +35,22 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, count
-};
 struct Value : converted::EngineObject {
 };
-namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope }; }
+struct EngineValue : converted::EngineObject {
+};
+struct NodeDef : converted::EngineObject {
+};
+struct Host : converted::EngineObject {
+};
+struct NativeBlueprint : converted::EngineObject {
+};
 struct Instance : converted::EngineObject {
 };
-namespace Runtime { enum class Chain : u8 { event, call, call_inside }; }
+struct CNode : converted::EngineObject {
+};
+struct Machine : converted::EngineObject {
+};
 f32 cell_rand(u32 seed, u32 i);
 f32 agent_random(u32 seed);
 struct Race {

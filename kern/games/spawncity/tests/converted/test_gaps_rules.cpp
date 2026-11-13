@@ -56,14 +56,40 @@ constexpr f32 kPi = 3.14159265358979323846;
 constexpr f32 kDeg = kPi / 180.0;
 inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
 enum class Type : u8 { null, boolean, number, string, array, object };
+struct Value : converted::EngineObject {
+};
 enum class PinType : u8 {
   exec, boolean, integer, number, vector, text, actor, enumeration, structure,
   boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, count
 };
+struct EngineValue : converted::EngineObject {
+};
+struct Node {
+  u32 id = 0;
+  std::string type;                                   // registry key, e.g. "flow.branch"
+  f32 x = 0, y = 0;                                   // canvas position (px)
+  std::vector<std::pair<std::string, Value>> values;  // literals of unlinked inputs, by pin id
+  std::vector<std::pair<std::string, std::string>> params;  // node settings (variable name, event name, key...)
+  std::string comment;
+  
+  
+  
+  
+};
 namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope }; }
+enum class NodeKind : u8 { event, action, pure, flow };
+struct NodeDef : converted::EngineObject {
+};
+struct Host : converted::EngineObject {
+};
+struct NativeBlueprint : converted::EngineObject {
+};
 struct Instance : converted::EngineObject {
 };
-namespace Runtime { enum class Chain : u8 { event, call, call_inside }; }
+struct CNode : converted::EngineObject {
+};
+struct Machine : converted::EngineObject {
+};
 struct Puff {
   bool alive = false, ember = false;
   Vec3 pos, vel;

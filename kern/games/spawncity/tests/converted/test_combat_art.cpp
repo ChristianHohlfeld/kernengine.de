@@ -138,6 +138,8 @@ struct Mat4 {
 
 
 };
+struct Material : converted::EngineObject {
+};
 enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh };
 struct Shape { u64 id = 0; };
 constexpr f32 kPi = 3.14159265358979323846;

@@ -69,6 +69,8 @@ struct Vec4 {
   
   
 };
+struct HeightSampler : converted::EngineObject {
+};
 enum class Surface : u8 { none, cloth, tpu, floor };
 enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
 enum class AreaKind : u8 { water, park, wood, grass, sand, pitch };
