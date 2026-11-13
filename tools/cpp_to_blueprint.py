@@ -53,6 +53,7 @@ writes anew.
 Needs clang++ (CLANGXX overrides the binary).
 """
 import collections
+import io
 import json
 import os
 import re
@@ -5438,6 +5439,37 @@ def convert_file(path, namespace, flags, taken=(), barred=None):
     return unit
 
 
+def convert_one(job):
+    """One file, converted and - with a test directory - its test written: what main needs of it, as plain
+    values (a process of its own does this for every file)."""
+    path, namespace, flags, taken, test = job
+    # A function is written only when its test compares it: what the test cannot compare yet waits,
+    # and with it what calls it - the file is converted again without those.
+    barred, said = {}, io.StringIO()
+    keep, sys.stderr = sys.stderr, said
+    try:
+        while True:
+            unit = convert_file(path, namespace, flags, taken, barred)
+            unit.test = (None, [])
+            if not (test and unit.order):
+                break
+            writer = TestWriter(unit, os.path.relpath(os.path.dirname(os.path.abspath(path)), test), flags)
+            writer.test_dir = test
+            unit.test = writer.write()
+            more = {f.decl["id"]: f"its test cannot compare it yet ({why})" for f, why in unit.test[1] if why != "it gives nothing" and f.decl["id"] not in barred}
+            if not more:
+                break
+            barred.update(more)
+    finally:
+        sys.stderr = keep
+    fs = unit.all
+    written = [f for f in fs if f.text]
+    return {"path": path, "name": unit.name, "total": len(fs), "done": len(written), "total_lines": sum(f.lines for f in fs), "done_lines": sum(f.lines for f in written),
+            "waits": [(f.wait, f.lines) for f in fs if f.wait], "functions": [f"    {f.cpp} ({f.lines}): " + ("written" if f.text else f.wait) for f in fs],
+            "order": [(f.name, f.cpp, f.params, f.result, f.pure) for f in unit.order], "text": unit.text() if unit.order else "",
+            "test": (unit.test[0], [(f.cpp, why) for f, why in unit.test[1]]), "errors": said.getvalue()}
+
+
 def apply_to_level(level, folder, blueprints, prune=False):
     """Writes the Blueprints into the level: each is the Blueprint of the actor of its name (made when
     the level has none), read from its text by the engine's own reader."""
@@ -5503,54 +5535,45 @@ def main(argv):
     taken = set()
     if level:
         taken = {a["name"] for a in json.load(open(level, encoding="utf-8"))["actors"] if a.get("folder") != (folder or "Source")}
-    for path in files:
-        # A function is written only when its test compares it: what the test cannot compare yet waits,
-        # and with it what calls it - the file is converted again without those.
-        barred = {}
-        while True:
-            unit = convert_file(path, namespace, flags, taken, barred)
-            if not (test and unit.order):
-                break
-            writer = TestWriter(unit, os.path.relpath(os.path.dirname(os.path.abspath(path)), test), flags)
-            writer.test_dir = test
-            unit.test = writer.write()
-            more = {f.decl["id"]: f"its test cannot compare it yet ({why})" for f, why in unit.test[1] if why != "it gives nothing" and f.decl["id"] not in barred}
-            if not more:
-                break
-            barred.update(more)
-        fs = unit.all
-        written = [f for f in fs if f.text]
-        total += len(fs)
-        done += len(written)
-        total_lines += sum(f.lines for f in fs)
-        done_lines += sum(f.lines for f in written)
-        for f in fs:
-            if f.wait:
-                waits[f.wait] += 1
-                wait_lines[f.wait] += f.lines
-        print(f"{os.path.basename(path):28} {len(written):4} / {len(fs):4} functions   {sum(f.lines for f in written):6} / {sum(f.lines for f in fs):6} lines", flush=True)
+    jobs = [(path, namespace, flags, taken, test) for path in files]
+    workers = max(1, min(len(files), int(os.environ.get("KERN_JOBS") or os.cpu_count() or 1)))
+    if workers > 1:   # (the files do not depend on one another: one process each, as many as there are cores)
+        import multiprocessing
+        pool = multiprocessing.Pool(workers)
+        results = pool.imap(convert_one, jobs)
+    else:
+        results = map(convert_one, jobs)
+    for r in results:
+        path = r["path"]
+        total += r["total"]
+        done += r["done"]
+        total_lines += r["total_lines"]
+        done_lines += r["done_lines"]
+        for w, lines in r["waits"]:
+            waits[w] += 1
+            wait_lines[w] += lines
+        sys.stderr.write(r["errors"])
+        print(f"{os.path.basename(path):28} {r['done']:4} / {r['total']:4} functions   {r['done_lines']:6} / {r['total_lines']:6} lines", flush=True)
         if os.environ.get("FUNCTIONS"):
-            for f in fs:
-                print(f"    {f.cpp} ({f.lines}): " + ("written" if f.text else f.wait))
-        if texts and unit.order:
+            for line in r["functions"]:
+                print(line)
+        if texts and r["order"]:
             os.makedirs(texts, exist_ok=True)
-            open(os.path.join(texts, unit.name + ".cpp"), "w").write(unit.text())
-        if test and unit.order:
-            body, skipped = unit.test
+            open(os.path.join(texts, r["name"] + ".cpp"), "w").write(r["text"])
+        if test and r["order"]:
+            body, skipped = r["test"]
             compared += (body or "").count("converted::Tally tally(")
-            for f, why in skipped:
+            for cpp, why in skipped:
                 not_compared[why] += 1
                 if os.environ.get("FUNCTIONS") and why != "it gives nothing":
-                    print(f"    not compared: {f.cpp}: {why}")
+                    print(f"    not compared: {cpp}: {why}")
             name = os.path.join(test, "test_" + os.path.splitext(os.path.basename(path))[0] + ".cpp")
             if body:
                 os.makedirs(test, exist_ok=True)
                 if not os.path.exists(name) or open(name).read() != body:
                     open(name, "w").write(body)
                 tests_written.add(os.path.abspath(name))
-        units.append((path, unit.name, [(f.name, f.cpp, f.params, f.result, f.pure) for f in unit.order], unit.text() if unit.order else ""))
-        unit.tree = None
-        del unit
+        units.append((path, r["name"], r["order"], r["text"]))
     if level and mode == "--convert":
         apply_to_level(level, folder or "Source", [(u[1], u[3]) for u in units if u[2]], prune=len(files) > 20)
     print(f"\n{done} of {total} functions are written as Blueprints ({done_lines} of {total_lines} lines), in {sum(1 for u in units if u[2])} of {len(files)} files")
