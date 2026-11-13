@@ -75,6 +75,9 @@ tools/export_game.sh, .mjs           der native Export: ein Level als Spiel, die
   eine Liste, die Ein- und Ausgänge einer Funktion und Pins können von so einem Typ sein. Make
   baut einen Wert aus seinen Feldern, Break gibt die Felder – in beiden Schreibweisen und in
   jeder Stufe gleich (siehe „Strukturen“).
+- **Fertig: Lesen kopiert nicht (in der Klasse).** Get Item und Break geben den Eintrag, wie er
+  dasteht (`list_get<T>` und `struct_break<S>` sind in der Klasse `const T&`), Find, Contains und
+  Remove Item vergleichen ohne Kopie. Die Bedeutung ist die von Werten – in jeder Stufe dieselbe.
 - **Fertig: Referenz-Eingänge.** Ein Eingang einer Funktion kann der Platz sein, den der Aufruf
   nennt – `void Skid(Wheel& wheel)`, aufgerufen `Skid(Cars[i].Wheels[j]);` –, zum Ändern oder
   (`const Wheel&`) zum Lesen, ohne Kopie; mit der Regel, dass ein gehaltener Eintrag bleibt, wo er

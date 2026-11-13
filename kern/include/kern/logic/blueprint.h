@@ -259,7 +259,7 @@ struct BlueprintCore : logic::PureNodes {
   // change a list variable - the member itself is their first value.
   template <class T, Setting Count, class... V> static List<T> list_make(const V&... items) { return List<T>{T(items)...}; }
   template <class T> static Int list_length(const std::type_identity_t<List<T>>& list) { return logic::list::length(list); }
-  template <class T> static T list_get(const std::type_identity_t<List<T>>& list, Int index) { return logic::list::get(list, index); }
+  template <class T> static const T& list_get(const std::type_identity_t<List<T>>& list, Int index) { return list[index]; }
   template <class T> static Bool list_contains(const std::type_identity_t<List<T>>& list, const std::type_identity_t<T>& item) { return logic::list::contains(list, item); }
   template <class T> static Int list_find(const std::type_identity_t<List<T>>& list, const std::type_identity_t<T>& item) { return logic::list::find(list, item); }
   template <class T> static void list_add(List<T>& list, std::type_identity_t<T> item) { logic::list::add(list, std::move(item)); }
@@ -327,7 +327,7 @@ struct BlueprintCore : logic::PureNodes {
       if (list[k].*Field == value) return FoundRow<decltype(owner_of(Field))>{true, list[k], static_cast<Int>(k)};
     return r;
   }
-  template <class S> static S struct_break(std::type_identity_t<S> value) { return value; }
+  template <class S> static const S& struct_break(const std::type_identity_t<S>& value) { return value; }
 
   // ---- steps ----
   void flow_reroute() {}

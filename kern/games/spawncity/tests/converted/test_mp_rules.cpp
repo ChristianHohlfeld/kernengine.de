@@ -95,6 +95,7 @@ struct Node {
   
   
 };
+namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input }; }
 namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; }
 enum class NodeKind : u8 { event, action, pure, flow };
 struct NodeDef : converted::EngineObject {
@@ -178,6 +179,22 @@ std::vector<Crumb> sample_breadcrumbs(const std::vector<Vec2>& route, Vec2 posit
 struct Turn { enum class Dir : u8 { none, left, right, u_turn } dir = Dir::none; f32 distance = 0, angle_deg = 0; };
 Turn upcoming_turn(const std::vector<Vec2>& route, Vec2 position, f32 scan = 250, f32 window = 12, f32 min_angle = 38);
 f32 route_left(const std::vector<Vec2>& route, Vec2 position);
+struct Ping { u8 owner = 0; Vec3 p; u32 color = 0; f64 at_ms = 0; };
+struct PingBoard {
+ public:
+  /// The local player pings at `p`: his own marker within 5 m is removed (returns false), else set.
+  
+  void set(u8 owner, Vec3 p, u32 color, f64 now_ms);
+  
+  
+  
+  
+  /// 1 while fresh, fading over the last 4 s.
+  
+
+ private:
+  std::vector<Ping> pings_;
+};
 f64 fmin2(f64 a, f64 b) { return a < b ? a : b; }
 f64 clampd(f64 v, f64 lo, f64 hi) { return v < lo ? lo : (v > hi ? hi : v); }
 Quat nlerp_slerp(Quat a, Quat b, f32 t) { return slerp(a, b, t); }
@@ -339,6 +356,11 @@ f32 route_left(const std::vector<Vec2>& pts, Vec2 pos) {
   const Along a = project_on(pts, pos, cum);
   return converted::back(cum) - a.along + a.distance;
 }
+void PingBoard::set(u8 owner, Vec3 p, u32 color, f64 now) {
+  for (Ping& q : pings_)
+    if (q.owner == owner) { q.p = p; q.color = color; q.at_ms = now; return; }
+  pings_.push_back({owner, p, color, now});
+}
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
@@ -473,6 +495,29 @@ f32 route_left(const std::vector<Vec2>& pts, Vec2 pos) {
 [[maybe_unused]] static bool defined(const Turn& s) { return defined(s.dir) && defined(s.distance) && defined(s.angle_deg); }
 [[maybe_unused]] static std::string text(const Turn& s) { return std::string("{") + text(s.dir) + ", " + text(s.distance) + ", " + text(s.angle_deg) + "}"; }
 [[maybe_unused]] static void take(Turn& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<Turn::Dir>(s.dir, (*v.rows)[0]); converted::take_as<double>(s.distance, (*v.rows)[1]); converted::take_as<double>(s.angle_deg, (*v.rows)[2]); }
+[[maybe_unused]] static Ping draw_mp__Ping(converted::Draw& draw) {
+  Ping s{};
+  s.owner = static_cast<unsigned char>(draw.below(40));
+  s.p = draw.vector();
+  s.color = static_cast<unsigned int>(draw.below(40));
+  s.at_ms = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Ping& s) { return converted::Value::structure({arg(s.owner), arg(s.p), arg(s.color), arg(s.at_ms)}); }
+[[maybe_unused]] static bool same(const Ping& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.owner, (*got.rows)[0]) && same(want.p, (*got.rows)[1]) && same(want.color, (*got.rows)[2]) && same(want.at_ms, (*got.rows)[3]); }
+[[maybe_unused]] static bool defined(const Ping& s) { return defined(s.owner) && defined(s.p) && defined(s.color) && defined(s.at_ms); }
+[[maybe_unused]] static std::string text(const Ping& s) { return std::string("{") + text(s.owner) + ", " + text(s.p) + ", " + text(s.color) + ", " + text(s.at_ms) + "}"; }
+[[maybe_unused]] static void take(Ping& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<unsigned char>(s.owner, (*v.rows)[0]); converted::take_as<Vec3>(s.p, (*v.rows)[1]); converted::take_as<unsigned int>(s.color, (*v.rows)[2]); converted::take_as<double>(s.at_ms, (*v.rows)[3]); }
+[[maybe_unused]] static PingBoard draw_mp__PingBoard(converted::Draw& draw) {
+  PingBoard s{};
+  s.pings_ = draw_list(draw, [&]() -> Ping { return draw_mp__Ping(draw); });
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const PingBoard& s) { return converted::Value::structure({arg(s.pings_)}); }
+[[maybe_unused]] static bool same(const PingBoard& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(want.pings_, (*got.rows)[0]); }
+[[maybe_unused]] static bool defined(const PingBoard& s) { return defined(s.pings_); }
+[[maybe_unused]] static std::string text(const PingBoard& s) { return std::string("{") + text(s.pings_) + "}"; }
+[[maybe_unused]] static void take(PingBoard& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<std::vector<Ping>>(s.pings_, (*v.rows)[0]); }
 struct Out_NavTimeline_push { NavTimeline Self; bool Result; };
 [[maybe_unused]] static bool same(const Out_NavTimeline_push& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_NavTimeline_push& s) { return defined(s.Self) && defined(s.Result); }
@@ -865,6 +910,26 @@ SC_TEST(converted_mp_rules) {
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+    }
+  }
+  {  // PingBoard::set
+    converted::Tally tally("PingBoard_set");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] PingBoard a0, [[maybe_unused]] unsigned char a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] unsigned int a3, [[maybe_unused]] double a4) { a0.set(a1, a2, a3, a4); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      const PingBoard a0 = draw_mp__PingBoard(draw);
+      const unsigned char a1 = static_cast<unsigned char>(draw.below(40));
+      const Vec3 a2 = draw.vector();
+      const unsigned int a3 = static_cast<unsigned int>(draw.below(40));
+      const double a4 = draw.number();
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0, a1, a2, a3, a4);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); }, {});
     }
   }
 }

@@ -112,7 +112,7 @@ struct SmokeField {
   /// startWorldCriticalDamage: returns the time it goes off (an existing effect keeps its clock).
   
   /// accelerateWorldCriticalDamage: never later, at least 0.18 s from now.
-  
+  bool accelerate(const std::string& id, f32 expires_at, f32 now);
   
   void move(const std::string& id, Vec3 at);
   bool active(const std::string& id) const;
@@ -160,6 +160,11 @@ f32 unit_hash(u32 x) {
   return static_cast<f32>(static_cast<f64>(x) / 4294967295.0);
 }
 Vec3 rgb(u32 hex) { return {static_cast<f32>((hex >> 16) & 255) / 255, static_cast<f32>((hex >> 8) & 255) / 255, static_cast<f32>(hex & 255) / 255}; }
+bool SmokeField::accelerate(const std::string& id, f32 expires_at, f32 now) {
+  for (SmokeEffect& e : effects_)
+    if (e.id == id) { e.expires = std::fmin(e.expires, std::fmax(now + 0.18, expires_at)); return true; }
+  return false;
+}
 void SmokeField::move(const std::string& id, Vec3 at) {
   for (SmokeEffect& e : effects_)
     if (e.id == id) e.at = at;
@@ -305,6 +310,10 @@ void VisualPose::update(Vec3 position, Quat rotation, Vec3 anchor, i32 mode, f32
 [[maybe_unused]] static bool defined(const VisualPose& s) { return defined(s.init_) && defined(s.mode_) && defined(s.offset_) && defined(s.q_); }
 [[maybe_unused]] static std::string text(const VisualPose& s) { return std::string("{") + text(s.init_) + ", " + text(s.mode_) + ", " + text(s.offset_) + ", " + text(s.q_) + "}"; }
 [[maybe_unused]] static void take(VisualPose& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<bool>(s.init_, (*v.rows)[0]); converted::take_as<int>(s.mode_, (*v.rows)[1]); converted::take_as<Vec3>(s.offset_, (*v.rows)[2]); converted::take_as<Quat>(s.q_, (*v.rows)[3]); }
+struct Out_SmokeField_accelerate { SmokeField Self; bool Result; };
+[[maybe_unused]] static bool same(const Out_SmokeField_accelerate& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_SmokeField_accelerate& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_SmokeField_accelerate& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_VisualPose_update { VisualPose Self; Vec3 out_p; Quat out_q; };
 [[maybe_unused]] static bool same(const Out_VisualPose_update& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Self, (*got.rows)[0]) && same(want.out_p, (*got.rows)[1]) && same(want.out_q, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const Out_VisualPose_update& s) { return defined(s.Self) && defined(s.out_p) && defined(s.out_q); }
@@ -342,6 +351,25 @@ SC_TEST(converted_gaps_rules) {
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+    }
+  }
+  {  // SmokeField::accelerate
+    converted::Tally tally("SmokeField_accelerate");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] SmokeField a0, [[maybe_unused]] std::string a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { const auto r = a0.accelerate(a1, a2, a3); return Out_SmokeField_accelerate{a0, r}; };
+    for (int i = 0; tally.more(i); ++i) {
+      const SmokeField a0 = draw_gaps__SmokeField(draw);
+      const std::string a1 = draw.word();
+      const double a2 = draw.number();
+      const double a3 = draw.number();
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0, a1, a2, a3);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); }, {1, 0});
     }
   }
   {  // SmokeField::move

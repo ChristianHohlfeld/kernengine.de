@@ -1215,6 +1215,7 @@ class Emit:
         self.index = {}       # decl id of a loop's counter -> "n12.index"
         self.pre = []         # steps to run before the statement being written
         self.loops = []       # the loops around the statement being written: their flags for break and continue
+        self.frozen = None    # while the list of a loop is named: the lines that hold its indexes (see `fixed`)
         self.result_struct = None
         self.homes = {}       # decl id of an iterator (or of what insert() gave) -> the list it goes through
         self.serial = 0       # the number of the statement being written (see `slot`)
@@ -1853,6 +1854,10 @@ class Emit:
         return {x.get("referencedDecl", {}).get("id") for x in walk(n) if x.get("kind") == "DeclRefExpr"}
 
     def for_each(self, s):
+        """for (auto& x : list): a loop over the list where it stands. The entry of a pass is the place
+        list[index] - read and changed there, nothing is copied (a loop variable by value is a copy, as in the
+        C++). The list is named once, as the C++ evaluates its range once: an index on the way to it is held in
+        a variable; a list that is no place (what a function gives) is held in one itself."""
         c = kids(s)
         body = c[-1]
         var = next((x for x in c if x.get("kind") == "DeclStmt" and kids(x) and kids(x)[0].get("kind") in ("VarDecl", "DecompositionDecl") and not kids(x)[0].get("isImplicit")), None)
@@ -1868,33 +1873,44 @@ class Emit:
         it = lt[5:-1]
         if v.get("kind") == "DecompositionDecl":   # for (auto& [key, value] : map): the names are the parts of the row
             self.bind(v, it)
-        # (an entry the body only reads is the loop's item, whatever the loop calls it)
-        changes = "&" in raw and not re.search(r"\bconst\b", raw) and v["id"] in self.assigned(body)
-        node = self.u.next_node
-        self.u.next_node += 1
-        self.u.members.append(f"  struct : kern::Node<{node}> {{ {it} item = {self.u.zero(it)}; Int index = 0; }} n{node};")
-        lst = self.ex(src, lt)
-        before = self.take_pre()
-        loop = self.enter_loop(body)
-        if not changes:
-            self.names[v["id"]] = f"n{node}.item"
-            self.types[v["id"]] = it
-            lines = self.loop_body(loop, [body])
+        mark, self.frozen = len(self.pre), []
+        try:
+            got = self.spot(src)
+        finally:
+            held, self.frozen = self.frozen, None
+        if got is not None and got[1] == lt:
+            place = got[0]
         else:
-            # a loop that changes its entries: the entry is a local variable, stored back into the list
-            # when the pass is over (the loop itself goes through the list as it was at its start)
-            if any(x.get("kind") == "ReturnStmt" for x in walk(body)):
-                raise Wait("a loop that changes the entries of its list and returns from inside")
-            item = self.local(v, it)
-            lines = [f"{item} = n{node}.item;"] + self.loop_body(loop, [body])
-            saved, self.pre = self.pre, []
-            lines += self.store({"kind": "ArraySubscriptExpr", "type": v.get("type", {}), "inner": [src, {"kind": "_Text", "_text": f"n{node}.index", "_type": "Int"}]}, lambda _t: item)
-            lines = lines[:len(lines)] if not self.pre else lines
-            self.pre = saved
-        if loop["stop"]:   # (For Each goes through the whole list: after a break the remaining passes do nothing)
-            lines = [f"if (logic_not({loop['stop']})) {{", *["  " + ln for ln in lines], "}"]
-            before.append(f"{loop['stop']} = false;")
-        return before + [f"for (auto it{node} = flow_for_each<{it}>(n{node}, {lst}); it{node}.next();) {{", *["  " + ln for ln in lines], "}"]
+            del self.pre[mark:]
+            place = self.temp("list", lt)
+            held = [f"{place} = {self.ex(src, lt)};"]
+        before = self.take_pre() + held
+        has_break = self.jumps(body)[0]
+        if has_break:
+            # a loop a break ends: it counts itself, and its condition has the break's flag
+            at = self.temp("at", "Int")
+            count = self.temp("count", "Int")
+            index = at
+        else:
+            node = self.u.next_node
+            self.u.next_node += 1
+            self.u.members.append(f"  struct : kern::Node<{node}> {{ Int index = 0; }} n{node};")
+            index = f"n{node}.index"
+        entry = f"{place}[{index}]"
+        loop = self.enter_loop(body)
+        first = []
+        if "&" in raw:
+            self.names[v["id"]] = entry
+            self.types[v["id"]] = it
+        else:
+            first = [f"{self.local(v, it)} = {entry};"]
+        if has_break:
+            lines = first + self.loop_body(loop, [body], [f"{at} += 1;"])
+            cond = f'math_compare<"<">(kern::to<Float>({at}), kern::to<Float>({count}))'
+            return before + [f"{count} = list_length<{it}>({place});", f"{at} = 0;"] + self.loop_lines(cond, [], lines, loop)
+        lines = first + self.loop_body(loop, [body])
+        last = self.whole_math("-", f"list_length<{it}>({place})", "1")
+        return before + [f"for (auto it{node} = flow_for(n{node}, 0, {last}); it{node}.next();) {{", *["  " + ln for ln in lines], "}"]
 
     def switch(self, s):
         c = kids(s)
@@ -2207,11 +2223,11 @@ class Emit:
         for i, node, is_changed in free:
             raw = re.sub(r"\s*&+\s*$", "", qtype(node))
             raw = re.sub(r"^const\s+", "", raw)
-            params.append({"id": i, "kind": "ParmVarDecl", "name": self.names[i].replace(".", "_"), "type": {"qualType": raw + " &" if is_changed else "const " + raw + " &"}})
+            params.append({"id": i, "kind": "ParmVarDecl", "name": re.sub(r"\W+", "_", self.names[i]).strip("_"), "type": {"qualType": raw + " &" if is_changed else "const " + raw + " &"}})
             if by_ref:
                 args.append(node)
             else:
-                snap = self.temp(self.names[i].replace(".", "_") + "_then", self.types[i])
+                snap = self.temp(re.sub(r"\W+", "_", self.names[i]).strip("_") + "_then", self.types[i])
                 lines.append(f"{snap} = {self.ex(node, self.types[i])};")
                 args.append({"kind": "_Text", "_text": snap, "_type": self.types[i]})
         outer = self.f.decl
@@ -2761,16 +2777,18 @@ class Emit:
 
     def plain_variable(self, n):
         n = bare(n)
-        return n.get("kind") == "DeclRefExpr" and n.get("referencedDecl", {}).get("id") in self.names and "." not in self.names[n["referencedDecl"]["id"]]
+        return n.get("kind") == "DeclRefExpr" and n.get("referencedDecl", {}).get("id") in self.names and re.fullmatch(r"\w+", self.names[n["referencedDecl"]["id"]]) is not None
 
     def lvalue(self, n):
         n = bare(n)
         if n.get("kind") == "DeclRefExpr":
             i = n.get("referencedDecl", {}).get("id")
             if i in self.names:
-                if "." in self.names[i]:
-                    raise Wait("a loop's own counter or item is changed")
-                return self.names[i]
+                name = self.names[i]
+                # (a variable - or the entry a loop over a list is at, where that list can be changed)
+                if re.fullmatch(r"\w+", name) is None and not (self.is_local(re.match(r"\w*", name).group(0)) and self.writable(name)):
+                    raise Wait("a loop's own counter is changed")
+                return name
             raise Wait("state outside the function is changed")
         raise Wait("an assignment to something that is not a variable")
 
@@ -2804,6 +2822,16 @@ class Emit:
             after.append(lambda: self.store(n, self.typed(held, t)))
         return held
 
+    def fixed(self, index):
+        """The index of a list entry on the way to a place. For the list a loop goes through it is worked out
+        once, before the loop (self.frozen: the lines that do that) - what the loop's body changes does not move
+        the loop to another list."""
+        if self.frozen is None or re.fullmatch(r"-?\d+|n\d+\.index", index):
+            return index
+        at = self.temp("at", "Int")
+        self.frozen.append(f"{at} = {index};")
+        return at
+
     def spot(self, n):
         """The place an lvalue is, as the notation writes one - a variable of the function and from it
         fields and list entries, self_.cur_.path[i] -: (text, type). None when it is none: a value, an
@@ -2819,7 +2847,8 @@ class Emit:
         if k == "DeclRefExpr":
             i = b.get("referencedDecl", {}).get("id")
             name = self.names.get(i)
-            return (name, self.types[i]) if name is not None and self.is_local(name) else None
+            # (a variable or an input of the function - or the entry a loop over a list is at: a place that starts at one)
+            return (name, self.types[i]) if name is not None and self.is_local(re.match(r"\w*", name).group(0)) else None
         if self.is_this(b):
             return (self.self_name, self.f.self_type) if self.f.self_type is not None and self.is_local(self.self_name) else None
         if k == "UnaryOperator" and b.get("opcode") == "*" and kids(b) and self.is_this(kids(b)[0]):
@@ -2867,7 +2896,7 @@ class Emit:
             if got is None or not got[1].startswith("List<"):
                 return None
             self.f.indexes = True
-            return f"{got[0]}[{self.ex(idx, 'Int')}]", got[1][5:-1]
+            return f"{got[0]}[{self.fixed(self.ex(idx, 'Int'))}]", got[1][5:-1]
         if k == "CXXMemberCallExpr" and callee(b).get("name") in ("front", "back", "at") and kids(callee(b)):
             base = kids(callee(b))[0]
             a = kids(b)[1:]
@@ -2880,7 +2909,7 @@ class Emit:
             self.f.indexes = True
             it = got[1][5:-1]
             at = self.ex(a[0], "Int") if name == "at" else "0" if name == "front" else self.whole_math("-", f"list_length<{it}>({got[0]})", "1")
-            return f"{got[0]}[{at}]", it
+            return f"{got[0]}[{self.fixed(at)}]", it
         return None
 
     def variable_of(self, n, t):

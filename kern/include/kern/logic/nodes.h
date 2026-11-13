@@ -338,8 +338,10 @@ template <class T> T get(const std::vector<T>& items, i64 index) {
 }
 /// The first index of an item that equals `item`, or -1.
 template <class T> i64 find(const std::vector<T>& items, const std::type_identity_t<T>& item) {
-  for (std::size_t k = 0; k < items.size(); ++k)
-    if (T(items[k]) == item) return static_cast<i64>(k);
+  for (std::size_t k = 0; k < items.size(); ++k) {
+    const T& at = items[k];  // (read where it stands: comparing copies nothing)
+    if (at == item) return static_cast<i64>(k);
+  }
   return -1;
 }
 template <class T> bool contains(const std::vector<T>& items, const std::type_identity_t<T>& item) { return find(items, item) >= 0; }
@@ -362,8 +364,11 @@ template <class T> void remove_at(std::vector<T>& items, i64 index) {
 template <class T> bool remove(std::vector<T>& items, const std::type_identity_t<T>& item) {
   std::size_t kept = 0;
   for (std::size_t k = 0; k < items.size(); ++k) {
-    if (T(items[k]) == item) continue;
-    if (kept != k) items[kept] = T(items[k]);
+    {
+      const T& at = items[k];
+      if (at == item) continue;
+    }
+    if (kept != k) items[kept] = std::move(items[k]);
     ++kept;
   }
   const bool removed = kept != items.size();

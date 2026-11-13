@@ -417,12 +417,36 @@ Eine Form, die Gestalt oder Kosten ändert, ist keine von beiden.
    a, b);`, `Rng_range(rng, -1.0, 1.0)`). Im Level stehen 333 statt 1.414 `struct_break` und 69
    statt 243 `list_get`. Der Test vergleicht weiter alles, was eine Funktion gibt und ändert: was
    sie zurückgibt und was sie aus ihren Referenzen gemacht hat.
-3. **Kosten in der Klasse.** Was nur liest, kopiert nicht: Eingänge von Listen und Strukturen sind
-   `const&`, Get Item und Break geben den Eintrag, wie er dasteht, For Each geht ohne Kopie durch
-   eine Liste, die sein Rumpf nicht ändert. Die Bedeutung bleibt die von Werten.
+3. **Kosten in der Klasse.** *(Seit 13.11.2026, 23:42.)* Was nur liest, kopiert nicht: Get Item
+   und Break geben in der Klasse den Eintrag, wie er dasteht (`const T&`), Suchen und Entfernen
+   vergleichen ohne Kopie; was eine Funktion nur liest, bekommt sie als const-Referenz (Schritt 2).
+   For Each behält seine Bedeutung (die Liste, wie sie beim Start war – eine Kopie); der Konverter
+   schreibt `for (auto& x : liste)` darum als Zählschleife auf der Liste, wo sie steht – der
+   Eintrag eines Durchlaufs ist der Platz `liste[n.index]`, gelesen und geändert ohne Kopie, eine
+   Schleifenvariable als Wert ist eine Kopie wie im C++, ein `break` beendet die Schleife. Im
+   Level stehen damit 273 `struct_break` (am Morgen: 2.471), 60 `list_get` (367) und kein For Each des Konverters mehr (62); zwei Funktionen mehr sind geschrieben (Schleifen, die ihre Einträge ändern und von innen zurückkehren).
 4. **Bibliotheken.** Eine Funktion eines Blueprints ohne Zustand ruft jeder andere Blueprint
    direkt – in der Klasse ein gewöhnlicher Aufruf. Damit steht jede Funktion einmal im Projekt
-   (heute: in jedem Blueprint, der sie benutzt).
+   (heute: in jedem Blueprint, der sie benutzt). So ist es festgelegt (13.11.2026, 23:45):
+   - **Eine Bibliothek ist ein Blueprint, der nichts behält:** keine Variablen, keine Events,
+     Timer oder Zustände, und kein Knoten, der zwischen zwei Aufrufen etwas behält (Do Once,
+     Gate, Flip Flop, die eigene Folge eines Random, ein Warten). Sie hat Typen und Funktionen.
+     Im Text: `struct Random : virtual kern::Blueprint { … };`.
+   - **Ein Blueprint benutzt Bibliotheken:** `struct Destruction : virtual kern::Blueprint, virtual
+     Random, virtual Geometry { … };`. Er hat damit ihre Typen (`Rng`, ohne sie noch einmal zu
+     deklarieren – in C++ ist es *ein* Typ, darum bindet eine Referenz) und ruft ihre Funktionen
+     beim Namen der Bibliothek: `n13 = Random::range(rng, -1.0, 1.0);`. Das ist gewöhnliches C++:
+     der Aufruf einer Funktion einer Basisklasse, einmal übersetzt, direkt.
+   - **Der Graph bleibt für sich lesbar:** Er hält, wie die Funktionen und Typen aussehen, die er
+     von seinen Bibliotheken benutzt (wie heute bei `KERN_EXTERN` und den Typen des Projekts);
+     der Text zeigt sie nicht noch einmal. Wer den Text liest, braucht die Bibliothek – wie ein
+     C++-Compiler ihren Header.
+   - **Interpreter und JIT:** Beim Start wird der Blueprint mit seinen Bibliotheken zu einem
+     Graphen gebunden (ihre Funktionen heißen dort `Random::range`); danach ist ein Aufruf einer
+     Bibliotheksfunktion ein Aufruf wie jeder andere – auch mit Referenzen. Keine zweite
+     Laufzeit, kein Sonderweg.
+   - **Der Konverter** schreibt jede Quelldatei und jeden Header als einen Blueprint, jede
+     Funktion einmal, und jeden Typ in der Bibliothek, die ihn definiert.
 5. **Map und Set** als Typen, mit ihren Knoten.
 6. **`Int64`**: die ganze Zahl mit 64 Bit, die bei 2^64 umbricht, mit ihren Rechen- und Bit-Knoten.
 7. **Engine-Aufrufe direkt** in der Klasse (heute: durch `Host::engine`, beim Namen, mit
@@ -528,10 +552,10 @@ sagt, in den Zahlen der Sprache – überall gleich. Er sagt nicht, dass das die
 heutigen Programm: Das rechnet dieselben Formeln mit `f32` in 32 Bit, die Sprache in 64 Bit (wie das
 JavaScript-Original). Das ist die Festlegung der Sprache, kein Spielraum des Tests.
 
-Stand (13.11.2026, 22:20): 356 von 1.428 Funktionen (2.713 von 28.544 Zeilen) aus 58 von 77 Dateien stehen
+Stand (13.11.2026, 23:42): 358 von 1.428 Funktionen (2.723 von 28.544 Zeilen) aus 58 von 77 Dateien stehen
 als Blueprints im Level (58 Actors im Ordner „Source“). Der Test vergleicht jede davon, die etwas
-gibt, Bit für Bit mit ihrem Quelltext – 514 Vergleiche, weil Funktionen aus Headern (und die der
-64-Bit-Zahlen) in jedem Blueprint stehen, der sie benutzt; keine ist ausgenommen. Das Spiel führt für diese Dateien weiter
+gibt oder ändert, Bit für Bit mit ihrem Quelltext – 516 Vergleiche, weil Funktionen aus Headern (und die der
+64-Bit-Zahlen) in jedem Blueprint stehen, der sie benutzt (das endet mit Schritt 4); keine ist ausgenommen. Das Spiel führt für diese Dateien weiter
 ihr C++ aus (Stufe 5).
 
 Worauf die anderen warten, nach Zeilen: der Zustand von `Game` (328 Funktionen, 13.818 Zeilen:

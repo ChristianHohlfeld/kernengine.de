@@ -7,6 +7,9 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-13",time:"23:42",title:"Blueprints: Lesen ohne Kopie",items:[
+    "Unter der Haube: Was nur gelesen wird, wird nicht mehr kopiert – ein Feld, ein Listeneintrag, eine Schleife über eine Liste arbeiten im Export dort, wo die Daten stehen. 358 von 1.428 Funktionen stehen als Blueprints im Level, 516 Vergleiche Bit für Bit mit dem Quelltext. Am Spiel ändert sich nichts.",
+  ]},
   {date:"2026-11-13",time:"22:20",title:"Konverter: Referenzen statt Kopien",items:[
     "Unter der Haube: Eine Methode des Spiels bekommt ihr Objekt jetzt als Referenz und ändert es, wo es steht – vorher wurde es bei jedem Aufruf hinein- und wieder herauskopiert (98 Methoden). 356 von 1.428 Funktionen stehen als Blueprints im Level, 514 Vergleiche Bit für Bit mit dem Quelltext. Am Spiel ändert sich nichts.",
   ]},
