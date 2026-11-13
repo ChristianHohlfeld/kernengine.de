@@ -35,7 +35,25 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+struct Whole64 {
+  u32 high = 0;
+  u32 low = 0;
+};
+inline Whole64 w64_from_number(double x) {
+  const double high = std::floor(x / 4294967296.0);
+  const double low = x - high * 4294967296.0;
+  return {static_cast<u32>(converted::fits<unsigned int>(high < 0.0 ? high + 4294967296.0 : high)), static_cast<u32>(converted::fits<unsigned int>(low))};
+}
+inline Whole64 w64_bit_or(Whole64 a, Whole64 b) { return {a.high | b.high, a.low | b.low}; }
+inline Whole64 w64_shift_left(Whole64 a, u32 by) {
+  if (by == 0) return a;
+  if (by >= 64) return {0, 0};
+  if (by >= 32) return {converted::shl(a.low, (by - 32)), 0};
+  return {(converted::shl(a.high, by)) | (converted::shr(a.low, (32 - by))), converted::shl(a.low, by)};
+}
 enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
+enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
+enum class Surface : u8 { none, cloth, tpu, floor };
 inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
 enum class GeomType : u8 { unknown = 0, point = 1, line = 2, polygon = 3 };
 struct Lane {
@@ -49,6 +67,7 @@ enum class PinType : u8 {
   boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, count
 };
 namespace TrafficRules { struct Pursuit { Vec2 target, tangent{1, 0}; bool passed = false; f32 end = 0; }; }
+u64 cell(i32 x, i32 y) { return (converted::shl_bits(static_cast<u64>(static_cast<u32>(x)), 32)) | static_cast<u32>(y); }
 namespace TrafficRules { inline TrafficRules::Pursuit pursuit(const Lane& lane, i32 index, i32 dir, Vec2 pos, f32 look, f32 off) {
   Pursuit out;
   const i32 n = static_cast<i32>(lane.points.size());
@@ -85,18 +104,28 @@ namespace TrafficRules { inline TrafficRules::Pursuit pursuit(const Lane& lane, 
 #undef protected
 #pragma GCC diagnostic pop
 
+[[maybe_unused]] static Whole64 draw_w64__Whole64(converted::Draw& draw) {
+  Whole64 s{};
+  s.high = static_cast<unsigned int>(draw.below(40));
+  s.low = static_cast<unsigned int>(draw.below(40));
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Whole64& s) { return converted::Value::structure({arg(s.high), arg(s.low)}); }
+[[maybe_unused]] static bool same(const Whole64& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.high, (*got.rows)[0]) && same(want.low, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Whole64& s) { return defined(s.high) && defined(s.low); }
+[[maybe_unused]] static std::string text(const Whole64& s) { return std::string("{") + text(s.high) + ", " + text(s.low) + "}"; }
 [[maybe_unused]] static Lane draw_Lane(converted::Draw& draw) {
   Lane s{};
   s.points = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
   s.width = draw.number();
-  s.tile = static_cast<unsigned long>(draw.below(40));
+  s.tile = static_cast<u64>(draw.bits());
   s.alive = draw.flag();
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const Lane& s) { return converted::Value::structure({arg(s.points), arg(s.width), arg(s.tile), arg(s.alive)}); }
-[[maybe_unused]] static bool same(const Lane& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.points, (*got.rows)[0]) && same(want.width, (*got.rows)[1]) && same(want.tile, (*got.rows)[2]) && same(want.alive, (*got.rows)[3]); }
-[[maybe_unused]] static bool defined(const Lane& s) { return defined(s.points) && defined(s.width) && defined(s.tile) && defined(s.alive); }
-[[maybe_unused]] static std::string text(const Lane& s) { return std::string("{") + text(s.points) + ", " + text(s.width) + ", " + text(s.tile) + ", " + text(s.alive) + "}"; }
+[[maybe_unused]] static converted::Value arg(const Lane& s) { return converted::Value::structure({arg(s.points), arg(s.width), arg(converted::wholes(s.tile)), arg(s.alive)}); }
+[[maybe_unused]] static bool same(const Lane& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.points, (*got.rows)[0]) && same(want.width, (*got.rows)[1]) && same(converted::wholes(want.tile), (*got.rows)[2]) && same(want.alive, (*got.rows)[3]); }
+[[maybe_unused]] static bool defined(const Lane& s) { return defined(s.points) && defined(s.width) && defined(converted::wholes(s.tile)) && defined(s.alive); }
+[[maybe_unused]] static std::string text(const Lane& s) { return std::string("{") + text(s.points) + ", " + text(s.width) + ", " + text(converted::wholes(s.tile)) + ", " + text(s.alive) + "}"; }
 [[maybe_unused]] static TrafficRules::Pursuit draw_TrafficRules__Pursuit(converted::Draw& draw) {
   TrafficRules::Pursuit s{};
   s.target = draw.vector2();
@@ -114,6 +143,53 @@ namespace TrafficRules { using converted::arg; using converted::same; using conv
 
 SC_TEST(converted_world_traffic) {
   converted::Blueprint bp("WorldTraffic");
+  {  // w64_from_number
+    converted::Tally tally("w64_from_number");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] double a0) { return converted_world_traffic::w64_from_number(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      const double a0 = draw.number();
+      const converted::Watch watch;
+      const auto want = run(a0);
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
+  {  // w64_shift_left
+    converted::Tally tally("w64_shift_left");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] unsigned int a1) { return converted_world_traffic::w64_shift_left(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // w64_bit_or
+    converted::Tally tally("w64_bit_or");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_world_traffic::w64_bit_or(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const Whole64 a1 = draw_w64__Whole64(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // cell
+    converted::Tally tally("cell");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] int a0, [[maybe_unused]] int a1) { return converted_world_traffic::cell(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const int a0 = static_cast<int>(draw.whole());
+      const int a1 = static_cast<int>(draw.whole());
+      const converted::Watch watch;
+      const auto want = converted::wholes(run(a0, a1));
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
   {  // TrafficRules::pursuit
     converted::Tally tally("TrafficRules_pursuit");
     converted::Draw draw;   // (every function its own arguments, the same in every run)

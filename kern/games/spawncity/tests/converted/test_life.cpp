@@ -35,6 +35,34 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+struct Whole64 {
+  u32 high = 0;
+  u32 low = 0;
+};
+inline Whole64 w64_from_number(double x) {
+  const double high = std::floor(x / 4294967296.0);
+  const double low = x - high * 4294967296.0;
+  return {static_cast<u32>(converted::fits<unsigned int>(high < 0.0 ? high + 4294967296.0 : high)), static_cast<u32>(converted::fits<unsigned int>(low))};
+}
+inline double w64_to_number(Whole64 a) { return static_cast<double>(a.high) * 4294967296.0 + static_cast<double>(a.low); }
+inline Whole64 w64_bit_xor(Whole64 a, Whole64 b) { return {a.high ^ b.high, a.low ^ b.low}; }
+inline Whole64 w64_shift_right(Whole64 a, u32 by) {
+  if (by == 0) return a;
+  if (by >= 64) return {0, 0};
+  if (by >= 32) return {0, converted::shr(a.high, (by - 32))};
+  return {converted::shr(a.high, by), (converted::shr(a.low, by)) | (converted::shl(a.high, (32 - by)))};
+}
+inline Whole64 w64_add(Whole64 a, Whole64 b) {
+  const u32 low = a.low + b.low;
+  return {a.high + b.high + (low < a.low ? 1u : 0u), low};
+}
+inline u32 w64_multiply_high(u32 a, u32 b) {
+  const u32 a0 = a & 65535u, a1 = a >> 16, b0 = b & 65535u, b1 = b >> 16;
+  const u32 low = a0 * b0, mid1 = a1 * b0, mid2 = a0 * b1;
+  const u32 carry = ((low >> 16) + (mid1 & 65535u) + (mid2 & 65535u)) >> 16;
+  return a1 * b1 + (mid1 >> 16) + (mid2 >> 16) + carry;
+}
+inline Whole64 w64_multiply(Whole64 a, Whole64 b) { return {w64_multiply_high(a.low, b.low) + a.low * b.high + a.high * b.low, a.low * b.low}; }
 struct Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
   
@@ -53,7 +81,10 @@ struct Quat {
 
 };
 enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
+enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
+enum class Surface : u8 { none, cloth, tpu, floor };
 struct Body { u64 id = 0; };
+constexpr f32 kPi = 3.14159265358979323846;
 namespace Life { struct Cow {
     u64 key = 0;
     i32 meadow = -1;
@@ -71,6 +102,24 @@ namespace Life { struct Cow {
     Quat net_rot;
     bool net_dead = false;
   }; }
+namespace Life { struct Pet {
+    f32 radius = 20, omega = 0.05, phase = 0, wobble_omega = 0.2, wobble_r = 2, scale = 1;
+    Vec3 pos;
+    f32 yaw = 0, gait = 0, speed = 0, dead_at = -1;
+    bool shown = false, has_pose = false, carried = false;  // carried: picked up / thrown alive (a VR hand)
+    f32 carried_still = 0;
+    Vec2 off;  // where a throw left it, off its round (back to it over some seconds)
+    i32 punches = 0;
+    Vec3 color;
+    Body body;  // the dead animal
+    Quat rot;
+    Quat net_rot;  // MP client: the host's carried / dead pose
+  }; }
+f32 hash01(u64 v) {
+  v ^= converted::shr_bits(v, 33); converted::times_bits_to(v, 0xff51afd7ed558ccdull); v ^= converted::shr_bits(v, 33); converted::times_bits_to(v, 0xc4ceb9fe1a85ec53ull); v ^= converted::shr_bits(v, 33);
+  return static_cast<f32>(converted::shr_bits(v, 40)) / 16777216.0;
+}
+u64 mix(u64 a, u64 b) { return converted::plus_bits(converted::plus_bits(converted::times_bits(a, 0x9e3779b97f4a7c15ull), b), 0x632be59bd9b4e019ull); }
 f32 dist2d(Vec3 a, Vec3 b) { return hypot_bp(a.x - b.x, a.y - b.y); }
 f32 dist2d(Vec2 a, Vec2 b) { return hypot_bp(a.x - b.x, a.y - b.y); }
 Vec3 rgb(u32 h) { return {((h >> 16) & 255) / 255.0, ((h >> 8) & 255) / 255.0, (h & 255) / 255.0}; }
@@ -102,6 +151,15 @@ namespace Life { inline f32 ring_area(const std::vector<Vec2>& r) {
   for (std::size_t i = 0, j = converted::minus(r.size(), 1); i < r.size(); j = converted::post_inc(i)) a += (converted::at(r, j).x + converted::at(r, i).x) * (converted::at(r, j).y - converted::at(r, i).y);
   return std::fabs(a) * 0.5;
 } }
+namespace Life { inline void pet_params(Pet& p, u32 i) {
+  const u64 h = mix(0xa11a, i);
+  p.radius = 13 + 45 * hash01(converted::plus_bits(h, 1));
+  p.omega = (0.55 + 0.9 * hash01(converted::plus_bits(h, 2))) / p.radius;
+  p.phase = hash01(converted::plus_bits(h, 3)) * 2 * kPi;
+  p.wobble_omega = 0.12 + 0.18 * hash01(converted::plus_bits(h, 4));
+  p.wobble_r = 1.2 + 2.3 * hash01(converted::plus_bits(h, 5));
+  p.scale = 0.72 + 0.46 * hash01(converted::plus_bits(h, 6));
+} }
 namespace Life { inline void scare_cow(Cow& c, Vec2 from, f32 now, f32 secs) {
   if (c.dead) return;
   Vec2 d{c.pos.x - from.x, c.pos.y - from.y};
@@ -114,6 +172,25 @@ namespace Life { inline void scare_cow(Cow& c, Vec2 from, f32 now, f32 secs) {
 #undef protected
 #pragma GCC diagnostic pop
 
+[[maybe_unused]] static Whole64 draw_w64__Whole64(converted::Draw& draw) {
+  Whole64 s{};
+  s.high = static_cast<unsigned int>(draw.below(40));
+  s.low = static_cast<unsigned int>(draw.below(40));
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Whole64& s) { return converted::Value::structure({arg(s.high), arg(s.low)}); }
+[[maybe_unused]] static bool same(const Whole64& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.high, (*got.rows)[0]) && same(want.low, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Whole64& s) { return defined(s.high) && defined(s.low); }
+[[maybe_unused]] static std::string text(const Whole64& s) { return std::string("{") + text(s.high) + ", " + text(s.low) + "}"; }
+[[maybe_unused]] static Body draw_kern__physics__Body(converted::Draw& draw) {
+  Body s{};
+  s.id = static_cast<u64>(draw.bits());
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Body& s) { return converted::Value::structure({arg(converted::wholes(s.id))}); }
+[[maybe_unused]] static bool same(const Body& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::wholes(want.id), (*got.rows)[0]); }
+[[maybe_unused]] static bool defined(const Body& s) { return defined(converted::wholes(s.id)); }
+[[maybe_unused]] static std::string text(const Body& s) { return std::string("{") + text(converted::wholes(s.id)) + "}"; }
 [[maybe_unused]] static Quat draw_kern__Quat(converted::Draw& draw) {
   Quat s{};
   s.x = draw.number();
@@ -126,18 +203,40 @@ namespace Life { inline void scare_cow(Cow& c, Vec2 from, f32 now, f32 secs) {
 [[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
 [[maybe_unused]] static bool defined(const Quat& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
 [[maybe_unused]] static std::string text(const Quat& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
-[[maybe_unused]] static Body draw_kern__physics__Body(converted::Draw& draw) {
-  Body s{};
-  s.id = static_cast<unsigned long>(draw.below(40));
+[[maybe_unused]] static Life::Pet draw_Life__Pet(converted::Draw& draw) {
+  Life::Pet s{};
+  s.radius = draw.number();
+  s.omega = draw.number();
+  s.phase = draw.number();
+  s.wobble_omega = draw.number();
+  s.wobble_r = draw.number();
+  s.scale = draw.number();
+  s.pos = draw.vector();
+  s.yaw = draw.number();
+  s.gait = draw.number();
+  s.speed = draw.number();
+  s.dead_at = draw.number();
+  s.shown = draw.flag();
+  s.has_pose = draw.flag();
+  s.carried = draw.flag();
+  s.carried_still = draw.number();
+  s.off = draw.vector2();
+  s.punches = static_cast<int>(draw.whole());
+  s.color = draw.vector();
+  s.body = draw_kern__physics__Body(draw);
+  s.rot = draw_kern__Quat(draw);
+  s.net_rot = draw_kern__Quat(draw);
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const Body& s) { return converted::Value::structure({arg(s.id)}); }
-[[maybe_unused]] static bool same(const Body& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(want.id, (*got.rows)[0]); }
-[[maybe_unused]] static bool defined(const Body& s) { return defined(s.id); }
-[[maybe_unused]] static std::string text(const Body& s) { return std::string("{") + text(s.id) + "}"; }
+namespace Life { using converted::arg; using converted::same; using converted::defined; using converted::text;
+[[maybe_unused]] static converted::Value arg(const Life::Pet& s) { return converted::Value::structure({arg(s.radius), arg(s.omega), arg(s.phase), arg(s.wobble_omega), arg(s.wobble_r), arg(s.scale), arg(s.pos), arg(s.yaw), arg(s.gait), arg(s.speed), arg(s.dead_at), arg(s.shown), arg(s.has_pose), arg(s.carried), arg(s.carried_still), arg(s.off), arg(s.punches), arg(s.color), arg(s.body), arg(s.rot), arg(s.net_rot)}); }
+[[maybe_unused]] static bool same(const Life::Pet& want, const converted::Value& got) { return got.rows && got.rows->size() == 21 && same(want.radius, (*got.rows)[0]) && same(want.omega, (*got.rows)[1]) && same(want.phase, (*got.rows)[2]) && same(want.wobble_omega, (*got.rows)[3]) && same(want.wobble_r, (*got.rows)[4]) && same(want.scale, (*got.rows)[5]) && same(want.pos, (*got.rows)[6]) && same(want.yaw, (*got.rows)[7]) && same(want.gait, (*got.rows)[8]) && same(want.speed, (*got.rows)[9]) && same(want.dead_at, (*got.rows)[10]) && same(want.shown, (*got.rows)[11]) && same(want.has_pose, (*got.rows)[12]) && same(want.carried, (*got.rows)[13]) && same(want.carried_still, (*got.rows)[14]) && same(want.off, (*got.rows)[15]) && same(want.punches, (*got.rows)[16]) && same(want.color, (*got.rows)[17]) && same(want.body, (*got.rows)[18]) && same(want.rot, (*got.rows)[19]) && same(want.net_rot, (*got.rows)[20]); }
+[[maybe_unused]] static bool defined(const Life::Pet& s) { return defined(s.radius) && defined(s.omega) && defined(s.phase) && defined(s.wobble_omega) && defined(s.wobble_r) && defined(s.scale) && defined(s.pos) && defined(s.yaw) && defined(s.gait) && defined(s.speed) && defined(s.dead_at) && defined(s.shown) && defined(s.has_pose) && defined(s.carried) && defined(s.carried_still) && defined(s.off) && defined(s.punches) && defined(s.color) && defined(s.body) && defined(s.rot) && defined(s.net_rot); }
+[[maybe_unused]] static std::string text(const Life::Pet& s) { return std::string("{") + text(s.radius) + ", " + text(s.omega) + ", " + text(s.phase) + ", " + text(s.wobble_omega) + ", " + text(s.wobble_r) + ", " + text(s.scale) + ", " + text(s.pos) + ", " + text(s.yaw) + ", " + text(s.gait) + ", " + text(s.speed) + ", " + text(s.dead_at) + ", " + text(s.shown) + ", " + text(s.has_pose) + ", " + text(s.carried) + ", " + text(s.carried_still) + ", " + text(s.off) + ", " + text(s.punches) + ", " + text(s.color) + ", " + text(s.body) + ", " + text(s.rot) + ", " + text(s.net_rot) + "}"; }
+}
 [[maybe_unused]] static Life::Cow draw_Life__Cow(converted::Draw& draw) {
   Life::Cow s{};
-  s.key = static_cast<unsigned long>(draw.below(40));
+  s.key = static_cast<u64>(draw.bits());
   s.meadow = static_cast<int>(draw.whole());
   s.home = draw.vector2();
   s.off = draw.vector2();
@@ -165,14 +264,108 @@ namespace Life { inline void scare_cow(Cow& c, Vec2 from, f32 now, f32 secs) {
   return s;
 }
 namespace Life { using converted::arg; using converted::same; using converted::defined; using converted::text;
-[[maybe_unused]] static converted::Value arg(const Life::Cow& s) { return converted::Value::structure({arg(s.key), arg(s.meadow), arg(s.home), arg(s.off), arg(s.pos), arg(s.yaw), arg(s.hp), arg(s.phase), arg(s.next_moo), arg(s.flee_until), arg(s.flinch_at), arg(s.last_hit), arg(s.flee_v), arg(s.color), arg(s.rot), arg(s.dead), arg(s.walking), arg(s.carried), arg(s.carried_still), arg(s.body), arg(s.net_to), arg(s.net_v), arg(s.net_at), arg(s.net_rot), arg(s.net_dead)}); }
-[[maybe_unused]] static bool same(const Life::Cow& want, const converted::Value& got) { return got.rows && got.rows->size() == 25 && same(want.key, (*got.rows)[0]) && same(want.meadow, (*got.rows)[1]) && same(want.home, (*got.rows)[2]) && same(want.off, (*got.rows)[3]) && same(want.pos, (*got.rows)[4]) && same(want.yaw, (*got.rows)[5]) && same(want.hp, (*got.rows)[6]) && same(want.phase, (*got.rows)[7]) && same(want.next_moo, (*got.rows)[8]) && same(want.flee_until, (*got.rows)[9]) && same(want.flinch_at, (*got.rows)[10]) && same(want.last_hit, (*got.rows)[11]) && same(want.flee_v, (*got.rows)[12]) && same(want.color, (*got.rows)[13]) && same(want.rot, (*got.rows)[14]) && same(want.dead, (*got.rows)[15]) && same(want.walking, (*got.rows)[16]) && same(want.carried, (*got.rows)[17]) && same(want.carried_still, (*got.rows)[18]) && same(want.body, (*got.rows)[19]) && same(want.net_to, (*got.rows)[20]) && same(want.net_v, (*got.rows)[21]) && same(want.net_at, (*got.rows)[22]) && same(want.net_rot, (*got.rows)[23]) && same(want.net_dead, (*got.rows)[24]); }
-[[maybe_unused]] static bool defined(const Life::Cow& s) { return defined(s.key) && defined(s.meadow) && defined(s.home) && defined(s.off) && defined(s.pos) && defined(s.yaw) && defined(s.hp) && defined(s.phase) && defined(s.next_moo) && defined(s.flee_until) && defined(s.flinch_at) && defined(s.last_hit) && defined(s.flee_v) && defined(s.color) && defined(s.rot) && defined(s.dead) && defined(s.walking) && defined(s.carried) && defined(s.carried_still) && defined(s.body) && defined(s.net_to) && defined(s.net_v) && defined(s.net_at) && defined(s.net_rot) && defined(s.net_dead); }
-[[maybe_unused]] static std::string text(const Life::Cow& s) { return std::string("{") + text(s.key) + ", " + text(s.meadow) + ", " + text(s.home) + ", " + text(s.off) + ", " + text(s.pos) + ", " + text(s.yaw) + ", " + text(s.hp) + ", " + text(s.phase) + ", " + text(s.next_moo) + ", " + text(s.flee_until) + ", " + text(s.flinch_at) + ", " + text(s.last_hit) + ", " + text(s.flee_v) + ", " + text(s.color) + ", " + text(s.rot) + ", " + text(s.dead) + ", " + text(s.walking) + ", " + text(s.carried) + ", " + text(s.carried_still) + ", " + text(s.body) + ", " + text(s.net_to) + ", " + text(s.net_v) + ", " + text(s.net_at) + ", " + text(s.net_rot) + ", " + text(s.net_dead) + "}"; }
+[[maybe_unused]] static converted::Value arg(const Life::Cow& s) { return converted::Value::structure({arg(converted::wholes(s.key)), arg(s.meadow), arg(s.home), arg(s.off), arg(s.pos), arg(s.yaw), arg(s.hp), arg(s.phase), arg(s.next_moo), arg(s.flee_until), arg(s.flinch_at), arg(s.last_hit), arg(s.flee_v), arg(s.color), arg(s.rot), arg(s.dead), arg(s.walking), arg(s.carried), arg(s.carried_still), arg(s.body), arg(s.net_to), arg(s.net_v), arg(s.net_at), arg(s.net_rot), arg(s.net_dead)}); }
+[[maybe_unused]] static bool same(const Life::Cow& want, const converted::Value& got) { return got.rows && got.rows->size() == 25 && same(converted::wholes(want.key), (*got.rows)[0]) && same(want.meadow, (*got.rows)[1]) && same(want.home, (*got.rows)[2]) && same(want.off, (*got.rows)[3]) && same(want.pos, (*got.rows)[4]) && same(want.yaw, (*got.rows)[5]) && same(want.hp, (*got.rows)[6]) && same(want.phase, (*got.rows)[7]) && same(want.next_moo, (*got.rows)[8]) && same(want.flee_until, (*got.rows)[9]) && same(want.flinch_at, (*got.rows)[10]) && same(want.last_hit, (*got.rows)[11]) && same(want.flee_v, (*got.rows)[12]) && same(want.color, (*got.rows)[13]) && same(want.rot, (*got.rows)[14]) && same(want.dead, (*got.rows)[15]) && same(want.walking, (*got.rows)[16]) && same(want.carried, (*got.rows)[17]) && same(want.carried_still, (*got.rows)[18]) && same(want.body, (*got.rows)[19]) && same(want.net_to, (*got.rows)[20]) && same(want.net_v, (*got.rows)[21]) && same(want.net_at, (*got.rows)[22]) && same(want.net_rot, (*got.rows)[23]) && same(want.net_dead, (*got.rows)[24]); }
+[[maybe_unused]] static bool defined(const Life::Cow& s) { return defined(converted::wholes(s.key)) && defined(s.meadow) && defined(s.home) && defined(s.off) && defined(s.pos) && defined(s.yaw) && defined(s.hp) && defined(s.phase) && defined(s.next_moo) && defined(s.flee_until) && defined(s.flinch_at) && defined(s.last_hit) && defined(s.flee_v) && defined(s.color) && defined(s.rot) && defined(s.dead) && defined(s.walking) && defined(s.carried) && defined(s.carried_still) && defined(s.body) && defined(s.net_to) && defined(s.net_v) && defined(s.net_at) && defined(s.net_rot) && defined(s.net_dead); }
+[[maybe_unused]] static std::string text(const Life::Cow& s) { return std::string("{") + text(converted::wholes(s.key)) + ", " + text(s.meadow) + ", " + text(s.home) + ", " + text(s.off) + ", " + text(s.pos) + ", " + text(s.yaw) + ", " + text(s.hp) + ", " + text(s.phase) + ", " + text(s.next_moo) + ", " + text(s.flee_until) + ", " + text(s.flinch_at) + ", " + text(s.last_hit) + ", " + text(s.flee_v) + ", " + text(s.color) + ", " + text(s.rot) + ", " + text(s.dead) + ", " + text(s.walking) + ", " + text(s.carried) + ", " + text(s.carried_still) + ", " + text(s.body) + ", " + text(s.net_to) + ", " + text(s.net_v) + ", " + text(s.net_at) + ", " + text(s.net_rot) + ", " + text(s.net_dead) + "}"; }
 }
 
 SC_TEST(converted_life) {
   converted::Blueprint bp("Life");
+  {  // w64_shift_right
+    converted::Tally tally("w64_shift_right");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] unsigned int a1) { return converted_life::w64_shift_right(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // w64_bit_xor
+    converted::Tally tally("w64_bit_xor");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_life::w64_bit_xor(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const Whole64 a1 = draw_w64__Whole64(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // w64_multiply_high
+    converted::Tally tally("w64_multiply_high");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted_life::w64_multiply_high(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // w64_multiply
+    converted::Tally tally("w64_multiply");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_life::w64_multiply(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const Whole64 a1 = draw_w64__Whole64(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // w64_to_number
+    converted::Tally tally("w64_to_number");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0) { return converted_life::w64_to_number(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const converted::Watch watch;
+      const auto want = run(a0);
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
+  {  // hash01
+    converted::Tally tally("hash01");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] u64 a0) { return converted_life::hash01(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      const u64 a0 = static_cast<u64>(draw.bits());
+      const converted::Watch watch;
+      const auto want = run(a0);
+      tally.take(bp, {arg(converted::wholes(a0))}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
+  {  // w64_add
+    converted::Tally tally("w64_add");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_life::w64_add(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const Whole64 a1 = draw_w64__Whole64(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // mix
+    converted::Tally tally("mix");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] u64 a0, [[maybe_unused]] u64 a1) { return converted_life::mix(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const u64 a0 = static_cast<u64>(draw.bits());
+      const u64 a1 = static_cast<u64>(draw.bits());
+      const converted::Watch watch;
+      const auto want = converted::wholes(run(a0, a1));
+      tally.take(bp, {arg(converted::wholes(a0)), arg(converted::wholes(a1))}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
   {  // dist2d
     converted::Tally tally("dist2d");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -255,6 +448,29 @@ SC_TEST(converted_life) {
       const converted::Watch watch;
       const auto want = run(a0);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
+  {  // w64_from_number
+    converted::Tally tally("w64_from_number");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] double a0) { return converted_life::w64_from_number(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      const double a0 = draw.number();
+      const converted::Watch watch;
+      const auto want = run(a0);
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
+  {  // Life::pet_params
+    converted::Tally tally("Life_pet_params");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Life::Pet a0, [[maybe_unused]] unsigned int a1) { converted_life::Life::pet_params(a0, a1); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      const Life::Pet a0 = draw_Life__Pet(draw);
+      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
   {  // Life::scare_cow

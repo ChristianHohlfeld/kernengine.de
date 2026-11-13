@@ -34,6 +34,65 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+struct Whole64 {
+  u32 high = 0;
+  u32 low = 0;
+};
+inline Whole64 w64_from_number(double x) {
+  const double high = std::floor(x / 4294967296.0);
+  const double low = x - high * 4294967296.0;
+  return {static_cast<u32>(converted::fits<unsigned int>(high < 0.0 ? high + 4294967296.0 : high)), static_cast<u32>(converted::fits<unsigned int>(low))};
+}
+inline bool w64_is_zero(Whole64 a) { return a.high == 0 && a.low == 0; }
+inline Whole64 w64_shift_left(Whole64 a, u32 by) {
+  if (by == 0) return a;
+  if (by >= 64) return {0, 0};
+  if (by >= 32) return {converted::shl(a.low, (by - 32)), 0};
+  return {(converted::shl(a.high, by)) | (converted::shr(a.low, (32 - by))), converted::shl(a.low, by)};
+}
+inline Whole64 w64_add(Whole64 a, Whole64 b) {
+  const u32 low = a.low + b.low;
+  return {a.high + b.high + (low < a.low ? 1u : 0u), low};
+}
+inline Whole64 w64_subtract(Whole64 a, Whole64 b) {
+  const u32 low = a.low - b.low;
+  return {a.high - b.high - (a.low < b.low ? 1u : 0u), low};
+}
+inline Whole64 w64_negate(Whole64 a) { return w64_subtract({0, 0}, a); }
+inline bool w64_equal(Whole64 a, Whole64 b) { return a.high == b.high && a.low == b.low; }
+inline bool w64_less(Whole64 a, Whole64 b) { return a.high != b.high ? a.high < b.high : a.low < b.low; }
+inline bool w64_less_signed(Whole64 a, Whole64 b) {
+  const u32 x = a.high ^ 2147483648u, y = b.high ^ 2147483648u;
+  return x != y ? x < y : a.low < b.low;
+}
+struct Whole64Divided {
+  Whole64 quotient;
+  Whole64 remainder;
+};
+inline Whole64Divided w64_divide_both(Whole64 a, Whole64 b) {
+  Whole64Divided out;
+  if (w64_is_zero(b)) return out;
+  for (i32 bit = 63; bit >= 0; --bit) {
+    out.remainder = w64_shift_left(out.remainder, 1);
+    const u32 taken = bit >= 32 ? (converted::shr(a.high, static_cast<u32>(bit - 32))) & 1u : (converted::shr(a.low, static_cast<u32>(bit))) & 1u;
+    out.remainder.low = out.remainder.low | taken;
+    if (!w64_less(out.remainder, b)) {
+      out.remainder = w64_subtract(out.remainder, b);
+      if (bit >= 32) {
+        out.quotient.high = out.quotient.high | (converted::shl(1u, static_cast<u32>(bit - 32)));
+      } else {
+        out.quotient.low = out.quotient.low | (converted::shl(1u, static_cast<u32>(bit)));
+      }
+    }
+  }
+  return out;
+}
+inline Whole64 w64_remainder(Whole64 a, Whole64 b) { return w64_divide_both(a, b).remainder; }
+inline Whole64 w64_remainder_signed(Whole64 a, Whole64 b) {
+  const bool minus_a = a.high >= 2147483648u, minus_b = b.high >= 2147483648u;
+  const Whole64 r = w64_remainder(minus_a ? w64_negate(a) : a, minus_b ? w64_negate(b) : b);
+  return minus_a ? w64_negate(r) : r;
+}
 enum class LogLevel : i32 { debug = 0, info = 1, warn = 2, error = 3 };
 constexpr f32 kPi = 3.14159265358979323846;
 struct Quat {
@@ -164,6 +223,7 @@ struct SkyState {
   f32 blast_age = -1;          // < 0: no shock wave in the clouds
   Vec2 wind{0.012, 0.004};
 };
+enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
 struct Lighting {
   Vec3 sun_direction{-0.45, -0.52, 0.72};
   Vec3 sun_color{2.8, 2.47, 2.11};
@@ -335,11 +395,11 @@ Vec3 hex_linear(u32 rgb) {
   return {lin(static_cast<f32>((rgb >> 16) & 255) / 255), lin(static_cast<f32>((rgb >> 8) & 255) / 255), lin(static_cast<f32>(rgb & 255) / 255)};
 }
 int police_flash(f32 now_s) {
-  const i64 slot = converted::rem(static_cast<i64>(converted::fits<long>(std::floor(now_s * 1000 / 110))), 6);
+  const i64 slot = converted::rem_bits(static_cast<i64>(converted::fits<converted::SignedWhole>(std::floor(now_s * 1000 / 110))), 6);
   return slot == 0 || slot == 2 ? 1 : slot == 3 || slot == 5 ? 2 : 0;
 }
 int drone_flash(f32 now_s, int index) {
-  const i64 slot = converted::rem((converted::plus((converted::rem(static_cast<i64>(converted::fits<long>(std::floor((now_s * 1000 + index * 37) / 92))), 8)), 8)), 8);
+  const i64 slot = converted::rem_bits((converted::plus_bits((converted::rem_bits(static_cast<i64>(converted::fits<converted::SignedWhole>(std::floor((now_s * 1000 + index * 37) / 92))), 8)), 8)), 8);
   return slot <= 1 ? 1 : slot == 4 || slot == 5 ? 2 : 0;
 }
 #undef private
@@ -445,6 +505,26 @@ int drone_flash(f32 now_s, int index) {
 [[maybe_unused]] static bool same(const SkyState& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.sun, (*got.rows)[0]) && same(want.moon, (*got.rows)[1]) && same(want.night, (*got.rows)[2]) && same(want.clouds, (*got.rows)[3]) && same(want.blast_direction, (*got.rows)[4]) && same(want.blast_age, (*got.rows)[5]) && same(want.wind, (*got.rows)[6]); }
 [[maybe_unused]] static bool defined(const SkyState& s) { return defined(s.sun) && defined(s.moon) && defined(s.night) && defined(s.clouds) && defined(s.blast_direction) && defined(s.blast_age) && defined(s.wind); }
 [[maybe_unused]] static std::string text(const SkyState& s) { return std::string("{") + text(s.sun) + ", " + text(s.moon) + ", " + text(s.night) + ", " + text(s.clouds) + ", " + text(s.blast_direction) + ", " + text(s.blast_age) + ", " + text(s.wind) + "}"; }
+[[maybe_unused]] static Whole64 draw_w64__Whole64(converted::Draw& draw) {
+  Whole64 s{};
+  s.high = static_cast<unsigned int>(draw.below(40));
+  s.low = static_cast<unsigned int>(draw.below(40));
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Whole64& s) { return converted::Value::structure({arg(s.high), arg(s.low)}); }
+[[maybe_unused]] static bool same(const Whole64& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.high, (*got.rows)[0]) && same(want.low, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Whole64& s) { return defined(s.high) && defined(s.low); }
+[[maybe_unused]] static std::string text(const Whole64& s) { return std::string("{") + text(s.high) + ", " + text(s.low) + "}"; }
+[[maybe_unused]] static Whole64Divided draw_w64__Whole64Divided(converted::Draw& draw) {
+  Whole64Divided s{};
+  s.quotient = draw_w64__Whole64(draw);
+  s.remainder = draw_w64__Whole64(draw);
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Whole64Divided& s) { return converted::Value::structure({arg(s.quotient), arg(s.remainder)}); }
+[[maybe_unused]] static bool same(const Whole64Divided& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.quotient, (*got.rows)[0]) && same(want.remainder, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Whole64Divided& s) { return defined(s.quotient) && defined(s.remainder); }
+[[maybe_unused]] static std::string text(const Whole64Divided& s) { return std::string("{") + text(s.quotient) + ", " + text(s.remainder) + "}"; }
 struct Out_Shake_sample { Shake Self; bool Result; Vec3 angles; Vec2 offset; };
 [[maybe_unused]] static bool same(const Out_Shake_sample& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]) && same(want.angles, (*got.rows)[2]) && same(want.offset, (*got.rows)[3]); }
 [[maybe_unused]] static bool defined(const Out_Shake_sample& s) { return defined(s.Self) && defined(s.Result) && defined(s.angles) && defined(s.offset); }
@@ -684,6 +764,123 @@ SC_TEST(converted_look) {
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
+  {  // w64_from_number
+    converted::Tally tally("w64_from_number");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] double a0) { return converted_look::w64_from_number(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      const double a0 = draw.number();
+      const converted::Watch watch;
+      const auto want = run(a0);
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
+  {  // w64_is_zero
+    converted::Tally tally("w64_is_zero");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0) { return converted_look::w64_is_zero(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const converted::Watch watch;
+      const auto want = run(a0);
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
+  {  // w64_shift_left
+    converted::Tally tally("w64_shift_left");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] unsigned int a1) { return converted_look::w64_shift_left(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // w64_less
+    converted::Tally tally("w64_less");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_look::w64_less(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const Whole64 a1 = draw_w64__Whole64(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // w64_subtract
+    converted::Tally tally("w64_subtract");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_look::w64_subtract(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const Whole64 a1 = draw_w64__Whole64(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // w64_divide_both
+    converted::Tally tally("w64_divide_both");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_look::w64_divide_both(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const Whole64 a1 = draw_w64__Whole64(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // w64_remainder
+    converted::Tally tally("w64_remainder");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_look::w64_remainder(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const Whole64 a1 = draw_w64__Whole64(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // w64_negate
+    converted::Tally tally("w64_negate");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0) { return converted_look::w64_negate(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const converted::Watch watch;
+      const auto want = run(a0);
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
+  {  // w64_remainder_signed
+    converted::Tally tally("w64_remainder_signed");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_look::w64_remainder_signed(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const Whole64 a1 = draw_w64__Whole64(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // w64_equal
+    converted::Tally tally("w64_equal");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_look::w64_equal(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const Whole64 a1 = draw_w64__Whole64(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
   {  // police_flash
     converted::Tally tally("police_flash");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -693,6 +890,30 @@ SC_TEST(converted_look) {
       const converted::Watch watch;
       const auto want = run(a0);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
+  {  // w64_add
+    converted::Tally tally("w64_add");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_look::w64_add(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const Whole64 a1 = draw_w64__Whole64(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // w64_less_signed
+    converted::Tally tally("w64_less_signed");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_look::w64_less_signed(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const Whole64 a1 = draw_w64__Whole64(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
   {  // drone_flash

@@ -38,6 +38,36 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+struct Whole64 {
+  u32 high = 0;
+  u32 low = 0;
+};
+inline Whole64 w64_from_number(double x) {
+  const double high = std::floor(x / 4294967296.0);
+  const double low = x - high * 4294967296.0;
+  return {static_cast<u32>(converted::fits<unsigned int>(high < 0.0 ? high + 4294967296.0 : high)), static_cast<u32>(converted::fits<unsigned int>(low))};
+}
+inline Whole64 w64_bit_or(Whole64 a, Whole64 b) { return {a.high | b.high, a.low | b.low}; }
+inline Whole64 w64_bit_xor(Whole64 a, Whole64 b) { return {a.high ^ b.high, a.low ^ b.low}; }
+inline Whole64 w64_shift_left(Whole64 a, u32 by) {
+  if (by == 0) return a;
+  if (by >= 64) return {0, 0};
+  if (by >= 32) return {converted::shl(a.low, (by - 32)), 0};
+  return {(converted::shl(a.high, by)) | (converted::shr(a.low, (32 - by))), converted::shl(a.low, by)};
+}
+inline Whole64 w64_shift_right(Whole64 a, u32 by) {
+  if (by == 0) return a;
+  if (by >= 64) return {0, 0};
+  if (by >= 32) return {0, converted::shr(a.high, (by - 32))};
+  return {converted::shr(a.high, by), (converted::shr(a.low, by)) | (converted::shl(a.high, (32 - by)))};
+}
+inline u32 w64_multiply_high(u32 a, u32 b) {
+  const u32 a0 = a & 65535u, a1 = a >> 16, b0 = b & 65535u, b1 = b >> 16;
+  const u32 low = a0 * b0, mid1 = a1 * b0, mid2 = a0 * b1;
+  const u32 carry = ((low >> 16) + (mid1 & 65535u) + (mid2 & 65535u)) >> 16;
+  return a1 * b1 + (mid1 >> 16) + (mid2 >> 16) + carry;
+}
+inline Whole64 w64_multiply(Whole64 a, Whole64 b) { return {w64_multiply_high(a.low, b.low) + a.low * b.high + a.high * b.low, a.low * b.low}; }
 enum class Surface : u8 { none, cloth, tpu, floor };
 struct Rng {
   u32 s;
@@ -174,7 +204,12 @@ struct Projector {
     return {static_cast<f32>(x0 + fx * (x1 - x0)), static_cast<f32>(y)};
   }
 };
+u32 hash_u32(u64 v) {
+  v ^= converted::shr_bits(v, 33); converted::times_bits_to(v, 0xff51afd7ed558ccdull); v ^= converted::shr_bits(v, 33); converted::times_bits_to(v, 0xc4ceb9fe1a85ec53ull); v ^= converted::shr_bits(v, 33);
+  return static_cast<u32>(v);
+}
 namespace FurnishIndex { static constexpr f32 kCell = 20; }
+namespace FurnishIndex { inline u64 key(i32 x, i32 y) { return (converted::shl_bits(static_cast<u64>(static_cast<u32>(x)), 32)) | static_cast<u32>(y); } }
 namespace FurnishIndex { inline i32 cell(f32 v) { return static_cast<i32>(converted::fits<int>(std::floor(v / kCell))); } }
 void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out) {
   // A walled-town grid with a market square: blocks of narrow terraced houses (3-6 storeys),
@@ -280,6 +315,16 @@ void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out) {
 [[maybe_unused]] static bool same(const Projector& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.x0, (*got.rows)[0]) && same(want.x1, (*got.rows)[1]) && same(want.y0, (*got.rows)[2]) && same(want.ym, (*got.rows)[3]) && same(want.y1, (*got.rows)[4]) && same(want.inv_extent, (*got.rows)[5]); }
 [[maybe_unused]] static bool defined(const Projector& s) { return defined(s.x0) && defined(s.x1) && defined(s.y0) && defined(s.ym) && defined(s.y1) && defined(s.inv_extent); }
 [[maybe_unused]] static std::string text(const Projector& s) { return std::string("{") + text(s.x0) + ", " + text(s.x1) + ", " + text(s.y0) + ", " + text(s.ym) + ", " + text(s.y1) + ", " + text(s.inv_extent) + "}"; }
+[[maybe_unused]] static Whole64 draw_w64__Whole64(converted::Draw& draw) {
+  Whole64 s{};
+  s.high = static_cast<unsigned int>(draw.below(40));
+  s.low = static_cast<unsigned int>(draw.below(40));
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Whole64& s) { return converted::Value::structure({arg(s.high), arg(s.low)}); }
+[[maybe_unused]] static bool same(const Whole64& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.high, (*got.rows)[0]) && same(want.low, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Whole64& s) { return defined(s.high) && defined(s.low); }
+[[maybe_unused]] static std::string text(const Whole64& s) { return std::string("{") + text(s.high) + ", " + text(s.low) + "}"; }
 [[maybe_unused]] static Rng draw_Rng(converted::Draw& draw) {
   Rng s = Rng(static_cast<unsigned int>(draw.below(40)));
   s.s = static_cast<unsigned int>(draw.below(40));
@@ -490,6 +535,112 @@ SC_TEST(converted_tiles) {
       const Vec2 a1 = draw.vector2();
       const converted::Watch watch;
       const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // w64_shift_right
+    converted::Tally tally("w64_shift_right");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] unsigned int a1) { return converted_tiles::w64_shift_right(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // w64_bit_xor
+    converted::Tally tally("w64_bit_xor");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_tiles::w64_bit_xor(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const Whole64 a1 = draw_w64__Whole64(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // w64_multiply_high
+    converted::Tally tally("w64_multiply_high");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted_tiles::w64_multiply_high(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // w64_multiply
+    converted::Tally tally("w64_multiply");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_tiles::w64_multiply(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const Whole64 a1 = draw_w64__Whole64(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // hash_u32
+    converted::Tally tally("hash_u32");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] u64 a0) { return converted_tiles::hash_u32(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      const u64 a0 = static_cast<u64>(draw.bits());
+      const converted::Watch watch;
+      const auto want = run(a0);
+      tally.take(bp, {arg(converted::wholes(a0))}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
+  {  // w64_from_number
+    converted::Tally tally("w64_from_number");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] double a0) { return converted_tiles::w64_from_number(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      const double a0 = draw.number();
+      const converted::Watch watch;
+      const auto want = run(a0);
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
+  {  // w64_shift_left
+    converted::Tally tally("w64_shift_left");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] unsigned int a1) { return converted_tiles::w64_shift_left(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // w64_bit_or
+    converted::Tally tally("w64_bit_or");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_tiles::w64_bit_or(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const Whole64 a1 = draw_w64__Whole64(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // FurnishIndex::key
+    converted::Tally tally("FurnishIndex_key");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] int a0, [[maybe_unused]] int a1) { return converted_tiles::FurnishIndex::key(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const int a0 = static_cast<int>(draw.whole());
+      const int a1 = static_cast<int>(draw.whole());
+      const converted::Watch watch;
+      const auto want = converted::wholes(run(a0, a1));
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }

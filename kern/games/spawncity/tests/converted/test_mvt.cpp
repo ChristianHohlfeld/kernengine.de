@@ -35,6 +35,44 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+struct Whole64 {
+  u32 high = 0;
+  u32 low = 0;
+};
+inline Whole64 w64_from_number(double x) {
+  const double high = std::floor(x / 4294967296.0);
+  const double low = x - high * 4294967296.0;
+  return {static_cast<u32>(converted::fits<unsigned int>(high < 0.0 ? high + 4294967296.0 : high)), static_cast<u32>(converted::fits<unsigned int>(low))};
+}
+inline Whole64 w64_bit_and(Whole64 a, Whole64 b) { return {a.high & b.high, a.low & b.low}; }
+inline Whole64 w64_bit_or(Whole64 a, Whole64 b) { return {a.high | b.high, a.low | b.low}; }
+inline Whole64 w64_bit_xor(Whole64 a, Whole64 b) { return {a.high ^ b.high, a.low ^ b.low}; }
+inline Whole64 w64_shift_left(Whole64 a, u32 by) {
+  if (by == 0) return a;
+  if (by >= 64) return {0, 0};
+  if (by >= 32) return {converted::shl(a.low, (by - 32)), 0};
+  return {(converted::shl(a.high, by)) | (converted::shr(a.low, (32 - by))), converted::shl(a.low, by)};
+}
+inline Whole64 w64_shift_right(Whole64 a, u32 by) {
+  if (by == 0) return a;
+  if (by >= 64) return {0, 0};
+  if (by >= 32) return {0, converted::shr(a.high, (by - 32))};
+  return {converted::shr(a.high, by), (converted::shr(a.low, by)) | (converted::shl(a.high, (32 - by)))};
+}
+inline Whole64 w64_shift_right_signed(Whole64 a, u32 by) {
+  const u32 fill = a.high >= 2147483648u ? 4294967295u : 0u;
+  if (by == 0) return a;
+  if (by >= 64) return {fill, fill};
+  if (by >= 32) return {fill, by == 32 ? a.high : (converted::shr(a.high, (by - 32))) | (converted::shl(fill, (64 - by)))};
+  return {(converted::shr(a.high, by)) | (converted::shl(fill, (32 - by))), (converted::shr(a.low, by)) | (converted::shl(a.high, (32 - by)))};
+}
+inline Whole64 w64_subtract(Whole64 a, Whole64 b) {
+  const u32 low = a.low - b.low;
+  return {a.high - b.high - (a.low < b.low ? 1u : 0u), low};
+}
+inline Whole64 w64_negate(Whole64 a) { return w64_subtract({0, 0}, a); }
+inline bool w64_less(Whole64 a, Whole64 b) { return a.high != b.high ? a.high < b.high : a.low < b.low; }
+enum class Surface : u8 { none, cloth, tpu, floor };
 struct Value {
   enum class Kind : u8 { none, string, number, boolean } kind = Kind::none;
   std::string s;
@@ -61,7 +99,7 @@ struct Writer {
   PendingLayer layer_;
   std::vector<u8> out_;
 };
-i64 zigzag(u64 v) { return static_cast<i64>(converted::shr(v, 1)) ^ -static_cast<i64>(v & 1); }
+i64 zigzag(u64 v) { return static_cast<i64>(converted::shr_bits(v, 1)) ^ -static_cast<i64>(v & 1); }
 f64 ring_area(const std::vector<Vec2>& ring) {
   f64 a = 0;
   const std::size_t n = ring.size();
@@ -75,9 +113,11 @@ bool wanted_layer(const std::string& name, const std::vector<std::string>& wante
   return false;
 }
 void put_varint(std::vector<u8>& o, u64 v) {
-  while (v >= 0x80) { o.push_back(static_cast<u8>(v | 0x80)); converted::shr_to(v, 7); }
+  while (v >= 0x80) { o.push_back(static_cast<u8>(v | 0x80)); converted::shr_bits_to(v, 7); }
   o.push_back(static_cast<u8>(v));
 }
+void put_key(std::vector<u8>& o, u32 field, u32 wire) { put_varint(o, (converted::shl_bits(static_cast<u64>(field), 3)) | wire); }
+u64 zz(i64 v) { return (converted::shl_bits(static_cast<u64>(v), 1)) ^ static_cast<u64>(converted::shr_bits(v, 63)); }
 void Writer::begin_layer(const std::string& name, u32 extent) {
   layer_ = PendingLayer{};
   layer_.name = name;
@@ -87,6 +127,16 @@ void Writer::begin_layer(const std::string& name, u32 extent) {
 #undef protected
 #pragma GCC diagnostic pop
 
+[[maybe_unused]] static Whole64 draw_w64__Whole64(converted::Draw& draw) {
+  Whole64 s{};
+  s.high = static_cast<unsigned int>(draw.below(40));
+  s.low = static_cast<unsigned int>(draw.below(40));
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Whole64& s) { return converted::Value::structure({arg(s.high), arg(s.low)}); }
+[[maybe_unused]] static bool same(const Whole64& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.high, (*got.rows)[0]) && same(want.low, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Whole64& s) { return defined(s.high) && defined(s.low); }
+[[maybe_unused]] static std::string text(const Whole64& s) { return std::string("{") + text(s.high) + ", " + text(s.low) + "}"; }
 [[maybe_unused]] static Value draw_mvt__Value(converted::Draw& draw) {
   Value s{};
   s.kind = static_cast<Value::Kind>(draw.below(4));
@@ -125,15 +175,74 @@ void Writer::begin_layer(const std::string& name, u32 extent) {
 
 SC_TEST(converted_mvt) {
   converted::Blueprint bp("Mvt");
-  {  // zigzag
-    converted::Tally tally("zigzag");
+  {  // w64_shift_right
+    converted::Tally tally("w64_shift_right");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned long a0) { return converted_mvt::zigzag(a0); };
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] unsigned int a1) { return converted_mvt::w64_shift_right(a0, a1); };
     for (int i = 0; tally.more(i); ++i) {
-      const unsigned long a0 = static_cast<unsigned long>(draw.below(40));
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // w64_bit_and
+    converted::Tally tally("w64_bit_and");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_mvt::w64_bit_and(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const Whole64 a1 = draw_w64__Whole64(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // w64_subtract
+    converted::Tally tally("w64_subtract");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_mvt::w64_subtract(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const Whole64 a1 = draw_w64__Whole64(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // w64_negate
+    converted::Tally tally("w64_negate");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0) { return converted_mvt::w64_negate(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
       const converted::Watch watch;
       const auto want = run(a0);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
+  {  // w64_bit_xor
+    converted::Tally tally("w64_bit_xor");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_mvt::w64_bit_xor(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const Whole64 a1 = draw_w64__Whole64(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // zigzag
+    converted::Tally tally("zigzag");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] u64 a0) { return converted_mvt::zigzag(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      const u64 a0 = static_cast<u64>(draw.bits());
+      const converted::Watch watch;
+      const auto want = converted::wholes(run(a0));
+      tally.take(bp, {arg(converted::wholes(a0))}, want, watch.left(), [&] { return text(a0); });
     }
   }
   {  // ring_area
@@ -159,16 +268,99 @@ SC_TEST(converted_mvt) {
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
-  {  // put_varint
-    converted::Tally tally("put_varint");
+  {  // w64_less
+    converted::Tally tally("w64_less");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] unsigned long a1) { converted_mvt::put_varint(a0, a1); return a0; };
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_mvt::w64_less(a0, a1); };
     for (int i = 0; tally.more(i); ++i) {
-      const std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
-      const unsigned long a1 = static_cast<unsigned long>(draw.below(40));
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const Whole64 a1 = draw_w64__Whole64(draw);
       const converted::Watch watch;
       const auto want = run(a0, a1);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // w64_bit_or
+    converted::Tally tally("w64_bit_or");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_mvt::w64_bit_or(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const Whole64 a1 = draw_w64__Whole64(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // put_varint
+    converted::Tally tally("put_varint");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] u64 a1) { converted_mvt::put_varint(a0, a1); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      const std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      const u64 a1 = static_cast<u64>(draw.bits());
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(converted::wholes(a1))}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // w64_from_number
+    converted::Tally tally("w64_from_number");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] double a0) { return converted_mvt::w64_from_number(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      const double a0 = draw.number();
+      const converted::Watch watch;
+      const auto want = run(a0);
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
+  {  // w64_shift_left
+    converted::Tally tally("w64_shift_left");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] unsigned int a1) { return converted_mvt::w64_shift_left(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // put_key
+    converted::Tally tally("put_key");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] unsigned int a2) { converted_mvt::put_key(a0, a1, a2); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      const std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const unsigned int a2 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+    }
+  }
+  {  // w64_shift_right_signed
+    converted::Tally tally("w64_shift_right_signed");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] unsigned int a1) { return converted_mvt::w64_shift_right_signed(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // zz
+    converted::Tally tally("zz");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] i64 a0) { return converted_mvt::zz(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      const i64 a0 = static_cast<i64>(draw.bits());
+      const converted::Watch watch;
+      const auto want = converted::wholes(run(a0));
+      tally.take(bp, {arg(converted::wholes(a0))}, want, watch.left(), [&] { return text(a0); });
     }
   }
   {  // Writer::begin_layer

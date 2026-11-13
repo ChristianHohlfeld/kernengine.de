@@ -7,6 +7,9 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-13",time:"10:43",title:"Konverter: 64-Bit-Zahlen als Bitmuster",items:[
+    "Unter der Haube: Schlüssel aus zwei 32-Bit-Zahlen, Hashes und Zufallszustände (u64, i64) sind im Blueprint jetzt die Struktur Whole64 aus zwei 32-Bit-Hälften; gerechnet wird mit Funktionen, die selbst umgeschrieben und Bit für Bit verglichen sind – über den ganzen Bereich von 64 Bit. 281 Funktionen aus 54 Dateien stehen als Blueprints im Level (390 Vergleiche). Am Spiel ändert sich dadurch nichts.",
+  ]},
   {date:"2026-11-13",time:"02:35",title:"Konverter: Zählen in 64 Bit, Namen für Stellen",items:[
     "Unter der Haube: Der Konverter schreibt jetzt auch Rechnen mit Längen und Indizes (64-Bit-Zahlen, mit denen gezählt wird), Referenzen als Namen für eine Stelle, std::reverse und Listen fester Länge. 263 Funktionen aus 54 Dateien stehen als Blueprints im Level. Am Spiel ändert sich dadurch nichts.",
     "Der Vergleich Bit für Bit kennt jetzt alle Stellen, an denen C++ nichts festlegt (eine Zahl, die ihr Typ nicht hält; ein Eintrag aus einer leeren Liste; ein Aufzählungswert, den es nicht gibt): Für solche Argumente wird neu gewürfelt, statt sie zu vergleichen.",

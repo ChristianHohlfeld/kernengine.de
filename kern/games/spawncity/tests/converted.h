@@ -36,6 +36,23 @@ namespace sc::converted {
 
 using Value = kern::logic::Value;
 
+/// A 64-bit bit pattern of the program (its u64, i64) as the test hands it to a Blueprint: the Blueprint's
+/// Whole64, two 32-bit halves (tools/blueprint_whole64.h). In C++ a u64 and a size_t are one type; the
+/// program's spelling tells them apart, and the generated test wraps what is spelled u64 (wholes).
+struct Whole {
+  unsigned long long v = 0;
+};
+struct SignedWhole {};
+inline Whole wholes(unsigned long long x) { return {x}; }
+inline Whole wholes(long long x) { return {static_cast<unsigned long long>(x)}; }
+inline Whole wholes(unsigned long x) { return {x}; }
+inline Whole wholes(long x) { return {static_cast<unsigned long long>(x)}; }
+template <class T> auto wholes(const std::vector<T>& v) {
+  std::vector<decltype(wholes(v[0]))> out;
+  for (const T& x : v) out.push_back(wholes(x));
+  return out;
+}
+
 // ---- the numbers of the Blueprint language, for the source a test holds ----
 // A number is 64-bit. A vector holds its components in 32 bit; read, a component is a number like any
 // other, and what is written into one is brought to 32 bit. What vectors do as a whole (add, dot, cross,
@@ -148,6 +165,15 @@ struct Draw {
   bool flag() { return below(2) != 0; }
   Vec3 vector() { return {static_cast<f32>(number()), static_cast<f32>(number()), static_cast<f32>(number())}; }
   Vec2 vector2() { return {static_cast<f32>(number()), static_cast<f32>(number())}; }
+  /// 64 bits: any at all, and now and then a small number.
+  unsigned long long bits() {
+    const unsigned long long x = (static_cast<unsigned long long>(rng.next()) << 32) | rng.next();
+    switch (below(4)) {
+      case 0: return x >> 58;
+      case 1: return x >> 32;
+      default: return x;
+    }
+  }
   const char* c_word() {
     static const char* const words[] = {"", "a", "Abc", "x1", "hello world", "north", "7", "A-B"};
     return words[below(8)];
@@ -174,6 +200,7 @@ template <class T> inline constexpr bool is_list<std::vector<T>> = true;
 inline Value arg(f64 x) { return Value::number(x); }
 inline Value arg(f32 x) { return Value::number(static_cast<f64>(x)); }
 inline Value arg(bool x) { return Value::boolean(x); }
+inline Value arg(Whole w) { return Value::structure({Value::integer(static_cast<kern::i64>(w.v >> 32)), Value::integer(static_cast<kern::i64>(w.v & 0xFFFFFFFFull))}); }
 inline Value arg(Vec3 v) { return Value::vector(v); }
 inline Value arg(Vec2 v) { return Value::vector({v.x, v.y, 0}); }
 inline Value arg(wide::Vec3 v) { return arg(kern::Vec3(v)); }
@@ -230,6 +257,9 @@ inline bool same(Vec2 want, const Value& got) {
   const Vec3 v = got.as_vector();
   return same_bits(want.x, v.x) && same_bits(want.y, v.y);
 }
+inline bool same(Whole want, const Value& got) {
+  return got.rows && got.rows->size() == 2 && (*got.rows)[0].as_int() == static_cast<kern::i64>(want.v >> 32) && (*got.rows)[1].as_int() == static_cast<kern::i64>(want.v & 0xFFFFFFFFull);
+}
 inline bool same(wide::Vec3 want, const Value& got) { return same(kern::Vec3(want), got); }
 inline bool same(wide::Vec2 want, const Value& got) { return same(kern::Vec2(want), got); }
 inline bool same(const char* want, const Value& got) { return got.as_text() == (want ? want : ""); }
@@ -284,6 +314,7 @@ inline bool defined(f32 x) { return std::isfinite(x); }
 inline bool defined(f64 x) { return std::isfinite(x); }
 inline bool defined(Vec3 v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z); }
 inline bool defined(Vec2 v) { return std::isfinite(v.x) && std::isfinite(v.y); }
+inline bool defined(Whole) { return true; }
 inline bool defined(wide::Vec3 v) { return defined(kern::Vec3(v)); }
 inline bool defined(wide::Vec2 v) { return defined(kern::Vec2(v)); }
 inline bool defined(bool) { return true; }
@@ -303,6 +334,11 @@ inline std::string text(f64 x) { char b[40]; std::snprintf(b, sizeof b, "%.17g",
 inline std::string text(bool x) { return x ? "true" : "false"; }
 inline std::string text(Vec3 v) { return "{" + text(v.x) + ", " + text(v.y) + ", " + text(v.z) + "}"; }
 inline std::string text(Vec2 v) { return "{" + text(v.x) + ", " + text(v.y) + "}"; }
+inline std::string text(Whole w) {
+  char out[40];
+  std::snprintf(out, sizeof out, "0x%llx", w.v);
+  return out;
+}
 inline std::string text(wide::Vec3 v) { return text(kern::Vec3(v)); }
 inline std::string text(wide::Vec2 v) { return text(kern::Vec2(v)); }
 inline std::string text(const char* s) { return std::string("\"") + (s ? s : "") + "\""; }
@@ -366,8 +402,13 @@ struct Tally {
   /// as two seconds have room for, but twenty at least. (What the source says nothing for is drawn again.)
   bool more(int tried) const {
     if (compared >= kCalls || tried >= kCalls * 20) return false;
-    return compared < 20 || std::chrono::duration<double>(std::chrono::steady_clock::now() - began).count() < 2.0;
+    if (compared >= 20) return seconds() < 2.0;
+    return compared < 5 || seconds() < kLong;
   }
+  /// A function whose calls take seconds each (a number raised to a 256-bit power, limb by limb): five
+  /// compared calls at least, and as many more as twenty seconds have room for.
+  static constexpr double kLong = 20.0;
+  double seconds() const { return std::chrono::duration<double>(std::chrono::steady_clock::now() - began).count(); }
   /// One call. `want`: what the source gives, computed with the Blueprint language's numbers;
   /// `left`: the source divided by zero or left the numbers on the way - nothing to compare.
   template <class Want, class Describe> void take(Blueprint& bp, const std::vector<Value>& args, const Want& want, bool left, Describe describe) {
@@ -398,7 +439,9 @@ struct Tally {
       std::printf("  note: %s: %d of %d calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to %.0f ms - is not run in the interpreter)\n",
                   function, class_only, compared, slowest * 1000);
     SC_CHECK(wrong == 0, "%s: %d of %d calls differ", function, wrong, compared);
-    SC_CHECK(compared >= 20, "%s: only %d calls could be compared (in %d the source left the numbers)", function, compared, outside);
+    const bool long_calls = compared >= 5 && compared < 20 && seconds() >= kLong;
+    if (long_calls) std::printf("  note: %s: %d calls compared (they take %.0f s; of a function whose calls take less, twenty at least are)\n", function, compared, seconds());
+    SC_CHECK(compared >= 20 || long_calls, "%s: only %d calls could be compared (in %d the source left the numbers)", function, compared, outside);
   }
 };
 
@@ -424,6 +467,21 @@ template <class C, class I> auto at(C&& c, I i) -> decltype(c[0]) {
   }
 }
 /// A number as a whole number of the type T: one T does not hold (or none at all) marks the call.
+template <class T> constexpr double fits(double x);
+template <> constexpr double fits<Whole>(double x) {
+  if (!(x > -1.0 && x < 18446744073709551616.0)) {
+    g_open = true;
+    return 0;
+  }
+  return x;
+}
+template <> constexpr double fits<SignedWhole>(double x) {
+  if (!(x > -9223372036854775809.0 && x < 9223372036854775808.0)) {
+    g_open = true;
+    return 0;
+  }
+  return x;
+}
 template <class T> constexpr double fits(double x) {
   const bool in = std::is_signed_v<T> ? (x > -9007199254740992.0 && x < 9007199254740992.0 && x >= static_cast<double>(std::numeric_limits<T>::min()) - 0.5 &&
                                          (sizeof(T) == 8 || x <= static_cast<double>(std::numeric_limits<T>::max()) + 0.5))
@@ -563,6 +621,84 @@ template <class A, class B> constexpr A& quot_to(A& a, B b) { return a = static_
 template <class A, class B> constexpr A& rem_to(A& a, B b) { return a = static_cast<A>(rem(a, b)); }
 template <class A, class B> constexpr A& shl_to(A& a, B b) { return a = static_cast<A>(shl(a, b)); }
 template <class A, class B> constexpr A& shr_to(A& a, B b) { return a = static_cast<A>(shr(a, b)); }
+
+// A 64-bit bit pattern (the program's u64 and i64 - a Blueprint's Whole64, see tools/blueprint_whole64.h) is
+// computed around 2^64, as C++ computes with unsigned numbers: nothing to mark there. What C++ leaves open
+// marks the call: signed arithmetic that leaves the 64 bits, a division by zero, a shift by 64 or more.
+template <class R> constexpr R kept_bits(__int128 exact) {
+  if (exact < static_cast<__int128>(std::numeric_limits<R>::min()) || exact > static_cast<__int128>(std::numeric_limits<R>::max())) {
+    g_open = true;
+    return 0;
+  }
+  return static_cast<R>(exact);
+}
+template <class A, class B> constexpr auto plus_bits(A a, B b) -> decltype(a + b) {
+  using R = decltype(a + b);
+  if constexpr (std::is_signed_v<R>) {
+    return kept_bits<R>(static_cast<__int128>(static_cast<R>(a)) + static_cast<__int128>(static_cast<R>(b)));
+  } else {
+    return a + b;
+  }
+}
+template <class A, class B> constexpr auto minus_bits(A a, B b) -> decltype(a - b) {
+  using R = decltype(a - b);
+  if constexpr (std::is_signed_v<R>) {
+    return kept_bits<R>(static_cast<__int128>(static_cast<R>(a)) - static_cast<__int128>(static_cast<R>(b)));
+  } else {
+    return a - b;
+  }
+}
+template <class A, class B> constexpr auto times_bits(A a, B b) -> decltype(a * b) {
+  using R = decltype(a * b);
+  if constexpr (std::is_signed_v<R>) {
+    return kept_bits<R>(static_cast<__int128>(static_cast<R>(a)) * static_cast<__int128>(static_cast<R>(b)));
+  } else {
+    return a * b;
+  }
+}
+template <class A, class B> constexpr auto quot_bits(A a, B b) -> decltype(a / b) {
+  using R = decltype(a / b);
+  if (b == 0 || (std::is_signed_v<R> && static_cast<R>(a) == std::numeric_limits<R>::min() && static_cast<long long>(b) == -1)) {
+    g_open = true;
+    return 0;
+  }
+  return a / b;
+}
+template <class A, class B> constexpr auto rem_bits(A a, B b) -> decltype(a % b) {
+  using R = decltype(a % b);
+  if (b == 0 || (std::is_signed_v<R> && static_cast<R>(a) == std::numeric_limits<R>::min() && static_cast<long long>(b) == -1)) {
+    g_open = true;
+    return 0;
+  }
+  return a % b;
+}
+template <class A, class B> constexpr auto shl_bits(A a, B b) -> decltype(a << b) {
+  using R = decltype(a << b);
+  if (b < 0 || static_cast<unsigned long long>(b) >= sizeof(R) * 8) {
+    g_open = true;
+    return 0;
+  }
+  return static_cast<R>(static_cast<std::make_unsigned_t<R>>(a) << b);
+}
+template <class A, class B> constexpr auto shr_bits(A a, B b) -> decltype(a >> b) {
+  using R = decltype(a >> b);
+  if (b < 0 || static_cast<unsigned long long>(b) >= sizeof(R) * 8) {
+    g_open = true;
+    return 0;
+  }
+  return a >> b;
+}
+template <class A, class B> constexpr A& plus_bits_to(A& a, B b) { return a = static_cast<A>(plus_bits(a, b)); }
+template <class A, class B> constexpr A& minus_bits_to(A& a, B b) { return a = static_cast<A>(minus_bits(a, b)); }
+template <class A, class B> constexpr A& times_bits_to(A& a, B b) { return a = static_cast<A>(times_bits(a, b)); }
+template <class A, class B> constexpr A& quot_bits_to(A& a, B b) { return a = static_cast<A>(quot_bits(a, b)); }
+template <class A, class B> constexpr A& rem_bits_to(A& a, B b) { return a = static_cast<A>(rem_bits(a, b)); }
+template <class A, class B> constexpr A& shl_bits_to(A& a, B b) { return a = static_cast<A>(shl_bits(a, b)); }
+template <class A, class B> constexpr A& shr_bits_to(A& a, B b) { return a = static_cast<A>(shr_bits(a, b)); }
+template <class A> constexpr A& pre_inc_bits(A& a) { return a = static_cast<A>(plus_bits(a, static_cast<A>(1))); }
+template <class A> constexpr A& pre_dec_bits(A& a) { return a = static_cast<A>(minus_bits(a, static_cast<A>(1))); }
+template <class A> constexpr A post_inc_bits(A& a) { const A was = a; a = static_cast<A>(plus_bits(a, static_cast<A>(1))); return was; }
+template <class A> constexpr A post_dec_bits(A& a) { const A was = a; a = static_cast<A>(minus_bits(a, static_cast<A>(1))); return was; }
 
 /// Runs the source and says whether it left the numbers on the way (see Tally::take): a division by zero
 /// or a computation without a result, or one of the places above.

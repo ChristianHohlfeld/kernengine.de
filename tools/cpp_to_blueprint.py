@@ -29,6 +29,14 @@ arithmetic and bit operations have formula functions of their own. A 64-bit whol
 while it is within 2^53 of zero; an unsigned one is held read with its sign (WIDE_UNSIGNED). A number
 literal is the decimal the source spells (0.1f is 0.1).
 
+A 64-bit number the program spells u64, i64, uint64_t or int64_t is a bit pattern - a key made of
+two 32-bit numbers, a hash, the state of a random number generator. In the Blueprint it is the
+struct Whole64 of its two halves, and what C++ computes with it the functions of
+tools/blueprint_whole64.h compute (w64_add, w64_multiply, w64_shift_left ...): C++ of the kind
+this tool converts, written into every Blueprint that uses them and compared with their source
+like the program's own functions. (A number spelled size_t, long ... is one the program counts
+with: the Blueprint's whole number, as above.)
+
   tools/cpp_to_blueprint.py --check <namespace> <include flags...> -- <file.cpp>...
 
 only counts: how many functions are written, and what the others wait for.
@@ -63,6 +71,8 @@ NODE_NAME = re.compile(r"^(math|logic|flow|list|text|vector|struct|enum|value|fu
 
 NUMBER = {"bool": "Bool", "float": "Float", "double": "Float", "long double": "Float", "int": "Int", "long": "Int", "long long": "Int", "short": "Int", "signed char": "Int",
           "unsigned char": "Int", "unsigned short": "Int", "unsigned int": "Int", "char": "Int", "unsigned long": "Int", "unsigned long long": "Int"}
+W64 = ("whole64u", "whole64s")     # (a type's name, cleaned: a 64-bit bit pattern, unsigned and signed)
+W64_HEADER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "blueprint_whole64.h")
 UNSIGNED = {"unsigned char", "unsigned short", "unsigned int", "unsigned long", "unsigned long long"}
 # An unsigned 64-bit whole number is, in a Blueprint, the whole number its bits are read with a sign
 # (2^64 - 1 is -1): what C++ adds, subtracts and multiplies around 2^64 comes out the same, exactly,
@@ -71,8 +81,8 @@ WIDE_UNSIGNED = {"unsigned long", "unsigned long long"}
 TEXT = {"const char *", "std::basic_string<char>", "std::string", "std::basic_string_view<char>", "std::string_view", "std::basic_string<char, std::char_traits<char>, std::allocator<char>>",
         "std::basic_string_view<char, std::char_traits<char>>"}
 # (the names the engine writes these types with, where clang gives the name as written)
-ALIAS = {"f32": "float", "f64": "double", "i8": "signed char", "i16": "short", "i32": "int", "i64": "long", "u8": "unsigned char", "u16": "unsigned short", "u32": "unsigned int",
-         "u64": "unsigned long", "usize": "unsigned long", "size_t": "unsigned long", "Vec2": "kern::Vec2", "Vec3": "kern::Vec3", "Vec4": "kern::Vec4", "Quat": "kern::Quat",
+ALIAS = {"f32": "float", "f64": "double", "i8": "signed char", "i16": "short", "i32": "int", "i64": "whole64s", "u8": "unsigned char", "u16": "unsigned short", "u32": "unsigned int",
+         "u64": "whole64u", "uint64_t": "whole64u", "int64_t": "whole64s", "usize": "unsigned long", "size_t": "unsigned long", "Vec2": "kern::Vec2", "Vec3": "kern::Vec3", "Vec4": "kern::Vec4", "Quat": "kern::Quat",
          "Mat4": "kern::Mat4"}
 ZERO = {"Float": "0.0", "Int": "0", "Bool": "false", "Vector": "Vector{0.0, 0.0, 0.0}", "Text": '""'}
 # (functions of numbers a formula has, by the names C++ calls them)
@@ -167,6 +177,7 @@ def run_clang(path, namespace, flags):
         if name.endswith(".h"):
             h.update(f"{name}:{os.path.getmtime(os.path.join(d, name))}".encode())
     h.update(" ".join([namespace, "steady" if STEADY else "", *flags]).encode())
+    h.update(open(W64_HEADER, "rb").read())
     cache = os.path.join(os.environ.get("TMPDIR", "/tmp"), "kern-cpp-to-blueprint")
     os.makedirs(cache, exist_ok=True)
     cached = os.path.join(cache, h.hexdigest()[:20] + ".json.gz")
@@ -262,9 +273,21 @@ def kids(n):
     return [c for c in n.get("inner", []) or [] if isinstance(c, dict) and c.get("kind") and not c["kind"].endswith("Comment") and not c["kind"].endswith("Attr")]
 
 
+# A 64-bit whole number the program spells u64, i64, uint64_t or int64_t is a bit pattern: in a Blueprint
+# the struct Whole64 (tools/blueprint_whole64.h). The compiler's tree says how a type is spelled (its
+# "qualType") next to what it is (its "desugaredQualType", where size_t and u64 are the same): where the
+# spelling names one of those, the spelling is the type - unless it also names something only the other
+# says (a list's value_type, auto).
+WHOLE64 = re.compile(r"(?<![\w:])(?:kern::|std::|sc::)?(u64|i64|uint64_t|int64_t)\b")
+UNSPELLED = re.compile(r"::(?:value_type|reference|const_reference|size_type|difference_type|key_type|mapped_type|element_type|iterator|const_iterator|pointer)\b|\bauto\b|\bdecltype\b|\btypename\b|__")
+
+
 def qtype(n):
     t = n.get("type", {})
-    return t.get("desugaredQualType") or t.get("qualType", "")
+    spelled = t.get("qualType", "")
+    if spelled and WHOLE64.search(spelled) and not UNSPELLED.search(spelled):
+        return spelled
+    return t.get("desugaredQualType") or spelled
 
 
 SKIP = ("ParenExpr", "ExprWithCleanups", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr", "ConstantExpr", "SubstNonTypeTemplateParmExpr", "FullExpr")
@@ -292,6 +315,7 @@ class Tree:
     def __init__(self, path, namespace, flags):
         self.path = os.path.abspath(path)
         self.namespace = namespace
+        flags = [*flags, "-include", W64_HEADER]
         self.dumps = run_clang(path, namespace, flags)
         st = {"file": ""}
         for o in self.dumps:
@@ -313,11 +337,18 @@ class Tree:
         self.aliases = {}     # a name the program gives a type (using Bytes32 = ...) -> that type
         self.alias_decls = []
         self.template_of = {}  # a function made from a template (its id) -> the template
+        self.w64 = run_clang(path, "w64", flags) if STEADY else []
+        st = {"file": ""}
+        for o in self.w64:
+            annotate(o, st)
         seen = set()
         for o in self.dumps:
             self.take(o, self.scope_from(o), seen)
         for o in self.engine:
             self.take(o, ENGINE + "::", seen)
+        for o in self.w64:
+            self.take(o, "w64::", seen)
+        self.whole = {n["name"]: i for i, n in self.decl.items() if self.scope_of.get(i) == "w64::" and n.get("kind") == "FunctionDecl"}
         for i, n in list(self.decl.items()):
             if n.get("kind") in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl") and any(c.get("kind") == "CompoundStmt" for c in kids(n)):
                 self.body[i] = n
@@ -521,7 +552,7 @@ class Unit:
     # ---- types ----
     def clean(self, t):
         t = re.sub(r"\b(const|volatile|struct|class|enum)\b", " ", t).replace("&&", " ").replace("&", " ")
-        t = re.sub(r"(?<![\w:])(?:kern::)?(f32|f64|i8|i16|i32|i64|u8|u16|u32|u64|usize|Vec2|Vec3|Vec4|Quat|Mat4|size_t)\b", lambda m: ALIAS[m.group(1)], t)
+        t = re.sub(r"(?<![\w:])(?:kern::|std::)?(f32|f64|i8|i16|i32|i64|u8|u16|u32|u64|uint64_t|int64_t|usize|Vec2|Vec3|Vec4|Quat|Mat4|size_t)\b", lambda m: ALIAS[m.group(1)], t)
         t = t.replace("std::size_t", "unsigned long").replace("(anonymous namespace)::", "")
         for _ in range(4):   # (the names the program itself gives types)
             before = t
@@ -534,7 +565,7 @@ class Unit:
 
     def clean0(self, t):
         t = re.sub(r"\b(const|volatile|struct|class|enum)\b", " ", t).replace("&&", " ").replace("&", " ").replace("(anonymous namespace)::", "")
-        return re.sub(r"(?<![\w:])(?:kern::)?(f32|f64|i8|i16|i32|i64|u8|u16|u32|u64|usize|Vec2|Vec3|Vec4|Quat|Mat4|size_t)\b", lambda m: ALIAS[m.group(1)], t)
+        return re.sub(r"(?<![\w:])(?:kern::|std::)?(f32|f64|i8|i16|i32|i64|u8|u16|u32|u64|uint64_t|int64_t|usize|Vec2|Vec3|Vec4|Quat|Mat4|size_t)\b", lambda m: ALIAS[m.group(1)], t)
 
     def find_type(self, t):
         """The program's record or enum a type name means (its qualified name), or None."""
@@ -586,6 +617,10 @@ class Unit:
         t = self.clean(raw)
         if t in NUMBER:
             return NUMBER[t]
+        if t in W64:
+            if "w64::Whole64" not in self.tree.records:
+                raise Wait("a 64-bit whole number that wraps around or is shifted (a Blueprint's are exact up to 2^53)")
+            return self.struct("w64::Whole64")
         if t in TEXT or t.startswith("std::basic_string<char") or t.startswith("std::basic_string_view<char"):
             return "Text"
         if t in ("kern::Vec3", "kern::Vec2"):
@@ -593,6 +628,8 @@ class Unit:
         if t == "void":
             return None
         if "*" in t:
+            if os.environ.get("HANDLES") and re.fullmatch(r"(const )?kern::[\w:]+ \*(const)?", t):
+                return "Int"
             raise Wait("a pointer")
         m = re.match(r"std::vector<(.+)>$", t)
         if m:
@@ -620,6 +657,11 @@ class Unit:
         if q in self.tree.enums:
             return self.enum(q)
         if q in self.tree.records:
+            if os.environ.get("HANDLES") and q.startswith("kern::"):
+                try:
+                    return self.struct(q)
+                except Wait:
+                    return "Int"
             return self.struct(q)
         if t.startswith("kern::"):
             raise Wait(f"the engine's {t.split('<')[0]}")
@@ -868,7 +910,7 @@ class Const:
     def __init__(self, unit):
         self.unit = unit
 
-    BITS = {"unsigned char": 8, "signed char": 8, "char": 8, "unsigned short": 16, "short": 16, "unsigned int": 32, "int": 32,
+    BITS = {"whole64u": 64, "whole64s": 64, "unsigned char": 8, "signed char": 8, "char": 8, "unsigned short": 16, "short": 16, "unsigned int": 32, "int": 32,
             "long": 64, "unsigned long": 64, "long long": 64, "unsigned long long": 64}
 
     def fit(self, v, n):
@@ -961,6 +1003,8 @@ class Const:
             raise Wait(f"a constant computed with {name}()")
         if k == "CXXDefaultInitExpr" or k == "ImplicitValueInitExpr" or k == "CXXScalarValueInitExpr":
             return 0.0
+        if k in ("CXXNullPtrLiteralExpr", "GNUNullExpr") and os.environ.get("HANDLES"):
+            return 0
         raise Wait(f"a constant written as {k}")
 
     def decimal(self, n):
@@ -988,6 +1032,9 @@ class Const:
         while k in ("ImplicitCastExpr", "CXXFunctionalCastExpr", "CXXStaticCastExpr") and t not in ("Float", "Int", "Bool") and kids(n):
             n = bare(kids(n)[-1])
             k = n.get("kind")
+        if t == u.structs.get("w64::Whole64") and t is not None and k not in ("InitListExpr", "CXXConstructExpr"):
+            v = int(self.number(n)) % (1 << 64)   # (a 64-bit number written out: its two halves)
+            return f"{t}{{{v >> 32}, {v & 0xFFFFFFFF}}}"
         if t == "Float":
             return flit(self.decimal(n))
         if t == "Int":
@@ -1477,7 +1524,8 @@ class Emit:
                 raw = qtype(v)
                 if "&" in raw and not re.search(r"\bconst\b", raw):
                     raise Wait("a reference to something it changes")
-                name = self.local(v)
+                wide_init = kids(v) and v.get("init") and self.u.clean(raw) in ("unsigned long", "long", "unsigned long long", "long long") and self.is64(kids(v)[-1])
+                name = self.local(v, self.whole64() if wide_init else None)
                 init = kids(v)[-1] if kids(v) and v.get("init") else None
                 if init is not None:
                     out.append(f"{name} = {self.ex(init, self.types[v['id']])};")
@@ -1817,7 +1865,10 @@ class Emit:
             if op == "+" and self.plain_variable(a) and ta in ("Float", "Int"):
                 return [f"{self.lvalue(a)} += {self.ex(b, ta)};"]
             synth = {"kind": "BinaryOperator", "opcode": op, "type": n.get("type", {}) if "computeResultType" not in n else n["computeResultType"], "inner": [a, b]}
-            return self.store(a, lambda t: self.ex(synth, t))
+            lines = self.store(a, lambda t: self.ex(synth, t))
+            if synth.get("_w64"):
+                n["_w64"] = True
+            return lines
         if k == "UnaryOperator" and n.get("opcode") in ("++", "--"):
             a = kids(n)[0]
             ta = self.tp(a)
@@ -1825,7 +1876,10 @@ class Emit:
                 return [f"{self.lvalue(a)} += {'1' if ta == 'Int' else '1.0'};"]
             one = {"kind": "IntegerLiteral", "value": "1", "type": {"qualType": "int"}}
             synth = {"kind": "BinaryOperator", "opcode": "+" if n["opcode"] == "++" else "-", "type": a.get("type", {}), "inner": [a, one]}
-            return self.store(a, lambda t: self.ex(synth, t))
+            lines = self.store(a, lambda t: self.ex(synth, t))
+            if synth.get("_w64"):
+                n["_w64"] = True
+            return lines
         if self.is_local_call(n):
             self.local_call(n)
             return []
@@ -2329,6 +2383,11 @@ class Emit:
     def conv(self, text, have, want):
         if want is None or have == want:
             return text
+        whole = self.u.structs.get("w64::Whole64")
+        if whole is not None and want == whole and have in ("Int", "Float", "Bool"):
+            return self.to64(text, have)
+        if whole is not None and have == whole and want in ("Int", "Float", "Bool"):
+            return self.from64(text, "whole64u", "long" if want == "Int" else "double", want)
         if want == "Float" and have == "Int" and re.fullmatch(r"-?\d+", text):
             return flit(float(text))
         if text.startswith("kern::to<") and have in ("Float", "Int", "Bool") and want in ("Float", "Int", "Bool"):
@@ -2411,6 +2470,26 @@ class Emit:
             return f"list_get<{lt[5:-1]}>({self.ex(b['inner'][0], lt)}, 0)", lt[5:-1]
         if k == "CXXRewrittenBinaryOperator":   # (a != b written by the compiler as !(a == b))
             return self.value(kids(b)[0])
+        # 64-bit bit patterns (Whole64): what C++ computes with them, the functions of blueprint_whole64.h do
+        if k in CAST and kids(b) and b.get("castKind") not in ("LValueToRValue", "NoOp") and self.is64(kids(b)[-1]) and not self.is64(b):
+            text, have = self.value(kids(b)[-1])
+            want = self.tp(b)
+            if have != self.whole64() or want is None:
+                return self.conv(text, have, want), want
+            return self.from64(text, self.ctype(kids(b)[-1]), self.ctype(b), want), want
+        if (k == "IntegerLiteral" or k in CAST or (k == "InitListExpr" and len(kids(b)) <= 1) or (k == "BinaryOperator" and b.get("opcode") in ("+", "-", "*", "/", "%", "&", "|", "^", "<<", ">>"))
+                or (k == "UnaryOperator" and b.get("opcode") in ("-", "+", "~")) or k == "ConditionalOperator") and self.is64(b):
+            return self.value64(b)
+        if k == "BinaryOperator" and b.get("opcode") in COMPARE and (self.is64(kids(b)[0]) or self.is64(kids(b)[1])):
+            x, y = kids(b)
+            op = b["opcode"]
+            signed = self.ctype(x) in ("whole64s", "long", "long long") and self.ctype(y) in ("whole64s", "long", "long long")
+            l, r = self.ex64(x), self.ex64(y)
+            if op in ("==", "!="):
+                same = self.w64("w64_equal", l, r)
+                return (same if op == "==" else f"logic_not({same})"), "Bool"
+            less = "w64_less_signed" if signed else "w64_less"
+            return {"<": self.w64(less, l, r), ">": self.w64(less, r, l), "<=": f"logic_not({self.w64(less, r, l)})", ">=": f"logic_not({self.w64(less, l, r)})"}[op], "Bool"
         if k in ("FloatingLiteral", "IntegerLiteral", "CXXBoolLiteralExpr", "CharacterLiteral"):
             t = self.tp(b)
             v = Const(u).number(b)
@@ -2424,6 +2503,8 @@ class Emit:
         if k == "StringLiteral":
             return text_literal(c_string(b["value"])), "Text"
         if k in ("CXXNullPtrLiteralExpr", "GNUNullExpr"):
+            if os.environ.get("HANDLES"):
+                return "0", "Int"
             raise Wait("a pointer")
         if self.arithmetic(b):
             return self.formula(b)
@@ -2642,6 +2723,12 @@ class Emit:
         """An expression of numbers as the text of a formula over `leaves`."""
         b = bare(n)
         k = b.get("kind")
+        if self.is64(b):   # (a 64-bit bit pattern in a computation with numbers: the number it is)
+            text, have = self.value(b)
+            return self.leaf(None, leaves, self.from64(text, self.ctype(b), "double", "Float") if have == self.whole64() else self.conv(text, have, "Float"))
+        if k in CAST and kids(b) and b.get("castKind") not in ("LValueToRValue", "NoOp") and self.is64(kids(b)[-1]):
+            text, have = self.value(b)
+            return self.leaf(None, leaves, self.conv(text, have, "Float"))
         if k in ("FloatingLiteral", "IntegerLiteral", "CXXBoolLiteralExpr", "CharacterLiteral"):
             v = Const(self.u).decimal(b)
             if k == "IntegerLiteral" and v >= 2.0 ** 63 and self.ctype(b) in WIDE_UNSIGNED:
@@ -2812,6 +2899,124 @@ class Emit:
         m = re.search(r"\[(\d+)\]\s*$", qtype(bare(kids(x)[0])))
         return int(m.group(1)) if m and bare(kids(y)[0]).get("kind") == "ArraySubscriptExpr" else None
 
+    # ---- 64-bit bit patterns ----
+    def whole64(self):
+        return self.u.btype("whole64u")
+
+    def is64(self, n):
+        """Is this value a 64-bit bit pattern (a Whole64 in the Blueprint)? Its type's spelling says so; where
+        the compiler's tree has lost the spelling, what it is made of does."""
+        b = bare(n)
+        c = self.ctype(b)
+        if c in W64:
+            return True
+        if c not in ("unsigned long", "long", "unsigned long long", "long long"):
+            return False
+        k, ks = b.get("kind"), kids(b)
+        whole = self.u.structs.get("w64::Whole64")
+        if whole is None:
+            return False
+        if k == "DeclRefExpr":
+            return self.types.get(b.get("referencedDecl", {}).get("id")) == whole
+        if k in CAST:
+            return bool(ks) and self.ctype(ks[-1]) in ("unsigned long", "long", "unsigned long long", "long long", *W64) and self.is64(ks[-1])
+        if k in ("BinaryOperator", "CompoundAssignOperator") and len(ks) == 2:
+            op = b.get("opcode", "")
+            if op in ("<<", ">>") or op.endswith("=") and op not in COMPARE:
+                return self.is64(ks[0])
+            if op == ",":
+                return self.is64(ks[1])
+            return op not in COMPARE and op not in ("&&", "||") and (self.is64(ks[0]) or self.is64(ks[1]))
+        if k == "UnaryOperator" and ks:
+            return self.is64(ks[0])
+        if k == "ConditionalOperator" and len(ks) == 3:
+            return self.is64(ks[1]) or self.is64(ks[2])
+        if (k == "ArraySubscriptExpr" or (k == "CXXOperatorCallExpr" and callee_name(b) == "operator[]")) and len(ks) >= 2:
+            return self.tp_or_none(ks[-2]) == f"List<{whole}>"
+        if k == "CXXMemberCallExpr" and callee(b).get("name") in ("front", "back", "at") and kids(callee(b)):
+            return self.tp_or_none(kids(callee(b))[0]) == f"List<{whole}>"
+        return False
+
+    def w64(self, name, *texts):
+        """A call of one of the functions of 64-bit numbers (tools/blueprint_whole64.h, converted like the program's own)."""
+        i = self.tree.whole.get(name)
+        if i is None:
+            raise Wait("a 64-bit whole number that wraps around or is shifted (a Blueprint's are exact up to 2^53)")
+        g = self.u.function(i)
+        self.f.calls.append(g)
+        return f"{g.name}({', '.join(texts)}).Result"
+
+    def to64(self, text, have):
+        """A number as 64 bits: a whole number as it is (a negative one in two's complement), another one cut off."""
+        if have in self.u.enum_values:
+            text, have = self.conv(text, have, "Int"), "Int"
+        if have == "Float":
+            text = f"kern::formula([](Float x) -> Float {{ return kern::math::trunc(x); }}, {text})"
+        elif re.fullmatch(r"-?\d+", text):
+            v = int(text) % (1 << 64)
+            return f"struct_make<{self.whole64()}>({v >> 32}, {v & 0xFFFFFFFF})"
+        else:
+            text = self.conv(text, have, "Float")
+        return self.w64("w64_from_number", text)
+
+    def ex64(self, n):
+        lit = bare(n)
+        while lit.get("kind") in CAST and kids(lit):
+            lit = bare(kids(lit)[-1])
+        if lit.get("kind") == "IntegerLiteral":   # (a number written out: its two halves, whatever its size)
+            v = int(lit["value"]) % (1 << 64)
+            return f"struct_make<{self.whole64()}>({v >> 32}, {v & 0xFFFFFFFF})"
+        text, have = self.value(n)
+        return text if have == self.whole64() else self.to64(text, have)
+
+    def from64(self, text, source, target, want):
+        """64 bits as a value of another type, as C++ converts: `source` and `target` are the C++ types."""
+        whole = self.whole64()
+        signed = source in ("whole64s", "long", "long long")
+        if want == "Bool":
+            return f"logic_not({self.w64('w64_is_zero', text)})"
+        if want == "Float":
+            return self.w64("w64_to_signed_number" if signed else "w64_to_number", text)
+        if want == "Int" or want in self.u.enum_values:
+            if Const.BITS.get(target, 64) >= 64 or target in W64:
+                got = f"kern::to<Int>({self.w64('w64_to_signed_number', text)})"   # (a number to count with: read with its sign)
+            else:
+                low = f"kern::to<Float>(struct_break<{whole}>({text}).low)"
+                cut = self.narrow("x", "unsigned int", target, None)
+                got = f"struct_break<{whole}>({text}).low" if cut == "x" else f"kern::to<Int>(kern::formula([](Float x) -> Float {{ return {cut}; }}, {low}))"
+            return got if want == "Int" else self.conv(got, "Int", want)
+        raise Wait(f"a 64-bit number where a {want} is needed")
+
+    def value64(self, b):
+        """(text, Whole64) of a computation with 64-bit bit patterns."""
+        whole = self.whole64()
+        k, ks = b.get("kind"), kids(b)
+        signed = self.ctype(b) in ("whole64s", "long", "long long")
+        b["_w64"] = True   # (said to the test: this is computed around 2^64 - see TestWriter.guard)
+        if k == "IntegerLiteral":
+            v = int(b["value"]) % (1 << 64)
+            return f"struct_make<{whole}>({v >> 32}, {v & 0xFFFFFFFF})", whole
+        if k in CAST:
+            return self.ex64(ks[-1]), whole
+        if k == "InitListExpr":   # (u64{x}, u64{})
+            return (self.ex64(ks[0]) if ks else f"struct_make<{whole}>(0, 0)"), whole
+        if k == "BinaryOperator":
+            op = b["opcode"]
+            x, y = ks
+            if op in ("<<", ">>"):
+                name = "w64_shift_left" if op == "<<" else "w64_shift_right_signed" if signed else "w64_shift_right"
+                return self.w64(name, self.ex64(x), self.ex(y, "Int") if not self.is64(y) else self.from64(self.ex64(y), "whole64u", "unsigned int", "Int")), whole
+            name = {"+": "add", "-": "subtract", "*": "multiply", "&": "bit_and", "|": "bit_or", "^": "bit_xor",
+                    "/": "divide_signed" if signed else "divide", "%": "remainder_signed" if signed else "remainder"}[op]
+            return self.w64("w64_" + name, self.ex64(x), self.ex64(y)), whole
+        if k == "UnaryOperator":
+            x = self.ex64(ks[0])
+            return (x if b["opcode"] == "+" else self.w64("w64_bit_not" if b["opcode"] == "~" else "w64_negate", x)), whole
+        if k == "ConditionalOperator":
+            c = self.bx(ks[0])
+            return f"logic_select<{whole}>({c}, {self.sometimes(lambda: self.ex64(ks[1]))}, {self.sometimes(lambda: self.ex64(ks[2]))})", whole
+        raise Wait(f"a 64-bit number written as {k}")
+
     def once(self, n, leaves):
         """A part of a formula that the formula names several times: a variable or a number itself, anything
         else as a value of its own (computed once)."""
@@ -2838,7 +3043,7 @@ class Emit:
         """A whole number converted to a C++ type that holds less of it: what that type keeps."""
         if have == want or want not in NUMBER or NUMBER[want] != "Int" or NUMBER.get(have) == "Bool":
             return text
-        if self.known_positive(inner) and int(bare(inner)["value"]) < {"unsigned char": 256, "unsigned short": 65536}.get(want, 2 ** 31):
+        if inner is not None and self.known_positive(inner) and int(bare(inner)["value"]) < {"unsigned char": 256, "unsigned short": 65536}.get(want, 2 ** 31):
             return text
         size = {"unsigned char": 8, "signed char": 8, "char": 8, "unsigned short": 16, "short": 16, "unsigned int": 32, "int": 32}
         if want not in size:   # (64 bit: holds every whole number a Blueprint has; an unsigned one is held read with its sign)
@@ -3232,6 +3437,7 @@ class TestWriter:
     def widen_code(text):
         text = re.sub(r"(?<![\w.])((?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?)[fF]\b", lambda m: m.group(1) if re.search(r"[.eE]", m.group(1)) else m.group(1) + ".0", text)
         text = re.sub(r"\bfloat\b", "double", text)
+        text = re.sub(r"\b(?:std::)?(u?)int64_t\b", lambda m: "u64" if m.group(1) else "i64", text)
         text = re.sub(r"\b(?:" + ENGINE + r"::)?dm::(" + "|".join(WIDE_MATH) + r")\s*\(", lambda m: WIDE_MATH[m.group(1)] + "(", text)   # (the engine's own functions of numbers: the formula's)
         return re.sub(r"\bstd::(" + "|".join(WIDE_MATH) + r")f?\s*\(", lambda m: WIDE_MATH[m.group(1)] + "(", text)
 
@@ -3321,7 +3527,8 @@ class TestWriter:
             elif n.get("castKind") == "FloatingToIntegral" and ks and self.u.clean(qtype(n)) in Const.BITS:
                 # a number as a whole number of a type that does not hold it
                 ca, cb = span(ks[-1])
-                edits.append((ca, 2, depth, ca, f"converted::fits<{self.u.clean(qtype(n))}>("))
+                target = {"whole64u": "converted::Whole", "whole64s": "converted::SignedWhole"}.get(self.u.clean(qtype(n)), self.u.clean(qtype(n)))
+                edits.append((ca, 2, depth, ca, f"converted::fits<{target}>("))
                 edits.append((cb, 0, -depth, cb, ")"))
             elif (k in ("CXXStaticCastExpr", "CStyleCastExpr", "CXXFunctionalCastExpr") and ks and n.get("castKind") == "IntegralCast"
                   and self.u.find_type(self.u.clean(qtype(n))) in self.tree.enums and NUMBER.get(self.u.clean(qtype(ks[-1]))) == "Int"):
@@ -3350,6 +3557,23 @@ class TestWriter:
                     swap(bb, span(ks[1])[0], f".{ks[0]['name']}(", ", ")
                 else:
                     swap(bb, b, f".{ks[0]['name']}()", ")")
+            elif n.get("_w64") and k in ("BinaryOperator", "CompoundAssignOperator") and n.get("opcode") in ("+", "-", "*", "/", "%", "<<", ">>", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=") and len(ks) == 2:
+                # a 64-bit bit pattern (a Blueprint's Whole64): computed around 2^64 - only what C++ leaves open marks the call
+                op = n["opcode"]
+                (a, b), (xa, xb), (ya, yb) = span(n), span(ks[0]), span(ks[1])
+                name = {"+": "plus", "-": "minus", "*": "times", "/": "quot", "%": "rem", "<<": "shl", ">>": "shr"}[op[:-1] if k == "CompoundAssignOperator" else op]
+                edits.append((a, 2, depth, a, f"converted::{name}_bits" + ("_to(" if k == "CompoundAssignOperator" else "(")))
+                swap(xb, ya, op, ", ")
+                edits.append((b, 0, -depth, b, ")"))
+            elif n.get("_w64") and k == "UnaryOperator" and n.get("opcode") in ("++", "--") and len(ks) == 1:
+                (a, b), (xa, xb) = span(n), span(ks[0])
+                name = ("post_" if n.get("isPostfix") else "pre_") + ("inc" if n["opcode"] == "++" else "dec") + "_bits"
+                if n.get("isPostfix"):
+                    edits.append((a, 2, depth, a, f"converted::{name}("))
+                    swap(xb, b, n["opcode"], ")")
+                else:
+                    swap(a, xa, n["opcode"], f"converted::{name}(")
+                    edits.append((b, 0, -depth, b, ")"))
             elif k in ("BinaryOperator", "CompoundAssignOperator") and n.get("opcode") in ("+", "-", "*", "+=", "-=", "*=") and len(ks) == 2 and wide(n) and whole(ks[0]) and whole(ks[1]):
                 # a 64-bit whole number: a Blueprint holds it while it is within 2^53 of zero (read with its sign)
                 op = n["opcode"]
@@ -3419,10 +3643,18 @@ class TestWriter:
         return d is not None and os.path.abspath(d.get("_file", "")) == self.path
 
     # ---- types as the test writes them ----
+    @staticmethod
+    def wrap(expr, spelled):
+        """A value of the test as the Blueprint has it where the two differ by more than their numbers: a
+        64-bit bit pattern (the program's u64) is the Blueprint's Whole64 - converted::wholes makes it one."""
+        return f"converted::wholes({expr})" if re.fullmatch(r"(?:std::vector<)*(?:u64|i64)>*", spelled) else expr
+
     def spell(self, raw):
         c = self.u.clean(raw)
         if raw.replace(" ", "") in ("constchar*", "constchar*const"):
             return "const char*"
+        if c in W64:
+            return "u64" if c == "whole64u" else "i64"
         if c in ("float", "double", "long double"):
             return "double"
         if c in NUMBER:
@@ -3452,6 +3684,8 @@ class TestWriter:
         c = self.u.clean(raw)
         if raw.replace(" ", "") in ("constchar*", "constchar*const"):
             return "draw.c_word()"
+        if c in W64:
+            return f"static_cast<{self.spell(raw)}>(draw.bits())"
         if c in ("float", "double", "long double"):
             return "draw.number()"
         if c == "bool":
@@ -3542,8 +3776,9 @@ class TestWriter:
             raise
         if held:
             lines[lines.index(make)] = f"  {t} s{{{', '.join(f'.{f} = kept_{f}.back()' for f in held)}}};"
+        spelled = {f: f"std::vector<{arrays[f]}>" if f in arrays else self.spell(ft) for f, ft in fields if f not in held}
         def of(f, obj="s"):
-            return f"std::vector<{arrays[f]}>(std::begin({obj}.{f}), std::end({obj}.{f}))" if f in arrays else f"{obj}.{f}"
+            return self.wrap(f"std::vector<{arrays[f]}>(std::begin({obj}.{f}), std::end({obj}.{f}))" if f in arrays else f"{obj}.{f}", spelled.get(f, ""))
         lines += ["  return s;", "}"]
         lines.append(f"[[maybe_unused]] static converted::Value arg(const {t}& s) {{ return converted::Value::structure({{{', '.join(f'arg({of(f)})' for f, _ in fields)}}}); }}")
         lines.append(f"[[maybe_unused]] static bool same(const {t}& want, const converted::Value& got) {{ return got.rows && got.rows->size() == {len(fields)}"
@@ -3558,7 +3793,7 @@ class TestWriter:
         """A struct of the test itself (what a call gives and changes), with what the comparison needs."""
         lines = [f"struct {name} {{ " + " ".join(f"{t} {f};" for f, t in fields) + " };"]
         lines.append(f"[[maybe_unused]] static bool same(const {name}& want, const converted::Value& got) {{ return got.rows && got.rows->size() == {len(fields)}"
-                     + "".join(f" && same(want.{f}, (*got.rows)[{i}])" for i, (f, _) in enumerate(fields)) + "; }")
+                     + "".join(f" && same({self.wrap(f'want.{f}', t)}, (*got.rows)[{i}])" for i, (f, t) in enumerate(fields)) + "; }")
         lines.append(f"[[maybe_unused]] static bool defined(const {name}& s) {{ return " + " && ".join(f"defined(s.{f})" for f, _ in fields) + "; }")
         lines.append(f"[[maybe_unused]] static std::string text(const {name}& s) {{ return std::string(\"{{\") + " + ' + ", " + '.join(f"text(s.{f})" for f, _ in fields) + ' + "}"; }')
         return lines
@@ -3876,6 +4111,7 @@ class TestWriter:
                 for place_ in f.refs:
                     parts[("ref", place_)] = f"a{place_}"
                 out_lines = []
+                want_type = ""   # (how the test spells what the call gives, see `wrap`)
                 if f.ctor:
                     give = f"return {target};"
                 elif f.out is not None:
@@ -3885,6 +4121,7 @@ class TestWriter:
                 else:
                     src_ = f.out_fields[0][2]
                     give = f"return {target};" if src_ == "result" else f"{target}; return {parts[src_]};"
+                    want_type = types[0] if src_ == "self" else self.spell(ret) if src_ == "result" else types[src_[1]]
             except Wait as w:
                 skipped.append((f, str(w)))
                 continue
@@ -3899,8 +4136,8 @@ class TestWriter:
                 "    for (int i = 0; tally.more(i); ++i) {",
                 *[f"      {x}" for x in decl_lines],
                 "      const converted::Watch watch;",
-                f"      const auto want = run({', '.join(names)});",
-                f"      tally.take(bp, {{{', '.join(f'arg({n})' for n in names)}}}, want, watch.left(), [&] {{ return {shown}; }});",
+                f"      const auto want = {self.wrap('run(' + ', '.join(names) + ')', want_type)};",
+                f"      tally.take(bp, {{{', '.join(f'arg({self.wrap(n, t)})' for n, t in zip(names, types))}}}, want, watch.left(), [&] {{ return {shown}; }});",
                 "    }",
                 "  }"])))
         if not cases:

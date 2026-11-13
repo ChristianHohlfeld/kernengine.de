@@ -33,6 +33,17 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+struct Whole64 {
+  u32 high = 0;
+  u32 low = 0;
+};
+inline Whole64 w64_bit_xor(Whole64 a, Whole64 b) { return {a.high ^ b.high, a.low ^ b.low}; }
+inline Whole64 w64_shift_right(Whole64 a, u32 by) {
+  if (by == 0) return a;
+  if (by >= 64) return {0, 0};
+  if (by >= 32) return {0, converted::shr(a.high, (by - 32))};
+  return {converted::shr(a.high, by), (converted::shr(a.low, by)) | (converted::shl(a.high, (32 - by)))};
+}
 enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh };
 inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
 namespace Ragdolls { enum Bone : u8 { pelvis, chest, head, upper_arm_l, upper_arm_r, lower_arm_l, lower_arm_r, thigh_l, thigh_r, shin_l, shin_r, kBones }; }
@@ -51,7 +62,7 @@ const BoneDef kDefs[Ragdolls::kBones] = {
     {{0, -0.1, 0.27}, {0.06, 0.06, 0.24}, true},
 };
 f32 hash_noise(u64 seed, u32 i) {
-  u32 x = static_cast<u32>(seed ^ (converted::shr(seed, 32))) + (i + 1) * 0x9e3779b1u;
+  u32 x = static_cast<u32>(seed ^ (converted::shr_bits(seed, 32))) + (i + 1) * 0x9e3779b1u;
   x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16;
   return static_cast<f32>(x) / 4294967295.0 * 2 - 1;
 }
@@ -62,19 +73,53 @@ namespace Ragdolls { inline Vec3 rest_half(u32 b) { return converted::at(kDefs, 
 #undef protected
 #pragma GCC diagnostic pop
 
+[[maybe_unused]] static Whole64 draw_w64__Whole64(converted::Draw& draw) {
+  Whole64 s{};
+  s.high = static_cast<unsigned int>(draw.below(40));
+  s.low = static_cast<unsigned int>(draw.below(40));
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Whole64& s) { return converted::Value::structure({arg(s.high), arg(s.low)}); }
+[[maybe_unused]] static bool same(const Whole64& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.high, (*got.rows)[0]) && same(want.low, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Whole64& s) { return defined(s.high) && defined(s.low); }
+[[maybe_unused]] static std::string text(const Whole64& s) { return std::string("{") + text(s.high) + ", " + text(s.low) + "}"; }
 
 SC_TEST(converted_ragdoll) {
   converted::Blueprint bp("Ragdoll");
-  {  // hash_noise
-    converted::Tally tally("hash_noise");
+  {  // w64_shift_right
+    converted::Tally tally("w64_shift_right");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned long a0, [[maybe_unused]] unsigned int a1) { return converted_ragdoll::hash_noise(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] unsigned int a1) { return converted_ragdoll::w64_shift_right(a0, a1); };
     for (int i = 0; tally.more(i); ++i) {
-      const unsigned long a0 = static_cast<unsigned long>(draw.below(40));
+      const Whole64 a0 = draw_w64__Whole64(draw);
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
       const auto want = run(a0, a1);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // w64_bit_xor
+    converted::Tally tally("w64_bit_xor");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_ragdoll::w64_bit_xor(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const Whole64 a1 = draw_w64__Whole64(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // hash_noise
+    converted::Tally tally("hash_noise");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] u64 a0, [[maybe_unused]] unsigned int a1) { return converted_ragdoll::hash_noise(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const u64 a0 = static_cast<u64>(draw.bits());
+      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(converted::wholes(a0)), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
   {  // smooth

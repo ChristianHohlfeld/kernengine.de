@@ -35,7 +35,12 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+struct Whole64 {
+  u32 high = 0;
+  u32 low = 0;
+};
 inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
+enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
 struct Lane {
   std::vector<Vec2> points;
   f32 width = 6;
@@ -71,14 +76,14 @@ f32 lane_distance(const Lane& l, Vec2 p) {
   Lane s{};
   s.points = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
   s.width = draw.number();
-  s.tile = static_cast<unsigned long>(draw.below(40));
+  s.tile = static_cast<u64>(draw.bits());
   s.alive = draw.flag();
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const Lane& s) { return converted::Value::structure({arg(s.points), arg(s.width), arg(s.tile), arg(s.alive)}); }
-[[maybe_unused]] static bool same(const Lane& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.points, (*got.rows)[0]) && same(want.width, (*got.rows)[1]) && same(want.tile, (*got.rows)[2]) && same(want.alive, (*got.rows)[3]); }
-[[maybe_unused]] static bool defined(const Lane& s) { return defined(s.points) && defined(s.width) && defined(s.tile) && defined(s.alive); }
-[[maybe_unused]] static std::string text(const Lane& s) { return std::string("{") + text(s.points) + ", " + text(s.width) + ", " + text(s.tile) + ", " + text(s.alive) + "}"; }
+[[maybe_unused]] static converted::Value arg(const Lane& s) { return converted::Value::structure({arg(s.points), arg(s.width), arg(converted::wholes(s.tile)), arg(s.alive)}); }
+[[maybe_unused]] static bool same(const Lane& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.points, (*got.rows)[0]) && same(want.width, (*got.rows)[1]) && same(converted::wholes(want.tile), (*got.rows)[2]) && same(want.alive, (*got.rows)[3]); }
+[[maybe_unused]] static bool defined(const Lane& s) { return defined(s.points) && defined(s.width) && defined(converted::wholes(s.tile)) && defined(s.alive); }
+[[maybe_unused]] static std::string text(const Lane& s) { return std::string("{") + text(s.points) + ", " + text(s.width) + ", " + text(converted::wholes(s.tile)) + ", " + text(s.alive) + "}"; }
 
 SC_TEST(converted_game_traffic) {
   converted::Blueprint bp("GameTraffic");

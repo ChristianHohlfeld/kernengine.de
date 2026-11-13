@@ -35,18 +35,92 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+struct Whole64 {
+  u32 high = 0;
+  u32 low = 0;
+};
+inline Whole64 w64_from_number(double x) {
+  const double high = std::floor(x / 4294967296.0);
+  const double low = x - high * 4294967296.0;
+  return {static_cast<u32>(converted::fits<unsigned int>(high < 0.0 ? high + 4294967296.0 : high)), static_cast<u32>(converted::fits<unsigned int>(low))};
+}
+inline Whole64 w64_bit_and(Whole64 a, Whole64 b) { return {a.high & b.high, a.low & b.low}; }
+inline Whole64 w64_bit_xor(Whole64 a, Whole64 b) { return {a.high ^ b.high, a.low ^ b.low}; }
+inline Whole64 w64_shift_left(Whole64 a, u32 by) {
+  if (by == 0) return a;
+  if (by >= 64) return {0, 0};
+  if (by >= 32) return {converted::shl(a.low, (by - 32)), 0};
+  return {(converted::shl(a.high, by)) | (converted::shr(a.low, (32 - by))), converted::shl(a.low, by)};
+}
 enum class Surface : u8 { none, cloth, tpu, floor };
 constexpr f32 kSpacing = 34, kPoleH = 6.2, kGridM = 10;
 i64 cell_key(f32 x, f32 y);
-i64 grid_key(f32 x, f32 y) { return (converted::shl(static_cast<i64>(converted::fits<long>(std::floor(x / kGridM))), 32)) ^ (static_cast<i64>(converted::fits<long>(std::floor(y / kGridM))) & 0xffffffffll); }
-i64 cell_key(f32 x, f32 y) { return (converted::shl(static_cast<i64>(std::lround(x / 8)), 32)) ^ (static_cast<i64>(std::lround(y / 8)) & 0xffffffffll); }
+i64 grid_key(f32 x, f32 y) { return (converted::shl_bits(static_cast<i64>(converted::fits<converted::SignedWhole>(std::floor(x / kGridM))), 32)) ^ (static_cast<i64>(converted::fits<converted::SignedWhole>(std::floor(y / kGridM))) & 0xffffffffll); }
+i64 cell_key(f32 x, f32 y) { return (converted::shl_bits(static_cast<i64>(std::lround(x / 8)), 32)) ^ (static_cast<i64>(std::lround(y / 8)) & 0xffffffffll); }
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
 
+[[maybe_unused]] static Whole64 draw_w64__Whole64(converted::Draw& draw) {
+  Whole64 s{};
+  s.high = static_cast<unsigned int>(draw.below(40));
+  s.low = static_cast<unsigned int>(draw.below(40));
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Whole64& s) { return converted::Value::structure({arg(s.high), arg(s.low)}); }
+[[maybe_unused]] static bool same(const Whole64& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.high, (*got.rows)[0]) && same(want.low, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Whole64& s) { return defined(s.high) && defined(s.low); }
+[[maybe_unused]] static std::string text(const Whole64& s) { return std::string("{") + text(s.high) + ", " + text(s.low) + "}"; }
 
 SC_TEST(converted_lamps) {
   converted::Blueprint bp("LampsSource");
+  {  // w64_from_number
+    converted::Tally tally("w64_from_number");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] double a0) { return converted_lamps::w64_from_number(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      const double a0 = draw.number();
+      const converted::Watch watch;
+      const auto want = run(a0);
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
+  {  // w64_shift_left
+    converted::Tally tally("w64_shift_left");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] unsigned int a1) { return converted_lamps::w64_shift_left(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // w64_bit_and
+    converted::Tally tally("w64_bit_and");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_lamps::w64_bit_and(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const Whole64 a1 = draw_w64__Whole64(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // w64_bit_xor
+    converted::Tally tally("w64_bit_xor");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_lamps::w64_bit_xor(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const Whole64 a1 = draw_w64__Whole64(draw);
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
   {  // grid_key
     converted::Tally tally("grid_key");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -55,7 +129,7 @@ SC_TEST(converted_lamps) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const converted::Watch watch;
-      const auto want = run(a0, a1);
+      const auto want = converted::wholes(run(a0, a1));
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -67,7 +141,7 @@ SC_TEST(converted_lamps) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const converted::Watch watch;
-      const auto want = run(a0, a1);
+      const auto want = converted::wholes(run(a0, a1));
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }

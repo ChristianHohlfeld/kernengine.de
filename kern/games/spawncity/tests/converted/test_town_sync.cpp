@@ -35,6 +35,10 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+struct Whole64 {
+  u32 high = 0;
+  u32 low = 0;
+};
 enum class Kind : u8 { none = 0, car_hit = 1, person_hit = 2, lamps = 3, plank_step = 4, planks = 5, state = 6, ask = 7 };
 Kind kind_of(const std::vector<u8>& blob);
 struct LampRec { i64 key = 0; u8 state = 0; bool operator==(const LampRec&) const = default; };
@@ -82,26 +86,26 @@ std::vector<u8> pack_ask() { return {static_cast<u8>(Kind::ask)}; }
 [[maybe_unused]] static std::string text(const In& s) { return std::string("{") + text(s.b) + ", " + text(s.at) + ", " + text(s.ok) + "}"; }
 [[maybe_unused]] static LampRec draw_town__LampRec(converted::Draw& draw) {
   LampRec s{};
-  s.key = static_cast<long>(draw.whole());
+  s.key = static_cast<i64>(draw.bits());
   s.state = static_cast<unsigned char>(draw.below(40));
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const LampRec& s) { return converted::Value::structure({arg(s.key), arg(s.state)}); }
-[[maybe_unused]] static bool same(const LampRec& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.key, (*got.rows)[0]) && same(want.state, (*got.rows)[1]); }
-[[maybe_unused]] static bool defined(const LampRec& s) { return defined(s.key) && defined(s.state); }
-[[maybe_unused]] static std::string text(const LampRec& s) { return std::string("{") + text(s.key) + ", " + text(s.state) + "}"; }
+[[maybe_unused]] static converted::Value arg(const LampRec& s) { return converted::Value::structure({arg(converted::wholes(s.key)), arg(s.state)}); }
+[[maybe_unused]] static bool same(const LampRec& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(converted::wholes(want.key), (*got.rows)[0]) && same(want.state, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const LampRec& s) { return defined(converted::wholes(s.key)) && defined(s.state); }
+[[maybe_unused]] static std::string text(const LampRec& s) { return std::string("{") + text(converted::wholes(s.key)) + ", " + text(s.state) + "}"; }
 [[maybe_unused]] static PlankRec draw_town__PlankRec(converted::Draw& draw) {
   PlankRec s{};
-  s.key = static_cast<long>(draw.whole());
+  s.key = static_cast<i64>(draw.bits());
   s.door = static_cast<unsigned char>(draw.below(40));
   s.doors = static_cast<unsigned char>(draw.below(40));
   s.planks = static_cast<unsigned char>(draw.below(40));
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const PlankRec& s) { return converted::Value::structure({arg(s.key), arg(s.door), arg(s.doors), arg(s.planks)}); }
-[[maybe_unused]] static bool same(const PlankRec& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.key, (*got.rows)[0]) && same(want.door, (*got.rows)[1]) && same(want.doors, (*got.rows)[2]) && same(want.planks, (*got.rows)[3]); }
-[[maybe_unused]] static bool defined(const PlankRec& s) { return defined(s.key) && defined(s.door) && defined(s.doors) && defined(s.planks); }
-[[maybe_unused]] static std::string text(const PlankRec& s) { return std::string("{") + text(s.key) + ", " + text(s.door) + ", " + text(s.doors) + ", " + text(s.planks) + "}"; }
+[[maybe_unused]] static converted::Value arg(const PlankRec& s) { return converted::Value::structure({arg(converted::wholes(s.key)), arg(s.door), arg(s.doors), arg(s.planks)}); }
+[[maybe_unused]] static bool same(const PlankRec& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(converted::wholes(want.key), (*got.rows)[0]) && same(want.door, (*got.rows)[1]) && same(want.doors, (*got.rows)[2]) && same(want.planks, (*got.rows)[3]); }
+[[maybe_unused]] static bool defined(const PlankRec& s) { return defined(converted::wholes(s.key)) && defined(s.door) && defined(s.doors) && defined(s.planks); }
+[[maybe_unused]] static std::string text(const PlankRec& s) { return std::string("{") + text(converted::wholes(s.key)) + ", " + text(s.door) + ", " + text(s.doors) + ", " + text(s.planks) + "}"; }
 [[maybe_unused]] static MarkRec draw_town__MarkRec(converted::Draw& draw) {
   MarkRec s{};
   s.at = draw.vector();

@@ -35,14 +35,154 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+struct Whole64 {
+  u32 high = 0;
+  u32 low = 0;
+};
+struct EndpointConfig {
+  int max_packet_size = 16 * 1024;     // payload bytes (before fragmentation)
+  int fragment_above = 1024;           // bigger packets are fragmented
+  int fragment_size = 1024;
+  int max_fragments = 16;
+  int ack_buffer_size = 256;
+  int sent_packets_buffer_size = 256;
+  int received_packets_buffer_size = 256;
+  int fragment_reassembly_buffer_size = 64;
+  f32 rtt_smoothing = 0.1;            // per acked packet
+  f32 packet_loss_smoothing = 0.1;
+  f32 bandwidth_smoothing = 0.1;
+  int packet_header_size = 28;         // IPv4 + UDP for bandwidth estimates
+};
+enum class ChannelType : u8 { reliable_ordered, unreliable_unordered };
+struct ChannelConfig {
+  ChannelType type = ChannelType::reliable_ordered;
+  int send_queue_size = 1024;            // messages (reliable: window)
+  int receive_queue_size = 1024;
+  int max_messages_per_packet = 256;
+  int packet_budget = 0;                 // bytes per packet for this channel (0 = whatever is left)
+  int max_message_size = 64 * 1024;      // larger messages are refused
+  int block_threshold = 512;             // reliable: bigger messages go as blocks
+  int block_fragment_size = 1024;
+  f32 resend_time = 0.1;                // seconds (at least; RTT * 1.25 when known)
+};
+struct ConnectionConfig {
+  std::vector<ChannelConfig> channels{ChannelConfig{}, ChannelConfig{ChannelType::unreliable_unordered}};
+  int max_packet_size = 8 * 1024;        // message payload per packet
+  int max_message_types = 256;
+  EndpointConfig endpoint;
+};
+struct ClientServerConfig {
+  u64 protocol_id = 0x4b45524e30303031ull;  // "KERN0001": different games / versions do not talk
+  int max_clients = 16;
+  f64 timeout = 6;                           // seconds without packets
+  f64 request_interval = 0.1;                // handshake resend
+  f64 connect_timeout = 6;
+  f64 keepalive_interval = 0.1;              // payload packets go out at least this often
+  ConnectionConfig connection;
+};
+enum class PacketType : u8 { request = 1, denied, challenge, response, keepalive, payload, disconnect };
+enum class PinType : u8 {
+  exec, boolean, integer, number, vector, text, actor, enumeration, structure,
+  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, count
+};
+namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope }; }
+constexpr u32 kMaxPlayers = 9;
+namespace Turn { enum class Dir : u8 { none, left, right, u_turn }; }
+ClientServerConfig config() {
+  ClientServerConfig c;
+  c.protocol_id = 0x53504157534e3032ull;  // "SPAWSN02": SpawnCity sessions only
+  c.max_clients = kMaxPlayers - 1;
+  ChannelConfig reliable;
+  reliable.type = ChannelType::reliable_ordered;
+  ChannelConfig unreliable;
+  unreliable.type = ChannelType::unreliable_unordered;
+  unreliable.max_message_size = 1200;
+  c.connection.channels = {reliable, unreliable};
+  c.connection.max_packet_size = 1300;
+  return c;
+}
 bool sane(Vec3 v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z) && std::fabs(v.x) < 1e6 && std::fabs(v.y) < 1e6 && std::fabs(v.z) < 1e5; }
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
 
+[[maybe_unused]] static ChannelConfig draw_kern__net__ChannelConfig(converted::Draw& draw) {
+  ChannelConfig s{};
+  s.type = static_cast<ChannelType>(draw.below(2));
+  s.send_queue_size = static_cast<int>(draw.whole());
+  s.receive_queue_size = static_cast<int>(draw.whole());
+  s.max_messages_per_packet = static_cast<int>(draw.whole());
+  s.packet_budget = static_cast<int>(draw.whole());
+  s.max_message_size = static_cast<int>(draw.whole());
+  s.block_threshold = static_cast<int>(draw.whole());
+  s.block_fragment_size = static_cast<int>(draw.whole());
+  s.resend_time = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const ChannelConfig& s) { return converted::Value::structure({arg(s.type), arg(s.send_queue_size), arg(s.receive_queue_size), arg(s.max_messages_per_packet), arg(s.packet_budget), arg(s.max_message_size), arg(s.block_threshold), arg(s.block_fragment_size), arg(s.resend_time)}); }
+[[maybe_unused]] static bool same(const ChannelConfig& want, const converted::Value& got) { return got.rows && got.rows->size() == 9 && same(want.type, (*got.rows)[0]) && same(want.send_queue_size, (*got.rows)[1]) && same(want.receive_queue_size, (*got.rows)[2]) && same(want.max_messages_per_packet, (*got.rows)[3]) && same(want.packet_budget, (*got.rows)[4]) && same(want.max_message_size, (*got.rows)[5]) && same(want.block_threshold, (*got.rows)[6]) && same(want.block_fragment_size, (*got.rows)[7]) && same(want.resend_time, (*got.rows)[8]); }
+[[maybe_unused]] static bool defined(const ChannelConfig& s) { return defined(s.type) && defined(s.send_queue_size) && defined(s.receive_queue_size) && defined(s.max_messages_per_packet) && defined(s.packet_budget) && defined(s.max_message_size) && defined(s.block_threshold) && defined(s.block_fragment_size) && defined(s.resend_time); }
+[[maybe_unused]] static std::string text(const ChannelConfig& s) { return std::string("{") + text(s.type) + ", " + text(s.send_queue_size) + ", " + text(s.receive_queue_size) + ", " + text(s.max_messages_per_packet) + ", " + text(s.packet_budget) + ", " + text(s.max_message_size) + ", " + text(s.block_threshold) + ", " + text(s.block_fragment_size) + ", " + text(s.resend_time) + "}"; }
+[[maybe_unused]] static EndpointConfig draw_kern__net__EndpointConfig(converted::Draw& draw) {
+  EndpointConfig s{};
+  s.max_packet_size = static_cast<int>(draw.whole());
+  s.fragment_above = static_cast<int>(draw.whole());
+  s.fragment_size = static_cast<int>(draw.whole());
+  s.max_fragments = static_cast<int>(draw.whole());
+  s.ack_buffer_size = static_cast<int>(draw.whole());
+  s.sent_packets_buffer_size = static_cast<int>(draw.whole());
+  s.received_packets_buffer_size = static_cast<int>(draw.whole());
+  s.fragment_reassembly_buffer_size = static_cast<int>(draw.whole());
+  s.rtt_smoothing = draw.number();
+  s.packet_loss_smoothing = draw.number();
+  s.bandwidth_smoothing = draw.number();
+  s.packet_header_size = static_cast<int>(draw.whole());
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const EndpointConfig& s) { return converted::Value::structure({arg(s.max_packet_size), arg(s.fragment_above), arg(s.fragment_size), arg(s.max_fragments), arg(s.ack_buffer_size), arg(s.sent_packets_buffer_size), arg(s.received_packets_buffer_size), arg(s.fragment_reassembly_buffer_size), arg(s.rtt_smoothing), arg(s.packet_loss_smoothing), arg(s.bandwidth_smoothing), arg(s.packet_header_size)}); }
+[[maybe_unused]] static bool same(const EndpointConfig& want, const converted::Value& got) { return got.rows && got.rows->size() == 12 && same(want.max_packet_size, (*got.rows)[0]) && same(want.fragment_above, (*got.rows)[1]) && same(want.fragment_size, (*got.rows)[2]) && same(want.max_fragments, (*got.rows)[3]) && same(want.ack_buffer_size, (*got.rows)[4]) && same(want.sent_packets_buffer_size, (*got.rows)[5]) && same(want.received_packets_buffer_size, (*got.rows)[6]) && same(want.fragment_reassembly_buffer_size, (*got.rows)[7]) && same(want.rtt_smoothing, (*got.rows)[8]) && same(want.packet_loss_smoothing, (*got.rows)[9]) && same(want.bandwidth_smoothing, (*got.rows)[10]) && same(want.packet_header_size, (*got.rows)[11]); }
+[[maybe_unused]] static bool defined(const EndpointConfig& s) { return defined(s.max_packet_size) && defined(s.fragment_above) && defined(s.fragment_size) && defined(s.max_fragments) && defined(s.ack_buffer_size) && defined(s.sent_packets_buffer_size) && defined(s.received_packets_buffer_size) && defined(s.fragment_reassembly_buffer_size) && defined(s.rtt_smoothing) && defined(s.packet_loss_smoothing) && defined(s.bandwidth_smoothing) && defined(s.packet_header_size); }
+[[maybe_unused]] static std::string text(const EndpointConfig& s) { return std::string("{") + text(s.max_packet_size) + ", " + text(s.fragment_above) + ", " + text(s.fragment_size) + ", " + text(s.max_fragments) + ", " + text(s.ack_buffer_size) + ", " + text(s.sent_packets_buffer_size) + ", " + text(s.received_packets_buffer_size) + ", " + text(s.fragment_reassembly_buffer_size) + ", " + text(s.rtt_smoothing) + ", " + text(s.packet_loss_smoothing) + ", " + text(s.bandwidth_smoothing) + ", " + text(s.packet_header_size) + "}"; }
+[[maybe_unused]] static ConnectionConfig draw_kern__net__ConnectionConfig(converted::Draw& draw) {
+  ConnectionConfig s{};
+  s.channels = draw_list(draw, [&]() -> ChannelConfig { return draw_kern__net__ChannelConfig(draw); });
+  s.max_packet_size = static_cast<int>(draw.whole());
+  s.max_message_types = static_cast<int>(draw.whole());
+  s.endpoint = draw_kern__net__EndpointConfig(draw);
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const ConnectionConfig& s) { return converted::Value::structure({arg(s.channels), arg(s.max_packet_size), arg(s.max_message_types), arg(s.endpoint)}); }
+[[maybe_unused]] static bool same(const ConnectionConfig& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.channels, (*got.rows)[0]) && same(want.max_packet_size, (*got.rows)[1]) && same(want.max_message_types, (*got.rows)[2]) && same(want.endpoint, (*got.rows)[3]); }
+[[maybe_unused]] static bool defined(const ConnectionConfig& s) { return defined(s.channels) && defined(s.max_packet_size) && defined(s.max_message_types) && defined(s.endpoint); }
+[[maybe_unused]] static std::string text(const ConnectionConfig& s) { return std::string("{") + text(s.channels) + ", " + text(s.max_packet_size) + ", " + text(s.max_message_types) + ", " + text(s.endpoint) + "}"; }
+[[maybe_unused]] static ClientServerConfig draw_kern__net__ClientServerConfig(converted::Draw& draw) {
+  ClientServerConfig s{};
+  s.protocol_id = static_cast<u64>(draw.bits());
+  s.max_clients = static_cast<int>(draw.whole());
+  s.timeout = draw.number();
+  s.request_interval = draw.number();
+  s.connect_timeout = draw.number();
+  s.keepalive_interval = draw.number();
+  s.connection = draw_kern__net__ConnectionConfig(draw);
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const ClientServerConfig& s) { return converted::Value::structure({arg(converted::wholes(s.protocol_id)), arg(s.max_clients), arg(s.timeout), arg(s.request_interval), arg(s.connect_timeout), arg(s.keepalive_interval), arg(s.connection)}); }
+[[maybe_unused]] static bool same(const ClientServerConfig& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(converted::wholes(want.protocol_id), (*got.rows)[0]) && same(want.max_clients, (*got.rows)[1]) && same(want.timeout, (*got.rows)[2]) && same(want.request_interval, (*got.rows)[3]) && same(want.connect_timeout, (*got.rows)[4]) && same(want.keepalive_interval, (*got.rows)[5]) && same(want.connection, (*got.rows)[6]); }
+[[maybe_unused]] static bool defined(const ClientServerConfig& s) { return defined(converted::wholes(s.protocol_id)) && defined(s.max_clients) && defined(s.timeout) && defined(s.request_interval) && defined(s.connect_timeout) && defined(s.keepalive_interval) && defined(s.connection); }
+[[maybe_unused]] static std::string text(const ClientServerConfig& s) { return std::string("{") + text(converted::wholes(s.protocol_id)) + ", " + text(s.max_clients) + ", " + text(s.timeout) + ", " + text(s.request_interval) + ", " + text(s.connect_timeout) + ", " + text(s.keepalive_interval) + ", " + text(s.connection) + "}"; }
 
 SC_TEST(converted_net_session) {
   converted::Blueprint bp("NetSession");
+  {  // config
+    converted::Tally tally("config");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]() { return converted_net_session::config(); };
+    for (int i = 0; tally.more(i); ++i) {
+      const converted::Watch watch;
+      const auto want = run();
+      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });
+    }
+  }
   {  // sane
     converted::Tally tally("sane");
     converted::Draw draw;   // (every function its own arguments, the same in every run)

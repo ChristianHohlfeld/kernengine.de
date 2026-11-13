@@ -374,7 +374,21 @@ und schreibt sie in der Schreibweise:
   (Stufe 5) ebenso tun. Eine Funktion, die lange rechnet, wird so oft verglichen, wie zwei Sekunden
   Platz lassen – mindestens 20-mal. Braucht die kompilierte Klasse für einen Aufruf länger als 5 ms,
   wird dieser Aufruf nur mit der Klasse verglichen: Der Interpreter bräuchte dafür Minuten (er löst
-  jeden Schritt über Namen auf). Der Test nennt jede solche Funktion in seiner Ausgabe (`note:`).
+  jeden Schritt über Namen auf). Dauert ein einzelner Aufruf Sekunden (eine 256-Bit-Zahl hoch eine
+  256-Bit-Zahl, Glied für Glied in 32 Bit), werden so viele verglichen, wie 20 Sekunden Platz
+  lassen – mindestens fünf. Der Test nennt jede solche Funktion in seiner Ausgabe (`note:`).
+- **64-Bit-Zahlen als Bitmuster.** Eine Zahl, die das Programm `u64`, `i64`, `uint64_t` oder
+  `int64_t` schreibt, ist ein Bitmuster: ein Schlüssel aus zwei 32-Bit-Zahlen, ein Hash, der
+  Zustand eines Zufallsgenerators. Eine ganze Zahl des Blueprints ist bis 2^53 exakt – das reicht
+  dafür nicht. Im Blueprint ist so eine Zahl die Struktur `Whole64` aus ihren beiden 32-Bit-Hälften,
+  und was C++ mit ihr rechnet (addieren, multiplizieren, schieben, teilen, vergleichen – alles um
+  2^64 herum), rechnen die Funktionen aus `tools/blueprint_whole64.h`: C++ von der Art, die der
+  Konverter umschreibt. Sie stehen in jedem Blueprint, der sie benutzt, und werden wie die
+  Funktionen des Programms Bit für Bit mit ihrem Quelltext verglichen – über den ganzen Bereich
+  von 64 Bit. Offen lässt C++ dort nur: vorzeichenbehaftetes Rechnen, das die 64 Bit verlässt, eine
+  Division durch null, ein Schieben um 64 oder mehr (`converted::plus_bits`, `quot_bits`,
+  `shl_bits` … markieren den Aufruf). Eine Zahl, die `size_t`, `long` … geschrieben ist, ist eine,
+  mit der gezählt wird: die ganze Zahl des Blueprints (siehe unten).
 - Ein Stück Quelltext, das mit den Zahlen der Sprache nicht übersetzt (es ruft etwas, das nicht
   umgeschrieben ist), nimmt der Konverter aus dem Test und nennt die Funktion als nicht verglichen.
 - Eine Funktion wird geschrieben, wenn alles in ihr einen Platz in der Schreibweise hat – und
@@ -386,10 +400,10 @@ sagt, in den Zahlen der Sprache – überall gleich. Er sagt nicht, dass das die
 heutigen Programm: Das rechnet dieselben Formeln mit `f32` in 32 Bit, die Sprache in 64 Bit (wie das
 JavaScript-Original). Das ist die Festlegung der Sprache, kein Spielraum des Tests.
 
-Stand (13.11.2026): 263 von 1.428 Funktionen (1.859 von 28.544 Zeilen) aus 54 von 77 Dateien stehen
+Stand (13.11.2026): 281 von 1.428 Funktionen (1.916 von 28.544 Zeilen) aus 54 von 77 Dateien stehen
 als Blueprints im Level (54 Actors im Ordner „Source“). Der Test vergleicht jede davon, die etwas
-gibt, Bit für Bit mit ihrem Quelltext – 303 Vergleiche, weil Funktionen aus Headern in jedem
-Blueprint stehen, der sie benutzt; keine ist ausgenommen. Das Spiel führt für diese Dateien weiter
+gibt, Bit für Bit mit ihrem Quelltext – 390 Vergleiche, weil Funktionen aus Headern (und die der
+64-Bit-Zahlen) in jedem Blueprint stehen, der sie benutzt; keine ist ausgenommen. Das Spiel führt für diese Dateien weiter
 ihr C++ aus (Stufe 5).
 
 Worauf die anderen warten, nach Zeilen: der Zustand von `Game` (328 Funktionen, 13.818 Zeilen:
@@ -398,7 +412,7 @@ den Renderer, den Mixer oder die Physik der Engine (`Life`, `PeopleArt`, `Car`, 
 `Destruction`, `Drone`, `Interiors`, `Ragdolls` …: rund 4.500 Zeilen, dazu rund 1.000 Zeilen mit
 Zeigern im Rumpf); Maps und Sets (`Terrain`, `CityStream`, `TrafficRules`, `RoadGraph`: rund 2.700
 Zeilen); `Session` (Netz der Engine: 664); die Aufrufe der Regel-Blueprints (482); Text formatieren
-und zeichenweise lesen; 64-Bit-Zahlen als Bitmuster (Hashes, Schlüssel aus zwei 32-Bit-Zahlen).
+und zeichenweise lesen.
 
 Aufruf (in `kern/games/spawncity`):
 
@@ -444,8 +458,9 @@ Was als Nächstes dazukommt, in der Reihenfolge der Zeilen, die darauf warten:
      kommt so exakt gleich heraus, solange die Zahlen innerhalb von 2^53 um null liegen; Vergleiche
      und die Umwandlung in eine Zahl sagen es aus. Der Test markiert einen Aufruf, in dem der
      Quelltext diesen Bereich verlässt.
-   - [ ] 64-Bit-Zahlen als Bitmuster (Schlüssel aus zwei 32-Bit-Zahlen, FNV-Hash): Ein Int ist bis
-     2^53 exakt – dafür braucht es zwei 32-Bit-Hälften.
+   - [x] 64-Bit-Zahlen als Bitmuster (Schlüssel aus zwei 32-Bit-Zahlen, FNV-Hash): die Struktur
+     `Whole64` aus zwei 32-Bit-Hälften, gerechnet von den Funktionen aus
+     `tools/blueprint_whole64.h` (siehe oben).
    - [x] Listen: einfügen und löschen an einer Stelle oder über einen Bereich (`erase`, `insert`),
      `resize`, `assign`, Listen, die ein Konstruktor baut (`std::vector<T> v(n, x)`, aus einem
      Bereich), `std::swap`, `std::reverse`.
