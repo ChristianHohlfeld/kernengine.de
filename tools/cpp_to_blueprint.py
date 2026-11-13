@@ -112,9 +112,8 @@ MORE_MATH = ("hypot", "clampf", "lerp", "sign0", "hash_u32", "ldexp", "ldexpf", 
 
 
 # The engine's functions as nodes in converted code (BLUEPRINTS.md, 6c): handles for the engine's objects,
-# calls as nodes, steps inside conditional parts of an expression. Off until the generated tests have the
-# engine's stand-ins - a function is only written when its test can compare it.
-ENGINE_NODES = os.environ.get("ENGINE_NODES") == "1"
+# calls as nodes, steps inside conditional parts of an expression. (ENGINE_NODES=0 leaves them out.)
+ENGINE_NODES = os.environ.get("ENGINE_NODES", "1") != "0"
 
 
 class Hoists(Wait):
@@ -901,6 +900,8 @@ class Unit:
         self.functions[d["id"]] = f
         self.names.add(f.name)
         try:
+            if d["id"] in getattr(self, "barred", {}):
+                raise Wait(self.barred[d["id"]])
             Emit(self, f).run()
             self.order.append(f)
         except Wait as w:
@@ -917,7 +918,7 @@ class Unit:
         for f in self.order:
             used.update(word.findall(f.text))
         def name_of(line):
-            m = re.match(r"\s*KERN_(?:ENUM|STRUCT)\((\w+)", line) or re.match(r"\s*(?:[\w<>:]+)\s+(\w+)\s*=", line) or re.search(r"\}\s*(n\d+);", line)
+            m = re.match(r"\s*KERN_(?:ENUM|STRUCT)\((\w+)", line) or re.match(r"\s*(?:[\w<>:]+)\s+(\w+)\s*=", line) or re.search(r"\}\s*(n\d+);", line) or re.match(r"\s*\w+Result (n\d+);", line)
             return m.group(1) if m else None
         variables = []
         pending = []
@@ -2305,6 +2306,7 @@ class Emit:
         if f["value"]:
             tmp = self.temp(d["name"], outs[0][1])
             return [f"{tmp} = {fn}({', '.join(texts)});"], tmp, outs[0][1]
+        self.f.pure = False   # (a step of the engine: the function changes something outside itself)
         if not outs:
             return [f"{fn}({', '.join(texts)});"], None, None
         node = u.next_node
@@ -2944,6 +2946,18 @@ class Emit:
             if place in g.refs:
                 backs[("ref", place)] = lambda v, o=a, t_=pt: self.store(o, self.typed(v, t_))
         call = f"{g.name}({', '.join(texts)}).Result"
+        if not g.pure:
+            # a function that changes something outside itself (it calls a step of the engine) is called as a
+            # step: the call keeps what it gave (n12 = F(...); n12.Result), and who calls it is such a function too
+            self.f.pure = False
+            if not g.out_fields:
+                self.hoist([f"{g.name}({', '.join(texts)});"])
+                return None, None
+            node = self.u.next_node
+            self.u.next_node += 1
+            self.u.members.append(f"  {g.name}Result n{node};")
+            self.hoist([f"n{node} = {g.name}({', '.join(texts)});"])
+            call = f"n{node}.Result"
         if not g.out_fields:
             return None, None
         if g.out is None:
@@ -4709,7 +4723,7 @@ class TestWriter:
         ps = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
         for i, (p, (name, _, _)) in enumerate(zip(ps, f["ins"][1:] if cls else f["ins"])):
             raw = qtype(p).strip()
-            default = self.tree.source(kids(p)[-1]).strip() if kids(p) else ""
+            default = self.tree.source(kids(p)[-1]).strip().lstrip("=").strip() if kids(p) else ""   # (`= {}`: the tree has the sign with it)
             default = " = " + default if default else ""
             if not self.u.object_of(raw) and raw.replace(" ", "") not in ("constchar*", "constchar*const"):
                 self.result_ok(re.sub(r"\*\s*(const)?$", "", raw))   # (the helpers of the structs it is made of)
@@ -4789,6 +4803,11 @@ class TestWriter:
             chunks.append((tree.place(d), ("engine", d["id"]), head + a + tail))
             defs.append((("engine", d["id"]), head + b + tail))
             pairs.append(("::" + tree.scope_of.get(d["id"], "") + d["name"], "::".join(spaces + [d["name"]])))
+        if os.environ.get("STAND_INS"):
+            for _, key, text in chunks:
+                sys.stderr.write(f"{key}: {text}\n")
+            for key, text in defs:
+                sys.stderr.write(f"{key}: {text}\n")
         return chunks, defs
 
     # ---- the test ----
@@ -5137,7 +5156,12 @@ class TestWriter:
                 "    for (int i = 0; tally.more(i); ++i) {",
                 *[f"      {x}" for x in decl_lines],
                 "      const converted::Watch watch;",
+                "      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)",
+                "      converted::g_can_bail = true;",
+                "      converted::may_bail(true);",
                 f"      const auto want = {self.wrap('run(' + ', '.join(names) + ')', want_type)};",
+                "      converted::g_can_bail = false;",
+                "      converted::may_bail(false);",
                 f"      tally.take(bp, {{{', '.join(f'arg({self.wrap(n, t)})' for n, t in zip(names, types))}}}, want, watch.left(), [&] {{ return {shown}; }});",
                 "    }",
                 "  }"])))
@@ -5308,6 +5332,17 @@ class TestWriter:
                 if only_cases or (key[0] != "case" and min(first for first, last, k in where if k == key) == early):
                     dropped.add(key)
                     why[key] = message
+                    if key[0] == "function":
+                        # a method whose definition goes: its declaration in its class goes with it (what calls it
+                        # then does not compile and goes too - instead of compiling and not linking), and its own case
+                        before = tree.decl.get(key[1], {}).get("previousDecl")
+                        while before:
+                            dropped.add(("member", before))
+                            why[("member", before)] = message
+                            before = tree.decl.get(before, {}).get("previousDecl")
+                        if any(k == ("case", key[1]) for k, _ in cases):
+                            dropped.add(("case", key[1]))
+                            why[("case", key[1])] = message
                     if os.environ.get("TEST_ERRORS"):
                         what = tree.decl.get(key[1], {}).get("name", key[1]) if key[0] in ("member", "function", "case") else key[1]
                         sys.stderr.write(f"--- {stem}: without the {key[0]} {what}: {message}\n")
@@ -5373,12 +5408,14 @@ def actor_name(path):
     return "".join(p[:1].upper() + p[1:] for p in re.split(r"[_\W]+", stem) if p)
 
 
-def convert_file(path, namespace, flags, taken=()):
+def convert_file(path, namespace, flags, taken=(), barred=None):
     """A source file's functions, converted as far as they are; returns the Unit. `taken`: names of
-    actors the level has for something else (a file of that name is the actor <Name>Source)."""
+    actors the level has for something else (a file of that name is the actor <Name>Source). `barred`:
+    functions that are not written this time (decl id -> what they wait for)."""
     tree = Tree(path, namespace, flags)
     name = actor_name(path)
     unit = Unit(tree, name + "Source" if name in taken else name)
+    unit.barred = dict(barred or {})
     mine = [d for i, d in tree.body.items() if i == d["id"] and d.get("_file") and os.path.abspath(d["_file"]) == tree.path and d.get("kind") != "VarDecl"]
     mine.sort(key=lambda d: d.get("_at", (0, 0))[0] or 0)
     unit.all = []
@@ -5467,7 +5504,20 @@ def main(argv):
     if level:
         taken = {a["name"] for a in json.load(open(level, encoding="utf-8"))["actors"] if a.get("folder") != (folder or "Source")}
     for path in files:
-        unit = convert_file(path, namespace, flags, taken)
+        # A function is written only when its test compares it: what the test cannot compare yet waits,
+        # and with it what calls it - the file is converted again without those.
+        barred = {}
+        while True:
+            unit = convert_file(path, namespace, flags, taken, barred)
+            if not (test and unit.order):
+                break
+            writer = TestWriter(unit, os.path.relpath(os.path.dirname(os.path.abspath(path)), test), flags)
+            writer.test_dir = test
+            unit.test = writer.write()
+            more = {f.decl["id"]: f"its test cannot compare it yet ({why})" for f, why in unit.test[1] if why != "it gives nothing" and f.decl["id"] not in barred}
+            if not more:
+                break
+            barred.update(more)
         fs = unit.all
         written = [f for f in fs if f.text]
         total += len(fs)
@@ -5486,9 +5536,7 @@ def main(argv):
             os.makedirs(texts, exist_ok=True)
             open(os.path.join(texts, unit.name + ".cpp"), "w").write(unit.text())
         if test and unit.order:
-            writer = TestWriter(unit, os.path.relpath(os.path.dirname(os.path.abspath(path)), test), flags)
-            writer.test_dir = test
-            body, skipped = writer.write()
+            body, skipped = unit.test
             compared += (body or "").count("converted::Tally tally(")
             for f, why in skipped:
                 not_compared[why] += 1

@@ -168,7 +168,12 @@ SC_TEST(converted_qr_code) {
     for (int i = 0; tally.more(i); ++i) {
       const int a0 = static_cast<int>(draw.whole());
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -179,7 +184,12 @@ SC_TEST(converted_qr_code) {
     for (int i = 0; tally.more(i); ++i) {
       const int a0 = static_cast<int>(draw.whole());
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -191,7 +201,12 @@ SC_TEST(converted_qr_code) {
       const unsigned char a0 = static_cast<unsigned char>(draw.below(40));
       const unsigned char a1 = static_cast<unsigned char>(draw.below(40));
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -203,7 +218,12 @@ SC_TEST(converted_qr_code) {
       const std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       const std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -214,7 +234,12 @@ SC_TEST(converted_qr_code) {
     for (int i = 0; tally.more(i); ++i) {
       const int a0 = static_cast<int>(draw.whole());
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -228,7 +253,12 @@ SC_TEST(converted_qr_code) {
       const int a2 = static_cast<int>(draw.whole());
       const bool a3 = draw.flag();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2, a3);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); });
     }
   }
@@ -241,7 +271,12 @@ SC_TEST(converted_qr_code) {
       const int a1 = static_cast<int>(draw.whole());
       const int a2 = static_cast<int>(draw.whole());
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
     }
   }
@@ -253,7 +288,12 @@ SC_TEST(converted_qr_code) {
       const Grid a0 = draw_qr__Grid(draw);
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -266,7 +306,12 @@ SC_TEST(converted_qr_code) {
       const int a1 = static_cast<int>(draw.whole());
       const int a2 = static_cast<int>(draw.whole());
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
     }
   }
@@ -279,7 +324,12 @@ SC_TEST(converted_qr_code) {
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a2 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
     }
   }

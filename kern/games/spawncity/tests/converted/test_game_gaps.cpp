@@ -164,6 +164,7 @@ enum class Key : u8 {
   left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
   count
 };
+namespace audio { void normalize(std::vector<double>& samples, const double& peak); }
 enum class Result : u8 { ok, unchanged, invalid, owner_only_pilot, already_seated, seat_occupied, no_pilot, not_occupant };
 namespace Fx { enum Kind : u8 { shot, explosion, impact, rocket, cow_death, push, lamp, strike, flyover, mil_tracer, mil_shell, npc_death, melee, kLast = melee }; }
 struct Biquad {
@@ -209,6 +210,28 @@ MeshData smoke_disc() {
     d.indices.insert(d.indices.end(), {0, a, b});
     d.indices.insert(d.indices.end(), {a + 1, a + 2, b + 2, a + 1, b + 2, b + 1});
   }
+  return d;
+}
+std::vector<f32> jet_roar_pcm(u32 rate, f32 cutoff) {
+  const std::size_t n = converted::times(static_cast<std::size_t>(rate), 4);
+  std::vector<f32> d(converted::count(n));
+  u32 s = 0x2545f491u;
+  f32 lp = 0, lp2 = 0, br = 0;
+  for (std::size_t i = 0; i < n; converted::pre_inc(i)) {
+    const f32 t = static_cast<f32>(i) / static_cast<f32>(rate);
+    s ^= s << 13; s ^= s >> 17; s ^= s << 5;
+    const f32 w = static_cast<f32>(s) / 2147483648.0 - 1;
+    lp += (w - lp) * 0.08;
+    lp2 += (lp - lp2) * 0.02;
+    br += (w - br) * 0.6;
+    const f32 whine = kern::math::sin(2 * kPi * 1180 * t + kern::math::sin(2 * kPi * 3 * t) * 2) * 0.05 + kern::math::sin(2 * kPi * 2360 * t) * 0.025;
+    converted::at(d, i) = lp2 * 2.4 + lp * 0.9 + (w - br) * 0.18 + whine;
+  }
+  const std::size_t f = static_cast<std::size_t>(converted::fits<unsigned long>(rate * 0.05));
+  for (std::size_t i = 0; i < f; converted::pre_inc(i)) { const f32 a = static_cast<f32>(i) / static_cast<f32>(f); converted::at(d, converted::plus(converted::minus(n, f), i)) = converted::at(d, converted::plus(converted::minus(n, f), i)) * (1 - a) + converted::at(d, i) * a; }
+  Biquad lpf = Biquad::lowpass(cutoff, 0.7, static_cast<f32>(rate));
+  for (f32& v : d) v = lpf.run(v);
+  audio::normalize(d, 0.9);
   return d;
 }
 #undef private
@@ -257,6 +280,7 @@ MeshData smoke_disc() {
 [[maybe_unused]] static bool defined(const MeshData& s) { return defined(s.positions) && defined(s.normals) && defined(s.colors) && defined(s.uvs) && defined(s.extra) && defined(s.extra_size) && defined(s.indices); }
 [[maybe_unused]] static std::string text(const MeshData& s) { return std::string("{") + text(s.positions) + ", " + text(s.normals) + ", " + text(s.colors) + ", " + text(s.uvs) + ", " + text(s.extra) + ", " + text(s.extra_size) + ", " + text(s.indices) + "}"; }
 [[maybe_unused]] static void take(MeshData& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<std::vector<double>>(s.positions, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.normals, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.colors, (*v.rows)[2]); converted::take_as<std::vector<double>>(s.uvs, (*v.rows)[3]); converted::take_as<std::vector<double>>(s.extra, (*v.rows)[4]); converted::take_as<unsigned int>(s.extra_size, (*v.rows)[5]); converted::take_as<std::vector<unsigned int>>(s.indices, (*v.rows)[6]); }
+namespace audio { inline void normalize(std::vector<double>& samples, const double& peak) { const std::vector<converted::Value> out = converted::engine_call("engine.audio.normalize", {arg(samples), arg(peak)}); converted::take_as<std::vector<double>>(samples, out[0]); } }
 struct Out_Biquad_run { Biquad Self; double Result; };
 [[maybe_unused]] static bool same(const Out_Biquad_run& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_Biquad_run& s) { return defined(s.Self) && defined(s.Result); }
@@ -272,7 +296,12 @@ SC_TEST(converted_game_gaps) {
       const Biquad a0 = draw_Biquad(draw);
       const double a1 = draw.number();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -285,7 +314,12 @@ SC_TEST(converted_game_gaps) {
       const double a1 = draw.number();
       const double a2 = draw.number();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
     }
   }
@@ -299,7 +333,12 @@ SC_TEST(converted_game_gaps) {
       const double a2 = draw.number();
       const double a3 = draw.number();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2, a3);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); });
     }
   }
@@ -315,7 +354,12 @@ SC_TEST(converted_game_gaps) {
       const double a4 = draw.number();
       const double a5 = draw.number();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2, a3, a4, a5);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5); });
     }
   }
@@ -330,7 +374,12 @@ SC_TEST(converted_game_gaps) {
       const Vec3 a3 = draw.vector();
       const Vec2 a4 = draw.vector2();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2, a3, a4);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); });
     }
   }
@@ -340,8 +389,30 @@ SC_TEST(converted_game_gaps) {
     const auto run = [&]() { return converted_game_gaps::smoke_disc(); };
     for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run();
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });
+    }
+  }
+  {  // jet_roar_pcm
+    converted::Tally tally("jet_roar_pcm");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] double a1) { return converted_game_gaps::jet_roar_pcm(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      const double a1 = draw.number();
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
 }

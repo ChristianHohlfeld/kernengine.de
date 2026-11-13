@@ -60,6 +60,10 @@ enum class PinType : u8 {
   exec, boolean, integer, number, vector, text, actor, enumeration, structure,
   boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, count
 };
+namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope }; }
+struct Instance : converted::EngineObject {
+};
+namespace Runtime { enum class Chain : u8 { event, call, call_inside }; }
 struct Puff {
   bool alive = false, ember = false;
   Vec3 pos, vel;
@@ -287,7 +291,12 @@ SC_TEST(converted_gaps_rules) {
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -298,7 +307,12 @@ SC_TEST(converted_gaps_rules) {
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -311,7 +325,12 @@ SC_TEST(converted_gaps_rules) {
       const std::string a1 = draw.word();
       const Vec3 a2 = draw.vector();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
     }
   }
@@ -323,7 +342,12 @@ SC_TEST(converted_gaps_rules) {
       const SmokeField a0 = draw_gaps__SmokeField(draw);
       const std::string a1 = draw.word();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -334,7 +358,12 @@ SC_TEST(converted_gaps_rules) {
     for (int i = 0; tally.more(i); ++i) {
       const SmokeField a0 = draw_gaps__SmokeField(draw);
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -346,7 +375,12 @@ SC_TEST(converted_gaps_rules) {
       const Puff a0 = draw_gaps__Puff(draw);
       const double a1 = draw.number();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -358,7 +392,12 @@ SC_TEST(converted_gaps_rules) {
       const Puff a0 = draw_gaps__Puff(draw);
       const double a1 = draw.number();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -370,7 +409,12 @@ SC_TEST(converted_gaps_rules) {
       const double a0 = draw.number();
       const double a1 = draw.number();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -381,7 +425,12 @@ SC_TEST(converted_gaps_rules) {
     for (int i = 0; tally.more(i); ++i) {
       const Quat a0 = draw_kern__Quat(draw);
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -394,7 +443,12 @@ SC_TEST(converted_gaps_rules) {
       const Quat a1 = draw_kern__Quat(draw);
       const double a2 = draw.number();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
     }
   }
@@ -406,7 +460,12 @@ SC_TEST(converted_gaps_rules) {
       const Quat a0 = draw_kern__Quat(draw);
       const Quat a1 = draw_kern__Quat(draw);
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -424,7 +483,12 @@ SC_TEST(converted_gaps_rules) {
       const Vec3 a6 = draw.vector();
       const Quat a7 = draw_kern__Quat(draw);
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2, a3, a4, a5, a6, a7);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5), arg(a6), arg(a7)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5) + ", " + text(a6) + ", " + text(a7); });
     }
   }

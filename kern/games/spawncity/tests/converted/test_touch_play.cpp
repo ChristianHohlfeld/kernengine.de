@@ -409,7 +409,12 @@ SC_TEST(converted_touch_play) {
       const bool a5 = draw.flag();
       const bool a6 = draw.flag();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2, a3, a4, a5, a6);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5), arg(a6)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5) + ", " + text(a6); });
     }
   }
@@ -421,7 +426,12 @@ SC_TEST(converted_touch_play) {
       const TouchPlay a0 = draw_TouchPlay(draw);
       const TouchBtn a1 = draw_TouchBtn(draw);
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -437,7 +447,12 @@ SC_TEST(converted_touch_play) {
       const double a4 = draw.number();
       const double a5 = draw.number();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2, a3, a4, a5);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5); });
     }
   }
@@ -448,7 +463,12 @@ SC_TEST(converted_touch_play) {
     for (int i = 0; tally.more(i); ++i) {
       const TouchPlay a0 = draw_TouchPlay(draw);
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -463,7 +483,12 @@ SC_TEST(converted_touch_play) {
       const double a3 = draw.number();
       const double a4 = draw.number();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2, a3, a4);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); });
     }
   }
@@ -474,7 +499,12 @@ SC_TEST(converted_touch_play) {
     for (int i = 0; tally.more(i); ++i) {
       const TouchPlay a0 = draw_TouchPlay(draw);
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -485,7 +515,12 @@ SC_TEST(converted_touch_play) {
     for (int i = 0; tally.more(i); ++i) {
       const TouchPlay a0 = draw_TouchPlay(draw);
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -496,7 +531,12 @@ SC_TEST(converted_touch_play) {
     for (int i = 0; tally.more(i); ++i) {
       const TouchPlay a0 = draw_TouchPlay(draw);
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -508,7 +548,12 @@ SC_TEST(converted_touch_play) {
       const TouchPlay a0 = draw_TouchPlay(draw);
       const std::string a1 = draw.word();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -521,7 +566,12 @@ SC_TEST(converted_touch_play) {
       const double a1 = draw.number();
       const double a2 = draw.number();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
     }
   }

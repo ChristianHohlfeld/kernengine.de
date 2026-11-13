@@ -66,7 +66,12 @@ SC_TEST(converted_game_military) {
       const Vec3 a0 = draw.vector();
       const Vec3 a1 = draw.vector();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -77,7 +82,12 @@ SC_TEST(converted_game_military) {
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -90,7 +100,12 @@ SC_TEST(converted_game_military) {
       const double a1 = draw.number();
       const double a2 = draw.number();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
     }
   }

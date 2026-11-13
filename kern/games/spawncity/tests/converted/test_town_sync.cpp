@@ -131,7 +131,12 @@ SC_TEST(converted_town_sync) {
     for (int i = 0; tally.more(i); ++i) {
       const In a0 = draw_town__In(draw);
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -142,7 +147,12 @@ SC_TEST(converted_town_sync) {
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -153,7 +163,12 @@ SC_TEST(converted_town_sync) {
     for (int i = 0; tally.more(i); ++i) {
       const LampRec a0 = draw_town__LampRec(draw);
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -164,7 +179,12 @@ SC_TEST(converted_town_sync) {
     for (int i = 0; tally.more(i); ++i) {
       const PlankRec a0 = draw_town__PlankRec(draw);
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -175,7 +195,12 @@ SC_TEST(converted_town_sync) {
     for (int i = 0; tally.more(i); ++i) {
       const MarkRec a0 = draw_town__MarkRec(draw);
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -186,7 +211,12 @@ SC_TEST(converted_town_sync) {
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -196,7 +226,12 @@ SC_TEST(converted_town_sync) {
     const auto run = [&]() { return converted_town_sync::pack_ask(); };
     for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run();
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });
     }
   }

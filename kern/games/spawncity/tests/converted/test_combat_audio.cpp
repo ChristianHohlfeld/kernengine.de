@@ -59,6 +59,33 @@ double nwave_at(double t, double rise, double fall) {
   if (t < rise + fall * 1.9) return -0.6 * (1 - (t - rise - fall) / (fall * 0.9));
   return 0;
 }
+std::vector<f32> shot(u32 rate, u32 v) {
+  const double duration = 0.2 + v * 0.01;
+  Buf data(converted::count(samples(duration, rate))), dry(converted::count(data.size()));
+  Random random(0x5a1c0d + v * 4049);
+  double lpA = 0, lpB = 0, phase = 0;
+  const double rise = 0.00024, fall = 0.0009 + v * 0.00005;
+  for (std::size_t n = 0; n < data.size(); converted::pre_inc(n)) {
+    const double t = static_cast<double>(n) / rate, white = random() * 2 - 1;
+    const double nwave = nwave_at(t, rise, fall);
+    lpA += 0.6 * (white - lpA);
+    lpB += 0.25 * (lpA - lpB);
+    const double blast = ((lpA - lpB) * 0.9 + (white - lpA) * 0.5) * kern::math::exp(-t / 0.008);
+    phase += TAU * (185 * kern::math::exp(-t * 30) + 70) / rate;
+    const double thump = kern::math::sin(phase) * kern::math::exp(-t / 0.02) * (1 - kern::math::exp(-t / 0.0008));
+    const double u = t - 0.017 - v * 0.001;
+    const double bolt = u > 0 && u < 0.012 ? (kern::math::sin(TAU * 2700 * u) + 0.5 * (random() * 2 - 1)) * kern::math::exp(-u / 0.003) * 0.25 : 0;
+    converted::at(dry, n) = nwave * 1.2 + blast * 0.9 + thump * 0.7 + bolt;
+  }
+  const double taps[3][2] = {{0.011, 0.32}, {0.019, 0.22}, {0.031, 0.14}};
+  for (const auto& tap : taps) {
+    const std::size_t k = static_cast<std::size_t>(converted::fits<unsigned long>((converted::at(tap, 0) + v * 0.0006) * rate));
+    for (std::size_t n = data.size(); converted::post_dec(n) > k;) converted::at(data, n) += converted::at(dry, converted::minus(n, k)) * converted::at(tap, 1);
+  }
+  double lp = 0;
+  for (std::size_t n = 0; n < data.size(); converted::pre_inc(n)) { lp += 0.5 * (converted::at(data, n) - lp); converted::at(data, n) = tanh_bp((converted::at(dry, n) + lp * 0.8) * 2.1); }
+  return finish(data, 0.95);
+}
 std::vector<f32> hit(u32 rate, u32 v) {
   const double duration = 0.105 + v * 0.009;
   Buf data(converted::count(samples(duration, rate)));
@@ -222,7 +249,12 @@ SC_TEST(converted_combat_audio) {
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -233,7 +265,12 @@ SC_TEST(converted_combat_audio) {
     for (int i = 0; tally.more(i); ++i) {
       const Random a0 = draw_combat_audio__Random(draw);
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -247,7 +284,12 @@ SC_TEST(converted_combat_audio) {
       const double a2 = draw.number();
       const double a3 = draw.number();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2, a3);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); });
     }
   }
@@ -259,7 +301,12 @@ SC_TEST(converted_combat_audio) {
       const std::vector<double> a0 = draw_list(draw, [&]() -> double { return draw.number(); });
       const double a1 = draw.number();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -271,7 +318,12 @@ SC_TEST(converted_combat_audio) {
       const double a0 = draw.number();
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -284,8 +336,30 @@ SC_TEST(converted_combat_audio) {
       const double a1 = draw.number();
       const double a2 = draw.number();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+    }
+  }
+  {  // shot
+    converted::Tally tally("shot");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted_combat_audio::shot(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
   {  // hit
@@ -296,7 +370,12 @@ SC_TEST(converted_combat_audio) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -308,7 +387,12 @@ SC_TEST(converted_combat_audio) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -320,7 +404,12 @@ SC_TEST(converted_combat_audio) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -333,7 +422,12 @@ SC_TEST(converted_combat_audio) {
       const double a1 = draw.number();
       const double a2 = draw.number();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
     }
   }
@@ -345,7 +439,12 @@ SC_TEST(converted_combat_audio) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -357,7 +456,12 @@ SC_TEST(converted_combat_audio) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -369,7 +473,12 @@ SC_TEST(converted_combat_audio) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -380,7 +489,12 @@ SC_TEST(converted_combat_audio) {
     for (int i = 0; tally.more(i); ++i) {
       const int a0 = static_cast<int>(draw.whole());
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -396,7 +510,12 @@ SC_TEST(converted_combat_audio) {
       const double a4 = draw.number();
       const double a5 = draw.number();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2, a3, a4, a5);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5); });
     }
   }

@@ -51,7 +51,12 @@ SC_TEST(converted_game_weapons) {
     for (int i = 0; tally.more(i); ++i) {
       const Id a0 = static_cast<Id>(draw.below(14));
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }

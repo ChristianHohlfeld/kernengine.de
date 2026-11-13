@@ -36,6 +36,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+double now_ms();
 constexpr f32 kPi = 3.14159265358979323846;
 struct Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
@@ -67,29 +68,29 @@ struct Mat4 {
 
 
 
+  Mat4 operator*(const Mat4& b) const {
+    Mat4 r;
+    for (int c = 0; c < 4; ++c) {
+      const f32 b0 = converted::at(b.m, 4 * c), b1 = converted::at(b.m, 4 * c + 1), b2 = converted::at(b.m, 4 * c + 2), b3 = converted::at(b.m, 4 * c + 3);
+      for (int k = 0; k < 4; ++k)
+        converted::at(r.m, 4 * c + k) = converted::at(m, k) * b0 + converted::at(m, 4 + k) * b1 + converted::at(m, 8 + k) * b2 + converted::at(m, 12 + k) * b3;
+    }
+    return r;
+  }
+  
+
+
+
+  
+
+
+
   
 
 
 
 
-
-
-
-
-  
-
-
-
-  
-
-
-
-  
-
-
-
-
-  
+  static Mat4 translate(Vec3 t) { Mat4 r; converted::at(r.m, 12) = t.x; converted::at(r.m, 13) = t.y; converted::at(r.m, 14) = t.z; return r; }
   
 
   /// Translation * rotation * scale.
@@ -151,6 +152,35 @@ struct Camera {
   bool has_projection = false;
   Mat4 projection = Mat4{};
 };
+struct MeshData {
+  std::vector<f32> positions, normals, colors, uvs;
+  std::vector<f32> extra;  // optional per-vertex stream (extra_size floats each)
+  u32 extra_size = 0;
+  std::vector<u32> indices;
+
+  
+  
+  
+
+
+  
+
+
+
+
+
+  
+  
+
+
+  /// Borrowed MeshInput view (geometry only; material etc. stay default).
+  
+};
+namespace CombatArt { enum Shape : u8 { box, sphere, cylinder, cone, glow_box, glow_sphere, smoke, fade_sphere, fade_ring, kShapes }; }
+enum class PinType : u8 {
+  exec, boolean, integer, number, vector, text, actor, enumeration, structure,
+  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, count
+};
 namespace GpsLive { enum class View : u8 { eye, follow, map }; }
 enum class Key : u8 {
   unknown = 0,
@@ -160,8 +190,19 @@ enum class Key : u8 {
   count
 };
 enum class Result : u8 { ok, unchanged, invalid, owner_only_pilot, already_seated, seat_occupied, no_pilot, not_occupant };
+namespace Fx { enum Kind : u8 { shot, explosion, impact, rocket, cow_death, push, lamp, strike, flyover, mil_tracer, mil_shell, npc_death, melee, kLast = melee }; }
 enum class Id : u8 { smg, glock, sniper, grenade_launcher, rocket, fists, knife, hand_grenade, drone_gun, drone_rockets, drone_guided, jet_cannon, jet_missile, jet_bomb };
+namespace primitives { MeshData box(const Vec3& size, const Vec3& color = {1, 1, 1}); }
+namespace primitives { MeshData cylinder(const double& radius, const double& height, const unsigned int& segments = 20, const Vec3& color = {1, 1, 1}); }
+namespace primitives { void append(MeshData& dst, const MeshData& src, const Mat4& m); }
+f64 clock_ms() { return now_ms(); }
 Vec3 srgb(u32 hex) { return {static_cast<f32>((hex >> 16) & 255) / 255, static_cast<f32>((hex >> 8) & 255) / 255, static_cast<f32>(hex & 255) / 255}; }
+void box(MeshData& m, Vec3 size, u32 color, Vec3 at, const Mat4& extra = Mat4{}) { primitives::append(m, primitives::box(size, srgb(color)), extra * Mat4::translate(at)); }
+void cyl(MeshData& m, f32 r, f32 len, u32 color, Vec3 at, u32 seg = 14, const Mat4& extra = Mat4{}) {
+  primitives::append(m, primitives::cylinder(r, len, seg, srgb(color)), extra * Mat4::translate({at.x, at.y, at.z - len * 0.5}));
+}
+void glow_box(MeshData& m, Vec3 size, Vec3 hdr, Vec3 at) { primitives::append(m, primitives::box(size, hdr), Mat4::translate(at)); }
+void glow_cyl(MeshData& m, f32 r, f32 len, Vec3 hdr, Vec3 at) { primitives::append(m, primitives::cylinder(r, len, 14, hdr), Mat4::translate({at.x, at.y, at.z - len * 0.5})); }
 int vm_index(Id id) {
   switch (id) {
     case Id::grenade_launcher: return 0;
@@ -199,6 +240,22 @@ Mat4 euler(f32 x, f32 y, f32 z) {
 [[maybe_unused]] static bool defined(const Mat4& s) { return defined(std::vector<double>(std::begin(s.m), std::end(s.m))); }
 [[maybe_unused]] static std::string text(const Mat4& s) { return std::string("{") + text(std::vector<double>(std::begin(s.m), std::end(s.m))) + "}"; }
 [[maybe_unused]] static void take(Mat4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[0]); for (std::size_t k = 0; k < items.size() && k < std::size(s.m); ++k) s.m[k] = items[k]; } }
+[[maybe_unused]] static MeshData draw_kern__MeshData(converted::Draw& draw) {
+  MeshData s{};
+  s.positions = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.normals = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.colors = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.uvs = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.extra = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.extra_size = static_cast<unsigned int>(draw.below(40));
+  s.indices = draw_list(draw, [&]() -> unsigned int { return static_cast<unsigned int>(draw.below(40)); });
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const MeshData& s) { return converted::Value::structure({arg(s.positions), arg(s.normals), arg(s.colors), arg(s.uvs), arg(s.extra), arg(s.extra_size), arg(s.indices)}); }
+[[maybe_unused]] static bool same(const MeshData& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.positions, (*got.rows)[0]) && same(want.normals, (*got.rows)[1]) && same(want.colors, (*got.rows)[2]) && same(want.uvs, (*got.rows)[3]) && same(want.extra, (*got.rows)[4]) && same(want.extra_size, (*got.rows)[5]) && same(want.indices, (*got.rows)[6]); }
+[[maybe_unused]] static bool defined(const MeshData& s) { return defined(s.positions) && defined(s.normals) && defined(s.colors) && defined(s.uvs) && defined(s.extra) && defined(s.extra_size) && defined(s.indices); }
+[[maybe_unused]] static std::string text(const MeshData& s) { return std::string("{") + text(s.positions) + ", " + text(s.normals) + ", " + text(s.colors) + ", " + text(s.uvs) + ", " + text(s.extra) + ", " + text(s.extra_size) + ", " + text(s.indices) + "}"; }
+[[maybe_unused]] static void take(MeshData& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<std::vector<double>>(s.positions, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.normals, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.colors, (*v.rows)[2]); converted::take_as<std::vector<double>>(s.uvs, (*v.rows)[3]); converted::take_as<std::vector<double>>(s.extra, (*v.rows)[4]); converted::take_as<unsigned int>(s.extra_size, (*v.rows)[5]); converted::take_as<std::vector<unsigned int>>(s.indices, (*v.rows)[6]); }
 [[maybe_unused]] static Camera draw_kern__Camera(converted::Draw& draw) {
   Camera s{};
   s.eye = draw.vector();
@@ -231,9 +288,28 @@ Mat4 euler(f32 x, f32 y, f32 z) {
 [[maybe_unused]] static bool defined(const Quat& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
 [[maybe_unused]] static std::string text(const Quat& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
 [[maybe_unused]] static void take(Quat& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
+inline double now_ms() { const std::vector<converted::Value> out = converted::engine_call("engine.now_ms", {}); double result{}; converted::take_as<double>(result, out[0]); return result; }
+namespace primitives { inline void append(MeshData& dst, const MeshData& src, const Mat4& m) { const std::vector<converted::Value> out = converted::engine_call("engine.primitives.append", {arg(dst), arg(src), arg(m)}); converted::take_as<MeshData>(dst, out[0]); } }
+namespace primitives { inline MeshData box(const Vec3& size, const Vec3& color) { const std::vector<converted::Value> out = converted::engine_call("engine.primitives.box", {arg(size), arg(color)}); MeshData result{}; converted::take_as<MeshData>(result, out[0]); return result; } }
+namespace primitives { inline MeshData cylinder(const double& radius, const double& height, const unsigned int& segments, const Vec3& color) { const std::vector<converted::Value> out = converted::engine_call("engine.primitives.cylinder", {arg(radius), arg(height), arg(segments), arg(color)}); MeshData result{}; converted::take_as<MeshData>(result, out[0]); return result; } }
 
 SC_TEST(converted_game_look) {
   converted::Blueprint bp("GameLook");
+  {  // clock_ms
+    converted::Tally tally("clock_ms");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]() { return converted_game_look::clock_ms(); };
+    for (int i = 0; tally.more(i); ++i) {
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run();
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });
+    }
+  }
   {  // srgb
     converted::Tally tally("srgb");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -241,8 +317,127 @@ SC_TEST(converted_game_look) {
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
+  {  // Mat4::operator*
+    converted::Tally tally("Mat4_mul");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Mat4 a0, [[maybe_unused]] Mat4 a1) { return a0.operator*(a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Mat4 a0 = draw_kern__Mat4(draw);
+      const Mat4 a1 = draw_kern__Mat4(draw);
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // Mat4::translate
+    converted::Tally tally("Mat4_translate");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Vec3 a0) { return Mat4::translate(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Vec3 a0 = draw.vector();
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
+  {  // box
+    converted::Tally tally("box");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] MeshData a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] unsigned int a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] Mat4 a4) { converted_game_look::box(a0, a1, a2, a3, a4); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      const MeshData a0 = draw_kern__MeshData(draw);
+      const Vec3 a1 = draw.vector();
+      const unsigned int a2 = static_cast<unsigned int>(draw.below(40));
+      const Vec3 a3 = draw.vector();
+      const Mat4 a4 = draw_kern__Mat4(draw);
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0, a1, a2, a3, a4);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); });
+    }
+  }
+  {  // cyl
+    converted::Tally tally("cyl");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] MeshData a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] unsigned int a3, [[maybe_unused]] Vec3 a4, [[maybe_unused]] unsigned int a5, [[maybe_unused]] Mat4 a6) { converted_game_look::cyl(a0, a1, a2, a3, a4, a5, a6); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      const MeshData a0 = draw_kern__MeshData(draw);
+      const double a1 = draw.number();
+      const double a2 = draw.number();
+      const unsigned int a3 = static_cast<unsigned int>(draw.below(40));
+      const Vec3 a4 = draw.vector();
+      const unsigned int a5 = static_cast<unsigned int>(draw.below(40));
+      const Mat4 a6 = draw_kern__Mat4(draw);
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0, a1, a2, a3, a4, a5, a6);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5), arg(a6)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5) + ", " + text(a6); });
+    }
+  }
+  {  // glow_box
+    converted::Tally tally("glow_box");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] MeshData a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] Vec3 a3) { converted_game_look::glow_box(a0, a1, a2, a3); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      const MeshData a0 = draw_kern__MeshData(draw);
+      const Vec3 a1 = draw.vector();
+      const Vec3 a2 = draw.vector();
+      const Vec3 a3 = draw.vector();
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0, a1, a2, a3);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); });
+    }
+  }
+  {  // glow_cyl
+    converted::Tally tally("glow_cyl");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] MeshData a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] Vec3 a4) { converted_game_look::glow_cyl(a0, a1, a2, a3, a4); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      const MeshData a0 = draw_kern__MeshData(draw);
+      const double a1 = draw.number();
+      const double a2 = draw.number();
+      const Vec3 a3 = draw.vector();
+      const Vec3 a4 = draw.vector();
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0, a1, a2, a3, a4);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); });
     }
   }
   {  // vm_index
@@ -252,7 +447,12 @@ SC_TEST(converted_game_look) {
     for (int i = 0; tally.more(i); ++i) {
       const Id a0 = static_cast<Id>(draw.below(14));
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -263,7 +463,12 @@ SC_TEST(converted_game_look) {
     for (int i = 0; tally.more(i); ++i) {
       const Camera a0 = draw_kern__Camera(draw);
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -276,7 +481,12 @@ SC_TEST(converted_game_look) {
       const Quat a1 = draw_kern__Quat(draw);
       const Vec3 a2 = draw.vector();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
     }
   }
@@ -288,7 +498,12 @@ SC_TEST(converted_game_look) {
       const Quat a0 = draw_kern__Quat(draw);
       const Quat a1 = draw_kern__Quat(draw);
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -300,7 +515,12 @@ SC_TEST(converted_game_look) {
       const Vec3 a0 = draw.vector();
       const double a1 = draw.number();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -313,7 +533,12 @@ SC_TEST(converted_game_look) {
       const double a1 = draw.number();
       const double a2 = draw.number();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
     }
   }

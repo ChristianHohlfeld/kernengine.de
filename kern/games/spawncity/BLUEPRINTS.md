@@ -412,9 +412,9 @@ sagt, in den Zahlen der Sprache – überall gleich. Er sagt nicht, dass das die
 heutigen Programm: Das rechnet dieselben Formeln mit `f32` in 32 Bit, die Sprache in 64 Bit (wie das
 JavaScript-Original). Das ist die Festlegung der Sprache, kein Spielraum des Tests.
 
-Stand (13.11.2026): 286 von 1.428 Funktionen (1.986 von 28.544 Zeilen) aus 54 von 77 Dateien stehen
-als Blueprints im Level (54 Actors im Ordner „Source“). Der Test vergleicht jede davon, die etwas
-gibt, Bit für Bit mit ihrem Quelltext – 397 Vergleiche, weil Funktionen aus Headern (und die der
+Stand (13.11.2026): 353 von 1.428 Funktionen (2.682 von 28.544 Zeilen) aus 58 von 77 Dateien stehen
+als Blueprints im Level (58 Actors im Ordner „Source“). Der Test vergleicht jede davon, die etwas
+gibt, Bit für Bit mit ihrem Quelltext – 511 Vergleiche, weil Funktionen aus Headern (und die der
 64-Bit-Zahlen) in jedem Blueprint stehen, der sie benutzt; keine ist ausgenommen. Das Spiel führt für diese Dateien weiter
 ihr C++ aus (Stufe 5).
 
@@ -536,16 +536,18 @@ Was als Nächstes dazukommt, in der Reihenfolge der Zeilen, die darauf warten:
        abhängig vom Aufruf und davon, wie viele vor ihm kamen, und hält jeden Aufruf fest). Die
        Engine prüft jeden Knoten ihrer Bibliothek in jeder Stufe: Der erzeugte Blueprint „Engine"
        ruft jede der 540 Funktionen einmal, im Interpreter und als kompilierte Klasse.
-     - [ ] (c) Der Konverter schreibt Engine-Aufrufe als diese Knoten – geschrieben, aber
-       abgeschaltet (`ENGINE_NODES=1` schaltet es zur Probe ein: 359 statt 286 Funktionen, 3.003
-       statt 1.986 Zeilen), bis der Vergleichstest die Stellvertreter hat. Was der Konverter dabei
+     - [x] (c) Der Konverter schreibt Engine-Aufrufe als diese Knoten (eingeschaltet seit 13.11.,
+       15:55): 353 Funktionen, 2.682 Zeilen, 58 Dateien, 511 Vergleiche. Was er dabei
        tut: Ein Zeiger oder eine Referenz auf ein Objekt der Engine, dessen Daten keine Struktur
        sein können, ist ein `Int` (Handle; `nullptr` ist 0). Jeder Engine-Aufruf ist ein eigener
        Schritt vor der Anweisung, in der er steht – er läuft genau einmal, wo C++ ihn ruft; ein
        Wert geht in eine lokale Variable, ein Schritt mit Ausgängen in das Glied des Knotens
        (`struct { RayHit result = …; } n12;`). Steht er in einem Teil eines Ausdrucks, den C++
        nicht immer auswertet (`a && w->valid(b)`, `c ? x : y`), wird daraus ein `if`, das eine
-       Variable setzt. Die Pins müssen die der Tabelle der Engine sein, sonst wartet die Funktion.
+       Variable setzt. Eine Funktion, die einen Schritt der Engine enthält, ist nicht „pure": Wer
+       sie ruft, ruft sie als Schritt (`n12 = Car_reapply(…);`, gelesen wird `n12.Result`) und ist
+       dann selbst so eine Funktion. Die Pins müssen die der Tabelle der Engine sein, sonst wartet
+       die Funktion.
      - [x] (c) Der Test dazu ist geschrieben: Für jede Klasse der Engine, von der der Quelltext
        ein Objekt hält, hat der Test eine Stellvertreter-Klasse (`TestWriter.stand_ins`) mit genau
        den gerufenen Methoden – Signatur aus dem Header, in den Typen des Tests. Jede Methode gibt
@@ -555,17 +557,20 @@ Was als Nächstes dazukommt, in der Reihenfolge der Zeilen, die darauf warten:
        Blueprints im Test hat denselben Stellvertreter. `Tally::take` vergleicht zusätzlich die
        drei Aufzeichnungen (Quelltext, Interpreter, Klasse): dieselben Aufrufe in derselben
        Reihenfolge mit denselben Bits; die erste Abweichung nennt er.
-     - [ ] (c) Einschalten. Der Probelauf mit `ENGINE_NODES=1` über alle Dateien schreibt rund 359
-       Funktionen; 14 davon vergleicht der Test noch nicht. Bevor es eingeschaltet wird:
-       1. **Was nicht verglichen werden kann, wird nicht geschrieben.** Heute nennt der Konverter
-          so eine Funktion nur („not compared"); er muss sie (und was sie ruft) warten lassen.
-       2. Freie Funktionen der Engine in Namensräumen (`primitives::box`, `audio::…`): Der
-          Stellvertreter steht im Test im gleichnamigen Namensraum, der Quelltext findet ihn noch
-          nicht („is not a member of").
-       3. Default-Argumente der Stellvertreter, deren Text der Baum nicht hergibt, und Werte für
-          `std::initializer_list<…>` im Test.
-       4. Methoden schlichter Engine-Strukturen, die nur die Engine definiert
-          (`MeshData::as_input`), und Engine-Objekte, die eine Klasse als Wert hält.
+     - [x] (c) Eingeschaltet. Dabei festgelegt:
+       - Eine Funktion wird nur geschrieben, wenn ihr Test sie vergleicht. Was der Test noch nicht
+         vergleichen kann, wartet mit Grund – und mit ihr, was sie ruft (die Datei wird ohne sie
+         noch einmal umgeschrieben). Fällt die Definition einer Methode aus dem Test, fällt ihre
+         Deklaration mit: Was sie ruft, übersetzt dann nicht, statt nicht zu linken.
+       - Ein Quelltext, der außerhalb einer Liste liest, hat verlassen, was C++ festlegt; tut er
+         das in einer Schleife weiter (bis zu einer Länge, die es nicht gibt), liefe er endlos.
+         Nach zehntausend solchen Lesern gibt der Test den Aufruf auf und würfelt neu
+         (`converted::open_read`).
+       - Offen (wartet mit Grund): `pistol` (Feld-Zuweisung im Test), drei Funktionen mit
+         `std::initializer_list<…>` als Argument, `Jet::step` und `PeopleArt::projectile` (ihr
+         Quelltext mischt in `?:` eine Zahl mit einer Vektor-Komponente), Methoden schlichter
+         Engine-Strukturen, die nur die Engine definiert (`MeshData::as_input`), Engine-Objekte,
+         die eine Klasse als Wert hält.
      - [ ] (d) **Volle Geschwindigkeit im Export:** In der exportierten Klasse ruft die Funktion
        eines Engine-Knotens die Funktion der Engine direkt und typisiert
        (`world_of(welt)->cast_ray(a, b)`), ohne Werte zu verpacken; die Tür bleibt für Interpreter

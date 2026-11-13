@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <bit>
 #include <cfenv>
+#include <csetjmp>
 #include <chrono>
 #include <limits>
 #include <cmath>
@@ -798,6 +799,8 @@ struct Tally {
       std::printf("  %s(%s): the source gives %s, the Blueprint %s (interpreter) and %s (class)\n", function, describe().c_str(), text(want).c_str(),
                   !both ? "(not run)" : ia && a.size() == 1 ? shown(a[0]).c_str() : "nothing", ib && b.size() == 1 ? shown(b[0]).c_str() : "nothing");
   }
+  /// A call the source was given up in (open_read): counted with those it has nothing to compare for.
+  void given_up() { ++outside; }
   ~Tally() {
     if (class_only > 0)
       std::printf("  note: %s: %d of %d calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to %.0f ms - is not run in the interpreter)\n",
@@ -814,13 +817,35 @@ struct Tally {
 // or more gives, C++ does not say. The source in a test goes through these there: they give the value where
 // there is one and mark the call where there is none - such a call is then not compared (see Watch).
 inline bool g_open = false;
+// A source that reads outside a list has left what C++ defines; one that goes on doing so in a loop (a loop
+// up to a length that is not there) would run for ever. After ten thousand such reads the call is given up:
+// the test's function is where it was before the call (g_bail - see the generated tests), nothing is compared.
+inline std::jmp_buf g_bail;
+/// (What a call that is given up had on the heap stays there: the leak check does not count what the
+/// source allocates while it may be given up.)
+#if defined(__SANITIZE_ADDRESS__)
+extern "C" void __lsan_disable();
+extern "C" void __lsan_enable();
+inline void may_bail(bool on) { on ? __lsan_disable() : __lsan_enable(); }
+#else
+inline void may_bail(bool) {}
+#endif
+inline bool g_can_bail = false;
+inline long g_open_reads = 0;
+inline void open_read() {
+  g_open = true;
+  if (g_can_bail && ++g_open_reads > 10000) {
+    g_can_bail = false;
+    std::longjmp(g_bail, 1);
+  }
+}
 inline void wide::mark_open() { g_open = true; }
 
 template <class C, class I> auto at(C&& c, I i) -> decltype(c[0]) {
   using R = decltype(c[0]);
   const long long n = static_cast<long long>(std::size(c)), k = static_cast<long long>(i);
   if (k >= 0 && k < n) return c[static_cast<std::size_t>(k)];
-  g_open = true;
+  open_read();
   if constexpr (std::is_reference_v<R>) {
     static std::remove_cvref_t<R> none;
     none = std::remove_cvref_t<R>{};
@@ -1071,6 +1096,7 @@ struct Watch {
   Watch() {
     std::feclearexcept(FE_ALL_EXCEPT);
     g_open = false;
+    g_open_reads = 0;
     g_source_engine.calls.clear();
   }
   bool left() const { return g_open || std::fetestexcept(FE_DIVBYZERO | FE_INVALID) != 0; }

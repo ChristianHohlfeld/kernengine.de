@@ -35,6 +35,16 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+enum class PinType : u8 {
+  exec, boolean, integer, number, vector, text, actor, enumeration, structure,
+  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, count
+};
+struct Value : converted::EngineObject {
+};
+namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope }; }
+struct Instance : converted::EngineObject {
+};
+namespace Runtime { enum class Chain : u8 { event, call, call_inside }; }
 f32 cell_rand(u32 seed, u32 i);
 f32 agent_random(u32 seed);
 struct Race {
@@ -95,7 +105,12 @@ SC_TEST(converted_combat_rules) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -106,7 +121,12 @@ SC_TEST(converted_combat_rules) {
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -117,7 +137,12 @@ SC_TEST(converted_combat_rules) {
     for (int i = 0; tally.more(i); ++i) {
       const Race a0 = draw_combat__Race(draw);
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }

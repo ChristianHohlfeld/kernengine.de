@@ -35,14 +35,223 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+struct Renderer : converted::EngineObject {
+  bool remove(const unsigned int& id) const;
+};
+enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh };
+struct World : converted::EngineObject {
+};
+struct Rng {
+  u32 s;
+  
+  u32 next() { s ^= s << 13; s ^= s >> 17; s ^= s << 5; return s; }
+  f32 unit() { return static_cast<f32>(next() >> 8) * (1.0 / 16777216.0); }
+  f32 range(f32 a, f32 b) { return a + (b - a) * unit(); }
+  /// Standard normal (Box-Muller), as SpawnCity's sensor noise.
+  
+
+
+
+
+
+
+
+
+ private:
+  f32 spare_ = 0;
+  bool has_spare_ = false;
+};
+struct Destruction {
+ public:
+  static constexpr u32 kPieces = 2000, kTorn = 40;
+  static constexpr f32 kFloor = 3.2, kRubble = 0.8, kPieceLife = 22;
+
+  
+  /// A weapon's blast at `at` (radius m, the blast's damage); `missile`: the guided missile (x 2.2).
+  /// Returns how many buildings lost height.
+  
+  
+  
+  /// RESET / a new city: every building whole, no debris, no points lost.
+  
+
+  struct Stats { u32 pieces = 0, torn = 0, hits = 0, collapsed = 0; };
+  
+  /// Destruction sync: the structural points left per building (seed) - only ever fewer. The
+  /// points a blast here took (since the last call), and those another machine reports.
+  
+  
+  
+
+ private:
+  // what fracture needs of a broken building (a copy: the tile may go while a piece flies)
+  struct Broken {
+    std::vector<std::vector<Vec2>> rings;
+    Vec2 c, lo, hi;
+    f32 new_top = 0, top = 0, intensity = 0;
+  };
+  struct Piece { Vec3 p, v, size, axis, tint; f32 yaw = 0, angle = 0, spin = 0, age = 0; bool rest = false; };
+  struct Torn {
+    u32 mesh = 0;
+    Broken b;
+    Vec3 center, dir, axis, pivot, offset;
+    f32 tilt = 0, speed = 0, lift = 0, break_at = 1, age = 0;
+  };
+  
+  
+  
+  void spawn(Vec3 at, Vec3 v, Vec3 size, f32 yaw, Vec3 tint, Rng& rng);
+  void free_torn(Torn& t);
+
+  Renderer* r_ = nullptr;
+  converted::wide::Map<u32, f32> points_;  // structural points left, by building seed
+  std::vector<std::pair<u32, f32>> points_log_;
+  std::vector<Piece> pieces_;
+  std::vector<Torn> torn_;
+  Stats stats_;
+};
 Vec2 norm2(Vec2 v, Vec2 fallback) {
   const f32 l = hypot_bp(v.x, v.y);
   return l > 1e-3 ? Vec2{v.x / l, v.y / l} : fallback;
+}
+void Destruction::spawn(Vec3 at, Vec3 v, Vec3 size, f32 yaw, Vec3 tint, Rng& rng) {
+  if (pieces_.size() >= kPieces) return;  // the pool is full: no more pieces (as the original)
+  Piece p;
+  p.p = at;
+  p.v = v;
+  p.size = size;
+  p.yaw = yaw;
+  p.axis = normalize(Vec3{rng.range(-1, 1), rng.range(-1, 1), rng.range(-1, 1)}, {1, 0, 0});
+  p.angle = rng.range(0, 6.28);
+  p.spin = rng.range(-9, 9);
+  p.tint = tint;
+  pieces_.push_back(p);
+}
+void Destruction::free_torn(Torn& t) {
+  if (t.mesh && r_) r_->remove(t.mesh);
+  t.mesh = 0;
 }
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
 
+[[maybe_unused]] static Rng draw_Rng(converted::Draw& draw) {
+  Rng s{};
+  s.s = static_cast<unsigned int>(draw.below(40));
+  s.spare_ = draw.number();
+  s.has_spare_ = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Rng& s) { return converted::Value::structure({arg(s.s), arg(s.spare_), arg(s.has_spare_)}); }
+[[maybe_unused]] static bool same(const Rng& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.s, (*got.rows)[0]) && same(want.spare_, (*got.rows)[1]) && same(want.has_spare_, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const Rng& s) { return defined(s.s) && defined(s.spare_) && defined(s.has_spare_); }
+[[maybe_unused]] static std::string text(const Rng& s) { return std::string("{") + text(s.s) + ", " + text(s.spare_) + ", " + text(s.has_spare_) + "}"; }
+[[maybe_unused]] static void take(Rng& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned int>(s.s, (*v.rows)[0]); converted::take_as<double>(s.spare_, (*v.rows)[1]); converted::take_as<bool>(s.has_spare_, (*v.rows)[2]); }
+[[maybe_unused]] static Destruction::Piece draw_Destruction__Piece(converted::Draw& draw) {
+  Destruction::Piece s{};
+  s.p = draw.vector();
+  s.v = draw.vector();
+  s.size = draw.vector();
+  s.axis = draw.vector();
+  s.tint = draw.vector();
+  s.yaw = draw.number();
+  s.angle = draw.number();
+  s.spin = draw.number();
+  s.age = draw.number();
+  s.rest = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Destruction::Piece& s) { return converted::Value::structure({arg(s.p), arg(s.v), arg(s.size), arg(s.axis), arg(s.tint), arg(s.yaw), arg(s.angle), arg(s.spin), arg(s.age), arg(s.rest)}); }
+[[maybe_unused]] static bool same(const Destruction::Piece& want, const converted::Value& got) { return got.rows && got.rows->size() == 10 && same(want.p, (*got.rows)[0]) && same(want.v, (*got.rows)[1]) && same(want.size, (*got.rows)[2]) && same(want.axis, (*got.rows)[3]) && same(want.tint, (*got.rows)[4]) && same(want.yaw, (*got.rows)[5]) && same(want.angle, (*got.rows)[6]) && same(want.spin, (*got.rows)[7]) && same(want.age, (*got.rows)[8]) && same(want.rest, (*got.rows)[9]); }
+[[maybe_unused]] static bool defined(const Destruction::Piece& s) { return defined(s.p) && defined(s.v) && defined(s.size) && defined(s.axis) && defined(s.tint) && defined(s.yaw) && defined(s.angle) && defined(s.spin) && defined(s.age) && defined(s.rest); }
+[[maybe_unused]] static std::string text(const Destruction::Piece& s) { return std::string("{") + text(s.p) + ", " + text(s.v) + ", " + text(s.size) + ", " + text(s.axis) + ", " + text(s.tint) + ", " + text(s.yaw) + ", " + text(s.angle) + ", " + text(s.spin) + ", " + text(s.age) + ", " + text(s.rest) + "}"; }
+[[maybe_unused]] static void take(Destruction::Piece& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 10) return; converted::take_as<Vec3>(s.p, (*v.rows)[0]); converted::take_as<Vec3>(s.v, (*v.rows)[1]); converted::take_as<Vec3>(s.size, (*v.rows)[2]); converted::take_as<Vec3>(s.axis, (*v.rows)[3]); converted::take_as<Vec3>(s.tint, (*v.rows)[4]); converted::take_as<double>(s.yaw, (*v.rows)[5]); converted::take_as<double>(s.angle, (*v.rows)[6]); converted::take_as<double>(s.spin, (*v.rows)[7]); converted::take_as<double>(s.age, (*v.rows)[8]); converted::take_as<bool>(s.rest, (*v.rows)[9]); }
+[[maybe_unused]] static Destruction::Broken draw_Destruction__Broken(converted::Draw& draw) {
+  Destruction::Broken s{};
+  s.rings = draw_list(draw, [&]() -> std::vector<Vec2> { return draw_list(draw, [&]() -> Vec2 { return draw.vector2(); }); });
+  s.c = draw.vector2();
+  s.lo = draw.vector2();
+  s.hi = draw.vector2();
+  s.new_top = draw.number();
+  s.top = draw.number();
+  s.intensity = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Destruction::Broken& s) { return converted::Value::structure({arg(s.rings), arg(s.c), arg(s.lo), arg(s.hi), arg(s.new_top), arg(s.top), arg(s.intensity)}); }
+[[maybe_unused]] static bool same(const Destruction::Broken& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.rings, (*got.rows)[0]) && same(want.c, (*got.rows)[1]) && same(want.lo, (*got.rows)[2]) && same(want.hi, (*got.rows)[3]) && same(want.new_top, (*got.rows)[4]) && same(want.top, (*got.rows)[5]) && same(want.intensity, (*got.rows)[6]); }
+[[maybe_unused]] static bool defined(const Destruction::Broken& s) { return defined(s.rings) && defined(s.c) && defined(s.lo) && defined(s.hi) && defined(s.new_top) && defined(s.top) && defined(s.intensity); }
+[[maybe_unused]] static std::string text(const Destruction::Broken& s) { return std::string("{") + text(s.rings) + ", " + text(s.c) + ", " + text(s.lo) + ", " + text(s.hi) + ", " + text(s.new_top) + ", " + text(s.top) + ", " + text(s.intensity) + "}"; }
+[[maybe_unused]] static void take(Destruction::Broken& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<std::vector<std::vector<Vec2>>>(s.rings, (*v.rows)[0]); converted::take_as<Vec2>(s.c, (*v.rows)[1]); converted::take_as<Vec2>(s.lo, (*v.rows)[2]); converted::take_as<Vec2>(s.hi, (*v.rows)[3]); converted::take_as<double>(s.new_top, (*v.rows)[4]); converted::take_as<double>(s.top, (*v.rows)[5]); converted::take_as<double>(s.intensity, (*v.rows)[6]); }
+[[maybe_unused]] static Destruction::Torn draw_Destruction__Torn(converted::Draw& draw) {
+  Destruction::Torn s{};
+  s.mesh = static_cast<unsigned int>(draw.below(40));
+  s.b = draw_Destruction__Broken(draw);
+  s.center = draw.vector();
+  s.dir = draw.vector();
+  s.axis = draw.vector();
+  s.pivot = draw.vector();
+  s.offset = draw.vector();
+  s.tilt = draw.number();
+  s.speed = draw.number();
+  s.lift = draw.number();
+  s.break_at = draw.number();
+  s.age = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Destruction::Torn& s) { return converted::Value::structure({arg(s.mesh), arg(s.b), arg(s.center), arg(s.dir), arg(s.axis), arg(s.pivot), arg(s.offset), arg(s.tilt), arg(s.speed), arg(s.lift), arg(s.break_at), arg(s.age)}); }
+[[maybe_unused]] static bool same(const Destruction::Torn& want, const converted::Value& got) { return got.rows && got.rows->size() == 12 && same(want.mesh, (*got.rows)[0]) && same(want.b, (*got.rows)[1]) && same(want.center, (*got.rows)[2]) && same(want.dir, (*got.rows)[3]) && same(want.axis, (*got.rows)[4]) && same(want.pivot, (*got.rows)[5]) && same(want.offset, (*got.rows)[6]) && same(want.tilt, (*got.rows)[7]) && same(want.speed, (*got.rows)[8]) && same(want.lift, (*got.rows)[9]) && same(want.break_at, (*got.rows)[10]) && same(want.age, (*got.rows)[11]); }
+[[maybe_unused]] static bool defined(const Destruction::Torn& s) { return defined(s.mesh) && defined(s.b) && defined(s.center) && defined(s.dir) && defined(s.axis) && defined(s.pivot) && defined(s.offset) && defined(s.tilt) && defined(s.speed) && defined(s.lift) && defined(s.break_at) && defined(s.age); }
+[[maybe_unused]] static std::string text(const Destruction::Torn& s) { return std::string("{") + text(s.mesh) + ", " + text(s.b) + ", " + text(s.center) + ", " + text(s.dir) + ", " + text(s.axis) + ", " + text(s.pivot) + ", " + text(s.offset) + ", " + text(s.tilt) + ", " + text(s.speed) + ", " + text(s.lift) + ", " + text(s.break_at) + ", " + text(s.age) + "}"; }
+[[maybe_unused]] static void take(Destruction::Torn& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 12) return; converted::take_as<unsigned int>(s.mesh, (*v.rows)[0]); converted::take_as<Destruction::Broken>(s.b, (*v.rows)[1]); converted::take_as<Vec3>(s.center, (*v.rows)[2]); converted::take_as<Vec3>(s.dir, (*v.rows)[3]); converted::take_as<Vec3>(s.axis, (*v.rows)[4]); converted::take_as<Vec3>(s.pivot, (*v.rows)[5]); converted::take_as<Vec3>(s.offset, (*v.rows)[6]); converted::take_as<double>(s.tilt, (*v.rows)[7]); converted::take_as<double>(s.speed, (*v.rows)[8]); converted::take_as<double>(s.lift, (*v.rows)[9]); converted::take_as<double>(s.break_at, (*v.rows)[10]); converted::take_as<double>(s.age, (*v.rows)[11]); }
+[[maybe_unused]] static Destruction::Stats draw_Destruction__Stats(converted::Draw& draw) {
+  Destruction::Stats s{};
+  s.pieces = static_cast<unsigned int>(draw.below(40));
+  s.torn = static_cast<unsigned int>(draw.below(40));
+  s.hits = static_cast<unsigned int>(draw.below(40));
+  s.collapsed = static_cast<unsigned int>(draw.below(40));
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Destruction::Stats& s) { return converted::Value::structure({arg(s.pieces), arg(s.torn), arg(s.hits), arg(s.collapsed)}); }
+[[maybe_unused]] static bool same(const Destruction::Stats& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.pieces, (*got.rows)[0]) && same(want.torn, (*got.rows)[1]) && same(want.hits, (*got.rows)[2]) && same(want.collapsed, (*got.rows)[3]); }
+[[maybe_unused]] static bool defined(const Destruction::Stats& s) { return defined(s.pieces) && defined(s.torn) && defined(s.hits) && defined(s.collapsed); }
+[[maybe_unused]] static std::string text(const Destruction::Stats& s) { return std::string("{") + text(s.pieces) + ", " + text(s.torn) + ", " + text(s.hits) + ", " + text(s.collapsed) + "}"; }
+[[maybe_unused]] static void take(Destruction::Stats& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<unsigned int>(s.pieces, (*v.rows)[0]); converted::take_as<unsigned int>(s.torn, (*v.rows)[1]); converted::take_as<unsigned int>(s.hits, (*v.rows)[2]); converted::take_as<unsigned int>(s.collapsed, (*v.rows)[3]); }
+[[maybe_unused]] static Destruction draw_Destruction(converted::Draw& draw) {
+  Destruction s{};
+  s.r_ = converted::engine_object<Renderer>(1 + draw.below(6));
+  s.points_ = converted::draw_map<converted::wide::Map<unsigned int, double>>(draw, [&]() -> unsigned int { return static_cast<unsigned int>(draw.below(40)); }, [&]() -> double { return draw.number(); });
+  s.points_log_ = draw_list(draw, [&]() -> std::pair<unsigned int, double> { return std::pair<unsigned int, double>(static_cast<unsigned int>(draw.below(40)), draw.number()); });
+  s.pieces_ = draw_list(draw, [&]() -> Destruction::Piece { return draw_Destruction__Piece(draw); });
+  s.torn_ = draw_list(draw, [&]() -> Destruction::Torn { return draw_Destruction__Torn(draw); });
+  s.stats_ = draw_Destruction__Stats(draw);
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Destruction& s) { return converted::Value::structure({arg(s.r_), arg(converted::shaped<converted::wide::Map<unsigned int, double>>(s.points_)), arg(s.points_log_), arg(s.pieces_), arg(s.torn_), arg(s.stats_)}); }
+[[maybe_unused]] static bool same(const Destruction& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.r_, (*got.rows)[0]) && same(converted::shaped<converted::wide::Map<unsigned int, double>>(want.points_), (*got.rows)[1]) && same(want.points_log_, (*got.rows)[2]) && same(want.pieces_, (*got.rows)[3]) && same(want.torn_, (*got.rows)[4]) && same(want.stats_, (*got.rows)[5]); }
+[[maybe_unused]] static bool defined(const Destruction& s) { return defined(s.r_) && defined(converted::shaped<converted::wide::Map<unsigned int, double>>(s.points_)) && defined(s.points_log_) && defined(s.pieces_) && defined(s.torn_) && defined(s.stats_); }
+[[maybe_unused]] static std::string text(const Destruction& s) { return std::string("{") + text(s.r_) + ", " + text(converted::shaped<converted::wide::Map<unsigned int, double>>(s.points_)) + ", " + text(s.points_log_) + ", " + text(s.pieces_) + ", " + text(s.torn_) + ", " + text(s.stats_) + "}"; }
+[[maybe_unused]] static void take(Destruction& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<Renderer*>(s.r_, (*v.rows)[0]); converted::take_as<converted::wide::Map<unsigned int, double>>(s.points_, (*v.rows)[1]); converted::take_as<std::vector<std::pair<unsigned int, double>>>(s.points_log_, (*v.rows)[2]); converted::take_as<std::vector<Destruction::Piece>>(s.pieces_, (*v.rows)[3]); converted::take_as<std::vector<Destruction::Torn>>(s.torn_, (*v.rows)[4]); converted::take_as<Destruction::Stats>(s.stats_, (*v.rows)[5]); }
+inline bool Renderer::remove(const unsigned int& id) const { const std::vector<converted::Value> out = converted::engine_call("engine.renderer.remove", {arg(*this), arg(id)}); bool result{}; converted::take_as<bool>(result, out[0]); return result; }
+struct Out_Rng_next { Rng Self; unsigned int Result; };
+[[maybe_unused]] static bool same(const Out_Rng_next& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_Rng_next& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_Rng_next& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
+struct Out_Rng_unit { Rng Self; double Result; };
+[[maybe_unused]] static bool same(const Out_Rng_unit& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_Rng_unit& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_Rng_unit& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
+struct Out_Rng_range { Rng Self; double Result; };
+[[maybe_unused]] static bool same(const Out_Rng_range& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_Rng_range& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_Rng_range& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
+struct Out_Destruction_spawn { Destruction Self; Rng rng; };
+[[maybe_unused]] static bool same(const Out_Destruction_spawn& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.rng, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_Destruction_spawn& s) { return defined(s.Self) && defined(s.rng); }
+[[maybe_unused]] static std::string text(const Out_Destruction_spawn& s) { return std::string("{") + text(s.Self) + ", " + text(s.rng) + "}"; }
+struct Out_Destruction_free_torn { Destruction Self; Destruction::Torn t; };
+[[maybe_unused]] static bool same(const Out_Destruction_free_torn& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.t, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_Destruction_free_torn& s) { return defined(s.Self) && defined(s.t); }
+[[maybe_unused]] static std::string text(const Out_Destruction_free_torn& s) { return std::string("{") + text(s.Self) + ", " + text(s.t) + "}"; }
 
 SC_TEST(converted_destruction) {
   converted::Blueprint bp("Destruction");
@@ -54,7 +263,101 @@ SC_TEST(converted_destruction) {
       const Vec2 a0 = draw.vector2();
       const Vec2 a1 = draw.vector2();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // Rng::next
+    converted::Tally tally("Rng_next");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Rng a0) { const auto r = a0.next(); return Out_Rng_next{a0, r}; };
+    for (int i = 0; tally.more(i); ++i) {
+      const Rng a0 = draw_Rng(draw);
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
+  {  // Rng::unit
+    converted::Tally tally("Rng_unit");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Rng a0) { const auto r = a0.unit(); return Out_Rng_unit{a0, r}; };
+    for (int i = 0; tally.more(i); ++i) {
+      const Rng a0 = draw_Rng(draw);
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
+  {  // Rng::range
+    converted::Tally tally("Rng_range");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Rng a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { const auto r = a0.range(a1, a2); return Out_Rng_range{a0, r}; };
+    for (int i = 0; tally.more(i); ++i) {
+      const Rng a0 = draw_Rng(draw);
+      const double a1 = draw.number();
+      const double a2 = draw.number();
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0, a1, a2);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+    }
+  }
+  {  // Destruction::spawn
+    converted::Tally tally("Destruction_spawn");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Destruction a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] double a4, [[maybe_unused]] Vec3 a5, [[maybe_unused]] Rng a6) { a0.spawn(a1, a2, a3, a4, a5, a6); return Out_Destruction_spawn{a0, a6}; };
+    for (int i = 0; tally.more(i); ++i) {
+      const Destruction a0 = draw_Destruction(draw);
+      const Vec3 a1 = draw.vector();
+      const Vec3 a2 = draw.vector();
+      const Vec3 a3 = draw.vector();
+      const double a4 = draw.number();
+      const Vec3 a5 = draw.vector();
+      const Rng a6 = draw_Rng(draw);
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0, a1, a2, a3, a4, a5, a6);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5), arg(a6)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5) + ", " + text(a6); });
+    }
+  }
+  {  // Destruction::free_torn
+    converted::Tally tally("Destruction_free_torn");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Destruction a0, [[maybe_unused]] Destruction::Torn a1) { a0.free_torn(a1); return Out_Destruction_free_torn{a0, a1}; };
+    for (int i = 0; tally.more(i); ++i) {
+      const Destruction a0 = draw_Destruction(draw);
+      const Destruction::Torn a1 = draw_Destruction__Torn(draw);
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }

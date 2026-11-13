@@ -7,6 +7,9 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-13",time:"15:55",title:"Konverter: Code, der die Engine ruft",items:[
+    "Unter der Haube: Der Konverter schreibt jetzt auch Funktionen, die die Engine rufen (Physik, Renderer, Ton) – als Knoten der Engine. 353 Funktionen aus 58 Dateien stehen als Blueprints im Level. Jede ist Bit für Bit mit ihrem Quelltext verglichen (511 Vergleiche), dazu jeder Aufruf der Engine: dieselben Aufrufe, in derselben Reihenfolge, mit denselben Werten. Am Spiel ändert sich dadurch nichts.",
+  ]},
   {date:"2026-11-13",time:"13:34",title:"Konverter: Beweis für Engine-Aufrufe",items:[
     "Unter der Haube: Der Vergleichstest kann jetzt auch Funktionen prüfen, die die Engine rufen. Quelltext und Blueprint laufen gegen denselben Stellvertreter der Engine, der jeden Aufruf aufzeichnet; verglichen werden das Ergebnis und die Aufzeichnung, Bit für Bit. Der Konverter schreibt solche Funktionen schon zur Probe (rund 359 statt 286), ins Level kommen sie erst, wenn jede einzelne verglichen ist. Am Spiel ändert sich dadurch nichts.",
   ]},

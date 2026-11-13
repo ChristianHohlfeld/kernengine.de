@@ -40,6 +40,8 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+struct Renderer : converted::EngineObject {
+};
 enum class Weapon : u8 { other, smg, glock, sniper, fists, knife, launcher, rocket, grenade, drone_gun, drone_rocket, jet_gun, jet_missile, jet_bomb, explosion };
 enum class Id : u8 { smg, glock, sniper, grenade_launcher, rocket, fists, knife, hand_grenade, drone_gun, drone_rockets, drone_guided, jet_cannon, jet_missile, jet_bomb };
 Weapon mp_weapon(Id id) {
@@ -75,7 +77,12 @@ SC_TEST(converted_game_net) {
     for (int i = 0; tally.more(i); ++i) {
       const Id a0 = static_cast<Id>(draw.below(14));
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }

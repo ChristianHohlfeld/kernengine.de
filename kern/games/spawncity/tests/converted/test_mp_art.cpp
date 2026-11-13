@@ -34,6 +34,23 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+struct Quat {
+  f32 x = 0, y = 0, z = 0, w = 1;
+  static Quat axis_angle(Vec3 axis, f32 radians) {
+    const Vec3 a = normalize(axis);
+    const f32 s = kern::math::sin(radians * 0.5);
+    return {a.x * s, a.y * s, a.z * s, kern::math::cos(radians * 0.5)};
+  }
+  
+
+
+
+  
+
+
+
+
+};
 struct Mat4 {
   f32 m[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 
@@ -47,43 +64,43 @@ struct Mat4 {
 
 
 
+  Mat4 operator*(const Mat4& b) const {
+    Mat4 r;
+    for (int c = 0; c < 4; ++c) {
+      const f32 b0 = converted::at(b.m, 4 * c), b1 = converted::at(b.m, 4 * c + 1), b2 = converted::at(b.m, 4 * c + 2), b3 = converted::at(b.m, 4 * c + 3);
+      for (int k = 0; k < 4; ++k)
+        converted::at(r.m, 4 * c + k) = converted::at(m, k) * b0 + converted::at(m, 4 + k) * b1 + converted::at(m, 8 + k) * b2 + converted::at(m, 12 + k) * b3;
+    }
+    return r;
+  }
+  
+
+
+
+  
+
+
+
   
 
 
 
 
-
-
-
-
-  
-
-
-
-  
-
-
-
-  
-
-
-
-
-  
+  static Mat4 translate(Vec3 t) { Mat4 r; converted::at(r.m, 12) = t.x; converted::at(r.m, 13) = t.y; converted::at(r.m, 14) = t.z; return r; }
   
 
   /// Translation * rotation * scale.
-  
-
-
-
-
-
-
-
-
-
-
+  static Mat4 trs(Vec3 t, Quat q, Vec3 s) {
+    const f32 x2 = q.x + q.x, y2 = q.y + q.y, z2 = q.z + q.z;
+    const f32 xx = q.x * x2, xy = q.x * y2, xz = q.x * z2, yy = q.y * y2, yz = q.y * z2, zz = q.z * z2;
+    const f32 wx = q.w * x2, wy = q.w * y2, wz = q.w * z2;
+    Mat4 r;
+    converted::at(r.m, 0) = (1 - yy - zz) * s.x; converted::at(r.m, 1) = (xy + wz) * s.x; converted::at(r.m, 2) = (xz - wy) * s.x; converted::at(r.m, 3) = 0;
+    converted::at(r.m, 4) = (xy - wz) * s.y; converted::at(r.m, 5) = (1 - xx - zz) * s.y; converted::at(r.m, 6) = (yz + wx) * s.y; converted::at(r.m, 7) = 0;
+    converted::at(r.m, 8) = (xz + wy) * s.z; converted::at(r.m, 9) = (yz - wx) * s.z; converted::at(r.m, 10) = (1 - xx - yy) * s.z; converted::at(r.m, 11) = 0;
+    converted::at(r.m, 12) = t.x; converted::at(r.m, 13) = t.y; converted::at(r.m, 14) = t.z; converted::at(r.m, 15) = 1;
+    return r;
+  }
 
   
 
@@ -121,29 +138,77 @@ struct Mat4 {
 
 
 };
-namespace MpArt { struct Part { u32 id = 0; std::vector<f32> transforms, tints; }; }
-namespace MpArt { inline void put(Part& p, const Mat4& m, Vec3 t) {
+struct Material : converted::EngineObject {
+};
+enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh };
+enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter };
+constexpr f32 kPi = 3.14159265358979323846;
+inline Quat yaw_quat(f32 yaw) { return Quat::axis_angle({0, 0, 1}, yaw); }
+struct Renderer : converted::EngineObject {
+  unsigned int allocate_id() const;
+};
+struct MpArt {
+ public:
+  
+  
+  /// A ping at `foot` (scale grows with distance so it stays readable), fade 0..1, bob/spin time.
+  void ping(Vec3 foot, f32 scale, Vec3 color, f32 fade, f32 now);
+  /// A tracer segment (centre, direction, length) in a player's colour.
+  void tracer(Vec3 at, Vec3 dir, f32 length, Vec3 color);
+  /// A growing, fading fire ball (t 0..1 over its life).
+  void flash(Vec3 at, f32 radius, f32 t);
+  /// Canopy and LED ring of a mate's drone (body frame as the drone art).
+  void drone_accent(const Mat4& body, Vec3 color);
+  /// A bubble around a protected player.
+  void shield(Vec3 center, f32 radius, f32 now);
+  
+  
+
+ private:
+  struct Part { u32 id = 0; std::vector<f32> transforms, tints; };
+  
+  void put(Part& p, const Mat4& m, Vec3 tint);
+  Renderer* r_ = nullptr;
+  Part post_, gem_, ring_, tracer_, flash_, canopy_, led_, shield_;
+};
+void MpArt::put(Part& p, const Mat4& m, Vec3 t) {
   p.transforms.insert(p.transforms.end(), m.m, m.m + 16);
   p.tints.insert(p.tints.end(), {t.x, t.y, t.z, 1});
-} }
+}
+void MpArt::ping(Vec3 foot, f32 s, Vec3 c, f32 fade, f32 now) {
+  const Vec3 t = c * fade;
+  put(post_, Mat4::trs(foot, Quat{}, {s, s, 2.2 * s}), Vec3{1, 1, 1} * fade);
+  const f32 bob = kern::math::sin(now / 0.3) * 0.15 * s;
+  put(gem_, Mat4::trs(foot + Vec3{0, 0, 2.6 * s + bob}, yaw_quat(now / 0.7), {s, s, 1.5 * s}), t);
+  const f32 rs = s * (1 + 0.25 * kern::math::sin(now / 0.22));
+  put(ring_, Mat4::trs(foot + Vec3{0, 0, 0.05}, Quat{}, {rs, rs, 0.3 * rs}), t);
+}
+void MpArt::tracer(Vec3 at, Vec3 dir, f32 len, Vec3 c) {
+  // The cylinder stands along +Z: turn Z onto the flight direction.
+  const f32 dl = length(dir);
+  if (dl < 1e-6) return;
+  const Vec3 d = dir * (1 / dl);
+  const Vec3 axis{-d.y, d.x, 0};  // cross(z, d)
+  const f32 s = length(axis), a = kern::math::atan2(s, d.z);
+  const Quat q = s > 1e-5 ? Quat::axis_angle(axis * (1 / s), a) : (d.z < 0 ? Quat::axis_angle({1, 0, 0}, kPi) : Quat{});
+  put(tracer_, Mat4::trs(at, q, {1, 1, len}), c);
+}
+void MpArt::flash(Vec3 at, f32 radius, f32 t) {
+  const f32 r = radius * (0.35 + 0.65 * t);
+  put(flash_, Mat4::trs(at, Quat{}, {r, r, r}), Vec3{1, 1, 1} * std::fmax(0.0, 1 - t));
+}
+void MpArt::drone_accent(const Mat4& body, Vec3 c) {
+  put(canopy_, body * Mat4::translate({0.005, 0, 0.027}), c);
+  put(led_, body * Mat4::translate({0.005, 0, 0.042}), c);
+}
+void MpArt::shield(Vec3 center, f32 radius, f32 now) {
+  const f32 r = radius * (1 + 0.04 * kern::math::sin(now * 9));
+  put(shield_, Mat4::trs(center, Quat{}, {r, r, r * 1.3}), {0.6, 0.85, 1});
+}
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
 
-[[maybe_unused]] static MpArt::Part draw_MpArt__Part(converted::Draw& draw) {
-  MpArt::Part s{};
-  s.id = static_cast<unsigned int>(draw.below(40));
-  s.transforms = draw_list(draw, [&]() -> double { return draw.number(); });
-  s.tints = draw_list(draw, [&]() -> double { return draw.number(); });
-  return s;
-}
-namespace MpArt { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const MpArt::Part& s) { return converted::Value::structure({arg(s.id), arg(s.transforms), arg(s.tints)}); }
-[[maybe_unused]] static bool same(const MpArt::Part& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.id, (*got.rows)[0]) && same(want.transforms, (*got.rows)[1]) && same(want.tints, (*got.rows)[2]); }
-[[maybe_unused]] static bool defined(const MpArt::Part& s) { return defined(s.id) && defined(s.transforms) && defined(s.tints); }
-[[maybe_unused]] static std::string text(const MpArt::Part& s) { return std::string("{") + text(s.id) + ", " + text(s.transforms) + ", " + text(s.tints) + "}"; }
-[[maybe_unused]] static void take(MpArt::Part& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.transforms, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.tints, (*v.rows)[2]); }
-}
 [[maybe_unused]] static Mat4 draw_kern__Mat4(converted::Draw& draw) {
   Mat4 s{};
   for (auto& e : s.m) e = draw.number();
@@ -154,20 +219,250 @@ namespace MpArt { using converted::arg; using converted::same; using converted::
 [[maybe_unused]] static bool defined(const Mat4& s) { return defined(std::vector<double>(std::begin(s.m), std::end(s.m))); }
 [[maybe_unused]] static std::string text(const Mat4& s) { return std::string("{") + text(std::vector<double>(std::begin(s.m), std::end(s.m))) + "}"; }
 [[maybe_unused]] static void take(Mat4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[0]); for (std::size_t k = 0; k < items.size() && k < std::size(s.m); ++k) s.m[k] = items[k]; } }
+[[maybe_unused]] static MpArt::Part draw_MpArt__Part(converted::Draw& draw) {
+  MpArt::Part s{};
+  s.id = static_cast<unsigned int>(draw.below(40));
+  s.transforms = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.tints = draw_list(draw, [&]() -> double { return draw.number(); });
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const MpArt::Part& s) { return converted::Value::structure({arg(s.id), arg(s.transforms), arg(s.tints)}); }
+[[maybe_unused]] static bool same(const MpArt::Part& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.id, (*got.rows)[0]) && same(want.transforms, (*got.rows)[1]) && same(want.tints, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const MpArt::Part& s) { return defined(s.id) && defined(s.transforms) && defined(s.tints); }
+[[maybe_unused]] static std::string text(const MpArt::Part& s) { return std::string("{") + text(s.id) + ", " + text(s.transforms) + ", " + text(s.tints) + "}"; }
+[[maybe_unused]] static void take(MpArt::Part& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.transforms, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.tints, (*v.rows)[2]); }
+[[maybe_unused]] static MpArt draw_MpArt(converted::Draw& draw) {
+  MpArt s{};
+  s.r_ = converted::engine_object<Renderer>(1 + draw.below(6));
+  s.post_ = draw_MpArt__Part(draw);
+  s.gem_ = draw_MpArt__Part(draw);
+  s.ring_ = draw_MpArt__Part(draw);
+  s.tracer_ = draw_MpArt__Part(draw);
+  s.flash_ = draw_MpArt__Part(draw);
+  s.canopy_ = draw_MpArt__Part(draw);
+  s.led_ = draw_MpArt__Part(draw);
+  s.shield_ = draw_MpArt__Part(draw);
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const MpArt& s) { return converted::Value::structure({arg(s.r_), arg(s.post_), arg(s.gem_), arg(s.ring_), arg(s.tracer_), arg(s.flash_), arg(s.canopy_), arg(s.led_), arg(s.shield_)}); }
+[[maybe_unused]] static bool same(const MpArt& want, const converted::Value& got) { return got.rows && got.rows->size() == 9 && same(want.r_, (*got.rows)[0]) && same(want.post_, (*got.rows)[1]) && same(want.gem_, (*got.rows)[2]) && same(want.ring_, (*got.rows)[3]) && same(want.tracer_, (*got.rows)[4]) && same(want.flash_, (*got.rows)[5]) && same(want.canopy_, (*got.rows)[6]) && same(want.led_, (*got.rows)[7]) && same(want.shield_, (*got.rows)[8]); }
+[[maybe_unused]] static bool defined(const MpArt& s) { return defined(s.r_) && defined(s.post_) && defined(s.gem_) && defined(s.ring_) && defined(s.tracer_) && defined(s.flash_) && defined(s.canopy_) && defined(s.led_) && defined(s.shield_); }
+[[maybe_unused]] static std::string text(const MpArt& s) { return std::string("{") + text(s.r_) + ", " + text(s.post_) + ", " + text(s.gem_) + ", " + text(s.ring_) + ", " + text(s.tracer_) + ", " + text(s.flash_) + ", " + text(s.canopy_) + ", " + text(s.led_) + ", " + text(s.shield_) + "}"; }
+[[maybe_unused]] static void take(MpArt& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 9) return; converted::take_as<Renderer*>(s.r_, (*v.rows)[0]); converted::take_as<MpArt::Part>(s.post_, (*v.rows)[1]); converted::take_as<MpArt::Part>(s.gem_, (*v.rows)[2]); converted::take_as<MpArt::Part>(s.ring_, (*v.rows)[3]); converted::take_as<MpArt::Part>(s.tracer_, (*v.rows)[4]); converted::take_as<MpArt::Part>(s.flash_, (*v.rows)[5]); converted::take_as<MpArt::Part>(s.canopy_, (*v.rows)[6]); converted::take_as<MpArt::Part>(s.led_, (*v.rows)[7]); converted::take_as<MpArt::Part>(s.shield_, (*v.rows)[8]); }
+[[maybe_unused]] static Quat draw_kern__Quat(converted::Draw& draw) {
+  Quat s{};
+  s.x = draw.number();
+  s.y = draw.number();
+  s.z = draw.number();
+  s.w = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Quat& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
+[[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
+[[maybe_unused]] static bool defined(const Quat& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
+[[maybe_unused]] static std::string text(const Quat& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
+[[maybe_unused]] static void take(Quat& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
+inline unsigned int Renderer::allocate_id() const { const std::vector<converted::Value> out = converted::engine_call("engine.renderer.allocate_id", {arg(*this)}); unsigned int result{}; converted::take_as<unsigned int>(result, out[0]); return result; }
 
 SC_TEST(converted_mp_art) {
   converted::Blueprint bp("MpArt");
+  {  // Mat4::translate
+    converted::Tally tally("Mat4_translate");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Vec3 a0) { return Mat4::translate(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Vec3 a0 = draw.vector();
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
   {  // MpArt::put
     converted::Tally tally("MpArt_put");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MpArt::Part a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { converted_mp_art::MpArt::put(a0, a1, a2); return a0; };
+    const auto run = [&]([[maybe_unused]] MpArt::Part a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { MpArt{}.put(a0, a1, a2); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const MpArt::Part a0 = draw_MpArt__Part(draw);
       const Mat4 a1 = draw_kern__Mat4(draw);
       const Vec3 a2 = draw.vector();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+    }
+  }
+  {  // Mat4::trs
+    converted::Tally tally("Mat4_trs");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Quat a1, [[maybe_unused]] Vec3 a2) { return Mat4::trs(a0, a1, a2); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Vec3 a0 = draw.vector();
+      const Quat a1 = draw_kern__Quat(draw);
+      const Vec3 a2 = draw.vector();
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0, a1, a2);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+    }
+  }
+  {  // Quat::axis_angle
+    converted::Tally tally("Quat_axis_angle");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return Quat::axis_angle(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Vec3 a0 = draw.vector();
+      const double a1 = draw.number();
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // yaw_quat
+    converted::Tally tally("yaw_quat");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] double a0) { return converted_mp_art::yaw_quat(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      const double a0 = draw.number();
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
+  {  // MpArt::ping
+    converted::Tally tally("MpArt_ping");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] MpArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { a0.ping(a1, a2, a3, a4, a5); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      const MpArt a0 = draw_MpArt(draw);
+      const Vec3 a1 = draw.vector();
+      const double a2 = draw.number();
+      const Vec3 a3 = draw.vector();
+      const double a4 = draw.number();
+      const double a5 = draw.number();
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0, a1, a2, a3, a4, a5);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5); });
+    }
+  }
+  {  // MpArt::tracer
+    converted::Tally tally("MpArt_tracer");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] MpArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] Vec3 a4) { a0.tracer(a1, a2, a3, a4); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      const MpArt a0 = draw_MpArt(draw);
+      const Vec3 a1 = draw.vector();
+      const Vec3 a2 = draw.vector();
+      const double a3 = draw.number();
+      const Vec3 a4 = draw.vector();
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0, a1, a2, a3, a4);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); });
+    }
+  }
+  {  // MpArt::flash
+    converted::Tally tally("MpArt_flash");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] MpArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { a0.flash(a1, a2, a3); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      const MpArt a0 = draw_MpArt(draw);
+      const Vec3 a1 = draw.vector();
+      const double a2 = draw.number();
+      const double a3 = draw.number();
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0, a1, a2, a3);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); });
+    }
+  }
+  {  // Mat4::operator*
+    converted::Tally tally("Mat4_mul");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Mat4 a0, [[maybe_unused]] Mat4 a1) { return a0.operator*(a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Mat4 a0 = draw_kern__Mat4(draw);
+      const Mat4 a1 = draw_kern__Mat4(draw);
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // MpArt::drone_accent
+    converted::Tally tally("MpArt_drone_accent");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] MpArt a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { a0.drone_accent(a1, a2); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      const MpArt a0 = draw_MpArt(draw);
+      const Mat4 a1 = draw_kern__Mat4(draw);
+      const Vec3 a2 = draw.vector();
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0, a1, a2);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
+    }
+  }
+  {  // MpArt::shield
+    converted::Tally tally("MpArt_shield");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] MpArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { a0.shield(a1, a2, a3); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      const MpArt a0 = draw_MpArt(draw);
+      const Vec3 a1 = draw.vector();
+      const double a2 = draw.number();
+      const double a3 = draw.number();
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0, a1, a2, a3);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); });
     }
   }
 }

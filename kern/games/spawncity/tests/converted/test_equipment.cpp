@@ -43,140 +43,12 @@ enum class PinType : u8 {
   exec, boolean, integer, number, vector, text, actor, enumeration, structure,
   boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, count
 };
-struct ActorHandle {
-  ActorRef id = 0;
-  bool operator==(const ActorHandle&) const = default;
-};
-using ListItems = std::tuple<std::vector<bool>, std::vector<i64>, std::vector<f64>, std::vector<Vec3>, std::vector<std::string>, std::vector<ActorHandle>>;
-struct Value {
-  PinType type = PinType::number;
-  bool b = false;
-  i64 i = 0;
-  f64 n = 0;
-  Vec3 v;
-  std::string s;
-  ActorRef a = 0;
-  /// A list's items (none: an empty list). They are shared: a list on a wire is not copied, and
-  /// whoever changes one (edit) changes its own.
-  std::shared_ptr<const ListItems> list;
-  /// A struct's fields, in the order its declaration has them; of a list of structs: the structs.
-  /// Shared like a list's items. A struct that holds none (Value::zero) has every field at its
-  /// declared default - what a field is, is read through the declaration (logic::field_of).
-  std::shared_ptr<const std::vector<Value>> rows;
-
-  
-  
-  
-  
-  
-  
-  /// A value of an enum: its place among the enum's values (the first is 0).
-  
-  /// A list of values of an enum.
-  
-
-
-
-
-
-  /// A value of a struct: its fields' values, in the order of the declaration.
-  
-
-
-
-
-
-  /// A list of structs.
-  
-
-
-
-
-
-  
-  /// A list of these items (T: bool, i64, f64, Vec3, std::string or ActorHandle; Value: structs).
-  /// Whole numbers are held as every Int is (logic::normal).
-  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  /// The items of a list of T - none if this is no such list.
-  
-
-
-
-
-  /// Is this a list whose items are held as T? (A list of enum values holds them as i64, a list
-  /// of structs as Value.)
-  
-
-
-
-  /// The items of a list of T, to change them: this value's own (it becomes that list if it is
-  /// none).
-  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  /// The field of a struct at `index`, as the value holds it (null: it holds none there - the
-  /// field is at its declared default).
-  
-  /// How many fields a struct's value holds.
-  
-  /// The rows (a struct's fields, the structs of a list), to change them: this value's own.
-  
-
-
-
-
-  /// How many items a list has (no list: 0).
-  
-  /// A list's item as a value (beyond its end, or no list: the zero of the item's type).
-  
-
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  /// The same where the value may be a struct's (or hold one): `of` names the struct or the enum
-  /// in the Blueprint `g`. A struct is an object of its fields by their names - {"Name": "Knife",
-  /// "Damage": 25} -, written with every field; read, a field that is missing has its default.
-  
-  
-  
+struct Value : converted::EngineObject {
 };
 namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope }; }
 enum class NodeKind : u8 { event, action, pure, flow };
+struct Instance : converted::EngineObject {
+};
 struct Event {
   std::string type;
   ActorRef target = 0;                 // only instances whose Self is target (0 = every instance)
@@ -185,6 +57,7 @@ struct Event {
   std::vector<std::pair<std::string, Value>> args;
   
 };
+namespace Runtime { enum class Chain : u8 { event, call, call_inside }; }
 struct FlightSample {
   f32 t = 0;            // simulation time
   Vec3 pos, vel;
@@ -367,7 +240,12 @@ SC_TEST(converted_equipment) {
       const FlightSample a1 = draw_FlightSample(draw);
       const bool a2 = draw.flag();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
     }
   }
@@ -379,7 +257,12 @@ SC_TEST(converted_equipment) {
       const FlightLog a0 = draw_FlightLog(draw);
       const char* a1 = draw.c_word();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -392,7 +275,12 @@ SC_TEST(converted_equipment) {
       const std::string a1 = draw.word();
       const double a2 = draw.number();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
     }
   }
@@ -403,7 +291,12 @@ SC_TEST(converted_equipment) {
     for (int i = 0; tally.more(i); ++i) {
       const int a0 = static_cast<int>(draw.whole());
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -414,7 +307,12 @@ SC_TEST(converted_equipment) {
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }

@@ -81,7 +81,11 @@ struct BuildingOptions {
   BuildingStyle style;
 };
 enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
+struct Renderer : converted::EngineObject {
+};
 enum class Surface : u8 { none, cloth, tpu, floor };
+struct World : converted::EngineObject {
+};
 BuildingStyle konstanz_style() {
   // world_city_buildings.mjs WALLS / ROOFS (sRGB) and the cornice mix with #f4efe4 (0.45)
   auto hex = [](u32 h) { return Rgb{((h >> 16) & 255) / 255.0, ((h >> 8) & 255) / 255.0, (h & 255) / 255.0}; };
@@ -191,7 +195,12 @@ SC_TEST(converted_city_stream) {
     const auto run = [&]() { return converted_city_stream::konstanz_style(); };
     for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run();
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });
     }
   }
@@ -201,7 +210,12 @@ SC_TEST(converted_city_stream) {
     const auto run = [&]() { return converted_city_stream::road_palette(); };
     for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run();
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });
     }
   }
@@ -212,7 +226,12 @@ SC_TEST(converted_city_stream) {
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -225,7 +244,12 @@ SC_TEST(converted_city_stream) {
       const double a1 = draw.number();
       const double a2 = draw.number();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
     }
   }
@@ -236,7 +260,12 @@ SC_TEST(converted_city_stream) {
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -248,7 +277,12 @@ SC_TEST(converted_city_stream) {
       const Whole64 a0 = draw_w64__Whole64(draw);
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -260,7 +294,12 @@ SC_TEST(converted_city_stream) {
       const Whole64 a0 = draw_w64__Whole64(draw);
       const Whole64 a1 = draw_w64__Whole64(draw);
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -272,7 +311,12 @@ SC_TEST(converted_city_stream) {
       const int a0 = static_cast<int>(draw.whole());
       const int a1 = static_cast<int>(draw.whole());
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = converted::shaped<converted::Whole>(run(a0, a1));
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -283,7 +327,12 @@ SC_TEST(converted_city_stream) {
     for (int i = 0; tally.more(i); ++i) {
       const Vec2 a0 = draw.vector2();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = converted::shaped<converted::Whole>(run(a0));
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -293,7 +342,12 @@ SC_TEST(converted_city_stream) {
     const auto run = [&]() { return converted_city_stream::building_options(); };
     for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run();
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {}, want, watch.left(), [&] { return std::string(); });
     }
   }

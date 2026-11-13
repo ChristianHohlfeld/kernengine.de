@@ -36,9 +36,110 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+struct Whole64 {
+  u32 high = 0;
+  u32 low = 0;
+};
+inline bool w64_equal(Whole64 a, Whole64 b) { return a.high == b.high && a.low == b.low; }
+struct MeshData {
+  std::vector<f32> positions, normals, colors, uvs;
+  std::vector<f32> extra;  // optional per-vertex stream (extra_size floats each)
+  u32 extra_size = 0;
+  std::vector<u32> indices;
+
+  
+  
+  
+
+
+  
+
+
+
+
+
+  
+  
+
+
+  /// Borrowed MeshInput view (geometry only; material etc. stay default).
+  
+};
+enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
+enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
+struct Renderer : converted::EngineObject {
+  bool remove(const unsigned int& id) const;
+};
+enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh };
+enum class Surface : u8 { none, cloth, tpu, floor };
+struct Body { u64 id = 0; bool valid() const { return id != 0; } };
+struct World : converted::EngineObject {
+  bool body_valid(const Body& body) const;
+  void destroy_body(const Body& body) const;
+};
 inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
-namespace Interiors { struct Door { Vec2 c, d, n; }; }
+namespace Value { enum class Kind : u8 { none, string, number, boolean }; }
+enum class RoadClass : u8 { motorway, trunk, primary, secondary, tertiary, minor, service, track, path, pedestrian, river, canal, stream };
+struct Interiors {
+ public:
+  struct Door { Vec2 c, d, n; };  // centre on the facade, along the wall, outward normal
+  struct Core { Vec2 o, u, v; };  // stair core origin, across (lanes), along (flights)
+  /// A building's interior: geometry for drawing and collision, and what the game needs to know.
+  struct Plan {
+    std::vector<Vec2> outer, inner;
+    std::vector<std::vector<Vec2>> holes, inner_holes;
+    std::vector<Door> doors;
+    std::vector<f32> levels;  // floor heights (the first is the lobby)
+    f32 base = 0, top = 8, floor_h = 3.3, area = 0;
+    bool has_core = false, roof_access = false;
+    Core core;
+    MeshData mesh;         // everything visible inside (vertex colours)
+    MeshData glass;        // the window panes (one transparent mesh)
+    std::vector<Vec3> points;    // collision triangles
+    std::vector<u32> indices;
+    std::vector<Vec3> lamps;     // ceiling light panels
+    u32 furniture = 0;
+  };
+  /// Builds the plan of a building (outer ring first, then courtyards); `door_ground` is the
+  /// ground height in front of the main door. False: not enterable (too small, too big, odd).
+  
+  /// The doors of a footprint (the longest edge, a second one on the opposite side when big).
+  
+
+  
+  void clear();
+  
+  
+  
+  /// "interior" (state), "interior go" (to the nearest building's door), "interior up" (onto
+  /// the next storey's stairs), "interior roof".
+  
+  
+  bool inside(Vec3 p) const;
+  i32 level_at(Vec3 p) const;
+  
+
+ private:
+  
+  
+  Renderer* r_ = nullptr;
+  World* world_ = nullptr;
+  bool active_ = false;
+  u64 tile_ = 0;
+  u32 index_ = 0;
+  Plan plan_;
+  u32 mesh_id_ = 0, glass_id_ = 0;
+  Body body_;
+  std::vector<f32> door_angle_;
+  struct Closed { Vec3 at; f32 yaw; };
+  std::vector<Closed> closed_;
+  f32 next_scan_ = 0;
+  Vec3 feet_;
+  u32 entered_ = 0, built_ = 0;
+  bool was_inside_ = false;
+};
 constexpr f32 kActivate = 30, kDoorsRadius = 95, kDoorW = 1.8;
+constexpr f32 kLane = 1.2, kCoreW = 2 * kLane + 0.2, kLand = 1.3, kRun = 3.6, kCoreL = 2 * kLand + kRun, kSlab = 0.25, kRoofHouse = 2.7;
 Vec3 rgb(u32 h) { return {((h >> 16) & 255) / 255.0, ((h >> 8) & 255) / 255.0, (h & 255) / 255.0}; }
 f32 signed_area(const std::vector<Vec2>& r) {
   f32 a = 0;
@@ -111,6 +212,28 @@ bool door_gap(const std::vector<Interiors::Door>& doors, Vec2 a, Vec2 b, f32 ins
   }
   return false;
 }
+void Interiors::clear() {
+  if (r_ && mesh_id_) { r_->remove(mesh_id_); mesh_id_ = 0; }
+  if (r_ && glass_id_) { r_->remove(glass_id_); glass_id_ = 0; }
+  if (world_ && body_.valid() && world_->body_valid(body_)) world_->destroy_body(body_);
+  body_ = {};
+  active_ = false;
+  closed_.clear();
+}
+bool Interiors::inside(Vec3 p) const {
+  if (!active_ || !pip({p.x, p.y}, plan_.outer)) return false;
+  for (const auto& h : plan_.holes)
+    if (pip({p.x, p.y}, h)) return false;
+  return p.z > plan_.base - 1 && p.z < plan_.top + kRoofHouse + 1;
+}
+i32 Interiors::level_at(Vec3 p) const {
+  if (!inside(p)) return -1;
+  i32 k = 0;
+  for (std::size_t i = 0; i < plan_.levels.size(); converted::pre_inc(i))
+    if (p.z >= converted::at(plan_.levels, i) - 0.3) k = static_cast<i32>(i);
+  if (plan_.roof_access && p.z >= plan_.top - 0.3) k = static_cast<i32>(plan_.levels.size());
+  return k;
+}
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
@@ -122,13 +245,127 @@ bool door_gap(const std::vector<Interiors::Door>& doors, Vec2 a, Vec2 b, f32 ins
   s.n = draw.vector2();
   return s;
 }
-namespace Interiors { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const Interiors::Door& s) { return converted::Value::structure({arg(s.c), arg(s.d), arg(s.n)}); }
 [[maybe_unused]] static bool same(const Interiors::Door& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.c, (*got.rows)[0]) && same(want.d, (*got.rows)[1]) && same(want.n, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const Interiors::Door& s) { return defined(s.c) && defined(s.d) && defined(s.n); }
 [[maybe_unused]] static std::string text(const Interiors::Door& s) { return std::string("{") + text(s.c) + ", " + text(s.d) + ", " + text(s.n) + "}"; }
 [[maybe_unused]] static void take(Interiors::Door& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<Vec2>(s.c, (*v.rows)[0]); converted::take_as<Vec2>(s.d, (*v.rows)[1]); converted::take_as<Vec2>(s.n, (*v.rows)[2]); }
+[[maybe_unused]] static Whole64 draw_w64__Whole64(converted::Draw& draw) {
+  Whole64 s{};
+  s.high = static_cast<unsigned int>(draw.below(40));
+  s.low = static_cast<unsigned int>(draw.below(40));
+  return s;
 }
+[[maybe_unused]] static converted::Value arg(const Whole64& s) { return converted::Value::structure({arg(s.high), arg(s.low)}); }
+[[maybe_unused]] static bool same(const Whole64& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.high, (*got.rows)[0]) && same(want.low, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Whole64& s) { return defined(s.high) && defined(s.low); }
+[[maybe_unused]] static std::string text(const Whole64& s) { return std::string("{") + text(s.high) + ", " + text(s.low) + "}"; }
+[[maybe_unused]] static void take(Whole64& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<unsigned int>(s.high, (*v.rows)[0]); converted::take_as<unsigned int>(s.low, (*v.rows)[1]); }
+[[maybe_unused]] static Body draw_kern__physics__Body(converted::Draw& draw) {
+  Body s{};
+  s.id = static_cast<u64>(draw.bits());
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Body& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
+[[maybe_unused]] static bool same(const Body& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
+[[maybe_unused]] static bool defined(const Body& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
+[[maybe_unused]] static std::string text(const Body& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
+[[maybe_unused]] static void take(Body& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
+[[maybe_unused]] static Interiors::Core draw_Interiors__Core(converted::Draw& draw) {
+  Interiors::Core s{};
+  s.o = draw.vector2();
+  s.u = draw.vector2();
+  s.v = draw.vector2();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Interiors::Core& s) { return converted::Value::structure({arg(s.o), arg(s.u), arg(s.v)}); }
+[[maybe_unused]] static bool same(const Interiors::Core& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.o, (*got.rows)[0]) && same(want.u, (*got.rows)[1]) && same(want.v, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const Interiors::Core& s) { return defined(s.o) && defined(s.u) && defined(s.v); }
+[[maybe_unused]] static std::string text(const Interiors::Core& s) { return std::string("{") + text(s.o) + ", " + text(s.u) + ", " + text(s.v) + "}"; }
+[[maybe_unused]] static void take(Interiors::Core& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<Vec2>(s.o, (*v.rows)[0]); converted::take_as<Vec2>(s.u, (*v.rows)[1]); converted::take_as<Vec2>(s.v, (*v.rows)[2]); }
+[[maybe_unused]] static MeshData draw_kern__MeshData(converted::Draw& draw) {
+  MeshData s{};
+  s.positions = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.normals = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.colors = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.uvs = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.extra = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.extra_size = static_cast<unsigned int>(draw.below(40));
+  s.indices = draw_list(draw, [&]() -> unsigned int { return static_cast<unsigned int>(draw.below(40)); });
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const MeshData& s) { return converted::Value::structure({arg(s.positions), arg(s.normals), arg(s.colors), arg(s.uvs), arg(s.extra), arg(s.extra_size), arg(s.indices)}); }
+[[maybe_unused]] static bool same(const MeshData& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.positions, (*got.rows)[0]) && same(want.normals, (*got.rows)[1]) && same(want.colors, (*got.rows)[2]) && same(want.uvs, (*got.rows)[3]) && same(want.extra, (*got.rows)[4]) && same(want.extra_size, (*got.rows)[5]) && same(want.indices, (*got.rows)[6]); }
+[[maybe_unused]] static bool defined(const MeshData& s) { return defined(s.positions) && defined(s.normals) && defined(s.colors) && defined(s.uvs) && defined(s.extra) && defined(s.extra_size) && defined(s.indices); }
+[[maybe_unused]] static std::string text(const MeshData& s) { return std::string("{") + text(s.positions) + ", " + text(s.normals) + ", " + text(s.colors) + ", " + text(s.uvs) + ", " + text(s.extra) + ", " + text(s.extra_size) + ", " + text(s.indices) + "}"; }
+[[maybe_unused]] static void take(MeshData& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<std::vector<double>>(s.positions, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.normals, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.colors, (*v.rows)[2]); converted::take_as<std::vector<double>>(s.uvs, (*v.rows)[3]); converted::take_as<std::vector<double>>(s.extra, (*v.rows)[4]); converted::take_as<unsigned int>(s.extra_size, (*v.rows)[5]); converted::take_as<std::vector<unsigned int>>(s.indices, (*v.rows)[6]); }
+[[maybe_unused]] static Interiors::Plan draw_Interiors__Plan(converted::Draw& draw) {
+  Interiors::Plan s{};
+  s.outer = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+  s.inner = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+  s.holes = draw_list(draw, [&]() -> std::vector<Vec2> { return draw_list(draw, [&]() -> Vec2 { return draw.vector2(); }); });
+  s.inner_holes = draw_list(draw, [&]() -> std::vector<Vec2> { return draw_list(draw, [&]() -> Vec2 { return draw.vector2(); }); });
+  s.doors = draw_list(draw, [&]() -> Interiors::Door { return draw_Interiors__Door(draw); });
+  s.levels = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.base = draw.number();
+  s.top = draw.number();
+  s.floor_h = draw.number();
+  s.area = draw.number();
+  s.has_core = draw.flag();
+  s.roof_access = draw.flag();
+  s.core = draw_Interiors__Core(draw);
+  s.mesh = draw_kern__MeshData(draw);
+  s.glass = draw_kern__MeshData(draw);
+  s.points = draw_list(draw, [&]() -> Vec3 { return draw.vector(); });
+  s.indices = draw_list(draw, [&]() -> unsigned int { return static_cast<unsigned int>(draw.below(40)); });
+  s.lamps = draw_list(draw, [&]() -> Vec3 { return draw.vector(); });
+  s.furniture = static_cast<unsigned int>(draw.below(40));
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Interiors::Plan& s) { return converted::Value::structure({arg(s.outer), arg(s.inner), arg(s.holes), arg(s.inner_holes), arg(s.doors), arg(s.levels), arg(s.base), arg(s.top), arg(s.floor_h), arg(s.area), arg(s.has_core), arg(s.roof_access), arg(s.core), arg(s.mesh), arg(s.glass), arg(s.points), arg(s.indices), arg(s.lamps), arg(s.furniture)}); }
+[[maybe_unused]] static bool same(const Interiors::Plan& want, const converted::Value& got) { return got.rows && got.rows->size() == 19 && same(want.outer, (*got.rows)[0]) && same(want.inner, (*got.rows)[1]) && same(want.holes, (*got.rows)[2]) && same(want.inner_holes, (*got.rows)[3]) && same(want.doors, (*got.rows)[4]) && same(want.levels, (*got.rows)[5]) && same(want.base, (*got.rows)[6]) && same(want.top, (*got.rows)[7]) && same(want.floor_h, (*got.rows)[8]) && same(want.area, (*got.rows)[9]) && same(want.has_core, (*got.rows)[10]) && same(want.roof_access, (*got.rows)[11]) && same(want.core, (*got.rows)[12]) && same(want.mesh, (*got.rows)[13]) && same(want.glass, (*got.rows)[14]) && same(want.points, (*got.rows)[15]) && same(want.indices, (*got.rows)[16]) && same(want.lamps, (*got.rows)[17]) && same(want.furniture, (*got.rows)[18]); }
+[[maybe_unused]] static bool defined(const Interiors::Plan& s) { return defined(s.outer) && defined(s.inner) && defined(s.holes) && defined(s.inner_holes) && defined(s.doors) && defined(s.levels) && defined(s.base) && defined(s.top) && defined(s.floor_h) && defined(s.area) && defined(s.has_core) && defined(s.roof_access) && defined(s.core) && defined(s.mesh) && defined(s.glass) && defined(s.points) && defined(s.indices) && defined(s.lamps) && defined(s.furniture); }
+[[maybe_unused]] static std::string text(const Interiors::Plan& s) { return std::string("{") + text(s.outer) + ", " + text(s.inner) + ", " + text(s.holes) + ", " + text(s.inner_holes) + ", " + text(s.doors) + ", " + text(s.levels) + ", " + text(s.base) + ", " + text(s.top) + ", " + text(s.floor_h) + ", " + text(s.area) + ", " + text(s.has_core) + ", " + text(s.roof_access) + ", " + text(s.core) + ", " + text(s.mesh) + ", " + text(s.glass) + ", " + text(s.points) + ", " + text(s.indices) + ", " + text(s.lamps) + ", " + text(s.furniture) + "}"; }
+[[maybe_unused]] static void take(Interiors::Plan& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 19) return; converted::take_as<std::vector<Vec2>>(s.outer, (*v.rows)[0]); converted::take_as<std::vector<Vec2>>(s.inner, (*v.rows)[1]); converted::take_as<std::vector<std::vector<Vec2>>>(s.holes, (*v.rows)[2]); converted::take_as<std::vector<std::vector<Vec2>>>(s.inner_holes, (*v.rows)[3]); converted::take_as<std::vector<Interiors::Door>>(s.doors, (*v.rows)[4]); converted::take_as<std::vector<double>>(s.levels, (*v.rows)[5]); converted::take_as<double>(s.base, (*v.rows)[6]); converted::take_as<double>(s.top, (*v.rows)[7]); converted::take_as<double>(s.floor_h, (*v.rows)[8]); converted::take_as<double>(s.area, (*v.rows)[9]); converted::take_as<bool>(s.has_core, (*v.rows)[10]); converted::take_as<bool>(s.roof_access, (*v.rows)[11]); converted::take_as<Interiors::Core>(s.core, (*v.rows)[12]); converted::take_as<MeshData>(s.mesh, (*v.rows)[13]); converted::take_as<MeshData>(s.glass, (*v.rows)[14]); converted::take_as<std::vector<Vec3>>(s.points, (*v.rows)[15]); converted::take_as<std::vector<unsigned int>>(s.indices, (*v.rows)[16]); converted::take_as<std::vector<Vec3>>(s.lamps, (*v.rows)[17]); converted::take_as<unsigned int>(s.furniture, (*v.rows)[18]); }
+[[maybe_unused]] static Interiors::Closed draw_Interiors__Closed(converted::Draw& draw) {
+  Interiors::Closed s{};
+  s.at = draw.vector();
+  s.yaw = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Interiors::Closed& s) { return converted::Value::structure({arg(s.at), arg(s.yaw)}); }
+[[maybe_unused]] static bool same(const Interiors::Closed& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.at, (*got.rows)[0]) && same(want.yaw, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Interiors::Closed& s) { return defined(s.at) && defined(s.yaw); }
+[[maybe_unused]] static std::string text(const Interiors::Closed& s) { return std::string("{") + text(s.at) + ", " + text(s.yaw) + "}"; }
+[[maybe_unused]] static void take(Interiors::Closed& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<Vec3>(s.at, (*v.rows)[0]); converted::take_as<double>(s.yaw, (*v.rows)[1]); }
+[[maybe_unused]] static Interiors draw_Interiors(converted::Draw& draw) {
+  Interiors s{};
+  s.r_ = converted::engine_object<Renderer>(1 + draw.below(6));
+  s.world_ = converted::engine_object<World>(1 + draw.below(6));
+  s.active_ = draw.flag();
+  s.tile_ = static_cast<u64>(draw.bits());
+  s.index_ = static_cast<unsigned int>(draw.below(40));
+  s.plan_ = draw_Interiors__Plan(draw);
+  s.mesh_id_ = static_cast<unsigned int>(draw.below(40));
+  s.glass_id_ = static_cast<unsigned int>(draw.below(40));
+  s.body_ = draw_kern__physics__Body(draw);
+  s.door_angle_ = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.closed_ = draw_list(draw, [&]() -> Interiors::Closed { return draw_Interiors__Closed(draw); });
+  s.next_scan_ = draw.number();
+  s.feet_ = draw.vector();
+  s.entered_ = static_cast<unsigned int>(draw.below(40));
+  s.built_ = static_cast<unsigned int>(draw.below(40));
+  s.was_inside_ = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Interiors& s) { return converted::Value::structure({arg(s.r_), arg(s.world_), arg(s.active_), arg(converted::shaped<converted::Whole>(s.tile_)), arg(s.index_), arg(s.plan_), arg(s.mesh_id_), arg(s.glass_id_), arg(s.body_), arg(s.door_angle_), arg(s.closed_), arg(s.next_scan_), arg(s.feet_), arg(s.entered_), arg(s.built_), arg(s.was_inside_)}); }
+[[maybe_unused]] static bool same(const Interiors& want, const converted::Value& got) { return got.rows && got.rows->size() == 16 && same(want.r_, (*got.rows)[0]) && same(want.world_, (*got.rows)[1]) && same(want.active_, (*got.rows)[2]) && same(converted::shaped<converted::Whole>(want.tile_), (*got.rows)[3]) && same(want.index_, (*got.rows)[4]) && same(want.plan_, (*got.rows)[5]) && same(want.mesh_id_, (*got.rows)[6]) && same(want.glass_id_, (*got.rows)[7]) && same(want.body_, (*got.rows)[8]) && same(want.door_angle_, (*got.rows)[9]) && same(want.closed_, (*got.rows)[10]) && same(want.next_scan_, (*got.rows)[11]) && same(want.feet_, (*got.rows)[12]) && same(want.entered_, (*got.rows)[13]) && same(want.built_, (*got.rows)[14]) && same(want.was_inside_, (*got.rows)[15]); }
+[[maybe_unused]] static bool defined(const Interiors& s) { return defined(s.r_) && defined(s.world_) && defined(s.active_) && defined(converted::shaped<converted::Whole>(s.tile_)) && defined(s.index_) && defined(s.plan_) && defined(s.mesh_id_) && defined(s.glass_id_) && defined(s.body_) && defined(s.door_angle_) && defined(s.closed_) && defined(s.next_scan_) && defined(s.feet_) && defined(s.entered_) && defined(s.built_) && defined(s.was_inside_); }
+[[maybe_unused]] static std::string text(const Interiors& s) { return std::string("{") + text(s.r_) + ", " + text(s.world_) + ", " + text(s.active_) + ", " + text(converted::shaped<converted::Whole>(s.tile_)) + ", " + text(s.index_) + ", " + text(s.plan_) + ", " + text(s.mesh_id_) + ", " + text(s.glass_id_) + ", " + text(s.body_) + ", " + text(s.door_angle_) + ", " + text(s.closed_) + ", " + text(s.next_scan_) + ", " + text(s.feet_) + ", " + text(s.entered_) + ", " + text(s.built_) + ", " + text(s.was_inside_) + "}"; }
+[[maybe_unused]] static void take(Interiors& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 16) return; converted::take_as<Renderer*>(s.r_, (*v.rows)[0]); converted::take_as<World*>(s.world_, (*v.rows)[1]); converted::take_as<bool>(s.active_, (*v.rows)[2]); converted::take_as<converted::Whole>(s.tile_, (*v.rows)[3]); converted::take_as<unsigned int>(s.index_, (*v.rows)[4]); converted::take_as<Interiors::Plan>(s.plan_, (*v.rows)[5]); converted::take_as<unsigned int>(s.mesh_id_, (*v.rows)[6]); converted::take_as<unsigned int>(s.glass_id_, (*v.rows)[7]); converted::take_as<Body>(s.body_, (*v.rows)[8]); converted::take_as<std::vector<double>>(s.door_angle_, (*v.rows)[9]); converted::take_as<std::vector<Interiors::Closed>>(s.closed_, (*v.rows)[10]); converted::take_as<double>(s.next_scan_, (*v.rows)[11]); converted::take_as<Vec3>(s.feet_, (*v.rows)[12]); converted::take_as<unsigned int>(s.entered_, (*v.rows)[13]); converted::take_as<unsigned int>(s.built_, (*v.rows)[14]); converted::take_as<bool>(s.was_inside_, (*v.rows)[15]); }
+inline bool Renderer::remove(const unsigned int& id) const { const std::vector<converted::Value> out = converted::engine_call("engine.renderer.remove", {arg(*this), arg(id)}); bool result{}; converted::take_as<bool>(result, out[0]); return result; }
+inline bool World::body_valid(const Body& body) const { const std::vector<converted::Value> out = converted::engine_call("engine.world.body_valid", {arg(*this), arg(body)}); bool result{}; converted::take_as<bool>(result, out[0]); return result; }
+inline void World::destroy_body(const Body& body) const { const std::vector<converted::Value> out = converted::engine_call("engine.world.destroy_body", {arg(*this), arg(body)}); }
 struct Out_door_gap { bool Result; double t0; double t1; };
 [[maybe_unused]] static bool same(const Out_door_gap& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Result, (*got.rows)[0]) && same(want.t0, (*got.rows)[1]) && same(want.t1, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const Out_door_gap& s) { return defined(s.Result) && defined(s.t0) && defined(s.t1); }
@@ -143,7 +380,12 @@ SC_TEST(converted_interiors) {
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -154,7 +396,12 @@ SC_TEST(converted_interiors) {
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -165,7 +412,12 @@ SC_TEST(converted_interiors) {
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
@@ -177,7 +429,12 @@ SC_TEST(converted_interiors) {
       const Vec2 a0 = draw.vector2();
       const std::vector<Vec2> a1 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -190,7 +447,12 @@ SC_TEST(converted_interiors) {
       const Vec2 a1 = draw.vector2();
       const Vec2 a2 = draw.vector2();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
     }
   }
@@ -202,7 +464,12 @@ SC_TEST(converted_interiors) {
       const Vec2 a0 = draw.vector2();
       const std::vector<Vec2> a1 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -214,7 +481,12 @@ SC_TEST(converted_interiors) {
       const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       const double a1 = draw.number();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -226,7 +498,12 @@ SC_TEST(converted_interiors) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -238,7 +515,12 @@ SC_TEST(converted_interiors) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -254,8 +536,96 @@ SC_TEST(converted_interiors) {
       const double a4 = draw.number();
       const double a5 = draw.number();
       const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
       const auto want = run(a0, a1, a2, a3, a4, a5);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5); });
+    }
+  }
+  {  // w64_equal
+    converted::Tally tally("w64_equal");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_interiors::w64_equal(a0, a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Whole64 a0 = draw_w64__Whole64(draw);
+      const Whole64 a1 = draw_w64__Whole64(draw);
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // Body::valid
+    converted::Tally tally("Body_valid");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Body a0) { return a0.valid(); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Body a0 = draw_kern__physics__Body(draw);
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
+  {  // Interiors::clear
+    converted::Tally tally("Interiors_clear");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Interiors a0) { a0.clear(); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      const Interiors a0 = draw_Interiors(draw);
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
+  {  // Interiors::inside
+    converted::Tally tally("Interiors_inside");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Interiors a0, [[maybe_unused]] Vec3 a1) { return a0.inside(a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Interiors a0 = draw_Interiors(draw);
+      const Vec3 a1 = draw.vector();
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // Interiors::level_at
+    converted::Tally tally("Interiors_level_at");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Interiors a0, [[maybe_unused]] Vec3 a1) { return a0.level_at(a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      const Interiors a0 = draw_Interiors(draw);
+      const Vec3 a1 = draw.vector();
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0, a1);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
 }
