@@ -391,8 +391,11 @@ Eine Form, die Gestalt oder Kosten ändert, ist keine von beiden.
    geändert, wo er steht: `Cars[i].Wheels[j].Slip += x;`, `list_add(Log.Cur.Path, p);`. Es gibt
    ein Set für jeden Platz; „Set Field“ und „Set List Item“ waren Sonderfälle davon und sind als
    eigene Knoten entfallen (alte Dokumente werden beim Laden umgestellt). Neben einer Liste steht
-   in jeder Stufe ein Eintrag mit den Defaults, der nichts behält. Der Konverter schreibt bisher
-   nur das Setzen eines Eintrags so (`X[i] = v;`); dass er Plätze statt Kopien schreibt, folgt.
+   in jeder Stufe ein Eintrag mit den Defaults, der nichts behält. Der Konverter schreibt seit
+   19:30 Plätze statt Kopien, wo eine Funktion auf ihren eigenen Variablen arbeitet
+   (`self_.cur_.path[i].x = v;`, `list_add(self_.pieces_, p);`, gelesen `self_.cur_.t`): im Level
+   stehen damit 1.414 statt 2.471 `struct_break` und 243 statt 367 `list_get`. Die 98 Methoden, die
+   ihr Objekt hinein- und herausbekommen, löst Schritt 2 ab.
 2. **Referenz-Parameter.** Ein Eingang einer Funktion kann eine Referenz sein (`Car& self`): Der
    Aufruf nennt einen Platz, die Funktion liest und ändert ihn dort; in ihr ist er wie eine lokale
    Variable. Dazu eine Regel (`check`): Solange ein Aufruf einen Platz in einer Liste hält, ändert
@@ -509,9 +512,9 @@ sagt, in den Zahlen der Sprache – überall gleich. Er sagt nicht, dass das die
 heutigen Programm: Das rechnet dieselben Formeln mit `f32` in 32 Bit, die Sprache in 64 Bit (wie das
 JavaScript-Original). Das ist die Festlegung der Sprache, kein Spielraum des Tests.
 
-Stand (13.11.2026, 17:22): 355 von 1.428 Funktionen (2.700 von 28.544 Zeilen) aus 58 von 77 Dateien stehen
+Stand (13.11.2026, 19:30): 356 von 1.428 Funktionen (2.713 von 28.544 Zeilen) aus 58 von 77 Dateien stehen
 als Blueprints im Level (58 Actors im Ordner „Source“). Der Test vergleicht jede davon, die etwas
-gibt, Bit für Bit mit ihrem Quelltext – 513 Vergleiche, weil Funktionen aus Headern (und die der
+gibt, Bit für Bit mit ihrem Quelltext – 514 Vergleiche, weil Funktionen aus Headern (und die der
 64-Bit-Zahlen) in jedem Blueprint stehen, der sie benutzt; keine ist ausgenommen. Das Spiel führt für diese Dateien weiter
 ihr C++ aus (Stufe 5).
 

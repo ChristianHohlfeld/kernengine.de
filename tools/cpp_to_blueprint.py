@@ -2781,12 +2781,99 @@ class Emit:
             n = bare(kids(n)[0])
         return n
 
+    def is_local(self, name):
+        """Is this the name of a variable of the function being written (not an input, not what a node gives)?"""
+        return any(name == n for n, _ in self.locals)
+
+    def spot(self, n):
+        """The place an lvalue is, as the notation writes one - a variable of the function and from it
+        fields and list entries, self_.cur_.path[i] -: (text, type). None when it is none: a value, an
+        input of the function, a component of a vector, a map's row by its key (that one is found first)."""
+        got = self.spot_held(n)
+        if got is not None and got[1] in self.u.rows:   # (a list inside a list is held as a struct of that list: its place is that field)
+            return got[0] + ".items", self.u.rows[got[1]]
+        return got
+
+    def spot_held(self, n):
+        b = self.unwrap(n)
+        k = b.get("kind")
+        if k == "DeclRefExpr":
+            i = b.get("referencedDecl", {}).get("id")
+            name = self.names.get(i)
+            return (name, self.types[i]) if name is not None and self.is_local(name) else None
+        if self.is_this(b):
+            return (self.self_name, self.f.self_type) if self.f.self_type is not None and self.is_local(self.self_name) else None
+        if k == "UnaryOperator" and b.get("opcode") == "*" and kids(b) and self.is_this(kids(b)[0]):
+            return (self.self_name, self.f.self_type) if self.f.self_type is not None and self.is_local(self.self_name) else None
+        holder = self.box(b)
+        if holder is not None:   # the value an owned or optional value holds: the one entry of its list
+            got = self.spot(holder)
+            return (f"{got[0]}[0]", got[1][5:-1]) if got is not None and got[1].startswith("List<") else None
+        at_iterator = self.entry_of(b)
+        if at_iterator is not None:
+            return self.spot(at_iterator)
+        if k == "MemberExpr":
+            base = kids(b)[0] if kids(b) else None
+            if base is None or self.is_this(base):
+                if self.f.self_type is None or not self.is_local(self.self_name):
+                    return None
+                fname, ft = self.u.field(self.f.self_type, b["name"])
+                return f"{self.self_name}.{fname}", ft
+            at_iterator = self.entry_of(base)
+            if at_iterator is not None:
+                base = at_iterator
+            elif b.get("isArrow"):
+                if self.box(base) is None:
+                    return None
+                base = self.boxed(self.box(base))
+            if self.is_vec(base):
+                return None
+            got = self.spot(base)
+            if got is None or got[1] not in self.u.struct_fields:
+                return None
+            fname, ft = self.u.field(got[1], b["name"])
+            return f"{got[0]}.{fname}", ft
+        if k == "ArraySubscriptExpr" or (k == "CXXOperatorCallExpr" and not b.get("_op") and callee_name(b) == "operator[]" and len(kids(b)) == 3):
+            if k == "CXXOperatorCallExpr":
+                if self.is_slot(b):
+                    return None
+                base, idx = kids(b)[1], kids(b)[2]
+            else:
+                base, idx = kids(b)
+                while bare(base).get("kind") == "ImplicitCastExpr":
+                    base = kids(bare(base))[0]
+            if self.is_vec(base):
+                return None
+            got = self.spot(base)
+            if got is None or not got[1].startswith("List<"):
+                return None
+            self.f.indexes = True
+            return f"{got[0]}[{self.ex(idx, 'Int')}]", got[1][5:-1]
+        if k == "CXXMemberCallExpr" and callee(b).get("name") in ("front", "back", "at") and kids(callee(b)):
+            base = kids(callee(b))[0]
+            a = kids(b)[1:]
+            name = callee(b)["name"]
+            if self.is_this(base) or self.keyed(base) or len(a) != (1 if name == "at" else 0):
+                return None
+            got = self.spot(base)
+            if got is None or not got[1].startswith("List<"):
+                return None
+            self.f.indexes = True
+            it = got[1][5:-1]
+            at = self.ex(a[0], "Int") if name == "at" else "0" if name == "front" else self.whole_math("-", f"list_length<{it}>({got[0]})", "1")
+            return f"{got[0]}[{at}]", it
+        return None
+
     def variable_of(self, n, t):
-        """A variable to change in place of an lvalue: (lines before, its name, lines after). The lvalue
-        itself when it is a variable; otherwise a copy that is stored back afterwards."""
+        """A place to change for an lvalue: (lines before, its text, lines after). The lvalue itself when
+        it is a place of the notation (a variable, a field or an entry in one); otherwise a copy that is
+        stored back afterwards."""
         b = self.unwrap(n)
         if self.plain_variable(b):
             return [], self.lvalue(b), []
+        got = self.spot(n)
+        if got is not None:
+            return [], got[0], []
         tmp = self.temp("t", t)
         return [f"{tmp} = {self.ex(n, t)};"], tmp, self.store(n, self.typed(tmp, t))
 
@@ -2849,6 +2936,9 @@ class Emit:
         k = t.get("kind")
         if k == "DeclRefExpr":
             return [f"{self.lvalue(t)} = {value(self.tp(t))};"]
+        got = self.spot(t)
+        if got is not None:   # a place of the notation: set where it stands
+            return [f"{got[0]} = {value(got[1])};"]
         if k == "CXXOperatorCallExpr":
             at_iterator = self.entry_of(t)
             if at_iterator is not None:   # (*it = v: the entry the iterator stands at)
@@ -3078,6 +3168,9 @@ class Emit:
         if k == "_Text":
             return b["_text"], b["_type"]
         if k == "_Box":
+            got = self.spot(b)
+            if got is not None:
+                return got
             lt = self.tp(b["inner"][0])
             return f"list_get<{lt[5:-1]}>({self.ex(b['inner'][0], lt)}, 0)", lt[5:-1]
         if k == "CXXRewrittenBinaryOperator":   # (a != b written by the compiler as !(a == b))
@@ -3170,6 +3263,9 @@ class Emit:
                 return u.constant(d)
             raise Wait(f"a name that is {ref.get('kind')}")
         if k == "MemberExpr":
+            got = self.spot(b)
+            if got is not None:   # a field at a place: read where it stands
+                return got
             base = kids(b)[0] if kids(b) else None
             if base is None or self.is_this(base):
                 if self.f.self_type is None:
@@ -3280,6 +3376,9 @@ class Emit:
         if k == "CXXMemberCallExpr":
             return self.member_call(b)
         if k == "ArraySubscriptExpr":
+            got = self.spot(b)
+            if got is not None:
+                return got
             base, idx = kids(b)
             while bare(base).get("kind") == "ImplicitCastExpr":
                 base = kids(bare(base))[0]
@@ -3884,6 +3983,9 @@ class Emit:
             raise Wait(f"vector: {name}")
         t0 = self.tp(ops[0]) if ops else None
         if t0 and t0.startswith("List<") and name == "operator[]":
+            got = self.spot(b)
+            if got is not None:
+                return got
             self.f.indexes = True
             return f"list_get<{t0[5:-1]}>({self.ex(ops[0], t0)}, {self.ex(ops[1], 'Int')})", t0[5:-1]
         if t0 == "Text":
@@ -4045,6 +4147,9 @@ class Emit:
             if name == "empty" and not a:
                 return f'math_compare<"==">(kern::to<Float>(list_length<{it}>({lst})), 0.0)', "Bool"
             if name in ("at", "front", "back"):
+                got = self.spot(b)
+                if got is not None:
+                    return got
                 self.f.indexes = True
             if name in ("at",) and len(a) == 1:
                 return f"list_get<{it}>({lst}, {self.ex(a[0], 'Int')})", it
@@ -5527,7 +5632,9 @@ def apply_to_level(level, folder, blueprints, prune=False):
         r = subprocess.run([os.path.join(ROOT, "tools", "blueprint_cpp.sh"), "--apply", level, name, tmp], capture_output=True, text=True)
         if r.returncode != 0:
             failed += 1
-            sys.stderr.write(f"{name}: {(r.stderr or r.stdout).strip()[:1500]}\n")
+            kept = os.path.join(os.path.dirname(tmp), f"kern-cpp-to-blueprint-{name}.cpp")   # (the text that was refused: to look at)
+            open(kept, "w").write(text)
+            sys.stderr.write(f"{name}: {(r.stderr or r.stdout).strip()[:1500]}\n  (its text: {kept})\n")
     os.unlink(tmp)
     if failed:
         raise SystemExit(f"{failed} Blueprint(s) were not read")

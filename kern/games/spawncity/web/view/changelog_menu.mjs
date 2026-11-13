@@ -7,6 +7,9 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-13",time:"19:30",title:"Konverter: Plätze statt Kopien",items:[
+    "Unter der Haube: Der Konverter schreibt Felder und Listeneinträge jetzt dort, wo sie stehen, statt sie herauszulesen und zurückzuschreiben. 356 von 1.428 Funktionen stehen als Blueprints im Level, 514 Vergleiche Bit für Bit mit dem Quelltext. Am Spiel selbst ändert sich nichts.",
+  ]},
   {date:"2026-11-13",time:"18:55",title:"Sprache: Plätze",items:[
     "Unter der Haube: Die Blueprint-Sprache ändert jetzt, wo etwas steht – ein Feld, ein Eintrag einer Liste, beliebig tief (Cars[i].Wheels[j].Slip += 0.1). Nichts wird mehr herausgelesen und zurückgeschrieben, im Editor wie im Export. „Set Field“ und „Set List Item“ sind in dem einen Set aufgegangen. Am Spiel selbst ändert sich nichts.",
   ]},

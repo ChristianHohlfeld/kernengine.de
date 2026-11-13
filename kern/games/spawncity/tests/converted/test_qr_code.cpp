@@ -63,6 +63,19 @@ u8 gf_mul(u8 x, u8 y) {
   }
   return static_cast<u8>(z);
 }
+std::vector<u8> rs_divisor(i32 degree) {
+  std::vector<u8> r(converted::count(static_cast<std::size_t>(degree)), 0);
+  converted::back(r) = 1;
+  u8 root = 1;
+  for (i32 i = 0; i < degree; ++i) {
+    for (std::size_t j = 0; j < r.size(); converted::pre_inc(j)) {
+      converted::at(r, j) = gf_mul(converted::at(r, j), root);
+      if (converted::plus(j, 1) < r.size()) converted::at(r, j) ^= converted::at(r, converted::plus(j, 1));
+    }
+    root = gf_mul(root, 2);
+  }
+  return r;
+}
 std::vector<u8> rs_remainder(const std::vector<u8>& data, const std::vector<u8>& div) {
   std::vector<u8> r(converted::count(div.size()), 0);
   for (u8 b : data) {
@@ -208,6 +221,22 @@ SC_TEST(converted_qr_code) {
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // rs_divisor
+    converted::Tally tally("rs_divisor");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] int a0) { return converted_qr_code::rs_divisor(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      const int a0 = static_cast<int>(draw.whole());
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      const auto want = run(a0);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }
   {  // rs_remainder
