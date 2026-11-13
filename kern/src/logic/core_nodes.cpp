@@ -68,6 +68,11 @@ ParamDef param(std::string key, std::string label, ParamDef::Kind kind, std::str
 /// The setting of a node that names a variable: the function whose local variable it is (empty:
 /// a variable of the Blueprint).
 ParamDef local_of() { return param("scope", "Local of", ParamDef::Kind::scope); }
+/// The setting "path" of a node that names a place: from its variable through fields and list
+/// entries (ParamDef::Kind::path).
+ParamDef path_of() { return param("path", "Path", ParamDef::Kind::path); }
+/// The place a node names, as its title has it: Cars[].Speed.
+std::string place_title(const Node& n) { return n.param("variable", "?") + n.param("path"); }
 
 /// The setting "Type" of a generic node: the type of its pins (`with_lists`: a list type too).
 ParamDef type_param(bool with_lists) {
@@ -428,7 +433,7 @@ void add_variables(Library& lib) {
   auto var_shape = [](bool input, bool output) {
     return [input, output](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
       Variable named;
-      const Variable* v = g.variable_of(n, named) ? &named : nullptr;
+      const Variable* v = g.place_of(n, named) ? &named : nullptr;
       const PinType t = v ? v->type : PinType::number;
       for (PinDef& p : in) if (p.id == "value" && input) { p.type = t; p.of = v ? v->of : std::string(); p.def = v ? v->value : json::Value(0.0); }
       for (PinDef& p : out) if (p.id == "value" && output) { p.type = t; p.of = v ? v->of : std::string(); }
@@ -436,56 +441,74 @@ void add_variables(Library& lib) {
   };
   {
     NodeDef d = make("var.get", "Get Variable", "Variables", NodeKind::pure, "Reads a variable of this graph.");
-    d.params = {param("variable", "Variable", ParamDef::Kind::variable), local_of()};
+    d.params = {param("variable", "Variable", ParamDef::Kind::variable), local_of(), path_of()};
     d.outputs = {data("value", "Value", PinType::number)};
     d.shape = var_shape(false, true);
-    d.title = [](const NodeDef&, const Node& n) { return n.param("variable", "?"); };
+    d.title = [](const NodeDef&, const Node& n) { return place_title(n); };
     d.run = [](Context& c) {
-      c.out(std::size_t{0}, c.instance().get(c.node()));
+      c.out(std::size_t{0}, c.instance().place(c.node(), c.path()));
       return kStop;
     };
     lib.add(std::move(d));
   }
   {
-    NodeDef d = make("var.set", "Set Variable", "Variables", NodeKind::action, "Writes a variable of this graph.");
-    d.params = {param("variable", "Variable", ParamDef::Kind::variable), local_of()};
+    NodeDef d = make("var.set", "Set Variable", "Variables", NodeKind::action,
+                     "Writes a variable of this graph - or, with a path, a place in it: one field of a struct, one entry of a list (beside the list: nothing). "
+                     "Value: what is there now.",
+                     "assign change write field member entry item element");
+    d.params = {param("variable", "Variable", ParamDef::Kind::variable), local_of(), path_of()};
     d.inputs = {exec_in(), data("value", "Value", PinType::number)};
     d.outputs = {exec_out(), data("value", "Value", PinType::number)};
     d.shape = var_shape(true, true);
-    d.title = [](const NodeDef&, const Node& n) { return "Set " + n.param("variable", "?"); };
+    d.title = [](const NodeDef&, const Node& n) { return "Set " + place_title(n); };
     d.run = [](Context& c) {
-      c.instance().set(c.node(), c.in("value"));
-      c.out("value", c.instance().get(c.node()));
+      const Value value = c.in("value");
+      const std::vector<i64> at = c.path();
+      const Graph& g = c.instance().graph();
+      Variable named;
+      const TypeRef type = g.place_of(c.node(), named) ? TypeRef{named.type, named.of} : TypeRef{value.type, {}};
+      Value now;
+      c.instance().change(c.node(), at, [&](Value& v) {
+        v = from_outside(value, type, g);
+        now = v;
+      });
+      c.out("value", now);
       return 0;
     };
     lib.add(std::move(d));
   }
   {
     NodeDef d = make("var.add", "Add to Variable", "Variables", NodeKind::action, "Adds Amount to a number variable, Integer or Float (use -1 to count down).");
-    d.params = {param("variable", "Variable", ParamDef::Kind::variable), local_of()};
+    d.params = {param("variable", "Variable", ParamDef::Kind::variable), local_of(), path_of()};
     d.inputs = {exec_in(), data("amount", "Amount", PinType::number, 1.0)};
     d.outputs = {exec_out(), data("value", "Value", PinType::number)};
     d.keywords = "increment decrement counter plus";
-    d.title = [](const NodeDef&, const Node& n) { return "Add to " + n.param("variable", "?"); };
+    d.title = [](const NodeDef&, const Node& n) { return "Add to " + place_title(n); };
     // The amount and the result have the variable's type: whole numbers add as whole numbers.
     d.shape = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
       Variable named;
-      const Variable* v = g.variable_of(n, named) ? &named : nullptr;
+      const Variable* v = g.place_of(n, named) ? &named : nullptr;
       if (!v || v->type != PinType::integer) return;
       for (PinDef& p : in) if (p.id == "amount") { p.type = PinType::integer; p.def = json::Value(1); }
       for (PinDef& p : out) if (p.id == "value") p.type = PinType::integer;
     };
     d.problem = [](const Node& n, const Graph& g) {
       Variable named;
-      const Variable* v = g.variable_of(n, named) ? &named : nullptr;
+      const Variable* v = g.place_of(n, named) ? &named : nullptr;
       return v && v->type != PinType::integer && v->type != PinType::number
                  ? "needs a number variable (Integer or Float): \"" + v->name + "\" is " + std::string(pin_type_name(v->type)) + " - use Set"
                  : std::string();
     };
     d.run = [](Context& c) {
-      const Value cur = c.instance().get(c.node());
-      c.instance().set(c.node(), Value::number(cur.as_number() + c.in_number("amount")));
-      c.out("value", c.instance().get(c.node()));
+      const f64 amount = c.in_number("amount");
+      const std::vector<i64> at = c.path();
+      Value now;
+      c.instance().change(c.node(), at, [&](Value& v) {
+        // (the number where it is: a whole number stays one - as a variable's slot holds it)
+        v = v.type == PinType::integer ? Value::integer(whole(v.as_number() + amount)) : Value::number(v.as_number() + amount);
+        now = v;
+      });
+      c.out("value", now);
       return 0;
     };
     lib.add(std::move(d));
@@ -647,7 +670,7 @@ void add_lists(Library& lib) {
   // ---- steps: they change a list variable (the setting Variable) ----
   auto of_variable = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
     Variable named;
-      const Variable* v = g.variable_of(n, named) ? &named : nullptr;
+      const Variable* v = g.place_of(n, named) ? &named : nullptr;
     const TypeRef e = v && is_list(v->type) ? TypeRef{element_of(v->type), v->of} : TypeRef{};
     for (PinDef& p : in)
       if (p.id == "item") retype(p, e, g);
@@ -655,14 +678,14 @@ void add_lists(Library& lib) {
   };
   auto needs_list = [](const Node& n, const Graph& g) {
     Variable named;
-      const Variable* v = g.variable_of(n, named) ? &named : nullptr;
+      const Variable* v = g.place_of(n, named) ? &named : nullptr;
     return v && !is_list(v->type) ? "needs a list variable: \"" + v->name + "\" is " + std::string(pin_type_name(v->type)) : std::string();
   };
   // A step on the list variable of the node: `change(items, c)` with the vector of its items.
   // The inputs have been read by then (each exactly once, whatever the variable is).
   auto step = [&](const char* type, const char* label, const char* help, const char* keywords, std::vector<PinDef> in, std::vector<PinDef> out) {
     NodeDef d = make(type, label, "Lists", NodeKind::action, help, keywords);
-    d.params = {param("variable", "List", ParamDef::Kind::variable), local_of()};
+    d.params = {param("variable", "List", ParamDef::Kind::variable), local_of(), path_of()};
     d.inputs = {exec_in()};
     for (PinDef& p : in) d.inputs.push_back(std::move(p));
     d.outputs = {exec_out()};
@@ -671,21 +694,26 @@ void add_lists(Library& lib) {
     d.problem = needs_list;
     return d;
   };
-  auto variable = [](Context& c) -> Value* {
-    Value* v = c.instance().variable(c.node());
-    return v && is_list(v->type) ? v : nullptr;
+  // The list at the node's place, to change it: `change(list)` with the value that holds it. The
+  // node's own inputs have been read by then; the indices of its path are read here.
+  auto on_list = [](Context& c, const std::function<void(Value&)>& change) {
+    const std::vector<i64> at = c.path();
+    c.instance().change(c.node(), at, [&](Value& v) {
+      if (is_list(v.type)) change(v);
+    });
   };
   {
     NodeDef d = step("list.add", "Add to List", "Adds the value at the end of a list variable. Index: where it is now.", "append push array", {data("item", "Item", PinType::number, 0.0)},
                      {data("index", "Index", PinType::integer)});
-    d.title = [](const NodeDef&, const Node& n) { return "Add to " + n.param("variable", "?"); };
-    d.run = [variable](Context& c) {
+    d.title = [](const NodeDef&, const Node& n) { return "Add to " + place_title(n); };
+    d.run = [on_list](Context& c) {
       const Value item = c.in("item");
-      if (Value* v = variable(c))
-        with_items(element_of(v->type), [&](auto type) {
+      on_list(c, [&](Value& v) {
+        with_items(element_of(v.type), [&](auto type) {
           using T = typename decltype(type)::type;
-          c.out("index", Value::integer(list::add(v->template edit<T>(), from_value<T>(item))));
+          c.out("index", Value::integer(list::add(v.template edit<T>(), from_value<T>(item))));
         });
+      });
       return 0;
     };
     lib.add(std::move(d));
@@ -693,45 +721,31 @@ void add_lists(Library& lib) {
   {
     NodeDef d = step("list.insert", "Insert into List", "Puts the value in front of the item at the index (0: at the start; past the end: at the end).", "add at array",
                      {data("index", "Index", PinType::integer, 0), data("item", "Item", PinType::number, 0.0)}, {});
-    d.title = [](const NodeDef&, const Node& n) { return "Insert into " + n.param("variable", "?"); };
-    d.run = [variable](Context& c) {
+    d.title = [](const NodeDef&, const Node& n) { return "Insert into " + place_title(n); };
+    d.run = [on_list](Context& c) {
       const i64 index = c.in_int("index");
       const Value item = c.in("item");
-      if (Value* v = variable(c))
-        with_items(element_of(v->type), [&](auto type) {
+      on_list(c, [&](Value& v) {
+        with_items(element_of(v.type), [&](auto type) {
           using T = typename decltype(type)::type;
-          list::insert(v->template edit<T>(), index, from_value<T>(item));
+          list::insert(v.template edit<T>(), index, from_value<T>(item));
         });
-      return 0;
-    };
-    lib.add(std::move(d));
-  }
-  {
-    NodeDef d = step("list.set", "Set List Item", "Replaces the item at the index. Beyond the list: nothing.", "replace change element array",
-                     {data("index", "Index", PinType::integer, 0), data("item", "Item", PinType::number, 0.0)}, {});
-    d.title = [](const NodeDef&, const Node& n) { return "Set Item of " + n.param("variable", "?"); };
-    d.run = [variable](Context& c) {
-      const i64 index = c.in_int("index");
-      const Value item = c.in("item");
-      if (Value* v = variable(c))
-        with_items(element_of(v->type), [&](auto type) {
-          using T = typename decltype(type)::type;
-          list::set(v->template edit<T>(), index, from_value<T>(item));
-        });
+      });
       return 0;
     };
     lib.add(std::move(d));
   }
   {
     NodeDef d = step("list.remove_at", "Remove Index", "Takes the item at the index out of a list variable. Beyond the list: nothing.", "delete erase array", {data("index", "Index", PinType::integer, 0)}, {});
-    d.title = [](const NodeDef&, const Node& n) { return "Remove Index from " + n.param("variable", "?"); };
-    d.run = [variable](Context& c) {
+    d.title = [](const NodeDef&, const Node& n) { return "Remove Index from " + place_title(n); };
+    d.run = [on_list](Context& c) {
       const i64 index = c.in_int("index");
-      if (Value* v = variable(c))
-        with_items(element_of(v->type), [&](auto type) {
+      on_list(c, [&](Value& v) {
+        with_items(element_of(v.type), [&](auto type) {
           using T = typename decltype(type)::type;
-          list::remove_at(v->template edit<T>(), index);
+          list::remove_at(v.template edit<T>(), index);
         });
+      });
       return 0;
     };
     lib.add(std::move(d));
@@ -739,27 +753,29 @@ void add_lists(Library& lib) {
   {
     NodeDef d = step("list.remove", "Remove Item", "Takes every item that equals the value out of a list variable. Removed: was there one?", "delete erase array",
                      {data("item", "Item", PinType::number, 0.0)}, {data("removed", "Removed", PinType::boolean)});
-    d.title = [](const NodeDef&, const Node& n) { return "Remove from " + n.param("variable", "?"); };
-    d.run = [variable](Context& c) {
+    d.title = [](const NodeDef&, const Node& n) { return "Remove from " + place_title(n); };
+    d.run = [on_list](Context& c) {
       const Value item = c.in("item");
-      if (Value* v = variable(c))
-        with_items(element_of(v->type), [&](auto type) {
+      on_list(c, [&](Value& v) {
+        with_items(element_of(v.type), [&](auto type) {
           using T = typename decltype(type)::type;
-          c.out("removed", Value::boolean(list::remove(v->template edit<T>(), from_value<T>(item))));
+          c.out("removed", Value::boolean(list::remove(v.template edit<T>(), from_value<T>(item))));
         });
+      });
       return 0;
     };
     lib.add(std::move(d));
   }
   {
     NodeDef d = step("list.clear", "Clear List", "Takes every item out of a list variable.", "empty reset array", {}, {});
-    d.title = [](const NodeDef&, const Node& n) { return "Clear " + n.param("variable", "?"); };
-    d.run = [variable](Context& c) {
-      if (Value* v = variable(c))
-        with_items(element_of(v->type), [&](auto type) {
+    d.title = [](const NodeDef&, const Node& n) { return "Clear " + place_title(n); };
+    d.run = [on_list](Context& c) {
+      on_list(c, [&](Value& v) {
+        with_items(element_of(v.type), [&](auto type) {
           using T = typename decltype(type)::type;
-          list::clear(v->template edit<T>());
+          list::clear(v.template edit<T>());
         });
+      });
       return 0;
     };
     lib.add(std::move(d));
@@ -1009,53 +1025,6 @@ void add_structs(Library& lib) {
       c.out("row", at >= 0 ? list.item(static_cast<std::size_t>(at)) : s ? default_of(*s, g) : Value::zero(PinType::structure));
       c.out("index", Value::integer(at));
       return kStop;
-    };
-    lib.add(std::move(d));
-  }
-  {
-    // The struct of the node's variable, and the place of the node's field in it (-1: none).
-    auto field = [](const Node& n, const Graph& g, const StructType*& s) {
-      Variable named;
-      const Variable* v = g.variable_of(n, named) ? &named : nullptr;
-      s = v && v->type == PinType::structure ? g.structure(v->of) : nullptr;
-      return s ? s->field(n.param("field")) : -1;
-    };
-    NodeDef d = make("struct.set_field", "Set Field", "Structures", NodeKind::action, "Changes one field of a struct variable; the others stay as they are. Value: what the field is now.",
-                     "member assign change write");
-    d.params = {param("variable", "Struct", ParamDef::Kind::variable), param("field", "Field", ParamDef::Kind::field), local_of()};
-    d.inputs = {exec_in(), data("value", "Value", PinType::number)};
-    d.outputs = {exec_out(), data("value", "Value", PinType::number)};
-    d.title = [](const NodeDef&, const Node& n) { return "Set " + n.param("field", "?") + " of " + n.param("variable", "?"); };
-    d.shape = [field](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
-      const StructType* s = nullptr;
-      const int k = field(n, g, s);
-      if (k < 0) return;
-      const StructField& f = s->fields[static_cast<std::size_t>(k)];
-      for (PinDef& p : in)
-        if (p.id == "value") { retype(p, f.type, g); p.def = f.value; }
-      for (PinDef& p : out)
-        if (p.id == "value") retype(p, f.type, g);
-    };
-    d.problem = [field](const Node& n, const Graph& g) {
-      Variable named;
-      const Variable* v = g.variable_of(n, named) ? &named : nullptr;
-      if (!v) return std::string();  // (the check says that there is no such variable)
-      if (v->type != PinType::structure) return "needs a struct variable: \"" + v->name + "\" is " + type_text({v->type, v->of});
-      const StructType* s = nullptr;
-      if (field(n, g, s) >= 0 || !s) return std::string();
-      std::string all;
-      for (const StructField& f : s->fields) all += (all.empty() ? "" : ", ") + f.name;
-      return s->name + " has no field \"" + n.param("field") + "\" (" + all + ")";
-    };
-    d.run = [field](Context& c) {
-      const Value value = c.in("value");
-      const StructType* s = nullptr;
-      const int k = field(c.node(), c.instance().graph(), s);
-      Value* v = c.instance().variable(c.node());
-      if (k < 0 || !v || v->type != PinType::structure) return 0;
-      structs::set_field(*v, static_cast<std::size_t>(k), value);
-      c.out("value", value);
-      return 0;
     };
     lib.add(std::move(d));
   }

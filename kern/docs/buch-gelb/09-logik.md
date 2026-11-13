@@ -234,9 +234,9 @@ Kern bringt **104** eingebaute Knoten mit:
 | State Machines | On State Entered/Left, Set State, Current State |
 | Flow | Branch, Sequence, For, For Each, While, Do Once, Do N, Gate, Flip Flop, Delay, Tween, Switch |
 | Variablen | Get, Set, Add |
-| Listen | Make List, Length, Get Item, Contains, Find Item, Add, Insert, Set Item, Remove, Clear |
+| Listen | Make List, Length, Get Item, Contains, Find Item, Add, Insert, Remove, Clear |
 | Aufzählungen (Enums) | Equal, Enum to Text, Text to Enum, Enum to Index, Index to Enum, All Values |
-| Strukturen (Structs) | Make, Break, Set Field |
+| Strukturen (Structs) | Make, Break |
 | Funktionen | Function Entry, Return, Call Function |
 | Mathe | plus, minus, mal, geteilt, Rest, Wurzel, Zufall, Rechnen mit Winkeln |
 | Logik | Compare, AND, OR, XOR, NOT, Select |
@@ -263,8 +263,9 @@ Viele Namen sind englisch. Was aus Scratch bekannt ist:
   gebündelt, die auch in eine Liste passt. Wie der Wert einer Aufzählung wandelt er sich in
   nichts um, und ein Draht verbindet nur Pins derselben Struktur. Im Menü tragen ihre Knoten den
   Namen deiner Struktur: **Make Weapon** baut einen Wert aus seinen Feldern, **Break Weapon**
-  gibt die Felder, und **Set Field** ändert ein Feld einer Variablen und lässt die anderen, wie
-  sie sind. Zwei Werte sind gleich, wenn alle ihre Felder gleich sind.
+  gibt die Felder. Ein Feld einer Variablen ist ein Platz: **Set Held.Damage** ändert es, wo es
+  steht, und lässt die anderen, wie sie sind – ebenso ein Eintrag einer Liste (**Set Scores[]**),
+  beliebig tief (**Cars[].Wheels[].Slip**). Zwei Werte sind gleich, wenn alle ihre Felder gleich sind.
 - **Switch** = je nach Zahl, Text oder Wert einer Aufzählung einer von mehreren Ausgängen, wie
   eine Weiche mit vielen Gleisen. **Switch on Mode** hat einen Ausgang für jeden Wert.
 - **AND, OR, NOT** = „und“, „oder“, „nicht“. **XOR** = „entweder – oder, aber nicht beides“.

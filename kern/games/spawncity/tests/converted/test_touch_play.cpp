@@ -161,7 +161,7 @@ enum class PinType : u8 {
   exec, boolean, integer, number, vector, text, actor, enumeration, structure,
   boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, count
 };
-namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope }; }
+namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; }
 namespace Runtime { enum class Chain : u8 { event, call, call_inside }; }
 constexpr f32 kSafe = 10, kGap = 8;
 TouchBtn btn(const char* id, const std::string& label, f32 w, f32 h, u32 color, bool round, bool on_down = true) {

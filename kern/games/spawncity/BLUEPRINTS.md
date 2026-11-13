@@ -385,10 +385,14 @@ Eine Form, die Gestalt oder Kosten ändert, ist keine von beiden.
 
 **Was die Sprache dafür bekommt.**
 
-1. **Plätze.** Ein Schritt, der etwas ändert (Set, Add, Set Field, die Listen-Schritte), nennt
-   einen Platz: eine Variable, ein Feld eines Platzes, einen Eintrag einer Liste an einem Platz –
-   `Cars[i].Wheels[j].Slip = x;`, `list_add(Log.Cur.Path, p);`. Ein Index neben der Liste: Der
-   Schritt tut nichts (wie Set Item heute).
+1. **Plätze.** *(In der Engine seit 13.11.2026, 18:55 – `kern/docs/blueprint_cpp.md`, „Plätze“.)*
+   Jeder Knoten, der eine Variable nennt, kann einen Platz in ihr nennen: eine Variable, ein Feld
+   eines Platzes, einen Eintrag einer Liste an einem Platz – gelesen, gesetzt, erhöht und als Liste
+   geändert, wo er steht: `Cars[i].Wheels[j].Slip += x;`, `list_add(Log.Cur.Path, p);`. Es gibt
+   ein Set für jeden Platz; „Set Field“ und „Set List Item“ waren Sonderfälle davon und sind als
+   eigene Knoten entfallen (alte Dokumente werden beim Laden umgestellt). Neben einer Liste steht
+   in jeder Stufe ein Eintrag mit den Defaults, der nichts behält. Der Konverter schreibt bisher
+   nur das Setzen eines Eintrags so (`X[i] = v;`); dass er Plätze statt Kopien schreibt, folgt.
 2. **Referenz-Parameter.** Ein Eingang einer Funktion kann eine Referenz sein (`Car& self`): Der
    Aufruf nennt einen Platz, die Funktion liest und ändert ihn dort; in ihr ist er wie eine lokale
    Variable. Dazu eine Regel (`check`): Solange ein Aufruf einen Platz in einer Liste hält, ändert

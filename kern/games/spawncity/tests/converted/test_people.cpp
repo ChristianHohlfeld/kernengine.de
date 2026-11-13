@@ -67,7 +67,7 @@ struct State {
   f32 x = 0, y = 0;
   bool initial = false;
 };
-namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope }; }
+namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; }
 namespace Runtime { enum class Chain : u8 { event, call, call_inside }; }
 enum class Crime : u8 { person, person_hit, player, car, bus, police_drone, police_officer, police_car, carjacking, bird };
 struct CrimeReport {

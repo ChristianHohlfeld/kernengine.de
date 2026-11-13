@@ -125,7 +125,7 @@ template <class Core> struct BlueprintNodesOf : Core {
   using Vector = Vec3;
   using Text = std::string;
   using Actor = logic::ActorHandle;
-  template <class T> using List = std::vector<T>;
+  template <class T> using List = logic::List<T>;
 
   GameWorld* kern_game() const { return this->kern_world.host ? static_cast<GameWorld*>(this->kern_world.host->game()) : nullptr; }
   logic::ActorRef kern_self() const { return this->kern_world.self; }

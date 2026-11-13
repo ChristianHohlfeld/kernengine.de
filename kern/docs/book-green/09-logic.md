@@ -236,7 +236,8 @@ always exactly one of them. It is neither a number nor a text, so its wire only 
 same enum – and **Switch on Mode** is a railroad switch with one track for each value. A
 **struct** is a type of your own too, but it bundles several values under names, like an index
 card: a "Weapon" with a "Name", a "Type" and a "Damage". **Make Weapon** fills in a card, **Break
-Weapon** reads its fields, and **Set Field** changes one field and leaves the others alone. All
+Weapon** reads its fields, and a **Set** of one field ("Set Held.Damage") changes that field
+and leaves the others alone. All
 104 nodes with their fine points are in the blue book, Chapter 9.
 
 > **Did you know?** Even randomness isn't quite random in Kern. It comes from a generator whose

@@ -233,9 +233,9 @@ Kern brings **104** built-in nodes:
 | state machines | On State Entered/Left, Set State, Current State |
 | flow | Branch, Sequence, For, For Each, While, Do Once, Do N, Gate, Flip Flop, Delay, Tween, Switch |
 | variables | Get, Set, Add |
-| lists | Make List, Length, Get Item, Contains, Find Item, Add, Insert, Set Item, Remove, Clear |
+| lists | Make List, Length, Get Item, Contains, Find Item, Add, Insert, Remove, Clear |
 | enums | Equal, Enum to Text, Text to Enum, Enum to Index, Index to Enum, All Values |
-| structures | Make, Break, Set Field |
+| structures | Make, Break |
 | functions | Function Entry, Return, Call Function |
 | math | plus, minus, times, divided by, remainder, square root, random, calculating with angles |
 | logic | Compare, AND, OR, XOR, NOT, Select |
@@ -260,8 +260,9 @@ What you know from Scratch:
   for every field – several variables bundled into one, which also fits into a list. Like an
   enum's value it converts to nothing, and a wire only connects pins of the same struct. In the
   menu its nodes carry your struct's name: **Make Weapon** builds a value from its fields,
-  **Break Weapon** gives the fields, and **Set Field** changes one field of a variable and
-  leaves the others as they are. Two values are equal if all their fields are equal.
+  **Break Weapon** gives the fields. One field of a variable is a place: **Set Held.Damage**
+  changes it where it stands and leaves the others as they are - and so is an entry of a list
+  (**Set Scores[]**), as deep as it goes (**Cars[].Wheels[].Slip**). Two values are equal if all their fields are equal.
 - **Switch** = one of several outputs depending on a number, a text or an enum's value, like a
   railroad switch with many tracks. **Switch on Mode** has one output for each value.
 - **AND, OR, NOT** = "and," "or," "not." **XOR** = "either – or, but not both."

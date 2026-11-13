@@ -17,7 +17,7 @@ template <class Core> struct EngineNodesOf : Core {
   using Float = f64;
   using Vector = Vec3;
   using Text = std::string;
-  template <class T> using List = std::vector<T>;
+  template <class T> using List = logic::List<T>;
 
   /// One call of the engine: the inputs as values to the host, what it gives as values back (zeros where it has no such function).
   std::vector<Value> kern_engine(std::string_view function, const std::vector<Value>& in, std::initializer_list<PinType> outputs) const {

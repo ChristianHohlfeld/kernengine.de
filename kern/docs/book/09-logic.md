@@ -45,8 +45,14 @@ From the header comment of `logic.h` (Unreal Blueprint semantics):
 - **Variables**: per graph instance, typed, with a default value.
 - **Lists**: a pin or a variable may hold a list of values of one type (Unreal's arrays). A list
   on a wire is a value like any other: whoever reads it has the list as it was. The steps that
-  change a list (Add, Insert, Set Item, Remove, Clear) change a list variable; For Each goes
-  through a list as it was when the loop started.
+  change a list (Add, Insert, Remove, Clear) change a list where it stands – a variable, or a
+  list inside one; For Each goes through a list as it was when the loop started.
+- **Places**: a variable – or what fields and list entries lead to from it, as deep as it goes:
+  `Held.Damage`, `Scores[i]`, `Cars[i].Wheels[j].Slip`. Every node that names a variable can name
+  a place in it (the setting Path, with an index pin for every list entry): Get, Set and Add,
+  and the steps that change a list. What is changed is changed where it stands – nothing is read
+  out and written back, in any tier. Beside a list stands an entry with the defaults that keeps
+  nothing: no index leads into the void.
 - **Enums**: a Blueprint may declare enums – a type of its own with named values, for example
   `Mode` with the values `Closed`, `Opening`, `Open`. A value of an enum is exactly one of its
   values, held as its place among them (the first is 0). It is neither a number nor a text: it
@@ -55,8 +61,8 @@ From the header comment of `logic.h` (Unreal Blueprint semantics):
 - **Structs**: a Blueprint may declare structs – a type of its own with named fields, for example
   `Weapon` with the fields `Name`, `Type`, `Damage`. Each field has a type and a default. A value
   of a struct holds a value for each of its fields. It converts to nothing, and a wire only
-  connects pins of the same struct. Make builds a value from its fields, Break gives the fields,
-  Set Field changes one field of a variable.
+  connects pins of the same struct. Make builds a value from its fields, Break gives the fields;
+  one field of a variable is a place (`Held.Damage`), read and set like the variable itself.
 - **State machines**: states and transitions in the style of the state editor of
   digitalisierungsplanung.de. A transition fires on an event, a timer, a condition variable or
   automatically; entering and leaving a state trigger events.
@@ -406,10 +412,10 @@ on an action node reads that node's last stored output.
 | **Events** | `event.begin` Begin Play · `event.tick` Event Tick (Delta Seconds) · `event.every` Every N Seconds (interval parameter, keeps its own time, output Count) · `event.custom` Custom Event (name; outputs Actor, Value, Text; also switches state machine transitions of the same name) |
 | **State machines** | `event.state_enter` On State Entered · `event.state_exit` On State Left · `state.set` Set State · `state.get` Current State · `state.is` Is In State |
 | **Flow** | `flow.reroute` / `value.reroute` (nodes for wires) · `flow.branch` Branch · `flow.sequence` Sequence (1..16 outputs) · `flow.for` For Loop (First, Last inclusive; Index) · `flow.for_each` For Each (a list; Item, Index; the list as it is when the loop starts) · `flow.while` While Loop · `flow.do_once` Do Once (Reset, Start Closed) · `flow.do_n` Do N (N, Reset, Counter) · `flow.gate` Gate (Enter, Open, Close, Toggle, Start Closed) · `flow.flip_flop` Flip Flop (A/B, Is A) · `flow.delay` Delay (calls during the wait are ignored) · `flow.retrigger_delay` Retriggerable Delay · `flow.tween` Tween (Play, Stop, Duration; Update every step with Alpha 0→1, easing linear/smooth/in/out, then Finished) · `flow.switch_int` Switch on Int · `flow.switch_text` Switch on Text (cases separated by commas) · `flow.switch_enum` Switch on Enum (setting Enum; an exec output for each value of the enum, labelled with the value's name) · `flow.call` Call Event (Target, Actor, Value, Text) |
-| **Variables** | `var.get` · `var.set` · `var.add` (Amount, −1 counts down) |
-| **Lists** | values, generic over the items' type (setting Type): `list.make` Make List (0..16 items) · `list.length` · `list.get` Get Item (beyond the list: the type's zero) · `list.contains` · `list.find` Find Item (index or −1) · `list.find_row` Find Row (a list of structs as a table: the first item whose field is the value; Found, Row, Index) – steps on a list variable (setting List): `list.add` Add to List (gives the index) · `list.insert` (in front of the index; past the end: at the end) · `list.set` Set List Item · `list.remove_at` Remove Index · `list.remove` Remove Item (every equal item; Removed) · `list.clear` |
+| **Variables** | `var.get` · `var.set` · `var.add` (Amount, −1 counts down) – each on a variable or, with the setting Path, on a place in it: a field (`.Damage`), a list entry (`[]`, with an index pin), as deep as it goes (`[].Wheels[].Slip`); Value: what is there now |
+| **Lists** | values, generic over the items' type (setting Type): `list.make` Make List (0..16 items) · `list.length` · `list.get` Get Item (beyond the list: the type's zero) · `list.contains` · `list.find` Find Item (index or −1) · `list.find_row` Find Row (a list of structs as a table: the first item whose field is the value; Found, Row, Index) – steps on a list where it stands (settings List and Path: a list variable, or a list at a place in a variable): `list.add` Add to List (gives the index) · `list.insert` (in front of the index; past the end: at the end) · `list.remove_at` Remove Index · `list.remove` Remove Item (every equal item; Removed) · `list.clear` |
 | **Enums** | on the values of one enum of the Blueprint (setting Enum; in the editor a node carries the enum's name, "Mode to Text"): `enum.equal` Equal (Enum) (A, B; Result) · `enum.name` Enum to Text (the value's name) · `enum.from_name` Text to Enum (the value with that name; Found – no value has that name: the first value, and Found is false) · `enum.index` Enum to Index (the place of the value among the enum's values, the first is 0) · `enum.from_index` Index to Enum (the value at that place; Valid – no such place: the first value, and Valid is false) · `enum.values` All Values (a list of every value in their order, for a For Each) – the nodes that take any type work in an enum's type too: Get and Set of a variable, Select, Reroute, the list nodes and For Each |
-| **Structures** | on one struct of the Blueprint (setting Struct; in the editor a node carries the struct's name, "Make Weapon"): `struct.make` Make Struct (an input per field – without a wire: the field's default; Value) · `struct.break` Break Struct (Value; an output per field) · `struct.set_field` Set Field (a step on a struct variable, settings Variable and Field: changes that field and leaves the others; Value – the field as it is now) |
+| **Structures** | on one struct of the Blueprint (setting Struct; in the editor a node carries the struct's name, "Make Weapon"): `struct.make` Make Struct (an input per field – without a wire: the field's default; Value) · `struct.break` Break Struct (Value; an output per field) – a field of a variable is set where it stands: `var.set` with the Path to it (in the editor "Set Held.Damage"; documents with the former nodes Set Field and Set List Item are read as that Set) |
 | **Functions** | `func.entry` Function Entry · `func.return` Return · `func.call` Call Function · `func.pure` Function Value (a function marked Pure, as a value) · `func.call_on` Call on Actor (a function on the Blueprint of another actor or - without a Target - of the Level; the Blueprint declares what it looks like) |
 | **Math** | `math.add`, `sub`, `mul`, `div`, `mod`, `min`, `max`, `clamp`, `abs`, `negate`, `lerp`, `sin`/`cos`/`atan2` (degrees), `sqrt`, `pow`, `round`, `floor`, `random` (float in range), `random_int`, `random_bool` · `math.formula` Formula (every name in it is an input) |
 | **Logic** | `math.compare` Compare (`==`, `!=`, `<`, `<=`, `>`, `>=`; equality with 10⁻⁹ tolerance) · `logic.and`, `or`, `xor`, `not` · `logic.select` Select |
@@ -714,7 +720,7 @@ field. Structs are a blue of their own (`#3f6fd6`).
 A struct that is in use can still be edited. Renaming the struct or a field changes nothing but
 the name: values, and the wires on Make and Break, stay. Moving a field changes its place only.
 A new field has its default everywhere. When a field is removed, its value goes everywhere, and
-so do the wires on its pins; a Set Field that names it reports an error. When a field's type
+so do the wires on its pins; a node whose path leads through it reports an error. When a field's type
 changes, its value stays where the types convert, and wires that no longer fit go. A field that
 takes the type of a struct listed below this one moves this struct below it. A struct that
 something is of (a variable, a function's pin, a field, a node) cannot be removed; the editor

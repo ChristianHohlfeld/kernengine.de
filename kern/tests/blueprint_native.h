@@ -41,6 +41,120 @@ struct Case {
   std::vector<Call> outside = {};
 };
 
+// Places: a variable, and from it fields and list entries - read, set, added to and changed as a
+// list where they stand, at every depth, and beside every list on the way (there stands an entry
+// with the defaults that keeps nothing).
+inline const char* kPlaces = R"kn(
+struct Places : kern::Blueprint {
+  KERN_ENUM(Side, Front, Rear);
+  KERN_STRUCT(Wheel) {
+    Float Slip = 0.5;
+    Side At = Side::Front;
+    List<Float> Marks = List<Float>{1.0};
+  };
+  KERN_STRUCT(Car) {
+    Text Name = "car";
+    Float Speed = 3.0;
+    Int Laps = 2;
+    Wheel Spare = Wheel{0.25, Side::Rear, List<Float>{}};
+    List<Wheel> Wheels = List<Wheel>{};
+    List<Int> Gears = List<Int>{1, 2};
+    List<Text> Tags = List<Text>{"new"};
+    List<Bool> Lights = List<Bool>{true};
+  };
+
+  List<Car> Cars = List<Car>{};
+  Car Mine = Car{"mine", 5.0, 1, Wheel{0.125, Side::Front, List<Float>{2.0, 4.0}}, List<Wheel>{Wheel{0.75, Side::Rear, List<Float>{}}}, List<Int>{4}, List<Text>{"a"}, List<Bool>{}};
+  List<Float> Scores = List<Float>{1.0, 2.5};
+  List<Int> Counts = List<Int>{7};
+
+  struct GrowResult { Int cars = 0; Int wheels = 0; };
+  /// A car more, with so many wheels: Add to a list that stands in an entry of a list.
+  GrowResult Grow(Int wheels = 2, Float slip = 0.5) {
+    list_add(n3, Cars, Mine);
+    for (auto it4 = flow_for(n4, 1, wheels); it4.next();) {
+      list_add(Cars[n3.index].Wheels, struct_make<Wheel>(math_mul(slip, kern::to<Float>(n4.index)), Side::Rear, list_make<Float, "1">(slip)));
+    }
+    return {list_length<Car>(Cars), list_length<Wheel>(Cars[n3.index].Wheels)};
+  }
+
+  struct ReadResult { Float slip = 0.0; Float speed = 0.0; Int laps = 0; Text name = ""; Float mark = 0.0; Int gear = 0; Text tag = ""; Bool light = false; Side at = Side::Front; Wheel spare = Wheel{0.5, Side::Front, List<Float>{1.0}}; Int wheels = 0; Float score = 0.0; Float mine = 0.0; };
+  /// What stands at a place - a number, a text, an enum's value, a struct, an entry of a list of
+  /// every kind -, also beside every list on the way to it.
+  KERN_PURE ReadResult Read(Int car = 0, Int wheel = 0, Int at = 0) {
+    return {Cars[car].Wheels[wheel].Slip, Cars[car].Speed, Cars[car].Laps, Cars[car].Name, Cars[car].Wheels[wheel].Marks[at], Cars[car].Gears[at], Cars[car].Tags[at], Cars[car].Lights[at],
+            Cars[car].Wheels[wheel].At, Cars[car].Spare, list_length<Wheel>(Cars[car].Wheels), Scores[at], Mine.Spare.Marks[at]};
+  }
+
+  struct SetResult { Float slip = 0.0; Float speed = 0.0; Int laps = 0; Int gear = 0; Float score = 0.0; Text name = ""; };
+  /// Set and Add at a place: a field, a field of a field, an entry, a field of an entry of a list
+  /// in an entry - and what each step gives.
+  SetResult Set(Int car = 0, Int wheel = 0, Float value = 1.0) {
+    n20.value = (Cars[car].Wheels[wheel].Slip = value);
+    Cars[car].Spare.Slip = math_add(Cars[car].Spare.Slip, value);
+    n23.value = (Cars[car].Name = text_append(Cars[car].Name, "!", ""));
+    n24.value = (Cars[car].Speed += value);
+    n25.value = (Cars[car].Laps += 3);
+    n26.value = (Cars[car].Gears[wheel] = kern::to<Int>(value));
+    Cars[car].Gears[wheel] += 1;
+    Cars[car].Wheels[wheel].Marks[0] += 0.5;
+    Cars[car].Wheels[wheel].At = Side::Front;
+    Cars[car].Tags[0] = "set";
+    Cars[car].Lights[0] = false;
+    Cars[car].Spare = Cars[car].Wheels[wheel];
+    Mine.Spare.Marks[1] = value;
+    Mine.Speed += 1.0;
+    Mine.Laps += 1;
+    n35.value = (Scores[wheel] += value);
+    Counts[car] += 2;
+    Scores[car] = value;
+    return {n20.value, n24.value, n25.value, n26.value, n35.value, n23.value};
+  }
+
+  struct EditResult { Int index = 0; Bool removed = false; Int marks = 0; Int tags = 0; Text shown = ""; };
+  /// The steps that change a list, on a list at a place - at every index, also beside the lists
+  /// on the way.
+  EditResult Edit(Text what = "add", Int car = 0, Int wheel = 0, Int at = 0, Float value = 0.0) {
+    switch (flow_switch_text<"add, insert, remove_at, remove, clear, whole, tags">(what)) {
+      case 0: { list_add(n41, Cars[car].Wheels[wheel].Marks, value); } break;
+      case 1: { list_insert(Cars[car].Wheels[wheel].Marks, at, value); } break;
+      case 2: { list_remove_at(Cars[car].Wheels[wheel].Marks, at); } break;
+      case 3: { list_remove(n44, Cars[car].Wheels[wheel].Marks, value); } break;
+      case 4: { list_clear(Cars[car].Wheels); } break;
+      case 5: { Cars[car].Wheels[wheel] = Mine.Spare; } break;
+      case 6: {
+        list_add(Cars[car].Tags, kern::to<Text>(value));
+        list_add(Mine.Tags, "m");
+        list_insert(Mine.Spare.Marks, 0, value);
+      } break;
+    }
+    return {n41.index, n44.removed, list_length<Float>(Cars[car].Wheels[wheel].Marks), list_length<Text>(Cars[car].Tags), kern::to<Text>(Cars[car].Wheels[wheel].Marks)};
+  }
+
+  struct LocalResult { Float slip = 0.0; Int wheels = 0; Text name = ""; };
+  /// A local variable of a function is a place like any other.
+  LocalResult Local(Float slip = 1.0, Int at = 0) {
+    Car Work = Car{"work", 1.0, 0, Wheel{0.5, Side::Front, List<Float>{1.0}}, List<Wheel>{}, List<Int>{1, 2}, List<Text>{"new"}, List<Bool>{true}};
+    list_add(Work.Wheels, struct_make<Wheel>(slip, Side::Rear, List<Float>{}));
+    Work.Wheels[at].Slip += slip;
+    Work.Spare.Marks[0] = slip;
+    Work.Name = text_append(Work.Name, kern::to<Text>(Work.Wheels[at].Slip), "");
+    return {Work.Wheels[at].Slip, list_length<Wheel>(Work.Wheels), Work.Name};
+  }
+
+  struct { Int index = 0; } n3;
+  struct : kern::Node<4> { Int index = 0; } n4;
+  struct { Float value = 0.0; } n20;
+  struct { Text value = ""; } n23;
+  struct { Float value = 0.0; } n24;
+  struct { Int value = 0; } n25;
+  struct { Int value = 0; } n26;
+  struct { Float value = 0.0; } n35;
+  struct { Int index = 0; } n41;
+  struct { Bool removed = false; } n44;
+};
+)kn";
+
 // Branches, loops, the flow nodes that keep something, switches, steps several wires lead to.
 inline const char* kFlow = R"kn(
 struct Flow : kern::Blueprint {
@@ -379,7 +493,7 @@ struct Lists : kern::Blueprint {
   EditResult Edit(Text what = "insert", Int index = 0, Float value = 0.0) {
     switch (flow_switch_text<"insert, set, remove_at, remove, clear">(what)) {
       case 0: { list_insert(Scores, index, value); } break;
-      case 1: { list_set(Scores, index, value); } break;
+      case 1: { Scores[index] = value; } break;
       case 2: { list_remove_at(Scores, index); } break;
       case 3: { list_remove(n14, Scores, value); } break;
       case 4: { list_clear(Scores); } break;
@@ -420,7 +534,7 @@ struct Lists : kern::Blueprint {
       list_insert(Points, 0, vector_make(kern::to<Float>(n40.index), 0.5, -1.0));
       list_add(Team, who);
     }
-    list_set(Counts, 0, -7);
+    Counts[0] = -7;
     list_remove(Flags, false);
     return {Counts, Flags, Points, Team};
   }
@@ -615,7 +729,7 @@ struct Structs : kern::Blueprint {
   EditResult Edit(Text what = "insert", Int at = 0, Weapon w = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{0}, List<Kind>{Kind::Magic}}) {
     switch (flow_switch_text<"insert, set, remove_at, remove, clear, add">(what)) {
       case 0: { list_insert(Rack, at, w); } break;
-      case 1: { list_set(Rack, at, w); } break;
+      case 1: { Rack[at] = w; } break;
       case 2: { list_remove_at(Rack, at); } break;
       case 3: { list_remove(n44, Rack, w); } break;
       case 4: { list_clear(Rack); } break;
@@ -1028,6 +1142,31 @@ inline std::vector<Case> cases() {
     c.outside.push_back({"Take", {weapons[4], N(1), solos[1]}});
     c.outside.push_back({"Tune", {N(2), T("y"), weapons[1], E(1)}});
     c.outside.push_back({"Take", {}});
+  }
+  {
+    Case& c = read("Places", kPlaces);
+    const i64 most = std::numeric_limits<i64>::max();
+    auto read_all = [&] {
+      for (i64 car : {i64{0}, i64{1}, i64{2}, i64{-1}, i64{7}, most})
+        for (i64 wheel : {i64{0}, i64{1}, i64{3}, i64{-1}})
+          for (i64 at : {i64{0}, i64{1}, i64{9}}) c.calls.push_back({"Read", {I(car), I(wheel), I(at)}});
+    };
+    read_all();  // (nothing there yet: beside every list)
+    c.calls.push_back({"Grow", {I(2), N(0.5)}});
+    c.calls.push_back({"Grow", {I(0), N(1.0)}});
+    c.calls.push_back({"Grow", {I(3), N(0.25)}});
+    read_all();
+    for (i64 car : {i64{0}, i64{2}, i64{1}, i64{-1}, i64{5}, most})
+      for (i64 wheel : {i64{0}, i64{1}, i64{2}, i64{-3}, i64{40}}) c.calls.push_back({"Set", {I(car), I(wheel), N(static_cast<f64>(car % 5) + 0.75)}});
+    read_all();
+    for (const char* what : {"add", "insert", "remove", "remove_at", "whole", "tags", "add", "clear", "add", "nothing"})
+      for (i64 car : {i64{0}, i64{2}, i64{9}, i64{-1}})
+        for (i64 wheel : {i64{0}, i64{1}, i64{-1}})
+          for (i64 at : {i64{0}, i64{5}, i64{-2}}) c.calls.push_back({"Edit", {T(what), I(car), I(wheel), I(at), N(static_cast<f64>(at) + 0.5)}});
+    read_all();
+    for (i64 at : {i64{0}, i64{1}, i64{-1}, most}) c.calls.push_back({"Local", {N(1.5), I(at)}});
+    c.calls.push_back({"Grow", {I(1), N(2.0)}});
+    read_all();
   }
   {
     all.push_back({"Functions", {}, {}});

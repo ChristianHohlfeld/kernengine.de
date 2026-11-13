@@ -243,7 +243,8 @@ noch Text, sein Draht passt also nur an Pins derselben Aufzählung – und **Swi
 Weiche mit einem Gleis für jeden Wert. Auch eine **Struktur** (im Editor: Struct) ist eine eigene
 Sorte, aber sie bündelt mehrere Werte unter Namen, wie eine Karteikarte: eine „Weapon“ mit
 „Name“, „Type“ und „Damage“. **Make Weapon** füllt eine Karte aus, **Break Weapon** liest ihre
-Felder, und **Set Field** ändert ein Feld und lässt die anderen, wie sie sind. Alle 104 Knoten
+Felder, und ein **Set** auf ein Feld („Set Held.Damage“) ändert dieses Feld und lässt die
+anderen, wie sie sind. Alle 104 Knoten
 mit ihren Feinheiten stehen im blauen Buch, Kapitel 9.
 
 > **Wusstest du?** Auch der Zufall ist bei Kern nicht ganz zufällig. Er kommt aus einem Generator,

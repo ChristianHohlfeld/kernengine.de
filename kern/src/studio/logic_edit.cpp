@@ -89,6 +89,7 @@ const char* param_kind_name(logic::ParamDef::Kind k) {
     case K::type: return "type";
     case K::field: return "field";
     case K::scope: return "scope";
+    case K::path: return "path";
   }
   return "text";
 }
@@ -497,17 +498,14 @@ json::Value Studio::logic_json() const {
           // (the variables of the Blueprint - or, for a node of a function's local variables, those)
           const logic::Function* of = g->function(n.param("scope"));
           auto offer = [&](const std::string& name, logic::PinType type, const std::string& type_of) {
-            if (n.type != "struct.set_field" || type == logic::PinType::structure) choice(name, name + " (" + logic::type_label(logic::TypeRef{type, type_of}) + ")");
+            choice(name, name + " (" + logic::type_label(logic::TypeRef{type, type_of}) + ")");
           };
           if (of) for (const logic::FunctionPin& l : of->locals) offer(l.name, l.type, l.of);
           else for (const logic::Variable& v : g->variables) offer(v.name, v.type, v.of);
         }
         if (pd.kind == K::field) {
-          // (the fields of the struct the node's variable is of)
-          logic::Variable held;
-          const logic::Variable* v = g->variable_of(n, held) ? &held : nullptr;
-          const logic::StructType* named = g->structure(n.param("struct"));  // (Find Row names its struct itself)
-          if (const logic::StructType* s = named ? named : v && v->type == logic::PinType::structure ? g->structure(v->of) : nullptr)
+          // (the fields of the struct the node names: Find Row)
+          if (const logic::StructType* s = g->structure(n.param("struct")))
             for (const logic::StructField& f : s->fields) choice(f.name, f.name + " (" + logic::type_label(f.type) + ")");
         }
         if (pd.kind == K::machine)
@@ -776,16 +774,24 @@ json::Value Studio::logic_palette(const json::Value& c) const {
     consider({"Set " + v.name, category, "Writes " + what, "var.set", with({{"variable", v.name}})});
     if (v.type == logic::PinType::number || v.type == logic::PinType::integer)
       consider({"Add to " + v.name, category, "Adds to " + what, "var.add", with({{"variable", v.name}})});
-    // a struct variable: Set Field, for each of its fields
+    // a struct variable: the Set of each of its fields - a Set at that place (Held.Damage)
     if (const logic::StructType* s = v.type == logic::PinType::structure ? g->structure(v.of) : nullptr)
       for (const logic::StructField& f : s->fields) {
         logic::Node named;
-        named.type = "struct.set_field";
+        named.type = "var.set";
         named.set_param("variable", v.name);
-        named.set_param("field", f.name);
-        consider({lib.title(named), scope.empty() ? std::string("Structures") : category, "Changes the field " + f.name + " of " + what, named.type, with({{"variable", v.name}, {"field", f.name}})});
+        named.set_param("path", "." + f.name);
+        consider({lib.title(named), scope.empty() ? std::string("Structures") : category, "Changes the field " + f.name + " of " + what, named.type, with({{"variable", v.name}, {"path", "." + f.name}})});
       }
     if (!logic::is_list(v.type)) return;
+    // a list variable: the Set of one of its entries - a Set at that place (Scores[index]) -, and the steps that change it
+    {
+      logic::Node named;
+      named.type = "var.set";
+      named.set_param("variable", v.name);
+      named.set_param("path", "[]");
+      consider({lib.title(named), scope.empty() ? std::string("Lists") : category, "Replaces one entry of " + what + " (beside the list: nothing)", named.type, with({{"variable", v.name}, {"path", "[]"}})});
+    }
     for (const auto& d : lib.all()) {
       if (!variable_step(*d) || d->type.rfind("list.", 0) != 0) continue;
       logic::Node named;
@@ -1265,18 +1271,6 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         if (g.variables.empty()) g.variables.push_back({"Count", logic::PinType::number, json::Value(0.0), {}});
         n.set_param("variable", g.variables.front().name);
       }
-      // Set Field names a struct variable and one of its fields: the first ones, when none is said.
-      if (type == "struct.set_field") {
-        logic::Variable held;
-        const logic::Variable* v = g.variable_of(n, held) ? &held : nullptr;
-        if (!v)
-          for (const logic::Variable& x : g.variables)
-            if (!v && x.type == logic::PinType::structure) v = &x;
-        const logic::StructType* s = v && v->type == logic::PinType::structure ? g.structure(v->of) : nullptr;
-        if (!s || s->fields.empty()) { error = "Set Field changes a struct variable: this Blueprint has none yet (My Blueprint: a struct, then a variable of its type)"; return false; }
-        n.set_param("variable", v->name);
-        if (s->field(n.param("field")) < 0) n.set_param("field", s->fields.front().name);
-      }
       if ((type.rfind("event.state", 0) == 0 || type.rfind("state.", 0) == 0) && n.param("machine").empty()) {
         if (g.machines.empty()) {
           logic::StateMachine m;
@@ -1458,12 +1452,10 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       if (!n) { error = "no such node"; return false; }
       const json::Value& v = c["value"];
       n->set_param(str("key"), v.is_string() ? v.as_string() : v.is_number() ? std::to_string(static_cast<i64>(v.as_number())) : json::stringify(v));
-      // Set Field of another variable: a field that variable's struct has (its first, when it has none of that name).
-      if (n->type == "struct.set_field" && str("key") == "variable") {
+      // Another variable: the node's path was a way through the old one - it starts at the new one again.
+      if (str("key") == "variable" && !n->param("path").empty()) {
         logic::Variable held;
-        const logic::Variable* var = g.variable_of(*n, held) ? &held : nullptr;
-        const logic::StructType* s = var && var->type == logic::PinType::structure ? g.structure(var->of) : nullptr;
-        if (s && !s->fields.empty() && s->field(n->param("field")) < 0) n->set_param("field", s->fields.front().name);
+        if (!g.place_of(*n, held)) n->set_param("path", "");
       }
       // A changed variable / count can remove pins: drop wires to pins that no longer exist.
       std::vector<logic::PinDef> in, out;
@@ -1966,13 +1958,24 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       if (index < 0) { error = old + " has no field " + str("field"); return false; }
       const std::size_t at = static_cast<std::size_t>(index);
       const std::string field = s->fields[at].name;
-      // the struct's own nodes: Make and Break have a pin for each field, Set Field names one
+      // the struct's own nodes: Make and Break have a pin for each field, Find Row names one
       auto is_node = [&](const logic::Node& n, const char* type) { return n.type == type && n.param("struct") == old; };
+      auto finds_by_field = [&](const logic::Node& n) { return n.type == "list.find_row" && n.param("struct") == old && n.param("field") == field; };
+      // ... and the nodes whose place leads through the field (Held.Damage, Cars[].Wheels[].Slip):
+      // the steps of a node's path that are this field (none: the node has nothing to do with it)
+      auto steps_through = [&](const logic::Node& n, std::vector<std::string>& steps) {
+        std::vector<std::string> owners;
+        std::vector<std::size_t> at_steps;
+        if (n.param("path").empty() || !g.path_of(n, steps, owners)) return at_steps;
+        for (std::size_t k = 0; k < steps.size(); ++k)
+          if (steps[k] == field && owners[k] == old) at_steps.push_back(k);
+        return at_steps;
+      };
+      // a Set of the field itself: its place ends there
       auto sets_field = [&](const logic::Node& n) {
-        logic::Variable held;
-        const logic::Variable* v = g.variable_of(n, held) ? &held : nullptr;
-        if (n.type == "list.find_row") return n.param("struct") == old && n.param("field") == field;  // (Find Row names its struct itself)
-        return n.type == "struct.set_field" && v && v->type == logic::PinType::structure && v->of == old && n.param("field") == field;
+        std::vector<std::string> steps;
+        const std::vector<std::size_t> through = steps_through(n, steps);
+        return n.type == "var.set" && !through.empty() && through.back() + 1 == steps.size();
       };
       if (op == "renameField") {
         const std::string to = str("to");
@@ -1989,7 +1992,12 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
           });
         });
         for (logic::Node& n : g.nodes) {
-          if (sets_field(n)) n.set_param("field", to);
+          if (finds_by_field(n)) n.set_param("field", to);
+          std::vector<std::string> steps;
+          if (const std::vector<std::size_t> through = steps_through(n, steps); !through.empty()) {
+            for (std::size_t k : through) steps[k] = to;
+            n.set_param("path", logic::path_text(steps));
+          }
           if (!is_node(n, "struct.make")) continue;
           for (auto& v : n.values) if (v.first == field) v.first = to;
         }
@@ -2032,7 +2040,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         for (logic::Node& n : g.nodes) {
           if (is_node(n, "struct.make"))
             for (auto& v : n.values) if (v.first == field) v.second = retyped_default(g, v.second, from, t);
-          if (sets_field(n)) n.values.erase(std::remove_if(n.values.begin(), n.values.end(), [&](const auto& v) { return v.first == "value"; }), n.values.end());
+          if (sets_field(n) || finds_by_field(n)) n.values.erase(std::remove_if(n.values.begin(), n.values.end(), [&](const auto& v) { return v.first == "value"; }), n.values.end());
         }
         s->fields[at].value = retyped_default(g, s->fields[at].value, from, t);
         s->fields[at].type = t;

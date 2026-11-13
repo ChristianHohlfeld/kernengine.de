@@ -451,12 +451,36 @@ struct Graph {
   /// The variable a node's settings name: a variable of the Blueprint, or - with the setting
   /// "scope" - a local variable of that function. `out` holds it (a local as a Variable).
   bool variable_of(const Node& n, Variable& out) const;
+  /// The place a node's settings name: its variable (variable_of) and from there the path of the
+  /// setting "path" - fields and list entries (logic::path_steps). `out` holds what is there, as
+  /// a Variable: its type, its default (a field's declared one, the zero of a list's entry), and
+  /// as its name the place as C++ writes it ("Cars[].Speed").
+  /// A node without a path names its variable. False: no such variable, or the path leads
+  /// through something the variable has not - `why` then says what.
+  bool place_of(const Node& n, Variable& out, std::string* why = nullptr) const;
+  /// A node's path as its steps (logic::path_steps), and for every step that is a field the
+  /// struct that has it (its name) - empty for a list entry, and from where the path stops
+  /// leading through the variable's type. What renaming a field has to go by. False: the node
+  /// names no variable, or its path is none.
+  bool path_of(const Node& n, std::vector<std::string>& steps, std::vector<std::string>& owners) const;
   StateMachine* machine(u32 id);
   const StateMachine* machine(std::string_view name) const;
   const Function* function(std::string_view name) const;
   Function* function(std::string_view name);
   bool operator==(const Graph& o) const;  // via JSON
 };
+
+/// The steps of a path (the setting "path" of a node that names a place): ".Wheels[].Slip" is
+/// the field Wheels, a list entry (an empty step), the field Slip. False: no path.
+bool path_steps(std::string_view path, std::vector<std::string>& steps);
+/// The path its steps are (path_steps the other way round).
+std::string path_text(const std::vector<std::string>& steps);
+/// How many list entries a path goes through: the node has an index input for each (path_pin).
+std::size_t path_indices(std::string_view path);
+/// The id of the index input of a path's `k`-th list entry: "path0", "path1" ...
+std::string path_pin(std::size_t k);
+/// Is `id` such an input's?
+bool is_path_pin(std::string_view id);
 
 json::Value graph_to_json(const Graph& g);
 bool graph_from_json(const json::Value& j, Graph& out, std::string* error = nullptr);
@@ -472,6 +496,9 @@ Value field_of(const Value& v, const StructType& s, std::size_t index, const Gra
 /// Is `v` a value of type `t` as a Blueprint holds it: of that pin type; an enum's value one of
 /// its values; a struct with a value of its type for every field; a list of such items?
 bool is_value_of(const Value& v, const TypeRef& t, const Graph& g);
+/// Makes a struct's value hold a value for every field (one that holds none has them at their
+/// declared defaults): what changing one of its fields in place starts from.
+void hold_fields(Value& v, const StructType& s, const Graph& g);
 /// What comes from outside (Instance::set, the arguments of Instance::call) as a value of type
 /// `t`: converted as a wire converts; an enum's value that is none of the enum's is the first; and
 /// what is no struct of that type is the struct's default.
@@ -548,7 +575,11 @@ struct ParamDef {
   /// (Set Field). In a Blueprint's C++ it is that member: Held.Damage = 2.0.
   /// scope: the function whose local variable the setting "variable" names; empty for a variable
   /// of the Blueprint. A Blueprint's C++ does not write it: the body the text stands in says it.
-  enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope } kind = Kind::text;
+  /// path: from the variable the setting "variable" names to the place the node means - fields
+  /// and list entries, ".Wheels[].Slip" (empty: the variable itself). Every "[]" has an index
+  /// input of the node (path0, path1 ...). In a Blueprint's C++ it is that place:
+  /// Cars[i].Wheels[j].Slip.
+  enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path } kind = Kind::text;
   std::vector<std::string> choices;  // value, label pairs flattened for Kind::choice
   std::string def;
   bool with_lists = false;  // Kind::type: the list types are among them (not for the type of a list's items)
@@ -815,6 +846,14 @@ class Instance {
   Value get(const Node& n) const;
   bool set(const Node& n, const Value& v);
   Value* variable(const Node& n);
+  /// What is at the place a node names (Graph::place_of) - its variable, or what the node's path
+  /// leads to in it. `indices`: the path's list entries, in its order. Beside a list there is an
+  /// entry with the defaults.
+  Value place(const Node& n, const std::vector<i64>& indices) const;
+  /// Changes what is at that place: `change` gets the value there and leaves what it is to be.
+  /// Beside a list `change` gets an entry with the defaults, and nothing of it is kept - the same
+  /// a Blueprint's class does there (kern::List). False: no such place.
+  bool change(const Node& n, const std::vector<i64>& indices, const std::function<void(Value&)>& change);
   /// How many chains of this Blueprint are running, one inside the other (more than one: an event
   /// a running chain raised has reached a handler of the same Blueprint).
   int chains() const { return active_; }
@@ -1073,6 +1112,9 @@ class Context {
   Vec3 in_vector(std::string_view pin) { return in(pin).as_vector(); }
   std::string in_text(std::string_view pin) { return in(pin).as_text(); }
   ActorRef in_actor(std::string_view pin) { return in(pin).as_actor(); }
+  /// The list entries of the node's path (the setting "path"): its index inputs, each read once,
+  /// in the path's order - what Instance::place and Instance::change take.
+  std::vector<i64> path();
   std::size_t input_count() const { return inst_.nodes_[node_].in.size(); }
   const PinDef& input(std::size_t i) const { return inst_.nodes_[node_].in[i]; }
   const PinDef& output(std::size_t i) const { return inst_.nodes_[node_].out[i]; }

@@ -45,8 +45,15 @@ Aus dem Kopfkommentar von `logic.h` (Unreal-Blueprint-Semantik):
 - **Variablen**: pro Graph-Instanz, typisiert, mit Standardwert.
 - **Listen**: Ein Pin oder eine Variable kann eine Liste von Werten eines Typs halten (Unreals
   Arrays). Eine Liste auf einem Draht ist ein Wert wie jeder andere: Wer sie liest, hat die
-  Liste, wie sie war. Die Schritte, die eine Liste ändern (Add, Insert, Set Item, Remove, Clear),
-  ändern eine Listen-Variable; For Each geht durch eine Liste, wie sie beim Start der Schleife war.
+  Liste, wie sie war. Die Schritte, die eine Liste ändern (Add, Insert, Remove, Clear), ändern eine
+  Liste, wo sie steht – eine Variable oder eine Liste darin; For Each geht durch eine Liste, wie
+  sie beim Start der Schleife war.
+- **Plätze**: eine Variable – oder was von ihr aus über Felder und Listeneinträge erreicht wird,
+  beliebig tief: `Held.Damage`, `Scores[i]`, `Cars[i].Wheels[j].Slip`. Jeder Knoten, der eine
+  Variable nennt, kann einen Platz in ihr nennen (Einstellung Path, mit einem Index-Pin je
+  Listeneintrag): Get, Set und Add und die Schritte, die eine Liste ändern. Geändert wird, wo es
+  steht – nichts wird herausgelesen und zurückgeschrieben, in keiner Stufe. Neben einer Liste
+  steht ein Eintrag mit den Defaults, der nichts behält: Kein Index führt ins Leere.
 - **Aufzählungen** (Enums): Ein Blueprint kann eigene Typen mit benannten Werten deklarieren,
   etwa `Mode` mit den Werten `Closed`, `Opening`, `Open`. Ein Wert einer Aufzählung ist genau
   einer ihrer Werte, gehalten als seine Stelle unter ihnen (die erste ist 0). Er ist weder Zahl
@@ -57,7 +64,8 @@ Aus dem Kopfkommentar von `logic.h` (Unreal-Blueprint-Semantik):
   etwa `Weapon` mit den Feldern `Name`, `Type`, `Damage`. Jedes Feld hat einen Typ und einen
   Standardwert. Ein Wert einer Struktur hält einen Wert für jedes ihrer Felder. Er wandelt sich
   in nichts um, und ein Draht verbindet nur Pins derselben Struktur. Make baut einen Wert aus
-  seinen Feldern, Break gibt die Felder, Set Field ändert ein Feld einer Variablen.
+  seinen Feldern, Break gibt die Felder; ein Feld einer Variablen ist ein Platz (`Held.Damage`),
+  gelesen und gesetzt wie die Variable selbst.
 - **State Machines**: Zustände und Übergänge im Stil des Zustandseditors von
   digitalisierungsplanung.de. Ein Übergang feuert auf ein Event, einen Timer, eine Bedingungsvariable
   oder automatisch; Betreten und Verlassen eines Zustands lösen Events aus.
@@ -411,10 +419,10 @@ ein Compile-Fehler). Ein Eingang an einem Aktionsknoten liest dessen zuletzt ges
 | **Events** | `event.begin` Begin Play · `event.tick` Event Tick (Delta Seconds) · `event.every` Every N Seconds (Intervall-Parameter, zählt eigene Zeit, Ausgang Count) · `event.custom` Custom Event (Name; Ausgänge Actor, Value, Text; schaltet auch gleichnamige State-Machine-Übergänge) |
 | **State Machines** | `event.state_enter` On State Entered · `event.state_exit` On State Left · `state.set` Set State · `state.get` Current State · `state.is` Is In State |
 | **Flow** | `flow.reroute` / `value.reroute` (Knoten für Drähte) · `flow.branch` Branch · `flow.sequence` Sequence (1..16 Ausgänge) · `flow.for` For Loop (First, Last inklusive; Index) · `flow.for_each` For Each (eine Liste; Item, Index; die Liste, wie sie beim Start der Schleife ist) · `flow.while` While Loop · `flow.do_once` Do Once (Reset, Start Closed) · `flow.do_n` Do N (N, Reset, Counter) · `flow.gate` Gate (Enter, Open, Close, Toggle, Start Closed) · `flow.flip_flop` Flip Flop (A/B, Is A) · `flow.delay` Delay (Aufrufe während des Wartens werden ignoriert) · `flow.retrigger_delay` Retriggerable Delay · `flow.tween` Tween (Play, Stop, Duration; Update jeden Schritt mit Alpha 0→1, Easing linear/smooth/in/out, dann Finished) · `flow.switch_int` Switch on Int · `flow.switch_text` Switch on Text (Fälle durch Kommas getrennt) · `flow.switch_enum` Switch on Enum (Einstellung Enum; ein Exec-Ausgang je Wert der Aufzählung, beschriftet mit dem Namen des Werts) · `flow.call` Call Event (Target, Actor, Value, Text) |
-| **Variablen** | `var.get` · `var.set` · `var.add` (Amount, −1 zählt herunter) |
-| **Listen** | Werte, generisch über den Typ der Einträge (Einstellung Type): `list.make` Make List (0..16 Einträge) · `list.length` · `list.get` Get Item (jenseits der Liste: der Nullwert des Typs) · `list.contains` · `list.find_row` Find Row (eine Liste einer Struktur als Tabelle: der erste Eintrag, dessen Feld der Wert ist; Found, Row, Index) · `list.find` Find Item (Index oder −1) – Schritte auf einer Listen-Variablen (Einstellung List): `list.add` Add to List (gibt den Index) · `list.insert` (vor dem Index; hinter dem Ende: ans Ende) · `list.set` Set List Item · `list.remove_at` Remove Index · `list.remove` Remove Item (jeden gleichen Eintrag; Removed) · `list.clear` |
+| **Variablen** | `var.get` · `var.set` · `var.add` (Amount, −1 zählt herunter) – jeder auf einer Variablen oder, mit der Einstellung Path, auf einem Platz in ihr: einem Feld (`.Damage`), einem Listeneintrag (`[]`, mit einem Index-Pin), beliebig tief (`[].Wheels[].Slip`); Value: was dort jetzt steht |
+| **Listen** | Werte, generisch über den Typ der Einträge (Einstellung Type): `list.make` Make List (0..16 Einträge) · `list.length` · `list.get` Get Item (jenseits der Liste: der Nullwert des Typs) · `list.contains` · `list.find_row` Find Row (eine Liste einer Struktur als Tabelle: der erste Eintrag, dessen Feld der Wert ist; Found, Row, Index) · `list.find` Find Item (Index oder −1) – Schritte auf einer Liste, wo sie steht (Einstellungen List und Path: eine Listen-Variable oder eine Liste an einem Platz in einer Variablen): `list.add` Add to List (gibt den Index) · `list.insert` (vor dem Index; hinter dem Ende: ans Ende) · `list.remove_at` Remove Index · `list.remove` Remove Item (jeden gleichen Eintrag; Removed) · `list.clear` |
 | **Aufzählungen** | auf den Werten einer Aufzählung des Blueprints (Einstellung Enum; im Editor trägt der Knoten ihren Namen, „Mode to Text“): `enum.equal` Equal (Enum) (A, B; Result) · `enum.name` Enum to Text (der Name des Werts) · `enum.from_name` Text to Enum (der Wert mit diesem Namen; Found – heißt kein Wert so: der erste Wert, und Found ist falsch) · `enum.index` Enum to Index (die Stelle des Werts unter den Werten der Aufzählung, die erste ist 0) · `enum.from_index` Index to Enum (der Wert an dieser Stelle; Valid – gibt es die Stelle nicht: der erste Wert, und Valid ist falsch) · `enum.values` All Values (eine Liste aller Werte in ihrer Reihenfolge, für ein For Each) – die Knoten für jeden Typ arbeiten auch im Typ einer Aufzählung: Get und Set einer Variablen, Select, Reroute, die Listen-Knoten und For Each |
-| **Strukturen** | auf einer Struktur des Blueprints (Einstellung Struct; im Editor trägt der Knoten ihren Namen, „Make Weapon“): `struct.make` Make Struct (ein Eingang je Feld – ohne Draht: der Standardwert des Felds; Value) · `struct.break` Break Struct (Value; ein Ausgang je Feld) · `struct.set_field` Set Field (ein Schritt auf einer Struktur-Variablen, Einstellungen Variable und Field: ändert dieses Feld und lässt die anderen; Value – das Feld, wie es jetzt ist) |
+| **Strukturen** | auf einer Struktur des Blueprints (Einstellung Struct; im Editor trägt der Knoten ihren Namen, „Make Weapon“): `struct.make` Make Struct (ein Eingang je Feld – ohne Draht: der Standardwert des Felds; Value) · `struct.break` Break Struct (Value; ein Ausgang je Feld) – ein Feld einer Variablen wird gesetzt, wo es steht: `var.set` mit dem Path dorthin (im Editor „Set Held.Damage“; Dokumente mit den früheren Knoten Set Field und Set List Item werden als dieses Set gelesen) |
 | **Funktionen** | `func.entry` Function Entry · `func.return` Return · `func.call` Call Function · `func.pure` Function Value (eine als Pure markierte Funktion, als Wert) · `func.call_on` Call on Actor (eine Funktion auf dem Blueprint eines anderen Actors oder – ohne Target – des Levels; der Blueprint erklärt, wie sie aussieht) |
 | **Mathe** | `math.add`, `sub`, `mul`, `div`, `mod`, `min`, `max`, `clamp`, `abs`, `negate`, `lerp`, `sin`/`cos`/`atan2` (Grad), `sqrt`, `pow`, `round`, `floor`, `random` (Float im Bereich), `random_int`, `random_bool` · `math.formula` Formula (jeder Name darin ist ein Eingang) |
 | **Logik** | `math.compare` Compare (`==`, `!=`, `<`, `<=`, `>`, `>=`; Gleichheit mit 10⁻⁹ Toleranz) · `logic.and`, `or`, `xor`, `not` · `logic.select` Select |
@@ -730,7 +738,7 @@ Eine Struktur, die benutzt wird, lässt sich weiter bearbeiten. Die Struktur ode
 umzubenennen, ändert nichts außer dem Namen: Die Werte und die Drähte an Make und Break bleiben.
 Ein Feld zu verschieben, ändert nur seinen Platz. Ein neues Feld hat überall seinen
 Standardwert. Wird ein Feld entfernt, fällt sein Wert überall weg, ebenso die Drähte an seinen
-Pins; ein Set Field, das es nennt, meldet einen Fehler. Bekommt ein Feld einen anderen Typ,
+Pins; ein Knoten, dessen Weg durch es führt, meldet einen Fehler. Bekommt ein Feld einen anderen Typ,
 bleibt sein Wert, wo die Typen sich umwandeln, und Drähte, die nicht mehr passen, fallen weg.
 Nimmt ein Feld den Typ einer Struktur an, die unter dieser steht, rückt diese Struktur unter
 sie. Eine Struktur, von deren Typ noch etwas ist (eine Variable, ein Pin einer Funktion, ein

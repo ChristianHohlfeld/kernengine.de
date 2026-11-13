@@ -73,8 +73,12 @@ tools/export_game.sh, .mjs           der native Export: ein Level als Spiel, die
   (`KERN_STRUCT(Weapon) { Text Name = ""; Float Damage = 10.0; };`). Ein Feld ist ein Wert-Typ,
   eine Aufzählung, eine weiter oben deklarierte Struktur oder eine Liste davon. Eine Variable,
   eine Liste, die Ein- und Ausgänge einer Funktion und Pins können von so einem Typ sein. Make
-  baut einen Wert aus seinen Feldern, Break gibt die Felder, Set Field ändert ein Feld einer
-  Variablen – in beiden Schreibweisen und in jeder Stufe gleich (siehe „Strukturen“).
+  baut einen Wert aus seinen Feldern, Break gibt die Felder – in beiden Schreibweisen und in
+  jeder Stufe gleich (siehe „Strukturen“).
+- **Fertig: Plätze.** Eine Variable, ein Feld davon, ein Eintrag einer Liste darin – beliebig
+  tief – wird gelesen, gesetzt, erhöht und als Liste geändert, wo es steht:
+  `Cars[i].Wheels[j].Slip += 0.1;`. Kein Herauslesen und Zurückschreiben, in keiner Stufe; neben
+  einer Liste steht ein Eintrag mit den Defaults, der nichts behält (siehe „Plätze“).
 - **Die Stufen stimmen überein:** Was Interpreter, JIT und Klasse verschieden taten – Funktionen,
   die über Events wieder aufgerufen werden, die Tiefe von Events und Werten, ganze Zahlen an
   ihren Enden, der Stapel des JIT –, ist gleichgezogen (21 Tier-Fälle, in jeder Stufe dasselbe).
@@ -173,6 +177,7 @@ KERN_LAYOUT(Demo) {
 | Call on Actor | `func_call_on<"Fn">(target, kern::out(n7.y), x);` – erst das Target (`Actor{0}`: der Blueprint des Levels), dann `kern::out(...)` mit allen Ausgängen in ihrer Reihenfolge als Felder des Members `n7` (oder `kern::out()`, wenn niemand sie liest), dann die Eingänge |
 | Function Entry | der Anfang des Funktionsrumpfs; seine Ausgänge sind die Parameter |
 | Lokale Variable einer Funktion | `Float Total = 0.0;` als erste Zeilen des Funktionsrumpfs – eine lokale Variable von C++; gelesen und gesetzt wie jede Variable (`Total`, `Total = x;`, `Total += x;`, `Hit.Damage = x;`, `list_add(n7, Seen, x);`) |
+| Platz (eine Variable, ein Feld davon, ein Eintrag einer Liste darin – beliebig tief) | wie C++ ihn schreibt: `Cars[i].Wheels[j].Slip` – die Einstellung „path“ des Knotens (`[].Wheels[].Slip`), jeder Index ein Eingang (siehe „Plätze“) |
 | Return | `return {wert, wert};` bzw. `return;` |
 | Event | `KERN_EVENT(on5, event_custom<"Hit">)` und `void on5(Actor actor, Float value, Text text) { ... }` |
 | State Machine | `kern::Machine machine3 = machine("Door").state(...).on_event(...).after(...).when(...).automatic(...);` |
@@ -181,14 +186,13 @@ KERN_LAYOUT(Demo) {
 | Eingänge eines Knotens | Funktionsargumente, in der Reihenfolge der Pins |
 | unverdrahteter Eingang | der eingetippte Wert als Literal |
 | Wert-Knoten (pure) | ein Ausdruck: `math_add(a, b)` |
-| Get Variable | der Name der Variablen |
-| Set / Add to Variable | `Heat = wert;` / `Heat += wert;` – wird ihr Ergebnis gelesen: `n5.value = (Heat += wert);` |
-| Schritt, der eine Listen-Variable ändert (Add to List, Insert, Set Item, Remove, Clear) | `list_add(Scores, wert);` – die Variable selbst ist das erste Argument; wird sein Ergebnis gelesen: `list_add(n7, Scores, wert);` und `n7.index` |
+| Get Variable | der Name der Variablen – oder der Platz, den der Knoten nennt: `Held.Damage`, `Cars[i].Wheels[j].Slip` |
+| Set / Add to Variable | `Heat = wert;` / `Heat += wert;` – an einem Platz genauso: `Held.Damage = wert;`, `Scores[i] = wert;`, `Cars[i].Speed += wert;`; wird ihr Ergebnis gelesen: `n5.value = (Heat += wert);` |
+| Schritt, der eine Liste ändert (Add to List, Insert, Remove, Clear) | `list_add(Scores, wert);` – der Platz der Liste ist das erste Argument, eine Variable oder eine Liste darin (`list_add(Cars[i].Wheels, rad);`); wird sein Ergebnis gelesen: `list_add(n7, Scores, wert);` und `n7.index` |
 | Wert-Knoten auf einer Liste (Length, Get Item, Contains, Find, Make List) | `list_get<Float>(Scores, 0)`, `list_make<Text, "2">("a", "b")` – die Einstellung „Type“ ist der Typ der Einträge |
 | For Each | `for (auto it9 = flow_for_each<Float>(n9, Scores); it9.next();) { ... }` – im Rumpf `n9.item` und `n9.index` |
 | Wert-Knoten einer Aufzählung (Equal, Enum to Text, Text to Enum, Enum to Index, Index to Enum, All Values) | `enum_name<Mode>(State)`, `enum_from_name<Mode>(text).value`, `enum_values<Mode>()` – die Einstellung „Enum“ ist die Aufzählung selbst |
 | Make und Break einer Struktur | `struct_make<Weapon>("Bow", Kind::Ranged, 12.0)` – ein Wert je Feld, in der Reihenfolge der Felder; `struct_break<Weapon>(Held).Damage` – das Feld bei seinem Namen |
-| Set Field (ein Feld einer Struktur-Variablen ändern) | `Held.Damage = wert;` – wird sein Ergebnis gelesen: `n5.value = (Held.Damage = wert);` |
 | Call Function | `Fn(args);` – oder `n14 = Fn(args);`, wenn seine Ergebnisse gelesen werden |
 | Function Value | `Fn(args).y` |
 | Formel-Knoten | `kern::formula([](Float a, Float b) -> Float { return a * b; }, wertA, wertB)` |
@@ -233,7 +237,8 @@ für den Wert einer Struktur gilt dasselbe (siehe „Strukturen“).
 ### Listen
 
 Eine Liste hält Werte **eines** Typs, in ihrer Reihenfolge; der erste Eintrag hat den Index 0. In
-C++ ist `List<Float>` ein `std::vector` – eine Listen-Variable ist ein Member wie jede andere:
+C++ ist `List<Float>` ein `std::vector`, dessen `[]` nie neben die Liste greift (`kern::List`,
+siehe „Plätze“) – eine Listen-Variable ist ein Member wie jede andere:
 
 ```cpp
 List<Float> Scores = List<Float>{1.0, 2.5};
@@ -253,13 +258,15 @@ void on1(Actor actor, Float value, Text text) {
 ```
 
 - **Eine Liste auf einem Draht ist ein Wert.** Wer sie liest, hat die Liste, wie sie in dem
-  Moment war – eine Kopie, kein Verweis. Geändert wird nur eine Variable: Die Schritte Add,
-  Insert, Set Item, Remove Index, Remove Item und Clear nennen ihre Listen-Variable als
-  Einstellung, und in C++ steht sie als erstes Argument (nach `n<id>`), weil die Funktion genau
-  diesen Member ändert. Eine ganze Liste setzt man wie jede Variable: `Scores = werte;`.
-- **Kein Index führt ins Leere.** Get Item jenseits der Liste gibt den Nullwert des Typs, Set
-  Item und Remove Index tun dort nichts, Insert fügt vor dem ersten bzw. hinter dem letzten
-  Eintrag ein, Find gibt −1. Es gibt kein Lesen oder Schreiben neben der Liste – in keiner Stufe.
+  Moment war – eine Kopie, kein Verweis. Geändert wird nur ein Platz: Die Schritte Add, Insert,
+  Remove Index, Remove Item und Clear nennen den Platz ihrer Liste – eine Variable oder eine
+  Liste darin – als Einstellung, und in C++ steht er als erstes Argument (nach `n<id>`), weil
+  die Funktion genau diese Liste ändert. Eine ganze Liste setzt man wie jede Variable
+  (`Scores = werte;`), einen Eintrag an seinem Platz (`Scores[i] = wert;`).
+- **Kein Index führt ins Leere.** Get Item jenseits der Liste gibt den Nullwert des Typs, ein
+  Platz neben der Liste (`Scores[99]`) ist ein Eintrag mit den Defaults, der nichts behält,
+  Remove Index tut dort nichts, Insert fügt vor dem ersten bzw. hinter dem letzten Eintrag ein,
+  Find gibt −1. Es gibt kein Lesen oder Schreiben neben der Liste – in keiner Stufe.
 - **For Each geht durch die Liste, wie sie beim Start der Schleife war.** Was der Rumpf mit der
   Variablen tut (hinzufügen, leeren), ändert den Lauf nicht. Der Stand der Schleife gehört dem
   Knoten (`n9`), wie der Index einer For-Schleife: Startet der Rumpf dieselbe Schleife noch
@@ -408,9 +415,10 @@ struct Arena : kern::Blueprint {
   (`Slot{Weapon{...}, 1}`), eine Liste davon ist `List<Weapon>{Weapon{...}, Weapon{...}}`.
 - **Make** baut einen Wert aus einem Wert je Feld: `struct_make<Weapon>(name, kind, damage, falloff)`.
   **Break** gibt die Felder eines Werts; gelesen wird ein Feld bei seinem Namen:
-  `struct_break<Weapon>(Held).Damage`. **Set Field** ändert ein Feld einer Struktur-Variablen und
-  lässt die anderen, wie sie sind – es ist die Zuweisung `Held.Damage = wert;`. Wird gelesen, was
-  der Schritt gibt (das Feld, wie es jetzt ist): `n5.value = (Held.Damage = wert);`.
+  `struct_break<Weapon>(Held).Damage`. Ein Feld einer Variablen ist ein **Platz**: gelesen
+  `Held.Damage`, gesetzt `Held.Damage = wert;` – die anderen Felder bleiben, wie sie sind (siehe
+  „Plätze“). Wird gelesen, was der Schritt gibt (das Feld, wie es jetzt ist):
+  `n5.value = (Held.Damage = wert);`.
 - **Nichts wandelt sich um.** Ein Wert einer Struktur ist weder Zahl noch Text, und er passt nur
   dorthin, wo dieselbe Struktur verlangt ist; `kern::to<Text>(Held)` lehnt der Leser ab. Auch
   eine `List<Weapon>` wird nicht zu Text.
@@ -442,7 +450,50 @@ Die Knoten einer Struktur (`S` ist die Struktur):
 | Make S | `struct_make<S>(feld, feld, …)` | ein Wert der Struktur aus einem Wert je Feld |
 | Break S | `struct_break<S>(wert).Feld` | das Feld des Werts |
 | Find Row (Find S by Feld) | `list_find_row<&S::Feld>(liste, wert)` | `.found`, `.row`, `.index`: der erste Eintrag einer Liste von S, dessen Feld der Wert ist |
-| Set Feld of Variable | `Variable.Feld = wert;` | ändert das eine Feld der Variablen; gibt das Feld, wie es jetzt ist |
+| Set an einem Platz (Set Variable mit Pfad) | `Variable.Feld = wert;` | ändert das eine Feld der Variablen; gibt das Feld, wie es jetzt ist |
+
+### Plätze
+
+Ein **Platz** ist eine Variable – oder was von ihr aus über Felder und Listeneinträge erreicht
+wird, beliebig tief: `Held.Damage`, `Scores[i]`, `Cars[i].Wheels[j].Slip`. C++ schreibt ihn so, und
+so steht er im Text. Im Graphen nennt der Knoten seine Variable (Einstellung „variable“, bei einer
+lokalen dazu „scope“) und den Weg von ihr zum Platz (Einstellung „path“: `[].Wheels[].Slip` – ein
+Feld bei seinem Namen, ein Listeneintrag als `[]`); für jeden Listeneintrag hat der Knoten einen
+Index-Eingang (`path0`, `path1` …).
+
+```cpp
+KERN_STRUCT(Wheel) { Float Slip = 0.5; List<Float> Marks = List<Float>{}; };
+KERN_STRUCT(Car) { Float Speed = 0.0; List<Wheel> Wheels = List<Wheel>{}; };
+List<Car> Cars = List<Car>{};
+
+void Skid(Int car = 0, Int wheel = 0, Float by = 0.1) {
+  Cars[car].Wheels[wheel].Slip += by;                    // Add to Variable an einem Platz
+  Cars[car].Speed = math_mul(Cars[car].Speed, 0.5);      // Set und Get an einem Platz
+  list_add(Cars[car].Wheels[wheel].Marks, by);           // ein Listen-Schritt auf einer Liste an einem Platz
+}
+```
+
+- **Jeder Knoten, der eine Variable nennt, kann einen Platz in ihr nennen:** Get, Set und Add to
+  Variable und die Schritte, die eine Liste ändern (Add, Insert, Remove Index, Remove Item,
+  Clear). Es gibt keinen Unterschied zwischen einer Variablen und einem Platz in ihr: Was an
+  dem einen geht, geht an dem anderen.
+- **Geändert wird am Platz.** Nichts wird herausgelesen und zurückgeschrieben: In der Klasse ist
+  `Cars[car].Wheels[wheel].Slip += by;` genau diese Zeile C++ auf den Membern; der Interpreter
+  ändert den Wert der Variablen an derselben Stelle (`Instance::change`).
+- **Neben einer Liste steht ein Eintrag mit den Defaults, der nichts behält.** Führt ein Index
+  des Wegs neben seine Liste, wird dort gelesen, was ein Eintrag mit den Defaults seines Typs
+  hat – eine Struktur mit den Defaults ihrer Felder –, und was dort geschrieben wird, bleibt
+  nirgends. Was ein Schritt gibt, ist, was er auf diesem Eintrag gibt (`n5.value = (Cars[99].Speed
+  += 1.0);` gibt den Default plus 1). In jeder Stufe dasselbe: in der Klasse durch `kern::List`
+  (`kern/logic/nodes.h`), deren `[]` neben der Liste diesen Eintrag gibt; im Interpreter durch
+  `Instance::place` und `Instance::change`.
+- **Ein Platz ist vom Typ dessen, was dort steht.** Die Pins des Knotens haben diesen Typ (der
+  Wert eines Set, die Menge eines Add, der Eintrag eines Listen-Schritts); Add zählt Zahlen, ein
+  Listen-Schritt braucht eine Liste. Führt der Weg durch etwas, das die Variable nicht hat –
+  ein Feld, das es nicht gibt, ein Eintrag von etwas, das keine Liste ist –, meldet `check()` es
+  mit der Stelle (`Held.Damage is float: it has no entries`).
+- **Dokumente von früher:** Set Field und Set List Item waren eigene Knoten. Beim Laden wird
+  jeder zu dem Set an seinem Platz, das er ist (`Held.Damage = wert;`, `Scores[index] = wert;`).
 
 ### Formeln
 
@@ -615,7 +666,9 @@ Abgelehnt wird – immer mit Zeile, Spalte und dem Grund, oft mit der richtigen 
 - alles außerhalb der Schreibweise (`int x = 3;`, `break`, Operatoren wie `a + b` außerhalb einer
   Formel, eigene Klassen),
 - die Knoten, die ihre eigene Form haben, als Aufruf (`var_set<"Heat">(wert);` – es heißt
-  `Heat = wert;`),
+  `Heat = wert;`; `list_set(Scores, 0, wert);` – es heißt `Scores[0] = wert;`),
+- ein Weg, der durch etwas führt, das die Variable nicht hat (`Heat.X = 1.0;`,
+  `Held.Damage[0]`),
 - unbekannte Namen, falsche Anzahl von Werten, falscher Typ ohne `kern::to`,
 - eine Struktur, die nicht mit jedem Feld ausgeschrieben ist (`Weapon has 3 field(s) (Label, Type,
   Damage): Weapon{...} gives a value for each, in that order`), ein Feld vom falschen Typ, ein

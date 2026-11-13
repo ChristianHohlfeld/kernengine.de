@@ -1018,6 +1018,8 @@ export class LogicEditor {
       const has = choices.some(([v]) => v === p.value);
       return `<select class="lg-par" ${attr}>${has ? "" : `<option value="${lgEsc(p.value)}" selected>${lgEsc(p.value || "(none)")}</option>`}${choices.map(([v, l]) => `<option value="${lgEsc(v)}"${v === p.value ? " selected" : ""}>${lgEsc(l)}</option>`).join("")}</select>`;
     }
+    // the path from the node's variable to the place it means: fields and list entries (each [] gets an index pin)
+    if (p.kind === "path") return `<input class="lg-par lg-path" ${attr} value="${lgEsc(p.value)}" spellcheck="false" placeholder=".Field[]" title="From the variable to the place: fields and list entries, e.g. .Wheels[].Slip - every [] has an index pin">`;
     if (p.kind === "event") {
       const list = `lgev-${n.id}-${p.key}`;
       return `<input class="lg-par" ${attr} value="${lgEsc(p.value)}" list="${list}" spellcheck="false"><datalist id="${list}">${choices.map(([v]) => `<option value="${lgEsc(v)}">`).join("")}</datalist>`;

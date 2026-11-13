@@ -2101,7 +2101,7 @@ class Emit:
                 a, b, held = self.temp("first", "Int"), self.temp("last", "Int"), self.temp("held", it)
                 lines = [f"{a} = {first};", f"{b} = {self.whole_math('-', last, '1')};",
                          f'while (loop(math_compare<"<">(kern::to<Float>({a}), kern::to<Float>({b})))) {{',
-                         f"  {held} = list_get<{it}>({lv}, {a});", f"  list_set({lv}, {a}, list_get<{it}>({lv}, {b}));", f"  list_set({lv}, {b}, {held});",
+                         f"  {held} = list_get<{it}>({lv}, {a});", f"  {lv}[{a}] = list_get<{it}>({lv}, {b});", f"  {lv}[{b}] = {held};",
                          f"  {a} += 1;", f"  {b} = {self.whole_math('-', b, '1')};", "}"]
                 return before + lines + after
             if name == "swap" and len(kids(n)) == 3:
@@ -2404,7 +2404,7 @@ class Emit:
         lines += ["  " + ln for ln in body + after]
         if assign and kind == "map":
             held = self.temp("row", row)
-            lines += ["} else {"] + ["  " + ln for ln in before + [f"{held} = list_get<{row}>({lv}, {at});", f"{held}.second = {value};", f"list_set({lv}, {at}, {held});"] + after]
+            lines += ["} else {"] + ["  " + ln for ln in before + [f"{held} = list_get<{row}>({lv}, {at});", f"{held}.second = {value};", f"{lv}[{at}] = {held};"] + after]
         lines.append("}")
         return lines, at, fresh
 
@@ -2866,7 +2866,7 @@ class Emit:
         if holder is not None:   # the value an owned or optional value holds: the one entry of its list
             lt = self.tp(holder)
             before, var, after = self.variable_of(holder, lt)
-            return before + [f"list_set({var}, 0, {value(lt[5:-1])});"] + after
+            return before + [f"{var}[0] = {value(lt[5:-1])};"] + after
         if k == "MemberExpr":
             base = kids(t)[0] if kids(t) else None
             if base is None or self.is_this(base):
@@ -2908,7 +2908,7 @@ class Emit:
             if not lt.startswith("List<"):
                 raise Wait("an entry of something that is not a list is set")
             before, var, after = self.variable_of(base, lt)
-            return before + [f"list_set({var}, {self.ex(idx, 'Int')}, {value(lt[5:-1])});"] + after
+            return before + [f"{var}[{self.ex(idx, 'Int')}] = {value(lt[5:-1])};"] + after
         raise Wait(f"an assignment to {k}")
 
     def invoke(self, g, args, obj=None):

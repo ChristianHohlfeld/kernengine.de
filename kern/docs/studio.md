@@ -427,7 +427,7 @@ Eine Funktion hat einen Namen, typisierte Eingänge und typisierte Ausgänge. An
 - **Lokale Variablen** gehören einer Funktion allein: Details der Funktion, Abschnitt *Local
   Variables* – **+ Local Variable**, dann Name, Typ und Default wie bei einem Pin; *Get* und *Set*
   in der Zeile legen den Knoten in den Graphen, das Aktionsmenü bietet sie unter „Local Variables
-  of <Funktion>“ an (auch Add, Set Field und die Listen-Schritte). Jeder Aufruf beginnt mit den
+  of <Funktion>“ an (auch Add und die Listen-Schritte). Jeder Aufruf beginnt mit den
   Defaults, und mit dem Aufruf sind sie vorbei: Eine lokale Variable wird nur auf einem Weg ihrer
   eigenen Funktion gelesen und gesetzt – nicht nach einem Delay, nicht in einem Event, nicht in
   einer anderen Funktion (sonst Compile-Fehler am Knoten, wie bei Return). Zwei Funktionen dürfen
@@ -526,9 +526,11 @@ Arrays). Ein Listen-Pin ist ein kleines Raster in der Farbe seiner Einträge.
   **Contains**, **Find Item**. Der erste Eintrag hat den Index 0. Get Item jenseits der Liste
   gibt den Nullwert des Typs, Find Item gibt −1, wenn nichts passt.
 - **Ändern** (Schritte, je Listen-Variable angeboten: „Add to Scores“): **Add to List** (gibt den
-  Index), **Insert into List**, **Set List Item**, **Remove Index**, **Remove Item** (alle gleichen
-  Einträge; sagt, ob es einen gab), **Clear List**. Sie ändern die Variable, die sie nennen. Eine
-  ganze Liste setzt *Set* wie bei jeder Variablen.
+  Index), **Insert into List**, **Remove Index**, **Remove Item** (alle gleichen
+  Einträge; sagt, ob es einen gab), **Clear List**. Sie ändern die Liste, die sie nennen – eine
+  Variable oder, mit der Einstellung *Path*, eine Liste an einem Platz darin
+  (`Cars[].Wheels`). Eine ganze Liste setzt *Set* wie bei jeder Variablen, einen Eintrag *Set*
+  mit dem Path `[]` („Set Scores[]“, der Index ist ein Pin).
 - **For Each** (Flow) läuft für jeden Eintrag einmal durch *Loop Body* – mit *Item* und *Index* –
   und danach durch *Completed*. Es geht durch die Liste, wie sie beim Start der Schleife war: Der
   Rumpf darf die Variable ändern, ohne dass die Schleife springt oder nie endet.
@@ -623,7 +625,7 @@ derselben Struktur. Die Farbe der Strukturen ist ein Blau (`#3f6fd6`).
   |---|---|
   | **Make Weapon** | ein Eingang je Feld (ohne Draht: der Default des Felds) → der Wert der Struktur |
   | **Break Weapon** | der Wert → ein Ausgang je Feld |
-  | **Set Damage of Held** (Set Field; je Struktur-Variable und Feld) | ein Schritt mit Exec-Pins: ändert das eine Feld der Variablen und lässt die anderen, wie sie sind; gibt das Feld, wie es jetzt ist. Variable und Feld stehen in Details unter Settings |
+  | **Set Held.Damage** (Set an einem Platz; je Struktur-Variable und Feld angeboten) | ein Schritt mit Exec-Pins: ändert das eine Feld der Variablen und lässt die anderen, wie sie sind; gibt das Feld, wie es jetzt ist. Variable und *Path* (der Weg von ihr zum Platz: `.Damage`, tiefer `.Sight.Tries`, durch eine Liste `.Marks[].Tries` mit einem Index-Pin je `[]`) stehen auf dem Knoten und in Details unter Settings. Get, Add und die Listen-Schritte nennen einen Platz genauso |
 - **Die Knoten für jeden Typ** arbeiten auch mit Strukturen: Get und Set einer Variablen, Select,
   Reroute, die Listen-Knoten und For Each. Contains, Find Item und Remove Item vergleichen Feld
   für Feld: Zwei Werte sind gleich, wenn alle ihre Felder gleich sind. Ein Eintrag jenseits einer
@@ -631,8 +633,8 @@ derselben Struktur. Die Farbe der Strukturen ist ein Blau (`#3f6fd6`).
 - **Eine Struktur ändern, die benutzt wird:** Die Struktur oder ein Feld umzubenennen, ändert
   nichts außer dem Namen – die Werte und die Drähte an Make und Break bleiben. Ein Feld nach oben
   oder unten zu schieben, ändert nur seinen Platz. Ein neues Feld hat überall seinen Default. Wird
-  ein Feld entfernt, fällt sein Wert überall weg, ebenso die Drähte an seinen Pins; ein Set Field,
-  das es nennt, meldet danach einen Fehler. Bekommt ein Feld einen anderen Typ, bleibt sein Wert,
+  ein Feld entfernt, fällt sein Wert überall weg, ebenso die Drähte an seinen Pins; ein Knoten,
+  dessen Path durch es führt, meldet danach einen Fehler. Bekommt ein Feld einen anderen Typ, bleibt sein Wert,
   wo die Typen sich umwandeln, und Drähte, die nicht mehr passen, fallen weg. Nimmt ein Feld den
   Typ einer Struktur an, die in My Blueprint unter dieser steht, rückt diese Struktur unter sie.
   Eine Struktur, von deren Typ noch etwas ist – eine Variable, ein Pin einer Funktion, ein Feld,
@@ -662,7 +664,7 @@ Jeder Eintrag ist eine Zeile, jedes Feld eine Spalte.
   **Index** (ohne Treffer −1).
 - Die Daten stehen im Blueprint (für Daten des ganzen Spiels: im Blueprint des Levels) und werden
   mit ihm gespeichert, als C++ geschrieben und kompiliert. Weil es eine Variable ist, lässt sich
-  die Tabelle im Spiel auch ändern (Add, Set Item, Set Field …).
+  die Tabelle im Spiel auch ändern (Add, Set an einem Eintrag oder Feld …).
 
 ### Formel-Knoten
 

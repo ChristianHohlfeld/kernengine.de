@@ -337,6 +337,13 @@ Value field_of(const Value& v, const StructType& s, std::size_t index, const Gra
   return read_value(s.fields[index].value, s.fields[index].type, g, struct_depth(g) - 1);
 }
 bool is_value_of(const Value& v, const TypeRef& t, const Graph& g) { return value_of(v, t, g, struct_depth(g)); }
+void hold_fields(Value& v, const StructType& s, const Graph& g) {
+  if (v.type == PinType::structure && v.fields() == s.fields.size()) return;
+  std::vector<Value> fields;
+  fields.reserve(s.fields.size());
+  for (std::size_t k = 0; k < s.fields.size(); ++k) fields.push_back(field_of(v, s, k, g));
+  v = Value::structure(std::move(fields));
+}
 
 Value from_outside(const Value& v, const TypeRef& t, const Graph& g) {
   Value r = v.converted(t.type);
@@ -522,6 +529,113 @@ bool Graph::variable_of(const Node& n, Variable& out) const {
   const FunctionPin* l = f ? f->local(name) : nullptr;
   if (l) out = Variable{l->name, l->type, l->value, {}, l->of};
   return l != nullptr;
+}
+bool path_steps(std::string_view path, std::vector<std::string>& steps) {
+  steps.clear();
+  std::size_t k = 0;
+  while (k < path.size()) {
+    if (path[k] == '[') {
+      if (k + 1 >= path.size() || path[k + 1] != ']') return false;
+      steps.emplace_back();
+      k += 2;
+    } else if (path[k] == '.') {
+      std::size_t end = k + 1;
+      while (end < path.size() && path[end] != '.' && path[end] != '[') ++end;
+      if (end == k + 1) return false;
+      steps.emplace_back(path.substr(k + 1, end - k - 1));
+      k = end;
+    } else {
+      return false;
+    }
+  }
+  return true;
+}
+std::string path_text(const std::vector<std::string>& steps) {
+  std::string r;
+  for (const std::string& step : steps) r += step.empty() ? std::string("[]") : "." + step;
+  return r;
+}
+bool Graph::path_of(const Node& n, std::vector<std::string>& steps, std::vector<std::string>& owners) const {
+  owners.clear();
+  Variable var;
+  if (!path_steps(n.param("path"), steps) || !variable_of(n, var)) return false;
+  TypeRef at{var.type, var.of};
+  bool fits = true;
+  for (const std::string& step : steps) {
+    if (step.empty()) {
+      fits = fits && is_list(at.type);
+      if (fits) at.type = element_of(at.type);
+      owners.emplace_back();
+      continue;
+    }
+    const StructType* s = fits && at.type == PinType::structure ? structure(at.of) : nullptr;
+    const int k = s ? s->field(step) : -1;
+    owners.push_back(k >= 0 ? s->name : std::string());
+    fits = k >= 0;
+    if (fits) at = s->fields[static_cast<std::size_t>(k)].type;
+  }
+  return true;
+}
+std::size_t path_indices(std::string_view path) {
+  std::size_t n = 0;
+  for (char c : path) n += c == '[';
+  return n;
+}
+std::string path_pin(std::size_t k) { return "path" + std::to_string(k); }
+bool is_path_pin(std::string_view id) {
+  if (id.size() < 5 || id.substr(0, 4) != "path") return false;
+  for (char c : id.substr(4))
+    if (c < '0' || c > '9') return false;
+  return true;
+}
+bool Graph::place_of(const Node& n, Variable& out, std::string* why) const {
+  if (!variable_of(n, out)) {
+    if (why) *why = "no variable \"" + n.param("variable") + "\"";
+    return false;
+  }
+  const std::string path = n.param("path");
+  if (path.empty()) return true;
+  std::vector<std::string> steps;
+  if (!path_steps(path, steps)) {
+    if (why) *why = "\"" + path + "\" is no path: fields and list entries lead from a variable to a place (.Field, [])";
+    return false;
+  }
+  TypeRef at{out.type, out.of};
+  std::string name = out.name;
+  const json::Value* declared = nullptr;  // (the default the last step's field declares)
+  for (const std::string& step : steps) {
+    if (step.empty()) {
+      if (!is_list(at.type)) {
+        if (why) *why = name + " is " + type_text(at) + ": it has no entries";
+        return false;
+      }
+      at.type = element_of(at.type);
+      name += "[]";
+      declared = nullptr;
+      continue;
+    }
+    const StructType* s = at.type == PinType::structure ? structure(at.of) : nullptr;
+    if (!s) {
+      if (why) *why = name + " is " + type_text(at) + ": it has no fields";
+      return false;
+    }
+    const int k = s->field(step);
+    if (k < 0) {
+      std::string all;
+      for (const StructField& f : s->fields) all += (all.empty() ? "" : ", ") + f.name;
+      if (why) *why = s->name + " has no field \"" + step + "\" (" + all + ")";
+      return false;
+    }
+    at = s->fields[static_cast<std::size_t>(k)].type;
+    declared = &s->fields[static_cast<std::size_t>(k)].value;
+    name += "." + step;
+  }
+  // what stands there when nothing else is said: a field's declared default, an entry's zero
+  out.value = declared ? *declared : zero_of(at, *this).to_json(*this, at.of);
+  out.name = name;
+  out.type = at.type;
+  out.of = at.of;
+  return true;
 }
 StateMachine* Graph::machine(u32 id) {
   for (StateMachine& m : machines) if (m.id == id) return &m;
@@ -839,6 +953,22 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
     if (!g.find(l.from) || !g.find(l.to)) return bad("a link refers to a missing node");
     if (std::find(g.links.begin(), g.links.end(), l) == g.links.end()) g.links.push_back(std::move(l));
   }
+  // Documents from before a Set could name a place: Set Field and Set List Item were nodes of
+  // their own. Each is the Set at that place - Held.Damage = value;   Scores[index] = value;
+  for (Node& n : g.nodes) {
+    if (n.type == "struct.set_field") {
+      n.type = "var.set";
+      n.set_param("path", "." + n.param("field"));
+      std::erase_if(n.params, [](const auto& p) { return p.first == "field"; });
+    } else if (n.type == "list.set") {
+      n.type = "var.set";
+      n.set_param("path", "[]");
+      const std::string index = path_pin(0);
+      for (auto& [pin, value] : n.values) pin = pin == "index" ? index : pin == "item" ? std::string("value") : pin;
+      for (Link& l : g.links)
+        if (l.to == n.id) l.in = l.in == "index" ? index : l.in == "item" ? std::string("value") : l.in;
+    }
+  }
   for (const json::Value& v : j["machines"].items()) {
     StateMachine m;
     m.id = id_of(v["id"]);
@@ -943,6 +1073,19 @@ void Library::pins(const Node& node, const Graph& graph, std::vector<PinDef>& in
   in = d->inputs;
   out = d->outputs;
   if (d->shape) d->shape(*d, node, graph, in, out);
+  // (a node that names a place: an index input for every list entry its path goes through)
+  for (const ParamDef& pd : d->params) {
+    if (pd.kind != ParamDef::Kind::path) continue;
+    const std::size_t entries = path_indices(node.param(pd.key));
+    for (std::size_t k = 0; k < entries; ++k) {
+      PinDef pin;
+      pin.id = path_pin(k);
+      pin.label = entries > 1 ? "Index " + std::to_string(k + 1) : std::string("Index");
+      pin.type = PinType::integer;
+      pin.def = json::Value(0);
+      in.push_back(std::move(pin));
+    }
+  }
 }
 
 std::string Library::title(const Node& node) const {
@@ -993,6 +1136,11 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
         Variable named;
         if (!scope.empty() && !g.function(scope)) err(n.id, lib.title(n) + ": no function \"" + scope + "\" (whose local variable \"" + v + "\" would be)");
         else if (!g.variable_of(n, named)) err(n.id, lib.title(n) + (scope.empty() ? ": no variable \"" + v + "\"" : ": the function " + scope + " has no local variable \"" + v + "\""));
+      }
+      if (pd.kind == ParamDef::Kind::path && !v.empty()) {
+        Variable named;
+        std::string why;
+        if (g.variable_of(n, named) && !g.place_of(n, named, &why)) err(n.id, lib.title(n) + ": " + why);
       }
       if (pd.kind == ParamDef::Kind::machine && !g.machine(v)) err(n.id, lib.title(n) + ": no state machine \"" + v + "\"");
       if (pd.kind == ParamDef::Kind::state) {
@@ -1292,7 +1440,7 @@ bool Instance::inline_pure(int node) const {
                                   "value.float", "value.int", "value.bool"};
   for (const char* t : kInline) if (c.def->type == t) return true;
   if (c.def->type == "logic.select") return numeric(c.out[0].type);
-  if (c.def->type == "var.get") return var_slot(*c.node) >= 0;
+  if (c.def->type == "var.get") return var_slot(*c.node) >= 0 && c.node->param("path").empty();
   return false;
 }
 
@@ -1306,7 +1454,7 @@ bool Instance::inline_node(int node) const {
   if (t == "flow.branch" || t == "flow.sequence" || t == "flow.for" || t == "flow.while" || t == "flow.do_once" || t == "flow.do_n" || t == "flow.gate" ||
       t == "flow.flip_flop")
     return true;
-  if (t == "var.set" || t == "var.add") return var_slot(*c.node) >= 0;
+  if (t == "var.set" || t == "var.add") return var_slot(*c.node) >= 0 && c.node->param("path").empty();
   return false;
 }
 
@@ -1600,6 +1748,96 @@ Value* Instance::variable(const Node& n) {
   if (blueprint_) return nullptr;
   auto it = vars_.find(key_of(n));
   return it == vars_.end() ? nullptr : &it->second;
+}
+namespace {
+/// The entry `at` of a list becomes `x` (a list of structs holds them as values: Value::edit).
+void set_item(Value& list, std::size_t at, const Value& x) {
+  switch (list.type) {
+    case PinType::boolean_list: list.edit<bool>()[at] = x.as_bool(); break;
+    case PinType::integer_list: list.edit<i64>()[at] = x.as_int(); break;
+    case PinType::number_list: list.edit<f64>()[at] = x.as_number(); break;
+    case PinType::vector_list: list.edit<Vec3>()[at] = x.as_vector(); break;
+    case PinType::text_list: list.edit<std::string>()[at] = x.as_text(); break;
+    case PinType::actor_list: list.edit<ActorHandle>()[at] = ActorHandle{x.as_actor()}; break;
+    case PinType::enumeration_list: list.edit<i64>()[at] = x.i; break;
+    default: break;
+  }
+}
+/// What `steps` (from `k` on) lead to in `v`, a value of type `t`. Beside a list: an entry with
+/// the defaults.
+Value value_at(const Value& v, const TypeRef& t, const std::vector<std::string>& steps, std::size_t k, const std::vector<i64>& indices, std::size_t ik, const Graph& g) {
+  if (k == steps.size()) return v;
+  if (steps[k].empty()) {
+    const i64 at = ik < indices.size() ? indices[ik] : -1;
+    const TypeRef item{element_of(t.type), t.of};
+    const bool there = at >= 0 && static_cast<std::size_t>(at) < v.size();
+    return value_at(there ? v.item(static_cast<std::size_t>(at)) : zero_of(item, g), item, steps, k + 1, indices, ik + 1, g);
+  }
+  const StructType* s = t.type == PinType::structure ? g.structure(t.of) : nullptr;
+  const int f = s ? s->field(steps[k]) : -1;
+  if (f < 0) return Value();
+  return value_at(field_of(v, *s, static_cast<std::size_t>(f), g), s->fields[static_cast<std::size_t>(f)].type, steps, k + 1, indices, ik, g);
+}
+/// The same to change it: `change` gets the value there, in its place - every value on the way
+/// is the variable's own (Value::edit, own_rows). Beside a list `change` gets an entry with the
+/// defaults, and nothing of it is kept.
+void change_at(Value& v, const TypeRef& t, const std::vector<std::string>& steps, std::size_t k, const std::vector<i64>& indices, std::size_t ik, const Graph& g,
+               const std::function<void(Value&)>& change) {
+  if (k == steps.size()) {
+    change(v);
+    return;
+  }
+  if (steps[k].empty()) {
+    const i64 at = ik < indices.size() ? indices[ik] : -1;
+    const TypeRef item{element_of(t.type), t.of};
+    const bool there = at >= 0 && static_cast<std::size_t>(at) < v.size();
+    if (!there) {
+      Value beside = zero_of(item, g);
+      change_at(beside, item, steps, k + 1, indices, ik + 1, g, change);
+      return;
+    }
+    if (t.type == PinType::structure_list) {
+      change_at(v.edit<Value>()[static_cast<std::size_t>(at)], item, steps, k + 1, indices, ik + 1, g, change);
+      return;
+    }
+    Value entry = v.item(static_cast<std::size_t>(at));
+    change_at(entry, item, steps, k + 1, indices, ik + 1, g, change);
+    set_item(v, static_cast<std::size_t>(at), entry);
+    return;
+  }
+  const StructType* s = t.type == PinType::structure ? g.structure(t.of) : nullptr;
+  const int f = s ? s->field(steps[k]) : -1;
+  if (f < 0) return;
+  hold_fields(v, *s, g);
+  change_at(v.own_rows()[static_cast<std::size_t>(f)], s->fields[static_cast<std::size_t>(f)].type, steps, k + 1, indices, ik, g, change);
+}
+}  // namespace
+Value Instance::place(const Node& n, const std::vector<i64>& indices) const {
+  if (blueprint_) return Value();
+  const std::string path = n.param("path");
+  if (path.empty()) return held(key_of(n));
+  std::vector<std::string> steps;
+  Variable var;
+  if (!path_steps(path, steps) || !graph_.variable_of(n, var)) return Value();
+  return value_at(held(key_of(n)), {var.type, var.of}, steps, 0, indices, 0, graph_);
+}
+bool Instance::change(const Node& n, const std::vector<i64>& indices, const std::function<void(Value&)>& change) {
+  if (blueprint_) return false;
+  const std::string key = key_of(n);
+  std::vector<std::string> steps;
+  Variable var;
+  if (!path_steps(n.param("path"), steps) || !graph_.variable_of(n, var)) return false;
+  if (var_slot(key) >= 0) {
+    // (a number of the Blueprint lives in a slot: there is no way into it)
+    if (!steps.empty()) return false;
+    Value v = held(key);
+    change(v);
+    return hold(key, v);
+  }
+  auto it = vars_.find(key);
+  if (it == vars_.end()) return false;
+  change_at(it->second, {var.type, var.of}, steps, 0, indices, 0, graph_, change);
+  return true;
 }
 std::vector<Value> Instance::locals() const {
   std::vector<Value> r;
@@ -2044,6 +2282,14 @@ Value Context::in(std::size_t index) {
   const auto& src = c.data_in[index];
   if (src.node < 0) return c.literal[index];
   return pull(src.node, src.pin).converted(c.in[index].type);
+}
+
+std::vector<i64> Context::path() {
+  std::vector<i64> r;
+  const std::size_t count = inst_.nodes_[static_cast<std::size_t>(node_)].in.size();
+  for (std::size_t k = 0; k < count; ++k)
+    if (is_path_pin(inst_.nodes_[static_cast<std::size_t>(node_)].in[k].id)) r.push_back(in(k).as_int());
+  return r;
 }
 
 Value Context::in(std::string_view pin) {

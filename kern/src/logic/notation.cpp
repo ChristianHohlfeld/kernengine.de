@@ -198,7 +198,7 @@ std::string settings_of(const NodeDef& def, const Node& n, const Graph& g) {
   std::string r;
   for (std::size_t k = 0; k < def.params.size(); ++k) {
     const ParamDef& pd = def.params[k];
-    if (pd.kind == ParamDef::Kind::variable || pd.kind == ParamDef::Kind::scope) continue;
+    if (pd.kind == ParamDef::Kind::variable || pd.kind == ParamDef::Kind::scope || pd.kind == ParamDef::Kind::path) continue;
     const std::string value = n.param(pd.key, pd.def);
     // (a struct and one of its fields are one setting, as C++ names a field: &Weapon::Name)
     if (pd.kind == ParamDef::Kind::type && pd.structs_only && k + 1 < def.params.size() && def.params[k + 1].kind == ParamDef::Kind::field) {
@@ -210,6 +210,12 @@ std::string settings_of(const NodeDef& def, const Node& n, const Graph& g) {
     r += (r.empty() ? "<" : ", ") + (pd.kind == ParamDef::Kind::type && type_from_text(value, g, type) ? cpp_type(type) : text_literal(value));
   }
   return r.empty() ? r : r + ">";
+}
+/// Does a node of this kind name a place (a variable and a path from it: ParamDef::Kind::path)?
+bool names_place(const NodeDef& def) {
+  for (const ParamDef& pd : def.params)
+    if (pd.kind == ParamDef::Kind::path) return true;
+  return false;
 }
 /// The variables a node's settings name, in their order.
 std::vector<std::string> variables_of(const NodeDef& def, const Node& n) {
@@ -909,11 +915,37 @@ struct Writer {
     return pin.type == want ? e : std::string("kern::to<") + cpp_type(want) + ">(" + e + ")";
   }
 
+  /// The place a node names, as C++ writes it: its variable and from there its path - a field
+  /// by its name, a list entry by the value of its index input: Cars[n4.index].Wheels[0].
+  std::string place_text(int x, int c) {
+    std::string r = at(x).node->param("variable");
+    std::vector<std::string> steps;
+    if (!names_place(*at(x).def) || !path_steps(at(x).node->param("path"), steps)) return r;
+    std::size_t entry = 0;
+    for (const std::string& step : steps) {
+      if (!step.empty()) {
+        r += "." + step;
+        continue;
+      }
+      int pin = -1;
+      const std::vector<int> pins = at(x).data_in;
+      for (int k : pins)
+        if (at(x).in[static_cast<std::size_t>(k)].id == path_pin(entry)) pin = k;
+      const std::string index = pin >= 0 ? value(x, pin, c) : std::string("0");
+      r += "[" + index + "]";
+      ++entry;
+    }
+    return r;
+  }
+  /// Is input `k` of `x` the index of a list entry in the node's path (written in its place)?
+  bool in_place(int x, int k) { return names_place(*at(x).def) && is_path_pin(at(x).in[static_cast<std::size_t>(k)].id); }
+
   std::string inputs(int x, int c, const std::vector<std::string>& first = {}) {
     std::string r;
     for (const std::string& a : first) r += (r.empty() ? "" : ", ") + a;
     const std::vector<int> pins = at(x).data_in;
     for (int k : pins) {
+      if (in_place(x, k)) continue;
       const std::string v = value(x, k, c);
       r += (r.empty() ? "" : ", ") + v;
     }
@@ -924,7 +956,7 @@ struct Writer {
   std::string pure(int x, int c) {
     order.push_back(x);
     const std::string t = at(x).def->type;
-    if (t == "var.get") return at(x).node->param("variable");
+    if (t == "var.get") return place_text(x, c);
     if (t == "func.pure") {
       const std::string args = inputs(x, c);
       return at(x).node->param("function") + "(" + args + ")";
@@ -940,7 +972,9 @@ struct Writer {
     }
     std::vector<std::string> head;
     if (at(x).member) head.push_back("n" + id(x));
-    for (std::string& v : variables_of(*at(x).def, *at(x).node)) head.push_back(std::move(v));
+    if (names_place(*at(x).def)) head.push_back(place_text(x, c));
+    else
+      for (std::string& v : variables_of(*at(x).def, *at(x).node)) head.push_back(std::move(v));
     const std::string args = inputs(x, c, head);
     return callee(x) + "(" + args + ")";
   }
@@ -1011,7 +1045,9 @@ struct Writer {
     std::vector<std::string> head;
     if (at(x).member) head.push_back("n" + id(x));
     if (at(x).exec_in.size() >= 2) head.push_back(definition ? std::string("entry") : text_literal(at(x).in[static_cast<std::size_t>(entry)].id));
-    for (std::string& v : variables_of(*at(x).def, *at(x).node)) head.push_back(std::move(v));
+    if (names_place(*at(x).def)) head.push_back(place_text(x, c));
+    else
+      for (std::string& v : variables_of(*at(x).def, *at(x).node)) head.push_back(std::move(v));
     const std::string args = inputs(x, c, head);
     return callee(x) + "(" + args + ")";
   }
@@ -1139,14 +1175,10 @@ struct Writer {
     }
     // a plain step
     if (t == "var.set" || t == "var.add") {
-      // Heat = value;   or, when what the node gives is read: n5.value = (Heat = value);
-      const std::string set = X.node->param("variable") + (t == "var.set" ? " = " : " += ") + value(x, X.data_in.front(), c);
-      line(ind, X.member ? "n" + id(x) + "." + X.out[static_cast<std::size_t>(X.data_out.front())].id + " = (" + set + ");" : set + ";");
-      return 0;
-    }
-    if (t == "struct.set_field") {
-      // Held.Damage = value;   or, when what the node gives is read: n5.value = (Held.Damage = value);
-      const std::string set = X.node->param("variable") + "." + X.node->param("field") + " = " + value(x, X.data_in.front(), c);
+      // Heat = value;   Cars[n4.index].Wheels[0].Slip = value;   Heat += value;
+      // or, when what the node gives is read: n5.value = (Heat = value);
+      const std::string where = place_text(x, c);
+      const std::string set = where + (t == "var.set" ? " = " : " += ") + value(x, X.data_in.front(), c);
       line(ind, X.member ? "n" + id(x) + "." + X.out[static_cast<std::size_t>(X.data_out.front())].id + " = (" + set + ");" : set + ";");
       return 0;
     }
@@ -2255,7 +2287,7 @@ struct Reader {
     std::size_t count = 0;
     for (std::size_t k = 0; k < def->params.size(); ++k) {
       const ParamDef& pd = def->params[k];
-      if (pd.kind == ParamDef::Kind::variable || pd.kind == ParamDef::Kind::scope) continue;
+      if (pd.kind == ParamDef::Kind::variable || pd.kind == ParamDef::Kind::scope || pd.kind == ParamDef::Kind::path) continue;
       if (pd.kind == ParamDef::Kind::type && pd.structs_only && k + 1 < def->params.size() && def->params[k + 1].kind == ParamDef::Kind::field) {
         want += (want.empty() ? "" : ", ") + std::string("&AStruct::Field");
         ++count;
@@ -2280,12 +2312,12 @@ struct Reader {
     if (!settings(given, &as_type)) return -1;
     std::size_t written = 0, variables = 0;
     for (const ParamDef& pd : def->params)
-      if (pd.kind != ParamDef::Kind::scope) ++(pd.kind == ParamDef::Kind::variable ? variables : written);
+      if (pd.kind != ParamDef::Kind::scope && pd.kind != ParamDef::Kind::path) ++(pd.kind == ParamDef::Kind::variable ? variables : written);
     if (given.size() != written) { fail(tok, node_name(def->type) + settings_text(def)); return -1; }
     // (a type is written as a type, everything else as a text; and the type is one the setting can name)
     for (std::size_t k = 0, at = 0; k < def->params.size(); ++k) {
       const ParamDef& pd = def->params[k];
-      if (pd.kind == ParamDef::Kind::variable || pd.kind == ParamDef::Kind::scope) continue;
+      if (pd.kind == ParamDef::Kind::variable || pd.kind == ParamDef::Kind::scope || pd.kind == ParamDef::Kind::path) continue;
       bool fits = as_type[at] == (pd.kind == ParamDef::Kind::type);
       if (fits && pd.kind == ParamDef::Kind::type) {
         fits = false;
@@ -2295,6 +2327,7 @@ struct Reader {
       ++at;
     }
     std::vector<std::string> names;
+    std::string path;  // (of a node that names a place: what follows its variable)
     if (variables) {
       const std::string fname = node_name(def->type);
       if (!is("(")) { fail(p, fname + "(...) expected, not " + shown(peek())); return -1; }
@@ -2308,15 +2341,110 @@ struct Reader {
           return -1;
         }
         names.push_back(peek(q).s);
+        if (names_place(*def)) {
+          // (the place it changes: the variable and what follows it, up to the comma)
+          const std::size_t name = q;
+          ++q;
+          if (!path_ahead(q, path) || !place_fits(names.back(), path, p + name, false)) return -1;
+          --q;
+        }
       }
     }
     std::vector<std::pair<std::string, std::string>> params;
     std::size_t g_at = 0, v_at = 0;
     for (const ParamDef& pd : def->params) {
-      if (pd.kind != ParamDef::Kind::scope) params.push_back({pd.key, pd.kind == ParamDef::Kind::variable ? names[v_at++] : given[g_at++]});
-      else if (scope.function && !names.empty() && scope.function->local(names.front())) params.push_back({pd.key, scope.function->name});
+      if (pd.kind == ParamDef::Kind::path) {
+        if (!path.empty()) params.push_back({pd.key, path});
+      } else if (pd.kind != ParamDef::Kind::scope) {
+        params.push_back({pd.key, pd.kind == ParamDef::Kind::variable ? names[v_at++] : given[g_at++]});
+      } else if (scope.function && !names.empty() && scope.function->local(names.front())) {
+        params.push_back({pd.key, scope.function->name});
+      }
     }
     return make(def, tok, std::move(params));
+  }
+  /// The path of a place, read ahead: `q` stands behind the variable's name (so many tokens
+  /// ahead) and is moved behind what follows it - .Field and [index] -, `path` is that as a
+  /// node's setting has it (".Wheels[].Slip"). The indices are not read here: the node they belong
+  /// to has to be made first (place_rest reads them).
+  bool path_ahead(std::size_t& q, std::string& path) {
+    path.clear();
+    for (;;) {
+      if (is(".", q) && peek(q + 1).kind == Tok::id) {
+        path += "." + peek(q + 1).s;
+        q += 2;
+        continue;
+      }
+      if (!is("[", q)) return true;
+      int depth = 0;
+      std::size_t end = q;
+      for (;; ++end) {
+        if (peek(end).kind == Tok::end) return fail(p + q, "\"[\" is not closed: a list's entry is List[index]");
+        if (peek(end).kind != Tok::punct) continue;
+        if (is("[", end) || is("(", end) || is("{", end)) ++depth;
+        else if ((is("]", end) || is(")", end) || is("}", end)) && --depth == 0) break;
+      }
+      path += "[]";
+      q = end + 1;
+    }
+  }
+  /// Does `path` lead from the variable `var` to a place? `tok`: where the variable's name stands.
+  /// `set`: the place is about to be changed field by field (the words of the refusal).
+  bool place_fits(const std::string& var, const std::string& path, std::size_t tok, bool set, TypeRef* type = nullptr) {
+    Variable named;
+    if (!variable_here(var, named)) return fail(tok, "\"" + var + "\" is no variable");
+    TypeRef at{named.type, named.of};
+    std::string name = var;
+    std::vector<std::string> steps;
+    path_steps(path, steps);
+    std::size_t where = tok + 1;  // (the token of the step)
+    for (const std::string& step : steps) {
+      if (step.empty()) {
+        if (!is_list(at.type)) return fail(where, name + " is " + cpp_type(at) + ": it has no entries");
+        at.type = element_of(at.type);
+        name += "[]";
+        int depth = 0;
+        for (;; ++where) {
+          const Tok& t = toks[std::min(where, toks.size() - 1)];
+          if (t.kind == Tok::end) break;
+          if (t.kind != Tok::punct) continue;
+          if (t.s == "[" || t.s == "(" || t.s == "{") ++depth;
+          else if ((t.s == "]" || t.s == ")" || t.s == "}") && --depth == 0) break;
+        }
+        ++where;
+        continue;
+      }
+      const StructType* s = at.type == PinType::structure ? g.structure(at.of) : nullptr;
+      if (!s) return fail(where, name + " is " + cpp_type(at) + (set ? ": only a struct has fields to set (Variable.Field = value;)" : ": it has no fields"));
+      const int k = s->field(step);
+      if (k < 0) return fail(where + 1, s->name + " has no field \"" + step + "\" (" + field_names(*s) + ")");
+      at = s->fields[static_cast<std::size_t>(k)].type;
+      name += "." + step;
+      where += 2;
+    }
+    if (type) *type = at;
+    return true;
+  }
+  /// What follows the variable's name in a place - .Field and [index] - for the node that names
+  /// the place (path_ahead has read its shape): every index is the node's next index input.
+  bool place_rest(int node) {
+    for (std::size_t entry = 0;;) {
+      if (is(".") && peek(1).kind == Tok::id) {
+        p += 2;
+        continue;
+      }
+      if (!is("[")) return true;
+      ++p;
+      const Src s = value();
+      if (failed()) return false;
+      int pin = -1;
+      const Made& m = made[static_cast<std::size_t>(node)];
+      for (std::size_t k = 0; k < m.in.size(); ++k)
+        if (m.in[k].id == path_pin(entry)) pin = static_cast<int>(k);
+      if (pin < 0) return fail(p, "this place has no entry here");
+      if (!bind(node, pin, s) || !expect("]", "(a list's entry is List[index])")) return false;
+      ++entry;
+    }
   }
   bool declare(u32 id, int node, std::size_t tok) {
     if (id == 0 || node < 0) return !failed();
@@ -2331,7 +2459,9 @@ struct Reader {
   std::vector<int> data_inputs(int node) const {
     std::vector<int> r;
     const Made& m = made[static_cast<std::size_t>(node)];
-    for (std::size_t k = 0; k < m.in.size(); ++k) if (m.in[k].type != PinType::exec) r.push_back(static_cast<int>(k));
+    const bool place = names_place(*m.def);  // (the indices of its path stand in the place, not among its values)
+    for (std::size_t k = 0; k < m.in.size(); ++k)
+      if (m.in[k].type != PinType::exec && !(place && is_path_pin(m.in[k].id))) r.push_back(static_cast<int>(k));
     return r;
   }
   std::vector<std::string> exec_pins(int node, bool inputs) const {
@@ -2411,6 +2541,7 @@ struct Reader {
       const std::string name = m.node.param(pd.key);
       if (!a.more() || peek().kind != Tok::id || peek().s != name) return fail(p, node_name(m.def->type) + ": the variable " + name + " expected, not " + shown(peek()));
       ++p;
+      if (names_place(*m.def) && !place_rest(node)) return false;
     }
     return true;
   }
@@ -2498,14 +2629,15 @@ struct Reader {
       return s;
     }
     if (Variable named; variable_here(t.s, named)) {
-      const Variable* v = &named;
-      if (is(".")) {
-        const std::string field = peek(1).kind == Tok::id ? peek(1).s : std::string("Field");
-        if (v->type == PinType::structure) fail(p, "a struct's field is read through Break: struct_break<" + v->of + ">(" + v->name + ")." + field);
-        else fail(p, v->name + " is " + cpp_type(TypeRef{v->type, v->of}) + ": it has no fields");
-        return s;
-      }
-      s.node = make("var.get", s.tok, naming(t.s));
+      // (a place is read as C++ reads it: Held.Damage, Cars[i].Wheels[j].Slip)
+      std::size_t q = 0;
+      std::string path;
+      if (!path_ahead(q, path) || !place_fits(named.name, path, p - 1, false)) return s;
+      std::vector<std::pair<std::string, std::string>> params = naming(t.s);
+      if (!path.empty()) params.push_back({"path", path});
+      const int node = make("var.get", s.tok, std::move(params));
+      if (node < 0 || !place_rest(node)) return s;
+      s.node = node;
       s.root = true;
       return s;
     }
@@ -2604,23 +2736,22 @@ struct Reader {
     if (std::find(ins.begin(), ins.end(), entry) == ins.end()) return fail(at, node_name(m.def->type) + " has no exec input \"" + entry + "\" (" + list + ")");
     return true;
   }
-  /// Variable.Field = value   ("Variable" has been read, "." is next): the Set Field it is, up to
-  /// and including the "=" (-1: refused).
-  int field_step(const std::string& var, std::size_t at) {
-    Variable named;
-    const Variable* v = variable_here(var, named) ? &named : nullptr;
-    const StructType* s = v && v->type == PinType::structure ? g.structure(v->of) : nullptr;
-    if (!s) { fail(p, var + " is " + (v ? cpp_type(TypeRef{v->type, v->of}) : std::string("no variable")) + ": only a struct has fields to set (Variable.Field = value;)"); return -1; }
-    ++p;
-    std::string field;
-    const std::size_t where = p;
-    if (!word(field, "a field of " + s->name + " (" + field_names(*s) + ")")) return -1;
-    if (s->field(field) < 0) { fail(where, s->name + " has no field \"" + field + "\" (" + field_names(*s) + ")"); return -1; }
-    if (!is("=")) { fail(p, var + "." + field + " = value; expected, not " + shown(peek())); return -1; }
-    ++p;
+  /// Place = value   Place += value   ("Variable" has been read): the Set or Add it is, up to and
+  /// including the "=" (-1: refused). A place is the variable, or what .Field and [index] lead to
+  /// from it: Heat = value;   Held.Damage = value;   Cars[i].Wheels[j].Slip += value;
+  int place_step(const std::string& var, std::size_t at) {
+    std::size_t q = 0;
+    std::string path;
+    if (!path_ahead(q, path)) return -1;
+    const bool add = is("+=", q);
+    if (!place_fits(var, path, p - 1, true)) return -1;
+    if (!add && !is("=", q)) { fail(p + q, var + " = value; or " + var + " += value; expected, not " + shown(peek(q))); return -1; }
     std::vector<std::pair<std::string, std::string>> params = naming(var);
-    params.insert(params.begin() + 1, {"field", field});
-    return step(make("struct.set_field", at, std::move(params)), at);
+    if (!path.empty()) params.push_back({"path", path});
+    const int node = step(make(add ? "var.add" : "var.set", at, std::move(params)), at);
+    if (node < 0 || !place_rest(node)) return -1;
+    ++p;  // (the "=" or "+=")
+    return node;
   }
   /// A body in braces: "{" has been read; reads up to and including "}".
   Ends block(Ends open, bool keep_scope = true) {
@@ -2920,15 +3051,7 @@ struct Reader {
       std::string var;
       if (!word(var, "a variable")) return {};
       if (Variable named; !variable_here(var, named)) { fail(name, "\"" + var + "\" is no variable: n<id>.value = (Variable = value); keeps what a Set gave"); return {}; }
-      int node = -1;
-      if (is(".")) {
-        node = field_step(var, at);  // n<id>.value = (Variable.Field = value);
-      } else {
-        const bool add = is("+=");
-        if (!add && !is("=")) { fail(p, var + " = value or " + var + " += value expected, not " + shown(peek())); return {}; }
-        ++p;
-        node = step(make(add ? "var.add" : "var.set", at, naming(var)), at);
-      }
+      const int node = place_step(var, at);  // n<id>.value = (Variable = value);   ... (Place.Field = value);
       if (node < 0 || !declare(id, node, at)) return {};
       enter(in, node, "", at);
       const Src s = value();
@@ -2953,15 +3076,7 @@ struct Reader {
       // Variable = value;   Variable += value;   Variable.Field = value;
       const std::string var = named.name;
       p += 1;
-      int node = -1;
-      if (is(".")) {
-        node = field_step(var, at);
-      } else {
-        const bool add = is("+=");
-        if (!add && !is("=")) { fail(p, var + " = value; or " + var + " += value; expected, not " + shown(peek())); return {}; }
-        ++p;
-        node = step(make(add ? "var.add" : "var.set", at, naming(var)), at);
-      }
+      const int node = place_step(var, at);
       if (node < 0) return {};
       enter(in, node, "", at);
       const Src s = value();
@@ -2974,16 +3089,17 @@ struct Reader {
     }
     auto fn = node_fns.find(t.s);
     if (fn == node_fns.end()) {
-      fail(at, "\"" + t.s + "\" starts no statement: no variable, no function, no node");
+      if (t.s == "list_set") fail(at, "an entry of a list is set at its place: List[index] = value;");
+      else if (t.s == "struct_set_field") fail(at, "a struct's field is set by its name: Variable.Field = value;");
+      else fail(at, "\"" + t.s + "\" starts no statement: no variable, no function, no node");
       return {};
     }
     // a step called by its function's name
     const NodeDef* def = fn->second;
     const std::string fname = node_name(def->type);
     p += 1;
-    if (def->type == "var.set" || def->type == "var.add") { fail(at, "a variable is set by its name: Heat = value; or Heat += value;"); return {}; }
+    if (def->type == "var.set" || def->type == "var.add") { fail(at, "a variable is set by its name: Heat = value; or Heat += value; - and a place in it likewise: Held.Damage = value;"); return {}; }
     if (def->type == "func.call") { fail(at, "a function is called by its name: Function(values);"); return {}; }
-    if (def->type == "struct.set_field") { fail(at, "a struct's field is set by its name: Variable.Field = value;"); return {}; }
     if (def->kind == NodeKind::pure) { fail(at, fname + " is a value: alone on a line it does nothing"); return {}; }
     if (def->kind == NodeKind::event) { fail(at, fname + " is an event: KERN_EVENT(on<id>, " + fname + ")"); return {}; }
     if (def->loop) { fail(at, fname + " is a loop: for (auto it<id> = " + fname + "(...); it<id>.next();) { }"); return {}; }

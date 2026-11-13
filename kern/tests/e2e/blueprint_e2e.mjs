@@ -289,7 +289,7 @@ await cmd({cmd: "play"});
 check(await until(async () => (await status()).hud?.message === "is Ajar", 60000), `Play switches on the enum and says the value's name (${(await status()).hud?.message})`);
 await cmd({cmd: "stop"});
 
-// ---- 1e. a struct: its fields in Details, a variable of its type, Make / Break / Set Field, played ----
+// ---- 1e. a struct: its fields in Details, a variable of its type, Make / Break / Set of a field, played ----
 // (The editor draws a change with its next frame: what is asked of the page comes after it.)
 const settle = async fn => {
   const ok = await until(fn);
@@ -376,7 +376,7 @@ await page.click('.lg-st[data-struct="Weapon"]');
 await settle(async () => await fieldRow("Damage").count() === 1);
 await renameField("Damage", "Power");
 check(await settle(async () => await fieldsOf("Weapon") === "Power:float,Label:text,Sight:Aim,Type:Kind") && (await held()).value.Power === 25 && !("Damage" in (await held()).value), "a renamed field keeps its values");
-// Begin Play: Set Power of Held (typed on the node); the message says Break's Label and Power
+// Begin Play: Set Held.Power (typed on the node); the message says Break's Label and Power
 await page.hover('.lg-st[data-struct="Weapon"]');  // (a row's buttons show under the cursor)
 await page.click('.lg-st[data-struct="Weapon"] [data-make]');
 check(await settle(async () => (await logic()).nodes.some(n => n.type === "struct.make")), "Make in My Blueprint adds a Make node of the struct");
@@ -392,15 +392,15 @@ await makeSight.fill("9");
 await makeSight.press("Enter");
 check(await settle(async () => (await logic()).nodes.find(n => n.id === makeNode.id).inputs.find(q => q.id === "Sight").value.Tries === 9), "typing there sets the pin's value");
 const ebs = (await cmd({cmd: "logicAdd", type: "event.begin", x: 0, y: 300})).id;
-const tune = (await cmd({cmd: "logicAdd", type: "struct.set_field", x: 240, y: 300, params: {variable: "Held", field: "Power"}})).id;
+const tune = (await cmd({cmd: "logicAdd", type: "var.set", x: 240, y: 300, params: {variable: "Held", path: ".Power"}})).id;
 const getHeld = (await cmd({cmd: "logicAdd", type: "var.get", x: 240, y: 520, params: {variable: "Held"}})).id;
 const brk = (await cmd({cmd: "logicAdd", type: "struct.break", x: 480, y: 520, params: {struct: "Weapon"}})).id;
 const joined = (await cmd({cmd: "logicAdd", type: "text.append", x: 760, y: 520})).id;
 const says = (await cmd({cmd: "logicAdd", type: "game.message", x: 1000, y: 300})).id;
 l = await logic();
 const tuneNode = l.nodes.find(n => n.id === tune);
-check(tuneNode.title === "Set Power of Held" && tuneNode.params.find(q => q.key === "field").choices.map(c => c[0]).join(",") === "Power,Label,Sight,Type" && tuneNode.inputs.find(q => q.id === "value").type === "float",
-      "Set Field names a struct variable and one of its fields; its value is of the field's type");
+check(tuneNode.title === "Set Held.Power" && tuneNode.params.find(q => q.key === "path").value === ".Power" && tuneNode.params.find(q => q.key === "path").kind === "path" && tuneNode.inputs.find(q => q.id === "value").type === "float",
+      "a Set names a variable and the path to the place in it - one of its fields; its value is of the field's type");
 const fromHeld = (await cmd({cmd: "logicPalette", query: "", from: {node: getHeld, pin: "value", output: true}})).items;
 check(fromHeld.some(e => e.type === "struct.break" && e.params?.struct === "Weapon") && fromHeld.some(e => e.type === "logic.select" && e.params?.type === "Weapon") && !fromHeld.some(e => e.type === "debug.print" || e.type === "math.add" || e.params?.struct === "Aim"),
       "from a Weapon pin the menu offers Break Weapon and Select of a Weapon, and nothing a struct does not go into");
@@ -420,7 +420,7 @@ code = await cppText.inputValue();
 check(code.includes("  KERN_STRUCT(Aim) {\n    Int Tries = 3;\n  };\n  KERN_STRUCT(Weapon) {\n    Float Power = 10.0;\n    Text Label = \"Fist\";\n    Aim Sight = Aim{3};\n    Kind Type = Kind::First;\n  };\n") &&
       code.includes("Weapon Held = Weapon{25.0, \"Fist\", Aim{7}, Kind::Second};") && code.includes("Held.Power = 12.5;") && /struct_break<Weapon>\(Held\)/.test(code) && /n\d+\(\)\.Label/.test(code) &&
       code.includes("struct_make<Weapon>(10.0, \"Fist\", Aim{9}, Kind::First)"),
-      "the structs with their fields, a variable written out with every field, Set Field as an assignment, Break read by the field's name");
+      "the structs with their fields, a variable written out with every field, the Set of a field as an assignment, Break read by the field's name");
 check((await nativeNote.textContent()) === "runs as compiled C++", "a compiler runs it as it stands");
 // a field renamed in the text is renamed in the Blueprint
 await cppText.fill(code.replaceAll("Label", "Title"));

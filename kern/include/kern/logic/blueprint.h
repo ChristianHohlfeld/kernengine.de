@@ -26,8 +26,9 @@
 
 namespace kern {
 
-/// A list in a Blueprint's C++: List<Float>, List<Int>, List<Text> ...
-template <class T> using List = std::vector<T>;
+/// A list in a Blueprint's C++: List<Float>, List<Int>, List<Text> ... - a std::vector whose []
+/// never reaches beside the list (logic::List, nodes.h).
+template <class T> using List = logic::List<T>;
 
 /// What a node keeps between runs: the member n<id> of a node with memory (a loop's index, Do
 /// Once, Gate ...). The same four numbers the interpreter keeps for the node.
@@ -264,7 +265,6 @@ struct BlueprintCore : logic::PureNodes {
   template <class T> static void list_add(List<T>& list, std::type_identity_t<T> item) { logic::list::add(list, std::move(item)); }
   template <class N, class T> static void list_add(N& n, List<T>& list, std::type_identity_t<T> item) { n.index = logic::list::add(list, std::move(item)); }
   template <class T> static void list_insert(List<T>& list, Int index, std::type_identity_t<T> item) { logic::list::insert(list, index, std::move(item)); }
-  template <class T> static void list_set(List<T>& list, Int index, std::type_identity_t<T> item) { logic::list::set(list, index, std::move(item)); }
   template <class T> static void list_remove_at(List<T>& list, Int index) { logic::list::remove_at(list, index); }
   template <class T> static void list_remove(List<T>& list, const std::type_identity_t<T>& item) { logic::list::remove(list, item); }
   template <class N, class T> static void list_remove(N& n, List<T>& list, const std::type_identity_t<T>& item) { n.removed = logic::list::remove(list, item); }
@@ -308,8 +308,8 @@ struct BlueprintCore : logic::PureNodes {
   // ---- structs ----
   // A struct the Blueprint declares with KERN_STRUCT; the nodes' setting "Struct" is the type.
   // Make is the struct from a value for each field, in their order; Break is the struct, read
-  // field by field: struct_break<Weapon>(Held).Damage. (Set Field is the assignment
-  // Held.Damage = 2.0; - no function.)
+  // field by field: struct_break<Weapon>(Held).Damage. (A field of a variable is set where it
+  // is: Held.Damage = 2.0; - the Set at that place, no function.)
   template <class S, class... V> static S struct_make(const V&... fields) { return S{fields...}; }
   /// list_find_row<&Weapon::Name>(Rack, "Bow"): the first item of a list of structs whose field
   /// is the value - a table's row by its key. Not found: the struct's defaults, index -1.

@@ -98,6 +98,35 @@ struct Whole {
   }
 };
 
+/// A list in a Blueprint's C++ (List<Float>, List<Weapon> ...): a std::vector whose [] never
+/// reaches beside the list. Beside it stands an entry with the zero of the items' type - a struct
+/// with its defaults - that keeps nothing: read, it is that zero; what is written there is gone
+/// with the next step. So a place like Cars[i].Wheels[j].Slip is one in every tier - the
+/// interpreter does the same there (Instance::place, Instance::change).
+template <class T> struct List : std::vector<T> {
+  using std::vector<T>::vector;
+  List() = default;
+  List(const std::vector<T>& items) : std::vector<T>(items) {}                 // NOLINT (implicit: the vector of its items is the list)
+  List(std::vector<T>&& items) noexcept : std::vector<T>(std::move(items)) {}  // NOLINT
+  template <class I>
+    requires std::is_integral_v<I> || std::is_same_v<I, Whole>
+  typename std::vector<T>::reference operator[](I index) {
+    const i64 at = static_cast<i64>(index);
+    if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return std::vector<T>::operator[](static_cast<std::size_t>(at));
+    static thread_local std::vector<T> beside(1);
+    beside[0] = T{};
+    return beside[0];
+  }
+  template <class I>
+    requires std::is_integral_v<I> || std::is_same_v<I, Whole>
+  typename std::vector<T>::const_reference operator[](I index) const {
+    const i64 at = static_cast<i64>(index);
+    if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return std::vector<T>::operator[](static_cast<std::size_t>(at));
+    static const T zero{};
+    return zero;
+  }
+};
+
 /// A value of the interpreter as the C++ type of its pin, and back. A list is the vector of its
 /// items; a list of whole numbers is a vector of i64 in the interpreter and of Whole (`Int`) in a
 /// Blueprint's class.
@@ -202,6 +231,10 @@ template <NativeStruct S> struct Held<std::vector<S>> {
     return r;
   }
 };
+// A list of a Blueprint's class (List<Float>, List<Weapon> ...): held as the vector of its items.
+template <class T> struct Held<List<T>> : Held<std::vector<T>> {
+  static List<T> from(const Value& v) { return List<T>(Held<std::vector<T>>::from(v)); }
+};
 }  // namespace detail
 template <class T> T from_value(const Value& v) { return detail::Held<T>::from(v); }
 /// What a function of the engine gives where a Blueprint's own type stands - one of its structs or
@@ -281,10 +314,6 @@ template <class T> void insert(std::vector<T>& items, i64 index, std::type_ident
   const std::size_t at = index <= 0 ? 0 : static_cast<u64>(index) >= items.size() ? items.size() : static_cast<std::size_t>(index);
   items.insert(items.begin() + static_cast<std::ptrdiff_t>(at), std::move(item));
 }
-/// Replaces the item at `index`; beyond the list: nothing.
-template <class T> void set(std::vector<T>& items, i64 index, std::type_identity_t<T> item) {
-  if (index >= 0 && static_cast<u64>(index) < items.size()) items[static_cast<std::size_t>(index)] = std::move(item);
-}
 /// Takes the item at `index` out; beyond the list: nothing.
 template <class T> void remove_at(std::vector<T>& items, i64 index) {
   if (index >= 0 && static_cast<u64>(index) < items.size()) items.erase(items.begin() + static_cast<std::ptrdiff_t>(index));
@@ -342,8 +371,8 @@ inline std::vector<std::string> names(std::string_view list) {
 namespace structs {
 /// Make: the struct with these fields.
 inline Value make(std::vector<Value> fields) { return Value::structure(std::move(fields)); }
-/// Set Field: the field at `index` of the struct `s` becomes `value` (a field it does not have:
-/// nothing).
+/// The field at `index` of the struct `s` becomes `value` (a field it does not hold: nothing -
+/// logic::hold_fields makes a value hold them all).
 inline void set_field(Value& s, std::size_t index, Value value) {
   if (index < s.fields()) s.own_rows()[index] = std::move(value);
 }

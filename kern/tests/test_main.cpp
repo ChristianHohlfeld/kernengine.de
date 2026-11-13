@@ -2407,7 +2407,7 @@ struct L : kern::Blueprint {
   void on1() {
     list_add(Items, 2.0);
     list_insert(Items, 0, 9.0);
-    list_set(Items, 1, 7.0);
+    Items[1] = 7.0;
     list_remove_at(Items, 5);
     list_remove(Items, 1.0);
     for (auto it7 = flow_for_each<Float>(n7, Items); it7.next();) {
@@ -3129,7 +3129,7 @@ struct Arena : kern::Blueprint {
   problem(with_types(R"("nodes":[{"id":1,"type":"enum.name","params":{"enum":"S"}}],"links":[])"), "\"S\" is no enum of this Blueprint");
   problem(with_types(R"("nodes":[{"id":1,"type":"logic.select","params":{"type":"U"}}],"links":[])"), "\"U\" is no type it can have (Type: float, int, bool, vector, text, actor, an enum or a struct of this Blueprint, or a list of one");
   problem(with_types(R"("variables":[{"name":"V","type":"float","value":0}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"struct.set_field","params":{"variable":"V","field":"N"}}],"links":[[1,"then",2,"exec"]])"),
-          "needs a struct variable: \"V\" is float");
+          "V is float: it has no fields");
   problem(with_types(R"("variables":[{"name":"V","type":"struct","of":"S","value":{}}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"struct.set_field","params":{"variable":"V","field":"Gone"}}],"links":[[1,"then",2,"exec"]])"),
           "S has no field \"Gone\" (K, N)");
   problem(with_types(R"("nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"struct.set_field","params":{"variable":"Gone","field":"N"}}],"links":[[1,"then",2,"exec"]])"), "no variable \"Gone\"");
@@ -3349,7 +3349,7 @@ static logic::Graph every_node_graph(bool wired) {
     std::vector<std::pair<std::string, std::string>> params;
     for (const logic::ParamDef& pd : def->params) {
       using K = logic::ParamDef::Kind;
-      params.push_back({pd.key, pd.kind == K::type && pd.enums_only ? "EM" : pd.kind == K::type && pd.structs_only ? "SM" : pd.kind == K::variable ? (type == "struct.set_field" ? "VS" : type.rfind("list.", 0) == 0 ? "LT" : "VF") :
+      params.push_back({pd.key, pd.kind == K::type && pd.enums_only ? "EM" : pd.kind == K::type && pd.structs_only ? "SM" : pd.kind == K::variable ? (type.rfind("list.", 0) == 0 ? "LT" : "VF") :
                                     pd.kind == K::field ? "In" : pd.kind == K::function ? (def->kind == logic::NodeKind::pure ? "Calc" : "Fn") : pd.kind == K::machine ? "State Machine" :
                                     pd.kind == K::state ? "Idle" : pd.def});
     }
@@ -4022,16 +4022,17 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused(weapon + solo + "  Weapon Other = Solo{1.0};", "this is Solo, but Weapon is needed");
   refused(weapon + "  List<Weapon> Rack = List<Weapon>{Weapon{\"a\", Kind::Melee, 1.0}, 2.0};", "a list's item: this is Float, but Weapon is needed");
   refused(weapon + "  List<Weapon> Rack = List<Kind>{};", "this is List<Kind>, but List<Weapon> is needed (like List<Weapon>{})");
-  // a field is set by its name, and read through Break
+  // a field is set and read at its place: by its name
   refused(weapon + in_event("    Held.Range = 1.0;"), "Weapon has no field \"Range\" (Label, Type, Damage)", "line 14, column 10:");
-  refused(weapon + in_event("    Held.Damage += 1.0;"), "Held.Damage = value; expected, not \"+=\"");
   refused(weapon + in_event("    Held.Damage = \"a\";"), "is Float, this is Text");
   refused(weapon + in_event("    Held.Type = Count;"), "this is Int, the input is Kind: the two do not convert");
   refused(in_event("    Heat.X = 1.0;"), "Heat is Float: only a struct has fields to set (Variable.Field = value;)");
   refused(weapon + in_event("    n9.value = (Held.Range = 1.0);"), "Weapon has no field \"Range\"");
   refused(weapon + in_event("    n9.total = (Held.Damage = 1.0);"), "a Set gives \"value\"");
   refused(weapon + in_event("    struct_set_field<\"Damage\">(Held, 1.0);"), "a struct's field is set by its name: Variable.Field = value;");
-  refused(weapon + in_event("    Heat = Held.Damage;"), "a struct's field is read through Break: struct_break<Weapon>(Held).Damage");
+  refused(weapon + in_event("    Held.Label[0] = \"a\";"), "Held.Label is Text: it has no entries");
+  refused(weapon + in_event("    Heat = Held.Damage[0];"), "Held.Damage is Float: it has no entries");
+  refused(weapon + in_event("    list_set(Held, 0, 1.0);"), "an entry of a list is set at its place: List[index] = value;");
   refused(in_event("    Heat = Count.Damage;"), "Count is Int: it has no fields");
   refused(weapon + in_event("    Heat = struct_break<Weapon>(Held);"), "struct_break gives several values: say which one (.Label, Type, Damage)");
   refused(solo + in_event("    Heat = struct_break<Solo>(One);"), "which field: struct_break<Solo>(...).A");
@@ -9527,13 +9528,15 @@ TEST(studio_logic_lists) {
   bool add_to = false, bare = false;
   for (const json::Value& it : pal["items"].items()) add_to |= it["type"].as_string() == "list.add" && it["label"].as_string() == "Add to Names" && it["params"]["variable"].as_string() == "Names";
   pal = f.cmd(R"({"cmd":"logicPalette","query":"list"})");
-  std::size_t steps = 0;
+  std::size_t steps = 0, entries = 0;
   for (const json::Value& it : pal["items"].items()) {
+    // (an entry is set at its place: the Set with the path [] - "Set Names[]")
+    if (it["type"].as_string() == "var.set" && it["params"]["path"].as_string() == "[]") entries += it["label"].as_string() == "Set " + it["params"]["variable"].as_string() + "[]";
     if (it["type"].as_string().rfind("list.", 0) != 0 || !it["params"]["variable"].is_string()) continue;
     ++steps;
     bare |= it["params"]["variable"].as_string().empty();
   }
-  CHECK(add_to && !bare && steps == 12);  // (six steps for each of the two list variables)
+  CHECK(add_to && !bare && steps == 10 && entries == 2);  // (five steps and the Set of an entry for each of the two list variables)
   // From the pin of Get Names: the nodes for a list, in its type; nothing a list does not go into.
   auto added = [&](const char* type, const char* params = "{}") {
     json::Value add = json::Value::object(), p;
@@ -9972,7 +9975,7 @@ TEST(studio_logic_structs) {
   json::Value pal = cmd({{"cmd", "logicPalette"}, {"query", "weapon"}});
   CHECK(offered(pal, "struct.make", "struct", "Weapon", "Make Weapon") && offered(pal, "struct.break", "struct", "Weapon", "Break Weapon") && !offered(pal, "struct.make", "struct", "Aim"));
   pal = cmd({{"cmd", "logicPalette"}, {"query", "held"}});
-  CHECK(offered(pal, "struct.set_field", "field", "Damage", "Set Damage of Held") && offered(pal, "struct.set_field", "field", "Sight", "Set Sight of Held") && offered(pal, "var.set", "variable", "Held"));
+  CHECK(offered(pal, "var.set", "path", ".Damage", "Set Held.Damage") && offered(pal, "var.set", "path", ".Sight", "Set Held.Sight") && offered(pal, "var.set", "variable", "Held"));
   pal = cmd({{"cmd", "logicPalette"}, {"query", "struct"}});
   bool bare = false;
   std::size_t per_struct = 0;
@@ -10023,23 +10026,30 @@ TEST(studio_logic_structs) {
   };
   // Make has an input for each field - of the field's type, with its default -, Break an output; Set Field names a variable and a field.
   const u32 begin = added("event.begin"), make = added("struct.make", R"({"struct":"Weapon"})"), brk = added("struct.break", R"({"struct":"Weapon"})"), set = added("var.set", R"({"variable":"Held"})");
-  const u32 tune = added("struct.set_field", R"({"variable":"Held","field":"Damage"})"), number = added("math.add"), text = added("text.append"), print = added("debug.print");
+  const u32 tune = added("var.set", R"({"variable":"Held","path":".Damage"})"), number = added("math.add"), text = added("text.append"), print = added("debug.print");
   CHECK(node(make)["title"].as_string() == "Make Weapon" && node(make)["inputs"].size() == 6 && node(make)["inputs"][1]["id"].as_string() == "Damage" && node(make)["inputs"][1]["type"].as_string() == "float");
   CHECK(pin(make, "Damage", false)["value"].as_number() == 10 && pin(make, "Type", false)["type"].as_string() == "enum" && pin(make, "Type", false)["of"].as_string() == "Kind" && pin(make, "Type", false)["value"].as_number() == 1);
   CHECK(pin(make, "Sight", false)["type"].as_string() == "struct" && pin(make, "Sight", false)["of"].as_string() == "Aim" && pin(make, "Sight", false)["value"]["Tries"].as_number() == 3);
   CHECK(pin(make, "Marks", false)["type"].as_string() == "struct_list" && pin(make, "value", true)["type"].as_string() == "struct" && pin(make, "value", true)["of"].as_string() == "Weapon");
   CHECK(node(brk)["title"].as_string() == "Break Weapon" && node(brk)["outputs"].size() == 6 && pin(brk, "Label", true)["type"].as_string() == "text" && pin(brk, "value", false)["value"]["Damage"].as_number() == 10);
-  CHECK(node(tune)["title"].as_string() == "Set Damage of Held" && pin(tune, "value", false)["type"].as_string() == "float" && pin(tune, "value", false)["value"].as_number() == 10);
-  // (its settings: the struct variables, and the fields of the one it names)
-  std::string variables, field_choices;
+  CHECK(node(tune)["title"].as_string() == "Set Held.Damage" && pin(tune, "value", false)["type"].as_string() == "float" && pin(tune, "value", false)["value"].as_number() == 10);
+  // (its settings: the variable, and the path from it to the place - a text on the node)
+  std::string variables, path_kind, path_value;
   const json::Value tuned = node(tune);
-  for (const json::Value& p : tuned["params"].items())
-    for (const json::Value& ch : p["choices"].items()) (p["key"].as_string() == "variable" ? variables : field_choices) += ch[0].as_string() + " ";
-  CHECK(variables == "Held Last " && field_choices == "Label Damage Type Falloff Sight Marks " && node(tune)["params"][1]["kind"].as_string() == "field");
-  // (a Set Field without settings names the first struct variable and its first field; of another variable: a field that one has)
-  const u32 loose = added("struct.set_field");
-  CHECK(f.s->level().logic.find(loose)->param("variable") == "Held" && f.s->level().logic.find(loose)->param("field") == "Label");
-  CHECK(cmd({{"cmd", "logicParam"}, {"node", loose}, {"key", "variable"}, {"value", "Last"}})["ok"].as_bool() && f.s->level().logic.find(loose)->param("field") == "Tries" && node(loose)["title"].as_string() == "Set Tries of Last");
+  for (const json::Value& p : tuned["params"].items()) {
+    for (const json::Value& ch : p["choices"].items())
+      if (p["key"].as_string() == "variable") variables += ch[0].as_string() + " ";
+    if (p["key"].as_string() == "path") path_kind = p["kind"].as_string(), path_value = p["value"].as_string();
+  }
+  CHECK(variables.find("Held ") != std::string::npos && variables.find("Last ") != std::string::npos && path_kind == "path" && path_value == ".Damage");
+  // (another variable: a path that does not lead through it starts at the variable again; a path typed in leads on from there)
+  const u32 loose = added("var.set", R"({"variable":"Held","path":".Label"})");
+  CHECK(node(loose)["title"].as_string() == "Set Held.Label" && pin(loose, "value", false)["type"].as_string() == "text");
+  CHECK(cmd({{"cmd", "logicParam"}, {"node", loose}, {"key", "variable"}, {"value", "Last"}})["ok"].as_bool() && f.s->level().logic.find(loose)->param("path").empty() && node(loose)["title"].as_string() == "Set Last");
+  CHECK(cmd({{"cmd", "logicParam"}, {"node", loose}, {"key", "path"}, {"value", ".Tries"}})["ok"].as_bool() && node(loose)["title"].as_string() == "Set Last.Tries" && pin(loose, "value", false)["type"].as_string() == "int");
+  // (a list's entry: the path's [] is an index pin of the node)
+  CHECK(cmd({{"cmd", "logicParam"}, {"node", loose}, {"key", "variable"}, {"value", "Held"}})["ok"].as_bool() && cmd({{"cmd", "logicParam"}, {"node", loose}, {"key", "path"}, {"value", ".Marks[].Tries"}})["ok"].as_bool());
+  CHECK(node(loose)["title"].as_string() == "Set Held.Marks[].Tries" && pin(loose, "path0", false)["type"].as_string() == "int" && pin(loose, "value", false)["type"].as_string() == "int");
   json::Value gone = json::Value::array();
   gone.push(loose);
   CHECK(cmd({{"cmd", "logicDelete"}, {"ids", gone}})["ok"].as_bool());
@@ -10058,9 +10068,9 @@ TEST(studio_logic_structs) {
   CHECK(pin(select, "result", true)["type"].as_string() == "struct" && pin(select, "result", true)["of"].as_string() == "Weapon" && wire(rack, "value", length, "list")["ok"].as_bool());
   CHECK(f.s->level().logic.find(length)->param("type") == "Weapon" && pin(length, "list", false)["type"].as_string() == "struct_list" && no_errors(logic::check(f.s->level().logic)));
 
-  // A field's new name: its values and its wires stay with it - on Make, on Break, in Set Field, in every default.
+  // A field's new name: its values and its wires stay with it - on Make, on Break, in every path that leads through it, in every default.
   CHECK(edit("renameField", "Weapon", {{"field", "Damage"}, {"to", "Power"}})["ok"].as_bool() && fields("Weapon").find("Power:float") != std::string::npos);
-  CHECK(wired(number, "result", make, "Power") && wired(brk, "Power", tune, "value") && !wired(number, "result", make, "Damage") && node(tune)["title"].as_string() == "Set Power of Held");
+  CHECK(wired(number, "result", make, "Power") && wired(brk, "Power", tune, "value") && !wired(number, "result", make, "Damage") && node(tune)["title"].as_string() == "Set Held.Power");
   CHECK(variable("Held")["value"]["Power"].as_number() == 25 && !variable("Held")["value"].has("Damage") && variable("Rack")["value"][1]["Power"].as_number() == 10 && no_errors(logic::check(f.s->level().logic)));
   CHECK(cmd({{"cmd", "logicValue"}, {"node", make}, {"pin", "Label"}, {"value", "typed"}})["ok"].as_bool() && edit("renameField", "Weapon", {{"field", "Label"}, {"to", "Title"}})["ok"].as_bool());
   CHECK(f.s->level().logic.find(make)->value("Title") && f.s->level().logic.find(make)->value("Title")->as_string() == "typed" && wired(text, "result", make, "Title") && wired(brk, "Title", print, "text"));

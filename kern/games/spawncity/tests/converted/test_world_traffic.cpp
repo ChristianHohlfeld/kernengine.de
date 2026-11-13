@@ -85,7 +85,7 @@ struct Node {
   
   
 };
-namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope }; }
+namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; }
 enum class NodeKind : u8 { event, action, pure, flow };
 struct NodeDef : converted::EngineObject {
 };
