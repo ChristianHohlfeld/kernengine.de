@@ -119,7 +119,7 @@ SC_TEST(converted_ragdoll) {
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
       const auto want = run(a0, a1);
-      tally.take(bp, {arg(converted::wholes(a0)), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(converted::shaped<converted::Whole>(a0)), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
   {  // smooth

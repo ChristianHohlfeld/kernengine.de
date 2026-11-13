@@ -389,6 +389,18 @@ und schreibt sie in der Schreibweise:
   Division durch null, ein Schieben um 64 oder mehr (`converted::plus_bits`, `quot_bits`,
   `shl_bits` … markieren den Aufruf). Eine Zahl, die `size_t`, `long` … geschrieben ist, ist eine,
   mit der gezählt wird: die ganze Zahl des Blueprints (siehe unten).
+- **Maps und Sets sind Listen.** Eine Map ist im Blueprint die Liste ihrer Zeilen – Strukturen aus
+  Schlüssel (`first`) und Wert (`second`) –, ein Set die Liste seiner Schlüssel. Die Reihenfolge ist
+  die, in der die Schlüssel hineinkamen (`std::map` und `std::set`: die der Schlüssel) – was
+  `std::unordered_map` offen lässt, ist damit festgelegt, und im Test steht an ihrer Stelle eine Map
+  mit genau dieser Reihenfolge (`converted::wide::Map`, `Set`). Nachschlagen ist der Knoten Find Row
+  (`list_find_row<&Zeile::first>(liste, schlüssel)`); `m[k]` legt die Zeile an, wenn es sie nicht
+  gibt, wie in C++ – auch wenn nur gelesen wird; `insert`, `emplace`, `try_emplace`,
+  `insert_or_assign`, `erase`, `find`, `count`, `contains`, `at` sind Schritte und Werte über diese
+  Liste. Ein Iterator (in eine Map, ein Set oder eine Liste) ist die Stelle, an der er steht – eine
+  ganze Zahl; `end()` ist die Länge der Liste, `it->second` der Eintrag an der Stelle, `++it` die
+  nächste. `auto [a, b] = wert;` und `for (auto& [k, v] : map)` sind Namen für die Teile des Werts:
+  wo sie stehen, steht der Teil (`wert.first`).
 - Ein Stück Quelltext, das mit den Zahlen der Sprache nicht übersetzt (es ruft etwas, das nicht
   umgeschrieben ist), nimmt der Konverter aus dem Test und nennt die Funktion als nicht verglichen.
 - Eine Funktion wird geschrieben, wenn alles in ihr einen Platz in der Schreibweise hat – und
@@ -400,18 +412,17 @@ sagt, in den Zahlen der Sprache – überall gleich. Er sagt nicht, dass das die
 heutigen Programm: Das rechnet dieselben Formeln mit `f32` in 32 Bit, die Sprache in 64 Bit (wie das
 JavaScript-Original). Das ist die Festlegung der Sprache, kein Spielraum des Tests.
 
-Stand (13.11.2026): 281 von 1.428 Funktionen (1.916 von 28.544 Zeilen) aus 54 von 77 Dateien stehen
+Stand (13.11.2026): 286 von 1.428 Funktionen (1.986 von 28.544 Zeilen) aus 54 von 77 Dateien stehen
 als Blueprints im Level (54 Actors im Ordner „Source“). Der Test vergleicht jede davon, die etwas
-gibt, Bit für Bit mit ihrem Quelltext – 390 Vergleiche, weil Funktionen aus Headern (und die der
+gibt, Bit für Bit mit ihrem Quelltext – 397 Vergleiche, weil Funktionen aus Headern (und die der
 64-Bit-Zahlen) in jedem Blueprint stehen, der sie benutzt; keine ist ausgenommen. Das Spiel führt für diese Dateien weiter
 ihr C++ aus (Stufe 5).
 
 Worauf die anderen warten, nach Zeilen: der Zustand von `Game` (328 Funktionen, 13.818 Zeilen:
 geteilte Zeiger, Typen der Engine mit eigenem Innenleben); Klassen mit einem Zeiger auf die Welt,
 den Renderer, den Mixer oder die Physik der Engine (`Life`, `PeopleArt`, `Car`, `Marks`,
-`Destruction`, `Drone`, `Interiors`, `Ragdolls` …: rund 4.500 Zeilen, dazu rund 1.000 Zeilen mit
-Zeigern im Rumpf); Maps und Sets (`Terrain`, `CityStream`, `TrafficRules`, `RoadGraph`: rund 2.700
-Zeilen); `Session` (Netz der Engine: 664); die Aufrufe der Regel-Blueprints (482); Text formatieren
+`Destruction`, `Drone`, `Interiors`, `Ragdolls`, `Terrain`, `CityStream` …: rund 7.000 Zeilen, dazu
+rund 800 Zeilen mit Zeigern im Rumpf); `Session` (Netz der Engine: 664); die Aufrufe der Regel-Blueprints (482); Text formatieren
 und zeichenweise lesen.
 
 Aufruf (in `kern/games/spawncity`):
@@ -464,7 +475,9 @@ Was als Nächstes dazukommt, in der Reihenfolge der Zeilen, die darauf warten:
    - [x] Listen: einfügen und löschen an einer Stelle oder über einen Bereich (`erase`, `insert`),
      `resize`, `assign`, Listen, die ein Konstruktor baut (`std::vector<T> v(n, x)`, aus einem
      Bereich), `std::swap`, `std::reverse`.
-   - [ ] Maps und Sets; Text formatieren und zerlegen; Listen sortieren und durchsuchen.
+   - [x] Maps und Sets als Listen ihrer Zeilen, Iteratoren als Stellen, Namen für die Teile eines
+     Werts (`auto [a, b]`) – siehe oben.
+   - [ ] Text formatieren und zerlegen; Listen sortieren und durchsuchen; `std::priority_queue`.
    - [ ] Zeiger: ein Zeiger auf ein Objekt des Spiels ist sein Platz in einer Liste oder ein Actor;
      ein Zeiger auf die Welt, den Renderer oder den Mixer der Engine ist die Engine selbst (6).
 5. [ ] **Aufrufe zwischen Blueprints als Werte:** eine reine Funktion eines anderen Blueprints

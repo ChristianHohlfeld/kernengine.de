@@ -253,7 +253,7 @@ SC_TEST(converted_game_barricades) {
     for (int i = 0; tally.more(i); ++i) {
       const Interiors::Plan a0 = draw_Interiors__Plan(draw);
       const converted::Watch watch;
-      const auto want = converted::wholes(run(a0));
+      const auto want = converted::shaped<converted::Whole>(run(a0));
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }

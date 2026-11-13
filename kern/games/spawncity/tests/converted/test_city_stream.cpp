@@ -267,7 +267,7 @@ SC_TEST(converted_city_stream) {
       const int a0 = static_cast<int>(draw.whole());
       const int a1 = static_cast<int>(draw.whole());
       const converted::Watch watch;
-      const auto want = converted::wholes(run(a0, a1));
+      const auto want = converted::shaped<converted::Whole>(run(a0, a1));
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -278,7 +278,7 @@ SC_TEST(converted_city_stream) {
     for (int i = 0; tally.more(i); ++i) {
       const Vec2 a0 = draw.vector2();
       const converted::Watch watch;
-      const auto want = converted::wholes(run(a0));
+      const auto want = converted::shaped<converted::Whole>(run(a0));
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
     }
   }

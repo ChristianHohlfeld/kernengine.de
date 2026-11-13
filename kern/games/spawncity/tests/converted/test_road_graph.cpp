@@ -59,9 +59,18 @@ inline u32 w64_multiply_high(u32 a, u32 b) {
   return a1 * b1 + (mid1 >> 16) + (mid2 >> 16) + carry;
 }
 inline Whole64 w64_multiply(Whole64 a, Whole64 b) { return {w64_multiply_high(a.low, b.low) + a.low * b.high + a.high * b.low, a.low * b.low}; }
+namespace Earcut { struct Node {
+    u32 i;
+    f64 x, y;
+    Node *prev, *next;
+    i32 z;
+    Node *prev_z, *next_z;
+    bool steiner;
+  }; }
 enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
 enum class Surface : u8 { none, cloth, tpu, floor };
 inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
+enum class GeomType : u8 { unknown = 0, point = 1, line = 2, polygon = 3 };
 enum class RoadClass : u8 { motorway, trunk, primary, secondary, tertiary, minor, service, track, path, pedestrian, river, canal, stream };
 struct Lane {
   std::vector<Vec2> points;
@@ -69,11 +78,33 @@ struct Lane {
   u64 tile = 0;
   bool alive = true;
 };
-namespace RoadGraph { struct Node {
+struct RoadGraph {
+ public:
+  /// Rebuilds from the live lanes (cheap; call when the lane set changed).
+  void rebuild(const std::vector<Lane>& lanes);
+  
+  
+  /// The node closest to `p` (-1 when the graph is empty or nothing lies within `max_m`).
+  i32 nearest(Vec2 p, f32 max_m = 80) const;
+  /// A* from the street closest to `from` to the one closest to `to`; `out` gets the points
+  /// (starting at `from`'s projection, ending at `to`). False when no route exists.
+  
+  /// Pure pursuit: the point `look` metres further along `path` from the projection of `p`.
+  static Vec2 pursuit_point(const std::vector<Vec2>& path, Vec2 p, f32 look);
+  /// Signature of the lane set it was built from (rebuild when it differs).
+  u64 built_from = ~0ull;
+
+ private:
+  struct Node {
     Vec2 p;
     std::vector<std::pair<i32, f32>> edges;  // neighbour, length
-  }; }
+  };
+  i32 node_at(Vec2 p);
+  std::vector<Node> nodes_;
+  converted::wide::Map<u64, i32> cells_;
+};
 u64 lane_signature(const std::vector<Lane>& lanes);
+constexpr f32 kCell = 3.5;
 u64 cell_key(i32 x, i32 y) { return (converted::shl_bits(static_cast<u64>(static_cast<u32>(x)), 32)) | static_cast<u32>(y); }
 f32 dist(Vec2 a, Vec2 b) { return hypot_bp(a.x - b.x, a.y - b.y); }
 u64 lane_signature(const std::vector<Lane>& lanes) {
@@ -84,7 +115,50 @@ u64 lane_signature(const std::vector<Lane>& lanes) {
   }
   return h;
 }
-namespace RoadGraph { inline Vec2 pursuit_point(const std::vector<Vec2>& path, Vec2 p, f32 look) {
+i32 RoadGraph::node_at(Vec2 p) {
+  const i32 cx = static_cast<i32>(converted::fits<int>(std::floor(p.x / kCell))), cy = static_cast<i32>(converted::fits<int>(std::floor(p.y / kCell)));
+  for (i32 dx = -1; dx <= 1; ++dx)
+    for (i32 dy = -1; dy <= 1; ++dy) {
+      auto it = cells_.find(cell_key(cx + dx, cy + dy));
+      if (it != cells_.end() && dist(converted::at(nodes_, it->second).p, p) < kCell) return it->second;
+    }
+  const i32 id = static_cast<i32>(nodes_.size());
+  nodes_.push_back({p, {}});
+  cells_[cell_key(cx, cy)] = id;
+  return id;
+}
+void RoadGraph::rebuild(const std::vector<Lane>& lanes) {
+  nodes_.clear();
+  cells_.clear();
+  for (const Lane& l : lanes) {
+    if (!l.alive || l.points.size() < 2) continue;
+    i32 prev = node_at(converted::at(l.points, 0));
+    for (std::size_t i = 1; i < l.points.size(); converted::pre_inc(i)) {
+      const i32 cur = node_at(converted::at(l.points, i));
+      if (cur == prev) continue;
+      const f32 len = dist(converted::at(nodes_, prev).p, converted::at(nodes_, cur).p);
+      auto link = [&](i32 a, i32 b) {
+        for (auto& e : converted::at(nodes_, a).edges)
+          if (e.first == b) return;
+        converted::at(nodes_, a).edges.push_back({b, len});
+      };
+      link(prev, cur);
+      link(cur, prev);
+      prev = cur;
+    }
+  }
+  built_from = lane_signature(lanes);
+}
+i32 RoadGraph::nearest(Vec2 p, f32 max_m) const {
+  i32 best = -1;
+  f32 bd = max_m;
+  for (std::size_t i = 0; i < nodes_.size(); converted::pre_inc(i)) {
+    const f32 d = dist(converted::at(nodes_, i).p, p);
+    if (d < bd) { bd = d; best = static_cast<i32>(i); }
+  }
+  return best;
+}
+Vec2 RoadGraph::pursuit_point(const std::vector<Vec2>& path, Vec2 p, f32 look) {
   if (path.empty()) return p;
   if (path.size() < 2) return converted::at(path, 0);
   std::size_t bi = 0;
@@ -105,7 +179,7 @@ namespace RoadGraph { inline Vec2 pursuit_point(const std::vector<Vec2>& path, V
     t = 0;
   }
   return converted::back(path);
-} }
+}
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
@@ -128,10 +202,35 @@ namespace RoadGraph { inline Vec2 pursuit_point(const std::vector<Vec2>& path, V
   s.alive = draw.flag();
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const Lane& s) { return converted::Value::structure({arg(s.points), arg(s.width), arg(converted::wholes(s.tile)), arg(s.alive)}); }
-[[maybe_unused]] static bool same(const Lane& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.points, (*got.rows)[0]) && same(want.width, (*got.rows)[1]) && same(converted::wholes(want.tile), (*got.rows)[2]) && same(want.alive, (*got.rows)[3]); }
-[[maybe_unused]] static bool defined(const Lane& s) { return defined(s.points) && defined(s.width) && defined(converted::wholes(s.tile)) && defined(s.alive); }
-[[maybe_unused]] static std::string text(const Lane& s) { return std::string("{") + text(s.points) + ", " + text(s.width) + ", " + text(converted::wholes(s.tile)) + ", " + text(s.alive) + "}"; }
+[[maybe_unused]] static converted::Value arg(const Lane& s) { return converted::Value::structure({arg(s.points), arg(s.width), arg(converted::shaped<converted::Whole>(s.tile)), arg(s.alive)}); }
+[[maybe_unused]] static bool same(const Lane& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.points, (*got.rows)[0]) && same(want.width, (*got.rows)[1]) && same(converted::shaped<converted::Whole>(want.tile), (*got.rows)[2]) && same(want.alive, (*got.rows)[3]); }
+[[maybe_unused]] static bool defined(const Lane& s) { return defined(s.points) && defined(s.width) && defined(converted::shaped<converted::Whole>(s.tile)) && defined(s.alive); }
+[[maybe_unused]] static std::string text(const Lane& s) { return std::string("{") + text(s.points) + ", " + text(s.width) + ", " + text(converted::shaped<converted::Whole>(s.tile)) + ", " + text(s.alive) + "}"; }
+[[maybe_unused]] static RoadGraph::Node draw_RoadGraph__Node(converted::Draw& draw) {
+  RoadGraph::Node s{};
+  s.p = draw.vector2();
+  s.edges = draw_list(draw, [&]() -> std::pair<int, double> { return std::pair<int, double>(static_cast<int>(draw.whole()), draw.number()); });
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const RoadGraph::Node& s) { return converted::Value::structure({arg(s.p), arg(s.edges)}); }
+[[maybe_unused]] static bool same(const RoadGraph::Node& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.p, (*got.rows)[0]) && same(want.edges, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const RoadGraph::Node& s) { return defined(s.p) && defined(s.edges); }
+[[maybe_unused]] static std::string text(const RoadGraph::Node& s) { return std::string("{") + text(s.p) + ", " + text(s.edges) + "}"; }
+[[maybe_unused]] static RoadGraph draw_RoadGraph(converted::Draw& draw) {
+  RoadGraph s{};
+  s.built_from = static_cast<u64>(draw.bits());
+  s.nodes_ = draw_list(draw, [&]() -> RoadGraph::Node { return draw_RoadGraph__Node(draw); });
+  s.cells_ = converted::draw_map<converted::wide::Map<u64, int>>(draw, [&]() -> u64 { return static_cast<u64>(draw.bits()); }, [&]() -> int { return static_cast<int>(draw.whole()); });
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const RoadGraph& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.built_from)), arg(s.nodes_), arg(converted::shaped<converted::wide::Map<converted::Whole, int>>(s.cells_))}); }
+[[maybe_unused]] static bool same(const RoadGraph& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(converted::shaped<converted::Whole>(want.built_from), (*got.rows)[0]) && same(want.nodes_, (*got.rows)[1]) && same(converted::shaped<converted::wide::Map<converted::Whole, int>>(want.cells_), (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const RoadGraph& s) { return defined(converted::shaped<converted::Whole>(s.built_from)) && defined(s.nodes_) && defined(converted::shaped<converted::wide::Map<converted::Whole, int>>(s.cells_)); }
+[[maybe_unused]] static std::string text(const RoadGraph& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.built_from)) + ", " + text(s.nodes_) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, int>>(s.cells_)) + "}"; }
+struct Out_RoadGraph_node_at { RoadGraph Self; int Result; };
+[[maybe_unused]] static bool same(const Out_RoadGraph_node_at& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_RoadGraph_node_at& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_RoadGraph_node_at& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 
 SC_TEST(converted_road_graph) {
   converted::Blueprint bp("RoadGraph");
@@ -178,7 +277,7 @@ SC_TEST(converted_road_graph) {
       const int a0 = static_cast<int>(draw.whole());
       const int a1 = static_cast<int>(draw.whole());
       const converted::Watch watch;
-      const auto want = converted::wholes(run(a0, a1));
+      const auto want = converted::shaped<converted::Whole>(run(a0, a1));
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
@@ -237,14 +336,51 @@ SC_TEST(converted_road_graph) {
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<Lane> a0 = draw_list(draw, [&]() -> Lane { return draw_Lane(draw); });
       const converted::Watch watch;
-      const auto want = converted::wholes(run(a0));
+      const auto want = converted::shaped<converted::Whole>(run(a0));
       tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); });
+    }
+  }
+  {  // RoadGraph::node_at
+    converted::Tally tally("RoadGraph_node_at");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] RoadGraph a0, [[maybe_unused]] Vec2 a1) { const auto r = a0.node_at(a1); return Out_RoadGraph_node_at{a0, r}; };
+    for (int i = 0; tally.more(i); ++i) {
+      const RoadGraph a0 = draw_RoadGraph(draw);
+      const Vec2 a1 = draw.vector2();
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // RoadGraph::rebuild
+    converted::Tally tally("RoadGraph_rebuild");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] RoadGraph a0, [[maybe_unused]] std::vector<Lane> a1) { a0.rebuild(a1); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      const RoadGraph a0 = draw_RoadGraph(draw);
+      const std::vector<Lane> a1 = draw_list(draw, [&]() -> Lane { return draw_Lane(draw); });
+      const converted::Watch watch;
+      const auto want = run(a0, a1);
+      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+    }
+  }
+  {  // RoadGraph::nearest
+    converted::Tally tally("RoadGraph_nearest");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] RoadGraph a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2) { return a0.nearest(a1, a2); };
+    for (int i = 0; tally.more(i); ++i) {
+      const RoadGraph a0 = draw_RoadGraph(draw);
+      const Vec2 a1 = draw.vector2();
+      const double a2 = draw.number();
+      const converted::Watch watch;
+      const auto want = run(a0, a1, a2);
+      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); });
     }
   }
   {  // RoadGraph::pursuit_point
     converted::Tally tally("RoadGraph_pursuit_point");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2) { return converted_road_graph::RoadGraph::pursuit_point(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2) { return RoadGraph::pursuit_point(a0, a1, a2); };
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       const Vec2 a1 = draw.vector2();

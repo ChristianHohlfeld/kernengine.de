@@ -7,6 +7,9 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-13",time:"11:05",title:"Konverter: Maps, Sets und Iteratoren",items:[
+    "Unter der Haube: Eine Map ist im Blueprint die Liste ihrer Zeilen (Schlüssel und Wert), ein Set die Liste seiner Schlüssel – in der Reihenfolge, in der sie hineinkamen. Ein Iterator ist die Stelle, an der er steht. Der Konverter schreibt find, insert, emplace, erase, m[k], Schleifen über Maps und auto [a, b]. 286 Funktionen aus 54 Dateien stehen als Blueprints im Level (397 Vergleiche, Bit für Bit). Am Spiel ändert sich dadurch nichts.",
+  ]},
   {date:"2026-11-13",time:"10:43",title:"Konverter: 64-Bit-Zahlen als Bitmuster",items:[
     "Unter der Haube: Schlüssel aus zwei 32-Bit-Zahlen, Hashes und Zufallszustände (u64, i64) sind im Blueprint jetzt die Struktur Whole64 aus zwei 32-Bit-Hälften; gerechnet wird mit Funktionen, die selbst umgeschrieben und Bit für Bit verglichen sind – über den ganzen Bereich von 64 Bit. 281 Funktionen aus 54 Dateien stehen als Blueprints im Level (390 Vergleiche). Am Spiel ändert sich dadurch nichts.",
   ]},

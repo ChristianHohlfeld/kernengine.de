@@ -187,10 +187,10 @@ namespace Life { inline void scare_cow(Cow& c, Vec2 from, f32 now, f32 secs) {
   s.id = static_cast<u64>(draw.bits());
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const Body& s) { return converted::Value::structure({arg(converted::wholes(s.id))}); }
-[[maybe_unused]] static bool same(const Body& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::wholes(want.id), (*got.rows)[0]); }
-[[maybe_unused]] static bool defined(const Body& s) { return defined(converted::wholes(s.id)); }
-[[maybe_unused]] static std::string text(const Body& s) { return std::string("{") + text(converted::wholes(s.id)) + "}"; }
+[[maybe_unused]] static converted::Value arg(const Body& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
+[[maybe_unused]] static bool same(const Body& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
+[[maybe_unused]] static bool defined(const Body& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
+[[maybe_unused]] static std::string text(const Body& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
 [[maybe_unused]] static Quat draw_kern__Quat(converted::Draw& draw) {
   Quat s{};
   s.x = draw.number();
@@ -264,10 +264,10 @@ namespace Life { using converted::arg; using converted::same; using converted::d
   return s;
 }
 namespace Life { using converted::arg; using converted::same; using converted::defined; using converted::text;
-[[maybe_unused]] static converted::Value arg(const Life::Cow& s) { return converted::Value::structure({arg(converted::wholes(s.key)), arg(s.meadow), arg(s.home), arg(s.off), arg(s.pos), arg(s.yaw), arg(s.hp), arg(s.phase), arg(s.next_moo), arg(s.flee_until), arg(s.flinch_at), arg(s.last_hit), arg(s.flee_v), arg(s.color), arg(s.rot), arg(s.dead), arg(s.walking), arg(s.carried), arg(s.carried_still), arg(s.body), arg(s.net_to), arg(s.net_v), arg(s.net_at), arg(s.net_rot), arg(s.net_dead)}); }
-[[maybe_unused]] static bool same(const Life::Cow& want, const converted::Value& got) { return got.rows && got.rows->size() == 25 && same(converted::wholes(want.key), (*got.rows)[0]) && same(want.meadow, (*got.rows)[1]) && same(want.home, (*got.rows)[2]) && same(want.off, (*got.rows)[3]) && same(want.pos, (*got.rows)[4]) && same(want.yaw, (*got.rows)[5]) && same(want.hp, (*got.rows)[6]) && same(want.phase, (*got.rows)[7]) && same(want.next_moo, (*got.rows)[8]) && same(want.flee_until, (*got.rows)[9]) && same(want.flinch_at, (*got.rows)[10]) && same(want.last_hit, (*got.rows)[11]) && same(want.flee_v, (*got.rows)[12]) && same(want.color, (*got.rows)[13]) && same(want.rot, (*got.rows)[14]) && same(want.dead, (*got.rows)[15]) && same(want.walking, (*got.rows)[16]) && same(want.carried, (*got.rows)[17]) && same(want.carried_still, (*got.rows)[18]) && same(want.body, (*got.rows)[19]) && same(want.net_to, (*got.rows)[20]) && same(want.net_v, (*got.rows)[21]) && same(want.net_at, (*got.rows)[22]) && same(want.net_rot, (*got.rows)[23]) && same(want.net_dead, (*got.rows)[24]); }
-[[maybe_unused]] static bool defined(const Life::Cow& s) { return defined(converted::wholes(s.key)) && defined(s.meadow) && defined(s.home) && defined(s.off) && defined(s.pos) && defined(s.yaw) && defined(s.hp) && defined(s.phase) && defined(s.next_moo) && defined(s.flee_until) && defined(s.flinch_at) && defined(s.last_hit) && defined(s.flee_v) && defined(s.color) && defined(s.rot) && defined(s.dead) && defined(s.walking) && defined(s.carried) && defined(s.carried_still) && defined(s.body) && defined(s.net_to) && defined(s.net_v) && defined(s.net_at) && defined(s.net_rot) && defined(s.net_dead); }
-[[maybe_unused]] static std::string text(const Life::Cow& s) { return std::string("{") + text(converted::wholes(s.key)) + ", " + text(s.meadow) + ", " + text(s.home) + ", " + text(s.off) + ", " + text(s.pos) + ", " + text(s.yaw) + ", " + text(s.hp) + ", " + text(s.phase) + ", " + text(s.next_moo) + ", " + text(s.flee_until) + ", " + text(s.flinch_at) + ", " + text(s.last_hit) + ", " + text(s.flee_v) + ", " + text(s.color) + ", " + text(s.rot) + ", " + text(s.dead) + ", " + text(s.walking) + ", " + text(s.carried) + ", " + text(s.carried_still) + ", " + text(s.body) + ", " + text(s.net_to) + ", " + text(s.net_v) + ", " + text(s.net_at) + ", " + text(s.net_rot) + ", " + text(s.net_dead) + "}"; }
+[[maybe_unused]] static converted::Value arg(const Life::Cow& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.key)), arg(s.meadow), arg(s.home), arg(s.off), arg(s.pos), arg(s.yaw), arg(s.hp), arg(s.phase), arg(s.next_moo), arg(s.flee_until), arg(s.flinch_at), arg(s.last_hit), arg(s.flee_v), arg(s.color), arg(s.rot), arg(s.dead), arg(s.walking), arg(s.carried), arg(s.carried_still), arg(s.body), arg(s.net_to), arg(s.net_v), arg(s.net_at), arg(s.net_rot), arg(s.net_dead)}); }
+[[maybe_unused]] static bool same(const Life::Cow& want, const converted::Value& got) { return got.rows && got.rows->size() == 25 && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]) && same(want.meadow, (*got.rows)[1]) && same(want.home, (*got.rows)[2]) && same(want.off, (*got.rows)[3]) && same(want.pos, (*got.rows)[4]) && same(want.yaw, (*got.rows)[5]) && same(want.hp, (*got.rows)[6]) && same(want.phase, (*got.rows)[7]) && same(want.next_moo, (*got.rows)[8]) && same(want.flee_until, (*got.rows)[9]) && same(want.flinch_at, (*got.rows)[10]) && same(want.last_hit, (*got.rows)[11]) && same(want.flee_v, (*got.rows)[12]) && same(want.color, (*got.rows)[13]) && same(want.rot, (*got.rows)[14]) && same(want.dead, (*got.rows)[15]) && same(want.walking, (*got.rows)[16]) && same(want.carried, (*got.rows)[17]) && same(want.carried_still, (*got.rows)[18]) && same(want.body, (*got.rows)[19]) && same(want.net_to, (*got.rows)[20]) && same(want.net_v, (*got.rows)[21]) && same(want.net_at, (*got.rows)[22]) && same(want.net_rot, (*got.rows)[23]) && same(want.net_dead, (*got.rows)[24]); }
+[[maybe_unused]] static bool defined(const Life::Cow& s) { return defined(converted::shaped<converted::Whole>(s.key)) && defined(s.meadow) && defined(s.home) && defined(s.off) && defined(s.pos) && defined(s.yaw) && defined(s.hp) && defined(s.phase) && defined(s.next_moo) && defined(s.flee_until) && defined(s.flinch_at) && defined(s.last_hit) && defined(s.flee_v) && defined(s.color) && defined(s.rot) && defined(s.dead) && defined(s.walking) && defined(s.carried) && defined(s.carried_still) && defined(s.body) && defined(s.net_to) && defined(s.net_v) && defined(s.net_at) && defined(s.net_rot) && defined(s.net_dead); }
+[[maybe_unused]] static std::string text(const Life::Cow& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(s.meadow) + ", " + text(s.home) + ", " + text(s.off) + ", " + text(s.pos) + ", " + text(s.yaw) + ", " + text(s.hp) + ", " + text(s.phase) + ", " + text(s.next_moo) + ", " + text(s.flee_until) + ", " + text(s.flinch_at) + ", " + text(s.last_hit) + ", " + text(s.flee_v) + ", " + text(s.color) + ", " + text(s.rot) + ", " + text(s.dead) + ", " + text(s.walking) + ", " + text(s.carried) + ", " + text(s.carried_still) + ", " + text(s.body) + ", " + text(s.net_to) + ", " + text(s.net_v) + ", " + text(s.net_at) + ", " + text(s.net_rot) + ", " + text(s.net_dead) + "}"; }
 }
 
 SC_TEST(converted_life) {
@@ -339,7 +339,7 @@ SC_TEST(converted_life) {
       const u64 a0 = static_cast<u64>(draw.bits());
       const converted::Watch watch;
       const auto want = run(a0);
-      tally.take(bp, {arg(converted::wholes(a0))}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(converted::shaped<converted::Whole>(a0))}, want, watch.left(), [&] { return text(a0); });
     }
   }
   {  // w64_add
@@ -362,8 +362,8 @@ SC_TEST(converted_life) {
       const u64 a0 = static_cast<u64>(draw.bits());
       const u64 a1 = static_cast<u64>(draw.bits());
       const converted::Watch watch;
-      const auto want = converted::wholes(run(a0, a1));
-      tally.take(bp, {arg(converted::wholes(a0)), arg(converted::wholes(a1))}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      const auto want = converted::shaped<converted::Whole>(run(a0, a1));
+      tally.take(bp, {arg(converted::shaped<converted::Whole>(a0)), arg(converted::shaped<converted::Whole>(a1))}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
   {  // dist2d

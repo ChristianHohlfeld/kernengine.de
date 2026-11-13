@@ -37,6 +37,12 @@ this tool converts, written into every Blueprint that uses them and compared wit
 like the program's own functions. (A number spelled size_t, long ... is one the program counts
 with: the Blueprint's whole number, as above.)
 
+A map is the list of its rows - structs of a key (`first`) and what it holds (`second`) -, a set
+the list of its keys, in the order the keys were put in (std::map and std::set: in the order of
+the keys). An iterator into a map, a set or a list is the place it stands at, a whole number; the
+end is the list's length. `auto [a, b] = value;` gives names to the parts of a value: where they
+stand, the part is written out.
+
   tools/cpp_to_blueprint.py --check <namespace> <include flags...> -- <file.cpp>...
 
 only counts: how many functions are written, and what the others wait for.
@@ -72,6 +78,12 @@ NODE_NAME = re.compile(r"^(math|logic|flow|list|text|vector|struct|enum|value|fu
 NUMBER = {"bool": "Bool", "float": "Float", "double": "Float", "long double": "Float", "int": "Int", "long": "Int", "long long": "Int", "short": "Int", "signed char": "Int",
           "unsigned char": "Int", "unsigned short": "Int", "unsigned int": "Int", "char": "Int", "unsigned long": "Int", "unsigned long long": "Int"}
 W64 = ("whole64u", "whole64s")     # (a type's name, cleaned: a 64-bit bit pattern, unsigned and signed)
+# A map is, in a Blueprint, the list of its rows - structs of a key (`first`) and what it holds (`second`) -,
+# a set the list of its keys: in the order they were put in (std::map and std::set: in the order of the
+# keys). An iterator into one, or into a list, is the place it stands at - a whole number; the end is the
+# list's length.
+KEYED = re.compile(r"std::(unordered_)?(multi)?(map|set)<")
+ITERATOR = re.compile(r"std::__detail::_Node_(?:const_)?iterator(?:_base)?<|std::_Rb_tree_(?:const_)?iterator<|__gnu_cxx::__normal_iterator<")
 W64_HEADER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "blueprint_whole64.h")
 UNSIGNED = {"unsigned char", "unsigned short", "unsigned int", "unsigned long", "unsigned long long"}
 # An unsigned 64-bit whole number is, in a Blueprint, the whole number its bits are read with a sign
@@ -627,10 +639,23 @@ class Unit:
             return "Vector"
         if t == "void":
             return None
+        if ITERATOR.match(t):
+            return "Int"
         if "*" in t:
             if os.environ.get("HANDLES") and re.fullmatch(r"(const )?kern::[\w:]+ \*(const)?", t):
                 return "Int"
             raise Wait("a pointer")
+        m = KEYED.match(t)
+        if m:
+            a = template_args(t)
+            if m.group(2):
+                raise Wait("a multimap or multiset")
+            extra = a[1:] if m.group(3) == "set" else a[2:]
+            if extra and not re.match(r"std::(hash|less)<", extra[0]):
+                raise Wait("a map or set with an order or a hash of its own")
+            if m.group(3) == "set":
+                return f"List<{self.element(self.btype(a[0]))}>"
+            return f"List<{self.pair(self.btype(a[0]), self.btype(a[1]))}>"
         m = re.match(r"std::vector<(.+)>$", t)
         if m:
             return f"List<{self.element(self.btype(template_args(t)[0]))}>"
@@ -644,8 +669,6 @@ class Unit:
             return f"List<{self.element(self.btype(template_args(t)[0]))}>"
         if t.startswith("std::shared_ptr"):
             raise Wait("a shared pointer (shared_ptr)")
-        if t.startswith("std::unordered_map") or t.startswith("std::map") or t.startswith("std::unordered_set") or t.startswith("std::set"):
-            raise Wait("a map or set (the language has lists)")
         if t.startswith("std::function") or "(lambda" in t:
             raise Wait("a function value (lambda / std::function)")
         if t.startswith("std::pair<"):
@@ -1146,10 +1169,48 @@ class Emit:
         self.loops = []       # the loops around the statement being written: their flags for break and continue
         self.ref_names = {}
         self.result_struct = None
+        self.homes = {}       # decl id of an iterator (or of what insert() gave) -> the list it goes through
+        self.serial = 0       # the number of the statement being written (see `slot`)
 
     # ---- types ----
     def tp(self, n):
+        """The Blueprint type of an expression: what the Blueprint holds there - a variable has the type it was
+        declared with, a field the struct's -, else what its C++ type says."""
+        t = self.held_type(n)
+        if t is not None:
+            return self.u.rows.get(t, t)   # (a list inside a list is held as a struct of that list: here, the list)
         return self.u.btype(qtype(n))
+
+    def held_type(self, n):
+        b = n if "_bt" in n else bare(n)
+        k = b.get("kind")
+        if "_bt" in b:
+            return b["_bt"]
+        if k == "DeclRefExpr" and b.get("referencedDecl", {}).get("id") in self.types:
+            return self.types[b["referencedDecl"]["id"]]
+        try:
+            if k == "MemberExpr" and kids(b) and not self.is_this(kids(b)[0]):
+                e = self.entry_of(kids(b)[0])
+                st = self.tp(e if e is not None else kids(b)[0])
+                if st in self.u.struct_fields and not (b.get("isArrow") and e is None) and st not in self.u.rows:
+                    return self.u.field(st, b["name"])[1]
+            if k == "CXXOperatorCallExpr" and not b.get("_op"):
+                e = self.entry_of(b)
+                if e is not None:
+                    return e["_bt"]
+                if self.is_slot(b):
+                    return self.rows(kids(b)[1])[3]
+        except Wait:
+            pass
+        return None
+
+    def copied_type(self, init):
+        """The type of the value `auto x = init;` copies, as the Blueprint holds it (None: what C++ says)."""
+        b = bare(init)
+        while (b.get("kind") == "ImplicitCastExpr" and b.get("castKind") in ("LValueToRValue", "NoOp") or b.get("kind") in ("CXXConstructExpr", "CXXBindTemporaryExpr")) and len(kids(b)) == 1:
+            b = bare(kids(b)[0])
+        t = self.held_type(b)
+        return self.u.rows.get(t, t) if t is not None else None
 
     def ctype(self, n):
         return self.u.clean(qtype(n))
@@ -1367,9 +1428,13 @@ class Emit:
                 targets.append(kids(n)[0])
             elif k == "CXXOperatorCallExpr" and callee_name(n) in ("operator=", "operator+=", "operator-=", "operator*=", "operator/="):
                 targets.append(kids(n)[1])
-            elif k == "CXXMemberCallExpr" and callee(n).get("name") in ("push_back", "emplace_back", "clear", "pop_back", "resize", "erase", "insert", "assign"):
+            elif k == "CXXMemberCallExpr" and callee(n).get("name") in ("push_back", "emplace_back", "clear", "pop_back", "resize", "erase", "insert", "assign", "emplace", "try_emplace", "insert_or_assign", "swap"):
                 if kids(callee(n)):
                     targets.append(kids(callee(n))[0])
+            elif k == "CXXMemberCallExpr" and callee(n).get("name") in ("find", "begin", "end") and kids(callee(n)) and re.match(r"std::__detail::_Node_iterator<|std::_Rb_tree_iterator<|__gnu_cxx::__normal_iterator<(?!const )", qtype(n)):
+                targets.append(kids(callee(n))[0])   # (an iterator through which the list may be changed)
+            elif k == "CXXOperatorCallExpr" and callee_name(n) == "operator[]" and len(kids(n)) == 3 and KEYED.match(self.u.clean(qtype(kids(n)[1]))):
+                targets.append(kids(n)[1])   # (m[key] makes the key's row when there is none)
             if k in ("CallExpr", "CXXMemberCallExpr", "CXXOperatorCallExpr"):
                 c = callee(n)
                 d = self.tree.decl.get(c.get("referencedMemberDecl") or c.get("referencedDecl", {}).get("id"))
@@ -1401,9 +1466,9 @@ class Emit:
             return
         for v in kids(s):
             raw = qtype(v)
-            if v.get("kind") != "VarDecl" or not (kids(v) and v.get("init")) or "&" not in raw or "&&" in raw or v.get("id") in self.named_places:
+            if v.get("kind") not in ("VarDecl", "DecompositionDecl") or self.init_of(v) is None or "&" not in raw or "&&" in raw or v.get("id") in self.named_places:
                 continue
-            init = kids(v)[-1]
+            init = self.init_of(v)
             if self.lambda_of(init) is not None:
                 continue
             target, root, own = self.unwrap(init), None, False
@@ -1429,6 +1494,8 @@ class Emit:
                 continue
             if (self.reads(init) - {root}) & changed:
                 raise Wait("a reference to an entry at a place that changes while the reference lives")
+            if v.get("kind") == "DecompositionDecl":   # (auto& [a, b] = place; - a and b are parts of the place)
+                self.bind(v, self.tp(init))
             for n in walk(rest):
                 if n.get("kind") == "DeclRefExpr" and n.get("referencedDecl", {}).get("id") == v["id"]:
                     n.clear()
@@ -1473,6 +1540,7 @@ class Emit:
     def stmt(self, s):
         """The lines of one statement, and whether the path ends there."""
         saved, self.pre = self.pre, []
+        self.serial += 1
         try:
             lines, ends = self.stmt1(s)
             return self.pre + lines, ends
@@ -1508,6 +1576,21 @@ class Emit:
             for v in kids(s):
                 if v.get("kind") in ("StaticAssertDecl", "UsingDecl", "TypeAliasDecl", "TypedefDecl"):
                     continue
+                if v.get("kind") == "DecompositionDecl":
+                    # auto [a, b] = value; - the value in a variable of its own, a and b its parts
+                    init = self.init_of(v)
+                    if v.get("id") in self.named_places:
+                        self.value(init)   # (a name for a place: what making the place does - a new row of a map - is done here)
+                        out += self.take_pre()
+                        continue
+                    if init is None:
+                        raise Wait("names for the parts of nothing")
+                    text, have = self.value(init)
+                    name = self.local(v, have)
+                    self.bind(v, have)
+                    self.note_home(v["id"], init, of_pair=True)
+                    out += self.take_pre() + [f"{name} = {text};"]
+                    continue
                 if v.get("kind") != "VarDecl":
                     raise Wait(f"a declaration in a body: {v.get('kind')}")
                 if v.get("storageClass") == "static":
@@ -1520,15 +1603,29 @@ class Emit:
                     out += self.local_function(v, lam)
                     continue
                 if v.get("id") in self.named_places:
-                    continue   # (a name for a place: written out where it is used)
+                    # (a name for a place: written out where it is used - what making the place does, a new row of a map, is done here)
+                    if any(x.get("kind") == "CXXOperatorCallExpr" and self.is_slot(x) for x in walk(kids(v)[-1])):
+                        self.value(kids(v)[-1])
+                        out += self.take_pre()
+                    continue
                 raw = qtype(v)
                 if "&" in raw and not re.search(r"\bconst\b", raw):
                     raise Wait("a reference to something it changes")
                 wide_init = kids(v) and v.get("init") and self.u.clean(raw) in ("unsigned long", "long", "unsigned long long", "long long") and self.is64(kids(v)[-1])
-                name = self.local(v, self.whole64() if wide_init else None)
                 init = kids(v)[-1] if kids(v) and v.get("init") else None
+                kept = None
+                if init is not None and "auto" in v.get("type", {}).get("qualType", "") and not wide_init:
+                    # (auto: the type is the value's - as the Blueprint holds it)
+                    kept = self.copied_type(init)
+                name = self.local(v, self.whole64() if wide_init else kept)
                 if init is not None:
-                    out.append(f"{name} = {self.ex(init, self.types[v['id']])};")
+                    text = self.ex(init, self.types[v['id']])
+                    out += self.take_pre() + [f"{name} = {text};"]
+                    c = self.ctype(v)
+                    if ITERATOR.match(c):
+                        self.note_home(v["id"], init)
+                    elif c.startswith("std::pair<") and ITERATOR.match(template_args(c)[0]):
+                        self.note_home(v["id"], init, of_pair=True)
                 else:
                     value = self.zero_value(raw, self.types[v["id"]])
                     out += self.take_pre() + [f"{name} = {value};"]
@@ -1662,6 +1759,7 @@ class Emit:
 
     def effect_stmt(self, n):
         saved, self.pre = self.pre, []
+        self.serial += 1
         try:
             lines = self.effect(n)
             return self.pre + lines
@@ -1688,18 +1786,21 @@ class Emit:
     def for_each(self, s):
         c = kids(s)
         body = c[-1]
-        var = next((x for x in c if x.get("kind") == "DeclStmt" and kids(x) and kids(x)[0].get("kind") == "VarDecl" and not kids(x)[0].get("isImplicit")), None)
+        var = next((x for x in c if x.get("kind") == "DeclStmt" and kids(x) and kids(x)[0].get("kind") in ("VarDecl", "DecompositionDecl") and not kids(x)[0].get("isImplicit")), None)
         rng = next((x for x in c if x.get("kind") == "DeclStmt" and kids(x) and kids(x)[0].get("name", "").startswith("__range")), None)
         if var is None or rng is None:
             raise Wait("a loop over a range of another shape")
         v = kids(var)[0]
         raw = qtype(v)
-        changes = "&" in raw and not re.search(r"\bconst\b", raw)
         src = kids(kids(rng)[0])[-1]
         lt = self.tp(src)
         if not lt.startswith("List<"):
             raise Wait("a loop over something that is not a list")
         it = lt[5:-1]
+        if v.get("kind") == "DecompositionDecl":   # for (auto& [key, value] : map): the names are the parts of the row
+            self.bind(v, it)
+        # (an entry the body only reads is the loop's item, whatever the loop calls it)
+        changes = "&" in raw and not re.search(r"\bconst\b", raw) and v["id"] in self.assigned(body)
         node = self.u.next_node
         self.u.next_node += 1
         self.u.members.append(f"  struct : kern::Node<{node}> {{ {it} item = {self.u.zero(it)}; Int index = 0; }} n{node};")
@@ -1886,6 +1987,19 @@ class Emit:
         if k == "CXXOperatorCallExpr":
             name = callee_name(n)
             ops = kids(n)[1:]
+            if ops and self.is_iter(ops[0]) and name in ("operator++", "operator--", "operator+=", "operator-="):
+                by = "1" if name[-1] != "=" else self.ex(ops[1], "Int")
+                if name == "operator++" and self.plain_variable(ops[0]):
+                    return [f"{self.lvalue(ops[0])} += 1;"]
+                return self.store(ops[0], lambda t: self.whole_math("+" if name in ("operator++", "operator+=") else "-", self.ex(ops[0], "Int"), by))
+            if ops and self.is_iter(ops[0]) and name == "operator=":
+                target = self.unwrap(ops[0])
+                if target.get("kind") == "DeclRefExpr":
+                    self.note_home(target.get("referencedDecl", {}).get("id"), ops[1])
+                return self.store(ops[0], lambda t: self.ex(ops[1], t))
+            if self.is_slot(n):
+                self.slot(n)   # (m[key]; - the key's row is made)
+                return []
             if name == "operator=":
                 if self.is_box(ops[0]) and self.nothing(ops[1]):
                     return self.store(ops[0], lambda t: t + "{}")
@@ -1938,8 +2052,12 @@ class Emit:
                 raise Wait(f"{name}() of an owned or optional value")
             if base is not None and not self.is_this(base) and self.tp(base).startswith("List<"):
                 it = self.tp(base)[5:-1]
-                before, lv, after = self.variable_of(base, self.tp(base))
                 args = kids(n)[1:]
+                if name in ("reserve", "shrink_to_fit", "rehash", "max_load_factor"):
+                    return []
+                if self.keyed(base) and name in ("insert", "emplace", "try_emplace", "insert_or_assign", "erase") and not (name == "erase" and len(args) != 1):
+                    return self.keyed_change(base, name, args)[0]
+                before, lv, after = self.variable_of(base, self.tp(base))
                 if name in ("push_back", "emplace_back") and len(args) == 1:
                     return before + [f"list_add({lv}, {self.ex(args[0], it)});"] + after
                 if name == "clear":
@@ -2045,6 +2163,290 @@ class Emit:
     def is_local_call(self, n):
         return n.get("kind") == "CXXOperatorCallExpr" and callee_name(n) == "operator()" and callee(n).get("referencedDecl", {}).get("id") in self.u.lambdas
 
+    # ---- maps and sets: lists of rows by their keys; iterators: places ----
+    def keyed(self, n):
+        """Is this a map or a set? ("map" or "set", is it kept in the order of its keys) - else None."""
+        m = KEYED.match(self.ctype(n))
+        return (m.group(3), not m.group(1)) if m else None
+
+    def is_iter(self, n):
+        return ITERATOR.match(self.ctype(n)) is not None
+
+    def rows(self, n):
+        """(the list's type, a row's, a key's, what a row holds - None in a set) of a map or set."""
+        lt = self.tp(n)
+        row = lt[5:-1]
+        if self.keyed(n)[0] == "map":
+            fields = self.u.struct_fields[row]
+            return lt, row, fields[0][1], fields[1][1]
+        return lt, row, row, None
+
+    def found(self, kind, row, lst, key):
+        """Is there a row of this key?"""
+        return f"list_find_row<&{row}::first>({lst}, {key}).found" if kind == "map" else f"list_contains<{row}>({lst}, {key})"
+
+    def found_at(self, kind, row, lst, key):
+        """The place of a key's row, -1 when there is none."""
+        return f"list_find_row<&{row}::first>({lst}, {key}).index" if kind == "map" else f"list_find<{row}>({lst}, {key})"
+
+    def less(self, raw_key, kt, a, b):
+        """Does the key a come before b, as std::map and std::set order their keys?"""
+        whole = self.u.structs.get("w64::Whole64")
+        if whole is not None and kt == whole:
+            return self.w64("w64_less_signed" if raw_key in ("whole64s", "long", "long long") else "w64_less", a, b)
+        if kt in ("Int", "Float", "Bool") or kt in self.u.enum_values:
+            return f'math_compare<"<">({self.conv(a, kt, "Float")}, {self.conv(b, kt, "Float")})'
+        raise Wait(f"a map or set in the order of its keys, which are {kt}")
+
+    def put_row(self, base, key, value=None, assign=False):
+        """Steps that put a key into a map or set unless it is there (insert, emplace, m[key]): (the steps,
+        the place of the key's row, was it new). `key` and `value`: variables of the key's type and of what a
+        row holds (no value: its zero). `assign`: a row that is there gets the value (insert_or_assign)."""
+        kind, in_order = self.keyed(base)
+        lt, row, kt, vt = self.rows(base)
+        lst = self.ex(base, lt)
+        at, fresh = self.temp("at", "Int"), self.temp("fresh", "Bool")
+        new = f"struct_make<{row}>({key}, {value if value is not None else self.u.zero(vt)})" if kind == "map" else key
+        before, lv, after = self.variable_of(base, lt)
+        lines = [f"{at} = {self.found_at(kind, row, lst, key)};", f'{fresh} = math_compare<"<">(kern::to<Float>({at}), 0.0);', f"if ({fresh}) {{"]
+        body = list(before)
+        if in_order:
+            here = f"list_get<{row}>({lv}, {at})"
+            if kind == "map":
+                here = f"struct_break<{row}>({here}).first"
+            less = self.less(template_args(self.ctype(base))[0], kt, here, key)
+            body += [f"{at} = 0;", f'while (loop(logic_and(math_compare<"<">(kern::to<Float>({at}), kern::to<Float>(list_length<{row}>({lv}))), {less}))) {{', f"  {at} += 1;", "}",
+                     f"list_insert({lv}, {at}, {new});"]
+        else:
+            body += [f"{at} = list_length<{row}>({lv});", f"list_add({lv}, {new});"]
+        lines += ["  " + ln for ln in body + after]
+        if assign and kind == "map":
+            held = self.temp("row", row)
+            lines += ["} else {"] + ["  " + ln for ln in before + [f"{held} = list_get<{row}>({lv}, {at});", f"{held}.second = {value};", f"list_set({lv}, {at}, {held});"] + after]
+        lines.append("}")
+        return lines, at, fresh
+
+    def slot(self, n):
+        """m[key]: the place of the key's row. Steps before the statement find it - and add the row when the
+        key is new, as C++ does."""
+        cached = n.get("_slot")
+        if cached is not None and cached[0] == self.serial:
+            return cached[1]
+        base, key = kids(n)[1], kids(n)[2]
+        kt = self.rows(base)[2]
+        held = self.temp("key", kt)
+        self.hoist([f"{held} = {self.ex(key, kt)};"])
+        lines, at, _ = self.put_row(base, held)
+        self.hoist(lines)
+        n["_slot"] = (self.serial, at)
+        return at
+
+    def is_slot(self, n):
+        return n.get("kind") == "CXXOperatorCallExpr" and not n.get("_op") and callee_name(n) == "operator[]" and len(kids(n)) == 3 and (self.keyed(kids(n)[1]) or ("", 0))[0] == "map"
+
+    def entry(self, lst, index, row):
+        """The entry of a list at a place, as an expression of its own (the place: an expression or a text)."""
+        at = index if isinstance(index, dict) else {"kind": "_Text", "_text": index, "_type": "Int"}
+        return {"kind": "ArraySubscriptExpr", "_bt": row, "type": {"qualType": "int"}, "inner": [lst, at]}
+
+    def held_by(self, n):
+        """m[key] as the place it is: what the key's row holds."""
+        base = kids(n)[1]
+        _, row, _, vt = self.rows(base)
+        return {"kind": "MemberExpr", "name": "second", "_bt": vt, "type": {"qualType": "int"}, "inner": [self.entry(base, self.slot(n), row)]}
+
+    def iter_node(self, n):
+        """An iterator's expression without what only converts it (an iterator made a const_iterator)."""
+        b = self.unwrap(n)
+        while b.get("kind") in ("CXXConstructExpr", "CXXFunctionalCastExpr", "CXXStaticCastExpr") and len(kids(b)) == 1 and self.is_iter(kids(b)[0]):
+            b = self.unwrap(kids(b)[0])
+        return b
+
+    def entry_of(self, n):
+        """`*it`, `it->`: the entry an iterator into a list, map or set stands at, as an expression of its own."""
+        b = self.unwrap(n)
+        if b.get("kind") == "CXXOperatorCallExpr" and not b.get("_op") and callee_name(b) in ("operator->", "operator*") and len(kids(b)) == 2 and self.is_iter(kids(b)[1]):
+            home = self.home(kids(b)[1])
+            return self.entry(home, kids(b)[1], self.tp(home)[5:-1])
+        return None
+
+    def home(self, n):
+        """The list an iterator goes through."""
+        b = self.iter_node(n)
+        k = b.get("kind")
+        if k == "DeclRefExpr":
+            h = self.homes.get(b.get("referencedDecl", {}).get("id"))
+            if not h:
+                raise Wait("an iterator whose list is not known where it is used")
+            return h
+        if k == "CXXMemberCallExpr":
+            m = callee(b)
+            base = kids(m)[0] if kids(m) else None
+            if base is not None and not self.is_this(base) and m.get("name") in ("begin", "cbegin", "end", "cend", "find", "erase", "insert", "lower_bound", "upper_bound") and (self.tp_or_none(base) or "").startswith("List<"):
+                return base
+        if k == "MemberExpr" and b.get("name") == "first" and kids(b):   # (what insert() and emplace() give: the place and whether the key was new)
+            x = self.unwrap(kids(b)[0])
+            if x.get("kind") == "DeclRefExpr" and self.homes.get(x.get("referencedDecl", {}).get("id")):
+                return self.homes[x["referencedDecl"]["id"]]
+            if x.get("kind") == "CXXMemberCallExpr" and kids(callee(x)) and callee(x).get("name") in ("insert", "emplace", "try_emplace", "insert_or_assign"):
+                return kids(callee(x))[0]
+        if k == "CXXOperatorCallExpr" and callee_name(b) in ("operator+", "operator-", "operator++", "operator--", "operator+=", "operator-=") and len(kids(b)) >= 2:
+            return self.home(kids(b)[1])
+        if k == "CallExpr" and callee_name(b) in ("find", "next", "prev", "lower_bound", "upper_bound", "max_element", "min_element") and len(kids(b)) >= 2:
+            return self.home(kids(b)[1])
+        raise Wait("an iterator whose list is not known where it is used")
+
+    def steady(self, n):
+        """A list an iterator is kept into is named the same way as long as the iterator lives: a variable or
+        a field, not an entry at a place that is computed."""
+        b = self.unwrap(n)
+        while True:
+            if b.get("kind") == "DeclRefExpr" or self.is_this(b):
+                return n
+            if b.get("kind") == "MemberExpr" and not kids(b):
+                return n
+            if b.get("kind") == "MemberExpr" and (self.is_this(kids(b)[0]) or not b.get("isArrow")):
+                b = self.unwrap(kids(b)[0])
+                continue
+            raise Wait("an iterator kept into a list at a place that is computed")
+
+    def note_home(self, decl_id, source, of_pair=False):
+        """A variable is given an iterator (or what insert() gave): the list it goes through from here on."""
+        try:
+            if of_pair:
+                x = self.unwrap(source)
+                while x.get("kind") in ("CXXConstructExpr", "CXXBindTemporaryExpr") and len(kids(x)) == 1:
+                    x = self.unwrap(kids(x)[0])
+                if x.get("kind") == "CXXMemberCallExpr" and kids(callee(x)) and callee(x).get("name") in ("insert", "emplace", "try_emplace", "insert_or_assign"):
+                    h = self.steady(kids(callee(x))[0])
+                else:
+                    return
+            else:
+                h = self.steady(self.home(source))
+        except Wait:
+            return
+        old = self.homes.get(decl_id)
+        if old is None:
+            self.homes[decl_id] = h
+        elif old and not self.same_list(old, h):
+            self.homes[decl_id] = False   # (now this list, now that one: not known where it is used)
+
+    def two_of(self, n):
+        """The two parts of a pair written out where it is used ({k, v}, std::make_pair(k, v), std::pair<K, V>(k, v)), or None."""
+        b = self.unwrap(n)
+        while True:
+            k = b.get("kind")
+            ks = [x for x in kids(b) if x.get("kind") != "CXXDefaultArgExpr"]
+            if k == "CallExpr" and callee_name(b) == "make_pair" and len(kids(b)) == 3:
+                return kids(b)[1:]
+            if k in ("CXXConstructExpr", "CXXTemporaryObjectExpr", "InitListExpr", "CXXFunctionalCastExpr") and self.ctype(b).startswith("std::pair<"):
+                if len(ks) == 2 and k != "CXXFunctionalCastExpr":
+                    return ks
+                if len(ks) == 1:
+                    b = self.unwrap(ks[0])
+                    continue
+            return None
+
+    def keyed_change(self, base, name, a):
+        """A call that changes a map or set, as steps: (the steps, the place of the key's row, a flag - was
+        the key new; of erase: was it there)."""
+        kind, _ = self.keyed(base)
+        lt, row, kt, vt = self.rows(base)
+        if name == "erase" and len(a) == 1:
+            at = self.temp("at", "Int")
+            if self.is_iter(a[0]):
+                place = self.ex(a[0], "Int")
+                before, lv, after = self.variable_of(base, lt)
+                return before + [f"{at} = {place};", f"list_remove_at({lv}, {at});"] + after, at, "true"
+            key, gone = self.temp("key", kt), self.temp("gone", "Bool")
+            lines = [f"{key} = {self.ex(a[0], kt)};", f"{at} = {self.found_at(kind, row, self.ex(base, lt), key)};", f'{gone} = math_compare<">=">(kern::to<Float>({at}), 0.0);']
+            before, lv, after = self.variable_of(base, lt)
+            return lines + [f"if ({gone}) {{", *["  " + ln for ln in before + [f"list_remove_at({lv}, {at});"] + after], "}"], at, gone
+        if name in ("insert", "emplace", "try_emplace", "insert_or_assign") and a:
+            key_node, value = a[0], None
+            if kind == "set":
+                if len(a) != 1 or self.is_iter(a[0]) or bare(self.unwrap(a[0])).get("kind") in ("CXXStdInitializerListExpr", "InitListExpr") and self.tp_or_none(a[0]) != kt:
+                    raise Wait(f"{name}() of a set with other arguments")
+            else:
+                rest = a[1:]
+                if name in ("insert", "emplace") and len(a) == 1:
+                    two = self.two_of(a[0])
+                    if two is None:
+                        raise Wait(f"{name}() of a map with a pair that is made elsewhere")
+                    key_node, rest = two[0], [two[1]]
+                elif name == "insert" or (name == "emplace" and len(a) != 2):
+                    raise Wait(f"{name}() of a map with other arguments")
+                if not rest:
+                    value = lambda: self.u.zero(vt)
+                elif len(rest) == 1 and (vt not in self.u.struct_fields or self.tp_or_none(rest[0]) == vt):
+                    value = lambda: self.ex(rest[0], vt)
+                elif vt in self.u.struct_fields:
+                    value = lambda: self.make(vt, rest)
+                else:
+                    raise Wait(f"{name}() of a map with other arguments")
+            key = self.temp("key", kt)
+            lines = [f"{key} = {self.ex(key_node, kt)};"]
+            held = None
+            if kind == "map":
+                held = self.temp("value", vt)
+                lines.append(f"{held} = {value()};")
+            more, at, fresh = self.put_row(base, key, held, assign=name == "insert_or_assign")
+            return lines + more, at, fresh
+        raise Wait(f"{name}() of a map or set")
+
+    def keyed_call(self, b, base, name, a):
+        """A call of a map or set, as a value (None: one a list has as well - size, empty ...)."""
+        kind, _ = self.keyed(base)
+        lt, row, kt, vt = self.rows(base)
+        if name in ("find", "count", "contains", "at") and len(a) == 1:
+            lst, key = self.ex(base, lt), self.ex(a[0], kt)
+            if name == "contains":
+                return self.found(kind, row, lst, key), "Bool"
+            if name == "count":
+                return f"kern::to<Int>({self.found(kind, row, lst, key)})", "Int"
+            if name == "at":
+                if kind != "map":
+                    raise Wait("at() of a set")
+                self.f.indexes = True
+                return f"struct_break<{row}>(list_find_row<&{row}::first>({lst}, {key}).row).second", vt
+            return (f"kern::to<Int>(kern::formula([](Float at, Float count) -> Float {{ return at < 0.0 ? count : at; }}, "
+                    f"kern::to<Float>({self.found_at(kind, row, lst, key)}), kern::to<Float>(list_length<{row}>({lst}))))"), "Int"
+        if name in ("insert", "emplace", "try_emplace", "insert_or_assign", "erase") and not (name == "erase" and len(a) != 1):
+            lines, at, flag = self.keyed_change(base, name, a)
+            self.hoist(lines)
+            if name == "erase":
+                return (at, "Int") if self.is_iter(a[0]) else (f"kern::to<Int>({flag})", "Int")
+            pt = self.u.btype(qtype(b))
+            if pt not in self.u.struct_fields:
+                raise Wait(f"what {name}() of a map or set gives")
+            return f"struct_make<{pt}>({at}, {flag})", pt
+        if name in ("lower_bound", "upper_bound", "equal_range", "extract", "merge"):
+            raise Wait(f"{name}() of a map or set")
+        return None
+
+    def bind(self, d, bt):
+        """`auto [a, b] = ...;` - a and b are names for the parts of the value: where they are used, the part
+        is written out (the first field of the value, the second ...)."""
+        fields = self.u.struct_fields.get(bt)
+        binds = [c for c in kids(d) if c.get("kind") == "BindingDecl"]
+        if fields is None or len(fields) != len(binds) or any(f[3] is None for f in fields):
+            raise Wait("names for the parts of something that is not a struct")
+        ids = {c["id"]: i for i, c in enumerate(binds)}
+        for n in walk(self.f.decl):
+            if n.get("kind") == "DeclRefExpr" and n.get("referencedDecl", {}).get("id") in ids:
+                f, ft = fields[ids[n["referencedDecl"]["id"]]][3], fields[ids[n["referencedDecl"]["id"]]][1]
+                whole = {"kind": "DeclRefExpr", "referencedDecl": {"id": d["id"], "kind": "VarDecl", "name": d.get("name", "")}, "type": d.get("type", {}), "_bt": bt}
+                was = n.get("type", {})
+                n.clear()
+                n.update({"kind": "MemberExpr", "name": f, "isArrow": False, "type": was, "_bt": ft, "inner": [whole]})
+
+    @staticmethod
+    def init_of(v):
+        """What a declaration starts its variable with, or None."""
+        if v.get("kind") == "DecompositionDecl":
+            return next((c for c in kids(v) if c.get("kind") != "BindingDecl"), None)
+        return kids(v)[-1] if kids(v) and v.get("init") else None
+
     # ---- lists: places and the steps that change several entries ----
     def whole_math(self, op, a, b):
         """a + b or a - b of whole numbers (a number written out stands in the formula itself)."""
@@ -2084,6 +2486,8 @@ class Emit:
             raw = bare(kids(raw)[0])
         if raw.get("kind") == "ImplicitCastExpr" and raw.get("castKind") == "ArrayToPointerDecay" and (self.tp_or_none(kids(raw)[0]) or "").startswith("List<"):
             return kids(raw)[0], "0"
+        if self.is_iter(b):   # (an iterator: the place it stands at, in the list it goes through)
+            return self.home(b), self.ex(b, "Int")
         raise Wait("a place in a list of another shape")
 
     def tp_or_none(self, n):
@@ -2263,6 +2667,17 @@ class Emit:
         k = t.get("kind")
         if k == "DeclRefExpr":
             return [f"{self.lvalue(t)} = {value(self.tp(t))};"]
+        if k == "CXXOperatorCallExpr":
+            at_iterator = self.entry_of(t)
+            if at_iterator is not None:   # (*it = v: the entry the iterator stands at)
+                return self.store(at_iterator, value)
+            if self.is_slot(t):
+                # m[key] = v: first the value, then the key's row (new when the key is), then the row gets it
+                vt = self.rows(kids(t)[1])[3]
+                put = self.temp("put", vt)
+                text = value(vt)
+                self.hoist([f"{put} = {text};"])
+                return self.store(self.held_by(t), lambda _t: put)
         if self.is_this(t):
             return [f"{self.self_var()} = {value(self.f.self_type)};"]
         holder = self.box(t)
@@ -2277,7 +2692,10 @@ class Emit:
                     raise Wait("the state of its object (a method)")
                 fname, ft = self.u.field(self.f.self_type, t["name"])
                 return [f"{self.self_var()}.{fname} = {value(ft)};"]
-            if t.get("isArrow"):
+            at_iterator = self.entry_of(base)
+            if at_iterator is not None:
+                base = at_iterator
+            elif t.get("isArrow"):
                 if self.box(base) is None:
                     raise Wait("a pointer")
                 base = self.boxed(self.box(base))
@@ -2553,7 +2971,10 @@ class Emit:
                     raise Wait("the state of its object (a method)")
                 fname, ft = u.field(self.f.self_type, b["name"])
                 return f"struct_break<{self.f.self_type}>({self.self_name}).{fname}", ft
-            if b.get("isArrow"):
+            at_iterator = self.entry_of(base)
+            if at_iterator is not None:
+                base = at_iterator
+            elif b.get("isArrow"):
                 if self.box(base) is None:
                     raise Wait("a pointer")
                 base = self.boxed(self.box(base))
@@ -2907,6 +3328,8 @@ class Emit:
         """Is this value a 64-bit bit pattern (a Whole64 in the Blueprint)? Its type's spelling says so; where
         the compiler's tree has lost the spelling, what it is made of does."""
         b = bare(n)
+        if "_bt" in b:
+            return b["_bt"] == self.u.structs.get("w64::Whole64", "")
         c = self.ctype(b)
         if c in W64:
             return True
@@ -2916,6 +3339,8 @@ class Emit:
         whole = self.u.structs.get("w64::Whole64")
         if whole is None:
             return False
+        if k == "MemberExpr" or (k == "CXXOperatorCallExpr" and callee_name(b) in ("operator*", "operator[]")):
+            return self.tp_or_none(b) == whole   # (a field, a key of a map, what an iterator stands at: as the Blueprint holds it)
         if k == "DeclRefExpr":
             return self.types.get(b.get("referencedDecl", {}).get("id")) == whole
         if k in CAST:
@@ -3162,6 +3587,37 @@ class Emit:
         name = b.get("_op") or callee_name(b)
         ops = kids(b)[1:]
         ref = callee(b).get("referencedDecl", {}) if not b.get("_op") else {}
+        if self.is_slot(b):
+            return self.value(self.held_by(b))
+        if ops and not b.get("_op") and self.is_iter(ops[0]):
+            # an iterator is the place it stands at
+            if name in ("operator*", "operator->") and len(ops) == 1:
+                return self.value(self.entry_of(b))
+            if name in ("operator==", "operator!=") and len(ops) == 2:
+                x, y = self.iter_node(ops[0]), self.iter_node(ops[1])
+                for f_, e_ in ((x, y), (y, x)):   # (m.find(key) != m.end(): is there a row of the key?)
+                    if (f_.get("kind") == e_.get("kind") == "CXXMemberCallExpr" and callee(f_).get("name") == "find" and callee(e_).get("name") in ("end", "cend")
+                            and kids(callee(f_)) and kids(callee(e_)) and self.keyed(kids(callee(f_))[0]) and self.same_list(kids(callee(f_))[0], kids(callee(e_))[0])):
+                        fb = kids(callee(f_))[0]
+                        lt, row, kt, _ = self.rows(fb)
+                        there = self.found(self.keyed(fb)[0], row, self.ex(fb, lt), self.ex(kids(f_)[1], kt))
+                        return (there if name == "operator!=" else f"logic_not({there})"), "Bool"
+                same = f'math_compare<"==">(kern::to<Float>({self.ex(ops[0], "Int")}), kern::to<Float>({self.ex(ops[1], "Int")}))'
+                return (same if name == "operator==" else f"logic_not({same})"), "Bool"
+            if name in ("operator<", "operator>", "operator<=", "operator>=") and len(ops) == 2:
+                return f'math_compare<"{name[8:]}">(kern::to<Float>({self.ex(ops[0], "Int")}), kern::to<Float>({self.ex(ops[1], "Int")}))', "Bool"
+            if name in ("operator+", "operator-") and len(ops) == 2:
+                return self.whole_math(name[-1], self.ex(ops[0], "Int"), self.ex(ops[1], "Int")), "Int"
+            if name in ("operator++", "operator--"):
+                if not self.plain_variable(ops[0]):
+                    raise Wait("++ / -- of something that is not a variable, inside an expression")
+                var = self.lvalue(ops[0])
+                if len(ops) == 2:   # (it++: what it was before)
+                    old = self.temp("was", "Int")
+                    self.hoist([f"{old} = {var};"] + self.effect(b))
+                    return old, "Int"
+                self.hoist(self.effect(b))
+                return var, "Int"
         if self.own(ref.get("id")) and ref.get("id") in self.tree.body:   # an operator the program itself defines
             d = self.tree.body[ref["id"]]
             g = self.u.function(ref["id"])
@@ -3344,6 +3800,13 @@ class Emit:
             raise Wait("a pointer" if name in ("get", "release") else f"{name}() of an owned or optional value")
         bt = self.tp(base)
         a = kids(b)[1:]
+        if bt.startswith("List<") and name in ("begin", "cbegin", "end", "cend") and not a and self.is_iter(b):
+            # an iterator is the place it stands at: the first entry's is 0, the end the list's length
+            return ("0" if "begin" in name else f"list_length<{bt[5:-1]}>({self.ex(base, bt)})"), "Int"
+        if bt.startswith("List<") and self.keyed(base):
+            got = self.keyed_call(b, base, name, a)
+            if got is not None:
+                return got
         if bt.startswith("List<"):
             it = bt[5:-1]
             lst = self.ex(base, bt)
@@ -3385,6 +3848,9 @@ using converted::wide::distance; using converted::wide::distance_sq; using conve
 using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;"""
+
+
+KEYED_TEST = {"unordered_map": "Map", "unordered_set": "Set", "map": "SortedMap", "set": "SortedSet"}
 
 
 class TestWriter:
@@ -3438,6 +3904,8 @@ class TestWriter:
         text = re.sub(r"(?<![\w.])((?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?)[fF]\b", lambda m: m.group(1) if re.search(r"[.eE]", m.group(1)) else m.group(1) + ".0", text)
         text = re.sub(r"\bfloat\b", "double", text)
         text = re.sub(r"\b(?:std::)?(u?)int64_t\b", lambda m: "u64" if m.group(1) else "i64", text)
+        # (a map and a set as the Blueprint language has them: rows in the order they were put in - converted.h)
+        text = re.sub(r"\bstd::(unordered_map|unordered_set|map|set)\s*<", lambda m: "converted::wide::" + KEYED_TEST[m.group(1)] + "<", text)
         text = re.sub(r"\b(?:" + ENGINE + r"::)?dm::(" + "|".join(WIDE_MATH) + r")\s*\(", lambda m: WIDE_MATH[m.group(1)] + "(", text)   # (the engine's own functions of numbers: the formula's)
         return re.sub(r"\bstd::(" + "|".join(WIDE_MATH) + r")f?\s*\(", lambda m: WIDE_MATH[m.group(1)] + "(", text)
 
@@ -3501,7 +3969,9 @@ class TestWriter:
                 while callee.get("kind") == "ImplicitCastExpr" and kids(callee):
                     callee = bare(kids(callee)[0])
                 name = (callee.get("referencedDecl") or {}).get("name")
-            if k == "ArraySubscriptExpr" or name == "operator[]":
+            if name == "operator[]" and KEYED.match(self.u.clean(qtype(ks[1]))):
+                pass   # (m[key] is said for every key)
+            elif k == "ArraySubscriptExpr" or name == "operator[]":
                 base, index = ks[-2:]
                 inner = bare(base)
                 if k == "ArraySubscriptExpr" and not (inner.get("kind") == "ImplicitCastExpr" and inner.get("castKind") == "ArrayToPointerDecay"):
@@ -3512,7 +3982,7 @@ class TestWriter:
                 edits.append((a, 2, depth, a, "converted::at("))
                 swap(bb, ia, "[", ", ")
                 swap(ib, b, "]", ")")
-            elif k == "CXXMemberCallExpr" and ks and ks[0].get("kind") == "MemberExpr" and ks[0].get("name") in ("at", "front", "back") and kids(ks[0]):
+            elif k == "CXXMemberCallExpr" and ks and ks[0].get("kind") == "MemberExpr" and ks[0].get("name") in ("at", "front", "back") and kids(ks[0]) and not KEYED.match(self.u.clean(qtype(kids(ks[0])[0]))):
                 base = kids(ks[0])[0]
                 if ks[0].get("isArrow") or base.get("kind") == "CXXThisExpr":
                     raise Wait("an entry by a pointer")
@@ -3646,8 +4116,11 @@ class TestWriter:
     @staticmethod
     def wrap(expr, spelled):
         """A value of the test as the Blueprint has it where the two differ by more than their numbers: a
-        64-bit bit pattern (the program's u64) is the Blueprint's Whole64 - converted::wholes makes it one."""
-        return f"converted::wholes({expr})" if re.fullmatch(r"(?:std::vector<)*(?:u64|i64)>*", spelled) else expr
+        64-bit bit pattern (the program's u64) is the Blueprint's Whole64, a map the list of its rows, a
+        set the list of its keys - converted::shaped makes it that, by the type as the program spells it."""
+        if not re.search(r"\b[ui]64\b|converted::wide::(?:Sorted)?(?:Map|Set)<", spelled):
+            return expr
+        return f"converted::shaped<{re.sub(r'\b[ui]64\b', 'converted::Whole', spelled)}>({expr})"
 
     def spell(self, raw):
         c = self.u.clean(raw)
@@ -3669,6 +4142,14 @@ class TestWriter:
             if inner.startswith("std::array<") or "[" in inner:
                 raise Wait("the test has no values of a list inside a list")
             return f"std::vector<{self.spell(inner)}>"
+        m = KEYED.match(c)
+        if m and not m.group(2):
+            a = template_args(c)
+            name = "converted::wide::" + KEYED_TEST[(m.group(1) or "") + m.group(3)]
+            return f"{name}<{self.spell(a[0])}>" if m.group(3) == "set" else f"{name}<{self.spell(a[0])}, {self.spell(a[1])}>"
+        if c.startswith("std::pair<"):
+            a = template_args(c)
+            return f"std::pair<{self.spell(a[0])}, {self.spell(a[1])}>"
         q = self.u.find_type(c)
         if q in self.tree.enums:
             if q not in self.enum_names:
@@ -3700,6 +4181,16 @@ class TestWriter:
         if m:
             inner = template_args(c)[0]
             return f"draw_list(draw, [&]() -> {self.spell(inner)} {{ return {self.draw(inner)}; }})" if self.u.clean(inner) != "bool" else "draw_list(draw, [&] { return draw.flag(); })"
+        m = KEYED.match(c)
+        if m and not m.group(2):
+            a = template_args(c)
+            key = f"[&]() -> {self.spell(a[0])} {{ return {self.draw(a[0])}; }}"
+            if m.group(3) == "set":
+                return f"converted::draw_set<{self.spell(raw)}>(draw, {key})"
+            return f"converted::draw_map<{self.spell(raw)}>(draw, {key}, [&]() -> {self.spell(a[1])} {{ return {self.draw(a[1])}; }})"
+        if c.startswith("std::pair<"):
+            a = template_args(c)
+            return f"{self.spell(raw)}({self.draw(a[0])}, {self.draw(a[1])})"
         q = self.u.find_type(c)
         if q in self.tree.enums:
             return f"static_cast<{self.spell(raw)}>(draw.below({len(self.u.enum_values[self.u.enums[q]])}))"
@@ -3713,10 +4204,19 @@ class TestWriter:
         if raw.strip() in ("const char *", "const char *const"):
             return
         self.spell(raw)
-        m = re.match(r"std::vector<(.+)>$", c)
-        q = self.u.find_type(template_args(c)[0] if m else c)
-        if q in self.tree.records and q not in ("kern::Vec3", "kern::Vec2"):
-            self.helpers(q)
+        def parts(c):
+            """The classes a type is made of, through lists, maps, sets and pairs."""
+            if re.match(r"std::vector<", c):
+                return parts(template_args(c)[0])
+            m = KEYED.match(c)
+            if m or c.startswith("std::pair<"):
+                a = template_args(c)
+                return parts(a[0]) + (parts(a[1]) if not (m and m.group(3) == "set") else [])
+            return [c]
+        for part in parts(c):
+            q = self.u.find_type(part)
+            if q in self.tree.records and q not in ("kern::Vec3", "kern::Vec2"):
+                self.helpers(q)
 
     def helpers(self, q):
         """The helpers of a class of the test - draw, arg, same, defined, text - and the name of draw."""

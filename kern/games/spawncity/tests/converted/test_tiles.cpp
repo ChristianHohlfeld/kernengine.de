@@ -594,7 +594,7 @@ SC_TEST(converted_tiles) {
       const u64 a0 = static_cast<u64>(draw.bits());
       const converted::Watch watch;
       const auto want = run(a0);
-      tally.take(bp, {arg(converted::wholes(a0))}, want, watch.left(), [&] { return text(a0); });
+      tally.take(bp, {arg(converted::shaped<converted::Whole>(a0))}, want, watch.left(), [&] { return text(a0); });
     }
   }
   {  // w64_from_number
@@ -640,7 +640,7 @@ SC_TEST(converted_tiles) {
       const int a0 = static_cast<int>(draw.whole());
       const int a1 = static_cast<int>(draw.whole());
       const converted::Watch watch;
-      const auto want = converted::wholes(run(a0, a1));
+      const auto want = converted::shaped<converted::Whole>(run(a0, a1));
       tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }

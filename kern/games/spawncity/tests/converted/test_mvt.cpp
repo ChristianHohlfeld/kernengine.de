@@ -241,8 +241,8 @@ SC_TEST(converted_mvt) {
     for (int i = 0; tally.more(i); ++i) {
       const u64 a0 = static_cast<u64>(draw.bits());
       const converted::Watch watch;
-      const auto want = converted::wholes(run(a0));
-      tally.take(bp, {arg(converted::wholes(a0))}, want, watch.left(), [&] { return text(a0); });
+      const auto want = converted::shaped<converted::Whole>(run(a0));
+      tally.take(bp, {arg(converted::shaped<converted::Whole>(a0))}, want, watch.left(), [&] { return text(a0); });
     }
   }
   {  // ring_area
@@ -301,7 +301,7 @@ SC_TEST(converted_mvt) {
       const u64 a1 = static_cast<u64>(draw.bits());
       const converted::Watch watch;
       const auto want = run(a0, a1);
-      tally.take(bp, {arg(a0), arg(converted::wholes(a1))}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
+      tally.take(bp, {arg(a0), arg(converted::shaped<converted::Whole>(a1))}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); });
     }
   }
   {  // w64_from_number
@@ -359,8 +359,8 @@ SC_TEST(converted_mvt) {
     for (int i = 0; tally.more(i); ++i) {
       const i64 a0 = static_cast<i64>(draw.bits());
       const converted::Watch watch;
-      const auto want = converted::wholes(run(a0));
-      tally.take(bp, {arg(converted::wholes(a0))}, want, watch.left(), [&] { return text(a0); });
+      const auto want = converted::shaped<converted::Whole>(run(a0));
+      tally.take(bp, {arg(converted::shaped<converted::Whole>(a0))}, want, watch.left(), [&] { return text(a0); });
     }
   }
   {  // Writer::begin_layer

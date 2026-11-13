@@ -90,10 +90,10 @@ std::vector<u8> pack_ask() { return {static_cast<u8>(Kind::ask)}; }
   s.state = static_cast<unsigned char>(draw.below(40));
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const LampRec& s) { return converted::Value::structure({arg(converted::wholes(s.key)), arg(s.state)}); }
-[[maybe_unused]] static bool same(const LampRec& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(converted::wholes(want.key), (*got.rows)[0]) && same(want.state, (*got.rows)[1]); }
-[[maybe_unused]] static bool defined(const LampRec& s) { return defined(converted::wholes(s.key)) && defined(s.state); }
-[[maybe_unused]] static std::string text(const LampRec& s) { return std::string("{") + text(converted::wholes(s.key)) + ", " + text(s.state) + "}"; }
+[[maybe_unused]] static converted::Value arg(const LampRec& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.key)), arg(s.state)}); }
+[[maybe_unused]] static bool same(const LampRec& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]) && same(want.state, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const LampRec& s) { return defined(converted::shaped<converted::Whole>(s.key)) && defined(s.state); }
+[[maybe_unused]] static std::string text(const LampRec& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(s.state) + "}"; }
 [[maybe_unused]] static PlankRec draw_town__PlankRec(converted::Draw& draw) {
   PlankRec s{};
   s.key = static_cast<i64>(draw.bits());
@@ -102,10 +102,10 @@ std::vector<u8> pack_ask() { return {static_cast<u8>(Kind::ask)}; }
   s.planks = static_cast<unsigned char>(draw.below(40));
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const PlankRec& s) { return converted::Value::structure({arg(converted::wholes(s.key)), arg(s.door), arg(s.doors), arg(s.planks)}); }
-[[maybe_unused]] static bool same(const PlankRec& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(converted::wholes(want.key), (*got.rows)[0]) && same(want.door, (*got.rows)[1]) && same(want.doors, (*got.rows)[2]) && same(want.planks, (*got.rows)[3]); }
-[[maybe_unused]] static bool defined(const PlankRec& s) { return defined(converted::wholes(s.key)) && defined(s.door) && defined(s.doors) && defined(s.planks); }
-[[maybe_unused]] static std::string text(const PlankRec& s) { return std::string("{") + text(converted::wholes(s.key)) + ", " + text(s.door) + ", " + text(s.doors) + ", " + text(s.planks) + "}"; }
+[[maybe_unused]] static converted::Value arg(const PlankRec& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.key)), arg(s.door), arg(s.doors), arg(s.planks)}); }
+[[maybe_unused]] static bool same(const PlankRec& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]) && same(want.door, (*got.rows)[1]) && same(want.doors, (*got.rows)[2]) && same(want.planks, (*got.rows)[3]); }
+[[maybe_unused]] static bool defined(const PlankRec& s) { return defined(converted::shaped<converted::Whole>(s.key)) && defined(s.door) && defined(s.doors) && defined(s.planks); }
+[[maybe_unused]] static std::string text(const PlankRec& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(s.door) + ", " + text(s.doors) + ", " + text(s.planks) + "}"; }
 [[maybe_unused]] static MarkRec draw_town__MarkRec(converted::Draw& draw) {
   MarkRec s{};
   s.at = draw.vector();
