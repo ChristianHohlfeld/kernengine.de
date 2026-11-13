@@ -491,6 +491,39 @@ Was als Nächstes dazukommt, in der Reihenfolge der Zeilen, die darauf warten:
    Gelenke, Abfragen), Kamera, Renderer und Meshes, Netz, Ton, Zeit –, allgemein und für jedes
    Spiel.
 
+   **Plan (13.11.2026).** Rund 21.000 der 28.544 Zeilen warten hierauf: `Game` und fast jede
+   Klasse mit Zustand hält einen Zeiger auf die Welt der Physik, den Renderer oder den Mixer und
+   ruft sie auf. Die Quellen rufen 154 Funktionen der Engine, die ihre Header nur deklarieren
+   (`physics::World` 39, `GameWorld` 21, Netz 13, `Mixer` 10, `Renderer` 9, Meshes bauen 10 …).
+   - **Ein Knoten je Funktion.** Was ein Header der Engine deklariert und nicht selbst definiert,
+     ist ein Knoten: `World::cast_ray` ist `world.cast_ray`, in C++ `world_cast_ray(welt, von,
+     nach)`. Eine `const`-Methode und eine freie Funktion ohne Seiteneffekt ist ein Wert, alles
+     andere ein Schritt; was eine Funktion durch einen Parameter schreibt (`std::vector<u64>& out`),
+     ist ein weiterer Ausgang. Was Rümpfe im Header hat, wird wie bisher umgeschrieben.
+   - **Erzeugt aus den Headern** (`tools/engine_api.py`, mit dem Baum des Compilers wie der
+     Konverter): die Tabelle der Funktionen mit ihren Pins (`src/game/engine_api.gen.cpp`), die
+     Funktionen der Blueprint-Klasse (`include/kern/game/engine_nodes.gen.h`) und der Verteiler,
+     der einen Aufruf mit seinen Werten an die Funktion der Engine gibt. Eine Funktion, deren Typen
+     keinen Platz haben (ein Callback), bekommt keinen Knoten und wird genannt.
+   - **Ein Objekt der Engine ist ein Handle:** Ein Zeiger oder eine Referenz auf eine Klasse der
+     Engine mit eigenem Innenleben (`physics::World*`, `Renderer*`, `Mixer*`) ist im Blueprint eine
+     ganze Zahl, die der Host vergibt; sie ist der erste Eingang der Knoten dieser Klasse. Schlichte
+     Strukturen der Engine (`Pose`, `BodySettings`, `RayHit`) sind Strukturen, die der Blueprint
+     deklariert – der Pin nennt den Namen.
+   - **Alle Stufen gehen durch eine Tür:** `logic::Host::engine(function, in, out)`. Interpreter,
+     JIT und Klasse rufen dieselbe Funktion des Hosts mit denselben Werten; das Spiel bindet dort
+     die echte Engine, ein Test einen Stellvertreter.
+   - **Der Beweis** bleibt Bit für Bit: Der Quelltext im Test läuft gegen Stellvertreter-Klassen
+     der Engine (erzeugt), die jeden Aufruf mit seinen Argumenten aufzeichnen und die Antwort
+     würfeln (aus der Form des Ausgangs, die die Tabelle nennt); der Blueprint läuft gegen einen
+     Host, der dasselbe tut. Verglichen werden das Ergebnis und die Aufzeichnung: dieselben Aufrufe,
+     in derselben Reihenfolge, mit denselben Bits. Reine Funktionen der Engine (Meshes bauen,
+     Klänge rechnen) ruft der Test auf beiden Seiten echt auf.
+   - Reihenfolge: (a) `Host::engine`, Tabelle, Knoten und Klassen-Funktionen in der Engine, mit
+     Tests der Engine; (b) der Generator über alle Header; (c) der Konverter: Handles, Aufrufe als
+     Knoten, Stellvertreter im Test; (d) der Verteiler auf die echte Engine – Voraussetzung für
+     Stufe 5.
+
 ### 5 – Umschalten
 Eine Datei schaltet um, sobald sie ganz durchläuft: Ihr C++ wird gelöscht, das Spiel läuft auf
 ihrem Blueprint, und ihre bisherigen Tests prüfen den Blueprint. Bis dahin ist das C++ die Quelle,
