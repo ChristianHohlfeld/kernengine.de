@@ -523,6 +523,15 @@ Was als Nächstes dazukommt, in der Reihenfolge der Zeilen, die darauf warten:
      Tests der Engine; (b) der Generator über alle Header; (c) der Konverter: Handles, Aufrufe als
      Knoten, Stellvertreter im Test; (d) der Verteiler auf die echte Engine – Voraussetzung für
      Stufe 5.
+   - Stand: `tools/engine_api.py --list` liest die Header (17 Dateien: Physik, Renderer, Meshes,
+     Ton, Netz, Spielwelt, Jobs, App) und nennt die Knoten: 540 Funktionen bekommen einen, 54
+     warten (Zeiger, durch die die Engine schreibt; Typen mit eigenem Innenleben als Wert). Ein
+     Zeiger auf Daten, die nur gelesen werden (`const Vec3* rotation`, `const f32* samples` mit
+     ihrer Anzahl daneben), ist die Liste dieser Daten – leer für `nullptr`. Noch nicht eingebunden:
+     Die Dateien, die der Generator schreibt, braucht Schritt (a).
+   - Die Engine prüft jeden Knoten ihrer Bibliothek in jeder Stufe (`kern/tests`: kein Knoten ohne
+     Fall). Für die erzeugten Knoten erzeugt der Generator auch den Fall: einen Blueprint, der jede
+     Funktion einmal ruft, gegen einen Host, der aufzeichnet – im Interpreter und als Klasse.
 
 ### 5 – Umschalten
 Eine Datei schaltet um, sobald sie ganz durchläuft: Ihr C++ wird gelöscht, das Spiel läuft auf
