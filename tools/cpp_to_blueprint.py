@@ -713,6 +713,7 @@ class World:
         self.actors = {}       # the level's actors with a Blueprint: name -> {"library": does it keep nothing, "functions": {name: ([inputs], [outputs])}}
         self.pointer_lists = {}    # (a function's key, the place of a parameter that is a pointer into a list) -> the length of the list every call hands it ("list": any; "mixed", "other": see main)
         self.states = {}       # a class of the program there is one object of (see state_classes) -> the Blueprint it is the state of
+        self.globals = {}      # a variable of a namespace of the program with external linkage (its qualified name) -> does it start at zero (as its definition says)
         self.parts = {}        # a part of a Blueprint of several source files (a job: "Game/game_net_cpp") -> that Blueprint
         self.part_numbers = {} # such a part -> its number among the parts of its Blueprint (the block of its nodes' ids)
         self.closures = None   # with tests: a function's key -> the places of the pieces its test holds, as its file's test hands them on (TestWriter.exports)
@@ -1435,27 +1436,43 @@ class Unit:
         its own) and starting at its initializer. (its name, its type)"""
         if d["id"] in self.state_statics:
             return self.state_statics[d["id"]]
-        want = f"{owner}_{d.get('name') or 'kept'}"
+        shared = d.get("storageClass") != "static" and "_GLOBAL__N_" not in (d.get("mangledName") or "") and d["id"] in self.tree.scope_of
+        if shared:   # (a variable the whole program shares: called by its namespaces, the same in every part of the Blueprint)
+            q = self.tree.scope_of[d["id"]] + (d.get("name") or "")
+            inner = q[len(self.tree.namespace) + 2:] if q.startswith(self.tree.namespace + "::") else q
+            owner = "_".join(inner.split("::")[:-1]) or "program"
         name = sane_name(want)
         if name in self.names:
             raise Wait(f"the variable {d.get('name')} kept by {owner}: the Blueprint {self.name} has something called {name}")
         t = self.btype(qtype(d))
         init = kids(d)[-1] if kids(d) and d.get("init") else None
+        if shared and init is None and self.world.globals.get(q) is False:
+            raise Wait(f"the variable {q} starts with what its definition in another file says")
         try:
             default = Const(self).literal(init, t) if init is not None else self.zero(t)
         except Wait as w:
             raise Wait(f"the variable {d.get('name')} kept by {owner} starts with what is computed when it is first met ({w})")
+        if shared and init is not None and starts_at_zero(init):
+            default = self.zero(t)   # (written as every part writes it, also those that only see it declared)
         self.names.add(name)
-        self.state_lines[(1, name)] = [f"  /// (kept by {owner})", f"  {self.dtype(qtype(d), t)} {name} = {default};"]
+        self.state_lines[(1, name)] = [f"  /// ({'of the program: ' + q if shared else 'kept by ' + owner})", f"  {self.dtype(qtype(d), t)} {name} = {default};"]
         self.state_statics[d["id"]] = (name, t)
         return name, t
 
     def kept_by_state(self, d):
-        """Is this variable of a source file one only the state's methods use - one the file has for itself
-        (static, or in a namespace without a name) and changes, that no other function of the file names?"""
+        """Is this a variable of the program that the state keeps: one the program has once - of a namespace,
+        not const -, which the program's one object (the state) reads and changes? Then it is a variable of
+        the state's Blueprint. A variable of a file (static, or in a namespace without a name) only when no
+        other function of the file names it; one other files name too (extern) as every file sees it."""
         if self.state is None or d.get("kind") != "VarDecl" or d.get("constexpr") or re.search(r"\bconst\b", qtype(d)):
             return False
-        if not (d.get("storageClass") == "static" or "_GLOBAL__N_" in (d.get("mangledName") or "")) or is_header(d.get("_file", "")):
+        if d["id"] not in self.tree.scope_of or self.tree.scope_of[d["id"]].rstrip(":") in self.tree.records:
+            return False   # (a local variable - or a static field of a class: the class's)
+        if not self.world.program(d.get("_file") or "?") or self.actor_type(qtype(d)):
+            return False   # (the engine's - or the program's way to call an actor's Blueprint: Call on Actor names the actor)
+        if not (d.get("storageClass") == "static" or "_GLOBAL__N_" in (d.get("mangledName") or "")):
+            return True   # (a variable the whole program shares: of its one object)
+        if is_header(d.get("_file", "")):
             return False
         if self.state_users is None:
             users = collections.defaultdict(set)
@@ -1468,6 +1485,18 @@ class Unit:
                         users[n["referencedDecl"]["id"]].add(state)
             self.state_users = users
         return self.state_users.get(d["id"]) == {True}
+
+    def actor_type(self, t):
+        """Is this the engine's kern::logic::ActorBlueprint, or a class of the program made of it?"""
+        c = re.sub(r"^const\s+", "", self.clean(t)).strip()
+        if c == ENGINE + "::logic::ActorBlueprint":
+            return True
+        try:
+            q = self.find_type(c) if c else None
+        except Wait:
+            return False
+        d = self.tree.records.get(q) if q else None
+        return d is not None and any(self.actor_type(b.get("type", {}).get("qualType", "")) for b in d.get("bases", []) or [])
 
     def is_state_variable(self, name):
         return self.state is not None and (any(name == n for _, n, _ in self.state_fields.values()) or any(name == n for n, _ in self.state_statics.values()))
@@ -8938,11 +8967,40 @@ def survey_one(job):
                           "name": Unit.cpp_name_of(tree, d), "owner": tree.owner.get(d["id"])})
     types = [(q, os.path.abspath(o.get("_file") or "?")) for q, o in [*tree.records.items(), *tree.enums.items()] if o.get("_file")]
     statics, made = objects_made(tree)
+    # (the variables of the program's namespaces that other files name too: whether each starts at zero)
+    starts = {}
+    for i, d in tree.decl.items():
+        if d.get("kind") != "VarDecl" or i not in tree.scope_of or d.get("storageClass") in ("static", "extern") or "_GLOBAL__N_" in (d.get("mangledName") or ""):
+            continue
+        if d.get("constexpr") or re.search(r"\bconst\b", qtype(d)) or os.path.abspath(d.get("_file") or "?") != me:
+            continue
+        init = kids(d)[-1] if kids(d) and d.get("init") else None
+        starts[tree.scope_of[i] + d.get("name", "")] = init is None or starts_at_zero(init)
     records = {q: {"file": os.path.abspath(tree.records[q].get("_file") or "?"), "bases": bool(tree.records[q].get("bases")),
                    "virtual": any(c.get("virtual") for c in kids(tree.records[q]))} for q in statics if q in tree.records}
     # (what a caller's own parameter hands on: by the caller's key and the parameter's place)
     pointer_args = [(key, k, ("param", *params_of[src[1]]) if isinstance(src, tuple) and src[1] in params_of else "other" if isinstance(src, tuple) else src) for key, k, src in pointer_args]
-    return {"path": path, "functions": functions, "types": types, "statics": statics, "made": made, "records": records, "pointer_args": pointer_args}
+    return {"path": path, "functions": functions, "types": types, "statics": statics, "made": made, "records": records, "pointer_args": pointer_args, "globals": starts}
+
+
+def starts_at_zero(init):
+    """Is this initializer a zero - 0, 0.0f, false, nullptr, {} - of whatever type it makes?"""
+    b = init
+    while b.get("kind") in ("ImplicitCastExpr", "ExprWithCleanups", "MaterializeTemporaryExpr", "CXXFunctionalCastExpr", "ParenExpr") and len(kids(b)) == 1:
+        b = kids(b)[0]
+    k = b.get("kind")
+    if k in ("IntegerLiteral", "FloatingLiteral"):
+        try:
+            return float(b.get("value", "1").rstrip("fFuUlL")) == 0
+        except ValueError:
+            return False
+    if k == "CXXBoolLiteralExpr":
+        return not b.get("value")
+    if k == "CXXNullPtrLiteralExpr":
+        return True
+    if k in ("InitListExpr", "CXXConstructExpr") and not kids(b):
+        return True
+    return False
 
 
 def objects_made(tree):
@@ -9240,6 +9298,9 @@ def main(argv):
         world.pointer_lists[at] = "other" if "other" in got else "mixed" if len(got) > 1 else next(iter(got)) if got else "list"
     # The classes there is one object of: each is the state of a Blueprint - no type (state_classes)
     world.states = state_classes(world, surveys)
+    for r in surveys:
+        for q, zero in r["globals"].items():
+            world.globals[q] = world.globals.get(q, True) and zero
     types = {(q, file) for q, file in types if q not in world.states}
     # A header's function stands in the header's Blueprint when all it calls stands in headers too
     # (whoever includes the header has all of it); one that needs a source file - it calls what stands in
@@ -9312,7 +9373,7 @@ def main(argv):
         w = World(files, flags, more)
         w.units, w.type_names, w.taken, w.nodes, w.function_units, w.source_units = world.units, world.type_names, world.taken, world.nodes, world.function_units, world.source_units
         w.actors, w.states, w.parts, w.part_numbers = world.actors, world.states, world.parts, world.part_numbers
-        w.pointer_lists = world.pointer_lists
+        w.pointer_lists, w.globals = world.pointer_lists, world.globals
         w.table = {k: e for d in need for k, e in tables.get(d, {}).items()}
         if test:   # (the pieces of their source their tests hand on: what the test of this one holds of them)
             w.closures, w.pieces = {}, {}
