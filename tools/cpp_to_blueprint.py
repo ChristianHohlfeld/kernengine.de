@@ -231,7 +231,11 @@ def c_string(v):
 def run_clang(path, namespace, flags):
     """The compiler's tree of the declarations of a namespace, as it reads the file now (nothing is kept
     between runs: a tree of another state of the sources is another tree)."""
-    cmd = [os.environ.get("CLANGXX", "clang++"), "-std=c++20", "-fsyntax-only", "-Xclang", "-ast-dump=json", "-Xclang", f"-ast-dump-filter={namespace}::", *flags, path]
+    # (The filter is an argument of its own: the runs for the several namespaces of one file differ in that short
+    # word alone - what the compiler allocates before it reads the file is then the same in each, and so are the
+    # addresses its nodes are named by - see STEADY. Written in one, `-ast-dump-filter=hwcontract::` was longer
+    # than `-ast-dump-filter=fc::` by more than the allocator rounds away, and every node had another address.)
+    cmd = [os.environ.get("CLANGXX", "clang++"), "-std=c++20", "-fsyntax-only", "-Xclang", "-ast-dump=json", "-Xclang", "-ast-dump-filter", "-Xclang", f"{namespace}::", *flags, path]
     if STEADY:
         cmd = ["setarch", "-R", *cmd]
     r = subprocess.run(cmd, capture_output=True, text=True)
@@ -4509,7 +4513,14 @@ class Emit:
                 base, idx = kids(t)
             base = self.unwrap(base) if not self.is_this(base) else base
             if self.is_vec(base):
-                raise Wait("a component of a vector by its number is set")
+                # a component of a vector by its number, as the vector's operator[] picks it (0: x, 1: y, any
+                # other: z) - the number and the value worked out once, the vector set anew where it stands
+                at, put = self.temp("at", "Float"), self.temp("put", "Float")
+                lines = [f"{at} = {self.ex(idx, 'Float')};", f"{put} = {value('Float')};"]
+                old = self.ex(base, "Vector")
+                parts = [f"kern::formula([](Float i, Float v, Float c) -> Float {{ return {cond} ? v : c; }}, {at}, {put}, vector_break({old}).{c})"
+                         for cond, c in (("i == 0.0", "x"), ("i == 1.0", "y"), ("i != 0.0 && i != 1.0", "z"))]
+                return lines + self.store(base, lambda _t: f"vector_make({', '.join(parts)})")
             lt = self.tp(base)
             if not lt.startswith("List<"):
                 raise Wait("an entry of something that is not a list is set")
