@@ -4919,6 +4919,22 @@ class Emit:
                 return f'list_make<{it}, "{len(vals)}">({", ".join(vals)})', t
             if len(a) == 1 and self.tp_or_none(a[0]) == t:
                 return self.ex(a[0], t), t
+            if len(a) == 2 and re.match(r"(?:kern::)?Span<", self.ctype(b)):
+                # a view of a list, Span(p, n): with p its first entry (v.data(), an array) and n its length, the whole list
+                lst = bare(a[0])
+                while lst.get("kind") == "ImplicitCastExpr" and lst.get("castKind") in ("NoOp", "LValueToRValue") and kids(lst):
+                    lst = bare(kids(lst)[0])
+                if lst.get("kind") == "ImplicitCastExpr" and lst.get("castKind") == "ArrayToPointerDecay" and kids(lst):
+                    lst = bare(kids(lst)[0])
+                elif lst.get("kind") == "CXXMemberCallExpr" and callee(lst).get("name") == "data" and kids(callee(lst)) and len(kids(lst)) == 1:
+                    lst = kids(callee(lst))[0]
+                else:
+                    lst = None
+                if lst is not None and self.tp_or_none(lst) == t:
+                    n = self.ex(a[1], "Int")
+                    if n in (f"list_length<{it}>({self.ex(lst, t)})", str(u.fixed(qtype(lst)))):
+                        return self.ex(lst, t), t
+                raise Wait("a view (Span) of a part of a list")
             if len(a) in (1, 2) and self.tp_or_none(a[0]) in ("Int", "Float") and (len(a) == 1 or self.tp_or_none(a[1]) is not None):
                 # std::vector<T>(n) and (n, x): n entries, each T's zero or x
                 made = self.temp("made", t)
