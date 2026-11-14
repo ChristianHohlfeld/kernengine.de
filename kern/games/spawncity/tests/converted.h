@@ -686,6 +686,13 @@ void take(T*& to, const Value& v) { to = engine_object<T>(v.as_int()); }
 template <class T>
   requires std::is_base_of_v<EngineObject, T>
 void take(T& to, const Value& v) { to = *engine_object<T>(v.as_int()); }
+/// An owned object of the engine (std::unique_ptr): the one of that handle, none for 0.
+template <class T>
+  requires std::is_base_of_v<EngineObject, T>
+void take(std::unique_ptr<T>& to, const Value& v) {
+  if (v.as_int() == 0) to.reset();
+  else to = std::make_unique<T>(*engine_object<T>(v.as_int()));
+}
 template <class T> void take(std::vector<T>& to, const Value& v);
 /// By the type as the program spells it (S, with Whole where it says u64 or i64 - see shaped).
 template <class S> struct Take {

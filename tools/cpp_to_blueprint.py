@@ -5853,6 +5853,7 @@ class TestWriter:
         self.helped = collections.OrderedDict()   # a record -> the lines of its helpers (None: being written)
         self.edits = {}        # a file -> the guards in it (see `guard`), in the order of the file
         self.enum_names = {}   # an enum (qualified) -> its name in the test
+        self.object_enums = collections.defaultdict(list)   # a class of the engine the test has a stand-in of -> its enums the test needs
         self.made = {}         # a class the test makes by a constructor -> (the constructor, the line that makes it without)
         self.objects = {}      # a class of the engine the source holds objects of -> its stand-in's name in the test
 
@@ -6442,7 +6443,7 @@ class TestWriter:
                         self.no_stand_in(f, w)
                         continue   # (what it takes the test has no values of: a function that calls it is not compared)
                     defs.append((("engine", f["decl"]["id"]), b))
-        for q in sorted(u.objects_seen | set(by_class)):
+        for q in sorted(u.objects_seen | set(by_class) | set(self.object_enums)):
             if q not in tree.records or not u.engine_object(q):
                 continue
             name = self.object_name(q)
@@ -6456,7 +6457,7 @@ class TestWriter:
                     continue   # (what it takes the test has no values of: a function that calls it is not compared)
                 decls.append("  " + a)
                 defs.append((("object", q), b))
-            chunks.append((tree.place(tree.records[q]), ("object", q), "\n".join([f"struct {name} : converted::EngineObject {{", *decls, "};"])))
+            chunks.append((tree.place(tree.records[q]), ("object", q), "\n".join([f"struct {name} : converted::EngineObject {{", *self.object_enums.get(q, []), *decls, "};"])))
         for f in free:
             d = f["decl"]
             try:
@@ -6609,6 +6610,8 @@ class TestWriter:
                 return
             if tree.scope_of.get(d["id"], "").startswith(ENGINE + "::dm::"):
                 return   # (the engine's functions of numbers: in the test's source the formula's, see `widen`)
+            if ENGINE_NODES and (u.api().declared_only(d) or u.api().declared_only(tree.decl.get(i, d))):
+                return   # (a node of the engine - a method of its object, defined in its header or not: the test has its stand-in)
             f = converted.get(d["id"])
             owner = tree.owner.get(d["id"]) or tree.owner.get(i)
             if owner in vectors:
@@ -6723,7 +6726,16 @@ class TestWriter:
         pairs += [(f"::{ENGINE}::Vec3", "Vec3"), (f"::{ENGINE}::Vec2", "Vec2"), (f"::{ENGINE}::Span", "Span"), (f"::{tree.namespace}::Vec3", "Vec3"), (f"::{tree.namespace}::Vec2", "Vec2")]
         pairs += [(f"::{space}::{n}", n) for space in (ENGINE, tree.namespace) for n in ("f32", "f64", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64")]
         pairs += [(f"::{ENGINE}::{n}", n) for n in ("dot", "cross", "length", "length_sq", "distance", "distance_sq", "finite", "lerp", "vmin", "vmax", "normalize")]
-        enum_chunks = [(tree.place(tree.enums[q]), ("enum", q), in_classes(q.rsplit("::", 1)[0] + "::" if "::" in q else "", self.piece(tree.enums[q]) + ";")) for q in sorted(enums)]
+        # (an enum of a class of the engine the test has a stand-in of - logic::Runtime::Chain - stands in that stand-in)
+        self.object_enums.clear()
+        in_objects = set()
+        for q in sorted(enums):
+            owner = q.rsplit("::", 1)[0] if "::" in q else ""
+            if owner in tree.records and u.engine_object(owner):
+                self.object_enums[owner].append("  " + self.piece(tree.enums[q]) + ";")
+                in_objects.add(q)
+        enum_chunks = [(tree.place(tree.enums[q]), ("enum", q), in_classes(q.rsplit("::", 1)[0] + "::" if "::" in q else "", self.piece(tree.enums[q]) + ";")) for q in sorted(enums)
+                       if q not in in_objects]
         # the constants: their own text. (Several declared in one statement - `constexpr f32 kA = 1, kB = 2`
         # - are that statement as far as its last one that is needed.)
         const_chunks, by_start = [], {}
