@@ -48,6 +48,57 @@ HEADERS = ["core/base.h", "core/jobs.h", "app/app.h", "audio/audio.h", "audio/sy
            "geo/mesh_data.h", "geo/primitives.h", "geo/earcut.h", "geo/buildings.h", "geo/roads.h", "game/level.h", "game/sound.h", "game/runtime.h",
            "net/client_server.h"]
 Api, snake = c2b.Api, c2b.snake
+INT64 = {"Int64": ("int64", "l"), "List<Int64>": ("int64_list", "[l]")}   # (the pin type, the form of the value - see EngineStandIn)
+
+
+class EngineApi(Api):
+    """The engine's functions as nodes, with its 64-bit numbers as they are: a u64 or an i64 the engine
+    takes or gives (a mask of bits, a key, a counter of 64 bits) is an Int64 pin - 64 bits, as C++ has
+    them - and a list of them a List<Int64>. (What a struct of the engine holds in its fields is the
+    struct as tools/cpp_to_blueprint.py writes it.)"""
+
+    def wide(self, raw):
+        """The Blueprint type of a parameter's or a result's type when it is 64 bits as C++ has them
+        (u64, const i64&, std::vector<u64>&, Span<const u64>, const u64* with a count): Int64 or
+        List<Int64> - else None."""
+        r = re.sub(r"\s*(&&|&|\*\s*(const)?)$", "", raw.strip())
+        r = re.sub(r"^const\s+", "", r).strip()
+        c = self.u.clean(r)
+        if c in c2b.W64:
+            return "Int64"
+        m = re.match(r"(?:std::vector|(?:kern::)?Span)<\s*(?:const\s+)?(.+?)\s*>$", c)
+        if m and self.u.clean(m.group(1)) in c2b.W64:
+            return "List<Int64>"
+        return None
+
+    def handed(self, raw):
+        bt = self.wide(raw)
+        if bt is None:
+            return super().handed(raw)
+        r = raw.strip()
+        pointer = bool(re.search(r"\*\s*(const)?$", r))
+        writes = (r.endswith("&") and not r.endswith("&&") or pointer) and not re.match(r"const\b", r)
+        if pointer and writes:
+            raise Wait("a pointer it writes through")
+        if pointer:
+            bt = "List<Int64>"   # (the data it only reads: one value that may be missing, or the first of several)
+        return bt, writes and not pointer, None
+
+    def optional_out(self, p):
+        bt = self.wide(qtype(p))
+        if bt is not None and re.search(r"\*\s*$", qtype(p).strip()) and not re.match(r"const\b", qtype(p).strip()):
+            init = c2b.bare(kids(p)[-1]) if kids(p) else {}
+            while init.get("kind") == "ImplicitCastExpr" and kids(init):
+                init = c2b.bare(kids(init)[0])
+            if init.get("kind") in ("CXXNullPtrLiteralExpr", "GNUNullExpr"):
+                return bt
+        return super().optional_out(p)
+
+    def pin(self, bt):
+        return (INT64[bt][0], "") if bt in INT64 else super().pin(bt)
+
+    def shape(self, bt):
+        return INT64[bt][1] if bt in INT64 else super().shape(bt)
 
 
 def c_text(s):
@@ -75,13 +126,13 @@ def table_text(api, functions):
 
 def class_text(api, functions):
     """The functions of a Blueprint's class: each hands its inputs to the host and takes what it gives."""
-    plain = {"Bool": "Bool", "Int": "Int", "Float": "Float", "Vector": "Vector", "Text": "const Text&"}
+    plain = {"Bool": "Bool", "Int": "Int", "Float": "Float", "Vector": "Vector", "Text": "const Text&", "Int64": "Int64"}
     lines = ["// The engine's functions as a Blueprint's class calls them (written by tools/engine_api.py from the",
              "// engine's headers - see kern/logic/engine_api.h; not edited by hand). Included by kern/logic/blueprint.h.",
              "#pragma once", "", "#include <initializer_list>", "#include <string_view>", "#include <type_traits>", "#include <vector>", "", '#include "kern/logic/nodes.h"', "",
              "namespace kern::logic {", "",
              "template <class Core> struct EngineNodesOf : Core {",
-             "  using Bool = bool;", "  using Int = logic::Whole;", "  using Float = f64;", "  using Vector = Vec3;", "  using Text = logic::Text;",
+             "  using Bool = bool;", "  using Int = logic::Whole;", "  using Float = f64;", "  using Vector = Vec3;", "  using Text = logic::Text;", "  using Int64 = logic::Int64;",
              "  template <class T> using List = logic::List<T>;", "",
              "  /// One call of the engine: the inputs as values to the host, what it gives as values back (zeros where it has no such function).",
              "  std::vector<Value> kern_engine(std::string_view function, const std::vector<Value>& in, std::initializer_list<PinType> outputs) const {",
@@ -131,7 +182,8 @@ def class_text(api, functions):
 def case_text(api, functions):
     """The test's Blueprint: every function of the engine called once, what it gives kept in a variable."""
     u = api.u
-    plain = {"Bool": "false", "Int": "0", "Float": "0.0", "Vector": "Vector{0.0, 0.0, 0.0}", "Text": '""'}
+    plain = {"Bool": "false", "Int": "0", "Float": "0.0", "Vector": "Vector{0.0, 0.0, 0.0}", "Text": '""', "Int64": "Int64{0x0}"}
+    zero = lambda bt: plain[bt] if bt in plain else u.zero(bt)
     variables, members, bodies, inputs = [], [], [], {}
 
     def value(bt):
@@ -141,7 +193,7 @@ def case_text(api, functions):
             return bt + "{}"
         if bt not in inputs:   # (a struct, an enum, a list of them: a variable of that type, at its default)
             inputs[bt] = "In" + str(len(inputs) + 1)
-            variables.append(f"  {bt} {inputs[bt]} = {u.zero(bt)};")
+            variables.append(f"  {bt} {inputs[bt]} = {zero(bt)};")
         return inputs[bt]
     node = 10
     for k, f in enumerate(functions):
@@ -150,16 +202,16 @@ def case_text(api, functions):
         lines = []
         if f["value"]:
             bt = f["outs"][0][1]
-            variables.append(f"  {bt} R{k} = {u.zero(bt)};")
+            variables.append(f"  {bt} R{k} = {zero(bt)};")
             lines.append(f"R{k} = {name}({', '.join(args)});")
         elif not f["outs"]:
             lines.append(f"{name}({', '.join(args)});")
         else:
             node += 1
-            members.append("  struct { " + " ".join(f"{bt} {o} = {u.zero(bt)};" for o, bt, _ in f["outs"]) + f" }} n{node};")
+            members.append("  struct { " + " ".join(f"{bt} {o} = {zero(bt)};" for o, bt, _ in f["outs"]) + f" }} n{node};")
             lines.append(f"{name}({', '.join([f'n{node}'] + args)});")
             for j, (o, bt, _) in enumerate(f["outs"]):
-                variables.append(f"  {bt} R{k}_{j} = {u.zero(bt)};")
+                variables.append(f"  {bt} R{k}_{j} = {zero(bt)};")
                 lines.append(f"R{k}_{j} = n{node}.{o};")
         bodies.append(lines)
     word = re.compile(r"[A-Za-z_]\w*")
@@ -199,7 +251,7 @@ def read_engine(flags=()):
 
 def main(argv):
     tree, unit = read_engine()
-    api = Api(tree, unit)
+    api = EngineApi(tree, unit)
     functions, waiting = [], []
     for d in sorted((x for x in tree.decl.values() if api.declared_only(x)), key=lambda x: (x.get("_file", ""), x.get("_at", (0,))[0] or 0)):
         try:
