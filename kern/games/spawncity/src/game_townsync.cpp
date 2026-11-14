@@ -32,9 +32,8 @@
 
 namespace sc {
 
-TownSync& Game::townsync() {
+void Game::townsync_ready() {
   if (!townsync_) townsync_ = std::make_unique<TownSync>();
-  return *townsync_;
 }
 
 bool Game::town_car_remote(i32 car) const {
@@ -44,11 +43,15 @@ bool Game::town_car_remote(i32 car) const {
 
 void Game::townsync_car_hit(i32 car, f32 amount, town::Cause cause) {
   net_.town_to_host(town::pack(town::CarHit{static_cast<u8>(car_net_[static_cast<std::size_t>(car)]), amount, cause}));
-  ++townsync().car_hits[static_cast<std::size_t>(cause)];
+  townsync_ready();
+  ++townsync_->car_hits[static_cast<std::size_t>(cause)];
 }
 
 void Game::townsync_lamp(i64 key, u8 state) {
-  if (net_.active()) townsync().lamps_out.push_back({key, state});
+  if (net_.active()) {
+    townsync_ready();
+    townsync_->lamps_out.push_back({key, state});
+  }
 }
 
 void Game::townsync_plank(i64 key, u8 door, u8 doors, i32 step) {
@@ -60,14 +63,16 @@ void Game::townsync_plank(i64 key, u8 door, u8 doors, i32 step) {
 void Game::town_mark(Vec3 at, f32 radius, f32 strength, bool craters) {
   if (!life_) return;
   life_->marks.blast(at, radius, strength, city_, world_->physics(), rng_, world_->sim_time(), craters);
-  TownSync& t = townsync();
+  townsync_ready();
+  TownSync& t = *townsync_;
   t.marks.push_back({at, radius, strength});
   if (t.marks.size() > town::kMarks) t.marks.erase(t.marks.begin());
 }
 
 void Game::townsync_send_full(i32 to) {
   if (!gaps_) return;
-  TownSync& t = townsync();
+  townsync_ready();
+  TownSync& t = *townsync_;
   std::vector<town::LampRec> lamps;
   for (const auto& [key, state] : gaps_->lamps.broken_list()) lamps.push_back({key, state});
   std::vector<town::PlankRec> planks;
@@ -88,7 +93,8 @@ void Game::townsync_reset() {
   // RESET (after the lamps here were put back up): the host's is everybody's - a new epoch, his
   // state from scratch; a client's is his own picture only, so he takes the host's state again
   if (!net_.active()) return;
-  TownSync& t = townsync();
+  townsync_ready();
+  TownSync& t = *townsync_;
   t.lamps_out.clear();
   if (net_.hosting()) { ++t.epoch; townsync_send_full(-1); }
   else { net_.town_to_host(town::pack_ask()); ++t.asks; }
@@ -96,7 +102,8 @@ void Game::townsync_reset() {
 
 void Game::townsync_update(f32 dt) {
   (void)dt;
-  TownSync& t = townsync();
+  townsync_ready();
+  TownSync& t = *townsync_;
   std::vector<People::Hurt> hurts;
   people_.take_hurts(hurts);
   if (!net_.active() || !gaps_) {
@@ -219,7 +226,8 @@ void Game::townsync_update(f32 dt) {
 }
 
 std::string Game::townsync_json() {
-  const TownSync& t = townsync();
+  townsync_ready();
+  const TownSync& t = *townsync_;
   std::size_t open_doors = 0;
   if (gaps_)
     for (const auto& [key, doors] : gaps_->planks)

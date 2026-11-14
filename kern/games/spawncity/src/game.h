@@ -216,7 +216,8 @@ class Game {
   void dsync_send_full(i32 to);
   void dsync_reset_epoch();
   std::string dsync_json();
-  DestroySync& dsync();
+  /// (made where it is first needed: then dsync_ holds it)
+  void dsync_ready();
   std::unique_ptr<DestroySync> dsync_;
   // thrown things (game_toss.cpp): what our hand takes flies on every machine
   void toss_update(f32 dt);
@@ -230,7 +231,8 @@ class Game {
   // every round in flight replicated (game_projsync.cpp): ours streamed, the mates' drawn on their track
   void projsync_update(f32 dt);
   void projsync_blast(u8 owner, Vec3 at);
-  ProjSync& projsync();
+  /// (made where it is first needed: then projsync_ holds it)
+  void projsync_ready();
   std::unique_ptr<ProjSync> projsync_;
   u32 proj_serial_ = 0;
   // the town's lasting state and a client's hits on it (game_townsync.cpp, town_sync.h): street
@@ -248,7 +250,8 @@ class Game {
   /// done on the host's machine.
   bool town_car_remote(i32 car) const;
   std::string townsync_json();
-  TownSync& townsync();
+  /// (made where it is first needed: then townsync_ holds it)
+  void townsync_ready();
   std::unique_ptr<TownSync> townsync_;
   std::string worldsync_list() const;
   bool world_puppet() const;
@@ -312,7 +315,8 @@ class Game {
   void jet_attack(bool gun, bool missile, bool bomb);
   void draw_projectiles();
   // multiplayer (game_net.cpp; its state lives in MpLocal, see mp_rules.h / net_session.h)
-  MpLocal& mp_local();
+  /// (made where it is first needed: then mp_ holds it)
+  void mp_local_ready();
   // ---- the mates' units (game_swarm.cpp: zombie_nights.mjs zombie-sync, military_response.mjs mil-snap;
   // the police and the sandbox enemies the same way)
   struct RemoteUnit {
