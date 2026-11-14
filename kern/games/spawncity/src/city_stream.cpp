@@ -86,8 +86,6 @@ struct CityStream::Tile {
   u32 tries = 0;       // failed requests so far
   f64 retry_ms = 0;    // when a failed tile is asked for again
   bool procedural = false;
-  std::vector<u8> bytes;
-  mvt::Decoder decoder;
   MapFeatures features;
   kern::FootprintStream footprints;
   kern::RoadStream roads;
