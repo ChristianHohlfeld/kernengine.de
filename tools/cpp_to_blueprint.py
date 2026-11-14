@@ -2700,7 +2700,7 @@ class Emit:
             ref = callee(n).get("referencedDecl", {})
             if name == "snprintf" and self.text_buffer_of(kids(n)[1] if len(kids(n)) > 1 else {}) is not None:
                 return self.formatted(n)
-            d = self.engine_decl(ref.get("id")) if ref.get("id") not in self.tree.body else None
+            d = self.engine_decl(ref.get("id"))
             if d is not None:
                 return self.engine(d, None, kids(n)[1:])[0]
             if self.own(ref.get("id")):
@@ -4535,14 +4535,14 @@ class Emit:
             defaulted = True
         else:
             defaulted = False
+        d = self.engine_decl(ref.get("id"))
+        if d is not None:
+            return self.engine_value(d, None, kids(b)[1:])
         if self.own(ref.get("id")) and ref.get("id") in self.tree.body:
             got = self.invoke(u.function(ref["id"]), kids(b)[1:])
             if got[0] is None:
                 raise Wait("a call without a result as a value")
             return got
-        d = self.engine_decl(ref.get("id"))
-        if d is not None:
-            return self.engine_value(d, None, kids(b)[1:])
         vec = [self.is_vec(x) for x in a]
         if name == "isfinite" and len(a) == 1 and self.numeric(a[0]):
             x = self.ex(a[0], "Float")
@@ -5005,8 +5005,12 @@ class Api:
         return self.tree.owner.get(d["id"]) or self.tree.scope_of.get(d["id"], "").rstrip(":")
 
     def declared_only(self, d):
-        """Is this a function only the engine can do: declared in a header, defined in the engine?"""
-        if d.get("kind") not in ("FunctionDecl", "CXXMethodDecl") or d["id"] in self.tree.body or d.get("isImplicit") or d.get("explicitlyDeleted"):
+        """Is this a function only the engine can do: declared in a header, defined in the engine - or a
+        method of an object of the engine (a class with a life of its own: Unit.object_of), wherever it is
+        defined? What such an object holds is the engine's: a Blueprint reaches it through its node only."""
+        if d.get("kind") not in ("FunctionDecl", "CXXMethodDecl") or d.get("isImplicit") or d.get("explicitlyDeleted"):
+            return False
+        if d["id"] in self.tree.body and not self.of_object(d):
             return False
         scope = self.tree.scope_of.get(d["id"], "")
         if not scope.startswith(ENGINE + "::") or any((scope + "::").startswith(s) or scope.startswith(s) for s in ENGINE_SKIP):
@@ -5014,6 +5018,13 @@ class Api:
         if d.get("previousDecl") or d["id"] in self.tree.template_of or not d.get("name") or d["name"].startswith("operator") or "(anonymous" in scope:
             return False
         return not (d.get("kind") == "CXXMethodDecl" and d.get("access", "public") != "public")
+
+    def of_object(self, d):
+        """Is `d` a method of a class of the engine that is an object (not plain data a Blueprint holds)?"""
+        owner = self.tree.owner.get(d["id"])
+        if d.get("kind") != "CXXMethodDecl" or not owner or not owner.startswith(ENGINE + "::"):
+            return False
+        return self.u.object_of(owner) is not None
 
     def siblings(self, d):
         home = self.home(d)
