@@ -829,6 +829,7 @@ class World:
         self.actors = {}       # the level's actors with a Blueprint: name -> {"library": does it keep nothing, "functions": {name: ([inputs], [outputs])}}
         self.pointer_lists = {}    # (a function's key, the place of a parameter that is a pointer into a list) -> the length of the list every call hands it ("list": any; "mixed", "other": see main)
         self.states = {}       # a class of the program there is one object of (see state_classes) -> the Blueprint it is the state of
+        self.state_members = {}  # such a class -> its fields and methods by name, in their order (a part that does not see the class)
         self.state_functions = set()   # (keys of) the functions that are no methods of a state but functions of its Blueprint: they share a variable of the program (main)
         self.globals = {}      # a variable of a namespace of the program with external linkage (its qualified name) -> does it start at zero (as its definition says)
         self.parts = {}        # a part of a Blueprint of several source files (a job: "Game/game_net_cpp") -> that Blueprint
@@ -1526,7 +1527,15 @@ class Unit:
         methods', in the order the class has them."""
         rec = self.tree.records.get(self.state)
         if rec is None:
-            raise SystemExit(f"{self.job}: the class {self.state} is not known here")
+            # A part of functions that are no methods (they share the program's variables) in a file that does not
+            # see the class: its members' names are taken all the same, as every part names them - none of it is
+            # used here (a method or a field would need the class).
+            members = self.world.state_members.get(self.state)
+            if members is None:
+                raise SystemExit(f"{self.job}: the class {self.state} is not known here")
+            for kind, n in [m for m in members if m[0] == "field"] + [m for m in members if m[0] == "method" and not m[1].startswith("operator")]:
+                self.names.add(self.fresh(n))   # (fields first, then methods: as with the class)
+            return
         for c in kids(rec):
             if c.get("kind") == "FieldDecl":
                 name = self.fresh(c.get("name") or "field")
@@ -1613,7 +1622,7 @@ class Unit:
             for f in {id(x): x for x in self.tree.body.values()}.values():
                 if f.get("kind") == "VarDecl":
                     continue
-                state = self.tree.owner.get(f["id"]) == self.state
+                state = self.tree.owner.get(f["id"]) == self.state or function_key(self.tree, f) in self.world.state_functions
                 for n in walk(f):
                     if n.get("kind") == "DeclRefExpr" and (n.get("referencedDecl") or {}).get("kind") == "VarDecl":
                         users[n["referencedDecl"]["id"]].add(state)
@@ -9295,7 +9304,11 @@ def survey_one(job):
         init = kids(d)[-1] if kids(d) and d.get("init") else None
         starts[tree.scope_of[i] + d.get("name", "")] = init is None or starts_at_zero(init)
     records = {q: {"file": os.path.abspath(tree.records[q].get("_file") or "?"), "bases": bool(tree.records[q].get("bases")),
-                   "virtual": any(c.get("virtual") for c in kids(tree.records[q]))} for q in statics if q in tree.records}
+                   "virtual": any(c.get("virtual") for c in kids(tree.records[q])),
+                   # (its members by name, in their order: what a part of its Blueprint that does not see the class names them)
+                   "members": [("field", c.get("name") or "field") if c.get("kind") == "FieldDecl" else ("method", c.get("name"))
+                               for c in kids(tree.records[q]) if c.get("kind") == "FieldDecl" or (c.get("kind") == "CXXMethodDecl" and not c.get("isImplicit"))]}
+               for q in statics if q in tree.records}
     # (what a caller's own parameter hands on: by the caller's key and the parameter's place)
     pointer_args = [(key, k, ("param", *params_of[src[1]]) if isinstance(src, tuple) and src[1] in params_of else "other" if isinstance(src, tuple) else src) for key, k, src in pointer_args]
     return {"path": path, "functions": functions, "types": types, "statics": statics, "made": made, "records": records, "pointer_args": pointer_args, "globals": starts}
@@ -9307,8 +9320,8 @@ def shared_variable(tree, d):
     if d is None or d.get("kind") != "VarDecl" or d.get("constexpr") or re.search(r"\bconst\b", qtype(d)) or d["id"] not in tree.scope_of:
         return False
     scope = tree.scope_of[d["id"]]
-    if scope.rstrip(":") in tree.records or not any(scope.startswith(x + "::") for x in (tree.namespace, *tree.spaces)):
-        return False
+    if scope.rstrip(":") in tree.records or scope.startswith((ENGINE + "::", "std::", "__")):
+        return False   # (a static field of a class; the engine's, the library's)
     def actor(t, depth=0):
         c = re.sub(r"^const\s+", "", t).strip()
         if c.endswith("logic::ActorBlueprint"):
@@ -9401,6 +9414,7 @@ def state_classes(world, surveys):
         if len(places) != 1 or q in made or info is None or not world.program(info["file"]) or info["bases"] or info["virtual"]:
             continue
         out[q] = type_name_of(q)
+        world.state_members[q] = info.get("members", [])
     return out
 
 
@@ -9731,7 +9745,7 @@ def main(argv):
                 stack += deps.get(d, ())
         w = World(files, flags, more)
         w.units, w.type_names, w.taken, w.nodes, w.function_units, w.source_units = world.units, world.type_names, world.taken, world.nodes, world.function_units, world.source_units
-        w.actors, w.states, w.parts, w.part_numbers = world.actors, world.states, world.parts, world.part_numbers
+        w.actors, w.states, w.parts, w.part_numbers, w.state_members = world.actors, world.states, world.parts, world.part_numbers, world.state_members
         w.pointer_lists, w.globals, w.state_functions = world.pointer_lists, world.globals, world.state_functions
         w.table = {k: e for d in need for k, e in tables.get(d, {}).items()}
         if test:   # (the pieces of their source their tests hand on: what the test of this one holds of them)
