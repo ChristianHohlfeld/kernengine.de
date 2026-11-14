@@ -2766,6 +2766,30 @@ class Emit:
         target = self.names[b["referencedDecl"]["id"]]
         return self.take_pre() + [f"{target} = text_format<{text_literal(fmt)}>({', '.join([str(most)] + values)});"]
 
+    def logged(self, n):
+        """`std::fprintf(stderr, "...\\n", ...)`: a line of the program's log - Print String (not on the screen),
+        the line as the format writes it (Print ends the line itself)."""
+        a = kids(n)[2:]
+        f = bare(a[0])
+        while f.get("kind") in CAST and kids(f):
+            f = bare(kids(f)[-1])
+        if f.get("kind") != "StringLiteral":
+            raise Wait("a format that is not written out (Format Text has its format as a setting)")
+        fmt = c_string(f["value"])
+        fmt = fmt.decode("latin-1") if isinstance(fmt, bytes) else fmt
+        if fmt.endswith("\n"):
+            fmt = fmt[:-1]
+        if "\n" in fmt:
+            raise Wait("a line of the log that is several lines")
+        kinds = self.format_kinds(fmt)
+        if kinds is None:
+            raise Wait("a format Format Text does not know (d i u x X o c s f e g, flags, width, precision)")
+        if len(kinds) != len(a) - 1:
+            raise Wait("a format whose conversions are not its values")
+        values = [self.ex(x, t) for x, t in zip(a[1:], kinds)]
+        self.f.pure = False   # (a step: the log gets a line)
+        return self.take_pre() + [f"debug_print(text_format<{text_literal(fmt.encode('latin-1'))}>({', '.join(['-1'] + values)}), false);"]
+
     # ---- a function that names a place ----
     PLAIN = frozenset(("DeclRefExpr", "MemberExpr", "ImplicitCastExpr", "ParenExpr", "IntegerLiteral", "FloatingLiteral", "CXXBoolLiteralExpr", "CharacterLiteral", "StringLiteral",
                        "ArraySubscriptExpr", "CStyleCastExpr", "CXXStaticCastExpr", "CXXFunctionalCastExpr", "CXXThisExpr", "ConstantExpr", "MaterializeTemporaryExpr",
@@ -3661,6 +3685,8 @@ class Emit:
             ref = callee(n).get("referencedDecl", {})
             if name == "snprintf" and self.text_buffer_of(kids(n)[1] if len(kids(n)) > 1 else {}) is not None:
                 return self.formatted(n)
+            if name == "fprintf" and len(kids(n)) >= 3 and re.search(r"\bstderr\b", self.tree.source(kids(n)[1])):
+                return self.logged(n)
             d = self.engine_decl(ref.get("id"))
             if d is not None:
                 return self.engine(d, None, kids(n)[1:])[0]
