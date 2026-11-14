@@ -7124,7 +7124,8 @@ class TestWriter:
         def span(n):
             a, b = n.get("_at", (None, None))
             if a is None or b is None or n.get("_file") != file or not lo <= a < b <= hi:
-                raise Wait("written by a macro")
+                where = f"{os.path.basename(n.get('_file') or '?')}:{self.tree.text(n['_file']).count(chr(10), 0, a) + 1}" if a is not None and n.get("_file") else "nowhere in the source"
+                raise Wait(f"written by a macro (a {n.get('kind')} at {where})")
             return a, b
         def swap(a, b, token, text):
             if raw[a:b].strip() != token:
