@@ -7552,7 +7552,10 @@ class TestWriter:
 
     def piece(self, d):
         a, b = d["_at"]
-        return self.tree.said(self.cut(d["_file"], a, b))
+        text = self.tree.said(self.cut(d["_file"], a, b))
+        if defaulted_maker(d):   # (the compiler's tree ends `Game::Game() = default;` before `= default`)
+            text = re.sub(r"\s*(=\s*default\s*)?;?\s*$", "", text) + " = default;"
+        return text
 
     def cut(self, file, a, b, edits=None):
         """The bytes of a file from a to b, with the guards of `guard` in them (or the changes `edits`)."""
@@ -9269,7 +9272,7 @@ class TestWriter:
                         # its constructor: the one object made as the program makes it (static storage: zero, then
                         # the constructor - converted::made_static); the variables begin as the Blueprint's do, as
                         # an object is before its constructor makes anything of the engine (quiet_static)
-                        decl_lines += ["made.reset();", f"s = converted::quiet_static<{self.names[u.state]}>();"]
+                        decl_lines += ["made_state.reset();", f"s = converted::quiet_static<{self.names[u.state]}>();"]
                     else:
                         decl_lines.append(f"s = {state['draw']}(draw);")
                 if owner and f.self_type is not None and not f.ctor and not static:
@@ -9329,14 +9332,14 @@ class TestWriter:
                     self.helpers(owner)   # (a method that does not use its object: called on one as its class makes it)
                 here = f"{ns}::"   # (by its full name: the test's own function, whatever its arguments are)
                 state_made = f.state and d.get("kind") == "CXXConstructorDecl"
-                target = (f"{self.names[owner]}({args})" if f.ctor else f"made = converted::made_static<{self.names[owner]}>()" if state_made
+                target = (f"{self.names[owner]}({args})" if f.ctor else f"(void)(made_state = converted::made_static<{self.names[owner]}>())" if state_made
                           else f"{self.names[owner]}::{d['name']}({args})" if owner and static
                           else f"s->{d['name']}({args})" if f.state and owner
                           else f"a0.{d['name']}({args})" if owner and f.self_type is not None else f"{self.names[owner]}{{}}.{d['name']}({args})" if owner else f"{here}{free or self.function_name(d)}({args})")
                 parts = {"self": "a0", "result": "r"}   # (what the call changed: run's own values, handed back as they are)
                 if f.state:
                     # (the object after the call: all its variables are compared - of the constructor, the one it made)
-                    parts["state"] = f"{state['struct']}{{{'made' if state_made else 's'}.get()}}"
+                    parts["state"] = f"{state['struct']}{{{'made_state' if state_made else 's'}.get()}}"
                 for place_ in f.refs:
                     parts[("ref", place_)] = f"a{place_}"
                 out_lines = []
@@ -9374,7 +9377,7 @@ class TestWriter:
                 f'    converted::Tally tally("{f.name}");',
                 "    converted::Draw draw;   // (every function its own arguments, the same in every run)",
                 *([f"    std::unique_ptr<{self.names[u.state]}> s;   // (the object of the state: drawn for every call)"] if f.state else []),
-                *([f"    std::unique_ptr<{self.names[u.state]}> made;   // (the one its constructor makes: compared after the call)"] if state_made else []),
+                *([f"    std::unique_ptr<{self.names[u.state]}> made_state;   // (the one its constructor makes: compared after the call)"] if state_made else []),
                 f"    const auto run = [&]({', '.join(f'[[maybe_unused]] const {t}& {n}' if n in held_lists else f'[[maybe_unused]] {t} {n}' for t, n in zip(types, names))}) {{ {give} }};",
                 "    for (int i = 0; tally.more(i); ++i) {",
                 *[f"      {x}" for x in decl_lines],
