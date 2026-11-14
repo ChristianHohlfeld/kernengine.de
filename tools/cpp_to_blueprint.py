@@ -496,9 +496,11 @@ class Tree:
                 if z and name:
                     self.layouts.setdefault(name, (int(z.group(1)), fields))
                     name = ""
-        if q not in self.layouts:
-            raise Wait(f"the bytes of a {q.split('::')[-1]} (the compiler gives no layout of it here)")
-        return self.layouts[q]
+        # (the compiler names a record with all its namespaces; the tree without the one that is converted)
+        for name in (q, f"{self.namespace}::{q}"):
+            if name in self.layouts:
+                return self.layouts[name]
+        raise Wait(f"the bytes of a {q.split('::')[-1]} (the compiler gives no layout of it here)")
 
     def __init__(self, path, namespace, flags, spaces=()):
         self.path = os.path.abspath(path)
@@ -3811,7 +3813,8 @@ class Emit:
             b = bare(kids(b)[-1])
         if b.get("kind") == "IntegerLiteral":
             return str(int(b["value"]) - 1)
-        return f"kern::to<Int>(kern::formula([](Float n) -> Float {{ return n - 1.0; }}, kern::to<Float>({text})))"
+        # (a bound that is itself a conversion - `i < from + n` - is a value of its own first: conv)
+        return f"kern::to<Int>(kern::formula([](Float n) -> Float {{ return n - 1.0; }}, {self.conv(text, 'Int', 'Float')}))"
 
     def refers(self, n, decl_id):
         n = bare(n)
@@ -7205,8 +7208,9 @@ class Emit:
                     if n in (f"list_length<{it}>({self.ex(lst, t)})", str(u.fixed(qtype(lst)))):
                         return self.ex(lst, t), t
                 raise Wait("a view (Span) of a part of a list")
-            if len(a) in (1, 2) and self.tp_or_none(a[0]) in ("Int", "Float") and (len(a) == 1 or self.tp_or_none(a[1]) is not None):
-                # std::vector<T>(n) and (n, x): n entries, each T's zero or x
+            if len(a) in (1, 2) and self.tp_or_none(a[0]) in ("Int", "Float") and (len(a) == 1 or self.tp_or_none(a[1]) is not None) and not (len(a) == 2 and self.is_iter(a[0])):
+                # std::vector<T>(n) and (n, x): n entries, each T's zero or x (a place in a list is an Int as well:
+                # two of them are the range below)
                 made = self.temp("made", t)
                 self.hoist([f"{made} = {t}{{}};", f"list_resize({made}, {self.ex(a[0], 'Int')}, {self.ex(a[1], it) if len(a) == 2 else u.zero(it)});"])
                 return made, t
@@ -7218,8 +7222,10 @@ class Emit:
                     raise Wait("a list made of a range of another type")
                 if self.whole_list(a[0], a[1]):
                     return self.ex(s0, st), t   # (the whole list: a copy of it)
-                made, src, i0, i1 = self.temp("made", t), self.temp("from", st), self.temp("first", "Int"), self.temp("last", "Int")
-                self.hoist([f"{made} = {t}{{}};", f"{src} = {self.ex(s0, st)};", f"{i0} = {first};", f"{i1} = {self.whole_math('-', last, '1')};",
+                # (the entries read where the list stands - nothing is copied but them, as in C++)
+                src = self.place_arg(s0, st, "const", [])
+                made, i0, i1 = self.temp("made", t), self.temp("first", "Int"), self.temp("last", "Int")
+                self.hoist([f"{made} = {t}{{}};", f"{i0} = {first};", f"{i1} = {self.whole_math('-', last, '1')};",
                             f"list_reserve({made}, {self.whole_math('+', self.whole_math('-', i1, i0), '1')});"]
                            + self.count_loop(i0, i1, lambda i: [f"list_add({made}, list_get<{it}>({src}, {i}));"]))
                 return made, t
