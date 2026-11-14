@@ -4695,6 +4695,32 @@ class Emit:
         self.u.members.append(f"  struct : kern::Node<{node}> {{ Int index = 0; }} n{node};")
         return [f"for (auto it{node} = flow_for(n{node}, {first}, {last}); it{node}.next();) {{", *["  " + ln for ln in body(f"n{node}.index")], "}"]
 
+    def unique_entries(self, base, lv, it, rng, end):
+        """v.erase(std::unique(v.begin(), v.end()), v.end()): of every run of equal entries the first stays -
+        as std::unique goes: each entry is compared with the last one kept (==) and, when it differs, put
+        behind it; then the list ends after the last one kept."""
+        def whole(n, want):
+            b = self.unwrap(n)
+            while b.get("kind") in ("CXXConstructExpr", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr", "ImplicitCastExpr") and len(kids(b)) == 1:
+                b = self.unwrap(kids(b)[0])
+            return b.get("kind") == "CXXMemberCallExpr" and callee(b).get("name") == want and kids(callee(b)) and self.same_list(kids(callee(b))[0], base)
+        if not (whole(rng[0], "begin") and whole(rng[1], "end") and whole(end, "end")):
+            raise Wait("list: std::unique of a part of a list")
+        if it not in ("Int", "Float", "Text") and it not in self.u.enum_values:
+            raise Wait(f"list: std::unique of {it} (its ==)")
+        cpp = self.entry_cpp(base)
+        kept, n = self.temp("kept", "Int"), self.temp("count", "Int")
+        def body(r):
+            same = self.is_equal(self.at_place(base, kept, it), self.at_place(base, r, it), it, cpp)
+            return [f"if (logic_not({same})) {{", f"  {kept} += 1;", f"  {lv}[{kept}] = {lv}[{r}];", "}"]
+        first, last = "1", self.whole_math("-", n, "1")
+        return [f"{n} = list_length<{it}>({lv});",
+                f'if (math_compare<">">(kern::to<Float>({n}), 0.0)) {{',
+                f"  {kept} = 0;",
+                *["  " + ln for ln in self.count_loop(first, last, body)],
+                f"  list_resize({lv}, {self.whole_math('+', kept, '1')}, {self.u.zero(it)});",
+                "}"]
+
     def list_step(self, name, base, lv, it, args):
         """A call that changes a list (erase, insert, resize, assign) as the steps the language has."""
         length = f"kern::to<Float>(list_length<{it}>({lv}))"
@@ -4715,6 +4741,8 @@ class Emit:
                 return [f"{x} = {self.ex(kids(inner)[3], it)};", f"while (loop(list_contains<{it}>({lv}, {x}))) {{", f"  list_remove({lv}, {x});", "}"]
             if inner.get("kind") == "CallExpr" and callee_name(inner) == "remove_if" and len(kids(inner)) == 4:
                 return self.removed_where(base, lv, it, kids(inner)[1:], args[1])
+            if inner.get("kind") == "CallExpr" and callee_name(inner) == "unique" and len(kids(inner)) == 3:
+                return self.unique_entries(base, lv, it, kids(inner)[1:], args[1])
             if inner.get("kind") == "CallExpr" and callee_name(inner) in ("remove_if", "unique", "partition", "stable_partition"):
                 raise Wait("a function value (lambda / std::function)")
             (l0, first), (l1, last) = self.place(args[0]), self.place(args[1])
@@ -5078,12 +5106,18 @@ class Emit:
         return (any(root == n for n, _ in self.locals) or any(root == n and kind == "ref" for (n, _), kind in zip(self.f.params, self.f.kinds))
                 or (self.f.state and self.u.is_state_variable(root)))   # (a variable of the Blueprint: C++ said whether the method may change it)
 
-    def place_arg(self, n, t, kind, after, fixed=None):
+    def place_arg(self, n, t, kind, after, fixed=None, raising=False):
         """What a call gives a reference input: the place the argument is. Where the argument is none of the
         notation's places (a value, a map's row by its key ...), a variable holds it for the call - and is
         stored back after it, when the function changes it (`after`: the lines for that). `fixed`: the input
-        is a list of that fixed length - so is the variable (a reference is the place itself)."""
+        is a list of that fixed length - so is the variable (a reference is the place itself). `raising`: the
+        function may run handlers (it calls on an actor's Blueprint) - while it runs, a place in a list could
+        go: an entry is given as its value (a const reference reads it as it was), one to change waits."""
         got = self.spot(n)
+        if got is not None and got[1] == t and raising and "[" in got[0]:
+            if kind == "ref":
+                raise Wait("an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)")
+            got = None
         if got is not None and got[1] == t and (kind != "ref" or self.writable(got[0])):
             return got[0]
         held = self.temp("a", t, fixed)
@@ -5091,6 +5125,15 @@ class Emit:
         if kind == "ref":
             after.append(lambda: self.store(n, self.typed(held, t)))
         return held
+
+    def may_raise(self, g, seen=None):
+        """May the function run handlers while it runs - does it call on an actor's Blueprint, itself or
+        through what it calls?"""
+        seen = set() if seen is None else seen
+        if id(g) in seen:
+            return False
+        seen.add(id(g))
+        return bool(g.on_actors) or any(self.may_raise(c, seen) for c in g.calls)
 
     def fixed(self, index):
         """The index of a list entry on the way to a place. For the list a loop goes through it is worked out
@@ -5397,7 +5440,7 @@ class Emit:
                     self.self_var()   # (a method that only reads its object does not call one that changes it)
                 texts.append(self.self_name)
             else:
-                texts.append(self.place_arg(obj, g.self_type, kinds[0], after))
+                texts.append(self.place_arg(obj, g.self_type, kinds[0], after, raising=self.may_raise(g)))
             params = params[1:]
             kinds = kinds[1:]
         first = len(g.params) - len(params)   # (a method: its object is the first input)
@@ -5410,7 +5453,7 @@ class Emit:
                 j += 2
                 continue
             (_, pt), kind = params[j], kinds[j]
-            texts.append(self.place_arg(a, pt, kind, after, g.fixed.get(first + j)) if kind else self.ex(a, pt))
+            texts.append(self.place_arg(a, pt, kind, after, g.fixed.get(first + j), raising=self.may_raise(g)) if kind else self.ex(a, pt))
             j += 1
         gives = g.self_type if g.ctor else g.value
         texts = [texts[i] for i in g.order()]   # (as the Blueprint function has its inputs: those by reference first)
