@@ -8812,11 +8812,21 @@ class TestWriter:
                     done = [case_of[key[1]] for key, _ in cases if key not in dropped]
                     return None, skipped + [(f, "its source does not compile with a Blueprint's numbers yet: " + message) for f in done]
                 found.setdefault(piece, message)
-            # a piece of the source that does not compile may be why later ones do not: the first one goes
+            # a piece of the source that does not compile may be why later ones do not: the first one goes - and with
+            # it every other one whose complaint names nothing of a piece that does not compile either (a complaint
+            # of its own, not one that follows from another: it would go in a later round all the same)
             only_cases = all(k[0] == "case" for k in found)
             early = min(first for first, last, key in where if key in found and (only_cases or key[0] != "case"))
+            def named_by(key):
+                d = tree.decl.get(key[1]) if isinstance(key[1], str) else None
+                n = (d or {}).get("name") or (key[1].split("::")[-1] if isinstance(key[1], str) else "")
+                return n if n and re.fullmatch(r"\w+", n) else None
+            failing = {n for n in (named_by(k) for k in found) if n}
+            def own_complaint(key, message):
+                mine = named_by(key)
+                return key[0] != "case" and not any(re.search(rf"\b{re.escape(n)}\b", message) for n in failing if n != mine)
             for key, message in found.items():
-                if only_cases or (key[0] != "case" and min(first for first, last, k in where if k == key) == early):
+                if only_cases or (key[0] != "case" and (min(first for first, last, k in where if k == key) == early or own_complaint(key, message))):
                     dropped.add(key)
                     why[key] = message
                     if key[0] == "function":
