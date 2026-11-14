@@ -44,10 +44,10 @@ enum class Opt : u8 {
 };
 
 struct OptSpec {
-  const char* key;      // command / storage key
-  const char* section;  // menu section: maus, drohne, fuss, auto, kamera, ton, welt
-  const char* label;    // menu label (German)
-  const char* help;     // one line (settings_help.mjs)
+  std::string key;      // command / storage key
+  std::string section;  // menu section: maus, drohne, fuss, auto, kamera, ton, welt
+  std::string label;    // menu label (German)
+  std::string help;     // one line (settings_help.mjs)
   f32 min, max, step, def;
   bool toggle;
   bool live;            // false: a WORLD kind the game does not have yet (shown as "bald")

@@ -198,7 +198,7 @@ void Devices::platform(bool fine_pointer, bool coarse_pointer, i32 max_touch_poi
   fine = fine_pointer;
   coarse = coarse_pointer;
   touch_points = max_touch_points;
-  set(g_rules.flag("DevicePlatform", fine, static_cast<i64>(touch_points)));
+  set(g_rules.flag("DevicePlatform", fine, touch_points));
 }
 void Devices::input(Event e) {
   bool now_desktop = false, now_pad = false;

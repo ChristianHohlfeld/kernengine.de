@@ -126,6 +126,12 @@ const char* Engine::arg(const char* key, const char* fallback) const {
   return fallback;
 }
 
+bool Engine::has_arg(const char* key) const {
+  for (const auto& kv : args_)
+    if (kv.first == key) return true;
+  return false;
+}
+
 f64 Engine::arg_number(const char* key, f64 fallback) const {
   const char* v = arg(key);
   if (!v || !*v) return fallback;

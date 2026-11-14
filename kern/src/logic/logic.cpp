@@ -2978,6 +2978,7 @@ Instance* Runtime::add(const Graph& own, ActorRef self, std::string name) {
 void Runtime::remove(ActorRef self) {
   for (std::size_t i = 0; i < instances_.size();) {
     if (instances_[i]->self() == self) {
+      end_play(*instances_[i]);
       Instance* gone = instances_[i].get();
       pending_.erase(std::remove_if(pending_.begin(), pending_.end(), [&](const Pending& p) { return p.inst == gone; }), pending_.end());
       instances_.erase(instances_.begin() + static_cast<std::ptrdiff_t>(i));
@@ -3070,6 +3071,20 @@ void Runtime::begin() {
       if (inst.nodes_[static_cast<std::size_t>(i)].def->type == "event.begin") run_from(inst, i, 0);
     }
   }
+}
+
+void Runtime::end_play(Instance& inst) {
+  if (!inst.begun_ || inst.ended_ || inst.disabled_) return;
+  inst.ended_ = true;
+  step_starts();
+  for (std::size_t at = 0; at < inst.events_.size() && !inst.disabled_; ++at) {
+    const int i = inst.events_[at];
+    if (inst.nodes_[static_cast<std::size_t>(i)].def->type == "event.end") run_from(inst, i, 0);
+  }
+}
+
+void Runtime::end() {
+  for (std::size_t k = 0; k < instances_.size(); ++k) end_play(*instances_[k]);
 }
 
 void Runtime::tick(f32 dt) {

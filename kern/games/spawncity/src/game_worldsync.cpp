@@ -123,15 +123,16 @@ void Game::worldsync_update(f32 dt) {
     for (std::size_t i = 0; i < cars_.size(); ++i) {
       TrafficCar& c = cars_[i];
       i32 owner = -1;
-      const net::Remote* who = nullptr;
-      for (const net::Remote& r : net_.remotes())
-        if (r.state.mode == net::PlayerMode::car && r.state.car == i) { owner = r.state.slot; who = &r; }
+      std::size_t who = 0;  // (the place of the mate who drives it in net_.remotes(), when owner >= 0)
+      const std::vector<net::Remote>& remotes = net_.remotes();
+      for (std::size_t k = 0; k < remotes.size(); ++k)
+        if (remotes[k].state.mode == net::PlayerMode::car && remotes[k].state.car == i) { owner = remotes[k].state.slot; who = k; }
       if (car_lent_.size() < cars_.size()) { car_lent_.resize(cars_.size(), false); car_lent_at_.resize(cars_.size()); }
       const bool was = car_lent_[i];
       if (owner >= 0) {
         if (!was && c.placed) world_->set_alive(c.actor, false);
         car_lent_[i] = true;
-        car_lent_at_[i] = {who->shown, who->shown_rotation};
+        car_lent_at_[i] = {remotes[who].shown, remotes[who].shown_rotation};
       } else if (was) {
         car_lent_[i] = false;
         // his car comes back to the town where he got out (the pose he last sent)

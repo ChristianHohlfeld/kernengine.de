@@ -50,7 +50,7 @@ struct SpawnGuardWorld {
     guard.name = "SpawnGuard";
     guard.logic.emplace();
     std::string error;
-    if (!rules::actor_graph("SpawnGuard", *guard.logic, &error)) problems = error;
+    if (!rules::actor_graph("SpawnGuard", *guard.logic, error)) problems = error;
     for (const kern::logic::Issue& i : kern::logic::check(*guard.logic)) problems += (i.error ? "error: " : "warning: ") + i.text + "\n";
     const kern::game::ActorId id = level.add(guard).id;
     if (wall) {

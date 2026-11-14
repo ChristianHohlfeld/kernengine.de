@@ -88,6 +88,8 @@ class Engine {
   void request_pointer_lock(bool lock);
   /// Launch parameter `key` from the host (the page's query string by default), or `fallback`.
   const char* arg(const char* key, const char* fallback = nullptr) const;
+  /// Whether the host gave the launch parameter `key` (also when it is empty).
+  bool has_arg(const char* key) const;
   f64 arg_number(const char* key, f64 fallback) const;
   /// Platform side: "k=v&k2=v2" (URL-encoded) launch parameters.
   void set_args(const char* text, u32 length);

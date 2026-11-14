@@ -1478,6 +1478,10 @@ struct PureNodes {
   /// A Float's 64 bits (IEEE 754), and the Float of 64 bits.
   static Int64 int64_bits_of_float(Float a) { return Int64(std::bit_cast<u64>(a)); }
   static Float int64_float_of_bits(Int64 a) { return std::bit_cast<f64>(a.bits); }
+  /// A float's 32 bits (IEEE 754, std::bit_cast of a float): of the float the Float is as a 32-bit number
+  /// (static_cast<f32>), 0 .. 2^32 - 1 - and the Float the 32 bits are (the Int's last 32 bits).
+  static Int math_bits_of_float32(Float a) { return static_cast<i64>(bytes::single_bits(a)); }
+  static Float math_float32_of_bits(Int a) { return bytes::single_value(static_cast<u32>(static_cast<u64>(a))); }
   /// Two halves of 32 bits each (an Int each, cut to its last 32 bits), and the halves again (0 .. 2^32 - 1).
   static Int64 int64_of_halves(Int high, Int low) { return Int64((static_cast<u64>(static_cast<u32>(high)) << 32) | static_cast<u32>(low)); }
   static Int int64_high(Int64 a) { return static_cast<i64>(a.bits >> 32); }

@@ -114,13 +114,13 @@ TEST(math_matrices) {
 TEST(math_camera) {
   const Vec3 eye{10, -5, 4}, target{0, 3, 1};
   bool ok = false;
-  const Mat4 view = Mat4::look_at(eye, target, {0, 0, 1}, &ok);
+  const Mat4 view = Mat4::look_at(eye, target, {0, 0, 1}, ok);
   CHECK(ok);
   const Mat4 vp = Mat4::perspective(1.0f, 1.6f, 0.1f, 500.0f) * view;
   const Vec4 c = vp.transform({target, 1});
   CHECK_NEAR(c.x / c.w, 0.0f, 1e-5f);
   CHECK_NEAR(c.y / c.w, 0.0f, 1e-5f);
-  Mat4::look_at(eye, eye, {0, 0, 1}, &ok);
+  Mat4::look_at(eye, eye, {0, 0, 1}, ok);
   CHECK(!ok);
   const Frustum f = Frustum::from_matrix(vp);
   CHECK(f.sphere_visible({target, 1}));
@@ -2225,6 +2225,55 @@ TEST(logic_local_variables) {
   CHECK(error.find("line 7") != std::string::npos);
   CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  Float L = 0.0;\n  void F() {\n    Float L = 1.0;\n  }\n};\n", none, nullptr, &error));
   CHECK(error.find("local variable L") != std::string::npos);
+}
+
+TEST(logic_end_play) {
+  // End Play runs once when play stops (Runtime::end) or the actor is taken out (remove) - after it began, in
+  // every stage the same; as C++ notation: KERN_EVENT(onN, event_end).
+  const char* text = R"kn(
+struct Ends : kern::Blueprint {
+  Int Began = 0;
+  Int Ended = 0;
+
+  KERN_EVENT(on1, event_begin)
+  void on1() {
+    Began += 1;
+  }
+
+  KERN_EVENT(on2, event_end)
+  void on2() {
+    Ended = kern::to<Int>(math_add(kern::to<Float>(Began), 10.0));
+  }
+};
+)kn";
+  logic::Graph g;
+  std::string error;
+  CHECK(logic::from_cpp(text, g, nullptr, &error));
+  if (!error.empty()) std::printf("%s\n", error.c_str());
+  CHECK(no_errors(logic::check(g)));
+  std::string again;
+  CHECK(logic::to_cpp(g, "Ends", again, &error) && again.find("KERN_EVENT(on2, event_end)") != std::string::npos);
+  for (bool jit : {false, true}) {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.jit = jit;
+    logic::Instance* a = rt.add(g, 7, "A");
+    logic::Instance* b = rt.add(g, 8, "B");
+    logic::Instance* late = rt.add(g, 9, "Late");
+    CHECK(a && b && late);
+    if (!a || !b || !late) continue;
+    rt.begin();
+    rt.remove(9);   // (it began: its End Play runs as it goes)
+    CHECK(a->get("Ended").i == 0 && b->get("Ended").i == 0);
+    rt.end();
+    CHECK(a->get("Ended").i == 11 && b->get("Ended").i == 11);
+    a->set("Ended", logic::Value::integer(0));
+    rt.end();   // (once)
+    CHECK(a->get("Ended").i == 0);
+    logic::Instance* fresh = rt.add(g, 10, "Fresh");
+    rt.end();   // (it never began: no End Play)
+    CHECK(fresh && fresh->get("Ended").i == 0 && fresh->get("Began").i == 0);
+  }
 }
 
 TEST(logic_call_on_actor_by_its_name) {
@@ -4476,6 +4525,14 @@ TEST(logic_int64_is_u64_and_i64) {
     same = same && P::int64_high(I(a)) == static_cast<i64>(a >> 32) && P::int64_low(I(a)) == static_cast<i64>(a & 0xffffffffull) && P::int64_of_halves(P::int64_high(I(a)), P::int64_low(I(a))).bits == a;
     same = same && P::int64_count_ones(I(a)) == std::popcount(a) && P::int64_leading_zeros(I(a)) == std::countl_zero(a) && P::int64_trailing_zeros(I(a)) == std::countr_zero(a);
     same = same && P::int64_bits_of_float(P::int64_float_of_bits(I(a))).bits == a;  // (a no-number's bits too)
+    // 32 bits: std::bit_cast of a float, both ways - of every pattern, also the no-numbers (their sign and payload) and the subnormals
+    const u32 w = static_cast<u32>(a);
+    const bool no_number = (w & 0x7f800000u) == 0x7f800000u && (w & 0x007fffffu) != 0;
+    // (a no-number a Float holds is quiet - as a float that becomes a double is: its 32 bits again with the quiet bit)
+    same = same && P::math_bits_of_float32(P::math_float32_of_bits(static_cast<i64>(w))) == static_cast<i64>(no_number ? w | 0x00400000u : w);
+    same = same && P::int64_bits_of_float(P::math_float32_of_bits(static_cast<i64>(a))).bits == P::int64_bits_of_float(P::math_float32_of_bits(static_cast<i64>(w))).bits;  // (the last 32 bits)
+    if (!no_number)
+      same = same && P::math_float32_of_bits(static_cast<i64>(w)) == static_cast<f64>(std::bit_cast<f32>(w)) && P::math_bits_of_float32(static_cast<f64>(std::bit_cast<f32>(w))) == static_cast<i64>(w);
     same = same && P::int64_of_text(P::int64_text(I(a))).bits == a && P::int64_of_text(P::int64_text_signed(I(a))).bits == a && P::int64_of_text("0x" + P::int64_text_hex(I(a))).bits == a;
     same = same && P::int64_text(I(a)) == std::to_string(a) && P::int64_text_signed(I(a)) == std::to_string(sa);
     same = same && P::int64_to_float(I(a)) == static_cast<f64>(sa) && P::int64_to_float_unsigned(I(a)) == static_cast<f64>(a) && P::int64_to_int(I(a)) == logic::normal(sa);

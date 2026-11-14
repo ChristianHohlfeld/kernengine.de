@@ -297,14 +297,15 @@ void Game::foot_rounds_update(f32 dt) {
     const Vec3 seg = s.to - s.from;
     const f32 l2 = kern::dot(seg, seg);
     if (l2 < 1e-6f) continue;
-    Projectile* best = nullptr;
+    std::size_t best = projectiles_.size();  // (its place in projectiles_; none: the end)
     f32 bt = 2;
-    for (Projectile& p : projectiles_) {
+    for (std::size_t i = 0; i < projectiles_.size(); ++i) {
+      const Projectile& p = projectiles_[i];
       if (!p.alive || p.ghost || !foot_round(p.id)) continue;
       const f32 t = clampf(kern::dot(p.pos - s.from, seg) / l2, 0, 1);
-      if (kern::length(s.from + seg * t - p.pos) <= kShotHit && t < bt) { bt = t; best = &p; }
+      if (kern::length(s.from + seg * t - p.pos) <= kShotHit && t < bt) { bt = t; best = i; }
     }
-    if (best) { best->fuse = 0; best->born = now - 1; }
+    if (best < projectiles_.size()) { projectiles_[best].fuse = 0; projectiles_[best].born = now - 1; }
   }
   // knifeAt: the blade connects at the strike frame, 130 ms after the press, along the ray then
   if (g.knife_due >= 0 && now >= g.knife_due) {

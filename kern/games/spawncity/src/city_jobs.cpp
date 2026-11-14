@@ -210,9 +210,10 @@ bool read_chunks(const std::vector<u8>& output, std::vector<kern::GeoChunk>& out
 }
 
 u32 chunk_count(const std::vector<u8>& output) {
-  u32 n = 0;
-  if (output.size() >= 4) std::memcpy(&n, output.data(), 4);
-  return n;
+  // (the count the job put first: its four bytes as they lie in memory - little-endian, as on every
+  // target of the engine)
+  if (output.size() < 4) return 0;
+  return u32{output[0]} | u32{output[1]} << 8 | u32{output[2]} << 16 | u32{output[3]} << 24;
 }
 
 bool read_chunk(const std::vector<u8>& output, std::size_t& at, kern::GeoChunk& c) {

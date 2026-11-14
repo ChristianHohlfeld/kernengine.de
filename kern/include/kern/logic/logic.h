@@ -1261,6 +1261,7 @@ class Instance {
   bool stopping_ = false;             // the loop guard: disabled when its outermost chain is over
   bool disabled_ = false;
   bool begun_ = false;
+  bool ended_ = false;                // End Play has run (Runtime::end, remove)
 };
 
 /// Event delivered to graphs: type (e.g. "game.overlap"), optional filter
@@ -1285,10 +1286,13 @@ class Runtime {
   /// The Blueprints of the project: where a Blueprint's libraries are found (Graph::uses). A
   /// Blueprint that uses libraries runs as one graph with them (logic::link).
   Blueprints blueprints;
+  /// Takes the actor's Blueprint out - after its End Play.
   void remove(ActorRef self);
   void clear();
   /// Begin Play for instances that have not begun.
   void begin();
+  /// End Play for every instance that has begun and not ended (play stops), in the order they were added.
+  void end();
   /// One fixed step: latent actions, timers, state machine timers, Tick events.
   void tick(f32 dt);
   /// Raises an event (synchronously runs the handlers).
@@ -1348,6 +1352,7 @@ class Runtime {
   };
   enum class Chain : u8 { event, call, call_inside };  // what starts it (run_from)
   void run_from(Instance& inst, int node, int entry, Chain chain = Chain::event);
+  void end_play(Instance& inst);   // (its End Play handlers, once - see end, remove)
   void enter_state(Instance& inst, std::size_t machine, u32 state);
   void check_transitions(Instance& inst, const std::string* event);
   void step_starts();              // a new step: the guard counts from zero

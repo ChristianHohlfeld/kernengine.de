@@ -202,6 +202,7 @@ KERN_LAYOUT(Demo) {
 | Platz (eine Variable, ein Feld davon, ein Eintrag einer Liste darin – beliebig tief) | wie C++ ihn schreibt: `Cars[i].Wheels[j].Slip` – die Einstellung „path“ des Knotens (`[].Wheels[].Slip`), jeder Index ein Eingang (siehe „Plätze“) |
 | Return | `return {wert, wert};` bzw. `return;` |
 | Event | `KERN_EVENT(on5, event_custom<"Hit">)` und `void on5(Actor actor, Float value, Text text) { ... }` |
+| Begin Play, End Play | `KERN_EVENT(on1, event_begin)` · `KERN_EVENT(on2, event_end)` – End Play läuft einmal, wenn das Spiel endet (`Runtime::end`, `GameWorld::stop`) oder der Actor die Welt verlässt (`Runtime::remove`), und nur, wenn Begin Play gelaufen ist; in jeder Stufe gleich |
 | State Machine | `kern::Machine machine3 = machine("Door").state(...).on_event(...).after(...).when(...).automatic(...);` |
 | Knoten-Einstellungen (Parameter) | Template-Argumente: `flow_tween<"smooth">`, `event_custom<"Hit">` |
 | Einstellung, die einen Typ nennt („Type“ von Select, Reroute, den Listen-Knoten; „Enum“ der Knoten einer Aufzählung; „Struct“ von Make und Break) | der Typ selbst: `logic_select<Float>(pick, a, b)`, `value_reroute<List<Text>>(x)`, `list_make<Vector, "2">(a, b)`, `enum_name<Mode>(wert)`, `struct_make<Weapon>(...)` |
@@ -714,6 +715,13 @@ Frame Back = struct_of_bytes<Frame, "10: u32@0 u16@4 u16@6 i16@8">(Bytes, 0);
   sagt. Eine Struktur mit Füllung, mit einem `float` (die Sprache hält ihn in 64 Bit), einer Zahl,
   deren Breite die Plattform bestimmt (`long`, `size_t`, `char`), einer Aufzählung, einem
   Bitfeld oder einem Feld, das keine Zahl ist, hat dort noch keine Bytes und wartet mit Grund.
+- **Die Bits einer Zahl** (`std::bit_cast` zwischen einer Gleitkommazahl und einer ganzen Zahl
+  ihrer Breite) sind eigene Knoten: Bits of Float 32 (`math_bits_of_float32(x)`: die 32 Bit der
+  Zahl als `float`, 0 bis 2^32 − 1) und Float 32 of Bits (`math_float32_of_bits(b)`: der `float`
+  der letzten 32 Bit des Int), für 64 Bit Bits of Float und Float of Bits mit einem Int64. Ein NaN
+  ist wie oben still, mit Vorzeichen und den oberen Bits seiner Nutzlast. Der Konverter schreibt
+  `std::bit_cast<u32>(f)`, `std::bit_cast<i32>(f)` (das Zweierkomplement der 32 Bit),
+  `std::bit_cast<f32>(u)`, `std::bit_cast<u64>(d)` und `std::bit_cast<f64>(w)` damit.
 
 ### Plätze
 

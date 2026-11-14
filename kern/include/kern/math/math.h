@@ -163,23 +163,28 @@ struct Mat4 {
   }
 
   /// View matrix. Returns identity (and false in `ok`) for a degenerate basis.
-  static Mat4 look_at(Vec3 eye, Vec3 target, Vec3 up, bool* ok = nullptr) {
+  static Mat4 look_at(Vec3 eye, Vec3 target, Vec3 up, bool& ok) {
     Vec3 z = eye - target;
     f32 len = length(z);
     Mat4 r;
-    if (!(len > 1e-10f)) { if (ok) *ok = false; return r; }
+    if (!(len > 1e-10f)) { ok = false; return r; }
     z = z / len;
     Vec3 x = cross(up, z);
     len = length(x);
-    if (!(len > 1e-10f)) { if (ok) *ok = false; return r; }
+    if (!(len > 1e-10f)) { ok = false; return r; }
     x = x / len;
     const Vec3 y = cross(z, x);
     r.m[0] = x.x; r.m[1] = y.x; r.m[2] = z.x; r.m[3] = 0;
     r.m[4] = x.y; r.m[5] = y.y; r.m[6] = z.y; r.m[7] = 0;
     r.m[8] = x.z; r.m[9] = y.z; r.m[10] = z.z; r.m[11] = 0;
     r.m[12] = -dot(x, eye); r.m[13] = -dot(y, eye); r.m[14] = -dot(z, eye); r.m[15] = 1;
-    if (ok) *ok = true;
+    ok = true;
     return r;
+  }
+  /// The same, where nobody asks whether it is one.
+  static Mat4 look_at(Vec3 eye, Vec3 target, Vec3 up) {
+    bool ok = false;
+    return look_at(eye, target, up, ok);
   }
 };
 

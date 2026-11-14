@@ -9,11 +9,10 @@ namespace sc::detail {
 namespace {
 using rules::decimal;
 rules::Blueprint g_rules{"CombatDetail"};
-kern::logic::Instance*& g_blueprint = g_rules.running;
 }  // namespace
 
-void bind(kern::logic::Instance* blueprint) { g_blueprint = blueprint; }
-kern::logic::Instance* blueprint() { return g_blueprint; }
+void bind(kern::logic::Instance* blueprint) { g_rules.running = blueprint; }
+kern::logic::Instance* blueprint() { return g_rules.running; }
 
 bool is_critical(Critical k, f32 hp, f32 max_hp) {
   bool critical = false;
@@ -50,6 +49,6 @@ Vec3 bullet_impulse(Vec3 direction, Round round) {
   g_rules.call("BulletImpulse", std::tie(impulse), direction, round);
   return impulse;
 }
-f32 projectile_gravity() { return g_blueprint ? static_cast<f32>(g_blueprint->get("ProjectileGravity").as_number()) : 0; }
+f32 projectile_gravity() { return static_cast<f32>(g_rules.get<f64>("ProjectileGravity")); }
 
 }  // namespace sc::detail
