@@ -50,6 +50,11 @@ template <class Core> struct EngineNodesOf : Core {
   void engine_input_set_focus(Int input, Bool focused) { this->kern_engine("engine.input.set_focus", {to_value(input), to_value(focused)}, {}); }
   /// clears per-frame edges and deltas
   void engine_input_end_frame(Int input) { this->kern_engine("engine.input.end_frame", {to_value(input)}, {}); }
+  /// The renderer and the input of the frame: objects of the engine (a Blueprint reaches them by these).
+  Int engine_engine_renderer(Int engine) const { return from_value<Int>(this->kern_engine("engine.engine.renderer", {to_value(engine)}, {PinType::integer})[0].converted(pin_type_of<Int>())); }
+  void engine_engine_input(Int engine) { this->kern_engine("engine.engine.input", {to_value(engine)}, {PinType::integer}); }
+  template <class KernNode> void engine_engine_input(KernNode& kern_n, Int engine) { const std::vector<Value> kern_out = this->kern_engine("engine.engine.input", {to_value(engine)}, {PinType::integer}); kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]); }
+  Int engine_engine_input_2(Int engine) const { return from_value<Int>(this->kern_engine("engine.engine.input_2", {to_value(engine)}, {PinType::integer})[0].converted(pin_type_of<Int>())); }
   /// Text shown by the host page in its status overlay (empty hides it).
   void engine_engine_set_status(Int engine, const Text& text) { this->kern_engine("engine.engine.set_status", {to_value(engine), to_value(text)}, {}); }
   /// Asks the host to capture (or release) the mouse for mouse-look controls.
@@ -63,6 +68,52 @@ template <class Core> struct EngineNodesOf : Core {
   Int engine_engine_height(Int engine) const { return from_value<Int>(this->kern_engine("engine.engine.height", {to_value(engine)}, {PinType::integer})[0].converted(pin_type_of<Int>())); }
   Float engine_engine_aspect(Int engine) const { return from_value<Float>(this->kern_engine("engine.engine.aspect", {to_value(engine)}, {PinType::number})[0].converted(pin_type_of<Float>())); }
   EngineValue engine_engine_stats(Int engine) const { return {this->kern_engine("engine.engine.stats", {to_value(engine)}, {PinType::structure})[0]}; }
+  /// Clear colour for the frame (behind the sky only where no sky is drawn).
+  EngineValue engine_engine_clear_color(Int engine) const { return {this->kern_engine("engine.engine.clear_color", {to_value(engine)}, {PinType::structure})[0]}; }
+  template <class T1> void engine_engine_set_clear_color(Int engine, const T1& color) { this->kern_engine("engine.engine.set_clear_color", {to_value(engine), to_value(color)}, {}); }
+  /// WebXR (kern_app_frame_xr): the headset's eye in the world and where it looks, as drawn last frame (the first eye); `xr` false outside a session.
+  Bool engine_engine_xr(Int engine) const { return from_value<Bool>(this->kern_engine("engine.engine.xr", {to_value(engine)}, {PinType::boolean})[0].converted(pin_type_of<Bool>())); }
+  void engine_engine_set_xr(Int engine, Bool on) { this->kern_engine("engine.engine.set_xr", {to_value(engine), to_value(on)}, {}); }
+  Vector engine_engine_xr_eye(Int engine) const { return from_value<Vector>(this->kern_engine("engine.engine.xr_eye", {to_value(engine)}, {PinType::vector})[0].converted(pin_type_of<Vector>())); }
+  void engine_engine_set_xr_eye(Int engine, Vector eye) { this->kern_engine("engine.engine.set_xr_eye", {to_value(engine), to_value(eye)}, {}); }
+  Vector engine_engine_xr_forward(Int engine) const { return from_value<Vector>(this->kern_engine("engine.engine.xr_forward", {to_value(engine)}, {PinType::vector})[0].converted(pin_type_of<Vector>())); }
+  void engine_engine_set_xr_forward(Int engine, Vector forward) { this->kern_engine("engine.engine.set_xr_forward", {to_value(engine), to_value(forward)}, {}); }
+  /// The room (WebXR "local" space) in the world: its forward (where the headset's -z points at zero head yaw) and the head's yaw in it this frame (degrees, counter-clockwise from above; set before the app's update). With `xr_follow_head` the app turns its body with the head: the room is the body's heading minus that yaw, so turning in the real room turns the player.
+  Vector engine_engine_xr_room_forward(Int engine) const { return from_value<Vector>(this->kern_engine("engine.engine.xr_room_forward", {to_value(engine)}, {PinType::vector})[0].converted(pin_type_of<Vector>())); }
+  void engine_engine_set_xr_room_forward(Int engine, Vector forward) { this->kern_engine("engine.engine.set_xr_room_forward", {to_value(engine), to_value(forward)}, {}); }
+  Float engine_engine_xr_head_yaw(Int engine) const { return from_value<Float>(this->kern_engine("engine.engine.xr_head_yaw", {to_value(engine)}, {PinType::number})[0].converted(pin_type_of<Float>())); }
+  void engine_engine_set_xr_head_yaw(Int engine, Float yaw) { this->kern_engine("engine.engine.set_xr_head_yaw", {to_value(engine), to_value(yaw)}, {}); }
+  Bool engine_engine_xr_follow_head(Int engine) const { return from_value<Bool>(this->kern_engine("engine.engine.xr_follow_head", {to_value(engine)}, {PinType::boolean})[0].converted(pin_type_of<Bool>())); }
+  void engine_engine_set_xr_follow_head(Int engine, Bool on) { this->kern_engine("engine.engine.set_xr_follow_head", {to_value(engine), to_value(on)}, {}); }
+  /// Keep the room where it is (the app's camera spins or falls: death, a ragdoll).
+  Bool engine_engine_xr_hold_room(Int engine) const { return from_value<Bool>(this->kern_engine("engine.engine.xr_hold_room", {to_value(engine)}, {PinType::boolean})[0].converted(pin_type_of<Bool>())); }
+  void engine_engine_set_xr_hold_room(Int engine, Bool on) { this->kern_engine("engine.engine.set_xr_hold_room", {to_value(engine), to_value(on)}, {}); }
+  /// The room turns with the camera fully (pitch and roll too: a cockpit, an FPV drone - the craft is the rest frame); `xr_room_up` is then its up (else the world's).
+  Bool engine_engine_xr_full_room(Int engine) const { return from_value<Bool>(this->kern_engine("engine.engine.xr_full_room", {to_value(engine)}, {PinType::boolean})[0].converted(pin_type_of<Bool>())); }
+  void engine_engine_set_xr_full_room(Int engine, Bool on) { this->kern_engine("engine.engine.set_xr_full_room", {to_value(engine), to_value(on)}, {}); }
+  Vector engine_engine_xr_room_up(Int engine) const { return from_value<Vector>(this->kern_engine("engine.engine.xr_room_up", {to_value(engine)}, {PinType::vector})[0].converted(pin_type_of<Vector>())); }
+  void engine_engine_set_xr_room_up(Int engine, Vector up) { this->kern_engine("engine.engine.set_xr_room_up", {to_value(engine), to_value(up)}, {}); }
+  /// The comfort tunnel (0 off .. 1 narrow): `xr_vignette_mesh` (the app's mesh: a black ring in its x-z plane facing +y, see-through inside radius 1, opaque from 2 out) is put before each eye, the hole's half-angle 60 deg at 0 down to 26 deg at 1; hidden at 0.
+  Float engine_engine_xr_vignette(Int engine) const { return from_value<Float>(this->kern_engine("engine.engine.xr_vignette", {to_value(engine)}, {PinType::number})[0].converted(pin_type_of<Float>())); }
+  void engine_engine_set_xr_vignette(Int engine, Float amount) { this->kern_engine("engine.engine.set_xr_vignette", {to_value(engine), to_value(amount)}, {}); }
+  Int engine_engine_xr_vignette_mesh(Int engine) const { return from_value<Int>(this->kern_engine("engine.engine.xr_vignette_mesh", {to_value(engine)}, {PinType::integer})[0].converted(pin_type_of<Int>())); }
+  void engine_engine_set_xr_vignette_mesh(Int engine, Int mesh) { this->kern_engine("engine.engine.set_xr_vignette_mesh", {to_value(engine), to_value(mesh)}, {}); }
+  /// A second view drawn first in an XR frame (a sniper's scope): into `xr_scope_fbo` (a render target of xr_scope_size px, Renderer::create_render_target) through `xr_scope_camera`.
+  Bool engine_engine_xr_scope(Int engine) const { return from_value<Bool>(this->kern_engine("engine.engine.xr_scope", {to_value(engine)}, {PinType::boolean})[0].converted(pin_type_of<Bool>())); }
+  void engine_engine_set_xr_scope(Int engine, Bool on) { this->kern_engine("engine.engine.set_xr_scope", {to_value(engine), to_value(on)}, {}); }
+  EngineValue engine_engine_xr_scope_camera(Int engine) const { return {this->kern_engine("engine.engine.xr_scope_camera", {to_value(engine)}, {PinType::structure})[0]}; }
+  template <class T1> void engine_engine_set_xr_scope_camera(Int engine, const T1& camera) { this->kern_engine("engine.engine.set_xr_scope_camera", {to_value(engine), to_value(camera)}, {}); }
+  Int engine_engine_xr_scope_fbo(Int engine) const { return from_value<Int>(this->kern_engine("engine.engine.xr_scope_fbo", {to_value(engine)}, {PinType::integer})[0].converted(pin_type_of<Int>())); }
+  void engine_engine_set_xr_scope_fbo(Int engine, Int fbo) { this->kern_engine("engine.engine.set_xr_scope_fbo", {to_value(engine), to_value(fbo)}, {}); }
+  Int engine_engine_xr_scope_size(Int engine) const { return from_value<Int>(this->kern_engine("engine.engine.xr_scope_size", {to_value(engine)}, {PinType::integer})[0].converted(pin_type_of<Int>())); }
+  void engine_engine_set_xr_scope_size(Int engine, Int size) { this->kern_engine("engine.engine.set_xr_scope_size", {to_value(engine), to_value(size)}, {}); }
+  /// Side-by-side stereo (a phone in a cardboard viewer, 3D TVs): the frame is drawn twice, the left and the right half, the eyes `stereo_ipd` metres apart; `stereo_cross`: cross-eye viewing, the right eye's image on the left half.
+  Bool engine_engine_stereo(Int engine) const { return from_value<Bool>(this->kern_engine("engine.engine.stereo", {to_value(engine)}, {PinType::boolean})[0].converted(pin_type_of<Bool>())); }
+  void engine_engine_set_stereo(Int engine, Bool on) { this->kern_engine("engine.engine.set_stereo", {to_value(engine), to_value(on)}, {}); }
+  Float engine_engine_stereo_ipd(Int engine) const { return from_value<Float>(this->kern_engine("engine.engine.stereo_ipd", {to_value(engine)}, {PinType::number})[0].converted(pin_type_of<Float>())); }
+  void engine_engine_set_stereo_ipd(Int engine, Float ipd) { this->kern_engine("engine.engine.set_stereo_ipd", {to_value(engine), to_value(ipd)}, {}); }
+  Bool engine_engine_stereo_cross(Int engine) const { return from_value<Bool>(this->kern_engine("engine.engine.stereo_cross", {to_value(engine)}, {PinType::boolean})[0].converted(pin_type_of<Bool>())); }
+  void engine_engine_set_stereo_cross(Int engine, Bool on) { this->kern_engine("engine.engine.set_stereo_cross", {to_value(engine), to_value(on)}, {}); }
   /// Renderer configuration, asked once before start().
   void engine_app_configure(Int app) { this->kern_engine("engine.app.configure", {to_value(app)}, {PinType::structure}); }
   template <class KernNode> void engine_app_configure(KernNode& kern_n, Int app) { const std::vector<Value> kern_out = this->kern_engine("engine.app.configure", {to_value(app)}, {PinType::structure}); kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]); }
@@ -789,6 +840,13 @@ template <class Core> struct EngineNodesOf : Core {
   template <class KernNode> void engine_renderer_create_render_target(KernNode& kern_n, Int renderer, Int size, Int framebuffer) { const std::vector<Value> kern_out = this->kern_engine("engine.renderer.create_render_target", {to_value(renderer), to_value(size), to_value(framebuffer)}, {PinType::integer, PinType::integer}); kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]); kern_n.framebuffer = from_value<std::remove_cvref_t<decltype(kern_n.framebuffer)>>(kern_out[1]); }
   void engine_renderer_delete_texture(Int renderer, Int texture) { this->kern_engine("engine.renderer.delete_texture", {to_value(renderer), to_value(texture)}, {PinType::boolean}); }
   template <class KernNode> void engine_renderer_delete_texture(KernNode& kern_n, Int renderer, Int texture) { const std::vector<Value> kern_out = this->kern_engine("engine.renderer.delete_texture", {to_value(renderer), to_value(texture)}, {PinType::boolean}); kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]); }
+  /// ---- scene state ---- The camera the frame is drawn from, the lighting and the sky: read, and set as a whole.
+  EngineValue engine_renderer_camera(Int renderer) const { return {this->kern_engine("engine.renderer.camera", {to_value(renderer)}, {PinType::structure})[0]}; }
+  template <class T1> void engine_renderer_set_camera(Int renderer, const T1& camera) { this->kern_engine("engine.renderer.set_camera", {to_value(renderer), to_value(camera)}, {}); }
+  EngineValue engine_renderer_lighting(Int renderer) const { return {this->kern_engine("engine.renderer.lighting", {to_value(renderer)}, {PinType::structure})[0]}; }
+  template <class T1> void engine_renderer_set_lighting(Int renderer, const T1& lighting) { this->kern_engine("engine.renderer.set_lighting", {to_value(renderer), to_value(lighting)}, {}); }
+  EngineValue engine_renderer_sky(Int renderer) const { return {this->kern_engine("engine.renderer.sky", {to_value(renderer)}, {PinType::structure})[0]}; }
+  template <class T1> void engine_renderer_set_sky(Int renderer, const T1& sky) { this->kern_engine("engine.renderer.set_sky", {to_value(renderer), to_value(sky)}, {}); }
   template <class T1> void engine_renderer_set_point_lights(Int renderer, const T1& lights) { this->kern_engine("engine.renderer.set_point_lights", {to_value(renderer), to_value(lights)}, {PinType::boolean}); }
   template <class KernNode, class T1> void engine_renderer_set_point_lights(KernNode& kern_n, Int renderer, const T1& lights) { const std::vector<Value> kern_out = this->kern_engine("engine.renderer.set_point_lights", {to_value(renderer), to_value(lights)}, {PinType::boolean}); kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]); }
   EngineValue engine_renderer_point_lights(Int renderer) const { return {this->kern_engine("engine.renderer.point_lights", {to_value(renderer)}, {PinType::structure})[0]}; }

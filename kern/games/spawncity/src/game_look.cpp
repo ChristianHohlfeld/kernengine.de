@@ -234,7 +234,7 @@ void Game::look_apply_tier() {
     L.lights = kern::LightPool(L.pool_size, 96);
   }
   if (engine_) {
-    kern::Renderer& r = engine_->renderer;
+    kern::Renderer& r = engine_->renderer();
     r.set_shadow_filter(q.shadow_filter);
     kern::AoOptions ao;
     // The original has no ambient occlusion (three.js without an AO pass): off on every level.
@@ -291,10 +291,14 @@ void Game::look_blast(Vec3 at, f32 radius) {
 
 void Game::look_lighting(f32 dt) {
   LookState& L = look_;
-  kern::Renderer& r = engine_->renderer;
+  kern::Renderer& r = engine_->renderer();
   const kern::game::WorldSettings& w = world_->level().world;
   // The game's day clock instead of GameWorld's (same sun path and colours; "time" can set it).
-  night_ = look::day_lighting(L.tod, w.sun_azimuth, w.fog_density, w.exposure, r.lighting, r.sky);
+  kern::Lighting lighting = r.lighting();
+  kern::SkyState sky = r.sky();
+  night_ = look::day_lighting(L.tod, w.sun_azimuth, w.fog_density, w.exposure, lighting, sky);
+  r.set_lighting(lighting);
+  r.set_sky(sky);
   windows_.night = night_;
   water_look_.time = static_cast<f32>(world_->sim_time());  // world_water.mjs uTime
   // simulator.mjs: shadowMap.enabled = !presentationSoftwareRaster (no shadows on a software rasterizer)
@@ -449,7 +453,7 @@ void Game::look_lighting(f32 dt) {
 
 void Game::look_draw(kern::Engine& e, f32 dt) {
   LookState& L = look_;
-  kern::Renderer& r = e.renderer;
+  kern::Renderer& r = e.renderer();
   // speed_lines.mjs: radial streaks on a plane 0.6 m in front of the eye.
   if (!L.streak_mesh) {
     L.streak_mesh = r.allocate_id();
@@ -499,12 +503,12 @@ void Game::look_draw(kern::Engine& e, f32 dt) {
   // stereo_sbs.mjs: side-by-side cross-eye 3D (KAMERA: 3D NEBENEINANDER, ?sbs=1); the eye base by
   // the view (stereoRig: on foot 6.4 cm, else .013 x focus x the view's width at 1 m, focus car 8,
   // drone 6, jet 40 m, at most 2 m)
-  engine_->stereo = !vr_ && (ui_.settings.on(Opt::cam_stereo) || engine_->arg_number("sbs", 0) > 0);
-  if (engine_->stereo) {
+  engine_->set_stereo(!vr_ && (ui_.settings.on(Opt::cam_stereo) || engine_->arg_number("sbs", 0) > 0));
+  if (engine_->stereo()) {
     const f32 aspect = std::fmax(0.3f, frame_w_ * 0.5f / std::fmax(1.0f, frame_h_)), k = 2 * std::tan(cam_.fov * 0.5f) * aspect;
     const f32 F = mode_ == Mode::jet ? 40.0f : mode_ == Mode::car ? 8.0f : mode_ == Mode::foot ? 4.0f : 6.0f;
-    engine_->stereo_ipd = mode_ == Mode::foot ? 0.064f : std::fmax(0.064f, std::fmin(2.0f, 0.013f * F * k));
-    engine_->stereo_cross = true;
+    engine_->set_stereo_ipd(mode_ == Mode::foot ? 0.064f : std::fmax(0.064f, std::fmin(2.0f, 0.013f * F * k)));
+    engine_->set_stereo_cross(true);
   }
   look_lap(perf::Slot::draw);
   const kern::RenderStats& rs = e.stats();
@@ -514,8 +518,8 @@ void Game::look_draw(kern::Engine& e, f32 dt) {
 void Game::look_vr_hud() {
   // A panel 1.3 m ahead of the head and 0.5 m below it, turned to the eye, levelled to the heading
   // (it stays put under a nod): the page draws it, the game only carries it.
-  kern::Renderer& r = engine_->renderer;
-  const bool on = vr_ && engine_->xr && vr_hud_tex_;
+  kern::Renderer& r = engine_->renderer();
+  const bool on = vr_ && engine_->xr() && vr_hud_tex_;
   if (!on) { if (vr_hud_mesh_) r.set_visible(vr_hud_mesh_, false); return; }
   if (!vr_hud_mesh_) {
     MeshData q;
@@ -546,17 +550,17 @@ void Game::look_vr_hud() {
     c = lh.translation() + hy * 0.06f + hz * 0.09f;  // over the back of the wrist
     if (vr_menu_open_) { w = 0.32f; h = 0.24f; c = c + hy * 0.06f; }
     (void)hx;
-    to_eye = kern::normalize(engine_->xr_eye - c, hy);
+    to_eye = kern::normalize(engine_->xr_eye() - c, hy);
     // turned to the eye, upright: the viewer's right is up x the normal towards him
     rt = kern::normalize(kern::cross(Vec3{0, 0, 1}, to_eye), {1, 0, 0});
     up = kern::cross(to_eye, rt);
   } else {
-    Vec3 f = engine_->xr_forward;
+    Vec3 f = engine_->xr_forward();
     f.z = 0;
     f = kern::normalize(f, {1, 0, 0});
     rt = {f.y, -f.x, 0};
-    c = engine_->xr_eye + f * 1.1f - Vec3{0, 0, 0.85f};
-    to_eye = kern::normalize(engine_->xr_eye - c, f * -1.0f);
+    c = engine_->xr_eye() + f * 1.1f - Vec3{0, 0, 0.85f};
+    to_eye = kern::normalize(engine_->xr_eye() - c, f * -1.0f);
     rt = kern::normalize(kern::cross(Vec3{0, 0, 1}, to_eye), rt);
     up = kern::cross(to_eye, rt);
     w = 0.48f; h = 0.36f;
@@ -570,7 +574,7 @@ void Game::look_vr_hud() {
 
 void Game::look_view_models(f32 dt) {
   LookState& L = look_;
-  kern::Renderer& r = engine_->renderer;
+  kern::Renderer& r = engine_->renderer();
   if (!L.vm_built) {
     L.vm_built = true;
     for (int set = 0; set < 2; ++set) {
@@ -792,7 +796,7 @@ bool Game::look_command(const std::string& cmd, std::string& out) {
   }
   if (cmd == "viewmodel") {  // tests: the shown first-person model, where it is relative to the eye
     if (L.vm_shown < 0) { out = "none"; return true; }
-    const kern::Mesh* m = engine_->renderer.mesh(L.vm_body[L.vm_shown]);
+    const kern::Mesh* m = engine_->renderer().mesh(L.vm_body[L.vm_shown]);
     if (!m || m->transforms.size() < 16) { out = "no mesh"; return true; }
     const Vec3 p{m->transforms[12], m->transforms[13], m->transforms[14]};
     const Vec3 f = kern::normalize(cam_.target - cam_.eye, {1, 0, 0});
@@ -802,7 +806,7 @@ bool Game::look_command(const std::string& cmd, std::string& out) {
     return true;
   }
   if (cmd == "lights") {  // tests: the point lights of the last frame
-    const kern::PointLights& pl = engine_->renderer.point_lights();
+    const kern::PointLights& pl = engine_->renderer().point_lights();
     out = "[";
     for (u32 i = 0; i < pl.count; ++i) {
       std::snprintf(b, sizeof b, "%s{\"p\":[%.1f,%.1f,%.1f],\"range\":%.1f,\"i\":%.2f}", i ? "," : "", pl.pos_range[i * 4], pl.pos_range[i * 4 + 1], pl.pos_range[i * 4 + 2],

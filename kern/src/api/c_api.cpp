@@ -239,11 +239,11 @@ KERN_EXPORT(kern_camera_set) i32 kern_camera_set(const f32* c) {
     fail("invalid camera");
     return 0;
   }
-  R().camera = cam;
+  R().set_camera(cam);
   return 1;
 }
 KERN_EXPORT(kern_lighting_set) void kern_lighting_set(const f32* f) {
-  Lighting& l = R().lighting;
+  Lighting l = R().lighting();
   l.sun_direction = vec3_at(f, KERN_LI_SUN_DIRECTION);
   l.sun_color = vec3_at(f, KERN_LI_SUN_COLOR);
   l.sky_color = vec3_at(f, KERN_LI_SKY_COLOR);
@@ -255,9 +255,10 @@ KERN_EXPORT(kern_lighting_set) void kern_lighting_set(const f32* f) {
   l.env_zenith = vec3_at(f, KERN_LI_ENV_ZENITH);
   l.env_horizon = vec3_at(f, KERN_LI_ENV_HORIZON);
   l.env_ground = vec3_at(f, KERN_LI_ENV_GROUND);
+  R().set_lighting(l);
 }
 KERN_EXPORT(kern_lighting_get) void kern_lighting_get(f32* f) {
-  const Lighting& l = R().lighting;
+  const Lighting& l = R().lighting();
   store3(f, KERN_LI_SUN_DIRECTION, l.sun_direction);
   store3(f, KERN_LI_SUN_COLOR, l.sun_color);
   store3(f, KERN_LI_SKY_COLOR, l.sky_color);
@@ -273,10 +274,11 @@ KERN_EXPORT(kern_lighting_get) void kern_lighting_get(f32* f) {
 // Atmosphere on top of the lighting block (kept separate so the 27-slot layout stays as it is).
 // All 0 = the plain FogExp2 as before.
 KERN_EXPORT(kern_atmosphere_set) void kern_atmosphere_set(f32 height_falloff, f32 sun_scatter, f32 horizon) {
-  Lighting& l = R().lighting;
+  Lighting l = R().lighting();
   l.fog_height_falloff = height_falloff > 0 ? height_falloff : 0;
   l.fog_sun_scatter = sun_scatter;
   l.fog_horizon = horizon;
+  R().set_lighting(l);
 }
 /// Ambient occlusion: quality 0 low .. 3 ultra (XeGTAO presets), half = half resolution, radius in world units (0 = default).
 KERN_EXPORT(kern_ao_set) void kern_ao_set(i32 enabled, i32 quality, i32 half, f32 radius) {
@@ -288,7 +290,7 @@ KERN_EXPORT(kern_ao_set) void kern_ao_set(i32 enabled, i32 quality, i32 half, f3
   R().set_ambient_occlusion(o);
 }
 KERN_EXPORT(kern_sky_set) void kern_sky_set(const f32* f) {
-  SkyState& s = R().sky;
+  SkyState s = R().sky();
   s.sun = vec3_at(f, KERN_SK_SUN);
   s.moon = vec3_at(f, KERN_SK_MOON);
   s.night = f[KERN_SK_NIGHT];
@@ -296,6 +298,7 @@ KERN_EXPORT(kern_sky_set) void kern_sky_set(const f32* f) {
   s.blast_direction = vec3_at(f, KERN_SK_BLAST_DIRECTION);
   s.blast_age = f[KERN_SK_BLAST_AGE];
   s.wind = {f[KERN_SK_WIND], f[KERN_SK_WIND + 1]};
+  R().set_sky(s);
 }
 KERN_EXPORT(kern_point_lights_set) i32 kern_point_lights_set(u32 count, const f32* pos_range, const f32* color_intensity) {
   PointLights l;

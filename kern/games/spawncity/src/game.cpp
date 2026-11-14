@@ -259,7 +259,7 @@ bool Game::start(kern::Engine& e) {
   soldier_controller_.camera_fov = 59;  // 90 degrees across a 16:9 view (camera_pitch_contract.mjs)
 
   life_ = std::make_unique<WorldLife>();  // M3 world state (game_world.h)
-  world_ = std::make_unique<GameWorld>(e.renderer);  // the night of the facades: game_look.cpp (windows_.night)
+  world_ = std::make_unique<GameWorld>(e.renderer());  // the night of the facades: game_look.cpp (windows_.night)
   if (!world_->start(build_level(), kern::game::SimMode::play)) return kern::fail("level start: %s", kern::last_error());
   // The rules that are Blueprints of the level's actors: bound to the C++ that still calls them.
   {
@@ -348,12 +348,12 @@ bool Game::start(kern::Engine& e) {
     const std::string wsel = e.arg("world", "");
     city_.training_offline = wsel == "training" || (wsel != "town" && e.arg_number("offline", 0) <= 0);
   }
-  city_.start(e.renderer, world_->physics(), lon_, lat_, e.arg_number("dem", 1) > 0 && e.arg_number("offline", 0) <= 0);
+  city_.start(e.renderer(), world_->physics(), lon_, lat_, e.arg_number("dem", 1) > 0 && e.arg_number("offline", 0) <= 0);
   if (e.arg_number("offline", 0) > 0) city_.go_offline();
-  if (!art_.init(e.renderer)) return false;
-  if (!people_art_.init(e.renderer)) return false;
-  if (!combat_art_.init(e.renderer)) return false;  // combat and events (game_military.cpp)
-  destruction_.init(e.renderer);
+  if (!art_.init(e.renderer())) return false;
+  if (!people_art_.init(e.renderer())) return false;
+  if (!combat_art_.init(e.renderer())) return false;  // combat and events (game_military.cpp)
+  destruction_.init(e.renderer());
   gaps_init(e);  // sc-m3-gaps (game_gaps.cpp)
   people_.set_budget(mobile_ ? 68 : 100);  // PERSON_SLOTS (world_procedural_population.mjs)
   if (mobile_) people_.set_ranges(140, 160);  // world_procedural_population.mjs PEOPLE_SHOW_M / HIDE_M (phone)
@@ -361,7 +361,7 @@ bool Game::start(kern::Engine& e) {
   e.set_status("SpawnCity: Karte wird geladen ...");
   cam_.eye = {-30, -40, 60};
   cam_.target = {0, 0, 0};
-  e.renderer.camera = cam_;
+  e.renderer().set_camera(cam_);
   return true;
 }
 
@@ -1076,7 +1076,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
   update_camera(e, dt);
   ui_camera(dt);  // LIVE GPS views (game_ui.cpp)
   look_camera(dt);  // FPV stabilizer, camera shake, speed (game_look.cpp)
-  e.renderer.camera = cam_;
+  e.renderer().set_camera(cam_);
   world_->set_view(cam_);
   night_ = world_->apply_lighting(cam_.eye);
   look_lighting(dt);  // own day clock, point lights, quality (game_look.cpp)
@@ -1574,9 +1574,9 @@ std::string Game::command(const std::string& cmd) {
   if (starts("vr hud ")) { vr_hud_tex_ = static_cast<u32>(std::atoi(cmd.c_str() + 7)); vr_hud_mesh_ = 0; return "hud"; }
   if (cmd == "vr state") {
     char b[200];
-    const Vec3 rf = engine_ ? engine_->xr_room_forward : Vec3{};
-    std::snprintf(b, sizeof b, "{\"body\":%.1f,\"head\":%.1f,\"room\":%.1f,\"follow\":%d,\"hand\":%d,\"arms\":%d,\"scope\":%d}", world_->camera_yaw(), engine_ ? engine_->xr_head_yaw : 0,
-                  std::atan2(rf.y, rf.x) / kDeg, engine_ && engine_->xr_follow_head ? 1 : 0, vr_hands_[1].valid ? 1 : 0, vr_arms_ ? 1 : 0, engine_ && engine_->xr_scope ? 1 : 0);
+    const Vec3 rf = engine_ ? engine_->xr_room_forward() : Vec3{};
+    std::snprintf(b, sizeof b, "{\"body\":%.1f,\"head\":%.1f,\"room\":%.1f,\"follow\":%d,\"hand\":%d,\"arms\":%d,\"scope\":%d}", world_->camera_yaw(), engine_ ? engine_->xr_head_yaw() : 0,
+                  std::atan2(rf.y, rf.x) / kDeg, engine_ && engine_->xr_follow_head() ? 1 : 0, vr_hands_[1].valid ? 1 : 0, vr_arms_ ? 1 : 0, engine_ && engine_->xr_scope() ? 1 : 0);
     return b;
   }
   if (cmd == "destroy sync") return dsync_json();

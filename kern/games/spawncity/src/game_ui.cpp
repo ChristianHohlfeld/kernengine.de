@@ -157,7 +157,7 @@ void Game::ui_gps_update(f32 dt) {
 
 // The position puck and the track line on the ground (gps_live_mode.mjs ensureScene / pushTrailPoint).
 void Game::ui_draw_gps(f32 dt) {
-  kern::Renderer& r = engine_->renderer;
+  kern::Renderer& r = engine_->renderer();
   if (!ui_.puck_acc) {
     namespace prim = kern::primitives;
     auto make = [&](u32& id, const kern::MeshData& m, Vec3 color, f32 alpha) {
@@ -230,7 +230,7 @@ void Game::ui_draw_gps(f32 dt) {
 // settings_help.mjs worldGrid (1 m reference grid around the player) and box3dColliderDebug (Box3D's
 // collision shapes as wire frames). Visual only.
 void Game::ui_draw_helpers() {
-  kern::Renderer& r = engine_->renderer;
+  kern::Renderer& r = engine_->renderer();
   const Settings& st = ui_.settings;
   auto line_mesh = [&](u32& id, const std::vector<f32>& pos, const std::vector<f32>* col, Vec3 color) {
     if (!id) id = r.allocate_id();

@@ -237,7 +237,7 @@ Vec3 Game::rocket_laser_dot() {
   if (!flying) laser_pinned_ = false;
   if (laser_pinned_) { laser_valid_ = true; laser_dot_ = laser_pin_; return laser_dot_; }
   Vec3 from, ad;
-  if (engine_ && engine_->xr) { from = engine_->xr_eye; ad = engine_->xr_forward; }  // VR: where you look steers the rocket
+  if (engine_ && engine_->xr()) { from = engine_->xr_eye(); ad = engine_->xr_forward(); }  // VR: where you look steers the rocket
   else if (laser_finger_) ctl_screen_ray(laser_fx_, laser_fy_, from, ad);
   else { ad = kern::normalize(cam_.target - cam_.eye, {1, 0, 0}); from = cam_.eye; }
   const RayResult r = cast(world_->physics(), from, ad, kLaserRange, body(soldier_));

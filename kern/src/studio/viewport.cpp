@@ -873,11 +873,12 @@ void Studio::render_viewport(Viewport& v, f64 now_ms) {
   game::GameWorld& world = client ? *client->world : *world_;
   const f32 aspect = static_cast<f32>(v.rect.w) / static_cast<f32>(max_of(1, v.rect.h));
   (void)aspect;
-  r_->camera = cam;
+  r_->set_camera(cam);
   world.apply_lighting(cam.eye);
-  Lighting& l = r_->lighting;
+  Lighting l = r_->lighting();
   const bool helpers = !v.game_view && !playing_here && !player_only_;
   if (!v.flags.fog || cam.orthographic) l.fog_density = 0;
+  r_->set_lighting(l);
   RenderParams p;
   p.layers = layer::scene;
   p.sky = v.flags.sky && !cam.orthographic;
@@ -968,7 +969,7 @@ void Studio::render_robot_camera(Viewport& v) {
   // Top right of the viewport (drawing buffer pixels, y up from the bottom like the viewports).
   p.viewport = {v.rect.x + v.rect.w - w - margin, v.rect.y + v.rect.h - h - margin, w, h};
   robot_view_ = {v.index, w / v.dpr, h / v.dpr, who};  // the page frames it and shows the ToF beside it
-  r_->camera = cam;
+  r_->set_camera(cam);
   world_->apply_lighting(cam.eye);
   RenderStats stats;
   r_->render(p, stats);

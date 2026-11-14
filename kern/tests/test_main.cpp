@@ -374,8 +374,12 @@ TEST(renderer_frame) {
   in.material = Material{};
   in.material.viewmodel = true;
   CHECK(r.upsert(gun, in));
-  r.camera.eye = {0, 10, 5};
-  r.camera.target = {0, 0, 0};
+  {
+    Camera cam = r.camera();
+    cam.eye = {0, 10, 5};
+    cam.target = {0, 0, 0};
+    r.set_camera(cam);
+  }
   RenderStats s;
   const u64 uniforms_before = g_gl.uniform_calls;
   CHECK(r.render({}, s));
@@ -433,8 +437,12 @@ TEST(renderer_lines_and_layers) {
   li.material.lines = true;
   li.layers = 1;
   CHECK(r.upsert(lines, li));
-  r.camera.eye = {0, 12, 4};
-  r.camera.target = {2, 0, 0};
+  {
+    Camera cam = r.camera();
+    cam.eye = {0, 12, 4};
+    cam.target = {2, 0, 0};
+    r.set_camera(cam);
+  }
   RenderStats s;
   RenderParams p;
   p.layers = 1;
@@ -454,7 +462,7 @@ TEST(renderer_lines_and_layers) {
   PickHit hit;
   PickQuery q;
   q.layers = 2;
-  const Ray to_a{r.camera.eye, normalize(Vec3{0, 0, 0} - r.camera.eye)};
+  const Ray to_a{r.camera().eye, normalize(Vec3{0, 0, 0} - r.camera().eye)};
   CHECK(!r.pick_ray(to_a, q, hit) || hit.mesh == b);
   q.layers = 1;
   CHECK(r.pick_ray(to_a, q, hit));
@@ -623,8 +631,12 @@ TEST(renderer_instance_updates) {
   MeshInput in = input_of(boxd);
   in.transforms = Span<const f32>(t.data(), t.size());
   CHECK(r.upsert(a, in));
-  r.camera.eye = {0, 10, 5};
-  r.camera.target = {0, 0, 0};
+  {
+    Camera cam = r.camera();
+    cam.eye = {0, 10, 5};
+    cam.target = {0, 0, 0};
+    r.set_camera(cam);
+  }
   RenderStats s;
   CHECK(r.render({}, s));
   CHECK(r.render({}, s) && s.shadow_reused);
@@ -677,8 +689,12 @@ TEST(renderer_mirrored_instances) {
   in.transforms = Span<const f32>(mirror.m, 16);
   CHECK(r.upsert(a, in));
   CHECK(r.mesh(a)->mirror == 1 && r.mesh(a)->cull_mode() == 2);
-  r.camera.eye = {0, 10, 5};
-  r.camera.target = {0, 0, 0};
+  {
+    Camera cam = r.camera();
+    cam.eye = {0, 10, 5};
+    cam.target = {0, 0, 0};
+    r.set_camera(cam);
+  }
   RenderStats s;
   const u64 front = g_gl.cull_front;
   CHECK(r.render({}, s));
@@ -1172,13 +1188,17 @@ TEST(renderer_orthographic_camera) {
   const MeshData box = primitives::box({2, 2, 2});
   const u32 id = r.allocate_id();
   CHECK(r.upsert(id, input_of(box)));
-  r.camera.orthographic = true;
-  r.camera.ortho_height = 10;
-  r.camera.eye = {0, 0, 50};
-  r.camera.target = {0, 0, 0};
-  r.camera.up = {0, 1, 0};
-  r.camera.near = 0.1f;
-  r.camera.far = 200;
+  {
+    Camera cam = r.camera();
+    cam.orthographic = true;
+    cam.ortho_height = 10;
+    cam.eye = {0, 0, 50};
+    cam.target = {0, 0, 0};
+    cam.up = {0, 1, 0};
+    cam.near = 0.1f;
+    cam.far = 200;
+    r.set_camera(cam);
+  }
   RenderStats s;
   CHECK(r.render({}, s));
   CHECK(s.draw_calls == 1);
@@ -1193,7 +1213,11 @@ TEST(renderer_orthographic_camera) {
   CHECK(r.pick(200, 100, {}, hit));
   CHECK(hit.mesh == id);
   CHECK(!r.pick(390, 100, {}, hit));
-  r.camera.ortho_height = 0;
+  {
+    Camera cam = r.camera();
+    cam.ortho_height = 0;
+    r.set_camera(cam);
+  }
   CHECK(!r.render({}, s));  // invalid projection is rejected
   r.shutdown();
 }
@@ -1396,7 +1420,7 @@ TEST(game_world_presentation) {
   l.world.time_of_day = 0.5f;
   f.world->sync(l);
   CHECK(f.world->apply_lighting({0, 0, 10}) < 0.01f);
-  CHECK(f.renderer.lighting.sun_direction.z > 0.9f);
+  CHECK(f.renderer.lighting().sun_direction.z > 0.9f);
   l.world.time_of_day = 0.0f;
   f.world->sync(l);
   CHECK(f.world->apply_lighting({0, 0, 10}) > 0.99f);

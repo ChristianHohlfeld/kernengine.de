@@ -260,7 +260,7 @@ void Game::vr_menu_input(f32 dt) {
   // the drone, in / out of a vehicle, the air strike, the radio, the EMP, the settings, RESET, out
   // of VR) and the settings (locomotion, turning, horizon, tunnel, always day, sound, music).
   // Holding Y for a second is RESET from anywhere, menu or not (stuck in a wall, fallen through).
-  if (!vr_ || !engine_ || !engine_->xr) { vr_menu_open_ = false; vr_y_held_ = 0; return; }
+  if (!vr_ || !engine_ || !engine_->xr()) { vr_menu_open_ = false; vr_y_held_ = 0; return; }
   const bool y = pad.connected && pad.down(kPadY);
   if (y) {
     vr_y_held_ += dt;
@@ -349,7 +349,7 @@ void Game::vr_menu_input(f32 dt) {
       break;
     case 3: {
       // the air strike on what you look at (the first hit along the head's ray, else 180 m out)
-      const Vec3 eye = engine_->xr_eye, f = engine_->xr_forward;
+      const Vec3 eye = engine_->xr_eye(), f = engine_->xr_forward();
       const RayResult rr = cast(world_->physics(), eye, f, 1500, body(soldier_));
       Vec3 at = rr.hit ? rr.point : eye + f * 180.0f;
       at.z = city_.ground_height(at.x, at.y);
@@ -402,10 +402,10 @@ void Game::vr_room(Vec3& f, Vec3& r, Vec3& up) const {
   f.z = 0;
   f = kern::normalize(f, {0, 1, 0});
   up = {0, 0, 1};
-  if (engine_ && engine_->xr_follow_head) {
-    const f32 a = -engine_->xr_head_yaw * kDeg, c = std::cos(a), s = std::sin(a);
+  if (engine_ && engine_->xr_follow_head()) {
+    const f32 a = -engine_->xr_head_yaw() * kDeg, c = std::cos(a), s = std::sin(a);
     f = kern::normalize(Vec3{f.x * c - f.y * s, f.x * s + f.y * c, 0}, {0, 1, 0});
-  } else if (engine_ && engine_->xr_full_room) {
+  } else if (engine_ && engine_->xr_full_room()) {
     const Vec3 ff = kern::normalize(cam_.target - cam_.eye, f);
     const Vec3 rr = kern::normalize(kern::cross(ff, cam_.up), Vec3{f.y, -f.x, 0});
     f = ff;
@@ -421,7 +421,7 @@ Vec3 Game::vr_room_forward() const {
 }
 
 bool Game::vr_hand_matrix(i32 side, Mat4& out) const {
-  if (!vr_ || !engine_ || !engine_->xr || side < 0 || side > 1 || !vr_hands_[side].valid) return false;
+  if (!vr_ || !engine_ || !engine_->xr() || side < 0 || side > 1 || !vr_hands_[side].valid) return false;
   const VrHand& h = vr_hands_[side];
   Vec3 f, r, up;
   vr_room(f, r, up);
@@ -444,16 +444,16 @@ bool Game::vr_hand_ray(Vec3& from, Vec3& dir) const {
 }
 
 void Game::vr_foot(kern::game::PlayInput& p, f32& forward, f32& strafe, f32 dt) {
-  if (!engine_ || !engine_->xr) return;
+  if (!engine_ || !engine_->xr()) return;
   // no stick look in the headset: the head looks, the body follows it
   p.look_x = 0;
   p.look_y = 0;
   p.look_stick_x = p.look_stick_y = 0;
   // the room turn: the body to the room's heading plus the head's yaw in it (exact, every frame)
-  const Vec3 rf = engine_->xr_room_forward;
+  const Vec3 rf = engine_->xr_room_forward();
   const f32 room = std::atan2(rf.y, rf.x) / kDeg;
   const f32 body = world_->camera_yaw();
-  f32 turn = std::remainder(room + engine_->xr_head_yaw - body, 360.0f);
+  f32 turn = std::remainder(room + engine_->xr_head_yaw() - body, 360.0f);
   // snap turn on the right stick: a flick past .7, again only after it came back under .3
   const f32 rx = pad.connected ? pad.rx : 0;
   if (std::fabs(rx) < 0.3f) vr_snap_armed_ = true;
@@ -530,16 +530,16 @@ void Game::vr_scope_update() {
   // The sniper's scope in VR: a second camera looks out of the objective along the barrel (5 deg),
   // its picture lies on the lens at the eyepiece - bring the rifle to the eye and look through it,
   // take it down and you see the world again (no zoom of the whole view: no sickness)
-  kern::Renderer& r = engine_->renderer;
+  kern::Renderer& r = engine_->renderer();
   kern::Mat4 m;
-  const bool on = vr_ && engine_->xr && mode_ == Mode::foot && !player_dead_ && foot_weapon_ == weapons::Id::sniper && vr_hand_matrix(1, m);
-  engine_->xr_scope = false;
+  const bool on = vr_ && engine_->xr() && mode_ == Mode::foot && !player_dead_ && foot_weapon_ == weapons::Id::sniper && vr_hand_matrix(1, m);
+  engine_->set_xr_scope(false);
   if (!on) { if (vr_scope_mesh_) r.set_visible(vr_scope_mesh_, false); return; }
   if (!vr_scope_tex_) {
     u32 fbo = 0;
     vr_scope_tex_ = r.create_render_target(512, fbo);
-    engine_->xr_scope_fbo = fbo;
-    engine_->xr_scope_size = 512;
+    engine_->set_xr_scope_fbo(fbo);
+    engine_->set_xr_scope_size(512);
     if (!vr_scope_tex_) return;
   }
   if (!vr_scope_mesh_) {
@@ -571,13 +571,13 @@ void Game::vr_scope_update() {
   c.up = y;
   c.fov = 5 * kDeg;
   c.near = 0.05f;
-  engine_->xr_scope_camera = c;
-  engine_->xr_scope = true;
+  engine_->set_xr_scope_camera(c);
+  engine_->set_xr_scope(true);
   // Scoping the easy way (the left trigger held, or the eyepiece brought within 12 cm of the eye):
   // the scope's picture comes up before the eye along the barrel, 16 cm across at 30 cm (about 30
   // deg of the view) - aim with the rifle, the middle is where the round goes; let go and it sits
   // on the rifle again
-  const Vec3 eye = engine_->xr_eye;
+  const Vec3 eye = engine_->xr_eye();
   const bool ads = (pad.connected && pad.lt > 0.5f) || kern::length(eyepiece - eye) < 0.12f;
   const f32 lens = ads ? 0.16f : 0.034f;  // m across
   const Vec3 c0 = ads ? eye - z * 0.3f : eyepiece;
@@ -596,12 +596,12 @@ void Game::vr_update_view() {
   if (vr_ && mode_ == Mode::foot && !game_weapon_in_hand() && vr_hand_matrix(1, m)) world_->set_view_hand(&m);
   else world_->set_view_hand(nullptr);
   if (engine_) {
-    engine_->xr_follow_head = vr_ && mode_ == Mode::foot && !player_dead_;
-    engine_->xr_hold_room = vr_ && player_dead_;  // dying the camera falls and turns: the room stays (no spin)
+    engine_->set_xr_follow_head(vr_ && mode_ == Mode::foot && !player_dead_);
+    engine_->set_xr_hold_room(vr_ && player_dead_);  // dying the camera falls and turns: the room stays (no spin)
     // the jet's cockpit and the FPV drone with the horizon free (VR: Horizont halten off): you sit
     // in the craft, it is the rest frame - the world turns round it, loops and rolls included
-    engine_->xr_full_room = vr_ && !player_dead_ && !ui_.settings.on(Opt::vr_level) &&
-                            ((mode_ == Mode::jet && jet_cockpit_) || (mode_ == Mode::drone && drone_cam_ == 0));
+    engine_->set_xr_full_room(vr_ && !player_dead_ && !ui_.settings.on(Opt::vr_level) &&
+                              ((mode_ == Mode::jet && jet_cockpit_) || (mode_ == Mode::drone && drone_cam_ == 0)));
   }
 }
 
@@ -610,12 +610,12 @@ void Game::vr_comfort(f32 dt) {
   // the player's own head - turns or speeds the view: a stick turn, a snap, a car taking a corner,
   // a drone braking. Turning your head, walking in the room, cruising straight leave it open.
   if (!engine_) return;
-  kern::Renderer& r = engine_->renderer;
-  const bool on = vr_ && engine_->xr && ui_.settings.on(Opt::vr_tunnel) && !player_dead_;
+  kern::Renderer& r = engine_->renderer();
+  const bool on = vr_ && engine_->xr() && ui_.settings.on(Opt::vr_tunnel) && !player_dead_;
   if (!on) {
     vr_tunnel_ = 0;
     vr_prev_ok_ = false;
-    engine_->xr_vignette = 0;
+    engine_->set_xr_vignette(0);
     return;
   }
   if (!vr_tunnel_mesh_) {
@@ -660,7 +660,7 @@ void Game::vr_comfort(f32 dt) {
     look.texture = vr_tunnel_tex_;
     if (!kern::upsert(r, vr_tunnel_mesh_, d, look)) { r.release_id(vr_tunnel_mesh_); vr_tunnel_mesh_ = 0; return; }
     r.set_visible(vr_tunnel_mesh_, false);
-    engine_->xr_vignette_mesh = vr_tunnel_mesh_;
+    engine_->set_xr_vignette_mesh(vr_tunnel_mesh_);
   }
   // this frame's room and the camera (the room's anchor) against the last
   Vec3 f, rt, up;
@@ -689,7 +689,7 @@ void Game::vr_comfort(f32 dt) {
   // in fast (80 ms), out slow (350 ms): no pumping
   const f32 tau = want > vr_tunnel_ ? 0.08f : 0.35f;
   vr_tunnel_ += (want - vr_tunnel_) * (1 - std::exp(-dt / tau));
-  engine_->xr_vignette = vr_tunnel_ < 0.02f ? 0 : vr_tunnel_;
+  engine_->set_xr_vignette(vr_tunnel_ < 0.02f ? 0 : vr_tunnel_);
 }
 
 }  // namespace sc

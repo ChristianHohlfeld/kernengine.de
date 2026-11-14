@@ -607,14 +607,14 @@ bool Renderer::set_shadows(const ShadowOptions* options) {
 
 void Renderer::set_frame_uniforms(const Mat4& vp) {
   UniformCache& c = cache_;
-  const Lighting& l = lighting;
+  const Lighting& l = lighting_;
   c.set_mat4(u_.view_projection, vp.m);
   c.set_vec3(u_.sun_direction, l.sun_direction);
   c.set_vec3(u_.sun_color, l.sun_color);
   c.set_vec3(u_.sky_color, l.sky_color);
   c.set_vec3(u_.ground_color, l.ground_color);
   c.set_vec3(u_.fog_color, l.fog_color);
-  c.set_vec3(u_.eye, camera.eye);
+  c.set_vec3(u_.eye, camera_.eye);
   c.set_vec3(u_.env_zenith, l.env_zenith);
   c.set_vec3(u_.env_horizon, l.env_horizon);
   c.set_vec3(u_.env_ground, l.env_ground);
@@ -693,12 +693,12 @@ bool Renderer::render(const RenderParams& params, RenderStats& stats) {
     if (rect.width < 1 || rect.height < 1 || rect.x < 0 || rect.y < 0 || (!params.framebuffer && (rect.x + rect.width > width_ || rect.y + rect.height > height_)))
       return fail("viewport must fit inside the drawing buffer");
   }
-  if (!camera_valid(camera)) return fail("invalid camera projection");
+  if (!camera_valid(camera_)) return fail("invalid camera projection");
   bool ok = false;
-  const Mat4 view = Mat4::look_at(camera.eye, camera.target, camera.up, &ok);
+  const Mat4 view = Mat4::look_at(camera_.eye, camera_.target, camera_.up, &ok);
   if (!ok) return fail("degenerate camera direction/up");
   const f32 aspect = static_cast<f32>(rect.width) / static_cast<f32>(rect.height);
-  const Mat4 vp = projection_matrix(camera, aspect) * view;
+  const Mat4 vp = projection_matrix(camera_, aspect) * view;
   const Frustum frustum = Frustum::from_matrix(vp);
 
   // GPU timer results arrive asynchronously, a few frames late.
@@ -723,26 +723,26 @@ bool Renderer::render(const RenderParams& params, RenderStats& stats) {
     // Stable fit (Valient 2008): the bounding sphere of the view frustum from the near plane to the shadow
     // distance. A symmetric frustum with tan half-angles th, tv: k = th^2 + tv^2; the sphere's centre lies
     // on the view axis at c = (f + n)(1 + k) / 2 (at most f), radius sqrt((f - c)^2 + f^2 k).
-    Vec3 focus = camera.target;
+    Vec3 focus = camera_.target;
     f32 extent = 0;
     shadow_fit_radius_ = 0;
-    if (shadow_distance_ > 0 && !camera.orthographic) {
-      const f32 n = camera.near, f = max_of(camera.near + 0.1f, min_of(shadow_distance_, camera.far));
-      const f32 tv = std::tan(camera.fov * 0.5f), th = tv * aspect, k = th * th + tv * tv;
+    if (shadow_distance_ > 0 && !camera_.orthographic) {
+      const f32 n = camera_.near, f = max_of(camera_.near + 0.1f, min_of(shadow_distance_, camera_.far));
+      const f32 tv = std::tan(camera_.fov * 0.5f), th = tv * aspect, k = th * th + tv * tv;
       const f32 c = min_of(f, (f + n) * (1 + k) * 0.5f);
       const f32 r = std::sqrt((f - c) * (f - c) + f * f * k);
-      const Vec3 forward = normalize(camera.target - camera.eye, {0, 1, 0});
-      focus = camera.eye + forward * c;
+      const Vec3 forward = normalize(camera_.target - camera_.eye, {0, 1, 0});
+      focus = camera_.eye + forward * c;
       extent = r;
       shadow_fit_radius_ = r;
-      shadow_fit_eye_ = camera.eye;
+      shadow_fit_eye_ = camera_.eye;
     }
-    const u64 key = shadow_->focus_key(focus, lighting.sun_direction, extent) ^ (shadow_revision_ * 0x9e3779b97f4a7c15ull) ^
+    const u64 key = shadow_->focus_key(focus, lighting_.sun_direction, extent) ^ (shadow_revision_ * 0x9e3779b97f4a7c15ull) ^
                     (static_cast<u64>(params.layers) * 0xc2b2ae3d27d4eb4full);
     if (shadow_key_valid_ && (key == shadow_key_ || params.reuse_shadow)) {
       stats.shadow_reused = true;
     } else {
-      stats.shadow_draw_calls = shadow_->draw(meshes(), focus, lighting.sun_direction, params.layers, extent);
+      stats.shadow_draw_calls = shadow_->draw(meshes(), focus, lighting_.sun_direction, params.layers, extent);
       shadow_key_ = key;
       shadow_key_valid_ = true;
     }
@@ -767,7 +767,7 @@ bool Renderer::render(const RenderParams& params, RenderStats& stats) {
     const Material& mat = m->material;
     if (!m->skinned() && mat.frustum_culled && !frustum.sphere_visible(m->world_bounds)) { stats.culled_meshes++; continue; }
     if (mat.viewmodel) { viewmodel_.push_back(m); continue; }
-    m->sort_distance = distance_sq(m->world_bounds.center, camera.eye);
+    m->sort_distance = distance_sq(m->world_bounds.center, camera_.eye);
     (mat.alpha == AlphaMode::blend ? transparent_ : opaque_).push_back(m);
   }
   std::sort(opaque_.begin(), opaque_.end(), [](const Mesh* a, const Mesh* b) { return a->sort_distance < b->sort_distance; });
@@ -776,9 +776,9 @@ bool Renderer::render(const RenderParams& params, RenderStats& stats) {
 
   // Ambient occlusion without a second geometry pass: the forward pass records the indirect share of each
   // pixel (third scene target); GTAO runs on the finished scene depth; the composite darkens that share.
-  const bool want_ao = post && !camera.orthographic && ao_.options().enabled;
+  const bool want_ao = post && !camera_.orthographic && ao_.options().enabled;
   bool ao = false;
-  const Mat4 projection = projection_matrix(camera, aspect);
+  const Mat4 projection = projection_matrix(camera_, aspect);
 
   gl::enable(gl::DEPTH_TEST);
   gl::depthFunc(gl::LEQUAL);
@@ -793,16 +793,16 @@ bool Renderer::render(const RenderParams& params, RenderStats& stats) {
   // Transparent and first-person surfaces are not in the AO depth.
   cache_.set_int(u_.ao_out, 0);
 
-  if (params.sky && !camera.orthographic) {
+  if (params.sky && !camera_.orthographic) {
     SkyAtmosphere atmosphere;
-    atmosphere.fog_color = lighting.fog_color;
-    atmosphere.sun_color = lighting.sun_color;
-    atmosphere.sun_direction = lighting.sun_direction;
-    atmosphere.sun_scatter = lighting.fog_density > 0 ? clamp(lighting.fog_sun_scatter, 0.0f, 1.0f) : 0.0f;
+    atmosphere.fog_color = lighting_.fog_color;
+    atmosphere.sun_color = lighting_.sun_color;
+    atmosphere.sun_direction = lighting_.sun_direction;
+    atmosphere.sun_scatter = lighting_.fog_density > 0 ? clamp(lighting_.fog_sun_scatter, 0.0f, 1.0f) : 0.0f;
     // How fogged the far end of the view is: thin fog gives only a thin horizon haze.
-    const f32 far_fog = lighting.fog_density * min_of(camera.far, 2000.0f);
-    atmosphere.horizon = clamp(lighting.fog_horizon, 0.0f, 1.0f) * (1 - std::exp(-far_fog * far_fog));
-    sky_pass_.draw(camera, aspect, sky, lighting.exposure, start / 1000.0, atmosphere);
+    const f32 far_fog = lighting_.fog_density * min_of(camera_.far, 2000.0f);
+    atmosphere.horizon = clamp(lighting_.fog_horizon, 0.0f, 1.0f) * (1 - std::exp(-far_fog * far_fog));
+    sky_pass_.draw(camera_, aspect, sky_, lighting_.exposure, start / 1000.0, atmosphere);
   }
   program_.use();
   cull_state_ = -1;
@@ -844,7 +844,7 @@ bool Renderer::render(const RenderParams& params, RenderStats& stats) {
       occlusion.scale_y = static_cast<f32>(ao_.height()) / static_cast<f32>(height_);
       occlusion.projection = projection;
     }
-    bloom_.end(lighting.exposure, ao ? &occlusion : nullptr);
+    bloom_.end(lighting_.exposure, ao ? &occlusion : nullptr);
     gl::enable(gl::DEPTH_TEST);
     gl::viewport(rect.x, rect.y, rect.width, rect.height);
     bound_texture_ = ~0u;
@@ -866,7 +866,7 @@ bool Renderer::render(const RenderParams& params, RenderStats& stats) {
 // queries
 
 bool Renderer::screen_ray(f32 x, f32 y, Ray& ray) const {
-  return kern::screen_ray(camera, x, y, static_cast<f32>(width_), static_cast<f32>(height_), ray);
+  return kern::screen_ray(camera_, x, y, static_cast<f32>(width_), static_cast<f32>(height_), ray);
 }
 
 bool Renderer::pick(f32 x, f32 y, const PickQuery& query, PickHit& hit, PickStats* stats) const {

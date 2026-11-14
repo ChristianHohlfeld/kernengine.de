@@ -814,7 +814,7 @@ f32 GameWorld::apply_lighting(Vec3 eye) {
   const Vec3 moon = normalize(Vec3{-sun.x, -sun.y, max_of(0.35f, -sun.z)});
   const f32 night = smoothstep(0.06f, -0.16f, sun.z);
   const f32 dusk = clamp(1 - std::fabs(sun.z) * 4, 0.0f, 1.0f) * (1 - night * 0.6f);
-  Lighting& l = r_.lighting;
+  Lighting l = r_.lighting();
   // Daylight balance: one sky irradiance (the environment dome, no extra hemisphere light on top) with
   // a clear-sky sun : sky irradiance of about 5 : 1 on a horizontal surface, as measured outdoors
   // (sun ~100 klx, sky ~20 klx), and a ground bounce that follows from that light.
@@ -843,12 +843,15 @@ f32 GameWorld::apply_lighting(Vec3 eye) {
     l.env_ground = mix3(bounce, {0.105f, 0.127f, 0.084f}, night);
   }
   l.exposure = w.exposure * (1.0f + 0.35f * night);
+  r_.set_lighting(l);
   r_.set_ambient_occlusion_radius(w.ao_radius);
   r_.set_shadow_distance(w.shadow_distance);
-  r_.sky.sun = sun;
-  r_.sky.moon = moon;
-  r_.sky.night = night;
-  r_.sky.clouds = w.clouds;
+  SkyState sky = r_.sky();
+  sky.sun = sun;
+  sky.moon = moon;
+  sky.night = night;
+  sky.clouds = w.clouds;
+  r_.set_sky(sky);
   if (windows_) windows_->night = night;
   // Point lights: every light component of a living, visible actor.
   for (const Actor& a : level_.actors) {

@@ -57,7 +57,7 @@ const char* hint_weapon(Mode m, weapons::Id foot, i32 drone) {
 
 void Game::read_input(kern::Engine& e, f32 dt) {
   ControlsState& C = ctl_;
-  kern::Input& in = e.input;
+  kern::Input& in = e.input();
   C.clock += dt;
   // A menu was open: the drone pad waits until its buttons are let go (xbox_gamepad.mjs).
   if (C.was_paused) { C.latch.armed = true; C.was_paused = false; }
@@ -110,7 +110,7 @@ void Game::read_input(kern::Engine& e, f32 dt) {
   C.look.step(dt, C.keep_look);
   // hand grenade (hand_grenade.mjs): T held / LB held / the button held = cooking, let go = throw;
   // regeneration in every mode, a cooking grenade drops when the pilot leaves the foot mode
-  ctl_grenade(mode_ == Mode::foot && in.down(Key::t), mode_ == Mode::foot && pad.connected && pad.down(kPadLB) && !(engine_ && engine_->xr), dt);  // VR: the left grip grabs (game_vr.cpp)
+  ctl_grenade(mode_ == Mode::foot && in.down(Key::t), mode_ == Mode::foot && pad.connected && pad.down(kPadLB) && !(engine_ && engine_->xr()), dt);  // VR: the left grip grabs (game_vr.cpp)
   C.keep_look = ui_.settings.on(Opt::view_keep_look);
   C.aim_scheme = ui_.settings.on(Opt::pad_aim_scheme);  // xbox_control_mode.mjs CLASSIC / AIM  // WORLD: KEEP 360 LOOK (the head look stays)
   ui_after_input(dt);  // vehicle settings, the jetpack (game_ui.cpp, game_equipment.cpp)
@@ -141,7 +141,7 @@ void Game::ctl_enter(bool jet_first) {
 void Game::ctl_discrete(kern::Engine& e, f32 dt) {
   (void)dt;
   ControlsState& C = ctl_;
-  kern::Input& in = e.input;
+  kern::Input& in = e.input();
   const f32 now = C.clock;
   auto ph = [&](int b) { return (C.pad_hit & (1u << b)) != 0; };
   const bool alive = !player_dead_;
@@ -161,7 +161,7 @@ void Game::ctl_discrete(kern::Engine& e, f32 dt) {
   if (view == 2) command("bigmap toggle");
   bool camera = in.pressed(Key::c) || view == 1 || pad_touch_.take_pressed("cam");
   // VR: the left stick's click switches the view in a vehicle (cockpit / outside; the drone's three)
-  if (engine_ && engine_->xr && mode_ != Mode::foot && ph(kPadL3)) camera = true;
+  if (engine_ && engine_->xr() && mode_ != Mode::foot && ph(kPadL3)) camera = true;
   if (vr_cam_request_) { camera = true; vr_cam_request_ = false; }
 
   // ---- dead: R / Enter / Space and A / Y respawn; nothing else plays (desktop_controls.mjs:165) ----
@@ -218,7 +218,7 @@ void Game::ctl_discrete(kern::Engine& e, f32 dt) {
 
   // ---- EMP (G, pad B, the EMP button: foot and drone) ----
   // (VR: B is the weapon switch - Y opens the wrist menu, EMP is there too)
-  const bool xr = engine_ && engine_->xr;
+  const bool xr = engine_ && engine_->xr();
   if ((on_foot || drone) && (in.pressed(Key::g) || (ph(kPadB) && !xr) || pad_touch_.take_pressed("emp"))) emp_pulse();
 
   // ---- weapons: Q / wheel / Y (not in the R3+Y chord) / D-pad left / the thumb button ----
@@ -300,10 +300,10 @@ void Game::ctl_strike_confirm(bool at_point, f32 x, f32 y) {
 
 bool Game::ctl_screen_ray(f32 x, f32 y, Vec3& from, Vec3& dir) const {
   // VR: every screen point is where the head looks (WebXR, kern_app_frame_xr)
-  if (engine_ && engine_->xr) {
+  if (engine_ && engine_->xr()) {
     // the right controller's ray on foot (the gun is in that hand), else where the head looks
     if (mode_ == Mode::foot && vr_hand_ray(from, dir)) return true;
-    from = engine_->xr_eye; dir = engine_->xr_forward; return true;
+    from = engine_->xr_eye(); dir = engine_->xr_forward(); return true;
   }
   // The inverse of project_screen (game_net.cpp): a ray through a CSS px point of the view.
   const Vec3 f = kern::normalize(cam_.target - cam_.eye, {1, 0, 0});
@@ -370,7 +370,7 @@ void Game::ctl_grenade(bool hold_key, bool hold_pad, f32 dt) {
 
 PlayInput Game::foot_input(kern::Engine& e, f32 dt) {
   ControlsState& C = ctl_;
-  kern::Input& in = e.input;
+  kern::Input& in = e.input();
   const Settings& st = ui_.settings;
   const f32 now = C.clock;
   PlayInput p;
@@ -518,7 +518,7 @@ PlayInput Game::foot_input(kern::Engine& e, f32 dt) {
     if (pad_touch_.held("fire")) fire = true;
   }
   // VR: the head looks, the body follows it; snap turn, the stick or the arms walk (game_vr.cpp)
-  if (engine_ && engine_->xr) {
+  if (engine_ && engine_->xr()) {
     vr_foot(p, forward, strafe, dt);
     // VR boxing and the knife: the blow is the controller's speed (vr_melee), never a trigger
     if (w == weapons::Id::fists || w == weapons::Id::knife) { fire = fire_edge = false; touch_fresh = touch_fire = false; }
@@ -543,7 +543,7 @@ PlayInput Game::foot_input(kern::Engine& e, f32 dt) {
     // Kern fires the guns (keyboard / mouse / pad); an empty magazine on touch pulls Kern's trigger
     // once so that the soldier reloads (touch_fire)
     p.fire = fire || touch_fire;
-    if (engine_ && engine_->xr && fire && !locked) {
+    if (engine_ && engine_->xr() && fire && !locked) {
       // VR: the round goes where the head looks (the game fires it, Kern's soldier only reloads)
       const bool empty = ctl_touch_shot(frame_w_ / 2, frame_h_ / 2);
       p.fire = empty;
@@ -838,7 +838,7 @@ bool Game::ctl_touch_shot(f32 x, f32 y) {
 
 void Game::drone_input(kern::Engine& e, f32 dt) {
   ControlsState& C = ctl_;
-  kern::Input& in = e.input;
+  kern::Input& in = e.input();
   const Settings& st = ui_.settings;
   const DroneTelemetry& t = drone_.telemetry();
   const f32 now = C.clock;
@@ -848,7 +848,7 @@ void Game::drone_input(kern::Engine& e, f32 dt) {
   const bool pad_on = pad.connected && !C.latch.step(latch_vals);
   // VR (Quest controllers): mode 2 like a real drone's remote - left stick throttle (up / down) and
   // yaw, right stick pitch and roll, the right trigger fires, A arms, B the weapon
-  const bool vr_pad = pad_on && engine_ && engine_->xr;
+  const bool vr_pad = pad_on && engine_ && engine_->xr();
   const bool aim = pad_on && !vr_pad && C.aim_scheme && pad.down(kPadLB);
   // left stick: WASD (x = D - A, y = S - W), the touch stick, LS
   Vec2 left{key(in, Key::d) - key(in, Key::a), key(in, Key::s) - key(in, Key::w)};
@@ -958,7 +958,7 @@ void Game::drone_input(kern::Engine& e, f32 dt) {
 
 void Game::car_input(kern::Engine& e, f32 dt) {
   ControlsState& C = ctl_;
-  kern::Input& in = e.input;
+  kern::Input& in = e.input();
   if (car_index_ < 0) return;
   TrafficCar& c = cars_[car_index_];
   CarInput ci;
@@ -974,7 +974,7 @@ void Game::car_input(kern::Engine& e, f32 dt) {
     look_y += -pad_touch_.look().y;
   }
   bool brake = in.down(Key::space) || pad_touch_.held("hb");
-  const bool xr = engine_ && engine_->xr;
+  const bool xr = engine_ && engine_->xr();
   if (pad.connected) {
     steer += controls::gamepad_axis(pad.lx, 0.08f);
     pedal += pad.rt - pad.lt;
@@ -1004,7 +1004,7 @@ void Game::car_input(kern::Engine& e, f32 dt) {
 
 void Game::jet_input(kern::Engine& e, f32 dt) {
   ControlsState& C = ctl_;
-  kern::Input& in = e.input;
+  kern::Input& in = e.input();
   const f32 now = C.clock;
   // jet_mode.mjs readInputs: left stick lift + rudder, right stick pitch + roll (pull back = nose up)
   f32 lift = key(in, Key::w) - key(in, Key::s), yaw = key(in, Key::d) - key(in, Key::a);
@@ -1067,7 +1067,7 @@ void Game::jet_input(kern::Engine& e, f32 dt) {
 
 void Game::parachute_input(kern::Engine& e, f32 dt) {
   ControlsState& C = ctl_;
-  kern::Input& in = e.input;
+  kern::Input& in = e.input();
   // jet_mode.mjs stepPara: the right-hand inputs steer (arrows, mouse, RS, the right stick)
   f32 roll = key(in, Key::right) - key(in, Key::left), pitch = key(in, Key::down) - key(in, Key::up);
   if (touch_mode_) { roll += pad_touch_.look().x; pitch += pad_touch_.look().y; }
@@ -1095,7 +1095,7 @@ void Game::parachute_input(kern::Engine& e, f32 dt) {
 void Game::ctl_camera(kern::Camera& c) {
   const ControlsState& C = ctl_;
   if (mode_ == Mode::foot || mode_ == Mode::car) return;
-  if (engine_ && engine_->xr) return;  // VR: the head looks
+  if (engine_ && engine_->xr()) return;  // VR: the head looks
   if (C.look.yaw_deg == 0 && C.look.pitch_deg == 0) return;
   const Vec3 d = c.target - c.eye;
   const f32 len = kern::length(d);

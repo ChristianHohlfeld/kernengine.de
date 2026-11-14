@@ -69,7 +69,7 @@ mp::Weapon mp_weapon(weapons::Id id) {
 
 MpLocal& Game::mp_local() {
   if (!mp_) mp_ = std::make_unique<MpLocal>();
-  if (!mp_->art.ready() && engine_) mp_->art.init(engine_->renderer);
+  if (!mp_->art.ready() && engine_) mp_->art.init(engine_->renderer());
   return *mp_;
 }
 
@@ -144,11 +144,11 @@ net::PlayerState Game::my_state() const {
   s.avatar_yaw = world_->camera_yaw() * kDeg;
   s.yaw = world_->camera_yaw() * kDeg;
   s.pitch = world_->camera_pitch() * kDeg;
-  if (engine_ && engine_->xr) {
+  if (engine_ && engine_->xr()) {
     // VR: where the gun points (the right hand's ray) is the aim the others see - yaw and pitch
     Vec3 from, dir;
     if (mode_ == Mode::foot && vr_hand_ray(from, dir)) { s.yaw = std::atan2(dir.y, dir.x); s.pitch = -std::asin(clampf(dir.z, -1, 1)); }
-    else { const Vec3 f = engine_->xr_forward; s.pitch = -std::asin(clampf(f.z, -1, 1)); }
+    else { const Vec3 f = engine_->xr_forward(); s.pitch = -std::asin(clampf(f.z, -1, 1)); }
   }
   s.speed = std::hypot(b.velocity.x, b.velocity.y);
   const kern::game::Hud& h = world_->hud();
@@ -161,7 +161,7 @@ net::PlayerState Game::my_state() const {
   if (mode_ == Mode::foot && !player_dead_) {
     const f32 tnow = world_->sim_time();
     const Vec3 feet = matrix_of(soldier_).translation() - Vec3{0, 0, 0.73f};
-    if (engine_ && engine_->xr && vr_) {
+    if (engine_ && engine_->xr() && vr_) {
       kern::Mat4 hm;
       bool any = false;
       for (i32 side = 0; side < 2; ++side)
@@ -229,7 +229,7 @@ void Game::rebase_origin(f64 lon, f64 lat) {
   lat_ = lat;
   destruction_.reset(city_);
   city_.clear();
-  city_.start(engine_->renderer, world_->physics(), lon_, lat_, engine_->arg_number("dem", 1) > 0 && engine_->arg_number("offline", 0) <= 0);
+  city_.start(engine_->renderer(), world_->physics(), lon_, lat_, engine_->arg_number("dem", 1) > 0 && engine_->arg_number("offline", 0) <= 0);
   if (engine_->arg_number("offline", 0) > 0) city_.go_offline();
   for (TrafficCar& c : cars_) {
     if (c.placed) world_->set_alive(c.actor, false);
