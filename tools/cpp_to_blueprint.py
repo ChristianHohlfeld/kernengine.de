@@ -116,7 +116,6 @@ KEYED = re.compile(r"std::(unordered_)?(multi)?(map|set)<")
 # kern::Map, kern::Set (kern/core/map.h): the language's Map and Set - values under keys, keys, in the order the keys came
 KEYED_KERN = re.compile(r"kern::(Map|Set)<")
 ITERATOR = re.compile(r"std::__detail::_Node_(?:const_)?iterator(?:_base)?<|std::_Rb_tree_(?:const_)?iterator<|__gnu_cxx::__normal_iterator<")
-W64_HEADER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "blueprint_whole64.h")
 UNSIGNED = {"unsigned char", "unsigned short", "unsigned int", "unsigned long", "unsigned long long"}
 # An unsigned 64-bit whole number is, in a Blueprint, the whole number its bits are read with a sign
 # (2^64 - 1 is -1): what C++ adds, subtracts and multiplies around 2^64 comes out the same, exactly,
@@ -349,7 +348,6 @@ class Tree:
     def __init__(self, path, namespace, flags):
         self.path = os.path.abspath(path)
         self.namespace = namespace
-        flags = [*flags, "-include", W64_HEADER]
         self.dumps = run_clang(path, namespace, flags)
         st = {"file": ""}
         for o in self.dumps:
@@ -375,18 +373,11 @@ class Tree:
         self.unnamed = {}     # how the compiler spells the type of an enum without a name -> its underlying type
         self.local_types = {}  # a type a function declares in its body (qualified name) -> that function's scope
         self.local_spans = []  # (file, from, to, scope) of the functions that declare types of their own
-        self.w64 = run_clang(path, "w64", flags) if STEADY else []
-        st = {"file": ""}
-        for o in self.w64:
-            annotate(o, st)
         seen = set()
         for o in self.dumps:
             self.take(o, self.scope_from(o), seen)
         for o in self.engine:
             self.take(o, ENGINE + "::", seen)
-        for o in self.w64:
-            self.take(o, "w64::", seen)
-        self.whole = {n["name"]: i for i, n in self.decl.items() if self.scope_of.get(i) == "w64::" and n.get("kind") == "FunctionDecl"}
         for i, n in list(self.decl.items()):
             if n.get("kind") in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl") and any(c.get("kind") == "CompoundStmt" for c in kids(n)):
                 self.body[i] = n
@@ -677,7 +668,7 @@ class World:
     def program(self, file):
         """Is this a file of the program itself - one of those to convert as a whole?"""
         p = os.path.abspath(file)
-        return os.path.dirname(p) in self.program_dirs or p == os.path.abspath(W64_HEADER)
+        return os.path.dirname(p) in self.program_dirs
 
     def unit_of(self, file):
         """The Blueprint of a file: a header's is called like the header (car.h: car), a source file's
@@ -7944,7 +7935,7 @@ def convert_unit(job):
         if path is None:   # (headers alone: a file that includes them is what the compiler reads)
             scratch = tempfile.mkdtemp(prefix="kern-cpp-to-blueprint-")
             path = os.path.join(scratch, part.replace("/", "_") + ".cpp")
-            open(path, "w").write("".join(f'#include "{os.path.abspath(f)}"\n' for f in files if os.path.abspath(f) != os.path.abspath(W64_HEADER)) or "\n")
+            open(path, "w").write("".join(f'#include "{os.path.abspath(f)}"\n' for f in files) or "\n")
         tree = Tree(path, namespace, flags)
         main_file = os.path.abspath(source or files[0])
         # its functions, in the order they stand in: those of a header first (a source file's Blueprint has
@@ -8171,8 +8162,6 @@ def main(argv):
         if unit_of[k] is not None and unit_of[k] not in program:
             wanted[unit_of[k]].add(k)
         todo += [c for c in functions[k]["calls"] if c in functions]
-    w64 = os.path.abspath(W64_HEADER)
-    seen.update(k for k, f in functions.items() if f["file"] == w64)   # (the 64-bit numbers' functions: the converter's own, all of them)
     unit_files, nowhere = collections.defaultdict(set), []
     for k in seen:
         if unit_of[k] is None:
