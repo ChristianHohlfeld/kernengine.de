@@ -8888,8 +8888,9 @@ class TestWriter:
                 said_consts.add(self.widen(piece["text"]))
             foreign_chunks.append(((first[0], first[1] - 0.5, i), ("foreign", place), None))
         # The Blueprints of the level's actors the source calls on them (kern::logic::ActorBlueprint): the test runs
-        # them (converted::ActorWorld) - for the source, bound to the objects it calls them by, and for the
-        # Blueprint, where actor_find finds them.
+        # them (converted::Blueprint, RuleBlueprint) - for the source, bound to the objects it calls them by, and
+        # for the Blueprint beside it, where actor_find finds them (the host's find_actor); the engine is the
+        # test's stand-in for all of them.
         actors = sorted({a for f in u.order for a in actors_called(f)})
         bindings = []
         for v in G.consts.values():
@@ -8899,14 +8900,10 @@ class TestWriter:
             if v.get("name") and self.actor_blueprint(qtype(v)) and self.inside(v, [tree.records[q] for q in sorted(G.records)]) is None:
                 bindings.append("::".join(classes_of(tree.scope_of.get(first["id"], "")) + [v["name"]]))
         bindings += [name for p in G.foreign.values() for name in p.get("actors", ())]
-        engine_too = bool(actors) and bool(u.engine_calls or self.engine_called(G))
         for f in u.order:
             d = f.decl
             if f.lifted:
                 continue   # (a local function: in the source of the function it stands in, compared with it)
-            if engine_too:
-                skipped.append((f, "its Blueprint calls the engine and the Blueprint of an actor of the level: the world that runs the actor's Blueprint has the engine itself, not the test's stand-in"))
-                continue
             owner = tree.owner.get(d["id"])
             free = G.freed.get(d["id"], (None,))[0]
             if free:
