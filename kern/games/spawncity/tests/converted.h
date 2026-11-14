@@ -446,6 +446,12 @@ template <class U> wide::Span<const U> kept_span(std::vector<U> entries) {
   kept.push_back(std::move(entries));
   return {kept.back().data(), kept.back().size()};
 }
+/// The same for a view through which the entries are changed.
+template <class U> wide::Span<U> kept_span_changed(std::vector<U> entries) {
+  static std::deque<std::vector<U>> kept;
+  kept.push_back(std::move(entries));
+  return {kept.back().data(), kept.back().size()};
+}
 
 inline Value arg(f64 x) { return Value::number(x); }
 inline Value arg(f32 x) { return Value::number(static_cast<f64>(x)); }

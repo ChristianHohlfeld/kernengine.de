@@ -7425,8 +7425,9 @@ class TestWriter:
             const = "const " if re.match(r"const\b", r) else ""
             return const + name + ("&" if r.endswith("&") else "*" if re.search(r"\*\s*(const)?$", r) else "")
         m = re.match(r"(?:kern::)?Span<\s*(.+)>$", c)
-        if m:
-            return f"std::vector<{self.spell(m.group(1))}>"
+        if m:   # (a view of a list: of entries the test keeps - converted::kept_span; as constant as the source says)
+            const, inner = self.span_of(raw, m.group(1))
+            return f"converted::wide::Span<{const}{self.spell(inner)}>"
         if c in W64:
             return "u64" if c == "whole64u" else "i64"
         if c in ("float", "double", "long double"):
@@ -7470,6 +7471,14 @@ class TestWriter:
             return self.names[q]
         raise Wait(f"the test has no values of {c}")
 
+    @staticmethod
+    def span_of(raw, cleaned):
+        """Of a view (kern::Span<const T>): ("const " or "", T) - as the source spells it."""
+        inner = (template_args(re.sub(r"^\s*const\s+|\s*&\s*$", "", raw)) or [cleaned])[0]
+        if re.match(r"const\b", inner):
+            return "const ", re.sub(r"^const\s+", "", inner)
+        return "", inner
+
     def record_named(self, c):
         """The class or enum of the program a type of the test's values names - the one it names by its full
         name. (A class this file only declares - its definition stands in another source file - is none
@@ -7505,9 +7514,9 @@ class TestWriter:
                 return f"std::make_unique<{self.object_name(q)}>(*{one})"
             return one if re.search(r"\*\s*(const)?$", r) else "*" + one
         m = re.match(r"(?:kern::)?Span<\s*(?:const\s+)?(.+)>$", c)
-        if m:   # (a view: of entries the test keeps - converted::kept_span)
-            inner = m.group(1)
-            return f"converted::kept_span(draw_list(draw, [&]() -> {self.spell(inner)} {{ return {self.draw(inner)}; }}))"
+        if m:   # (a view: of entries the test keeps - converted::kept_span; ones it may change, if the view may)
+            const, inner = self.span_of(raw, m.group(1))
+            return f"converted::{'kept_span' if const else 'kept_span_changed'}(draw_list(draw, [&]() -> {self.spell(inner)} {{ return {self.draw(inner)}; }}))"
         if c in W64:
             return f"static_cast<{self.spell(raw)}>(draw.bits())"
         if c in ("float", "double", "long double"):
@@ -7565,8 +7574,8 @@ class TestWriter:
         self.spell(raw)
         def parts(c):
             """The classes a type is made of, through lists, maps, sets and pairs."""
-            if re.match(r"std::(vector|array|unique_ptr|optional|initializer_list)<", c):
-                return parts(template_args(c)[0])
+            if re.match(r"std::(vector|array|unique_ptr|optional|initializer_list)<|(?:kern::)?Span<", c):
+                return parts(re.sub(r"^const\s+", "", template_args(c)[0]))
             m = KEYED_KERN.match(c)
             if m or c.startswith("std::pair<"):
                 a = template_args(c)
@@ -7819,6 +7828,13 @@ class TestWriter:
                 data = f"std::vector<{inner}>({name}, {name} + {after['name']})" if counted else f"({name} ? std::vector<{inner}>{{*{name}}} : std::vector<{inner}>{{}})"
                 params.append((f"const {inner}* {name}", default))
                 values.append(f"arg({self.wrap(data, f'std::vector<{inner}>')})")
+            elif re.match(r"(?:kern::)?Span<", self.u.clean(raw)):
+                # a view of data: of what the source shows it (the node gets the list it shows)
+                inner = template_args(re.sub(r"^const\s+|\s*&$", "", raw))[0]
+                const = "const " if re.match(r"const\b", inner) else ""
+                inner = re.sub(r"^const\s+", "", inner)
+                params.append((f"converted::wide::Span<{const}{self.spell(inner)}> {name}", default))
+                values.append(f"arg({self.wrap(f'converted::as_list({name})', f'std::vector<{self.spell(inner)}>')})")
             else:
                 t = self.spell(raw)
                 writes = raw.endswith("&") and not raw.endswith("&&") and not re.match(r"const\b", raw)
@@ -8180,6 +8196,9 @@ class TestWriter:
                 return   # (the engine's logic - how C++ calls a Blueprint: in a test the engine's own, which runs the Blueprints)
             if q in vectors or d is None or t in G.records or d.get("_at", (None, None))[1] is None or t in u.objects_seen or t in G.objects or q in tree.local_types:
                 return   # (of the engine's classes with a life of their own the test has stand-ins: see stand_ins)
+            if t.startswith(ENGINE + "::") and u.object_of(t + "*"):
+                G.objects.add(t)   # (one the source names that the Blueprint does not touch - a field of a class compiled along: a stand-in too)
+                return
             G.records.add(t)
             todo.append(("record", d))
         def want_unnamed(i):
