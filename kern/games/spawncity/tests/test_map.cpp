@@ -45,7 +45,8 @@ SC_TEST(map_mvt_round_trip) {
   mvt::Tile tile;
   SC_CHECK(mvt::decode(w.bytes().data(), w.bytes().size(), tile), "decodes");
   SC_CHECK(tile.layers.size() == 4, "four layers (%zu)", tile.layers.size());
-  const mvt::Layer* b = tile.layer("building");
+  const i32 b_at = tile.layer_at("building");
+  const mvt::Layer* b = b_at >= 0 ? &tile.layers[static_cast<std::size_t>(b_at)] : nullptr;
   SC_CHECK(b && b->features.size() == 1 && b->features[0].id == 42 && b->features[0].parts.size() == 2, "building with courtyard");
   SC_CHECK(b && std::fabs(b->number(b->features[0], "render_height", 0) - 15) < 1e-9, "height tag");
   SC_CHECK(b && b->features[0].parts[0][2].x == 1100 && b->features[0].parts[0][2].y == 1100, "delta-coded vertices");

@@ -568,7 +568,10 @@ i32 Terrain::corridor_set(f32 x, f32 y) const {
   auto in = [&](const CorridorSet& s) { return x >= s.bounds.x && x < s.bounds.z && y >= s.bounds.y && y < s.bounds.w; };
   if (corridor_hit_ >= 0 && in(*corridors_[static_cast<std::size_t>(corridor_hit_)])) return corridor_hit_;
   for (std::size_t i = 0; i < corridors_.size(); ++i)
-    if (in(*corridors_[i])) return corridor_hit_ = static_cast<i32>(i);
+    if (in(*corridors_[i])) {
+      corridor_hit_ = static_cast<i32>(i);
+      return corridor_hit_;
+    }
   return -1;
 }
 

@@ -1645,9 +1645,11 @@ bool Life::shout(Vec3 at, const char* mood, u32 seed, f32 now, f32 d, LifeOut& o
   if (now - last_shout_ < kShoutGap || d > kMaxHear) return false;
   for (auto& [s, t] : source_gap_)
     if (s == seed && now - t < kSourceGap) return false;
-  std::size_t pick = 0;  // (the lines of this mood: the first ones when there are none for it)
-  for (std::size_t i = 0; i < std::size(kLines); ++i)
-    if (kLines[i].mood == mood) pick = i;
+  std::size_t pick = 0, i = 0;  // (the lines of this mood: the first ones when there are none for it)
+  for (const Lines& l : kLines) {
+    if (l.mood == mood) pick = i;
+    ++i;
+  }
   const Lines& lines = kLines[pick];
   const f32 r = hash01(mix(seed, static_cast<u64>(now / 0.997f)));
   const std::string_view line = lines.lines[static_cast<u32>(r * static_cast<f32>(lines.n)) % lines.n];

@@ -35,15 +35,16 @@ struct Layer {
   std::vector<std::string> keys;
   std::vector<Value> values;
   std::vector<Feature> features;
-  /// The value of a tag on a feature (nullptr when absent).
-  const Value* tag(const Feature& f, std::string_view key) const;
+  /// The place in `values` of a tag's value on a feature (-1 when absent).
+  i32 tag_at(const Feature& f, std::string_view key) const;
   std::string_view text(const Feature& f, std::string_view key) const;
   f64 number(const Feature& f, std::string_view key, f64 fallback) const;
 };
 
 struct Tile {
   std::vector<Layer> layers;
-  const Layer* layer(std::string_view name) const;
+  /// The place in `layers` of the layer of that name (-1 when the tile has none).
+  i32 layer_at(std::string_view name) const;
 };
 
 /// Decodes `bytes` (uncompressed protobuf). Layers not in `wanted` (when non-empty) are skipped.
