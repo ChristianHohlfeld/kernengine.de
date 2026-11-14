@@ -4600,6 +4600,14 @@ class Emit:
                 t = self.tp(b)
                 fields = u.struct_fields[t]
                 return f"struct_make<{t}>({self.ex(a[0], fields[0][1])}, {self.ex(a[1], fields[1][1])})", t
+            if name == "to_string" and len(a) == 1:
+                # std::to_string: what sprintf gives with the format of its type (C++ [string.conversions])
+                c = self.ctype(a[0])
+                fmt = {"int": "%d", "short": "%d", "signed char": "%d", "char": "%d", "unsigned int": "%u", "unsigned short": "%u", "unsigned char": "%u",
+                       "long": "%lld", "long long": "%lld", "unsigned long": "%llu", "unsigned long long": "%llu", "float": "%f", "double": "%f"}.get(c)
+                if fmt is None:
+                    raise Wait(f"std::to_string of a {c}")
+                return f'text_format<"{fmt}">(-1, {self.ex(a[0], "Float" if fmt == "%f" else "Int")})', "Text"
             if name in ("snprintf", "printf", "sprintf", "to_string", "strtod", "atof", "atoi", "strcmp", "strlen", "strncmp", "strchr", "strstr"):
                 raise Wait("text formatting and parsing (snprintf, to_string, atof ...)")
             if name in ("sort", "stable_sort", "remove_if", "find", "find_if", "unique", "any_of", "all_of", "count_if", "swap", "fill", "reverse", "accumulate", "lower_bound", "upper_bound"):
