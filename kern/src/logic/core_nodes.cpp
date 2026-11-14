@@ -1949,6 +1949,20 @@ void add_functions(Library& lib) {
     lib.add(std::move(d));
   }
   {
+    // Has Blueprint: whether Call on Actor and Get Variable on Actor reach a Blueprint on Target
+    NodeDef d = make("func.has_blueprint", "Has Blueprint", "Functions", NodeKind::pure,
+                     "True when Target (the Level when Target is empty) has a Blueprint that runs: one without errors that has not been stopped. Call on Actor and Get "
+                     "Variable on Actor reach it; where it has none, they give their defaults.");
+    d.inputs = {data("target", "Target", PinType::actor, 0)};
+    d.outputs = {data("result", "Has Blueprint", PinType::boolean)};
+    d.keywords = "has blueprint logic running valid other actor remote bound";
+    d.run = [](Context& c) {
+      c.out(std::size_t{0}, Value::boolean(c.runtime().has_blueprint(c.in_actor("target"))));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
     NodeDef d = make("func.pure", "Function Value", "Functions", NodeKind::pure,
                      "A function as a value: it runs whenever one of its outputs is read. For functions that only compute (no effects on the world).");
     d.params = {param("function", "Function", ParamDef::Kind::function)};

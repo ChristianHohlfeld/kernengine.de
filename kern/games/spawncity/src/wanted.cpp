@@ -9,8 +9,7 @@ namespace {
 rules::Blueprint g_rules{"Wanted"};
 }  // namespace
 
-void bind(kern::logic::Instance* blueprint) { g_rules.running = blueprint; }
-kern::logic::Instance* blueprint() { return g_rules.running; }
+bool bind(kern::logic::Runtime& logic) { return g_rules.bind(logic); }
 
 i32 max_stars() { return g_rules.get<i32>("MaxStars"); }
 f32 emp_range() { return static_cast<f32>(g_rules.get<f64>("EmpRange")); }

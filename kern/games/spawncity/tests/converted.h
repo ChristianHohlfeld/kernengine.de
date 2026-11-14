@@ -1126,9 +1126,8 @@ struct Blueprint {
   kern::logic::Instance* interp = nullptr;
   kern::logic::Instance* native = nullptr;
   explicit Blueprint(const char* actor, std::vector<std::string> actors = {}) {
-    const auto none = [](kern::logic::Instance*) {};
-    interpreted = std::make_unique<RuleBlueprint>(actor, none, false, actors);
-    compiled = std::make_unique<RuleBlueprint>(actor, none, true, actors);
+    interpreted = std::make_unique<RuleBlueprint>(actor, nullptr, false, actors);
+    compiled = std::make_unique<RuleBlueprint>(actor, nullptr, true, actors);
     // (The loop guard is the host's: a program whose functions loop long - a sound computed sample by
     // sample, a number raised to a 256-bit power - sets it to what they take.)
     interpreted->rt.budget = compiled->rt.budget = 2000000000u;
@@ -1137,7 +1136,7 @@ struct Blueprint {
     SC_CHECK(interp && native, "%s: %s%s", actor, interpreted->problems.c_str(), compiled->problems.c_str());
     SC_CHECK(interpreted->problems.empty(), "%s: %s", actor, interpreted->problems.c_str());
     if (!actors.empty()) {
-      source = std::make_unique<RuleBlueprint>(nullptr, none, true, actors);
+      source = std::make_unique<RuleBlueprint>(nullptr, nullptr, true, actors);
       source->rt.budget = 2000000000u;
       source->host.keeps = &g_source_engine;   // (what the actors ask the engine for the source: what the source asks)
       SC_CHECK(source->problems.empty(), "%s: %s", actor, source->problems.c_str());
@@ -1148,8 +1147,9 @@ struct Blueprint {
     SC_CHECK(native && std::string(native->tier()) == "native C++", "%s runs as its C++ class (it runs: %s)", actor, native ? native->tier() : "not at all");
     kern::logic::native_probe = class_runs;
   }
-  /// The running Blueprint of an actor for the source's ActorBlueprint (kern::logic::ActorBlueprint::running).
-  kern::logic::Instance* source_actor(const char* name) { return source ? source->find(name) : nullptr; }
+  /// The logic the source's ActorBlueprints are bound to (kern::logic::ActorBlueprint::bind): the runtime of
+  /// its own in which the actors' Blueprints run - where it calls none, one in which none has a Blueprint.
+  kern::logic::Runtime& source_logic() { return source ? source->rt : no_logic(); }
   /// Before the source's call: the actors' Blueprints as they started.
   void before_source() { source_actors.restore(); }
   /// What the Blueprint asked the engine's stand-in.

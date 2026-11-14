@@ -488,6 +488,9 @@ sie **auf einem Actor** auf.
 - Aufrufe über Blueprints hinweg dürfen im Kreis gehen (A ruft B, B ruft A, eine Funktion sich
   selbst auf ihrem eigenen Actor): Jeder Aufruf hat seine eigenen Parameter und lokalen Variablen.
   Tiefer als 64 ineinander geht es nicht – der Aufruf entfällt dann und wird gemeldet.
+- **Ob er einen hat:** der Wert-Knoten **Has Blueprint** (unter *Functions*) sagt, ob Target – ohne
+  Target das Level – einen Blueprint hat, der läuft (ohne Fehler, nicht gestoppt): den, den Call on
+  Actor und Get Variable on Actor dann erreichen.
 
 ### Typen des Projekts (Aufzählungen und Strukturen, die mehrere Blueprints haben)
 

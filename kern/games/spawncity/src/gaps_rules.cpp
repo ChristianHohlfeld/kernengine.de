@@ -13,7 +13,7 @@ namespace {
 using rules::decimal;
 rules::Blueprint g_sirens{"Sirens"};
 }  // namespace
-void bind_sirens(kern::logic::Instance* blueprint) { g_sirens.running = blueprint; }
+bool bind_sirens(kern::logic::Runtime& logic) { return g_sirens.bind(logic); }
 f32 horn_low() { return static_cast<f32>(g_sirens.get<f64>("HornLow")); }
 f32 horn_high() { return static_cast<f32>(g_sirens.get<f64>("HornHigh")); }
 f32 car_gain() { return static_cast<f32>(g_sirens.get<f64>("CarGain")); }

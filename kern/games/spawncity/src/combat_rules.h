@@ -21,14 +21,15 @@
 
 namespace sc::combat {
 
-/// The running Blueprints of the actors "Military", "Zombies", "Sandbox", "Fun" and "Race" (the
-/// game binds them once its world has started; tests bind the ones they run). False when a table
-/// is not as the game needs it.
-bool bind_military(kern::logic::Instance* blueprint);
-bool bind_zombies(kern::logic::Instance* blueprint);
-bool bind_sandbox(kern::logic::Instance* blueprint);
-bool bind_fun(kern::logic::Instance* blueprint);
-bool bind_race(kern::logic::Instance* blueprint);
+/// Bind the rules to the logic the level's Blueprints run in (the game once its world has started,
+/// tests the one they run) - the Blueprints of the actors "Military", "Zombies", "Sandbox", "Fun" and
+/// "Race", each found by its name at every call - and take their numbers and tables. False when the
+/// actor has no Blueprint that runs there or a table is not as the game needs it.
+bool bind_military(kern::logic::Runtime& logic);
+bool bind_zombies(kern::logic::Runtime& logic);
+bool bind_sandbox(kern::logic::Runtime& logic);
+bool bind_fun(kern::logic::Runtime& logic);
+bool bind_race(kern::logic::Runtime& logic);
 
 // ---------------------------------------------------------------- military_response.mjs
 extern f32 kTriggerHeat, kTriggerHoldS, kTriggerExtremeHeat, kAlertS, kReinforceS, kFirstReinforceS;

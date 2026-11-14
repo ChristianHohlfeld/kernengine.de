@@ -9,8 +9,7 @@ namespace {
 rules::Blueprint g_rules{"JetSeats"};
 }  // namespace
 
-void bind(kern::logic::Instance* blueprint) { g_rules.running = blueprint; }
-kern::logic::Instance* blueprint() { return g_rules.running; }
+bool bind(kern::logic::Runtime& logic) { return g_rules.bind(logic); }
 
 std::string result_name(Result r) {
   std::string name;

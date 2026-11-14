@@ -40,11 +40,11 @@ std::string num(f32 v) {
 }
 }  // namespace
 
-bool bind_settings(kern::logic::Instance* blueprint) {
-  g_rules.running = blueprint;
+bool bind_settings(kern::logic::Runtime& logic) {
+  const bool runs = g_rules.bind(logic);
   g_specs.clear();
   g_rows = g_rules.get<std::vector<Option>>("Options");
-  if (g_rows.size() != kCount) {
+  if (!runs || g_rows.size() != kCount) {
     g_rows.clear();
     return false;
   }

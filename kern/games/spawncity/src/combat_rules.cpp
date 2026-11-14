@@ -115,10 +115,10 @@ const Gate kNoGate = {"", {}, 1, 1, false};
 }  // namespace
 
 // ---------------------------------------------------------------- "Military"
-bool bind_military(kern::logic::Instance* blueprint) {
-  g_military.running = blueprint;
+bool bind_military(kern::logic::Runtime& logic) {
+  const bool runs = g_military.bind(logic);
   kTriggerHeat = kTriggerHoldS = kTriggerExtremeHeat = kAlertS = kReinforceS = kFirstReinforceS = kEndStars = kSquad = kMaxSoldiers = kSoldierHp = kMilHit = kHeliHp = kTankHp = kHeliDmg = kHeliDmgDrone = kSoldierDmg = kSoldierDmgDrone = kShellDmg = kSoldierReactS = kBurstWindowS = kSoldierBursts = kFlakCell = kFlakChance = kFlakRange = kFlakMinAgl = kFlakMuzzle = kFlakRps = kFlakOn = kFlakOff = kFlakSpread = kFlakBurstR = kFlakHp = kJetSpeed = kSoundMps = kJetAltMin = kJetAltMax = kJetSpan = kAmbientMinS = kAmbientMaxS = kStrikeCooldownS = kBombRadius = kBombDamage = kStickLen = kStick = kPunchDmg = kStabDmg = kGangGunDmg = 0;
-  if (!blueprint) return false;
+  if (!runs) return false;
   kTriggerHeat = static_cast<f32>(g_military.get<f64>("TriggerHeat"));
   kTriggerHoldS = static_cast<f32>(g_military.get<f64>("TriggerHoldS"));
   kTriggerExtremeHeat = static_cast<f32>(g_military.get<f64>("TriggerExtremeHeat"));
@@ -264,10 +264,10 @@ Arms arms_of(u32 seed) {
 }
 
 // ---------------------------------------------------------------- "Zombies"
-bool bind_zombies(kern::logic::Instance* blueprint) {
-  g_zombies.running = blueprint;
+bool bind_zombies(kern::logic::Runtime& logic) {
+  const bool runs = g_zombies.bind(logic);
   kZombieCap = kZombieHit = kZombieMelee = kZombieMeleeS = kZombieSpawnMin = kZombieSpawnMax = kZombieHitPts = kZombieKillPts = 0;
-  if (!blueprint) return false;
+  if (!runs) return false;
   kZombieCap = static_cast<i32>(g_zombies.get<f64>("ZombieCap"));
   kZombieHit = static_cast<f32>(g_zombies.get<f64>("ZombieHit"));
   kZombieMelee = static_cast<f32>(g_zombies.get<f64>("ZombieMelee"));
@@ -326,13 +326,13 @@ f32 ZombieRounds::speed(f32 r_fast, f32 r_speed) const {
 }
 
 // ---------------------------------------------------------------- "Sandbox"
-bool bind_sandbox(kern::logic::Instance* blueprint) {
-  g_sandbox.running = blueprint;
+bool bind_sandbox(kern::logic::Runtime& logic) {
+  const bool runs = g_sandbox.bind(logic);
   g_enemies.clear();
   kEnemySpawnS = static_cast<f32>(g_sandbox.get<f64>("EnemySpawnS"));
   kComboS = static_cast<f32>(g_sandbox.get<f64>("ComboS"));
   g_enemy_rows = g_sandbox.get<std::vector<EnemyRow>>("Enemies");
-  if (g_enemy_rows.size() < 3) {  // (a row for each EnemyType)
+  if (!runs || g_enemy_rows.size() < 3) {  // (a row for each EnemyType)
     g_enemy_rows.clear();
     return false;
   }
@@ -389,15 +389,15 @@ void Chaos::tick(f32 dt, f32 now) {
 }
 
 // ---------------------------------------------------------------- "Fun"
-bool bind_fun(kern::logic::Instance* blueprint) {
-  g_fun.running = blueprint;
+bool bind_fun(kern::logic::Runtime& logic) {
+  const bool runs = g_fun.bind(logic);
   g_contracts.clear();
   kContracts = 0;
   kFunComboS = static_cast<f32>(g_fun.get<f64>("FunComboS"));
   kOverdriveS = static_cast<f32>(g_fun.get<f64>("OverdriveS"));
   kMomentumTarget = static_cast<i32>(g_fun.get<f64>("MomentumTarget"));
   g_contract_rows = g_fun.get<std::vector<ContractRow>>("Contracts");
-  if (g_contract_rows.empty()) return false;
+  if (!runs || g_contract_rows.empty()) return false;
   for (const ContractRow& c : g_contract_rows) g_contracts.push_back({c.id, c.name, c.hint, c.target, c.reward});
   kContracts = static_cast<i32>(g_contracts.size());
   return true;
@@ -456,15 +456,15 @@ f32 Fun::police_damage_scale() const {
 }
 
 // ---------------------------------------------------------------- "Race"
-bool bind_race(kern::logic::Instance* blueprint) {
-  g_race.running = blueprint;
+bool bind_race(kern::logic::Runtime& logic) {
+  const bool runs = g_race.bind(logic);
   g_gate_rows.clear();
   g_gates.clear();
   kGates = 0;
   kRaceLaps = static_cast<i32>(g_race.get<f64>("RaceLaps"));
   kCourseScale = static_cast<f32>(g_race.get<f64>("CourseScale"));
   const i32 n = static_cast<i32>(g_race.get<std::vector<GateRow>>("Gates").size());
-  if (n < 2) return false;
+  if (!runs || n < 2) return false;
   for (i32 i = 0; i < n; ++i) {  // (each gate as it stands in the world: the Blueprint's GateAt)
     GateRow g;
     g_race.call("GateAt", std::tie(g), i);

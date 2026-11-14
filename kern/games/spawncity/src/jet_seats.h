@@ -18,10 +18,10 @@
 
 namespace sc::seats {
 
-/// The running Blueprint of the actor "JetSeats" (the game binds it once its world has started;
-/// tests bind the one they run). Unbound, no seat is given and nothing changes.
-void bind(kern::logic::Instance* blueprint);
-kern::logic::Instance* blueprint();
+/// Binds the rules to the logic the level's Blueprints run in (the game once its world has started,
+/// tests the one they run): the Blueprint of the actor "JetSeats" is found by its name at every call.
+/// True: the actor has a Blueprint that runs there. Unbound, no seat is given and nothing changes.
+bool bind(kern::logic::Runtime& logic);
 
 constexpr u8 kNone = 253;  // no player (the host is slot 255, net::kNobody 254)
 enum class Seat : u8 { pilot = 0, passenger = 1 };

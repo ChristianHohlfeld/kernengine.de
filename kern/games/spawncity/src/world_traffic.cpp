@@ -171,16 +171,17 @@ void TrafficRules::near(Vec2 p, f32 r, std::vector<i32>& out) const {
     }
 }
 
-void TrafficRules::bind(kern::logic::Instance* blueprint) {
-  g_rules.running = blueprint;
+bool TrafficRules::bind(kern::logic::Runtime& logic) {
+  const bool runs = g_rules.bind(logic);
   g_laws = Laws{};
-  if (!blueprint) return;
+  if (!runs) return false;
   g_laws.ahead_min = static_cast<f32>(g_rules.get<f64>("AheadMinM"));
   g_laws.ahead_max = static_cast<f32>(g_rules.get<f64>("AheadMaxM"));
   g_laws.stop_line = static_cast<f32>(g_rules.get<f64>("StopLineM"));
   g_laws.first_come = static_cast<f32>(g_rules.get<f64>("FirstComeM"));
   g_laws.claim_s = static_cast<f32>(g_rules.get<f64>("ClaimS"));
   g_laws.patience_s = static_cast<f32>(g_rules.get<f64>("PatienceS"));
+  return true;
 }
 
 i32 TrafficRules::light(const Junction& j, Vec2 heading, f32 now) const {

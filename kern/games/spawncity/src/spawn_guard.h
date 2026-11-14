@@ -16,10 +16,10 @@
 
 namespace sc::spawn {
 
-/// The running Blueprint of the actor "SpawnGuard" (the game binds it once its world has started;
-/// tests bind the one they run). Unbound, nothing may spawn and nothing overlaps.
-void bind(kern::logic::Instance* blueprint);
-kern::logic::Instance* blueprint();
+/// Binds the rules to the logic the level's Blueprints run in (the game once its world has started,
+/// tests the one they run): the Blueprint of the actor "SpawnGuard" is found by its name at every call.
+/// True: the actor has a Blueprint that runs there. Unbound, nothing may spawn and nothing overlaps.
+bool bind(kern::logic::Runtime& logic);
 
 /// The Blueprint's variable DefaultFar.
 f32 default_far();

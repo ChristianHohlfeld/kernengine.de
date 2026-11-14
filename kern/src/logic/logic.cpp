@@ -2994,10 +2994,22 @@ void Runtime::clear() {
 
 Value Runtime::get_on(const Instance& caller, std::string_view name, ActorRef target, const TypeRef& type) {
   const Graph& g = caller.graph();
+  Value v;
+  if (!get_on(target, name, type.type, v)) return zero_of(type, g);
+  return from_outside(v, type, g);
+}
+
+bool Runtime::get_on(ActorRef target, std::string_view name, PinType as, Value& out) {
   Instance* from = find(target);
   const Variable* v = from ? from->graph().variable(std::string(name)) : nullptr;
-  if (!v || !fits(TypeRef{v->type, v->of}, TypeRef{type.type, type.of})) return zero_of(type, g);
-  return from_outside(from->get(name), type, g);
+  if (!v || !convertible(v->type, as)) return false;
+  out = from->get(name);
+  return true;
+}
+
+bool Runtime::has_blueprint(ActorRef target) {
+  const Instance* i = find(target);
+  return i && !i->disabled_;
 }
 
 void Runtime::call_on(Instance& caller, std::string_view function, ActorRef target, const std::vector<Value>& args, std::vector<Value>& results) {
@@ -3006,11 +3018,19 @@ void Runtime::call_on(Instance& caller, std::string_view function, ActorRef targ
   const Function* declared = g.function(function);
   if (declared)
     for (const FunctionPin& p : declared->outputs) results.push_back(Value::from_json(p.value, logic::declared(p), g));
+  std::vector<Value> got;
+  if (!call_on(target, declared && !declared->remote.empty() ? std::string_view(declared->remote) : function, args, got, caller.name()) || !declared) return;
+  for (std::size_t k = 0; k < results.size() && k < got.size(); ++k)
+    results[k] = from_outside(got[k], logic::declared(declared->outputs[k]), g);
+}
+
+bool Runtime::call_on(ActorRef target, std::string_view function, const std::vector<Value>& args, std::vector<Value>& got, std::string_view caller) {
+  got.clear();
   Instance* to = find(target);
-  if (!to || to->disabled_) return;
+  if (!to || to->disabled_) return false;
   if (depth_ >= 64) {
-    host_.error(caller.name() + ": calls on other Blueprints nest more than 64 deep - the call of " + std::string(function) + " is left out");
-    return;
+    host_.error(std::string(caller) + ": calls on other Blueprints nest more than 64 deep - the call of " + std::string(function) + " is left out");
+    return false;
   }
   // (a Blueprint in the middle of a call of that function: the interpreter and the JIT hold a
   // call's values in the instance - the call that is interrupted has its own back afterwards,
@@ -3018,12 +3038,10 @@ void Runtime::call_on(Instance& caller, std::string_view function, ActorRef targ
   const bool at_work = !to->blueprint_ && to->active_ > 0;
   Instance::Held held;
   if (at_work) held = to->held_calls();
-  std::vector<Value> got;
-  const bool known = to->call(declared && !declared->remote.empty() ? std::string_view(declared->remote) : function, args, got);
+  const bool known = to->call(function, args, got);
   if (at_work) to->set_held_calls(std::move(held));
-  if (!known || !declared) return;
-  for (std::size_t k = 0; k < results.size() && k < got.size(); ++k)
-    results[k] = from_outside(got[k], logic::declared(declared->outputs[k]), g);
+  if (!known) got.clear();
+  return known;
 }
 
 Instance* Runtime::find(ActorRef self) {
