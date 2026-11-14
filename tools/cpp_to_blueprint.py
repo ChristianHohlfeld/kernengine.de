@@ -1604,6 +1604,9 @@ def callee_name(n):
 
 # ---- a function's body -------------------------------------------------------------------------------
 CAST = ("ImplicitCastExpr", "CXXStaticCastExpr", "CStyleCastExpr", "CXXFunctionalCastExpr")
+# (The language has no step that puts a list in an order: a loop of Blueprint steps would cost more than the
+# library's sort - and of entries the order says are equal, std::sort leaves their order to the library.)
+ORDER_WAIT = "algorithm: std::{} (a list put in an order: the language has no step for it)"
 COMPARE = ("<", "<=", ">", ">=", "==", "!=")
 
 
@@ -2551,6 +2554,8 @@ class Emit:
                 t = self.tp(a)
                 tmp = self.temp("swapped", t)
                 return [f"{tmp} = {self.ex(a, t)};"] + self.store(a, lambda want: self.ex(b, want)) + self.store(b, self.typed(tmp, t))
+            if name in ("sort", "stable_sort") and not self.own(ref.get("id")):
+                raise Wait(ORDER_WAIT.format(name))
             raise Wait(f"call: {name}()")
         if k == "CXXMemberCallExpr":
             m = callee(n)
@@ -2929,7 +2934,7 @@ class Emit:
                 return kids(callee(x))[0]
         if k == "CXXOperatorCallExpr" and callee_name(b) in ("operator+", "operator-", "operator++", "operator--", "operator+=", "operator-=") and len(kids(b)) >= 2:
             return self.home(kids(b)[1])
-        if k == "CallExpr" and callee_name(b) in ("find", "next", "prev", "lower_bound", "upper_bound", "max_element", "min_element") and len(kids(b)) >= 2:
+        if k == "CallExpr" and callee_name(b) in ("find", "find_if", "find_if_not", "next", "prev", "lower_bound", "upper_bound", "max_element", "min_element") and len(kids(b)) >= 2:
             return self.home(kids(b)[1])
         raise Wait("an iterator whose list is not known where it is used")
 
@@ -3212,6 +3217,151 @@ class Emit:
             n, fill = self.temp("count", "Int"), self.temp("fill", it)
             return [f"{n} = {self.ex(args[0], 'Int')};", f"{fill} = {self.ex(args[1], it)};", f"list_clear({lv});", f"list_resize({lv}, {n}, {fill});"]
         raise Wait(f"list: {name}()")
+
+    # ---- algorithms over a range of a list (<algorithm>): a loop over its places ----
+    def range_of(self, name, first, last):
+        """The range first..last of an algorithm - two iterators into one list: (the list, its type, the
+        place of first, the place of last). The list is a place of the function that is named without
+        steps of its own: every pass reads its entries where they stand."""
+        (l0, a), (l1, b) = self.place(first), self.place(last)
+        if not self.same_list(l0, l1):
+            raise Wait(f"algorithm: std::{name} between two lists")
+        lt = self.tp(l0)
+        pre, got = self.lazily(lambda: self.spot(l0))
+        if got is None or pre or not lt.startswith("List<"):
+            raise Wait(f"algorithm: std::{name} in a list that is no place of the function")
+        return l0, lt, a, b
+
+    def entry_cpp(self, lst):
+        """The C++ type of a list's entries (std::vector<T>, std::array<T, N>, T[N]: T)."""
+        c = self.ctype(lst)
+        if c.startswith(("std::vector<", "std::array<")):
+            return template_args(c)[0]
+        m = re.match(r"(.+?)\s*\[\d*\]$", c)
+        if m:
+            return m.group(1)
+        raise Wait(f"the entries of {c.split('<')[0]}")
+
+    def at_place(self, lst, at, it):
+        """The entry of a list at the place `at` (a variable), as an expression of the C++ type the entries have."""
+        e = self.entry(lst, at, it)
+        e["type"] = {"qualType": self.entry_cpp(lst)}
+        return e
+
+    def named(self, name, t, cpp):
+        """A variable of the function's own making as an expression - a place, like one the C++ declares."""
+        i = f"_named:{name}"
+        self.names[i], self.types[i] = name, t
+        return {"kind": "DeclRefExpr", "referencedDecl": {"id": i, "kind": "VarDecl", "name": name}, "type": {"qualType": cpp}}
+
+    def held_once(self, n, t):
+        """A value an algorithm reads on every pass, as C++ binds it once (const T&): the place it is, when
+        it is one that is named without steps; else a variable that holds it."""
+        pre, got = self.lazily(lambda: self.spot(n))
+        if got is not None and not pre and got[1] == t:
+            return n
+        held = self.temp("value", t)
+        self.hoist([f"{held} = {self.ex(n, t)};"])
+        return self.named(held, t, self.ctype(n))
+
+    def function_value(self, name, fn):
+        """The function an algorithm is given - a lambda written there, or a local function (`auto f =
+        [&](...) {...};`): (the Blueprint function, what it is called with before its own inputs, the steps
+        its declaration needs: what it captures by value)."""
+        lam, lines = self.lambda_of(fn), []
+        if lam is None:
+            b = self.unwrap(fn)
+            while b.get("kind") in ("CXXConstructExpr", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr") and len(kids(b)) == 1:
+                b = self.unwrap(kids(b)[0])
+            d = self.tree.decl.get(b.get("referencedDecl", {}).get("id")) if b.get("kind") == "DeclRefExpr" else None
+            lam = self.lambda_of(kids(d)[-1]) if d is not None and d.get("init") and kids(d) else None
+            if lam is None:
+                raise Wait(f"algorithm: std::{name} with a function value that is no lambda")
+        else:
+            lines = self.local_function({"name": "match"}, lam)
+        rec = next((c for c in kids(lam) if c.get("kind") == "CXXRecordDecl"), {})
+        method = next((c for c in kids(rec) if c.get("kind") == "CXXMethodDecl" and c.get("name") == "operator()"), {})
+        info = self.u.lambdas.get(method.get("id"))
+        if info is None:
+            raise Wait(f"algorithm: std::{name} with a function value of another shape")
+        return self.u.function(method["id"]), info["args"], lines
+
+    def is_less(self, x, y, cpp, cmp=None):
+        """x < y as the algorithm compares two entries: with the function it is given (`cmp`: function,
+        what it is called with first), else with C++'s < of numbers."""
+        if cmp is not None:
+            got = self.invoke(cmp[0], cmp[1] + [x, y])
+            if got[1] != "Bool":
+                raise Wait("an order that gives no Bool")
+            return got[0]
+        if self.tp(x) not in ("Int", "Float") and not self.is64(x):
+            raise Wait(f"the order of {self.tp(x)} (an algorithm without its own)")
+        return self.bx({"kind": "BinaryOperator", "opcode": "<", "type": {"qualType": "bool"}, "inner": [x, y]})
+
+    def is_equal(self, x, y, it, cpp):
+        """x == y as std::find compares an entry with its value: C++'s == of the type."""
+        if it == "Text":
+            return f"text_equal({self.ex(x, 'Text')}, {self.ex(y, 'Text')})"
+        q = self.u.find_type(cpp)
+        if q in self.tree.records:
+            # (a struct's == is the program's own: its method, or a function of two of it)
+            op = next((c["id"] for c in kids(self.tree.records[q]) if c.get("kind") == "CXXMethodDecl" and c.get("name") == "operator==" and c.get("id") in self.tree.body), None)
+            if op is None:
+                raise Wait("algorithm: std::find of a struct without an == of the program's")
+            got = self.invoke(self.u.function(op), [y], obj=x)
+            return got[0]
+        if it not in ("Int", "Float", "Bool") and it not in self.u.enum_values and not self.is64(x):
+            raise Wait(f"algorithm: std::find of a {it}")
+        return self.bx({"kind": "BinaryOperator", "opcode": "==", "type": {"qualType": "bool"}, "inner": [x, y]})
+
+    def first_match(self, name, a):
+        """std::find(first, last, x) / std::find_if(first, last, f) / std::find_if_not: the place of the first
+        entry from first on that is x / that f holds for / does not - last when there is none, as C++ gives
+        it. The entries are read where they stand, from first on, and f runs for each until one matches -
+        as often as in C++, in the same order."""
+        l0, lt, first, last = self.range_of(name, a[0], a[1])
+        it = lt[5:-1]
+        cpp = self.entry_cpp(l0)
+        lines = []
+        if name == "find":
+            if self.u.clean(self.ctype(a[2])) != self.u.clean(cpp) or self.tp(a[2]) != it:
+                raise Wait("algorithm: std::find of a value of another type")
+            x = self.held_once(a[2], it)
+        else:
+            g, given, lines = self.function_value(name, a[2])
+        at, end, go = self.temp("at", "Int"), self.temp("end", "Int"), self.temp("go", "Bool")
+        entry = self.at_place(l0, at, it)
+        def test():
+            if name == "find":
+                return self.is_equal(entry, x, it, cpp)
+            got = self.invoke(g, given + [entry])
+            if got[1] != "Bool":
+                raise Wait(f"algorithm: std::{name} with a function that gives no Bool")
+            return got[0] if name == "find_if" else f"logic_not({got[0]})"
+        pre, hit = self.lazily(test)
+        more = f'math_compare<"<">(kern::to<Float>({at}), kern::to<Float>({end}))'
+        self.hoist(lines + [f"{at} = {first};", f"{end} = {last};", f"{go} = {more};", f"while (loop({go})) {{", *["  " + ln for ln in pre],
+                            f"  if ({hit}) {{", f"    {go} = false;", "  } else {", f"    {at} += 1;", f"    {go} = {more};", "  }", "}"])
+        return at
+
+    def extreme(self, name, a):
+        """std::min_element / std::max_element(first, last[, less]): the place of the first smallest / first
+        largest entry - last when the range is empty. As C++ goes: every entry after the first is compared
+        with the best so far (min: entry < best; max: best < entry), in their order."""
+        l0, lt, first, last = self.range_of(name, a[0], a[1])
+        it = lt[5:-1]
+        cpp = self.entry_cpp(l0)
+        lines, cmp = [], None
+        if len(a) == 3:
+            g, given, lines = self.function_value(name, a[2])
+            cmp = (g, given)
+        best, at, end = self.temp("best", "Int"), self.temp("at", "Int"), self.temp("end", "Int")
+        x, y = self.at_place(l0, at, it), self.at_place(l0, best, it)
+        pre, better = self.lazily(lambda: self.is_less(x, y, cpp, cmp) if name == "min_element" else self.is_less(y, x, cpp, cmp))
+        more = f'math_compare<"<">(kern::to<Float>({at}), kern::to<Float>({end}))'
+        self.hoist(lines + [f"{best} = {first};", f"{end} = {last};", f"{at} = {self.whole_math('+', best, '1')};", f"while (loop({more})) {{", *["  " + ln for ln in pre],
+                            f"  if ({better}) {{", f"    {best} = {at};", "  }", f"  {at} += 1;", "}"])
+        return best
 
     def whole_list(self, first, last):
         """Are these two places the begin and the end of one list - begin()/end(), cbegin()/cend(),
@@ -4424,6 +4574,12 @@ class Emit:
                 return f"struct_make<{t}>({self.ex(a[0], fields[0][1])}, {self.ex(a[1], fields[1][1])})", t
             if name in ("snprintf", "printf", "sprintf", "to_string", "strtod", "atof", "atoi", "strcmp", "strlen", "strncmp", "strchr", "strstr"):
                 raise Wait("text formatting and parsing (snprintf, to_string, atof ...)")
+            if name in ("find", "find_if", "find_if_not") and len(a) == 3 and self.is_iter(b):
+                return self.first_match(name, a), "Int"
+            if name in ("min_element", "max_element") and len(a) in (2, 3) and self.is_iter(b):
+                return self.extreme(name, a), "Int"
+            if name in ("sort", "stable_sort"):
+                raise Wait(ORDER_WAIT.format(name))
             if name in ("sort", "stable_sort", "remove_if", "find", "find_if", "unique", "any_of", "all_of", "count_if", "swap", "fill", "reverse", "accumulate", "lower_bound", "upper_bound"):
                 raise Wait(f"algorithm: std::{name}")
             if name in ("memcpy", "memset", "memcmp"):
