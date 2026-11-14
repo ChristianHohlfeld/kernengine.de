@@ -991,6 +991,7 @@ class Unit:
         for q in list(tree.records) + list(tree.enums):
             self.short[q.split("::")[-1]].append(q)
         self.local_scope = ""       # the scope of the types the function being written declares in its body (Tree.take_locals)
+        self.lookup_scope = None    # the namespace or class the declaration being read stands in: where its names are looked up (find_type)
 
     # ---- names ----
     def fresh(self, want, taken=None, among=None):
@@ -1067,6 +1068,13 @@ class Unit:
             return cands[0]
         if len(cands) > 1:
             best = [q for q in cands if q == t or q.endswith("::" + t) or t.endswith("::" + q)]
+            # (a name as C++ looks it up from where it is written: the innermost namespace or class around the
+            # declaration being read that has it)
+            if len(best) > 1 and self.lookup_scope is not None:
+                seen = [q for q in best if q.endswith("::" + t) and self.lookup_scope.startswith(q[: len(q) - len(t)])]
+                if seen:
+                    deepest = max(len(q) for q in seen)
+                    best = [q for q in seen if len(q) == deepest]
             if best:
                 longest = max(len(q) for q in best)
                 best = [q for q in best if len(q) == longest]
@@ -1699,10 +1707,12 @@ class Unit:
             if d["id"] in getattr(self, "barred", {}):
                 raise Wait(self.barred[d["id"]])
             outer, self.local_scope = self.local_scope, self.tree.local_scope(d)
+            looked, self.lookup_scope = self.lookup_scope, self.tree.scope_of.get(d["id"])
             try:
                 Emit(self, f).run()
             finally:
                 self.local_scope = outer
+                self.lookup_scope = looked
             # (what calls a function on the Blueprint of an actor of the level: its test runs that Blueprint - the
             # source calls it as the program binds it, the Blueprint calls it on that actor; TestWriter)
             self.order.append(f)
@@ -1754,12 +1764,16 @@ class Unit:
                 # the types it takes and gives are this Blueprint's too now: as this file's compiler sees them
                 # (they are the same types - a type is converted the same wherever it is seen)
                 seen = []
-                if f.self_type is not None:
-                    mine = self.struct(self.tree.owner.get(d["id"]))
-                    seen += [mine] if not f.ctor else []
-                seen += [t for x in kids(d) if x.get("kind") == "ParmVarDecl" for t in self.param_types(x)]
-                if f.value is not None:
-                    seen.append(self.btype(qtype(d).split("(")[0].strip()))
+                looked, self.lookup_scope = self.lookup_scope, self.tree.scope_of.get(d["id"])
+                try:
+                    if f.self_type is not None:
+                        mine = self.struct(self.tree.owner.get(d["id"]))
+                        seen += [mine] if not f.ctor else []
+                    seen += [t for x in kids(d) if x.get("kind") == "ParmVarDecl" for t in self.param_types(x)]
+                    if f.value is not None:
+                        seen.append(self.btype(qtype(d).split("(")[0].strip()))
+                finally:
+                    self.lookup_scope = looked
                 told = [t for _, t in f.params] + ([f.value] if f.value is not None else [])
                 if seen != told:
                     raise SystemExit(f"{self.name}: {f.cpp}() of {f.unit} takes and gives {told} there and {seen} here")
