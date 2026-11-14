@@ -463,6 +463,18 @@ inline const std::vector<Case>& cases() {
           {"name":"Mul","pure":true,"inputs":[{"name":"a","type":"struct","of":"Mat","ref":"const","value":{"m":[1,0,0,1],"Name":"m"}},{"name":"b","type":"struct","of":"Mat","ref":"const","value":{"m":[1,0,0,1],"Name":"m"}}],"outputs":[{"name":"out","type":"struct","of":"Mat","value":{"m":[1,0,0,1],"Name":"m"}}],"locals":[{"name":"R","type":"struct","of":"Mat","value":{"m":[1,0,0,1],"Name":"m"}}]},
           {"name":"Scaled","inputs":[{"name":"v","type":"float_list","count":3,"value":[1,1,1]},{"name":"by","type":"float","value":2}],"outputs":[{"name":"v","type":"float_list","count":3,"value":[]}],"locals":[{"name":"Made","type":"float_list","count":3,"value":[]}]},
           {"name":"Bump","inputs":[{"name":"axis","type":"float_list","count":3,"ref":true,"value":[]},{"name":"by","type":"float","value":1}],"outputs":[]}]})"},
+      // Format Text: a format as printf has it with Int, Float and Text values - widths, precision,
+      // %x %c %%, the Most input cutting what it gives (snprintf's size).
+      {"text_format",
+       R"({"variables":[{"name":"Shown","type":"text","value":""},{"name":"Time","type":"float","value":0}],"nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},
+          {"id":2,"type":"func.entry","params":{"function":"Clock"}},{"id":3,"type":"func.return","params":{"function":"Clock"}},
+          {"id":4,"type":"text.format","params":{"format":"%02d:%06.3f"},"values":{"most":-1}},{"id":5,"type":"var.set","params":{"variable":"Shown"}},
+          {"id":6,"type":"text.append"},{"id":7,"type":"func.pure","params":{"function":"Clock"}},
+          {"id":8,"type":"text.format","params":{"format":"|%s|%5.1f|%x|%c|100%%"},"values":{"most":-1,"v3":65}},
+          {"id":9,"type":"text.format","params":{"format":"%s"},"values":{"most":3,"v0":"abcdef"}}],"links":[[1,"text",8,"v0"],[1,"then",5,"exec"],[1,"value",7,"m"],
+          [1,"value",7,"s"],[1,"value",8,"v1"],[1,"value",8,"v2"],[2,"m",4,"v0"],[2,"s",4,"v1"],[2,"then",3,"exec"],[4,"result",3,"out"],[6,"result",5,"value"],[7,"out",6,"a"],
+          [8,"result",6,"b"],[9,"result",6,"c"]],"functions":[
+          {"name":"Clock","pure":true,"inputs":[{"name":"m","type":"int","value":0},{"name":"s","type":"float","value":0}],"outputs":[{"name":"out","type":"text","value":""}]}]})"},
       // Lists in one go: Set Length cuts and fills (a list of numbers, of booleans, of structs;
       // less than 0), Append and Insert List put a whole list in - at the start, in the middle,
       // past the end, a list into itself -, Reserve changes nothing one can read.

@@ -672,6 +672,27 @@ ein Literal auch (es wird referenziert). Ein Puffer, in den geschrieben wird (`c
 abgelehnt – seine Zeichen gehören in einen `std::string`. Gelesen wird ein `Text` als
 `std::string_view` (`text.view()`), als eigener `std::string` mit `text.str()`.
 
+### Text formatieren
+
+**Format Text** (`text.format`) macht einen Text aus einem Format, wie es `printf` in C hat, und den
+Werten seiner Umwandlungen – Zeichen für Zeichen, was `snprintf` gibt:
+
+```cpp
+Text Zeit = text_format<"%02d:%06.3f">(-1, minuten, sekunden);   // "03:07.250"
+Text Kurz = text_format<"%s">(3, name);                          // höchstens 3 Bytes, wie snprintf mit Größe 4
+```
+
+- Das Format ist die Einstellung; seine Umwandlungen bestimmen die Eingänge, in ihrer Reihenfolge:
+  `%d %i %u %x %X %o %c` nehmen ein Int, `%f %F %e %E %g %G` ein Float, `%s` einen Text, `%%` ist ein
+  Prozentzeichen. Flags `- + Leerzeichen 0 #`, Breite und Genauigkeit als Zahlen (bis 512); `*`
+  gibt es nicht. Breiten der ganzen Zahlen wie in C: `hh` 8, `h` 16, ohne 32, `l ll j z t` 64 Bit.
+- Der erste Eingang **Most**: höchstens so viele Bytes (das `size - 1` von `snprintf`); kleiner als
+  0: alles.
+- Zahlen werden exakt gerundet (`std::to_chars`, die Rundung von `printf`: die nächste Dezimalzahl
+  zum binären Wert, bei Gleichstand gerade) – auf jeder Maschine derselbe Text. (Einzige bekannte
+  Abweichung von glibc: `%#g`, wo glibc gegen den C-Standard eine Null zu wenig schreibt.)
+- Ein Format, das der Knoten nicht kennt, ist ein Fehler des Graphen, mit Grund.
+
 ### Referenz-Eingänge
 
 Ein Eingang einer Funktion ist ein **Wert** – der Wert, den er beim Aufruf hatte – oder eine

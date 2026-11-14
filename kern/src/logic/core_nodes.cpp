@@ -1239,6 +1239,48 @@ void add_math(Library& lib) {
   lib.add(pure("text.equal", "Text Equals", "Text", {data("a", "A", K::text, ""), data("b", "B", K::text, "")}, boolean, of(&P::text_equal)));
   lib.add(pure("text.contains", "Contains", "Text", {data("a", "Text", K::text, ""), data("b", "Search", K::text, "")}, boolean, of(&P::text_contains)));
   lib.add(pure("text.length", "Text Length", "Text", {data("a", "Text", K::text, "")}, integer, of(&P::text_length)));
+  {
+    // Format Text: a format as printf has it, and a value for each of its conversions (nodes.h, format)
+    NodeDef d = make("text.format", "Format Text", "Text", NodeKind::pure,
+                     "A text from a format as C's printf has it: %d %u %x %o %c take an Int, %f %e %g a Float, %s a Text; flags - + space 0 #, width and "
+                     "precision. Character for character what snprintf gives. Most: at most that many bytes of it (less than 0: all).");
+    d.params = {param("format", "Format", ParamDef::Kind::text, "%d")};
+    d.inputs = {data("most", "Most", K::integer, -1)};
+    d.outputs = {data("result", "", K::text)};
+    d.keywords = "format printf sprintf snprintf number to text string";
+    d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>&) {
+      std::vector<format::Arg::Kind> kinds;
+      format::kinds(n.param("format", "%d"), &kinds, nullptr);
+      for (std::size_t k = 0; k < kinds.size(); ++k) {
+        const PinType t = kinds[k] == format::Arg::Kind::number ? K::number : kinds[k] == format::Arg::Kind::text ? K::text : K::integer;
+        in.push_back(data("v" + std::to_string(k), std::to_string(k), t, t == K::text ? json::Value("") : json::Value(0.0)));
+      }
+    };
+    d.title = [](const NodeDef&, const Node& n) {
+      const std::string f = n.param("format", "%d");
+      return "Format \"" + (f.size() > 30 ? f.substr(0, 29) + "..." : f) + "\"";
+    };
+    d.problem = [](const Node& n, const Graph&) {
+      std::string why;
+      return format::kinds(n.param("format", "%d"), nullptr, &why) ? std::string() : "the format: " + why;
+    };
+    d.run = [](Context& c) {
+      const std::string fmt = c.param("format", "%d");
+      std::vector<format::Arg::Kind> kinds;
+      format::kinds(fmt, &kinds, nullptr);
+      std::vector<Value> held;  // (the texts the values are read from stay here while the text is made)
+      held.reserve(kinds.size());
+      std::vector<format::Arg> args;
+      for (std::size_t k = 0; k < kinds.size() && k + 1 < c.input_count(); ++k) {
+        held.push_back(kinds[k] == format::Arg::Kind::text ? Value::text(c.in(k + 1).as_text()) : c.in(k + 1));
+        const Value& v = held.back();
+        args.push_back(kinds[k] == format::Arg::Kind::number ? format::arg(v.as_number()) : kinds[k] == format::Arg::Kind::text ? format::arg(std::string_view(v.s)) : format::arg(v.as_int()));
+      }
+      c.out(std::size_t{0}, Value::text(format::text_of(fmt, args.data(), args.size(), c.in(std::size_t{0}).as_int())));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
   // Time.
   lib.add(pure("time.now", "Game Time", "Utilities", {}, data("result", "Seconds", K::number), [](Context& c) { return Value::number(c.host().time()); }, "Seconds since play started", "clock elapsed"));
   {

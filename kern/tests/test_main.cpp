@@ -2858,6 +2858,12 @@ TEST(logic_tier_cases_interpreter) {
       CHECK(inst->get("Gate").as_int() == 3);   // opened after the first 3 calls
       CHECK(inst->get("Flips").as_int() == 303);
     }
+    if (std::string(c.name) == "text_format") {
+      // the last Go: value 1, no text - as snprintf writes it ("%s" of three bytes at most: "abc")
+      char want[64];
+      std::snprintf(want, sizeof want, "%02d:%06.3f|%s|%5.1f|%x|%c|100%%%s", 1, 1.0, "", 1.0, 1, 65, "abc");
+      CHECK(inst->get("Shown").as_text() == want);
+    }
     if (std::string(c.name) == "while_nested") {
       CHECK(inst->get("I").as_int() == 7);
       CHECK(inst->get("Total").as_number() == 6.0 * (1 + 2 + 3 + 4 + 5 + 6 + 7));

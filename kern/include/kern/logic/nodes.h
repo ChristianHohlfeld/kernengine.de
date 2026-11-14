@@ -6,6 +6,7 @@
 #pragma once
 
 #include <array>
+#include <charconv>
 #include <cmath>
 #include <compare>
 #include <cstddef>
@@ -595,6 +596,263 @@ template <class T> void append(std::vector<T>& items, const std::vector<T>& more
 
 /// What the enum nodes do. An enum's values have names; a value is its place among them (the
 /// first is 0). The node library and a Blueprint's C++ call these.
+/// Format Text (text.format): a text made from a format as C's printf has it and values - character
+/// for character what snprintf gives in the C locale. The format says the conversions; each takes
+/// one value, of the type it names:
+///   %d %i            Int, as a signed number   (hh h: 8 / 16 bit, none: 32 bit, l ll j z t: 64 bit)
+///   %u %x %X %o      Int, as an unsigned one   (the same widths)
+///   %c               Int, the character of that code (8 bit)
+///   %f %F %e %E %g %G Float
+///   %s               Text
+///   %%               a % sign
+/// with the flags - + space 0 #, a width and a precision as numbers (not *). Numbers are written
+/// exactly rounded (std::to_chars, which is printf's rounding: the decimal nearest the binary
+/// value, ties to even) - the same text on every machine. `most`: at most that many bytes of it
+/// (snprintf's size - 1); less than 0: all of it.
+namespace format {
+/// A value a conversion takes.
+struct Arg {
+  enum class Kind : u8 { whole, number, text } kind = Kind::whole;
+  i64 i = 0;
+  f64 f = 0;
+  std::string_view s;
+};
+inline Arg arg(i64 v) { return {Arg::Kind::whole, v, 0, {}}; }
+inline Arg arg(Whole v) { return arg(static_cast<i64>(v)); }
+inline Arg arg(f64 v) { return {Arg::Kind::number, 0, v, {}}; }
+inline Arg arg(std::string_view v) { return {Arg::Kind::text, 0, 0, v}; }
+/// One conversion of a format.
+struct Spec {
+  bool left = false, plus = false, space = false, zero = false, alt = false;
+  int width = 0, precision = -1;  // (-1: none given)
+  int bits = 32;                  // of a whole number: 8, 16, 32 or 64
+  char conv = 0;
+};
+/// The longest precision and width a format may say (what a number can be written with in one piece).
+inline constexpr int kLongest = 512;
+/// The type of value a conversion takes.
+inline Arg::Kind kind_of(char conv) {
+  switch (conv) {
+    case 'f': case 'F': case 'e': case 'E': case 'g': case 'G': return Arg::Kind::number;
+    case 's': return Arg::Kind::text;
+    default: return Arg::Kind::whole;
+  }
+}
+/// Reads the conversion at fmt[at] (just after its %). False: it is none this format knows - `why` says.
+inline bool read_spec(std::string_view fmt, std::size_t& at, Spec& sp, std::string* why) {
+  auto fail = [&](const char* w) {
+    if (why) *why = w;
+    return false;
+  };
+  for (; at < fmt.size(); ++at) {
+    const char c = fmt[at];
+    if (c == '-') sp.left = true;
+    else if (c == '+') sp.plus = true;
+    else if (c == ' ') sp.space = true;
+    else if (c == '0') sp.zero = true;
+    else if (c == '#') sp.alt = true;
+    else break;
+  }
+  auto number = [&](int& out) {
+    out = 0;
+    while (at < fmt.size() && fmt[at] >= '0' && fmt[at] <= '9') {
+      out = out * 10 + (fmt[at++] - '0');
+      if (out > kLongest) return false;
+    }
+    return true;
+  };
+  if (at < fmt.size() && fmt[at] == '*') return fail("a width given by a value (*) is not supported: write the width out");
+  if (!number(sp.width)) return fail("a width of more than 512");
+  if (at < fmt.size() && fmt[at] == '.') {
+    ++at;
+    if (at < fmt.size() && fmt[at] == '*') return fail("a precision given by a value (.*) is not supported: write the precision out");
+    if (!number(sp.precision)) return fail("a precision of more than 512");
+  }
+  if (at < fmt.size() && fmt[at] == 'h') {
+    sp.bits = 16;
+    if (++at < fmt.size() && fmt[at] == 'h') sp.bits = 8, ++at;
+  } else if (at < fmt.size() && (fmt[at] == 'l' || fmt[at] == 'j' || fmt[at] == 'z' || fmt[at] == 't')) {
+    sp.bits = 64;
+    if (fmt[at] == 'l' && at + 1 < fmt.size() && fmt[at + 1] == 'l') ++at;
+    ++at;
+  }
+  if (at >= fmt.size()) return fail("the format ends inside a conversion (a % without its letter)");
+  sp.conv = fmt[at++];
+  switch (sp.conv) {
+    case 'd': case 'i': case 'u': case 'x': case 'X': case 'o': case 'c': case 's':
+    case 'f': case 'F': case 'e': case 'E': case 'g': case 'G': case '%': return true;
+    default: return fail("a conversion that is not supported (d i u x X o c s f F e E g G %)");
+  }
+}
+/// The types of the values a format takes, in their order. False: the format is none - `why` says.
+inline bool kinds(std::string_view fmt, std::vector<Arg::Kind>* out, std::string* why) {
+  for (std::size_t at = 0; at < fmt.size();) {
+    if (fmt[at++] != '%') continue;
+    Spec sp;
+    if (!read_spec(fmt, at, sp, why)) return false;
+    if (sp.conv != '%' && out) out->push_back(kind_of(sp.conv));
+  }
+  return true;
+}
+/// Where the characters go: counted only (to = nullptr), or written.
+struct Sink {
+  char* to = nullptr;
+  std::size_t at = 0;
+  void put(char c) {
+    if (to) to[at] = c;
+    ++at;
+  }
+  void put(std::string_view t) {
+    for (char c : t) put(c);
+  }
+  void fill(char c, int n) {
+    for (int k = 0; k < n; ++k) put(c);
+  }
+};
+/// Writes one conversion: its sign or prefix, its digits, padded to the width.
+inline void pad(Sink& out, const Spec& sp, std::string_view sign, std::string_view digits, bool zeros) {
+  const int len = static_cast<int>(sign.size() + digits.size());
+  const int room = sp.width > len ? sp.width - len : 0;
+  if (!sp.left && !zeros) out.fill(' ', room);
+  out.put(sign);
+  if (!sp.left && zeros) out.fill('0', room);
+  out.put(digits);
+  if (sp.left) out.fill(' ', room);
+}
+inline void put_whole(Sink& out, const Spec& sp, i64 v) {
+  const bool is_signed = sp.conv == 'd' || sp.conv == 'i';
+  u64 u = 0;
+  bool negative = false;
+  if (is_signed) {
+    const i64 x = sp.bits == 8 ? static_cast<i64>(static_cast<i8>(v)) : sp.bits == 16 ? static_cast<i64>(static_cast<i16>(v)) : sp.bits == 32 ? static_cast<i64>(static_cast<i32>(v)) : v;
+    negative = x < 0;
+    u = negative ? u64{0} - static_cast<u64>(x) : static_cast<u64>(x);
+  } else {
+    u = sp.bits == 8 ? static_cast<u64>(static_cast<u8>(v)) : sp.bits == 16 ? static_cast<u64>(static_cast<u16>(v)) : sp.bits == 32 ? static_cast<u64>(static_cast<u32>(v)) : static_cast<u64>(v);
+  }
+  const unsigned base = sp.conv == 'x' || sp.conv == 'X' ? 16 : sp.conv == 'o' ? 8 : 10;
+  const char* const digit_chars = sp.conv == 'X' ? "0123456789ABCDEF" : "0123456789abcdef";
+  char buf[kLongest + 32];
+  int n = 0;
+  for (u64 x = u; x; x /= base) buf[n++] = digit_chars[x % base];
+  const int least = sp.precision < 0 ? 1 : sp.precision;
+  while (n < least) buf[n++] = '0';  // (precision 0 and the value 0: no digit at all)
+  if (sp.alt && base == 8 && (n == 0 || buf[n - 1] != '0')) buf[n++] = '0';
+  char digits[kLongest + 32];
+  for (int k = 0; k < n; ++k) digits[k] = buf[n - 1 - k];
+  std::string_view sign;
+  if (is_signed) sign = negative ? "-" : sp.plus ? "+" : sp.space ? " " : "";
+  else if (sp.alt && base == 16 && u != 0) sign = sp.conv == 'X' ? "0X" : "0x";
+  pad(out, sp, sign, {digits, static_cast<std::size_t>(n)}, sp.zero && !sp.left && sp.precision < 0);
+}
+inline void put_number(Sink& out, const Spec& sp, f64 v) {
+  const bool upper = sp.conv == 'F' || sp.conv == 'E' || sp.conv == 'G';
+  const std::string_view sign = std::signbit(v) ? "-" : sp.plus ? "+" : sp.space ? " " : "";
+  const f64 a = std::fabs(v);
+  if (!std::isfinite(a)) {
+    pad(out, sp, sign, std::isnan(a) ? (upper ? "NAN" : "nan") : (upper ? "INF" : "inf"), false);
+    return;
+  }
+  const int p = sp.precision < 0 ? 6 : sp.precision;
+  char buf[kLongest + 400];
+  char* const end = buf + sizeof buf - 2;  // (room for a point put in afterwards)
+  std::to_chars_result r{};
+  char conv = static_cast<char>(sp.conv | 0x20);  // (lower case)
+  bool strip = false;
+  if (conv == 'g') {
+    // %g: %e or %f by the exponent the number has with p significant digits (C 7.21.6.1)
+    const int sig = p == 0 ? 1 : p;
+    char e[64];
+    const std::to_chars_result er = std::to_chars(e, e + sizeof e, a, std::chars_format::scientific, sig - 1);
+    const char* ep = e;
+    while (ep < er.ptr && *ep != 'e') ++ep;
+    int x = 0;
+    {
+      const char* q = ep + 1;
+      const bool minus = q < er.ptr && *q == '-';
+      if (q < er.ptr && (*q == '-' || *q == '+')) ++q;
+      for (; q < er.ptr; ++q) x = x * 10 + (*q - '0');
+      if (minus) x = -x;
+    }
+    if (sig > x && x >= -4) r = std::to_chars(buf, end, a, std::chars_format::fixed, sig - 1 - x), conv = 'f';
+    else r = std::to_chars(buf, end, a, std::chars_format::scientific, sig - 1), conv = 'e';
+    strip = !sp.alt;
+  } else {
+    r = std::to_chars(buf, end, a, conv == 'f' ? std::chars_format::fixed : std::chars_format::scientific, p);
+  }
+  char* last = r.ptr;
+  char* mark = buf;  // (where the exponent begins, or the end)
+  while (mark < last && *mark != 'e') ++mark;
+  std::size_t mant = static_cast<std::size_t>(mark - buf);
+  bool point = false;
+  for (std::size_t k = 0; k < mant; ++k) point = point || buf[k] == '.';
+  if (strip && point) {
+    std::size_t keep = mant;
+    while (keep > 0 && buf[keep - 1] == '0') --keep;
+    if (keep > 0 && buf[keep - 1] == '.') --keep;
+    for (char* q = mark; q < last; ++q) buf[keep + static_cast<std::size_t>(q - mark)] = *q;  // (the exponent moves up)
+    last = buf + keep + static_cast<std::size_t>(last - mark);
+    mark = buf + keep;
+    mant = keep;
+  } else if (sp.alt && !point) {
+    for (char* q = last; q > mark; --q) *q = q[-1];  // (# : the point stays, also without a digit after it)
+    *mark = '.';
+    ++last;
+  }
+  if (upper)
+    for (char* q = buf; q < last; ++q)
+      if (*q == 'e') *q = 'E';
+  pad(out, sp, sign, {buf, static_cast<std::size_t>(last - buf)}, sp.zero && !sp.left);
+}
+inline void put_text(Sink& out, const Spec& sp, std::string_view s) {
+  if (sp.precision >= 0 && static_cast<std::size_t>(sp.precision) < s.size()) s = s.substr(0, static_cast<std::size_t>(sp.precision));
+  pad(out, sp, {}, s, false);
+}
+/// The format with these values, into `out` (nullptr: only counted). How many bytes it has. A value a
+/// conversion does not have: the zero of its type; a value of another type: converted as a wire does.
+inline std::size_t write(char* to, std::string_view fmt, const Arg* args, std::size_t count) {
+  Sink out{to, 0};
+  std::size_t next = 0;
+  for (std::size_t at = 0; at < fmt.size();) {
+    const char c = fmt[at++];
+    if (c != '%') {
+      out.put(c);
+      continue;
+    }
+    Spec sp;
+    if (!read_spec(fmt, at, sp, nullptr)) break;  // (a format that is none: what stands before it - the check reports it)
+    if (sp.conv == '%') {
+      out.put('%');
+      continue;
+    }
+    const Arg a = next < count ? args[next] : Arg{kind_of(sp.conv), 0, 0, {}};
+    ++next;
+    switch (kind_of(sp.conv)) {
+      case Arg::Kind::number: put_number(out, sp, a.kind == Arg::Kind::number ? a.f : static_cast<f64>(a.i)); break;
+      case Arg::Kind::text: put_text(out, sp, a.s); break;
+      case Arg::Kind::whole:
+        if (sp.conv == 'c') {
+          const char ch = static_cast<char>(static_cast<u8>(a.kind == Arg::Kind::whole ? a.i : logic::whole(a.f)));
+          pad(out, sp, {}, {&ch, 1}, false);
+        } else {
+          put_whole(out, sp, a.kind == Arg::Kind::whole ? a.i : logic::whole(a.f));
+        }
+        break;
+    }
+  }
+  return out.at;
+}
+/// The text: counted, then written in one piece (one request for memory at most, as a std::string
+/// of that length makes).
+inline std::string text_of(std::string_view fmt, const Arg* args, std::size_t count, i64 most) {
+  std::size_t n = write(nullptr, fmt, args, count);
+  std::string r(n, '\0');
+  write(r.data(), fmt, args, count);
+  if (most >= 0 && static_cast<u64>(most) < n) r.resize(static_cast<std::size_t>(most));
+  return r;
+}
+}  // namespace format
+
 namespace enums {
 /// `index` when it is the place of one of `count` values, else 0 (the first value).
 constexpr i64 valid(std::size_t count, i64 index) { return index >= 0 && static_cast<u64>(index) < count ? index : 0; }

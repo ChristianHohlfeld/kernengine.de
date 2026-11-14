@@ -313,6 +313,15 @@ struct BlueprintCore : logic::PureNodes {
   static Bool text_equal(const Text& a, const Text& b) { return a == b; }
   static Bool text_contains(const Text& a, const Text& b) { return a.view().find(b.view()) != std::string_view::npos; }
   static Int text_length(const Text& a) { return static_cast<i64>(a.size()); }
+  /// Format Text: text_format<"%02d:%06.3f">(most, minutes, seconds) - the values in the order of
+  /// the format's conversions (logic::format).
+  template <Setting Format, class... V> static Text text_format(Int most, const V&... values) {
+    const logic::format::Arg args[] = {format_arg(values)..., logic::format::Arg{}};
+    return logic::format::text_of(Format.view(), args, sizeof...(V), most);
+  }
+  static logic::format::Arg format_arg(Int v) { return logic::format::arg(static_cast<i64>(v)); }
+  static logic::format::Arg format_arg(Float v) { return logic::format::arg(v); }
+  static logic::format::Arg format_arg(const Text& v) { return logic::format::arg(v.view()); }
 
   // ---- enums ----
   // An enum the Blueprint declares with KERN_ENUM; the nodes' setting "Enum" is the type:
