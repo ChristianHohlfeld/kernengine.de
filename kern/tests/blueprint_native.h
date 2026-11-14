@@ -1789,7 +1789,9 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
       std::size_t end = at;
       while (end < c.calls.size() && c.calls[end].function == c.calls[at].function) ++end;  // calls of one function in a row: one table
       const logic::Function& f = *c.graph.function(c.calls[at].function);
-      body += "  {\n    const struct {";
+      // (each table in a function of its own - a lambda: one function of a Blueprint with every node would be too
+      // much for one function of the compiler)
+      body += "  [&] {\n    const struct {";
       for (std::size_t i = 0; i < f.inputs.size(); ++i) body += " " + cpp_type(f.inputs[i].type, f.inputs[i].of, c.name) + " a" + std::to_string(i) + ";";
       body += " int row; } rows[] = {\n";
       for (std::size_t r = at; r < end; ++r) {
@@ -1827,7 +1829,7 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
       body += "}, results))) hosted += \"(no call) \";\n      hosted += " + shown + " + \") ->\"";
       for (std::size_t k = 0; k < f.outputs.size(); ++k)
         body += " + \" " + f.outputs[k].name + "=\" + native_show(results.size() > " + std::to_string(k) + " ? results[" + std::to_string(k) + "] : kern::logic::Value())";
-      body += changed_by_name + " + hosted_variables() + \"\\n\";\n    }\n  }\n";
+      body += changed_by_name + " + hosted_variables() + \"\\n\";\n    }\n  }();\n";
       at = end;
     }
     // The calls with values from outside: the class takes them as the engine gives them - each
@@ -1855,12 +1857,12 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
         }
         direct += std::string(i ? ", " : "") + (in.ref ? "p" + k : taken);
       }
-      body += "  {\n    const std::vector<kern::logic::Value> given = {" + given + "};\n" + places + "    " + (f.outputs.empty() ? "" : "const auto out = ") + direct + ");\n    got += " + shown + " + \") ->\"";
+      body += "  [&] {\n    const std::vector<kern::logic::Value> given = {" + given + "};\n" + places + "    " + (f.outputs.empty() ? "" : "const auto out = ") + direct + ");\n    got += " + shown + " + \") ->\"";
       for (const logic::FunctionPin& o : f.outputs) body += " + \" " + o.name + "=\" + show(out." + o.name + ")";
       body += changed + " + variables() + \"\\n\";\n    std::vector<kern::logic::Value> results;\n    if (!named(inst->call(\"" + f.name + "\", given, results))) hosted += \"(no call) \";\n    hosted += " + shown + " + \") ->\"";
       for (std::size_t k = 0; k < f.outputs.size(); ++k)
         body += " + \" " + f.outputs[k].name + "=\" + native_show(results.size() > " + std::to_string(k) + " ? results[" + std::to_string(k) + "] : kern::logic::Value())";
-      body += changed_by_name + " + hosted_variables() + \"\\n\";\n  }\n";
+      body += changed_by_name + " + hosted_variables() + \"\\n\";\n  }();\n";
     }
     runs += body + "}\n\n";
   }
