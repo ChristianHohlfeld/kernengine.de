@@ -196,6 +196,7 @@ KERN_LAYOUT(Demo) {
 | Typ des Projekts (mehrere Blueprints des Levels haben ihn, alle gleich) | `KERN_PROJECT_ENUM(Mode, Closed, Open);` · `KERN_PROJECT_STRUCT(Door) { Mode State = Mode::Closed; };` – sonst wie `KERN_ENUM` / `KERN_STRUCT` |
 | Funktion eines anderen Blueprints | `KERN_EXTERN FnResult Fn(Float x = 1.5);` – wie sie aussieht, ohne Rumpf (mit `struct FnResult { ... };` darüber, wenn sie Ausgänge hat) |
 | Call on Actor | `func_call_on<"Fn">(target, kern::out(n7.y), x);` – erst das Target (`Actor{0}`: der Blueprint des Levels), dann `kern::out(...)` mit allen Ausgängen in ihrer Reihenfolge als Felder des Members `n7` (oder `kern::out()`, wenn niemand sie liest), dann die Eingänge |
+| Get Variable on Actor | `func_get_on<"Speed", Float>(target)` – was die Variable des Namens im Blueprint von Target jetzt hält, als Wert des Typs der Einstellung (die Null des Typs, wo Target keine solche Variable dieses Typs hat); ein Wert-Knoten |
 | Function Entry | der Anfang des Funktionsrumpfs; seine Ausgänge sind die Parameter |
 | Lokale Variable einer Funktion | `Float Total = 0.0;` als erste Zeilen des Funktionsrumpfs – eine lokale Variable von C++; gelesen und gesetzt wie jede Variable (`Total`, `Total = x;`, `Total += x;`, `Hit.Damage = x;`, `list_add(n7, Seen, x);`) |
 | Platz (eine Variable, ein Feld davon, ein Eintrag einer Liste darin – beliebig tief) | wie C++ ihn schreibt: `Cars[i].Wheels[j].Slip` – die Einstellung „path“ des Knotens (`[].Wheels[].Slip`), jeder Index ein Eingang (siehe „Plätze“) |
@@ -1044,6 +1045,12 @@ Typs: Ist kein Blueprint gebunden oder hat er die Funktion nicht, gibt der Aufru
 Actor die erklärten Defaults gibt, und die Erklärung einer Funktion eines anderen Blueprints hat die
 Nullen. Die Werte werden vor den Ausgängen genommen: Ein Wert darf aus einem Platz kommen, in den ein
 Ausgang geht.
+
+Eine Funktion mit einem Ausgang ist dort auch ein Wert: `f64 s = rules.number("Speed", x);`,
+`bool seen = rules.flag("Seen", p);` – als Blueprint derselbe Call on Actor mit einem Ausgang. Eine
+Variable des Blueprints liest `rules.get<f64>("MaxSpeed")` – als Blueprint
+`func_get_on<"MaxSpeed", Float>(actor_find("Military"))` (Get Variable on Actor); wo kein Blueprint
+gebunden ist oder er die Variable nicht hat, ist es die Null des Typs.
 
 **Wie tief es geht.** Gezählt werden Events, die aus Handlern heraus Handler erreichen: höchstens
 64 ineinander, dann wird die Kette gestoppt und es wird gemeldet – in jeder Stufe beim selben
