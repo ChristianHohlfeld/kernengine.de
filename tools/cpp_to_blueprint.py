@@ -7,7 +7,14 @@ This tool reads such sources with the compiler's own parser (clang's syntax tree
 in the notation, function by function:
 
   tools/cpp_to_blueprint.py --convert <namespace> --level <level.klevel> [--folder <name>]
-      [--test <dir>] [--texts <dir>] <include flags...> -- <file.cpp>...
+      [--test <dir>] [--texts <dir>] [--program <folder>=<namespace>[,<namespace>...]]...
+      <include flags...> -- <file.cpp>...
+
+  - the program is the folders of the sources, in the namespace given - and the further folders named
+    with --program, each with the namespaces its files declare (vendored code the program includes:
+    --program firmware=fc,hwcontract). Their headers are the program's like the sources' own, each a
+    Blueprint; their types are named with their namespace (fc::V3 is fc_V3, as net::Session is
+    net_Session);
 
   - every header and every source file becomes the Blueprint of one actor of the level (terrain.h
     -> "terrain", terrain.cpp -> "terrain_cpp"): a library - a Blueprint that keeps nothing. Its
@@ -342,16 +349,26 @@ ENGINE = os.environ.get("KERN_ENGINE_NAMESPACE", "kern")
 
 
 class Tree:
-    """One source file as the compiler read it."""
+    """One source file as the compiler read it. `namespace` is the program's own namespace (its names are
+    the program's names, without it); `spaces` are further namespaces of the program - of folders that are
+    the program's too (World.spaces): their declarations are the program's, named with their namespace
+    (`fc::V3`, as `net::Session` is)."""
 
-    def __init__(self, path, namespace, flags):
+    def __init__(self, path, namespace, flags, spaces=()):
         self.path = os.path.abspath(path)
         self.namespace = namespace
+        self.spaces = tuple(s for s in spaces if s != namespace)
         flags = [*flags, "-include", W64_HEADER]
         self.dumps = run_clang(path, namespace, flags)
         st = {"file": ""}
         for o in self.dumps:
             annotate(o, st)
+        # (the further namespaces of the program, each dumped as the engine's is: by its own name)
+        self.more = [(space, run_clang(path, space, flags) if STEADY else []) for space in self.spaces]
+        for _, dumps in self.more:
+            st = {"file": ""}
+            for o in dumps:
+                annotate(o, st)
         # the engine the program is written against: its types and the functions its headers define
         self.engine = run_clang(path, ENGINE, flags) if STEADY and ENGINE and ENGINE != namespace else []
         st = {"file": ""}
@@ -379,6 +396,9 @@ class Tree:
         seen = set()
         for o in self.dumps:
             self.take(o, self.scope_from(o), seen)
+        for space, dumps in self.more:
+            for o in dumps:
+                self.take(o, space + "::", seen)
         for o in self.engine:
             self.take(o, ENGINE + "::", seen)
         for o in self.w64:
@@ -439,7 +459,7 @@ class Tree:
         declares constants, and no type anybody names. Where one is used, the tree has the number it is,
         of the enum's underlying type - as C++ converts it there. (`_unnamed`: the enum it is of; the
         source a test holds names it.)"""
-        for o in [*self.dumps, *self.engine]:
+        for o in [*self.dumps, *(o for _, dumps in self.more for o in dumps), *self.engine]:
             for n in walk(o):
                 if n.get("kind") != "DeclRefExpr" or (n.get("referencedDecl") or {}).get("kind") != "EnumConstantDecl":
                     continue
@@ -452,6 +472,18 @@ class Tree:
     def scope_from(self, o):
         """The scope a dumped declaration stands in: clang says it for those defined outside their class."""
         return ""
+
+    def program_space(self, q):
+        """The further namespace of the program a qualified name stands in (`fc::V3`: fc), or None."""
+        parts = q.lstrip(":").split("::")
+        return parts[0] if len(parts) > 1 and parts[0] in self.spaces else None
+
+    def absolute(self, q):
+        """A qualified name as C++ writes it from outside every namespace: a name of the engine or of a further
+        namespace of the program has its namespace in it already, one of the program's own namespace stands
+        in that."""
+        q = q.lstrip(":")
+        return "::" + q if q.startswith(ENGINE + "::") or self.program_space(q) else "::" + self.namespace + "::" + q
 
     def place(self, d):
         """Where a declaration stands in the translation unit (what stands before it can be used in it)."""
@@ -650,8 +682,13 @@ class World:
     file's functions stand in, what the types are called, and the functions of the Blueprints that are
     written already."""
 
-    def __init__(self, sources=(), flags=()):
-        self.program_dirs = sorted({os.path.dirname(os.path.abspath(f)) for f in sources})
+    def __init__(self, sources=(), flags=(), more=()):
+        # The program is the folders of the sources - and further folders, each with the namespaces its files
+        # declare (`more`: [(folder, [namespace])], --program): their files are the program's like the
+        # sources' headers, each a Blueprint of its own, their functions the program's functions.
+        self.program_dirs = sorted({os.path.dirname(os.path.abspath(f)) for f in sources} | {os.path.abspath(d) for d, _ in more})
+        self.more = [(os.path.abspath(d), list(spaces)) for d, spaces in more]
+        self.spaces = [s for _, spaces in self.more for s in spaces]   # (the program's further namespaces: Tree.spaces)
         self.include_dirs = sorted((os.path.abspath(f[2:]) for f in flags if f.startswith("-I") and len(f) > 2), key=len, reverse=True)
         self.units = {}        # a file -> the Blueprint its functions stand in
         self.type_names = {}   # (a type's qualified name, the file that defines it) -> its name, where it is not type_name_of's
@@ -1558,9 +1595,43 @@ class Const:
             raise Wait(f"a constant computed with {name}()")
         if k == "CXXDefaultInitExpr" or k == "ImplicitValueInitExpr" or k == "CXXScalarValueInitExpr":
             return 0.0
+        if k == "InitListExpr" and len(kids(n)) <= 1 and (NUMBER.get(self.unit.clean(qtype(n))) or self.unit.clean(qtype(n)) in W64):
+            # a number in braces: `f32 x{}` is zero, `u32 dt{kNominalDtUs}` the number in them
+            return self.number(kids(n)[0]) if kids(n) else 0.0
+        if k == "MemberExpr" and kids(n) and not n.get("isArrow"):
+            # a field of a value that is known: the part of it that sets the field (`gains.d_cutoff_hz` of the
+            # `Gains{...}` a constructor was given), else the field's own default
+            v = self.field_of(kids(n)[0], n.get("referencedMemberDecl"))
+            if v is not None:
+                return self.number(v)
         if k in ("CXXNullPtrLiteralExpr", "GNUNullExpr") and ENGINE_NODES:   # (no object of the engine: the handle 0)
             return 0
         raise Wait(f"a constant written as {k}")
+
+    def field_of(self, value, field_id):
+        """What sets the field `field_id` in a value made of known parts - an aggregate's braces
+        (`Gains{0.003f, ...}`), copied or not -: that part, or the field's default (an ImplicitValueInitExpr:
+        zero). None: the value is none such."""
+        v = bare(value)
+        while v.get("kind") in ("ImplicitCastExpr", "CXXFunctionalCastExpr", "CXXStaticCastExpr") and kids(v):
+            v = bare(kids(v)[-1])
+        if v.get("kind") == "CXXConstructExpr" and len(kids(v)) == 1 and self.unit.clean(qtype(kids(v)[0])) == self.unit.clean(qtype(v)):
+            return self.field_of(kids(v)[0], field_id)   # (a copy)
+        if v.get("kind") != "InitListExpr":
+            return None
+        q = self.unit.find_type(self.unit.clean(qtype(v)))
+        record = self.unit.tree.records.get(q)
+        if record is None or record.get("bases"):
+            return None
+        fields = [c for c in kids(record) if c.get("kind") == "FieldDecl"]
+        at = next((i for i, c in enumerate(fields) if c.get("id") == field_id), None)
+        if at is None:
+            return None
+        parts = kids(v)
+        if at < len(parts) and parts[at].get("kind") not in ("ImplicitValueInitExpr", "CXXDefaultInitExpr"):
+            return parts[at]
+        f = fields[at]
+        return kids(f)[-1] if kids(f) and f.get("hasInClassInitializer") else {"kind": "ImplicitValueInitExpr"}
 
     def inlined(self, n):
         """A call of a constexpr function that returns one expression of its parameters
@@ -1592,12 +1663,15 @@ class Const:
         return out
 
     def constructed(self, n):
-        """A value made by a constexpr constructor that only sets fields from what it is given
-        (`constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}`): its fields
-        by their C++ names -> the expressions they are set to, the parameters standing for what is
-        given. Fields it does not set have their defaults. None: the constructor is none such."""
+        """A value made by a constructor that only sets fields from what it is given
+        (`constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}`, `explicit
+        PT1(f32 cutoff) : cutoff_(cutoff) {}`): its fields by their C++ names -> the expressions they are
+        set to, the parameters standing for what is given. Fields it does not set have their defaults.
+        (Constexpr or not, such a constructor makes the same value of the same arguments: what the
+        expressions are is worked out as a constant - `number`, `literal` -, or the constant waits.) None:
+        the constructor is none such."""
         d = constructor_of(self.unit.tree, n)
-        if d is None or not d.get("constexpr"):
+        if d is None:
             return None
         params = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
         args = [a for a in kids(n)]
@@ -1674,7 +1748,7 @@ class Const:
         inlined = self.inlined(n)
         if inlined is not None:
             return self.literal(inlined, t)
-        if t == u.structs.get("w64::Whole64") and t is not None and k not in ("InitListExpr", "CXXConstructExpr"):
+        if t == u.structs.get("w64::Whole64") and t is not None and (k not in ("InitListExpr", "CXXConstructExpr") or u.clean(qtype(n)) in W64):
             v = int(self.number(n)) % (1 << 64)   # (a 64-bit number written out: its two halves)
             return f"{t}{{{v >> 32}, {v & 0xFFFFFFFF}}}"
         if t == "Float":
@@ -1708,6 +1782,8 @@ class Const:
                 return ZERO["Vector"]
             raise Wait(f"a vector constant written as {k}")
         if t in u.enum_values:
+            if k == "InitListExpr" and len(kids(n)) == 1:   # (`FaultCode fault{kFaultNone}`)
+                return self.literal(kids(n)[0], t)
             if k == "DeclRefExpr" and n.get("referencedDecl", {}).get("kind") == "EnumConstantDecl":
                 return f"{t}::{enum_value(u, t, n['referencedDecl']['name'])}"
             if k in ("CXXDefaultInitExpr", "ImplicitValueInitExpr", "InitListExpr") and not kids(n):
@@ -1747,6 +1823,10 @@ class Const:
                         return self.literal(args[0], t)
                     if args:
                         raise Wait("a list constant made by a constructor")
+                if len(args) == 1 and bare(args[0]).get("kind") == "InitListExpr" and qtype(args[0]).rstrip().endswith("]"):
+                    args = kids(bare(args[0]))   # (std::array's braces: those of the array it holds)
+                elif len(args) == 1 and bare(args[0]).get("kind") == "ImplicitValueInitExpr" and qtype(args[0]).rstrip().endswith("]"):
+                    args = []   # (`std::array<u16, 16> ch{}`: the array it holds is zero)
                 # (an array of C++ - a constant, the default of a field - is declared with its length: what
                 # is not written is zero there, in the Blueprint as in C++)
                 return t + "{" + ", ".join(self.literal(c, it) for c in args) + "}"
@@ -6042,7 +6122,7 @@ class TestWriter:
         return best
 
     def absolute(self, q):
-        return "::" + q if q.startswith(ENGINE + "::") else "::" + self.tree.namespace + "::" + q.lstrip(":")
+        return self.tree.absolute(q)
 
     def local(self, q):
         d = self.tree.records.get(q) or self.tree.enums.get(q)
@@ -6388,7 +6468,7 @@ class TestWriter:
         other = {}   # kern::physics -> [ph]
         for file in [self.path, *self.tree.texts]:
             for name, what in re.findall(r"\bnamespace\s+(\w+)\s*=\s*(?:::)?([\w:]+)\s*;", self.tree.text(file)):
-                other.setdefault(what if what.startswith(ENGINE + "::") or what.startswith(self.tree.namespace + "::") else self.tree.namespace + "::" + what, set()).add(name)
+                other.setdefault(what if what.split("::")[0] in (ENGINE, self.tree.namespace, *self.tree.spaces) else self.tree.namespace + "::" + what, set()).add(name)
         for absolute, local in pairs:
             parts, keep = absolute.strip(":").split("::"), len(local.split("::"))
             for i in range(len(parts) - keep):
@@ -6608,9 +6688,13 @@ class TestWriter:
         def in_function(d):
             return any(f.decl.get("_file") == d.get("_file") and f.decl["_at"][0] <= d["_at"][0] < f.decl["_at"][1] for f in u.functions.values() if f.decl.get("_at") and f.decl["_at"][1])
         def absolute(d, name):
-            scope = tree.scope_of.get(d["id"], "")
-            return "::" + (scope if scope.startswith(ENGINE + "::") else tree.namespace + "::" + scope) + name
+            return tree.absolute(tree.scope_of.get(d["id"], "") + name)
         pairs = [(self.absolute(q), self.names[q]) for q in self.names] + [(self.absolute(q), self.enum_names[q]) for q in self.enum_names]
+        for q in self.enum_names:   # (the values of an enum that is not scoped stand in the scope around it: `fc::kFaultNone` is the test's kFaultNone)
+            if tree.enums[q].get("scopedEnumTag"):
+                continue
+            outer = q.rsplit("::", 1)[0] + "::" if "::" in q else ""
+            pairs += [(tree.absolute(outer + c["name"]), "::".join(classes_of(outer) + [c["name"]])) for c in kids(tree.enums[q]) if c.get("kind") == "EnumConstantDecl" and c.get("name")]
         pairs += [(f"::{ENGINE}::Vec3", "Vec3"), (f"::{ENGINE}::Vec2", "Vec2"), (f"::{tree.namespace}::Vec3", "Vec3"), (f"::{tree.namespace}::Vec2", "Vec2")]
         pairs += [(f"::{space}::{n}", n) for space in (ENGINE, tree.namespace) for n in ("f32", "f64", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64")]
         pairs += [(f"::{ENGINE}::{n}", n) for n in ("dot", "cross", "length", "length_sq", "distance", "distance_sq", "finite", "lerp", "vmin", "vmax", "normalize")]
@@ -6815,7 +6899,7 @@ class TestWriter:
         rename = self.renamer(pairs)
         wide = lambda text: rename(self.widen(text))
         # a name of the program or the engine that is still written out in full: not the test's own
-        foreign = re.compile(r"(?<![\w:])(?:::)?(?:" + re.escape(tree.namespace) + "|" + re.escape(ENGINE) + r")::(?!math::)(\w+)")
+        foreign = re.compile(r"(?<![\w:])(?:::)?(?:" + "|".join(re.escape(x) for x in (tree.namespace, *tree.spaces, ENGINE)) + r")::(?!math::)(\w+)")
 
         # all of it in the order of the translation unit: what a piece uses stands before it there
         source = sorted([*enum_chunks, *[(tree.place(tree.records[q]), ("record", q), None) for q in top], *const_chunks, *fn_chunks, *alias_chunks, *object_chunks], key=lambda c: c[0])
@@ -7006,8 +7090,8 @@ def survey_one(job):
     """One source file as the compiler reads it, for the plan of the whole program: the functions that
     have a body there (their key, their file, the functions they call - with a body or only declared) and
     the types (qualified name, file). Nothing is converted."""
-    path, namespace, flags = job
-    tree = Tree(path, namespace, flags)
+    path, namespace, flags, spaces = job
+    tree = Tree(path, namespace, flags, spaces)
     me = os.path.abspath(path)
     functions = []
     for i, d in tree.body.items():
@@ -7053,7 +7137,7 @@ def convert_unit(job):
             scratch = tempfile.mkdtemp(prefix="kern-cpp-to-blueprint-")
             path = os.path.join(scratch, name + ".cpp")
             open(path, "w").write("".join(f'#include "{os.path.abspath(f)}"\n' for f in files if os.path.abspath(f) != os.path.abspath(W64_HEADER)) or "\n")
-        tree = Tree(path, namespace, flags)
+        tree = Tree(path, namespace, flags, world.spaces)
         main_file = os.path.abspath(source or files[0])
         # its functions, in the order they stand in: those of a header first (a source file's Blueprint has
         # the functions of its header that need the source file), then the source file's
@@ -7188,14 +7272,20 @@ def main(argv):
     cut = argv.index("--")
     opts, files = argv[3:cut], argv[cut + 1:]
     level = folder = test = texts = None
-    flags = []
+    flags, more = [], []
     i = 0
     while i < len(opts):
-        if opts[i] in ("--level", "--folder", "--test", "--texts"):
+        if opts[i] in ("--level", "--folder", "--test", "--texts", "--program"):
             v = opts[i + 1]
             if opts[i] == "--level": level = v
             elif opts[i] == "--folder": folder = v
             elif opts[i] == "--test": test = v
+            elif opts[i] == "--program":
+                # a further folder of the program and the namespaces its files declare: <folder>=<namespace>[,<namespace>...]
+                d, _, spaces = v.partition("=")
+                if not d or not spaces or not all(re.fullmatch(r"[A-Za-z_]\w*", s) for s in spaces.split(",")) or not os.path.isdir(d):
+                    raise SystemExit(f"--program {v}: give a folder and its namespaces, <folder>=<namespace>[,<namespace>...]")
+                more.append((d, spaces.split(",")))
             else: texts = v
             i += 2
         else:
@@ -7211,7 +7301,7 @@ def main(argv):
         raise SystemExit("the engine's node names are not to be had (tools/blueprint_cpp.sh --node-names): " + (r.stderr or r.stdout).strip()[:500])
     NODES.update(r.stdout.split())
     pool = concurrent.futures.ProcessPoolExecutor(workers)
-    world = World(files, flags)
+    world = World(files, flags, more)
     world.nodes = set(NODES)
     if level:   # (the Blueprints of the level's actors: what the program calls on them looks as they have it)
         for a in json.load(open(level, encoding="utf-8")).get("actors", []):
@@ -7228,7 +7318,7 @@ def main(argv):
             raise SystemExit(f"{path} and {sources[unit]} would both be the Blueprint {unit}")
         sources[unit] = os.path.abspath(path)
     world.source_units = set(sources)
-    for r in pool.map(survey_one, [(path, namespace, flags) for path in files]):
+    for r in pool.map(survey_one, [(path, namespace, flags, world.spaces) for path in files]):
         for f in r["functions"]:
             functions.setdefault(f["key"], f)
         types.update((q, file) for q, file in r["types"])
@@ -7284,7 +7374,7 @@ def main(argv):
             if d not in need:
                 need.add(d)
                 stack += deps.get(d, ())
-        w = World(files, flags)
+        w = World(files, flags, more)
         w.units, w.type_names, w.taken, w.nodes, w.function_units, w.source_units = world.units, world.type_names, world.taken, world.nodes, world.function_units, world.source_units
         w.actors = world.actors
         w.table = {k: e for d in need for k, e in tables.get(d, {}).items()}
