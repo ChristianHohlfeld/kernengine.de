@@ -498,12 +498,28 @@ template <class S, class Key> S draw_set(Draw& draw, Key key) {
 // the source through the stand-in classes the test has for the engine's (they derive from EngineObject -
 // an object of the engine is a handle in the Blueprint), the Blueprint through its host. The two must
 // have asked the same, call for call (Tally::take).
+// An object the source makes (a stand-in's constructor: the engine's <class>.make) is its own: its
+// destructor releases it (<class>.release). A copy, and the test's own objects, are not made: quiet.
 struct EngineObject {
   long long kern_handle = 0;
+  bool kern_owned = false;
+  EngineObject() = default;
+  EngineObject(const EngineObject& o) : kern_handle(o.kern_handle) {}
+  EngineObject& operator=(const EngineObject& o) {
+    kern_handle = o.kern_handle;
+    return *this;
+  }
 };
+/// While the test makes its own objects of a class (engine_object): no make of the source.
+inline bool g_keeping = false;
 /// One of the few objects of an engine class a test keeps, by its handle.
 template <class T> T* engine_object(long long handle) {
-  static T kept[8];
+  static T* const kept = [] {
+    g_keeping = true;
+    T* k = new T[8];
+    g_keeping = false;
+    return k;
+  }();
   T* object = &kept[static_cast<unsigned long long>(handle) % 8];
   object->kern_handle = static_cast<long long>(static_cast<unsigned long long>(handle) % 8);
   return object;
@@ -516,6 +532,11 @@ inline std::vector<Value> engine_call(const char* function, const std::vector<Va
     for (const kern::logic::EnginePin& p : f->outputs) out.push_back(Value::zero(p.type));
   g_source_engine.engine(function, in, out);
   return out;
+}
+/// What a stand-in's constructor is given by the engine: the handle of the object it made, its own.
+inline void take_made(EngineObject& object, const Value& handle) {
+  object.kern_handle = handle.as_int();
+  object.kern_owned = true;
 }
 inline Value arg(const EngineObject* object) { return Value::integer(object ? object->kern_handle : 0); }
 template <class T>
@@ -830,8 +851,15 @@ void take(T& to, const Value& v) { to = *engine_object<T>(v.as_int()); }
 template <class T>
   requires std::is_base_of_v<EngineObject, T>
 void take(std::unique_ptr<T>& to, const Value& v) {
+  // (the object the Blueprint has there is owned there: the source's is too - what this replaces is the
+  // test's handing over, not the source's: no release)
+  g_keeping = true;
   if (v.as_int() == 0) to.reset();
-  else to = std::make_unique<T>(*engine_object<T>(v.as_int()));
+  else {
+    to = std::make_unique<T>(*engine_object<T>(v.as_int()));
+    to->kern_owned = true;
+  }
+  g_keeping = false;
 }
 template <class T> void take(std::vector<T>& to, const Value& v);
 /// By the type as the program spells it (S, with Whole where it says u64 or i64 - see shaped).

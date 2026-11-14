@@ -1921,6 +1921,7 @@ class Emit:
         self.f = f
         self.tree = unit.tree
         self.names = {}       # decl id -> the Blueprint name of a parameter or local
+        self.scopes = []      # per block being written: the objects of the engine made in it, (local, class) - released where it ends
         self.types = {}       # decl id -> its Blueprint type
         self.locals = []      # (name, type): declared at the top of the body
         self.lengths = {}     # the local variables that are lists of a fixed length (name -> length)
@@ -2525,6 +2526,35 @@ class Emit:
     named_places = frozenset()
 
     def block(self, stmts):
+        self.scopes.append([])
+        try:
+            out, ended = self.block_of(stmts)
+        finally:
+            made = self.scopes.pop()
+        if made and len(stmts) == 1 and stmts[0].get("kind") == "DeclStmt":
+            raise Wait("an object of the engine made in the declaration of an if, a for or a while")
+        return out if ended else out + self.releases(made)
+
+    def releases(self, made):
+        """What ends the objects of the engine a block made, where its way out is (in the reverse order of
+        their making, as C++ destroys them): each is released, if it was made - its handle is none after."""
+        out = []
+        for name, q in reversed(made):
+            out += self.release(q, name) + [f"{name} = 0;"]
+        return out
+
+    def release(self, q, handle):
+        """The release of an object of the engine (its destructor), if the handle is one: the node <class>.release."""
+        u = self.u
+        f = u.api().releaser(q)
+        if u.engine_table().get(f["type"]) != (False, [(n, *u.api().pin(bt)) for n, bt, _ in f["ins"]], []):
+            raise Wait(f"the release of a {q.split('::')[-1]} (its node is another one in the engine)")
+        u.engine_calls[f["decl"]["id"] + ":release"] = f
+        self.f.pure = False
+        return [f'if (math_compare<"!=">(kern::to<Float>({handle}), 0.0)) {{', f'  {f["type"].replace(".", "_")}({handle});', "}"]
+
+    def block_of(self, stmts):
+        """The statements of a block, and whether it always returns (then its objects are released by the return)."""
         out = []
         for i, s in enumerate(stmts):
             if not isinstance(self.named_places, set):
@@ -2532,14 +2562,16 @@ class Emit:
             self.name_references(stmts, i)
             lines, ends = self.stmt(s)
             out += lines
-            if ends or s.get("kind") in ("BreakStmt", "ContinueStmt"):
+            if ends:
+                return out, True
+            if s.get("kind") in ("BreakStmt", "ContinueStmt"):
                 break
             if self.loops and any(self.jumps(s)):   # (after a statement that may break or continue: the rest only if it did not)
                 rest = self.block(stmts[i + 1:])
                 if rest:
                     out += [f"if ({self.going()}) {{", *["  " + ln for ln in rest], "}"]
                 break
-        return out
+        return out, False
 
     def ends(self, stmts):
         """Does a list of statements always return?"""
@@ -2637,8 +2669,16 @@ class Emit:
                     raise Wait("a reference to something it changes")
                 wide_init = kids(v) and v.get("init") and self.u.clean(raw) in ("unsigned long", "long", "unsigned long long", "long long") and self.is64(kids(v)[-1])
                 init = kids(v)[-1] if kids(v) and v.get("init") else None
-                if init is None and self.u.object_of(raw) and not ("&" in raw or "*" in raw):
-                    raise Wait("an object of the engine made here (the engine makes them: a node that gives its handle)")
+                made = None
+                if self.u.object_of(raw) and not ("&" in raw or "*" in raw):
+                    if re.match(r"(?:const\s+)?std::unique_ptr<", self.u.clean(raw)):
+                        if init is not None and any(callee_name(x) == "make_unique" for x in walk(init) if x.get("kind") == "CallExpr"):
+                            raise Wait("an owned object of the engine made into a local variable")
+                    else:
+                        # (an object of the engine as a local: made here - <class>.make -, released where its block ends)
+                        if init is None or self.maker_of(init) is None:
+                            raise Wait("an object of the engine as a local that is not made by a constructor of it")
+                        made = self.u.object_of(raw)
                 kept = None
                 if init is not None and "auto" in v.get("type", {}).get("qualType", "") and not wide_init:
                     # (auto: the type is the value's - as the Blueprint holds it)
@@ -2655,6 +2695,10 @@ class Emit:
                         raise Wait("a text buffer that begins with something else than a text")
                     continue
                 name = self.local(v, self.whole64() if wide_init else kept)
+                if made is not None:
+                    out += self.take_pre() + [f"{name} = {self.ex(init, 'Int')};"]
+                    self.scopes[-1].append((name, made))
+                    continue
                 if init is not None:
                     # (an array written out: its place - declared with its length - is set to what is written)
                     said = self.written_array(init, self.types[v['id']]) if name in self.lengths else None
@@ -2672,9 +2716,21 @@ class Emit:
             return out, False
         if k == "ReturnStmt":
             c = kids(s)
-            if not c:
-                return [self.ret_line(None)], True
-            return [self.ret_line(self.ex(c[0], self.f.value))], True
+            made = [x for scope in self.scopes for x in scope]
+            if not made:
+                if not c:
+                    return [self.ret_line(None)], True
+                return [self.ret_line(self.ex(c[0], self.f.value))], True
+            # the objects of the engine the function made are released on its way out - after what it
+            # returns is computed (C++: the value first, then the destructors)
+            mine = {i for scope in self.scopes for i, _ in scope}
+            if c and any(x.get("kind") == "DeclRefExpr" and self.names.get(x.get("referencedDecl", {}).get("id")) in mine for x in walk(c[0])):
+                raise Wait("a return of an object of the engine the function made")
+            text = self.ex(c[0], self.f.value) if c else None
+            if text is None or self.f.ctor or self.f.value is None:
+                return self.take_pre() + self.releases(made) + [self.ret_line(None)], True
+            kept = self.temp("returned", self.f.value)
+            return self.take_pre() + [f"{kept} = {text};"] + self.releases(made) + [self.ret_line(kept)], True
         if k == "IfStmt":
             c = kids(s)
             out = []
@@ -3122,6 +3178,15 @@ class Emit:
             if inner.get("kind") == "CXXOperatorCallExpr" and not inner.get("_op") and callee_name(inner) == "operator=" and len(kids(inner)) == 3:
                 # a = b = v of a class (a vector, a struct): first b, then a is what b is now
                 return self.effect(inner) + self.store(ops[0], lambda t: self.ex(kids(inner)[1], t))
+            if name == "operator=" and self.owned_object(ops[0]):
+                # an owned object of the engine (std::unique_ptr) gets another: the new one first, then the
+                # old one is released (unique_ptr::operator=: reset - the pointer stored, then the old deleted)
+                q = self.owned_object(ops[0])
+                old = self.temp("old", "Int")
+                lines = [f"{old} = {self.ex(ops[0], 'Int')};"]
+                text = "0" if self.nothing(ops[1]) else self.ex(ops[1], "Int")
+                lines += self.take_pre()
+                return lines + self.store(ops[0], lambda t: text) + self.release(q, old)
             if name == "operator=":
                 self.moved_into(ops[1], qtype(callee(n)))
                 if self.is_box(ops[0]) and self.nothing(ops[1]):
@@ -3183,6 +3248,10 @@ class Emit:
                     raise Wait("a pointer")
                 self.invoke(self.u.function(m["referencedMemberDecl"]), kids(n)[1:], obj=base)
                 return []
+            if base is not None and not self.is_this(base) and self.owned_object(base) and name == "reset" and len(kids(n)) == 1:
+                q = self.owned_object(base)
+                old = self.temp("old", "Int")
+                return [f"{old} = {self.ex(base, 'Int')};"] + self.store(base, lambda t: "0") + self.release(q, old)
             if base is not None and not self.is_this(base) and self.is_box(base):
                 if name == "reset" and len(kids(n)) == 1:
                     return self.store(base, lambda t: t + "{}")
@@ -5470,6 +5539,17 @@ class Emit:
                 return self.taken_out(a[0], lt), lt
             if name in ("move", "forward") and len(a) == 1:
                 return self.value(a[0])
+            if name == "make_unique" and u.object_of(qtype(b)):
+                # an owned object of the engine made: its constructor of these arguments (one of them by their count)
+                q = u.object_of(qtype(b))
+                fit = []
+                for d in u.api().makers(q):
+                    ps = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
+                    if len([p for p in ps if not kids(p)]) <= len(a) <= len(ps):
+                        fit.append(d)
+                if len(fit) != 1:
+                    raise Wait(f"std::make_unique of a {q.split('::')[-1]}: " + ("no constructor of it is a node" if not fit else "which of its constructors"))
+                return self.made(fit[0], a), "Int"
             if name == "make_unique" and self.is_box(b):
                 lt = self.tp(b)
                 if lt[5:-1] not in u.struct_fields:
@@ -5608,15 +5688,47 @@ class Emit:
             pass
         raise Wait(f"the operator {name[8:]} of {t0}")
 
+    def owned_object(self, n):
+        """The engine's class of an owned object of the engine (std::unique_ptr) this names - else None."""
+        if not re.match(r"(?:const\s+)?std::unique_ptr<", self.u.clean(qtype(n))):
+            return None
+        return self.u.object_of(qtype(n))
+
+    def maker_of(self, n):
+        """The constructor of the engine's class a value is made by (CXXConstructExpr) that is a node
+        <class>.make - else None."""
+        n = self.unwrap(n)
+        while n.get("kind") in ("ExprWithCleanups", "CXXBindTemporaryExpr", "MaterializeTemporaryExpr") and len(kids(n)) == 1:
+            n = self.unwrap(kids(n)[0])
+        if n.get("kind") not in ("CXXConstructExpr", "CXXTemporaryObjectExpr"):
+            return None
+        q = self.u.object_of(qtype(n))
+        if q is None:
+            return None
+        makers = self.u.api().makers(q)
+        d = constructor_of(self.tree, n)
+        if d is None and not [x for x in kids(n) if x.get("kind") != "CXXDefaultArgExpr"]:
+            return makers[0] if len(makers) == 1 and not [p for p in kids(makers[0]) if p.get("kind") == "ParmVarDecl"] else None
+        return d if d in makers else None
+
+    def made(self, d, args):
+        """An object of the engine made by its constructor `d` (the node <class>.make): its handle. A step."""
+        lines, text, _ = self.engine(d, None, args)
+        self.hoist(lines)
+        return text
+
     def construct(self, b):
         u = self.u
         for x in kids(b):
             self.moved_into(x, b.get("ctorType", {}).get("qualType", ""))
         if u.object_of(qtype(b)):
             a = [x for x in kids(b) if x.get("kind") != "CXXDefaultArgExpr"]
-            if len(a) == 1 and u.object_of(qtype(a[0])):
+            if len(a) == 1 and u.object_of(qtype(a[0])) and self.maker_of(b) is None:
                 return self.ex(a[0], "Int"), "Int"   # (a handle handed on)
-            raise Wait("an object of the engine made here (the engine makes them: a node that gives its handle)")
+            d = self.maker_of(b)
+            if d is None:
+                raise Wait("an object of the engine made by what is not a constructor of it")
+            return self.made(d, a), "Int"
         t = self.tp(b)
         a = [x for x in kids(b) if x.get("kind") != "CXXDefaultArgExpr"]
         if self.is_box(b):
@@ -5831,6 +5943,7 @@ class Api:
     def __init__(self, tree, unit):
         self.tree, self.u = tree, unit
         self.by_class = {}   # a class or a namespace -> its functions that are declared only, in their order
+        self.implicit_makers = {}   # a class of the engine without a constructor of its own -> the one C++ gives it
 
     def opaque(self, q):
         """Is this class an object of the engine with a life of its own (a handle in a Blueprint)?"""
@@ -5955,9 +6068,76 @@ class Api:
         nth = same.index(d) + 1 if d in same else 1
         return "engine." + (group + "." if group else "") + d["name"] + (f"_{nth}" if nth > 1 else "")
 
+    # ---- objects of the engine: made and ended ----
+    def makers(self, q):
+        """The constructors of the engine's class `q` that make an object of it - a node `<class>.make`
+        each, in the order of the header: the public ones, not deleted, no copy or move (a handle is
+        not copied: the engine's object is one), of a class that is an object of the engine and not
+        abstract. (None for any other class.)"""
+        rec = self.tree.records.get(q)
+        if rec is None or not q.startswith(ENGINE + "::") or not self.opaque(q) or any((q + "::").startswith(s) for s in ENGINE_SKIP):
+            return []
+        if (rec.get("definitionData") or {}).get("isAbstract") or any(c.get("pure") for c in kids(rec) if c.get("kind") == "CXXMethodDecl"):
+            return []
+        if any(c.get("kind") == "CXXDestructorDecl" and (c.get("explicitlyDeleted") or not (c.get("isImplicit") or self.public(c))) for c in kids(rec)):
+            return []   # (what cannot be ended is not made here)
+        name = q.split("::")[-1]
+        own = re.compile(r"\s*void\s*\(\s*(const\s+)?(?:[\w:]+::)?" + re.escape(name) + r"\s*&{1,2}\s*\)\s*(noexcept)?\s*")
+        declared = [c for c in kids(rec) if c.get("kind") == "CXXConstructorDecl" and not c.get("isImplicit")]
+        if any(c.get("kind") == "FieldDecl" and qtype(c).strip().endswith("&") for c in kids(rec)):
+            if not declared:
+                return []   # (a reference in it: C++ gives it no constructor - it is made by one it declares)
+        if not declared and ((rec.get("definitionData") or {}).get("defaultCtor") or {}).get("exists"):
+            # (a class that declares no constructor: the one C++ gives it, without parameters)
+            if q not in self.implicit_makers:
+                self.implicit_makers[q] = {"kind": "CXXConstructorDecl", "id": rec["id"] + ":make", "name": name, "type": {"qualType": "void ()"}, "inner": []}
+                self.tree.owner[rec["id"] + ":make"] = q
+            return [self.implicit_makers[q]]
+        return [c for c in declared if not c.get("explicitlyDeleted") and self.public(c) and not own.fullmatch(qtype(c))]
+
+    def maker(self, d):
+        """The node that makes an object of the engine by the constructor `d`: its parameters are the
+        node's inputs, the object's handle its result. A step - the host keeps the object until it is
+        released (<class>.release)."""
+        q = self.tree.owner.get(d["id"])
+        makers = self.makers(q)
+        if d not in makers:
+            raise Wait("a constructor that makes no object of the engine")
+        group = snake(q.split("::")[-1])
+        nth = makers.index(d) + 1
+        ins, params, taken = [], [], {"exec", "then", "result"}
+        for i, p in enumerate(x for x in kids(d) if x.get("kind") == "ParmVarDecl"):
+            bt, writes, handle = self.handed(qtype(p))
+            if writes:
+                raise Wait("a constructor that writes through a parameter")
+            name = re.sub(r"\W", "_", p.get("name") or f"value{i + 1}")
+            if name in CPP_WORDS or name in taken:
+                name += "_" + str(i + 1)
+            taken.add(name)
+            ins.append((name, bt, handle))
+            params.append((name, None))
+        for _, bt, _ in ins:
+            self.pin(bt)
+            self.shape(bt)
+        return {"type": f"engine.{group}.make" + (f"_{nth}" if nth > 1 else ""), "cpp": q + "::" + q.split("::")[-1], "label": "Make " + q.split("::")[-1],
+                "category": "Engine: " + q.split("::")[-1], "help": self.u.comment_of(d) or f"Makes a {q.split('::')[-1]} of the engine: its handle (the host keeps it until it is released).",
+                "value": False, "ins": ins, "outs": [("result", "Int", q)], "params": params, "decl": d, "role": "make", "class": q}
+
+    def releaser(self, q):
+        """The node that ends an object of the engine that was made (its destructor): <class>.release."""
+        if not self.makers(q):
+            raise Wait("an object of the engine that is not made here")
+        rec = self.tree.records[q]
+        group = snake(q.split("::")[-1])
+        return {"type": f"engine.{group}.release", "cpp": q + "::~" + q.split("::")[-1], "label": "Release " + q.split("::")[-1],
+                "category": "Engine: " + q.split("::")[-1], "help": f"Ends the {q.split('::')[-1]} (its destructor): the handle is none after it.",
+                "value": False, "ins": [(group, "Int", q)], "outs": [], "params": [], "decl": rec, "role": "release", "class": q}
+
     def function(self, d):
         """The node of a declared function of the engine: a dict - or Wait, when its types have no place."""
         tree, u = self.tree, self.u
+        if d.get("kind") == "CXXConstructorDecl":
+            return self.maker(d)
         if d.get("variadic"):
             raise Wait("a variadic function")
         owner = tree.owner.get(d["id"])
@@ -6784,6 +6964,36 @@ class TestWriter:
         return (f"{ret} {d['name']}({', '.join(a + b for a, b in params)}){const};",
                 f"inline {ret} {cls + '::' if cls else ''}{d['name']}({', '.join(a for a, _ in params)}){const} {{ {' '.join(body)} }}")
 
+    def engine_bases(self, q):
+        """The classes of the engine the class `q` of the engine derives from that are objects of it too."""
+        out = []
+        for b in self.tree.records[q].get("bases", []) or []:
+            try:
+                bq = self.u.find_type(self.u.clean(qtype(b)))
+            except Wait:
+                bq = None
+            if bq is not None and bq in self.tree.records and self.u.engine_object(bq):
+                out.append(bq)
+        return out
+
+    def stand_in_life(self, f, cls):
+        """The constructor (role make) or the destructor (role release) of the stand-in `cls`: (its
+        declaration, its definition). The constructor asks the stand-in of the engine for the handle of the
+        object it makes, and the object is the source's own: its destructor releases it. (The test's own
+        objects of the class - converted::engine_object - and copies are not made by the source: quiet.)"""
+        if f["role"] == "release":
+            return (f"~{cls}();",
+                    f'inline {cls}::~{cls}() {{ if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("{f["type"]}", {{arg(*this)}}); }}')
+        a, b = self.stand_in(f, None)
+        head = re.escape(f["decl"]["name"])
+        a = re.sub(r"^void\s+" + head + r"\(", cls + "(", a)
+        b = re.sub(r"^inline void\s+" + head + r"\(", f"inline {cls}::{cls}(", b)
+        if not b.endswith(" }"):
+            raise Wait("a constructor's stand-in")
+        b = b[:-2] + ' converted::take_made(*this, kern_out[0]); }'
+        b = b.replace("{ const std::vector<converted::Value> kern_out", "{ if (converted::g_keeping) return; const std::vector<converted::Value> kern_out", 1)
+        return a, b
+
     @staticmethod
     def no_stand_in(f, why):
         """A function of the engine the test has no stand-in of (STAND_INS=1 names it with why)."""
@@ -6800,7 +7010,9 @@ class TestWriter:
         for f in [*u.engine_calls.values(), *(f for i, f in self.more_engine.items() if i not in u.engine_calls)]:
             d = f["decl"]
             owner = tree.owner.get(d["id"])
-            if owner and d.get("kind") == "CXXMethodDecl" and d.get("storageClass") != "static":
+            if f.get("role") in ("make", "release"):
+                by_class[f["class"]].append(f)   # (its constructor and its destructor)
+            elif owner and d.get("kind") == "CXXMethodDecl" and d.get("storageClass") != "static":
                 by_class[owner].append(f)
             else:
                 free.append(f)
@@ -6818,21 +7030,27 @@ class TestWriter:
                         self.no_stand_in(f, w)
                         continue   # (what it takes the test has no values of: a function that calls it is not compared)
                     defs.append((("engine", f["decl"]["id"]), b))
-        for q in sorted(u.objects_seen | set(by_class) | self.more_objects | set(self.object_enums)):
-            if q not in tree.records or not u.engine_object(q):
-                continue
+        objects = {q for q in u.objects_seen | set(by_class) | self.more_objects | set(self.object_enums) if q in tree.records and u.engine_object(q)}
+        for q in sorted(objects):   # (the classes of the engine they derive from: stand-ins too - HostTransport is a Transport)
+            for b in self.engine_bases(q):
+                objects.add(b)
+        for q in sorted(objects):
             name = self.object_name(q)
             pairs.append((self.absolute(q), name))
-            decls = []
+            decls, made = [], False
             for f in by_class.get(q, []):
                 try:
-                    a, b = self.stand_in(f, name)
+                    a, b = self.stand_in_life(f, name) if f.get("role") else self.stand_in(f, name)
                 except Wait as w:
                     self.no_stand_in(f, w)
                     continue   # (what it takes the test has no values of: a function that calls it is not compared)
+                made = made or (f.get("role") == "make" and not f["ins"])
                 decls.append("  " + a)
                 defs.append((("object", q), b))
-            chunks.append((tree.place(tree.records[q]), ("object", q), "\n".join([f"struct {name} : converted::EngineObject {{", *self.object_enums.get(q, []), *decls, "};"])))
+            if any(f.get("role") == "make" for f in by_class.get(q, [])) and not made:
+                decls.insert(0, f"  {name}() = default;")   # (the test's own objects of it - see converted::engine_object)
+            over = ", ".join(f"public {self.object_name(b)}" for b in self.engine_bases(q)) or "converted::EngineObject"
+            chunks.append((tree.place(tree.records[q]), ("object", q), "\n".join([f"struct {name} : {over} {{", *self.object_enums.get(q, []), *decls, "};"])))
         for f in free:
             d = f["decl"]
             try:
