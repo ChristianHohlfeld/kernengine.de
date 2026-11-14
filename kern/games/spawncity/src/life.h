@@ -25,9 +25,10 @@ struct LifeCar {
   bool player = false, airborne = false, stuck = false, driver = true;
 };
 
+/// The world as street life sees it this frame: values. What it reads of the town itself - the
+/// streamed city, where the ground changed - the functions are given by reference.
 struct LifeView {
   const kern::physics::World* physics = nullptr;
-  const CityStream* city = nullptr;
   Vec3 focus, player;   // player: his feet (or vehicle)
   Vec3 eye;             // the camera (hearing distance)
   Vec3 head;            // the player's head (the black cat leaps at it)
@@ -37,7 +38,6 @@ struct LifeView {
   bool on_foot = true, people_on = true, birds_on = true;  // WORLD options (world.people, world.birds)
   std::vector<LifeCar> cars;
   std::vector<Vec3> mates;  // MP host: where the other players are (herds and flocks there too: one world)
-  const std::vector<kern::Vec4>* ground_changes = nullptr;  // where the ground changed this frame (what stands there is put on it again)
 };
 
 /// What the game should do for street life this frame.
@@ -121,7 +121,7 @@ class Life {
 
   void init(kern::physics::World& w, bool mobile);
   void clear();
-  void update(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeOut& out);
+  void update(f32 dt, f32 now, const LifeView& view, const CityStream& city, const std::vector<kern::Vec4>& ground_changes, Rng& rng, LifeOut& out);
 
   /// A bullet from `from` to `to`: cows, birds and joggers. Returns true when something was hit
   /// (`to` shortened to the hit).
@@ -138,9 +138,9 @@ class Life {
 
   // tests / commands
   bool spawn_herd(Vec2 center, f32 radius, u32 n, f32 now);
-  bool spawn_joggers(const LifeView& view, f32 now, Rng& rng);
+  bool spawn_joggers(const LifeView& view, const CityStream& city, f32 now, Rng& rng);
   void spook_pigeons(f32 now);
-  bool spawn_flock(Vec2 at, f32 now, Rng& rng, const LifeView& view);
+  bool spawn_flock(Vec2 at, f32 now, Rng& rng, const LifeView& view, const CityStream& city);
 
   Ragdolls& ragdolls() { return ragdolls_; }
   const Ragdolls& ragdolls() const { return ragdolls_; }
@@ -234,21 +234,21 @@ class Life {
   bool remote_joggers_ = false;
   f32 remote_joggers_at_ = -9;
   struct Meadow { std::vector<std::vector<Vec2>> rings; Vec2 lo, hi, centre; f32 area = 0; u64 key = 0; bool alive = true; };
-  void rebuild_herds(const LifeView& view, f32 now);
+  void rebuild_herds(const LifeView& view, const CityStream& city, f32 now);
   Vec2 graze_spot(const Cow& c, i64 k) const;
   void kill_cow(Cow& c, Vec3 impulse, f32 now, LifeOut& out);
   void scare_cow(Cow& c, Vec2 from, f32 now, f32 secs);
-  void update_cows(f32 dt, f32 now, const LifeView& view, LifeOut& out);
-  void update_pigeons(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeOut& out);
-  void spook(Flock& f, Vec2 from, f32 now, Rng& rng, const LifeView& view, LifeOut& out);
-  bool blocked(const LifeView& view, Vec2 p) const;
-  bool spot_near(const LifeView& view, Vec2 c, f32 r0, f32 r1, Rng& rng, Vec2& out) const;
-  void update_birds(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeOut& out);
-  void update_trees(const LifeView& view, f32 now);
-  void update_pets(f32 dt, f32 now, const LifeView& view, LifeOut& out);
+  void update_cows(f32 dt, f32 now, const LifeView& view, const CityStream& city, LifeOut& out);
+  void update_pigeons(f32 dt, f32 now, const LifeView& view, const CityStream& city, Rng& rng, LifeOut& out);
+  void spook(Flock& f, Vec2 from, f32 now, Rng& rng, const LifeView& view, const CityStream& city, LifeOut& out);
+  bool blocked(const LifeView& view, const CityStream& city, Vec2 p) const;
+  bool spot_near(const LifeView& view, const CityStream& city, Vec2 c, f32 r0, f32 r1, Rng& rng, Vec2& out) const;
+  void update_birds(f32 dt, f32 now, const LifeView& view, const CityStream& city, Rng& rng, LifeOut& out);
+  void update_trees(const LifeView& view, const CityStream& city, const std::vector<kern::Vec4>& ground_changes, f32 now);
+  void update_pets(f32 dt, f32 now, const LifeView& view, const CityStream& city, LifeOut& out);
   void kill_pet(u32 i, Vec3 dir, f32 now, LifeOut& out);
   static void pet_params(Pet& p, u32 i);
-  void update_joggers(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeOut& out);
+  void update_joggers(f32 dt, f32 now, const LifeView& view, const CityStream& city, Rng& rng, LifeOut& out);
   void kill_runner(i32 i, Vec3 velocity, f32 now, LifeOut& out);
   Vec3 sample(f32 s, f32& yaw, Vec2& normal) const;
   void update_voices(f32 dt, f32 now, const LifeView& view, LifeOut& out);

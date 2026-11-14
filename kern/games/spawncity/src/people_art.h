@@ -17,7 +17,7 @@ class PeopleArt {
   void begin();
   void person(const People::Person& p, f32 now);
   /// The fallen as ragdolls (ragdoll.cpp bones): the same rounded body, face and hair as standing.
-  void ragdolls(const std::vector<Ragdolls::Draw>& bones);
+  void ragdolls(const std::vector<Ragdolls::Draw>& bones, const Ragdolls& dolls);
   /// A person's hair colour (the dead's dull, a zombie's grey-green).
   static Vec3 hair_color(const People::Person& p);
   /// A light bar on a car roof (chassis frame), flashing when `on`.

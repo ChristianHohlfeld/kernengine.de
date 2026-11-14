@@ -37,7 +37,7 @@ void Marks::clear(kern::physics::World* w) {
 }
 
 void Marks::blast(Vec3 at, f32 r, f32 strength, CityStream& city, kern::physics::World& w, Rng& rng, f32 now, bool craters) {
-  city_ = &city;
+  struck_ = true;
   Terrain& t = city.terrain();
   r = clampf(r, 1.5f, 400);
   const f32 above = at.z - t.height(at.x, at.y);
@@ -197,7 +197,7 @@ bool facade_glass(f32 u, f32 len, f32 z, f32 H, u32 seed) {
 }  // namespace
 
 bool Marks::bullet(Vec3 p, const CityStream& city, Rng& rng) {
-  city_ = &city;
+  struck_ = true;
   city.walls_near({p.x, p.y}, 0.6f, near_);
   for (const CityStream::Wall& w : near_) {
     const Vec2 rel{p.x - w.a.x, p.y - w.a.y};
@@ -220,26 +220,26 @@ bool Marks::bullet(Vec3 p, const CityStream& city, Rng& rng) {
   return false;
 }
 
-void Marks::update(f32 now, kern::physics::World& w) {
+void Marks::update(f32 now, const CityStream& city, kern::physics::World& w) {
   for (auto it = rubble_.begin(); it != rubble_.end();) {
     if (now > it->until) {
       if (it->body.valid() && w.body_valid(it->body)) w.destroy_body(it->body);
       it = rubble_.erase(it);
     } else ++it;
   }
-  if (city_ && city_->damage_serial() != damage_seen_) { damage_seen_ = city_->damage_serial(); prune_walls(); }
+  if (struck_ && city.damage_serial() != damage_seen_) { damage_seen_ = city.damage_serial(); prune_walls(city); }
   stats_.scorches = static_cast<u32>(scorches_.size());
   stats_.soots = static_cast<u32>(soots_.size());
   stats_.breaches = static_cast<u32>(breaches_.size());
   stats_.rubble = static_cast<u32>(rubble_.size());
 }
 
-void Marks::prune_walls() {
+void Marks::prune_walls(const CityStream& city) {
   // soot, breaches and window cracks sit on a wall: when the building lost the floors they were on
   // (or fell to its stump), they go - nothing stays hanging in the air where the facade was
   std::vector<CityStream::Wall> walls;
   auto gone = [&](const WallMark& m) {
-    city_->walls_near({m.c.x, m.c.y}, 0.8f, walls);
+    city.walls_near({m.c.x, m.c.y}, 0.8f, walls);
     for (const CityStream::Wall& w : walls)
       if (w.top >= m.c.z - 0.15f && w.base <= m.c.z + 0.5f) return false;
     return true;
@@ -367,9 +367,9 @@ void Marks::rebuild(const CityStream& city) {
   }
 }
 
-void Marks::draw(WorldArt& art, kern::physics::World& w, f32 now) {
-  if (dirty_ && city_) {
-    rebuild(*city_);
+void Marks::draw(WorldArt& art, const CityStream& city, kern::physics::World& w, f32 now) {
+  if (dirty_ && struck_) {
+    rebuild(city);
     kern::Material m;
     m.alpha = kern::AlphaMode::blend;
     m.color = {1, 1, 1, 0.88f};

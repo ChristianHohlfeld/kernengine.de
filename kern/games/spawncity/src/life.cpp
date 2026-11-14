@@ -43,7 +43,6 @@ u64 mix(u64 a, u64 b) { return a * 0x9e3779b97f4a7c15ull + b + 0x632be59bd9b4e01
 f32 dist2d(Vec3 a, Vec3 b) { return std::hypot(a.x - b.x, a.y - b.y); }
 f32 dist2d(Vec2 a, Vec2 b) { return std::hypot(a.x - b.x, a.y - b.y); }
 Vec3 rgb(u32 h) { return {((h >> 16) & 255) / 255.0f, ((h >> 8) & 255) / 255.0f, (h & 255) / 255.0f}; }
-f32 ground(const LifeView& v, f32 x, f32 y) { return v.city ? v.city->ground_height(x, y) : 0; }
 
 bool in_ring(const std::vector<Vec2>& r, Vec2 p) {
   bool c = false;
@@ -130,14 +129,14 @@ void Life::clear() {
   ragdolls_.clear();
 }
 
-void Life::update(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeOut& out) {
-  if (!world_ || !view.city || dt <= 0) return;
-  update_cows(dt, now, view, out);
-  update_pigeons(dt, now, view, rng, out);
-  update_birds(dt, now, view, rng, out);
-  update_trees(view, now);
-  update_pets(dt, now, view, out);
-  update_joggers(dt, now, view, rng, out);
+void Life::update(f32 dt, f32 now, const LifeView& view, const CityStream& city, const std::vector<kern::Vec4>& ground_changes, Rng& rng, LifeOut& out) {
+  if (!world_ || dt <= 0) return;
+  update_cows(dt, now, view, city, out);
+  update_pigeons(dt, now, view, city, rng, out);
+  update_birds(dt, now, view, city, rng, out);
+  update_trees(view, city, ground_changes, now);
+  update_pets(dt, now, view, city, out);
+  update_joggers(dt, now, view, city, rng, out);
   update_voices(dt, now, view, out);
   ragdolls_.update(dt, now);
 }
@@ -145,21 +144,21 @@ void Life::update(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeOut& out)
 // ---------------------------------------------------------------------------------------------
 // cows (cows.mjs): herds on the meadows, a clock-driven grazing walk, a Box3D body when killed
 
-void Life::rebuild_herds(const LifeView& view, f32 now) {
+void Life::rebuild_herds(const LifeView& view, const CityStream& city, f32 now) {
   std::vector<CityStream::AreaRef> areas;
   // around the player and (host) around every mate: the same herds for everybody
   std::vector<Vec3> foci{view.focus};
   foci.insert(foci.end(), view.mates.begin(), view.mates.end());
   for (const Vec3& f : foci) {
     std::vector<CityStream::AreaRef> more;
-    view.city->areas_near({f.x, f.y}, kHerdRadius, AreaKind::grass, more);
+    city.areas_near({f.x, f.y}, kHerdRadius, AreaKind::grass, more);
     for (const CityStream::AreaRef& a : more)
       if (std::none_of(areas.begin(), areas.end(), [&](const CityStream::AreaRef& q) { return q.key == a.key; })) areas.push_back(a);
   }
   struct Cand { Meadow m; f32 d; };
   std::vector<Cand> cand;
   for (const CityStream::AreaRef& a : areas) {
-    const MapFeatures::Area& meadow = view.city->area(a);
+    const MapFeatures::Area& meadow = city.area(a);
     const f32 area = ring_area(meadow.rings[0]);
     if (area < kMinArea) continue;
     Meadow m;
@@ -209,7 +208,7 @@ void Life::rebuild_herds(const LifeView& view, f32 now) {
       c.next_moo = now + 8 + hash01(mix(key, 9)) * 30;
       c.phase = hash01(key) * 6;
       const Vec2 g = graze_spot(c, static_cast<i64>(now / kPeriod));
-      c.pos = {g.x, g.y, ground(view, g.x, g.y)};
+      c.pos = {g.x, g.y, city.ground_height(g.x, g.y)};
       next.push_back(c);
     }
     if (next.size() >= kMaxCows) break;
@@ -374,7 +373,7 @@ kern::physics::Body Life::grab_animal(Vec3 at, f32 reach) {
   return {};
 }
 
-void Life::update_cows(f32 dt, f32 now, const LifeView& view, LifeOut& out) {
+void Life::update_cows(f32 dt, f32 now, const LifeView& view, const CityStream& city, LifeOut& out) {
   if (remote_animals_) {
     // the host's herds: eased to his snapshots; one that is a body here (ours: in our hand, thrown,
     // killed here) follows its body until it stands or lies again
@@ -386,7 +385,7 @@ void Life::update_cows(f32 dt, f32 now, const LifeView& view, LifeOut& out) {
         c.rot = p.rotation;
         if (c.carried && !c.dead) {
           c.carried_still = kern::length(world_->linear_velocity(c.body)) < 0.35f ? c.carried_still + dt : 0;
-          if (c.carried_still > 1.0f) { world_->destroy_body(c.body); c.body = {}; c.carried = false; c.pos.z = ground(view, c.pos.x, c.pos.y); }
+          if (c.carried_still > 1.0f) { world_->destroy_body(c.body); c.body = {}; c.carried = false; c.pos.z = city.ground_height(c.pos.x, c.pos.y); }
         }
         continue;
       }
@@ -394,7 +393,7 @@ void Life::update_cows(f32 dt, f32 now, const LifeView& view, LifeOut& out) {
       const Vec3 d = want - c.pos;
       if (kern::length(d) > 8) c.pos = want;
       else c.pos = c.pos + d * std::fmin(1.0f, dt * 8);
-      if (!c.carried && !c.net_dead) c.pos.z = ground(view, c.pos.x, c.pos.y);
+      if (!c.carried && !c.net_dead) c.pos.z = city.ground_height(c.pos.x, c.pos.y);
       c.rot = c.net_rot;
       c.dead = c.net_dead;
       c.phase += dt * (c.walking ? 3.2f : 0.0f);
@@ -407,7 +406,7 @@ void Life::update_cows(f32 dt, f32 now, const LifeView& view, LifeOut& out) {
     if (dist2d(herds_for_, Vec2{view.focus.x, view.focus.y}) > 150 || (!view.mates.empty() && now - herds_at_ > 6)) {
       herds_at_ = now;
       herds_for_ = {view.focus.x, view.focus.y};
-      rebuild_herds(view, now);
+      rebuild_herds(view, city, now);
     }
   }
   for (Cow& c : cows_) {
@@ -441,7 +440,7 @@ void Life::update_cows(f32 dt, f32 now, const LifeView& view, LifeOut& out) {
           const f32 len = std::hypot(d.x, d.y), walk = std::fmin(kPeriod * 0.75f, len / kWalk);
           const f32 u = std::fmin(1.0f, static_cast<f32>(clock - static_cast<f64>(k) * kPeriod) / std::fmax(0.001f, walk));
           c.off = Vec2{p.position.x, p.position.y} - (A + d * u);
-          c.pos = {p.position.x, p.position.y, ground(view, p.position.x, p.position.y)};
+          c.pos = {p.position.x, p.position.y, city.ground_height(p.position.x, p.position.y)};
         }
         continue;
       }
@@ -465,7 +464,7 @@ void Life::update_cows(f32 dt, f32 now, const LifeView& view, LifeOut& out) {
     const bool walking = running || (u < 1 && len > 0.2f);
     const f32 yaw = running ? std::atan2(c.flee_v.y, c.flee_v.x) : len > 0.2f ? std::atan2(d.y, d.x) : c.yaw;
     c.yaw += wrap_pi(yaw - c.yaw) * std::fmin(1.0f, dt * (running ? 6.0f : 2.2f));
-    c.pos = {p.x, p.y, ground(view, p.x, p.y)};
+    c.pos = {p.x, p.y, city.ground_height(p.x, p.y)};
     c.walking = walking;
     c.phase += dt * (running ? 7.0f : walking ? 3.2f : 0.0f);
     if (now > c.next_moo) {
@@ -501,25 +500,25 @@ void Life::update_cows(f32 dt, f32 now, const LifeView& view, LifeOut& out) {
 // ---------------------------------------------------------------------------------------------
 // pigeons (pigeons.mjs)
 
-bool Life::blocked(const LifeView& view, Vec2 p) const {
-  if (view.city->terrain().water_at(p.x, p.y)) return true;
-  const f32 g = ground(view, p.x, p.y);
+bool Life::blocked(const LifeView& view, const CityStream& city, Vec2 p) const {
+  if (city.terrain().water_at(p.x, p.y)) return true;
+  const f32 g = city.ground_height(p.x, p.y);
   const RayResult r = cast(*view.physics, {p.x, p.y, g + 40}, {0, 0, -1}, 45, {}, kCatWorld);
   return r.hit && r.point.z > g + 0.35f;
 }
 
-bool Life::spot_near(const LifeView& view, Vec2 c, f32 r0, f32 r1, Rng& rng, Vec2& out) const {
+bool Life::spot_near(const LifeView& view, const CityStream& city, Vec2 c, f32 r0, f32 r1, Rng& rng, Vec2& out) const {
   for (int i = 0; i < 24; ++i) {
     const f32 a = rng.unit() * 2 * kPi, r = rng.range(r0, r1);
     const Vec2 p{c.x + std::cos(a) * r, c.y + std::sin(a) * r};
-    if (!blocked(view, p)) { out = p; return true; }
+    if (!blocked(view, city, p)) { out = p; return true; }
   }
   return false;
 }
 
-bool Life::spawn_flock(Vec2 at, f32 now, Rng& rng, const LifeView& view) {
+bool Life::spawn_flock(Vec2 at, f32 now, Rng& rng, const LifeView& view, const CityStream& city) {
   Flock f;
-  if (!spot_near(view, at, 0, 3, rng, f.at)) return false;
+  if (!spot_near(view, city, at, 0, 3, rng, f.at)) return false;
   const u32 n = kPerFlockMin + rng.next() % (kPerFlockMax - kPerFlockMin + 1);
   for (u32 i = 0; i < n; ++i) {
     Pigeon b;
@@ -529,7 +528,7 @@ bool Life::spawn_flock(Vec2 at, f32 now, Rng& rng, const LifeView& view) {
     b.peck = rng.unit() * 10;
     b.flap = rng.unit() * 6;
     b.lag = rng.range(0, 0.45f);
-    b.pos = {f.at.x + b.o.x, f.at.y + b.o.y, ground(view, f.at.x, f.at.y)};
+    b.pos = {f.at.x + b.o.x, f.at.y + b.o.y, city.ground_height(f.at.x, f.at.y)};
     f.birds.push_back(b);
   }
   f.next_flight = now + rng.range(25, 70);
@@ -539,12 +538,12 @@ bool Life::spawn_flock(Vec2 at, f32 now, Rng& rng, const LifeView& view) {
   return true;
 }
 
-void Life::spook(Flock& f, Vec2 from, f32 now, Rng& rng, const LifeView& view, LifeOut& out) {
+void Life::spook(Flock& f, Vec2 from, f32 now, Rng& rng, const LifeView& view, const CityStream& city, LifeOut& out) {
   if (f.air) return;
   const f32 away = std::atan2(f.at.y - from.y, f.at.x - from.x) + rng.range(-0.6f, 0.6f);
   const f32 far = rng.range(25, 55);
   Vec2 dest;
-  if (!spot_near(view, f.at + Vec2{std::cos(away), std::sin(away)} * far, 0, 18, rng, dest) && !spot_near(view, f.at, 20, 50, rng, dest)) dest = f.at;
+  if (!spot_near(view, city, f.at + Vec2{std::cos(away), std::sin(away)} * far, 0, 18, rng, dest) && !spot_near(view, city, f.at, 20, 50, rng, dest)) dest = f.at;
   f.air = true;
   f.t = 0;
   f.c = f.at + Vec2{std::cos(away), std::sin(away)} * 12;
@@ -555,7 +554,7 @@ void Life::spook(Flock& f, Vec2 from, f32 now, Rng& rng, const LifeView& view, L
   f.dur = rng.range(7, 13);
   f.dest = dest;
   f.from = f.at;
-  if (dist2d(view.focus, Vec3{f.at.x, f.at.y, view.focus.z}) < 45) out.sounds.push_back({LifeOut::Sound::flap, {f.at.x, f.at.y, ground(view, f.at.x, f.at.y) + 0.5f}, 0.8f, rng.range(0.9f, 1.15f)});
+  if (dist2d(view.focus, Vec3{f.at.x, f.at.y, view.focus.z}) < 45) out.sounds.push_back({LifeOut::Sound::flap, {f.at.x, f.at.y, city.ground_height(f.at.x, f.at.y) + 0.5f}, 0.8f, rng.range(0.9f, 1.15f)});
   (void)now;
 }
 
@@ -594,14 +593,14 @@ void Life::spook_pigeons(f32 now) {
   for (Flock& f : flocks_) { f.next_flight = now; }
 }
 
-void Life::update_pigeons(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeOut& out) {
+void Life::update_pigeons(f32 dt, f32 now, const LifeView& view, const CityStream& city, Rng& rng, LifeOut& out) {
   if (remote_animals_) {
     // the host's flocks: every bird eased to where he has it (walking, pecking, flying)
     if (!view.birds_on) { flocks_.clear(); }
     for (Flock& f : flocks_)
       for (Pigeon& b : f.birds) {
         if (b.dead_at >= 0) {
-          const f32 gz = ground(view, b.pos.x, b.pos.y);
+          const f32 gz = city.ground_height(b.pos.x, b.pos.y);
           if (b.pos.z > gz + 0.01f || b.fall_v.z > 0) { b.fall_v.z -= 9.81f * dt; b.pos = b.pos + b.fall_v * dt; if (b.pos.z <= gz) { b.pos.z = gz; b.fall_v = {}; } }
           continue;
         }
@@ -610,7 +609,7 @@ void Life::update_pigeons(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeO
         const bool moving = kern::length(b.net_v) > 0.05f;
         if (kern::length(d) > 15) b.pos = want;
         else b.pos = b.pos + d * std::fmin(1.0f, dt * 10);
-        if (!f.air) b.pos.z = ground(view, b.pos.x, b.pos.y);
+        if (!f.air) b.pos.z = city.ground_height(b.pos.x, b.pos.y);
         b.yaw += wrap_pi(b.net_yaw - b.yaw) * std::fmin(1.0f, dt * 8);
         b.flap += dt * (f.air ? 16.0f : 0.0f);
         b.peck += dt * (f.air ? 0.0f : moving ? 9.0f : 3.0f);
@@ -647,7 +646,7 @@ void Life::update_pigeons(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeO
     u32 there = 0;
     for (const Flock& f : flocks_) there += dist2d(f.at, around) <= kDespawn;
     Vec2 at;
-    if (there < want && spot_near(view, around, kNear, kFar, rng, at)) spawn_flock(at, now, rng, view);
+    if (there < want && spot_near(view, city, around, kNear, kFar, rng, at)) spawn_flock(at, now, rng, view, city);
   }
   // a pigeon let go flies off: up and away (it beats its wings), gone after 6 s
   for (LooseBird& b : loose_) {
@@ -666,16 +665,16 @@ void Life::update_pigeons(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeO
     f.birds.erase(std::remove_if(f.birds.begin(), f.birds.end(), [&](const Pigeon& b) { return b.dead_at >= 0 && now - b.dead_at > 12; }), f.birds.end());
     if (!f.air) {
       const f32 dp = dist2d(me, f.at);
-      if (dp < kSpookPlayer + 2.4f && view.player_speed > 0.3f) spook(f, me, now, rng, view, out);
+      if (dp < kSpookPlayer + 2.4f && view.player_speed > 0.3f) spook(f, me, now, rng, view, city, out);
       else if (const Vec3* mate = [&]() -> const Vec3* { for (const Vec3& m : view.mates) if (dist2d(Vec2{m.x, m.y}, f.at) < kSpookPlayer + 1.4f) return &m; return nullptr; }())
-        spook(f, {mate->x, mate->y}, now, rng, view, out);  // a mate walking up to them (host: his flocks are everybody's)
+        spook(f, {mate->x, mate->y}, now, rng, view, city, out);  // a mate walking up to them (host: his flocks are everybody's)
       else
         for (const LifeCar& c : view.cars)
-          if (std::hypot(c.position.x - f.at.x, c.position.y - f.at.y) < kSpookCar && kern::length(c.velocity) > 2) { spook(f, {c.position.x, c.position.y}, now, rng, view, out); break; }
-      if (!f.air && now > f.next_flight) spook(f, f.at + Vec2{rng.range(-1, 1), rng.range(-1, 1)}, now, rng, view, out);
+          if (std::hypot(c.position.x - f.at.x, c.position.y - f.at.y) < kSpookCar && kern::length(c.velocity) > 2) { spook(f, {c.position.x, c.position.y}, now, rng, view, city, out); break; }
+      if (!f.air && now > f.next_flight) spook(f, f.at + Vec2{rng.range(-1, 1), rng.range(-1, 1)}, now, rng, view, city, out);
       if (!f.air && now > f.coo_at) {
         f.coo_at = now + rng.range(3.5f, 11);
-        if (dp < 30 && now - last_coo_ > 1.6f) { last_coo_ = now; out.sounds.push_back({LifeOut::Sound::coo, {f.at.x, f.at.y, ground(view, f.at.x, f.at.y) + 0.3f}, 0.6f * std::fmax(0.15f, 1 - dp / 30), rng.range(0.92f, 1.08f)}); }
+        if (dp < 30 && now - last_coo_ > 1.6f) { last_coo_ = now; out.sounds.push_back({LifeOut::Sound::coo, {f.at.x, f.at.y, city.ground_height(f.at.x, f.at.y) + 0.3f}, 0.6f * std::fmax(0.15f, 1 - dp / 30), rng.range(0.92f, 1.08f)}); }
       }
     } else {
       f.t += dt;
@@ -688,7 +687,7 @@ void Life::update_pigeons(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeO
     }
     for (Pigeon& b : f.birds) {
       if (b.dead_at >= 0) {
-        const f32 gz = ground(view, b.pos.x, b.pos.y);
+        const f32 gz = city.ground_height(b.pos.x, b.pos.y);
         if (b.pos.z > gz + 0.01f || b.fall_v.z > 0) {
           b.fall_v.z -= 9.81f * dt;
           b.pos = b.pos + b.fall_v * dt;
@@ -716,7 +715,7 @@ void Life::update_pigeons(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeO
         const f32 k = std::fmin(1.0f, dt * 6);
         b.pos.x += (t.x - b.pos.x) * k;
         b.pos.y += (t.y - b.pos.y) * k;
-        b.pos.z = ground(view, b.pos.x, b.pos.y);
+        b.pos.z = city.ground_height(b.pos.x, b.pos.y);
         const bool moving = std::hypot(b.v.x, b.v.y) > 0.05f;
         b.peck += dt * (moving ? 9.0f : 3.0f);
       } else {
@@ -729,7 +728,7 @@ void Life::update_pigeons(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeO
         Vec2 p = l;
         if (t < 1.2f) p = src + (l - src) * lift;
         if (land > 0) p = l + (dst - l) * land;
-        const f32 z = ground(view, p.x, p.y) + f.h * std::fmin(lift, 1 - land) + 0.05f;
+        const f32 z = city.ground_height(p.x, p.y) + f.h * std::fmin(lift, 1 - land) + 0.05f;
         const Vec2 dv{p.x - b.pos.x, p.y - b.pos.y};
         if (std::hypot(dv.x, dv.y) > 0.01f) b.yaw = std::atan2(dv.y, dv.x);
         b.pos = {p.x, p.y, z};
@@ -742,7 +741,7 @@ void Life::update_pigeons(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeO
 // ---------------------------------------------------------------------------------------------
 // birds over the roofs and trees along the streets (world_liveliness.mjs)
 
-void Life::update_birds(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeOut& out) {
+void Life::update_birds(f32 dt, f32 now, const LifeView& view, const CityStream& city, Rng& rng, LifeOut& out) {
   if (!view.birds_on) {
     for (Bird& b : birds_) b.dead_until = std::fmax(b.dead_until, now + 0.5f);  // switched off: not drawn, not hit
     return;
@@ -761,7 +760,7 @@ void Life::update_birds(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeOut
       b.fall_v.z -= 5.4f * dt;
       b.pos = b.pos + b.fall_v * dt;
       b.yaw += b.spin * dt;
-      const f32 gz = ground(view, b.pos.x, b.pos.y);
+      const f32 gz = city.ground_height(b.pos.x, b.pos.y);
       if (b.pos.z <= gz + 0.05f) {
         b.pos.z = gz + 0.05f;
         b.down = true;
@@ -775,13 +774,13 @@ void Life::update_birds(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeOut
     const f32 phase = static_cast<f32>(b.seed % 10000) / 10000;
     const f32 a = now * (0.22f + static_cast<f32>(b.seed % 22) / 1000) + phase * 2 * kPi, r = 18 + static_cast<f32>(b.seed % 34);
     const f32 z = 8 + static_cast<f32>(b.seed % 13) + std::sin(a * 2.3f + static_cast<f32>(i)) * 2.1f;
-    b.pos = {b.center.x + std::cos(a) * r, b.center.y + std::sin(a * 0.94f) * r, ground(view, b.center.x, b.center.y) + z};
+    b.pos = {b.center.x + std::cos(a) * r, b.center.y + std::sin(a * 0.94f) * r, city.ground_height(b.center.x, b.center.y) + z};
     b.yaw = std::atan2(0.94f * std::cos(a * 0.94f), -std::sin(a));
     b.flap = 0.82f + 0.2f * std::sin(now * 10 + static_cast<f32>(i));
   }
 }
 
-void Life::update_trees(const LifeView& view, f32 now) {
+void Life::update_trees(const LifeView& view, const CityStream& city, const std::vector<kern::Vec4>& ground_changes, f32 now) {
   auto key_of = [](u64 tile, u32 index) { return tile * 0x9e3779b97f4a7c15ull + index; };
   // blown-over trees lie 40 s, then they are gone (and stay gone while their tile is loaded)
   for (const Tree& t : trees_) if (t.fell_at >= 0 && now - t.fell_at > 40) trees_gone_.insert(key_of(t.tile, t.index));
@@ -789,22 +788,22 @@ void Life::update_trees(const LifeView& view, f32 now) {
   // The trees are the map tiles' (tiles.h furnish: beside the streets, clear of every street,
   // path and house - from the tile's data alone, so every machine has the same trees): taken
   // whenever the set of tiles changes; a tile that goes takes its trees along.
-  if (tree_serial_ != view.city->furniture_serial()) {
-    tree_serial_ = view.city->furniture_serial();
+  if (tree_serial_ != city.furniture_serial()) {
+    tree_serial_ = city.furniture_serial();
     std::vector<u64> tiles;
-    view.city->furniture(tiles);
+    city.furniture(tiles);
     std::unordered_map<u64, Tree> fallen;
     for (const Tree& t : trees_) if (t.fell_at >= 0) fallen[key_of(t.tile, t.index)] = t;
     std::unordered_set<u64> gone;
     trees_.clear();
     for (u64 tile : tiles) {
-      const std::vector<MapFeatures::Spot>& spots = view.city->features(tile).trees;
+      const std::vector<MapFeatures::Spot>& spots = city.features(tile).trees;
       for (u32 i = 0; i < spots.size(); ++i) {
         const MapFeatures::Spot& sp = spots[i];
         const u64 k = key_of(tile, i);
         if (trees_gone_.count(k)) { gone.insert(k); continue; }
-        if (view.city->terrain().water_at(sp.p.x, sp.p.y)) continue;
-        Tree t{{sp.p.x, sp.p.y, ground(view, sp.p.x, sp.p.y)}, sp.a, 0, -1, {1, 0}, tile, i};
+        if (city.terrain().water_at(sp.p.x, sp.p.y)) continue;
+        Tree t{{sp.p.x, sp.p.y, city.ground_height(sp.p.x, sp.p.y)}, sp.a, 0, -1, {1, 0}, tile, i};
         if (const auto it = fallen.find(k); it != fallen.end()) { t.fell_at = it->second.fell_at; t.fall_dir = it->second.fall_dir; }
         trees_.push_back(t);
       }
@@ -812,10 +811,9 @@ void Life::update_trees(const LifeView& view, f32 now) {
     trees_gone_ = std::move(gone);
   }
   // the ground changed somewhere (a crater, a new elevation window): the trees there stand on it
-  if (view.ground_changes)
-    for (const kern::Vec4& r : *view.ground_changes)
-      for (Tree& t : trees_)
-        if (t.foot.x >= r.x && t.foot.x <= r.z && t.foot.y >= r.y && t.foot.y <= r.w) t.foot.z = ground(view, t.foot.x, t.foot.y);
+  for (const kern::Vec4& r : ground_changes)
+    for (Tree& t : trees_)
+      if (t.foot.x >= r.x && t.foot.x <= r.z && t.foot.y >= r.y && t.foot.y <= r.w) t.foot.z = city.ground_height(t.foot.x, t.foot.y);
 }
 
 
@@ -877,7 +875,7 @@ void Life::kill_pet(u32 i, Vec3 dir, f32 now, LifeOut& out) {
   world_->apply_linear_impulse_to_center(p.body, Vec3{dir.x, dir.y, std::fmax(0.0f, dir.z)} * mass);
 }
 
-void Life::update_pets(f32 dt, f32 now, const LifeView& view, LifeOut& out) {
+void Life::update_pets(f32 dt, f32 now, const LifeView& view, const CityStream& city, LifeOut& out) {
   epoch_ = view.epoch;
   // the anchor: the neighbourhood (re-anchored when the player is 2.5 km away, REANCHOR_M)
   const Vec2 me{view.focus.x, view.focus.y};
@@ -929,7 +927,7 @@ void Life::update_pets(f32 dt, f32 now, const LifeView& view, LifeOut& out) {
     if (cat_.phase == 2) {
       cat_.p = cat_.p + Vec3{std::cos(cat_.away_yaw), std::sin(cat_.away_yaw), 0} * (1.3f * dt);
       cat_.yaw = cat_.away_yaw;
-      cat_.p.z = ground(view, cat_.p.x, cat_.p.y);
+      cat_.p.z = city.ground_height(cat_.p.x, cat_.p.y);
       if (d > 28 || now - cat_.leave_at > 20) cat_.on = false;
     } else if (!view.on_foot) {
       cat_.on = false;
@@ -940,14 +938,14 @@ void Life::update_pets(f32 dt, f32 now, const LifeView& view, LifeOut& out) {
         const f32 step = std::fmin(d, 11 * dt);
         cat_.p.x += dx / std::fmax(1e-3f, d) * step;
         cat_.p.y += dy / std::fmax(1e-3f, d) * step;
-        cat_.p.z = ground(view, cat_.p.x, cat_.p.y) + std::fabs(std::sin(now / 0.055f)) * 0.12f;
+        cat_.p.z = city.ground_height(cat_.p.x, cat_.p.y) + std::fabs(std::sin(now / 0.055f)) * 0.12f;
         if (d < 1.6f) { cat_.phase = 1; cat_.leap_at = now; cat_.from = cat_.p; out.sounds.push_back({LifeOut::Sound::screech, cat_.p, 1, 1}); }
         if (now - cat_.start > 25) cat_.on = false;
       } else {
         const f32 k = std::fmin(1.0f, (now - cat_.leap_at) / 0.34f);
         cat_.p.x = cat_.from.x + (head.x - cat_.from.x) * k;
         cat_.p.y = cat_.from.y + (head.y - cat_.from.y) * k;
-        cat_.p.z = std::fmax(ground(view, cat_.p.x, cat_.p.y) + 0.18f, cat_.from.z + (head.z - 0.05f - cat_.from.z) * k + std::sin(k * kPi) * 0.55f);
+        cat_.p.z = std::fmax(city.ground_height(cat_.p.x, cat_.p.y) + 0.18f, cat_.from.z + (head.z - 0.05f - cat_.from.z) * k + std::sin(k * kPi) * 0.55f);
         if (k >= 1) {
           out.kill_player = true;
           cat_.phase = 2;
@@ -979,14 +977,14 @@ void Life::update_pets(f32 dt, f32 now, const LifeView& view, LifeOut& out) {
           p.off = p.off * std::exp(-dt / 5);
           const f32 a = p.phase + p.omega * t;
           const Vec2 q = anchor_of(i) + Vec2{std::cos(a), std::sin(a)} * p.radius + Vec2{std::cos(p.wobble_omega * t), std::sin(p.wobble_omega * t * 1.3f)} * p.wobble_r + p.off;
-          to = {q.x, q.y, ground(view, q.x, q.y)};
+          to = {q.x, q.y, city.ground_height(q.x, q.y)};
           if (p.has_pose && dist2d(Vec2{q.x, q.y}, Vec2{p.pos.x, p.pos.y}) > 1e-4f) pet_net_yaw_[i] = std::atan2(q.y - p.pos.y, q.x - p.pos.x);
         }
         const Vec3 d = to - p.pos;
         const Vec2 last{p.pos.x, p.pos.y};
         if (!p.has_pose || kern::length(d) > 6 || round) p.pos = to;
         else p.pos = p.pos + d * std::fmin(1.0f, dt * 7);
-        if (!p.carried && p.dead_at < 0) p.pos.z = ground(view, p.pos.x, p.pos.y);
+        if (!p.carried && p.dead_at < 0) p.pos.z = city.ground_height(p.pos.x, p.pos.y);
         p.yaw += wrap_pi(pet_net_yaw_[i] - p.yaw) * std::fmin(1.0f, dt * 8);
         if (p.has_pose && dt > 0) p.speed = std::fmin(6.0f, dist2d(Vec2{p.pos.x, p.pos.y}, last) / dt);
         p.gait += p.speed * dt / (0.55f * p.scale);
@@ -1036,11 +1034,11 @@ void Life::update_pets(f32 dt, f32 now, const LifeView& view, LifeOut& out) {
     if (p.has_pose && dist2d(q, last) > 1e-4f) p.yaw = std::atan2(q.y - last.y, q.x - last.x);
     p.speed = p.has_pose && dt > 0 ? dist2d(q, last) / dt : 0;
     if (p.speed > 6) p.speed = 0;  // re-anchored
-    p.pos = {q.x, q.y, ground(view, q.x, q.y)};
+    p.pos = {q.x, q.y, city.ground_height(q.x, q.y)};
     p.gait += p.speed * dt / (0.55f * p.scale);
     p.has_pose = true;
     // in a building or the water: not there (the path goes on, it reappears outside)
-    p.shown = !blocked(view, q);
+    p.shown = !blocked(view, city, q);
     if (!p.shown) continue;
     // cars (a blow that changes its velocity this hard kills it)
     for (const LifeCar& c : view.cars) {
@@ -1077,8 +1075,8 @@ Vec3 Life::sample(f32 s, f32& yaw, Vec2& normal) const {
   return {a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, 0};
 }
 
-bool Life::spawn_joggers(const LifeView& view, f32 now, Rng& rng) {
-  const std::vector<Lane>& lanes = view.city->lanes();
+bool Life::spawn_joggers(const LifeView& view, const CityStream& city, f32 now, Rng& rng) {
+  const std::vector<Lane>& lanes = city.lanes();
   const Lane* best = nullptr;
   f32 best_score = -1e9f;
   for (const Lane& l : lanes) {
@@ -1116,7 +1114,7 @@ bool Life::spawn_joggers(const LifeView& view, f32 now, Rng& rng) {
       Vec2 n;
       for (f32 s = 0; s <= c.len && free; s += 1.5f) {
         const Vec3 q = sample(s, yaw, n);
-        free = !blocked(view, {q.x, q.y});
+        free = !blocked(view, city, {q.x, q.y});
       }
       if (!free) continue;
       // start at the end further from the player (they come towards you)
@@ -1131,7 +1129,7 @@ bool Life::spawn_joggers(const LifeView& view, f32 now, Rng& rng) {
         Runner& r = chain_.runners[i];
         r = Runner{};
         const Vec3 q = sample(chain_.s - static_cast<f32>(i) * kGap, yaw, n);
-        r.pos = {q.x, q.y, ground(view, q.x, q.y)};
+        r.pos = {q.x, q.y, city.ground_height(q.x, q.y)};
         r.yaw = r.yaw_s = yaw;
         r.phase = rng.unit() * 6;
       }
@@ -1361,7 +1359,7 @@ void Life::net_bird(u64 key, Vec3 at, f32 yaw, Vec3 vel, bool held) {
   loose_.push_back(lb);
 }
 
-void Life::update_joggers(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeOut& out) {
+void Life::update_joggers(f32 dt, f32 now, const LifeView& view, const CityStream& city, Rng& rng, LifeOut& out) {
   if (!view.people_on) { chain_alive_ = false; return; }
   if (remote_joggers_) {
     // the host's club: eased to his runners (his snapshots, five a second), gone when he stops sending it
@@ -1372,7 +1370,7 @@ void Life::update_joggers(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeO
       const Vec3 d = r.net_to + r.net_v * clampf(now - r.net_at, 0, 0.6f) - r.pos;
       const f32 k = std::fmin(1.0f, dt * 10);
       r.pos = r.pos + d * k;
-      r.pos.z = ground(view, r.pos.x, r.pos.y);
+      r.pos.z = city.ground_height(r.pos.x, r.pos.y);
       r.yaw_s += clampf(wrap_pi(r.yaw - r.yaw_s), -9 * dt, 9 * dt);
       r.phase += kSpeed * dt * 2.4f;
     }
@@ -1382,7 +1380,7 @@ void Life::update_joggers(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeO
     if (next_chain_ < 0) next_chain_ = now + kFirst;
     if (now >= next_chain_) {
       next_chain_ = now + rng.range(kEveryMin, kEveryMax);
-      if (!spawn_joggers(view, now, rng)) next_chain_ = now + 15;
+      if (!spawn_joggers(view, city, now, rng)) next_chain_ = now + 15;
     }
     return;
   }
@@ -1398,7 +1396,7 @@ void Life::update_joggers(f32 dt, f32 now, const LifeView& view, Rng& rng, LifeO
     f32 yaw;
     Vec2 n;
     const Vec3 q = sample(c.s - static_cast<f32>(i) * kGap, yaw, n);
-    r.pos = {q.x, q.y, ground(view, q.x, q.y)};
+    r.pos = {q.x, q.y, city.ground_height(q.x, q.y)};
     r.yaw = yaw;
     r.yaw_s += clampf(wrap_pi(r.yaw - r.yaw_s), -9 * dt, 9 * dt);  // a quick pivot at the end of the street
     r.phase += kSpeed * dt * 3.4f;

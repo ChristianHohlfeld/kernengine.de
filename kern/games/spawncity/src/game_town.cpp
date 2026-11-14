@@ -40,14 +40,16 @@ bool Game::line_of_sight(Vec3 a, Vec3 b) const {
 PeopleView Game::people_view() const {
   PeopleView v;
   v.physics = &world_->physics();
-  v.city = &city_;
   v.focus = focus_position();
   if (net_.hosting()) v.foci = mate_foci();  // MP: the citizens live around every player (game_worldsync.cpp)
   v.player = player_position();
   if (mode_ == Mode::foot) v.player.z -= 0.73f;
   v.player_on_foot = mode_ == Mode::foot;
   v.player_alive = !player_dead_;
-  v.can_spawn = [this](Vec3 p) { return gaps_can_spawn(p, 1.9f, mobile_ ? 125.0f : 150.0f); };  // spawn_visibility_guard.mjs (game_gaps.cpp)
+  // spawn_visibility_guard.mjs (game_gaps.cpp): who may not see a person appear
+  v.spawn_watched = gaps_spawn_viewers(v.spawn_viewers);
+  v.spawn_far_entry = mobile_ ? 125.0f : 150.0f;
+  v.spawn_height = 1.9f;
   for (std::size_t i = 0; i < cars_.size(); ++i) {
     const TrafficCar& c = cars_[i];
     if (!c.placed || !world_->actor_alive(c.actor)) continue;
@@ -872,7 +874,8 @@ void Game::update_town(f32 dt) {
   player_dead_ = dead;
   handle_shots();
   const PeopleView view = people_view();
-  people_.update(dt, now, view, rng_);
+  people_.update(dt, now, view, city_, rng_);
+  if (view.spawn_watched) { gaps_->spawn_allowed += people_.spawns_allowed(); gaps_->spawn_denied += people_.spawns_denied(); }
   // Burning and crashing cars (critical_damage_logic.mjs).
   for (std::size_t i = 0; i < cars_.size(); ++i) {
     TrafficCar& c = cars_[i];
