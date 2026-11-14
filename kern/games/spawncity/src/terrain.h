@@ -167,7 +167,13 @@ class Terrain {
  private:
   struct DemTile { TileKey key; std::vector<f32> h; u32 w = 0, hgt = 0; bool failed = false, requested = false; };
   struct Grid { f32 x0 = 0, y0 = 0, step = 10; u32 n = 0; std::vector<f32> h; f32 cx = 0, cy = 0; };
-  struct Job;
+  /// The elevation grid that is being computed (run_job).
+  struct Job {
+    Grid g;
+    u32 id = 0;  // the elevation grid job (kern/core/jobs.h, kDemJob)
+    bool side = false;  // a window round a far mate (host), not the player's own
+    i32 x0 = 0, y0 = 0, x1 = 0, y1 = 0;  // its elevation tiles
+  };
   struct RenderTile { u32 mesh = 0; bool skirt = true; };
   struct CollisionTile { kern::physics::Body body; };
   struct WaterBlock { u64 bits[4] = {}; std::vector<Vec2> flow; std::vector<f32> speed; };
@@ -176,8 +182,9 @@ class Terrain {
   struct CorridorSeg { f32 ax, ay, dx, dy, l2, ha, hb, half; };
   struct CorridorSet { u64 owner = 0; kern::Vec4 bounds, box; std::unordered_map<u64, std::vector<CorridorSeg>> grid; };
   std::vector<std::unique_ptr<CorridorSet>> corridors_;
-  mutable const CorridorSet* corridor_hit_ = nullptr;  // the set of the last query (queries come in runs)
-  const CorridorSet* corridor_set(f32 x, f32 y) const;
+  mutable i32 corridor_hit_ = -1;  // the set of the last query, its place in corridors_ (queries come in runs); -1: none
+  /// The place in corridors_ of the map tile's set whose square holds the point, or -1.
+  i32 corridor_set(f32 x, f32 y) const;
   f32 road_field(f32 x, f32 y) const;
   f32 road_level(f32 x, f32 y, f32 h) const;
   struct Tint { u64 owner; kern::Vec4 box; Vec3 lin; std::vector<std::vector<Vec2>> rings; };
@@ -196,8 +203,9 @@ class Terrain {
   f32 sample_dem(f64 lon, f64 lat, bool& ok) const;
   f32 grid_at(const Grid& g, f32 x, f32 y) const;
   bool water_cell(i32 cx, i32 cy) const;
-  mutable u64 wc_key_ = ~0ull;            // water_cell's last block (its key, its bits or none)
-  mutable const u64* wc_bits_ = nullptr;
+  mutable u64 wc_key_ = ~0ull;            // water_cell's last block: its key, whether there is one, its bits
+  mutable bool wc_has_ = false;
+  mutable u64 wc_bits_[4] = {};
   void set_water_cell(i32 cx, i32 cy);
   bool on_bridge(f32 x, f32 y) const;
   void dirty(f32 x0, f32 y0, f32 x1, f32 y1, bool notify = true);

@@ -106,13 +106,6 @@ void bare_earth(std::vector<f32>& h, u32 n, f32 step, f32 open_m, f32 blur_m) {
   for (i32 p = 0; p < 8; ++p) filter_pass(h, t, n, p, ro, rb, q);
 }
 
-struct Terrain::Job {
-  Grid g;
-  u32 id = 0;  // the elevation grid job (kern/core/jobs.h, kDemJob)
-  bool side = false;  // a window round a far mate (host), not the player's own
-  i32 x0 = 0, y0 = 0, x1 = 0, y1 = 0;  // its elevation tiles
-};
-
 namespace {
 // kDemJob: Terrarium tiles -> the bare-earth grid (sample_dem + bare_earth, without engine state).
 void dem_grid_job(kern::Span<const u8> in, std::vector<u8>& out) {
@@ -210,7 +203,7 @@ void Terrain::clear() {
   grid_ = Grid{};
   side_.clear();
   corridors_.clear();
-  corridor_hit_ = nullptr;
+  corridor_hit_ = -1;
   grid_ready_ = false;
   ref_ready_ = false;
   ref_height_ = 0;
@@ -547,7 +540,7 @@ void Terrain::set_corridors(u64 owner, const kern::Vec4& bounds, const std::vect
     }
   }
   const kern::Vec4 box = set->box;
-  corridor_hit_ = nullptr;
+  corridor_hit_ = -1;
   corridors_.push_back(std::move(set));
   // the ground of the tile's square changed where its streets run (nobody else's ground did)
   if (box.z > box.x) {
@@ -560,7 +553,7 @@ void Terrain::remove_corridors(u64 owner) {
   for (auto it = corridors_.begin(); it != corridors_.end(); ++it) {
     if ((*it)->owner != owner) continue;
     const kern::Vec4 box = (*it)->box, bounds = (*it)->bounds;
-    corridor_hit_ = nullptr;
+    corridor_hit_ = -1;
     corridors_.erase(it);
     if (box.z > box.x) {
       const kern::Vec4 c{std::fmax(box.x, bounds.x), std::fmax(box.y, bounds.y), std::fmin(box.z, bounds.z), std::fmin(box.w, bounds.w)};
@@ -570,23 +563,25 @@ void Terrain::remove_corridors(u64 owner) {
   }
 }
 
-const Terrain::CorridorSet* Terrain::corridor_set(f32 x, f32 y) const {
+i32 Terrain::corridor_set(f32 x, f32 y) const {
   // the map tile whose square holds the point (the squares tile the plane: west / south edge in)
   auto in = [&](const CorridorSet& s) { return x >= s.bounds.x && x < s.bounds.z && y >= s.bounds.y && y < s.bounds.w; };
-  if (corridor_hit_ && in(*corridor_hit_)) return corridor_hit_;
-  for (const auto& s : corridors_) if (in(*s)) return corridor_hit_ = s.get();
-  return nullptr;
+  if (corridor_hit_ >= 0 && in(*corridors_[static_cast<std::size_t>(corridor_hit_)])) return corridor_hit_;
+  for (std::size_t i = 0; i < corridors_.size(); ++i)
+    if (in(*corridors_[i])) return corridor_hit_ = static_cast<i32>(i);
+  return -1;
 }
 
-bool Terrain::corridors_at(f32 x, f32 y) const { return !corridors_expected || corridor_set(x, y) != nullptr; }
+bool Terrain::corridors_at(f32 x, f32 y) const { return !corridors_expected || corridor_set(x, y) >= 0; }
 
 f32 Terrain::road_level(f32 x, f32 y, f32 h) const {
   // terrain_craters.mjs roadLevel: every corridor covering the point contributes (weighted), so
   // junctions blend smoothly, no steps
-  const CorridorSet* set = corridors_.empty() ? nullptr : corridor_set(x, y);
-  if (!set) return h;
-  const auto it = set->grid.find(road_key(static_cast<i32>(std::floor(x / kRoadGrid)), static_cast<i32>(std::floor(y / kRoadGrid))));
-  if (it == set->grid.end()) return h;
+  const i32 at = corridors_.empty() ? -1 : corridor_set(x, y);
+  if (at < 0) return h;
+  const CorridorSet& set = *corridors_[static_cast<std::size_t>(at)];
+  const auto it = set.grid.find(road_key(static_cast<i32>(std::floor(x / kRoadGrid)), static_cast<i32>(std::floor(y / kRoadGrid))));
+  if (it == set.grid.end()) return h;
   f32 best = 0, sw = 0, sh = 0;
   for (const CorridorSeg& s : it->second) {
     const f32 t = clampf(((x - s.ax) * s.dx + (y - s.ay) * s.dy) / s.l2, 0, 1);
@@ -655,14 +650,16 @@ kern::HeightSampler Terrain::sampler(f32 offset) const {
 bool Terrain::water_cell(i32 cx, i32 cy) const {
   // The hottest lookup of the city's streets (every draped road point asks it, ?perf=1 / the CPU
   // profile): consecutive points almost always fall in the same 64 m block, so the last block is
-  // remembered (unordered_map nodes never move; set_water_cell / clear forget it).
+  // remembered - its 256 bits (set_water_cell / clear forget it).
   const u64 k = key2(cx >> 4, cy >> 4);
   if (k != wc_key_) {
     auto it = water_.find(k);
     wc_key_ = k;
-    wc_bits_ = it == water_.end() ? nullptr : it->second.bits;
+    wc_has_ = it != water_.end();
+    if (wc_has_)
+      for (std::size_t w = 0; w < 4; ++w) wc_bits_[w] = it->second.bits[w];
   }
-  if (!wc_bits_) return false;
+  if (!wc_has_) return false;
   const u32 idx = static_cast<u32>((cy & 15) * 16 + (cx & 15));
   return (wc_bits_[idx >> 6] >> (idx & 63)) & 1u;
 }
