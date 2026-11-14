@@ -4730,7 +4730,12 @@ class Emit:
             why = self.crosses(t, their, of, target)
             if why:
                 raise Wait(f"a call of {function} on the Blueprint of the actor {actor}: its pin {what} is {why}")
-        pins = (list(zip(ins, in_types)), list(zip(gives, out_types)))
+        # (an input is named here as the actor's Blueprint names it - unless this Blueprint has a variable or a
+        # function of that name: then one of its own. Call on Actor gives the values in their order, by no name.)
+        named_in = []
+        for x in ins:
+            named_in.append(u.fresh(x, set(named_in)) if x in u.names or x in named_in else x)
+        pins = (list(zip(named_in, in_types)), list(zip(gives, out_types)))
         # (named here by its actor and its own name - KERN_EXTERN_AS: two actors' Blueprints may each have a
         # function of that name that looks different; every part of a Blueprint names it the same)
         local = re.sub(r"\W", "_", actor) + "_" + function
@@ -8709,7 +8714,10 @@ class TestWriter:
                         self.no_stand_in(f, w)
                         continue   # (what it takes the test has no values of: a function that calls it is not compared)
                     defs.append((("engine", f["decl"]["id"]), b))
-        objects = {q for q in u.objects_seen | set(by_class) | self.more_objects | set(self.object_enums) if q in tree.records and u.engine_object(q)}
+        # (the logic the level's Blueprints run in, and the program's way to call them, are the test's own: it
+        # runs the actors' Blueprints in a real one - converted::Blueprint, RuleBlueprint)
+        own_logic = (ENGINE + "::logic::Runtime", ENGINE + "::logic::ActorBlueprint")
+        objects = {q for q in u.objects_seen | set(by_class) | self.more_objects | set(self.object_enums) if q in tree.records and u.engine_object(q) and q not in own_logic}
         for q in sorted(objects):   # (the classes of the engine they derive from: stand-ins too - HostTransport is a Transport)
             for b in self.engine_bases(q):
                 objects.add(b)
