@@ -132,21 +132,23 @@ void Game::gaps_init(kern::Engine& e) {
   g.smoke = gaps::SmokeField::of(mobile_ ? 48 : 78);  // MAX_PUFFS
   g.renderer = &e.renderer();
   const kern::MeshData disc = smoke_disc();
-  for (GapsState::Part* p : {&g.disc, &g.ember}) {
+  auto make_part = [&](GapsState::Part& p, bool ember) {
     kern::Material m;
     m.alpha = kern::AlphaMode::blend;
     m.unlit = true;
     m.double_sided = true;
     m.cast_shadow = false;
-    if (p == &g.ember) m.emissive = {1.0f, 0.54f, 0.24f};  // 0xff8a3d, additive in SpawnCity
-    p->id = e.renderer().allocate_id();
+    if (ember) m.emissive = {1.0f, 0.54f, 0.24f};  // 0xff8a3d, additive in SpawnCity
+    p.id = e.renderer().allocate_id();
     kern::MeshLook look;
     look.material = m;
     look.extra_slot = kern::kMaxExtensionAttributes;
     look.visible = false;
     const Mat4 parked = Mat4::translate({0, 0, -1000});
-    if (!kern::upsert(e.renderer(), p->id, disc, look, kern::Span<const f32>(parked.m, 16))) { e.renderer().release_id(p->id); p->id = 0; }
-  }
+    if (!kern::upsert(e.renderer(), p.id, disc, look, kern::Span<const f32>(parked.m, 16))) { e.renderer().release_id(p.id); p.id = 0; }
+  };
+  make_part(g.disc, false);
+  make_part(g.ember, true);
   gaps_lamps_init(e.renderer());  // street lamps (game_lamps.cpp)
   {
     // the GUIDED trail: soft light-grey puffs (0xd9dcdf, opacity .42, 1.6 m)
@@ -223,14 +225,15 @@ void Game::gaps_guided(f32 dt) {
   }
   for (GapsState::MotorVoice& v : g.motors) v.alive = false;
   for (const guided::Flight& f : guided_) {
-    GapsState::MotorVoice* v = nullptr;
-    for (GapsState::MotorVoice& q : g.motors)
-      if (q.born == f.m.born) { v = &q; break; }
-    if (!v) { g.motors.push_back({f.m.born, -1, 0, false}); v = &g.motors.back(); }
-    v->alive = true;
+    std::size_t voice = g.motors.size();  // the missile's motor voice: the one it has, or a new one
+    for (std::size_t i = 0; i < g.motors.size(); ++i)
+      if (g.motors[i].born == f.m.born) { voice = i; break; }
+    if (voice == g.motors.size()) g.motors.push_back({f.m.born, -1, 0, false});
+    GapsState::MotorVoice& v = g.motors[voice];
+    v.alive = true;
     if (!f.m.motor) continue;  // dropped off the rail, the motor not lit yet
-    if (v->lit < 0) {
-      v->lit = now;
+    if (v.lit < 0) {
+      v.lit = now;
       gaps_guided_sounds();
       world_->play_sound("sc:guidedbang", cam_.eye, 1, 1, false);
       if (g.motor_clip) {
@@ -244,15 +247,15 @@ void Game::gaps_guided(f32 dt) {
         p.volume = 0.5f;
         p.bus = kern::audio::Bus::sfx;
         p.fade_in = 0.06f;
-        v->v = mixer_.play(g.motor_clip, p);
+        v.v = mixer_.play(g.motor_clip, p);
       }
     }
-    if (v->v) {
+    if (v.v) {
       // .5 at 60 ms, exponentially to .28 at .6 s
-      const f32 t = now - v->lit;
+      const f32 t = now - v.lit;
       const f32 vol = t < 0.06f ? 0.5f * t / 0.06f : 0.5f * std::pow(0.28f / 0.5f, std::fmin(1.0f, (t - 0.06f) / 0.54f));
-      mixer_.set_volume(v->v, vol);
-      mixer_.set_position(v->v, f.m.p, f.m.v);
+      mixer_.set_volume(v.v, vol);
+      mixer_.set_position(v.v, f.m.p, f.m.v);
     }
     // a puff 0.9 m behind the missile every frame
     const f32 sp = kern::length(f.m.v);

@@ -625,9 +625,11 @@ void Game::vr_comfort(f32 dt) {
       for (int y = 0; y < 2; ++y)
         for (int x = 0; x < 64; ++x) {
           const f32 t = static_cast<f32>(x) / 63, a = t * t * (3 - 2 * t);
-          u8* p = px + (y * 64 + x) * 4;
-          p[0] = p[1] = p[2] = 0;
-          p[3] = static_cast<u8>(a * 255 + 0.5f);
+          const int at = (y * 64 + x) * 4;  // black, the ring's opacity in alpha
+          px[at] = 0;
+          px[at + 1] = 0;
+          px[at + 2] = 0;
+          px[at + 3] = static_cast<u8>(a * 255 + 0.5f);
         }
       kern::TextureDesc td;
       td.rgba = px;
