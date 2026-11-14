@@ -1088,6 +1088,14 @@ Parametern und lokalen Variablen, in C++ ohnehin, im Interpreter und im JIT, wei
 unterbrochenen Aufruf die seinen zurückgibt. Was Knoten geben und behalten (`n7`), gehört wie immer
 dem Blueprint, nicht dem Aufruf.
 
+**Das Target beim Namen.** Find Actor by Name (`actor_find("Military")`) fragt in jeder Stufe den
+Host: `logic::Host::find_actor` – der Interpreter und das JIT im Knoten, die Klasse über
+`kern_world.host`, alle drei mit demselben Aufruf. Der Host eines Spiels nennt den Actor seiner Welt
+(`GameWorld::find_actor`: ein lebender des Namens, sonst irgendeiner, sonst keiner); ein Host ohne
+Welt nennt keinen – es sei denn, er nennt eigene: ein Test gibt so den Instanzen seiner Runtime Namen
+(`Runtime::add(g, self, …)` mit dem `self`, das `find_actor` für den Namen gibt), und Call on Actor
+und Get Variable on Actor treffen sie, wie sie im Spiel die Actors des Levels treffen.
+
 **Aufrufe aus C++.** Das C++ eines Programms ruft eine Funktion des Blueprints eines Actors so, wie
 Call on Actor sie ruft: `kern::logic::ActorBlueprint` (kern/logic/actor_blueprint.h) ist der
 Blueprint eines Actors des Levels, beim Namen des Actors gemacht; das Programm bindet `running`, wenn

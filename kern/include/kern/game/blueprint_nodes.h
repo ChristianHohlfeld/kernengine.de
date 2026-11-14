@@ -134,7 +134,8 @@ template <class Core> struct BlueprintNodesOf : Core {
   Actor actor_self() const { return kern_game() ? Actor{kern_self()} : Actor{}; }
   Actor actor_player(Int index) const { GameWorld* g = kern_game(); return g ? nodes::actor_player(*g, kern_self(), index) : Actor{}; }
   Int actor_player_count() const { GameWorld* g = kern_game(); return g ? nodes::actor_player_count(*g, kern_self()) : 0; }
-  Actor actor_find(const Text& name) const { GameWorld* g = kern_game(); return g ? nodes::actor_find(*g, kern_self(), name) : Actor{}; }
+  /// (by the host: a game's finds the actor of its world - logic::Host::find_actor)
+  Actor actor_find(const Text& name) const { return this->kern_world.host ? Actor{this->kern_world.host->find_actor(name)} : Actor{}; }
   nodes::Found actor_find_tag(const Text& tag) const { GameWorld* g = kern_game(); return g ? nodes::actor_find_tag(*g, kern_self(), tag) : nodes::Found{}; }
   List<Actor> actor_all_with_tag(const Text& tag) const { GameWorld* g = kern_game(); return g ? nodes::actor_all_with_tag(*g, kern_self(), tag) : List<Actor>(); }
   template <class N> Actor actor_random_tag(N& n, const Text& tag) {

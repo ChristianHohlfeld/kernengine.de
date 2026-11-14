@@ -2285,6 +2285,92 @@ struct Caller : kern::Blueprint {
   CHECK(!logic::graph_from_json(logic::graph_to_json(bad), back));
 }
 
+TEST(logic_actor_find_by_the_host) {
+  // Find Actor by Name asks the host (logic::Host::find_actor) - in the interpreter, with the JIT and in a
+  // Blueprint's class alike. A host without a world that names actors of its own: two instances of one
+  // Blueprint by their names, and Call on Actor and Get Variable on Actor reach each of them.
+  CHECK(game::logic_nodes_registered());
+  const char* guard_text = R"kn(
+struct Guard : kern::Blueprint {
+  Float Speed = 1.0;
+
+  struct TwiceResult { Float out = 0.0; };
+  TwiceResult Twice(Float x = 0.0) {
+    return {math_add(math_mul(x, 2.0), Speed)};
+  }
+};
+)kn";
+  const char* asker_text = R"kn(
+struct Asker : kern::Blueprint {
+  Float GotA = 0.0;
+  Float GotB = 0.0;
+  Float SpeedA = 0.0;
+  Float SpeedB = 0.0;
+  Float Nobody = 0.0;
+
+  struct TwiceResult { Float out = -1.0; };
+  KERN_EXTERN TwiceResult Twice(Float x = 0.0);
+
+  KERN_EVENT(on1, event_custom<"Ask">)
+  void on1(Actor actor, Float value, Text text) {
+    func_call_on<"Twice">(actor_find("A"), kern::out(n2.out), 10.0);
+    GotA = n2.out;
+    func_call_on<"Twice">(actor_find("B"), kern::out(n4.out), 10.0);
+    GotB = n4.out;
+    SpeedA = func_get_on<"Speed", Float>(actor_find("A"));
+    SpeedB = func_get_on<"Speed", Float>(actor_find("B"));
+    Nobody = func_get_on<"Speed", Float>(actor_find("C"));
+  }
+
+  struct { Float out = 0.0; } n2;
+  struct { Float out = 0.0; } n4;
+};
+)kn";
+  struct NamingHost : FakeLogicHost {
+    logic::ActorRef find_actor(std::string_view name) override { return name == "A" ? 7 : name == "B" ? 8 : 0; }
+  };
+  logic::Graph guard, asker;
+  std::string error;
+  CHECK(logic::from_cpp(guard_text, guard, nullptr, &error));
+  CHECK(logic::from_cpp(asker_text, asker, nullptr, &error));
+  if (!error.empty()) std::printf("%s\n", error.c_str());
+  CHECK(no_errors(logic::check(guard)) && no_errors(logic::check(asker)));
+  for (bool jit : {false, true}) {
+    NamingHost host;
+    logic::Runtime rt(host);
+    rt.jit = jit;
+    logic::Instance* a = rt.add(guard, 7, "Guard A");
+    logic::Instance* b = rt.add(guard, 8, "Guard B");
+    logic::Instance* asking = rt.add(asker, 9, "Asker");
+    CHECK(a && b && asking);
+    if (!a || !b || !asking) continue;
+    rt.begin();
+    CHECK(a->set("Speed", logic::Value::number(3)) && b->set("Speed", logic::Value::number(5)));
+    rt.call("Ask", 9);
+    CHECK_NEAR(asking->get("GotA").as_number(), 23.0, 1e-12);
+    CHECK_NEAR(asking->get("GotB").as_number(), 25.0, 1e-12);
+    CHECK_NEAR(asking->get("SpeedA").as_number(), 3.0, 1e-12);
+    CHECK_NEAR(asking->get("SpeedB").as_number(), 5.0, 1e-12);
+    // a name the host does not know: no actor - the Level's Blueprint, and there is none (the zero)
+    CHECK_NEAR(asking->get("Nobody").as_number(), 0.0, 1e-12);
+    CHECK(host.errors.empty());
+  }
+  // ... and a host that names none (the default): no actor, no call reaches a Guard
+  {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    logic::Instance* a = rt.add(guard, 7, "Guard A");
+    logic::Instance* asking = rt.add(asker, 9, "Asker");
+    CHECK(a && asking);
+    if (a && asking) {
+      rt.begin();
+      rt.call("Ask", 9);
+      CHECK_NEAR(asking->get("GotA").as_number(), -1.0, 1e-12);
+      CHECK_NEAR(asking->get("SpeedA").as_number(), 0.0, 1e-12);
+    }
+  }
+}
+
 TEST(logic_call_on_actor) {
   // A Blueprint calls a function of another one: it declares what the function looks like
   // (KERN_EXTERN) and calls it on an actor - or on the Level (no target).
