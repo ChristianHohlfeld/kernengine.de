@@ -766,7 +766,7 @@ struct Shape {
     // (Reserve changes nothing one can read - but in the class the list moves: what a function holds of it would be gone)
     auto writes_place = [](const std::string& t) {
       return t == "var.set" || t == "var.take" || t == "list.add" || t == "list.insert" || t == "list.remove_at" || t == "list.remove" || t == "list.clear" || t == "list.resize" ||
-             t == "list.append" || t == "list.insert_list" || t == "list.reserve" || t == "list.sort" ||
+             t == "list.append" || t == "list.insert_list" || t == "list.reserve" || t == "list.sort" || t == "list.copy_bytes" ||
              // (a map's or a set's steps put entries in or take them out - and move the others: a map's values are its entries)
              t == "map.set" || t == "map.add" || t == "map.remove" || t == "map.remove_at" || t == "map.clear" || t == "map.reserve" ||
              t == "set.add" || t == "set.remove" || t == "set.remove_at" || t == "set.clear" || t == "set.reserve";
@@ -826,7 +826,8 @@ struct Shape {
         w.kind = g.root_of(*at(x).node, named);
         w.root = at(x).node->param("variable");
         if (w.kind == Graph::Root::none || !path_steps(at(x).node->param("path"), w.path)) continue;
-        w.resizes = t != "var.set" && t != "var.take" && t != "list.sort";  // (a Take puts the zero where something stood, like a Set; Sort puts other items there)
+        // (a Take puts the zero where something stood, like a Set; Sort puts other items there, Copy Bytes other bytes)
+        w.resizes = t != "var.set" && t != "var.take" && t != "list.sort" && t != "list.copy_bytes";
         w.node = x;
         writes[f].push_back(std::move(w));
       }

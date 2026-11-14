@@ -133,6 +133,27 @@ inline const std::vector<Case>& cases() {
        R"kg({"id":11,"type":"struct.of_bytes","params":{"struct":"Frame","layout":"16: u32@0 u16@4 i16@6 u16@8 bool@10 f32@12"},"values":{"at":1}}],)kg"
        R"kg("links":[[1,"then",2,"exec"],[4,"value",3,"value"],[3,"bytes",2,"value"],[1,"value",5,"value"],[5,"result",4,"Speed"],[1,"value",6,"a"],[6,"result",4,"Seq"],)kg"
        R"kg([2,"then",7,"exec"],[9,"value",8,"bytes"],[8,"value",7,"value"],[7,"then",10,"exec"],[9,"value",11,"bytes"],[11,"value",10,"value"]]})kg"},
+      // The bytes of lists of numbers (Copy Bytes, memcpy between them): floats into bytes (not all of
+      // them), bytes into floats from a place Go's value says (beyond the bytes: 0; the last float
+      // written in part keeps its other bytes), a list into itself (as memmove), an Int64 into bytes at
+      // a place beyond the list's end, whole numbers into a list of a fixed length of doubles, floats
+      // into bytes of whole numbers from before the list's start.
+      {"copy_bytes",
+       R"kg({"variables":[{"name":"B","type":"int_list","value":[0,0,0,0,0,0,0,0,0,0,0,0]},{"name":"F","type":"float_list","value":[0.1,-2.5,1e30]},)kg"
+       R"kg({"name":"G","type":"float_list","value":[9,9,9,9]},{"name":"W","type":"int_list","value":[70000,-3,7,65535]},{"name":"L","type":"int64_list","value":[]},)kg"
+       R"kg({"name":"Big","type":"int64","value":"18364758544493064720"},{"name":"Fx","type":"float_list","count":3,"value":[0.5,0.25,-1]}],)kg"
+       R"kg("nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},)kg"
+       R"kg({"id":2,"type":"list.copy_bytes","params":{"variable":"B","code":"u8","from_code":"f32"},"values":{"at":1,"from":0,"count":10}},{"id":3,"type":"var.get","params":{"variable":"F"}},)kg"
+       R"kg({"id":4,"type":"list.copy_bytes","params":{"variable":"G","code":"f32","from_code":"u8"},"values":{"at":0,"count":13}},{"id":5,"type":"math.round"},)kg"
+       R"kg({"id":6,"type":"var.get","params":{"variable":"B"}},)kg"
+       R"kg({"id":7,"type":"list.copy_bytes","params":{"variable":"W","code":"u16","from_code":"u16"},"values":{"at":1,"from":0,"count":5}},{"id":8,"type":"var.get","params":{"variable":"W"}},)kg"
+       R"kg({"id":15,"type":"list.add","params":{"variable":"L"}},{"id":16,"type":"var.get","params":{"variable":"Big"}},)kg"
+       R"kg({"id":9,"type":"list.copy_bytes","params":{"variable":"B","code":"u8","from_code":"i64"},"values":{"from":0,"count":16}},{"id":11,"type":"var.get","params":{"variable":"L"}},)kg"
+       R"kg({"id":12,"type":"list.copy_bytes","params":{"variable":"Fx","code":"f64","from_code":"i32"},"values":{"at":0,"from":1,"count":12}},)kg"
+       R"kg({"id":14,"type":"list.copy_bytes","params":{"variable":"W","code":"i8","from_code":"f32"},"values":{"at":-1,"from":0,"count":4}}],)kg"
+       R"kg("links":[[1,"then",2,"exec"],[3,"value",2,"items"],[2,"then",4,"exec"],[1,"value",5,"a"],[5,"result",4,"from"],[6,"value",4,"items"],)kg"
+       R"kg([4,"then",7,"exec"],[8,"value",7,"items"],[7,"then",15,"exec"],[16,"value",15,"item"],[15,"then",9,"exec"],[5,"result",9,"at"],[11,"value",9,"items"],)kg"
+       R"kg([9,"then",12,"exec"],[8,"value",12,"items"],[12,"then",14,"exec"],[3,"value",14,"items"]]})kg"},
       {"events_and_time",
        R"({"variables":[{"name":"Ticks","type":"int","value":0},{"name":"Elapsed","type":"float","value":0},{"name":"Heard","type":"float","value":0},{"name":"Last","type":"text","value":""}],
         "nodes":[{"id":1,"type":"event.tick"},{"id":2,"type":"var.add","params":{"variable":"Ticks"}},{"id":3,"type":"var.add","params":{"variable":"Elapsed"}},

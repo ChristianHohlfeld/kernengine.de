@@ -7,7 +7,9 @@
 //   - a const method and a function that only gives something is a value, everything else a step
 //     (a function handed an object of the engine to change is a step);
 //   - what a function writes through a parameter is a further output, and so is what it reports
-//     through a pointer that is null by default (`bool* changed = nullptr`);
+//     through a pointer that is null by default (`bool* changed = nullptr`), and what it writes
+//     through a pointer to numbers with their count beside it (`void render(f32* out, u32 frames)`:
+//     the output list `out`, its count an input - EnginePin::count);
 //   - an object of the engine with a life of its own (a class: the physics world, the renderer,
 //     the mixer; a struct that cannot be copied or holds such an object) is a handle, a whole
 //     number the host gives - the first input of its nodes, which are all its public methods;
@@ -33,6 +35,9 @@ struct EnginePin {
   PinType type;
   const char* of;     // a struct or an enum (or a list of them): its name
   const char* shape;  // the value's form, written out: n i b v t, l (Int64), e<values>, {fields}, [items]
+  /// An output list the engine writes through a pointer, with their count beside it (`void render(f32*
+  /// out, u32 frames)`): the input that is the count - the room the call says it has ("" for any other pin).
+  const char* count = "";
 };
 
 struct EngineFunction {
@@ -54,7 +59,8 @@ void add_engine_nodes(Library& lib);
 
 /// A stand-in for the engine, for tests: it answers every function of the table with values of
 /// its outputs' forms - made from the function's name and its inputs, so the same call gets the
-/// same answer in every tier - and keeps what it was asked, call by call.
+/// same answer in every tier - and keeps what it was asked, call by call. An output list with a
+/// count (EnginePin::count) has no more entries than that input says.
 struct EngineStandIn {
   std::vector<std::string> calls;  // "engine.world.pose(1, {2, 0})" ...
   bool engine(std::string_view function, const std::vector<Value>& in, std::vector<Value>& out);

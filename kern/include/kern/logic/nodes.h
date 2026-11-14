@@ -1306,6 +1306,88 @@ template <class E> u64 byte_at(const E* items, std::size_t count, i64 from, u32 
   const i64 k = from + static_cast<i64>(i);
   return k >= 0 && static_cast<u64>(k) < count ? byte_of(static_cast<i64>(items[static_cast<std::size_t>(k)])) : 0;
 }
+
+// ---- the bytes of a list of numbers (Copy Bytes) ----
+/// Which numbers an entry of a list of this type can be held as in C++ (Copy Bytes: Int u8 .. i32,
+/// Int64 u64 i64, Float f32 f64).
+constexpr bool suits_list(Code c, PinType element) {
+  return element == PinType::integer ? whole(c) : element == PinType::int64 ? wide(c) : element == PinType::number ? floating(c) : false;
+}
+/// The bits `w` holds of a number `c` is wide - the rest 0, or 1 where `c` has a sign and its
+/// highest bit is one (as C++ reads a number of that width).
+constexpr u64 widened(Code c, u64 w) {
+  const u32 n = width(c);
+  if (n >= 8) return w;
+  w &= (u64{1} << (8 * n)) - 1;
+  if (is_signed(c) && ((w >> (8 * n - 1)) & 1u)) w |= ~u64{0} << (8 * n);
+  return w;
+}
+/// The bits of an entry as the number `c` holds it: an Int's 64 bits (of which `c` takes as many
+/// as it is wide - as C++ converts), an Int64's, a Float's as a float or a double.
+inline u64 entry_bits(Code, i64 v) { return static_cast<u64>(v); }
+inline u64 entry_bits(Code, Whole v) { return static_cast<u64>(static_cast<i64>(v)); }
+inline u64 entry_bits(Code, Int64 v) { return v.bits; }
+inline u64 entry_bits(Code c, f64 v) { return bits(c, v); }
+/// The entry those bits of the number `c` are.
+inline void set_entry(i64& to, Code c, u64 w) { to = static_cast<i64>(widened(c, w)); }
+inline void set_entry(Whole& to, Code c, u64 w) { to = Whole(static_cast<i64>(widened(c, w))); }
+inline void set_entry(Int64& to, Code, u64 w) { to = Int64(w); }
+inline void set_entry(f64& to, Code c, u64 w) { to = c == Code::f32 ? single_value(static_cast<u32>(w)) : std::bit_cast<f64>(w); }
+/// Where the numbers of a list may lie for Copy Bytes: an entry or a byte beyond every list (a list
+/// has at most 2^24 entries, of at most 8 bytes) is the same as one further out - what is beyond
+/// that is cut to it, so that no sum leaves an i64.
+inline constexpr i64 kFarBytes = i64{1} << 40;
+constexpr i64 near(i64 v) { return v < -kFarBytes ? -kFarBytes : v > kFarBytes ? kFarBytes : v; }
+/// Copy Bytes: `count` bytes of the entries of `from` (`from_count` of them, each the number `of`,
+/// little-endian), from its entry `first` on, into the entries of `to` (each the number `into`) from
+/// its entry `at` on - what std::memcpy / std::memmove between lists of numbers does. A byte the
+/// entries of `from` do not have is 0; a byte beyond `to` is not written - it keeps its length; an
+/// entry some of whose bytes are written keeps the others (of its bits as `into` holds it). The
+/// entries of `from` are read as they were before (a list into itself, as memmove). One pass over
+/// the entries written; nothing is asked for - except where a list is copied into itself as another
+/// number than it is (then its entries as they were are taken first).
+template <class D, class S> void copy(D* to, std::size_t to_count, Code into, i64 at, const S* from, std::size_t from_count, Code of, i64 first, i64 count) {
+  const i64 w = width(into), v = width(of);
+  if (w == 0 || v == 0 || count <= 0 || to_count == 0) return;
+  count = near(count);
+  const i64 d0 = near(at) * w, s0 = near(first) * v;  // (where the bytes begin in each)
+  const i64 size = static_cast<i64>(to_count) * w;
+  const i64 lo = d0 < 0 ? 0 : d0, hi = d0 + count > size ? size : d0 + count;  // (the bytes of `to` written: lo .. hi - 1)
+  if (lo >= hi) return;
+  bool same = false;  // (is `from` the list `to` itself?)
+  if constexpr (std::is_same_v<D, S>) {
+    same = !std::less<const S*>{}(from, to) && std::less<const S*>{}(from, to + to_count);
+    if (same && into != of) {
+      const std::vector<S> were(from, from + from_count);
+      copy(to, to_count, into, at, were.data(), were.size(), of, first, count);
+      return;
+    }
+  }
+  // the byte of `from` at s (its entry read once for all its bytes a pass needs)
+  i64 held_at = -1;
+  u64 held = 0;
+  auto source = [&](i64 s) -> u64 {
+    const i64 j = s >= 0 ? s / v : -((-s + v - 1) / v);
+    if (j < 0 || static_cast<u64>(j) >= from_count) return 0;
+    if (j != held_at) held = entry_bits(of, from[static_cast<std::size_t>(j)]), held_at = j;
+    return (held >> (8 * (s - j * v))) & 0xffu;
+  };
+  // (from the last entry back where the bytes move up in a list into itself - each read before it is written)
+  const bool down = d0 > s0;
+  const i64 e0 = lo / w, e1 = (hi - 1) / w;
+  for (i64 k = 0; k <= e1 - e0; ++k) {
+    const i64 e = down ? e1 - k : e0 + k;
+    D& entry = to[static_cast<std::size_t>(e)];
+    u64 bits_ = entry_bits(into, entry);
+    for (i64 b = 0; b < w; ++b) {
+      const i64 at_byte = e * w + b;
+      if (at_byte < lo || at_byte >= hi) continue;
+      bits_ = (bits_ & ~(u64{0xff} << (8 * b))) | (source(s0 + (at_byte - d0)) << (8 * b));
+    }
+    set_entry(entry, into, bits_);
+    if (same) held_at = -1;  // (the entry written may be one read next)
+  }
+}
 }  // namespace bytes
 
 /// A whole number written as text, as settings hold them ("3", " 12"): leading blanks, a sign,

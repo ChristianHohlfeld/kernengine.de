@@ -945,6 +945,71 @@ void add_lists(Library& lib) {
     lib.add(std::move(d));
   }
   {
+    // Copy Bytes: what std::memcpy between lists of numbers does - the bytes of numbers, in one go
+    // (logic::bytes::copy, nodes.h: the same function for the interpreter and the class).
+    auto code_param = [](const char* key, const char* label) {
+      return param(key, label, ParamDef::Kind::choice, "u8",
+                   {"u8", "u8", "i8", "i8", "u16", "u16", "i16", "i16", "u32", "u32", "i32", "i32", "u64", "u64", "i64", "i64", "f32", "f32", "f64", "f64"});
+    };
+    auto list_of_code = [](bytes::Code c) {
+      return bytes::whole(c) ? PinType::integer_list : bytes::wide(c) ? PinType::int64_list : PinType::number_list;
+    };
+    NodeDef d = make("list.copy_bytes", "Copy Bytes", "Lists", NodeKind::action,
+                     "Writes Count bytes of the numbers of Items, from its item From on, into the list variable from its item At on - each item of a list the "
+                     "number its setting says (u8 i8 u16 i16 u32 i32: an Int; u64 i64: an Int64; f32 f64: a Float), little-endian, as C++ lays them out: what "
+                     "std::memcpy between lists of numbers does, in one go. A byte Items does not have is 0; one beyond the list is not written (it keeps "
+                     "its length); an item some of whose bytes are written keeps the others. Items are read as they were (a list into itself, as memmove).",
+                     "memcpy memmove bytes binary serialize wire buffer float array copy");
+    d.params = {param("variable", "List", ParamDef::Kind::variable), local_of(), path_of(), code_param("code", "Number"), code_param("from_code", "Number of Items")};
+    d.inputs = {exec_in(), data("at", "At", PinType::integer, 0), data("items", "Items", PinType::integer_list), data("from", "From", PinType::integer, 0),
+                data("count", "Count", PinType::integer, 0)};
+    d.outputs = {exec_out()};
+    d.title = [](const NodeDef&, const Node& n) { return "Copy Bytes into " + place_title(n); };
+    d.shape = [list_of_code](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>&) {
+      const bytes::Code of = bytes::code_of(n.param("from_code", "u8"));
+      for (PinDef& p : in)
+        if (p.id == "items" && of != bytes::Code::none && of != bytes::Code::boolean) retype(p, TypeRef{list_of_code(of), ""}, g);
+    };
+    d.problem = [](const Node& n, const Graph& g) -> std::string {
+      const bytes::Code into = bytes::code_of(n.param("code", "u8")), of = bytes::code_of(n.param("from_code", "u8"));
+      if (into == bytes::Code::none || into == bytes::Code::boolean || of == bytes::Code::none || of == bytes::Code::boolean)
+        return "a number is one of u8 i8 u16 i16 u32 i32 u64 i64 f32 f64";
+      Variable named;
+      const Variable* v = g.place_of(n, named) ? &named : nullptr;
+      if (v && !is_list(v->type)) return "needs a list variable: \"" + v->name + "\" is " + std::string(pin_type_name(v->type));
+      if (v && !bytes::suits_list(into, element_of(v->type)))
+        return "\"" + v->name + "\" is a list of " + std::string(pin_type_name(element_of(v->type))) + ": its numbers are not " + n.param("code", "u8") +
+               " (an Int is u8 .. i32; an Int64 u64, i64; a Float f32, f64)";
+      return {};
+    };
+    d.run = [](Context& c) {
+      const i64 at = c.in_int("at");
+      const Value items = c.in("items");
+      const i64 from = c.in_int("from"), count = c.in_int("count");
+      const bytes::Code into = bytes::code_of(c.param("code", "u8")), of = bytes::code_of(c.param("from_code", "u8"));
+      const std::vector<i64> path = c.path();  // (its indices, read after its inputs - as every step on a list)
+      c.instance().change(c.node(), path, [&](Value& v) {
+        if (!is_list(v.type) || !is_list(items.type) || !bytes::suits_list(into, element_of(v.type)) || !bytes::suits_list(of, element_of(items.type))) return;
+        auto numbers = [](PinType element, auto&& f) {
+          if (element == PinType::integer) f(std::type_identity<i64>{});
+          else if (element == PinType::int64) f(std::type_identity<Int64>{});
+          else if (element == PinType::number) f(std::type_identity<f64>{});
+        };
+        numbers(element_of(v.type), [&](auto to_type) {
+          using D = typename decltype(to_type)::type;
+          numbers(element_of(items.type), [&](auto from_type) {
+            using S = typename decltype(from_type)::type;
+            const std::vector<S>& source = items.template items<S>();
+            std::vector<D>& target = v.template edit<D>();
+            bytes::copy(target.data(), target.size(), into, at, source.data(), source.size(), of, from, count);
+          });
+        });
+      });
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
+  {
     NodeDef d = step("list.clear", "Clear List", "Takes every item out of a list variable.", "empty reset array", {}, {});
     d.title = [](const NodeDef&, const Node& n) { return "Clear " + place_title(n); };
     d.run = [on_list](Context& c) {

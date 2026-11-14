@@ -440,6 +440,49 @@ def record_of(tree, v):
     return longest[0] if len(longest) == 1 else None
 
 
+def byte_size(unit, raw):
+    """What sizeof gives for this type on every platform the engine runs on: (the bytes, does a float of the
+    program stand in it) - a number of a fixed width (BYTE_CODES), a struct of such numbers without padding
+    (record_bytes), an array of them. None for anything else - what the platform decides (a long, a pointer)
+    or C++ leaves open (padding)."""
+    t = re.sub(r"^(?:const\s+|volatile\s+)+", "", raw.strip())
+    t = re.sub(r"^(?:struct|class)\s+", "", t)
+    m = re.match(r"(.+?)\s*\[(\d+)\]$", t)
+    if m:
+        inner = byte_size(unit, m.group(1))
+        return (inner[0] * int(m.group(2)), inner[1]) if inner is not None else None
+    code = BYTE_CODES.get(t) or BYTE_CODES.get(unit.clean(t))
+    if code is not None:
+        return BYTE_WIDTH[code], code == "f32"
+    try:
+        q = unit.find_type(unit.clean(t))
+    except Wait:
+        return None
+    if q is None or q not in unit.tree.records:
+        return None
+    try:
+        _, size, fields = record_bytes(unit.tree, q)
+    except Wait:
+        return None
+    return size, any(c == "f32" for _, c in fields)
+
+
+def pointer_code(unit, x):
+    """The number a pointer handed to memcpy / memmove points at, as the bytes of a list hold it (Copy Bytes):
+    u8 .. i32, u64, i64, f32, f64 - of the pointer before it is made a void* (`grid.data()`: a float*, f32).
+    None: a pointer to anything else - to a char (its sign is the platform's), a bool, a long (its width is),
+    a struct."""
+    b = bare(x)
+    while b.get("kind") == "ImplicitCastExpr" and b.get("castKind") in ("BitCast", "NoOp") and kids(b) and re.match(r"(const\s+)?void\s*\*", qtype(b).strip()):
+        b = bare(kids(b)[0])
+    raw = qtype(b).strip()
+    if not re.search(r"\*\s*(const)?$", raw):
+        return None
+    inner = re.sub(r"^(const\s+|volatile\s+)+", "", re.sub(r"\*\s*(const)?$", "", raw).strip()).strip()
+    code = BYTE_CODES.get(inner) or BYTE_CODES.get(unit.clean(inner))
+    return code if code not in (None, "bool") else None
+
+
 def addressed_record(tree, a):
     """`&x` (also cast to a pointer to bytes) where x is a value of a record: (x, the record's qualified name) - else None."""
     x = bare(a)
@@ -517,6 +560,8 @@ class Tree:
                 z = re.search(r"\[sizeof=(\d+)", line)
                 if z and name:
                     self.layouts.setdefault(name, (int(z.group(1)), fields))
+                    # (a record of a file's own namespace: the tree names it without that namespace - the compiler with it)
+                    self.layouts.setdefault(name.replace("(anonymous namespace)::", ""), (int(z.group(1)), fields))
                     name = ""
         # (the compiler names a record with all its namespaces; the tree without the one that is converted)
         for name in (q, f"{self.namespace}::{q}"):
@@ -1330,7 +1375,7 @@ class Unit:
                 text = open(os.path.join(ROOT, "kern", "src", "logic", "engine_api.gen.cpp")).read()
             except OSError:
                 text = ""
-            pins = lambda t: [(m.group(1), m.group(2), m.group(3)) for m in re.finditer(r'\{"(\w+)", PinType::(\w+), "(\w*)", "[^"]*"\}', t)]
+            pins = lambda t: [(m.group(1), m.group(2), m.group(3)) for m in re.finditer(r'\{"(\w+)", PinType::(\w+), "(\w*)", "[^"]*"(?:, "\w*")?\}', t)]
             for m in re.finditer(r'\{"(engine\.[\w.]+)", (?:"(?:\\.|[^"\\])*", ){4}(true|false),\n\s*\{(.*)\},\n\s*\{(.*)\}\},', text):
                 self._table[m.group(1)] = (m.group(2) == "true", pins(m.group(3)), pins(m.group(4)))
         return self._table
@@ -2277,6 +2322,12 @@ class Const:
                 return self.number(v)
         if k in ("CXXNullPtrLiteralExpr", "GNUNullExpr") and ENGINE_NODES:   # (no object of the engine: the handle 0)
             return 0
+        if k == "UnaryExprOrTypeTraitExpr" and n.get("name") == "sizeof":
+            # (the bytes C++ gives the type - a number of a fixed width, a struct of them, an array: its layout's)
+            got = byte_size(self.unit, sized(n) or "")
+            if got is None:
+                raise Wait("sizeof")
+            return self.fit(got[0], n)
         raise Wait(f"a constant written as {k}")
 
     def field_of(self, value, field_id):
@@ -4329,6 +4380,18 @@ class Emit:
                          f"  {held} = list_get<{it}>({lv}, {a});", f"  {lv}[{a}] = list_get<{it}>({lv}, {b});", f"  {lv}[{b}] = {held};",
                          f"  {a} += 1;", f"  {b} = {self.whole_math('-', b, '1')};", "}"]
                 return before + lines + after
+            if name == "fill" and len(kids(n)) == 4 and not self.own(ref.get("id")):
+                # std::fill(first, last, x): every entry from first to before last this value - worked out once (as C++
+                # takes it, a const reference), then set where each entry stands: the loop C++ runs, nothing asked for
+                (l0, first), (l1, last) = self.place(kids(n)[1]), self.place(kids(n)[2])
+                if not self.same_list(l0, l1):
+                    raise Wait("call: fill() between two lists")
+                lt = self.tp(l0)
+                it = lt[5:-1]
+                before, lv, after = self.variable_of(l0, lt)
+                fill, a, b = self.temp("fill", it), self.temp("first", "Int"), self.temp("last", "Int")
+                lines = [f"{fill} = {self.ex(kids(n)[3], it)};", f"{a} = {first};", f"{b} = {self.whole_math('-', last, '1')};"]
+                return before + lines + self.count_loop(a, b, lambda i: [f"{lv}[{i}] = {fill};"]) + after
             if name == "swap" and len(kids(n)) == 3:
                 a, b = kids(n)[1:]
                 t = self.tp(a)
@@ -4338,6 +4401,10 @@ class Emit:
                 return self.sorted_list(name, kids(n)[1:])
             if name in ("memmove", "memcpy") and len(kids(n)) == 4 and not self.own(ref.get("id")) and self.byte_places(kids(n)[1:3]) is not None:
                 return self.moved_bytes(name, kids(n)[1:])
+            if name in ("memmove", "memcpy") and len(kids(n)) == 4 and not self.own(ref.get("id")):
+                got = self.copied_bytes(kids(n)[1:])
+                if got is not None:
+                    return got
             if name in ("memcpy", "memmove") and len(kids(n)) == 4 and not self.own(ref.get("id")):
                 got = self.bytes_into(kids(n)[1:])
                 if got is not None:
@@ -4419,11 +4486,50 @@ class Emit:
             except Wait:
                 return None
             c = self.ctype(lst)
-            entry = template_args(c)[0] if c.startswith(("std::array<", "std::vector<")) else re.sub(r"\s*\[\d*\]$", "", c) if c.endswith("]") else None
+            span = re.match(r"(?:kern::)?Span<\s*(?:const\s+)?(.+?)\s*>$", c)   # (a view of a list of bytes: that list)
+            entry = template_args(c)[0] if c.startswith(("std::array<", "std::vector<")) else span.group(1) if span else re.sub(r"\s*\[\d*\]$", "", c) if c.endswith("]") else None
             if entry is None or self.u.clean(entry) not in ("unsigned char", "signed char", "char") or self.tp(lst) != "List<Int>":
                 return None
             out.append((lst, at))
         return out
+
+    def copied_bytes(self, a):
+        """memcpy / memmove(to, from, count) between places of lists of numbers - `out.data()`, `v.data() + k`, an
+        array, a pointer into a list -, the bytes of a struct of numbers (`&head`: Bytes of Struct) as the place it
+        is copied from: Copy Bytes, in one go, the numbers of each as C++ holds them (`list_copy_bytes<"u8", "f32">`).
+        The list keeps its length, as C++'s does. None: it is no such memcpy."""
+        into = pointer_code(self.u, a[0])
+        if into is None:
+            return None
+        try:
+            dst, at = self.place(a[0])
+        except Wait:
+            return None
+        lt = self.tp(dst)
+        if not lt.startswith("List<") or BYTE_FIELD[into] != lt[5:-1]:
+            return None
+        held = addressed_record(self.tree, a[1])
+        if held is not None:
+            # (the bytes of a struct of numbers - Bytes of Struct, a list of a fixed length where the call is - as bytes)
+            v, q = held
+            st, text, size = self.u.byte_layout(q)
+            src, frm, of = self.temp("bytes", "List<Int>", size), "0", "u8"
+            self.hoist([f"{src} = struct_bytes<{st}, {text_literal(text)}>({self.ex(v, st)});"])
+        else:
+            of = pointer_code(self.u, a[1])
+            if of is None:
+                return None
+            try:
+                s, frm = self.place(a[1])
+            except Wait:
+                return None
+            st = self.tp(s)
+            if not st.startswith("List<") or BYTE_FIELD[of] != st[5:-1]:
+                return None
+            src = self.place_arg(s, st, "const", [])
+        count = self.ex(a[2], "Int")
+        before, lv, after = self.variable_of(dst, lt)
+        return before + [f"list_copy_bytes<{text_literal(into)}, {text_literal(of)}>({lv}, {at}, {src}, {frm}, {count});"] + after
 
     def bytes_into(self, a):
         """memcpy(&value, bytes, sizeof value): the value whose bytes those are (Struct of Bytes) - from a list of
@@ -4896,12 +5002,24 @@ class Emit:
         params = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
         nodes = {}   # pin -> the argument it is (an output: where the call wants it - None: nowhere)
         in_pins = {name: bt for name, bt, _ in ins}
+        out_pins = {name: bt for name, bt, _ in f["outs"]}
+        first = []   # (steps before the call: where in a list the engine writes - worked out as C++ works out its arguments)
         for i, (pin_in, pin_out) in enumerate(f["params"]):
             a = args[i] if i < len(args) else None
             if a is None or a.get("kind") == "CXXDefaultArgExpr":   # (left out: the default the header gives it)
                 a = kids(params[i])[-1] if kids(params[i]) else None
                 if a is None:
                     raise Wait("a call of the engine with a default argument that is declared elsewhere")
+            if pin_in is None and pin_out in f.get("counts", {}):
+                # numbers the engine writes through a pointer (Api.written_list): into the list the pointer points
+                # into, from the entry it points at on - the node's list, entry by entry, where they are written
+                lst, at = self.place(a)
+                if self.tp(lst) != out_pins[pin_out]:
+                    raise Wait(f"numbers the engine writes as {out_pins[pin_out][5:-1]} into a list of {self.tp(lst)[5:-1] if self.tp(lst).startswith('List<') else self.tp(lst)}")
+                held = self.temp("at", "Int")
+                first.append(f"{held} = {at};")
+                nodes[pin_out] = ("into", lst, held)
+                continue
             if pin_in is None:
                 # what the function reports if it is asked to (`bool* changed`): into the place the call
                 # names (&changed), or nowhere (nullptr) - the node gives it either way
@@ -4929,14 +5047,14 @@ class Emit:
         outs = f["outs"]
         if f["value"]:
             tmp = self.temp(d["name"], outs[0][1])
-            return [f"{tmp} = {fn}({', '.join(texts)});"], tmp, outs[0][1]
+            return first + [f"{tmp} = {fn}({', '.join(texts)});"], tmp, outs[0][1]
         self.f.pure = False   # (a step of the engine: the function changes something outside itself)
         if not outs:
-            return [f"{fn}({', '.join(texts)});"], None, None
+            return first + [f"{fn}({', '.join(texts)});"], None, None
         node = u.next_node
         u.next_node += 1
         u.members.append("  struct { " + " ".join(f"{bt} {o} = {u.zero(bt)};" for o, bt, _ in outs) + f" }} n{node};")
-        lines, got = [f"{fn}({', '.join([f'n{node}'] + texts)});"], (None, None)
+        lines, got = first + [f"{fn}({', '.join([f'n{node}'] + texts)});"], (None, None)
         for o, bt, _ in outs:
             if o == "result":
                 tmp = self.temp(d["name"], bt)
@@ -4944,6 +5062,15 @@ class Emit:
                 got = (tmp, bt)
             elif o == "self":
                 lines += self.store(own, self.typed(f"n{node}.self", bt))
+            elif isinstance(nodes.get(o), tuple):
+                # (what the engine wrote there: its numbers into the list one after the other from that entry on -
+                # the list keeps its length; the engine writes no more than the room the call gives it)
+                _, lst, at = nodes[o]
+                it = bt[5:-1]
+                before, lv, after = self.variable_of(lst, bt)
+                last = self.temp("last", "Int")
+                lines += before + [f"{last} = {self.whole_math('-', f'list_length<{it}>(n{node}.{o})', '1')};"]
+                lines += self.count_loop("0", last, lambda i: [f"{lv}[{self.whole_math('+', at, i)}] = list_get<{it}>(n{node}.{o}, {i});"]) + after
             elif nodes.get(o) is not None:
                 lines += self.store(nodes[o], self.typed(f"n{node}.{o}", bt))
         return lines, *got
@@ -5369,6 +5496,9 @@ class Emit:
             if base is not None and not self.is_this(base) and m.get("name") in ("begin", "cbegin", "end", "cend", "data") and not kids(b)[1:] and (self.tp_or_none(base) or "").startswith("List<"):
                 lt = self.tp(base)
                 return base, ("0" if "begin" in m["name"] or m["name"] == "data" else f"list_length<{lt[5:-1]}>({self.ex(base, lt)})")
+        if k == "MemberExpr" and b.get("name") == "data" and kids(b) and not b.get("isArrow") and re.match(r"(?:kern::)?Span<", self.ctype(kids(b)[0])):
+            # (a view of a list - kern::Span - is the list: its data is the place of its first entry)
+            return kids(b)[0], "0"
         if k in ("CXXOperatorCallExpr", "BinaryOperator"):
             op = callee_name(b)[-1] if k == "CXXOperatorCallExpr" else b.get("opcode")
             ops = kids(b)[1:] if k == "CXXOperatorCallExpr" else kids(b)
@@ -6429,6 +6559,10 @@ class Emit:
                 if b.get("name") not in ("x", "y", "z"):
                     raise Wait(f"vector: .{b.get('name')}")
                 return f"vector_break({self.ex(base, 'Vector')}).{b['name']}", "Float"
+            if b.get("name") == "size" and re.match(r"(?:kern::)?Span<", self.ctype(base)):
+                # (a view of a list is the list: its size is the list's length - its data the place of its first entry, see place)
+                lt = self.tp(base)
+                return f"list_length<{lt[5:-1]}>({self.ex(base, lt)})", "Int"
             st = self.tp(base)
             if st in u.struct_fields:
                 fname, ft = u.field(st, b["name"])
@@ -6550,7 +6684,11 @@ class Emit:
         if k == "CXXStdInitializerListExpr":
             return self.value(kids(b)[0])
         if k == "UnaryExprOrTypeTraitExpr":
-            raise Wait("sizeof")
+            # (the bytes C++ gives the type - a number of a fixed width, a struct of them, an array: its layout's)
+            got = byte_size(self.u, sized(b) or "") if b.get("name") == "sizeof" else None
+            if got is None:
+                raise Wait("sizeof")
+            return str(got[0]), "Int"
         if k == "OffsetOfExpr":
             return str(self.offset_of(b)), "Int"
         raise Wait(f"an expression: {k}")
@@ -7757,12 +7895,21 @@ class Api:
                     outs.append(("self", st, None))
         changes = False   # (an object of the engine it is handed to change - Renderer&, physics::World*: a step)
         params = []   # per parameter of the C++ function: (its input pin or None, its output pin or None)
-        for i, p in enumerate(x for x in kids(d) if x.get("kind") == "ParmVarDecl"):
+        counts = {}   # an output list the engine writes through a pointer -> the input that is its count (written_list)
+        all_params = [x for x in kids(d) if x.get("kind") == "ParmVarDecl"]
+        for i, p in enumerate(all_params):
             optional = self.optional_out(p)
             if optional is not None:
                 name = name_of(p.get("name") or f"value{i + 1}")
                 outs.append((name, optional, None))
                 params.append((None, name))
+                continue
+            written = self.written_list(p, all_params[i + 1] if i + 1 < len(all_params) else None)
+            if written is not None:
+                name = name_of(p.get("name") or f"value{i + 1}")
+                outs.append((name, written, None))
+                params.append((None, name))
+                counts[name] = i + 1   # (the parameter after it - its input's name is known once it is read)
                 continue
             bt, writes, handle = self.handed(qtype(p))
             name = name_of(p.get("name") or f"value{i + 1}")
@@ -7772,6 +7919,7 @@ class Api:
             params.append((name, name if writes else None))
             if handle and re.search(r"(&|\*\s*(const)?)$", qtype(p).strip()) and not re.match(r"const\b", qtype(p).strip()):
                 changes = True
+        counts = {name: params[k][0] for name, k in counts.items()}
         ret = qtype(d).split("(")[0].strip()
         if ret != "void":
             bt, _, handle = self.handed(ret)
@@ -7783,7 +7931,33 @@ class Api:
             self.shape(bt)
         words = d["name"].replace("_", " ").title()
         return {"type": self.type_of(d), "cpp": qualified, "label": words, "category": "Engine: " + self.home(d).split("::")[-1].replace("kern", "Engine"),
-                "help": u.comment_of(d), "value": value, "ins": ins, "outs": outs, "params": params, "decl": d}
+                "help": u.comment_of(d), "value": value, "ins": ins, "outs": outs, "params": params, "decl": d, "counts": counts}
+
+    def written_list(self, p, after):
+        """A parameter that is a pointer to numbers the function writes through, with their count beside it -
+        the parameter after it, a whole number (`void render(f32* out, u32 frames)`): what the engine writes
+        there is a further output, the list of those numbers (List<Float> ...); the count stays an input.
+        None for any other parameter. (A call hands it a place in a list - `buf.data()`, `buf.data() + k`: the
+        engine's numbers go there, entry by entry; the list keeps its length. The stand-in of the tests gives
+        no more of them than the count says - the room the call says it has.)"""
+        raw = qtype(p).strip()
+        if after is None or not re.search(r"\*\s*$", raw) or re.match(r"const\b", raw) or kids(p):
+            return None
+        inner = re.sub(r"\*\s*$", "", raw).strip()
+        if "*" in inner or "&" in inner or re.search(r"\bconst\b", inner) or self.u.object_of(raw) is not None:
+            return None   # (a pointer to an object of the engine is its handle)
+        count = self.u.clean(qtype(after).strip())
+        if NUMBER.get(count) != "Int" or count in ("bool", "char"):
+            return None
+        if self.u.clean(inner) == "char":
+            return None   # (characters: a text's, not numbers)
+        try:
+            bt = self.u.btype(inner)
+        except Wait:
+            return None
+        if bt not in ("Int", "Float", "Int64"):
+            return None   # (numbers: a pointer to anything else the function writes through has no node)
+        return f"List<{bt}>"
 
     def optional_out(self, p):
         """A parameter that is a pointer to plain data the function writes through, null by default
@@ -8071,6 +8245,19 @@ class TestWriter:
                     a, b = span(n)
                     steps = " ".join("converted::layout::%s(v_.%s, p_ + %d);" % ("single_from" if code == "f32" else "raw_from", name, at) for name, code, at in lay[0])
                     edits.append((a, 1, 0, b, "converted::layout::of_bytes(%s, %s, [](auto& v_, const kern::u8* p_) { %s })" % (text_of(held[0]), text_of(ks[2]), steps)))
+                    return
+                # between lists of numbers of which one holds floats of the program (Copy Bytes): the bytes the
+                # program copies, a float as its 32 bits (converted::layout::copy_bytes)
+                to_code, from_code = pointer_code(self.u, ks[1]), pointer_code(self.u, ks[2])
+                if to_code is not None and from_code is not None and "f32" in (to_code, from_code):
+                    a, b = span(ks[0])
+                    edits.append((a, 1, 0, b, "converted::layout::copy_bytes<%s, %s>" % ("true" if to_code == "f32" else "false", "true" if from_code == "f32" else "false")))
+            if k == "UnaryExprOrTypeTraitExpr" and n.get("name") == "sizeof":
+                # the bytes of what holds a float of the program, as the program has them (the test holds it in 64 bits)
+                got = byte_size(self.u, sized(n) or "")
+                if got is not None and got[1]:
+                    a, b = span(n)
+                    edits.append((a, 1, 0, b, "std::size_t{%d}" % got[0]))
                     return
             if k in ("CallExpr", "CXXMemberCallExpr"):
                 # the address of such a value handed to a pointer to bytes: its bytes, for the call
@@ -8738,6 +8925,13 @@ class TestWriter:
             raw = qtype(p).strip()
             default = self.tree.source(kids(p)[-1]).strip().lstrip("=").strip() if kids(p) else ""   # (`= {}`: the tree has the sign with it)
             default = " = " + default if default else ""
+            if pin_in is None and pin_out in f.get("counts", {}):
+                # numbers it writes through a pointer, their count beside it (Api.written_list): the entries the
+                # stand-in gives, one after the other from there on - no more than the count says
+                inner = self.spell(re.sub(r"\*\s*$", "", raw))
+                params.append((f"{inner}* {pin_out}", default))
+                takes.append((pin_out, inner, ("into", f["counts"][pin_out])))
+                continue
             if pin_in is None:
                 # what the function reports if it is asked to: written where the pointer says, if it says
                 inner = self.spell(re.sub(r"\*\s*$", "", raw))
@@ -8792,7 +8986,10 @@ class TestWriter:
             body.append(f"{ret} kern_result = converted::quiet<{ret}>(); converted::take_as<{shape(ret)}>(kern_result, kern_out[0]);")
             k = 1
         for name, t, optional in takes:
-            body.append(f"if ({name}) converted::take_as<{shape(t)}>(*{name}, kern_out[{k}]);" if optional else f"converted::take_as<{shape(t)}>({name}, kern_out[{k}]);")
+            if isinstance(optional, tuple):   # (into the entries the pointer points at, as many as the count beside it allows)
+                body.append(f"converted::take_into<{shape(t)}>({name}, {optional[1]}, kern_out[{k}]);")
+            else:
+                body.append(f"if ({name}) converted::take_as<{shape(t)}>(*{name}, kern_out[{k}]);" if optional else f"converted::take_as<{shape(t)}>({name}, kern_out[{k}]);")
             k += 1
         if ret != "void":
             body.append("return kern_result;")
@@ -10391,11 +10588,16 @@ def survey_one(job):
                 # functions of numbers - should one be called as a function after all, its file says so: main)
                 if not own_function(tree, t["id"]) or (tree.scope_of.get(t["id"], "").startswith(ENGINE + "::") and (t.get("name") in MATH or t.get("name") in MORE_MATH)):
                     continue
-                if t.get("kind") == "CXXConstructorDecl" and (tree.owner.get(t["id"]) or "").startswith(ENGINE + "::"):
+                if t.get("kind") in ("CXXConstructorDecl", "CXXMethodDecl") and (tree.owner.get(t["id"]) or "").startswith(ENGINE + "::"):
                     if kinds is None:
                         kinds = Unit(tree, "survey")
-                    if kinds.engine_object(tree.owner[t["id"]]):
+                    if t.get("kind") == "CXXConstructorDecl" and kinds.engine_object(tree.owner[t["id"]]):
                         continue   # (an object of the engine is made by its node <class>.make: no function of a Blueprint)
+                    if t.get("kind") == "CXXMethodDecl" and ENGINE_NODES and (kinds.api().declared_only(t) or kinds.api().declared_only(tree.decl.get(rid, t))):
+                        # (a method of an object of the engine is its node - also where its header defines it,
+                        # `int width() const { return width_; }`: what the object holds is the engine's. The call is
+                        # the node; no Blueprint has it as a function, none is written or tested as one.)
+                        continue
                 calls.add(function_key(tree, t))
         a, b = d.get("_at", (None, None))
         functions.append({"key": function_key(tree, d), "file": file, "at": a or 0, "calls": sorted(calls), "lines": tree.text(d["_file"]).count("\n", a, b) + 1 if a is not None else 0,

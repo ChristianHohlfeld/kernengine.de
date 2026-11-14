@@ -2143,6 +2143,58 @@ TEST(logic_bytes_of_struct) {
   CHECK(said);
 }
 
+TEST(logic_copy_bytes) {
+  // Copy Bytes is std::memcpy between lists of numbers: what it makes of them is what memcpy makes
+  // of the same numbers in C++ - floats into bytes, bytes into floats and whole numbers (the last
+  // written in part), an Int64 into bytes beyond their end, a list into itself (as memmove).
+  using logic::bytes::Code;
+  const f32 floats[3] = {0.1f, -2.5f, 1e30f};
+  u8 raw[12] = {7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7};
+  std::memcpy(raw + 1, floats, 10);
+  std::vector<i64> bytes(12, 7);
+  const std::vector<f64> held = {static_cast<f64>(floats[0]), static_cast<f64>(floats[1]), static_cast<f64>(floats[2])};
+  logic::bytes::copy(bytes.data(), bytes.size(), Code::u8, 1, held.data(), held.size(), Code::f32, 0, 10);
+  for (int k = 0; k < 12; ++k) CHECK(bytes[static_cast<std::size_t>(k)] == raw[k]);
+  // back: 6 bytes from the second on into floats (the second float keeps its upper two bytes)
+  f32 back[2] = {9.0f, 9.0f};
+  std::memcpy(back, raw + 2, 6);
+  std::vector<f64> into = {9.0, 9.0};
+  logic::bytes::copy(into.data(), into.size(), Code::f32, 0, bytes.data(), bytes.size(), Code::u8, 2, 6);
+  CHECK(std::bit_cast<u32>(static_cast<f32>(into[0])) == std::bit_cast<u32>(back[0]) && std::bit_cast<u32>(static_cast<f32>(into[1])) == std::bit_cast<u32>(back[1]));
+  // into whole numbers of 16 bits with a sign, and of 32 without
+  i16 shorts[3] = {1, 2, 3};
+  std::memcpy(shorts, raw + 1, 5);
+  std::vector<i64> whole = {1, 2, 3};
+  logic::bytes::copy(whole.data(), whole.size(), Code::i16, 0, bytes.data(), bytes.size(), Code::u8, 1, 5);
+  for (int k = 0; k < 3; ++k) CHECK(whole[static_cast<std::size_t>(k)] == shorts[k]);
+  // an Int64 into bytes: what is beyond the list is not written, what is before it is not either
+  const u64 big = 0xfedcba9876543210ull;
+  std::vector<i64> short_bytes(5, 0);
+  const std::vector<logic::Int64> wide = {logic::Int64(big)};
+  logic::bytes::copy(short_bytes.data(), short_bytes.size(), Code::u8, -2, wide.data(), wide.size(), Code::u64, 0, 8);
+  for (int k = 0; k < 5; ++k) CHECK(static_cast<u64>(short_bytes[static_cast<std::size_t>(k)]) == ((big >> (8 * (k + 2))) & 0xffu));
+  // no bytes: nothing; a list into itself, up and down (as memmove)
+  std::vector<i64> self = {1, 2, 3, 4};
+  logic::bytes::copy(self.data(), self.size(), Code::u32, 0, self.data(), self.size(), Code::u32, 0, 0);
+  CHECK((self == std::vector<i64>{1, 2, 3, 4}));
+  u32 moved[4] = {1, 2, 3, 4};
+  std::memmove(moved + 1, moved, 8);
+  std::vector<i64> down = {1, 2, 3, 4};
+  logic::bytes::copy(down.data(), down.size(), Code::u32, 1, down.data(), down.size(), Code::u32, 0, 8);
+  for (int k = 0; k < 4; ++k) CHECK(down[static_cast<std::size_t>(k)] == moved[k]);
+  u32 moved_back[4] = {1, 2, 3, 4};
+  std::memmove(moved_back, moved_back + 1, 12);
+  std::vector<i64> back_down = {1, 2, 3, 4};
+  logic::bytes::copy(back_down.data(), back_down.size(), Code::u32, 0, back_down.data(), back_down.size(), Code::u32, 1, 12);
+  for (int k = 0; k < 4; ++k) CHECK(back_down[static_cast<std::size_t>(k)] == moved_back[k]);
+  // the node on a graph: the list's numbers suit its setting, or the check says so
+  const logic::Graph wrong = logic_graph(R"({"variables":[{"name":"G","type":"float_list","value":[]}],
+    "nodes":[{"id":1,"type":"list.copy_bytes","params":{"variable":"G","code":"i32","from_code":"u8"}}]})");
+  bool said = false;
+  for (const logic::Issue& i : logic::check(wrong)) said |= i.error && i.node == 1 && i.text.find("are not i32") != std::string::npos;
+  CHECK(said);
+}
+
 TEST(logic_local_variables) {
   // A function's local variables: every call starts with their defaults; two functions have one
   // of the same name; a call another call of the same function interrupts has its own back.
@@ -3836,7 +3888,8 @@ static logic::Graph every_node_graph(bool wired) {
     std::vector<std::pair<std::string, std::string>> params;
     for (const logic::ParamDef& pd : def->params) {
       using K = logic::ParamDef::Kind;
-      params.push_back({pd.key, pd.kind == K::type && pd.enums_only ? "EM" : pd.kind == K::type && pd.structs_only ? (type.rfind("struct.bytes", 0) == 0 || type.rfind("struct.of_bytes", 0) == 0 ? "SB" : "SM") : pd.kind == K::variable ? (type.rfind("list.", 0) == 0 ? "LT" : type.rfind("map.", 0) == 0 ? "VM" : type.rfind("set.", 0) == 0 ? "VQ" : "VF") :
+      // (Copy Bytes on a list of whole numbers: its default numbers are bytes, u8)
+      params.push_back({pd.key, pd.kind == K::type && pd.enums_only ? "EM" : pd.kind == K::type && pd.structs_only ? (type.rfind("struct.bytes", 0) == 0 || type.rfind("struct.of_bytes", 0) == 0 ? "SB" : "SM") : pd.kind == K::variable ? (type == "list.copy_bytes" ? "LI" : type.rfind("list.", 0) == 0 ? "LT" : type.rfind("map.", 0) == 0 ? "VM" : type.rfind("set.", 0) == 0 ? "VQ" : "VF") :
                                     pd.kind == K::field ? "In" : pd.kind == K::function ? (pd.optional ? pd.def : def->kind == logic::NodeKind::pure ? "Calc" : "Fn") : pd.kind == K::machine ? "State Machine" :
                                     pd.kind == K::state ? "Idle" : pd.def});
     }
