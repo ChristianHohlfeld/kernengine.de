@@ -7931,7 +7931,10 @@ class TestWriter:
                 # a number formatted as text: a 32-bit one goes as the double it is promoted to (in the test a
                 # vector's component is converted::wide::Num32 - one that is not a number goes nowhere as such)
                 for x in ks[1:]:
-                    if self.u.clean(qtype(x)) == "float":
+                    y = x   # (the promotion to double is a cast the source does not write: under it, the 32-bit number)
+                    while self.u.clean(qtype(y)) != "float" and y.get("kind") in ("ImplicitCastExpr", "ParenExpr") and kids(y):
+                        y = kids(y)[0]
+                    if self.u.clean(qtype(y)) == "float":
                         xa, xb = span(x)
                         edits.append((xa, 2, depth + 1, xa, "static_cast<double>("))
                         edits.append((xb, 0, -depth - 1, xb, ")"))
@@ -8779,14 +8782,18 @@ class TestWriter:
                     out.append(name)
         return out
 
-    def with_usings(self, text, usings, rename, own=()):
+    def with_usings(self, text, usings, rename, own=(), gives=()):
         """A piece of the source with the using-declarations of its files that it needs before it (in the test
-        the names stand in their namespaces: `Id` the source has from `using weapons::Id;`)."""
+        the names stand in their namespaces: `Id` the source has from `using weapons::Id;`). Not one that names
+        what the piece declares itself (`gives`: qualified names) - that comes after its declaration."""
         words = set(re.findall(r"[A-Za-z_]\w*", text))
         said = []
         for name in usings:
             last = name.split("::")[-1]
             if last not in words or last in own:
+                continue
+            target = "::" + name.lstrip(":")
+            if any(("::" + g.lstrip(":")).endswith(target) for g in gives):
                 continue
             there = rename(name.lstrip(":"))
             if "::" in there and f"using {there};" not in said:
@@ -9237,8 +9244,10 @@ class TestWriter:
         the functions the test does not hold the source of: they are not part of it."""
         tree = self.tree
         d = tree.records[q]
+        # (a lambda in a method's body is that method's: its call operator is no member of the class)
+        in_lambdas = {c["id"] for x in walk(d) if x.get("kind") == "LambdaExpr" for c in walk(x) if c is not x and "id" in c}
         members = [m for m in walk(d) if m is not d and m.get("kind") in ("CXXMethodDecl", "CXXConstructorDecl", "CXXDestructorDecl", "CXXConversionDecl", "FunctionDecl", "FunctionTemplateDecl")
-                   and not m.get("isImplicit") and m.get("_file") == d.get("_file") and m.get("_at", (None, None))[0] is not None and m["_at"][1] is not None and d["_at"][0] <= m["_at"][0] and m["_at"][1] <= d["_at"][1]]
+                   and m.get("id") not in in_lambdas and not m.get("isImplicit") and m.get("_file") == d.get("_file") and m.get("_at", (None, None))[0] is not None and m["_at"][1] is not None and d["_at"][0] <= m["_at"][0] and m["_at"][1] <= d["_at"][1]]
         inner_templates, unconverted = set(), set()
         for m in members:
             if m.get("kind") == "FunctionTemplateDecl":
@@ -9799,7 +9808,8 @@ class TestWriter:
                     piece = G.foreign[key[1]]
                     there = wide_of(piece)   # (a piece of another file alone stands in its namespace: its text says so - see `items`)
                     if piece["kind"] != "record":
-                        add(key, self.with_usings(there(piece["text"]), piece.get("usings", ()), there, () if piece["kind"] not in ("enum", "alias") else set(re.findall(r"\b(?:enum\s+(?:class\s+|struct\s+)?|using\s+)(\w+)", piece["text"]))))
+                        add(key, self.with_usings(there(piece["text"]), piece.get("usings", ()), there, () if piece["kind"] not in ("enum", "alias") else set(re.findall(r"\b(?:enum\s+(?:class\s+|struct\s+)?|using\s+)(\w+)", piece["text"])),
+                                                  [a for a, _ in piece.get("pairs", ())]))
                         continue
                     text, inner, lines_ = "", [], 0
                     for part, place, newlines in piece["segments"]:
@@ -9814,7 +9824,9 @@ class TestWriter:
                     continue
                 if key[0] != "record":
                     own_names = set(re.findall(r"\b(?:enum\s+(?:class\s+|struct\s+)?|using\s+)(\w+)", text)) if key[0] in ("enum", "alias") else ()
-                    add(key, self.with_usings(wide(text), tu_usings, wide, own_names) if key[0] not in ("object", "engine") else wide(text))
+                    d = tree.decl.get(key[1]) if key[0] == "function" and isinstance(key[1], str) else None
+                    gives = [self.absolute_of(d, d["name"])] if d is not None and d.get("name") else ()
+                    add(key, self.with_usings(wide(text), tu_usings, wide, own_names, gives) if key[0] not in ("object", "engine") else wide(text))
                     continue
                 q = key[1]
                 d = tree.records[q]
