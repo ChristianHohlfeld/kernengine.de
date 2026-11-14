@@ -440,6 +440,49 @@ def record_of(tree, v):
     return longest[0] if len(longest) == 1 else None
 
 
+def byte_size(unit, raw):
+    """What sizeof gives for this type on every platform the engine runs on: (the bytes, does a float of the
+    program stand in it) - a number of a fixed width (BYTE_CODES), a struct of such numbers without padding
+    (record_bytes), an array of them. None for anything else - what the platform decides (a long, a pointer)
+    or C++ leaves open (padding)."""
+    t = re.sub(r"^(?:const\s+|volatile\s+)+", "", raw.strip())
+    t = re.sub(r"^(?:struct|class)\s+", "", t)
+    m = re.match(r"(.+?)\s*\[(\d+)\]$", t)
+    if m:
+        inner = byte_size(unit, m.group(1))
+        return (inner[0] * int(m.group(2)), inner[1]) if inner is not None else None
+    code = BYTE_CODES.get(t) or BYTE_CODES.get(unit.clean(t))
+    if code is not None:
+        return BYTE_WIDTH[code], code == "f32"
+    try:
+        q = unit.find_type(unit.clean(t))
+    except Wait:
+        return None
+    if q is None or q not in unit.tree.records:
+        return None
+    try:
+        _, size, fields = record_bytes(unit.tree, q)
+    except Wait:
+        return None
+    return size, any(c == "f32" for _, c in fields)
+
+
+def pointer_code(unit, x):
+    """The number a pointer handed to memcpy / memmove points at, as the bytes of a list hold it (Copy Bytes):
+    u8 .. i32, u64, i64, f32, f64 - of the pointer before it is made a void* (`grid.data()`: a float*, f32).
+    None: a pointer to anything else - to a char (its sign is the platform's), a bool, a long (its width is),
+    a struct."""
+    b = bare(x)
+    while b.get("kind") == "ImplicitCastExpr" and b.get("castKind") in ("BitCast", "NoOp") and kids(b) and re.match(r"(const\s+)?void\s*\*", qtype(b).strip()):
+        b = bare(kids(b)[0])
+    raw = qtype(b).strip()
+    if not re.search(r"\*\s*(const)?$", raw):
+        return None
+    inner = re.sub(r"^(const\s+|volatile\s+)+", "", re.sub(r"\*\s*(const)?$", "", raw).strip()).strip()
+    code = BYTE_CODES.get(inner) or BYTE_CODES.get(unit.clean(inner))
+    return code if code not in (None, "bool") else None
+
+
 def addressed_record(tree, a):
     """`&x` (also cast to a pointer to bytes) where x is a value of a record: (x, the record's qualified name) - else None."""
     x = bare(a)
@@ -4326,6 +4369,10 @@ class Emit:
                 return self.sorted_list(name, kids(n)[1:])
             if name in ("memmove", "memcpy") and len(kids(n)) == 4 and not self.own(ref.get("id")) and self.byte_places(kids(n)[1:3]) is not None:
                 return self.moved_bytes(name, kids(n)[1:])
+            if name in ("memmove", "memcpy") and len(kids(n)) == 4 and not self.own(ref.get("id")):
+                got = self.copied_bytes(kids(n)[1:])
+                if got is not None:
+                    return got
             if name in ("memcpy", "memmove") and len(kids(n)) == 4 and not self.own(ref.get("id")):
                 got = self.bytes_into(kids(n)[1:])
                 if got is not None:
@@ -4407,11 +4454,50 @@ class Emit:
             except Wait:
                 return None
             c = self.ctype(lst)
-            entry = template_args(c)[0] if c.startswith(("std::array<", "std::vector<")) else re.sub(r"\s*\[\d*\]$", "", c) if c.endswith("]") else None
+            span = re.match(r"(?:kern::)?Span<\s*(?:const\s+)?(.+?)\s*>$", c)   # (a view of a list of bytes: that list)
+            entry = template_args(c)[0] if c.startswith(("std::array<", "std::vector<")) else span.group(1) if span else re.sub(r"\s*\[\d*\]$", "", c) if c.endswith("]") else None
             if entry is None or self.u.clean(entry) not in ("unsigned char", "signed char", "char") or self.tp(lst) != "List<Int>":
                 return None
             out.append((lst, at))
         return out
+
+    def copied_bytes(self, a):
+        """memcpy / memmove(to, from, count) between places of lists of numbers - `out.data()`, `v.data() + k`, an
+        array, a pointer into a list -, the bytes of a struct of numbers (`&head`: Bytes of Struct) as the place it
+        is copied from: Copy Bytes, in one go, the numbers of each as C++ holds them (`list_copy_bytes<"u8", "f32">`).
+        The list keeps its length, as C++'s does. None: it is no such memcpy."""
+        into = pointer_code(self.u, a[0])
+        if into is None:
+            return None
+        try:
+            dst, at = self.place(a[0])
+        except Wait:
+            return None
+        lt = self.tp(dst)
+        if not lt.startswith("List<") or BYTE_FIELD[into] != lt[5:-1]:
+            return None
+        held = addressed_record(self.tree, a[1])
+        if held is not None:
+            # (the bytes of a struct of numbers - Bytes of Struct, a list of a fixed length where the call is - as bytes)
+            v, q = held
+            st, text, size = self.u.byte_layout(q)
+            src, frm, of = self.temp("bytes", "List<Int>", size), "0", "u8"
+            self.hoist([f"{src} = struct_bytes<{st}, {text_literal(text)}>({self.ex(v, st)});"])
+        else:
+            of = pointer_code(self.u, a[1])
+            if of is None:
+                return None
+            try:
+                s, frm = self.place(a[1])
+            except Wait:
+                return None
+            st = self.tp(s)
+            if not st.startswith("List<") or BYTE_FIELD[of] != st[5:-1]:
+                return None
+            src = self.place_arg(s, st, "const", [])
+        count = self.ex(a[2], "Int")
+        before, lv, after = self.variable_of(dst, lt)
+        return before + [f"list_copy_bytes<{text_literal(into)}, {text_literal(of)}>({lv}, {at}, {src}, {frm}, {count});"] + after
 
     def bytes_into(self, a):
         """memcpy(&value, bytes, sizeof value): the value whose bytes those are (Struct of Bytes) - from a list of
@@ -5357,6 +5443,9 @@ class Emit:
             if base is not None and not self.is_this(base) and m.get("name") in ("begin", "cbegin", "end", "cend", "data") and not kids(b)[1:] and (self.tp_or_none(base) or "").startswith("List<"):
                 lt = self.tp(base)
                 return base, ("0" if "begin" in m["name"] or m["name"] == "data" else f"list_length<{lt[5:-1]}>({self.ex(base, lt)})")
+        if k == "MemberExpr" and b.get("name") == "data" and kids(b) and not b.get("isArrow") and re.match(r"(?:kern::)?Span<", self.ctype(kids(b)[0])):
+            # (a view of a list - kern::Span - is the list: its data is the place of its first entry)
+            return kids(b)[0], "0"
         if k in ("CXXOperatorCallExpr", "BinaryOperator"):
             op = callee_name(b)[-1] if k == "CXXOperatorCallExpr" else b.get("opcode")
             ops = kids(b)[1:] if k == "CXXOperatorCallExpr" else kids(b)
@@ -6417,6 +6506,10 @@ class Emit:
                 if b.get("name") not in ("x", "y", "z"):
                     raise Wait(f"vector: .{b.get('name')}")
                 return f"vector_break({self.ex(base, 'Vector')}).{b['name']}", "Float"
+            if b.get("name") == "size" and re.match(r"(?:kern::)?Span<", self.ctype(base)):
+                # (a view of a list is the list: its size is the list's length - its data the place of its first entry, see place)
+                lt = self.tp(base)
+                return f"list_length<{lt[5:-1]}>({self.ex(base, lt)})", "Int"
             st = self.tp(base)
             if st in u.struct_fields:
                 fname, ft = u.field(st, b["name"])
@@ -6538,7 +6631,11 @@ class Emit:
         if k == "CXXStdInitializerListExpr":
             return self.value(kids(b)[0])
         if k == "UnaryExprOrTypeTraitExpr":
-            raise Wait("sizeof")
+            # (the bytes C++ gives the type - a number of a fixed width, a struct of them, an array: its layout's)
+            got = byte_size(self.u, sized(b) or "") if b.get("name") == "sizeof" else None
+            if got is None:
+                raise Wait("sizeof")
+            return str(got[0]), "Int"
         if k == "OffsetOfExpr":
             return str(self.offset_of(b)), "Int"
         raise Wait(f"an expression: {k}")
@@ -8059,6 +8156,19 @@ class TestWriter:
                     a, b = span(n)
                     steps = " ".join("converted::layout::%s(v_.%s, p_ + %d);" % ("single_from" if code == "f32" else "raw_from", name, at) for name, code, at in lay[0])
                     edits.append((a, 1, 0, b, "converted::layout::of_bytes(%s, %s, [](auto& v_, const kern::u8* p_) { %s })" % (text_of(held[0]), text_of(ks[2]), steps)))
+                    return
+                # between lists of numbers of which one holds floats of the program (Copy Bytes): the bytes the
+                # program copies, a float as its 32 bits (converted::layout::copy_bytes)
+                to_code, from_code = pointer_code(self.u, ks[1]), pointer_code(self.u, ks[2])
+                if to_code is not None and from_code is not None and "f32" in (to_code, from_code):
+                    a, b = span(ks[0])
+                    edits.append((a, 1, 0, b, "converted::layout::copy_bytes<%s, %s>" % ("true" if to_code == "f32" else "false", "true" if from_code == "f32" else "false")))
+            if k == "UnaryExprOrTypeTraitExpr" and n.get("name") == "sizeof":
+                # the bytes of what holds a float of the program, as the program has them (the test holds it in 64 bits)
+                got = byte_size(self.u, sized(n) or "")
+                if got is not None and got[1]:
+                    a, b = span(n)
+                    edits.append((a, 1, 0, b, "std::size_t{%d}" % got[0]))
                     return
             if k in ("CallExpr", "CXXMemberCallExpr"):
                 # the address of such a value handed to a pointer to bytes: its bytes, for the call

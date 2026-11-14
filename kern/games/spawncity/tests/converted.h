@@ -191,6 +191,50 @@ template <std::size_t N, class T, class F> std::array<kern::u8, N> bytes_of(cons
   return out;
 }
 template <class T, class F> void of_bytes(T& v, const void* bytes, F fields) { fields(v, static_cast<const kern::u8*>(bytes)); }
+/// std::memcpy / std::memmove between lists of numbers of the program of which one holds floats (Copy
+/// Bytes; the test holds such a float as a 64-bit number - ToSingle, FromSingle): the `count` bytes the
+/// program copies, a float as its 32 bits and every other number as it is, as std::memmove copies them -
+/// in pieces of 64 bytes (whole entries of every number), each read before it is written, the last first
+/// where the bytes move up. An entry written in part keeps its other bytes.
+template <bool ToSingle, bool FromSingle, class D, class S> void copy_bytes(D* to, const S* from, std::size_t count) {
+  constexpr std::size_t kTo = ToSingle ? 4 : sizeof(D), kFrom = FromSingle ? 4 : sizeof(S), kPiece = 64;
+  static_assert(kPiece % kTo == 0 && kPiece % kFrom == 0 && (!ToSingle || std::is_same_v<D, double>) && (!FromSingle || std::is_same_v<S, double>));
+  const std::size_t pieces = (count + kPiece - 1) / kPiece;
+  const bool up = std::less<const void*>{}(static_cast<const void*>(from), static_cast<const void*>(to));
+  for (std::size_t p = 0; p < pieces; ++p) {
+    const std::size_t at = (up ? pieces - 1 - p : p) * kPiece, n = std::min(kPiece, count - at);
+    kern::u8 bytes[kPiece];
+    for (std::size_t i = at / kFrom; i * kFrom < at + n; ++i) {   // (the program's bytes of the entries read)
+      kern::u8 one[8];
+      if constexpr (FromSingle) {
+        const float f = static_cast<float>(from[i]);
+        std::memcpy(one, &f, sizeof f);
+      } else {
+        std::memcpy(one, &from[i], sizeof(S));
+      }
+      for (std::size_t b = 0; b < kFrom; ++b)
+        if (i * kFrom + b >= at && i * kFrom + b < at + n) bytes[i * kFrom + b - at] = one[b];
+    }
+    for (std::size_t j = at / kTo; j * kTo < at + n; ++j) {   // (into the entries written)
+      kern::u8 one[8];
+      if constexpr (ToSingle) {
+        const float f = static_cast<float>(to[j]);
+        std::memcpy(one, &f, sizeof f);
+      } else {
+        std::memcpy(one, &to[j], sizeof(D));
+      }
+      for (std::size_t b = 0; b < kTo; ++b)
+        if (j * kTo + b >= at && j * kTo + b < at + n) one[b] = bytes[j * kTo + b - at];
+      if constexpr (ToSingle) {
+        float f;
+        std::memcpy(&f, one, sizeof f);
+        to[j] = static_cast<double>(f);
+      } else {
+        std::memcpy(&to[j], one, sizeof(D));
+      }
+    }
+  }
+}
 }  // namespace layout
 
 /// A value of the source as the Blueprint holds it, where the two differ by more than their numbers: a

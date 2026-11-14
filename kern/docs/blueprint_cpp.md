@@ -213,7 +213,7 @@ KERN_LAYOUT(Demo) {
 | Get Variable | der Name der Variablen – oder der Platz, den der Knoten nennt: `Held.Damage`, `Cars[i].Wheels[j].Slip` |
 | Set / Add to Variable | `Heat = wert;` / `Heat += wert;` – an einem Platz genauso: `Held.Damage = wert;`, `Scores[i] = wert;`, `Cars[i].Speed += wert;`; wird ihr Ergebnis gelesen: `n5.value = (Heat += wert);` |
 | Take Variable | `var_take(Punkte);` – der Platz ist das Argument, eine Variable oder ein Platz in ihr (`var_take(Cars[i].Wheels);`); wird sein Ergebnis gelesen: `var_take(n7, Punkte);` und `n7.value`. Gibt, was am Platz steht, und lässt dort den leeren Wert des Typs (siehe „Übergeben statt kopieren“) |
-| Schritt, der eine Liste ändert (Add to List, Insert, Remove, Clear – und in einem Zug: Set Length, Append List, Insert List, Reserve) | `list_add(Scores, wert);` – der Platz der Liste ist das erste Argument, eine Variable oder eine Liste darin (`list_add(Cars[i].Wheels, rad);`); wird sein Ergebnis gelesen: `list_add(n7, Scores, wert);` und `n7.index` |
+| Schritt, der eine Liste ändert (Add to List, Insert, Remove, Clear – und in einem Zug: Set Length, Append List, Insert List, Reserve, Copy Bytes) | `list_add(Scores, wert);` – der Platz der Liste ist das erste Argument, eine Variable oder eine Liste darin (`list_add(Cars[i].Wheels, rad);`); wird sein Ergebnis gelesen: `list_add(n7, Scores, wert);` und `n7.index`. Copy Bytes nennt die Zahlen beider Listen als Einstellungen: `list_copy_bytes<"u8", "f32">(Out, 0, Grid, 0, n);` (siehe „Die Bytes eines Werts“) |
 | Wert-Knoten auf einer Liste (Length, Get Item, Contains, Find, Make List) | `list_get<Float>(Scores, 0)`, `list_make<Text, "2">("a", "b")` – die Einstellung „Type“ ist der Typ der Einträge |
 | Schritt, der eine Map oder ein Set ändert (Set at Key, Add Key, Remove Key, Remove Index, Clear, Reserve) | `map_set(Cells, key, wert);`, `set_add(Seen, key);` – der Platz ist das erste Argument; wird sein Ergebnis gelesen: `map_add(n7, Cells, key);` und `n7.added`, `n7.index` (siehe „Maps und Sets“) |
 | Wert-Knoten auf einer Map oder einem Set (Length, Has Key, Key At, Find) | `map_find<Int, Float>(Scores, 7).value`, `set_contains<Text>(Words, "a")` – die Einstellungen „Key“ und „Value“ sind die Typen der Schlüssel und Werte |
@@ -720,6 +720,36 @@ Frame Back = struct_of_bytes<Frame, "10: u32@0 u16@4 u16@6 i16@8">(Bytes, 0);
   Der Test hält einen `float` des Programms als 64-Bit-Zahl; wo das Programm die Bytes einer
   Struktur mit einem nimmt, schreibt er sie aus, wie das Layout des Programms sie legt (der `float`
   als seine 32 Bit, gerundet, wie C++ einen `double` zu einem `float` macht – `converted::layout`).
+- **Die Bytes einer Liste von Zahlen** (`std::memcpy` zwischen einer Liste von `float`, `u32`, …
+  und Bytes – oder zwischen zwei Listen von Zahlen) sind ein Schritt auf dem Platz der Liste, in die
+  geschrieben wird: **Copy Bytes**, in einem Zug.
+
+  ```cpp
+  // std::memcpy(out.data(), grid.data(), out.size());   out: std::vector<u8>, grid: std::vector<f32>
+  list_copy_bytes<"u8", "f32">(Out, 0, Grid, 0, list_length<Int>(Out));
+  // std::memcpy(v + 2, in.data + h, 8);                 v: f32[4], in: kern::Span<const u8>
+  list_copy_bytes<"f32", "u8">(V, 2, In, H, 8);
+  ```
+
+  Die erste Einstellung ist die Zahl, als die C++ jeden Eintrag des Platzes hält, die zweite die
+  der Einträge von Items (`u8 i8 u16 i16 u32 i32`: ein Int, `u64 i64`: ein Int64, `f32 f64`: ein
+  Float – wie oben, little-endian; ein `f32` sind die 32 Bit der Zahl als `float`). Dann: wo im
+  Platz (`At`, ein Eintrag), was (`Items`), ab welchem ihrer Einträge (`From`) und wie viele Bytes
+  (`Count`) – wie `memcpy(ziel + at, quelle + from, count)`. Ein Byte, das Items nicht hat (vor
+  ihnen, hinter ihnen), ist 0; eines, das hinter oder vor dem Platz läge, wird nicht geschrieben:
+  die Liste behält ihre Länge (auch eine Liste fester Länge kann der Platz sein); ein Eintrag, von
+  dem nur einige Bytes geschrieben werden, behält die anderen. Items werden gelesen, wie sie vorher
+  waren – eine Liste in sich selbst wie `memmove`. Es kostet, was `memcpy` kostet: ein Durchgang über
+  die geschriebenen Einträge, nichts wird angefordert (nur wo eine Liste in sich selbst als eine
+  andere Zahl kopiert wird, als sie ist, werden ihre Einträge vorher genommen). In jeder Stufe
+  dieselbe Funktion (`kern::logic::bytes::copy` in `kern/logic/nodes.h`); `check` verlangt, dass die
+  Zahl zur Liste passt. Tier-Fall `copy_bytes`, Unit-Test `logic_copy_bytes` (gegen `memcpy` und
+  `memmove` von C++). Der Konverter schreibt so jedes `memcpy` / `memmove`, dessen Zeiger auf
+  Einträge von Listen von Zahlen zeigen (`v.data()`, `v.data() + k`, ein Array, ein Zeiger in eine
+  Liste, `span.data`) – die Zahl liest er am Typ des Zeigers ab –, und eines aus `&wert` einer
+  Struktur aus Zahlen in eine Liste von Bytes (dessen Bytes, Bytes of S). Ein `char` (sein Vorzeichen
+  ist das der Plattform), ein `long`, ein `bool` hat keine solche Zahl; zwischen zwei Listen von
+  Bytes bleibt es die Schleife über ihre Einträge.
 - **Die Bits einer Zahl** (`std::bit_cast` zwischen einer Gleitkommazahl und einer ganzen Zahl
   ihrer Breite) sind eigene Knoten: Bits of Float 32 (`math_bits_of_float32(x)`: die 32 Bit der
   Zahl als `float`, 0 bis 2^32 − 1) und Float 32 of Bits (`math_float32_of_bits(b)`: der `float`

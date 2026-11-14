@@ -370,6 +370,27 @@ struct BlueprintCore : logic::PureNodes {
   }
   template <class T> static void list_insert_list(List<T>& list, Int index, std::type_identity_t<logic::Items<T>> items) { logic::list::insert_items(list, index, items.first, items.count); }
   template <class T> static void list_reserve(List<T>& list, Int count) { logic::list::reserve(list, count); }
+  /// Copy Bytes: list_copy_bytes<"f32", "u8">(Grid, at, Bytes, from, count) - `count` bytes of the numbers of
+  /// Bytes (each the number of the second setting) from its entry `from` on into the entries of the place
+  /// (each the number of the first) from `at` on: what std::memcpy between lists of numbers does
+  /// (logic::bytes::copy, nodes.h - the interpreter's function). On a list or a list of a fixed length.
+  template <logic::bytes::Code C> using BytesNumber = std::conditional_t<logic::bytes::whole(C), Int, std::conditional_t<logic::bytes::wide(C), Int64, Float>>;
+  template <Setting Into, Setting Of, class T>
+  static void list_copy_bytes(List<T>& list, Int at, logic::Items<BytesNumber<logic::bytes::code_of(Of.view())>> items, Int from, Int count) {
+    copy_bytes<Into, Of, T>(list.data(), list.size(), at, items, from, count);
+  }
+  template <Setting Into, Setting Of, class T, std::size_t N>
+  static void list_copy_bytes(Fixed<T, N>& list, Int at, logic::Items<BytesNumber<logic::bytes::code_of(Of.view())>> items, Int from, Int count) {
+    copy_bytes<Into, Of, T>(list.items.data(), N, at, items, from, count);
+  }
+  template <Setting Into, Setting Of, class T, class Item, class S>
+  static void copy_bytes(Item* to, std::size_t size, Int at, const logic::Items<S>& items, Int from, Int count) {
+    static constexpr logic::bytes::Code kInto = logic::bytes::code_of(Into.view()), kOf = logic::bytes::code_of(Of.view());
+    static_assert(kInto != logic::bytes::Code::none && kInto != logic::bytes::Code::boolean && kOf != logic::bytes::Code::none && kOf != logic::bytes::Code::boolean,
+                  "Copy Bytes: a number is one of u8 i8 u16 i16 u32 i32 u64 i64 f32 f64");
+    static_assert(logic::bytes::suits_list(kInto, logic::pin_type_of<T>()), "Copy Bytes: the place's numbers are an Int's (u8 .. i32), an Int64's (u64, i64) or a Float's (f32, f64)");
+    logic::bytes::copy(to, size, kInto, at, items.first, items.count, kOf, from, count);
+  }
 
   // ---- variables ----
   // Get, Set and Add are C++'s own (Heat, Heat = value, Heat += value). A Take gives what
