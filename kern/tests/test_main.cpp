@@ -10141,7 +10141,7 @@ TEST(studio_logic_lists) {
     ++steps;
     bare |= it["params"]["variable"].as_string().empty();
   }
-  CHECK(add_to && !bare && steps == 10 && entries == 2);  // (five steps and the Set of an entry for each of the two list variables)
+  CHECK(add_to && !bare && steps == 18 && entries == 2);  // (nine steps and the Set of an entry for each of the two list variables)
   // From the pin of Get Names: the nodes for a list, in its type; nothing a list does not go into.
   auto added = [&](const char* type, const char* params = "{}") {
     json::Value add = json::Value::object(), p;
