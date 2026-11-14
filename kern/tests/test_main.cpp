@@ -10236,6 +10236,28 @@ TEST(studio_logic_lists) {
     bare |= it["params"]["variable"].as_string().empty();
   }
   CHECK(add_to && !bare && steps == 18 && entries == 2);  // (nine steps and the Set of an entry for each of the two list variables)
+  {
+    // A list of a fixed length: the command says its length ("count"); its default has that many entries,
+    // the palette offers its Get and the Set of an entry - no step that would change its length.
+    CHECK(f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Axis","type":"float_list","count":3})")["ok"].as_bool());
+    CHECK(variable("Axis")["count"].as_number() == 3 && variable("Axis")["value"].size() == 3);
+    CHECK(f.cmd(R"({"cmd":"logicVariable","op":"value","name":"Axis","value":[1,2,3,4,5]})")["ok"].as_bool() && variable("Axis")["value"].size() == 3 && variable("Axis")["value"][2].as_number() == 3);
+    CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Bad","type":"float","count":3})")["ok"].as_bool());
+    CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Bad","type":"float_list","count":5000})")["ok"].as_bool());
+    pal = f.cmd(R"({"cmd":"logicPalette","query":"axis"})");
+    bool get = false, set_entry = false, step = false;
+    for (const json::Value& it : pal["items"].items()) {
+      if (it["params"]["variable"].as_string() != "Axis") continue;
+      get |= it["type"].as_string() == "var.get";
+      set_entry |= it["type"].as_string() == "var.set" && it["params"]["path"].as_string() == "[]";
+      step |= it["type"].as_string().rfind("list.", 0) == 0;
+    }
+    CHECK(get && set_entry && !step);
+    // (another length keeps what fits; the same type without a length is a list of any length again)
+    CHECK(f.cmd(R"({"cmd":"logicVariable","op":"type","name":"Axis","type":"float_list","count":2})")["ok"].as_bool() && variable("Axis")["value"].size() == 2 && variable("Axis")["value"][1].as_number() == 2);
+    CHECK(f.cmd(R"({"cmd":"logicVariable","op":"type","name":"Axis","type":"float_list"})")["ok"].as_bool() && !variable("Axis").has("count") && variable("Axis")["value"].size() == 2);
+    CHECK(f.cmd(R"({"cmd":"logicVariable","op":"remove","name":"Axis"})")["ok"].as_bool());
+  }
   // From the pin of Get Names: the nodes for a list, in its type; nothing a list does not go into.
   auto added = [&](const char* type, const char* params = "{}") {
     json::Value add = json::Value::object(), p;

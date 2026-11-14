@@ -1241,7 +1241,7 @@ class Unit:
         for f in self.order:
             used.update(word.findall(f.text))
         def name_of(line):
-            m = (re.match(r"\s*KERN_(?:ENUM|STRUCT)\((\w+)", line) or re.match(r"\s*(?:KERN_CONST\s+)?(?:[\w<>:]+)\s+(\w+)\s*=", line) or re.search(r"\}\s*(n\d+);", line)
+            m = (re.match(r"\s*KERN_(?:ENUM|STRUCT)\((\w+)", line) or re.match(r"\s*(?:KERN_CONST\s+)?(?:Fixed<[\w<>:]+,\s*\d+>|[\w<>:]+)\s+(\w+)\s*=", line) or re.search(r"\}\s*(n\d+);", line)
                  or re.match(r"\s*[\w:]+Result (n\d+);", line))
             return m.group(1) if m else None
         variables = []
