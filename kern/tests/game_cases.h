@@ -285,10 +285,28 @@ struct Door : kern::Blueprint {
 )kn";
 
 /// Three crates share this Blueprint: one class, three instances.
+/// A library of the level: a Blueprint that keeps nothing. The crates use it - they have its type
+/// and call its function directly, with their own variable as the place it works on.
+inline const char* kTally = R"kn(
+struct Tally : virtual kern::Library {
+  KERN_STRUCT(Hits) {
+    Int Count = 0;
+    Float Hardest = 0.0;
+  };
+
+  /// Counts a hit where the caller keeps its count.
+  void hit(Hits& hits, Float speed = 0.0) {
+    hits.Count += 1;
+    hits.Hardest = math_max(hits.Hardest, speed);
+  }
+};
+)kn";
+
 inline const char* kCrate = R"kn(
-struct Crate : kern::Blueprint {
+struct Crate : virtual kern::Blueprint, virtual Tally {
   Int Bumps = 0;
   Vector Home = Vector{0.0, 0.0, 0.0};
+  Hits Taken = Hits{0, 0.0};
 
   KERN_EVENT(on1, event_begin)
   void on1() {
@@ -298,6 +316,7 @@ struct Crate : kern::Blueprint {
   KERN_EVENT(on2, game_hit)
   void on2(Actor actor, Actor other, Float speed, Vector point, Vector normal) {
     Bumps += 1;
+    Tally::hit(Taken, speed);
   }
 
   KERN_EVENT(on3, event_custom<"Home">)
@@ -389,10 +408,10 @@ struct Level : kern::Blueprint {
 };
 )kn";
 
-inline logic::Graph blueprint(const char* text, std::string* error) {
+inline logic::Graph blueprint(const char* text, std::string* error, const logic::Blueprints& all = {}) {
   logic::Graph g;
   std::string why;
-  if (!logic::from_cpp(text, g, nullptr, &why) && error && error->empty()) *error = why;
+  if (!logic::from_cpp(text, g, nullptr, &why, logic::library(), all) && error && error->empty()) *error = why;
   return g;
 }
 
@@ -480,6 +499,14 @@ inline game::Level arena(std::string* error = nullptr) {
     pad.colliders.push_back(sensor({2, 2, 2}, {0, 0, 1}));
     l.add(pad);
   }
+  // (the library the crates use: the Blueprint of an actor of its own, found by that actor's name)
+  const logic::Graph tally = blueprint(kTally, &why);
+  {
+    Actor library = actor("Tally", {0, 0, 0});
+    library.logic = tally;
+    l.add(library);
+  }
+  const logic::Blueprints libraries = [&](std::string_view name) -> const logic::Graph* { return name == "Tally" ? &tally : nullptr; };
   for (int i = 0; i < 3; ++i) {
     const char* names[] = {"Crate A", "Crate B", "Crate C"};
     Actor crate = actor(names[i], {3 + 1.5f * static_cast<f32>(i), 6, 3 + 2 * static_cast<f32>(i)});
@@ -487,7 +514,7 @@ inline game::Level arena(std::string* error = nullptr) {
     crate.body = BodyComponent{};
     crate.body->mass = 20;
     crate.tags.push_back("crate");
-    crate.logic = blueprint(kCrate, &why);
+    crate.logic = blueprint(kCrate, &why, libraries);
     l.add(crate);
   }
   {

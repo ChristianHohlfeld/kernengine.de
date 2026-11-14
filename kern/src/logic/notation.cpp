@@ -888,7 +888,17 @@ struct Shape {
       if (!names.insert(v.name).second) return fail("the name \"" + v.name + "\" is used twice");
       if (!typed_ok("the variable " + v.name, v.type, v.of, v.value)) return false;
     }
+    for (const std::string& used : g.uses) {
+      if (!name_ok(used, "the library")) return false;
+      if (!names.insert(used).second) return fail("the name \"" + used + "\" is used twice (a library and a variable, or two libraries)");
+    }
     for (const Function& f : g.functions) {
+      if (!f.from.empty()) {
+        // (a function of a library: "Library::function", both names of C++)
+        if (f.name.rfind(f.from + "::", 0) != 0 || !name_ok(f.name.substr(f.from.size() + 2), "the function")) return fail("\"" + f.name + "\" is no function of the library " + f.from);
+        if (!names.insert(f.name).second) return fail("the function " + f.name + " is held twice");
+        continue;
+      }
       if (!name_ok(f.name, "the function")) return false;
       if (!names.insert(f.name).second) return fail("the name \"" + f.name + "\" is used twice (a variable and a function, or two functions)");
     }
@@ -925,6 +935,17 @@ struct Shape {
         }
         if (f.pure) return fail("function \"" + f.name + "\" is a function of another Blueprint: what it does is not known here, so it is called as a step (not Pure)");
         if (!f.locals.empty()) return fail("function \"" + f.name + "\" is a function of another Blueprint: it has no local variables here");
+        continue;
+      }
+      if (!f.from.empty() && entries == 0) {
+        // A function of a library the Blueprint uses: what it looks like - its body is the
+        // library's. (In the one graph a Blueprint is with its libraries, the body is there.)
+        if (!g.uses_library(f.from)) return fail(f.name + " is a function of the library " + f.from + ", which the Blueprint does not use");
+        for (int i : by_id) {
+          const std::string& t = at(i).def->type;
+          if ((t == "func.return" || t == "func.call_on") && at(i).node->param("function") == f.name)
+            return fail(f.name + " is a function of the library " + f.from + ": its body is there, and it is called directly (" + title(i) + ")", i);
+        }
         continue;
       }
       if (entries != 1) return fail("function \"" + f.name + "\" needs exactly one Function Entry node (it has " + std::to_string(entries) + ")");
@@ -1418,16 +1439,23 @@ struct Writer {
     out += "// Kern Blueprint, C++ notation 1: this text and the graph in Kern Studio are one thing in two\n";
     out += "// notations, each read from the other without loss (kern/docs/blueprint_cpp.md).\n";
     out += "#include \"kern/logic/blueprint.h\"\n\n";
-    out += "struct " + type + " : kern::Blueprint {\n";
+    // (a library: `virtual kern::Library`; what it uses, or a Blueprint uses, are bases beside that)
+    out += "struct " + type + " : " + (g.library ? "virtual kern::Library" : g.uses.empty() ? "kern::Blueprint" : "virtual kern::Blueprint");
+    for (const std::string& used : g.uses) out += ", virtual " + used;
+    out += " {\n";
+    bool own_types = false;  // (a type of a library it uses is the library's: its text has it)
+    for (const EnumType& e : g.enums) own_types = own_types || e.from.empty();
+    for (const StructType& st : g.structs) own_types = own_types || st.from.empty();
     bool any = false;
     auto section = [&](const char* title) {
       if (any) out += "\n";
       any = true;
       line(1, std::string("// ---- ") + title + " ----");
     };
-    if (!g.enums.empty() || !g.structs.empty()) {
+    if (own_types) {
       section("types");
       for (const EnumType& e : g.enums) {
+        if (!e.from.empty()) continue;
         doc(1, e.help);
         std::string values;
         for (const std::string& v : e.values) values += ", " + v;
@@ -1435,6 +1463,7 @@ struct Writer {
       }
       // (the structs after the enums: a field is of a type declared above it)
       for (const StructType& st : g.structs) {
+        if (!st.from.empty()) continue;
         doc(1, st.help);
         line(1, std::string(st.project ? "KERN_PROJECT_STRUCT(" : "KERN_STRUCT(") + st.name + ") {");
         for (const StructField& f : st.fields) line(2, cpp_type(f.type) + " " + f.name + " = " + literal(Value::from_json(f.value, f.type.type, g, f.type.of), f.type.of, g) + ";");
@@ -1472,10 +1501,13 @@ struct Writer {
       section("values several bodies read");
       named_values(kMember, 1);
     }
-    if (!g.functions.empty()) {
+    bool own_functions = false;  // (a function of a library it uses is the library's: its text has it)
+    for (const Function& f : g.functions) own_functions = own_functions || f.from.empty();
+    if (own_functions) {
       section("functions");
       bool first = true;
       for (const Function& f : g.functions) {
+        if (!f.from.empty()) continue;  // (a function of a library: the library's text has it)
         int e = -1;
         for (int i : s.by_id)
           if (at(i).def->type == "func.entry" && at(i).node->param("function") == f.name) e = i;
@@ -1669,7 +1701,8 @@ struct Reader {
 
   const Graph* before = nullptr;  // apply_cpp: the Blueprint this text changes
 
-  Reader(std::string_view t, const Library& l) : text(t), lib(l) {}
+  const Blueprints* all = nullptr;  // the Blueprints of the project: where the libraries the text names are found
+  Reader(std::string_view t, const Library& l, const Blueprints* blueprints = nullptr) : text(t), lib(l), all(blueprints) {}
 
   // ---- tokens ----
   bool fail(std::size_t tok, const std::string& why) {
@@ -3583,14 +3616,68 @@ struct Reader {
     if (!lex()) return false;
     for (const auto& d : lib.all()) node_fns[node_name(d->type)] = d.get();
     while (peek().kind == Tok::doc) ++p;
-    if (!expect("struct") || !word(name, "the Blueprint's name") || !expect(":") || !expect("kern") || !expect("::") || !expect("Blueprint") || !expect("{")) return false;
+    if (!head()) return false;
     if (!declarations() || !expect("}") || !expect(";")) return false;
     const std::size_t after = p;
     if (!bodies_pass()) return false;
     p = after;
     if (!layout()) return false;
     if (peek().kind != Tok::end) return fail(p, "the Blueprint ends here: " + shown(peek()) + " is too much");
-    return ids() && wires() && checked();
+    if (!ids() || !wires()) return false;
+    // (of its libraries it holds what it uses: their types, and how the functions look that it calls)
+    if (!g.uses.empty()) {
+      std::string why;
+      if (!take_libraries(g, all ? *all : Blueprints(), &why)) return fail(0, why);
+    }
+    return checked();
+  }
+
+  /// struct Name : kern::Blueprint {                                   a Blueprint
+  /// struct Name : virtual kern::Library {                             a library: it keeps nothing, others use it
+  /// struct Name : virtual kern::Blueprint, virtual Random {           a Blueprint that uses the library Random
+  /// struct Name : virtual kern::Library, virtual Types {              a library that uses one
+  /// What it uses it has: the libraries' types, and their functions as Random::range(...).
+  bool head() {
+    if (!expect("struct") || !word(name, "the Blueprint's name") || !expect(":")) return false;
+    const bool shared = accept("virtual");
+    const std::size_t base = p;
+    if (!expect("kern") || !expect("::")) return false;
+    if (accept("Library")) {
+      if (!shared) return fail(base, "a library is `struct " + name + " : virtual kern::Library` (virtual: the Blueprints that use it share what a Blueprint is)");
+      g.library = true;
+    } else if (!expect("Blueprint")) {
+      return false;
+    }
+    while (accept(",")) {
+      const std::size_t at = p;
+      if (!shared) return fail(base, "a Blueprint that uses libraries is `struct " + name + " : virtual kern::Blueprint, virtual <Library>`");
+      if (!expect("virtual")) return false;
+      std::string used;
+      if (!word(used, "the library's name")) return false;
+      if (g.uses_library(used)) return fail(at, "the library " + used + " is used twice");
+      g.uses.push_back(used);
+    }
+    if (shared && !g.library && g.uses.empty()) return fail(base, "`virtual` is for a library (virtual kern::Library) and for a Blueprint that uses one (virtual kern::Blueprint, virtual <Library>)");
+    if (!expect("{")) return false;
+    if (g.uses.empty()) return true;
+    // What the text may name of its libraries: their types, and every function of theirs.
+    std::string why;
+    if (!all || !*all) return fail(base, "the text uses the library " + g.uses[0] + ": reading it needs the project's Blueprints (as a C++ compiler needs the library's text)");
+    if (!take_libraries(g, *all, &why, true)) return fail(base, why);
+    // A name of a library is written with it - Random::range(...), Random::rangeResult n5; -: one name.
+    std::vector<Tok> merged;
+    for (std::size_t k = 0; k < toks.size(); ++k) {
+      if (k >= p && k + 2 < toks.size() && toks[k].kind == Tok::id && g.uses_library(toks[k].s) && toks[k + 1].kind == Tok::punct && toks[k + 1].s == "::" && toks[k + 2].kind == Tok::id) {
+        Tok t = toks[k];
+        t.s += "::" + toks[k + 2].s;
+        merged.push_back(std::move(t));
+        k += 2;
+        continue;
+      }
+      merged.push_back(toks[k]);
+    }
+    toks = std::move(merged);
+    return true;
   }
 
   u32 above_ids() const {
@@ -4077,6 +4164,10 @@ std::vector<std::pair<std::string, std::string>> cpp_names(Graph& g, const Libra
   std::vector<std::string> fn_names(g.functions.size()), var_names(g.variables.size());
   for (std::size_t i = 0; i < g.functions.size(); ++i) {
     const std::string& name = g.functions[i].name;
+    if (!g.functions[i].from.empty()) {  // (a function of a library has the name its library gives it)
+      fn_names[i] = name;
+      continue;
+    }
     if (!fine(name) || taken.count(name) || taken.count(name + "Result")) continue;
     fn_names[i] = name;
     taken.insert(name);
@@ -4181,7 +4272,7 @@ bool native_ready(const Graph& g, std::string* why, const Library& lib) {
   return true;
 }
 
-bool native_glue(const Graph& g, const std::string& name, std::string& out, std::string* error, const Library& lib, std::string_view space) {
+bool native_glue(const Graph& g, const std::string& name, std::string& out, std::string* error, const Library& lib, std::string_view space, const Blueprints& all) {
   // (the class from anywhere: ::Name, or ::space::Name)
   const std::string rooted = "::" + (space.empty() ? std::string() : std::string(space) + "::") + name;
   std::string why;
@@ -4233,6 +4324,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
   // A value from outside that is no struct of this type is the struct's default.
   std::string structs;
   for (const StructType& st : g.structs) {
+    if (!st.from.empty()) continue;  // (a struct of a library is the library's type: its glue says how it is held)
     const std::string full = rooted + "::" + st.name;
     auto held = [&](const StructField& f) -> std::string {
       if (element_of(f.type.type) != PinType::enumeration && element_of(f.type.type) != PinType::structure) return builtin(f.type.type);
@@ -4260,7 +4352,10 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     structs = (space.empty() ? std::string() : "}  // namespace " + std::string(space) + "\n") + "namespace kern::logic::detail {\n" + structs + "}  // namespace kern::logic::detail\n" +
               (space.empty() ? std::string() : "namespace " + std::string(space) + " {\n");
   char hash[40];
-  std::snprintf(hash, sizeof hash, "0x%016llxull", static_cast<unsigned long long>(graph_hash(g)));
+  // (a Blueprint that uses libraries is registered as what runs: the one graph it is with them)
+  Graph whole;
+  if (!link(g, all, whole, error, &lib)) return false;
+  std::snprintf(hash, sizeof hash, "0x%016llxull", static_cast<unsigned long long>(graph_hash(whole)));
   // The handlers of events: the runtime starts a chain at an event's node, the class has it as
   // the method on<id>; the event's values are the node's outputs.
   std::string events, running;
@@ -4324,7 +4419,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
                   "  bool call(std::string_view function, const std::vector<kern::logic::Value>& args, std::vector<kern::logic::Value>& results) override {\n"
                   "    using kern::logic::native_arg;\n    using kern::logic::to_value;\n    (void)args;\n    results.clear();\n";
   for (const Function& f : g.functions) {
-    if (f.external) continue;  // (a function of another Blueprint: nothing of it is here to call)
+    if (f.external || !f.from.empty()) continue;  // (a function of another Blueprint, or of a library: nothing of it is here to call by name)
     // (a reference input: called by name it is a variable of the call that starts as the argument;
     // what the function made of it stands behind the outputs - Instance::call)
     std::string call = "self." + f.name + "(", places, changed;
@@ -4382,8 +4477,8 @@ bool to_cpp(const Graph& g, const std::string& name, std::string& out, std::stri
   return true;
 }
 
-bool from_cpp(std::string_view text, Graph& out, std::string* name, std::string* error, const Library& lib) {
-  Reader r(text, lib);
+bool from_cpp(std::string_view text, Graph& out, std::string* name, std::string* error, const Library& lib, const Blueprints& all) {
+  Reader r(text, lib, &all);
   if (!r.read()) {
     if (error) *error = r.error.empty() ? std::string("the text is no Blueprint") : r.error;
     return false;
@@ -4393,8 +4488,8 @@ bool from_cpp(std::string_view text, Graph& out, std::string* name, std::string*
   return true;
 }
 
-bool apply_cpp(std::string_view text, const Graph& before, Graph& out, std::string* error, const Library& lib) {
-  Reader r(text, lib);
+bool apply_cpp(std::string_view text, const Graph& before, Graph& out, std::string* error, const Library& lib, const Blueprints& all) {
+  Reader r(text, lib, &all);
   r.before = &before;
   if (!r.read()) {
     if (error) *error = r.error.empty() ? std::string("the text is no Blueprint") : r.error;

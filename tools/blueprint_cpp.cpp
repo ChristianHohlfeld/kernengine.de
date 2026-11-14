@@ -16,8 +16,16 @@
 // writes this file again. Blueprints that are not ready yet are named in a comment, with what is
 // missing; they run in the interpreter (or the JIT).
 //
+// A library - a Blueprint that keeps nothing - is written before the Blueprints that use it; in
+// their namespace the library's class has the name they use it by. A Blueprint that uses
+// libraries is registered under the hash of the one graph it is with them (logic::link): when a
+// library changes, the Blueprints that use it change with it.
+//
 // <out.cpp> is only rewritten when it changes, so nothing recompiles for an unchanged level.
+#include <algorithm>
 #include <cstdio>
+#include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
@@ -94,12 +102,34 @@ int apply(const char* level_path, const std::string& actor, const char* text_pat
   logic::Graph before, g;
   std::string error;
   if (held->is_object() && held->find("nodes")) logic::graph_from_json(*held, before, &error);
-  if (!(before.empty() ? logic::from_cpp(text, g, nullptr, &error) : logic::apply_cpp(text, before, g, &error))) {
+  // (the libraries the text names: the Blueprints of the level's other actors, by their names)
+  std::map<std::string, std::unique_ptr<logic::Graph>> others;
+  const logic::Blueprints all = [&](std::string_view name) -> const logic::Graph* {
+    auto known = others.find(std::string(name));
+    if (known != others.end()) return known->second.get();
+    std::unique_ptr<logic::Graph> found;
+    if (name != actor)
+      for (const json::Value& a : doc["actors"].items()) {
+        const json::Value* logic = a["components"].find("logic");
+        if (a["name"].as_string() != name || !logic || !logic->is_object()) continue;
+        found = std::make_unique<logic::Graph>();
+        if (!logic::graph_from_json(*logic, *found)) found.reset();
+        break;
+      }
+    return (others[std::string(name)] = std::move(found)).get();
+  };
+  if (!(before.empty() ? logic::from_cpp(text, g, nullptr, &error, logic::library(), all) : logic::apply_cpp(text, before, g, &error, logic::library(), all))) {
     std::fprintf(stderr, "%s: %s\n", text_path, error.c_str());
     return 1;
   }
   int errors = 0;
-  for (const logic::Issue& i : logic::check(g)) {
+  // (with its libraries it is one graph: the rules that follow calls judge that one)
+  logic::Graph whole;
+  if (!logic::link(g, all, whole, &error)) {
+    std::fprintf(stderr, "%s: %s\n", text_path, error.c_str());
+    return 1;
+  }
+  for (const logic::Issue& i : logic::check(whole)) {
     std::fprintf(stderr, "%s: %s%s%s\n", text_path, i.error ? "error: " : "warning: ", i.text.c_str(), i.node ? (" (node " + std::to_string(i.node) + ")").c_str() : "");
     errors += i.error ? 1 : 0;
   }
@@ -144,38 +174,85 @@ int main(int argc, char** argv) {
                     "// as C++ classes (kern/docs/blueprint_cpp.md). Change the Blueprint in the level; the build writes\n"
                     "// this file again.\n"
                     "#include \"kern/logic/blueprint.h\"\n";
-  std::set<u64> written;
-  int classes = 0;
-  for (const auto& [owner, json] : found) {
+  // Every Blueprint of the level, by the name the others use it by (an actor's name).
+  struct Held {
+    std::string owner, name;
     logic::Graph g;
+    bool done = false;
+  };
+  std::vector<Held> held;
+  for (const auto& [owner, json] : found) {
+    Held h;
+    h.owner = owner;
+    h.name = owner == "the level" ? std::string("Level") : owner.substr(7, owner.size() - 8);
     std::string error;
-    if (!logic::graph_from_json(*json, g, &error)) {
+    if (!logic::graph_from_json(*json, h.g, &error)) {
       std::fprintf(stderr, "%s: the Blueprint of %s: %s\n", argv[1], owner.c_str(), error.c_str());
       return 1;
     }
-    if (g.empty()) continue;
-    logic::cpp_names(g);  // (as the level loader does for levels from before names had to be C++ names)
+    if (h.g.empty()) continue;
+    logic::cpp_names(h.g);  // (as the level loader does for levels from before names had to be C++ names)
+    held.push_back(std::move(h));
+  }
+  const logic::Blueprints all = [&](std::string_view name) -> const logic::Graph* {
+    for (const Held& h : held)
+      if (h.owner != "the level" && h.name == name) return &h.g;
+    return nullptr;
+  };
+  std::map<std::string, std::string> classes_of;  // a library that is written: its class, with its namespace
+  std::set<u64> written;
+  int classes = 0;
+  // A library before the Blueprints that use it: what is written next is one whose libraries
+  // are all written (or one that waits for nothing).
+  for (std::size_t left = held.size(); left > 0;) {
+    Held* next = nullptr;
+    for (Held& h : held) {
+      if (h.done) continue;
+      bool ready = true;
+      for (const std::string& used : h.g.uses) ready = ready && (classes_of.count(used) || !all(used) || std::any_of(held.begin(), held.end(), [&](const Held& o) { return o.name == used && o.done; }));
+      if (ready) { next = &h; break; }
+    }
+    if (!next)  // (libraries that use each other: logic::link says so below)
+      for (Held& h : held)
+        if (!h.done) { next = &h; break; }
+    Held& h = *next;
+    h.done = true;
+    --left;
+    const logic::Graph& g = h.g;
+    const std::string& owner = h.owner;
+    std::string error;
     out += "\n// ---------------------------------------------------------------------------\n// The Blueprint of " + owner;
-    if (!logic::native_ready(g, &why)) {
+    // (with its libraries it is one graph: what runs, and what the rules that follow calls judge)
+    logic::Graph whole;
+    if (!logic::native_ready(g, &why) || !logic::link(g, all, whole, &why) || !logic::native_ready(whole, &why)) {
       out += ": runs in the interpreter -\n// " + why + "\n";
       continue;
     }
-    if (!written.insert(logic::graph_hash(g)).second) {
-      out += ": the same Blueprint as one above.\n";
+    std::string uses;
+    for (const std::string& used : g.uses) {
+      if (!classes_of.count(used)) why = "its library " + used + " is not written as a class";
+      else uses += "using " + used + " = " + classes_of[used] + ";\n";
+    }
+    if (std::any_of(g.uses.begin(), g.uses.end(), [&](const std::string& used) { return !classes_of.count(used); })) {
+      out += ": runs in the interpreter -\n// " + why + "\n";
       continue;
     }
-    std::string label = owner == "the level" ? std::string("Level") : owner.substr(7, owner.size() - 8);
-    const std::string cls = logic::cpp_class_name(label, g);  // (each class has a namespace of its own, below)
+    const std::string cls = logic::cpp_class_name(h.name, g);  // (each class has a namespace of its own, below)
     // (a namespace of its own, named by the graph's hash: the class meets no other class of that
     // name - not the game's, not another level's)
     char space[48];
-    std::snprintf(space, sizeof space, "kern_blueprint_%016llx", static_cast<unsigned long long>(logic::graph_hash(g)));
+    std::snprintf(space, sizeof space, "kern_blueprint_%016llx", static_cast<unsigned long long>(logic::graph_hash(whole)));
+    if (g.library) classes_of[h.name] = std::string("::") + space + "::" + cls;
+    if (!written.insert(logic::graph_hash(whole)).second) {
+      out += ": the same Blueprint as one above.\n";
+      continue;
+    }
     std::string code, glue;
-    if (!logic::to_cpp(g, cls, code, &error) || !logic::native_glue(g, cls, glue, &error, logic::library(), space)) {
+    if (!logic::to_cpp(g, cls, code, &error) || !logic::native_glue(g, cls, glue, &error, logic::library(), space, all)) {
       std::fprintf(stderr, "%s: the Blueprint of %s: %s\n", argv[1], owner.c_str(), error.c_str());
       return 1;
     }
-    out += std::string("\nnamespace ") + space + " {\n\n" + code + "\n" + glue + "\n}  // namespace " + space + "\n";
+    out += std::string("\nnamespace ") + space + " {\n\n" + uses + (uses.empty() ? "" : "\n") + code + "\n" + glue + "\n}  // namespace " + space + "\n";
     ++classes;
   }
   std::string before;

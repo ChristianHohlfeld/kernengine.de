@@ -366,6 +366,12 @@ namespace kern {
 /// (BlueprintCore) and the game's (game::BlueprintNodesOf; they need the game only where a
 /// Blueprint uses them).
 struct Blueprint : game::BlueprintNodesOf<logic::EngineNodesOf<BlueprintCore>> {};
+/// A library is a Blueprint that keeps nothing: types and functions. The Blueprints that use it
+/// have its types and call its functions - it is one of their bases:
+///   struct Random : virtual kern::Library { ... };
+///   struct Door : virtual kern::Blueprint, virtual Random { ... n5 = Random::range(Seed, 0.0, 1.0); ... };
+/// (virtual: a Blueprint and the libraries it uses share what a Blueprint is.)
+using Library = Blueprint;
 
 }  // namespace kern
 

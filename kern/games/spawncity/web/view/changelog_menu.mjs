@@ -7,6 +7,9 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-14",time:"00:50",title:"Sprache: Bibliotheken",items:[
+    "Unter der Haube: Ein Blueprint, der nichts behält, ist jetzt eine Bibliothek – andere Blueprints haben seine Typen und rufen seine Funktionen direkt auf, auch mit Referenzen. Damit kann jede Funktion des Spiels einmal im Projekt stehen statt in jedem Blueprint, der sie benutzt. Am Spiel ändert sich nichts.",
+  ]},
   {date:"2026-11-13",time:"23:42",title:"Blueprints: Lesen ohne Kopie",items:[
     "Unter der Haube: Was nur gelesen wird, wird nicht mehr kopiert – ein Feld, ein Listeneintrag, eine Schleife über eine Liste arbeiten im Export dort, wo die Daten stehen. 358 von 1.428 Funktionen stehen als Blueprints im Level, 516 Vergleiche Bit für Bit mit dem Quelltext. Am Spiel ändert sich nichts.",
   ]},

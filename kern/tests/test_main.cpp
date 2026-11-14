@@ -3843,10 +3843,12 @@ TEST(game_blueprints_as_classes) {
   CHECK(error.empty() && cases.size() == 2);
   std::set<std::string> used;
   int blueprints = 0;
-  auto ready = [&](const logic::Graph& g, const std::string& owner) {
+  auto ready = [&](const logic::Graph& g, const std::string& owner, const logic::Blueprints& all) {
     std::string why, text, glue;
-    const bool ok = no_errors(logic::check(g)) && logic::native_ready(g, &why) && logic::to_cpp(g, logic::cpp_class_name(owner, g), text, &why) &&
-                    logic::native_glue(g, logic::cpp_class_name(owner, g), glue, &why);
+    // (a Blueprint that uses a library is one graph with it: that one is sound too)
+    logic::Graph whole;
+    const bool ok = no_errors(logic::check(g)) && logic::native_ready(g, &why) && logic::link(g, all, whole, &why) && logic::native_ready(whole, &why) &&
+                    logic::to_cpp(g, logic::cpp_class_name(owner, g), text, &why) && logic::native_glue(g, logic::cpp_class_name(owner, g), glue, &why, logic::library(), {}, all);
     if (!ok) std::printf("%s: %s\n", owner.c_str(), why.c_str());
     CHECK(ok);
     for (const logic::Node& n : g.nodes) used.insert(n.type);
@@ -3854,11 +3856,16 @@ TEST(game_blueprints_as_classes) {
   };
   for (const game_cases::Case& c : cases) {
     CHECK(no_errors(game::validate(c.level)));
-    ready(c.level.logic, "Level");
+    const logic::Blueprints all = [&](std::string_view name) -> const logic::Graph* {
+      for (const game::Actor& a : c.level.actors)
+        if (a.logic && a.name == name) return &*a.logic;
+      return nullptr;
+    };
+    ready(c.level.logic, "Level", all);
     for (const game::Actor& a : c.level.actors)
-      if (a.logic) ready(*a.logic, a.name);
+      if (a.logic) ready(*a.logic, a.name, all);
   }
-  CHECK(blueprints == 8);
+  CHECK(blueprints == 9);  // (one of them a library: Tally, which the crates use)
   // every node of the library does something: the gameplay nodes are described in one file
   // (logic_node_shapes.cpp) and bound to the game in another (logic_nodes.cpp)
   for (const auto& d : logic::library().all()) {
@@ -3876,7 +3883,7 @@ TEST(game_blueprints_as_classes) {
   game::Level stored;
   CHECK(game::from_text(game::to_text(cases[0].level), stored, &error) && logic::graph_hash(stored.logic) == logic::graph_hash(cases[0].level.logic));
   const game_cases::Played played = game_cases::play(stored, cases[0].scenario, false);
-  CHECK(played.tiers.size() == 7);
+  CHECK(played.tiers.size() == 8);
   for (const std::string& t : played.tiers) CHECK(t.find("native C++") == std::string::npos);
   for (const char* happened :
        {"Log=\"Door;", "in:Soldiertouched:Zone", "out:Zone", "pickup:3", "trigger:Pad", "hurt:Dummy", "death:Dummy", "respawn:Dummy", "Template;", "Crate A0Crate B1Crate C2each3each0", "jump;", "key:truekey:false",
@@ -4156,6 +4163,161 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   CHECK(!logic::from_cpp("struct A : kern::Blueprint {\n  Float x = 0.0;\n", g, nullptr, &error) && error.find("\"};\" is missing") != std::string::npos);
   CHECK(!logic::from_cpp("struct A : kern::Blueprint {\n};\nint more;", g, nullptr, &error) && error.find("is too much") != std::string::npos);
   CHECK(logic::from_cpp("struct A : kern::Blueprint {\n};\n", g, nullptr, &error) && g.empty());
+}
+
+TEST(logic_libraries) {
+  // A library is a Blueprint that keeps nothing: types and functions. A Blueprint that uses it
+  // has its types and calls its functions directly - Wheels::skid(Spare[at], by); -, also with
+  // references. Each function is there once.
+  const char* types = "struct Types : virtual kern::Library {\n  // ---- types ----\n  KERN_ENUM(Side, Front, Rear);\n  KERN_STRUCT(Wheel) {\n    Float Slip = 0.5;\n    Side At = Side::Front;\n    List<Float> Marks = List<Float>{};\n  };\n};\n";
+  const char* wheels =
+      "struct Wheels : virtual kern::Library, virtual Types {\n  // ---- functions ----\n"
+      "  /// Changes the wheel the call names.\n"
+      "  void skid(Wheel& wheel, Float by = 0.5) {\n    wheel.Slip += by;\n    list_add(wheel.Marks, wheel.Slip);\n  }\n\n"
+      "  struct wearResult { Float slip = 0.0; Int marks = 0; };\n"
+      "  KERN_PURE wearResult wear(const Wheel& wheel) {\n    return {wheel.Slip, list_length<Float>(wheel.Marks)};\n  }\n\n"
+      "  struct twiceResult { Float slip = 0.0; };\n"
+      "  twiceResult twice(Wheel& wheel) {\n    skid(wheel, 0.25);\n    skid(wheel, 0.25);\n    wheel.At = Side::Rear;\n    return {wear(wheel).slip};\n  }\n\n"
+      "  void unused(Wheel& wheel) {\n    wheel.Slip = 9.0;\n  }\n};\n";
+  const char* garage =
+      "struct Garage : virtual kern::Blueprint, virtual Wheels {\n  // ---- variables ----\n"
+      "  List<Wheel> Spare = List<Wheel>{Wheel{0.5, Side::Front, List<Float>{}}};\n  Float Seen = 0.0;\n\n  // ---- functions ----\n"
+      "  struct RunResult { Float slip = 0.0; Int marks = 0; Side at = Side::Front; };\n"
+      "  RunResult Run(Int at = 0, Float by = 1.0) {\n    Wheels::skid(Spare[at], by);\n    n5 = Wheels::twice(Spare[at]);\n    Seen = n5.slip;\n"
+      "    return {Wheels::wear(Spare[at]).slip, Wheels::wear(Spare[at]).marks, Spare[at].At};\n  }\n\n"
+      "  // ---- what nodes give and keep ----\n  Wheels::twiceResult n5;\n};\n";
+  std::map<std::string, logic::Graph> project;
+  const logic::Blueprints all = [&](std::string_view name) -> const logic::Graph* {
+    auto it = project.find(std::string(name));
+    return it == project.end() ? nullptr : &it->second;
+  };
+  auto read = [&](const char* name, const std::string& text) {
+    std::string error;
+    logic::Graph g;
+    if (!logic::from_cpp(text, g, nullptr, &error, logic::library(), all)) return error;
+    for (const logic::Issue& i : logic::check(g)) if (i.error) error += i.text + "\n";
+    if (!error.empty()) return error;
+    project[name] = std::move(g);
+    return std::string();
+  };
+  auto says = [&](const std::string& got, const char* why) {
+    if (got.find(why) == std::string::npos) std::printf("expected \"%s\", got: %s\n", why, got.empty() ? "(nothing wrong)" : got.c_str());
+    return got.find(why) != std::string::npos;
+  };
+  CHECK(read("Types", types).empty() && read("Wheels", wheels).empty() && read("Garage", garage).empty());
+  const logic::Graph& g = project["Garage"];
+  CHECK(project["Types"].library && project["Wheels"].library && !g.library && g.uses == std::vector<std::string>{"Wheels"});
+  // of its libraries it holds what it uses: their types, and how the functions look that it calls
+  CHECK(g.structure("Wheel") && g.structure("Wheel")->from == "Types" && g.enumeration("Side") && g.enumeration("Side")->from == "Types");
+  CHECK(g.function("Wheels::skid") && g.function("Wheels::skid")->from == "Wheels" && g.function("Wheels::skid")->inputs[0].ref && g.function("Wheels::twice") && g.function("Wheels::wear") &&
+        g.function("Wheels::wear")->pure && !g.function("Wheels::unused") && g.functions.size() == 4);
+  CHECK(project["Wheels"].structure("Wheel") && project["Wheels"].structure("Wheel")->from == "Types" && project["Wheels"].functions.size() == 4);
+  // its one text: the libraries' types and functions are not in it again - and the text reads back as the graph
+  for (const char* name : {"Types", "Wheels", "Garage"}) {
+    std::string text, error;
+    logic::Graph back, stored;
+    const char* wanted = name == std::string("Types") ? types : name == std::string("Wheels") ? wheels : garage;
+    CHECK(logic::to_cpp(project[name], name, text, &error, logic::library(), false) && text.find(wanted) != std::string::npos);
+    if (text.find(wanted) == std::string::npos) std::printf("%s is written as:\n%s\n%s\n", name, text.c_str(), error.c_str());
+    CHECK(logic::from_cpp(text, back, nullptr, &error, logic::library(), all) && back == project[name]);
+    CHECK(logic::graph_from_json(logic::graph_to_json(project[name]), stored) && stored == project[name] && logic::graph_hash(stored) == logic::graph_hash(project[name]));
+    CHECK(logic::cpp_problem(project[name]).empty());
+  }
+  // one graph with its libraries: the functions it calls, and those they call, with their bodies
+  logic::Graph linked;
+  std::string error;
+  CHECK(logic::link(g, all, linked, &error) && error.empty() && linked.uses.empty());
+  CHECK(linked.function("Wheels::skid") && linked.function("Wheels::skid")->from == "Wheels" && linked.function("Wheels::twice") && linked.function("Wheels::wear") && !linked.function("Wheels::unused"));
+  int bodies = 0;
+  for (const logic::Node& n : linked.nodes) bodies += n.type == "func.entry" && n.param("function").rfind("Wheels::", 0) == 0 ? 1 : 0;
+  CHECK(bodies == 3);
+  CHECK(no_errors(logic::check(linked)) && logic::cpp_problem(linked).empty());
+  for (const logic::Issue& i : logic::check(linked)) if (i.error) std::printf("linked: %s\n", i.text.c_str());
+  if (!logic::cpp_problem(linked).empty()) std::printf("linked: %s\n", logic::cpp_problem(linked).c_str());
+  for (const logic::Node& n : g.nodes) CHECK(linked.find(n.id) && linked.find(n.id)->type == n.type);  // (its own nodes keep their ids)
+  logic::Graph again;
+  CHECK(logic::link(g, all, again) && again == linked && logic::graph_hash(again) == logic::graph_hash(linked));
+  // it runs: in the interpreter and with the JIT's nodes, one graph, a call like any other
+  for (bool jit : {false, true}) {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.jit = jit;
+    rt.native = false;
+    rt.blueprints = all;
+    logic::Instance* inst = rt.add(g, 0, "Garage");
+    rt.begin();
+    std::vector<logic::Value> out;
+    // skid: 0.5 + 1 = 1.5, one mark; twice: + 0.25 + 0.25 = 2, three marks, the wheel is at the rear
+    CHECK(inst->call("Run", {logic::Value::integer(0), logic::Value::number(1)}, out) && out.size() == 3 && out[0].as_number() == 2 && out[1].as_int() == 3 && out[2].i == 1);
+    CHECK(inst->get("Seen").as_number() == 2 && inst->get("Spare").size() == 1 && host.errors.empty());
+    // beside the list: every place named there is an entry of its own - twice works on one (0.5 + 0.25 + 0.25)
+    CHECK(inst->call("Run", {logic::Value::integer(7), logic::Value::number(1)}, out) && out.size() == 3 && out[0].as_number() == 0.5 && out[1].as_int() == 0 && out[2].i == 0);
+    CHECK(inst->get("Seen").as_number() == 1 && inst->get("Spare").size() == 1);
+  }
+  // a library by itself is a Blueprint: its functions are called by name
+  {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.jit = false;
+    rt.native = false;
+    rt.blueprints = all;
+    logic::Instance* inst = rt.add(project["Wheels"], 0, "Wheels");
+    std::vector<logic::Value> out;
+    logic::Value wheel = logic::zero_of({logic::PinType::structure, "Wheel"}, project["Wheels"]);
+    CHECK(inst->call("twice", {wheel}, out) && out.size() == 2 && out[0].as_number() == 1 && out[1].field(0)->as_number() == 1 && out[1].field(1)->i == 1 && host.errors.empty());
+  }
+  // without its libraries a Blueprint does not run - and says so
+  {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.jit = false;
+    logic::Instance* inst = rt.add(g, 0, "Garage");
+    std::vector<logic::Value> out;
+    CHECK(!host.errors.empty() && host.errors[0].find("the library \"Wheels\" is not there") != std::string::npos && !inst->call("Run", {}, out));
+  }
+  // what a library is not, and what cannot be used
+  CHECK(says(read("Kept", "struct Kept : virtual kern::Library {\n  Float Sum = 0.0;\n};\n"), "a library keeps nothing: it has no variables"));
+  CHECK(says(read("Waits", "struct Waits : virtual kern::Library {\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n  }\n};\n"), "a library keeps nothing and waits for nothing: it has no events"));
+  CHECK(says(read("Flips", "struct Flips : virtual kern::Library {\n  void f(Float& x) {\n    switch (flow_flip_flop(n2)) {\n      case 0: { x = 1.0; } break;\n      case 1: { x = 2.0; } break;\n    }\n  }\n\n"
+                           "  struct : kern::Node<2> { Bool is_a = false; } n2;\n};\n"),
+             "keeps something between two calls"));
+  CHECK(says(read("A", "struct A : kern::Library {\n};\n"), "a library is `struct A : virtual kern::Library`"));
+  CHECK(says(read("A", "struct A : virtual kern::Blueprint {\n};\n"), "`virtual` is for a library"));
+  CHECK(says(read("A", "struct A : kern::Blueprint, virtual Wheels {\n};\n"), "a Blueprint that uses libraries is `struct A : virtual kern::Blueprint, virtual <Library>`"));
+  CHECK(says(read("A", "struct A : virtual kern::Blueprint, virtual Nothing {\n};\n"), "the library \"Nothing\" is not there"));
+  CHECK(says(read("A", "struct A : virtual kern::Blueprint, virtual Garage {\n};\n"), "\"Garage\" is no library"));
+  CHECK(says(read("A", "struct A : virtual kern::Blueprint, virtual Wheels, virtual Wheels {\n};\n"), "the library Wheels is used twice"));
+  CHECK(says(read("A", "struct A : virtual kern::Blueprint, virtual Wheels {\n  KERN_STRUCT(Wheel) {\n    Float Slip = 0.0;\n  };\n};\n"), "the name Wheel is declared twice"));
+  CHECK(says(read("A", "struct A : virtual kern::Blueprint, virtual Types {\n  Wheel Mine = Wheel{0.5, Side::Front, List<Float>{}};\n\n  void f() {\n    Wheels::skid(Mine, 1.0);\n  }\n};\n"), "starts no statement"));
+  CHECK(says(read("A", "struct A : virtual kern::Blueprint, virtual Wheels {\n  void f() {\n    Wheels::nothing();\n  }\n};\n"), "starts no statement"));
+  {
+    std::string text;
+    logic::Graph none;
+    CHECK(!logic::from_cpp(garage, none, nullptr, &text) && text.find("reading it needs the project's Blueprints") != std::string::npos);
+  }
+  // a library that changed: what the Blueprint holds of it is no longer what it has
+  {
+    std::map<std::string, logic::Graph> later = project;
+    const logic::Blueprints now = [&](std::string_view name) -> const logic::Graph* {
+      auto it = later.find(std::string(name));
+      return it == later.end() ? nullptr : &it->second;
+    };
+    later["Wheels"].function("skid")->inputs[1].value = json::Value(2.0);
+    CHECK(!logic::link(g, now, linked, &error) && error.find("the Blueprint holds the function Wheels::skid as its library had it before") != std::string::npos);
+    logic::Graph fresh = g;
+    CHECK(logic::take_libraries(fresh, now, &error) && logic::link(fresh, now, linked, &error) && !(fresh == g));
+    later = project;
+    later["Types"].structure("Wheel")->fields[0].name = "Grip";
+    CHECK(!logic::link(g, now, linked, &error) && error.find("the type Wheel of Types") != std::string::npos);
+    later = project;
+    later["Wheels"].uses.push_back("Wheels");
+    CHECK(!logic::link(g, now, linked, &error) && error.find("the library Wheels uses itself") != std::string::npos);
+  }
+  // an entry of a list that is held stays where it is - also when a library's function holds it
+  CHECK(read("Lists", "struct Lists : virtual kern::Library, virtual Types {\n  void grow(List<Wheel>& all, Wheel& one) {\n    list_add(all, one);\n  }\n};\n").empty());
+  CHECK(read("Grows", "struct Grows : virtual kern::Blueprint, virtual Lists {\n  List<Wheel> Spare = List<Wheel>{};\n\n  void f() {\n    Lists::grow(Spare, Spare[0]);\n  }\n};\n").empty());
+  CHECK(logic::link(project["Grows"], all, linked, &error) && logic::cpp_problem(linked).find("while Lists::grow holds it, the length of Spare is changed") != std::string::npos);
+  if (logic::cpp_problem(linked).find("while Lists::grow holds it") == std::string::npos) std::printf("Grows: %s | %s\n", error.c_str(), logic::cpp_problem(linked).c_str());
 }
 
 TEST(logic_notation_rules_are_errors_of_the_graph) {

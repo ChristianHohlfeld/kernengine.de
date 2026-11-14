@@ -367,6 +367,34 @@ std::string compact_symbol(const logic::Node& n) {
 // ---------------------------------------------------------------------------
 // view
 
+
+namespace {
+/// The Blueprints of a level by the name of the actor that has them: where the libraries a
+/// Blueprint uses are found.
+logic::Blueprints blueprints_of(const game::Level& level) {
+  return [&level](std::string_view name) -> const logic::Graph* {
+    for (const game::Actor& a : level.actors)
+      if (a.logic && a.name == name) return &*a.logic;
+    return nullptr;
+  };
+}
+/// What is wrong with a Blueprint. One that uses libraries is judged as the one graph it is
+/// with them (logic::link): the rules that follow calls see what a library's function does.
+std::vector<logic::Issue> whole_issues(const game::Level& level, const logic::Graph& g) {
+  if (g.uses.empty()) return logic::check(g);
+  logic::Graph whole;
+  std::string why;
+  if (!logic::link(g, blueprints_of(level), whole, &why)) {
+    std::vector<logic::Issue> issues = logic::check(g);
+    issues.push_back({0, true, why});
+    return issues;
+  }
+  std::vector<logic::Issue> issues = logic::check(whole);
+  // (what is wrong inside a library is said where the library is open: here only what is this Blueprint's)
+  std::erase_if(issues, [&](const logic::Issue& i) { return i.node != 0 && !g.find(i.node); });
+  return issues;
+}
+}  // namespace
 json::Value Studio::logic_json() const {
   json::Value o = json::Value::object();
   o.set("open", logic_open_);
@@ -403,7 +431,7 @@ json::Value Studio::logic_json() const {
   if (!g) return o;
   const logic::Library& lib = logic::library();
   std::unordered_map<u32, std::vector<const logic::Issue*>> by_node;
-  std::vector<logic::Issue> issues = logic::check(*g, lib);
+  std::vector<logic::Issue> issues = whole_issues(level_, *g);
   {
     // A function of another Blueprint: one of this level should have it as it is declared here.
     const auto others = other_blueprints(level_, logic_owner_);
@@ -1148,7 +1176,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     if (!logic::native_ready(*g, &why)) return fail_result(why);  // (it does not compile: Compile says where)
     const game::Actor* owner = logic_owner_ ? level_.find(logic_owner_) : nullptr;
     const std::string cls = logic::cpp_class_name(owner ? owner->name : std::string("Level"), *g);
-    if (!logic::to_cpp(*g, cls, text, &why) || !logic::native_glue(*g, cls, glue, &why)) return fail_result(why);
+    if (!logic::to_cpp(*g, cls, text, &why) || !logic::native_glue(*g, cls, glue, &why, logic::library(), {}, blueprints_of(level_))) return fail_result(why);
     json::Value r = ok_result();
     r.set("text", text + "\n" + glue);
     std::string file;
@@ -1162,7 +1190,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     const logic::Graph* g = graph_of(level_, logic_owner_);
     json::Value iss = json::Value::array();
     if (g)
-      for (const logic::Issue& i : logic::check(*g)) {
+      for (const logic::Issue& i : whole_issues(level_, *g)) {
         json::Value x = json::Value::object();
         x.set("node", i.node);
         x.set("error", i.error);
@@ -1248,7 +1276,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     // their ids and places; what cannot be read is refused with its line and the reason.
     const logic::Graph* g = graph_of(level_, owner);
     logic::Graph now;
-    if (!logic::apply_cpp(str("text"), g ? *g : logic::Graph(), now, &error)) return fail_result(error);
+    if (!logic::apply_cpp(str("text"), g ? *g : logic::Graph(), now, &error, logic::library(), blueprints_of(level_))) return fail_result(error);
     if (const std::string conflict = project_type_conflict(level_, owner, now); !conflict.empty()) return fail_result(conflict + " (change it in one of them: the others follow)");
     bool applied = false;
     graph_edit("Edit C++", [&](logic::Graph& graph, game::Level&) {

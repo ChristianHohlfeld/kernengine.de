@@ -59,6 +59,11 @@ From the header comment of `logic.h` (Unreal Blueprint semantics):
   place where it stands, to change it (`Car& car`) or only to read it (`const Car& car`).
   Nothing is copied in or out. While a call holds an entry of a list, nothing in it changes how
   long that list is – the check sees to that.
+- **Libraries**: a Blueprint that keeps nothing – types and functions, no variables, no events – is
+  a library. Other Blueprints use it: they have its types and call its functions directly
+  (`Workshop::skid(Spare[i], 1.0)`), also with references. So every function is in the project
+  once. In the interpreter a Blueprint runs as one graph with its libraries (`logic::link`); in
+  the class the library is a base.
 - **Enums**: a Blueprint may declare enums – a type of its own with named values, for example
   `Mode` with the values `Closed`, `Opening`, `Open`. A value of an enum is exactly one of its
   values, held as its place among them (the first is 0). It is neither a number nor a text: it

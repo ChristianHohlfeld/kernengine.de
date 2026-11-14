@@ -60,6 +60,11 @@ Aus dem Kopfkommentar von `logic.h` (Unreal-Blueprint-Semantik):
   diesem Platz, wo er steht – um ihn zu ändern (`Car& car`) oder nur zu lesen (`const Car& car`).
   Nichts wird hinein- oder herauskopiert. Solange ein Aufruf einen Eintrag einer Liste hält,
   ändert nichts in ihm die Länge dieser Liste – darauf achtet die Prüfung.
+- **Bibliotheken**: Ein Blueprint, der nichts behält – Typen und Funktionen, keine Variablen, keine
+  Events –, ist eine Bibliothek. Andere Blueprints benutzen sie: Sie haben ihre Typen und rufen
+  ihre Funktionen direkt auf (`Workshop::skid(Spare[i], 1.0)`), auch mit Referenzen. So steht
+  jede Funktion einmal im Projekt. Im Interpreter läuft ein Blueprint mit seinen Bibliotheken als
+  ein Graph (`logic::link`), in der Klasse ist die Bibliothek eine Basis.
 - **Aufzählungen** (Enums): Ein Blueprint kann eigene Typen mit benannten Werten deklarieren,
   etwa `Mode` mit den Werten `Closed`, `Opening`, `Open`. Ein Wert einer Aufzählung ist genau
   einer ihrer Werte, gehalten als seine Stelle unter ihnen (die erste ist 0). Er ist weder Zahl

@@ -75,6 +75,9 @@ tools/export_game.sh, .mjs           der native Export: ein Level als Spiel, die
   eine Liste, die Ein- und Ausgänge einer Funktion und Pins können von so einem Typ sein. Make
   baut einen Wert aus seinen Feldern, Break gibt die Felder – in beiden Schreibweisen und in
   jeder Stufe gleich (siehe „Strukturen“).
+- **Fertig: Bibliotheken.** Ein Blueprint, der nichts behält, wird von anderen benutzt: Sie haben
+  seine Typen und rufen seine Funktionen direkt – `Workshop::skid(Spare[i], 1.0);` –, auch mit
+  Referenzen. Jede Funktion steht einmal im Projekt (siehe „Bibliotheken“).
 - **Fertig: Lesen kopiert nicht (in der Klasse).** Get Item und Break geben den Eintrag, wie er
   dasteht (`list_get<T>` und `struct_break<S>` sind in der Klasse `const T&`), Find, Contains und
   Remove Item vergleichen ohne Kopie. Die Bedeutung ist die von Werten – in jeder Stufe dieselbe.
@@ -181,6 +184,7 @@ KERN_LAYOUT(Demo) {
 | Funktion ohne Ausgänge | `void Fn(...) { ... }` |
 | Funktion „pure“ (als Wert-Knoten angeboten) | `KERN_PURE` vor der Funktion |
 | Eingang einer Funktion als Wert | `Float by = 1.0` – mit seinem Default |
+| Bibliothek (ein Blueprint, der nichts behält) und wer sie benutzt | `struct Workshop : virtual kern::Library { … };` · `struct Garage : virtual kern::Blueprint, virtual Workshop { … };` – Aufruf `Workshop::skid(Spare[i], 1.0);` (siehe „Bibliotheken“) |
 | Eingang einer Funktion als Referenz (der Aufruf nennt einen Platz) | `Car& car` – die Funktion ändert den Platz; `const Car& car` – sie liest ihn nur. Im Aufruf steht der Platz: `Drive(Cars[i], 0.5);` (siehe „Referenz-Eingänge“) |
 | Typ des Projekts (mehrere Blueprints des Levels haben ihn, alle gleich) | `KERN_PROJECT_ENUM(Mode, Closed, Open);` · `KERN_PROJECT_STRUCT(Door) { Mode State = Mode::Closed; };` – sonst wie `KERN_ENUM` / `KERN_STRUCT` |
 | Funktion eines anderen Blueprints | `KERN_EXTERN FnResult Fn(Float x = 1.5);` – wie sie aussieht, ohne Rumpf (mit `struct FnResult { ... };` darüber, wenn sie Ausgänge hat) |
@@ -584,6 +588,68 @@ void on1(Float delta) {
   Referenz-Eingang, der nicht const ist, in der Reihenfolge der Eingänge.
 - **Call on Actor gibt Werte:** Eine Funktion eines anderen Blueprints (`KERN_EXTERN`) hat keine
   Referenz-Eingänge.
+
+### Bibliotheken
+
+Eine **Bibliothek** ist ein Blueprint, der nichts behält: Er hat Typen und Funktionen, keine
+Variablen, keine Events, keine State Machines – und keinen Knoten, der zwischen zwei Aufrufen
+etwas behält (Do Once, Gate, Flip Flop, die eigene Folge eines Random, ein Warten). Andere
+Blueprints **benutzen** sie: Sie haben dann ihre Typen und rufen ihre Funktionen direkt auf. So
+steht jede Funktion einmal im Projekt.
+
+```cpp
+struct Workshop : virtual kern::Library {                       // eine Bibliothek
+  KERN_STRUCT(Wheel) { Float Slip = 0.5; List<Float> Marks = List<Float>{}; };
+
+  /// Ändert das Rad, das der Aufruf nennt.
+  void skid(Wheel& wheel, Float by = 0.5) {
+    wheel.Slip += by;
+    list_add(wheel.Marks, wheel.Slip);
+  }
+  struct wearResult { Float slip = 0.0; };
+  KERN_PURE wearResult wear(const Wheel& wheel) {
+    return {wheel.Slip};
+  }
+};
+
+struct Garage : virtual kern::Blueprint, virtual Workshop {     // ein Blueprint, der sie benutzt
+  List<Wheel> Spare = List<Wheel>{};                            // Wheel: der Typ der Bibliothek
+  Float Seen = 0.0;
+
+  void Check(Int at = 0) {
+    Workshop::skid(Spare[at], 1.0);                             // direkt, mit einem Platz des Aufrufers
+    Seen = Workshop::wear(Spare[at]).slip;
+  }
+};
+```
+
+- **Im Text ist die Bibliothek eine Basis.** `virtual kern::Library` sagt, dass der Blueprint
+  eine Bibliothek ist (`kern::Library` ist `kern::Blueprint`); wer Bibliotheken benutzt, nennt sie
+  als weitere Basen: `struct Garage : virtual kern::Blueprint, virtual Workshop, virtual Parts`.
+  Auch eine Bibliothek kann Bibliotheken benutzen (`virtual kern::Library, virtual Parts`). Das
+  `virtual` heißt: Ein Blueprint und seine Bibliotheken teilen, was ein Blueprint ist – es gibt
+  eine Welt, ein Budget, jede Bibliothek einmal.
+- **Der Aufruf nennt die Bibliothek:** `Workshop::skid(Spare[at], 1.0);`, was ein Aufruf gab, ist
+  `Workshop::twiceResult n5;`. In C++ ist das der Aufruf einer Funktion einer Basisklasse: einmal
+  übersetzt, direkt. Eine Referenz ist ein Platz des Aufrufers, wie bei einer eigenen Funktion.
+- **Die Typen der Bibliothek hat, wer sie benutzt** – auch die der Bibliotheken, die sie selbst
+  benutzt –, ohne sie noch einmal zu deklarieren: In C++ ist `Wheel` *ein* Typ, darum bindet eine
+  Referenz. Zwei Bibliotheken deklarieren nicht denselben Namen; ein Blueprint deklariert keinen
+  Typ, den eine seiner Bibliotheken hat.
+- **Der Graph hält, was er von seinen Bibliotheken benutzt:** ihre Typen (`from`: die
+  Bibliothek, die sie deklariert) und wie die Funktionen aussehen, die er aufruft (Funktionen
+  ohne Rumpf, `from` und der Name `Workshop::skid`). Der Text zeigt beides nicht noch einmal. Wer
+  einen Text liest, der Bibliotheken nennt, braucht sie (`from_cpp(…, blueprints)`) – wie ein
+  C++-Compiler ihren Header; `take_libraries` bringt auf Stand, was ein Graph von ihnen hält.
+- **Interpreter und JIT führen einen Graphen aus:** Beim Start wird der Blueprint mit seinen
+  Bibliotheken gebunden (`logic::link`): Die Funktionen, die er aufruft – und die sie aufrufen –,
+  stehen dann mit ihrem Rumpf darin, unter ihrem Namen `Workshop::skid`. Ein Aufruf ist danach ein
+  Aufruf wie jeder andere, in jeder Stufe dasselbe. Die Regeln, die Aufrufen folgen (kein
+  Selbstaufruf, „nur rechnen“, gehaltene Einträge), urteilen über diesen einen Graphen. Hält der
+  Blueprint etwas anders, als seine Bibliothek es jetzt hat, bindet er nicht – und sagt, was.
+- **Die Klasse** ist registriert unter dem Hash dieses einen Graphen: Ändert sich eine
+  Bibliothek, passt die übersetzte Klasse ihrer Benutzer nicht mehr, und sie laufen im
+  Interpreter, bis neu gebaut ist.
 
 ### Formeln
 

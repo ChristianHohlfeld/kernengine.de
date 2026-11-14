@@ -325,6 +325,10 @@ struct EnumType {
   /// it the same (the editor keeps them so; a level in which they differ does not check). Such a
   /// value means the same in every Blueprint that takes or gives it.
   bool project = false;
+  /// A type of a library the Blueprint uses (Graph::uses): the name of the library that declares
+  /// it. The Blueprint has the type because it uses the library - it does not declare it, and
+  /// its C++ does not show it again (there it is the library's type itself, so a reference binds).
+  std::string from{};
 };
 
 /// A type as pins, variables and settings name it: the pin type, and for an enum or a struct
@@ -353,6 +357,7 @@ struct StructType {
   std::vector<StructField> fields;
   std::string help;
   bool project = false;  // a type of the project (see EnumType::project)
+  std::string from{};    // a type of the library of that name (see EnumType::from)
   /// The place of the field called `name`, or -1.
   int field(std::string_view name) const;
 };
@@ -422,6 +427,11 @@ struct Function {
   /// and calls it on an actor (Call on Actor) - it has no body here. In the Blueprint's C++:
   /// KERN_EXTERN FnResult Fn(Float x = 0.0);
   bool external = false;
+  /// A function of a library the Blueprint uses (Graph::uses): the library's name. This one says
+  /// what the function looks like - its name here is "Library::function", as the call writes it
+  /// (Random::range(rng, 0.0, 1.0)) - and has no body: the library has it, once. Called
+  /// directly, like one of the Blueprint's own; a reference input is a place of the caller.
+  std::string from{};
   std::string help;
   const FunctionPin* input(std::string_view name) const;
   const FunctionPin* output(std::string_view name) const;
@@ -447,6 +457,15 @@ struct Graph {
   std::vector<StructType> structs;     // (a struct after the structs its fields are of)
   std::vector<CommentBox> comments;    // editor only: no effect on what runs
   u32 next_id = 1;
+  /// A library: a Blueprint that keeps nothing - no variables, events or state machines, and no
+  /// node that keeps something between two calls. It has types and functions; the Blueprints
+  /// that use it call them directly and have its types. In C++:
+  /// struct Random : virtual kern::Blueprint { ... };
+  bool library = false;
+  /// The libraries it uses, by name. It has their types (EnumType::from, StructType::from) and
+  /// calls their functions (Function::from): struct Door : virtual kern::Blueprint, virtual Random { ... };
+  std::vector<std::string> uses;
+  bool uses_library(std::string_view name) const;
   bool empty() const { return nodes.empty() && variables.empty() && machines.empty() && functions.empty() && enums.empty() && structs.empty() && comments.empty(); }
   const EnumType* enumeration(std::string_view name) const;
   EnumType* enumeration(std::string_view name);
@@ -740,18 +759,40 @@ void platform_jit_release(i32 function);
 // statement or one expression. to_cpp writes it the one canonical way; from_cpp reads it back as
 // the same Blueprint and refuses, with the place and the reason, whatever is not in the subset.
 
+/// The Blueprints of a project by name - a level's: by the name of the actor that has it. Null:
+/// none of that name.
+using Blueprints = std::function<const Graph*(std::string_view)>;
+/// "Random::range": the name a function of a library has where it is used.
+std::string library_function(std::string_view library, std::string_view function);
+/// The libraries a Blueprint uses, with those they use, each once and after the ones it uses
+/// itself (what is declared first comes first). False: one is not there, is no library, or
+/// uses itself through others - `error` says which.
+bool libraries_of(const Graph& g, const Blueprints& all, std::vector<std::string>& out, std::string* error = nullptr);
+/// Brings what a Blueprint holds of its libraries up to date: their types (all of them, in front
+/// of its own) and how the functions look that its nodes call (`all_functions`: every function
+/// of every library it names in `uses` - what a text may call while it is read). False: a
+/// library is not there, or a type or function the Blueprint needs of it.
+bool take_libraries(Graph& g, const Blueprints& all, std::string* error = nullptr, bool all_functions = false);
+/// The Blueprint with its libraries as one graph, as the interpreter and the JIT run it and as
+/// the rules that follow calls judge it: the functions it calls of its libraries - and those
+/// they call - with their bodies, under their names "Library::function". The Blueprint's own
+/// nodes keep their ids; a library's nodes have ids above them. A Blueprint that uses no library
+/// is the graph it is. False: a library is not there, or the Blueprint holds something of one
+/// that the library has otherwise (take_libraries brings that up to date).
+bool link(const Graph& g, const Blueprints& all, Graph& out, std::string* error = nullptr, const class Library* lib = nullptr);
+
 /// The Blueprint as C++. False: the graph cannot be written (unknown node types, names that are
 /// no C++ names - check() reports the same) and `error` says why.
 /// `layout` false: the code alone, without the KERN_LAYOUT block that says where the nodes are in
 /// the graph view (what Studio shows; apply_cpp reads it back).
 bool to_cpp(const Graph& g, const std::string& name, std::string& out, std::string* error = nullptr, const Library& lib = library(), bool layout = true);
 /// The Blueprint a C++ text is. False: `error` says what is not a Blueprint, with line and column.
-bool from_cpp(std::string_view text, Graph& out, std::string* name = nullptr, std::string* error = nullptr, const Library& lib = library());
+bool from_cpp(std::string_view text, Graph& out, std::string* name = nullptr, std::string* error = nullptr, const Library& lib = library(), const Blueprints& all = {});
 /// The Blueprint a C++ text is, as a change to `before`. A text without its KERN_LAYOUT block
 /// keeps, for every node it still has, the id, the place and the comment the node has in
 /// `before`; a new node gets a new id and a place next to the node before it; the comment boxes
 /// stay. (With a KERN_LAYOUT block the text says all of that itself, as for from_cpp.)
-bool apply_cpp(std::string_view text, const Graph& before, Graph& out, std::string* error = nullptr, const Library& lib = library());
+bool apply_cpp(std::string_view text, const Graph& before, Graph& out, std::string* error = nullptr, const Library& lib = library(), const Blueprints& all = {});
 /// The one canonical form of a graph - what reading its own C++ gives: the nodes in the order
 /// the text names them, only the values and settings that differ from their defaults, formulas
 /// in their one spelling. It is the same Blueprint (same_blueprint) and runs exactly as `g`.
@@ -861,7 +902,10 @@ void register_native_blueprint(u64 hash, NativeBlueprintFactory make);
 /// hash: compiled after the Blueprint's text (to_cpp(g, name)) in the same source. For graphs that
 /// are native_ready. It is glue for the engine, not part of the notation: nothing to edit there.
 /// `space`: the namespace the class stands in (the glue is written into it too), empty: none.
-bool native_glue(const Graph& g, const std::string& name, std::string& out, std::string* error = nullptr, const Library& lib = library(), std::string_view space = {});
+/// `all`: the Blueprints of the project, for a Blueprint that uses libraries - it is registered
+/// under the hash of the one graph it is with them (logic::link), as Runtime::add looks it up.
+bool native_glue(const Graph& g, const std::string& name, std::string& out, std::string* error = nullptr, const Library& lib = library(), std::string_view space = {},
+                 const Blueprints& all = {});
 
 struct NodeState {           // per node instance: Do Once, Gate, Flip Flop, loops, latent waits
   f64 time = 0, a = 0, b = 0;
@@ -1111,6 +1155,9 @@ class Runtime {
   const Library& lib() const { return lib_; }
   /// Compiles and adds a graph. Errors from check() disable the instance and are reported.
   Instance* add(const Graph& graph, ActorRef self, std::string name);
+  /// The Blueprints of the project: where a Blueprint's libraries are found (Graph::uses). A
+  /// Blueprint that uses libraries runs as one graph with them (logic::link).
+  Blueprints blueprints;
   void remove(ActorRef self);
   void clear();
   /// Begin Play for instances that have not begun.

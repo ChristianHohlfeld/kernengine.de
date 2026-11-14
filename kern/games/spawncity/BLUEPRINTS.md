@@ -427,11 +427,14 @@ Eine Form, die Gestalt oder Kosten ändert, ist keine von beiden.
    Level stehen damit 273 `struct_break` (am Morgen: 2.471), 60 `list_get` (367) und kein For Each des Konverters mehr (62); zwei Funktionen mehr sind geschrieben (Schleifen, die ihre Einträge ändern und von innen zurückkehren).
 4. **Bibliotheken.** Eine Funktion eines Blueprints ohne Zustand ruft jeder andere Blueprint
    direkt – in der Klasse ein gewöhnlicher Aufruf. Damit steht jede Funktion einmal im Projekt
-   (heute: in jedem Blueprint, der sie benutzt). So ist es festgelegt (13.11.2026, 23:45):
+   (heute: in jedem Blueprint, der sie benutzt). *(In der Engine seit 14.11.2026, 00:50 –
+   `kern/docs/blueprint_cpp.md`, „Bibliotheken“; im Editor und im Konverter folgt es.)* So ist es
+   festgelegt (13.11.2026, 23:45):
    - **Eine Bibliothek ist ein Blueprint, der nichts behält:** keine Variablen, keine Events,
      Timer oder Zustände, und kein Knoten, der zwischen zwei Aufrufen etwas behält (Do Once,
      Gate, Flip Flop, die eigene Folge eines Random, ein Warten). Sie hat Typen und Funktionen.
-     Im Text: `struct Random : virtual kern::Blueprint { … };`.
+     Im Text: `struct Random : virtual kern::Library { … };` (`kern::Library` ist
+     `kern::Blueprint`: der Name sagt, was der Blueprint ist).
    - **Ein Blueprint benutzt Bibliotheken:** `struct Destruction : virtual kern::Blueprint, virtual
      Random, virtual Geometry { … };`. Er hat damit ihre Typen (`Rng`, ohne sie noch einmal zu
      deklarieren – in C++ ist es *ein* Typ, darum bindet eine Referenz) und ruft ihre Funktionen

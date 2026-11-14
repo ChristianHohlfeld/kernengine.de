@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <map>
 
 namespace kern::logic {
 
@@ -662,33 +663,40 @@ bool Graph::place_of(const Node& n, Variable& out, std::string* why, std::string
   out.of = at.of;
   return true;
 }
+namespace {
+/// The nodes of a function's body: the steps its Function Entry leads to along exec wires, and
+/// the values they read.
+std::vector<u32> body_nodes(const Graph& g, u32 entry, const Library& lib) {
+  std::vector<u32> todo{entry}, seen{entry};
+  auto take = [&](u32 id) {
+    if (std::find(seen.begin(), seen.end(), id) != seen.end()) return;
+    seen.push_back(id);
+    todo.push_back(id);
+  };
+  while (!todo.empty()) {
+    const u32 at = todo.back();
+    todo.pop_back();
+    const Node* n = g.find(at);
+    if (!n) continue;
+    std::vector<PinDef> in, out;
+    lib.pins(*n, g, in, out);
+    for (const Link& l : g.links) {
+      if (l.from == at)
+        for (const PinDef& p : out)
+          if (p.id == l.out && p.type == PinType::exec) take(l.to);
+      if (l.to == at)
+        for (const PinDef& p : in)
+          if (p.id == l.in && p.type != PinType::exec) take(l.from);
+    }
+  }
+  return seen;
+}
+}  // namespace
 std::string Graph::body_of(u32 node, const Library& lib) const {
   std::string body;
   for (const Node& entry : nodes) {
     if (entry.type != "func.entry") continue;
-    // the steps the entry leads to along exec wires, then the values they read
-    std::vector<u32> todo{entry.id}, seen{entry.id};
-    auto take = [&](u32 id) {
-      if (std::find(seen.begin(), seen.end(), id) != seen.end()) return;
-      seen.push_back(id);
-      todo.push_back(id);
-    };
-    while (!todo.empty()) {
-      const u32 at = todo.back();
-      todo.pop_back();
-      const Node* n = find(at);
-      if (!n) continue;
-      std::vector<PinDef> in, out;
-      lib.pins(*n, *this, in, out);
-      for (const Link& l : links) {
-        if (l.from == at)
-          for (const PinDef& p : out)
-            if (p.id == l.out && p.type == PinType::exec) take(l.to);
-        if (l.to == at)
-          for (const PinDef& p : in)
-            if (p.id == l.in && p.type != PinType::exec) take(l.from);
-      }
-    }
+    const std::vector<u32> seen = body_nodes(*this, entry.id, lib);
     if (std::find(seen.begin(), seen.end(), node) == seen.end()) continue;
     if (!body.empty() && body != entry.param("function")) return {};
     body = entry.param("function");
@@ -737,6 +745,240 @@ const Function* Graph::function(std::string_view name) const {
   for (const Function& f : functions) if (f.name == name) return &f;
   return nullptr;
 }
+bool Graph::uses_library(std::string_view name) const { return std::find(uses.begin(), uses.end(), name) != uses.end(); }
+
+// ---------------------------------------------------------------------------
+// libraries: Blueprints that keep nothing, and the Blueprints that use them
+
+std::string library_function(std::string_view library, std::string_view function) { return std::string(library) + "::" + std::string(function); }
+
+namespace {
+/// "Random::range" -> Random, range. False: a name of the Blueprint's own.
+bool split_library_function(std::string_view name, std::string& library, std::string& function) {
+  const std::size_t at = name.find("::");
+  if (at == std::string_view::npos) return false;
+  library = std::string(name.substr(0, at));
+  function = std::string(name.substr(at + 2));
+  return true;
+}
+bool calls_function(const Node& n) { return n.type == "func.call" || n.type == "func.pure"; }
+bool same_pins(const std::vector<FunctionPin>& a, const std::vector<FunctionPin>& b) {
+  if (a.size() != b.size()) return false;
+  for (std::size_t k = 0; k < a.size(); ++k)
+    if (a[k].name != b[k].name || a[k].type != b[k].type || a[k].of != b[k].of || a[k].ref != b[k].ref || a[k].constant != b[k].constant ||
+        json::stringify(a[k].value) != json::stringify(b[k].value))
+      return false;
+  return true;
+}
+/// A library's function as a Blueprint that uses the library holds it: what it looks like.
+Function declared(const std::string& library, const Function& f) {
+  Function d;
+  d.name = library_function(library, f.name);
+  d.from = library;
+  d.inputs = f.inputs;
+  d.outputs = f.outputs;
+  d.pure = f.pure;
+  d.help = f.help;
+  return d;
+}
+bool say(std::string* error, const std::string& why) {
+  if (error) *error = why;
+  return false;
+}
+}  // namespace
+
+bool libraries_of(const Graph& g, const Blueprints& all, std::vector<std::string>& out, std::string* error) {
+  out.clear();
+  std::vector<std::string> open;  // (the libraries being followed: one of them again is a library that uses itself)
+  std::function<bool(const std::vector<std::string>&)> follow = [&](const std::vector<std::string>& names) {
+    for (const std::string& name : names) {
+      if (std::find(out.begin(), out.end(), name) != out.end()) continue;
+      if (std::find(open.begin(), open.end(), name) != open.end()) return say(error, "the library " + name + " uses itself (through the libraries it uses)");
+      const Graph* l = all ? all(name) : nullptr;
+      if (!l) return say(error, "the library \"" + name + "\" is not there: no Blueprint of that name");
+      if (!l->library) return say(error, "\"" + name + "\" is no library: only a Blueprint that keeps nothing is used by others (My Blueprint: Library)");
+      open.push_back(name);
+      if (!follow(l->uses)) return false;
+      open.pop_back();
+      out.push_back(name);
+    }
+    return true;
+  };
+  return follow(g.uses);
+}
+
+bool take_libraries(Graph& g, const Blueprints& all, std::string* error, bool all_functions) {
+  std::vector<std::string> libraries;
+  if (!libraries_of(g, all, libraries, error)) return false;
+  // Their types, in front of its own: what is declared first comes first (a library after the
+  // libraries it uses, a struct after the structs its fields are of).
+  std::vector<EnumType> enums;
+  std::vector<StructType> structs;
+  auto taken = [&](const std::string& name) -> const std::string* {
+    for (const EnumType& e : enums) if (e.name == name) return &e.from;
+    for (const StructType& t : structs) if (t.name == name) return &t.from;
+    return nullptr;
+  };
+  for (const std::string& name : libraries) {
+    const Graph& l = *all(name);
+    for (const EnumType& e : l.enums) {
+      if (!e.from.empty()) continue;
+      if (const std::string* other = taken(e.name)) return say(error, "the libraries " + *other + " and " + name + " both declare a type \"" + e.name + "\"");
+      enums.push_back(e);
+      enums.back().from = name;
+    }
+    for (const StructType& t : l.structs) {
+      if (!t.from.empty()) continue;
+      if (const std::string* other = taken(t.name)) return say(error, "the libraries " + *other + " and " + name + " both declare a type \"" + t.name + "\"");
+      structs.push_back(t);
+      structs.back().from = name;
+    }
+  }
+  for (const EnumType& e : g.enums) {
+    if (!e.from.empty()) continue;
+    if (const std::string* other = taken(e.name)) return say(error, "the type \"" + e.name + "\" is declared here and in the library " + *other);
+    enums.push_back(e);
+  }
+  for (const StructType& t : g.structs) {
+    if (!t.from.empty()) continue;
+    if (const std::string* other = taken(t.name)) return say(error, "the type \"" + t.name + "\" is declared here and in the library " + *other);
+    structs.push_back(t);
+  }
+  // How the functions look that it calls of them.
+  std::vector<Function> functions;
+  auto take = [&](const std::string& library, const std::string& function) {
+    const std::string name = library_function(library, function);
+    for (const Function& f : functions) if (f.name == name) return true;
+    if (!g.uses_library(library)) return say(error, name + " is called, but the Blueprint does not use the library " + library);
+    const Graph* l = all(library);
+    const Function* f = l ? l->function(function) : nullptr;
+    if (!f || !f->from.empty() || f->external) return say(error, "the library " + library + " has no function \"" + function + "\"");
+    functions.push_back(declared(library, *f));
+    return true;
+  };
+  if (all_functions) {
+    for (const std::string& name : g.uses)
+      for (const Function& f : all(name)->functions)
+        if (f.from.empty() && !f.external && !take(name, f.name)) return false;
+  } else {
+    std::string library, function;
+    for (const Node& n : g.nodes)
+      if (calls_function(n) && split_library_function(n.param("function"), library, function) && !take(library, function)) return false;
+  }
+  std::sort(functions.begin(), functions.end(), [](const Function& a, const Function& b) { return a.name < b.name; });
+  for (Function& f : g.functions)
+    if (f.from.empty()) functions.push_back(std::move(f));
+  g.functions = std::move(functions);
+  g.enums = std::move(enums);
+  g.structs = std::move(structs);
+  return true;
+}
+
+bool link(const Graph& g, const Blueprints& all, Graph& out, std::string* error, const Library* lib_) {
+  out = g;
+  if (g.uses.empty()) return true;
+  const Library& lib = lib_ ? *lib_ : library();
+  // What it holds of its libraries is what they have: the rules were judged, and its C++ was
+  // written, against that.
+  {
+    Graph fresh = g;
+    if (!take_libraries(fresh, all, error)) return false;
+    auto stale = [&](const std::string& what) { return say(error, "the Blueprint holds " + what + " as its library had it before: its libraries have changed since (compile it again)"); };
+    for (const Function& f : fresh.functions) {
+      if (f.from.empty()) continue;
+      const Function* held = g.function(f.name);
+      if (!held || held->from != f.from || held->pure != f.pure || !same_pins(held->inputs, f.inputs) || !same_pins(held->outputs, f.outputs)) return stale("the function " + f.name);
+    }
+    std::size_t from = 0;
+    for (const EnumType& e : fresh.enums) {
+      if (e.from.empty()) continue;
+      ++from;
+      const EnumType* held = g.enumeration(e.name);
+      if (!held || held->from != e.from || !same_type(*held, e)) return stale("the type " + e.name + " of " + e.from);
+    }
+    for (const StructType& t : fresh.structs) {
+      if (t.from.empty()) continue;
+      ++from;
+      const StructType* held = g.structure(t.name);
+      if (!held || held->from != t.from || !same_type(*held, t)) return stale("the type " + t.name + " of " + t.from);
+    }
+    std::size_t held = 0;
+    for (const EnumType& e : g.enums) held += e.from.empty() ? 0 : 1;
+    for (const StructType& t : g.structs) held += t.from.empty() ? 0 : 1;
+    if (held != from) return stale("a type");
+  }
+  // The functions it calls of its libraries, and those they call: with their bodies, under the
+  // names the calls use. A library's nodes get ids above the Blueprint's own.
+  u32 next = out.next_id;
+  for (const Node& n : out.nodes) next = max_of(next, n.id + 1);
+  std::vector<std::string> todo, done;
+  for (const Node& n : g.nodes)
+    if (calls_function(n) && n.param("function").find("::") != std::string::npos) todo.push_back(n.param("function"));
+  std::map<std::string, std::map<u32, u32>> copied;  // per library: its node -> the node here
+  while (!todo.empty()) {
+    const std::string name = todo.back();
+    todo.pop_back();
+    if (std::find(done.begin(), done.end(), name) != done.end()) continue;
+    done.push_back(name);
+    std::string library, function;
+    split_library_function(name, library, function);
+    const Graph* l = all ? all(library) : nullptr;
+    const Function* f = l ? l->function(function) : nullptr;
+    if (!f || !f->from.empty() || f->external) return say(error, "the library " + library + " has no function \"" + function + "\"");
+    Function linked = *f;
+    linked.name = name;
+    linked.from = library;  // (it is the library's - here with its body)
+    if (Function* held = out.function(name)) *held = std::move(linked);
+    else out.functions.push_back(std::move(linked));
+    const Node* entry = nullptr;
+    for (const Node& n : l->nodes)
+      if (n.type == "func.entry" && n.param("function") == function) entry = &n;
+    if (!entry) return say(error, "the function " + name + " has no Function Entry node");
+    std::map<u32, u32>& ids = copied[library];
+    for (u32 id : body_nodes(*l, entry->id, lib)) {
+      if (ids.count(id)) continue;
+      const Node* from = l->find(id);
+      if (!from) continue;
+      Node n = *from;
+      n.id = ids[id] = next++;
+      // The names it has of its own library are the names they have here: a function of the
+      // library (its entry, its returns, a call of it), the function a local variable is of.
+      for (auto& [key, value] : n.params) {
+        if (value.empty() || value.find("::") != std::string::npos) continue;
+        if (key == "scope") {
+          value = library_function(library, value);
+        } else if (key == "function") {
+          const Function* named = l->function(value);
+          if (named && !named->external) value = library_function(library, value);
+        }
+      }
+      if (calls_function(n)) todo.push_back(n.param("function"));
+      if (n.type == "func.call_on") {
+        // (a function of another actor's Blueprint the library calls: what it looks like comes along)
+        const Function* named = l->function(n.param("function"));
+        const Function* held = named ? out.function(named->name) : nullptr;
+        if (named && held && (!held->external || !same_pins(held->inputs, named->inputs) || !same_pins(held->outputs, named->outputs)))
+          return say(error, "the library " + library + " calls " + named->name + " on an actor, and the Blueprint has another function of that name");
+        if (named && !held) out.functions.push_back(*named);
+      }
+      out.nodes.push_back(std::move(n));
+    }
+  }
+  for (const auto& [library, ids] : copied) {
+    const Graph& l = *all(library);
+    for (const Link& link : l.links) {
+      auto from = ids.find(link.from), to = ids.find(link.to);
+      if (from == ids.end() || to == ids.end()) continue;
+      Link here = link;
+      here.from = from->second;
+      here.to = to->second;
+      out.links.push_back(std::move(here));
+    }
+  }
+  out.next_id = next;
+  out.uses.clear();  // (one graph now: nothing is used from outside it)
+  return true;
+}
 Function* Graph::function(std::string_view name) {
   for (Function& f : functions) if (f.name == name) return &f;
   return nullptr;
@@ -775,6 +1017,12 @@ json::Value graph_to_json(const Graph& g) {
     vars.push(std::move(o));
   }
   root.set("variables", std::move(vars));
+  if (g.library) root.set("library", true);  // (only then, like the types: other graphs keep their content hash)
+  if (!g.uses.empty()) {
+    json::Value uses = json::Value::array();
+    for (const std::string& name : g.uses) uses.push(name);
+    root.set("uses", std::move(uses));
+  }
   if (!g.enums.empty()) {  // (only then: graphs without types of their own keep their content hash)
     json::Value enums = json::Value::array();
     for (const EnumType& e : g.enums) {
@@ -785,6 +1033,7 @@ json::Value graph_to_json(const Graph& g) {
       o.set("values", std::move(values));
       if (!e.help.empty()) o.set("help", e.help);
       if (e.project) o.set("project", true);
+      if (!e.from.empty()) o.set("from", e.from);
       enums.push(std::move(o));
     }
     root.set("enums", std::move(enums));
@@ -806,6 +1055,7 @@ json::Value graph_to_json(const Graph& g) {
       o.set("fields", std::move(fields));
       if (!s.help.empty()) o.set("help", s.help);
       if (s.project) o.set("project", true);
+      if (!s.from.empty()) o.set("from", s.from);
       structs.push(std::move(o));
     }
     root.set("structs", std::move(structs));
@@ -894,6 +1144,7 @@ json::Value graph_to_json(const Graph& g) {
       o.set("name", f.name);
       if (f.pure) o.set("pure", true);
       if (f.external) o.set("external", true);
+      if (!f.from.empty()) o.set("from", f.from);
       if (!f.help.empty()) o.set("help", f.help);
       o.set("inputs", pins(f.inputs));
       o.set("outputs", pins(f.outputs));
@@ -935,6 +1186,13 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
     max_id = max_of(max_id, id);
     return id;
   };
+  g.library = j["library"].as_bool();
+  for (const json::Value& v : j["uses"].items()) {
+    const std::string name = v.as_string();
+    if (name.empty() || name.size() > 64) return bad("a library that is used needs a name (1-64 characters)");
+    if (g.uses_library(name)) return bad("the library \"" + name + "\" is used twice");
+    g.uses.push_back(name);
+  }
   for (const json::Value& v : j["enums"].items()) {
     EnumType e;
     e.name = v["name"].as_string();
@@ -943,6 +1201,7 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
     for (const json::Value& x : v["values"].items()) e.values.push_back(x.as_string());
     e.help = v["help"].as_string();
     e.project = v["project"].as_bool();
+    e.from = v["from"].as_string();
     g.enums.push_back(std::move(e));
   }
   // A type in the file: its name, and for an enum's or a struct's values which one ("of").
@@ -969,6 +1228,7 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
     }
     s.help = v["help"].as_string();
     s.project = v["project"].as_bool();
+    s.from = v["from"].as_string();
     g.structs.push_back(std::move(s));
   }
   for (const json::Value& v : j["variables"].items()) {
@@ -1064,7 +1324,9 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
   for (const json::Value& v : j["functions"].items()) {
     Function f;
     f.name = v["name"].as_string();
-    if (f.name.empty() || f.name.size() > 64) return bad("a function needs a name (1-64 characters)");
+    f.from = v["from"].as_string();
+    // (a function of a library is named with it: "Random::range")
+    if (f.name.empty() || f.name.size() > 64 + (f.from.empty() ? 0 : f.from.size() + 2)) return bad("a function needs a name (1-64 characters)");
     if (g.function(f.name)) return bad("function \"" + f.name + "\" is declared twice");
     f.pure = v["pure"].as_bool();
     f.external = v["external"].as_bool();
@@ -1304,10 +1566,38 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
       if (!f.locals.empty()) err(0, "function \"" + f.name + "\" is a function of another Blueprint: it has no local variables here");
       continue;
     }
+    if (!f.from.empty()) {
+      // A function of a library: called directly. Where the Blueprint uses the library it holds
+      // what the function looks like - the library has its body; in the one graph a Blueprint is
+      // with its libraries (logic::link) the body is there.
+      for (const Node& n : g.nodes)
+        if (n.type == "func.call_on" && n.param("function") == f.name) err(n.id, f.name + " is a function of the library " + f.from + ": it is called directly (Call Function), not on an actor");
+      if (entries == 0) {
+        if (!g.uses_library(f.from)) err(0, f.name + " is a function of the library " + f.from + ", which the Blueprint does not use");
+        if (returns != 0) err(0, f.name + " is a function of the library " + f.from + ": its body is there, not here");
+        continue;
+      }
+    }
     if (entries == 0) err(0, "function \"" + f.name + "\" has no Function Entry node");
     if (entries > 1) err(0, "function \"" + f.name + "\" has " + std::to_string(entries) + " Function Entry nodes (one is its start)");
     if (entries == 1 && returns == 0 && !f.outputs.empty()) warn(0, "function \"" + f.name + "\" has no Return node: it gives its outputs' defaults");
   }
+  // A library keeps nothing: what it has are types and functions, and no node of it keeps
+  // something between two calls. So a Blueprint that uses it has nothing of it but its functions.
+  if (g.library) {
+    if (!g.variables.empty()) err(0, "a library keeps nothing: it has no variables (\"" + g.variables[0].name + "\") - what a function works on, its call gives it (a reference input)");
+    if (!g.machines.empty()) err(0, "a library keeps nothing: it has no state machines");
+    for (const Node& n : g.nodes) {
+      const NodeDef* d = lib.find(n.type);
+      if (!d) continue;
+      if (d->kind == NodeKind::event && n.type != "func.entry") err(n.id, "a library keeps nothing and waits for nothing: it has no events (" + lib.title(n) + ")");
+      else if (d->latent) err(n.id, "a library keeps nothing: " + lib.title(n) + " waits");
+      else if (d->memory && !d->loop) err(n.id, "a library keeps nothing: " + lib.title(n) + " keeps something between two calls");
+    }
+  }
+  for (std::size_t k = 0; k < g.uses.size(); ++k)
+    for (std::size_t o = 0; o < k; ++o)
+      if (g.uses[o] == g.uses[k]) err(0, "the library \"" + g.uses[k] + "\" is used twice");
   // Reference inputs (FunctionPin::ref): a call names a place for each, and the function works
   // on it where it stands.
   for (const Function& f : g.functions)
@@ -2158,8 +2448,18 @@ const Value* Event::arg(std::string_view name) const {
 Runtime::Runtime(Host& host, const Library& lib) : host_(host), lib_(lib) {}
 Runtime::~Runtime() = default;
 
-Instance* Runtime::add(const Graph& graph, ActorRef self, std::string name) {
+Instance* Runtime::add(const Graph& own, ActorRef self, std::string name) {
+  // A Blueprint that uses libraries runs as one graph with them: their functions are functions
+  // of that graph, and a call of one is a call like any other - in every tier.
+  Graph linked;
+  std::string unlinked;
+  const bool whole = own.uses.empty() || link(own, blueprints, linked, &unlinked, &lib_);
+  const Graph& graph = !own.uses.empty() && whole ? linked : own;
   auto inst = std::make_unique<Instance>(*this, graph, self, std::move(name));
+  if (!whole) {
+    host_.error(inst->name() + ": " + unlinked);
+    inst->disabled_ = true;
+  }
   for (const Issue& i : check(graph, lib_))
     if (i.error) {
       host_.error(inst->name() + ": " + i.text);

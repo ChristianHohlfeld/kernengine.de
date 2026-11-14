@@ -39,6 +39,16 @@ struct Case {
   /// type, also none the function's inputs have, and fewer than it has inputs. The class is given
   /// them as the engine gives them (logic::native_arg).
   std::vector<Call> outside = {};
+  /// The libraries it uses, with those they use (each a case of its own before it): the
+  /// Blueprints of its project.
+  std::vector<std::pair<std::string, logic::Graph>> libraries = {};
+  logic::Blueprints blueprints() const {
+    auto held = std::make_shared<std::vector<std::pair<std::string, logic::Graph>>>(libraries);
+    return [held](std::string_view name) -> const logic::Graph* {
+      for (const auto& [n, g] : *held) if (n == name) return &g;
+      return nullptr;
+    };
+  }
 };
 
 // Places: a variable, and from it fields and list entries - read, set, added to and changed as a
@@ -152,6 +162,85 @@ struct Places : kern::Blueprint {
   struct { Float value = 0.0; } n35;
   struct { Int index = 0; } n41;
   struct { Bool removed = false; } n44;
+};
+)kn";
+
+// Libraries: Blueprints that keep nothing - types, and functions - and a Blueprint that uses
+// them: it has their types and calls their functions directly, with values and with references
+// (an entry of its own list, also beside it). Each function is there once: in the class the
+// library is a base, in the interpreter the Blueprint runs as one graph with its libraries.
+inline const char* kParts = R"kn(
+struct Parts : virtual kern::Library {
+  KERN_ENUM(Side, Front, Rear);
+  KERN_STRUCT(Wheel) {
+    Float Slip = 0.5;
+    Side At = Side::Front;
+    List<Float> Marks = List<Float>{};
+  };
+
+  struct flippedResult { Side side = Side::Front; };
+  KERN_PURE flippedResult flipped(Side side = Side::Front) {
+    return {logic_select<Side>(enum_equal<Side>(side, Side::Front), Side::Rear, Side::Front)};
+  }
+};
+)kn";
+inline const char* kWorkshop = R"kn(
+struct Workshop : virtual kern::Library, virtual Parts {
+  /// Changes the wheel the call names.
+  void skid(Wheel& wheel, Float by = 0.5) {
+    wheel.Slip += by;
+    list_add(wheel.Marks, wheel.Slip);
+    wheel.At = Parts::flipped(wheel.At).side;
+  }
+  struct wearResult { Float slip = 0.0; Int marks = 0; };
+  KERN_PURE wearResult wear(const Wheel& wheel) {
+    return {wheel.Slip, list_length<Float>(wheel.Marks)};
+  }
+  struct twiceResult { Float slip = 0.0; Int passes = 0; };
+  /// A function of the library that calls its own, and loops.
+  twiceResult twice(Wheel& wheel, Int times = 2) {
+    Int Passes = 0;
+    for (auto it10 = flow_for(n10, 1, times); it10.next();) {
+      skid(wheel, 0.25);
+      Passes += 1;
+    }
+    return {wear(wheel).slip, Passes};
+  }
+  void fit(List<Wheel>& wheels, const Wheel& like, Int count = 1) {
+    for (auto it20 = flow_for(n20, 1, count); it20.next();) {
+      list_add(wheels, like);
+    }
+  }
+
+  struct : kern::Node<10> { Int index = 0; } n10;
+  struct : kern::Node<20> { Int index = 0; } n20;
+};
+)kn";
+inline const char* kGarage = R"kn(
+struct Garage : virtual kern::Blueprint, virtual Workshop, virtual Parts {
+  KERN_STRUCT(Car) {
+    Text Name = "car";
+    List<Wheel> Wheels = List<Wheel>{};
+  };
+
+  List<Car> Cars = List<Car>{Car{"a", List<Wheel>{Wheel{0.25, Side::Rear, List<Float>{}}}}};
+  Wheel Spare = Wheel{1.0, Side::Front, List<Float>{}};
+  Float Seen = 0.0;
+
+  struct RunResult { Float slip = 0.0; Int marks = 0; Side at = Side::Front; Int passes = 0; Int wheels = 0; Side flipped = Side::Front; };
+  /// Calls of the libraries' functions: a place of its own as a reference - a variable, an entry
+  /// of a list in an entry of a list, also beside the lists -, a value read of one.
+  RunResult Run(Int car = 0, Int wheel = 0, Float by = 1.0) {
+    Workshop::skid(Cars[car].Wheels[wheel], by);
+    n5 = Workshop::twice(Cars[car].Wheels[wheel], 3);
+    Seen = n5.slip;
+    Workshop::skid(Spare, by);
+    Workshop::fit(Cars[car].Wheels, Spare, 2);
+    return {Workshop::wear(Cars[car].Wheels[wheel]).slip, Workshop::wear(Cars[car].Wheels[wheel]).marks, Cars[car].Wheels[wheel].At, n5.passes, list_length<Wheel>(Cars[car].Wheels),
+            Parts::flipped(Spare.At).side};
+  }
+
+  Workshop::twiceResult n5;
 };
 )kn";
 
@@ -1134,10 +1223,18 @@ inline std::vector<Value> numbers(std::initializer_list<f64> v) {
 
 inline std::vector<Case> cases() {
   std::vector<Case> all;
+  // (a case that uses libraries finds them among the cases before it)
+  const logic::Blueprints before = [&](std::string_view name) -> const logic::Graph* {
+    for (std::size_t k = 0; k + 1 < all.size(); ++k) if (all[k].name == name) return &all[k].graph;
+    return nullptr;
+  };
   auto read = [&](const char* name, const char* text) -> Case& {
     all.push_back({name, {}, {}});
     std::string error;
-    if (!logic::from_cpp(text, all.back().graph, nullptr, &error)) std::printf("blueprint_native %s: %s\n", name, error.c_str());
+    std::vector<std::string> used;
+    if (!logic::from_cpp(text, all.back().graph, nullptr, &error, logic::library(), before) || !logic::libraries_of(all.back().graph, before, used, &error))
+      std::printf("blueprint_native %s: %s\n", name, error.c_str());
+    for (const std::string& library : used) all.back().libraries.push_back({library, *before(library)});
     return all.back();
   };
   const Value yes = Value::boolean(true), no = Value::boolean(false);
@@ -1296,6 +1393,21 @@ inline std::vector<Case> cases() {
     read_all();
   }
   {
+    read("Parts", kParts).calls = {{"flipped", {Value::enumeration(0)}}, {"flipped", {Value::enumeration(1)}}};
+    Case& w = read("Workshop", kWorkshop);
+    for (const Value& wheel : samples({PinType::structure, "Wheel"}, w.graph)) {
+      w.calls.push_back({"skid", {wheel, N(0.75)}});
+      w.calls.push_back({"wear", {wheel}});
+      w.calls.push_back({"twice", {wheel, I(3)}});
+    }
+    w.calls.push_back({"fit", {Value::structures({}), samples({PinType::structure, "Wheel"}, w.graph).front(), I(2)}});
+    Case& c = read("Garage", kGarage);
+    const i64 most = std::numeric_limits<i64>::max();
+    for (i64 car : {i64{0}, i64{1}, i64{-1}, most})
+      for (i64 wheel : {i64{0}, i64{1}, i64{4}, i64{-1}}) c.calls.push_back({"Run", {I(car), I(wheel), N(static_cast<f64>(wheel % 3) + 0.5)}});
+    c.calls.push_back({"Run", {I(0), I(0), N(-2.0)}});
+  }
+  {
     Case& c = read("References", kReferences);
     const logic::Graph& g = c.graph;
     const i64 most = std::numeric_limits<i64>::max();
@@ -1377,6 +1489,7 @@ inline std::string play(const Case& c, std::vector<std::string>* errors = nullpt
   logic::Runtime rt(host);
   rt.jit = false;
   rt.native = false;  // (the interpreter, also in a binary that has the Blueprint as a class)
+  rt.blueprints = c.blueprints();
   logic::Instance* inst = rt.add(c.graph, 0, c.name);
   rt.begin();
   std::string text = "== " + c.name + "\n";
@@ -1509,7 +1622,7 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
   std::string runs, expected;
   for (const Case& c : all) {
     std::string text, glue, why;
-    if (!logic::native_ready(c.graph, &why) || !logic::to_cpp(c.graph, c.name, text, &why) || !logic::native_glue(c.graph, c.name, glue, &why)) {
+    if (!logic::native_ready(c.graph, &why) || !logic::to_cpp(c.graph, c.name, text, &why) || !logic::native_glue(c.graph, c.name, glue, &why, logic::library(), {}, c.blueprints())) {
       if (error) *error = c.name + ": " + why;
       return false;
     }
@@ -1550,6 +1663,16 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
       runs += body;
       continue;
     }
+    // (the libraries it uses, as the runtime finds them: the Blueprints of its project)
+    std::string used;
+    for (std::size_t k = 0; k < c.libraries.size(); ++k)
+      used += "  kern::logic::Graph library" + std::to_string(k) + ";\n  {\n    kern::json::Value stored;\n    if (!kern::json::parse(kGraph_" + c.libraries[k].first +
+              ", stored) || !kern::logic::graph_from_json(stored, library" + std::to_string(k) + ")) hosted += \"(a library was not read)\\n\";\n  }\n";
+    if (!c.libraries.empty()) {
+      used += "  rt.blueprints = [&](std::string_view name) -> const kern::logic::Graph* {\n";
+      for (std::size_t k = 0; k < c.libraries.size(); ++k) used += "    if (name == \"" + c.libraries[k].first + "\") return &library" + std::to_string(k) + ";\n";
+      used += "    return nullptr;\n  };\n";
+    }
     body += ";\n\nstatic void run_" + c.name + "(std::string& got, std::string& hosted) {\n  " + c.name + " b;\n"
             "  NativeTestHost alone;  // (the class by itself: a host of its own - its Random nodes start from that host's number)\n  b.kern_world.host = &alone;\n"
             "  got += \"== " + c.name + "\\n\";\n  const auto variables = [&] {\n    return std::string(\" |\")";
@@ -1557,7 +1680,8 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
     body += ";\n  };\n"
             "  // the same Blueprint behind a logic::Instance: the engine's way to it, by name\n"
             "  NativeTestHost host;\n  kern::logic::Runtime rt(host);\n  rt.jit = false;\n  kern::logic::Graph graph;\n"
-            "  {\n    kern::json::Value stored;\n    if (!kern::json::parse(kGraph_" + c.name + ", stored) || !kern::logic::graph_from_json(stored, graph)) hosted += \"(the graph was not read)\\n\";\n  }\n"
+            "  {\n    kern::json::Value stored;\n    if (!kern::json::parse(kGraph_" + c.name + ", stored) || !kern::logic::graph_from_json(stored, graph)) hosted += \"(the graph was not read)\\n\";\n  }\n" +
+            used +
             "  kern::logic::Instance* inst = rt.add(graph, 0, \"" + c.name + "\");\n  rt.begin();\n  hosted += \"== " + c.name + "\\n\";\n"
             "  if (std::string(inst->tier()) != \"native C++\") hosted += std::string(\"(it runs in the \") + inst->tier() + \", not as its class)\\n\";\n"
             "  const auto hosted_variables = [&] {\n    return std::string(\" |\")";
