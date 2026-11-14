@@ -1900,6 +1900,105 @@ class Emit:
                     out.add(i)
         return out
 
+    # ---- text formatted into a buffer ----
+    def text_buffer(self, v):
+        """`char b[64];` that is a text: every use of it is the buffer snprintf writes into (its first
+        value) or a read of it as a text (const char*), and `sizeof b`. Its length (None: it is none such)."""
+        m = re.fullmatch(r"char\s*\[(\d+)\]", self.u.clean(qtype(v)))
+        if not m or self.f.decl is None:
+            return None
+        cache = self.__dict__.setdefault("_text_buffers", {})
+        if v["id"] in cache:
+            return cache[v["id"]]
+        ok = True
+        def uses(n, parents):
+            nonlocal ok
+            if n.get("kind") == "DeclRefExpr" and n.get("referencedDecl", {}).get("id") == v["id"]:
+                while parents and parents[-1].get("kind") == "ImplicitCastExpr" and parents[-1].get("castKind") == "NoOp" and "[" in qtype(parents[-1]):
+                    parents = parents[:-1]   # (the array as it is)
+                up = parents[-1] if parents else {}
+                if up.get("kind") == "UnaryExprOrTypeTraitExpr" and up.get("name") == "sizeof":
+                    return
+                if not (up.get("kind") == "ImplicitCastExpr" and up.get("castKind") == "ArrayToPointerDecay"):
+                    ok = False
+                    return
+                above = parents[-2] if len(parents) > 1 else {}
+                if above.get("kind") == "ImplicitCastExpr" and above.get("castKind") == "NoOp" and re.fullmatch(r"const char\s*\*", qtype(above).strip()):
+                    return   # (read as a text)
+                if above.get("kind") == "CallExpr" and callee_name(above) == "snprintf" and len(kids(above)) > 1 and kids(above)[1] is up:
+                    return   # (written by snprintf)
+                ok = False
+                return
+            for c in kids(n):
+                uses(c, parents + [n])
+        uses(self.f.decl, [])
+        cache[v["id"]] = int(m.group(1)) if ok else None
+        return cache[v["id"]]
+
+    def text_buffer_of(self, n):
+        """The length of the text buffer an expression names (see text_buffer), or None."""
+        b = n
+        while b.get("kind") in ("ImplicitCastExpr", "ParenExpr") and kids(b):
+            b = kids(b)[0]
+        if b.get("kind") != "DeclRefExpr":
+            return None
+        d = self.tree.decl.get(b.get("referencedDecl", {}).get("id")) or b.get("referencedDecl", {})
+        return self.text_buffer(d) if d.get("kind") == "VarDecl" and d.get("id") in self.names else None
+
+    @staticmethod
+    def format_kinds(fmt):
+        """The types of the values a printf format takes (logic::format): Int, Float or Text each - None:
+        a format the node Format Text does not know."""
+        out, at = [], 0
+        while at < len(fmt):
+            if fmt[at] != "%":
+                at += 1
+                continue
+            m = re.match(r"%([-+ 0#]*)(\d*)(?:\.(\d*))?(hh|h|ll|l|j|z|t)?([diuxXocsfFeEgG%])", fmt[at:])
+            if not m or len(m.group(2)) > 3 or (m.group(3) or "") and len(m.group(3)) > 3:
+                return None
+            if m.group(2) and int(m.group(2)) > 512 or m.group(3) and int(m.group(3)) > 512:
+                return None
+            c = m.group(5)
+            if c != "%":
+                out.append("Float" if c in "fFeEgG" else "Text" if c == "s" else "Int")
+            at += m.end()
+        return out
+
+    def formatted(self, n):
+        """`snprintf(b, sizeof b, "%02d:%06.3f", m, s);` into a text buffer: b is the text of Format Text,
+        cut where snprintf cuts it (its size - 1 bytes)."""
+        a = kids(n)[1:]
+        if len(a) < 3:
+            raise Wait("snprintf without a format")
+        room = self.text_buffer_of(a[0])
+        size = bare(a[1])
+        while size.get("kind") in CAST and kids(size):
+            size = bare(kids(size)[-1])
+        if size.get("kind") == "UnaryExprOrTypeTraitExpr" and size.get("name") == "sizeof" and kids(size) and self.text_buffer_of(kids(size)[0]) == room:
+            most = room - 1
+        elif size.get("kind") == "IntegerLiteral" and 0 < int(size.get("value", "0")) <= room:
+            most = int(size["value"]) - 1
+        else:
+            raise Wait("snprintf with a size that is not the buffer's")
+        f = bare(a[2])
+        while f.get("kind") in CAST and kids(f):
+            f = bare(kids(f)[-1])
+        if f.get("kind") != "StringLiteral":
+            raise Wait("a format that is not written out (Format Text has its format as a setting)")
+        fmt = c_string(f["value"])
+        kinds = self.format_kinds(fmt.decode("latin-1") if isinstance(fmt, bytes) else fmt)
+        if kinds is None:
+            raise Wait("a format Format Text does not know (d i u x X o c s f e g, flags, width, precision)")
+        if len(kinds) != len(a) - 3:
+            raise Wait("a format whose conversions are not its values")
+        values = [self.ex(x, t) for x, t in zip(a[3:], kinds)]
+        b = a[0]
+        while b.get("kind") in ("ImplicitCastExpr", "ParenExpr") and kids(b):
+            b = kids(b)[0]
+        target = self.names[b["referencedDecl"]["id"]]
+        return self.take_pre() + [f"{target} = text_format<{text_literal(fmt)}>({', '.join([str(most)] + values)});"]
+
     # ---- a function that names a place ----
     PLAIN = frozenset(("DeclRefExpr", "MemberExpr", "ImplicitCastExpr", "ParenExpr", "IntegerLiteral", "FloatingLiteral", "CXXBoolLiteralExpr", "CharacterLiteral", "StringLiteral",
                        "ArraySubscriptExpr", "CStyleCastExpr", "CXXStaticCastExpr", "CXXFunctionalCastExpr", "CXXThisExpr", "ConstantExpr", "MaterializeTemporaryExpr",
@@ -2171,6 +2270,17 @@ class Emit:
                 if init is not None and "auto" in v.get("type", {}).get("qualType", "") and not wide_init:
                     # (auto: the type is the value's - as the Blueprint holds it)
                     kept = self.copied_type(init)
+                if self.text_buffer(v) is not None:
+                    # (a buffer a text is formatted into and read from as a text: a Text - see text_buffer)
+                    name = self.local(v, "Text")
+                    said = bare(init) if init is not None else None
+                    if said is not None and said.get("kind") == "StringLiteral":
+                        out += [f"{name} = {text_literal(c_string(said['value']))};"]
+                    elif said is None or (said.get("kind") == "InitListExpr" and not [x for x in kids(said) if x.get("kind") != "ImplicitValueInitExpr"]):
+                        out += [f'{name} = "";']
+                    else:
+                        raise Wait("a text buffer that begins with something else than a text")
+                    continue
                 name = self.local(v, self.whole64() if wide_init else kept)
                 if init is not None:
                     # (an array written out: its place - declared with its length - is set to what is written)
@@ -2588,6 +2698,8 @@ class Emit:
         if k == "CallExpr":
             name = callee_name(n)
             ref = callee(n).get("referencedDecl", {})
+            if name == "snprintf" and self.text_buffer_of(kids(n)[1] if len(kids(n)) > 1 else {}) is not None:
+                return self.formatted(n)
             d = self.engine_decl(ref.get("id")) if ref.get("id") not in self.tree.body else None
             if d is not None:
                 return self.engine(d, None, kids(n)[1:])[0]
@@ -3761,6 +3873,11 @@ class Emit:
         k = b.get("kind")
         if k == "_Text":
             return b["_text"], b["_type"]
+        if k == "ImplicitCastExpr" and b.get("castKind") in ("NoOp", "ArrayToPointerDecay") and self.text_buffer_of(b) is not None:
+            x = b   # (a text buffer read as a text: its text)
+            while x.get("kind") in ("ImplicitCastExpr", "ParenExpr") and kids(x):
+                x = kids(x)[0]
+            return self.names[x["referencedDecl"]["id"]], "Text"
         if k == "_Box":
             got = self.spot(b)
             if got is not None:
