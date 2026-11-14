@@ -203,6 +203,7 @@ class GameWorld::LogicHost : public logic::Host {
     return s;
   }
   void* game() override { return &w_; }
+  logic::ActorRef find_actor(std::string_view name) override { return w_.find_actor(name); }
 
  private:
   GameWorld& w_;

@@ -328,7 +328,11 @@ void bind_actor_nodes(logic::Library& lib) {
   });
   bind(lib, "actor.player", &nodes::actor_player);
   bind(lib, "actor.player_count", &nodes::actor_player_count);
-  bind(lib, "actor.find", &nodes::actor_find);
+  bind(lib, "actor.find", [](Context& c) {  // (by the host, as in a Blueprint's class: logic::Host::find_actor)
+    Value name = c.in(std::size_t{0});
+    c.out(std::size_t{0}, Value::actor(c.host().find_actor(taken<std::string_view>(name))));
+    return kStop;
+  });
   bind(lib, "actor.find_tag", &nodes::actor_find_tag);
   bind(lib, "actor.all_with_tag", &nodes::actor_all_with_tag);
   bind(lib, "actor.random_tag", [](Context& c) {

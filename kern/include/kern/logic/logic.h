@@ -845,6 +845,11 @@ class Host {
   virtual u32 random() = 0;
   /// The game world behind this host (gameplay nodes), or null.
   virtual void* game() { return nullptr; }
+  /// The actor of this name (Find Actor by Name - in the interpreter, with the JIT and in a Blueprint's
+  /// class alike), or 0: none. A game's host: the actor of its world of that name (GameWorld::find_actor);
+  /// a host without a world names none - unless it is one that names actors of its own (a test's: the
+  /// instances of a runtime by name, for Call on Actor and Get Variable on Actor).
+  virtual ActorRef find_actor(std::string_view name);
   /// A function of the engine, by the name of its node - what the engine's nodes do in every tier
   /// (kern/logic/engine_api.h). `in`: the node's inputs in their order; `out`: its outputs, given as
   /// their zeros. False: this host has no such function (the outputs stay as they are).

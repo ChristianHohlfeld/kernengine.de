@@ -7877,6 +7877,14 @@ class TestWriter:
                     swap(bb, span(ks[1])[0], f".{ks[0]['name']}(", ", ")
                 else:
                     swap(bb, b, f".{ks[0]['name']}()", ")")
+            elif k == "CallExpr" and callee_name(n) in ("snprintf", "sprintf", "printf", "fprintf") and len(ks) > 2:
+                # a number formatted as text: a 32-bit one goes as the double it is promoted to (in the test a
+                # vector's component is converted::wide::Num32 - one that is not a number goes nowhere as such)
+                for x in ks[1:]:
+                    if self.u.clean(qtype(x)) == "float":
+                        xa, xb = span(x)
+                        edits.append((xa, 2, depth + 1, xa, "static_cast<double>("))
+                        edits.append((xb, 0, -depth - 1, xb, ")"))
             elif n.get("_w64") and k in ("BinaryOperator", "CompoundAssignOperator") and n.get("opcode") in ("+", "-", "*", "/", "%", "<<", ">>", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=") and len(ks) == 2:
                 # a 64-bit bit pattern (a Blueprint's Whole64): computed around 2^64 - only what C++ leaves open marks the call
                 op = n["opcode"]
@@ -8645,8 +8653,13 @@ class TestWriter:
             for k in range(1, len(parts)):
                 for name in other.get("::".join(parts[:k]), ()):
                     table.setdefault("::".join([name, *parts[k:]]), local)
+        # (the engine's logic - how C++ runs and calls a Blueprint - is in a test the engine's own: `logic::Graph`
+        # in the engine's source is ::kern::logic::Graph there, see gather)
+        logic = re.compile(r"(?<![\w:.>])(?:::)?(?:" + ENGINE + r"::)?logic::")
+        def own(code):
+            return logic.sub(f"::{ENGINE}::logic::", code)
         if not table:
-            return lambda text: text
+            return lambda text: self.in_code(text, own)
         pattern = re.compile(r"(?<![\w:])(?:::)?(" + "|".join(re.escape(k) for k in sorted(table, key=len, reverse=True)) + r")\b")
         # (`using kern::Mat4;` of what the test has where it stands: nothing to say - of what stands in a namespace
         # of the test, `using audio::Wave;`)
@@ -8655,7 +8668,7 @@ class TestWriter:
             if m.group(1) not in table:
                 return m.group(0)
             return f"using {table[m.group(1)]};" if "::" in table[m.group(1)] else ""
-        return lambda text: self.in_code(text, lambda code: pattern.sub(lambda m: table[m.group(1)], using.sub(said, code)))
+        return lambda text: self.in_code(text, lambda code: own(pattern.sub(lambda m: table[m.group(1)], using.sub(said, code))))
 
     # ---- what a test holds: the source of what it compares, and all that source names ----
     @staticmethod
@@ -9474,8 +9487,9 @@ class TestWriter:
                 said_consts.add(self.widen(piece["text"]))
             foreign_chunks.append(((first[0], first[1] - 0.5, i), ("foreign", place), None))
         # The Blueprints of the level's actors the source calls on them (kern::logic::ActorBlueprint): the test runs
-        # them (converted::ActorWorld) - for the source, bound to the objects it calls them by, and for the
-        # Blueprint, where actor_find finds them.
+        # them (converted::Blueprint, RuleBlueprint) - for the source, bound to the objects it calls them by, and
+        # for the Blueprint beside it, where actor_find finds them (the host's find_actor); the engine is the
+        # test's stand-in for all of them.
         actors = sorted({a for f in u.order for a in actors_called(f)})
         bindings = []
         for v in G.consts.values():
@@ -9485,14 +9499,10 @@ class TestWriter:
             if v.get("name") and self.actor_blueprint(qtype(v)) and self.inside(v, [tree.records[q] for q in sorted(G.records)]) is None:
                 bindings.append("::".join(classes_of(tree.scope_of.get(first["id"], "")) + [v["name"]]))
         bindings += [name for p in G.foreign.values() for name in p.get("actors", ())]
-        engine_too = bool(actors) and bool(u.engine_calls or self.engine_called(G))
         for f in u.order:
             d = f.decl
             if f.lifted:
                 continue   # (a local function: in the source of the function it stands in, compared with it)
-            if engine_too:
-                skipped.append((f, "its Blueprint calls the engine and the Blueprint of an actor of the level: the world that runs the actor's Blueprint has the engine itself, not the test's stand-in"))
-                continue
             owner = tree.owner.get(d["id"])
             free = G.freed.get(d["id"], (None,))[0]
             if free:
