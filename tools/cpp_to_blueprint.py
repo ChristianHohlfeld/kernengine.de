@@ -556,6 +556,11 @@ class Tree:
                     if spelled:
                         self.unnamed[spelled.group(0)] = qtype({"type": under})
         elif k == "CXXRecordDecl" and o.get("name"):
+            outer = self.decl.get(o["parentDeclContextId"]) if o.get("parentDeclContextId") else None
+            if outer is not None and outer.get("kind") == "CXXRecordDecl" and outer.get("_q"):
+                # (a class of a class defined outside it - `struct CityStream::Tile { ... };`: the class's own)
+                scope = outer["_q"] + "::"
+                self.scope_of[o["id"]] = scope
             q = scope + o["name"]
             if o.get("completeDefinition"):
                 self.records[q] = o
@@ -7127,6 +7132,31 @@ class TestWriter:
                     checks.append(f"same({of('w.s->')}, (*got.rows)[{len(checks)}])")
                     fine.append(f"defined({of('w.s->')})")
                     texts.append(f'"{variable} = " + text({of("w.s->")})')
+                # what the state keeps besides its fields (Unit.state_static): a variable of a file at the level of a
+                # namespace is one of the test's source too - drawn, set and compared by its name there; one a
+                # method keeps in itself (static in its body) no code outside the method reaches
+                for i, (variable, _) in self.u.state_statics.items():
+                    v = self.tree.decl.get(i) or {}
+                    if self.in_function(v) or v.get("storageClass") == "static" and v.get("isStaticLocal") or not v.get("name"):
+                        missing.append(f"{variable} (kept in the body of a method - static there: the test does not reach it from outside)")
+                        continue
+                    if i not in self.whole.consts:
+                        continue   # (not named by the source the test holds)
+                    first = v
+                    while first.get("previousDecl") in self.tree.decl:
+                        first = self.tree.decl[first["previousDecl"]]
+                    held = "::".join(self.classes_of(self.tree.scope_of.get(first["id"], "")) + [v["name"]])
+                    try:
+                        spelled = self.spell(qtype(v))
+                        draws.append(f"  {held} = {self.draw(qtype(v))};")
+                    except Wait as w:
+                        missing.append(f"{variable} ({w})")
+                        continue
+                    shown = self.wrap(held, spelled)
+                    values.append(f'{{"{variable}", arg({shown})}}')
+                    checks.append(f"same({shown}, (*got.rows)[{len(checks)}])")
+                    fine.append(f"defined({shown})")
+                    texts.append(f'"{variable} = " + text({shown})')
                 if missing:   # (every variable is set and compared: one the test has no values of, and it cannot compare any)
                     raise Wait(f"the test has no values of the variables of {self.u.name}: {'; '.join(missing)}")
                 n = len(values)
