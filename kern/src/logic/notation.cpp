@@ -70,12 +70,14 @@ const char* cpp_type(PinType t) {
     case PinType::vector: return "Vector";
     case PinType::text: return "Text";
     case PinType::actor: return "Actor";
+    case PinType::int64: return "Int64";
     case PinType::boolean_list: return "List<Bool>";
     case PinType::integer_list: return "List<Int>";
     case PinType::number_list: return "List<Float>";
     case PinType::vector_list: return "List<Vector>";
     case PinType::text_list: return "List<Text>";
     case PinType::actor_list: return "List<Actor>";
+    case PinType::int64_list: return "List<Int64>";
     default: return "void";
   }
 }
@@ -92,7 +94,7 @@ std::string cpp_type(const TypeRef& t) {
 }
 /// A value type by its name (a list is List<that>).
 bool type_of_cpp(std::string_view name, PinType& out) {
-  for (PinType t : {PinType::boolean, PinType::integer, PinType::number, PinType::vector, PinType::text, PinType::actor})
+  for (PinType t : {PinType::boolean, PinType::integer, PinType::number, PinType::vector, PinType::text, PinType::actor, PinType::int64})
     if (name == cpp_type(t)) { out = t; return true; }
   return false;
 }
@@ -164,6 +166,11 @@ std::string literal(const Value& v) {
     case PinType::vector: return "Vector{" + f32_text(v.v.x) + ", " + f32_text(v.v.y) + ", " + f32_text(v.v.z) + "}";
     case PinType::text: return text_literal(v.s);
     case PinType::actor: return "Actor{" + std::to_string(v.a) + "}";
+    case PinType::int64: {  // its bits: Int64{0x1f}
+      char b[24];
+      std::snprintf(b, sizeof b, "0x%llx", static_cast<unsigned long long>(static_cast<u64>(v.i)));
+      return std::string("Int64{") + b + "}";
+    }
     default: break;
   }
   if (!is_list(v.type)) return "0";
@@ -2231,6 +2238,42 @@ struct Reader {
       f64 x = 0, y = 0, z = 0;
       if (!number(x, "x") || !expect(",") || !number(y, "y") || !expect(",") || !number(z, "z") || !expect("}")) return true;
       v = Value::vector(Vec3{static_cast<f32>(x), static_cast<f32>(y), static_cast<f32>(z)});
+      return true;
+    }
+    if (t.kind == Tok::id && t.s == "Int64" && is("{", 1)) {
+      // Int64{0x1f}: its 64 bits (written as hex, read as any whole number C++ writes)
+      p += 2;
+      if (peek().kind != Tok::number || peek().real) {
+        fail(p, "an Int64 is written with its bits: Int64{0x1f}");
+        return true;
+      }
+      v = Value::int64(std::strtoull(toks[p++].s.c_str(), nullptr, 0));
+      expect("}");
+      return true;
+    }
+    if (t.kind == Tok::id && (t.s == "Map" || t.s == "Set") && is("<", 1)) {
+      // Map<Int, Float>{{1, 2.5}, {3, 4.0}}, Set<Int>{1, 3}: the entries in their order
+      TypeRef keyed;
+      if (!type_here(keyed)) return true;
+      if (!expect("{", "(a map written out is " + cpp_type(keyed) + "{...})")) return true;
+      const TypeRef key = key_type(keyed), value = keyed.type == PinType::map ? value_type(keyed) : TypeRef{};
+      v = Value::zero(keyed.type);
+      while (!is("}")) {
+        const bool pair = keyed.type == PinType::map;
+        if (pair && !expect("{", "(an entry of a map is {key, value})")) return true;
+        Value k, x;
+        if (!typed_literal(key, k, "a key")) return true;
+        if (pair && (!expect(",") || !typed_literal(value, x, "a value") || !expect("}"))) return true;
+        const MapKey mk = key_of(k);
+        if (v.keyed().contains(mk)) {
+          fail(p, "the key " + literal(k, key, g) + " is said twice");
+          return true;
+        }
+        v.own_entries().try_emplace(mk, std::move(x));
+        if (!accept(",")) break;
+      }
+      if (!expect("}")) return true;
+      if (of) *of = keyed.of;
       return true;
     }
     if (t.kind == Tok::id && t.s == "Actor" && is("{", 1)) {
@@ -4660,6 +4703,8 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
       case PinType::vector_list: return "kern::List<kern::Vec3>";
       case PinType::text_list: return "kern::List<kern::logic::Text>";
       case PinType::actor_list: return "kern::List<kern::logic::ActorHandle>";
+      case PinType::int64: return "kern::logic::Int64";
+      case PinType::int64_list: return "kern::List<kern::logic::Int64>";
       default: return "kern::logic::ActorHandle";
     }
   };

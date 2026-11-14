@@ -65,23 +65,25 @@ using ActorRef = u32;  // game actor id (0 = none)
 /// What a pin carries: exec, a value, or a list of values of one type (after the value types, in
 /// their order). `enumeration`: a value of an enum the Blueprint declares, `structure`: a value of
 /// one of its structs - which one says the name beside the type (PinDef::of, Variable::of ...).
-/// `map`: values of one type, each under a key of its own, in the order the keys came; `set`:
-/// keys in the order they came - of what types says the name beside it (keyed_of).
+/// `int64`: 64 bits, as a u64 or an i64 of C++ holds them - which of the two it is says the node
+/// that reads them (Compare Int64 <, <u; Int64 Math /s, /u), as in WebAssembly. `map`: values of
+/// one type, each under a key of its own, in the order the keys came; `set`: keys in the order
+/// they came - of what types says the name beside it (keyed_of).
 enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list,
+  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
+  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
   map, set, count
 };
-constexpr u8 kValueTypes = 8;  // boolean ... structure
+constexpr u8 kValueTypes = 9;  // boolean ... int64
 /// A list type, the type of a list's items (of a value: the type itself), and the list of a type.
-constexpr bool is_list(PinType t) { return t >= PinType::boolean_list && t <= PinType::structure_list; }
+constexpr bool is_list(PinType t) { return t >= PinType::boolean_list && t <= PinType::int64_list; }
 /// A map or a set: its entries are found by their keys (kern::Map, kern::Set - kern/core/map.h).
 constexpr bool is_keyed(PinType t) { return t == PinType::map || t == PinType::set; }
 constexpr PinType element_of(PinType t) { return is_list(t) ? static_cast<PinType>(static_cast<u8>(t) - kValueTypes) : t; }
-constexpr PinType list_of(PinType t) { return t >= PinType::boolean && t <= PinType::structure ? static_cast<PinType>(static_cast<u8>(t) + kValueTypes) : t; }
+constexpr PinType list_of(PinType t) { return t >= PinType::boolean && t <= PinType::int64 ? static_cast<PinType>(static_cast<u8>(t) + kValueTypes) : t; }
 /// The names of the pin types, in the order of PinType.
-inline constexpr std::string_view kPinTypeNames[] = {"exec",      "bool",     "int",        "float",       "vector",    "text",      "actor",      "enum",      "struct",
-                                                     "bool_list", "int_list", "float_list", "vector_list", "text_list", "actor_list", "enum_list", "struct_list",
+inline constexpr std::string_view kPinTypeNames[] = {"exec",      "bool",     "int",        "float",       "vector",    "text",      "actor",      "enum",      "struct",      "int64",
+                                                     "bool_list", "int_list", "float_list", "vector_list", "text_list", "actor_list", "enum_list", "struct_list", "int64_list",
                                                      "map",       "set"};
 static_assert(sizeof kPinTypeNames / sizeof kPinTypeNames[0] == static_cast<std::size_t>(PinType::count));
 /// "bool", "int", "float", "vector", "text", "actor"; a list: "float_list" ...
@@ -163,8 +165,21 @@ struct Value;
 /// The entries of a map or a set value (a set's values are none).
 using MapEntries = kern::Map<MapKey, Value>;
 
+/// `Int64` in a Blueprint's C++ (and on an Int64 pin): 64 bits, as a u64 or an i64 of C++ holds
+/// them. What they mean says the node that reads them - Int64 Less (signed) or Int64 Less Unsigned,
+/// Int64 Divide or Divide Unsigned -, as in WebAssembly; adding, subtracting and multiplying go
+/// round at 2^64, as in C++. Written out with its bits: Int64{0x1f}.
+struct Int64 {
+  u64 bits = 0;
+  constexpr Int64() = default;
+  constexpr explicit Int64(u64 b) : bits(b) {}
+  friend constexpr bool operator==(Int64 a, Int64 b) { return a.bits == b.bits; }
+  friend constexpr auto operator<=>(Int64 a, Int64 b) { return a.bits <=> b.bits; }  // (Sort List: as u64)
+  u64 hash() const { return KeyHash<u64>{}(bits); }  // (a key of a Map, a Set)
+};
+
 /// The items of a list value: the vector of the list's type holds them (the others are empty).
-using ListItems = std::tuple<std::vector<bool>, std::vector<i64>, std::vector<f64>, std::vector<Vec3>, std::vector<std::string>, std::vector<ActorHandle>>;
+using ListItems = std::tuple<std::vector<bool>, std::vector<i64>, std::vector<f64>, std::vector<Vec3>, std::vector<std::string>, std::vector<ActorHandle>, std::vector<Int64>>;
 /// The list type whose items are T (bool, i64, f64, Vec3, std::string, ActorHandle).
 template <class T> constexpr PinType list_type_of() = delete;
 template <> constexpr PinType list_type_of<bool>() { return PinType::boolean_list; }
@@ -173,6 +188,7 @@ template <> constexpr PinType list_type_of<f64>() { return PinType::number_list;
 template <> constexpr PinType list_type_of<Vec3>() { return PinType::vector_list; }
 template <> constexpr PinType list_type_of<std::string>() { return PinType::text_list; }
 template <> constexpr PinType list_type_of<ActorHandle>() { return PinType::actor_list; }
+template <> constexpr PinType list_type_of<Int64>() { return PinType::int64_list; }
 
 /// A value on a data pin.
 struct Value {
@@ -200,6 +216,8 @@ struct Value {
   static Value vector(Vec3 x) { Value r; r.type = PinType::vector; r.v = x; return r; }
   static Value text(std::string x) { Value r; r.type = PinType::text; r.s = std::move(x); return r; }
   static Value actor(ActorRef x) { Value r; r.type = PinType::actor; r.a = x; return r; }
+  /// An Int64: its 64 bits (held in `i`, as they are).
+  static Value int64(u64 bits) { Value r; r.type = PinType::int64; r.i = static_cast<i64>(bits); return r; }
   /// A value of an enum: its place among the enum's values (the first is 0).
   static Value enumeration(i64 index) { Value r; r.type = PinType::enumeration; r.i = index < 0 ? 0 : index; return r; }
   /// A list of values of an enum.
@@ -403,7 +421,7 @@ TypeRef value_type(const TypeRef& map);
 /// What TypeRef::of says of a map with these keys and values (`value` null: of a set).
 std::string keyed_of(const TypeRef& key, const TypeRef* value);
 /// Can a map's or a set's keys be of this type?
-constexpr bool key_type_ok(PinType t) { return t == PinType::boolean || t == PinType::integer || t == PinType::enumeration || t == PinType::text; }
+constexpr bool key_type_ok(PinType t) { return t == PinType::boolean || t == PinType::integer || t == PinType::int64 || t == PinType::enumeration || t == PinType::text; }
 /// The key of an entry as the interpreter holds it, and back (`key`: the keys' type).
 MapKey key_of(const Value& v);
 Value key_value(const MapKey& k, PinType key);

@@ -33,12 +33,12 @@ bool declared_type(PinType t) { return element_of(t) == PinType::enumeration || 
 std::vector<TypeRef> type_choices(const ParamDef& pd, const Graph& g) {
   std::vector<TypeRef> r;
   if (pd.keys_only) {
-    for (PinType t : {PinType::integer, PinType::text, PinType::boolean}) r.push_back({t, {}});
+    for (PinType t : {PinType::integer, PinType::int64, PinType::text, PinType::boolean}) r.push_back({t, {}});
     for (const EnumType& e : g.enums) r.push_back({PinType::enumeration, e.name});
     return r;
   }
   if (!pd.enums_only && !pd.structs_only)
-    for (PinType t : {PinType::number, PinType::integer, PinType::boolean, PinType::vector, PinType::text, PinType::actor}) r.push_back({t, {}});
+    for (PinType t : {PinType::number, PinType::integer, PinType::boolean, PinType::vector, PinType::text, PinType::actor, PinType::int64}) r.push_back({t, {}});
   if (!pd.structs_only)
     for (const EnumType& e : g.enums) r.push_back({PinType::enumeration, e.name});
   if (!pd.enums_only)
@@ -94,9 +94,9 @@ bool type_from_text(std::string_view text, const Graph& g, TypeRef& out) {
 std::string type_label(const TypeRef& t) {
   if (t.type == PinType::map) return "Map of " + type_label(key_type(t)) + " to " + type_label(value_type(t));
   if (t.type == PinType::set) return "Set of " + type_label(key_type(t));
-  static const char* const kLabels[] = {"Exec", "Boolean", "Integer", "Float", "Vector", "Text", "Actor"};
+  static const char* const kLabels[] = {"Exec", "Boolean", "Integer", "Float", "Vector", "Text", "Actor", "Enum", "Struct", "Int64"};
   const PinType e = element_of(t.type);
-  const std::string name = declared_type(e) ? (!t.of.empty() ? t.of : e == PinType::enumeration ? std::string("Enum") : std::string("Struct")) : static_cast<u32>(e) < 7 ? kLabels[static_cast<u32>(e)] : "?";
+  const std::string name = declared_type(e) ? (!t.of.empty() ? t.of : e == PinType::enumeration ? std::string("Enum") : std::string("Struct")) : static_cast<u32>(e) < 10 ? kLabels[static_cast<u32>(e)] : "?";
   return is_list(t.type) ? name + " List" : name;
 }
 
@@ -114,6 +114,7 @@ bool convertible(PinType from, PinType to) {
   // gives each of them)
   if (declared_type(from) || declared_type(to)) return false;
   if (is_keyed(from) || is_keyed(to)) return false;  // (a map is a map of its keys and values, a set a set of its keys)
+  if (element_of(from) == PinType::int64 || element_of(to) == PinType::int64) return false;  // (64 bits: the Int64 nodes say what they are as another type)
   if (to == PinType::text) return true;  // everything prints
   if (is_list(from) || is_list(to)) return false;  // (a list is a list of its type and nothing else)
   const bool from_num = from == PinType::integer || from == PinType::number || from == PinType::boolean;
@@ -149,13 +150,14 @@ std::string keyed_of(const TypeRef& key, const TypeRef* value) { return type_nam
 MapKey key_of(const Value& v) {
   MapKey k;
   if (v.type == PinType::text) k.s = v.s;
-  else k.i = v.type == PinType::boolean ? (v.b ? 1 : 0) : v.as_int();
+  else k.i = v.type == PinType::boolean ? (v.b ? 1 : 0) : v.type == PinType::int64 ? v.i : v.as_int();  // (an Int64: its bits)
   return k;
 }
 Value key_value(const MapKey& k, PinType key) {
   switch (key) {
     case PinType::boolean: return Value::boolean(k.i != 0);
     case PinType::enumeration: return Value::enumeration(k.i);
+    case PinType::int64: return Value::int64(static_cast<u64>(k.i));
     case PinType::text: return Value::text(k.s);
     default: return Value::integer(k.i);
   }
@@ -185,6 +187,7 @@ bool Value::as_bool() const {
     case PinType::vector: return length_sq(v) > 0;
     case PinType::text: return !s.empty() && s != "false" && s != "0";
     case PinType::actor: return a != 0;
+    case PinType::int64: return i != 0;
     case PinType::enumeration: return i != 0;
     default: return false;
   }
@@ -198,6 +201,7 @@ i64 Value::as_int() const {
     case PinType::number: return whole(n);
     case PinType::text: return std::strtoll(s.c_str(), nullptr, 10);
     case PinType::actor: return a;
+    case PinType::int64: return normal(i);  // (its bits as an i64, as an Int holds that - Int64 to Int says which it is)
     default: return 0;
   }
 }
@@ -211,6 +215,7 @@ f64 Value::as_number() const {
     case PinType::vector: return length(v);
     case PinType::text: return std::strtod(s.c_str(), nullptr);
     case PinType::actor: return a;
+    case PinType::int64: return static_cast<f64>(i);
     default: return 0;
   }
 }
@@ -230,6 +235,7 @@ std::string Value::as_text() const {
     case PinType::text: return s;
     case PinType::actor: return a ? "actor " + std::to_string(a) : "none";
     case PinType::enumeration: return std::to_string(i);  // (its place; its name is the enum's to say - Enum to Text)
+    case PinType::int64: return std::to_string(static_cast<u64>(i));  // (its bits as a u64 - Int64 to Text says it otherwise)
     case PinType::structure: {
       // (what it holds, in the order of its fields; their names are the struct's to say - Break)
       std::string r = "{";
@@ -269,6 +275,7 @@ std::size_t Value::size() const {
     case PinType::vector_list: return std::get<std::vector<Vec3>>(*list).size();
     case PinType::text_list: return std::get<std::vector<std::string>>(*list).size();
     case PinType::actor_list: return std::get<std::vector<ActorHandle>>(*list).size();
+    case PinType::int64_list: return std::get<std::vector<Int64>>(*list).size();
     case PinType::enumeration_list: return std::get<std::vector<i64>>(*list).size();
     default: return 0;
   }
@@ -286,6 +293,7 @@ Value Value::item(std::size_t index) const {
     case PinType::vector_list: return vector(std::get<std::vector<Vec3>>(*list)[index]);
     case PinType::text_list: return text(std::get<std::vector<std::string>>(*list)[index]);
     case PinType::actor_list: return actor(std::get<std::vector<ActorHandle>>(*list)[index].id);
+    case PinType::int64_list: return int64(std::get<std::vector<Int64>>(*list)[index].bits);
     case PinType::enumeration_list: return enumeration(std::get<std::vector<i64>>(*list)[index]);
     default: return zero(element_of(type));
   }
@@ -307,6 +315,7 @@ Value Value::converted(PinType to) const {
     case PinType::vector: return vector(as_vector());
     case PinType::text: return text(as_text());
     case PinType::actor: return actor(as_actor());
+    case PinType::int64: return zero(to);  // (nothing else is one: Int to Int64, Float to Int64 say how)
     case PinType::enumeration: return enumeration(as_int());
     case PinType::structure: return zero(to);  // (nothing but a struct is one: its default - zero_of)
     case PinType::enumeration_list:
@@ -334,6 +343,7 @@ json::Value Value::to_json() const {
     }
     case PinType::text: return json::Value(s);
     case PinType::actor: return json::Value(static_cast<f64>(a));
+    case PinType::int64: return json::Value(std::to_string(static_cast<u64>(i)));  // (64 bits: more than a JSON number holds - its decimal digits as a u64)
     case PinType::enumeration: return json::Value(static_cast<f64>(i));
     default: break;
   }
@@ -395,6 +405,7 @@ void at_length(Value& v, const TypeRef& t, const Graph& g) {
     case PinType::vector: v.edit<Vec3>().resize(t.count); break;
     case PinType::text: v.edit<std::string>().resize(t.count); break;
     case PinType::actor: v.edit<ActorHandle>().resize(t.count); break;
+    case PinType::int64: v.edit<Int64>().resize(t.count); break;
     case PinType::structure: v.edit<Value>().resize(t.count, zero_of(TypeRef{PinType::structure, t.of}, g)); break;
     default: break;
   }
@@ -441,6 +452,7 @@ bool identical(const Value& a, const Value& b, const TypeRef& t, const Graph& g,
     case PinType::vector: return bits32(a.v.x, b.v.x) && bits32(a.v.y, b.v.y) && bits32(a.v.z, b.v.z);
     case PinType::text: return a.s == b.s;
     case PinType::actor: return a.a == b.a;
+    case PinType::int64: return a.i == b.i;
     default: break;
   }
   if (a.type == PinType::structure) {
@@ -483,6 +495,7 @@ std::size_t said_of(const Value& v, const TypeRef& t, const Graph& g, int depth)
     case PinType::vector: for (const auto& x = v.items<Vec3>(); n && zero(x[n - 1].x) && zero(x[n - 1].y) && zero(x[n - 1].z);) --n; break;
     case PinType::text: for (const auto& x = v.items<std::string>(); n && x[n - 1].empty();) --n; break;
     case PinType::actor: for (const auto& x = v.items<ActorHandle>(); n && x[n - 1] == ActorHandle{};) --n; break;
+    case PinType::int64: for (const auto& x = v.items<Int64>(); n && x[n - 1].bits == 0;) --n; break;
     case PinType::structure: {
       // (the zero of a struct is the struct at its declared defaults: at_length fills up with it)
       const TypeRef item{PinType::structure, t.of};
@@ -707,6 +720,9 @@ Value Value::from_json(const json::Value& j, PinType t) {
       break;
     case PinType::text: v.s = j.is_string() ? j.as_string() : j.is_null() ? std::string() : json::stringify(j); break;
     case PinType::actor: v.a = j.is_number() ? static_cast<ActorRef>(max_of(0.0, j.as_number())) : 0; break;
+    case PinType::int64:  // ("18446744073709551615": its bits as a u64; a number - a small one - as it is)
+      v.i = static_cast<i64>(j.is_string() ? std::strtoull(j.as_string().c_str(), nullptr, 0) : j.is_number() ? static_cast<u64>(whole(j.as_number())) : 0);
+      break;
     case PinType::enumeration: v.i = j.is_number() ? max_of(i64{0}, whole(j.as_number())) : 0; break;
     default: break;
   }
@@ -724,6 +740,7 @@ Value Value::from_json(const json::Value& j, PinType t) {
         case PinType::vector: std::get<std::vector<Vec3>>(*held).push_back(x.v); break;
         case PinType::text: std::get<std::vector<std::string>>(*held).push_back(x.s); break;
         case PinType::actor: std::get<std::vector<ActorHandle>>(*held).push_back({x.a}); break;
+        case PinType::int64: std::get<std::vector<Int64>>(*held).push_back(Int64(static_cast<u64>(x.i))); break;
         case PinType::enumeration: std::get<std::vector<i64>>(*held).push_back(x.i); break;
         default: break;
       }
@@ -750,6 +767,7 @@ bool Value::operator==(const Value& o) const {
     case PinType::vector: return v.x == o.v.x && v.y == o.v.y && v.z == o.v.z;
     case PinType::text: return s == o.s;
     case PinType::actor: return a == o.a;
+    case PinType::int64: return i == o.i;
     case PinType::enumeration: return i == o.i;
     default: break;
   }
@@ -2621,6 +2639,7 @@ void set_item(Value& list, std::size_t at, const Value& x) {
     case PinType::vector_list: list.edit<Vec3>()[at] = x.as_vector(); break;
     case PinType::text_list: list.edit<std::string>()[at] = x.as_text(); break;
     case PinType::actor_list: list.edit<ActorHandle>()[at] = ActorHandle{x.as_actor()}; break;
+    case PinType::int64_list: list.edit<Int64>()[at] = Int64(static_cast<u64>(x.i)); break;
     case PinType::enumeration_list: list.edit<i64>()[at] = x.i; break;
     default: break;
   }

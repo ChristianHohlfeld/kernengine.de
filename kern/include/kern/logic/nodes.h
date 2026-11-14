@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <charconv>
 #include <cmath>
 #include <compare>
@@ -359,6 +360,10 @@ template <> struct Held<ActorHandle> {
   static constexpr PinType type = PinType::actor;
   static ActorHandle from(const Value& v) { return {v.as_actor()}; }
 };
+template <> struct Held<Int64> {
+  static constexpr PinType type = PinType::int64;
+  static Int64 from(const Value& v) { return Int64(v.type == PinType::int64 ? static_cast<u64>(v.i) : 0); }
+};
 template <class T> struct Held<std::vector<T>> {
   static constexpr PinType type = list_type_of<T>();
   static std::vector<T> from(const Value& v) { return v.items<T>(); }
@@ -474,6 +479,7 @@ inline Value to_value(std::string v) { return Value::text(std::move(v)); }
 inline Value to_value(const Text& v) { return Value::text(v.str()); }
 inline Value to_value(Text&& v) { return Value::text(std::move(v).str()); }
 inline Value to_value(ActorHandle v) { return Value::actor(v.id); }
+inline Value to_value(Int64 v) { return Value::int64(v.bits); }
 inline Value to_value(Value v) { return v; }  // (a struct in the interpreter)
 template <class T> Value to_value(std::vector<T> v) { return Value::of(std::move(v)); }
 template <detail::NativeStruct S> Value to_value(const S& v) { return detail::Held<S>::to(v); }
@@ -1289,6 +1295,91 @@ struct PureNodes {
   using Text = std::string;
   using Actor = ActorHandle;
   static constexpr f64 kDegrees = 3.14159265358979323846 / 180.0;
+
+  // ---- Int64: 64 bits, as u64 and i64 of C++ (WebAssembly's i64) ----
+  // Adding, subtracting, multiplying and shifting left go round at 2^64; what C++ leaves open is
+  // defined here for every value, the same in every tier: dividing by 0 gives 0 (and the
+  // smallest i64 by -1 itself), a shift goes by the amount's last 6 bits, a Float that is no
+  // number is 0 as an Int64, beyond its ends it is the nearest end.
+  using Int64 = logic::Int64;
+  static Int64 int64_add(Int64 a, Int64 b) { return Int64(a.bits + b.bits); }
+  static Int64 int64_sub(Int64 a, Int64 b) { return Int64(a.bits - b.bits); }
+  static Int64 int64_mul(Int64 a, Int64 b) { return Int64(a.bits * b.bits); }
+  static Int64 int64_div(Int64 a, Int64 b) {
+    const i64 x = static_cast<i64>(a.bits), y = static_cast<i64>(b.bits);
+    if (y == 0) return Int64(0);
+    if (y == -1) return Int64(0 - a.bits);  // (the smallest i64 by -1: itself, as it goes round)
+    return Int64(static_cast<u64>(x / y));
+  }
+  static Int64 int64_div_unsigned(Int64 a, Int64 b) { return Int64(b.bits ? a.bits / b.bits : 0); }
+  static Int64 int64_rem(Int64 a, Int64 b) {
+    const i64 x = static_cast<i64>(a.bits), y = static_cast<i64>(b.bits);
+    if (y == 0 || y == -1) return Int64(0);
+    return Int64(static_cast<u64>(x % y));
+  }
+  static Int64 int64_rem_unsigned(Int64 a, Int64 b) { return Int64(b.bits ? a.bits % b.bits : 0); }
+  static Int64 int64_and(Int64 a, Int64 b) { return Int64(a.bits & b.bits); }
+  static Int64 int64_or(Int64 a, Int64 b) { return Int64(a.bits | b.bits); }
+  static Int64 int64_xor(Int64 a, Int64 b) { return Int64(a.bits ^ b.bits); }
+  static Int64 int64_not(Int64 a) { return Int64(~a.bits); }
+  static Int64 int64_shift_left(Int64 a, Int by) { return Int64(a.bits << (static_cast<u64>(by) & 63)); }
+  static Int64 int64_shift_right(Int64 a, Int by) { return Int64(static_cast<u64>(static_cast<i64>(a.bits) >> (static_cast<u64>(by) & 63))); }
+  static Int64 int64_shift_right_unsigned(Int64 a, Int by) { return Int64(a.bits >> (static_cast<u64>(by) & 63)); }
+  static Int64 int64_rotate_left(Int64 a, Int by) { return Int64(std::rotl(a.bits, static_cast<int>(static_cast<u64>(by) & 63))); }
+  static Int64 int64_rotate_right(Int64 a, Int by) { return Int64(std::rotr(a.bits, static_cast<int>(static_cast<u64>(by) & 63))); }
+  static Bool int64_equal(Int64 a, Int64 b) { return a.bits == b.bits; }
+  static Bool int64_less(Int64 a, Int64 b) { return static_cast<i64>(a.bits) < static_cast<i64>(b.bits); }
+  static Bool int64_less_unsigned(Int64 a, Int64 b) { return a.bits < b.bits; }
+  /// An Int as 64 bits: an i64 (a whole number below 0 is its two's complement).
+  static Int64 int64_of_int(Int a) { return Int64(static_cast<u64>(static_cast<i64>(a))); }
+  /// The bits as an i64 / a u64, as an Int holds that (exact up to 2^53, beyond: the nearest).
+  static Int int64_to_int(Int64 a) { return normal(static_cast<i64>(a.bits)); }
+  static Int int64_to_int_unsigned(Int64 a) { return whole(static_cast<f64>(a.bits)); }
+  static Float int64_to_float(Int64 a) { return static_cast<f64>(static_cast<i64>(a.bits)); }
+  static Float int64_to_float_unsigned(Int64 a) { return static_cast<f64>(a.bits); }
+  /// A Float toward zero as an i64 / a u64 (no number: 0; beyond the ends: the nearest end).
+  static Int64 int64_of_float(Float a) {
+    if (!(a == a)) return Int64(0);
+    if (a >= 9223372036854775808.0) return Int64(static_cast<u64>(std::numeric_limits<i64>::max()));
+    if (a < -9223372036854775808.0) return Int64(static_cast<u64>(std::numeric_limits<i64>::min()));
+    return Int64(static_cast<u64>(static_cast<i64>(a)));
+  }
+  static Int64 int64_of_float_unsigned(Float a) {
+    if (!(a > 0)) return Int64(0);
+    if (a >= 18446744073709551616.0) return Int64(~u64{0});
+    return Int64(static_cast<u64>(a));
+  }
+  /// A Float's 64 bits (IEEE 754), and the Float of 64 bits.
+  static Int64 int64_bits_of_float(Float a) { return Int64(std::bit_cast<u64>(a)); }
+  static Float int64_float_of_bits(Int64 a) { return std::bit_cast<f64>(a.bits); }
+  /// Two halves of 32 bits each (an Int each, cut to its last 32 bits), and the halves again (0 .. 2^32 - 1).
+  static Int64 int64_of_halves(Int high, Int low) { return Int64((static_cast<u64>(static_cast<u32>(high)) << 32) | static_cast<u32>(low)); }
+  static Int int64_high(Int64 a) { return static_cast<i64>(a.bits >> 32); }
+  static Int int64_low(Int64 a) { return static_cast<i64>(a.bits & 0xffffffffu); }
+  static Int int64_count_ones(Int64 a) { return static_cast<i64>(std::popcount(a.bits)); }
+  static Int int64_leading_zeros(Int64 a) { return static_cast<i64>(std::countl_zero(a.bits)); }
+  static Int int64_trailing_zeros(Int64 a) { return static_cast<i64>(std::countr_zero(a.bits)); }
+  /// The bits as a text: a u64 in decimal, an i64 in decimal, hexadecimal (lower case, no 0x).
+  static std::string int64_text(Int64 a) { return std::to_string(a.bits); }
+  static std::string int64_text_signed(Int64 a) { return std::to_string(static_cast<i64>(a.bits)); }
+  static std::string int64_text_hex(Int64 a) {
+    char b[20];
+    auto [end, ec] = std::to_chars(b, b + sizeof b, a.bits, 16);
+    (void)ec;
+    return std::string(b, end);
+  }
+  /// A text as 64 bits: its whole number (decimal, 0x hexadecimal; a - in front: two's complement), 0 if it is none.
+  static Int64 int64_of_text(const std::string& text) { return int64_parse(text); }
+  static Int64 int64_parse(std::string_view a) {
+    bool minus = !a.empty() && a.front() == '-';
+    if (minus) a.remove_prefix(1);
+    int base = 10;
+    if (a.size() > 2 && a[0] == '0' && (a[1] == 'x' || a[1] == 'X')) base = 16, a.remove_prefix(2);
+    u64 v = 0;
+    const auto [end, ec] = std::from_chars(a.data(), a.data() + a.size(), v, base);
+    if (ec != std::errc() || end != a.data() + a.size()) return Int64(0);
+    return Int64(minus ? 0 - v : v);
+  }
 
   // ---- math ----
   static Float math_add(Float a, Float b) { return a + b; }

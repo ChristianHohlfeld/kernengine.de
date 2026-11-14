@@ -380,6 +380,8 @@ struct BlueprintCore : logic::PureNodes {
   static Bool text_equal(const Text& a, const Text& b) { return a == b; }
   static Bool text_contains(const Text& a, const Text& b) { return a.view().find(b.view()) != std::string_view::npos; }
   static Int text_length(const Text& a) { return static_cast<i64>(a.size()); }
+  /// (Text to Int64: of the text where it stands)
+  static Int64 int64_of_text(const Text& a) { return logic::PureNodes::int64_parse(a.view()); }
   static Int text_code_at(const Text& a, Int index) {
     const std::string_view v = a.view();
     return index >= 0 && static_cast<u64>(index) < v.size() ? static_cast<i64>(static_cast<u8>(v[static_cast<std::size_t>(static_cast<i64>(index))])) : 0;

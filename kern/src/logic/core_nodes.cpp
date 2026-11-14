@@ -589,6 +589,7 @@ template <class F> void with_items(PinType element, F&& f) {
     case PinType::vector: f(std::type_identity<Vec3>{}); break;
     case PinType::text: f(std::type_identity<std::string>{}); break;
     case PinType::actor: f(std::type_identity<ActorHandle>{}); break;
+    case PinType::int64: f(std::type_identity<Int64>{}); break;
     case PinType::enumeration: f(std::type_identity<i64>{}); break;  // (an enum's value is its place among them)
     case PinType::structure: f(std::type_identity<Value>{}); break;  // (a struct is the value that holds its fields)
     default: break;
@@ -1468,6 +1469,61 @@ void add_math(Library& lib) {
   lib.add(pure("math.mod", "Modulo", "Math", ab(K::number, 0.0, 2.0), number, of(&P::math_mod), "Remainder of A ÷ B", "% remainder"));
   lib.add(pure("math.min", "Min", "Math", ab(K::number), number, of(&P::math_min)));
   lib.add(pure("math.max", "Max", "Math", ab(K::number), number, of(&P::math_max)));
+  {
+    // Int64: 64 bits, as u64 and i64 of C++ hold them - what they mean says the node (nodes.h)
+    const json::Value none("0");
+    auto ab64 = [&] { return std::vector<PinDef>{data("a", "A", K::int64, none), data("b", "B", K::int64, none)}; };
+    auto by = [&] { return std::vector<PinDef>{data("a", "A", K::int64, none), data("by", "By", K::integer, 1)}; };
+    const PinDef int64 = data("result", "", K::int64);
+    struct Two { const char* type; const char* label; Int64 (*f)(Int64, Int64); const char* help; const char* keywords; };
+    for (const Two& t : {Two{"int64.add", "Int64 Add", &P::int64_add, "A + B, round at 2^64", "+ plus u64 i64"},
+                         Two{"int64.sub", "Int64 Subtract", &P::int64_sub, "A - B, round at 2^64", "- minus u64 i64"},
+                         Two{"int64.mul", "Int64 Multiply", &P::int64_mul, "A × B, round at 2^64", "* times u64 i64"},
+                         Two{"int64.div", "Int64 Divide", &P::int64_div, "A ÷ B as i64, toward zero (0 when B is 0)", "/ signed"},
+                         Two{"int64.div_unsigned", "Int64 Divide Unsigned", &P::int64_div_unsigned, "A ÷ B as u64 (0 when B is 0)", "/ unsigned u64"},
+                         Two{"int64.rem", "Int64 Remainder", &P::int64_rem, "What A ÷ B as i64 leaves (0 when B is 0)", "% modulo signed"},
+                         Two{"int64.rem_unsigned", "Int64 Remainder Unsigned", &P::int64_rem_unsigned, "What A ÷ B as u64 leaves (0 when B is 0)", "% modulo unsigned"},
+                         Two{"int64.and", "Int64 And", &P::int64_and, "The bits both have", "& bitwise mask"},
+                         Two{"int64.or", "Int64 Or", &P::int64_or, "The bits either has", "| bitwise"},
+                         Two{"int64.xor", "Int64 Xor", &P::int64_xor, "The bits one of them has", "^ bitwise"}})
+      lib.add(pure(t.type, t.label, "Int64", ab64(), int64, of(t.f), t.help, t.keywords));
+    struct Shift { const char* type; const char* label; Int64 (*f)(Int64, i64); const char* help; };
+    for (const Shift& t : {Shift{"int64.shift_left", "Int64 Shift Left", &P::int64_shift_left, "A << By (By's last 6 bits)"},
+                           Shift{"int64.shift_right", "Int64 Shift Right", &P::int64_shift_right, "A >> By as i64: the sign comes in (By's last 6 bits)"},
+                           Shift{"int64.shift_right_unsigned", "Int64 Shift Right Unsigned", &P::int64_shift_right_unsigned, "A >> By as u64: zeros come in (By's last 6 bits)"},
+                           Shift{"int64.rotate_left", "Int64 Rotate Left", &P::int64_rotate_left, "The bits turned By to the left"},
+                           Shift{"int64.rotate_right", "Int64 Rotate Right", &P::int64_rotate_right, "The bits turned By to the right"}})
+      lib.add(pure(t.type, t.label, "Int64", by(), int64, of(t.f), t.help, "<< >> bits"));
+    lib.add(pure("int64.not", "Int64 Not", "Int64", {data("a", "A", K::int64, none)}, int64, of(&P::int64_not), "Every bit the other way", "~ bitwise invert"));
+    lib.add(pure("int64.equal", "Int64 Equal", "Int64", ab64(), boolean, of(&P::int64_equal), "The same 64 bits?", "== same"));
+    lib.add(pure("int64.less", "Int64 Less", "Int64", ab64(), boolean, of(&P::int64_less), "A < B as i64", "< compare signed"));
+    lib.add(pure("int64.less_unsigned", "Int64 Less Unsigned", "Int64", ab64(), boolean, of(&P::int64_less_unsigned), "A < B as u64", "< compare unsigned"));
+    lib.add(pure("int64.of_int", "Int to Int64", "Int64", {data("a", "Int", K::integer, 0)}, int64, of(&P::int64_of_int), "An Int as an i64's 64 bits", "convert i64 u64"));
+    lib.add(pure("int64.to_int", "Int64 to Int", "Int64", {data("a", "A", K::int64, none)}, integer, of(&P::int64_to_int), "The bits as an i64, as an Int holds it (exact up to 2^53)", "convert"));
+    lib.add(pure("int64.to_int_unsigned", "Int64 to Int Unsigned", "Int64", {data("a", "A", K::int64, none)}, integer, of(&P::int64_to_int_unsigned),
+                 "The bits as a u64, as an Int holds it (exact up to 2^53)", "convert"));
+    lib.add(pure("int64.to_float", "Int64 to Float", "Int64", {data("a", "A", K::int64, none)}, number, of(&P::int64_to_float), "The bits as an i64, as the nearest Float", "convert double"));
+    lib.add(pure("int64.to_float_unsigned", "Int64 to Float Unsigned", "Int64", {data("a", "A", K::int64, none)}, number, of(&P::int64_to_float_unsigned), "The bits as a u64, as the nearest Float",
+                 "convert double"));
+    lib.add(pure("int64.of_float", "Float to Int64", "Int64", {data("a", "Float", K::number, 0.0)}, int64, of(&P::int64_of_float), "Toward zero, as an i64 (no number: 0; beyond: the nearest end)",
+                 "convert truncate"));
+    lib.add(pure("int64.of_float_unsigned", "Float to Int64 Unsigned", "Int64", {data("a", "Float", K::number, 0.0)}, int64, of(&P::int64_of_float_unsigned),
+                 "Toward zero, as a u64 (below 0 or no number: 0; beyond: the largest)", "convert truncate"));
+    lib.add(pure("int64.bits_of_float", "Bits of Float", "Int64", {data("a", "Float", K::number, 0.0)}, int64, of(&P::int64_bits_of_float), "A Float's 64 bits (IEEE 754)", "bit cast double"));
+    lib.add(pure("int64.float_of_bits", "Float of Bits", "Int64", {data("a", "Bits", K::int64, none)}, number, of(&P::int64_float_of_bits), "The Float these 64 bits are (IEEE 754)", "bit cast double"));
+    lib.add(pure("int64.of_halves", "Int64 of Halves", "Int64", {data("high", "High", K::integer, 0), data("low", "Low", K::integer, 0)}, int64, of(&P::int64_of_halves),
+                 "64 bits of two halves of 32 (each Int cut to its last 32 bits)", "make join u32"));
+    lib.add(pure("int64.high", "Int64 High", "Int64", {data("a", "A", K::int64, none)}, integer, of(&P::int64_high), "The upper 32 bits (0 .. 2^32 - 1)", "split u32"));
+    lib.add(pure("int64.low", "Int64 Low", "Int64", {data("a", "A", K::int64, none)}, integer, of(&P::int64_low), "The lower 32 bits (0 .. 2^32 - 1)", "split u32"));
+    lib.add(pure("int64.count_ones", "Int64 Count Ones", "Int64", {data("a", "A", K::int64, none)}, integer, of(&P::int64_count_ones), "How many bits are 1", "popcount"));
+    lib.add(pure("int64.leading_zeros", "Int64 Leading Zeros", "Int64", {data("a", "A", K::int64, none)}, integer, of(&P::int64_leading_zeros), "How many 0 bits come before the first 1 (64: none is)", "clz"));
+    lib.add(pure("int64.trailing_zeros", "Int64 Trailing Zeros", "Int64", {data("a", "A", K::int64, none)}, integer, of(&P::int64_trailing_zeros), "How many 0 bits come after the last 1 (64: none is)", "ctz"));
+    lib.add(pure("int64.text", "Int64 to Text", "Int64", {data("a", "A", K::int64, none)}, data("result", "", K::text), of(&P::int64_text), "The bits as a u64 in decimal", "string"));
+    lib.add(pure("int64.text_signed", "Int64 to Text Signed", "Int64", {data("a", "A", K::int64, none)}, data("result", "", K::text), of(&P::int64_text_signed), "The bits as an i64 in decimal", "string"));
+    lib.add(pure("int64.text_hex", "Int64 to Hex", "Int64", {data("a", "A", K::int64, none)}, data("result", "", K::text), of(&P::int64_text_hex), "The bits in hexadecimal (lower case, no 0x)", "string"));
+    lib.add(pure("int64.of_text", "Text to Int64", "Int64", {data("a", "Text", K::text, "")}, int64, of(&P::int64_of_text), "A whole number written out (decimal, 0x hexadecimal, - in front: two's complement) - 0 if it is none",
+                 "parse string"));
+  }
   lib.add(pure("math.clamp", "Clamp", "Math", {data("value", "Value", K::number, 0.0), data("min", "Min", K::number, 0.0), data("max", "Max", K::number, 1.0)}, number, of(&P::math_clamp)));
   lib.add(pure("math.abs", "Absolute", "Math", {data("a", "A", K::number, 0.0)}, number, of(&P::math_abs)));
   lib.add(pure("math.negate", "Negate", "Math", {data("a", "A", K::number, 0.0)}, number, of(&P::math_negate)));
