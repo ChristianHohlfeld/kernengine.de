@@ -256,7 +256,7 @@ template <class K, class Hash = KeyHash<K>> class Set {
   const_iterator end() const { return keys_.cend(); }
 
   std::size_t index_of(const K& key) const {
-    return index_.find(key, hash_(key), [this](std::size_t at) -> const K& { return keys_[at]; });
+    return index_.find(key, hash_(key), [this](std::size_t at) -> decltype(auto) { return keys_[at]; });
   }
   const_iterator find(const K& key) const {
     const std::size_t at = index_of(key);
@@ -268,7 +268,7 @@ template <class K, class Hash = KeyHash<K>> class Set {
   /// Puts the key in unless it is there. (where it is, was it new)
   std::pair<const_iterator, bool> insert(const K& key) {
     const u64 h = hash_(key);
-    const std::size_t at = index_.find(key, h, [this](std::size_t k) -> const K& { return keys_[k]; });
+    const std::size_t at = index_.find(key, h, [this](std::size_t k) -> decltype(auto) { return keys_[k]; });
     if (at != npos) return {begin() + static_cast<std::ptrdiff_t>(at), false};
     index_.room(keys_.size() + 1, [this](std::size_t k) { return hash_(keys_[k]); });
     keys_.push_back(key);
@@ -304,7 +304,7 @@ template <class K, class Hash = KeyHash<K>> class Set {
     index_.reserve(count);
   }
 
-  const K& key_at(std::size_t at) const { return keys_[at]; }
+  typename std::vector<K>::const_reference key_at(std::size_t at) const { return keys_[at]; }  // (of bool keys: the flag itself - std::vector<bool> holds no bool to refer to)
 
   friend bool operator==(const Set& a, const Set& b) { return a.keys_ == b.keys_; }
 
