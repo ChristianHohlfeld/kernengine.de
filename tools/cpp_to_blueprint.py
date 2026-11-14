@@ -7394,6 +7394,17 @@ class TestWriter:
             out.append((part, "::".join(parts[:i + 1]) in self.tree.records))
         return out
 
+    def compiled_top(self, q, records):
+        """The class among `records` (those the test compiles along, outermost) whose text holds this type - or
+        that is it; None: none."""
+        d = self.tree.records.get(q) or self.tree.enums.get(q)
+        parts = q.split("::")
+        for i in range(1, len(parts) + 1):
+            p = "::".join(parts[:i])
+            if p in records and (p == q or (d is not None and self.inside(d, [self.tree.records[p]]) is not None)):
+                return p
+        return None
+
     def home_of(self, q):
         """The class a type is compiled along with: the outermost one the Blueprint has as a struct whose text
         holds it - or itself, defined outside its class (`struct CityStream::Tile { ... };`)."""
@@ -7687,6 +7698,13 @@ class TestWriter:
             scan_record(d) if kind == "record" else scan(d)
             scan_text(d)
         G.records.difference_update(G.objects)
+        # (a class or an enum declared in a class that is compiled along stands in that class's text - not for
+        # itself as well, as one in a class the Blueprint does not have would: in the namespace of its name)
+        def held_by_record(q, d):
+            parts = q.split("::")
+            return any("::".join(parts[:i]) in G.records and self.inside(d, [tree.records["::".join(parts[:i])]]) is not None for i in range(1, len(parts)))
+        G.records = {q for q in G.records if not held_by_record(q, tree.records[q])}
+        G.enums = {q for q in G.enums if not held_by_record(q, tree.enums[q])}
         return G
 
     # ---- the pieces of the test's source ----
@@ -7863,9 +7881,9 @@ class TestWriter:
             return within if own(d) else None
         def outer(q):
             return q.rsplit("::", 1)[0] + "::" if "::" in q else ""
-        names = {q: "::".join(self.local_path(q + "::", local_of(tree.records[self.top_of(q)]))) for q in tree.records if self.top_of(q) in G.records}
-        enum_names = {q: "::".join(self.local_path(outer(q), local_of(tree.enums[q] if q in G.enums else tree.records[self.top_of(q)])) + [q.split("::")[-1]])
-                      for q in tree.enums if q in G.enums or self.top_of(q) in G.records}
+        names = {q: "::".join(self.local_path(q + "::", local_of(tree.records[self.compiled_top(q, G.records)]))) for q in tree.records if self.compiled_top(q, G.records)}
+        enum_names = {q: "::".join(self.local_path(outer(q), local_of(tree.enums[q] if q in G.enums else tree.records[self.compiled_top(q, G.records)])) + [q.split("::")[-1]])
+                      for q in tree.enums if q in G.enums or self.compiled_top(q, G.records)}
         # the types of this file alone the pieces declare, at the level of a namespace: a function of a header
         # that names one has it by a declaration at the start of its body (its name -> its name in the test)
         own_types = {q.split("::")[-1]: names[q] for q in G.records if own(tree.records[q]) and not any(c for _, c in self.steps_of(outer(q)))}
@@ -7957,7 +7975,7 @@ class TestWriter:
             segments.append((tree.said(self.cut(d["_file"], at, b0, [])), None, 0))
             inside_of = self.local_path(outer(q), local_of(d)) if self.top_of(q) == q else self.spaces_of(outer(q)) + ([local_of(d)] if local_of(d) else [])
             put(d, {"kind": "record", "segments": segments, "head": "".join(f"namespace {c} {{ " for c in inside_of), "tail": " }" * len(inside_of),
-                    "pairs": [(self.absolute(x), names[x]) for x in names if self.top_of(x) == q] + [(self.absolute(x), enum_names[x]) for x in enum_names if self.top_of(x) == q and x not in G.enums]})
+                    "pairs": [(self.absolute(x), names[x]) for x in names if self.compiled_top(x, G.records) == q] + [(self.absolute(x), enum_names[x]) for x in enum_names if self.compiled_top(x, G.records) == q and x not in G.enums]})
         for q in sorted(G.enums):
             put(tree.enums[q], {"kind": "enum", "text": self.enum_text(q, local_of(tree.enums[q])), "pairs": [(self.absolute(q), enum_names[q])]})
         for d, text, said, pairs in self.const_pieces(G.consts, decls, G.records, local_of):
@@ -8018,10 +8036,10 @@ class TestWriter:
         # the names of the test's own types
         decls = [tree.records[q] for q in sorted(records)]
         for q in tree.records:
-            if top_of(q) in records:
+            if self.compiled_top(q, records):
                 self.names[q] = "::".join(classes_of(q + "::"))
         for q in tree.enums:
-            if q in enums or top_of(q) in records:
+            if q in enums or self.compiled_top(q, records):
                 self.enum_names[q] = "::".join(classes_of(q.rsplit("::", 1)[0] + "::" if "::" in q else "") + [q.split("::")[-1]])
         top = sorted(records)
         types_at_top = [self.names[q] for q in top] + [self.enum_names[q] for q in enums]
@@ -8245,7 +8263,9 @@ class TestWriter:
                 "      converted::g_can_bail = true;",
                 "      converted::may_bail(true);",
                 "      bp.before_source();   // (the Blueprints of the actors it calls, as they started)",
-                f"      const auto want = {self.wrap('run(' + ', '.join(f'std::move({n})' if n in moved else n for n in names) + ')', want_type)};",
+                # (what the source gave, kept: as the Blueprint holds it, a view of it may be what is compared)
+                f"      const auto made = run({', '.join(f'std::move({n})' if n in moved else n for n in names)});",
+                f"      const auto& want = {self.wrap('made', want_type)};" if self.wrap('made', want_type) != 'made' else "      const auto& want = made;",
                 "      converted::g_can_bail = false;",
                 "      converted::may_bail(false);",
                 f"      tally.take(bp, given, want, watch.left(), [&] {{ return converted::shown_all(given); }}, {{{', '.join(str(k) for k in order)}}}"
@@ -8383,7 +8403,8 @@ class TestWriter:
                     made = self.made.get(q)
                     hl = hl if not made or ("member", made[0]) not in dropped else [hl[0], made[1], *hl[2:]]
                     # (where the class's compiled text stands: its helpers next to it, for a call from converted.h)
-                    spaces = classes_of(top_of(q).rsplit("::", 1)[0] + "::") if "::" in top_of(q) else []
+                    home = self.compiled_top(q, records) or top_of(q)
+                    spaces = classes_of(home.rsplit("::", 1)[0] + "::") if "::" in home else []
                     if spaces:   # (of a class in a namespace: there, where a call from converted.h looks for them)
                         hl = [*hl[:-5], "".join(f"namespace {c} {{ " for c in spaces) + "using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;",
                               *hl[-5:], "}" * len(spaces)]

@@ -163,7 +163,7 @@ template <class S> struct Shape {
 template <> struct Shape<Whole> {
   template <class T> static Whole of(T v) { return {static_cast<unsigned long long>(v)}; }
 };
-template <class S, class T> auto shaped(const T& v) { return Shape<S>::of(v); }
+template <class S, class T> decltype(auto) shaped(const T& v) { return Shape<S>::of(v); }   // (a value that needs no shape: as it is, not a copy)
 template <class S, class T> using Shaped = std::decay_t<decltype(Shape<S>::of(std::declval<const T&>()))>;
 template <class S> struct Shape<std::vector<S>> {
   template <class T> static auto of(const std::vector<T>& v) {
@@ -182,19 +182,19 @@ template <class S, std::size_t N> struct Shape<std::array<S, N>> {   // (a list 
 template <class A, class B> struct Shape<std::pair<A, B>> {
   template <class X, class Y> static auto of(const std::pair<X, Y>& p) { return std::pair<Shaped<A, X>, Shaped<B, Y>>(Shape<A>::of(p.first), Shape<B>::of(p.second)); }
 };
+/// A map or a set seen with its keys and values as the Blueprint holds them (a view: what it holds may be
+/// a value that is not to be copied - std::unique_ptr).
+template <class SK, class SV, class M> struct ShapedMap {
+  const M& m;
+};
+template <class SK, class M> struct ShapedSet {
+  const M& s;
+};
 template <class SK, class SV> struct Shape<kern::Map<SK, SV>> {
-  template <class K, class V> static auto of(const kern::Map<K, V>& m) {
-    kern::Map<Shaped<SK, K>, Shaped<SV, V>> out;
-    for (const auto& [k, v] : m) out.try_emplace(Shape<SK>::of(k), Shape<SV>::of(v));
-    return out;
-  }
+  template <class M> static ShapedMap<SK, SV, M> of(const M& m) { return {m}; }
 };
 template <class SK> struct Shape<kern::Set<SK>> {
-  template <class K> static auto of(const kern::Set<K>& s) {
-    kern::Set<Shaped<SK, K>> out;
-    for (const K& k : s) out.insert(Shape<SK>::of(k));
-    return out;
-  }
+  template <class M> static ShapedSet<SK, M> of(const M& s) { return {s}; }
 };
 
 /// The arguments a function is tried with: the same in every run.
@@ -399,6 +399,12 @@ template <class T>
   requires(!std::is_base_of_v<EngineObject, T>)
 std::string text(const std::unique_ptr<T>& p);
 template <class T> std::string text(const std::optional<T>& p);
+template <class SK, class SV, class M> Value arg(const ShapedMap<SK, SV, M>& w);
+template <class SK, class M> Value arg(const ShapedSet<SK, M>& w);
+template <class SK, class SV, class M> bool same(const ShapedMap<SK, SV, M>& want, const Value& got);
+template <class SK, class M> bool same(const ShapedSet<SK, M>& want, const Value& got);
+template <class SK, class SV, class M> bool defined(const ShapedMap<SK, SV, M>& w);
+template <class SK, class M> bool defined(const ShapedSet<SK, M>& w);
 template <class K, class V, class H> Value arg(const kern::Map<K, V, H>& m);
 template <class K, class H> Value arg(const kern::Set<K, H>& s);
 template <class K, class V, class H> bool same(const kern::Map<K, V, H>& want, const Value& got);
@@ -644,6 +650,39 @@ template <class K, class H> bool same(const kern::Set<K, H>& want, const Value& 
     if (!(kern::logic::key_of(arg(key)) == got.keyed().key_at(k++))) return false;
   return true;
 }
+template <class SK, class SV, class M> Value arg(const ShapedMap<SK, SV, M>& w) {
+  Value r = Value::zero(kern::logic::PinType::map);
+  if (w.m.empty()) return r;
+  kern::logic::MapEntries& e = r.own_entries();
+  e.reserve(w.m.size());
+  for (const auto& [k, v] : w.m) e.try_emplace(kern::logic::key_of(arg(shaped<SK>(k))), arg(shaped<SV>(v)));
+  return r;
+}
+template <class SK, class M> Value arg(const ShapedSet<SK, M>& w) {
+  Value r = Value::zero(kern::logic::PinType::set);
+  if (w.s.empty()) return r;
+  kern::logic::MapEntries& e = r.own_entries();
+  e.reserve(w.s.size());
+  for (const auto& k : w.s) e.try_emplace(kern::logic::key_of(arg(shaped<SK>(k))));
+  return r;
+}
+template <class SK, class SV, class M> bool same(const ShapedMap<SK, SV, M>& want, const Value& got) {
+  if (got.type != kern::logic::PinType::map || got.size() != want.m.size()) return false;
+  for (std::size_t k = 0; k < want.m.size(); ++k)
+    if (!(kern::logic::key_of(arg(shaped<SK>(want.m.key_at(k)))) == got.keyed().key_at(k)) || !same(shaped<SV>(want.m.value_at(k)), got.keyed().value_at(k))) return false;
+  return true;
+}
+template <class SK, class M> bool same(const ShapedSet<SK, M>& want, const Value& got) {
+  if (got.type != kern::logic::PinType::set || got.size() != want.s.size()) return false;
+  std::size_t k = 0;
+  for (const auto& key : want.s)
+    if (!(kern::logic::key_of(arg(shaped<SK>(key))) == got.keyed().key_at(k++))) return false;
+  return true;
+}
+template <class SK, class SV, class M> bool defined(const ShapedMap<SK, SV, M>& w) { return defined(w.m); }
+template <class SK, class M> bool defined(const ShapedSet<SK, M>&) { return true; }
+template <class SK, class SV, class M> std::string text(const ShapedMap<SK, SV, M>& w) { return text(w.m); }
+template <class SK, class M> std::string text(const ShapedSet<SK, M>& w) { return text(w.s); }
 template <class K, class V, class H> bool defined(const kern::Map<K, V, H>& m) {
   for (const auto& [k, v] : m) if (!defined(v)) return false;
   return true;
