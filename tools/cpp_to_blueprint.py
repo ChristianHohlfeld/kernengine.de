@@ -2616,8 +2616,11 @@ class Emit:
                 if self.keyed(base) and name in ("insert", "emplace", "try_emplace", "insert_or_assign", "erase") and not (name == "erase" and len(args) != 1):
                     return self.keyed_change(base, name, args)[0]
                 before, lv, after = self.variable_of(base, self.tp(base))
-                if name in ("push_back", "emplace_back") and len(args) == 1:
+                if name in ("push_back", "emplace_back") and len(args) == 1 and (name == "push_back" or it not in self.u.struct_fields or self.tp(args[0]) == it):
                     return before + [f"list_add({lv}, {self.ex(args[0], it)});"] + after
+                if name == "emplace_back" and it in self.u.struct_fields:
+                    # (the entry made of the arguments where it is added, as T(args...) makes it)
+                    return before + [f"list_add({lv}, {self.make(it, args)});"] + after
                 if name == "clear":
                     return before + [f"list_clear({lv});"] + after
                 if name == "pop_back":
