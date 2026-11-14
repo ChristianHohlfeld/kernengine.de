@@ -2025,6 +2025,9 @@ TEST(logic_formulas) {
   CHECK(value("min(3, 4) + max(3, 4) + clamp(9, 0, 5) + abs(-2) + sign(-3)") == 13);
   CHECK(value("floor(2.7) + ceil(2.1) + round(2.5) + trunc(-2.7)") == 6 && value("sqrt(16) + sqrt(-4) + log(-1)") == 4);
   CHECK(value("lerp(10, 20, 0.25)") == 12.5);
+  // copysign: the size of one with the sign bit of the other - also of -0 (where sign() says 0)
+  CHECK(value("copysign(2, -1)") == -2 && value("copysign(-2, 1)") == 2 && value("copysign(1, -0)") == -1 && value("copysign(1, 0)") == 1 && value("sign(-0)") == 0);
+  CHECK(std::signbit(value("copysign(0, -5)")) && !std::signbit(value("copysign(-0, 5)")));
   // whole numbers as a machine has them: bits, and arithmetic that wraps around at 32 bit
   CHECK(value("band(12, 10)") == 8 && value("bor(12, 10)") == 14 && value("bxor(12, 10)") == 6 && value("band(-1, 255)") == 255);
   CHECK(value("shl(1, 31)") == 2147483648.0 && value("shr(256, 4)") == 16 && value("shr(-16, 2)") == -4 && value("shl(1, 64)") == 0);

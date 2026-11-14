@@ -976,6 +976,10 @@ Für ganze Zahlen, wie eine Maschine sie hat, gibt es `band`, `bor`, `bxor`, `sh
 einer Zahl) und `wrap32`, `wrap32s`, `mul32` (Rechnen, das bei 32 Bit umbricht), dazu `single` (die Zahl, wie
 eine 32-Bit-Kommazahl sie hält) – in jeder Stufe
 dieselben Funktionen von `kern::math`.
+`copysign(a, b)` ist der Betrag von `a` mit dem Vorzeichen von `b` – auch dem von −0 (`copysign(1, -0)`
+ist −1, wo `sign(-0)` 0 sagt): `std::copysign`, eine Operation auf dem Vorzeichenbit, in jeder Stufe
+dieselbe (im JIT `f64.copysign` von WebAssembly). Als Knoten heißt sie Copy Sign (`math_copysign`). Der
+Konverter schreibt `std::copysign` und `copysignf` damit.
 Zurückgelesen wird der Lambda-Rumpf als Formel, in ihrer einen kanonischen Schreibweise
 (`Formula::text()`).
 
@@ -1391,7 +1395,7 @@ Break und Set Field, Vergleich Feld für Feld, ein Eintrag jenseits der Liste), 
 jeder Stufe beim selben Durchlauf), ein Handler, der sein eigenes Event auslöst
 (`event_reentry`), eine Funktion, die über ein Event wieder aufgerufen wird, und Events, die
 tiefer als 64 ineinander liegen (`function_reentry`), ganze Zahlen an ihren Enden
-(`whole_numbers`), Tweens und Timer (`waits`), Zustände (`states`) und Zufall (`random`).
+(`whole_numbers`), das Vorzeichen von −0 (`signed_zero`: Copy Sign und `copysign` der Formel), Tweens und Timer (`waits`), Zustände (`states`) und Zufall (`random`).
 Die Blueprints: alle Ablaufformen (`Flow`), Funktionen als Wert und als Schritt (`Calls`), jeder
 Draht zwischen verschiedenen Typen (`Casts`), Listen jedes Typs mit jedem Index, auch weit
 jenseits der Liste (`Lists`), Aufzählungen als Variablen, in Listen und durch Funktionen, Switch

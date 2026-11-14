@@ -106,7 +106,7 @@ constinit const_cast continue co_await co_return co_yield decltype default delet
 int long mutable namespace new noexcept not not_eq nullptr operator or or_eq private protected public register reinterpret_cast requires return short signed sizeof static
 static_assert static_cast struct switch template this thread_local throw true try typedef typeid typename union unsigned using virtual void volatile wchar_t while xor xor_eq
 Bool Int Float Vector Text Actor List loop machine entry detached kern""".split())
-FORMULA_WORDS = set("min max clamp abs sign floor ceil round trunc sqrt pow exp log sin cos tan asin acos atan atan2 rad deg lerp div mod pi band bor bxor shl shr wrap32 wrap32s mul32 single".split())
+FORMULA_WORDS = set("min max clamp abs sign copysign floor ceil round trunc sqrt pow exp log sin cos tan asin acos atan atan2 rad deg lerp div mod pi band bor bxor shl shr wrap32 wrap32s mul32 single".split())
 # What nothing of a Blueprint is called: a word of C++ or of the notation, a function of a formula, a node
 # (math_add, list_get ... - the engine says which there are: NODES, see main) or a name of the shape the
 # notation gives its nodes and paths (n12, go3 ...).
@@ -145,7 +145,8 @@ ZERO = {"Int64": "Int64{0x0}", "Float": "0.0", "Int": "0", "Bool": "false", "Vec
 MATH = {"sqrt": "sqrt", "sqrtf": "sqrt", "fabs": "abs", "fabsf": "abs", "abs": "abs", "fmin": "min", "fminf": "min", "min": "min", "min_of": "min", "fmax": "max", "fmaxf": "max", "max": "max",
         "max_of": "max", "floor": "floor", "floorf": "floor", "ceil": "ceil", "ceilf": "ceil", "round": "round", "roundf": "round", "lround": "round", "lroundf": "round", "trunc": "trunc",
         "truncf": "trunc", "pow": "pow", "powf": "pow", "exp": "exp", "expf": "exp", "log": "log", "logf": "log", "sin": "sin", "sinf": "sin", "cos": "cos", "cosf": "cos", "tan": "tan",
-        "tanf": "tan", "asin": "asin", "acos": "acos", "atan": "atan", "atan2": "atan2", "atan2f": "atan2", "fmod": "mod", "fmodf": "mod", "clamp": "clamp"}
+        "tanf": "tan", "asin": "asin", "acos": "acos", "atan": "atan", "atan2": "atan2", "atan2f": "atan2", "fmod": "mod", "fmodf": "mod", "clamp": "clamp",
+        "copysign": "copysign", "copysignf": "copysign"}
 
 
 VECTOR_FUNCTIONS = ("length", "dot", "cross", "distance", "normalize", "lerp", "length_sq", "distance_sq", "finite", "min_of", "max_of", "clamp", "hex_color", "vmin", "vmax")
@@ -5149,7 +5150,7 @@ class Emit:
         if name in ("clamp", "clampf"):
             return count == 3
         if name in MATH:
-            return count == {"min": 2, "max": 2, "pow": 2, "atan2": 2, "mod": 2}.get(MATH[name], 1)
+            return count == {"min": 2, "max": 2, "pow": 2, "atan2": 2, "mod": 2, "copysign": 2}.get(MATH[name], 1)
         if name in ("hypot", "ldexp", "ldexpf"):
             return count == 2
         if name == "lerp":
@@ -5608,7 +5609,7 @@ class Emit:
                     inner = [self.ex(x, "Float") for x in kids(b)[1:]]
                     return self.leaf(None, leaves, f"kern::formula([](Float v, Float lo, Float hi) -> Float {{ return v < lo ? lo : (hi < v ? hi : v); }}, {', '.join(inner)})")
                 return f"({v} < {lo} ? {lo} : ({hi} < {v} ? {hi} : {v}))"
-            if name in MATH and len(args) == {"min": 2, "max": 2, "pow": 2, "atan2": 2, "mod": 2}.get(MATH[name], 1):
+            if name in MATH and len(args) == {"min": 2, "max": 2, "pow": 2, "atan2": 2, "mod": 2, "copysign": 2}.get(MATH[name], 1):
                 return f"kern::math::{MATH[name]}({', '.join(args)})"
             if name == "hypot" and len(args) == 2:
                 return f"kern::math::sqrt(({args[0]} * {args[0]}) + ({args[1]} * {args[1]}))"
@@ -6604,7 +6605,7 @@ class Api:
 # ---- the test: the Blueprint next to its source ------------------------------------------------------
 WIDE_MATH = {"sin": "kern::math::sin", "cos": "kern::math::cos", "tan": "kern::math::tan", "asin": "kern::math::asin", "acos": "kern::math::acos", "atan": "kern::math::atan",
              "atan2": "kern::math::atan2", "exp": "kern::math::exp", "log": "kern::math::log", "pow": "kern::math::pow", "sqrt": "kern::math::sqrt", "fmod": "kern::math::mod",
-             "hypot": "hypot_bp", "tanh": "tanh_bp", "sinh": "sinh_bp", "cosh": "cosh_bp", "asinh": "asinh_bp", "log2": "log2_bp", "log10": "log10_bp", "cbrt": "cbrt_bp", "ldexp": "ldexp_bp"}
+             "copysign": "kern::math::copysign", "hypot": "hypot_bp", "tanh": "tanh_bp", "sinh": "sinh_bp", "cosh": "cosh_bp", "asinh": "asinh_bp", "log2": "log2_bp", "log10": "log10_bp", "cbrt": "cbrt_bp", "ldexp": "ldexp_bp"}
 # What a test needs where the source reads through a pointer into a list (Unit.pointed): the lists the test
 # handed it, so that an entry through such a pointer is checked against its list as converted::at checks one -
 # outside it the call is marked (C++ leaves open what it reads there). A pointer into nothing the test handed

@@ -99,6 +99,15 @@ inline const std::vector<Case>& cases() {
           {"id":6,"type":"var.set","params":{"variable":"H"}},{"id":7,"type":"math.formula","params":{"formula":"ceil(x * 0.7) + (x % 2 == 0 && x != 0) * 100"}}],
         "links":[[1,"then",2,"exec"],[1,"value",3,"value"],[3,"result",2,"value"],[2,"then",4,"exec"],[1,"value",5,"x"],[5,"result",4,"amount"],
           [4,"then",6,"exec"],[1,"value",7,"x"],[7,"result",6,"value"]]})kg"},
+      // The sign of -0 (Copy Sign, the formula's copysign): -Go's value is -0 for 0, and Copy Sign
+      // gives the size of 3 with that sign - -3 in every tier, where Sign of -0 says 0.
+      {"signed_zero",
+       R"kg({"variables":[{"name":"F","type":"float","value":0},{"name":"G","type":"float","value":0},{"name":"Signs","type":"float_list","value":[]}],
+        "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.add","params":{"variable":"G"}},{"id":3,"type":"math.negate"},
+          {"id":4,"type":"math.copysign","values":{"a":3}},{"id":5,"type":"var.set","params":{"variable":"F"}},
+          {"id":6,"type":"math.formula","params":{"formula":"copysign(1, z) * 100 + copysign(value, 1 - value)"}},{"id":7,"type":"list.add","params":{"variable":"Signs"}}],
+        "links":[[1,"then",2,"exec"],[1,"value",3,"a"],[3,"result",4,"b"],[4,"result",2,"amount"],[2,"then",5,"exec"],[3,"result",6,"z"],[1,"value",6,"value"],
+          [6,"result",5,"value"],[5,"then",7,"exec"],[6,"result",7,"item"]]})kg"},
       {"events_and_time",
        R"({"variables":[{"name":"Ticks","type":"int","value":0},{"name":"Elapsed","type":"float","value":0},{"name":"Heard","type":"float","value":0},{"name":"Last","type":"text","value":""}],
         "nodes":[{"id":1,"type":"event.tick"},{"id":2,"type":"var.add","params":{"variable":"Ticks"}},{"id":3,"type":"var.add","params":{"variable":"Elapsed"}},

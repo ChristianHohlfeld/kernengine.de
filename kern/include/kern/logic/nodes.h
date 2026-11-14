@@ -51,6 +51,9 @@ inline f64 max(f64 a, f64 b) { return max_of(a, b); }
 inline f64 clamp(f64 x, f64 lo, f64 hi) { return kern::clamp(x, min_of(lo, hi), max_of(lo, hi)); }
 inline f64 abs(f64 a) { return std::fabs(a); }
 inline f64 sign(f64 a) { return a > 0 ? 1 : a < 0 ? -1 : 0; }
+/// The size of `a` with the sign bit of `b` - also of -0 and of a NaN (copysign(1, -0) is -1,
+/// where sign(-0) is 0): IEEE 754's copySign, a bit operation, exact everywhere.
+inline f64 copysign(f64 a, f64 b) { return std::copysign(a, b); }
 inline f64 floor(f64 a) { return std::floor(a); }
 inline f64 ceil(f64 a) { return std::ceil(a); }
 inline f64 round(f64 a) { return std::round(a); }
@@ -1391,6 +1394,7 @@ struct PureNodes {
   static Float math_max(Float a, Float b) { return max_of(a, b); }
   static Float math_clamp(Float value, Float min, Float max) { return kern::clamp(value, min_of(min, max), max_of(min, max)); }
   static Float math_abs(Float a) { return std::fabs(a); }
+  static Float math_copysign(Float a, Float b) { return std::copysign(a, b); }  // (the formula's copysign)
   static Float math_negate(Float a) { return -a; }
   static Float math_lerp(Float a, Float b, Float alpha) { return a + (b - a) * alpha; }
   static Float math_sin(Float degrees) { return dm::sin(degrees * kDegrees); }

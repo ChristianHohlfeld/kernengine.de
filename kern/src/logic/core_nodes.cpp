@@ -1527,6 +1527,8 @@ void add_math(Library& lib) {
   }
   lib.add(pure("math.clamp", "Clamp", "Math", {data("value", "Value", K::number, 0.0), data("min", "Min", K::number, 0.0), data("max", "Max", K::number, 1.0)}, number, of(&P::math_clamp)));
   lib.add(pure("math.abs", "Absolute", "Math", {data("a", "A", K::number, 0.0)}, number, of(&P::math_abs)));
+  lib.add(pure("math.copysign", "Copy Sign", "Math", {data("a", "Magnitude", K::number, 0.0), data("b", "Sign", K::number, 1.0)}, number, of(&P::math_copysign),
+               "The size of Magnitude with the sign of Sign - also the sign of -0 (Copy Sign of 1 and -0 is -1)", "copysign negative zero minus"));
   lib.add(pure("math.negate", "Negate", "Math", {data("a", "A", K::number, 0.0)}, number, of(&P::math_negate)));
   lib.add(pure("math.lerp", "Lerp", "Math", {data("a", "A", K::number, 0.0), data("b", "B", K::number, 1.0), data("alpha", "Alpha", K::number, 0.5)}, number, of(&P::math_lerp),
                "A + (B - A) × Alpha", "interpolate mix blend"));
@@ -1684,7 +1686,7 @@ void add_math(Library& lib) {
 void add_formula(Library& lib) {
   NodeDef d = make("math.formula", "Formula", "Math", NodeKind::pure,
                    "A formula as one node: every name in it becomes an input. Operators + - * / % ^, comparisons (1 when true), && || !, a ? b : c; "
-                   "functions min max clamp abs sign floor ceil round trunc sqrt pow exp log sin cos tan asin acos atan atan2 (radians; rad(), deg()) lerp; "
+                   "functions min max clamp abs sign copysign floor ceil round trunc sqrt pow exp log sin cos tan asin acos atan atan2 (radians; rad(), deg()) lerp; "
                    "whole numbers as a machine has them: band bor bxor shl shr, wrap32 wrap32s mul32 (32 bit); single (the number as a 32-bit float holds it); pi.");
   d.params = {param("formula", "Formula", ParamDef::Kind::text, "a + b")};
   d.outputs = {data("result", "", PinType::number)};

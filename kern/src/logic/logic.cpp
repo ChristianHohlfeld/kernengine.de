@@ -2310,7 +2310,7 @@ u32 Instance::seed() {
 bool Instance::inline_pure(int node) const {
   const CNode& c = nodes_[static_cast<std::size_t>(node)];
   if (!c.def || c.def->kind != NodeKind::pure || c.fresh) return false;
-  static const char* kInline[] = {"math.add", "math.sub", "math.mul", "math.div", "math.mod", "math.min", "math.max", "math.clamp", "math.abs", "math.negate",
+  static const char* kInline[] = {"math.add", "math.sub", "math.mul", "math.div", "math.mod", "math.min", "math.max", "math.clamp", "math.abs", "math.copysign", "math.negate",
                                   "math.lerp", "math.sqrt", "math.floor", "math.round", "math.compare", "logic.and", "logic.or", "logic.xor", "logic.not",
                                   "value.float", "value.int", "value.bool"};
   for (const char* t : kInline) if (c.def->type == t) return true;

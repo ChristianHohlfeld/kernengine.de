@@ -1045,6 +1045,8 @@ inline const char* kFormulas[] = {
     "a ? b : c",
     "min(a, b) + max(b, c) + clamp(a, b, c)",
     "abs(a) + sign(b)",
+    "copysign(a, b)",
+    "copysign(1, a) * 4 + copysign(b, -c)",
     "floor(a) + ceil(b) * 10 + round(c) * 100 + trunc(a) * 1000",
     "sqrt(a) + pow(b, 2) + exp(c / 1000) + log(b)",
     "sin(a) + cos(b) + tan(c)",
