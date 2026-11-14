@@ -7394,6 +7394,31 @@ class TestWriter:
             out.append((part, "::".join(parts[:i + 1]) in self.tree.records))
         return out
 
+    def home_of(self, q):
+        """The class a type is compiled along with: the outermost one the Blueprint has as a struct whose text
+        holds it - or itself, defined outside its class (`struct CityStream::Tile { ... };`)."""
+        t = self.top_of(q)
+        if t == q:
+            return q
+        d, top = self.tree.records.get(q) or self.tree.enums.get(q), self.tree.records.get(t)
+        if d is None or top is None or self.inside(d, [top]) is not None:
+            return t
+        parts = q.split("::")
+        for i in range(len(parts) - 1, 0, -1):   # (in a class defined outside its own: there)
+            p = "::".join(parts[:i])
+            if p in self.tree.records and p != t and self.inside(d, [self.tree.records[p]]) is not None:
+                return self.home_of(p)
+        return q
+
+    def wrapped(self, q, text, local=None):
+        """A class's text where it stands in the test: in its namespaces - one defined outside its class
+        (`struct CityStream::Tile { ... };`) names that class itself."""
+        scope = q.rsplit("::", 1)[0] + "::" if "::" in q else ""
+        if self.top_of(q) != q:
+            names = self.spaces_of(scope) + ([local] if local else [])
+            return "".join(f"namespace {c} {{ " for c in names) + text + " }" * len(names)
+        return self.in_classes(scope, text, local)
+
     def classes_of(self, scope):
         """The names of a scope in the test, outermost first (see steps_of)."""
         return [name for name, _ in self.steps_of(scope)]
@@ -7466,7 +7491,9 @@ class TestWriter:
         G = Held()
         todo, seen_types = [], set()
         def want_record(q):
-            t = self.top_of(q)
+            t = self.home_of(q)
+            if t != self.top_of(q):
+                want_record(self.top_of(q))   # (a class defined outside its class: with that class, after it)
             d = tree.records.get(t)
             if t.startswith(ENGINE + "::logic::"):
                 return   # (the engine's logic - how C++ calls a Blueprint: in a test the engine's own, which runs the Blueprints)
@@ -7485,7 +7512,7 @@ class TestWriter:
             if d is None or not d.get("name") or d.get("_at", (None, None))[1] is None or q in tree.local_types:
                 return
             if self.top_of(q) != q:
-                want_record(self.top_of(q))
+                want_record(self.home_of(q))
             else:
                 G.enums.add(q)
         def want_types(text):
@@ -7928,7 +7955,7 @@ class TestWriter:
                 segments.append((text, None if m.get("explicitlyDefaulted") else self.ident(m), raw[ma:mb].count("\n")))
                 at = end
             segments.append((tree.said(self.cut(d["_file"], at, b0, [])), None, 0))
-            inside_of = self.local_path(outer(q), local_of(d))
+            inside_of = self.local_path(outer(q), local_of(d)) if self.top_of(q) == q else self.spaces_of(outer(q)) + ([local_of(d)] if local_of(d) else [])
             put(d, {"kind": "record", "segments": segments, "head": "".join(f"namespace {c} {{ " for c in inside_of), "tail": " }" * len(inside_of),
                     "pairs": [(self.absolute(x), names[x]) for x in names if self.top_of(x) == q] + [(self.absolute(x), enum_names[x]) for x in enum_names if self.top_of(x) == q and x not in G.enums]})
         for q in sorted(G.enums):
@@ -8346,7 +8373,7 @@ class TestWriter:
                     else:
                         inner.append((raw[a0:ma].count("\n"), raw[a0:mb].count("\n"), ("member", m["id"])))
                 text += self.cut(d["_file"], at, b0)
-                first = add(("record", q), in_classes(q.rsplit("::", 1)[0] + "::" if "::" in q else "", re.sub(r"^\s*class\b", "struct", wide(tree.said(text))) + ";"))
+                first = add(("record", q), self.wrapped(q, re.sub(r"^\s*class\b", "struct", wide(tree.said(text))) + ";"))
                 where.extend((first + x, first + y, key) for x, y, key in inner)
             add(None, "\n".join(["#undef private", "#undef protected", '#pragma GCC diagnostic pop', ""]))
             for q, hl in self.helped.items():
