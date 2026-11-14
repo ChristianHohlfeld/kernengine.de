@@ -813,6 +813,7 @@ class Unit:
         self.engine = None          # the engine's functions as nodes (Api), made when the first one is called
         self.engine_calls = {}      # the engine's functions this Blueprint calls: decl id -> its node (Api.function)
         self.objects_seen = set()   # the engine's classes it holds handles of
+        self.deciding = set()       # (the engine's classes engine_object is deciding about: one that holds itself)
         self.externs = {}           # a function of an actor's Blueprint it calls on that actor -> (its inputs, its outputs: [(name, type)], its declaration)
         self.working = set()
         self.short = collections.defaultdict(list)
@@ -969,14 +970,40 @@ class Unit:
             q = self.find_type(self.clean(r).replace("const ", "").strip())
         except Wait:
             return None
-        if q is None or not q.startswith(ENGINE + "::") or q not in self.tree.records or q in (ENGINE + "::Vec3", ENGINE + "::Vec2"):
+        if q is None or not self.engine_object(q):
             return None
+        self.objects_seen.add(q)
+        return q
+
+    def engine_object(self, q):
+        """Is the class `q` of the engine an object with a life of its own (a handle in a Blueprint), not
+        plain data? A `class` is one (its state is its own: the engine's convention), and so is a struct
+        that cannot be a struct of the Blueprint (a pointer in it, a field without a Blueprint type).
+        Api.opaque asks the same."""
+        if not q.startswith(ENGINE + "::") or q not in self.tree.records or q in (ENGINE + "::Vec3", ENGINE + "::Vec2"):
+            return False
+        rec = self.tree.records[q]
+        if rec.get("tagUsed") == "class":
+            return True
+        for c in kids(rec):
+            # a struct that cannot be copied (a Blueprint's struct is a value), or that holds an object of the
+            # engine itself - as a value or owned (std::unique_ptr): an object too (Mesh: its Bvh)
+            if c.get("kind") == "CXXConstructorDecl" and c.get("explicitlyDeleted") and re.fullmatch(r"\s*\w+\s*\(\s*const\s+[\w:]+\s*&\s*\)\s*", qtype(c)):
+                return True
+            if c.get("kind") == "FieldDecl":
+                raw = qtype(c).strip()
+                if not re.search(r"(&|\*\s*(const)?)$", raw) and q not in self.deciding:
+                    self.deciding.add(q)
+                    try:
+                        if self.object_of(raw) is not None:
+                            return True
+                    finally:
+                        self.deciding.discard(q)
         try:
             self.struct(q)
-            return None   # (plain data: a struct of the Blueprint)
+            return False   # (plain data: a struct of the Blueprint)
         except Wait:
-            self.objects_seen.add(q)
-            return q
+            return True
 
     def engine_table(self):
         """The engine's nodes as the engine has them (kern/src/logic/engine_api.gen.cpp): type -> (is it a
@@ -3445,22 +3472,35 @@ class Emit:
         u.engine_calls[d["id"]] = f
         ins, texts, own = list(f["ins"]), [], None
         if d.get("kind") == "CXXMethodDecl" and d.get("storageClass") != "static":
+            # (of an object of the engine: its handle; of plain data the engine defines the method of - MeshData::as_input
+            # -: the value, the node's first input, and what a method that is not const makes of it its output `self`)
             _, bt, handle = ins.pop(0)
-            if not handle:
-                raise Wait(f"the engine's {d.get('name')}() (a method of plain data that only the engine defines)")
             if obj is None or self.is_this(obj):
                 raise Wait("a call of the engine on its own object")
             texts.append(self.ex(obj, bt))
             own = obj
         params = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
-        nodes = []
-        for i, (name, bt, handle) in enumerate(ins):
+        nodes = {}   # pin -> the argument it is (an output: where the call wants it - None: nowhere)
+        in_pins = {name: bt for name, bt, _ in ins}
+        for i, (pin_in, pin_out) in enumerate(f["params"]):
             a = args[i] if i < len(args) else None
             if a is None or a.get("kind") == "CXXDefaultArgExpr":   # (left out: the default the header gives it)
                 a = kids(params[i])[-1] if kids(params[i]) else None
                 if a is None:
                     raise Wait("a call of the engine with a default argument that is declared elsewhere")
-            nodes.append(a)
+            if pin_in is None:
+                # what the function reports if it is asked to (`bool* changed`): into the place the call
+                # names (&changed), or nowhere (nullptr) - the node gives it either way
+                b = self.unwrap(a)
+                if self.nothing(b):
+                    nodes[pin_out] = None
+                elif b.get("kind") == "UnaryOperator" and b.get("opcode") == "&" and kids(b):
+                    nodes[pin_out] = kids(b)[0]
+                else:
+                    raise Wait("a pointer")
+                continue
+            name, bt = pin_in, in_pins[pin_in]
+            nodes[name] = a
             raw = qtype(params[i]).strip()
             made = self.unwrap(a)
             while made.get("kind") in ("MaterializeTemporaryExpr", "CXXBindTemporaryExpr", "CXXFunctionalCastExpr") and len(kids(made)) == 1:
@@ -3490,8 +3530,8 @@ class Emit:
                 got = (tmp, bt)
             elif o == "self":
                 lines += self.store(own, self.typed(f"n{node}.self", bt))
-            else:
-                lines += self.store(nodes[[x[0] for x in ins].index(o)], self.typed(f"n{node}.{o}", bt))
+            elif nodes.get(o) is not None:
+                lines += self.store(nodes[o], self.typed(f"n{node}.{o}", bt))
         return lines, *got
 
     def engine_value(self, d, obj, args):
@@ -4702,6 +4742,8 @@ class Emit:
                 e = u.enum(q)
                 return f"{e}::{enum_value(u, e, ref['name'])}", e
             if ref.get("kind") == "VarDecl":
+                if i in u.variables:   # (a constant of the function's own, `static const Vec3 kHair[6] = {…};` - see stmt1)
+                    return u.variables[i]
                 d = self.tree.decl.get(i)
                 if d is None:
                     if ref.get("name") == "kPi":
@@ -5703,16 +5745,7 @@ class Api:
 
     def opaque(self, q):
         """Is this class an object of the engine with a life of its own (a handle in a Blueprint)?"""
-        d = self.tree.records.get(q)
-        if d is None or not q.startswith(ENGINE + "::") or q in (ENGINE + "::Vec3", ENGINE + "::Vec2"):
-            return False
-        if d.get("tagUsed") == "class":
-            return True
-        try:
-            self.u.struct(q)
-            return False
-        except Wait:
-            return True
+        return self.u.engine_object(q)
 
     def handed(self, raw):
         """How a parameter is handed over: (its Blueprint type, does the function write through it, the
@@ -5796,7 +5829,21 @@ class Api:
             return False
         if d.get("previousDecl") or d["id"] in self.tree.template_of or not d.get("name") or d["name"].startswith("operator") or "(anonymous" in scope:
             return False
-        return not (d.get("kind") == "CXXMethodDecl" and d.get("access", "public") != "public")
+        return not (d.get("kind") == "CXXMethodDecl" and not self.public(d))
+
+    def public(self, d):
+        """Is the method `d` public in its class? (The compiler's tree says it by the access specifiers between
+        the members, not at a member: a class begins private, a struct public.)"""
+        rec = self.tree.records.get(self.tree.owner.get(d["id"], ""))
+        if rec is None:
+            return d.get("access", "public") == "public"
+        access = "private" if rec.get("tagUsed") == "class" else "public"
+        for c in kids(rec):
+            if c.get("kind") == "AccessSpecDecl":
+                access = c.get("access", access)
+            elif c.get("id") == d["id"]:
+                return access == "public"
+        return d.get("access", "public") == "public"
 
     def of_object(self, d):
         """Is `d` a method of a class of the engine that is an object (not plain data a Blueprint holds)?"""
@@ -5846,25 +5893,61 @@ class Api:
                 ins.append((name_of("self"), st, None))
                 if not const:
                     outs.append(("self", st, None))
+        changes = False   # (an object of the engine it is handed to change - Renderer&, physics::World*: a step)
+        params = []   # per parameter of the C++ function: (its input pin or None, its output pin or None)
         for i, p in enumerate(x for x in kids(d) if x.get("kind") == "ParmVarDecl"):
+            optional = self.optional_out(p)
+            if optional is not None:
+                name = name_of(p.get("name") or f"value{i + 1}")
+                outs.append((name, optional, None))
+                params.append((None, name))
+                continue
             bt, writes, handle = self.handed(qtype(p))
             name = name_of(p.get("name") or f"value{i + 1}")
             ins.append((name, bt, handle))
             if writes:
                 outs.append((name, bt, None))
+            params.append((name, name if writes else None))
+            if handle and re.search(r"(&|\*\s*(const)?)$", qtype(p).strip()) and not re.match(r"const\b", qtype(p).strip()):
+                changes = True
         ret = qtype(d).split("(")[0].strip()
         if ret != "void":
             bt, _, handle = self.handed(ret)
             outs.insert(0, ("result", bt, handle))
         qualified = self.home(d) + "::" + d["name"]
-        value = ret != "void" and len(outs) == 1 and (const or not method) and qualified not in ENGINE_STEPS
+        value = ret != "void" and len(outs) == 1 and (const or not method) and not changes and qualified not in ENGINE_STEPS
         for _, bt, _ in ins + outs:
             self.pin(bt)
             self.shape(bt)
         words = d["name"].replace("_", " ").title()
         return {"type": self.type_of(d), "cpp": qualified, "label": words, "category": "Engine: " + self.home(d).split("::")[-1].replace("kern", "Engine"),
-                "help": u.comment_of(d), "value": value, "ins": ins, "outs": outs, "decl": d}
+                "help": u.comment_of(d), "value": value, "ins": ins, "outs": outs, "params": params, "decl": d}
 
+    def optional_out(self, p):
+        """A parameter that is a pointer to plain data the function writes through, null by default
+        (`bool* changed = nullptr`, `std::string* error = nullptr`): what the function reports if it is
+        asked to - a further output, the Blueprint type of what it writes; None for any other parameter.
+        (The engine's convention: such a pointer only says where to put the report; what the function does
+        is the same with it or without it.)"""
+        raw = qtype(p).strip()
+        if not re.search(r"\*\s*$", raw) or re.match(r"const\b", raw) or not kids(p):
+            return None
+        init = bare(kids(p)[-1])
+        while init.get("kind") == "ImplicitCastExpr" and kids(init):
+            init = bare(kids(init)[0])
+        if init.get("kind") not in ("CXXNullPtrLiteralExpr", "GNUNullExpr"):
+            return None
+        inner = re.sub(r"\*\s*$", "", raw).strip()
+        if "*" in inner or "&" in inner:
+            return None
+        q = None
+        try:
+            q = self.u.find_type(self.u.clean(inner))
+        except Wait:
+            pass
+        if q is not None and q in self.tree.records and self.opaque(q):
+            return None   # (an object of the engine that may be missing: a handle, 0 for none)
+        return self.u.btype(inner)
 
 
 # ---- the test: the Blueprint next to its source ------------------------------------------------------
@@ -5875,7 +5958,7 @@ WIDE_PRELUDE = """// the numbers of the Blueprint language (../converted.h): a n
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
 using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
@@ -5921,6 +6004,7 @@ class TestWriter:
         self.helped = collections.OrderedDict()   # a record -> the lines of its helpers (None: being written)
         self.edits = {}        # a file -> the guards in it (see `guard`), in the order of the file
         self.enum_names = {}   # an enum (qualified) -> its name in the test
+        self.object_enums = collections.defaultdict(list)   # a class of the engine the test has a stand-in of -> its enums the test needs
         self.made = {}         # a class the test makes by a constructor -> (the constructor, the line that makes it without)
         self.objects = {}      # a class of the engine the source holds objects of -> its stand-in's name in the test
         self.whole = None      # what the test holds (`setup`)
@@ -6292,6 +6376,10 @@ class TestWriter:
             if re.match(r"(?:const\s+)?std::unique_ptr<", self.u.clean(r)):
                 return f"std::make_unique<{self.object_name(q)}>(*{one})"
             return one if re.search(r"\*\s*(const)?$", r) else "*" + one
+        m = re.match(r"(?:kern::)?Span<\s*(?:const\s+)?(.+)>$", c)
+        if m:   # (a view: of entries the test keeps - converted::kept_span)
+            inner = m.group(1)
+            return f"converted::kept_span(draw_list(draw, [&]() -> {self.spell(inner)} {{ return {self.draw(inner)}; }}))"
         if c in W64:
             return f"static_cast<{self.spell(raw)}>(draw.bits())"
         if c in ("float", "double", "long double"):
@@ -6461,18 +6549,29 @@ class TestWriter:
         return lines
 
     # ---- the engine in the test: stand-ins that keep every call ----
-    def stand_in(self, f, cls):
+    def stand_in(self, f, cls, plain=False):
         """A function of the engine as the test's source calls it: (its declaration, its definition). It hands
         its arguments to the stand-in of the engine as the values the Blueprint's node gets, and takes what
-        the stand-in answers."""
+        the stand-in answers. `plain`: a method of plain data (the test's own struct, MeshData::as_input) - the
+        struct is its first value, and what a method that is not const makes of it, the first it takes."""
         d = f["decl"]
         shape = lambda x: re.sub(r"\b[ui]64\b", "converted::Whole", x)
         params, values, takes = [], (["arg(*this)"] if cls else []), []
+        if plain and not qtype(d).rstrip().endswith("const"):
+            takes.append(("(*this)", cls, False))
         ps = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
-        for i, (p, (name, _, _)) in enumerate(zip(ps, f["ins"][1:] if cls else f["ins"])):
+        for i, (p, (pin_in, pin_out)) in enumerate(zip(ps, f["params"])):
             raw = qtype(p).strip()
             default = self.tree.source(kids(p)[-1]).strip().lstrip("=").strip() if kids(p) else ""   # (`= {}`: the tree has the sign with it)
             default = " = " + default if default else ""
+            if pin_in is None:
+                # what the function reports if it is asked to: written where the pointer says, if it says
+                inner = self.spell(re.sub(r"\*\s*$", "", raw))
+                self.result_ok(re.sub(r"\*\s*$", "", raw))
+                params.append((f"{inner}* {pin_out}", default))
+                takes.append((pin_out, inner, True))
+                continue
+            name = pin_in
             if not self.u.object_of(raw) and raw.replace(" ", "") not in ("constchar*", "constchar*const"):
                 self.result_ok(re.sub(r"\*\s*(const)?$", "", raw))   # (the helpers of the structs it is made of)
             if self.u.object_of(raw):
@@ -6492,24 +6591,31 @@ class TestWriter:
                 params.append(((f"{t}& {name}" if writes else f"const {t}& {name}"), default))
                 values.append(f"arg({self.wrap(name, t)})")
                 if writes:
-                    takes.append((name, t))
+                    takes.append((name, t, False))
         ret_raw = qtype(d).split("(")[0].strip()
         ret = "void" if ret_raw == "void" else self.spell(ret_raw)
         if ret_raw != "void" and not self.u.object_of(ret_raw):
             self.result_ok(ret_raw)
-        body = [f'const std::vector<converted::Value> out = converted::engine_call("{f["type"]}", {{{", ".join(values)}}});']
+        # (its own names begin with kern_: a parameter may be called `out` or `result` - hull_mesh's)
+        body = [f'const std::vector<converted::Value> kern_out = converted::engine_call("{f["type"]}", {{{", ".join(values)}}});']
         k = 0
         if ret != "void":
-            body.append(f"{ret} result{{}}; converted::take_as<{shape(ret)}>(result, out[0]);")
+            body.append(f"{ret} kern_result{{}}; converted::take_as<{shape(ret)}>(kern_result, kern_out[0]);")
             k = 1
-        for name, t in takes:
-            body.append(f"converted::take_as<{shape(t)}>({name}, out[{k}]);")
+        for name, t, optional in takes:
+            body.append(f"if ({name}) converted::take_as<{shape(t)}>(*{name}, kern_out[{k}]);" if optional else f"converted::take_as<{shape(t)}>({name}, kern_out[{k}]);")
             k += 1
         if ret != "void":
-            body.append("return result;")
-        const = " const" if cls else ""
+            body.append("return kern_result;")
+        const = " const" if cls and (not plain or qtype(d).rstrip().endswith("const")) else ""
         return (f"{ret} {d['name']}({', '.join(a + b for a, b in params)}){const};",
                 f"inline {ret} {cls + '::' if cls else ''}{d['name']}({', '.join(a for a, _ in params)}){const} {{ {' '.join(body)} }}")
+
+    @staticmethod
+    def no_stand_in(f, why):
+        """A function of the engine the test has no stand-in of (STAND_INS=1 names it with why)."""
+        if os.environ.get("STAND_INS"):
+            sys.stderr.write(f"no stand-in of {f['type']}: {why}\n")
 
     def stand_ins(self, pairs):
         """The engine as the test's source sees it: for every class of the engine the source holds an object of,
@@ -6526,8 +6632,21 @@ class TestWriter:
             else:
                 free.append(f)
         chunks, defs = [], []
-        for q in sorted(u.objects_seen | set(by_class) | self.more_objects):
-            if q not in tree.records:
+        for q in sorted(set(by_class) - u.objects_seen):
+            if q in tree.records and not u.engine_object(q):
+                # methods of plain data only the engine defines: defined after the test's copy of the struct
+                for f in by_class[q]:
+                    try:
+                        if q not in self.names:
+                            raise Wait(f"the class {q.split('::')[-1]} is not written")
+                        self.result_ok(q)
+                        _, b = self.stand_in(f, self.names[q], plain=True)
+                    except Wait as w:
+                        self.no_stand_in(f, w)
+                        continue   # (what it takes the test has no values of: a function that calls it is not compared)
+                    defs.append((("engine", f["decl"]["id"]), b))
+        for q in sorted(u.objects_seen | set(by_class) | self.more_objects | set(self.object_enums)):
+            if q not in tree.records or not u.engine_object(q):
                 continue
             name = self.object_name(q)
             pairs.append((self.absolute(q), name))
@@ -6535,20 +6654,25 @@ class TestWriter:
             for f in by_class.get(q, []):
                 try:
                     a, b = self.stand_in(f, name)
-                except Wait:
+                except Wait as w:
+                    self.no_stand_in(f, w)
                     continue   # (what it takes the test has no values of: a function that calls it is not compared)
                 decls.append("  " + a)
                 defs.append((("object", q), b))
-            chunks.append((tree.place(tree.records[q]), ("object", q), "\n".join([f"struct {name} : converted::EngineObject {{", *decls, "};"])))
+            chunks.append((tree.place(tree.records[q]), ("object", q), "\n".join([f"struct {name} : converted::EngineObject {{", *self.object_enums.get(q, []), *decls, "};"])))
         for f in free:
             d = f["decl"]
             try:
                 a, b = self.stand_in(f, None)
-            except Wait:
+            except Wait as w:
+                self.no_stand_in(f, w)
                 continue
             spaces = [x for x in tree.scope_of.get(d["id"], "").strip(":").split("::") if x][1:]
             head, tail = "".join(f"namespace {x} {{ " for x in spaces), " }" * len(spaces)
-            chunks.append((tree.place(d), ("engine", d["id"]), head + a + tail))
+            # (the stand-ins of the objects it is handed, declared before it: its header may stand before theirs -
+            # `bool upsert(Renderer&, …)` in mesh_data.h, which declares Renderer only)
+            named = sorted({self.object_name(q) for q in (u.object_of(qtype(p)) for p in kids(d) if p.get("kind") == "ParmVarDecl") if q in tree.records})
+            chunks.append((tree.place(d), ("engine", d["id"]), "".join(f"struct {n}; " for n in named) + head + a + tail))
             defs.append((("engine", d["id"]), head + b + tail))
             pairs.append(("::" + tree.scope_of.get(d["id"], "") + d["name"], "::".join(spaces + [d["name"]])))
         if os.environ.get("STAND_INS"):
@@ -6736,6 +6860,8 @@ class TestWriter:
                 return
             if tree.scope_of.get(d["id"], "").startswith(ENGINE + "::dm::"):
                 return   # (the engine's functions of numbers: in the test's source the formula's, see `widen`)
+            if ENGINE_NODES and (u.api().declared_only(d) or u.api().declared_only(tree.decl.get(i, d))):
+                return   # (a node of the engine - a method of its object, defined in its header or not: the test has its stand-in)
             f = converted.get(d["id"])
             owner = tree.owner.get(d["id"]) or tree.owner.get(i)
             if owner in vectors:
@@ -7174,11 +7300,19 @@ class TestWriter:
         if len(set(types_at_top)) != len(types_at_top):
             return None, [(f, "two types of one name") for f in u.order if not f.lifted]
         pairs = [(self.absolute(q), self.names[q]) for q in self.names] + [(self.absolute(q), self.enum_names[q]) for q in self.enum_names]
-        pairs += [(f"::{ENGINE}::Vec3", "Vec3"), (f"::{ENGINE}::Vec2", "Vec2"), (f"::{tree.namespace}::Vec3", "Vec3"), (f"::{tree.namespace}::Vec2", "Vec2")]
+        pairs += [(f"::{ENGINE}::Vec3", "Vec3"), (f"::{ENGINE}::Vec2", "Vec2"), (f"::{ENGINE}::Span", "Span"), (f"::{tree.namespace}::Vec3", "Vec3"), (f"::{tree.namespace}::Vec2", "Vec2")]
         pairs += [(f"::{space}::{n}", n) for space in (ENGINE, tree.namespace) for n in ("f32", "f64", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64")]
         # (by their full names: a local variable of a function may have the name of one - `const f32 length = kern::length(d)`)
         pairs += [(f"::{ENGINE}::{n}", n, "converted::wide::") for n in ("dot", "cross", "length", "length_sq", "distance", "distance_sq", "finite", "lerp", "vmin", "vmax", "normalize", "hex_color", "Span")]
-        enum_chunks = [(tree.place(tree.enums[q]), ("enum", q), self.enum_text(q)) for q in sorted(enums)]
+        # (an enum of a class of the engine the test has a stand-in of - logic::Runtime::Chain - stands in that stand-in)
+        self.object_enums.clear()
+        in_objects = set()
+        for q in sorted(enums):
+            owner = q.rsplit("::", 1)[0] if "::" in q else ""
+            if owner in tree.records and u.engine_object(owner):
+                self.object_enums[owner].append("  " + self.piece(tree.enums[q]) + ";")
+                in_objects.add(q)
+        enum_chunks = [(tree.place(tree.enums[q]), ("enum", q), self.enum_text(q)) for q in sorted(enums) if q not in in_objects]
         const_chunks, said_consts = [], set()
         for d, text, _, named in self.const_pieces(G.consts, decls, records):
             pairs += named

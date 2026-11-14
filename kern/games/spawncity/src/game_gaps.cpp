@@ -140,12 +140,12 @@ void Game::gaps_init(kern::Engine& e) {
     m.cast_shadow = false;
     if (p == &g.ember) m.emissive = {1.0f, 0.54f, 0.24f};  // 0xff8a3d, additive in SpawnCity
     p->id = e.renderer.allocate_id();
-    kern::MeshInput in = disc.as_input(kern::kMaxExtensionAttributes);
-    in.material = m;
-    in.visible = false;
-    static const Mat4 parked = Mat4::translate({0, 0, -1000});
-    in.transforms = kern::Span<const f32>(parked.m, 16);
-    if (!e.renderer.upsert(p->id, in)) { e.renderer.release_id(p->id); p->id = 0; }
+    kern::MeshLook look;
+    look.material = m;
+    look.extra_slot = kern::kMaxExtensionAttributes;
+    look.visible = false;
+    const Mat4 parked = Mat4::translate({0, 0, -1000});
+    if (!kern::upsert(e.renderer, p->id, disc, look, kern::Span<const f32>(parked.m, 16))) { e.renderer.release_id(p->id); p->id = 0; }
   }
   gaps_lamps_init(e.renderer);  // street lamps (game_lamps.cpp)
   {
@@ -157,17 +157,17 @@ void Game::gaps_init(kern::Engine& e) {
     m.cast_shadow = false;
     m.color = {0.851f, 0.863f, 0.875f, 1};
     g.trail_part.id = e.renderer.allocate_id();
-    kern::MeshInput in = disc.as_input(kern::kMaxExtensionAttributes);
-    in.material = m;
-    in.visible = false;
-    static const Mat4 parked = Mat4::translate({0, 0, -1000});
-    in.transforms = kern::Span<const f32>(parked.m, 16);
-    if (!e.renderer.upsert(g.trail_part.id, in)) { e.renderer.release_id(g.trail_part.id); g.trail_part.id = 0; }
+    kern::MeshLook look;
+    look.material = m;
+    look.extra_slot = kern::kMaxExtensionAttributes;
+    look.visible = false;
+    const Mat4 parked = Mat4::translate({0, 0, -1000});
+    if (!kern::upsert(e.renderer, g.trail_part.id, disc, look, kern::Span<const f32>(parked.m, 16))) { e.renderer.release_id(g.trail_part.id); g.trail_part.id = 0; }
     // the foot rocket's smoke (gameplay_final_runtime_v2.mjs ensureSmoke: 0xd8d8d8 sprites)
     m.color = {0.847f, 0.847f, 0.847f, 1};
-    in.material = m;
+    look.material = m;
     g.rocket_part.id = e.renderer.allocate_id();
-    if (!e.renderer.upsert(g.rocket_part.id, in)) { e.renderer.release_id(g.rocket_part.id); g.rocket_part.id = 0; }
+    if (!kern::upsert(e.renderer, g.rocket_part.id, disc, look, kern::Span<const f32>(parked.m, 16))) { e.renderer.release_id(g.rocket_part.id); g.rocket_part.id = 0; }
   }
 }
 

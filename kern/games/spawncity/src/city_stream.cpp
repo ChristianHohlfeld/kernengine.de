@@ -483,10 +483,11 @@ void CityStream::upload(Tile& t, kern::GeoChunk& chunk, const kern::Material& ma
   const u32 id = r_->allocate_id();
   ++upload_count_;
   upload_vertices_ += chunk.mesh.vertex_count();
-  kern::MeshInput in = chunk.mesh.as_input(walls ? 0 : kern::kMaxExtensionAttributes);
-  in.material = material;
-  in.pick_bvh = false;  // hits are Box3D rays (the collision set); no picking BVH to build per chunk
-  if (!r_->upsert(id, in)) { r_->release_id(id); return; }
+  kern::MeshLook look;
+  look.material = material;
+  look.extra_slot = walls ? 0 : kern::kMaxExtensionAttributes;
+  look.pick_bvh = false;  // hits are Box3D rays (the collision set); no picking BVH to build per chunk
+  if (!kern::upsert(*r_, id, chunk.mesh, look)) { r_->release_id(id); return; }
   t.meshes.push_back(id);
   if (walls) t.cell_ids[cell_key(chunk.x, chunk.y)].push_back(id);
   t.triangles += chunk.mesh.triangle_count();

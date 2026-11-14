@@ -135,12 +135,11 @@ bool Destruction::tear(const Broken& b, Vec3 center, Rng& rng) {
   }
   Torn t;
   t.mesh = r_->allocate_id();
-  kern::MeshInput in = m.as_input();
-  in.material.roughness = 0.9f;
-  in.material.double_sided = true;
+  kern::MeshLook look;
+  look.material.roughness = 0.9f;
+  look.material.double_sided = true;
   const kern::Mat4 at = kern::Mat4::translate(pivot);
-  in.transforms = kern::Span<const f32>(at.m, 16);
-  if (!r_->upsert(t.mesh, in)) { r_->release_id(t.mesh); return false; }
+  if (!kern::upsert(*r_, t.mesh, m, look, kern::Span<const f32>(at.m, 16))) { r_->release_id(t.mesh); return false; }
   const f32 I = std::fmin(b.intensity, 2.4f);
   t.b = b;
   t.center = center;

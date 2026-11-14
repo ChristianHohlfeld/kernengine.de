@@ -1150,12 +1150,12 @@ void Terrain::build_render_tile(i32 level, i32 ti, i32 tj) {
   skirt(0, n - 1, 1, 0, true);
   skirt(0, 0, 0, 1, true);
   skirt(n - 1, 0, 0, 1, false);
-  kern::MeshInput in = m.as_input();
-  in.material.roughness = 1;
-  in.material.cast_shadow = false;
-  in.material.double_sided = true;
+  kern::MeshLook look;
+  look.material.roughness = 1;
+  look.material.cast_shadow = false;
+  look.material.double_sided = true;
   const u32 id = r_->allocate_id();
-  if (!r_->upsert(id, in)) { r_->release_id(id); return; }
+  if (!kern::upsert(*r_, id, m, look)) { r_->release_id(id); return; }
   RenderTile& t = render_[key3(level, ti, tj)];
   if (t.mesh) r_->remove(t.mesh);
   t.mesh = id;
@@ -1303,13 +1303,14 @@ void Terrain::build_water_chunk(i32 ci, i32 cj, bool detail) {
   u32& slot = water_meshes_[key];
   water_detail_[key] = detail;
   if (m.vertex_count() == 0) { if (slot) r_->remove(slot); slot = 0; return; }
-  kern::MeshInput in = m.as_input(1);  // the second extension's stream (main.cpp: facades, water)
-  in.material.roughness = 0.08f;  // world_water.mjs: roughness .08, metalness 0, transparent .94
-  in.material.metalness = 0;
-  in.material.cast_shadow = false;
-  in.material.alpha = kern::AlphaMode::blend;
+  kern::MeshLook look;
+  look.material.roughness = 0.08f;  // world_water.mjs: roughness .08, metalness 0, transparent .94
+  look.material.metalness = 0;
+  look.material.cast_shadow = false;
+  look.material.alpha = kern::AlphaMode::blend;
+  look.extra_slot = 1;  // the second extension's stream (main.cpp: facades, water)
   const u32 id = r_->allocate_id();
-  if (!r_->upsert(id, in)) { r_->release_id(id); return; }
+  if (!kern::upsert(*r_, id, m, look)) { r_->release_id(id); return; }
   if (slot) r_->remove(slot);
   slot = id;
 }

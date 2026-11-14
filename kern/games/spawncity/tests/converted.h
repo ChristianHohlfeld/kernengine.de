@@ -300,6 +300,22 @@ template <class K, class V> class SortedMap : public std::map<K, V> {
   const V& at(const K& k) const { return const_cast<SortedMap*>(this)->at(k); }
 };
 template <class K> using SortedSet = std::set<K>;
+/// A view of entries (kern::Span) as the source makes one - `Span<const f32>(m.m, 16)`, `Span<const f32>(v)`:
+/// handed to the engine, it is the list of its entries (the stand-ins take a Span as that list).
+template <class T> struct Span {
+  T* data = nullptr;
+  std::size_t size = 0;
+  constexpr Span() = default;
+  constexpr Span(T* d, std::size_t n) : data(d), size(n) {}
+  template <class C>
+    requires(!std::is_same_v<std::remove_cv_t<C>, Span> && requires(C& c) { c.data(); c.size(); })
+  constexpr Span(C& c) : data(c.data()), size(c.size()) {}
+  constexpr T& operator[](std::size_t i) const { return data[i]; }
+  constexpr T* begin() const { return data; }
+  constexpr T* end() const { return data + size; }
+  constexpr bool empty() const { return size == 0; }
+  template <class U> operator std::vector<U>() const { return std::vector<U>(data, data + size); }
+};
 }  // namespace wide
 
 /// A value of the source as the Blueprint holds it, where the two differ by more than their numbers: a
@@ -515,6 +531,18 @@ template <class T> Value arg(const std::vector<T>& v);
 template <class T> bool same(const std::vector<T>& want, const Value& got);
 template <class T> bool defined(const std::vector<T>& v);
 template <class T> std::string text(const std::vector<T>& v);
+// a view (kern::Span) is the list of its entries - where the engine is handed one, or a struct of the
+// engine holds one (ShapeSettings::points, MeshInput::positions)
+template <class T> Value arg(const wide::Span<T>& s) { return arg(std::vector<std::remove_cv_t<T>>(s.begin(), s.end())); }
+template <class T> bool same(const wide::Span<T>& want, const Value& got) { return same(std::vector<std::remove_cv_t<T>>(want.begin(), want.end()), got); }
+template <class T> bool defined(const wide::Span<T>& s) { return defined(std::vector<std::remove_cv_t<T>>(s.begin(), s.end())); }
+template <class T> std::string text(const wide::Span<T>& s) { return text(std::vector<std::remove_cv_t<T>>(s.begin(), s.end())); }
+/// Entries the test keeps for a view to see (a drawn view, one the engine's stand-in gave): kept to the end.
+template <class U> wide::Span<const U> kept_span(std::vector<U> entries) {
+  static std::deque<std::vector<U>> kept;
+  kept.push_back(std::move(entries));
+  return {kept.back().data(), kept.back().size()};
+}
 
 inline Value arg(f64 x) { return Value::number(x); }
 inline Value arg(f32 x) { return Value::number(static_cast<f64>(x)); }
@@ -747,6 +775,13 @@ void take(T*& to, const Value& v) { to = engine_object<T>(v.as_int()); }
 template <class T>
   requires std::is_base_of_v<EngineObject, T>
 void take(T& to, const Value& v) { to = *engine_object<T>(v.as_int()); }
+/// An owned object of the engine (std::unique_ptr): the one of that handle, none for 0.
+template <class T>
+  requires std::is_base_of_v<EngineObject, T>
+void take(std::unique_ptr<T>& to, const Value& v) {
+  if (v.as_int() == 0) to.reset();
+  else to = std::make_unique<T>(*engine_object<T>(v.as_int()));
+}
 template <class T> void take(std::vector<T>& to, const Value& v);
 /// By the type as the program spells it (S, with Whole where it says u64 or i64 - see shaped).
 template <class S> struct Take {
@@ -770,6 +805,12 @@ template <class S> struct Take<std::vector<S>> {
       }
       target.push_back(std::move(item));
     }
+  }
+  /// (into a view: the entries, kept by the test - see kept_span)
+  template <class T> static void to(wide::Span<const T>& target, const Value& v) {
+    std::vector<T> entries;
+    to(entries, v);
+    target = kept_span(std::move(entries));
   }
 };
 /// What may be there or not, from the list of no entry or one. (An object of the engine: by its handle. A

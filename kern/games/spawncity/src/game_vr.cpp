@@ -553,13 +553,14 @@ void Game::vr_scope_update() {
       if (i > 0) d.indices.insert(d.indices.end(), {0u, static_cast<u32>(i), static_cast<u32>(i + 1)});
     }
     vr_scope_mesh_ = r.allocate_id();
-    kern::MeshInput in = d.as_input(kern::kMaxExtensionAttributes);
-    in.material.unlit = true;
-    in.material.double_sided = true;
-    in.material.cast_shadow = false;
-    in.material.frustum_culled = false;
-    in.texture = vr_scope_tex_;
-    if (!r.upsert(vr_scope_mesh_, in)) { r.release_id(vr_scope_mesh_); vr_scope_mesh_ = 0; return; }
+    kern::MeshLook look;
+    look.material.unlit = true;
+    look.material.double_sided = true;
+    look.material.cast_shadow = false;
+    look.material.frustum_culled = false;
+    look.extra_slot = kern::kMaxExtensionAttributes;
+    look.texture = vr_scope_tex_;
+    if (!kern::upsert(r, vr_scope_mesh_, d, look)) { r.release_id(vr_scope_mesh_); vr_scope_mesh_ = 0; return; }
   }
   const Vec3 x{m.m[0], m.m[1], m.m[2]}, y{m.m[4], m.m[5], m.m[6]}, z{m.m[8], m.m[9], m.m[10]}, at = m.translation();
   // the scope sits on the rifle above the grip: the eyepiece 9 cm behind it, the objective 30 cm ahead
@@ -649,14 +650,15 @@ void Game::vr_comfort(f32 dt) {
       }
     }
     vr_tunnel_mesh_ = r.allocate_id();
-    kern::MeshInput in = d.as_input(kern::kMaxExtensionAttributes);
-    in.material.unlit = true;
-    in.material.double_sided = true;
-    in.material.cast_shadow = false;
-    in.material.frustum_culled = false;
-    in.material.alpha = kern::AlphaMode::blend;
-    in.texture = vr_tunnel_tex_;
-    if (!r.upsert(vr_tunnel_mesh_, in)) { r.release_id(vr_tunnel_mesh_); vr_tunnel_mesh_ = 0; return; }
+    kern::MeshLook look;
+    look.material.unlit = true;
+    look.material.double_sided = true;
+    look.material.cast_shadow = false;
+    look.material.frustum_culled = false;
+    look.material.alpha = kern::AlphaMode::blend;
+    look.extra_slot = kern::kMaxExtensionAttributes;
+    look.texture = vr_tunnel_tex_;
+    if (!kern::upsert(r, vr_tunnel_mesh_, d, look)) { r.release_id(vr_tunnel_mesh_); vr_tunnel_mesh_ = 0; return; }
     r.set_visible(vr_tunnel_mesh_, false);
     engine_->xr_vignette_mesh = vr_tunnel_mesh_;
   }
