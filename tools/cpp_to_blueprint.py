@@ -1003,6 +1003,7 @@ class Function:
         self.on_actors = []   # (actor, function): what it calls on the Blueprint of an actor of the level (Call on Actor)
         self.pointers = []    # the parameters (by place) that are a pointer into a list: the list, read where it stands - the next parameter is the place in it (Unit.pointed)
         self.state = False    # a method of a state (World.states): a function of that Blueprint, its fields are the Blueprint's variables
+        self.logic = []       # the parameters of the C++ (by their place among its parameters) that are the logic the Blueprint runs in (Unit.is_logic): no input
 
     def order(self):
         """The parameters in the order the Blueprint function has its inputs: those by reference first, then those
@@ -1375,6 +1376,12 @@ class Unit:
             if ft != BYTE_FIELD[code]:
                 raise Wait(f"the bytes of a {q.split('::')[-1]} (its field {name} is a {ft}, its bytes a {code})")
         return st, text, size
+
+    def is_logic(self, raw):
+        """A parameter `kern::logic::Runtime&`: the logic the level's Blueprints run in. A Blueprint runs in one
+        logic, its own (BlueprintWorld::runtime) - what it is given there it has: no input of the function, and
+        a call hands it nothing. (Who calls hands on the logic it was given itself: Emit.logic_arg.)"""
+        return re.sub(r"\s*&$", "", re.sub(r"^const\s+", "", self.clean(raw)).strip()).strip() == ENGINE + "::logic::Runtime" and raw.strip().endswith("&")
 
     def pointed(self, raw):
         """A parameter `const T*` the function reads entries through (`p[i]`, `*p`), hands on (`p + 2`) or asks
@@ -1962,6 +1969,7 @@ class Unit:
                 f.wait = f"a function of {e['unit']}, the Blueprint of the program's one object: only its own functions call it"
             f.on_actors = [(a, None) for a in e.get("actors", ())]   # (the actors whose Blueprints it calls on them, itself or through what it calls)
             f.pointers = list(e["pointers"])
+            f.logic = list(e.get("logic", ()))
             if not f.wait and f.open and d["id"] not in self.tree.body and self.world.closures is not None and key not in self.world.closures:
                 # A function is written when its test compares it, and the test holds the source of all it
                 # calls once more: what stands in another source file, as the test of that file hands it on.
@@ -1996,7 +2004,7 @@ class Unit:
         return {"unit": self.name, "name": f.name, "cpp": f.cpp, "wait": (f.wait or (self.PLACE if f.place else None)) if not f.text else None, "pure": f.pure, "params": f.params, "kinds": f.kinds, "result": f.result,
                 "fixed": dict(f.fixed), "result_fixed": f.result_fixed,
                 "indexes": f.indexes, "self_type": f.self_type, "mutates": f.mutates, "refs": f.refs, "value": f.value, "ctor": f.ctor, "out_fields": f.out_fields,
-                "open": self.job in self.world.source_units, "state": f.state, "pointers": f.pointers,
+                "open": self.job in self.world.source_units, "state": f.state, "pointers": f.pointers, "logic": f.logic,
                 "actors": sorted(actors_called(f))}
 
     def uses(self):
@@ -2503,6 +2511,7 @@ class Emit:
         self.assigned_ids = set()   # (the variables the body changes - see assigned)
         self.keyed_vars = {}  # decl id of a name for an entry of a map or a set (a loop's variable, `auto& [k, v]`) -> (the map or set, its place)
         self.serial = 0       # the number of the statement being written (see `slot`)
+        self.logic_params = set()   # decl ids of the parameters that are the logic the Blueprint runs in (Unit.is_logic)
 
     # ---- types ----
     def tp(self, n):
@@ -2643,6 +2652,13 @@ class Emit:
             if p.get("kind") != "ParmVarDecl":
                 continue
             raw = qtype(p)
+            if u.is_logic(raw):
+                # the logic the Blueprint runs in: its own - no input (Unit.is_logic)
+                if re.search(r"\bconst\b", raw):
+                    raise Wait("the logic the Blueprint runs in, as a constant (a Blueprint binds its rules to its own)")
+                f.logic.append([x["id"] for x in kids(d) if x.get("kind") == "ParmVarDecl"].index(p["id"]))
+                self.logic_params.add(p["id"])
+                continue
             entries = u.pointed(raw)
             if entries is not None:
                 # a pointer into a list: the list, read where it stands, and the place in it (Unit.pointed)
@@ -4264,6 +4280,9 @@ class Emit:
             name = m.get("name")
             if self.on_actor(n) is not None:
                 return self.call_on(n, self.on_actor(n))
+            if self.actor_bind(n) is not None:
+                self.has_blueprint(n, self.actor_bind(n))   # (what it gives is not used: binding is the Blueprint's own, nothing to do)
+                return []
             d = self.engine_decl(m.get("referencedMemberDecl"))
             if d is not None:
                 return self.engine(d, base, kids(n)[1:])[0]
@@ -4546,7 +4565,10 @@ class Emit:
 
     def get_on(self, n, obj):
         """Get Variable on Actor: func_get_on<"Speed", Float>(actor_find("Guided")) - the variable as the program
-        binds the actor's Blueprint, of the type the C++ reads it as."""
+        binds the actor's Blueprint, of the type the C++ reads it as. The runtime reads it where its type becomes
+        that one (Runtime::get_on: as on a wire for a value on its own; a struct field by field, a list of its
+        kind - the reader's own type says which struct): checked against the actor's Blueprint as a call's pins
+        are (crosses), else the read would give the zero in both forms."""
         args = kids(n)[1:]
         named = self.unwrap(args[0]) if len(args) == 1 else {}
         if named.get("kind") != "StringLiteral":
@@ -4558,10 +4580,49 @@ class Emit:
         if name not in target.get("variables", {}):
             raise Wait(f"the variable {name} of the Blueprint of the actor {actor}, which has no such variable")
         t = self.tp(n)
-        if t not in ("Float", "Int", "Bool", "Vector", "Text") and t not in self.u.enum_values:
-            raise Wait(f"the variable {name} of the Blueprint of the actor {actor} as a {t}")
+        their, of = target["variables"][name]
+        simple = {"Bool": "bool", "Int": "int", "Float": "float", "Vector": "vector", "Text": "text"}
+        if t in simple:   # (a value on its own: as on a wire - logic::convertible)
+            numbers = ("bool", "int", "float")
+            if not (simple[t] == their or (simple[t] in numbers and their in numbers) or t == "Text" or (t == "Vector" and their in ("int", "float"))):
+                raise Wait(f"the variable {name} of the Blueprint of the actor {actor}, a {their}, as a {t} (it does not become one)")
+        else:
+            why = self.crosses(t, their, of, target, 1)   # (an enum's value, a struct, a list: of their kind, as in a struct)
+            if why:
+                raise Wait(f"the variable {name} of the Blueprint of the actor {actor}: it is {why}")
         self.f.on_actors.append((actor, name))
         return f'func_get_on<"{name}", {t}>(actor_find({text_literal(actor)}))', t
+
+    def actor_bind(self, n):
+        """rules.bind(logic) - kern::logic::ActorBlueprint::bind: the program binds the actor's Blueprint to the logic
+        it runs in. The object it is called on, else None."""
+        m = callee(n)
+        if n.get("kind") != "CXXMemberCallExpr" or m.get("kind") != "MemberExpr" or m.get("name") != "bind" or not kids(m):
+            return None
+        base = kids(m)[0]
+        return base if re.sub(r"^const\s+", "", self.ctype(base)).strip() == ENGINE + "::logic::ActorBlueprint" else None
+
+    def has_blueprint(self, n, obj):
+        """rules.bind(logic): what it gives is Has Blueprint - func_has_blueprint(actor_find("Wanted")): does the
+        actor have a Blueprint that runs in the logic? A Blueprint is bound to its own logic, always; the logic
+        the C++ binds is the one the function was given (logic_arg) - which a Blueprint does not need given."""
+        args = kids(n)[1:]
+        if len(args) != 1:
+            raise Wait("an actor's Blueprint bound otherwise than to a logic")
+        self.logic_arg(args[0])
+        actor = self.actor_named(obj)
+        if actor not in self.u.world.actors:
+            raise Wait(f"the Blueprint of the actor {actor}, which the level does not have")
+        self.f.on_actors.append((actor, None))
+        return f"func_has_blueprint(actor_find({text_literal(actor)}))", "Bool"
+
+    def logic_arg(self, a):
+        """The logic a call hands on (to ActorBlueprint::bind, to a function's `kern::logic::Runtime&`): in a
+        Blueprint it is its own, so it must be the one this function was given itself - the same logic all the
+        way down, whoever binds."""
+        b = self.unwrap(a)
+        if b.get("kind") != "DeclRefExpr" or b.get("referencedDecl", {}).get("id") not in self.logic_params:
+            raise Wait("a logic handed on that is not the one the function was given (a Blueprint runs in its own)")
 
     def actor_named(self, obj):
         """The actor whose Blueprint `obj` is: named where it is made (ActorBlueprint rules{"Lamps"}). The name
@@ -6018,10 +6079,13 @@ class Emit:
             params = params[1:]
             kinds = kinds[1:]
         first = len(g.params) - len(params)   # (a method: its object is the first input)
-        if len(args) != len(params) - len(g.pointers):
+        if len(args) - len(g.logic) != len(params) - len(g.pointers):
             raise Wait("a call with default arguments")
         j = 0
-        for a in args:
+        for i, a in enumerate(args):
+            if i in g.logic:   # (the logic the Blueprint runs in: the call hands it on, as its own - no input)
+                self.logic_arg(a)
+                continue
             if first + j in g.pointers:   # (a pointer into a list: the list and the place in it - Unit.pointed)
                 texts += self.pointer_arg(a, params[j][1][5:-1], g.fixed.get(first + j))
                 j += 2
@@ -6242,6 +6306,8 @@ class Emit:
                 return self.names[i], self.types[i]
             if i in self.pointers:
                 raise Wait("a pointer into a list used as more than its entries, its place in a call or whether it is null")
+            if i in self.logic_params:
+                raise Wait("the logic the Blueprint runs in, used otherwise than to bind an actor's Blueprint or to hand it on")
             if ref.get("kind") == "EnumConstantDecl":
                 d = self.tree.decl.get(i)
                 q = d.get("_enum") if d else None
@@ -7275,6 +7341,8 @@ class Emit:
         name = m.get("name")
         if self.actor_get(b) is not None:
             return self.get_on(b, self.actor_get(b))
+        if self.actor_bind(b) is not None:
+            return self.has_blueprint(b, self.actor_bind(b))
         if self.actor_value(b) is not None:
             return self.call_on(b, self.actor_value(b), "Float" if name == "number" else "Bool")
         d = self.engine_decl(m.get("referencedMemberDecl"))
@@ -9644,6 +9712,8 @@ class TestWriter:
                 first = len(names)
                 held_lists = []   # (the lists the source gets a pointer into: the list and the place - Unit.pointed)
                 for p in params:
+                    if self.u.is_logic(qtype(p)):
+                        continue   # (the logic the actors' Blueprints run in: the source's own - no input of the Blueprint)
                     if self.u.pointed(qtype(p)) is not None:
                         entry = re.sub(r"\s*\*$", "", qtype(p).strip())
                         if re.match(r"const\s+void$", entry):
@@ -9679,6 +9749,9 @@ class TestWriter:
                 # (a list the source writes in braces - std::initializer_list - is the drawn list as such a list: converted::listed)
                 braced, handed, at_ = {}, [], first
                 for p in params:
+                    if self.u.is_logic(qtype(p)):   # (the logic the source's ActorBlueprints are bound to: converted::Blueprint)
+                        handed.append("bp.source_logic()")
+                        continue
                     if self.u.pointed(qtype(p)) is not None:   # (the pointer: into the list the run was given, at its place)
                         handed.append(f"({names[at_ + 1]} < 0 ? nullptr : {names[at_]}.data() + {names[at_ + 1]})")
                         at_ += 2
@@ -9928,7 +10001,7 @@ class TestWriter:
                                   f'  converted::Blueprint bp("{u.name}"' + (", {" + ", ".join(text_literal(a) for a in actors) + "}" if actors else "") + ");"]))
             for b in dict.fromkeys(bindings):
                 if ("bind", b) not in dropped:   # (the source calls the actor's Blueprint as the program binds it)
-                    add(("bind", b), f"  {b}.running = bp.source_actor({b}.actor);")
+                    add(("bind", b), f"  {b}.bind(bp.source_logic());")
             for key, text in cases:
                 if key not in dropped:
                     add(key, text)
@@ -10489,7 +10562,7 @@ def main(argv):
                              for f in g.get("functions", []) if f.get("name")},
                     "structs": {t["name"]: [(x.get("type", "float"), x.get("of", "")) for x in t.get("fields", [])] for t in g.get("structs", []) if t.get("name")},
                     "enums": {t["name"]: len(t.get("values", [])) for t in g.get("enums", []) if t.get("name")},
-                    "variables": {v["name"]: v.get("type", "float") for v in g.get("variables", []) if v.get("name")}}
+                    "variables": {v["name"]: (v.get("type", "float"), v.get("of", "")) for v in g.get("variables", []) if v.get("name")}}
 
     # ---- the plan: every source file read once - its functions, what they call, the types ----
     functions, types, sources = {}, set(), {}
