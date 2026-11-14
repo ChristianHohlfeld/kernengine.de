@@ -526,7 +526,7 @@ der Konverter um die Ersatzform kürzer, alles wird neu gewandelt, verglichen un
 Was unten zu `Whole64`, zu „Maps und Sets sind Listen“ und zu Methoden auf einem Objekt steht,
 beschreibt den Stand davor und wird Schritt für Schritt ersetzt.
 
-**Stand 14.11.2026, 16:00 (auf `work`, geschrieben, Schlusslauf steht aus).**
+**Stand 14.11.2026, 17:00 (auf `work`, geschrieben, Schlusslauf läuft).**
 - **`Game` als Blueprint:** Eine Klasse, von der das Programm genau ein Objekt mit statischer
   Lebensdauer hält und sonst keins macht (ohne Basisklasse, ohne virtuelle Funktionen), ist der
   Zustand eines Blueprints (`state_classes`): Felder → Variablen, Methoden → Funktionen ohne
@@ -542,8 +542,20 @@ beschreibt den Stand davor und wird Schritt für Schritt ersetzt.
 - **Schritt 6 – Int64:** 64 Bit wie u64/i64 von C++, die Knoten wie WebAssemblys i64; `Whole64`
   und tools/blueprint_whole64.h sind entfernt.
 - **Regel-Blueprints:** Get Variable on Actor (`func_get_on`), Call on Actor mit einem Ausgang als
-  Wert (`number`, `flag`); Aufrufe mit Strukturen und Listen als Werten gehen noch über Listen von
-  Values.
+  Wert (`number`, `flag`). *(17:00)* Jeder Aufruf des Spiels ist typisiert: Strukturen und Listen
+  sind Werte (`kern::fields_of` nennt die Felder einer einfachen Struktur der Reihe nach); das Spiel
+  hält je Regel-Struct eine Struktur mit den Feldern des Blueprints (32-Bit-Zahlen als die Dezimalzahl,
+  für die sie stehen); der Konverter prüft jeden Pin gegen den Blueprint des Actors. Die Aufrufe mit
+  Listen von Values sind entfernt.
+- **Sort List:** `std::stable_sort` ist Sort List (nach einer reinen Funktion des Blueprints – das
+  Lambda – oder der eigenen Ordnung). Das Spiel ordnet überall stabil, wie das Original
+  (`Array.prototype.sort` ist stabil); `std::sort` wartet, weil es gleiche Einträge offenlässt.
+- **Variablen des Programms:** Eine Variable eines Namensraums des Programms (nicht const) ist eine
+  Variable des Blueprints seines einen Objekts (`Game`), nach ihren Namensräumen benannt; eine
+  Funktion, die keine Methode ist und eine solche Variable teilt (oder eine solche Funktion ruft),
+  ist eine Funktion dieses Blueprints, im Teil ihrer Datei.
+- **Engine-Objekte (Paket L):** make/release als Knoten aus Konstruktoren und Destruktoren; Getter
+  statt öffentlicher Felder (`Engine::renderer()` …).
 
 #### Der Konverter heute
 `tools/cpp_to_blueprint.py` liest die Quellen mit dem Parser des Compilers (clangs Syntaxbaum)
