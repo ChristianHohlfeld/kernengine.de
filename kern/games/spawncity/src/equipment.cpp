@@ -15,7 +15,6 @@ namespace sc {
 // JET_MAX_CLIMB_MPS 8; a full tank is ~5 s of thrust, it refills in ~4 s on the ground)
 
 namespace {
-using kern::logic::Value;
 rules::Blueprint g_jetpack{"Jetpack"};
 }  // namespace
 void Jetpack::bind(kern::logic::Instance* blueprint) { g_jetpack.running = blueprint; }
@@ -28,31 +27,32 @@ f32 Jetpack::ignition_damp() { return static_cast<f32>(g_jetpack.get<f64>("Ignit
 
 bool Jetpack::ignite(f32 vz) {
   (void)vz;
-  std::vector<Value> r;
-  return g_jetpack.call("Ignite", {pack()}, r) && r.size() >= 2 && (take(r[0]), r[1].b);
+  Pack p;
+  bool lit = false;
+  g_jetpack.call("Ignite", std::tie(p, lit), pack());
+  take(p);
+  return lit;
 }
 
 f32 Jetpack::update(f32 dt, f32 now, bool airborne, f32 vz, f32 height, bool hold) {
-  std::vector<Value> r;
-  if (!g_jetpack.call("Update", {pack(), rules::number(dt), rules::number(now), Value::boolean(airborne), rules::number(vz), rules::number(height), Value::boolean(hold)}, r) || r.size() < 2)
-    return 0;
-  take(r[0]);
-  return static_cast<f32>(r[1].as_number());
+  Pack p;
+  f64 thrust = 0;
+  g_jetpack.call("Update", std::tie(p, thrust), pack(), rules::decimal(dt), rules::decimal(now), airborne, rules::decimal(vz), rules::decimal(height), hold);
+  take(p);
+  return static_cast<f32>(thrust);
 }
 
-kern::logic::Value Jetpack::pack() const {
-  return Value::structure({rules::number(fuel), Value::boolean(thrusting), Value::boolean(used), Value::integer(ignitions), rules::number(burst_left_), rules::number(ground_since_),
-                           rules::number(last_thrust_)});
+Jetpack::Pack Jetpack::pack() const {
+  return {rules::decimal(fuel), thrusting, used, ignitions, rules::decimal(burst_left_), rules::decimal(ground_since_), rules::decimal(last_thrust_)};
 }
-void Jetpack::take(const kern::logic::Value& v) {
-  if (v.fields() < 7) return;
-  fuel = static_cast<f32>(v.field(0)->as_number());
-  thrusting = v.field(1)->b;
-  used = v.field(2)->b;
-  ignitions = static_cast<u32>(v.field(3)->i);
-  burst_left_ = static_cast<f32>(v.field(4)->as_number());
-  ground_since_ = static_cast<f32>(v.field(5)->as_number());
-  last_thrust_ = static_cast<f32>(v.field(6)->as_number());
+void Jetpack::take(const Pack& p) {
+  fuel = static_cast<f32>(p.fuel);
+  thrusting = p.thrusting;
+  used = p.used;
+  ignitions = p.ignitions;
+  burst_left_ = static_cast<f32>(p.burst_left);
+  ground_since_ = static_cast<f32>(p.ground_since);
+  last_thrust_ = static_cast<f32>(p.last_thrust);
 }
 
 // ---------------------------------------------------------------------------------------------

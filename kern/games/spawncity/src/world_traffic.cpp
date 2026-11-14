@@ -13,11 +13,9 @@ namespace sc {
 namespace {
 constexpr f32 kCell = 40;       // junction lookup grid
 constexpr f32 kMerge = 3;       // street vertices closer than this are one node
-using kern::logic::Value;
 rules::Blueprint g_rules{"Traffic"};  // the laws (see world_traffic.h)
 /// The Blueprint's distances and times the loops below compare with (read when it is bound).
 struct Laws { f32 ahead_min = 0, ahead_max = 0, stop_line = 0, first_come = 0, claim_s = 0, patience_s = 0; } g_laws;
-f32 num(const char* function, const std::vector<Value>& args) { return static_cast<f32>(g_rules.number(function, args)); }
 u64 cell(i32 x, i32 y) { return (static_cast<u64>(static_cast<u32>(x)) << 32) | static_cast<u32>(y); }
 }  // namespace
 
@@ -187,9 +185,9 @@ void TrafficRules::bind(kern::logic::Instance* blueprint) {
 
 i32 TrafficRules::light(const Junction& j, Vec2 heading, f32 now) const {
   if (!j.lights) return -1;
-  std::vector<Value> r;
-  if (!g_rules.call("Light", {rules::number(lights_time >= 0 ? lights_time : now), rules::number(j.offset), rules::number(heading.x * j.axis.x + heading.y * j.axis.y)}, r) || r.empty()) return -1;
-  return static_cast<i32>(r[0].i);
+  i32 light = 0;
+  g_rules.call("Light", std::tie(light), rules::decimal(lights_time >= 0 ? lights_time : now), rules::decimal(j.offset), rules::decimal(heading.x * j.axis.x + heading.y * j.axis.y));
+  return light;
 }
 
 TrafficRules::Pursuit TrafficRules::pursuit(const Lane& lane, i32 index, i32 dir, Vec2 pos, f32 look, f32 off) {
@@ -269,10 +267,9 @@ f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 no
       // honkCheck: the player sooner, a pedestrian after a while; then 9..16 s apart
       // (how much later the next honk comes: a number 0..1 from the car and the second)
       const f32 roll = static_cast<f32>((static_cast<u32>(car) * 2654435761u + static_cast<u32>(now)) % 700) / 700;
-      if (std::vector<Value> r; g_rules.call("Honk", {Value::boolean(by_player), rules::number(b.since), rules::number(b.next_honk), rules::number(now), rules::number(roll)}, r) && r.size() >= 2) {
-        view.honk = r[0].b;
-        b.next_honk = static_cast<f32>(r[1].as_number());
-      }
+      f64 next = 0;
+      g_rules.call("Honk", std::tie(view.honk, next), by_player, rules::decimal(b.since), rules::decimal(b.next_honk), rules::decimal(now), rules::decimal(roll));
+      b.next_honk = static_cast<f32>(next);
     } else b.since = -1;
   }
   // 2. the next junction ahead

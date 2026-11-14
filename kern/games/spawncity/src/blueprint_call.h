@@ -1,8 +1,9 @@
 // How the game's C++ calls a rule that is a Blueprint of the level (wanted.cpp, combat_detail.cpp,
 // guided.cpp ...): the running Blueprint of one actor, its functions by name with their values,
 // its variables. Nothing is computed here. A call with typed values and outputs
-// (kern::logic::ActorBlueprint::call) is what Call on Actor is in a Blueprint; the calls with lists of
-// values below go when every caller makes that one.
+// (kern::logic::ActorBlueprint::call) is what Call on Actor is in a Blueprint: a struct the game hands
+// over is one of its own whose fields are the Blueprint's, in their order - a 32-bit number of the
+// game as the decimal it stands for (decimal(), below).
 #pragma once
 #include <cmath>
 #include <string>
@@ -39,36 +40,11 @@ inline f64 decimal(f32 x) {
 }
 /// (A 64-bit number - a time in milliseconds, a number counted in 64 bit - is passed as it is.)
 inline f64 decimal(f64 x) { return x; }
-inline kern::logic::Value number(f32 x) { return kern::logic::Value::number(decimal(x)); }
-/// (A 64-bit number - a time in milliseconds, a number counted in 64 bit - is passed as it is.)
-inline kern::logic::Value number(f64 x) { return kern::logic::Value::number(x); }
 
 /// The Blueprint of one of the level's actors - Blueprint g_rules{"Lamps"}: the game binds `running` once its
 /// world has started, tests bind the one they run.
 struct Blueprint : kern::logic::ActorBlueprint {
-  using Value = kern::logic::Value;
   using ActorBlueprint::ActorBlueprint;
-  using ActorBlueprint::call;
-  using ActorBlueprint::number;
-  using ActorBlueprint::flag;
-
-  /// Calls a function; false (and no results) while no Blueprint is bound or it has no such function.
-  bool call(const char* function, const std::vector<Value>& args, std::vector<Value>& results) const {
-    results.clear();
-    return running && running->call(function, args, results);
-  }
-  /// (the same with a list of values - where a value is a struct or a list, which a typed call does not take yet)
-  f64 number(const char* function, const std::vector<Value>& args) const {
-    std::vector<Value> r;
-    return call(function, args, r) && !r.empty() ? r[0].as_number() : 0;
-  }
-  bool flag(const char* function, const std::vector<Value>& args) const {
-    std::vector<Value> r;
-    return call(function, args, r) && !r.empty() && r[0].b;
-  }
 };
-
-/// A value of one of the Blueprint's enums: the C++ enum has the same values in the same order.
-template <class E> kern::logic::Value of_enum(E e) { return kern::logic::Value::enumeration(static_cast<i64>(e)); }
 
 }  // namespace sc::rules

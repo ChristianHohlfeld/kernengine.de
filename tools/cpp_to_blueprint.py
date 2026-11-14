@@ -101,7 +101,7 @@ constinit const_cast continue co_await co_return co_yield decltype default delet
 int long mutable namespace new noexcept not not_eq nullptr operator or or_eq private protected public register reinterpret_cast requires return short signed sizeof static
 static_assert static_cast struct switch template this thread_local throw true try typedef typeid typename union unsigned using virtual void volatile wchar_t while xor xor_eq
 Bool Int Float Vector Text Actor List loop machine entry detached kern""".split())
-FORMULA_WORDS = set("min max clamp abs sign floor ceil round trunc sqrt pow exp log sin cos tan asin acos atan atan2 rad deg lerp div mod pi".split())
+FORMULA_WORDS = set("min max clamp abs sign floor ceil round trunc sqrt pow exp log sin cos tan asin acos atan atan2 rad deg lerp div mod pi band bor bxor shl shr wrap32 wrap32s mul32 single".split())
 # What nothing of a Blueprint is called: a word of C++ or of the notation, a function of a formula, a node
 # (math_add, list_get ... - the engine says which there are: NODES, see main) or a name of the shape the
 # notation gives its nodes and paths (n12, go3 ...).

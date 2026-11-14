@@ -13,15 +13,8 @@ namespace sc::mp {
 f64 kSpawnProtectMs = 0, kRegenDelayMs = 0, kRegenTickMs = 0, kRespawnCooldownMs = 0, kBallotMs = 0, kPingLifeMs = 0, kPingHoldMs = 0;
 f32 kRegenHpPerS = 0, kRespawnRadiusMin = 0, kRespawnRadiusMax = 0, kVoiceRadius = 0, kPingRemoveM = 0;
 namespace {
-using kern::logic::Value;
 rules::Blueprint g_rules{"Multiplayer"};
 std::vector<u32> g_palette;
-f32 num(const char* function, const std::vector<Value>& args) { return static_cast<f32>(g_rules.number(function, args)); }
-Vec2 pair(const char* function, const std::vector<Value>& args) {
-  std::vector<Value> r;
-  if (!g_rules.call(function, args, r) || r.size() < 2) return {};
-  return {static_cast<f32>(r[0].as_number()), static_cast<f32>(r[1].as_number())};
-}
 }  // namespace
 
 void bind(kern::logic::Instance* blueprint) {
@@ -39,9 +32,7 @@ void bind(kern::logic::Instance* blueprint) {
   kRespawnRadiusMax = static_cast<f32>(g_rules.get<f64>("RespawnRadiusMax"));
   kVoiceRadius = static_cast<f32>(g_rules.get<f64>("VoiceRadius"));
   kPingRemoveM = static_cast<f32>(g_rules.get<f64>("PingRemoveM"));
-  if (!blueprint) return;
-  const Value colors = blueprint->get("Palette");
-  for (std::size_t k = 0; k < colors.size(); ++k) g_palette.push_back(static_cast<u32>(colors.item(k).i));
+  g_palette = g_rules.get<std::vector<u32>>("Palette");
 }
 const std::vector<u32>& palette() { return g_palette; }
 
@@ -168,10 +159,8 @@ u32 hash_id(const std::string& id) {
 std::vector<u32> assign_colors(const std::vector<std::string>& ids) {
   std::vector<i64> numbers;
   for (const std::string& id : ids) numbers.push_back(hash_id(id));
-  std::vector<Value> r;
   std::vector<u32> out;
-  if (!g_rules.call("ColorSlots", {Value::of(std::move(numbers))}, r) || r.empty()) return out;
-  for (std::size_t k = 0; k < r[0].size(); ++k) out.push_back(static_cast<u32>(r[0].item(k).i));
+  g_rules.call("ColorSlots", std::tie(out), numbers);
   return out;
 }
 u32 color_of(const std::string& id) {
@@ -203,13 +192,9 @@ f32 blast_damage(f32 damage) {
 }
 
 HitVerdict judge_hit(bool target_known, bool shooter_known, bool self_damage, bool friendly_fire, f64 now, f64 protected_until, f32 hp) {
-  std::vector<Value> r;
-  if (!g_rules.call("JudgeHit", {Value::boolean(target_known), Value::boolean(shooter_known), Value::boolean(self_damage), Value::boolean(friendly_fire), rules::number(now),
-                                 rules::number(protected_until), rules::number(hp)},
-                    r) ||
-      r.empty())
-    return HitVerdict::unknown_player;
-  return static_cast<HitVerdict>(r[0].i);
+  HitVerdict verdict = HitVerdict::applied;
+  g_rules.call("JudgeHit", std::tie(verdict), target_known, shooter_known, self_damage, friendly_fire, now, protected_until, rules::decimal(hp));
+  return verdict;
 }
 
 f32 regen(f32 hp, f64 now, f64 last_hurt, f32 dt) {
@@ -220,7 +205,9 @@ f32 regen(f32 hp, f64 now, f64 last_hurt, f32 dt) {
 
 Vec2 respawn_offset(Rng& rng) {
   const f32 r1 = rng.unit(), r2 = rng.unit();  // (how far out, then which way)
-  return pair("RespawnOffset", {rules::number(r1), rules::number(r2)});
+  f64 x = 0, y = 0;
+  g_rules.call("RespawnOffset", std::tie(x, y), rules::decimal(r1), rules::decimal(r2));
+  return {static_cast<f32>(x), static_cast<f32>(y)};
 }
 
 void Scoreboard::ensure(u8 slot) {
@@ -273,32 +260,14 @@ bool group_spawn_center(const std::vector<Vec2>& pts, Vec2& out, f32 link) {
   return true;
 }
 
-Vec2 spawn_ring_offset(u32 slot) { return pair("SpawnRingOffset", {Value::integer(slot)}); }
+Vec2 spawn_ring_offset(u32 slot) {
+  f64 x = 0, y = 0;
+  g_rules.call("SpawnRingOffset", std::tie(x, y), slot);
+  return {static_cast<f32>(x), static_cast<f32>(y)};
+}
 
 // ---- vote -----------------------------------------------------------------------------------------
 namespace {
-Value ints(const std::vector<u8>& v) { return Value::of(std::vector<i64>(v.begin(), v.end())); }
-std::vector<u8> bytes(const Value& v) {
-  std::vector<u8> out;
-  for (std::size_t k = 0; k < v.size(); ++k) out.push_back(static_cast<u8>(v.item(k).i));
-  return out;
-}
-Value to_value(const Ballot& b) {
-  return Value::structure({Value::integer(b.id), Value::integer(b.key), Value::boolean(b.value), Value::integer(b.host), ints(b.members), ints(b.yes), rules::number(b.expires_ms),
-                           rules::of_enum(b.status)});
-}
-bool take(const Value& v, Ballot& b) {
-  if (v.fields() < 8) return false;
-  b.id = static_cast<u32>(v.field(0)->i);
-  b.key = static_cast<u8>(v.field(1)->i);
-  b.value = v.field(2)->b;
-  b.host = static_cast<u8>(v.field(3)->i);
-  b.members = bytes(*v.field(4));
-  b.yes = bytes(*v.field(5));
-  b.expires_ms = v.field(6)->as_number();
-  b.status = static_cast<Ballot::Status>(v.field(7)->i);
-  return true;
-}
 /// A roster as the vote compares it: in order, each player once.
 void roster(std::vector<u8>& members) {
   std::sort(members.begin(), members.end());
@@ -308,22 +277,14 @@ void roster(std::vector<u8>& members) {
 
 bool create_ballot(Ballot& b, u32 id, u8 key, bool value, u8 host, std::vector<u8> members, f64 now) {
   roster(members);
-  b = Ballot{};
-  b.status = Ballot::Status::invalid;
-  std::vector<Value> r;
-  if (!g_rules.call("CreateBallot", {Value::integer(id), Value::integer(key), Value::boolean(value), Value::integer(host), ints(members), rules::number(now)}, r) || r.size() < 2) return false;
-  take(r[1], b);
-  return r[0].b;
+  bool created = false;
+  g_rules.call("CreateBallot", std::tie(created, b), id, key, value, host, members, now);
+  return created;
 }
 
 Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now, Ballot::Status& did) {
   roster(current);
-  std::vector<Value> r;
-  did = b.status;
-  if (g_rules.call("CastVote", {to_value(b), Value::integer(voter), Value::boolean(approve), ints(current), rules::number(now)}, r) && r.size() >= 2) {
-    take(r[0], b);
-    did = static_cast<Ballot::Status>(r[1].i);
-  }
+  g_rules.call("CastVote", std::tie(b, did), b, voter, approve, current, now);
   return b.status;
 }
 Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now) {
@@ -331,7 +292,7 @@ Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> curr
   return cast_vote(b, voter, approve, std::move(current), now, did);
 }
 
-bool ballot_stale(const Ballot& b, const std::vector<u8>& current, f64 now) { return g_rules.flag("Stale", {to_value(b), ints(current), rules::number(now)}); }
+bool ballot_stale(const Ballot& b, const std::vector<u8>& current, f64 now) { return g_rules.flag("Stale", b, current, now); }
 
 std::string ballot_name(Ballot::Status s) {
   std::string out;
@@ -527,7 +488,9 @@ MapEdge locate_map_peer(Vec2 p, f32 w, f32 h, f32 ix, f32 it, f32 ib) {
 }
 
 Vec2 safe_mobile_marker_point(Vec2 p, f32 w, f32 h, bool mobile) {
-  return pair("SafeMobileMarkerPoint", {rules::number(p.x), rules::number(p.y), rules::number(w), rules::number(h), Value::boolean(mobile)});
+  f64 x = 0, y = 0;
+  g_rules.call("SafeMobileMarkerPoint", std::tie(x, y), rules::decimal(p.x), rules::decimal(p.y), rules::decimal(w), rules::decimal(h), mobile);
+  return {static_cast<f32>(x), static_cast<f32>(y)};
 }
 
 std::string format_distance(f32 m) {

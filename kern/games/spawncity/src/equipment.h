@@ -42,8 +42,15 @@ class Jetpack {
   u32 ignitions = 0;
 
  private:
-  kern::logic::Value pack() const;
-  void take(const kern::logic::Value& v);
+  /// The Blueprint's struct Pack, as it takes and gives it.
+  struct Pack {
+    f64 fuel = 1;
+    bool thrusting = false, used = false;
+    u32 ignitions = 0;
+    f64 burst_left = 0, ground_since = -1, last_thrust = -99;
+  };
+  Pack pack() const;
+  void take(const Pack& p);
   f32 burst_left_ = 0, ground_since_ = -1, last_thrust_ = -99;
 };
 

@@ -12,14 +12,17 @@
 namespace sc {
 
 namespace {
-using kern::logic::Value;
 rules::Blueprint g_rules{"Settings"};
-/// The table as the Blueprint has it: a row's texts (the specs point into them), the specs, and
-/// each row as the Blueprint's value (what Snap and InSection take).
-struct Row { std::string key, section, label, help; };
-std::vector<Row> g_texts;
+/// The Blueprint's struct Option, as it gives and takes it.
+struct Option {
+  std::string key, section, label, help;
+  f64 min = 0, max = 0, step = 0, def = 0;
+  bool toggle = false, live = false;
+};
+/// The table as the Blueprint has it - its rows (what Snap and InSection take; the specs point into
+/// their texts) - and the specs.
+std::vector<Option> g_rows;
 std::vector<OptSpec> g_specs;
-std::vector<Value> g_rows;
 const OptSpec kNone = {"", "", "", "", 0, 0, 0, 0, false, false};
 constexpr u32 kCount = static_cast<u32>(Opt::count);
 
@@ -39,23 +42,15 @@ std::string num(f32 v) {
 
 bool bind_settings(kern::logic::Instance* blueprint) {
   g_rules.running = blueprint;
-  g_texts.clear();
   g_specs.clear();
-  g_rows.clear();
-  if (!blueprint) return false;
-  const Value table = blueprint->get("Options");
-  if (table.size() != kCount) return false;
-  g_texts.reserve(kCount);  // (the specs point into the texts: they do not move again)
-  for (u32 i = 0; i < kCount; ++i) {
-    const Value row = table.item(i);
-    if (row.fields() < 10) { g_texts.clear(); g_specs.clear(); g_rows.clear(); return false; }
-    g_texts.push_back({row.field(0)->as_text(), row.field(1)->as_text(), row.field(2)->as_text(), row.field(3)->as_text()});
-    const Row& t = g_texts.back();
-    g_specs.push_back({t.key.c_str(), t.section.c_str(), t.label.c_str(), t.help.c_str(), static_cast<f32>(row.field(4)->as_number()),
-                       static_cast<f32>(row.field(5)->as_number()), static_cast<f32>(row.field(6)->as_number()), static_cast<f32>(row.field(7)->as_number()),
-                       row.field(8)->b, row.field(9)->b});
-    g_rows.push_back(row);
+  g_rows = g_rules.get<std::vector<Option>>("Options");  // (the rows stay as they are now: the specs point into their texts)
+  if (g_rows.size() != kCount) {
+    g_rows.clear();
+    return false;
   }
+  for (const Option& t : g_rows)
+    g_specs.push_back({t.key.c_str(), t.section.c_str(), t.label.c_str(), t.help.c_str(), static_cast<f32>(t.min), static_cast<f32>(t.max), static_cast<f32>(t.step), static_cast<f32>(t.def),
+                       t.toggle, t.live});
   return true;
 }
 
@@ -74,15 +69,18 @@ Settings::Settings() {
 void Settings::set(Opt o, f32 value) {
   const u32 i = static_cast<u32>(o);
   if (i >= g_rows.size() || !std::isfinite(value)) return;
-  const f32 v = static_cast<f32>(g_rules.number("Snap", {g_rows[i], rules::number(value)}));
+  const f32 v = static_cast<f32>(g_rules.number("Snap", g_rows[i], rules::decimal(value)));
   if (v != v_[i]) { v_[i] = v; ++version_; }
 }
 
 bool Settings::set(std::string_view key, std::string_view value) {
   Opt o;
   if (!find_opt(key, o)) return false;
-  if (std::vector<Value> word; g_rules.call("Word", {Value::text(std::string(value))}, word) && word.size() >= 2 && word[0].b) {
-    set(o, static_cast<f32>(word[1].as_number()));
+  bool known = false;
+  f64 word = 0;
+  g_rules.call("Word", std::tie(known, word), value);
+  if (known) {
+    set(o, static_cast<f32>(word));
     return true;
   }
   const std::string text(value);
@@ -95,7 +93,7 @@ bool Settings::set(std::string_view key, std::string_view value) {
 
 void Settings::reset_section(std::string_view section) {
   for (u32 i = 0; i < g_rows.size(); ++i)
-    if (g_rules.flag("InSection", {g_rows[i], Value::text(std::string(section))})) set(static_cast<Opt>(i), g_specs[i].def);
+    if (g_rules.flag("InSection", g_rows[i], section)) set(static_cast<Opt>(i), g_specs[i].def);
 }
 
 std::string Settings::values_json() const {
