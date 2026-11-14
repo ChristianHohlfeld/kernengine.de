@@ -108,6 +108,16 @@ inline const std::vector<Case>& cases() {
           {"id":6,"type":"math.formula","params":{"formula":"copysign(1, z) * 100 + copysign(value, 1 - value)"}},{"id":7,"type":"list.add","params":{"variable":"Signs"}}],
         "links":[[1,"then",2,"exec"],[1,"value",3,"a"],[3,"result",4,"b"],[4,"result",2,"amount"],[2,"then",5,"exec"],[3,"result",6,"z"],[1,"value",6,"value"],
           [6,"result",5,"value"],[5,"then",7,"exec"],[6,"result",7,"item"]]})kg"},
+      // The bits of a float (Bits of Float 32, Float 32 of Bits: std::bit_cast) - of Go's value * 0.1 - 0.25 as a
+      // float, and the float of them again; and End Play, once, when play ends (Runtime::end).
+      {"float_bits_end",
+       R"kg({"variables":[{"name":"Bits","type":"int_list","value":[]},{"name":"Back","type":"float_list","value":[]},{"name":"Ended","type":"int","value":0}],
+        "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"list.add","params":{"variable":"Bits"}},
+          {"id":3,"type":"math.formula","params":{"formula":"value * 0.1 - 0.25"}},{"id":4,"type":"math.bits_of_float32"},
+          {"id":5,"type":"list.add","params":{"variable":"Back"}},{"id":6,"type":"math.float32_of_bits"},
+          {"id":7,"type":"event.end"},{"id":8,"type":"var.set","params":{"variable":"Ended"},"values":{"value":7}}],
+        "links":[[1,"then",2,"exec"],[1,"value",3,"value"],[3,"result",4,"a"],[4,"result",2,"item"],[2,"then",5,"exec"],[4,"result",6,"a"],[6,"result",5,"item"],
+          [7,"then",8,"exec"]]})kg"},
       // The bytes of a struct (Bytes of Struct, Struct of Bytes): Go's value goes into a struct of
       // numbers, its bytes into B, and back - from the first byte and from the second (the last byte
       // missing: 0). Flags is cut to 16 bits, Speed to a float's, Vx is signed.
@@ -813,6 +823,7 @@ inline std::string play(kern::logic::Runtime& rt, Host& host, kern::logic::Insta
   for (int i = 0; i < 120; ++i) { host.t += 1.0 / 60; rt.tick(1.0f / 60); }
   rt.call("Go", 0, {{"value", Value::number(1)}});
   for (int i = 0; i < 60; ++i) { host.t += 1.0 / 60; rt.tick(1.0f / 60); }
+  rt.end();   // (End Play)
   std::string out;
   for (const auto& v : inst->graph().variables) out += v.name + "=" + inst->get(v.name).as_text() + "\n";
   for (const auto& m : inst->graph().machines) out += m.name + ":" + inst->state(m.name) + "\n";
