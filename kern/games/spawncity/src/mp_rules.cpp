@@ -179,15 +179,25 @@ u32 color_of(const std::string& id) {
 // ---- combat -------------------------------------------------------------------------------------
 
 std::string weapon_label(Weapon w) {
-  std::vector<Value> r;
-  return g_rules.call("WeaponLabel", {rules::of_enum(w)}, r) && !r.empty() ? r[0].as_text() : std::string();
+  std::string out;
+  g_rules.call("WeaponLabel", std::tie(out), w);
+  return out;
 }
 std::string zone_name(Zone z) {
-  std::vector<Value> r;
-  return g_rules.call("ZoneName", {rules::of_enum(z)}, r) && !r.empty() ? r[0].as_text() : std::string();
+  std::string out;
+  g_rules.call("ZoneName", std::tie(out), z);
+  return out;
 }
-f32 round_damage(Weapon w, Zone z) { return num("RoundDamage", {rules::of_enum(w), rules::of_enum(z)}); }
-f32 blast_damage(f32 damage) { return num("BlastDamage", {rules::number(damage)}); }
+f32 round_damage(Weapon w, Zone z) {
+  f64 damage = 0;
+  g_rules.call("RoundDamage", std::tie(damage), w, z);
+  return static_cast<f32>(damage);
+}
+f32 blast_damage(f32 damage) {
+  f64 dealt = 0;
+  g_rules.call("BlastDamage", std::tie(dealt), rules::decimal(damage));
+  return static_cast<f32>(dealt);
+}
 
 HitVerdict judge_hit(bool target_known, bool shooter_known, bool self_damage, bool friendly_fire, f64 now, f64 protected_until, f32 hp) {
   std::vector<Value> r;
@@ -199,7 +209,11 @@ HitVerdict judge_hit(bool target_known, bool shooter_known, bool self_damage, bo
   return static_cast<HitVerdict>(r[0].i);
 }
 
-f32 regen(f32 hp, f64 now, f64 last_hurt, f32 dt) { return num("Regen", {rules::number(hp), rules::number(now), rules::number(last_hurt), rules::number(dt)}); }
+f32 regen(f32 hp, f64 now, f64 last_hurt, f32 dt) {
+  f64 healed = 0;
+  g_rules.call("Regen", std::tie(healed), rules::decimal(hp), now, last_hurt, rules::decimal(dt));
+  return static_cast<f32>(healed);
+}
 
 Vec2 respawn_offset(Rng& rng) {
   const f32 r1 = rng.unit(), r2 = rng.unit();  // (how far out, then which way)
@@ -313,8 +327,9 @@ Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> curr
 bool ballot_stale(const Ballot& b, const std::vector<u8>& current, f64 now) { return g_rules.flag("Stale", {to_value(b), ints(current), rules::number(now)}); }
 
 std::string ballot_name(Ballot::Status s) {
-  std::vector<Value> r;
-  return g_rules.call("BallotName", {rules::of_enum(s)}, r) && !r.empty() ? r[0].as_text() : std::string();
+  std::string out;
+  g_rules.call("BallotName", std::tie(out), s);
+  return out;
 }
 
 // ---- voice ----------------------------------------------------------------------------------------
@@ -488,21 +503,18 @@ f32 route_left(const std::vector<Vec2>& pts, Vec2 pos) {
 }
 
 std::string bearing_arrow(f32 b) {
-  std::vector<Value> r;
-  return g_rules.call("BearingArrow", {rules::number(b)}, r) && !r.empty() ? r[0].as_text() : std::string();
+  std::string out;
+  g_rules.call("BearingArrow", std::tie(out), rules::decimal(b));
+  return out;
 }
 
 MapEdge locate_map_peer(Vec2 p, f32 w, f32 h, f32 ix, f32 it, f32 ib) {
   MapEdge out;
   if (!(std::isfinite(p.x) && std::isfinite(p.y))) return out;
-  std::vector<Value> r;
-  if (!g_rules.call("LocateMapPeer", {rules::number(p.x), rules::number(p.y), rules::number(w), rules::number(h), rules::number(ix), rules::number(it), rules::number(ib)}, r) || r.size() < 6)
-    return out;
-  out.valid = r[0].b;
-  out.p = {static_cast<f32>(r[1].as_number()), static_cast<f32>(r[2].as_number())};
-  out.offmap = r[3].b;
-  out.rotation_deg = static_cast<f32>(r[4].as_number());
-  out.arrow = r[5].as_text();
+  f64 x = 0, y = 0;
+  g_rules.call("LocateMapPeer", std::tie(out.valid, x, y, out.offmap, out.rotation_deg, out.arrow), rules::decimal(p.x), rules::decimal(p.y), rules::decimal(w), rules::decimal(h), rules::decimal(ix),
+               rules::decimal(it), rules::decimal(ib));
+  out.p = {static_cast<f32>(x), static_cast<f32>(y)};
   return out;
 }
 

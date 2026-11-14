@@ -1209,9 +1209,8 @@ class Unit:
             if f.on_actors:
                 # The test calls the function's source and the Blueprint with the same arguments: the source
                 # calls the actor's Blueprint as the program binds it, the Blueprint calls it on that actor.
-                actor, function = f.on_actors[0]
                 f.text = None
-                raise Wait(f"its test cannot compare it yet (it calls {function} on the Blueprint of the actor {actor}, which the test does not run)")
+                raise Wait(f"its test cannot compare it yet (it calls a function on the Blueprint of the actor {f.on_actors[0][0]}, which the test does not run)")
             self.order.append(f)
         except Wait as w:
             f.wait = str(w)
