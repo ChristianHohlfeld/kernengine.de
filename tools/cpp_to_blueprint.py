@@ -1455,7 +1455,7 @@ class Unit:
             f.self_type, f.mutates, f.refs, f.value, f.ctor = e["self_type"], e["mutates"], list(e["refs"]), e["value"], e["ctor"]
             f.out_fields = [(n, t, tuple(src) if isinstance(src, list) else src) for n, t, src in e["out_fields"]]
             f.open, f.state = e["open"], e["state"]
-            if not f.wait and f.open and d["id"] not in self.tree.body and key not in (self.world.closures or {}):
+            if not f.wait and f.open and d["id"] not in self.tree.body and self.world.closures is not None and key not in self.world.closures:
                 # A function is written when its test compares it, and the test holds the source of all it
                 # calls once more: what stands in another source file, as the test of that file hands it on.
                 f.wait = "what it calls stands in another source file, whose test does not hand its source on"
