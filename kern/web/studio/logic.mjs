@@ -23,10 +23,12 @@
 
 import {wheelPixels} from "../kern.mjs";
 
-const LG_TYPE_COLORS = {exec: "#ffffff", bool: "#d93b3b", int: "#1fe0b0", float: "#9be36b", vector: "#f6c12b", text: "#f06bc8", actor: "#2aa7f5"};
-const LG_TYPE_NAMES = {exec: "Exec", bool: "Boolean", int: "Integer", float: "Float", vector: "Vector", text: "Text", actor: "Actor"};
+const LG_TYPE_COLORS = {exec: "#ffffff", bool: "#d93b3b", int: "#1fe0b0", float: "#9be36b", vector: "#f6c12b", text: "#f06bc8", actor: "#2aa7f5", int64: "#0f9d8a"};
+const LG_TYPE_NAMES = {exec: "Exec", bool: "Boolean", int: "Integer", float: "Float", vector: "Vector", text: "Text", actor: "Actor", int64: "Int64"};
 // A list of values of one type ("float_list"): the colour of its items, a pin of its own shape.
-const LG_VALUE_TYPES = ["bool", "int", "float", "vector", "text", "actor"];
+// (An Int64 is its 64 bits: in the document the text of their u64 - more than a number of JSON
+// holds -, so here a text too: "18446744073709551615", "0x1f".)
+const LG_VALUE_TYPES = ["bool", "int", "float", "vector", "text", "actor", "int64"];
 for (const t of LG_VALUE_TYPES) { LG_TYPE_COLORS[t + "_list"] = LG_TYPE_COLORS[t]; LG_TYPE_NAMES[t + "_list"] = LG_TYPE_NAMES[t] + " List"; }
 const LG_DATA_TYPES = [...LG_VALUE_TYPES, ...LG_VALUE_TYPES.map(t => t + "_list")];
 const lgIsList = t => typeof t === "string" && t.endsWith("_list");
@@ -43,9 +45,34 @@ const LG_STRUCT_COLOR = "#3f6fd6";
 let lgStructNames = new Set();  // the structs of the Blueprint that is shown (lgNormalize)
 const lgBuiltin = t => t in LG_TYPE_NAMES;
 const lgIsStruct = t => lgStructNames.has(lgIsList(t) ? lgItemType(t) : t);
-const lgColor = t => LG_TYPE_COLORS[t] || (lgIsStruct(t) ? LG_STRUCT_COLOR : t ? LG_ENUM_COLOR : "#aaa");
-const lgTypeName = t => LG_TYPE_NAMES[t] || (lgIsList(t) ? lgItemType(t) + " List" : String(t ?? ""));
-const lgTyped = x => { if (x?.of && ["enum", "enum_list", "struct", "struct_list"].includes(x.type)) x.type = x.type.endsWith("_list") ? x.of + "_list" : x.of; };
+const lgColor = t => LG_TYPE_COLORS[t] || (lgIsKeyed(t) ? LG_MAP_COLOR : lgIsStruct(t) ? LG_STRUCT_COLOR : t ? LG_ENUM_COLOR : "#aaa");
+const lgTypeName = t => LG_TYPE_NAMES[t] || (lgIsKeyed(t) ? lgKeyedName(t) : lgIsList(t) ? lgItemType(t) + " List" : String(t ?? ""));
+const lgTyped = x => {
+  if (x && (x.type === "map" || x.type === "set")) { x.type = x.type + "<" + (x.of || "int") + ">"; return; }  // (a map, a set: "map<int>float>", as the engine names it)
+  if (x?.of && ["enum", "enum_list", "struct", "struct_list"].includes(x.type)) x.type = x.type.endsWith("_list") ? x.of + "_list" : x.of;
+};
+// A map of values under keys, a set of keys - in the order the keys came: a type by the engine's
+// name for it, "map<int>float>", "map<enum:Kind>struct_list:Cell>", "set<text>". Its keys and
+// values are named here as every other type is ("Kind", "Cell_list") - lgKeyed takes one apart,
+// lgKeyedType puts one together.
+const LG_MAP_COLOR = "#c77d2a";
+const LG_KEY_TYPES = ["int", "int64", "text", "bool"];  // (and the Blueprint's enums)
+const lgIsKeyed = t => typeof t === "string" && /^(map|set)<.*>$/.test(t);
+const lgFromNamed = s => { const [kind, of] = String(s).split(":"); return of === undefined ? kind : kind.endsWith("_list") ? of + "_list" : of; };
+const lgKeyed = t => {
+  const inner = t.slice(4, -1), at = inner.indexOf(">");
+  return {kind: t.slice(0, 3), key: lgFromNamed(at < 0 ? inner : inner.slice(0, at)), value: at < 0 ? null : lgFromNamed(inner.slice(at + 1))};
+};
+const lgToNamed = (t, enums) => {
+  if (lgBuiltin(t)) return t;
+  const list = lgIsList(t), name = list ? lgItemType(t) : t;
+  const kind = lgStructNames.has(name) ? "struct" : (enums || []).some(e => e.name === name) ? "enum" : null;
+  return kind ? kind + (list ? "_list" : "") + ":" + name : t;
+};
+const lgKeyedType = (kind, key, value, enums) => kind + "<" + lgToNamed(key, enums) + (kind === "map" ? ">" + lgToNamed(value || "float", enums) : "") + ">";
+const lgKeyedName = t => { const k = lgKeyed(t); return k.kind === "map" ? "Map of " + lgTypeName(k.key) + " to " + lgTypeName(k.value) : "Set of " + lgTypeName(k.key); };
+/** A value typed in for a type: an Int64 as the text of its bits, a number, a text. */
+const lgTyped64 = (type, text) => type === "int64" ? (String(text).trim() || "0") : type === "text" ? text : (+text || 0);
 const lgEnumOf = (enums, type) => lgBuiltin(type) ? null : (enums || []).find(e => e.name === (lgIsList(type) ? lgItemType(type) : type)) || null;
 const lgStructOf = (structs, type) => lgBuiltin(type) ? null : (structs || []).find(s => s.name === (lgIsList(type) ? lgItemType(type) : type)) || null;
 /** Every pin, variable, function pin and struct field of the editor's data with its type as one name. */
@@ -69,6 +96,11 @@ const lgNum = v => (typeof v === "number" ? (Math.abs(v) >= 1e4 || Number.isInte
 const lgSnap = v => Math.round(v / LG_SNAP) * LG_SNAP;
 /** A value as text. `data`: the editor's data - its enums and structs say what a value of theirs is. */
 const lgValueText = (v, type, data) => {
+  if (lgIsKeyed(type)) {  // a map: {key: value, ...}; a set: {key, ...} - in the order of the entries
+    const k = lgKeyed(type), entries = Array.isArray(v) ? v : [];
+    const key = x => k.key === "text" ? JSON.stringify(x ?? "") : lgValueText(x, k.key, data);
+    return "{" + entries.map(e => k.kind === "map" ? key(e?.[0]) + ": " + (k.value === "text" ? JSON.stringify(e?.[1] ?? "") : lgValueText(e?.[1], k.value, data)) : key(e)).join(", ") + "}";
+  }
   const e = lgEnumOf(data?.enums, type), s = lgStructOf(data?.structs, type);
   if (e) return lgIsList(type) ? "[" + (Array.isArray(v) ? v : []).map(x => e.values[x] ?? "?").join(", ") + "]" : e.values[v] ?? "?";  // (an enum's value by its name)
   if (s) {
@@ -86,7 +118,7 @@ const lgStructSummary = (v, type, data) => {
   const parts = s.fields.slice(0, 2).map(f => lgStructOf(data?.structs, f.type) || lgIsList(f.type) ? f.name : lgValueText(v?.[f.name], f.type, data));
   return "{" + parts.join(", ") + (s.fields.length > 2 ? ", …" : "") + "}";
 };
-const lgItemZero = item => item === "bool" ? false : item === "vector" ? [0, 0, 0] : item === "text" ? "" : lgStructNames.has(item) ? {} : 0;
+const lgItemZero = item => item === "bool" ? false : item === "vector" ? [0, 0, 0] : item === "text" ? "" : item === "int64" ? "0" : lgIsKeyed(item) ? [] : lgStructNames.has(item) ? {} : 0;
 const lgVector = text => { const n = String(text).split(/[,\s]+/).filter(Boolean).map(x => +x || 0); return [n[0] || 0, n[1] || 0, n[2] || 0]; };
 
 /** The editor of a list's items (the default of a variable or a function input, a list typed
@@ -104,7 +136,7 @@ function lgListEditor(type, value, data) {
 /** The items a list editor shows now. */
 function lgListValue(box) {
   const item = lgItemType(box.dataset.list);
-  return [...box.querySelectorAll("[data-li]")].map(f => item === "bool" ? f.checked : item === "vector" ? lgVector(f.value) : item === "text" ? f.value : (+f.value || 0));
+  return [...box.querySelectorAll("[data-li]")].map(f => item === "bool" ? f.checked : item === "vector" ? lgVector(f.value) : lgTyped64(item, f.value));
 }
 /** Every change of a list editor gives `send` the whole list. */
 function lgListBind(box, send) {
@@ -121,6 +153,14 @@ function lgListBind(box, send) {
  *  items' places from the value down); lgValueBind gives the whole value with that part changed. */
 function lgValueEditor(type, value, data, path = []) {
   const at = p => lgEsc(JSON.stringify(p));
+  if (lgIsKeyed(type)) {
+    // A map: a row for each entry, its key and its value; a set: a row for each key - in the order
+    // of the entries. A key is changed where it stands; one said twice is the first (the engine
+    // keeps that one).
+    const k = lgKeyed(type), entries = Array.isArray(value) ? value : [], map = k.kind === "map";
+    const rows = entries.map((e, i) => `<div class="lg-li lg-lis"><em>${i}</em>${lgValueEditor(k.key, map ? e?.[0] : e, data, map ? [...path, i, 0] : [...path, i])}${map ? `<span class="lg-dim">→</span>${lgValueEditor(k.value, e?.[1], data, [...path, i, 1])}` : ""}<button data-vx="${at([...path, i])}" title="Remove this entry">×</button></div>`).join("");
+    return `<div class="lg-list">${rows}<button class="lg-ladd" data-vkadd="${at(path)}" data-vt="${lgEsc(type)}" title="Add an entry at the end">+ ${map ? "Entry" : "Key"}</button></div>`;
+  }
   const st = lgStructOf(data?.structs, type), en = lgEnumOf(data?.enums, type);
   if (lgIsList(type)) {
     const item = lgItemType(type), items = Array.isArray(value) ? value : [];
@@ -142,7 +182,18 @@ function lgValueEditor(type, value, data, path = []) {
   if (en) return `<select data-vp="${at(path)}" data-vt="enum">${en.values.map((name, k) => `<option value="${k}"${k === value ? " selected" : ""}>${lgEsc(name)}</option>`).join("")}</select>`;
   if (type === "bool") return `<input type="checkbox" data-vp="${at(path)}" data-vt="bool"${value ? " checked" : ""}>`;
   if (type === "actor") return `<span class="lg-dim">none (set it while playing)</span>`;
-  return `<input data-vp="${at(path)}" data-vt="${lgEsc(type)}" value="${lgEsc(type === "vector" ? (Array.isArray(value) ? value : [0, 0, 0]).map(lgNum).join(", ") : type === "text" ? (value ?? "") : lgNum(value))}" spellcheck="false"${type === "text" ? "" : ' inputmode="decimal"'}>`;
+  return `<input data-vp="${at(path)}" data-vt="${lgEsc(type)}" value="${lgEsc(type === "vector" ? (Array.isArray(value) ? value : [0, 0, 0]).map(lgNum).join(", ") : type === "text" || type === "int64" ? (value ?? "") : lgNum(value))}" spellcheck="false"${type === "text" || type === "int64" ? "" : ' inputmode="decimal"'}>`;
+}
+/** A key a map or a set does not have yet (its entries: `entries`), of the keys' type. */
+function lgFreshKey(type, entries, data) {
+  const k = lgKeyed(type), keys = entries.map(e => k.kind === "map" ? e?.[0] : e);
+  const en = lgEnumOf(data?.enums, k.key);
+  if (en) { const free = en.values.findIndex((_, i) => !keys.includes(i)); return free < 0 ? null : free; }
+  if (k.key === "bool") return !keys.includes(false) ? false : !keys.includes(true) ? true : null;
+  for (let n = keys.length; ; ++n) {
+    const key = k.key === "text" ? "key" + n : k.key === "int64" ? String(n) : n;
+    if (!keys.some(x => String(x) === String(key))) return key;
+  }
 }
 /** Every change in a value editor gives `send` the whole value (`value`: what the editor shows). */
 function lgValueBind(box, current, send) {
@@ -160,7 +211,17 @@ function lgValueBind(box, current, send) {
   const part = path => path.reduce((o, k) => o?.[k], current());
   for (const f of box.querySelectorAll("[data-vp]")) {
     const t = f.dataset.vt;
-    f.onchange = () => send(put(JSON.parse(f.dataset.vp), t === "bool" ? f.checked : t === "enum" ? +f.value : t === "vector" ? lgVector(f.value) : t === "text" ? f.value : (+f.value || 0)));
+    f.onchange = () => send(put(JSON.parse(f.dataset.vp), t === "bool" ? f.checked : t === "enum" ? +f.value : t === "vector" ? lgVector(f.value) : lgTyped64(t, f.value)));
+  }
+  for (const add of box.querySelectorAll("[data-vkadd]")) {
+    // (a new entry of a map or a set: a key it does not have, a map's value at its zero)
+    const path = JSON.parse(add.dataset.vkadd), type = add.dataset.vt, k = lgKeyed(type);
+    add.onclick = () => {
+      const entries = part(path) || [];
+      const key = lgFreshKey(type, entries, box.lgData);
+      if (key === null) return;
+      send(put(path, [...entries, k.kind === "map" ? [key, lgItemZero(k.value)] : key]));
+    };
   }
   for (const x of box.querySelectorAll("[data-vx]")) {
     const path = JSON.parse(x.dataset.vx), list = path.slice(0, -1);
@@ -176,6 +237,10 @@ function lgPinIcon(type, linked) {
   const c = lgColor(type);
   if (type === "exec")
     return `<svg class="lg-pin exec" viewBox="0 0 14 14"><path d="M2 1.8h5.2l5 5.2-5 5.2H2z" fill="${linked ? c : "none"}" stroke="${c}" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+  if (lgIsKeyed(type)) {
+    // a map, a set: a key beside a box
+    return `<svg class="lg-pin list" viewBox="0 0 14 14"><circle cx="4" cy="7" r="2.6" fill="${linked ? c : "none"}" stroke="${c}" stroke-width="1.3"/><path d="M6.6 7h3.2M8.6 7v2" stroke="${c}" stroke-width="1.3"/><rect x="9.6" y="3.4" width="3.4" height="7.2" rx=".8" fill="${linked ? c : "none"}" stroke="${c}" stroke-width="1.1"/></svg>`;
+  }
   if (lgIsList(type)) {
     // a list: a grid of its items
     let cells = "";
@@ -851,9 +916,27 @@ export class LogicEditor {
   enumOf(type) { return lgEnumOf(this.data?.enums, type); }
   /** The types a variable, a function's pin or a struct's field can have: the value types, this
    *  Blueprint's enums and structs (`without`: the structs that are none of them), and a list of each. */
-  typeOptions(current, without = []) {
+  typeOptions(current, without = [], keyed = true) {
     const values = [...LG_VALUE_TYPES, ...(this.data?.enums || []).map(e => e.name), ...(this.data?.structs || []).map(s => s.name).filter(n => !without.includes(n))];
-    return [...values, ...values.map(t => t + "_list")].map(t => `<option value="${lgEsc(t)}"${t === current ? " selected" : ""}>${lgEsc(lgTypeName(t))}</option>`).join("");
+    const all = [...values, ...values.map(t => t + "_list")];
+    // (a map or a set: the one it is, else one of Integer keys - its keys and values are chosen beside it, keyOptions)
+    if (keyed) all.push(lgIsKeyed(current) && current.startsWith("map") ? current : "map<int>float>", lgIsKeyed(current) && current.startsWith("set") ? current : "set<int>");
+    return all.map(t => `<option value="${lgEsc(t)}"${t === current ? " selected" : ""}>${lgEsc(lgIsKeyed(t) ? (t.startsWith("map") ? "Map…" : "Set…") : lgTypeName(t))}</option>`).join("");
+  }
+  /** The types a map's or a set's keys can be: Integer, Int64, Text, Boolean and the Blueprint's enums. */
+  keyOptions(current) {
+    return [...LG_KEY_TYPES, ...(this.data?.enums || []).map(e => e.name)].map(t => `<option value="${lgEsc(t)}"${t === current ? " selected" : ""}>${lgEsc(lgTypeName(t))}</option>`).join("");
+  }
+  /** Beside the type of a map or a set: what its keys and (of a map) its values are. `attr`: the data attribute of the selects ("vk", "pf", "sf"). */
+  keyedChoices(type, attr, without = []) {
+    if (!lgIsKeyed(type)) return "";
+    const k = lgKeyed(type);
+    return `<select data-${attr}="mapkey" title="Keys">${this.keyOptions(k.key)}</select>` + (k.kind === "map" ? `<select data-${attr}="mapvalue" title="Values">${this.typeOptions(k.value, without, false)}</select>` : "");
+  }
+  /** The type of a map or a set with other keys (`which` "mapkey") or values ("mapvalue"). */
+  keyedWith(type, which, to) {
+    const k = lgKeyed(type);
+    return lgKeyedType(k.kind, which === "mapkey" ? to : k.key, which === "mapvalue" ? to : k.value, this.data?.enums);
   }
 
   selectEnum(name) {
@@ -904,7 +987,7 @@ export class LogicEditor {
     return (this.data?.structs || []).filter(s => s.name !== name && holds(s)).map(s => s.name);
   }
   /** The editor of a struct's value or of a list of structs, field by field ("": the type is neither). */
-  partsEditor(type, value) { return this.structOf(type) ? lgValueEditor(type, value, this.data) : ""; }
+  partsEditor(type, value) { return this.structOf(type) || lgIsKeyed(type) ? lgValueEditor(type, value, this.data) : ""; }
 
   selectStruct(name) {
     this.selStruct = name;
@@ -1024,11 +1107,13 @@ export class LogicEditor {
       case "int":
       case "float": return `<input class="lg-lit num" ${attr} value="${lgEsc(lgNum(v))}" spellcheck="false" inputmode="decimal">`;
       case "text": return `<input class="lg-lit txt" ${attr} value="${lgEsc(v)}" spellcheck="false">`;
+      case "int64": return `<input class="lg-lit txt" ${attr} value="${lgEsc(v ?? "0")}" spellcheck="false" title="64 bits: a whole number up to 18446744073709551615, or 0x... in hexadecimal">`;
       case "vector": return `<span class="lg-vec" ${attr}>${["X", "Y", "Z"].map((a, i) => `<label><i>${a}</i><input class="lg-lit num v" data-i="${i}" value="${lgEsc(lgNum(Array.isArray(v) ? v[i] : 0))}" spellcheck="false" inputmode="decimal"></label>`).join("")}</span>`;
       case "actor": return `<select class="lg-lit act" ${attr}><option value="0">${p.id === "target" || p.id === "a" ? "Self" : "None"}</option>${actors.map(([id, name]) => `<option value="${id}"${id === v ? " selected" : ""}>${lgEsc(name)}</option>`).join("")}</select>`;
       default:
         // a list that is not wired: how many items are typed in (they are edited in Details); a struct: its first fields
         if (lgIsList(p.type)) return `<span class="lg-lcount" title="${lgEsc(lgValueText(v, p.type, this.data))}">${Array.isArray(v) && v.length ? v.length + (v.length === 1 ? " item" : " items") : "empty"}</span>`;
+        if (lgIsKeyed(p.type)) return `<span class="lg-lcount">${Array.isArray(v) && v.length ? v.length + (v.length === 1 ? " entry" : " entries") : "empty"}</span>`;
         return this.structOf(p.type) ? `<span class="lg-lcount lg-scount" title="${lgEsc(lgValueText(v, p.type, this.data))}">${lgEsc(lgStructSummary(v, p.type, this.data))}</span>` : "";
     }
   }
@@ -1066,7 +1151,7 @@ export class LogicEditor {
       const node = +el.dataset.node, pin = el.dataset.lit;
       if (el.type === "checkbox") el.onchange = () => send(node, pin, el.checked);
       else if (el.tagName === "SELECT") el.onchange = () => send(node, pin, +el.value);
-      else el.onchange = () => send(node, pin, el.dataset.t === "text" ? el.value : (+el.value || 0));
+      else el.onchange = () => send(node, pin, lgTyped64(el.dataset.t, el.value));
     }
     for (const el of root.querySelectorAll(".lg-par")) {
       el.addEventListener("pointerdown", e => e.stopPropagation());
@@ -1273,7 +1358,7 @@ export class LogicEditor {
     const head = n.color ? lgHex(n.color) : LG_KIND_COLORS[n.kind] || LG_KIND_COLORS.action;
     const inputs = n.inputs.filter(p => p.type !== "exec");
     const rows = inputs.map(p => `<div class="lg-drow"><label>${lgPinIcon(p.type, p.linked)}${lgEsc(p.label || p.id)}</label><div>${p.linked ? `<span class="lg-dim">wired</span>` : this.literalHtml(n, p, actors)}</div></div>` +
-      (p.linked ? "" : this.structOf(p.type) ? `<div class="lg-lsub lg-vsub" data-node="${n.id}" data-pin="${lgEsc(p.id)}">${this.partsEditor(p.type, p.value)}</div>`
+      (p.linked ? "" : this.structOf(p.type) || lgIsKeyed(p.type) ? `<div class="lg-lsub lg-vsub" data-node="${n.id}" data-pin="${lgEsc(p.id)}">${this.partsEditor(p.type, p.value)}</div>`
         : lgIsList(p.type) ? `<div class="lg-lsub" data-node="${n.id}" data-pin="${lgEsc(p.id)}">${lgListEditor(p.type, p.value, this.data)}</div>` : "")).join("");
     const params = (n.params || []).map(p => `<div class="lg-drow"><label>${lgEsc(p.label)}</label><div>${this.paramHtml(n, p)}</div></div>`).join("");
     const issues = (n.issues || []).map(t => `<div class="lg-dissue ${n.error ? "err" : "warn"}">${lgIco(n.error ? "error" : "warn")}${lgEsc(t)}</div>`).join("");
@@ -1299,6 +1384,7 @@ export class LogicEditor {
     const live = this.trace?.variables?.[v.name];
     const list = lgIsList(v.type), of = this.enumOf(v.type), parts = this.partsEditor(v.type, v.value);
     const val = list ? `<span class="lg-dim">${Array.isArray(v.value) && v.value.length ? v.value.length + (v.value.length === 1 ? " item" : " items") : "empty"}</span>`
+      : lgIsKeyed(v.type) ? `<span class="lg-dim">${Array.isArray(v.value) && v.value.length ? v.value.length + (v.value.length === 1 ? " entry" : " entries") : "empty"}</span>`
       : parts ? `<span class="lg-dim">${lgEsc(lgTypeName(v.type))}: its fields</span>`
       : of ? `<select data-vk="value">${of.values.map((name, k) => `<option value="${k}"${k === v.value ? " selected" : ""}>${lgEsc(name)}</option>`).join("")}</select>`
       : v.type === "bool" ? `<input type="checkbox" data-vk="value"${v.value ? " checked" : ""}>`
@@ -1310,6 +1396,7 @@ export class LogicEditor {
       <div class="lg-dsec"><div class="lg-dst">Variable</div>
         <div class="lg-drow"><label>Name</label><div><input data-vk="name" value="${lgEsc(v.name)}" spellcheck="false"></div></div>
         <div class="lg-drow"><label>Type</label><div><select data-vk="type">${this.typeOptions(v.type)}</select></div></div>
+        ${lgIsKeyed(v.type) ? `<div class="lg-drow"><label title="A map holds a value under each key, a set holds keys - in the order the keys came (in C++: Map&lt;Int, Float&gt;, Set&lt;Text&gt;)">${v.type.startsWith("map") ? "Keys, Values" : "Keys"}</label><div>${this.keyedChoices(v.type, "vk")}</div></div>` : ""}
         ${lgIsList(v.type) ? `<div class="lg-drow"><label>Length</label><div><input data-vk="count" type="number" min="0" max="65536" step="1" value="${v.count || 0}" title="A list of a fixed length always has that many entries (in C++: Fixed&lt;Float, 16&gt; - std::array). 0: a list of any length."></div></div>` : ""}
         <div class="lg-drow"><label>Constant</label><div><label class="lg-check" title="A constant is read like a variable and never changed: no Set, no Add, no step that changes a list (in C++: KERN_CONST). A library has only constants."><input type="checkbox" data-vk="const"${v.const ? " checked" : ""}></label></div></div>
       </div>
@@ -1329,9 +1416,9 @@ export class LogicEditor {
       : `<input data-pf="value" class="lg-fval" value="${lgEsc(p.type === "vector" ? (p.value || [0, 0, 0]).join(", ") : p.type === "text" ? (p.value ?? "") : lgNum(p.value))}" title="Default" spellcheck="false">`;
     const rows = (list, side) => list.map((p, i) => `<div class="lg-frow" data-side="${side}" data-pin="${lgEsc(p.name)}">
         <i class="lg-pill" style="--c:${lgColor(p.type)}"></i><input data-pf="name" class="lg-fname" value="${lgEsc(p.name)}" spellcheck="false" title="Name">
-        <select data-pf="type" title="Type">${this.typeOptions(p.type)}</select>${lgIsList(p.type) ? `<input data-pf="count" class="lg-fcount" type="number" min="0" max="65536" step="1" value="${p.count || 0}" title="Length. A list of a fixed length always has that many entries (in C++: Fixed&lt;Float, 16&gt; - std::array). 0: a list of any length.">` : ""}${side === "in" ? `<select data-pf="ref" class="lg-fref" title="How the function takes it: its value - or the place the call names, to change it (&amp;) or to read it where it stands (const &amp;). Nothing is copied for a reference.">${[["", "value"], ["ref", "&"], ["const", "const &"]].map(([v, l]) => `<option value="${v}"${v === (p.ref === "const" ? "const" : p.ref ? "ref" : "") ? " selected" : ""}>${l}</option>`).join("")}</select>` : ""}${side === "in" && p.ref ? "" : value(p)}
+        <select data-pf="type" title="Type">${this.typeOptions(p.type)}</select>${this.keyedChoices(p.type, "pf")}${lgIsList(p.type) ? `<input data-pf="count" class="lg-fcount" type="number" min="0" max="65536" step="1" value="${p.count || 0}" title="Length. A list of a fixed length always has that many entries (in C++: Fixed&lt;Float, 16&gt; - std::array). 0: a list of any length.">` : ""}${side === "in" ? `<select data-pf="ref" class="lg-fref" title="How the function takes it: its value - or the place the call names, to change it (&amp;) or to read it where it stands (const &amp;). Nothing is copied for a reference.">${[["", "value"], ["ref", "&"], ["const", "const &"]].map(([v, l]) => `<option value="${v}"${v === (p.ref === "const" ? "const" : p.ref ? "ref" : "") ? " selected" : ""}>${l}</option>`).join("")}</select>` : ""}${side === "in" && p.ref ? "" : value(p)}
         ${side === "local" || (side === "in" && p.ref) ? `<button data-pf="get" title="Add a Get node">Get</button>${side === "in" && p.ref === "const" ? "" : `<button data-pf="set" title="Add a Set node">Set</button>`}` : ""}<button data-pf="up" title="Move up"${i === 0 ? " disabled" : ""}>↑</button><button data-pf="remove" title="Remove">×</button></div>` +
-        (this.structOf(p.type) ? `<div class="lg-lsub lg-vsub" data-side="${side}" data-fpin="${lgEsc(p.name)}">${this.partsEditor(p.type, p.value)}</div>`
+        (this.structOf(p.type) || lgIsKeyed(p.type) ? `<div class="lg-lsub lg-vsub" data-side="${side}" data-fpin="${lgEsc(p.name)}">${this.partsEditor(p.type, p.value)}</div>`
           : lgIsList(p.type) ? `<div class="lg-lsub" data-side="${side}" data-fpin="${lgEsc(p.name)}">${lgListEditor(p.type, p.value, this.data)}</div>` : "")).join("") ||
       `<div class="lg-none">${side === "in" ? "No inputs" : side === "out" ? "No outputs" : "No local variables"}</div>`;
     const refs = (this.data.nodes || []).filter(n => (n.type === "func.call" || n.type === "func.pure" || n.type === "func.call_on") && (n.params || []).some(p => p.key === "function" && p.value === f.name)).length;
@@ -1385,10 +1472,10 @@ export class LogicEditor {
       : `<input data-sf="value" class="lg-fval" value="${lgEsc(f.type === "vector" ? (f.value || [0, 0, 0]).join(", ") : f.type === "text" ? (f.value ?? "") : lgNum(f.value))}" title="Default" spellcheck="false">`;
     const rows = s.fields.map((f, i) => `<div class="lg-frow lg-srow" data-field="${lgEsc(f.name)}">
         <i class="lg-pill" style="--c:${lgColor(f.type)}"></i><input data-sf="name" class="lg-fname" value="${lgEsc(f.name)}" spellcheck="false" title="The field's name">
-        <select data-sf="type" title="Type">${this.typeOptions(f.type, without)}</select>${lgIsList(f.type) ? `<input data-sf="count" class="lg-fcount" type="number" min="0" max="65536" step="1" value="${f.count || 0}" title="Length. A list of a fixed length always has that many entries (in C++: Fixed&lt;Float, 16&gt; - std::array). 0: a list of any length.">` : ""}${value(f)}
+        <select data-sf="type" title="Type">${this.typeOptions(f.type, without)}</select>${this.keyedChoices(f.type, "sf", without)}${lgIsList(f.type) ? `<input data-sf="count" class="lg-fcount" type="number" min="0" max="65536" step="1" value="${f.count || 0}" title="Length. A list of a fixed length always has that many entries (in C++: Fixed&lt;Float, 16&gt; - std::array). 0: a list of any length.">` : ""}${value(f)}
         <button data-sf="up" title="Move up"${i === 0 ? " disabled" : ""}>↑</button><button data-sf="down" title="Move down"${i === s.fields.length - 1 ? " disabled" : ""}>↓</button>
         <button data-sf="remove" title="Remove this field"${s.fields.length === 1 ? " disabled" : ""}>×</button></div>` +
-        (this.structOf(f.type) ? `<div class="lg-lsub lg-vsub" data-sfield="${lgEsc(f.name)}">${this.partsEditor(f.type, f.value)}</div>`
+        (this.structOf(f.type) || lgIsKeyed(f.type) ? `<div class="lg-lsub lg-vsub" data-sfield="${lgEsc(f.name)}">${this.partsEditor(f.type, f.value)}</div>`
           : lgIsList(f.type) ? `<div class="lg-lsub" data-sfield="${lgEsc(f.name)}">${lgListEditor(f.type, f.value, this.data)}</div>` : "")).join("");
     return `<div class="lg-dh"><i class="lg-pill big" style="--c:${LG_STRUCT_COLOR}"></i>${lgEsc(s.name)}</div><div class="lg-dsub">${s.project ? "Struct of the project" : "Struct"}</div>
       <div class="lg-dsec"><div class="lg-dst">Struct</div>
@@ -1474,6 +1561,7 @@ export class LogicEditor {
         : d.fpin ? (d.side === "in" ? this.fn(fn.name)?.inputs : d.side === "local" ? this.fn(fn.name)?.locals : this.fn(fn.name)?.outputs)?.find(p => p.name === d.fpin)?.value
         : d.sfield ? this.structNamed(st.name)?.fields.find(f => f.name === d.sfield)?.value
         : this.data.nodes?.find(n => n.id === +d.node)?.inputs.find(p => p.id === d.pin)?.value;
+      sub.lgData = this.data;  // (the enums of the Blueprint: a new key of a map is a value of one it does not have yet)
       lgValueBind(sub, shown, send);
     }
     if (fn) {
@@ -1505,9 +1593,10 @@ export class LogicEditor {
           else f.onchange = () => {
             if (k === "name") edit({op: "pinRename", side, pin, to: f.value.trim()});
             else if (k === "type") edit({op: "pinType", side, pin, type: f.value});
+            else if (k === "mapkey" || k === "mapvalue") edit({op: "pinType", side, pin, type: this.keyedWith(def.type, k, f.value)});
             else if (k === "count") edit({op: "pinType", side, pin, type: def.type, count: Math.max(0, Math.floor(+f.value || 0))});
             else if (k === "ref") edit({op: "pinRef", side, pin, ref: f.value});
-            else edit({op: "pinValue", side, pin, value: f.type === "checkbox" ? f.checked : def.type === "vector" ? f.value.split(/[,\s]+/).filter(Boolean).map(v => +v || 0) : def.type === "text" ? f.value : (+f.value || 0)});
+            else edit({op: "pinValue", side, pin, value: f.type === "checkbox" ? f.checked : def.type === "vector" ? f.value.split(/[,\s]+/).filter(Boolean).map(v => +v || 0) : lgTyped64(def.type, f.value)});
           };
         }
       }
@@ -1561,8 +1650,9 @@ export class LogicEditor {
           else f.onchange = () => {
             if (k === "name") { if (edit({op: "renameField", field, to: f.value.trim()})?.ok === false) f.value = field; }
             else if (k === "type") { if (edit({op: "fieldType", field, type: f.value})?.ok === false) f.value = def.type; }
+            else if (k === "mapkey" || k === "mapvalue") edit({op: "fieldType", field, type: this.keyedWith(def.type, k, f.value)});
             else if (k === "count") { if (edit({op: "fieldType", field, type: def.type, count: Math.max(0, Math.floor(+f.value || 0))})?.ok === false) f.value = def.count || 0; }
-            else edit({op: "fieldValue", field, value: f.type === "checkbox" ? f.checked : f.tagName === "SELECT" ? +f.value : def.type === "vector" ? lgVector(f.value) : def.type === "text" ? f.value : (+f.value || 0)});
+            else edit({op: "fieldValue", field, value: f.type === "checkbox" ? f.checked : f.tagName === "SELECT" ? +f.value : def.type === "vector" ? lgVector(f.value) : lgTyped64(def.type, f.value)});
           };
         }
       }
@@ -1580,10 +1670,11 @@ export class LogicEditor {
         const k = f.dataset.vk;
         if (k === "name") { if (this.cmd({cmd: "logicVariable", op: "rename", name: variable.name, to: f.value.trim()})?.ok !== false) this.selVar = f.value.trim(); }
         else if (k === "type") this.cmd({cmd: "logicVariable", op: "type", name: variable.name, type: f.value});
+        else if (k === "mapkey" || k === "mapvalue") this.cmd({cmd: "logicVariable", op: "type", name: variable.name, type: this.keyedWith(variable.type, k, f.value)});
         else if (k === "count") this.cmd({cmd: "logicVariable", op: "type", name: variable.name, type: variable.type, count: Math.max(0, Math.floor(+f.value || 0))});
         else if (k === "const") this.cmd({cmd: "logicVariable", op: "constant", name: variable.name, value: f.checked});
         else {
-          const value = f.type === "checkbox" ? f.checked : variable.type === "vector" ? f.value.split(/[,\s]+/).filter(Boolean).map(s => +s || 0) : variable.type === "text" ? f.value : (+f.value || 0);
+          const value = f.type === "checkbox" ? f.checked : variable.type === "vector" ? f.value.split(/[,\s]+/).filter(Boolean).map(s => +s || 0) : lgTyped64(variable.type, f.value);
           this.cmd({cmd: "logicVariable", op: "value", name: variable.name, value});
         }
       };
@@ -2062,7 +2153,8 @@ export class LogicEditor {
     // a generic node nothing is wired to yet takes the wire's type (Select, Reroute, the list nodes)
     const takes = (generic, t) => !!generic && generic.split(" ").includes(t);
     if (takes(d.out ? row.dataset.generic : d.generic, from) || takes(d.out ? d.generic : row.dataset.generic, to)) return true;
-    if (!lgBuiltin(from) || !lgBuiltin(to)) return false;  // an enum's value goes where its own enum is wanted, nowhere else
+    if (!lgBuiltin(from) || !lgBuiltin(to)) return false;  // an enum's value goes where its own enum is wanted, nowhere else (a map, a set: where its own keys and values are)
+    if ([from, to].some(t => t === "int64" || t === "int64_list")) return false;  // (64 bits: the Int64 nodes say what they are as another type)
     if (to === "text") return true;
     if (lgIsList(from) || lgIsList(to)) return false;
     const numeric = t => t === "int" || t === "float" || t === "bool";
@@ -2275,7 +2367,7 @@ export class LogicEditor {
     }
     entries.push({label: "Add Nodes That Fit…", run: () => this.openPalette(x, y, {node, pin, output: out})});
     if (p && p.type !== "exec") entries.push({label: "Promote to Variable", run: () => { const r = this.cmd({cmd: "logicPromote", node, pin, output: out}); if (r?.variable) this.studio.toast(`New variable ${r.variable}`); }});
-    if (p && !out && p.type !== "exec" && !p.linked) entries.push({label: "Reset to Default", run: () => this.cmd({cmd: "logicValue", node, pin, value: lgIsList(p.type) ? [] : p.type === "vector" ? [0, 0, 0] : p.type === "text" ? "" : p.type === "bool" ? false : 0})});
+    if (p && !out && p.type !== "exec" && !p.linked) entries.push({label: "Reset to Default", run: () => this.cmd({cmd: "logicValue", node, pin, value: lgIsList(p.type) || lgIsKeyed(p.type) ? [] : p.type === "vector" ? [0, 0, 0] : p.type === "text" ? "" : p.type === "int64" ? "0" : p.type === "bool" ? false : 0})});
     this.studio.openMenu(entries, x, y);
   }
 
