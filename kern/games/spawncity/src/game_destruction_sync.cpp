@@ -39,7 +39,7 @@ constexpr f32 kDeltaEvery = 0.15f, kDigestEvery = 2.0f;
 constexpr std::size_t kPerMessage = 400;  // building records per message (a full state is split)
 
 using Craters = DestroySync::Craters;
-using Damage = DestroySync::Damage;
+using DamageList = DestroySync::DamageList;
 using Points = DestroySync::Points;
 
 void put_craters(std::vector<u8>& o, const Craters& c) {
@@ -52,11 +52,11 @@ bool get_craters(wire::Reader& in, const std::vector<u8>& b, Craters& c) {
   for (u8 i = 0; i < n && in.ok; ++i) { Terrain::CraterRec r; r.x = in.get_f32(b); r.y = in.get_f32(b); r.r = in.get_f32(b); r.depth = in.get_f32(b); c.push_back(r); }
   return in.ok;
 }
-void put_damage(std::vector<u8>& o, const Damage& d, std::size_t from, std::size_t n) {
+void put_damage(std::vector<u8>& o, const DamageList& d, std::size_t from, std::size_t n) {
   wire::put_u16(o, static_cast<u16>(n));
   for (std::size_t i = from; i < from + n; ++i) { wire::put_u32(o, d[i].seed); wire::put_f32(o, d[i].height); wire::put_u8(o, static_cast<u8>(d[i].leveled)); }
 }
-bool get_damage(wire::Reader& in, const std::vector<u8>& b, Damage& d) {
+bool get_damage(wire::Reader& in, const std::vector<u8>& b, DamageList& d) {
   const u16 n = in.get_u16(b);
   d.clear();
   for (u16 i = 0; i < n && in.ok; ++i) { CityStream::DamageRec r; r.seed = in.get_u32(b); r.height = in.get_f32(b); r.leveled = in.get_u8(b) != 0; d.push_back(r); }
@@ -89,7 +89,7 @@ void fnv_float(u32& h, f32 v) {
   const std::array<u8, 4> b = wire::f32_bytes(v);
   for (u8 x : b) fnv_byte(h, x);
 }
-u32 digest_of(const Craters& c, const Damage& d) {
+u32 digest_of(const Craters& c, const DamageList& d) {
   u32 h = 2166136261u;
   for (const Terrain::CraterRec& r : c) { fnv_float(h, r.x); fnv_float(h, r.y); fnv_float(h, r.r); fnv_float(h, r.depth); }
   for (const CityStream::DamageRec& r : d) {
@@ -117,7 +117,7 @@ void Game::dsync_send_full(i32 to) {
   DestroySync& d = *dsync_;
   Craters c;
   city_.terrain().crater_list(c);
-  Damage dm;
+  DamageList dm;
   city_.damage_list(dm);
   Points pt;
   destruction_.points_list(pt);
@@ -177,7 +177,7 @@ void Game::dsync_update(f32 dt) {
       if (kind == kAsk || epoch != d.epoch) { ++d.asks; dsync_send_full(m.from); continue; }  // a client behind: the whole state
       if (kind != kEdit) continue;
       Craters c;
-      Damage dm;
+      DamageList dm;
       Points pt;
       if (!get_craters(in, m.data, c) || !get_damage(in, m.data, dm) || !get_points(in, m.data, pt)) continue;
       // his craters join the list (in the order they reach the authority), his damage the city
@@ -196,7 +196,7 @@ void Game::dsync_update(f32 dt) {
       if (!in.ok) continue;
       Craters c;
       terrain.crater_list(c);
-      Damage dm;
+      DamageList dm;
       city_.damage_list(dm);
       // the check, not a repair: the protocol keeps the cities equal by construction (one
       // authority, reliable ordered deltas, merges that only ever lower, the whole state for a
@@ -210,7 +210,7 @@ void Game::dsync_update(f32 dt) {
     if (kind != kState) continue;
     const u8 full = in.get_u8(m.data);
     Craters c;
-    Damage dm;
+    DamageList dm;
     Points pt;
     if (!in.ok || !get_craters(in, m.data, c) || !get_damage(in, m.data, dm) || !get_points(in, m.data, pt)) continue;
     ++d.got_states;
@@ -266,7 +266,7 @@ void Game::dsync_update(f32 dt) {
       d.digest_clock = 0;
       Craters c;
       terrain.crater_list(c);
-      Damage dm;
+      DamageList dm;
       city_.damage_list(dm);
       std::vector<u8> o;
       wire::put_u8(o, kDigest);
@@ -315,7 +315,7 @@ std::string Game::dsync_json() {
   DestroySync& d = *dsync_;
   Craters c;
   city_.terrain().crater_list(c);
-  Damage dm;
+  DamageList dm;
   city_.damage_list(dm);
   char b[256];
   std::snprintf(b, sizeof b, "{\"epoch\":%u,\"craters\":%zu,\"damaged\":%zu,\"digest\":%u,\"sent\":%u,\"got\":%u,\"asks\":%u,\"pending\":%zu,\"mismatches\":%u}", d.epoch, c.size(), dm.size(),
