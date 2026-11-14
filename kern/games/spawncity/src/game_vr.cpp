@@ -36,7 +36,7 @@ void Game::vr_melee(i32 side, f32 dt) {
   // blow, harder the faster the hand, and is shoved along the hand's direction. Only a landed blow
   // starts the hand's recovery (a fast start of the swing that has not reached anyone yet does not
   // use the blow up).
-  VrHand& h = vr_.hands[side];
+  VrHand& h = vr_hands_[side];
   kern::Mat4 m;
   if (!vr_hand_matrix(side, m)) { h.world_ok = false; h.swish = false; return; }
   const Vec3 at = m.translation();
@@ -44,8 +44,8 @@ void Game::vr_melee(i32 side, f32 dt) {
   h.world_prev = at;
   h.world_ok = true;
   const f32 now = world_->sim_time();
-  const bool knife = weapons_.foot_weapon == weapons::Id::knife && side == 1;
-  const bool fists = weapons_.foot_weapon == weapons::Id::fists || (weapons_.foot_weapon == weapons::Id::knife && side == 0);
+  const bool knife = foot_weapon_ == weapons::Id::knife && side == 1;
+  const bool fists = foot_weapon_ == weapons::Id::fists || (foot_weapon_ == weapons::Id::knife && side == 0);
   if (!(knife || fists) || player_dead_ || dt <= 1e-4f || h.grab.valid() || h.grab_person >= 0) { h.prev_strike = h.p; h.swish = false; return; }
   // the hand's speed in the room (the body's own walking left out): a jab is 3-6 m/s
   const f32 speed = h.had ? kern::length(h.p - h.prev_strike) / dt : 0;
@@ -54,7 +54,7 @@ void Game::vr_melee(i32 side, f32 dt) {
   if (!h.swish) {
     h.swish = true;
     // (running with the arms every swing would whoosh: there only a landed blow is heard)
-    if (!vr_.arms) osfx(knife ? "gameplay_final_runtime_v2.knifeSwish" : "gameplay_final_runtime_v2.punchWhoosh", at, side == 1 ? 0 : 1, 0);
+    if (!vr_arms_) osfx(knife ? "gameplay_final_runtime_v2.knifeSwish" : "gameplay_final_runtime_v2.punchWhoosh", at, side == 1 ? 0 : 1, 0);
   }
   if (now - h.strike_at < kStrikeRecover) return;
   const Vec3 d = at - prev;
@@ -108,7 +108,7 @@ void Game::vr_melee(i32 side, f32 dt) {
   osfx(knife ? "gameplay_final_runtime_v2.knifeHit" : "gameplay_final_runtime_v2.punchThud", at_hit, side == 1 ? 0 : 1, 0);
   world_->play_sound(combat_sfx(combat_audio::Kind::hit), at_hit, 0.7f, knife ? 1.3f : 0.8f, true);
   world_->shake_camera(0.04f * k);  // the jolt of a landed blow (the hand has no haptics from here)
-  vr_.pulse[side] = std::fmin(1.0f, 0.4f + 0.3f * k);  // and the controller's rumble (host.mjs)
+  vr_pulse_[side] = std::fmin(1.0f, 0.4f + 0.3f * k);  // and the controller's rumble (host.mjs)
 }
 
 void Game::vr_grab(i32 side, bool want, f32 dt) {
@@ -116,7 +116,7 @@ void Game::vr_grab(i32 side, bool want, f32 dt) {
   // ragdoll), a person (who goes down as a ragdoll and is held by the chest), a car (only pushed:
   // the hand's force is a person's) - and drags it with a spring towards itself; letting go throws
   // it with the hand's speed.
-  VrHand& h = vr_.hands[side];
+  VrHand& h = vr_hands_[side];
   kern::Mat4 m;
   const bool hand = vr_hand_matrix(side, m);
   const Vec3 at = hand ? m.translation() : Vec3{};
@@ -174,7 +174,7 @@ void Game::vr_grab(i32 side, bool want, f32 dt) {
     else if (const i32 bird = glife_ ? glife_->life.catch_pigeon(at, kern::length(h.throw_v), now, rng_) : -1; bird >= 0) {
       h.bird = bird;  // a pigeon, caught (it took patience)
       toss_own(3, bird, 0);  // in our hand: everybody sees it (game_toss.cpp)
-      vr_.pulse[side] = 0.5f;
+      vr_pulse_[side] = 0.5f;
     } else if (const kern::physics::Body ab = glife_ ? glife_->life.grab_animal(at, 0.45f) : kern::physics::Body{}; valid(ab)) {
       // a live dog, cat or cow: picked up as a body (it gets up where it lands, life.cpp)
       h.grab = ab;
@@ -209,7 +209,7 @@ void Game::vr_grab(i32 side, bool want, f32 dt) {
   }
   if (h.bird >= 0) {
     if (glife_) glife_->life.hold_pigeon(h.bird, at, std::atan2(m.m[1], m.m[0]));
-    if (h.bird >= 0 && (now - h.grab_t) > 0 && (static_cast<i32>(now * 3) % 2) == 0) vr_.pulse[side] = std::fmax(vr_.pulse[side], 0.08f);  // it flutters
+    if (h.bird >= 0 && (now - h.grab_t) > 0 && (static_cast<i32>(now * 3) % 2) == 0) vr_pulse_[side] = std::fmax(vr_pulse_[side], 0.08f);  // it flutters
     return;
   }
   if (h.grab_slot >= 0) {
@@ -260,69 +260,69 @@ void Game::vr_menu_input(f32 dt) {
   // the drone, in / out of a vehicle, the air strike, the radio, the EMP, the settings, RESET, out
   // of VR) and the settings (locomotion, turning, horizon, tunnel, always day, sound, music).
   // Holding Y for a second is RESET from anywhere, menu or not (stuck in a wall, fallen through).
-  if (!vr_.on || !engine_ || !engine_->xr) { vr_.menu_open = false; vr_.y_held = 0; return; }
+  if (!vr_ || !engine_ || !engine_->xr) { vr_menu_open_ = false; vr_y_held_ = 0; return; }
   const bool y = pad.connected && pad.down(kPadY);
   if (y) {
-    vr_.y_held += dt;
-    if (vr_.y_held >= kResetHold && !vr_.y_fired) {
-      vr_.y_fired = true;
+    vr_y_held_ += dt;
+    if (vr_y_held_ >= kResetHold && !vr_y_fired_) {
+      vr_y_fired_ = true;
       ui_reset();
-      vr_.menu_open = false;
-      vr_.menu_page = 0;
+      vr_menu_open_ = false;
+      vr_menu_page_ = 0;
       toast_ = "RESET";
       toast_age_ = 0;
-      vr_.pulse[0] = 0.8f;
+      vr_pulse_[0] = 0.8f;
     }
   } else {
-    if (vr_.y_held > 0 && !vr_.y_fired) { vr_.menu_open = !vr_.menu_open; vr_.menu_page = 0; vr_.menu_stick_used = false; }  // a tap
-    vr_.y_held = 0;
-    vr_.y_fired = false;
+    if (vr_y_held_ > 0 && !vr_y_fired_) { vr_menu_open_ = !vr_menu_open_; vr_menu_page_ = 0; vr_menu_stick_used_ = false; }  // a tap
+    vr_y_held_ = 0;
+    vr_y_fired_ = false;
   }
-  if (!vr_.menu_open) { vr_.menu_hover = -1; return; }
-  vr_.menu_hover = -1;
+  if (!vr_menu_open_) { vr_menu_hover_ = -1; return; }
+  vr_menu_hover_ = -1;
   Vec3 from, dir;
-  if (vr_.menu_valid && vr_hand_ray(from, dir)) {
-    const f32 dn = kern::dot(dir, vr_.menu_n);
+  if (vr_menu_valid_ && vr_hand_ray(from, dir)) {
+    const f32 dn = kern::dot(dir, vr_menu_n_);
     if (std::fabs(dn) > 1e-4f) {
-      const f32 t = kern::dot(vr_.menu_c - from, vr_.menu_n) / dn;
+      const f32 t = kern::dot(vr_menu_c_ - from, vr_menu_n_) / dn;
       if (t > 0 && t < 3) {
-        const Vec3 p = from + dir * t - vr_.menu_c;
-        const f32 u = kern::dot(p, vr_.menu_r) / vr_.menu_w + 0.5f, v = 0.5f - kern::dot(p, vr_.menu_u) / vr_.menu_h;
+        const Vec3 p = from + dir * t - vr_menu_c_;
+        const f32 u = kern::dot(p, vr_menu_r_) / vr_menu_w_ + 0.5f, v = 0.5f - kern::dot(p, vr_menu_u_) / vr_menu_h_;
         // the canvas (host.mjs vrHudDraw): the title to kMenuTop px of 384, then the rows
         const f32 py = v * 384;
-        if (u >= 0 && u <= 1 && py >= kMenuTop && py < kMenuTop + kMenuRows * kMenuRow) vr_.menu_hover = static_cast<i32>((py - kMenuTop) / kMenuRow);
+        if (u >= 0 && u <= 1 && py >= kMenuTop && py < kMenuTop + kMenuRows * kMenuRow) vr_menu_hover_ = static_cast<i32>((py - kMenuTop) / kMenuRow);
       }
     }
   }
-  if (vr_.menu_hover != vr_.menu_hover_was && vr_.menu_hover >= 0) vr_.pulse[1] = std::fmax(vr_.pulse[1], 0.12f);  // a tick under the finger
-  vr_.menu_hover_was = vr_.menu_hover;
+  if (vr_menu_hover_ != vr_menu_hover_was_ && vr_menu_hover_ >= 0) vr_pulse_[1] = std::fmax(vr_pulse_[1], 0.12f);  // a tick under the finger
+  vr_menu_hover_was_ = vr_menu_hover_;
   // the right stick up / down steps through the rows as well (no pointing needed)
   {
     const f32 ry = pad.connected ? pad.ry : 0;
-    if (std::fabs(ry) < 0.3f) vr_.menu_stick_armed = true;
-    if (vr_.menu_stick_armed && std::fabs(ry) > 0.7f) {
-      vr_.menu_stick_armed = false;
-      vr_.menu_sel = vr_.menu_stick_used ? (vr_.menu_sel + (ry > 0 ? kMenuRows - 1 : 1)) % kMenuRows : 0;
-      vr_.menu_stick_used = true;
+    if (std::fabs(ry) < 0.3f) vr_menu_stick_armed_ = true;
+    if (vr_menu_stick_armed_ && std::fabs(ry) > 0.7f) {
+      vr_menu_stick_armed_ = false;
+      vr_menu_sel_ = vr_menu_stick_used_ ? (vr_menu_sel_ + (ry > 0 ? kMenuRows - 1 : 1)) % kMenuRows : 0;
+      vr_menu_stick_used_ = true;
     }
     // pointing wins; the stick's row only once the stick chose one (a trigger pulled while the ray
     // is off the panel must not pick the first row)
-    if (vr_.menu_hover >= 0) { vr_.menu_sel = vr_.menu_hover; vr_.menu_stick_used = false; }
-    else if (vr_.menu_stick_used) vr_.menu_hover = vr_.menu_sel;
+    if (vr_menu_hover_ >= 0) { vr_menu_sel_ = vr_menu_hover_; vr_menu_stick_used_ = false; }
+    else if (vr_menu_stick_used_) vr_menu_hover_ = vr_menu_sel_;
   }
-  const bool pick = pad.connected && ((pad.rt > 0.6f && !vr_.menu_trigger) || (pad.pressed & (1u << kPadA)));
-  vr_.menu_trigger = pad.connected && pad.rt > 0.6f;
+  const bool pick = pad.connected && ((pad.rt > 0.6f && !vr_menu_trigger_) || (pad.pressed & (1u << kPadA)));
+  vr_menu_trigger_ = pad.connected && pad.rt > 0.6f;
   if (pad.connected && (pad.pressed & (1u << kPadB))) {  // B: back / close
-    if (vr_.menu_page == 1) vr_.menu_page = 0;
-    else vr_.menu_open = false;
+    if (vr_menu_page_ == 1) vr_menu_page_ = 0;
+    else vr_menu_open_ = false;
     return;
   }
-  if (!pick || vr_.menu_hover < 0) return;
-  vr_.pulse[1] = 0.35f;
+  if (!pick || vr_menu_hover_ < 0) return;
+  vr_pulse_[1] = 0.35f;
   auto flip = [&](const char* key, Opt o) { command(std::string("set ") + key + (ui_.settings.on(o) ? " 0" : " 1")); };
-  if (vr_.menu_page == 1) {
-    switch (vr_.menu_hover) {
-      case 0: vr_.menu_page = 0; break;
+  if (vr_menu_page_ == 1) {
+    switch (vr_menu_hover_) {
+      case 0: vr_menu_page_ = 0; break;
       case 1: flip("vr.arms", Opt::vr_arms); break;
       case 2: flip("vr.smoothTurn", Opt::vr_smooth_turn); break;
       case 3: flip("vr.level", Opt::vr_level); break;
@@ -330,7 +330,7 @@ void Game::vr_menu_input(f32 dt) {
       case 5: flip("world.alwaysDay", Opt::world_always_day); break;
       case 6: flip("audio.on", Opt::audio_on); break;
       case 7: flip("music.on", Opt::music_on); break;
-      case 8: vr_.action = "radio_off"; break;
+      case 8: vr_action_ = "radio_off"; break;
       default:  // the microphone of the voice chat (the page opens it: mp_host.mjs)
         if (net_.active()) command("voice mic");
         else { toast_ = "MIKROFON: NUR IM MULTIPLAYER"; toast_age_ = 0; }
@@ -338,14 +338,14 @@ void Game::vr_menu_input(f32 dt) {
     }
     return;
   }
-  if (vr_.menu_hover >= 9) return;  // the main page has nine rows
-  switch (vr_.menu_hover) {
-    case 0: vr_.action = "multi"; break;
-    case 1: toggle_drone(); vr_.menu_open = false; break;
+  if (vr_menu_hover_ >= 9) return;  // the main page has nine rows
+  switch (vr_menu_hover_) {
+    case 0: vr_action_ = "multi"; break;
+    case 1: toggle_drone(); vr_menu_open_ = false; break;
     case 2:  // in / out: the nearest car or the jet, or out of the one you sit in
       if (mode_ == Mode::foot) ctl_enter(false);
       else if (mode_ == Mode::car || mode_ == Mode::jet) exit_vehicle();
-      vr_.menu_open = false;
+      vr_menu_open_ = false;
       break;
     case 3: {
       // the air strike on what you look at (the first hit along the head's ray, else 180 m out)
@@ -356,17 +356,17 @@ void Game::vr_menu_input(f32 dt) {
       osfx("fighter_jets.beep", at, 0);  // the original's place() and confirmStrike() beeps
       if (!air_strike(at)) { toast_ = "LUFTSCHLAG LAEDT NOCH"; toast_age_ = 0; osfx("fighter_jets.beep", at, 1); }
       else osfx("fighter_jets.beep", at, 5);
-      vr_.menu_open = false;
+      vr_menu_open_ = false;
       break;
     }
-    case 4: vr_.action = "radio"; break;  // the next station (car, jet, drone)
+    case 4: vr_action_ = "radio"; break;  // the next station (car, jet, drone)
     case 5:  // on foot the EMP, in a vehicle its view (cockpit / outside, the drone's three)
-      if (mode_ == Mode::foot) { emp_pulse(); vr_.menu_open = false; }
-      else vr_.cam_request = true;
+      if (mode_ == Mode::foot) { emp_pulse(); vr_menu_open_ = false; }
+      else vr_cam_request_ = true;
       break;
-    case 6: vr_.menu_page = 1; break;
-    case 7: ui_reset(); vr_.menu_open = false; break;
-    default: vr_.action = "exit"; vr_.menu_open = false; break;
+    case 6: vr_menu_page_ = 1; break;
+    case 7: ui_reset(); vr_menu_open_ = false; break;
+    default: vr_action_ = "exit"; vr_menu_open_ = false; break;
   }
 }
 
@@ -376,19 +376,19 @@ std::string Game::vr_menu_json() {
   std::snprintf(b, sizeof b,
                 ",\"vr\":{\"menu\":%d,\"page\":%d,\"hover\":%d,\"arms\":%d,\"smooth\":%d,\"level\":%d,\"tunnel\":%d,\"day\":%d,\"sound\":%d,\"music\":%d,\"rocket\":%d,"
                 "\"reset\":%.2f,\"pulse\":[%.2f,%.2f],\"near\":%d,\"mic\":%d,\"cam\":\"%s\",\"action\":\"%s\"}",
-                vr_.menu_open ? 1 : 0, vr_.menu_page, vr_.menu_hover, st.on(Opt::vr_arms) ? 1 : 0, st.on(Opt::vr_smooth_turn) ? 1 : 0, st.on(Opt::vr_level) ? 1 : 0,
+                vr_menu_open_ ? 1 : 0, vr_menu_page_, vr_menu_hover_, st.on(Opt::vr_arms) ? 1 : 0, st.on(Opt::vr_smooth_turn) ? 1 : 0, st.on(Opt::vr_level) ? 1 : 0,
                 st.on(Opt::vr_tunnel) ? 1 : 0, st.on(Opt::world_always_day) ? 1 : 0, st.on(Opt::audio_on) ? 1 : 0, st.on(Opt::music_on) ? 1 : 0, ctl_.rocket ? 1 : 0,
-                vr_.y_fired ? 1.0f : clampf(vr_.y_held / kResetHold, 0, 1), vr_.pulse[0], vr_.pulse[1], vr_.near_vehicle ? 1 : 0, voice_mic_on() ? 1 : 0,
-                mode_ == Mode::drone ? (view_.drone_cam == 0 ? "FPV" : view_.drone_cam == 1 ? "FOLGEN" : "AUSSEN") : mode_ == Mode::car ? (view_.car_cockpit ? "INNEN" : "AUSSEN")
-                : mode_ == Mode::jet ? (view_.jet_cockpit ? "COCKPIT" : "AUSSEN") : "", vr_.action.c_str());
-  vr_.action.clear();
-  vr_.pulse[0] = vr_.pulse[1] = 0;
+                vr_y_fired_ ? 1.0f : clampf(vr_y_held_ / kResetHold, 0, 1), vr_pulse_[0], vr_pulse_[1], vr_near_vehicle_ ? 1 : 0, voice_mic_on() ? 1 : 0,
+                mode_ == Mode::drone ? (drone_cam_ == 0 ? "FPV" : drone_cam_ == 1 ? "FOLGEN" : "AUSSEN") : mode_ == Mode::car ? (car_cockpit_ ? "INNEN" : "AUSSEN")
+                : mode_ == Mode::jet ? (jet_cockpit_ ? "COCKPIT" : "AUSSEN") : "", vr_action_.c_str());
+  vr_action_.clear();
+  vr_pulse_[0] = vr_pulse_[1] = 0;
   return b;
 }
 
 void Game::vr_set_hand(i32 side, bool valid, Vec3 p, Quat q) {
   if (side < 0 || side > 1) return;
-  VrHand& h = vr_.hands[side];
+  VrHand& h = vr_hands_[side];
   h.valid = valid;
   if (!valid) { h.had = false; return; }
   h.p = p;
@@ -398,7 +398,7 @@ void Game::vr_set_hand(i32 side, bool valid, Vec3 p, Quat q) {
 void Game::vr_room(Vec3& f, Vec3& r, Vec3& up) const {
   // what kern_app_frame_xr will use this frame: the body's heading (less the head's yaw on foot),
   // or - in a cockpit with the horizon free - the craft's whole attitude
-  f = view_.cam.target - view_.cam.eye;
+  f = cam_.target - cam_.eye;
   f.z = 0;
   f = kern::normalize(f, {0, 1, 0});
   up = {0, 0, 1};
@@ -406,8 +406,8 @@ void Game::vr_room(Vec3& f, Vec3& r, Vec3& up) const {
     const f32 a = -engine_->xr_head_yaw * kDeg, c = std::cos(a), s = std::sin(a);
     f = kern::normalize(Vec3{f.x * c - f.y * s, f.x * s + f.y * c, 0}, {0, 1, 0});
   } else if (engine_ && engine_->xr_full_room) {
-    const Vec3 ff = kern::normalize(view_.cam.target - view_.cam.eye, f);
-    const Vec3 rr = kern::normalize(kern::cross(ff, view_.cam.up), Vec3{f.y, -f.x, 0});
+    const Vec3 ff = kern::normalize(cam_.target - cam_.eye, f);
+    const Vec3 rr = kern::normalize(kern::cross(ff, cam_.up), Vec3{f.y, -f.x, 0});
     f = ff;
     up = kern::cross(rr, ff);
   }
@@ -421,12 +421,12 @@ Vec3 Game::vr_room_forward() const {
 }
 
 bool Game::vr_hand_matrix(i32 side, Mat4& out) const {
-  if (!vr_.on || !engine_ || !engine_->xr || side < 0 || side > 1 || !vr_.hands[side].valid) return false;
-  const VrHand& h = vr_.hands[side];
+  if (!vr_ || !engine_ || !engine_->xr || side < 0 || side > 1 || !vr_hands_[side].valid) return false;
+  const VrHand& h = vr_hands_[side];
   Vec3 f, r, up;
   vr_room(f, r, up);
   auto W = [&](Vec3 v) { return r * v.x + up * v.y + f * (-v.z); };
-  const Vec3 x = W(h.q.rotate({1, 0, 0})), y = W(h.q.rotate({0, 1, 0})), z = W(h.q.rotate({0, 0, 1})), p = view_.cam.eye + W(h.p);
+  const Vec3 x = W(h.q.rotate({1, 0, 0})), y = W(h.q.rotate({0, 1, 0})), z = W(h.q.rotate({0, 0, 1})), p = cam_.eye + W(h.p);
   out = Mat4{};
   out.m[0] = x.x; out.m[1] = x.y; out.m[2] = x.z;
   out.m[4] = y.x; out.m[5] = y.y; out.m[6] = y.z;
@@ -456,37 +456,37 @@ void Game::vr_foot(kern::game::PlayInput& p, f32& forward, f32& strafe, f32 dt) 
   f32 turn = std::remainder(room + engine_->xr_head_yaw - body, 360.0f);
   // snap turn on the right stick: a flick past .7, again only after it came back under .3
   const f32 rx = pad.connected ? pad.rx : 0;
-  if (std::fabs(rx) < 0.3f) vr_.snap_armed = true;
+  if (std::fabs(rx) < 0.3f) vr_snap_armed_ = true;
   if (ui_.settings.on(Opt::vr_smooth_turn)) {
     // smooth turn (a setting): up to 120 deg/s, a dead zone of .2, the curve soft near the centre
     const f32 a = std::fabs(rx) < 0.2f ? 0 : (std::fabs(rx) - 0.2f) / 0.8f;
     turn -= (rx > 0 ? 1 : -1) * a * a * 120 * dt;
-  } else if (vr_.snap_armed && std::fabs(rx) > 0.7f) { vr_.snap_armed = false; turn += rx > 0 ? -kSnapDeg : kSnapDeg; }
+  } else if (vr_snap_armed_ && std::fabs(rx) > 0.7f) { vr_snap_armed_ = false; turn += rx > 0 ? -kSnapDeg : kSnapDeg; }
   p.turn_deg = turn;
   // the weapon on the right stick, up / down (the turn has its sideways half): one step per flick,
   // again after it came back under .3 - the hand stays on the grip, the trigger stays free
   {
     const f32 ry = pad.connected ? pad.ry : 0;  // up-positive
-    if (std::fabs(ry) < 0.3f) vr_.wpn_armed = true;
-    if (vr_.wpn_armed && std::fabs(ry) > 0.75f && std::fabs(ry) > std::fabs(rx)) {
-      vr_.wpn_armed = false;
+    if (std::fabs(ry) < 0.3f) vr_wpn_armed_ = true;
+    if (vr_wpn_armed_ && std::fabs(ry) > 0.75f && std::fabs(ry) > std::fabs(rx)) {
+      vr_wpn_armed_ = false;
       cycle_foot_weapon(ry > 0 ? 1 : -1);
       ctl_.scope_on = false;
     }
   }
   // the locomotion is a setting (VR: Laufen mit den Armen); both stick clicks switch it in the headset
-  vr_.arms = ui_.settings.on(Opt::vr_arms);
+  vr_arms_ = ui_.settings.on(Opt::vr_arms);
   const bool both = pad.connected && pad.down(kPadL3) && pad.down(kPadR3);
-  if (both && !vr_.both_clicks) {
-    command(std::string("set vr.arms ") + (vr_.arms ? "0" : "1"));
-    vr_.arms = ui_.settings.on(Opt::vr_arms);
-    toast_ = vr_.arms ? "VR: LAUFEN MIT DEN ARMEN (links joggen = gehen, beide = rennen)" : "VR: STICK-STEUERUNG (links gehen, rechts drehen)";
+  if (both && !vr_both_clicks_) {
+    command(std::string("set vr.arms ") + (vr_arms_ ? "0" : "1"));
+    vr_arms_ = ui_.settings.on(Opt::vr_arms);
+    toast_ = vr_arms_ ? "VR: LAUFEN MIT DEN ARMEN (links joggen = gehen, beide = rennen)" : "VR: STICK-STEUERUNG (links gehen, rechts drehen)";
     toast_age_ = 0;
   }
-  vr_.both_clicks = both;
+  vr_both_clicks_ = both;
   // the arms' speed (smoothed), whatever the mode (the HUD can show it)
   const f32 k = 1 - std::exp(-std::fmax(dt, 1e-4f) / kSwingTau);
-  for (VrHand& h : vr_.hands) {
+  for (VrHand& h : vr_hands_) {
     if (!h.valid) { h.swing += (0 - h.swing) * k; continue; }
     const f32 v = h.had && dt > 1e-4f ? kern::length(h.p - h.prev) / dt : 0;
     h.prev = h.p;
@@ -495,17 +495,17 @@ void Game::vr_foot(kern::game::PlayInput& p, f32& forward, f32& strafe, f32 dt) 
   }
   // grabbing: the grip, or the trigger of a free hand (the left always; the right with the fists)
   {
-    const bool fists = weapons_.foot_weapon == weapons::Id::fists;
+    const bool fists = foot_weapon_ == weapons::Id::fists;
     // (the sniper's left trigger is its scope: the grip still grabs)
-    const bool lg = pad.connected && (pad.down(kPadLB) || (pad.lt > 0.5f && weapons_.foot_weapon != weapons::Id::sniper)), rg = pad.connected && (pad.down(kPadRB) || (fists && pad.rt > 0.5f));
+    const bool lg = pad.connected && (pad.down(kPadLB) || (pad.lt > 0.5f && foot_weapon_ != weapons::Id::sniper)), rg = pad.connected && (pad.down(kPadRB) || (fists && pad.rt > 0.5f));
     vr_grab(0, lg, dt);
-    vr_grab(1, rg && (fists || weapons_.foot_weapon == weapons::Id::knife ? true : pad.down(kPadRB)), dt);
+    vr_grab(1, rg && (fists || foot_weapon_ == weapons::Id::knife ? true : pad.down(kPadRB)), dt);
   }
   vr_melee(0, dt);
   vr_melee(1, dt);
-  if (vr_.arms) {
+  if (vr_arms_) {
     // no stick walking, no stick strafing, no stick sprint: only the arms (and the real body)
-    const VrHand &L = vr_.hands[0], &R = vr_.hands[1];
+    const VrHand &L = vr_hands_[0], &R = vr_hands_[1];
     // the left arm sets the pace - jogging walks, pumping it harder runs faster - so the right hand
     // stays on the gun, aims and fires while running; both arms count too, the left stick's click
     // held runs
@@ -532,17 +532,17 @@ void Game::vr_scope_update() {
   // take it down and you see the world again (no zoom of the whole view: no sickness)
   kern::Renderer& r = engine_->renderer;
   kern::Mat4 m;
-  const bool on = vr_.on && engine_->xr && mode_ == Mode::foot && !player_dead_ && weapons_.foot_weapon == weapons::Id::sniper && vr_hand_matrix(1, m);
+  const bool on = vr_ && engine_->xr && mode_ == Mode::foot && !player_dead_ && foot_weapon_ == weapons::Id::sniper && vr_hand_matrix(1, m);
   engine_->xr_scope = false;
-  if (!on) { if (vr_.scope_mesh) r.set_visible(vr_.scope_mesh, false); return; }
-  if (!vr_.scope_tex) {
+  if (!on) { if (vr_scope_mesh_) r.set_visible(vr_scope_mesh_, false); return; }
+  if (!vr_scope_tex_) {
     u32 fbo = 0;
-    vr_.scope_tex = r.create_render_target(512, fbo);
+    vr_scope_tex_ = r.create_render_target(512, fbo);
     engine_->xr_scope_fbo = fbo;
     engine_->xr_scope_size = 512;
-    if (!vr_.scope_tex) return;
+    if (!vr_scope_tex_) return;
   }
-  if (!vr_.scope_mesh) {
+  if (!vr_scope_mesh_) {
     kern::MeshData d;  // the lens: a disc (a fan), the picture mapped across it
     const Vec3 n{0, -1, 0};
     d.push({0, 0, 0}, n, {1, 1, 1}, {0.5f, 0.5f});
@@ -552,19 +552,19 @@ void Game::vr_scope_update() {
       d.push({std::cos(a) * 0.5f, 0, std::sin(a) * 0.5f}, n, {1, 1, 1}, {0.5f + std::cos(a) * 0.5f, 0.5f - std::sin(a) * 0.5f});
       if (i > 0) d.indices.insert(d.indices.end(), {0u, static_cast<u32>(i), static_cast<u32>(i + 1)});
     }
-    vr_.scope_mesh = r.allocate_id();
+    vr_scope_mesh_ = r.allocate_id();
     kern::MeshInput in = d.as_input(kern::kMaxExtensionAttributes);
     in.material.unlit = true;
     in.material.double_sided = true;
     in.material.cast_shadow = false;
     in.material.frustum_culled = false;
-    in.texture = vr_.scope_tex;
-    if (!r.upsert(vr_.scope_mesh, in)) { r.release_id(vr_.scope_mesh); vr_.scope_mesh = 0; return; }
+    in.texture = vr_scope_tex_;
+    if (!r.upsert(vr_scope_mesh_, in)) { r.release_id(vr_scope_mesh_); vr_scope_mesh_ = 0; return; }
   }
   const Vec3 x{m.m[0], m.m[1], m.m[2]}, y{m.m[4], m.m[5], m.m[6]}, z{m.m[8], m.m[9], m.m[10]}, at = m.translation();
   // the scope sits on the rifle above the grip: the eyepiece 9 cm behind it, the objective 30 cm ahead
   const Vec3 eyepiece = at + y * 0.075f + z * 0.09f, objective = at + y * 0.075f - z * 0.3f;
-  kern::Camera c = view_.cam;
+  kern::Camera c = cam_;
   c.eye = objective;
   c.target = objective - z;
   c.up = y;
@@ -581,9 +581,9 @@ void Game::vr_scope_update() {
   const f32 lens = ads ? 0.16f : 0.034f;  // m across
   const Vec3 c0 = ads ? eye - z * 0.3f : eyepiece;
   const f32 lm[16] = {x.x * lens, x.y * lens, x.z * lens, 0, -z.x, -z.y, -z.z, 0, y.x * lens, y.y * lens, y.z * lens, 0, c0.x, c0.y, c0.z, 1};
-  vr_.scoped = ads;
-  r.update_instances(vr_.scope_mesh, {lm, 16}, {});
-  r.set_visible(vr_.scope_mesh, true);
+  vr_scoped_ = ads;
+  r.update_instances(vr_scope_mesh_, {lm, 16}, {});
+  r.set_visible(vr_scope_mesh_, true);
 }
 
 void Game::vr_update_view() {
@@ -592,15 +592,15 @@ void Game::vr_update_view() {
   Mat4 m;
   // (the game's own weapons - launchers, knife, fists - are drawn by game_look.cpp; then Kern's
   // gun stays a hidden view model)
-  if (vr_.on && mode_ == Mode::foot && !game_weapon_in_hand() && vr_hand_matrix(1, m)) world_->set_view_hand(&m);
+  if (vr_ && mode_ == Mode::foot && !game_weapon_in_hand() && vr_hand_matrix(1, m)) world_->set_view_hand(&m);
   else world_->set_view_hand(nullptr);
   if (engine_) {
-    engine_->xr_follow_head = vr_.on && mode_ == Mode::foot && !player_dead_;
-    engine_->xr_hold_room = vr_.on && player_dead_;  // dying the camera falls and turns: the room stays (no spin)
+    engine_->xr_follow_head = vr_ && mode_ == Mode::foot && !player_dead_;
+    engine_->xr_hold_room = vr_ && player_dead_;  // dying the camera falls and turns: the room stays (no spin)
     // the jet's cockpit and the FPV drone with the horizon free (VR: Horizont halten off): you sit
     // in the craft, it is the rest frame - the world turns round it, loops and rolls included
-    engine_->xr_full_room = vr_.on && !player_dead_ && !ui_.settings.on(Opt::vr_level) &&
-                            ((mode_ == Mode::jet && view_.jet_cockpit) || (mode_ == Mode::drone && view_.drone_cam == 0));
+    engine_->xr_full_room = vr_ && !player_dead_ && !ui_.settings.on(Opt::vr_level) &&
+                            ((mode_ == Mode::jet && jet_cockpit_) || (mode_ == Mode::drone && drone_cam_ == 0));
   }
 }
 
@@ -610,16 +610,16 @@ void Game::vr_comfort(f32 dt) {
   // a drone braking. Turning your head, walking in the room, cruising straight leave it open.
   if (!engine_) return;
   kern::Renderer& r = engine_->renderer;
-  const bool on = vr_.on && engine_->xr && ui_.settings.on(Opt::vr_tunnel) && !player_dead_;
+  const bool on = vr_ && engine_->xr && ui_.settings.on(Opt::vr_tunnel) && !player_dead_;
   if (!on) {
-    vr_.tunnel = 0;
-    vr_.prev_ok = false;
+    vr_tunnel_ = 0;
+    vr_prev_ok_ = false;
     engine_->xr_vignette = 0;
     return;
   }
-  if (!vr_.tunnel_mesh) {
+  if (!vr_tunnel_mesh_) {
     // a black ring: see-through inside radius 1, opaque from 2 to 8 (the texture's u is the radius)
-    if (!vr_.tunnel_tex) {
+    if (!vr_tunnel_tex_) {
       u8 px[64 * 2 * 4];
       for (int y = 0; y < 2; ++y)
         for (int x = 0; x < 64; ++x) {
@@ -633,8 +633,8 @@ void Game::vr_comfort(f32 dt) {
       td.width = 64;
       td.height = 2;
       td.mipmaps = false;
-      vr_.tunnel_tex = r.create_texture(td);
-      if (!vr_.tunnel_tex) return;
+      vr_tunnel_tex_ = r.create_texture(td);
+      if (!vr_tunnel_tex_) return;
     }
     kern::MeshData d;
     const Vec3 n{0, -1, 0};
@@ -648,46 +648,46 @@ void Game::vr_comfort(f32 dt) {
         for (u32 k = 0; k < 2; ++k) d.indices.insert(d.indices.end(), {b + k, e + k, e + k + 1, b + k, e + k + 1, b + k + 1});
       }
     }
-    vr_.tunnel_mesh = r.allocate_id();
+    vr_tunnel_mesh_ = r.allocate_id();
     kern::MeshInput in = d.as_input(kern::kMaxExtensionAttributes);
     in.material.unlit = true;
     in.material.double_sided = true;
     in.material.cast_shadow = false;
     in.material.frustum_culled = false;
     in.material.alpha = kern::AlphaMode::blend;
-    in.texture = vr_.tunnel_tex;
-    if (!r.upsert(vr_.tunnel_mesh, in)) { r.release_id(vr_.tunnel_mesh); vr_.tunnel_mesh = 0; return; }
-    r.set_visible(vr_.tunnel_mesh, false);
-    engine_->xr_vignette_mesh = vr_.tunnel_mesh;
+    in.texture = vr_tunnel_tex_;
+    if (!r.upsert(vr_tunnel_mesh_, in)) { r.release_id(vr_tunnel_mesh_); vr_tunnel_mesh_ = 0; return; }
+    r.set_visible(vr_tunnel_mesh_, false);
+    engine_->xr_vignette_mesh = vr_tunnel_mesh_;
   }
   // this frame's room and the camera (the room's anchor) against the last
   Vec3 f, rt, up;
   vr_room(f, rt, up);
-  const Vec3 eye = view_.cam.eye;
+  const Vec3 eye = cam_.eye;
   f32 want = 0;
-  if (vr_.prev_ok && dt > 1e-4f) {
-    const f32 turn = std::acos(clampf(kern::dot(f, vr_.prev_f), -1, 1)) + std::acos(clampf(kern::dot(up, vr_.prev_up), -1, 1));
+  if (vr_prev_ok_ && dt > 1e-4f) {
+    const f32 turn = std::acos(clampf(kern::dot(f, vr_prev_f_), -1, 1)) + std::acos(clampf(kern::dot(up, vr_prev_up_), -1, 1));
     const f32 rate = turn / dt / kDeg;  // deg/s the game turns the room
-    const Vec3 v = (eye - vr_.prev_eye) * (1 / dt);
-    const f32 jump = kern::length(eye - vr_.prev_eye);
+    const Vec3 v = (eye - vr_prev_eye_) * (1 / dt);
+    const f32 jump = kern::length(eye - vr_prev_eye_);
     if (jump < 4) {  // not a respawn, a seat change, a teleport
-      const f32 acc = kern::length(v - vr_.prev_v) / dt;
+      const f32 acc = kern::length(v - vr_prev_v_) / dt;
       const f32 speed = kern::length(Vec3{v.x, v.y, 0});
       want = std::fmax(want, clampf((rate - 25) / 110, 0, 1));
       want = std::fmax(want, clampf((acc - 4) / 18, 0, 1) * 0.8f);
       // on foot the stick walk itself (a constant artificial motion): a light rim while moving
       if (mode_ == Mode::foot) want = std::fmax(want, clampf((speed - 0.8f) / 6, 0, 1) * 0.55f);
     }
-    vr_.prev_v = v;
+    vr_prev_v_ = v;
   }
-  vr_.prev_f = f;
-  vr_.prev_up = up;
-  vr_.prev_eye = eye;
-  vr_.prev_ok = true;
+  vr_prev_f_ = f;
+  vr_prev_up_ = up;
+  vr_prev_eye_ = eye;
+  vr_prev_ok_ = true;
   // in fast (80 ms), out slow (350 ms): no pumping
-  const f32 tau = want > vr_.tunnel ? 0.08f : 0.35f;
-  vr_.tunnel += (want - vr_.tunnel) * (1 - std::exp(-dt / tau));
-  engine_->xr_vignette = vr_.tunnel < 0.02f ? 0 : vr_.tunnel;
+  const f32 tau = want > vr_tunnel_ ? 0.08f : 0.35f;
+  vr_tunnel_ += (want - vr_tunnel_) * (1 - std::exp(-dt / tau));
+  engine_->xr_vignette = vr_tunnel_ < 0.02f ? 0 : vr_tunnel_;
 }
 
 }  // namespace sc

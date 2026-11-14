@@ -90,7 +90,7 @@ void Game::hud_world(std::string& s) {
 void Game::update_world(f32 dt) {
   if (!life_ || !world_placed_) return;
   WorldLife& L = *life_;
-  if (!L.sounds.ready && audio_.mixer.ready()) init_world_sounds(audio_.mixer, L.sounds);
+  if (!L.sounds.ready && mixer_.ready()) init_world_sounds(mixer_, L.sounds);
   if (!L.art_ready) L.art_ready = L.art.init(engine_->renderer);
   L.marks.update(world_->sim_time(), city_, world_->physics());
   update_traffic_world(dt);
@@ -121,7 +121,7 @@ void Game::update_world(f32 dt) {
     ++L.splashes;
     world_->particle_burst(sp.at, {0.62f, 0.82f, 1.0f});  // world_impacts.mjs water chips 0x9fd0ff
     if (sp.size > 2) world_->particle_burst(sp.at + Vec3{0, 0, 0.6f}, {0.9f, 0.95f, 1.0f});
-    if (L.sounds.ready) play_at(audio_.mixer, sp.size > 1.5f ? L.sounds.splash : L.sounds.splash_small, sp.at, clampf(0.4f + sp.size * 0.2f, 0.3f, 1.0f),
+    if (L.sounds.ready) play_at(mixer_, sp.size > 1.5f ? L.sounds.splash : L.sounds.splash_small, sp.at, clampf(0.4f + sp.size * 0.2f, 0.3f, 1.0f),
                                 1.15f - clampf(sp.size * 0.05f, 0, 0.4f), 80);
   }
   L.pending_splashes.clear();
@@ -159,8 +159,8 @@ void Game::step_world(f32 h) {
     }
     L.in_water[slot] = sub;
   };
-  if (vehicle_.jet_placed) water(0, jet_actor_, {0.8f, 8.1f, 0.8f}, false);  // the fuselage hull (jet.cpp rigid_spec)
-  if (vehicle_.drone_out) water(1, drone_actor_, {0.12f, 0.12f, 0.04f}, true);
+  if (jet_placed_) water(0, jet_actor_, {0.8f, 8.1f, 0.8f}, false);  // the fuselage hull (jet.cpp rigid_spec)
+  if (drone_out_) water(1, drone_actor_, {0.12f, 0.12f, 0.04f}, true);
   if (mode_ == Mode::parachute) water(2, chute_actor_, {0.3f, 0.3f, 0.85f}, false);
   for (std::size_t i = 0; i < cars_.size() && i + 3 < 32; ++i)
     if (cars_[i].placed) water(static_cast<u32>(i + 3), cars_[i].actor, cars_[i].car->spec().half, false);

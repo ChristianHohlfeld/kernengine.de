@@ -51,7 +51,7 @@ ProjSync& Game::projsync() {
 void Game::projsync_blast(u8 owner, Vec3 at) {
   // his blast: his round is over here too (whatever the stream still says)
   if (!projsync_) return;
-  for (Projectile& p : weapons_.projectiles)
+  for (Projectile& p : projectiles_)
     if (p.ghost && p.alive && (p.net >> 16) == owner && kern::length(p.pos - at) < 8) {
       p.alive = false;
       projsync_->ghosts.erase(p.net);
@@ -61,7 +61,7 @@ void Game::projsync_blast(u8 owner, Vec3 at) {
 void Game::projsync_update(f32 dt) {
   ProjSync& S = projsync();
   if (!net_.active()) {
-    if (!S.ghosts.empty()) { for (Projectile& p : weapons_.projectiles) if (p.ghost) p.alive = false; S.ghosts.clear(); }
+    if (!S.ghosts.empty()) { for (Projectile& p : projectiles_) if (p.ghost) p.alive = false; S.ghosts.clear(); }
     (void)net_.take_proj();
     return;
   }
@@ -74,9 +74,9 @@ void Game::projsync_update(f32 dt) {
     S.clock = 0;
     struct Rec { u16 id; u8 kind, flags; Vec3 p, v; };
     std::vector<Rec> recs;
-    for (const Projectile& p : weapons_.projectiles)
+    for (const Projectile& p : projectiles_)
       if (p.alive && !p.ghost && p.by_player && p.net) recs.push_back({static_cast<u16>(p.net), static_cast<u8>(p.id), 0, p.pos, p.vel});
-    for (const guided::Flight& f : guided_.flights)
+    for (const guided::Flight& f : guided_)
       recs.push_back({static_cast<u16>(0x8000 | (static_cast<u32>(std::lround(f.m.born * 1000)) & 0x7fff)), static_cast<u8>(weapons::Id::drone_guided), static_cast<u8>(f.m.motor ? 2 : 0), f.m.p, f.m.v});
     // the ones that ended: "gone", three times (the stream is unreliable)
     std::vector<std::pair<u16, u8>> next;
@@ -135,14 +135,14 @@ void Game::projsync_update(f32 dt) {
         q.net = key;
         q.gravity = q.id == weapons::Id::grenade_launcher || q.id == weapons::Id::hand_grenade || q.id == weapons::Id::jet_bomb;
         q.fuse = 1e9f;
-        weapons_.projectiles.push_back(q);
+        projectiles_.push_back(q);
         osfx("launch", p, static_cast<f32>(kind), 0);  // his launch, heard where it is
       }
       (void)flags;
     }
   }
   // ---- theirs: where each is now on his clock
-  for (Projectile& p : weapons_.projectiles) {
+  for (Projectile& p : projectiles_) {
     if (!p.ghost || !p.alive) continue;
     auto it = S.ghosts.find(p.net);
     if (it == S.ghosts.end() || it->second.gone || now - it->second.heard > kQuiet) { p.alive = false; continue; }

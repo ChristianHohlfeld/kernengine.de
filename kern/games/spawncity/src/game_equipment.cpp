@@ -35,7 +35,7 @@ std::vector<f32> render_loop(std::initializer_list<SynthPatch> layers, u32 rate,
 // audio clips (once, when the page starts the audio)
 
 void Game::ui_audio_init() {
-  kern::audio::Mixer& m = audio_.mixer;
+  kern::audio::Mixer& m = mixer_;
   const u32 rate = m.sample_rate();
   ui_.music.init(rate);
   // jetpack_audio.mjs: one roaring voice - noise, band-passed (flame colour), crackle (random AM).
@@ -191,11 +191,11 @@ void Game::ui_jetpack(f32 dt) {
   if ((pressed || ui_.jet_pending) && airborne && j.ignite(v.z)) {
     ui_.jet_pending = false;
     if (v.z < 0) { v.z *= Jetpack::ignition_damp(); world_->set_actor_velocity(soldier_, v); }
-    if (audio_.mixer.ready() && ui_.whoomp_clip) {
+    if (mixer_.ready() && ui_.whoomp_clip) {
       kern::audio::PlayParams p;
       p.volume = 0.8f;
       p.bus = kern::audio::Bus::sfx;
-      audio_.mixer.play(ui_.whoomp_clip, p);
+      mixer_.play(ui_.whoomp_clip, p);
     }
     world_->shake_camera(0.12f);
     osfx("jetpack.ignition", pos);  // jetpack_audio.mjs: "arondight:player-jetpack"
@@ -218,7 +218,7 @@ void Game::ui_jetpack(f32 dt) {
 
 void Game::ui_equipment(f32 dt) {
   // Flight logbook: every drone flight from ARM to DISARM.
-  if (vehicle_.drone_out) {
+  if (drone_out_) {
     const DroneTelemetry& t = drone_.telemetry();
     FlightSample s;
     s.t = world_->sim_time();
@@ -228,7 +228,7 @@ void Game::ui_equipment(f32 dt) {
     s.volts = t.battery_v;
     s.armed = t.armed;
     ui_.log.observe(s, t.fault ? "FC_FAULT" : "FC_DISARM");
-  } else if (ui_.log.flying()) ui_.log.finish(vehicle_.drone_hp <= 0 ? "DRONE_DESTROYED" : "DRONE_STOWED");
+  } else if (ui_.log.flying()) ui_.log.finish(drone_hp_ <= 0 ? "DRONE_DESTROYED" : "DRONE_STOWED");
   if (net_.active() && net_.status() != ui_.net_status) {
     ui_.net_status = net_.status();
     ui_.log.network(ui_.net_status, world_->sim_time());
@@ -236,7 +236,7 @@ void Game::ui_equipment(f32 dt) {
   // Car radio: in a car it comes on (the title music fades out under it); N / B or D-pad right / left
   // switch, with one RADIO AUS slot between the last and the first station.
   const bool in_car = mode_ == Mode::car && !ui_.paused;
-  if (in_car && engine_ && !audio_.web_audio) {  // on the page with the original's sound, car_radio.mjs itself (game_audio_web.cpp)
+  if (in_car && engine_ && !web_audio_) {  // on the page with the original's sound, car_radio.mjs itself (game_audio_web.cpp)
     // car_radio.mjs: N / B, the pad's D-pad right / left (padTick; D-pad right pings as well, pad_actions.mjs)
     const bool next = engine_->input.pressed(kern::Key::n) || pad.hit(kPadRight) || pad_touch_.take_pressed("radio");
     const bool prev = engine_->input.pressed(kern::Key::b) || pad.hit(kPadLeft);
@@ -249,12 +249,12 @@ void Game::ui_equipment(f32 dt) {
     if (ui_.car_vel_valid) {
       const f32 dv = kern::length(v - ui_.car_vel) - 9.81f * dt * 1.5f;
       if (dv > 1.8f) osfx("world-physics-impact", matrix_of(cars_[car_index_].actor).translation(), dv);
-      if (dv > 1.8f && audio_.mixer.ready() && ui_.thump_clip) {
+      if (dv > 1.8f && mixer_.ready() && ui_.thump_clip) {
         kern::audio::PlayParams p;
         p.volume = clampf(0.25f + dv * 0.06f, 0.3f, 1);
         p.pitch = clampf(1.2f - dv * 0.03f, 0.6f, 1.2f);
         p.bus = kern::audio::Bus::sfx;
-        audio_.mixer.play(ui_.thump_clip, p);
+        mixer_.play(ui_.thump_clip, p);
         ++ui_.thumps;
         world_->shake_camera(clampf((dv - 2.5f) / 14, 0, 0.7f));
       }
@@ -281,7 +281,7 @@ void Game::ui_radio(i32 dir) {
 
 void Game::ui_mix_equipment(f32 dt) {
   (void)dt;
-  kern::audio::Mixer& m = audio_.mixer;
+  kern::audio::Mixer& m = mixer_;
   const Settings& st = ui_.settings;
   // Jetpack roar: level and colour follow the thrust.
   const bool burn = ui_.jetpack.thrusting && !ui_.paused;
@@ -295,7 +295,7 @@ void Game::ui_mix_equipment(f32 dt) {
     }
   }
   // City bed: quieter high up, birds by day, crickets at night (ambience bus = the AMBIENT slider).
-  const f32 high = clampf(1 - (view_.cam.eye.z - city_.ground_height(view_.cam.eye.x, view_.cam.eye.y)) / 150, 0.15f, 1);
+  const f32 high = clampf(1 - (cam_.eye.z - city_.ground_height(cam_.eye.x, cam_.eye.y)) / 150, 0.15f, 1);
   const bool live = world_placed_ && !ui_.paused;
   drive_loop(m, ui_.city_voice, ui_.city_clip, live ? 0.32f * high * (city_.offline() ? 0.7f : 1.0f) : 0.0f, kern::audio::Bus::ambience);
   drive_loop(m, ui_.birds_voice, ui_.birds_clip, live ? 0.28f * high * (1 - night_) : 0.0f, kern::audio::Bus::ambience);

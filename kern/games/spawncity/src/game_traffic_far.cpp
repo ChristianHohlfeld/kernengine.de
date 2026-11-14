@@ -112,8 +112,8 @@ void Game::traffic_far_switch() {
     TrafficCar& c = cars_[i];
     const kern::physics::Body b = body(c.actor);
     if (!c.placed || !b.valid() || !w.body_valid(b)) { c.far = false; c.solid_masks.clear(); continue; }  // (no body, or a new one: solid)
-    if (worldsync_.puppet_world && i < worldsync_.car_net.size() && worldsync_.car_net[i] >= 0) { traffic_solid(c); continue; }  // the host's car here: on his poses (game_worldsync.cpp)
-    const bool keep = c.police || c.wreck || c.burn_until >= 0 || static_cast<i32>(i) == car_index_ || (i < worldsync_.car_lent.size() && worldsync_.car_lent[i]);
+    if (puppet_world_ && i < car_net_.size() && car_net_[i] >= 0) { traffic_solid(c); continue; }  // the host's car here: on his poses (game_worldsync.cpp)
+    const bool keep = c.police || c.wreck || c.burn_until >= 0 || static_cast<i32>(i) == car_index_ || (i < car_lent_.size() && car_lent_[i]);
     const Vec3 p = matrix_of(c.actor).translation();
     // near any player real physics (MP host: the ground and the buildings are loaded around the
     // mates too - CityStream::extra_foci); never where no ground collision stands yet

@@ -98,7 +98,7 @@ bool Game::world_puppet() const {
 f64 Game::life_epoch() const {
   // the clock the animals' rounds run on: the wall clock - in a session the host's (a client
   // counts on from what the host last sent), so a dog is at the same place of its round everywhere
-  if (net_.active() && !net_.hosting() && worldsync_.host_epoch_ok) return kern::now_ms() / 1000 + worldsync_.host_epoch_off;
+  if (net_.active() && !net_.hosting() && host_epoch_ok_) return kern::now_ms() / 1000 + host_epoch_off_;
   return static_cast<f64>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()) / 1000.0;
 }
 
@@ -126,17 +126,17 @@ void Game::worldsync_update(f32 dt) {
       const net::Remote* who = nullptr;
       for (const net::Remote& r : net_.remotes())
         if (r.state.mode == net::PlayerMode::car && r.state.car == i) { owner = r.state.slot; who = &r; }
-      if (worldsync_.car_lent.size() < cars_.size()) { worldsync_.car_lent.resize(cars_.size(), false); worldsync_.car_lent_at.resize(cars_.size()); }
-      const bool was = worldsync_.car_lent[i];
+      if (car_lent_.size() < cars_.size()) { car_lent_.resize(cars_.size(), false); car_lent_at_.resize(cars_.size()); }
+      const bool was = car_lent_[i];
       if (owner >= 0) {
         if (!was && c.placed) world_->set_alive(c.actor, false);
-        worldsync_.car_lent[i] = true;
-        worldsync_.car_lent_at[i] = {who->shown, who->shown_rotation};
+        car_lent_[i] = true;
+        car_lent_at_[i] = {who->shown, who->shown_rotation};
       } else if (was) {
-        worldsync_.car_lent[i] = false;
+        car_lent_[i] = false;
         // his car comes back to the town where he got out (the pose he last sent)
-        const Vec3 p = worldsync_.car_lent_at[i].first;
-        const Vec3 f = worldsync_.car_lent_at[i].second.rotate({1, 0, 0});
+        const Vec3 p = car_lent_at_[i].first;
+        const Vec3 f = car_lent_at_[i].second.rotate({1, 0, 0});
         const Vec3 rot{0, 0, std::atan2(f.y, f.x) / kDeg};
         world_->set_alive(c.actor, true);
         world_->teleport(c.actor, p, &rot);
@@ -148,10 +148,10 @@ void Game::worldsync_update(f32 dt) {
     // (in real time: a host whose game runs slow still sends at his rates)
     {
       const f64 real = kern::now_ms();
-      const f32 real_dt = worldsync_.world_send_real > 0 ? static_cast<f32>(std::min(1000.0, real - worldsync_.world_send_real) / 1000) : dt;
-      worldsync_.world_send_real = real;
-      worldsync_.world_send_clock += real_dt;
-      worldsync_.people_send_clock += real_dt;
+      const f32 real_dt = world_send_real_ > 0 ? static_cast<f32>(std::min(1000.0, real - world_send_real_) / 1000) : dt;
+      world_send_real_ = real;
+      world_send_clock_ += real_dt;
+      people_send_clock_ += real_dt;
     }
     const std::vector<Vec3> mates = mate_foci();
     // the town is loaded around them too (their tile and the ring; one tile on a phone)
@@ -164,9 +164,9 @@ void Game::worldsync_update(f32 dt) {
     // the last one marked; a client that got every part knows the whole list - what it does not
     // name is not there. Places are relative to the client (5 cm, 1 cm up), on the host's clock.
     // Sent whether there is anything or not: an empty list is the truth too.
-    const bool send_cars = worldsync_.world_send_clock >= kSendEvery, send_people = worldsync_.people_send_clock >= kPeopleEvery;
-    if (send_cars) { worldsync_.world_send_clock = 0; ++worldsync_.world_tick; }
-    if (send_people) worldsync_.people_send_clock = 0;
+    const bool send_cars = world_send_clock_ >= kSendEvery, send_people = people_send_clock_ >= kPeopleEvery;
+    if (send_cars) { world_send_clock_ = 0; ++world_tick_; }
+    if (send_people) people_send_clock_ = 0;
     // (the real clock, not the game's: a machine whose game runs slow still stamps true time)
     const u32 t_ms = static_cast<u32>(static_cast<u64>(kern::now_ms()));
     auto ang16 = [](f32 a) { return static_cast<i16>(std::lround(wrap_pi(a) / kPi * 32767)); };
@@ -195,7 +195,7 @@ void Game::worldsync_update(f32 dt) {
         L.head();
         for (std::size_t i = 0; i < cars_.size() && i < 255; ++i) {
           const TrafficCar& c = cars_[i];
-          if (!c.placed || c.police || !world_->actor_alive(c.actor) || (i < worldsync_.car_lent.size() && worldsync_.car_lent[i])) continue;
+          if (!c.placed || c.police || !world_->actor_alive(c.actor) || (i < car_lent_.size() && car_lent_[i])) continue;
           if (mode_ == Mode::car && static_cast<i32>(i) == car_index_) continue;  // ours: drawn as our car
           const BodyState s = state_of(c.actor);
           if (!near(s.position, kCarReach)) continue;
@@ -204,7 +204,7 @@ void Game::worldsync_update(f32 dt) {
           const u8 fl = static_cast<u8>((c.car->spec().radius > 0.4f ? 1 : 0) | (c.wreck ? 2 : 0) | (c.input.pedal < -0.05f ? 4 : 0) | (c.burn_until >= 0 ? 8 : 0));
           // at rest (standing, not turning): only named - it is where its last whole entry put it
           const bool rest = kern::length(s.velocity) < 0.03f && kern::length(s.angular) < 0.03f;
-          if (rest && (worldsync_.world_tick + i) % kRestEvery != 0) {
+          if (rest && (world_tick_ + i) % kRestEvery != 0) {
             e.put(static_cast<u8>(fl | 0x80));
             L.entry(e.b);
             continue;
@@ -218,7 +218,7 @@ void Game::worldsync_update(f32 dt) {
           L.entry(e.b);
         }
         L.flush(true);
-        ++worldsync_.world_sent;
+        ++world_sent_;
       }
       if (send_people) {
         {
@@ -337,16 +337,16 @@ void Game::worldsync_update(f32 dt) {
   if (!net_.hosting()) city_.extra_foci.clear();
   // ---- client: the host's town around us ----
   const bool puppet = world_puppet();
-  if (puppet != worldsync_.puppet_world) {
-    worldsync_.puppet_world = puppet;
+  if (puppet != puppet_world_) {
+    puppet_world_ = puppet;
     people_.set_puppets(puppet);
     if (glife_) glife_->life.set_remote_joggers(puppet);
     if (glife_) glife_->life.set_remote_animals(puppet);
-    worldsync_.car_net.assign(cars_.size(), -1);
-    worldsync_.car_line.assign(cars_.size(), {});
-    worldsync_.world_parts.clear();
-    worldsync_.host_epoch_ok = false;
-    worldsync_.world_clock_ok = false;
+    car_net_.assign(cars_.size(), -1);
+    car_line_.assign(cars_.size(), {});
+    world_parts_.clear();
+    host_epoch_ok_ = false;
+    world_clock_ok_ = false;
     for (std::size_t i = 0; i < cars_.size(); ++i) {
       TrafficCar& c = cars_[i];
       if (c.police || static_cast<i32>(i) == car_index_) continue;
@@ -356,12 +356,12 @@ void Game::worldsync_update(f32 dt) {
   // (every frame: the street life may only come to be after the session began)
   if (glife_) { glife_->life.set_remote_joggers(puppet); glife_->life.set_remote_animals(puppet); }
   std::vector<std::vector<u8>> blobs = net_.take_world();
-  worldsync_.world_got += static_cast<u32>(blobs.size());
-  if (!blobs.empty()) worldsync_.world_heard_at = now;
+  world_got_ += static_cast<u32>(blobs.size());
+  if (!blobs.empty()) world_heard_at_ = now;
   if (!puppet) return;
-  if (worldsync_.car_net.size() < cars_.size()) worldsync_.car_net.resize(cars_.size(), -1);
-  if (worldsync_.car_line.size() < cars_.size()) worldsync_.car_line.resize(cars_.size());
-  if (worldsync_.car_rest_q.size() < cars_.size()) worldsync_.car_rest_q.resize(cars_.size());
+  if (car_net_.size() < cars_.size()) car_net_.resize(cars_.size(), -1);
+  if (car_line_.size() < cars_.size()) car_line_.resize(cars_.size());
+  if (car_rest_q_.size() < cars_.size()) car_rest_q_.resize(cars_.size());
   const f64 now_ms = kern::now_ms();  // the real clock on both sides: the same pace everywhere
   for (const std::vector<u8>& blob : blobs) {
     Rd r{blob};
@@ -375,23 +375,23 @@ void Game::worldsync_update(f32 dt) {
     // then placed at the moment it was taken, so the motion between snapshots is his, not a stepping
     {
       const f64 lag = now_ms - static_cast<f64>(t_ms);
-      if (!worldsync_.world_clock_ok || lag < worldsync_.world_clock) { worldsync_.world_clock = lag; worldsync_.world_clock_ok = true; }
-      else worldsync_.world_clock += std::min(1.0, (lag - worldsync_.world_clock) * 0.02);
+      if (!world_clock_ok_ || lag < world_clock_) { world_clock_ = lag; world_clock_ok_ = true; }
+      else world_clock_ += std::min(1.0, (lag - world_clock_) * 0.02);
     }
     // when the list was taken, on our game clock: now, less its age in real time
-    const f64 age_ms = std::max(0.0, now_ms - (static_cast<f64>(t_ms) + worldsync_.world_clock));
+    const f64 age_ms = std::max(0.0, now_ms - (static_cast<f64>(t_ms) + world_clock_));
     const f32 snap_at = now - static_cast<f32>(age_ms / 1000);
     // the list this part belongs to: whole when every part up to the last one came
-    WorldParts& P = worldsync_.world_parts[type];
+    WorldParts& P = world_parts_[type];
     if (P.t_ms != t_ms) {
       if (static_cast<i32>(t_ms - P.t_ms) < 0 && P.t_ms != 0) continue;  // an older list, late: the newer one stands
       P = WorldParts{};
       P.t_ms = t_ms;
-      if (type == kCars) worldsync_.car_seen.assign(cars_.size(), false);
-      if (type == kPeople) worldsync_.people_acc.clear();
-      if (type == kCows) worldsync_.cows_acc.clear();
-      if (type == kPets) worldsync_.pets_acc.clear();
-      if (type == kFlocks) worldsync_.flocks_acc.clear();
+      if (type == kCars) car_seen_.assign(cars_.size(), false);
+      if (type == kPeople) people_acc_.clear();
+      if (type == kCows) cows_acc_.clear();
+      if (type == kPets) pets_acc_.clear();
+      if (type == kFlocks) flocks_acc_.clear();
     }
     if (part < 64) P.mask |= 1ull << part;
     const bool whole = last && part < 64 && P.mask == (part == 63 ? ~0ull : (1ull << (part + 1)) - 1);
@@ -400,7 +400,7 @@ void Game::worldsync_update(f32 dt) {
     auto x1 = [&](f32 base) { return base + r.get<i16>() / 100.0f; };
     auto quat = [&]() { Quat q; q.x = uq16(r.get<i16>()); q.y = uq16(r.get<i16>()); q.z = uq16(r.get<i16>()); q.w = uq16(r.get<i16>()); const f32 l = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w); if (l > 1e-6f) { q.x /= l; q.y /= l; q.z /= l; q.w /= l; } else q = Quat{}; return q; };
     if (type == kCars) {
-      std::vector<bool>& seen = worldsync_.car_seen;
+      std::vector<bool>& seen = car_seen_;
       if (seen.size() != cars_.size()) seen.assign(cars_.size(), false);
       // what a car's flags say of it (a whole entry, and one at rest that is only named, alike)
       auto car_state = [&](TrafficCar& c, u8 fl, Vec3 at) {
@@ -422,9 +422,9 @@ void Game::worldsync_update(f32 dt) {
           // at rest: named only - ours of that name stays as it is (one we do not have yet waits
           // for its whole entry)
           for (std::size_t i = 0; i < cars_.size(); ++i)
-            if (worldsync_.car_net[i] == idx) {
+            if (car_net_[i] == idx) {
               seen[i] = true;
-              if (i < worldsync_.car_line.size() && !worldsync_.car_line[i].empty()) worldsync_.car_line[i].push(worldsync_.car_line[i].last_position(), worldsync_.car_rest_q[i], {}, true, static_cast<f64>(t_ms), now_ms);
+              if (i < car_line_.size() && !car_line_[i].empty()) car_line_[i].push(car_line_[i].last_position(), car_rest_q_[i], {}, true, static_cast<f64>(t_ms), now_ms);
               if (cars_[i].placed && static_cast<i32>(i) != car_index_) car_state(cars_[i], flags, matrix_of(cars_[i].actor).translation());  // (a standing car burns too)
               break;
             }
@@ -441,24 +441,24 @@ void Game::worldsync_update(f32 dt) {
         if (!r.ok) break;
         // which of our cars plays his: the one that did, else a free one of the kind (car / bus)
         i32 local = -1;
-        for (std::size_t i = 0; i < cars_.size(); ++i) if (worldsync_.car_net[i] == idx) { local = static_cast<i32>(i); break; }
+        for (std::size_t i = 0; i < cars_.size(); ++i) if (car_net_[i] == idx) { local = static_cast<i32>(i); break; }
         const bool bus = flags & 1;
         if (local < 0)
           for (std::size_t i = 0; i < cars_.size(); ++i) {
             const TrafficCar& c = cars_[i];
-            if (c.police || worldsync_.car_net[i] >= 0 || static_cast<i32>(i) == car_index_ || c.placed || (c.car->spec().radius > 0.4f) != bus) continue;
+            if (c.police || car_net_[i] >= 0 || static_cast<i32>(i) == car_index_ || c.placed || (c.car->spec().radius > 0.4f) != bus) continue;
             local = static_cast<i32>(i);
             break;
           }
         if (local < 0 || local == car_index_) continue;
         TrafficCar& c = cars_[static_cast<std::size_t>(local)];
         seen[static_cast<std::size_t>(local)] = true;
-        if (worldsync_.car_net[static_cast<std::size_t>(local)] != idx || !c.placed) {
-          worldsync_.car_net[static_cast<std::size_t>(local)] = idx;
+        if (car_net_[static_cast<std::size_t>(local)] != idx || !c.placed) {
+          car_net_[static_cast<std::size_t>(local)] = idx;
           c.wreck = false;  // another car of his: nothing of the one this body played before
           c.hit_by_player = false;
           c.burn_until = -1;
-          worldsync_.car_line[static_cast<std::size_t>(local)].reset();
+          car_line_[static_cast<std::size_t>(local)].reset();
           if (!world_->actor_alive(c.actor)) { world_->set_alive(c.actor, true); c.solid_masks.clear(); }
           traffic_solid(c);  // (it had no physics far away here: his car is a body that pushes)
           // his car here: a kinematic body on his poses (it pushes what it meets; what happens
@@ -479,14 +479,14 @@ void Game::worldsync_update(f32 dt) {
         c.color = col;
         car_state(c, flags, p);
         c.car->show(steer);
-        worldsync_.car_line[static_cast<std::size_t>(local)].push(p, q, v, true, static_cast<f64>(t_ms), now_ms);
-        worldsync_.car_rest_q[static_cast<std::size_t>(local)] = q;
+        car_line_[static_cast<std::size_t>(local)].push(p, q, v, true, static_cast<f64>(t_ms), now_ms);
+        car_rest_q_[static_cast<std::size_t>(local)] = q;
       }
       // the whole list: the host's cars it does not name are gone here too
       if (whole) {
         for (std::size_t i = 0; i < cars_.size(); ++i) {
-          if (seen[i] || worldsync_.car_net[i] < 0 || static_cast<i32>(i) == car_index_) continue;
-          worldsync_.car_net[i] = -1;
+          if (seen[i] || car_net_[i] < 0 || static_cast<i32>(i) == car_index_) continue;
+          car_net_[i] = -1;
           if (cars_[i].placed) { world_->set_alive(cars_[i].actor, false); cars_[i].placed = false; }
         }
       }
@@ -499,9 +499,9 @@ void Game::worldsync_update(f32 dt) {
         const u8 fl = r.get<u8>();
         c.dead = fl & 1; c.walking = fl & 2; c.carried = fl & 4;
         c.rot = (fl & 5) ? quat() : Quat::axis_angle({0, 0, 1}, c.yaw);
-        if (r.ok) worldsync_.cows_acc.push_back(c);
+        if (r.ok) cows_acc_.push_back(c);
       }
-      if (whole && glife_) glife_->life.apply_cows(worldsync_.cows_acc, now, snap_at);
+      if (whole && glife_) glife_->life.apply_cows(cows_acc_, now, snap_at);
     } else if (type == kPets) {
       const f64 epoch = r.get<f64>();
       const u8 pet_count = r.get<u8>(), na = r.get<u8>();
@@ -510,10 +510,10 @@ void Game::worldsync_update(f32 dt) {
       if (!r.ok) continue;
       // the host's wall clock, counted on with ours
       {
-        const f64 off = epoch - (static_cast<f64>(t_ms) + worldsync_.world_clock) / 1000;  // his wall clock minus our real clock
-        if (!worldsync_.host_epoch_ok || std::fabs(off - worldsync_.host_epoch_off) > 0.5) worldsync_.host_epoch_off = off;
-        else worldsync_.host_epoch_off += (off - worldsync_.host_epoch_off) * 0.05;
-        worldsync_.host_epoch_ok = true;
+        const f64 off = epoch - (static_cast<f64>(t_ms) + world_clock_) / 1000;  // his wall clock minus our real clock
+        if (!host_epoch_ok_ || std::fabs(off - host_epoch_off_) > 0.5) host_epoch_off_ = off;
+        else host_epoch_off_ += (off - host_epoch_off_) * 0.05;
+        host_epoch_ok_ = true;
       }
       for (u8 k = 0; k < n && r.ok; ++k) {
         Life::NetPet p;
@@ -524,9 +524,9 @@ void Game::worldsync_update(f32 dt) {
         const u8 fl = r.get<u8>();
         p.shown = fl & 1; p.dead = fl & 2; p.carried = fl & 4;
         p.rot = (fl & 6) ? quat() : Quat::axis_angle({0, 0, 1}, p.yaw);
-        if (r.ok) worldsync_.pets_acc.push_back(p);
+        if (r.ok) pets_acc_.push_back(p);
       }
-      if (whole && glife_) glife_->life.apply_pets(worldsync_.pets_acc, pet_count, anchors, now);
+      if (whole && glife_) glife_->life.apply_pets(pets_acc_, pet_count, anchors, now);
     } else if (type == kFlocks) {
       for (u8 k = 0; k < n && r.ok; ++k) {
         Life::NetFlock f;
@@ -541,9 +541,9 @@ void Game::worldsync_update(f32 dt) {
           f.birds.push_back(b);
           f.yaws.push_back(un8(r.get<u8>()));
         }
-        if (r.ok) worldsync_.flocks_acc.push_back(std::move(f));
+        if (r.ok) flocks_acc_.push_back(std::move(f));
       }
-      if (whole && glife_) glife_->life.apply_flocks(worldsync_.flocks_acc, now, snap_at);
+      if (whole && glife_) glife_->life.apply_flocks(flocks_acc_, now, snap_at);
     } else if (type == kJoggers) {
       if (n == 0) continue;
       const u32 id = r.get<u32>();
@@ -570,16 +570,16 @@ void Game::worldsync_update(f32 dt) {
         np.yaw = un8(r.get<u8>());
         np.v = r.get<u8>() / 20.0f;
         np.at = snap_at;
-        if (r.ok) worldsync_.people_acc.push_back(np);
+        if (r.ok) people_acc_.push_back(np);
       }
-      if (whole) people_.apply_snapshot(worldsync_.people_acc, now);
+      if (whole) people_.apply_snapshot(people_acc_, now);
     }
   }
 }
 
 std::string Game::worldsync_list() const {
   // {"puppet":0/1,"cars":[[x,y,colour],..],"people":[[seed,x,y],..]} - the cars near us sorted
-  std::string o = "{\"puppet\":" + std::string(worldsync_.puppet_world ? "1" : "0") + ",\"refused\":" + std::to_string(net_.send_refused()) + ",\"sent\":" + std::to_string(worldsync_.world_sent) + ",\"got\":" + std::to_string(worldsync_.world_got) + ",\"mates\":" + std::to_string(mate_foci().size()) + ",\"cars\":[";
+  std::string o = "{\"puppet\":" + std::string(puppet_world_ ? "1" : "0") + ",\"refused\":" + std::to_string(net_.send_refused()) + ",\"sent\":" + std::to_string(world_sent_) + ",\"got\":" + std::to_string(world_got_) + ",\"mates\":" + std::to_string(mate_foci().size()) + ",\"cars\":[";
   char b[96];
   bool first = true;
   const Vec3 me = focus_position();
@@ -635,11 +635,11 @@ bool Game::puppet_car_step(TrafficCar& c, std::size_t i, f32 h) {
   // (mp::PoseTimeline: interpolated a jitter buffer behind his clock, a short extrapolation at
   // most), place, height and tilt, exactly. It pushes what it meets here; what is done to it is
   // done on his machine (he has every player's body there) and comes back with his next poses.
-  if (!worldsync_.puppet_world || i >= worldsync_.car_net.size() || worldsync_.car_net[i] < 0 || static_cast<i32>(i) == car_index_) return false;
+  if (!puppet_world_ || i >= car_net_.size() || car_net_[i] < 0 || static_cast<i32>(i) == car_index_) return false;
   const kern::physics::Body b = body(c.actor);
-  if (!b.valid() || i >= worldsync_.car_line.size()) return true;
+  if (!b.valid() || i >= car_line_.size()) return true;
   kern::physics::World& w = world_->physics();
-  const mp::PoseSample s = worldsync_.car_line[i].sample(kern::now_ms());
+  const mp::PoseSample s = car_line_[i].sample(kern::now_ms());
   if (!s.valid) return true;
   if (w.body_type(b) != kern::physics::BodyType::kinematic) w.set_body_type(b, kern::physics::BodyType::kinematic);
   const BodyState here = read_body(w, b);
