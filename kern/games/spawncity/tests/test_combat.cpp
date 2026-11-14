@@ -112,10 +112,9 @@ SC_TEST(combat_chaos_combo) {
   SC_CHECK(c.score == 250 + 500 + 750 && c.combo == 3, "combo within 3.2 s (%d)", c.score);
   c.award(100, 10);
   SC_CHECK(c.combo == 1, "combo lapses");
-  EnemyType t;
-  choose_enemy(4, 0.1f, 0, t);
+  EnemyType t = choose_enemy(4, 0.1f, 0);
   SC_CHECK(t == EnemyType::heavy, "four stars: a heavy now and then");
-  choose_enemy(1, 0.3f, 0, t);
+  t = choose_enemy(1, 0.3f, 0);
   SC_CHECK(t == EnemyType::cop, "one star: cops");
 }
 

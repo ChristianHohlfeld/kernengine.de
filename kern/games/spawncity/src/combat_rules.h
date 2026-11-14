@@ -105,7 +105,7 @@ struct EnemySpec { const char* name; f32 hp, speed, range, shot_s; i32 burst; f3
 const EnemySpec& enemy_spec(EnemyType t);
 extern f32 kEnemySpawnS, kComboS;
 /// Which enemy comes at `stars` (r: a random number).
-bool choose_enemy(i32 stars, f32 r, i32 heavies, EnemyType& out);
+EnemyType choose_enemy(i32 stars, f32 r, i32 heavies);
 f32 enemy_hit_chance(const EnemySpec& s, f32 d, f32 moving);
 /// How many enemies are up at `stars`.
 i32 enemy_budget(i32 stars);

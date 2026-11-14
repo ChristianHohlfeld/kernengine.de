@@ -157,15 +157,24 @@ bool bind_military(kern::logic::Instance* blueprint) {
   return true;
 }
 
+namespace {
+/// The Clock of the Blueprint "Military", as it takes and gives it.
+struct Clock {
+  bool active = false;
+  f64 since5 = -1, alert_at = -1, next_reinforce = 0;
+};
+}  // namespace
+
 MilEvent MilitaryClock::update(f32 now, i32 stars, f32 heat, bool enabled) {
-  std::vector<Value> r;
-  if (!g_military.call("Update", {Value::structure({B(active), N(since5), N(alert_at), N(next_reinforce)}), N(now), I(stars), N(heat), B(enabled)}, r) || r.size() < 2 || r[0].fields() < 4)
-    return MilEvent::none;
-  active = r[0].field(0)->b;
-  since5 = f(*r[0].field(1));
-  alert_at = f(*r[0].field(2));
-  next_reinforce = f(*r[0].field(3));
-  return static_cast<MilEvent>(r[1].i);
+  Clock clock;
+  MilEvent event = MilEvent::none;
+  g_military.call("Update", std::tie(clock, event), Clock{active, rules::decimal(since5), rules::decimal(alert_at), rules::decimal(next_reinforce)}, rules::decimal(now), stars,
+                  rules::decimal(heat), enabled);
+  active = clock.active;
+  since5 = static_cast<f32>(clock.since5);
+  alert_at = static_cast<f32>(clock.alert_at);
+  next_reinforce = static_cast<f32>(clock.next_reinforce);
+  return event;
 }
 f32 heli_hit_chance(f32 d, f32 speed) {
   f64 chance = 0;
@@ -259,31 +268,39 @@ bool bind_zombies(kern::logic::Instance* blueprint) {
 }
 
 namespace {
-Value to_value(const ZombieRounds& z) { return Value::structure({B(z.active), I(z.round), I(z.to_spawn), I(z.points), N(z.next_spawn), N(z.break_until)}); }
-void take(const Value& v, ZombieRounds& z) {
-  if (v.fields() < 6) return;
-  z.active = v.field(0)->b;
-  z.round = whole(*v.field(1));
-  z.to_spawn = whole(*v.field(2));
-  z.points = whole(*v.field(3));
-  z.next_spawn = f(*v.field(4));
-  z.break_until = f(*v.field(5));
+/// The Rounds of the Blueprint "Zombies", as it takes and gives them.
+struct Rounds {
+  bool active = false;
+  i32 round = 0, to_spawn = 0, points = 0;
+  f64 next_spawn = 0, break_until = -1;
+};
+Rounds rounds_of(const ZombieRounds& z) { return {z.active, z.round, z.to_spawn, z.points, rules::decimal(z.next_spawn), rules::decimal(z.break_until)}; }
+void take(const Rounds& r, ZombieRounds& z) {
+  z.active = r.active;
+  z.round = r.round;
+  z.to_spawn = r.to_spawn;
+  z.points = r.points;
+  z.next_spawn = static_cast<f32>(r.next_spawn);
+  z.break_until = static_cast<f32>(r.break_until);
 }
 }  // namespace
 
 ZombieEvent ZombieRounds::update(f32 now, bool night, i32 alive) {
-  std::vector<Value> r;
-  if (!g_zombies.call("Update", {to_value(*this), N(now), B(night), I(alive)}, r) || r.size() < 2) return ZombieEvent::none;
-  take(r[0], *this);
-  return static_cast<ZombieEvent>(r[1].i);
+  Rounds r;
+  ZombieEvent event = ZombieEvent::none;
+  g_zombies.call("Update", std::tie(r, event), rounds_of(*this), rules::decimal(now), night, alive);
+  take(r, *this);
+  return event;
 }
 void ZombieRounds::spawned(f32 now) {
-  std::vector<Value> r;
-  if (g_zombies.call("Spawned", {to_value(*this), N(now)}, r) && !r.empty()) take(r[0], *this);
+  Rounds r;
+  g_zombies.call("Spawned", std::tie(r), rounds_of(*this), rules::decimal(now));
+  take(r, *this);
 }
 void ZombieRounds::next_round(f32 now) {
-  std::vector<Value> r;
-  if (g_zombies.call("NextRound", {to_value(*this), N(now)}, r) && !r.empty()) take(r[0], *this);
+  Rounds r;
+  g_zombies.call("NextRound", std::tie(r), rounds_of(*this), rules::decimal(now));
+  take(r, *this);
 }
 f32 ZombieRounds::hp() const {
   f64 hp = 0;
@@ -320,11 +337,10 @@ bool bind_sandbox(kern::logic::Instance* blueprint) {
 
 const EnemySpec& enemy_spec(EnemyType t) { return static_cast<std::size_t>(t) < g_enemies.size() ? g_enemies[static_cast<std::size_t>(t)] : kNoEnemy; }
 
-bool choose_enemy(i32 stars, f32 r, i32 heavies, EnemyType& out) {
-  std::vector<Value> v;
-  if (!g_sandbox.call("ChooseEnemy", {I(stars), N(r), I(heavies)}, v) || v.empty()) return false;
-  out = static_cast<EnemyType>(v[0].i);
-  return true;
+EnemyType choose_enemy(i32 stars, f32 r, i32 heavies) {
+  EnemyType type = EnemyType::cop;
+  g_sandbox.call("ChooseEnemy", std::tie(type), stars, rules::decimal(r), heavies);
+  return type;
 }
 f32 enemy_hit_chance(const EnemySpec& s, f32 d, f32 moving) {
   f64 chance = 0;
@@ -338,25 +354,31 @@ i32 enemy_budget(i32 stars) {
 }
 
 namespace {
-Value to_value(const Chaos& c) { return Value::structure({I(c.score), I(c.combo), N(c.combo_until), N(c.flow)}); }
-void take(const Value& v, Chaos& c) {
-  if (v.fields() < 4) return;
-  c.score = whole(*v.field(0));
-  c.combo = whole(*v.field(1));
-  c.combo_until = f(*v.field(2));
-  c.flow = f(*v.field(3));
+/// The Chaos of the Blueprint "Sandbox", as it takes and gives it.
+struct ChaosRun {
+  i32 score = 0, combo = 1;
+  f64 combo_until = -1, flow = 0;
+};
+ChaosRun run_of(const Chaos& c) { return {c.score, c.combo, rules::decimal(c.combo_until), rules::decimal(c.flow)}; }
+void take(const ChaosRun& r, Chaos& c) {
+  c.score = r.score;
+  c.combo = r.combo;
+  c.combo_until = static_cast<f32>(r.combo_until);
+  c.flow = static_cast<f32>(r.flow);
 }
 }  // namespace
 
 i32 Chaos::award(i32 points, f32 now) {
-  std::vector<Value> r;
-  if (!g_sandbox.call("Award", {to_value(*this), I(points), N(now)}, r) || r.size() < 2) return 0;
-  take(r[0], *this);
-  return whole(r[1]);
+  ChaosRun r;
+  i32 gained = 0;
+  g_sandbox.call("Award", std::tie(r, gained), run_of(*this), points, rules::decimal(now));
+  take(r, *this);
+  return gained;
 }
 void Chaos::tick(f32 dt, f32 now) {
-  std::vector<Value> r;
-  if (g_sandbox.call("Tick", {to_value(*this), N(dt), N(now)}, r) && !r.empty()) take(r[0], *this);
+  ChaosRun r;
+  g_sandbox.call("Tick", std::tie(r), run_of(*this), rules::decimal(dt), rules::decimal(now));
+  take(r, *this);
 }
 
 // ---------------------------------------------------------------- "Fun"
@@ -387,41 +409,49 @@ bool bind_fun(kern::logic::Instance* blueprint) {
 const Contract& contract(i32 index) { return kContracts > 0 ? g_contracts[static_cast<std::size_t>(((index % kContracts) + kContracts) % kContracts)] : kNoContract; }
 
 namespace {
-Value to_value(const Fun& s) {
-  return Value::structure({I(s.score), I(s.at_risk), I(s.high_score), I(s.stars), I(s.max_stars), I(s.combo), I(s.best_combo), I(s.momentum), N(s.combo_expires), N(s.overdrive_until),
-                           I(s.contract_index), I(s.contract_progress), I(s.contracts_completed), I(s.mercy), I(s.last_award), N(s.run_damage), B(s.contract_complete),
-                           Value::text(s.last_label)});
+/// The Run of the Blueprint "Fun", as it takes and gives it.
+struct FunRun {
+  i32 score = 0, at_risk = 0, high_score = 0, stars = 0, max_stars = 0, combo = 0, best_combo = 0, momentum = 0;
+  f64 combo_expires = -1e9, overdrive_until = -1e9;
+  i32 contract_index = 0, contract_progress = 0, contracts_completed = 0, mercy = 0, last_award = 0;
+  f64 run_damage = 0;
+  bool contract_complete = false;
+  std::string last_label = "READY";
+};
+FunRun run_of(const Fun& s) {
+  return {s.score, s.at_risk, s.high_score, s.stars, s.max_stars, s.combo, s.best_combo, s.momentum, rules::decimal(s.combo_expires), rules::decimal(s.overdrive_until),
+          s.contract_index, s.contract_progress, s.contracts_completed, s.mercy, s.last_award, rules::decimal(s.run_damage), s.contract_complete, s.last_label};
 }
-void take(const Value& v, Fun& s) {
-  if (v.fields() < 18) return;
-  s.score = whole(*v.field(0));
-  s.at_risk = whole(*v.field(1));
-  s.high_score = whole(*v.field(2));
-  s.stars = whole(*v.field(3));
-  s.max_stars = whole(*v.field(4));
-  s.combo = whole(*v.field(5));
-  s.best_combo = whole(*v.field(6));
-  s.momentum = whole(*v.field(7));
-  s.combo_expires = f(*v.field(8));
-  s.overdrive_until = f(*v.field(9));
-  s.contract_index = whole(*v.field(10));
-  s.contract_progress = whole(*v.field(11));
-  s.contracts_completed = whole(*v.field(12));
-  s.mercy = whole(*v.field(13));
-  s.last_award = whole(*v.field(14));
-  s.run_damage = f(*v.field(15));
-  s.contract_complete = v.field(16)->b;
-  s.last_label = v.field(17)->as_text();
+void take(const FunRun& r, Fun& s) {
+  s.score = r.score;
+  s.at_risk = r.at_risk;
+  s.high_score = r.high_score;
+  s.stars = r.stars;
+  s.max_stars = r.max_stars;
+  s.combo = r.combo;
+  s.best_combo = r.best_combo;
+  s.momentum = r.momentum;
+  s.combo_expires = static_cast<f32>(r.combo_expires);
+  s.overdrive_until = static_cast<f32>(r.overdrive_until);
+  s.contract_index = r.contract_index;
+  s.contract_progress = r.contract_progress;
+  s.contracts_completed = r.contracts_completed;
+  s.mercy = r.mercy;
+  s.last_award = r.last_award;
+  s.run_damage = static_cast<f32>(r.run_damage);
+  s.contract_complete = r.contract_complete;
+  s.last_label = r.last_label;
 }
 }  // namespace
 
 std::string Fun::apply(FunEvent e, f32 now, i32 stars_now, f32 amount) {
-  std::vector<Value> r;
-  if (!g_fun.call("Apply", {to_value(*this), rules::of_enum(e), N(now), I(stars_now), N(amount)}, r) || r.size() < 2) return {};
-  take(r[0], *this);
-  return r[1].as_text();
+  FunRun r;
+  std::string line;
+  g_fun.call("Apply", std::tie(r, line), run_of(*this), e, rules::decimal(now), stars_now, rules::decimal(amount));
+  take(r, *this);
+  return line;
 }
-f32 Fun::multiplier(f32 now) const { return num(g_fun, "Multiplier", {to_value(*this), N(now)}); }
+f32 Fun::multiplier(f32 now) const { return static_cast<f32>(g_fun.number("Multiplier", run_of(*this), rules::decimal(now))); }
 f32 Fun::police_damage_scale() const {
   f64 scale = 0;
   g_fun.call("PoliceDamageScale", std::tie(scale), mercy);
@@ -454,10 +484,10 @@ bool bind_race(kern::logic::Instance* blueprint) {
 const Gate& gate(i32 i) { return kGates > 0 ? g_gates[static_cast<std::size_t>(((i % kGates) + kGates) % kGates)] : kNoGate; }
 
 void gate_axes(i32 i, Vec2& normal, Vec2& right) {
-  std::vector<Value> r;
-  if (!g_race.call("GateAxes", {I(i)}, r) || r.size() < 2) { normal = {1, 0}; right = {0, 1}; return; }
-  normal = {static_cast<f32>(r[0].v.x), static_cast<f32>(r[0].v.y)};
-  right = {static_cast<f32>(r[1].v.x), static_cast<f32>(r[1].v.y)};
+  Vec3 n, r;
+  g_race.call("GateAxes", std::tie(n, r), i);
+  normal = {n.x, n.y};
+  right = {r.x, r.y};
 }
 
 void Race::reset() { *this = Race{}; }
@@ -468,28 +498,37 @@ bool Race::crossed(i32 gi, Vec3 a, Vec3 b) {
   return crossed;
 }
 
+namespace {
+/// The Run of the Blueprint "Race", as it takes and gives it.
+struct RaceRun {
+  bool started = false, finished = false;
+  i32 lap = 0, next = 0;
+  f64 race_start = 0, lap_start = 0, finish_time = -1, last_lap = -1, best_lap = -1, last_pass = -99;
+  bool have_prev = false;
+  Vec3 prev;
+};
+}  // namespace
+
 i32 Race::update(Vec3 p, f32 t) {
-  std::vector<Value> r;
-  if (!g_race.call("Update", {Value::structure({B(started), B(finished), I(lap), I(next), N(race_start), N(lap_start), N(finish_time), N(last_lap), N(best_lap), N(last_pass), B(have_prev),
-                                                Value::vector(prev)}),
-                              Value::vector(p), N(t)},
-                   r) ||
-      r.size() < 2 || r[0].fields() < 12)
-    return -1;
-  const Value& v = r[0];
-  started = v.field(0)->b;
-  finished = v.field(1)->b;
-  lap = whole(*v.field(2));
-  next = whole(*v.field(3));
-  race_start = f(*v.field(4));
-  lap_start = f(*v.field(5));
-  finish_time = f(*v.field(6));
-  last_lap = f(*v.field(7));
-  best_lap = f(*v.field(8));
-  last_pass = f(*v.field(9));
-  have_prev = v.field(10)->b;
-  prev = vec(*v.field(11));
-  return whole(r[1]);
+  RaceRun r;
+  i32 passed = 0;
+  g_race.call("Update", std::tie(r, passed),
+              RaceRun{started, finished, lap, next, rules::decimal(race_start), rules::decimal(lap_start), rules::decimal(finish_time), rules::decimal(last_lap), rules::decimal(best_lap),
+                      rules::decimal(last_pass), have_prev, prev},
+              p, rules::decimal(t));
+  started = r.started;
+  finished = r.finished;
+  lap = r.lap;
+  next = r.next;
+  race_start = static_cast<f32>(r.race_start);
+  lap_start = static_cast<f32>(r.lap_start);
+  finish_time = static_cast<f32>(r.finish_time);
+  last_lap = static_cast<f32>(r.last_lap);
+  best_lap = static_cast<f32>(r.best_lap);
+  last_pass = static_cast<f32>(r.last_pass);
+  have_prev = r.have_prev;
+  prev = r.prev;
+  return passed;
 }
 
 // (how a time is written: "01:15.500")

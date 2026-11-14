@@ -206,8 +206,7 @@ void Game::update_enemies(f32 dt) {
     C.no_wanted_since = -1;
     if (have && up < enemy_budget(stars) && now - C.last_spawn > kEnemySpawnS) {
       C.last_spawn = now;
-      EnemyType type;
-      choose_enemy(stars, rng_.unit(), heavies, type);
+      const EnemyType type = choose_enemy(stars, rng_.unit(), heavies);
       for (int k = 0; k < 10; ++k) {
         const f32 a = rng_.range(0, 2 * kPi), d = rng_.range(55, 85);
         const Vec3 p{tp.x + std::cos(a) * d, tp.y + std::sin(a) * d, 0};
