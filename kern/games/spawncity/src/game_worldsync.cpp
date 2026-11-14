@@ -172,7 +172,7 @@ void Game::worldsync_update(f32 dt) {
         void head() {
           w.clear();
           wire::put_u8(w, type);
-          wire::put_u8(w, 0);
+          wire::put_u8(w, static_cast<u8>(0));
           wire::put_u8(w, part);
           wire::put_f32(w, o.x); wire::put_f32(w, o.y); wire::put_f32(w, o.z);
           wire::put_u32(w, t_ms);
@@ -315,7 +315,7 @@ void Game::worldsync_update(f32 dt) {
               std::vector<u8> e;
               wire::put_u32(e, ch.id);
               for (const Life::Runner& rn : ch.runners) {
-                wire::put_u8(e, rn.alive ? 1 : 0);
+                wire::put_u8(e, static_cast<u8>(rn.alive ? 1 : 0));
                 wire::put_i16(e, p5(rn.pos.x, o.x)); wire::put_i16(e, p5(rn.pos.y, o.y));
                 wire::put_u8(e, ang8(rn.yaw));
               }

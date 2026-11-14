@@ -410,8 +410,12 @@ def record_of(tree, v):
     that name)."""
     raw = re.sub(r"^(?:const\s+|volatile\s+)+", "", (v.get("type") or {}).get("desugaredQualType") or qtype(v)).strip()
     raw = re.sub(r"^(?:struct|class)\s+", "", raw)
-    found = [raw] if raw in tree.records else [r for r in tree.records if r.endswith("::" + raw)]
-    return found[0] if len(found) == 1 else None
+    if raw in tree.records:
+        return raw
+    # (the tree names a record without the namespace that is converted - `sc::wire::F32` is `wire::F32`)
+    found = [r for r in tree.records if raw.endswith("::" + r) or r.endswith("::" + raw)]
+    longest = [r for r in found if len(r) == max(map(len, found))]
+    return longest[0] if len(longest) == 1 else None
 
 
 def addressed_record(tree, a):
@@ -7851,7 +7855,10 @@ class TestWriter:
             if k in ("CallExpr", "CXXMemberCallExpr"):
                 # the address of such a value handed to a pointer to bytes: its bytes, for the call
                 member = k == "CXXMemberCallExpr" and bool(ks) and ks[0].get("kind") == "MemberExpr"
-                target = (ks[0].get("referencedMemberDecl") if member else (callee(n).get("referencedDecl") or {}).get("id")) if ks else None
+                fn = bare(ks[0]) if ks else {}
+                while fn.get("kind") in ("ImplicitCastExpr", "ParenExpr") and kids(fn):
+                    fn = bare(kids(fn)[0])
+                target = ks[0].get("referencedMemberDecl") if member else (fn.get("referencedDecl") or {}).get("id")
                 params = [p for p in kids(self.tree.decl.get(target) or {}) if p.get("kind") == "ParmVarDecl"]
                 for x, p in zip(ks[1:], params):
                     held = addressed_record(self.tree, x) if BYTE_POINTER.match(qtype(p).strip()) else None
