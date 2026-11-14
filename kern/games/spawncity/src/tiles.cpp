@@ -264,7 +264,9 @@ namespace {
 struct FurnishIndex {
   static constexpr f32 kCell = 20;
   struct Seg { Vec2 a, b; f32 half; u32 road; bool paved; };
-  struct Ring { const std::vector<Vec2>* r; kern::Vec4 box; };
+  /// A house's outline: the outer ring of the tile's building `index`, or the apron's ring `index`
+  /// (the outlines that reach over the tile's edge), with its bounding box.
+  struct Ring { bool apron; u32 index; kern::Vec4 box; };
   std::vector<Seg> segs;
   std::vector<Ring> rings;
   std::unordered_map<u64, std::vector<u32>> seg_cells, ring_cells;
@@ -277,24 +279,24 @@ struct FurnishIndex {
     for (i32 x = cell(std::fmin(a.x, b.x) - m); x <= cell(std::fmax(a.x, b.x) + m); ++x)
       for (i32 y = cell(std::fmin(a.y, b.y) - m); y <= cell(std::fmax(a.y, b.y) + m); ++y) seg_cells[key(x, y)].push_back(id);
   }
-  void add_ring(const std::vector<Vec2>& r) {
+  void add_ring(const std::vector<Vec2>& r, bool apron, u32 index) {
     if (r.size() < 3) return;
     kern::Vec4 box{1e30f, 1e30f, -1e30f, -1e30f};
     for (Vec2 p : r) box = {std::fmin(box.x, p.x), std::fmin(box.y, p.y), std::fmax(box.z, p.x), std::fmax(box.w, p.y)};
     if (box.z - box.x > 4000 || box.w - box.y > 4000) return;
     const u32 id = static_cast<u32>(rings.size());
-    rings.push_back({&r, box});
+    rings.push_back({apron, index, box});
     for (i32 x = cell(box.x); x <= cell(box.z); ++x)
       for (i32 y = cell(box.y); y <= cell(box.w); ++y) ring_cells[key(x, y)].push_back(id);
   }
-  /// Inside a house.
-  bool built(Vec2 p) const {
+  /// Inside a house (of the tile's `buildings` or the `apron` the rings were added from).
+  bool built(Vec2 p, const std::vector<MapFeatures::Building>& buildings, const std::vector<std::vector<Vec2>>& apron) const {
     const auto it = ring_cells.find(key(cell(p.x), cell(p.y)));
     if (it == ring_cells.end()) return false;
     for (u32 id : it->second) {
       const Ring& g = rings[id];
       if (p.x < g.box.x || p.x > g.box.z || p.y < g.box.y || p.y > g.box.w) continue;
-      const std::vector<Vec2>& r = *g.r;
+      const std::vector<Vec2>& r = g.apron ? apron[g.index] : buildings[g.index].rings[0];
       bool c = false;
       for (std::size_t i = 0, j = r.size() - 1; i < r.size(); j = i++)
         if ((r[i].y > p.y) != (r[j].y > p.y) && p.x < (r[j].x - r[i].x) * (p.y - r[i].y) / (r[j].y - r[i].y + 1e-12f) + r[i].x) c = !c;
@@ -328,9 +330,9 @@ void furnish(MapFeatures& out, const kern::Vec4& sq, const std::vector<std::vect
     const bool paved = r.cls != RoadClass::path && r.cls != RoadClass::track;
     for (std::size_t k = 0; k + 1 < r.points.size(); ++k) ix.add_seg(r.points[k], r.points[k + 1], road_width(r.cls) / 2, ri, paved);
   }
-  for (const MapFeatures::Building& b : out.buildings)
-    if (!b.rings.empty()) ix.add_ring(b.rings[0]);
-  for (const std::vector<Vec2>& r : apron) ix.add_ring(r);
+  for (u32 bi = 0; bi < out.buildings.size(); ++bi)
+    if (!out.buildings[bi].rings.empty()) ix.add_ring(out.buildings[bi].rings[0], false, bi);
+  for (u32 ai = 0; ai < apron.size(); ++ai) ix.add_ring(apron[ai], true, ai);
   auto inside = [&](Vec2 p) { return p.x >= sq.x && p.x < sq.z && p.y >= sq.y && p.y < sq.w; };
   constexpr f32 kPi2 = 6.2831853f;
   std::unordered_set<u64> lamp_cells;
@@ -351,9 +353,9 @@ void furnish(MapFeatures& out, const kern::Vec4& sq, const std::vector<std::vect
         for (f32 t = carry; t < len; t += 37, ++i) {
           const f32 side = (i & 1) ? 1.0f : -1.0f, off = w * 0.5f + 2.2f + static_cast<f32>(i % 4) * 0.4f;
           const Vec2 c = a + u * t + right * (side * off);
-          if (!inside(c) || !ix.off_roads(c, 1.9f, 0.6f) || ix.built(c)) continue;
+          if (!inside(c) || !ix.off_roads(c, 1.9f, 0.6f) || ix.built(c, out.buildings, apron)) continue;
           bool free = true;
-          for (int j = 0; j < 6 && free; ++j) free = !ix.built(c + Vec2{std::cos(static_cast<f32>(j) * kPi2 / 6), std::sin(static_cast<f32>(j) * kPi2 / 6)} * 2.4f);
+          for (int j = 0; j < 6 && free; ++j) free = !ix.built(c + Vec2{std::cos(static_cast<f32>(j) * kPi2 / 6), std::sin(static_cast<f32>(j) * kPi2 / 6)} * 2.4f, out.buildings, apron);
           if (free) out.trees.push_back({c, 0.82f + static_cast<f32>(i % 5) * 0.045f});
         }
         carry = std::fmod(carry + 37 - std::fmod(len, 37.0f), 37.0f);
@@ -373,7 +375,7 @@ void furnish(MapFeatures& out, const kern::Vec4& sq, const std::vector<std::vect
           if (!inside(c)) continue;
           const u64 cell = (static_cast<u64>(static_cast<u32>(std::lround(c.x / 8))) << 32) | static_cast<u32>(std::lround(c.y / 8));
           // on its kerb: off every other street's carriageway, not in a house (nor its arm's foot)
-          if (!ix.off_roads(c, 0.35f, 0.3f) || ix.built(c)) continue;
+          if (!ix.off_roads(c, 0.35f, 0.3f) || ix.built(c, out.buildings, apron)) continue;
           if (!lamp_cells.insert(cell).second) continue;
           out.lamps.push_back({c, std::atan2(-n.y * side, -n.x * side)});
         }
