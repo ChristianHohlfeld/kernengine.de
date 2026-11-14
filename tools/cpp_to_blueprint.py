@@ -60,6 +60,11 @@ the keys). An iterator into a map, a set or a list is the place it stands at, a 
 end is the list's length. `auto [a, b] = value;` gives names to the parts of a value: where they
 stand, the part is written out.
 
+A parameter `const T*` a function reads entries through (`p[i]`, `*p`), hands on (`p + 2`) or asks
+whether it is null is a pointer into a list, like an iterator: the list, read where it stands (a const
+reference input), and the place in it (an Int; null is -1). Its list is of the type every call of the
+program hands it - a std::array<T, N> is Fixed<T, N> - and `a.data() + k` hands (a, k).
+
   tools/cpp_to_blueprint.py --check <namespace> <include flags...> -- <file.cpp>...
 
 only counts: how many functions are written, and what the others wait for.
@@ -7568,6 +7573,8 @@ class TestWriter:
             local = "".join(within) + local
             for i in range(len(parts) - keep):
                 table.setdefault("::".join(parts[i:]), local)
+            if parts[0] in self.tree.spaces:   # (a name in a further namespace of the program, `::fc::V3` too: the test's)
+                table.setdefault("::".join(parts), local)
             for k in range(1, len(parts)):
                 for name in other.get("::".join(parts[:k]), ()):
                     table.setdefault("::".join([name, *parts[k:]]), local)
@@ -8477,7 +8484,9 @@ class TestWriter:
                 renamers[h] = self.renamer([*mine, *pairs, *outer], named_spaces)
             return lambda text: renamers[h](self.widen(text))
         # a name of the program or the engine that is still written out in full: not the test's own
-        foreign = re.compile(r"(?<![\w:])(?:::)?(?:" + "|".join(re.escape(x) for x in (tree.namespace, *tree.spaces, ENGINE)) + r")::(?!math::)(\w+)")
+        # (a further namespace of the program - fc:: - stands in the test as the source has it, like one inside
+        # the program's own: only from outside every namespace - ::fc:: - it names the program's)
+        foreign = re.compile(r"(?<![\w:])(?:(?:::)?(?:" + re.escape(tree.namespace) + "|" + re.escape(ENGINE) + r")" + "".join(f"|::{re.escape(x)}" for x in tree.spaces) + r")::(?!math::)(\w+)")
         def is_record(key):
             return key[0] == "record" or (key[0] == "foreign" and G.foreign[key[1]]["kind"] == "record")
 
