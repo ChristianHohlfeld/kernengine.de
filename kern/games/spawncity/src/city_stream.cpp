@@ -271,7 +271,7 @@ void CityStream::provide(const TileKey& key, kern::Span<const u8> bytes) {
 void CityStream::fail(const TileKey& key) {
   auto it = tiles_.find(key.hash());
   if (it == tiles_.end()) return;
-  Tile& t = *it.second;
+  Tile& t = *it->second;
   // asked again (a lost request is no hole in the city): after 2 s, 4 s, ... 20 s
   t.state = Tile::State::failed;
   ++t.tries;
