@@ -4904,6 +4904,9 @@ class Emit:
                 return f'math_compare<"==">(kern::to<Float>(text_length({self.ex(base, "Text")})), 0.0)', "Bool"
             if name in ("c_str", "data") and not a:
                 return self.ex(base, "Text"), "Text"
+            if name.startswith("operator ") and not a and self.tp_or_none(b) == "Text":
+                # (a std::string as a std::string_view, and the like: the same text)
+                return self.ex(base, "Text"), "Text"
             raise Wait(f"text: {name}()")
         raise Wait(f"call: {name}() of a {bt}")
 
