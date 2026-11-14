@@ -1579,6 +1579,41 @@ class Const:
                 x.update(arg)
         return out
 
+    def constructed(self, n):
+        """A value made by a constexpr constructor that only sets fields from what it is given
+        (`constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}`): its fields
+        by their C++ names -> the expressions they are set to, the parameters standing for what is
+        given. Fields it does not set have their defaults. None: the constructor is none such."""
+        d = constructor_of(self.unit.tree, n)
+        if d is None or not d.get("constexpr"):
+            return None
+        params = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
+        args = [a for a in kids(n)]
+        if len(args) != len(params) or any(a.get("kind") == "CXXDefaultArgExpr" for a in args):
+            return None
+        body = next((x for x in kids(d) if x.get("kind") == "CompoundStmt"), None)
+        if body is None or kids(body) or any(x.get("kind") not in ("ParmVarDecl", "CXXCtorInitializer", "CompoundStmt") for x in kids(d)):
+            return None
+        by = {p["id"]: a for p, a in zip(params, args)}
+        out = {}
+        for x in kids(d):
+            if x.get("kind") != "CXXCtorInitializer":
+                continue
+            field = (x.get("anyInit") or {}).get("name")
+            if not field or not kids(x):
+                return None   # (a base class, a delegating constructor)
+            e = kids(x)[0]
+            if e.get("kind") == "CXXDefaultInitExpr":
+                continue
+            e = copy.deepcopy(e)
+            for y in walk(e):
+                if y.get("kind") == "DeclRefExpr" and y.get("referencedDecl", {}).get("id") in by:
+                    arg = copy.deepcopy(by[y["referencedDecl"]["id"]])
+                    y.clear()
+                    y.update(arg)
+            out[field] = e
+        return out
+
     FLOAT_LIMITS = {"float": {"max": 3.4028234663852886e+38, "min": 1.1754943508222875e-38, "epsilon": 1.1920928955078125e-07},
                     "double": {"max": 1.7976931348623157e+308, "min": 2.2250738585072014e-308, "epsilon": 2.220446049250313e-16}}
 
@@ -1674,7 +1709,11 @@ class Const:
                 if k == "CXXConstructExpr" and len(args) == 1 and u.clean(qtype(args[0])) == u.clean(qtype(n)):
                     return self.literal(args[0], t)
                 if k == "CXXConstructExpr" and args and not u.clean(qtype(n)).startswith("std::pair<"):
-                    raise Wait("a struct constant made by a constructor")
+                    inits = self.constructed(n)
+                    if inits is None:
+                        raise Wait("a struct constant made by a constructor")
+                    vals = [self.literal(inits[c], ft) if c in inits else d for f, ft, d, c in u.struct_fields[t]]
+                    return t + "{" + ", ".join(vals) + "}"
                 fields = u.struct_fields[t]
                 vals = []
                 for i, (f, ft, d, _) in enumerate(fields):
