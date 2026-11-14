@@ -1,0 +1,53 @@
+// Unchanged from the original SpawnCity (spawncity.de, sim/world_options.mjs, commit 9108537), run on Kern's page
+// against the original's DOM (web/view.mjs); the game follows its settings (view_menu.mjs).
+// World options chosen in the main menu (WORLD tab): which living things exist in the world,
+// and player abilities. Stored per device. Modules read them live:
+//   globalThis.__arondightWorldOptions.get("zombies")   → true / false
+//   addEventListener(WORLD_OPTIONS_EVENT, e => e.detail.options)
+// A switched-off kind is not hidden and kept simulating: it does not exist (no bodies, no AI,
+// no draw); switching it back on brings it in out of the player's view like any arrival.
+export const WORLD_OPTIONS_KEY="spawnCityWorldOptionsV1";
+export const WORLD_OPTIONS_EVENT="spawncity-world-options-change";
+export const WORLD_OPTIONS=Object.freeze([
+  {key:"people",label:"PEOPLE",help:"Pedestrians walking to their own destinations."},
+  {key:"traffic",label:"TRAFFIC",help:"Cars and buses driving the streets."},
+  {key:"dogs",label:"DOGS",help:"Dogs roaming the neighbourhood."},
+  {key:"cats",label:"CATS",help:"Cats, including the black one."},
+  {key:"birds",label:"BIRDS",help:"Flocks in the sky."},
+  {key:"zombies",label:"ZOMBIES",help:"Zombie nights after dark."},
+  {key:"police",label:"POLICE",help:"Police drones and officers when you are wanted."},
+  {key:"military",label:"MILITARY",help:"Soldiers, tanks and helicopters at high wanted levels."},
+  {key:"flak",label:"FLAK",help:"Now and then a stationary anti-aircraft gun that fires on your drone and jet.",def:false},
+  {key:"jetpack",label:"JETPACK",help:"Jump twice to fire a short jetpack burst over houses. Recharges."},
+  {key:"destructibleTerrain",label:"DESTRUCTIBLE TERRAIN",help:"Big explosions tear craters into the ground. Off: the ground stays whole.",def:false},
+  {key:"guided",label:"GUIDED MISSILES",help:"The drone's guided missile (GUIDED). Off: the weapon switch goes GUN -> ROCKETS -> GUN."},
+  {key:"alwaysDay",label:"ALWAYS DAY",help:"No night: the sun stays at late morning (no zombie nights).",def:false},
+  {key:"friendlyFire",label:"FRIENDLY FIRE",help:"Player weapons can damage other players. The first player in the session sets this rule.",def:true,rule:true},
+]);
+export const DEFAULT_WORLD_OPTIONS=Object.freeze(Object.fromEntries(WORLD_OPTIONS.map(o=>[o.key,o.def??true])));
+// Game rules: in a multiplayer session the first joiner (host)'s switches apply to
+// everybody (game_rules_sync.mjs sends them); alone, your own. worldRule() is the one to ask.
+export const GAME_RULE_KEYS=Object.freeze(WORLD_OPTIONS.filter(o=>o.rule).map(o=>o.key));
+let hostRules=null;
+// 2026-11: new defaults (friendly fire on, destructible terrain off, flak off) also for a device
+// that stored the old ones - once
+try{if(!localStorage.getItem("spawnCityWorldDefaultsV2")){const raw=JSON.parse(localStorage.getItem(WORLD_OPTIONS_KEY)||"{}");Object.assign(raw,{friendlyFire:true,destructibleTerrain:false,flak:false});localStorage.setItem(WORLD_OPTIONS_KEY,JSON.stringify(raw));localStorage.setItem("spawnCityWorldDefaultsV2","1");}}catch{}
+let current=load();
+function load(){try{const raw=JSON.parse(localStorage.getItem(WORLD_OPTIONS_KEY)||"{}");return{...DEFAULT_WORLD_OPTIONS,...Object.fromEntries(Object.entries(raw).filter(([k,v])=>k in DEFAULT_WORLD_OPTIONS&&typeof v==="boolean"))};}catch{return{...DEFAULT_WORLD_OPTIONS};}}
+export function worldOption(key){return key in current?current[key]===true:false;} // unknown/retired powers fail closed
+export function worldRule(key){
+  if(hostRules&&key in hostRules)return hostRules[key]===true;
+  // Fail closed for a non-host awaiting its elected host's rules.
+  const m=globalThis.__arondightVsMultiplayer;
+  if(GAME_RULE_KEYS.includes(key)&&m?.connected&&m.authority!==m.self)return false;
+  return worldOption(key);
+}
+export function setHostRules(rules){const next=rules&&typeof rules==="object"?Object.fromEntries(GAME_RULE_KEYS.filter(k=>typeof rules[k]==="boolean").map(k=>[k,rules[k]])):null;const same=JSON.stringify(next)===JSON.stringify(hostRules);hostRules=next&&Object.keys(next).length?next:null;
+  if(!same&&typeof window!=="undefined")window.dispatchEvent(new CustomEvent(WORLD_OPTIONS_EVENT,{detail:{options:{...current},hostRules:hostRules?{...hostRules}:null,key:"hostRules"}}));}
+export function hostRulesActive(){return Boolean(hostRules);}
+export function setWorldOption(key,value){if(!(key in DEFAULT_WORLD_OPTIONS))return;
+  if(GAME_RULE_KEYS.includes(key)&&globalThis.__arondightVsMultiplayer?.connected&&!globalThis.__arondightRulesVote?.isCommitting){globalThis.__arondightRulesVote?.propose(key,Boolean(value));return;}
+  current={...current,[key]:Boolean(value)};try{localStorage.setItem(WORLD_OPTIONS_KEY,JSON.stringify(current));}catch{}
+  if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent(WORLD_OPTIONS_EVENT,{detail:{options:{...current},key,value:Boolean(value)}}));}
+export function worldOptions(){return{...current};}
+if(typeof globalThis!=="undefined")globalThis.__arondightWorldOptions={get:worldOption,rule:worldRule,setHostRules,get hostRules(){return hostRules?{...hostRules}:null;},set:setWorldOption,all:worldOptions,list:WORLD_OPTIONS,event:WORLD_OPTIONS_EVENT};
