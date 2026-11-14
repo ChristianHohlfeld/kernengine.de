@@ -600,7 +600,7 @@ SC_TEST(mp_town_state_for_a_late_joiner) {
   std::vector<lamps::Field::Spot> spots;
   for (int i = 0; i < 60; ++i) spots.push_back({i * 34.0f, 5.15f, 0});
   lamps::Field hl, al, bl;
-  for (lamps::Field* f : {&hl, &al, &bl}) f->rebuild(spots, nullptr);
+  for (lamps::Field* f : {&hl, &al, &bl}) f->rebuild(spots);
   // before b comes: lamp 3 shot dark, lamp 10 down, and one down in a part of town not loaded here
   SC_CHECK(hl.set_state(3, 1) && hl.set_state(10, 2), "broken on the host");
   const i64 far_key = lamps::cell_key(5000, 5000);
@@ -639,7 +639,7 @@ SC_TEST(mp_town_state_for_a_late_joiner) {
   // the far lamp's tile streams in at the joiner: it stands there broken
   std::vector<lamps::Field::Spot> more = spots;
   more.push_back({5000, 5000, 0});
-  bl.rebuild(more, nullptr);
+  bl.rebuild(more);
   SC_CHECK(bl.all().back().state == 2, "a lamp placed later is down as the town has it");
 
   // a change: a breaks lamp 20 - to the host, from him to everybody

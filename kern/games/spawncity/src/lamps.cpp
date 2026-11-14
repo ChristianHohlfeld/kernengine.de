@@ -22,7 +22,7 @@ f32 pole_radius() { return static_cast<f32>(g_rules.variable("PoleRadius")); }
 
 i64 cell_key(f32 x, f32 y) { return (static_cast<i64>(std::lround(x / 8)) << 32) ^ (static_cast<i64>(std::lround(y / 8)) & 0xffffffffll); }
 
-void Field::place_road(const std::vector<Vec2>& pts, f32 width, u32 lane, const std::function<f32(f32, f32)>& ground) {
+void Field::place_road(const std::vector<Vec2>& pts, f32 width, u32 lane, f32 ground) {
   f32 carry = kSpacing * 0.5f, side = 1;
   for (std::size_t i = 0; i + 1 < pts.size() && lamps_.size() < kMax * 8; ++i) {
     const Vec2 a = pts[i], b = pts[i + 1];
@@ -35,7 +35,7 @@ void Field::place_road(const std::vector<Vec2>& pts, f32 width, u32 lane, const 
       const i64 key = cell_key(x, y);
       if (!seen_.insert(key).second) continue;
       Lamp lp;
-      lp.foot = {x, y, ground ? ground(x, y) : 0};
+      lp.foot = {x, y, ground};
       lp.yaw = std::atan2(-ny * side, -nx * side);
       lp.head = {x + std::cos(lp.yaw) * kArm, y + std::sin(lp.yaw) * kArm};
       lp.key = key;
@@ -49,12 +49,12 @@ void Field::place_road(const std::vector<Vec2>& pts, f32 width, u32 lane, const 
   }
 }
 
-void Field::rebuild(const std::vector<Spot>& spots, const std::function<f32(f32, f32)>& ground) {
+void Field::rebuild(const std::vector<Spot>& spots) {
   clear();
   lamps_.reserve(spots.size());
   for (const Spot& s : spots) {
     Lamp lp;
-    lp.foot = {s.x, s.y, ground ? ground(s.x, s.y) : 0};
+    lp.foot = {s.x, s.y, s.z};
     lp.yaw = s.yaw;
     lp.head = {s.x + std::cos(s.yaw) * kArm, s.y + std::sin(s.yaw) * kArm};
     lp.key = cell_key(s.x, s.y);
@@ -66,10 +66,9 @@ void Field::rebuild(const std::vector<Spot>& spots, const std::function<f32(f32,
   }
 }
 
-void Field::reground(f32 x0, f32 y0, f32 x1, f32 y1, const std::function<f32(f32, f32)>& ground) {
-  if (!ground) return;
+void Field::reground(f32 x0, f32 y0, f32 x1, f32 y1, const CityStream& city) {
   for (Lamp& l : lamps_)
-    if (l.foot.x >= x0 && l.foot.x <= x1 && l.foot.y >= y0 && l.foot.y <= y1) l.foot.z = ground(l.foot.x, l.foot.y);
+    if (l.foot.x >= x0 && l.foot.x <= x1 && l.foot.y >= y0 && l.foot.y <= y1) l.foot.z = city.ground_height(l.foot.x, l.foot.y);
 }
 
 std::vector<i32> Field::near(f32 x, f32 y, f32 r) const {

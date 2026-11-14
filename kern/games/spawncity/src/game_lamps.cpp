@@ -112,7 +112,6 @@ void Game::gaps_lamps_place() {
   // with every road set): taken whenever the set of tiles changes - a tile that goes takes its
   // lamps along, what was broken stays broken (by cell). Not in open water.
   GapsState& g = *gaps_;
-  auto ground = [this](f32 x, f32 y) { return city_.ground_height(x, y); };
   if (g.lamp_serial != city_.furniture_serial()) {
     g.lamp_serial = city_.furniture_serial();
     std::vector<u64> tiles;
@@ -120,11 +119,11 @@ void Game::gaps_lamps_place() {
     std::vector<lamps::Field::Spot> spots;
     for (u64 tile : tiles)
       for (const MapFeatures::Spot& sp : city_.features(tile).lamps)
-        if (!city_.terrain().water_at(sp.p.x, sp.p.y)) spots.push_back({sp.p.x, sp.p.y, sp.a});
-    g.lamps.rebuild(spots, ground);
+        if (!city_.terrain().water_at(sp.p.x, sp.p.y)) spots.push_back({sp.p.x, sp.p.y, sp.a, city_.ground_height(sp.p.x, sp.p.y)});
+    g.lamps.rebuild(spots);
     g.lamps_dirty = true;
   }
-  for (const kern::Vec4& r : ground_changes_) { g.lamps.reground(r.x, r.y, r.z, r.w, ground); g.lamps_dirty = true; }
+  for (const kern::Vec4& r : ground_changes_) { g.lamps.reground(r.x, r.y, r.z, r.w, city_); g.lamps_dirty = true; }
   if (g.lamps_dirty) gaps_lamps_mirror();
 }
 
