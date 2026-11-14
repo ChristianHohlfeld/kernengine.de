@@ -968,6 +968,11 @@ inline void class_runs(bool begins) {
   }
 }
 
+/// A value as the Blueprint gets it - where a stand-in of the engine passes it on, whose class may have a
+/// function of its own called `arg` (Engine::arg): found as everywhere else (and a struct of the test by its
+/// own helpers).
+template <class T> Value value_of(const T& x) { return arg(x); }
+
 /// Is what the Blueprint gives this very value, bit for bit? (Numbers by their bits; a struct, a list, a map
 /// entry for entry.)
 inline bool same_value(const Value& a, const Value& b) {

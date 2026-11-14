@@ -7816,7 +7816,7 @@ class TestWriter:
         struct is its first value, and what a method that is not const makes of it, the first it takes."""
         d = f["decl"]
         shape = lambda x: re.sub(r"\b[ui]64\b", "converted::Whole", x)
-        params, values, takes = [], (["arg(*this)"] if cls else []), []
+        params, values, takes = [], (["converted::value_of(*this)"] if cls else []), []
         if plain and not qtype(d).rstrip().endswith("const"):
             takes.append(("(*this)", cls, False))
         ps = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
@@ -7836,7 +7836,7 @@ class TestWriter:
                 self.result_ok(re.sub(r"\*\s*(const)?$", "", raw))   # (the helpers of the structs it is made of)
             if self.u.object_of(raw):
                 params.append((f"{self.spell(raw)} {name}", default))
-                values.append(f"arg({name})")
+                values.append(f"converted::value_of({name})")
             elif re.search(r"\*\s*(const)?$", raw) and raw.replace(" ", "") not in ("constchar*", "constchar*const"):
                 # a pointer to data: one value that may be missing, or the first of as many as the count beside it says
                 inner = self.spell(re.sub(r"\*\s*(const)?$", "", raw))
@@ -7844,22 +7844,22 @@ class TestWriter:
                 counted = after is not None and NUMBER.get(self.u.clean(qtype(after))) == "Int" and re.search(r"count|size|len|num|^n$", after.get("name", ""))
                 data = f"std::vector<{inner}>({name}, {name} + {after['name']})" if counted else f"({name} ? std::vector<{inner}>{{*{name}}} : std::vector<{inner}>{{}})"
                 params.append((f"const {inner}* {name}", default))
-                values.append(f"arg({self.wrap(data, f'std::vector<{inner}>')})")
+                values.append(f"converted::value_of({self.wrap(data, f'std::vector<{inner}>')})")
             elif re.match(r"(?:kern::)?Span<", self.u.clean(raw)):
                 # a view of data: of what the source shows it (the node gets the list it shows)
                 inner = template_args(re.sub(r"^const\s+|\s*&$", "", raw))[0]
                 const = "const " if re.match(r"const\b", inner) else ""
                 inner = re.sub(r"^const\s+", "", inner)
                 params.append((f"converted::wide::Span<{const}{self.spell(inner)}> {name}", default))
-                values.append(f"arg({self.wrap(f'converted::as_list({name})', f'std::vector<{self.spell(inner)}>')})")
+                values.append(f"converted::value_of({self.wrap(f'converted::as_list({name})', f'std::vector<{self.spell(inner)}>')})")
             elif self.spell(raw) == "const char*":   # (a text in so many words: as it is given)
                 params.append((f"const char* {name}", default))
-                values.append(f"arg({name})")
+                values.append(f"converted::value_of({name})")
             else:
                 t = self.spell(raw)
                 writes = raw.endswith("&") and not raw.endswith("&&") and not re.match(r"const\b", raw)
                 params.append(((f"{t}& {name}" if writes else f"const {t}& {name}"), default))
-                values.append(f"arg({self.wrap(name, t)})")
+                values.append(f"converted::value_of({self.wrap(name, t)})")
                 if writes:
                     takes.append((name, t, False))
         ret_raw = qtype(d).split("(")[0].strip()
@@ -7869,7 +7869,11 @@ class TestWriter:
         # (its own names begin with kern_: a parameter may be called `out` or `result` - hull_mesh's)
         body = [f'const std::vector<converted::Value> kern_out = converted::engine_call("{f["type"]}", {{{", ".join(values)}}});']
         k = 0
-        if ret != "void":
+        if ret != "void" and ret.endswith("&") and self.u.object_of(ret_raw):
+            # (an object of the engine it gives by reference - World& physics(): the one of that handle)
+            body.append(f"{ret} kern_result = *converted::engine_object<{self.object_name(self.u.object_of(ret_raw))}>(kern_out[0].as_int());")
+            k = 1
+        elif ret != "void":
             body.append(f"{ret} kern_result{{}}; converted::take_as<{shape(ret)}>(kern_result, kern_out[0]);")
             k = 1
         for name, t, optional in takes:
@@ -7900,7 +7904,7 @@ class TestWriter:
         objects of the class - converted::engine_object - and copies are not made by the source: quiet.)"""
         if f["role"] == "release":
             return (f"~{cls}();",
-                    f'inline {cls}::~{cls}() {{ if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("{f["type"]}", {{arg(*this)}}); }}')
+                    f'inline {cls}::~{cls}() {{ if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("{f["type"]}", {{converted::value_of(*this)}}); }}')
         a, b = self.stand_in(f, None)
         head = re.escape(f["decl"]["name"])
         a = re.sub(r"^void\s+" + head + r"\(", cls + "(", a)
