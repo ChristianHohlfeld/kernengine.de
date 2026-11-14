@@ -715,6 +715,13 @@ Frame Back = struct_of_bytes<Frame, "10: u32@0 u16@4 u16@6 i16@8">(Bytes, 0);
   sagt. Eine Struktur mit Füllung, mit einem `float` (die Sprache hält ihn in 64 Bit), einer Zahl,
   deren Breite die Plattform bestimmt (`long`, `size_t`, `char`), einer Aufzählung, einem
   Bitfeld oder einem Feld, das keine Zahl ist, hat dort noch keine Bytes und wartet mit Grund.
+- **Die Bits einer Zahl** (`std::bit_cast` zwischen einer Gleitkommazahl und einer ganzen Zahl
+  ihrer Breite) sind eigene Knoten: Bits of Float 32 (`math_bits_of_float32(x)`: die 32 Bit der
+  Zahl als `float`, 0 bis 2^32 − 1) und Float 32 of Bits (`math_float32_of_bits(b)`: der `float`
+  der letzten 32 Bit des Int), für 64 Bit Bits of Float und Float of Bits mit einem Int64. Ein NaN
+  ist wie oben still, mit Vorzeichen und den oberen Bits seiner Nutzlast. Der Konverter schreibt
+  `std::bit_cast<u32>(f)`, `std::bit_cast<i32>(f)` (das Zweierkomplement der 32 Bit),
+  `std::bit_cast<f32>(u)`, `std::bit_cast<u64>(d)` und `std::bit_cast<f64>(w)` damit.
 
 ### Plätze
 

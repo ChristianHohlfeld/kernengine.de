@@ -4525,6 +4525,14 @@ TEST(logic_int64_is_u64_and_i64) {
     same = same && P::int64_high(I(a)) == static_cast<i64>(a >> 32) && P::int64_low(I(a)) == static_cast<i64>(a & 0xffffffffull) && P::int64_of_halves(P::int64_high(I(a)), P::int64_low(I(a))).bits == a;
     same = same && P::int64_count_ones(I(a)) == std::popcount(a) && P::int64_leading_zeros(I(a)) == std::countl_zero(a) && P::int64_trailing_zeros(I(a)) == std::countr_zero(a);
     same = same && P::int64_bits_of_float(P::int64_float_of_bits(I(a))).bits == a;  // (a no-number's bits too)
+    // 32 bits: std::bit_cast of a float, both ways - of every pattern, also the no-numbers (their sign and payload) and the subnormals
+    const u32 w = static_cast<u32>(a);
+    const bool no_number = (w & 0x7f800000u) == 0x7f800000u && (w & 0x007fffffu) != 0;
+    // (a no-number a Float holds is quiet - as a float that becomes a double is: its 32 bits again with the quiet bit)
+    same = same && P::math_bits_of_float32(P::math_float32_of_bits(static_cast<i64>(w))) == static_cast<i64>(no_number ? w | 0x00400000u : w);
+    same = same && P::int64_bits_of_float(P::math_float32_of_bits(static_cast<i64>(a))).bits == P::int64_bits_of_float(P::math_float32_of_bits(static_cast<i64>(w))).bits;  // (the last 32 bits)
+    if (!no_number)
+      same = same && P::math_float32_of_bits(static_cast<i64>(w)) == static_cast<f64>(std::bit_cast<f32>(w)) && P::math_bits_of_float32(static_cast<f64>(std::bit_cast<f32>(w))) == static_cast<i64>(w);
     same = same && P::int64_of_text(P::int64_text(I(a))).bits == a && P::int64_of_text(P::int64_text_signed(I(a))).bits == a && P::int64_of_text("0x" + P::int64_text_hex(I(a))).bits == a;
     same = same && P::int64_text(I(a)) == std::to_string(a) && P::int64_text_signed(I(a)) == std::to_string(sa);
     same = same && P::int64_to_float(I(a)) == static_cast<f64>(sa) && P::int64_to_float_unsigned(I(a)) == static_cast<f64>(a) && P::int64_to_int(I(a)) == logic::normal(sa);

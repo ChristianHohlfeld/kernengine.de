@@ -6745,6 +6745,26 @@ class Emit:
         text, have = self.value(n)
         return text if have == self.whole64() else self.to64(text, have)
 
+    def bit_cast(self, n, x):
+        """std::bit_cast between a float and a whole number of its width: the same bits read as the other type -
+        32 bits (Bits of Float 32, Float 32 of Bits: a u32 is 0 .. 2^32 - 1, an i32 its two's complement) and
+        64 bits (Bits of Float, Float of Bits: the Int64 the 64-bit number is)."""
+        plain = lambda t: re.sub(r"\bconst\b", "", self.u.clean(t)).strip()
+        to, frm = plain(self.ctype(n)), plain(self.ctype(x))
+        w32 = ("unsigned int", "int")
+        if frm == "float" and to in w32:
+            bits = f"math_bits_of_float32({self.ex(x, 'Float')})"
+            if to == "int":
+                bits = f"kern::to<Int>(kern::formula([](Float b) -> Float {{ return b >= 2147483648.0 ? b - 4294967296.0 : b; }}, kern::to<Float>({bits})))"
+            return bits, "Int"
+        if frm in w32 and to == "float":
+            return f"math_float32_of_bits({self.ex(x, 'Int')})", "Float"
+        if frm == "double" and self.tp(n) == self.whole64():
+            return f"int64_bits_of_float({self.ex(x, 'Float')})", self.whole64()
+        if to == "double" and self.tp(x) == self.whole64():
+            return f"int64_float_of_bits({self.ex64(x)})", "Float"
+        raise Wait(f"std::bit_cast from a {frm} to a {to}")
+
     def from64(self, text, source, target, want):
         """64 bits as a value of another type, as C++ converts: `source` and `target` are the C++ types."""
         whole = self.whole64()
@@ -6956,6 +6976,8 @@ class Emit:
                 if fmt is None:
                     raise Wait(f"std::to_string of a {c}")
                 return f'text_format<"{fmt}">(-1, {self.ex(a[0], "Float" if fmt == "%f" else "Int")})', "Text"
+            if name == "bit_cast" and len(a) == 1:
+                return self.bit_cast(b, a[0])
             if name in ("snprintf", "printf", "sprintf", "to_string", "strtod", "atof", "atoi", "strcmp", "strlen", "strncmp", "strchr", "strstr"):
                 raise Wait("text formatting and parsing (snprintf, to_string, atof ...)")
             if name in ("find", "find_if", "find_if_not") and len(a) == 3 and self.is_iter(b):

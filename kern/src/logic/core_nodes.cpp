@@ -1621,6 +1621,10 @@ void add_math(Library& lib) {
     lib.add(pure("int64.of_text", "Text to Int64", "Int64", {data("a", "Text", K::text, "")}, int64, of(&P::int64_of_text), "A whole number written out (decimal, 0x hexadecimal, - in front: two's complement) - 0 if it is none",
                  "parse string"));
   }
+  lib.add(pure("math.bits_of_float32", "Bits of Float 32", "Math", {data("a", "Float", K::number, 0.0)}, integer, of(&P::math_bits_of_float32),
+               "The 32 bits of the Float as a 32-bit float (IEEE 754, as std::bit_cast of a float): 0 .. 2^32 - 1", "bit cast single float32 u32"));
+  lib.add(pure("math.float32_of_bits", "Float 32 of Bits", "Math", {data("a", "Bits", K::integer, 0)}, number, of(&P::math_float32_of_bits),
+               "The 32-bit float these 32 bits are (the Int's last 32 bits; IEEE 754, as std::bit_cast to a float)", "bit cast single float32 u32"));
   lib.add(pure("math.clamp", "Clamp", "Math", {data("value", "Value", K::number, 0.0), data("min", "Min", K::number, 0.0), data("max", "Max", K::number, 1.0)}, number, of(&P::math_clamp)));
   lib.add(pure("math.abs", "Absolute", "Math", {data("a", "A", K::number, 0.0)}, number, of(&P::math_abs)));
   lib.add(pure("math.copysign", "Copy Sign", "Math", {data("a", "Magnitude", K::number, 0.0), data("b", "Sign", K::number, 1.0)}, number, of(&P::math_copysign),
