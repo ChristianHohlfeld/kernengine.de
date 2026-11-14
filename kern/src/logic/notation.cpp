@@ -2930,6 +2930,7 @@ struct Reader {
       std::size_t q = 1;
       if (peek(q).kind == Tok::id && numbered(peek(q).s, "n") && is(",", q + 1)) q += 2;                        // (its member)
       if ((peek(q).kind == Tok::text || (peek(q).kind == Tok::id && peek(q).s == "entry")) && is(",", q + 1)) q += 2;  // (its exec input)
+      if (is("*", q) && peek(q + 1).kind == Tok::id && peek(q + 1).s == "this" && is(",", q + 2)) q += 3;          // (the object its function runs on: runs_function)
       for (std::size_t k = 0; k < variables; ++k, q += 2) {
         Variable named;
         if (peek(q).kind != Tok::id || !variable_here(peek(q).s, named)) {

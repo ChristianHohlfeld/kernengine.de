@@ -667,7 +667,7 @@ std::vector<std::string> structs_in(const StructType& s, const Graph& g);
 ///   operators    + - * / %  ^ (power)       unary - and !
 ///                < <= > >= == !=            1 when true, else 0
 ///                && ||                      a ? b : c
-///   functions    min max clamp(x, lo, hi) abs sign floor ceil round trunc sqrt pow(x, y) exp log
+///   functions    min max clamp(x, lo, hi) abs sign copysign(x, s) floor ceil round trunc sqrt pow(x, y) exp log
 ///                sin cos tan asin acos atan atan2(y, x) - in radians; rad(degrees) deg(radians)
 ///                lerp(a, b, t)
 ///   constants    pi

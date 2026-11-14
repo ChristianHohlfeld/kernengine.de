@@ -266,6 +266,7 @@ class WasmGen {
     if (t == "math.min") { value(node, "a", depth); value(node, "b", depth); op(kF64Min); return; }
     if (t == "math.max") { value(node, "a", depth); value(node, "b", depth); op(kF64Max); return; }
     if (t == "math.abs") { value(node, "a", depth); op(kF64Abs); return; }
+    if (t == "math.copysign") { value(node, "a", depth); value(node, "b", depth); op(kF64Copysign); return; }  // (WebAssembly's f64.copysign: the same bit operation)
     if (t == "math.negate") { value(node, "a", depth); op(kF64Neg); return; }
     if (t == "math.sqrt") { value(node, "a", depth); f64c(0); op(kF64Max); op(kF64Sqrt); return; }
     if (t == "math.floor") { value(node, "a", depth); op(kF64Floor); return; }

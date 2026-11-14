@@ -666,6 +666,54 @@ Die Knoten einer Struktur (`S` ist die Struktur):
 | Break S | `struct_break<S>(wert).Feld` | das Feld des Werts |
 | Find Row (Find S by Feld) | `list_find_row<&S::Feld>(liste, wert)` | `.found`, `.row`, `.index`: der erste Eintrag einer Liste von S, dessen Feld der Wert ist |
 | Set an einem Platz (Set Variable mit Pfad) | `Variable.Feld = wert;` | ändert das eine Feld der Variablen; gibt das Feld, wie es jetzt ist |
+| Bytes of S | `struct_bytes<S, "20: u32@0 u16@4 …">(wert)` | die Bytes des Werts im Layout der Einstellung (siehe „Die Bytes eines Werts“) |
+| S of Bytes | `struct_of_bytes<S, "20: u32@0 u16@4 …">(bytes, at)` | der Wert, dessen Bytes bei `at` in der Liste beginnen |
+
+### Die Bytes eines Werts
+
+Ein Protokoll auf einem Draht, eine Datei, eine Prüfsumme lesen und schreiben die Bytes einer
+Struktur: in C++ `std::bit_cast` oder `std::memcpy` zwischen einer Struktur und Bytes – ihre
+Objektdarstellung. Die Sprache hat das als zwei Knoten einer Struktur aus Zahlen. Wie C++ die
+Struktur auslegt, ist ihre Einstellung „Layout“: die Größe in Bytes, dann für jedes Feld, in der
+Reihenfolge der Felder, die Zahl, als die C++ es hält, und wo es beginnt.
+
+```cpp
+KERN_STRUCT(Frame) { Int Magic = 827736398; Int Version = 1; Int Sequence = 0; Int Vx = 0; };
+// #pragma pack(1) struct Frame { uint32_t magic; uint16_t version, sequence; int16_t vx; };
+Fixed<Int, 10> Bytes = struct_bytes<Frame, "10: u32@0 u16@4 u16@6 i16@8">(Now);
+Frame Back = struct_of_bytes<Frame, "10: u32@0 u16@4 u16@6 i16@8">(Bytes, 0);
+```
+
+- **Die Zahlen:** `bool` (ein Feld vom Typ Bool), `u8 i8 u16 i16 u32 i32` (Int: geschrieben wird
+  die Zahl auf so viele Bits gekürzt, wie C++ sie umwandelt; gelesen, wo ein `i` steht, mit
+  Vorzeichen), `u64 i64` (Int64: die 64 Bit), `f32 f64` (Float: die Bits der Zahl als `float` –
+  gerundet, wie C++ rundet – oder als `double`). Ein NaN behält Vorzeichen und die oberen Bits
+  seiner Nutzlast und ist still – auf jeder Plattform dasselbe, nicht das, was eine Maschine
+  gerade tut (WebAssembly lässt es offen).
+- **Die Bytes stehen little-endian**, auf jeder Plattform gleich (die Engine läuft nur auf
+  solchen). Ein Byte, das kein Feld deckt (was C++ als Füllung lässt), ist 0.
+- **Bytes of S** gibt so viele Bytes, wie das Layout groß ist, je eine Zahl 0 bis 255 – in der
+  Klasse eine Liste fester Länge (`Fixed<Int, N>`): sie liegt, wo sie steht, nichts wird
+  angefordert, wie bei `std::array<uint8_t, N>`.
+- **S of Bytes** liest die Felder aus einer Liste von Zahlen, beginnend bei `at`. Ein Byte ist
+  das, was C++ einem `unsigned char` von der Zahl lässt: ihre letzten 8 Bit. Wo die Liste keins
+  hat – vor ihr, hinter ihr –, ist es 0 (kein Index führt ins Leere).
+- **Regeln (`check`):** Das Layout ist lesbar, 1 bis 65.536 Bytes groß, jedes Feld liegt darin,
+  keine zwei teilen sich ein Byte, es hat so viele Felder wie die Struktur, und jedes passt zum
+  Typ seines Felds. Eine Struktur mit einem Feld anderer Art (Text, Vektor, Liste, Aufzählung,
+  Struktur) hat keine Bytes.
+- **In jeder Stufe dasselbe:** `kern::logic::bytes` in `kern/logic/nodes.h` – der Interpreter
+  liest die Felder aus dem Wert, die Klasse aus dem `struct`, Bit für Bit gleich; der JIT gibt
+  die Knoten ihrer Funktion. Tier-Fall `bytes`, im Klassenvergleich jede Zahl, ein Byte ohne
+  Feld und Felder in anderer Reihenfolge als die Bytes.
+- **Der Konverter** schreibt damit, was das Programm mit den Bytes eines Werts tut: das Layout
+  liest er beim Compiler ab (`-fdump-record-layouts`, das, was C++ für diese Struktur festlegt,
+  auch unter `#pragma pack`); `memcpy(&wert, bytes, sizeof wert)` ist S of Bytes; ein Zeiger auf
+  Bytes (`const void*`, `const uint8_t*`), dem ein Aufruf `&wert` gibt, bekommt die Bytes des
+  Werts (Bytes of S, eine Liste fester Länge); `offsetof(S, feld)` ist die Zahl, die das Layout
+  sagt. Eine Struktur mit Füllung, mit einem `float` (die Sprache hält ihn in 64 Bit), einer Zahl,
+  deren Breite die Plattform bestimmt (`long`, `size_t`, `char`), einer Aufzählung, einem
+  Bitfeld oder einem Feld, das keine Zahl ist, hat dort noch keine Bytes und wartet mit Grund.
 
 ### Plätze
 
@@ -984,6 +1032,10 @@ Für ganze Zahlen, wie eine Maschine sie hat, gibt es `band`, `bor`, `bxor`, `sh
 einer Zahl) und `wrap32`, `wrap32s`, `mul32` (Rechnen, das bei 32 Bit umbricht), dazu `single` (die Zahl, wie
 eine 32-Bit-Kommazahl sie hält) – in jeder Stufe
 dieselben Funktionen von `kern::math`.
+`copysign(a, b)` ist der Betrag von `a` mit dem Vorzeichen von `b` – auch dem von −0 (`copysign(1, -0)`
+ist −1, wo `sign(-0)` 0 sagt): `std::copysign`, eine Operation auf dem Vorzeichenbit, in jeder Stufe
+dieselbe (im JIT `f64.copysign` von WebAssembly). Als Knoten heißt sie Copy Sign (`math_copysign`). Der
+Konverter schreibt `std::copysign` und `copysignf` damit.
 Zurückgelesen wird der Lambda-Rumpf als Formel, in ihrer einen kanonischen Schreibweise
 (`Formula::text()`).
 
@@ -1407,7 +1459,7 @@ Break und Set Field, Vergleich Feld für Feld, ein Eintrag jenseits der Liste), 
 jeder Stufe beim selben Durchlauf), ein Handler, der sein eigenes Event auslöst
 (`event_reentry`), eine Funktion, die über ein Event wieder aufgerufen wird, und Events, die
 tiefer als 64 ineinander liegen (`function_reentry`), ganze Zahlen an ihren Enden
-(`whole_numbers`), Tweens und Timer (`waits`), Zustände (`states`) und Zufall (`random`).
+(`whole_numbers`), das Vorzeichen von −0 (`signed_zero`: Copy Sign und `copysign` der Formel), die Bytes einer Struktur (`bytes`), Tweens und Timer (`waits`), Zustände (`states`) und Zufall (`random`).
 Die Blueprints: alle Ablaufformen (`Flow`), Funktionen als Wert und als Schritt (`Calls`), jeder
 Draht zwischen verschiedenen Typen (`Casts`), Listen jedes Typs mit jedem Index, auch weit
 jenseits der Liste (`Lists`), Aufzählungen als Variablen, in Listen und durch Funktionen, Switch

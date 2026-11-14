@@ -108,8 +108,9 @@ template <class K, class V, class Hash = KeyHash<K>> class Map {
   using key_type = K;
   using mapped_type = V;
   using value_type = std::pair<K, V>;
-  using iterator = value_type*;
-  using const_iterator = const value_type*;
+  // (the iterators of the vector the entries stand in: a place among them, as a list's iterator is one)
+  using iterator = typename std::vector<value_type>::iterator;
+  using const_iterator = typename std::vector<value_type>::const_iterator;
   static constexpr std::size_t npos = detail::KeyIndex::npos;
 
   Map() = default;
@@ -131,10 +132,10 @@ template <class K, class V, class Hash = KeyHash<K>> class Map {
 
   std::size_t size() const { return entries_.size(); }
   bool empty() const { return entries_.empty(); }
-  iterator begin() { return entries_.data(); }
-  iterator end() { return entries_.data() + entries_.size(); }
-  const_iterator begin() const { return entries_.data(); }
-  const_iterator end() const { return entries_.data() + entries_.size(); }
+  iterator begin() { return entries_.begin(); }
+  iterator end() { return entries_.end(); }
+  const_iterator begin() const { return entries_.cbegin(); }
+  const_iterator end() const { return entries_.cend(); }
 
   /// The place of the key's entry among them, npos: there is none.
   std::size_t index_of(const K& key) const {
@@ -142,11 +143,11 @@ template <class K, class V, class Hash = KeyHash<K>> class Map {
   }
   iterator find(const K& key) {
     const std::size_t at = index_of(key);
-    return at == npos ? end() : begin() + at;
+    return at == npos ? end() : begin() + static_cast<std::ptrdiff_t>(at);
   }
   const_iterator find(const K& key) const {
     const std::size_t at = index_of(key);
-    return at == npos ? end() : begin() + at;
+    return at == npos ? end() : begin() + static_cast<std::ptrdiff_t>(at);
   }
   bool contains(const K& key) const { return index_of(key) != npos; }
   std::size_t count(const K& key) const { return contains(key) ? 1 : 0; }
@@ -158,7 +159,7 @@ template <class K, class V, class Hash = KeyHash<K>> class Map {
   template <class... A> std::pair<iterator, bool> try_emplace(const K& key, A&&... args) {
     const u64 h = hash_(key);
     const std::size_t at = index_.find(key, h, [this](std::size_t k) -> const K& { return entries_[k].first; });
-    if (at != npos) return {begin() + at, false};
+    if (at != npos) return {begin() + static_cast<std::ptrdiff_t>(at), false};
     index_.room(entries_.size() + 1, [this](std::size_t k) { return hash_(entries_[k].first); });
     entries_.emplace_back(std::piecewise_construct, std::forward_as_tuple(key), std::forward_as_tuple(std::forward<A>(args)...));
     index_.add(entries_.size() - 1, h);
@@ -183,9 +184,9 @@ template <class K, class V, class Hash = KeyHash<K>> class Map {
   }
   /// Takes this entry out: the one after it is where it was.
   iterator erase(const_iterator it) {
-    const std::size_t at = static_cast<std::size_t>(it - begin());
+    const std::size_t at = static_cast<std::size_t>(it - const_iterator(begin()));
     erase_at(at);
-    return begin() + at;
+    return begin() + static_cast<std::ptrdiff_t>(at);
   }
   /// Takes the entry at this place out.
   void erase_at(std::size_t at) {
@@ -226,8 +227,8 @@ template <class K, class Hash = KeyHash<K>> class Set {
  public:
   using key_type = K;
   using value_type = K;
-  using iterator = const K*;
-  using const_iterator = const K*;
+  using iterator = typename std::vector<K>::const_iterator;   // (a key is not changed where it stands)
+  using const_iterator = typename std::vector<K>::const_iterator;
   static constexpr std::size_t npos = detail::KeyIndex::npos;
 
   Set() = default;
@@ -251,15 +252,15 @@ template <class K, class Hash = KeyHash<K>> class Set {
 
   std::size_t size() const { return keys_.size(); }
   bool empty() const { return keys_.empty(); }
-  const_iterator begin() const { return keys_.data(); }
-  const_iterator end() const { return keys_.data() + keys_.size(); }
+  const_iterator begin() const { return keys_.cbegin(); }
+  const_iterator end() const { return keys_.cend(); }
 
   std::size_t index_of(const K& key) const {
     return index_.find(key, hash_(key), [this](std::size_t at) -> const K& { return keys_[at]; });
   }
   const_iterator find(const K& key) const {
     const std::size_t at = index_of(key);
-    return at == npos ? end() : begin() + at;
+    return at == npos ? end() : begin() + static_cast<std::ptrdiff_t>(at);
   }
   bool contains(const K& key) const { return index_of(key) != npos; }
   std::size_t count(const K& key) const { return contains(key) ? 1 : 0; }
@@ -268,7 +269,7 @@ template <class K, class Hash = KeyHash<K>> class Set {
   std::pair<const_iterator, bool> insert(const K& key) {
     const u64 h = hash_(key);
     const std::size_t at = index_.find(key, h, [this](std::size_t k) -> const K& { return keys_[k]; });
-    if (at != npos) return {begin() + at, false};
+    if (at != npos) return {begin() + static_cast<std::ptrdiff_t>(at), false};
     index_.room(keys_.size() + 1, [this](std::size_t k) { return hash_(keys_[k]); });
     keys_.push_back(key);
     index_.add(keys_.size() - 1, h);
@@ -286,9 +287,9 @@ template <class K, class Hash = KeyHash<K>> class Set {
     return 1;
   }
   const_iterator erase(const_iterator it) {
-    const std::size_t at = static_cast<std::size_t>(it - begin());
+    const std::size_t at = static_cast<std::size_t>(it - const_iterator(begin()));
     erase_at(at);
-    return begin() + at;
+    return begin() + static_cast<std::ptrdiff_t>(at);
   }
   void erase_at(std::size_t at) {
     keys_.erase(keys_.begin() + static_cast<std::ptrdiff_t>(at));

@@ -99,6 +99,30 @@ inline const std::vector<Case>& cases() {
           {"id":6,"type":"var.set","params":{"variable":"H"}},{"id":7,"type":"math.formula","params":{"formula":"ceil(x * 0.7) + (x % 2 == 0 && x != 0) * 100"}}],
         "links":[[1,"then",2,"exec"],[1,"value",3,"value"],[3,"result",2,"value"],[2,"then",4,"exec"],[1,"value",5,"x"],[5,"result",4,"amount"],
           [4,"then",6,"exec"],[1,"value",7,"x"],[7,"result",6,"value"]]})kg"},
+      // The sign of -0 (Copy Sign, the formula's copysign): -Go's value is -0 for 0, and Copy Sign
+      // gives the size of 3 with that sign - -3 in every tier, where Sign of -0 says 0.
+      {"signed_zero",
+       R"kg({"variables":[{"name":"F","type":"float","value":0},{"name":"G","type":"float","value":0},{"name":"Signs","type":"float_list","value":[]}],
+        "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.add","params":{"variable":"G"}},{"id":3,"type":"math.negate"},
+          {"id":4,"type":"math.copysign","values":{"a":3}},{"id":5,"type":"var.set","params":{"variable":"F"}},
+          {"id":6,"type":"math.formula","params":{"formula":"copysign(1, z) * 100 + copysign(value, 1 - value)"}},{"id":7,"type":"list.add","params":{"variable":"Signs"}}],
+        "links":[[1,"then",2,"exec"],[1,"value",3,"a"],[3,"result",4,"b"],[4,"result",2,"amount"],[2,"then",5,"exec"],[3,"result",6,"z"],[1,"value",6,"value"],
+          [6,"result",5,"value"],[5,"then",7,"exec"],[6,"result",7,"item"]]})kg"},
+      // The bytes of a struct (Bytes of Struct, Struct of Bytes): Go's value goes into a struct of
+      // numbers, its bytes into B, and back - from the first byte and from the second (the last byte
+      // missing: 0). Flags is cut to 16 bits, Speed to a float's, Vx is signed.
+      {"bytes",
+       R"kg({"structs":[{"name":"Frame","fields":[{"name":"Magic","type":"int","value":1447121230},{"name":"Seq","type":"int","value":0},{"name":"Vx","type":"int","value":-3},)kg"
+       R"kg({"name":"Flags","type":"int","value":70000},{"name":"On","type":"bool","value":true},{"name":"Speed","type":"float","value":0}]}],)kg"
+       R"kg("variables":[{"name":"B","type":"int_list","value":[]},{"name":"Back","type":"struct","of":"Frame","value":{}},{"name":"Shifted","type":"struct","of":"Frame","value":{}}],)kg"
+       R"kg("nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.set","params":{"variable":"B"}},)kg"
+       R"kg({"id":3,"type":"struct.bytes","params":{"struct":"Frame","layout":"16: u32@0 u16@4 i16@6 u16@8 bool@10 f32@12"}},{"id":4,"type":"struct.make","params":{"struct":"Frame"}},)kg"
+       R"kg({"id":5,"type":"math.formula","params":{"formula":"value * 0.1"}},{"id":6,"type":"math.round"},{"id":7,"type":"var.set","params":{"variable":"Back"}},)kg"
+       R"kg({"id":8,"type":"struct.of_bytes","params":{"struct":"Frame","layout":"16: u32@0 u16@4 i16@6 u16@8 bool@10 f32@12"}},{"id":9,"type":"var.get","params":{"variable":"B"}},)kg"
+       R"kg({"id":10,"type":"var.set","params":{"variable":"Shifted"}},)kg"
+       R"kg({"id":11,"type":"struct.of_bytes","params":{"struct":"Frame","layout":"16: u32@0 u16@4 i16@6 u16@8 bool@10 f32@12"},"values":{"at":1}}],)kg"
+       R"kg("links":[[1,"then",2,"exec"],[4,"value",3,"value"],[3,"bytes",2,"value"],[1,"value",5,"value"],[5,"result",4,"Speed"],[1,"value",6,"a"],[6,"result",4,"Seq"],)kg"
+       R"kg([2,"then",7,"exec"],[9,"value",8,"bytes"],[8,"value",7,"value"],[7,"then",10,"exec"],[9,"value",11,"bytes"],[11,"value",10,"value"]]})kg"},
       {"events_and_time",
        R"({"variables":[{"name":"Ticks","type":"int","value":0},{"name":"Elapsed","type":"float","value":0},{"name":"Heard","type":"float","value":0},{"name":"Last","type":"text","value":""}],
         "nodes":[{"id":1,"type":"event.tick"},{"id":2,"type":"var.add","params":{"variable":"Ticks"}},{"id":3,"type":"var.add","params":{"variable":"Elapsed"}},
