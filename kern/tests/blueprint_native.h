@@ -1045,6 +1045,8 @@ inline const char* kFormulas[] = {
     "a ? b : c",
     "min(a, b) + max(b, c) + clamp(a, b, c)",
     "abs(a) + sign(b)",
+    "copysign(a, b)",
+    "copysign(1, a) * 4 + copysign(b, -c)",
     "floor(a) + ceil(b) * 10 + round(c) * 100 + trunc(a) * 1000",
     "sqrt(a) + pow(b, 2) + exp(c / 1000) + log(b)",
     "sin(a) + cos(b) + tan(c)",
@@ -1217,7 +1219,10 @@ inline Case nodes_case(const logic::Library& lib = logic::library()) {
                                          {"name":"Where","type":"struct","of":"Spot","value":{"Label":"home"}},{"name":"Hours","type":"int_list","value":[6,22]},
                                          {"name":"Stops","type":"struct_list","of":"Spot","value":[{"At":[1,2,3]}]},{"name":"Dry","type":"bool","value":true},
                                          {"name":"Guide","type":"actor","value":0},{"name":"Around","type":"enum_list","of":"Season","value":[0,3]}],"help":"A day of a season."},
-                 {"name":"Lone","fields":[{"name":"Only","type":"int","value":4}]}],"nodes":[],"links":[]})",
+                 {"name":"Lone","fields":[{"name":"Only","type":"int","value":4}]},
+                 {"name":"Wire","fields":[{"name":"Magic","type":"int","value":1447121230},{"name":"Delta","type":"int","value":-5},{"name":"On","type":"bool","value":true},
+                                          {"name":"Speed","type":"float","value":0.1},{"name":"Rate","type":"float","value":-2.5},{"name":"Key","type":"int64","value":"18446744073709551615"}],
+                  "help":"A packet of numbers (Bytes of Struct)."}],"nodes":[],"links":[]})",
                      types) ||
         !logic::graph_from_json(types, c.graph))
       std::printf("blueprint_native Nodes: its types were not read\n");
@@ -1230,6 +1235,11 @@ inline Case nodes_case(const logic::Library& lib = logic::library()) {
     if (d->type == "math.formula") {
       variants.clear();
       for (const char* formula : kFormulas) variants.push_back({{"formula", formula}});
+    } else if (d->type == "struct.bytes" || d->type == "struct.of_bytes") {
+      // (every number a layout has, a byte no field covers, and fields that are not in the struct's order)
+      variants = {{{"struct", "Wire"}, {"layout", "28: u32@0 i16@4 bool@6 f32@8 f64@12 u64@20"}},
+                  {{"struct", "Wire"}, {"layout", "24: i8@23 u16@0 bool@2 f64@3 f32@11 i64@15"}},
+                  {{"struct", "Lone"}, {"layout", "4: i32@0"}}, {{"struct", "Lone"}, {"layout", "3: u8@1"}}};
     } else if (d->params.size() == 1 && d->params[0].kind == logic::ParamDef::Kind::choice) {
       variants.clear();
       for (std::size_t i = 0; i + 1 < d->params[0].choices.size(); i += 2) variants.push_back({{d->params[0].key, d->params[0].choices[i]}});

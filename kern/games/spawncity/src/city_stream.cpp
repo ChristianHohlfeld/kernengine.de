@@ -152,7 +152,7 @@ void CityStream::request_around(Vec3 focus, i32 ring) {
   std::vector<std::pair<i32, TileKey>> want;
   for (i32 dy = -ring; dy <= ring; ++dy)
     for (i32 dx = -ring; dx <= ring; ++dx) want.push_back({dx * dx + dy * dy, TileKey{c.z, c.x + dx, c.y + dy}});
-  std::sort(want.begin(), want.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+  std::stable_sort(want.begin(), want.end(), [](const std::pair<i32, TileKey>& a, const std::pair<i32, TileKey>& b) { return a.first < b.first; });
   for (const auto& [d, k] : want) {
     if (tiles_.find(k.hash()) != tiles_.end()) continue;
     auto t = std::make_unique<Tile>();
@@ -263,7 +263,7 @@ void CityStream::furniture(std::vector<u64>& out) const {
   out.clear();
   for (const auto& [k, t] : tiles_)
     if (t->prepared) out.push_back(k);
-  std::sort(out.begin(), out.end());
+  std::stable_sort(out.begin(), out.end());
 }
 
 const MapFeatures& CityStream::features(u64 tile) const {
@@ -390,7 +390,7 @@ void CityStream::select_cells(Vec3 focus, bool force) {
       if (d <= kR + kKeep) picks.push_back({d, &t, cell, static_cast<u32>(items.size())});
     }
   }
-  std::sort(picks.begin(), picks.end(), [](const Pick& x, const Pick& y) { return x.d < y.d || (x.d == y.d && x.cell < y.cell); });
+  std::stable_sort(picks.begin(), picks.end(), [](const Pick& x, const Pick& y) { return x.d < y.d || (x.d == y.d && x.cell < y.cell); });
   for (auto& [k, tp] : tiles_) tp->want_cells.clear();
   u32 total = 0;
   f32 reach = kR;
@@ -512,7 +512,7 @@ void CityStream::update_collision(Vec3 focus, f64 deadline) {
         if (d2 <= 340.0f * 340.0f) all.push_back({d2, k, i});
       }
     }
-    std::sort(all.begin(), all.end(), [](const Pick& a, const Pick& b) { return a.d2 < b.d2; });
+    std::stable_sort(all.begin(), all.end(), [](const Pick& a, const Pick& b) { return a.d2 < b.d2; });
     const std::size_t cap = 480 + 320 * extra_foci.size();
     if (all.size() > cap) all.resize(cap);
     n.list.clear();
@@ -646,7 +646,7 @@ void CityStream::damage_list(std::vector<DamageRec>& out) const {
   out.clear();
   out.reserve(damage_.size());
   for (const auto& [seed, d] : damage_) out.push_back({seed, d.height, d.leveled});
-  std::sort(out.begin(), out.end(), [](const DamageRec& a, const DamageRec& b) { return a.seed < b.seed; });
+  std::stable_sort(out.begin(), out.end(), [](const DamageRec& a, const DamageRec& b) { return a.seed < b.seed; });
 }
 
 bool CityStream::damage_of(u32 seed, DamageRec& out) const {
@@ -723,7 +723,7 @@ void CityStream::begin_cells(Tile& t) {
     const i32 cx = static_cast<i32>(static_cast<u32>(c >> 32)), cy = static_cast<i32>(static_cast<u32>(c));
     order.push_back({std::hypot((static_cast<f32>(cx) + 0.5f) * kChunk - focus_.x, (static_cast<f32>(cy) + 0.5f) * kChunk - focus_.y), c});
   }
-  std::sort(order.begin(), order.end());
+  std::stable_sort(order.begin(), order.end(), [](const std::pair<f32, u64>& a, const std::pair<f32, u64>& b) { return a.first < b.first || (!(b.first < a.first) && a.second < b.second); });
   if (order.size() > 6) order.resize(6);
   kern::FootprintStream fs;
   std::vector<Vec2> thin;
@@ -936,7 +936,7 @@ void CityStream::update(Vec3 focus, f64 budget_ms) {
   // Nearest unfinished tile first.
   std::vector<Tile*> order;
   for (auto& [k, t] : tiles_) order.push_back(t.get());
-  std::sort(order.begin(), order.end(), [&](Tile* a, Tile* b) {
+  std::stable_sort(order.begin(), order.end(), [&](Tile* a, Tile* b) {
     const f32 da = (a->center.x - focus.x) * (a->center.x - focus.x) + (a->center.y - focus.y) * (a->center.y - focus.y);
     const f32 db = (b->center.x - focus.x) * (b->center.x - focus.x) + (b->center.y - focus.y) * (b->center.y - focus.y);
     return da < db;

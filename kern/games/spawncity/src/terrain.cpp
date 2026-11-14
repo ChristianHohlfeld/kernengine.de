@@ -722,7 +722,7 @@ void Terrain::add_water_polygon(const std::vector<std::vector<Vec2>>& rings) {
         const f32 ya = ring[a].y, yc = ring[c].y;
         if ((ya > y) != (yc > y)) xs.push_back(ring[a].x + (y - ya) / (yc - ya) * (ring[c].x - ring[a].x));
       }
-    std::sort(xs.begin(), xs.end());
+    std::stable_sort(xs.begin(), xs.end());
     for (std::size_t k = 0; k + 1 < xs.size(); k += 2) {
       const i32 ia = static_cast<i32>(std::ceil(xs[k] / kWaterCell - 0.5f)), ib = static_cast<i32>(std::floor(xs[k + 1] / kWaterCell - 0.5f));
       for (i32 i = ia; i <= ib; ++i) set_water_cell(i, j);
@@ -1055,7 +1055,7 @@ void Terrain::want_tiles(Vec3 focus, Vec3 anchor) {
     if (d < 2400) water.push_back({d, k});
   }
   auto finish = [](std::vector<WantedTile>& v, std::vector<u64>& out) {
-    std::sort(v.begin(), v.end(), [](const WantedTile& a, const WantedTile& b) { return a.d < b.d; });
+    std::stable_sort(v.begin(), v.end(), [](const WantedTile& a, const WantedTile& b) { return a.d < b.d; });
     out.clear();
     for (const WantedTile& w : v)
       if (std::find(out.begin(), out.end(), w.k) == out.end()) out.push_back(w.k);
@@ -1104,7 +1104,7 @@ void Terrain::build_render_tile(i32 level, i32 ti, i32 tj) {
             const Vec2 p = ring[q], o = ring[r];
             if ((p.y > y) != (o.y > y)) xs.push_back(p.x + (y - p.y) * (o.x - p.x) / (o.y - p.y));
           }
-        std::sort(xs.begin(), xs.end());
+        std::stable_sort(xs.begin(), xs.end());
         for (std::size_t q = 0; q + 1 < xs.size(); q += 2) {
           const i32 i0 = std::max(0, static_cast<i32>(std::ceil((xs[q] - x0) / step)));
           const i32 i1 = std::min(n - 1, static_cast<i32>(std::floor((xs[q + 1] - x0) / step)));

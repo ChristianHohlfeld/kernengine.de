@@ -56,7 +56,7 @@ class Destruction {
   /// Destruction sync: the structural points left per building (seed) - only ever fewer. The
   /// points a blast here took (since the last call), and those another machine reports.
   std::vector<std::pair<u32, f32>> take_points_log() { return std::move(points_log_); }
-  void points_list(std::vector<std::pair<u32, f32>>& out) const { out.assign(points_.begin(), points_.end()); std::sort(out.begin(), out.end()); }
+  void points_list(std::vector<std::pair<u32, f32>>& out) const { out.assign(points_.begin(), points_.end()); std::stable_sort(out.begin(), out.end(), [](const std::pair<u32, f32>& a, const std::pair<u32, f32>& b) { return a.first < b.first || (!(b.first < a.first) && a.second < b.second); }); }
   bool merge_points(const std::vector<std::pair<u32, f32>>& list, bool log);
 
  private:

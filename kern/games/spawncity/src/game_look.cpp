@@ -373,7 +373,7 @@ void Game::look_lighting(f32 dt) {
           const f32 d = std::hypot(head.x - eye.x, head.y - eye.y);
           if (d <= (L.pool_size >= 10 ? 110.0f : 70.0f)) near.push_back({d, head});
         }
-        std::sort(near.begin(), near.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+        std::stable_sort(near.begin(), near.end(), [](const std::pair<f32, Vec3>& a, const std::pair<f32, Vec3>& b) { return a.first < b.first; });
         L.near_lamps.clear();
         // the original's nearest three; the strongest level (10 lights) takes eight
         const std::size_t keep = L.pool_size >= 10 ? 8 : 3;
@@ -397,7 +397,7 @@ void Game::look_lighting(f32 dt) {
         const f32 d = kern::length(matrix_of(c.actor).translation() - eye);
         if (d < 60) near.push_back({d, static_cast<i32>(i)});
       }
-      std::sort(near.begin(), near.end());
+      std::stable_sort(near.begin(), near.end(), [](const std::pair<f32, i32>& a, const std::pair<f32, i32>& b) { return a.first < b.first || (!(b.first < a.first) && a.second < b.second); });
       for (std::size_t k = 0; k < near.size() && k < 3; ++k) {
         const kern::Mat4 m = matrix_of(cars_[static_cast<std::size_t>(near[k].second)].actor);
         const Vec3 fwd = kern::normalize(Vec3{m.m[0], m.m[1], 0}, {1, 0, 0});

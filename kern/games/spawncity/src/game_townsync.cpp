@@ -81,7 +81,7 @@ void Game::townsync_send_full(i32 to) {
     for (std::size_t i = 0; i < doors.size(); ++i)
       if (doors[i] < town::kPlanksMax) planks.push_back({key, static_cast<u8>(i), static_cast<u8>(doors.size()), doors[i]});
   }
-  std::sort(planks.begin(), planks.end(), [](const town::PlankRec& a, const town::PlankRec& b) { return a.key != b.key ? a.key < b.key : a.door < b.door; });
+  std::stable_sort(planks.begin(), planks.end(), [](const town::PlankRec& a, const town::PlankRec& b) { return a.key != b.key ? a.key < b.key : a.door < b.door; });
   for (const std::vector<u8>& part : town::pack_state(t.epoch, lamps, planks, t.marks)) {
     if (to < 0) net_.town_to_all(part);
     else net_.town_to(static_cast<u8>(to), part);

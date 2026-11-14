@@ -149,7 +149,7 @@ CoreFit find_core(const std::vector<Vec2>& inner, const std::vector<std::vector<
   std::vector<std::pair<f32, Vec2>> cands;
   for (f32 x = x0; x <= x1; x += step)
     for (f32 y = y0; y <= y1; y += step) cands.push_back({std::hypot(x - centroid.x, y - centroid.y), {x, y}});
-  std::sort(cands.begin(), cands.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+  std::stable_sort(cands.begin(), cands.end(), [](const std::pair<f32, Vec2>& a, const std::pair<f32, Vec2>& b) { return a.first < b.first; });
   auto ok_point = [&](Vec2 p, f32 clear) {
     if (!pip(p, inner) || ring_dist(p, inner) < clear) return false;
     for (const auto& h : inner_holes)
@@ -210,7 +210,7 @@ std::vector<Interiors::Door> Interiors::doors_of(const std::vector<Vec2>& outer,
     const Vec2 d = (b - a) * (1 / len);
     edges.push_back({len, a, d, {d.y, -d.x}});
   }
-  std::sort(edges.begin(), edges.end(), [](const Edge& p, const Edge& q) { return p.len > q.len; });
+  std::stable_sort(edges.begin(), edges.end(), [](const Edge& p, const Edge& q) { return p.len > q.len; });
   std::vector<Door> out;
   if (edges.empty()) return out;
   auto mk = [](const Edge& e) { return Door{e.a + e.d * (e.len / 2), e.d, e.n}; };
@@ -321,7 +321,7 @@ bool Interiors::build(const MapFeatures::Building& b, f32 door_ground, Plan& P) 
           if (reversed) { const f32 t0 = len_o - w1; w1 = len_o - w0; w0 = t0; }
           wins.push_back({w0 * to_inner, w1 * to_inner});
         }
-        std::sort(wins.begin(), wins.end());
+        std::stable_sort(wins.begin(), wins.end(), [](const std::pair<f32, f32>& a, const std::pair<f32, f32>& b) { return a.first < b.first || (!(b.first < a.first) && a.second < b.second); });
         // the full band below the sill and above the head, solid pieces between the windows
         f32 t = 0;
         for (auto [w0, w1] : wins) {
@@ -657,7 +657,7 @@ void Interiors::update(f32 dt, f32 now, Vec3 feet, bool on_foot, CityStream& cit
       doors.push_back({dist, {{d.c.x, d.c.y, std::fmax(b.base, city.ground_height(d.c.x + d.n.x, d.c.y + d.n.y))}, std::atan2(d.d.y, d.d.x)}});
     }
   }
-  std::sort(doors.begin(), doors.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+  std::stable_sort(doors.begin(), doors.end(), [](const std::pair<f32, Closed>& a, const std::pair<f32, Closed>& b) { return a.first < b.first; });
   closed_.clear();
   for (std::size_t i = 0; i < doors.size() && i < kMaxClosedDoors; ++i) closed_.push_back(doors[i].second);
 }

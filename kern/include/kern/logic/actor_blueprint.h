@@ -76,6 +76,8 @@ struct ActorBlueprint {
   template <class T> static constexpr bool is_list = detail::IsVector<T>::value;
   /// A plain struct of the program that crosses as a Blueprint's struct (not a vector, not a list).
   template <class T> static constexpr bool is_struct = PlainStruct<T> && !std::is_same_v<T, Vec3> && !is_list<T>;
+  /// A vector of the program's own type: one that becomes a Vec3 and is made of one (not a plain struct).
+  template <class T> static constexpr bool is_vector = std::is_same_v<T, Vec3> || (!is_struct<T> && !is_list<T> && std::is_convertible_v<const T&, Vec3> && std::is_constructible_v<T, Vec3>);
 
   template <class T> static Value argument(const T& x) {
     static_assert(!std::is_same_v<T, f32>, "a 32-bit number goes in as the decimal it stands for, a 64-bit one (f64)");
@@ -83,7 +85,7 @@ struct ActorBlueprint {
     else if constexpr (std::is_enum_v<T>) return Value::enumeration(static_cast<i64>(x));
     else if constexpr (std::is_integral_v<T>) return Value::integer(static_cast<i64>(x));
     else if constexpr (std::is_same_v<T, f64>) return Value::number(x);
-    else if constexpr (std::is_same_v<T, Vec3>) return Value::vector(x);
+    else if constexpr (is_vector<T>) return Value::vector(static_cast<Vec3>(x));
     else if constexpr (std::is_same_v<T, std::string> || std::is_same_v<T, std::string_view>) return Value::text(std::string(x));
     else if constexpr (std::is_same_v<T, const char*> || std::is_same_v<T, char*>) return Value::text(x ? x : "");
     else if constexpr (is_list<T>) return list_argument(x);
@@ -103,6 +105,7 @@ struct ActorBlueprint {
       return Value::enumerations(std::move(r));
     } else if constexpr (std::is_integral_v<T>) return Value::of(std::vector<i64>(items.begin(), items.end()));
     else if constexpr (std::is_same_v<T, f64> || std::is_same_v<T, Vec3> || std::is_same_v<T, std::string>) return Value::of(items);
+    else if constexpr (is_vector<T>) return Value::of(std::vector<Vec3>(items.begin(), items.end()));
     else {
       std::vector<Value> r;
       r.reserve(items.size());
@@ -116,7 +119,7 @@ struct ActorBlueprint {
     else if constexpr (std::is_enum_v<T>) to = static_cast<T>(v.i);
     else if constexpr (std::is_integral_v<T>) to = static_cast<T>(v.i);
     else if constexpr (std::is_floating_point_v<T>) to = static_cast<T>(v.as_number());
-    else if constexpr (std::is_same_v<T, Vec3>) to = v.as_vector();
+    else if constexpr (is_vector<T>) to = T(v.as_vector());
     else if constexpr (std::is_same_v<T, std::string>) to = v.as_text();
     else if constexpr (is_list<T>) {
       using I = typename T::value_type;
@@ -128,6 +131,8 @@ struct ActorBlueprint {
         for (i64 x : v.items<i64>()) to.push_back(static_cast<I>(x));
       } else if constexpr (std::is_floating_point_v<I>) {
         for (f64 x : v.items<f64>()) to.push_back(static_cast<I>(x));
+      } else if constexpr (is_vector<I>) {
+        for (Vec3 x : v.items<Vec3>()) to.push_back(I(x));
       } else {
         to.resize(v.size());
         for (std::size_t k = 0; k < to.size(); ++k) taken(v.items<Value>()[k], to[k]);

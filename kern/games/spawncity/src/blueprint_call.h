@@ -38,8 +38,8 @@ inline f64 decimal(f32 x) {
   }
   return d;
 }
-/// (A 64-bit number - a time in milliseconds, a number counted in 64 bit - is passed as it is.)
-inline f64 decimal(f64 x) { return x; }
+/// (A 64-bit number - a time in milliseconds, a number counted in 64 bit - is passed as it is: no
+/// decimal() of it.)
 
 /// The Blueprint of one of the level's actors - Blueprint g_rules{"Lamps"}: the game binds `running` once its
 /// world has started, tests bind the one they run.
