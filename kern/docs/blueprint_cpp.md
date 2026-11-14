@@ -710,10 +710,14 @@ Frame Back = struct_of_bytes<Frame, "10: u32@0 u16@4 u16@6 i16@8">(Bytes, 0);
   liest er beim Compiler ab (`-fdump-record-layouts`, das, was C++ für diese Struktur festlegt,
   auch unter `#pragma pack`); `memcpy(&wert, bytes, sizeof wert)` ist S of Bytes; ein Zeiger auf
   Bytes (`const void*`, `const uint8_t*`), dem ein Aufruf `&wert` gibt, bekommt die Bytes des
-  Werts (Bytes of S, eine Liste fester Länge); `offsetof(S, feld)` ist die Zahl, die das Layout
-  sagt. Eine Struktur mit Füllung, mit einem `float` (die Sprache hält ihn in 64 Bit), einer Zahl,
-  deren Breite die Plattform bestimmt (`long`, `size_t`, `char`), einer Aufzählung, einem
-  Bitfeld oder einem Feld, das keine Zahl ist, hat dort noch keine Bytes und wartet mit Grund.
+  Werts (Bytes of S, eine Liste fester Länge); `std::bit_cast<std::array<uint8_t, N>>(wert)` sind
+  seine Bytes ebenso (Bytes of S, N so groß wie die Struktur); `offsetof(S, feld)` ist die Zahl, die
+  das Layout sagt. Ein `float` ist im Layout `f32` (das Feld ein Float). Eine Struktur mit Füllung,
+  einer Zahl, deren Breite die Plattform bestimmt (`long`, `size_t`, `char`), einer Aufzählung,
+  einem Bitfeld oder einem Feld, das keine Zahl ist, hat dort noch keine Bytes und wartet mit Grund.
+  Der Test hält einen `float` des Programms als 64-Bit-Zahl; wo das Programm die Bytes einer
+  Struktur mit einem nimmt, schreibt er sie aus, wie das Layout des Programms sie legt (der `float`
+  als seine 32 Bit, gerundet, wie C++ einen `double` zu einem `float` macht – `converted::layout`).
 
 ### Plätze
 

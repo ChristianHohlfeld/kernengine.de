@@ -159,6 +159,36 @@ using kern::Map;
 using kern::Set;
 }  // namespace wide
 
+// ---- the bytes of a value, as the program lays it out (Bytes of Struct, Struct of Bytes) ----
+// The test's source holds a 32-bit float of the program as a 64-bit number (wide::f32). Where the program
+// takes the bytes of a struct with one (std::bit_cast to bytes, memcpy from bytes, its address handed to a
+// pointer to bytes), they are the bytes of the program's struct: each field at the place the program's
+// layout gives it, a float as its 32 bits - the number rounded as C++ converts a double to a float, read
+// back as C++ widens a float - and every other field as it is. The generated test writes the fields out
+// (TestWriter.guard); these functions are the bytes of one field.
+namespace layout {
+/// A field that is a float in the program: the 32 bits of the number.
+inline void single_to(kern::u8* at, double v) {
+  const float f = static_cast<float>(v);
+  std::memcpy(at, &f, sizeof f);
+}
+inline void single_from(double& v, const kern::u8* at) {
+  float f;
+  std::memcpy(&f, at, sizeof f);
+  v = static_cast<double>(f);
+}
+/// Any other field: its own bytes (the test holds it as the program does).
+template <class T> void raw_to(kern::u8* at, const T& v) { std::memcpy(at, &v, sizeof v); }
+template <class T> void raw_from(T& v, const kern::u8* at) { std::memcpy(&v, at, sizeof v); }
+/// The N bytes of a value (`fields` writes them), and a value set from bytes (`fields` reads them).
+template <std::size_t N, class T, class F> std::array<kern::u8, N> bytes_of(const T& v, F fields) {
+  std::array<kern::u8, N> out{};
+  fields(v, out.data());
+  return out;
+}
+template <class T, class F> void of_bytes(T& v, const void* bytes, F fields) { fields(v, static_cast<const kern::u8*>(bytes)); }
+}  // namespace layout
+
 /// A value of the source as the Blueprint holds it, where the two differ by more than their numbers: a
 /// 64-bit bit pattern is a Whole - also in a list, a pair, a map or a set. S is the type as the program
 /// spells it, with Whole where it says u64 or i64.
