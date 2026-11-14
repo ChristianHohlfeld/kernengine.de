@@ -323,8 +323,7 @@ Vec3 PeopleArt::hair_color(const People::Person& p) {
 
 void PeopleArt::ragdolls(const std::vector<Ragdolls::Draw>& bones) {
   for (const Ragdolls::Draw& d : bones) {
-    if (!d.colors) continue;
-    const Ragdolls::Colors& c = *d.colors;
+    const Ragdolls::Colors& c = d.colors;
     switch (d.bone) {
       case Ragdolls::pelvis: put(rd_pelvis_, d.pose, c.pants); break;
       case Ragdolls::chest:
