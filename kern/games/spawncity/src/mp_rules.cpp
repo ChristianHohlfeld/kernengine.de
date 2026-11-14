@@ -14,7 +14,7 @@ f64 kSpawnProtectMs = 0, kRegenDelayMs = 0, kRegenTickMs = 0, kRespawnCooldownMs
 f32 kRegenHpPerS = 0, kRespawnRadiusMin = 0, kRespawnRadiusMax = 0, kVoiceRadius = 0, kPingRemoveM = 0;
 namespace {
 using kern::logic::Value;
-rules::Blueprint g_rules;
+rules::Blueprint g_rules{"Multiplayer"};
 std::vector<u32> g_palette;
 f32 num(const char* function, const std::vector<Value>& args) { return static_cast<f32>(g_rules.number(function, args)); }
 Vec2 pair(const char* function, const std::vector<Value>& args) {

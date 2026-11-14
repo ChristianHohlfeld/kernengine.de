@@ -11,7 +11,7 @@ namespace sc::gaps {
 // ---- police_sirens.mjs, the dispatch grace, the organic crack: the Blueprint of the actor "Sirens"
 namespace {
 using kern::logic::Value;
-rules::Blueprint g_sirens;
+rules::Blueprint g_sirens{"Sirens"};
 f32 num(const char* function, const std::vector<Value>& args) { return static_cast<f32>(g_sirens.number(function, args)); }
 }  // namespace
 void bind_sirens(kern::logic::Instance* blueprint) { g_sirens.running = blueprint; }

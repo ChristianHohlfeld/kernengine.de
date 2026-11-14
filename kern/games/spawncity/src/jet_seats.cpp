@@ -8,7 +8,7 @@ namespace sc::seats {
 namespace {
 using kern::logic::Value;
 using rules::of_enum;
-rules::Blueprint g_rules;
+rules::Blueprint g_rules{"JetSeats"};
 
 // The Blueprint's struct Row, field by field in its order - and a table of them.
 Value to_value(const Row& r) { return Value::structure({Value::integer(r.owner), Value::integer(r.pilot), Value::integer(r.passenger)}); }

@@ -79,7 +79,7 @@ f32 kCourseScale = 0;
 
 namespace {
 using kern::logic::Value;
-rules::Blueprint g_military, g_zombies, g_sandbox, g_fun, g_race;
+rules::Blueprint g_military{"Military"}, g_zombies{"Zombies"}, g_sandbox{"Sandbox"}, g_fun{"Fun"}, g_race{"Race"};
 Value N(f32 x) { return rules::number(x); }
 Value I(i64 x) { return Value::integer(x); }
 Value B(bool x) { return Value::boolean(x); }

@@ -1,12 +1,15 @@
 // How the game's C++ calls a rule that is a Blueprint of the level (wanted.cpp, combat_detail.cpp,
 // guided.cpp ...): the running Blueprint of one actor, its functions by name with their values,
-// its variables. Nothing is computed here. (This goes when the callers are Blueprints themselves.)
+// its variables. Nothing is computed here. A call with typed values and outputs
+// (kern::logic::ActorBlueprint::call) is what Call on Actor is in a Blueprint; the calls with lists of
+// values below go when every caller makes that one.
 #pragma once
 #include <cmath>
 #include <string>
 #include <vector>
 
 #include "common.h"
+#include "kern/logic/actor_blueprint.h"
 #include "kern/logic/logic.h"
 
 namespace sc::rules {
@@ -38,9 +41,12 @@ inline kern::logic::Value number(f32 x) { return kern::logic::Value::number(deci
 /// (A 64-bit number - a time in milliseconds, a number counted in 64 bit - is passed as it is.)
 inline kern::logic::Value number(f64 x) { return kern::logic::Value::number(x); }
 
-struct Blueprint {
+/// The Blueprint of one of the level's actors - Blueprint g_rules{"Lamps"}: the game binds `running` once its
+/// world has started, tests bind the one they run.
+struct Blueprint : kern::logic::ActorBlueprint {
   using Value = kern::logic::Value;
-  kern::logic::Instance* running = nullptr;  // (the game binds it once its world has started; tests bind the one they run)
+  using ActorBlueprint::ActorBlueprint;
+  using ActorBlueprint::call;
 
   /// Calls a function; false (and no results) while no Blueprint is bound or it has no such function.
   bool call(const char* function, const std::vector<Value>& args, std::vector<Value>& results) const {

@@ -7,7 +7,7 @@ namespace sc::spawn {
 
 namespace {
 using kern::logic::Value;
-rules::Blueprint g_rules;
+rules::Blueprint g_rules{"SpawnGuard"};
 
 // The Blueprint's structs, field by field in their order.
 Value to_value(const Viewer& v) {

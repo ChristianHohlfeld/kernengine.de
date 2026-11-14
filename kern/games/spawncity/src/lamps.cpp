@@ -10,7 +10,7 @@ namespace sc::lamps {
 
 namespace {
 using kern::logic::Value;
-rules::Blueprint g_rules;  // the level's actor "Lamps": what happens to one lamp
+rules::Blueprint g_rules{"Lamps"};  // what happens to one lamp
 /// The Blueprint's function Worse: may a lamp in `state` become `to`?
 bool worse(u8 state, u8 to) { return g_rules.flag("Worse", {Value::integer(state), Value::integer(to)}); }
 i64 grid_key(f32 x, f32 y) { return (static_cast<i64>(std::floor(x / kGridM)) << 32) ^ (static_cast<i64>(std::floor(y / kGridM)) & 0xffffffffll); }

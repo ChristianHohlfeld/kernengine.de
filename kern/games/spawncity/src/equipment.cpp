@@ -16,7 +16,7 @@ namespace sc {
 
 namespace {
 using kern::logic::Value;
-rules::Blueprint g_jetpack;
+rules::Blueprint g_jetpack{"Jetpack"};
 }  // namespace
 void Jetpack::bind(kern::logic::Instance* blueprint) { g_jetpack.running = blueprint; }
 f32 Jetpack::acc() { return static_cast<f32>(g_jetpack.variable("Acc")); }
