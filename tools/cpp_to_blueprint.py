@@ -8404,7 +8404,9 @@ class TestWriter:
                     hl = hl if not made or ("member", made[0]) not in dropped else [hl[0], made[1], *hl[2:]]
                     # (where the class's compiled text stands: its helpers next to it, for a call from converted.h)
                     home = self.compiled_top(q, records) or top_of(q)
-                    spaces = classes_of(home.rsplit("::", 1)[0] + "::") if "::" in home else []
+                    outer_scope = home.rsplit("::", 1)[0] + "::" if "::" in home else ""
+                    # (of a class defined outside its class - struct CityStream::Tile: the namespaces that class stands in)
+                    spaces = self.spaces_of(outer_scope) if top_of(home) != home else classes_of(outer_scope)
                     if spaces:   # (of a class in a namespace: there, where a call from converted.h looks for them)
                         hl = [*hl[:-5], "".join(f"namespace {c} {{ " for c in spaces) + "using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;",
                               *hl[-5:], "}" * len(spaces)]
