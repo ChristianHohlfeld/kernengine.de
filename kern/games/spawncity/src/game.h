@@ -208,7 +208,6 @@ class Game {
   void drive_traffic(f32 h);
   void manage_traffic();
   // one world in multiplayer (game_worldsync.cpp): the host's traffic and citizens are everybody's
-  struct CarPuppet { Vec3 p, v; Quat q; f32 at = -9; };
   struct WorldParts { u32 t_ms = 0; u64 mask = 0; };  // the parts of the host's list that came (game_worldsync.cpp)
   f64 life_epoch() const;
   void car_body_dynamic(TrafficCar& c);
@@ -262,11 +261,9 @@ class Game {
   u32 world_tick_ = 0;  // the host's car snapshots so far (a car at rest sends its whole entry every 20th)
   u32 world_sent_ = 0, world_got_ = 0;
   f32 world_heard_at_ = -99;
-  bool cars_were_ = false;
   std::vector<bool> car_seen_;
   std::vector<People::NetPerson> people_acc_;
   std::vector<i32> car_net_;           // client: the host's index each of our cars plays (-1 none)
-  std::vector<CarPuppet> car_puppet_;
   std::vector<mp::PoseTimeline> car_line_;   // client: the host's poses of each of his cars
   std::vector<Quat> car_rest_q_;             // ... and how each last stood (a car at rest is only named)
   std::map<u8, WorldParts> world_parts_;
@@ -665,8 +662,6 @@ class Game {
   i32 drone_cam_ = 0;        // 0 fpv, 1 follow, 2 third (the page restores the player's last choice; FPV first)
   bool car_cockpit_ = false, jet_cockpit_ = false;
   f32 fpv_tilt_deg_ = -15, fpv_fov_deg_ = 105;
-  f32 jet_pitch_rate_ = 0, jet_roll_rate_ = 0;  // mouse rate commands (tau 25 ms)
-  f32 drone_yaw_rate_ = 0;
   Spot spawn_{};
   kern::Camera cam_;
   bool cam_valid_ = false;
@@ -726,7 +721,6 @@ class Game {
   net::Session net_;
   std::unique_ptr<Car> remote_car_, remote_bus_;
   bool rebased_ = false;
-  u8 my_color_ = 0;
   std::unique_ptr<MpLocal> mp_;  // pings, feed, voice, big map (game_net.h)
   // street lamps and night
   struct Lamp { Vec3 foot; f32 yaw; u32 lane; u8 state = 0; };  // state: street_lamps.mjs 0 lit, 1 dark, 2 down
@@ -735,7 +729,7 @@ class Game {
   std::vector<kern::Vec4> ground_changes_;  // where the ground changed this frame (city_stream.h take_ground_changes)
   f32 night_ = 0;
   bool show_lamps_ = true;
-  f32 star_since_ = -1, last_wave_ = -99, last_cop_shot_ = -99, drone_hp_ = 100, jet_hp_ = 400, town_clock_ = 0;  // jet: jet_mode.mjs HP_MAX 400
+  f32 star_since_ = -1, last_wave_ = -99, last_cop_shot_ = -99, drone_hp_ = 100, jet_hp_ = 400;  // jet: jet_mode.mjs HP_MAX 400
   i32 last_stars_ = 0;
   bool player_dead_ = false;
   // vs_combat_presentation.mjs: down until the player asks (R / Enter / Space, pad A / Y, the
