@@ -7122,6 +7122,8 @@ class TestWriter:
         raw = self.tree.text(file)
         edits = []
         def span(n):
+            while n.get("_call") is not None:   # (a place written out for a call: where the source has the call)
+                n = n["_call"]
             a, b = n.get("_at", (None, None))
             if a is None or b is None or n.get("_file") != file or not lo <= a < b <= hi:
                 where = f"{os.path.basename(n.get('_file') or '?')}:{self.tree.text(n['_file']).count(chr(10), 0, a) + 1}" if a is not None and n.get("_file") else "nowhere in the source"
