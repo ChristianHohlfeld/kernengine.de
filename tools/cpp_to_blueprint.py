@@ -1483,6 +1483,8 @@ class Const:
             if ref.get("name") == "kPi":
                 return 3.14159265358979323846
             raise Wait(f"the constant {ref.get('name')} is defined elsewhere")
+        if k == "CallExpr" and self.limit(n) is not None:
+            return self.limit(n)
         if k == "CallExpr":
             name = callee_name(n)
             args = [self.number(c) for c in kids(n)[1:]]
@@ -1499,6 +1501,26 @@ class Const:
         if k in ("CXXNullPtrLiteralExpr", "GNUNullExpr") and ENGINE_NODES:   # (no object of the engine: the handle 0)
             return 0
         raise Wait(f"a constant written as {k}")
+
+    FLOAT_LIMITS = {"float": {"max": 3.4028234663852886e+38, "min": 1.1754943508222875e-38, "epsilon": 1.1920928955078125e-07},
+                    "double": {"max": 1.7976931348623157e+308, "min": 2.2250738585072014e-308, "epsilon": 2.220446049250313e-16}}
+
+    def limit(self, n):
+        """std::numeric_limits<T>::max(), min(), lowest(), epsilon(): the number it is (None: no such call)."""
+        if n.get("kind") != "CallExpr" or len(kids(n)) != 1:
+            return None
+        m = re.search(r"numeric_limits\s*<\s*(.+?)\s*>\s*::\s*(max|min|lowest|epsilon)$", re.sub(r"\s+", " ", self.unit.tree.source(callee(n))))
+        if m is None:
+            return None
+        t, what = self.unit.clean(m.group(1)), m.group(2)
+        if t in self.FLOAT_LIMITS:
+            return -self.FLOAT_LIMITS[t]["max"] if what == "lowest" else self.FLOAT_LIMITS[t][what]
+        bits = self.BITS.get(t)
+        if bits is None or what == "epsilon":
+            raise Wait(f"std::numeric_limits<{m.group(1)}>::{what}()")
+        signed = t not in UNSIGNED and t != "whole64u"
+        top = (1 << (bits - 1)) - 1 if signed else (1 << bits) - 1
+        return top if what == "max" else (-top - 1 if signed else 0)
 
     def decimal(self, n):
         """A constant number as a Blueprint has it: a literal as it is spelled, a computed 32-bit
@@ -4651,6 +4673,9 @@ class Emit:
         d = self.engine_decl(ref.get("id"))
         if d is not None:
             return self.engine_value(d, None, kids(b)[1:])
+        if Const(u).limit(b) is not None:
+            t = self.tp(b)
+            return Const(u).literal(b, t), t   # (std::numeric_limits<T>::max(): the number it is)
         vec = [self.is_vec(x) for x in a]
         if name == "isfinite" and len(a) == 1 and self.numeric(a[0]):
             x = self.ex(a[0], "Float")
