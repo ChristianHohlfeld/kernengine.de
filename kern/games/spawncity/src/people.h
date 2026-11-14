@@ -145,7 +145,7 @@ class People {
     if (p.state == State::down || p.state == State::gone) return;
     p.hp -= damage;
     p.hurt_at = now;
-    if (p.hp <= 0) kill(p, from_dir, by_player, now, false);
+    if (p.hp <= 0) kill(i, from_dir, by_player, now, false);
   }
   void take_deaths(std::vector<Death>& out) { out.insert(out.end(), deaths_.begin(), deaths_.end()); deaths_.clear(); }
   /// MP: what our rounds and blows did to a mate's unit (Person::remote) since the last call: the
@@ -182,15 +182,17 @@ class People {
 
  public:
   /// VR grab: the person goes down as a ragdoll (gets up again later), pushed by `push`.
-  void grab_knock(i32 index, Vec3 push, f32 now) { if (index >= 0 && index < static_cast<i32>(people_.size())) knock(people_[static_cast<std::size_t>(index)], push, now); }
+  void grab_knock(i32 index, Vec3 push, f32 now) { if (index >= 0 && index < static_cast<i32>(people_.size())) knock(index, push, now); }
 
  private:
   void spawn(const PeopleView& view, const CityStream& city, Rng& rng, f32 now);
   void walk(Person& p, f32 dt, f32 now, const PeopleView& view, const CityStream& city, Rng& rng);
-  void kill(Person& p, Vec3 from_dir, bool by_player, f32 now, bool hit_by_car);
+  /// Person `i` (its place in people_) down for good.
+  void kill(i32 i, Vec3 from_dir, bool by_player, f32 now, bool hit_by_car);
   /// Down as a ragdoll that gets up again (world_procedural_population.mjs knockPerson).
-  void knock(Person& p, Vec3 push, f32 now) {
-    falls_.push_back({static_cast<i32>(&p - people_.data()), push, false, true});
+  void knock(i32 i, Vec3 push, f32 now) {
+    Person& p = people_[static_cast<std::size_t>(i)];
+    falls_.push_back({i, push, false, true});
     p.knocked_until = now + 6;
     p.v = 0;
   }
