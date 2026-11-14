@@ -19,12 +19,12 @@ using kern::logic::Value;
 rules::Blueprint g_jetpack{"Jetpack"};
 }  // namespace
 void Jetpack::bind(kern::logic::Instance* blueprint) { g_jetpack.running = blueprint; }
-f32 Jetpack::acc() { return static_cast<f32>(g_jetpack.variable("Acc")); }
-f32 Jetpack::air_accel() { return static_cast<f32>(g_jetpack.variable("AirAccel")); }
-f32 Jetpack::max_climb() { return static_cast<f32>(g_jetpack.variable("MaxClimb")); }
-f32 Jetpack::gravity() { return static_cast<f32>(g_jetpack.variable("Gravity")); }
-f32 Jetpack::fall_safe() { return static_cast<f32>(g_jetpack.variable("FallSafe")); }
-f32 Jetpack::ignition_damp() { return static_cast<f32>(g_jetpack.variable("IgnitionDamp")); }
+f32 Jetpack::acc() { return static_cast<f32>(g_jetpack.get<f64>("Acc")); }
+f32 Jetpack::air_accel() { return static_cast<f32>(g_jetpack.get<f64>("AirAccel")); }
+f32 Jetpack::max_climb() { return static_cast<f32>(g_jetpack.get<f64>("MaxClimb")); }
+f32 Jetpack::gravity() { return static_cast<f32>(g_jetpack.get<f64>("Gravity")); }
+f32 Jetpack::fall_safe() { return static_cast<f32>(g_jetpack.get<f64>("FallSafe")); }
+f32 Jetpack::ignition_damp() { return static_cast<f32>(g_jetpack.get<f64>("IgnitionDamp")); }
 
 bool Jetpack::ignite(f32 vz) {
   (void)vz;

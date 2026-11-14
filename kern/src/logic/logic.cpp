@@ -2983,6 +2983,14 @@ void Runtime::clear() {
   trace_.clear();
 }
 
+Value Runtime::get_on(const Instance& caller, std::string_view name, ActorRef target, const TypeRef& type) {
+  const Graph& g = caller.graph();
+  Instance* from = find(target);
+  const Variable* v = from ? from->graph().variable(std::string(name)) : nullptr;
+  if (!v || !fits(TypeRef{v->type, v->of}, TypeRef{type.type, type.of})) return zero_of(type, g);
+  return from_outside(from->get(name), type, g);
+}
+
 void Runtime::call_on(Instance& caller, std::string_view function, ActorRef target, const std::vector<Value>& args, std::vector<Value>& results) {
   results.clear();
   const Graph& g = caller.graph();

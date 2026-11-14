@@ -38,6 +38,25 @@ struct ActorBlueprint {
   /// has no such function, that is what the call gives - as Call on Actor gives the defaults its
   /// Blueprint declares for the function, and a Blueprint's declaration of a function of another
   /// actor has the zeros.
+  /// A function that gives one number, or one flag: what it gives - 0, false where no Blueprint is bound or it
+  /// has no such function. Call on Actor with one output, as a value: f64 speed = rules.number("Speed", x);
+  template <class... A> f64 number(const char* function, const A&... args) const {
+    f64 r = 0;
+    call(function, std::tie(r), args...);
+    return r;
+  }
+  template <class... A> bool flag(const char* function, const A&... args) const {
+    bool r = false;
+    call(function, std::tie(r), args...);
+    return r;
+  }
+  /// The variable `name` of its running Blueprint as a T (as an output of call() is taken) - the zero of T
+  /// where none is bound or it has no such variable. Get Variable on Actor in a Blueprint.
+  template <class T> T get(const char* name) const {
+    T v{};
+    if (running) taken(running->get(name), v);
+    return v;
+  }
   template <class... O, class... A> void call(const char* function, std::tuple<O&...> out, const A&... args) const {
     static_assert(!(std::is_same_v<A, f32> || ...), "a 32-bit number goes in as the decimal it stands for, a 64-bit one (f64)");
     const std::vector<Value> in{argument(args)...};  // (first the values: one may be read from a place an output goes to)

@@ -3384,6 +3384,34 @@ class Emit:
         base = kids(m)[0]
         return base if re.sub(r"^const\s+", "", self.ctype(base)).strip() == ENGINE + "::logic::ActorBlueprint" else None
 
+    def actor_get(self, n):
+        """rules.get<f64>("Speed") - kern::logic::ActorBlueprint::get: a variable of the Blueprint of an actor of
+        the level, read (Get Variable on Actor). The object it is read of, else None."""
+        m = callee(n)
+        if n.get("kind") != "CXXMemberCallExpr" or m.get("kind") != "MemberExpr" or m.get("name") != "get" or not kids(m):
+            return None
+        base = kids(m)[0]
+        return base if re.sub(r"^const\s+", "", self.ctype(base)).strip() == ENGINE + "::logic::ActorBlueprint" else None
+
+    def get_on(self, n, obj):
+        """Get Variable on Actor: func_get_on<"Speed", Float>(actor_find("Guided")) - the variable as the program
+        binds the actor's Blueprint, of the type the C++ reads it as."""
+        args = kids(n)[1:]
+        named = self.unwrap(args[0]) if len(args) == 1 else {}
+        if named.get("kind") != "StringLiteral":
+            raise Wait("a variable of an actor's Blueprint that is not named in so many words")
+        name, actor = c_string(named["value"]).decode("utf-8"), self.actor_named(obj)
+        target = self.u.world.actors.get(actor)
+        if target is None:
+            raise Wait(f"a variable of the Blueprint of the actor {actor}, which the level does not have")
+        if name not in target.get("variables", {}):
+            raise Wait(f"the variable {name} of the Blueprint of the actor {actor}, which has no such variable")
+        t = self.tp(n)
+        if t not in ("Float", "Int", "Bool", "Vector", "Text") and t not in self.u.enum_values:
+            raise Wait(f"the variable {name} of the Blueprint of the actor {actor} as a {t}")
+        self.f.on_actors.append((actor, name))
+        return f'func_get_on<"{name}", {t}>(actor_find({text_literal(actor)}))', t
+
     def actor_named(self, obj):
         """The actor whose Blueprint `obj` is: named where it is made (ActorBlueprint rules{"Lamps"}). The name
         is a constant of the object (`const char* const actor`) - the same for as long as it lives."""
@@ -3399,7 +3427,16 @@ class Emit:
             raise Wait("a call on an actor's Blueprint whose actor is not named in so many words where it is made")
         return c_string(said[0]["value"]).decode("utf-8")
 
-    def call_on(self, n, obj):
+    def actor_value(self, n):
+        """rules.number("Speed", x), rules.flag("Seen", y) - kern::logic::ActorBlueprint's Call on Actor with one
+        output, as a value: the object it is called on, else None."""
+        m = callee(n)
+        if n.get("kind") != "CXXMemberCallExpr" or m.get("kind") != "MemberExpr" or m.get("name") not in ("number", "flag") or not kids(m):
+            return None
+        base = kids(m)[0]
+        return base if re.sub(r"^const\s+", "", self.ctype(base)).strip() == ENGINE + "::logic::ActorBlueprint" else None
+
+    def call_on(self, n, obj, gives_type=None):
         """rules.call("Fn", std::tie(a, b), x, y): the Blueprint of the actor `rules` names runs its function Fn -
         Call on Actor, on the actor found by its name, as the program binds it. The Blueprint says what Fn
         looks like (KERN_EXTERN): its inputs and outputs as the actor's Blueprint names them, of the types of
@@ -3408,17 +3445,21 @@ class Emit:
         stored in the places std::tie names, one after the other."""
         u = self.u
         args = kids(n)[1:]
-        if len(args) < 2:
+        if len(args) < (1 if gives_type else 2):
             raise Wait("a call on an actor's Blueprint without its function and its outputs")
-        named, outs = self.unwrap(args[0]), self.unwrap(args[1])
-        while outs.get("kind") in ("MaterializeTemporaryExpr", "CXXBindTemporaryExpr", "CXXConstructExpr", "CXXFunctionalCastExpr") and len(kids(outs)) == 1:
-            outs = self.unwrap(kids(outs)[0])
+        named = self.unwrap(args[0])
         if named.get("kind") != "StringLiteral":
             raise Wait("a call on an actor's Blueprint whose function is not named in so many words")
-        if outs.get("kind") != "CallExpr" or callee_name(outs) != "tie" or not self.ctype(outs).startswith("std::tuple<"):
-            raise Wait("a call on an actor's Blueprint whose outputs are not the places std::tie names")
+        if gives_type:   # (one output, the value of the call: number(), flag())
+            places, values = [None], args[1:]
+        else:
+            outs = self.unwrap(args[1])
+            while outs.get("kind") in ("MaterializeTemporaryExpr", "CXXBindTemporaryExpr", "CXXConstructExpr", "CXXFunctionalCastExpr") and len(kids(outs)) == 1:
+                outs = self.unwrap(kids(outs)[0])
+            if outs.get("kind") != "CallExpr" or callee_name(outs) != "tie" or not self.ctype(outs).startswith("std::tuple<"):
+                raise Wait("a call on an actor's Blueprint whose outputs are not the places std::tie names")
+            places, values = kids(outs)[1:], args[2:]
         function, actor = c_string(named["value"]).decode("utf-8"), self.actor_named(obj)
-        places, values = kids(outs)[1:], args[2:]
         target = u.world.actors.get(actor)
         if target is None:
             raise Wait(f"a call on the Blueprint of the actor {actor}, which the level does not have")
@@ -3431,7 +3472,7 @@ class Emit:
             raise Wait(f"a call of {function} on the Blueprint of the actor {actor} with {len(values)} values and {len(places)} outputs, where the function takes {len(ins)} and gives {len(gives)}")
         if is_word(function) or any(not re.fullmatch(r"[A-Za-z_]\w*", x) or x in CPP_WORDS for x in [function, *ins, *gives]):
             raise Wait(f"a call of {function} on the Blueprint of the actor {actor}, which names it or a pin of it with a word of C++ or of the Blueprint language")
-        in_types, out_types = [self.tp(a) for a in values], [self.tp(p) for p in places]
+        in_types, out_types = [self.tp(a) for a in values], [gives_type if p is None else self.tp(p) for p in places]
         for t in in_types + out_types:
             if t.startswith("List<") or t.startswith("Fixed<") or t in u.struct_fields or (t in u.enum_values and u.enum_numbers.get(t)):
                 raise Wait(f"a call of {function} on the Blueprint of the actor {actor} with a {t} (a call on an actor's Blueprint gives and takes flags, numbers, vectors, texts and enum values)")
@@ -3457,6 +3498,9 @@ class Emit:
         if gives:
             u.members.append("  struct { " + " ".join(f"{t} {o} = {u.zero(t)};" for o, t in pins[1]) + f" }} n{node};")
         lines = [f'func_call_on<"{function}">(actor_find({text_literal(actor)}), kern::out({", ".join(f"n{node}.{o}" for o in gives)}){"".join(", " + x for x in texts)});']
+        if gives_type:
+            self.hoist(lines)
+            return f"n{node}.{gives[0]}", gives_type
         for p, (o, t) in zip(places, pins[1]):
             lines += self.store(p, self.typed(f"n{node}.{o}", t))
         return lines
@@ -5741,6 +5785,10 @@ class Emit:
         m = callee(b)
         base = kids(m)[0] if kids(m) else None
         name = m.get("name")
+        if self.actor_get(b) is not None:
+            return self.get_on(b, self.actor_get(b))
+        if self.actor_value(b) is not None:
+            return self.call_on(b, self.actor_value(b), "Float" if name == "number" else "Bool")
         d = self.engine_decl(m.get("referencedMemberDecl"))
         if d is not None:
             return self.engine_value(d, base, kids(b)[1:])
@@ -8266,7 +8314,8 @@ def main(argv):
             g = (a.get("components") or {}).get("logic")
             if g and a.get("name"):
                 world.actors[a["name"]] = {"library": bool(g.get("library")), "functions": {
-                    f["name"]: ([p["name"] for p in f.get("inputs", [])], [p["name"] for p in f.get("outputs", [])]) for f in g.get("functions", []) if f.get("name")}}
+                    f["name"]: ([p["name"] for p in f.get("inputs", [])], [p["name"] for p in f.get("outputs", [])]) for f in g.get("functions", []) if f.get("name")},
+                    "variables": {v["name"]: v.get("type", "float") for v in g.get("variables", []) if v.get("name")}}
 
     # ---- the plan: every source file read once - its functions, what they call, the types ----
     functions, types, sources = {}, set(), {}

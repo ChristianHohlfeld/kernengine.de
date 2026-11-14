@@ -14,13 +14,13 @@ using rules::decimal;
 rules::Blueprint g_sirens{"Sirens"};
 }  // namespace
 void bind_sirens(kern::logic::Instance* blueprint) { g_sirens.running = blueprint; }
-f32 horn_low() { return static_cast<f32>(g_sirens.variable("HornLow")); }
-f32 horn_high() { return static_cast<f32>(g_sirens.variable("HornHigh")); }
-f32 car_gain() { return static_cast<f32>(g_sirens.variable("CarGain")); }
-f32 drone_gain() { return static_cast<f32>(g_sirens.variable("DroneGain")); }
-f32 whoop_base() { return static_cast<f32>(g_sirens.variable("WhoopBase")); }
-f32 organic_gain() { return static_cast<f32>(g_sirens.variable("OrganicGain")); }
-f32 organic_min_gap_s() { return static_cast<f32>(g_sirens.variable("OrganicMinGapS")); }
+f32 horn_low() { return static_cast<f32>(g_sirens.get<f64>("HornLow")); }
+f32 horn_high() { return static_cast<f32>(g_sirens.get<f64>("HornHigh")); }
+f32 car_gain() { return static_cast<f32>(g_sirens.get<f64>("CarGain")); }
+f32 drone_gain() { return static_cast<f32>(g_sirens.get<f64>("DroneGain")); }
+f32 whoop_base() { return static_cast<f32>(g_sirens.get<f64>("WhoopBase")); }
+f32 organic_gain() { return static_cast<f32>(g_sirens.get<f64>("OrganicGain")); }
+f32 organic_min_gap_s() { return static_cast<f32>(g_sirens.get<f64>("OrganicMinGapS")); }
 
 f32 horn_hz(f32 t) {
   f64 hz = 0;

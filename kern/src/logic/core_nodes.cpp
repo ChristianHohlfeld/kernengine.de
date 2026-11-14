@@ -1829,6 +1829,24 @@ void add_functions(Library& lib) {
     lib.add(std::move(d));
   }
   {
+    // Get Variable on Actor: what a variable of another actor's Blueprint holds now (its type is the setting Type)
+    NodeDef d = make("func.get_on", "Get Variable on Actor", "Functions", NodeKind::pure,
+                     "What the variable of the name holds in the Blueprint of Target (the Level's when Target is empty), as a value of the type the setting says. Where Target has no such "
+                     "variable of that type: the zero of the type.");
+    d.params = {param("variable", "Variable", ParamDef::Kind::text, ""), type_param(true)};
+    d.inputs = {data("this", "Target", PinType::actor, 0)};
+    d.outputs = {data("value", "Value", PinType::number)};
+    d.shape = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>&, std::vector<PinDef>& out) { retype(out[0], setting_type(n, g, true), g); };
+    d.title = [](const NodeDef&, const Node& n) { return n.param("variable", "?") + " of Actor"; };
+    d.keywords = "get read variable other blueprint actor remote";
+    d.run = [](Context& c) {
+      const TypeRef t{c.output(0).type, c.output(0).of};
+      c.out(std::size_t{0}, c.runtime().get_on(c.instance(), c.param("variable"), c.in_actor("this"), t));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
     NodeDef d = make("func.pure", "Function Value", "Functions", NodeKind::pure,
                      "A function as a value: it runs whenever one of its outputs is read. For functions that only compute (no effects on the world).");
     d.params = {param("function", "Function", ParamDef::Kind::function)};

@@ -46,11 +46,11 @@ void from_value(const Value& v, GrenadeCook& g) {
 
 void bind(kern::logic::Instance* blueprint) { g_rules.running = blueprint; }
 
-f32 smoothstep01(f32 t) { return num("Smoothstep01", {N(t)}); }
-f32 walk_pad_axis(f32 v) { return num("WalkPadAxis", {N(v)}); }
+f32 smoothstep01(f32 t) { return static_cast<f32>(g_rules.number("Smoothstep01", rules::decimal(static_cast<f32>(t)))); }
+f32 walk_pad_axis(f32 v) { return static_cast<f32>(g_rules.number("WalkPadAxis", rules::decimal(static_cast<f32>(v)))); }
 Vec2 shape_first_person_move(f32 x, f32 y, f32 move_fineness, bool invert_h) { return pair("ShapeFirstPersonMove", {N(x), N(y), N(move_fineness), B(invert_h)}); }
-f32 fps_dynamic_curve(f32 n) { return num("FpsDynamicCurve", {N(n)}); }
-f32 look_curve_strength(f32 look_fineness) { return num("LookCurveStrength", {N(look_fineness)}); }
+f32 fps_dynamic_curve(f32 n) { return static_cast<f32>(g_rules.number("FpsDynamicCurve", rules::decimal(static_cast<f32>(n)))); }
+f32 look_curve_strength(f32 look_fineness) { return static_cast<f32>(g_rules.number("LookCurveStrength", rules::decimal(static_cast<f32>(look_fineness)))); }
 Vec2 shape_fps_stick(f32 x, f32 y, f32 inner, f32 curve_strength) { return pair("ShapeFpsStick", {N(x), N(y), N(inner), N(curve_strength)}); }
 
 f32 LookAxis::step(f32 target, f32 dt) {
@@ -75,14 +75,14 @@ AimAssist fps_aim_assist(f32 yaw, f32 pitch, f32 dist, f32 input, f32 in_yaw, f3
   a.pitch = f(r[3]);
   return a;
 }
-f32 aim_ellipse(f32 yaw_err, f32 pitch_err) { return num("AimEllipse", {N(yaw_err), N(pitch_err)}); }
+f32 aim_ellipse(f32 yaw_err, f32 pitch_err) { return static_cast<f32>(g_rules.number("AimEllipse", rules::decimal(static_cast<f32>(yaw_err)), rules::decimal(static_cast<f32>(pitch_err)))); }
 
-f32 gamepad_axis(f32 v, f32 dz) { return num("GamepadAxis", {N(v), N(dz)}); }
-f32 hard_cut(f32 v, f32 dz) { return num("HardCut", {N(v), N(dz)}); }
-f32 height_axis(f32 rt, f32 lt) { return num("HeightAxis", {N(rt), N(lt)}); }
-f32 phone_axis(f32 v, f32 fineness) { return num("PhoneAxis", {N(v), N(fineness)}); }
-f32 game_state_stick_magnitude(f32 a) { return num("GameStickMagnitude", {N(a)}); }
-f32 inverse_game_state_stick_magnitude(f32 v) { return num("InverseGameStickMagnitude", {N(v)}); }
+f32 gamepad_axis(f32 v, f32 dz) { return static_cast<f32>(g_rules.number("GamepadAxis", rules::decimal(static_cast<f32>(v)), rules::decimal(static_cast<f32>(dz)))); }
+f32 hard_cut(f32 v, f32 dz) { return static_cast<f32>(g_rules.number("HardCut", rules::decimal(static_cast<f32>(v)), rules::decimal(static_cast<f32>(dz)))); }
+f32 height_axis(f32 rt, f32 lt) { return static_cast<f32>(g_rules.number("HeightAxis", rules::decimal(static_cast<f32>(rt)), rules::decimal(static_cast<f32>(lt)))); }
+f32 phone_axis(f32 v, f32 fineness) { return static_cast<f32>(g_rules.number("PhoneAxis", rules::decimal(static_cast<f32>(v)), rules::decimal(static_cast<f32>(fineness)))); }
+f32 game_state_stick_magnitude(f32 a) { return static_cast<f32>(g_rules.number("GameStickMagnitude", rules::decimal(static_cast<f32>(a)))); }
+f32 inverse_game_state_stick_magnitude(f32 v) { return static_cast<f32>(g_rules.number("InverseGameStickMagnitude", rules::decimal(static_cast<f32>(v)))); }
 
 void apply_game_stick_left(DroneAxes& out, f32 x, f32 y, f32 fineness, bool invert_h, f32 max_kmh) {
   const Vec2 r = pair("GameStickLeft", {N(x), N(y), N(fineness), B(invert_h), N(max_kmh)});
@@ -94,11 +94,11 @@ void apply_game_stick_right(DroneAxes& out, f32 x, f32 y, f32 fineness, bool inv
   out.yaw = r.x;
   out.body_pitch = r.y;
 }
-f32 clearance_pad_axis(f32 centre_y, f32 y, f32 height) { return num("ClearancePadAxis", {N(centre_y), N(y), N(height)}); }
+f32 clearance_pad_axis(f32 centre_y, f32 y, f32 height) { return static_cast<f32>(g_rules.number("ClearancePadAxis", rules::decimal(static_cast<f32>(centre_y)), rules::decimal(static_cast<f32>(y)), rules::decimal(static_cast<f32>(height)))); }
 
 void RateStick::step(Vec2 px, f32 dt) {
-  rate.x = num("RateStickStep", {N(rate.x), N(px.x), N(dt), N(full_px_s), N(tau)});
-  rate.y = num("RateStickStep", {N(rate.y), N(px.y), N(dt), N(full_px_s), N(tau)});
+  rate.x = static_cast<f32>(g_rules.number("RateStickStep", rules::decimal(static_cast<f32>(rate.x)), rules::decimal(static_cast<f32>(px.x)), rules::decimal(static_cast<f32>(dt)), rules::decimal(static_cast<f32>(full_px_s)), rules::decimal(static_cast<f32>(tau))));
+  rate.y = static_cast<f32>(g_rules.number("RateStickStep", rules::decimal(static_cast<f32>(rate.y)), rules::decimal(static_cast<f32>(px.y)), rules::decimal(static_cast<f32>(dt)), rules::decimal(static_cast<f32>(full_px_s)), rules::decimal(static_cast<f32>(tau))));
 }
 
 void WorldLook::add(f32 dx, f32 dy, f32 kx, f32 ky) { look("LookAdd", {to_value(*this), N(dx), N(dy), N(kx), N(ky)}, *this); }
@@ -149,7 +149,7 @@ bool GrenadeCook::pull(f32 now, int from) {
   from_value(r[0], *this);
   return r[1].b;
 }
-void GrenadeCook::drag(f32 up_px) { power = num("GrenadeDrag", {N(up_px)}); }
+void GrenadeCook::drag(f32 up_px) { power = static_cast<f32>(g_rules.number("GrenadeDrag", rules::decimal(static_cast<f32>(up_px)))); }
 f32 GrenadeCook::release(f32 now) {
   std::vector<Value> r;
   if (!g_rules.call("GrenadeRelease", {to_value(*this), N(now)}, r) || r.size() < 2) return 0;
@@ -163,14 +163,14 @@ bool GrenadeCook::step(f32 now) {
   return r[1].b;
 }
 f32 GrenadeCook::left(f32 now) const { return num("GrenadeLeft", {to_value(*this), N(now)}); }
-f32 GrenadeCook::speed() const { return num("GrenadeSpeed", {N(power)}); }
-f32 grenade_fuse() { return static_cast<f32>(g_rules.variable("GrenadeFuse")); }
+f32 GrenadeCook::speed() const { return static_cast<f32>(g_rules.number("GrenadeSpeed", rules::decimal(static_cast<f32>(power)))); }
+f32 grenade_fuse() { return static_cast<f32>(g_rules.get<f64>("GrenadeFuse")); }
 
 void Devices::platform(bool fine_pointer, bool coarse_pointer, i32 max_touch_points) {
   fine = fine_pointer;
   coarse = coarse_pointer;
   touch_points = max_touch_points;
-  set(g_rules.flag("DevicePlatform", {B(fine), Value::integer(touch_points)}));
+  set(g_rules.flag("DevicePlatform", fine, static_cast<i64>(touch_points)));
 }
 void Devices::input(Event e) {
   std::vector<Value> r;

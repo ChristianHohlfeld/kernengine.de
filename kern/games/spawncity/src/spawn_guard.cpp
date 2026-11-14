@@ -21,9 +21,9 @@ Value to_value(const Footprint& f) {
 void bind(kern::logic::Instance* blueprint) { g_rules.running = blueprint; }
 kern::logic::Instance* blueprint() { return g_rules.running; }
 
-f32 default_far() { return static_cast<f32>(g_rules.variable("DefaultFar")); }
+f32 default_far() { return static_cast<f32>(g_rules.get<f64>("DefaultFar")); }
 
-f32 cone_half_angle(f32 vertical_fov, f32 aspect) { return static_cast<f32>(g_rules.number("ConeHalfAngle", {rules::number(vertical_fov), rules::number(aspect)})); }
+f32 cone_half_angle(f32 vertical_fov, f32 aspect) { return static_cast<f32>(g_rules.number("ConeHalfAngle", rules::decimal(vertical_fov), rules::decimal(aspect))); }
 
 bool seen_by(const Viewer& v, Vec3 point, f32 far_entry, f32 height) {
   return g_rules.flag("SeenBy", {to_value(v), Value::vector(point), rules::number(far_entry), rules::number(height)});

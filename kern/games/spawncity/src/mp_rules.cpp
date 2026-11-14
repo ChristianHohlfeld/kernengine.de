@@ -27,18 +27,18 @@ Vec2 pair(const char* function, const std::vector<Value>& args) {
 void bind(kern::logic::Instance* blueprint) {
   g_rules.running = blueprint;
   g_palette.clear();
-  kSpawnProtectMs = g_rules.variable("SpawnProtectMs");
-  kRegenDelayMs = g_rules.variable("RegenDelayMs");
-  kRegenTickMs = g_rules.variable("RegenTickMs");
-  kRespawnCooldownMs = g_rules.variable("RespawnCooldownMs");
-  kBallotMs = g_rules.variable("BallotMs");
-  kPingLifeMs = g_rules.variable("PingLifeMs");
-  kPingHoldMs = g_rules.variable("PingHoldMs");
-  kRegenHpPerS = static_cast<f32>(g_rules.variable("RegenHpPerS"));
-  kRespawnRadiusMin = static_cast<f32>(g_rules.variable("RespawnRadiusMin"));
-  kRespawnRadiusMax = static_cast<f32>(g_rules.variable("RespawnRadiusMax"));
-  kVoiceRadius = static_cast<f32>(g_rules.variable("VoiceRadius"));
-  kPingRemoveM = static_cast<f32>(g_rules.variable("PingRemoveM"));
+  kSpawnProtectMs = g_rules.get<f64>("SpawnProtectMs");
+  kRegenDelayMs = g_rules.get<f64>("RegenDelayMs");
+  kRegenTickMs = g_rules.get<f64>("RegenTickMs");
+  kRespawnCooldownMs = g_rules.get<f64>("RespawnCooldownMs");
+  kBallotMs = g_rules.get<f64>("BallotMs");
+  kPingLifeMs = g_rules.get<f64>("PingLifeMs");
+  kPingHoldMs = g_rules.get<f64>("PingHoldMs");
+  kRegenHpPerS = static_cast<f32>(g_rules.get<f64>("RegenHpPerS"));
+  kRespawnRadiusMin = static_cast<f32>(g_rules.get<f64>("RespawnRadiusMin"));
+  kRespawnRadiusMax = static_cast<f32>(g_rules.get<f64>("RespawnRadiusMax"));
+  kVoiceRadius = static_cast<f32>(g_rules.get<f64>("VoiceRadius"));
+  kPingRemoveM = static_cast<f32>(g_rules.get<f64>("PingRemoveM"));
   if (!blueprint) return;
   const Value colors = blueprint->get("Palette");
   for (std::size_t k = 0; k < colors.size(); ++k) g_palette.push_back(static_cast<u32>(colors.item(k).i));
@@ -358,7 +358,7 @@ f32 decode_mulaw(u8 byte) {
 }
 
 f32 proximity_gain(f32 d) { return voice_gain(d, false); }
-f32 voice_gain(f32 d, bool everywhere) { return std::isfinite(d) ? num("VoiceGain", {rules::number(d), Value::boolean(everywhere)}) : everywhere ? voice_gain(1e9f, true) : 0; }
+f32 voice_gain(f32 d, bool everywhere) { return std::isfinite(d) ? static_cast<f32>(g_rules.number("VoiceGain", rules::decimal(d), everywhere)) : everywhere ? voice_gain(1e9f, true) : 0; }
 
 bool VoiceStream::push(u32 seq, const std::vector<u8>& mulaw, f32 gain) {
   if (gain <= 0 || mulaw.empty() || mulaw.size() > 800) return false;
@@ -545,7 +545,7 @@ std::string format_distance(f32 m) {
 
 bool PingBoard::toggle(u8 owner, Vec3 p, u32 color, f64 now) {
   for (const Ping& q : pings_)
-    if (q.owner == owner && g_rules.flag("PingToggles", {rules::number(std::hypot(q.p.x - p.x, q.p.y - p.y))})) { clear(owner); return false; }
+    if (q.owner == owner && g_rules.flag("PingToggles", rules::decimal(std::hypot(q.p.x - p.x, q.p.y - p.y)))) { clear(owner); return false; }
   set(owner, p, color, now);
   return true;
 }
@@ -555,8 +555,8 @@ void PingBoard::set(u8 owner, Vec3 p, u32 color, f64 now) {
   pings_.push_back({owner, p, color, now});
 }
 void PingBoard::clear(u8 owner) { pings_.erase(std::remove_if(pings_.begin(), pings_.end(), [&](const Ping& q) { return q.owner == owner; }), pings_.end()); }
-void PingBoard::expire(f64 now) { pings_.erase(std::remove_if(pings_.begin(), pings_.end(), [&](const Ping& q) { return g_rules.flag("PingExpired", {rules::number(now - q.at_ms)}); }), pings_.end()); }
+void PingBoard::expire(f64 now) { pings_.erase(std::remove_if(pings_.begin(), pings_.end(), [&](const Ping& q) { return g_rules.flag("PingExpired", rules::decimal(now - q.at_ms)); }), pings_.end()); }
 
-f32 PingBoard::fade(const Ping& p, f64 now_ms) { return num("PingFade", {rules::number(now_ms - p.at_ms)}); }
+f32 PingBoard::fade(const Ping& p, f64 now_ms) { return static_cast<f32>(g_rules.number("PingFade", rules::decimal(now_ms - p.at_ms))); }
 
 }  // namespace sc::mp
