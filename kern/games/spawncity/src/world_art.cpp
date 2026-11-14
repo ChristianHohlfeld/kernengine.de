@@ -35,7 +35,7 @@ WorldArt::PartId WorldArt::part(const kern::MeshData& mesh, const kern::Material
   look.material = m;
   look.extra_slot = kern::kMaxExtensionAttributes;
   look.visible = false;
-  static const Mat4 parked = Mat4::translate({0, 0, -1000});
+  const Mat4 parked = Mat4::translate({0, 0, -1000});
   if (!kern::upsert(*r_, p.id, mesh, look, kern::Span<const f32>(parked.m, 16))) { r_->release_id(p.id); return 0; }
   parts_.push_back(std::move(p));
   return static_cast<PartId>(parts_.size() - 1);

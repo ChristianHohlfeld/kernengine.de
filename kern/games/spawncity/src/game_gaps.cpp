@@ -144,7 +144,7 @@ void Game::gaps_init(kern::Engine& e) {
     look.material = m;
     look.extra_slot = kern::kMaxExtensionAttributes;
     look.visible = false;
-    static const Mat4 parked = Mat4::translate({0, 0, -1000});
+    const Mat4 parked = Mat4::translate({0, 0, -1000});
     if (!kern::upsert(e.renderer, p->id, disc, look, kern::Span<const f32>(parked.m, 16))) { e.renderer.release_id(p->id); p->id = 0; }
   }
   gaps_lamps_init(e.renderer);  // street lamps (game_lamps.cpp)
@@ -161,7 +161,7 @@ void Game::gaps_init(kern::Engine& e) {
     look.material = m;
     look.extra_slot = kern::kMaxExtensionAttributes;
     look.visible = false;
-    static const Mat4 parked = Mat4::translate({0, 0, -1000});
+    const Mat4 parked = Mat4::translate({0, 0, -1000});
     if (!kern::upsert(e.renderer, g.trail_part.id, disc, look, kern::Span<const f32>(parked.m, 16))) { e.renderer.release_id(g.trail_part.id); g.trail_part.id = 0; }
     // the foot rocket's smoke (gameplay_final_runtime_v2.mjs ensureSmoke: 0xd8d8d8 sprites)
     m.color = {0.847f, 0.847f, 0.847f, 1};

@@ -51,7 +51,7 @@ bool CombatArt::init(kern::Renderer& r) {
     look.material = m;
     look.extra_slot = kern::kMaxExtensionAttributes;
     look.visible = false;
-    static const Mat4 parked = Mat4::translate({0, 0, -1000});
+    const Mat4 parked = Mat4::translate({0, 0, -1000});
     if (!kern::upsert(r, p.id, meshes[i], look, kern::Span<const f32>(parked.m, 16))) { r.release_id(p.id); p.id = 0; return false; }
   }
   return true;

@@ -36,7 +36,7 @@ bool VehicleArt::make(kern::Renderer& r, Part& p, const MeshData& mesh, const ke
   look.material = m;
   look.extra_slot = kern::kMaxExtensionAttributes;
   look.visible = false;
-  static const Mat4 parked = Mat4::translate({0, 0, -1000});  // hidden until the first frame places it
+  const Mat4 parked = Mat4::translate({0, 0, -1000});  // hidden until the first frame places it
   if (!kern::upsert(r, p.id, mesh, look, kern::Span<const f32>(parked.m, 16))) { r.release_id(p.id); p.id = 0; return false; }
   return true;
 }

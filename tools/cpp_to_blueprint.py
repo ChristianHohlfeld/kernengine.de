@@ -3360,14 +3360,27 @@ class Emit:
             texts.append(self.ex(obj, bt))
             own = obj
         params = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
-        nodes = []
-        for i, (name, bt, handle) in enumerate(ins):
+        nodes = {}   # pin -> the argument it is (an output: where the call wants it - None: nowhere)
+        in_pins = {name: bt for name, bt, _ in ins}
+        for i, (pin_in, pin_out) in enumerate(f["params"]):
             a = args[i] if i < len(args) else None
             if a is None or a.get("kind") == "CXXDefaultArgExpr":   # (left out: the default the header gives it)
                 a = kids(params[i])[-1] if kids(params[i]) else None
                 if a is None:
                     raise Wait("a call of the engine with a default argument that is declared elsewhere")
-            nodes.append(a)
+            if pin_in is None:
+                # what the function reports if it is asked to (`bool* changed`): into the place the call
+                # names (&changed), or nowhere (nullptr) - the node gives it either way
+                b = self.unwrap(a)
+                if self.nothing(b):
+                    nodes[pin_out] = None
+                elif b.get("kind") == "UnaryOperator" and b.get("opcode") == "&" and kids(b):
+                    nodes[pin_out] = kids(b)[0]
+                else:
+                    raise Wait("a pointer")
+                continue
+            name, bt = pin_in, in_pins[pin_in]
+            nodes[name] = a
             raw = qtype(params[i]).strip()
             made = self.unwrap(a)
             while made.get("kind") in ("MaterializeTemporaryExpr", "CXXBindTemporaryExpr", "CXXFunctionalCastExpr") and len(kids(made)) == 1:
@@ -3397,8 +3410,8 @@ class Emit:
                 got = (tmp, bt)
             elif o == "self":
                 lines += self.store(own, self.typed(f"n{node}.self", bt))
-            else:
-                lines += self.store(nodes[[x[0] for x in ins].index(o)], self.typed(f"n{node}.{o}", bt))
+            elif nodes.get(o) is not None:
+                lines += self.store(nodes[o], self.typed(f"n{node}.{o}", bt))
         return lines, *got
 
     def engine_value(self, d, obj, args):
@@ -5731,12 +5744,20 @@ class Api:
                 if not const:
                     outs.append(("self", st, None))
         changes = False   # (an object of the engine it is handed to change - Renderer&, physics::World*: a step)
+        params = []   # per parameter of the C++ function: (its input pin or None, its output pin or None)
         for i, p in enumerate(x for x in kids(d) if x.get("kind") == "ParmVarDecl"):
+            optional = self.optional_out(p)
+            if optional is not None:
+                name = name_of(p.get("name") or f"value{i + 1}")
+                outs.append((name, optional, None))
+                params.append((None, name))
+                continue
             bt, writes, handle = self.handed(qtype(p))
             name = name_of(p.get("name") or f"value{i + 1}")
             ins.append((name, bt, handle))
             if writes:
                 outs.append((name, bt, None))
+            params.append((name, name if writes else None))
             if handle and re.search(r"(&|\*\s*(const)?)$", qtype(p).strip()) and not re.match(r"const\b", qtype(p).strip()):
                 changes = True
         ret = qtype(d).split("(")[0].strip()
@@ -5750,8 +5771,33 @@ class Api:
             self.shape(bt)
         words = d["name"].replace("_", " ").title()
         return {"type": self.type_of(d), "cpp": qualified, "label": words, "category": "Engine: " + self.home(d).split("::")[-1].replace("kern", "Engine"),
-                "help": u.comment_of(d), "value": value, "ins": ins, "outs": outs, "decl": d}
+                "help": u.comment_of(d), "value": value, "ins": ins, "outs": outs, "params": params, "decl": d}
 
+    def optional_out(self, p):
+        """A parameter that is a pointer to plain data the function writes through, null by default
+        (`bool* changed = nullptr`, `std::string* error = nullptr`): what the function reports if it is
+        asked to - a further output, the Blueprint type of what it writes; None for any other parameter.
+        (The engine's convention: such a pointer only says where to put the report; what the function does
+        is the same with it or without it.)"""
+        raw = qtype(p).strip()
+        if not re.search(r"\*\s*$", raw) or re.match(r"const\b", raw) or not kids(p):
+            return None
+        init = bare(kids(p)[-1])
+        while init.get("kind") == "ImplicitCastExpr" and kids(init):
+            init = bare(kids(init)[0])
+        if init.get("kind") not in ("CXXNullPtrLiteralExpr", "GNUNullExpr"):
+            return None
+        inner = re.sub(r"\*\s*$", "", raw).strip()
+        if "*" in inner or "&" in inner:
+            return None
+        q = None
+        try:
+            q = self.u.find_type(self.u.clean(inner))
+        except Wait:
+            pass
+        if q is not None and q in self.tree.records and self.opaque(q):
+            return None   # (an object of the engine that may be missing: a handle, 0 for none)
+        return self.u.btype(inner)
 
 
 # ---- the test: the Blueprint next to its source ------------------------------------------------------
@@ -6286,10 +6332,18 @@ class TestWriter:
         shape = lambda x: re.sub(r"\b[ui]64\b", "converted::Whole", x)
         params, values, takes = [], (["arg(*this)"] if cls else []), []
         ps = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
-        for i, (p, (name, _, _)) in enumerate(zip(ps, f["ins"][1:] if cls else f["ins"])):
+        for i, (p, (pin_in, pin_out)) in enumerate(zip(ps, f["params"])):
             raw = qtype(p).strip()
             default = self.tree.source(kids(p)[-1]).strip().lstrip("=").strip() if kids(p) else ""   # (`= {}`: the tree has the sign with it)
             default = " = " + default if default else ""
+            if pin_in is None:
+                # what the function reports if it is asked to: written where the pointer says, if it says
+                inner = self.spell(re.sub(r"\*\s*$", "", raw))
+                self.result_ok(re.sub(r"\*\s*$", "", raw))
+                params.append((f"{inner}* {pin_out}", default))
+                takes.append((pin_out, inner, True))
+                continue
+            name = pin_in
             if not self.u.object_of(raw) and raw.replace(" ", "") not in ("constchar*", "constchar*const"):
                 self.result_ok(re.sub(r"\*\s*(const)?$", "", raw))   # (the helpers of the structs it is made of)
             if self.u.object_of(raw):
@@ -6309,7 +6363,7 @@ class TestWriter:
                 params.append(((f"{t}& {name}" if writes else f"const {t}& {name}"), default))
                 values.append(f"arg({self.wrap(name, t)})")
                 if writes:
-                    takes.append((name, t))
+                    takes.append((name, t, False))
         ret_raw = qtype(d).split("(")[0].strip()
         ret = "void" if ret_raw == "void" else self.spell(ret_raw)
         if ret_raw != "void" and not self.u.object_of(ret_raw):
@@ -6319,8 +6373,8 @@ class TestWriter:
         if ret != "void":
             body.append(f"{ret} result{{}}; converted::take_as<{shape(ret)}>(result, out[0]);")
             k = 1
-        for name, t in takes:
-            body.append(f"converted::take_as<{shape(t)}>({name}, out[{k}]);")
+        for name, t, optional in takes:
+            body.append(f"if ({name}) converted::take_as<{shape(t)}>(*{name}, out[{k}]);" if optional else f"converted::take_as<{shape(t)}>({name}, out[{k}]);")
             k += 1
         if ret != "void":
             body.append("return result;")
