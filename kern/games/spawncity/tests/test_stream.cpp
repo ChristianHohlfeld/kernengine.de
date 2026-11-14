@@ -46,7 +46,7 @@ SC_TEST(stream_tile_pipeline) {
   std::snprintf(want, sizeof want, "[[%d,%d,%d]]", key.z, key.x, key.y);
   SC_CHECK(req == want, "requests the player's tile: %s", req.c_str());
   const std::vector<u8> bytes = sample_tile();
-  city.provide(key, bytes.data(), bytes.size());
+  city.provide(key, bytes);
   int frames = 0;
   f64 worst = 0;
   // ready_at is true at once (the game starts like the original); the tile builds in jobs
@@ -70,8 +70,8 @@ SC_TEST(stream_tile_pipeline) {
     u32 within = 0;
     for (const auto& b : near) {
       Vec2 c{};
-      for (Vec2 q : b.building->rings[0]) c = c + q;
-      c = c * (1.0f / static_cast<f32>(b.building->rings[0].size()));
+      for (Vec2 q : city.building(b).rings[0]) c = c + q;
+      c = c * (1.0f / static_cast<f32>(city.building(b).rings[0].size()));
       within += std::hypot(c.x, c.y) <= 340 ? 1 : 0;
     }
     SC_CHECK(within > 0 && city.stats().colliders == std::min<u32>(within, 480), "a collider per building of the working set (%u of %u)", city.stats().colliders, within);

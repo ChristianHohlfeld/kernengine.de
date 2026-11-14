@@ -552,7 +552,7 @@ void Interiors::release(CityStream& city) {
 
 void Interiors::activate(const CityStream::BuildingRef& ref, CityStream& city, f32 ground) {
   Plan plan;
-  if (!build(*ref.building, ground, plan)) return;
+  if (!build(city.building(ref), ground, plan)) return;
   clear();
   plan_ = std::move(plan);
   ph::BodySettings bs;
@@ -631,36 +631,37 @@ void Interiors::update(f32 dt, f32 now, Vec3 feet, bool on_foot, CityStream& cit
   std::vector<CityStream::BuildingRef> near;
   city.buildings_near(f, kDoorsRadius, near);
   // which building is the player at? (inside it, or the nearest outline within ACTIVATE)
-  const CityStream::BuildingRef* best = nullptr;
+  i32 best = -1;  // (its place in `near`)
   f32 best_d = kActivate;
-  for (const CityStream::BuildingRef& r : near) {
-    const std::vector<Vec2>& o = r.building->rings[0];
+  for (std::size_t i = 0; i < near.size(); ++i) {
+    const std::vector<Vec2>& o = city.building(near[i]).rings[0];
     const f32 d = pip(f, o) ? 0 : ring_dist(f, o);
-    if (d < best_d) { best_d = d; best = &r; }
+    if (d < best_d) { best_d = d; best = static_cast<i32>(i); }
   }
   if (active_) {
     const f32 d = pip(f, plan_.outer) ? 0 : ring_dist(f, plan_.outer);
     const bool keep = inside(feet) || d < kRelease;
-    const bool other = best && !(best->tile == tile_ && best->index == index_) && best_d < 0.5f * d && !inside(feet);
+    const bool other = best >= 0 && !(near[static_cast<std::size_t>(best)].tile == tile_ && near[static_cast<std::size_t>(best)].index == index_) && best_d < 0.5f * d && !inside(feet);
     if (!keep || other || (!on_foot && d > kActivate)) release(city);
   }
-  if (!active_ && on_foot && best) {
+  if (!active_ && on_foot && best >= 0) {
     const f32 ground = city.ground_height(f.x, f.y);
-    activate(*best, city, ground);
+    activate(near[static_cast<std::size_t>(best)], city, ground);
   }
   // closed doors of the buildings around (the nearest MAX_CLOSED_DOORS)
   std::vector<std::pair<f32, Closed>> doors;
   for (const CityStream::BuildingRef& r : near) {
     if (active_ && r.tile == tile_ && r.index == index_) continue;
-    std::vector<Vec2> o = clean(r.building->rings[0]);
+    const MapFeatures::Building& b = city.building(r);
+    std::vector<Vec2> o = clean(b.rings[0]);
     if (o.size() < 3) continue;
     if (signed_area(o) < 0) std::reverse(o.begin(), o.end());
     const f32 area = signed_area(o);
-    if (area < 24 || area > 40000 || r.building->top - r.building->base < 2.8f) continue;
+    if (area < 24 || area > 40000 || b.top - b.base < 2.8f) continue;
     for (const Door& d : doors_of(o, area)) {
       const f32 dist = std::hypot(d.c.x - f.x, d.c.y - f.y);
       if (dist > kDoorsRadius) continue;
-      doors.push_back({dist, {{d.c.x, d.c.y, std::fmax(r.building->base, city.ground_height(d.c.x + d.n.x, d.c.y + d.n.y))}, std::atan2(d.d.y, d.d.x)}});
+      doors.push_back({dist, {{d.c.x, d.c.y, std::fmax(b.base, city.ground_height(d.c.x + d.n.x, d.c.y + d.n.y))}, std::atan2(d.d.y, d.d.x)}});
     }
   }
   std::sort(doors.begin(), doors.end(), [](const auto& a, const auto& b) { return a.first < b.first; });

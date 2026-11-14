@@ -14,6 +14,9 @@ namespace sc {
 
 namespace {
 
+/// The map features of a tile that is not loaded: none.
+const MapFeatures kNoFeatures{};
+
 kern::BuildingStyle konstanz_style() {
   // world_city_buildings.mjs WALLS / ROOFS (sRGB) and the cornice mix with #f4efe4 (0.45)
   auto hex = [](u32 h) { return kern::Rgb{((h >> 16) & 255) / 255.0, ((h >> 8) & 255) / 255.0, (h & 255) / 255.0}; };
@@ -302,11 +305,16 @@ void CityStream::go_offline() {
   tiles_[t->key.hash()] = std::move(t);
 }
 
-void CityStream::furniture(std::vector<Furniture>& out) const {
+void CityStream::furniture(std::vector<u64>& out) const {
   out.clear();
   for (const auto& [k, t] : tiles_)
-    if (t->prepared) out.push_back({k, &t->features.trees, &t->features.lamps});
-  std::sort(out.begin(), out.end(), [](const Furniture& a, const Furniture& b) { return a.tile < b.tile; });
+    if (t->prepared) out.push_back(k);
+  std::sort(out.begin(), out.end());
+}
+
+const MapFeatures& CityStream::features(u64 tile) const {
+  const auto it = tiles_.find(tile);
+  return it != tiles_.end() ? it->second->features : kNoFeatures;
 }
 
 bool CityStream::ready_at(Vec3 p) const {
@@ -1110,16 +1118,16 @@ void CityStream::buildings_near(Vec2 p, f32 radius, std::vector<BuildingRef>& ou
       f32 x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
       for (Vec2 q : b.rings[0]) { x0 = std::fmin(x0, q.x); y0 = std::fmin(y0, q.y); x1 = std::fmax(x1, q.x); y1 = std::fmax(y1, q.y); }
       if (p.x < x0 - radius || p.x > x1 + radius || p.y < y0 - radius || p.y > y1 + radius) continue;
-      out.push_back({k, static_cast<u32>(i), &b});
+      out.push_back({k, static_cast<u32>(i)});
     }
   }
 }
 
-void CityStream::ready_features(std::vector<const MapFeatures*>& out) const {
+void CityStream::ready_tiles(std::vector<u64>& out) const {
   for (const auto& [k, t] : tiles_)
     // a tile being re-synced keeps its features (the map and the town must not lose its houses
     // while the meshes are rebuilt: they flickered on the minimap)
-    if (t->prepared) out.push_back(&t->features);
+    if (t->prepared) out.push_back(k);
 }
 
 void CityStream::areas_near(Vec2 p, f32 radius, AreaKind kind, std::vector<AreaRef>& out) const {
@@ -1131,7 +1139,7 @@ void CityStream::areas_near(Vec2 p, f32 radius, AreaKind kind, std::vector<AreaR
       f32 x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
       for (Vec2 q : a.rings[0]) { x0 = std::fmin(x0, q.x); y0 = std::fmin(y0, q.y); x1 = std::fmax(x1, q.x); y1 = std::fmax(y1, q.y); }
       if (p.x < x0 - radius || p.x > x1 + radius || p.y < y0 - radius || p.y > y1 + radius) continue;
-      out.push_back({k * 65536 + i, &a});
+      out.push_back({k * 65536 + i, k, static_cast<u32>(i)});
     }
   }
 }

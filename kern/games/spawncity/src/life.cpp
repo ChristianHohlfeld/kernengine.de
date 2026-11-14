@@ -159,10 +159,11 @@ void Life::rebuild_herds(const LifeView& view, f32 now) {
   struct Cand { Meadow m; f32 d; };
   std::vector<Cand> cand;
   for (const CityStream::AreaRef& a : areas) {
-    const f32 area = ring_area(a.area->rings[0]);
+    const MapFeatures::Area& meadow = view.city->area(a);
+    const f32 area = ring_area(meadow.rings[0]);
     if (area < kMinArea) continue;
     Meadow m;
-    m.rings = a.area->rings;
+    m.rings = meadow.rings;
     m.key = a.key;
     m.area = area;
     m.lo = {1e9f, 1e9f};
@@ -790,22 +791,24 @@ void Life::update_trees(const LifeView& view, f32 now) {
   // whenever the set of tiles changes; a tile that goes takes its trees along.
   if (tree_serial_ != view.city->furniture_serial()) {
     tree_serial_ = view.city->furniture_serial();
-    std::vector<CityStream::Furniture> tiles;
+    std::vector<u64> tiles;
     view.city->furniture(tiles);
     std::unordered_map<u64, Tree> fallen;
     for (const Tree& t : trees_) if (t.fell_at >= 0) fallen[key_of(t.tile, t.index)] = t;
     std::unordered_set<u64> gone;
     trees_.clear();
-    for (const CityStream::Furniture& f : tiles)
-      for (u32 i = 0; i < f.trees->size(); ++i) {
-        const MapFeatures::Spot& sp = (*f.trees)[i];
-        const u64 k = key_of(f.tile, i);
+    for (u64 tile : tiles) {
+      const std::vector<MapFeatures::Spot>& spots = view.city->features(tile).trees;
+      for (u32 i = 0; i < spots.size(); ++i) {
+        const MapFeatures::Spot& sp = spots[i];
+        const u64 k = key_of(tile, i);
         if (trees_gone_.count(k)) { gone.insert(k); continue; }
         if (view.city->terrain().water_at(sp.p.x, sp.p.y)) continue;
-        Tree t{{sp.p.x, sp.p.y, ground(view, sp.p.x, sp.p.y)}, sp.a, 0, -1, {1, 0}, f.tile, i};
+        Tree t{{sp.p.x, sp.p.y, ground(view, sp.p.x, sp.p.y)}, sp.a, 0, -1, {1, 0}, tile, i};
         if (const auto it = fallen.find(k); it != fallen.end()) { t.fell_at = it->second.fell_at; t.fall_dir = it->second.fall_dir; }
         trees_.push_back(t);
       }
+    }
     trees_gone_ = std::move(gone);
   }
   // the ground changed somewhere (a crater, a new elevation window): the trees there stand on it
