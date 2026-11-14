@@ -240,7 +240,7 @@ std::string Terrain::take_requests() {
 
 void Terrain::provide(const TileKey& key, kern::Span<const u8> rgba, u32 width, u32 height) {
   auto it = dem_tiles_.find(key.hash());
-  if (it == dem_tiles_.end() || width == 0 || height == 0 || rgba.size < static_cast<std::size_t>(width) * height * 4) return;
+  if (it == dem_tiles_.end() || width == 0 || height == 0) return;
   DemTile& t = it->second;
   t.w = width;
   t.hgt = height;
@@ -833,7 +833,7 @@ void Terrain::plan_images(Vec3 focus) {
 
 void Terrain::provide_image(const TileKey& key, kern::Span<const u8> rgba, u32 width, u32 height) {
   auto it = images_.find(key.hash());
-  if (it == images_.end() || width == 0 || height == 0 || rgba.size < static_cast<std::size_t>(width) * height * 4) return;
+  if (it == images_.end() || width == 0 || height == 0) return;
   // the mosaic: 64 px per tile (an area average in the image's own sRGB, as the canvas draws it)
   constexpr u32 P = kImagePixels;
   std::vector<u8> small(P * P * 4);

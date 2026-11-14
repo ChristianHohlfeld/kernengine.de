@@ -371,7 +371,6 @@ bool VoiceStream::push(u32 seq, const std::vector<u8>& mulaw, f32 gain) {
 bool VoiceStream::render(std::vector<f32>& out, u32 frames, u32 rate) {
   if (queue_.empty() || rate == 0) return false;
   const f64 step = static_cast<f64>(kVoiceRate) / rate;
-  if (frames > out.size() / 2) frames = static_cast<u32>(out.size() / 2);  // (two samples a frame, as many as the buffer has)
   for (u32 i = 0; i < frames && !queue_.empty(); ++i) {
     if (lead_ > 0) { lead_ -= step; continue; }
     const Chunk& c = queue_.front();

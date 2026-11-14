@@ -279,7 +279,6 @@ f32 MusicSynth::next_sample(f32& right) {
 void MusicSynth::render_add(std::vector<f32>& out, u32 frames) {
   peak = 0;
   if (!rate_) return;
-  if (frames > out.size() / 2) frames = static_cast<u32>(out.size() / 2);  // (two samples a frame, as many as the buffer has)
   for (u32 i = 0; i < frames; ++i) {
     // Crossfade: a different programme fades the current one out (0.4 s), then starts.
     if (want_ != programme_) {
