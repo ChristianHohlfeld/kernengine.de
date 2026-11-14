@@ -18,6 +18,8 @@ struct WantedBlueprint {
     void print(const std::string&, bool) override {}
     void error(const std::string& text) override { errors += text + "\n"; }
     kern::u32 random() override { return 4; }
+    // (the actor of its name, as the game's world finds it: the rules bound to this logic reach it so)
+    kern::logic::ActorRef find_actor(std::string_view name) override { return name == "Wanted" ? 1 : 0; }
   } host;
   kern::logic::Runtime rt{host};
   kern::logic::Instance* inst = nullptr;
