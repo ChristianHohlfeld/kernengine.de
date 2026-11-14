@@ -3426,6 +3426,17 @@ class Emit:
             raise Wait("state outside the function is changed")
         raise Wait("an assignment to something that is not a variable")
 
+    def stepped_place(self, n):
+        """What ++ / -- inside an expression changes, as the text of its place: a variable of the function,
+        or a place in one that is named without steps of its own (a field, an entry: `++serial_`,
+        `next_id_++`) - read after the step as the variable is."""
+        if self.plain_variable(n):
+            return self.lvalue(n)
+        pre, got = self.lazily(lambda: self.spot(n))
+        if got is None or pre or not self.writable(got[0]):
+            raise Wait("++ / -- of something that is not a variable, inside an expression")
+        return got[0]
+
     def unwrap(self, n):
         n = bare(n)
         while n.get("kind") == "ImplicitCastExpr" and kids(n):
@@ -3989,10 +4000,8 @@ class Emit:
                 # ++i inside an expression: the step runs before the statement, the value is the variable
                 # (i++: what it was before)
                 target = kids(b)[0]
-                if not self.plain_variable(target):
-                    raise Wait("++ / -- of something that is not a variable, inside an expression")
                 t = self.tp(target)
-                name = self.lvalue(target)
+                name = self.stepped_place(target)
                 if b.get("isPostfix"):
                     old = self.temp("was", t)
                     self.hoist([f"{old} = {name};"] + self.effect(b))
@@ -4627,9 +4636,7 @@ class Emit:
             if name in ("operator+", "operator-") and len(ops) == 2:
                 return self.whole_math(name[-1], self.ex(ops[0], "Int"), self.ex(ops[1], "Int")), "Int"
             if name in ("operator++", "operator--"):
-                if not self.plain_variable(ops[0]):
-                    raise Wait("++ / -- of something that is not a variable, inside an expression")
-                var = self.lvalue(ops[0])
+                var = self.stepped_place(ops[0])
                 if len(ops) == 2:   # (it++: what it was before)
                     old = self.temp("was", "Int")
                     self.hoist([f"{old} = {var};"] + self.effect(b))
