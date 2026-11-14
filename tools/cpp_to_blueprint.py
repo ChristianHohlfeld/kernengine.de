@@ -3359,7 +3359,8 @@ class Emit:
                 st = self.tp(s0)
                 if st != f"List<{it}>":
                     raise Wait("list: insert() of entries of another type")
-                if self.whole_list(args[1], args[2]):
+                n = self.u.entries(qtype(bare(s0)))   # (an array of C++ from its first entry to past its last: all of it)
+                if self.whole_list(args[1], args[2]) or (n is not None and first.strip() == "0" and last.strip() in (str(n), f"{n}.0")):
                     # the whole list, in one go (one request for memory, as in C++)
                     return lines + [f"list_append({lv}, {self.ex(s0, st)});" if end else f"list_insert_list({lv}, {p}, {self.ex(s0, st)});"]
                 src = self.temp("from", st)
@@ -3370,11 +3371,16 @@ class Emit:
             if one.get("kind") in ("CXXStdInitializerListExpr", "InitListExpr"):
                 items = kids(one) if one.get("kind") == "InitListExpr" else kids(self.unwrap(kids(one)[0]))
                 vals = []
-                for x in items:
+                for x in items:   # (worked out one after the other, as C++ works out a list in braces)
                     v = self.temp("item", it)
                     lines.append(f"{v} = {self.ex(x, it)};")
                     vals.append(v)
-                return lines + [put(v, str(i)) for i, v in enumerate(vals)]
+                if not vals:
+                    return lines
+                # all of them in one go (one request for memory at most, as in C++): a list of that many
+                # entries, which lies where it stands
+                made = self.made_list(vals, f"List<{it}>")
+                return lines + [f"list_append({lv}, {made});" if end else f"list_insert_list({lv}, {p}, {made});"]
             v = self.temp("item", it)
             return lines + [f"{v} = {self.ex(args[1], it)};", put(v, "0")]
         if name in ("resize", "assign") and len(args) in (1, 2) and not (name == "assign" and len(args) == 1):
