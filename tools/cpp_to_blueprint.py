@@ -7203,6 +7203,8 @@ class TestWriter:
             local = "".join(within) + local
             for i in range(len(parts) - keep):
                 table.setdefault("::".join(parts[i:]), local)
+            if parts[0] in self.tree.spaces:   # (a name in a further namespace of the program, `::fc::V3` too: the test's)
+                table.setdefault("::".join(parts), local)
             for k in range(1, len(parts)):
                 for name in other.get("::".join(parts[:k]), ()):
                     table.setdefault("::".join([name, *parts[k:]]), local)
@@ -8112,7 +8114,9 @@ class TestWriter:
                 renamers[h] = self.renamer([*mine, *pairs, *outer], named_spaces)
             return lambda text: renamers[h](self.widen(text))
         # a name of the program or the engine that is still written out in full: not the test's own
-        foreign = re.compile(r"(?<![\w:])(?:::)?(?:" + "|".join(re.escape(x) for x in (tree.namespace, *tree.spaces, ENGINE)) + r")::(?!math::)(\w+)")
+        # (a further namespace of the program - fc:: - stands in the test as the source has it, like one inside
+        # the program's own: only from outside every namespace - ::fc:: - it names the program's)
+        foreign = re.compile(r"(?<![\w:])(?:(?:::)?(?:" + re.escape(tree.namespace) + "|" + re.escape(ENGINE) + r")" + "".join(f"|::{re.escape(x)}" for x in tree.spaces) + r")::(?!math::)(\w+)")
         def is_record(key):
             return key[0] == "record" or (key[0] == "foreign" and G.foreign[key[1]]["kind"] == "record")
 
