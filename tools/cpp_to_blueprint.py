@@ -60,6 +60,11 @@ the keys). An iterator into a map, a set or a list is the place it stands at, a 
 end is the list's length. `auto [a, b] = value;` gives names to the parts of a value: where they
 stand, the part is written out.
 
+A parameter `const T*` a function reads entries through (`p[i]`, `*p`), hands on (`p + 2`) or asks
+whether it is null is a pointer into a list, like an iterator: the list, read where it stands (a const
+reference input), and the place in it (an Int; null is -1). Its list is of the type every call of the
+program hands it - a std::array<T, N> is Fixed<T, N> - and `a.data() + k` hands (a, k).
+
   tools/cpp_to_blueprint.py --check <namespace> <include flags...> -- <file.cpp>...
 
 only counts: how many functions are written, and what the others wait for.
