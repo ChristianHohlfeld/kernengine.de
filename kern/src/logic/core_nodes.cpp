@@ -1239,6 +1239,10 @@ void add_math(Library& lib) {
   lib.add(pure("text.equal", "Text Equals", "Text", {data("a", "A", K::text, ""), data("b", "B", K::text, "")}, boolean, of(&P::text_equal)));
   lib.add(pure("text.contains", "Contains", "Text", {data("a", "Text", K::text, ""), data("b", "Search", K::text, "")}, boolean, of(&P::text_contains)));
   lib.add(pure("text.length", "Text Length", "Text", {data("a", "Text", K::text, "")}, integer, of(&P::text_length)));
+  lib.add(pure("text.code_at", "Code At", "Text", {data("a", "Text", K::text, ""), data("index", "Index", K::integer, 0)}, integer, of(&P::text_code_at),
+               "The byte at Index as a number 0 to 255 (beyond the text: 0)", "char character byte ascii index"));
+  lib.add(pure("text.of_code", "Text of Code", "Text", {data("code", "Code", K::integer, 65)}, data("result", "", K::text), of(&P::text_of_code),
+               "A text of one byte: Code cut to 8 bits", "char character byte ascii"));
   {
     // Format Text: a format as printf has it, and a value for each of its conversions (nodes.h, format)
     NodeDef d = make("text.format", "Format Text", "Text", NodeKind::pure,

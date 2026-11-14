@@ -1195,6 +1195,10 @@ struct PureNodes {
   static Bool text_equal(Text a, Text b) { return a == b; }
   static Bool text_contains(Text a, Text b) { return a.find(b) != std::string::npos; }
   static Int text_length(Text a) { return static_cast<i64>(a.size()); }
+  /// The byte at `index` as a number 0..255 (beyond the text: 0 - as std::string has a 0 after its last).
+  static Int text_code_at(Text a, Int index) { return index >= 0 && static_cast<u64>(index) < a.size() ? static_cast<i64>(static_cast<u8>(a[static_cast<std::size_t>(index)])) : 0; }
+  /// A text of one byte: the code cut to 8 bits, as a char holds it.
+  static Text text_of_code(Int code) { return Text(1, static_cast<char>(static_cast<u8>(code))); }
 };
 
 /// The flow nodes that keep something between runs. `m`: the node's memory, four numbers (the

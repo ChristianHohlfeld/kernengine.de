@@ -2598,6 +2598,44 @@ class Emit:
     def reads(self, n):
         return {x.get("referencedDecl", {}).get("id") for x in walk(n) if x.get("kind") == "DeclRefExpr"}
 
+    def char_of(self, text, index, raw):
+        """The byte of a text at an index as the C++ type `raw` holds it: a char (signed here, as on every
+        machine the game is built for) is -128..127, an unsigned char 0..255 (Code At gives that)."""
+        code = f"text_code_at({text}, {index})"
+        c = self.u.clean(re.sub(r"\bconst\b|&", "", raw)).strip()
+        if c in ("char", "signed char"):
+            return f"kern::to<Int>(kern::formula([](Float a) -> Float {{ return a >= 128.0 ? a - 256.0 : a; }}, kern::to<Float>({code})))"
+        if c in ("unsigned char", "u8", "uint8_t", "int", "unsigned int", "u32"):
+            return code
+        raise Wait(f"a character of a text as a {c}")
+
+    def for_each_char(self, s, v, raw, src, body):
+        """for (char c : text): a loop over the bytes of a text - each read where it stands (Code At)."""
+        if "&" in raw and not re.search(r"\bconst\b", raw):
+            raise Wait("a loop that changes the characters of a text")
+        got = self.spot(src)
+        before = self.take_pre()
+        if got is not None and got[1] == "Text":
+            text = got[0]
+        else:
+            text = self.temp("text", "Text")
+            before += [f"{text} = {self.ex(src, 'Text')};"] + self.take_pre()
+        has_break = self.jumps(body)[0]
+        loop = self.enter_loop(body)
+        if has_break:
+            at, count = self.temp("at", "Int"), self.temp("count", "Int")
+            first = [f"{self.local(v, 'Int')} = {self.char_of(text, at, raw)};"]
+            lines = first + self.loop_body(loop, [body], [f"{at} += 1;"])
+            cond = f'math_compare<"<">(kern::to<Float>({at}), kern::to<Float>({count}))'
+            return before + [f"{count} = text_length({text});", f"{at} = 0;"] + self.loop_lines(cond, [], lines, loop)
+        node = self.u.next_node
+        self.u.next_node += 1
+        self.u.members.append(f"  struct : kern::Node<{node}> {{ Int index = 0; }} n{node};")
+        first = [f"{self.local(v, 'Int')} = {self.char_of(text, f'n{node}.index', raw)};"]
+        lines = first + self.loop_body(loop, [body])
+        last = self.whole_math("-", f"text_length({text})", "1")
+        return before + [f"for (auto it{node} = flow_for(n{node}, 0, {last}); it{node}.next();) {{", *["  " + ln for ln in lines], "}"]
+
     def for_each(self, s):
         """for (auto& x : list): a loop over the list where it stands. The entry of a pass is the place
         list[index] - read and changed there, nothing is copied (a loop variable by value is a copy, as in the
@@ -2614,7 +2652,7 @@ class Emit:
         src = kids(kids(rng)[0])[-1]
         lt = self.tp(src)
         if lt == "Text":
-            raise Wait("a loop over the characters of a text (the language has no step that reads a character of a text)")
+            return self.for_each_char(s, v, raw, src, body)
         if not lt.startswith("List<"):
             raise Wait("a loop over something that is not a list")
         it = lt[5:-1]
@@ -5136,6 +5174,8 @@ class Emit:
                 return got
             self.f.indexes = True
             return f"list_get<{t0[5:-1]}>({self.ex(ops[0], t0)}, {self.ex(ops[1], 'Int')})", t0[5:-1]
+        if t0 == "Text" and name == "operator[]" and len(ops) == 2:
+            return self.char_of(self.ex(ops[0], "Text"), self.ex(ops[1], "Int"), qtype(b)), "Int"   # (s[i]: its byte - s[s.size()] is 0)
         if t0 == "Text":
             if name == "operator+" and self.tp(ops[1]) == "Text":
                 return f'text_append({self.ex(ops[0], "Text")}, {self.ex(ops[1], "Text")}, "")', "Text"
