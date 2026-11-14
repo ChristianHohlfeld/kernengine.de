@@ -526,6 +526,41 @@ der Konverter um die Ersatzform kürzer, alles wird neu gewandelt, verglichen un
 Was unten zu `Whole64`, zu „Maps und Sets sind Listen“ und zu Methoden auf einem Objekt steht,
 beschreibt den Stand davor und wird Schritt für Schritt ersetzt.
 
+**Stand 14.11.2026, 23:35 (Schlusslauf auf `work`).** 1.360 von 1.817 Funktionen des Programms
+(11.947 von 30.758 Zeilen) stehen als Blueprints im Level – 155 Blueprints (70 von Quelldateien,
+`Game` als ein Zustand, 84 von Headern und Formen); 1.316 Funktionen vergleicht der Test Bit für Bit
+mit ihrem Quelltext, jede einmal. Dazu kamen seit 17:00:
+- **Ende eines Spiels:** End Play (`event.end`, `KERN_EVENT(onN, event_end)`), einmal, wenn das Spiel
+  endet oder der Actor die Welt verlässt; was das eine Objekt des Programms von der Engine hält, gibt
+  es dort frei (in umgekehrter Reihenfolge der Felder, wie der Destruktor des Compilers).
+- **Regel-Blueprints beim Namen:** `ActorBlueprint` hält keinen Zeiger mehr, sondern die Logik, in
+  der es läuft, und findet den Actor bei jedem Aufruf beim Namen (`Host::find_actor`); C++ und
+  Knoten (Call on Actor, Get Variable on Actor) gehen durch einen Weg in `Runtime`. Neuer Knoten Has
+  Blueprint. Alle Bind-Funktionen des Spiels nehmen die Logik (`Runtime&`).
+- **Bytes:** `std::bit_cast` zwischen einer Zahl und ihren Bits (Bits of Float 32 / Float 32 of Bits,
+  64 Bit über Int64) und zu den Bytes einer Struktur; Copy Bytes (`memcpy` zwischen Listen von Zahlen,
+  am Platz); die Netz-Nachrichten über `wire.h` (eine Struktur je Zahl, ihre Bytes im Layout von C++).
+- **Engine:** Methoden von Engine-Objekten sind ihre Knoten, nicht Funktionen der Header-Blueprints;
+  was die Engine durch einen Zeiger mit einer Anzahl dahinter schreibt, ist eine Ausgabe-Liste
+  (`mixer.render` – offen: `frames` zählt Frames, die Engine schreibt 2 × frames Floats; der
+  Verteiler auf die echte Engine muss das so sagen).
+- **Zeiger:** die Stellen, die mit „a pointer“ warteten, nennen den Platz selbst (Index, Referenz,
+  lokale Funktion mit Referenz); `Mat4::look_at(…, bool& ok)`.
+- **Konverter:** Typnamen wie C++ sie sucht (erst die Klasse und die Namensräume um die
+  Deklaration); Referenzen, deren Typ der Compiler nur mit dem Namen der Bibliothek nennt
+  (`const value_type &`); eine Konversion einer Konversion mit dem Wert dazwischen; Makros für Werte
+  im Test; Dumps über Namensräume verbunden (fc ↔ hwcontract); Methoden-Regeln im Test.
+- **Spiel im Teilsatz:** keine Funktion ruft sich selbst, Abfragen (`const`) ohne Gedächtnis
+  (`Terrain::corridor_set`, `water_cell`), Texte der Regel-Tabellen als `std::string`, die Sender des
+  Radios im Header.
+
+Worauf die anderen warten, nach Zeilen (Schlusslauf): `Terrain::node_height` (39 Funktionen, 1.829
+Zeilen – bis 23:20 an einem Gedächtnis in `corridor_set`, das jetzt weg ist), Text zerlegen
+(`rfind`, `substr`, `strtod` in den Befehlen von `Game`: 1.362), Funktionen von `Game`, deren Test
+die Quelle noch nicht übersetzt (`Game` ist dort nicht deklariert: 523 und Folgen), Aufrufe von
+`Session::to_host` (460), Referenzen auf Einträge, deren Liste sich ändert (456), statische lokale
+Variablen.
+
 **Stand 14.11.2026, 17:00 (auf `work`, geschrieben, Schlusslauf läuft).**
 - **`Game` als Blueprint:** Eine Klasse, von der das Programm genau ein Objekt mit statischer
   Lebensdauer hält und sonst keins macht (ohne Basisklasse, ohne virtuelle Funktionen), ist der
