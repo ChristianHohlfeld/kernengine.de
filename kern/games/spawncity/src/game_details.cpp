@@ -24,45 +24,45 @@ void Game::update_details(f32 dt) {
   if (!world_placed_) return;
   const f32 now = world_->sim_time();
   // ---- burning cars and buses
-  if (car_last_hp_.size() != cars_.size()) { car_last_hp_.assign(cars_.size(), kCarHp); car_burn_seen_.assign(cars_.size(), -1); }
+  if (details_.car_last_hp.size() != cars_.size()) { details_.car_last_hp.assign(cars_.size(), kCarHp); details_.car_burn_seen.assign(cars_.size(), -1); }
   for (std::size_t i = 0; i < cars_.size(); ++i) {
     TrafficCar& c = cars_[i];
-    if (!c.placed || c.wreck) { car_last_hp_[i] = c.hp; car_burn_seen_[i] = -1; continue; }
+    if (!c.placed || c.wreck) { details_.car_last_hp[i] = c.hp; details_.car_burn_seen[i] = -1; continue; }
     const detail::Critical kind = is_bus(c) ? detail::Critical::bus : detail::Critical::car;
     if (c.burn_until >= 0) {
-      if (car_burn_seen_[i] < 0) {
+      if (details_.car_burn_seen[i] < 0) {
         // It just turned critical (game_town.cpp starts the car's 2.45 s): a bus takes longer.
-        car_burn_seen_[i] = now;
+        details_.car_burn_seen[i] = now;
         if (kind == detail::Critical::bus) c.burn_until = std::fmax(c.burn_until, detail::detonation_at(kind, now));
-      } else if (c.hp < car_last_hp_[i] - 1e-3f) {
+      } else if (c.hp < details_.car_last_hp[i] - 1e-3f) {
         c.burn_until = detail::accelerate(kind, c.burn_until, now);  // hit again while burning
       }
-    } else car_burn_seen_[i] = -1;
-    car_last_hp_[i] = c.hp;
+    } else details_.car_burn_seen[i] = -1;
+    details_.car_last_hp[i] = c.hp;
   }
   // ---- police drones: smoking at 34 %, then they come down in a blast
   for (i32 i = 0; i < 5; ++i) {
-    PoliceDrone& d = pdrones_[i];
-    if (!d.active) { pd_crit_[i].reset(); continue; }
-    if (pd_crit_[i].update(detail::Critical::police_drone, d.hp, kPdHp, now)) {
+    PoliceDrone& d = police_.pdrones[i];
+    if (!d.active) { details_.pd_crit[i].reset(); continue; }
+    if (details_.pd_crit[i].update(detail::Critical::police_drone, d.hp, kPdHp, now)) {
       explosion(d.pos, 3, 40, true);
-      wanted_.report(wanted::Crime::police_drone, true);
+      wanted::report(wanted::Crime::police_drone, true);
       d.active = false;
       d.destroyed_until = now + 9;
-      ++crit_blasts_;
+      ++details_.crit_blasts;
     }
   }
   // ---- the player's drone: 28 %, 2.05 s
-  if (mode_ == Mode::drone && drone_out_) {
-    const bool was = drone_crit_.armed();
-    if (drone_crit_.update(detail::Critical::drone, drone_hp_, kDroneHp, now)) {
-      ++crit_blasts_;
-      damage_player_vehicle(drone_hp_ + 1);
-    } else if (!was && drone_crit_.armed()) {
+  if (mode_ == Mode::drone && vehicle_.drone_out) {
+    const bool was = details_.drone_crit.armed();
+    if (details_.drone_crit.update(detail::Critical::drone, vehicle_.drone_hp, kDroneHp, now)) {
+      ++details_.crit_blasts;
+      damage_player_vehicle(vehicle_.drone_hp + 1);
+    } else if (!was && details_.drone_crit.armed()) {
       toast_ = "DROHNE KRITISCH";
       toast_age_ = 0;
     }
-  } else drone_crit_.reset();
+  } else details_.drone_crit.reset();
   // ---- bullet momentum into the bodies the rounds stopped in
   for (const kern::game::ShotEvent& s : world_->shots()) {
     if (!s.impact || s.surface != 2) continue;
@@ -73,19 +73,19 @@ void Game::update_details(f32 dt) {
     const kern::physics::RayHit h = world_->physics().cast_ray(s.from, dir * (l + 0.2f), ~0ull, {});
     if (!h.hit || !h.body.valid()) continue;
     detail::Round round = detail::Round::nine_mm;
-    if (s.shooter == soldier_ && foot_weapon_ == weapons::Id::sniper) round = detail::Round::fifty_bmg;
+    if (s.shooter == soldier_ && weapons_.foot_weapon == weapons::Id::sniper) round = detail::Round::fifty_bmg;
     else if (s.shooter != soldier_ && mode_ == Mode::drone) round = detail::Round::five_five_six;
     world_->physics().apply_linear_impulse(h.body, detail::bullet_impulse(dir, round), h.point);
-    ++bullet_pushes_;
+    ++details_.bullet_pushes;
   }
 }
 
 void Game::details_hud(std::string& s) {
   i32 smoking = 0;
-  for (const detail::CriticalClock& c : pd_crit_) smoking += c.armed() ? 1 : 0;
+  for (const detail::CriticalClock& c : details_.pd_crit) smoking += c.armed() ? 1 : 0;
   char b[200];
   std::snprintf(b, sizeof b, ",\"details\":{\"droneCritical\":%s,\"pdSmoking\":%d,\"critBlasts\":%u,\"bulletPushes\":%u,\"ballot\":\"%s\"}",
-                drone_crit_.armed() ? "true" : "false", smoking, crit_blasts_, bullet_pushes_, mp::ballot_name(ballot_.status).c_str());
+                details_.drone_crit.armed() ? "true" : "false", smoking, details_.crit_blasts, details_.bullet_pushes, mp::ballot_name(details_.ballot.status).c_str());
   s += b;
 }
 
@@ -94,16 +94,16 @@ bool Game::details_command(const std::string& cmd, std::string& out) {
   if (cmd == "guided") {
     // Tests: one press of the GUIDED weapon (the drone must be out).
     if (mode_ != Mode::drone) { out = "not drone"; return true; }
-    drone_weapon_ = 2;
+    weapons_.drone_weapon = 2;
     const bool ok = guided_press();
-    out = ok ? std::string("launched ") + guided_lock_ : guided_marked_ ? std::string("marked ") + guided_mark_.label : "denied";
+    out = ok ? std::string("launched ") + guided_.lock : guided_.marked ? std::string("marked ") + guided_.mark.label : "denied";
     return true;
   }
   if (starts("hurt ")) {
     // Tests: damage the vehicle the player is in (drone: critical below 28).
     damage_player_vehicle(static_cast<f32>(std::atof(cmd.c_str() + 5)));
     char b[64];
-    std::snprintf(b, sizeof b, "drone %.0f car %.0f", drone_hp_, mode_ == Mode::car && car_index_ >= 0 ? cars_[car_index_].hp : -1.0f);
+    std::snprintf(b, sizeof b, "drone %.0f car %.0f", vehicle_.drone_hp, mode_ == Mode::car && car_index_ >= 0 ? cars_[car_index_].hp : -1.0f);
     out = b;
     return true;
   }
@@ -121,18 +121,18 @@ bool Game::details_command(const std::string& cmd, std::string& out) {
       u32 host = 0, m = 0;
       in >> key >> value >> host;
       while (in >> m) members.push_back(static_cast<u8>(m));
-      mp::create_ballot(ballot_, key.empty() ? 0 : ++ballot_serial_, 0, value != 0, static_cast<u8>(host), members, now_ms);
+      mp::create_ballot(details_.ballot, key.empty() ? 0 : ++details_.ballot_serial, 0, value != 0, static_cast<u8>(host), members, now_ms);
     } else if (op == "vote") {
       u32 peer = 0, m = 0;
       int yes = 0;
       in >> peer >> yes;
       while (in >> m) members.push_back(static_cast<u8>(m));
-      mp::Ballot::Status did = ballot_.status;
-      mp::cast_vote(ballot_, static_cast<u8>(peer), yes != 0, members, now_ms, &did);
+      mp::Ballot::Status did = details_.ballot.status;
+      mp::cast_vote(details_.ballot, static_cast<u8>(peer), yes != 0, members, now_ms, &did);
       out = mp::ballot_name(did);
       return true;
     }
-    out = mp::ballot_name(ballot_.status);
+    out = mp::ballot_name(details_.ballot.status);
     return true;
   }
   return false;
@@ -154,7 +154,7 @@ const std::string& sfx_id(combat_audio::Kind k, u32 v) {
 }  // namespace
 
 void Game::combat_audio_init() {
-  if (combat_audio_ready_ || !bank_) return;
+  if (details_.combat_audio_ready || !audio_.bank) return;
   // Rendered once (combat_audio_bank.mjs prebakes its bank at load too), then handed to Kern's
   // SoundBank as decoded PCM, so play_sound("sc:pistol2", ...) works like any imported sound.
   for (u8 i = 0; i < static_cast<u8>(combat_audio::Kind::count); ++i) {
@@ -162,17 +162,17 @@ void Game::combat_audio_init() {
     for (u32 v = 0; v < combat_audio::kVariants[i]; ++v) {
       const std::vector<f32> pcm = combat_audio::render(k, v);
       const std::string& id = sfx_id(k, v);
-      bank_->request(id);
-      bank_->set_pcm(id, pcm.data(), static_cast<u32>(pcm.size()), 1, combat_audio::kSampleRate);
+      audio_.bank->request(id);
+      audio_.bank->set_pcm(id, pcm.data(), static_cast<u32>(pcm.size()), 1, combat_audio::kSampleRate);
     }
   }
-  combat_audio_ready_ = true;
+  details_.combat_audio_ready = true;
 }
 
 const char* Game::combat_sfx(combat_audio::Kind k) {
   // playCombatAudio: the variants take turns.
   const u8 i = static_cast<u8>(k);
-  const u32 v = sfx_cursor_[i]++ % combat_audio::kVariants[i];
+  const u32 v = details_.sfx_cursor[i]++ % combat_audio::kVariants[i];
   return sfx_id(k, v).c_str();
 }
 

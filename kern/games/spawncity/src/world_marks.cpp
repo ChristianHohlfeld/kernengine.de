@@ -323,7 +323,7 @@ void Marks::rebuild(const CityStream& city) {
     const f32 g = 0.46f - 0.2f * m.level;
     wall_disc(m, hole, {0.035f, 0.03f, 0.028f}, 0.82f, {g, g * 0.96f, g * 0.9f}, sd);
     const Vec3 n{m.n.x, m.n.y, 0};
-    Rng cr(m.seed | 1);
+    Rng cr{m.seed | 1};
     const i32 cracks = 5 + static_cast<i32>(cr.next() % 5);
     for (i32 i = 0; i < cracks; ++i) {
       const f32 a = 2 * kPi * (static_cast<f32>(i) + cr.unit() * 0.7f) / static_cast<f32>(cracks);
@@ -338,7 +338,7 @@ void Marks::rebuild(const CityStream& city) {
   // facade_marks.mjs CRACK_FS: radial spokes, two broken rings, a tiny pit - light on the pane
   for (const WallMark& m : cracks_) {
     const Vec3 n{m.n.x, m.n.y, 0};
-    Rng cr(m.seed | 1);
+    Rng cr{m.seed | 1};
     auto line = [&](Vec2 a, Vec2 b, f32 w, Vec3 col) {
       const Vec2 d = b - a;
       const f32 l = std::fmax(1e-4f, std::hypot(d.x, d.y));

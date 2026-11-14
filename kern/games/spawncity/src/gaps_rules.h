@@ -69,7 +69,13 @@ struct SmokeEffect {
 };
 class SmokeField {
  public:
-  explicit SmokeField(u32 pool = 78) : puffs_(pool) {}
+  /// A field with a pool of `pool` puffs (MAX_PUFFS: 78, on a phone 48). A field of its own has
+  /// none yet: it emits nothing.
+  static SmokeField of(u32 pool) {
+    SmokeField f;
+    f.puffs_.resize(pool);
+    return f;
+  }
   /// startWorldCriticalDamage: returns the time it goes off (an existing effect keeps its clock).
   f32 start(const std::string& id, Vec3 at, f32 scale, f32 delay_s, f32 now);
   /// accelerateWorldCriticalDamage: never later, at least 0.18 s from now.

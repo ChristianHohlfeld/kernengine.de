@@ -43,23 +43,15 @@ struct In {
 kern::i16 dms(f32 v) { return static_cast<kern::i16>(std::lround(clampf(v * 10, -32000, 32000))); }
 }  // namespace
 
-struct ProjSync {
-  struct Ghost { mp::PoseTimeline line; Vec3 v; f32 heard = 0; bool gone = false; };
-  std::map<u32, Ghost> ghosts;            // (shooter << 16 | id)
-  std::vector<std::pair<u16, u8>> sent;   // ours in the last message, and how often "gone" went out
-  f32 clock = 0;
-  u32 sent_msgs = 0, got = 0;
-};
-
 ProjSync& Game::projsync() {
-  if (!projsync_) projsync_ = std::make_shared<ProjSync>();
+  if (!projsync_) projsync_ = std::make_unique<ProjSync>();
   return *projsync_;
 }
 
 void Game::projsync_blast(u8 owner, Vec3 at) {
   // his blast: his round is over here too (whatever the stream still says)
   if (!projsync_) return;
-  for (Projectile& p : projectiles_)
+  for (Projectile& p : weapons_.projectiles)
     if (p.ghost && p.alive && (p.net >> 16) == owner && kern::length(p.pos - at) < 8) {
       p.alive = false;
       projsync_->ghosts.erase(p.net);
@@ -69,7 +61,7 @@ void Game::projsync_blast(u8 owner, Vec3 at) {
 void Game::projsync_update(f32 dt) {
   ProjSync& S = projsync();
   if (!net_.active()) {
-    if (!S.ghosts.empty()) { for (Projectile& p : projectiles_) if (p.ghost) p.alive = false; S.ghosts.clear(); }
+    if (!S.ghosts.empty()) { for (Projectile& p : weapons_.projectiles) if (p.ghost) p.alive = false; S.ghosts.clear(); }
     (void)net_.take_proj();
     return;
   }
@@ -82,9 +74,9 @@ void Game::projsync_update(f32 dt) {
     S.clock = 0;
     struct Rec { u16 id; u8 kind, flags; Vec3 p, v; };
     std::vector<Rec> recs;
-    for (const Projectile& p : projectiles_)
+    for (const Projectile& p : weapons_.projectiles)
       if (p.alive && !p.ghost && p.by_player && p.net) recs.push_back({static_cast<u16>(p.net), static_cast<u8>(p.id), 0, p.pos, p.vel});
-    for (const guided::Flight& f : guided_)
+    for (const guided::Flight& f : guided_.flights)
       recs.push_back({static_cast<u16>(0x8000 | (static_cast<u32>(std::lround(f.m.born * 1000)) & 0x7fff)), static_cast<u8>(weapons::Id::drone_guided), static_cast<u8>(f.m.motor ? 2 : 0), f.m.p, f.m.v});
     // the ones that ended: "gone", three times (the stream is unreliable)
     std::vector<std::pair<u16, u8>> next;
@@ -143,14 +135,14 @@ void Game::projsync_update(f32 dt) {
         q.net = key;
         q.gravity = q.id == weapons::Id::grenade_launcher || q.id == weapons::Id::hand_grenade || q.id == weapons::Id::jet_bomb;
         q.fuse = 1e9f;
-        projectiles_.push_back(q);
+        weapons_.projectiles.push_back(q);
         osfx("launch", p, static_cast<f32>(kind), 0);  // his launch, heard where it is
       }
       (void)flags;
     }
   }
   // ---- theirs: where each is now on his clock
-  for (Projectile& p : projectiles_) {
+  for (Projectile& p : weapons_.projectiles) {
     if (!p.ghost || !p.alive) continue;
     auto it = S.ghosts.find(p.net);
     if (it == S.ghosts.end() || it->second.gone || now - it->second.heard > kQuiet) { p.alive = false; continue; }

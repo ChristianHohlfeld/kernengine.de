@@ -35,19 +35,19 @@ u16 drone_id(const PoliceDrone& d) { return static_cast<u16>(d.serial % 65535 + 
 }  // namespace
 
 void Game::swarm_clear() {
-  for (auto& [o, sw] : swarms_)
+  for (auto& [o, sw] : swarm_.mates)
     for (RemoteUnit& u : sw.units)
       if (u.person >= 0) people_.at(u.person).state = People::State::gone;
-  swarms_.clear();
-  swarm_sent_.clear();
-  swarm_fallen_.clear();
+  swarm_.mates.clear();
+  swarm_.sent.clear();
+  swarm_.fallen.clear();
 }
 
 void Game::swarm_collect(std::vector<net::SwarmUnit>& out) {
   const f32 st = world_->sim_time();
   const f64 now = time_ * 1000;
   CombatState& C = combat_;
-  auto next_id = [&]() { if (++swarm_serial_ == 0) ++swarm_serial_; return swarm_serial_; };
+  auto next_id = [&]() { if (++swarm_.serial == 0) ++swarm_.serial; return swarm_.serial; };
   std::vector<SwarmSent> sent;
   for (ZombieAi& z : C.zombie_ai) {
     if (z.person < 0) continue;
@@ -74,7 +74,7 @@ void Game::swarm_collect(std::vector<net::SwarmUnit>& out) {
     out.push_back({s.id, net::SwarmKind::soldier, anim, p.pos, wrap_pi(p.yaw), p.v});
   }
   // the police: the officers who are out of their car ...
-  for (PoliceUnit& u : units_) {
+  for (PoliceUnit& u : police_.units) {
     if (u.car < 0) continue;
     for (PoliceUnit::Cop& c : u.cops) {
       if (c.person < 0 || c.inside) continue;
@@ -93,13 +93,13 @@ void Game::swarm_collect(std::vector<net::SwarmUnit>& out) {
     if (!c.police || !c.placed || !world_->actor_alive(c.actor) || (mode_ == Mode::car && car_index_ == static_cast<i32>(i))) continue;
     const BodyState s = state_of(c.actor);
     const Vec3 f = s.rotation.rotate({1, 0, 0});
-    const bool lights = c.unit >= 0 && c.unit < static_cast<i32>(units_.size()) && units_[c.unit].state != PoliceUnit::State::abandoned &&
-                        units_[c.unit].state != PoliceUnit::State::wreck && units_[c.unit].state != PoliceUnit::State::leave;  // (draw_town's light bar)
+    const bool lights = c.unit >= 0 && c.unit < static_cast<i32>(police_.units.size()) && police_.units[c.unit].state != PoliceUnit::State::abandoned &&
+                        police_.units[c.unit].state != PoliceUnit::State::wreck && police_.units[c.unit].state != PoliceUnit::State::leave;  // (draw_town's light bar)
     const u8 flags = static_cast<u8>((lights ? net::kCruiserLights : 0) | (c.wreck ? net::kCruiserWreck : 0) | (c.burn_until >= 0 ? net::kCruiserBurns : 0));
     out.push_back({static_cast<u16>(i + 1), net::SwarmKind::cruiser, flags, s.position, std::atan2(f.y, f.x), c.car->steer_angle()});
   }
   // ... and the drones
-  for (const PoliceDrone& d : pdrones_)
+  for (const PoliceDrone& d : police_.pdrones)
     if (d.active) out.push_back({drone_id(d), net::SwarmKind::police_drone, static_cast<u8>(d.emp ? net::kDroneEmp : 0), d.pos, wrap_pi(d.yaw), 0});
   // the sandbox enemies
   for (EnemyAi& e : C.enemies) {
@@ -112,7 +112,7 @@ void Game::swarm_collect(std::vector<net::SwarmUnit>& out) {
     sent.push_back({out.back(), e.person, p.seed});
   }
   // who was in the last list, is not in this one and lies dead: fallen (the mates see him go down)
-  for (const SwarmSent& was : swarm_sent_) {
+  for (const SwarmSent& was : swarm_.sent) {
     if (std::any_of(sent.begin(), sent.end(), [&](const SwarmSent& s) { return s.unit.id == was.unit.id && s.unit.kind == was.unit.kind; })) continue;
     if (was.person < 0 || was.person >= static_cast<i32>(people_.all().size())) continue;
     const People::Person& p = people_.at(was.person);
@@ -121,11 +121,11 @@ void Game::swarm_collect(std::vector<net::SwarmUnit>& out) {
     u.flags |= net::kUnitDead;
     u.p = p.pos;
     u.aux = 0;
-    swarm_fallen_.push_back({u, now + kFallenMs});
+    swarm_.fallen.push_back({u, now + kFallenMs});
   }
-  swarm_sent_ = std::move(sent);
-  std::erase_if(swarm_fallen_, [&](const SwarmFallen& f) { return now >= f.until; });
-  for (const SwarmFallen& f : swarm_fallen_) out.push_back(f.unit);
+  swarm_.sent = std::move(sent);
+  std::erase_if(swarm_.fallen, [&](const SwarmFallen& f) { return now >= f.until; });
+  for (const SwarmFallen& f : swarm_.fallen) out.push_back(f.unit);
 }
 
 void Game::swarm_apply_hit(const net::SwarmHit& h) {
@@ -160,7 +160,7 @@ void Game::swarm_apply_hit(const net::SwarmHit& h) {
     case net::SwarmKind::officer:
       // the damage is the officer's own rule already (People::shot on the mate's machine): he goes
       // down at 0 as under our rounds - it is not our crime
-      for (PoliceUnit& u : units_)
+      for (PoliceUnit& u : police_.units)
         for (PoliceUnit::Cop& c : u.cops)
           if (u.car >= 0 && c.id == h.id && c.person >= 0 && !c.inside && people_.at(c.person).seed == c.seed) people_.hurt(c.person, h.damage, {}, false, st);
       break;
@@ -179,19 +179,19 @@ void Game::swarm_apply_hit(const net::SwarmHit& h) {
 }
 
 void Game::swarm_update(f32 dt) {
-  if (!net_.active() || !world_placed_) { if (!swarms_.empty()) swarm_clear(); return; }
+  if (!net_.active() || !world_placed_) { if (!swarm_.mates.empty()) swarm_clear(); return; }
   const f64 now = time_ * 1000;
   const f32 st = world_->sim_time();
   // ---- ours out, every 120 ms (only with mates there)
-  if (now - swarm_clock_ >= kSyncMs && !net_.remotes().empty()) {
-    swarm_clock_ = now;
+  if (now - swarm_.clock >= kSyncMs && !net_.remotes().empty()) {
+    swarm_.clock = now;
     std::vector<net::SwarmUnit> out;
     swarm_collect(out);
     net_.send_swarm(out);
   }
   // ---- theirs in
   for (net::Swarm& sw : net_.take_swarms()) {
-    RemoteSwarm& r = swarms_[sw.owner];
+    RemoteSwarm& r = swarm_.mates[sw.owner];
     r.seen = now;
     std::vector<RemoteUnit> next;
     for (const net::SwarmUnit& u : sw.units) {
@@ -251,15 +251,15 @@ void Game::swarm_update(f32 dt) {
   std::vector<People::RemoteHit> ours;
   people_.take_remote_hits(ours);
   for (const People::RemoteHit& h : ours)
-    for (auto& [owner, sw] : swarms_)
+    for (auto& [owner, sw] : swarm_.mates)
       for (const RemoteUnit& u : sw.units)
         if (u.person == h.index) net_.send_swarm_hit(owner, u.id, u.kind, h.damage);
   // ---- drawn where they are (eased in, as renderRemote: 1 - exp(-10 dt)); silent mates leave
   const f32 a = 1 - std::exp(-dt * 10);
-  for (auto it = swarms_.begin(); it != swarms_.end();) {
+  for (auto it = swarm_.mates.begin(); it != swarm_.mates.end();) {
     if (now - it->second.seen > kSilentMs) {
       for (RemoteUnit& u : it->second.units) if (u.person >= 0) people_.at(u.person).state = People::State::gone;
-      it = swarms_.erase(it);
+      it = swarm_.mates.erase(it);
       continue;
     }
     for (RemoteUnit& u : it->second.units) {
@@ -284,7 +284,7 @@ void Game::swarm_update(f32 dt) {
 }
 
 bool Game::swarm_person_hit(i32 person, f32 damage) {
-  for (auto& [owner, sw] : swarms_)
+  for (auto& [owner, sw] : swarm_.mates)
     for (RemoteUnit& u : sw.units) {
       if (u.person != person) continue;
       if (u.kind != net::SwarmKind::zombie && u.kind != net::SwarmKind::soldier) return true;  // (an officer, an enemy: People noted the hit - swarm_update sends it)
@@ -301,8 +301,8 @@ bool Game::swarm_person_hit(i32 person, f32 damage) {
 bool Game::swarm_shot(kern::game::ShotEvent& s) {
   const Vec3 seg = s.to - s.from;
   const f32 l2 = kern::dot(seg, seg);
-  if (l2 < 1e-6f || swarms_.empty()) return false;
-  for (auto& [owner, sw] : swarms_)
+  if (l2 < 1e-6f || swarm_.mates.empty()) return false;
+  for (auto& [owner, sw] : swarm_.mates)
     for (RemoteUnit& u : sw.units) {
       if (is_person(u.kind)) continue;
       f32 t = 0;
@@ -328,7 +328,7 @@ bool Game::swarm_shot(kern::game::ShotEvent& s) {
         }
         if (miss) continue;
         t = t0;
-        damage = mode_ == Mode::foot && foot_weapon_ == weapons::Id::sniper ? 4 * kCruiserHit : kCruiserHit;  // car_bullet: the .50 counts as four hits
+        damage = mode_ == Mode::foot && weapons_.foot_weapon == weapons::Id::sniper ? 4 * kCruiserHit : kCruiserHit;  // car_bullet: the .50 counts as four hits
       } else if (u.kind == net::SwarmKind::police_drone) {
         if (u.flags & net::kDroneEmp) continue;
         t = clampf(kern::dot(u.p - s.from, seg) / l2, 0, 1);
@@ -352,7 +352,7 @@ bool Game::swarm_shot(kern::game::ShotEvent& s) {
 
 void Game::swarm_draw() {
   CombatArt& A = combat_art_;
-  for (auto& [owner, sw] : swarms_)
+  for (auto& [owner, sw] : swarm_.mates)
     for (const RemoteUnit& u : sw.units) {
       if (u.kind == net::SwarmKind::heli) A.heli(kern::Mat4::translate(u.p) * kern::Mat4::trs({}, yaw_quat(u.yaw), {1, 1, 1}), u.rotor, u.flags != 0);
       else if (u.kind == net::SwarmKind::tank) A.tank(kern::Mat4::translate({u.p.x, u.p.y, city_.ground_height(u.p.x, u.p.y)}) * kern::Mat4::trs({}, yaw_quat(u.yaw), {1, 1, 1}), u.aux, u.flags != 0);
@@ -370,19 +370,19 @@ void Game::swarm_draw() {
 
 void Game::swarm_draw_vehicles() {
   // the mates' cruisers: standing on our ground at their place and heading (as a car at rest stands)
-  for (auto& [owner, sw] : swarms_)
+  for (auto& [owner, sw] : swarm_.mates)
     for (const RemoteUnit& u : sw.units) {
       if (u.kind != net::SwarmKind::cruiser) continue;
-      if (!swarm_cruiser_) swarm_cruiser_ = std::make_unique<Car>(CarSpec::car());
-      const kern::physics::Pose rest = car_rest_pose(swarm_cruiser_->spec(), u.p.x, u.p.y, u.yaw);
-      swarm_cruiser_->show(u.aux);
-      art_.car(kern::Mat4::trs(rest.position, rest.rotation, {1, 1, 1}), *swarm_cruiser_, u.flags & net::kCruiserWreck ? kWreckBlack : kCruiserWhite, false, false);
+      if (!swarm_.cruiser) swarm_.cruiser = std::make_unique<Car>(CarSpec::car());
+      const kern::physics::Pose rest = car_rest_pose(swarm_.cruiser->spec(), u.p.x, u.p.y, u.yaw);
+      swarm_.cruiser->show(u.aux);
+      art_.car(kern::Mat4::trs(rest.position, rest.rotation, {1, 1, 1}), *swarm_.cruiser, u.flags & net::kCruiserWreck ? kWreckBlack : kCruiserWhite, false, false);
     }
 }
 
 void Game::swarm_draw_town() {
   const f32 now = world_->sim_time();
-  for (auto& [owner, sw] : swarms_)
+  for (auto& [owner, sw] : swarm_.mates)
     for (const RemoteUnit& u : sw.units) {
       if (u.kind == net::SwarmKind::cruiser) {
         const kern::physics::Pose rest = car_rest_pose(CarSpec::car(), u.p.x, u.p.y, u.yaw);

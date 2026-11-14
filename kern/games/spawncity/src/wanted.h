@@ -45,17 +45,14 @@ f32 emp_impulse(f32 distance_m);
 
 /// The heat - the Blueprint's variables Heat and HiddenMs and its functions Report, Update, Clear
 /// and Stars. Crimes seen by witnesses or police add heat; it is gone once the player has been
-/// out of sight for escape_ms(stars).
-class Tracker {
- public:
-  void report(Crime c, bool witnessed);
-  /// `seen`: a police unit or witness sees the player right now.
-  void update(f32 dt, bool seen);
-  void clear();
-  /// How long the police have not seen the player (the escape clock, wanted_police_drones.mjs searching).
-  f32 hidden_ms() const;
-  f32 heat() const;
-  i32 stars() const;
-};
+/// out of sight for escape_ms(stars). (The Blueprint holds it: the game keeps nothing of it.)
+void report(Crime c, bool witnessed);
+/// `seen`: a police unit or witness sees the player right now.
+void update(f32 dt, bool seen);
+void clear();
+/// How long the police have not seen the player (the escape clock, wanted_police_drones.mjs searching).
+f32 hidden_ms();
+f32 heat();
+i32 stars();
 
 }  // namespace sc::wanted

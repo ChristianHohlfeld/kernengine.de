@@ -11,11 +11,14 @@
 
 namespace sc {
 
+// (A unit's hit points are a rule of the "Military" Blueprint, read when the game binds it
+// (combat::kHeliHp, kTankHp, kFlakHp): whoever makes a unit gives it them - Game::spawn_heli,
+// spawn_tank, update_flak.)
 struct Heli {
   enum class State : u8 { inbound, orbit, leave, down };
   State state = State::inbound;
   Vec3 p, v;
-  f32 yaw = 0, hp = combat::kHeliHp, orbit = 0, rotor = 0, next_burst = 0, next_shot = 0;
+  f32 yaw = 0, hp = 0, orbit = 0, rotor = 0, next_burst = 0, next_shot = 0;
   i32 burst = 0;
   bool dead = false;
   u16 id = 0;  // in the snapshots to the mates (game_swarm.cpp)
@@ -23,7 +26,7 @@ struct Heli {
 
 struct Tank {
   Vec3 p;
-  f32 yaw = 0, turret = 0, hp = combat::kTankHp, speed = 0, next_shell = 0, path_at = -99, recover_until = -1, recover_start = -99, stuck_since = -1,
+  f32 yaw = 0, turret = 0, hp = 0, speed = 0, next_shell = 0, path_at = -99, recover_until = -1, recover_start = -99, stuck_since = -1,
       progress_t = 0, flipped = 0, wreck_at = -1;
   Vec2 progress_p, exit;
   i32 fails = 0;
@@ -47,7 +50,7 @@ struct SoldierAi {
 struct FlakGun {
   i64 cx = 0, cy = 0;
   Vec3 p;
-  f32 base_yaw = 0, yaw = 0, pitch = 0.2f, burst_t = 0, next_shot = 0, hp = combat::kFlakHp, los_at = -99, flash_at = -99;
+  f32 base_yaw = 0, yaw = 0, pitch = 0.2f, burst_t = 0, next_shot = 0, hp = 0, los_at = -99, flash_at = -99;
   u32 barrel = 0;
   bool los = false, dead = false;
 };

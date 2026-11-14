@@ -58,7 +58,7 @@ bool Game::gaps_seat_press() {
   f32 bd = kBoardM;
   const i32 best = gaps_boardable(&bd);
   if (best < 0) return false;
-  if (jet_placed_ && mode_ == Mode::foot) {
+  if (vehicle_.jet_placed && mode_ == Mode::foot) {
     // our own (empty) jet clearly nearer: that one; a manned one of his right there: ride along
     const Vec3 j = matrix_of(jet_actor_).translation();
     if (std::hypot(j.x - me.x, j.y - me.y) + 2 < bd) return false;
@@ -92,10 +92,10 @@ void Game::gaps_leave_ride() {
     world_->set_alive(chute_actor_, true);
     world_->teleport(chute_actor_, p + Vec3{0, 0, 2});
     world_->set_actor_velocity(chute_actor_, {});
-    chute_time_ = 0;
-    chute_open_ = false;
+    vehicle_.chute_time = 0;
+    vehicle_.chute_open = false;
     mode_ = Mode::parachute;
-    rig_init_ = false;
+    view_.rig_init = false;
   } else {
     Vec3 out = p + Vec3{std::cos(h), std::sin(h), 0} * 5.0f;
     out.z = city_.ground_height(out.x, out.y);

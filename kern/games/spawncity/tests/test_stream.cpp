@@ -84,7 +84,7 @@ SC_TEST(stream_tile_pipeline) {
   // Walls stop a horizontal ray.
   const RayResult wall = cast(world, {-30, 0.5f, 5}, {1, 0, 0}, 60, {});
   SC_CHECK(wall.hit && wall.normal.x < -0.9f, "wall facing west (hit %d n %.2f)", wall.hit, wall.normal.x);
-  Rng rng(3);
+  Rng rng{3};
   Vec3 p; f32 heading;
   SC_CHECK(city.street_point(rng, {0, 0, 0}, 500, p, heading), "street point");
   // Moving far away unloads it.
