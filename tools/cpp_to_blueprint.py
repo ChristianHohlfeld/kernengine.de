@@ -4244,7 +4244,12 @@ class Emit:
         n = bare(s)
         k = n.get("kind")
         if k in CAST and self.ctype(n) == "void":
-            return []  # (void)x;
+            # (void)x; - nothing, where x only names something; (void)f(...); - the call, its value thrown away
+            inner = bare(kids(n)[0]) if kids(n) else {}
+            acts = any(x.get("kind") in ("CallExpr", "CXXMemberCallExpr", "CXXOperatorCallExpr", "CompoundAssignOperator") or
+                       (x.get("kind") == "BinaryOperator" and x.get("opcode") == "=") or (x.get("kind") == "UnaryOperator" and x.get("opcode") in ("++", "--"))
+                       for x in walk(inner))
+            return self.effect(inner) if acts else []
         if k == "BinaryOperator" and n.get("opcode") == "=":
             a, b = kids(n)
             inner = self.unwrap(b)
@@ -10082,9 +10087,15 @@ class TestWriter:
                         types += [f"std::vector<{inner}>", "long long"]
                         # (never empty - an empty list's data() may be null -; now and then null itself, the place -1)
                         n_fixed = f.fixed.get(len(names))   # (the list it points into has a fixed length: that many entries)
+                        # (a parameter declared as an array - `const uint8_t raw[14]` - points at that many entries: C++ asks
+                        # for them, so the place leaves room for them; any other pointer may stand anywhere in the list)
+                        extent = re.search(r"\[\s*(\d+)\s*\]\s*$", re.sub(r"=.*", "", self.tree.source(p)).strip())
+                        room = f" - {int(extent.group(1))}" if extent else ""
                         decl_lines += [f"std::vector<{inner}> {lst}({n_fixed}); for (auto& e : {lst}) e = {self.draw(entry)};" if n_fixed else
-                                       f"std::vector<{inner}> {lst} = draw_list(draw, [&]() -> {inner} {{ return {self.draw(entry)}; }}); {lst}.push_back({self.draw(entry)});",
-                                       f"const long long {at} = draw.below(8) == 0 ? -1 : static_cast<long long>(draw.below(static_cast<u32>({lst}.size()) + 1));"]
+                                       f"std::vector<{inner}> {lst} = draw_list(draw, [&]() -> {inner} {{ return {self.draw(entry)}; }}); {lst}.push_back({self.draw(entry)});"]
+                        if extent and not n_fixed:   # (as many entries as the array has, at the least)
+                            decl_lines.append(f"while ({lst}.size() < {int(extent.group(1))}) {lst}.push_back({self.draw(entry)});")
+                        decl_lines.append(f"const long long {at} = draw.below(8) == 0 ? -1 : static_cast<long long>(draw.below(static_cast<u32>({lst}.size(){room}) + 1));")
                         names += [lst, at]
                         held_lists.append(lst)
                         continue
