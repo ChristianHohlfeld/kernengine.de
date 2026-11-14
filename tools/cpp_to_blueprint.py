@@ -794,6 +794,7 @@ class Unit:
         self.engine = None          # the engine's functions as nodes (Api), made when the first one is called
         self.engine_calls = {}      # the engine's functions this Blueprint calls: decl id -> its node (Api.function)
         self.objects_seen = set()   # the engine's classes it holds handles of
+        self.deciding = set()       # (the engine's classes engine_object is deciding about: one that holds itself)
         self.externs = {}           # a function of an actor's Blueprint it calls on that actor -> (its inputs, its outputs: [(name, type)], its declaration)
         self.working = set()
         self.short = collections.defaultdict(list)
@@ -962,8 +963,23 @@ class Unit:
         Api.opaque asks the same."""
         if not q.startswith(ENGINE + "::") or q not in self.tree.records or q in (ENGINE + "::Vec3", ENGINE + "::Vec2"):
             return False
-        if self.tree.records[q].get("tagUsed") == "class":
+        rec = self.tree.records[q]
+        if rec.get("tagUsed") == "class":
             return True
+        for c in kids(rec):
+            # a struct that cannot be copied (a Blueprint's struct is a value), or that holds an object of the
+            # engine itself - as a value or owned (std::unique_ptr): an object too (Mesh: its Bvh)
+            if c.get("kind") == "CXXConstructorDecl" and c.get("explicitlyDeleted") and re.fullmatch(r"\s*\w+\s*\(\s*const\s+[\w:]+\s*&\s*\)\s*", qtype(c)):
+                return True
+            if c.get("kind") == "FieldDecl":
+                raw = qtype(c).strip()
+                if not re.search(r"(&|\*\s*(const)?)$", raw) and q not in self.deciding:
+                    self.deciding.add(q)
+                    try:
+                        if self.object_of(raw) is not None:
+                            return True
+                    finally:
+                        self.deciding.discard(q)
         try:
             self.struct(q)
             return False   # (plain data: a struct of the Blueprint)
@@ -3352,9 +3368,9 @@ class Emit:
         u.engine_calls[d["id"]] = f
         ins, texts, own = list(f["ins"]), [], None
         if d.get("kind") == "CXXMethodDecl" and d.get("storageClass") != "static":
+            # (of an object of the engine: its handle; of plain data the engine defines the method of - MeshData::as_input
+            # -: the value, the node's first input, and what a method that is not const makes of it its output `self`)
             _, bt, handle = ins.pop(0)
-            if not handle:
-                raise Wait(f"the engine's {d.get('name')}() (a method of plain data that only the engine defines)")
             if obj is None or self.is_this(obj):
                 raise Wait("a call of the engine on its own object")
             texts.append(self.ex(obj, bt))
@@ -4612,6 +4628,8 @@ class Emit:
                 e = u.enum(q)
                 return f"{e}::{enum_value(u, e, ref['name'])}", e
             if ref.get("kind") == "VarDecl":
+                if i in u.variables:   # (a constant of the function's own, `static const Vec3 kHair[6] = {…};` - see stmt1)
+                    return u.variables[i]
                 d = self.tree.decl.get(i)
                 if d is None:
                     if ref.get("name") == "kPi":
@@ -5808,7 +5826,7 @@ WIDE_PRELUDE = """// the numbers of the Blueprint language (../converted.h): a n
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
 using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
@@ -6324,13 +6342,16 @@ class TestWriter:
         return lines
 
     # ---- the engine in the test: stand-ins that keep every call ----
-    def stand_in(self, f, cls):
+    def stand_in(self, f, cls, plain=False):
         """A function of the engine as the test's source calls it: (its declaration, its definition). It hands
         its arguments to the stand-in of the engine as the values the Blueprint's node gets, and takes what
-        the stand-in answers."""
+        the stand-in answers. `plain`: a method of plain data (the test's own struct, MeshData::as_input) - the
+        struct is its first value, and what a method that is not const makes of it, the first it takes."""
         d = f["decl"]
         shape = lambda x: re.sub(r"\b[ui]64\b", "converted::Whole", x)
         params, values, takes = [], (["arg(*this)"] if cls else []), []
+        if plain and not qtype(d).rstrip().endswith("const"):
+            takes.append(("(*this)", cls, False))
         ps = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
         for i, (p, (pin_in, pin_out)) in enumerate(zip(ps, f["params"])):
             raw = qtype(p).strip()
@@ -6378,7 +6399,7 @@ class TestWriter:
             k += 1
         if ret != "void":
             body.append("return result;")
-        const = " const" if cls else ""
+        const = " const" if cls and (not plain or qtype(d).rstrip().endswith("const")) else ""
         return (f"{ret} {d['name']}({', '.join(a + b for a, b in params)}){const};",
                 f"inline {ret} {cls + '::' if cls else ''}{d['name']}({', '.join(a for a, _ in params)}){const} {{ {' '.join(body)} }}")
 
@@ -6397,8 +6418,20 @@ class TestWriter:
             else:
                 free.append(f)
         chunks, defs = [], []
+        for q in sorted(set(by_class) - u.objects_seen):
+            if q in tree.records and not u.engine_object(q):
+                # methods of plain data only the engine defines: defined after the test's copy of the struct
+                for f in by_class[q]:
+                    try:
+                        if q not in self.names:
+                            raise Wait(f"the class {q.split('::')[-1]} is not written")
+                        self.result_ok(q)
+                        _, b = self.stand_in(f, self.names[q], plain=True)
+                    except Wait:
+                        continue   # (what it takes the test has no values of: a function that calls it is not compared)
+                    defs.append((("engine", f["decl"]["id"]), b))
         for q in sorted(u.objects_seen | set(by_class)):
-            if q not in tree.records:
+            if q not in tree.records or not u.engine_object(q):
                 continue
             name = self.object_name(q)
             pairs.append((self.absolute(q), name))
@@ -6419,7 +6452,10 @@ class TestWriter:
                 continue
             spaces = [x for x in tree.scope_of.get(d["id"], "").strip(":").split("::") if x][1:]
             head, tail = "".join(f"namespace {x} {{ " for x in spaces), " }" * len(spaces)
-            chunks.append((tree.place(d), ("engine", d["id"]), head + a + tail))
+            # (the stand-ins of the objects it is handed, declared before it: its header may stand before theirs -
+            # `bool upsert(Renderer&, …)` in mesh_data.h, which declares Renderer only)
+            named = sorted({self.object_name(q) for q in (u.object_of(qtype(p)) for p in kids(d) if p.get("kind") == "ParmVarDecl") if q in tree.records})
+            chunks.append((tree.place(d), ("engine", d["id"]), "".join(f"struct {n}; " for n in named) + head + a + tail))
             defs.append((("engine", d["id"]), head + b + tail))
             pairs.append(("::" + tree.scope_of.get(d["id"], "") + d["name"], "::".join(spaces + [d["name"]])))
         if os.environ.get("STAND_INS"):
@@ -6670,7 +6706,7 @@ class TestWriter:
             scope = tree.scope_of.get(d["id"], "")
             return "::" + (scope if scope.startswith(ENGINE + "::") else tree.namespace + "::" + scope) + name
         pairs = [(self.absolute(q), self.names[q]) for q in self.names] + [(self.absolute(q), self.enum_names[q]) for q in self.enum_names]
-        pairs += [(f"::{ENGINE}::Vec3", "Vec3"), (f"::{ENGINE}::Vec2", "Vec2"), (f"::{tree.namespace}::Vec3", "Vec3"), (f"::{tree.namespace}::Vec2", "Vec2")]
+        pairs += [(f"::{ENGINE}::Vec3", "Vec3"), (f"::{ENGINE}::Vec2", "Vec2"), (f"::{ENGINE}::Span", "Span"), (f"::{tree.namespace}::Vec3", "Vec3"), (f"::{tree.namespace}::Vec2", "Vec2")]
         pairs += [(f"::{space}::{n}", n) for space in (ENGINE, tree.namespace) for n in ("f32", "f64", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64")]
         pairs += [(f"::{ENGINE}::{n}", n) for n in ("dot", "cross", "length", "length_sq", "distance", "distance_sq", "finite", "lerp", "vmin", "vmax", "normalize")]
         enum_chunks = [(tree.place(tree.enums[q]), ("enum", q), in_classes(q.rsplit("::", 1)[0] + "::" if "::" in q else "", self.piece(tree.enums[q]) + ";")) for q in sorted(enums)]

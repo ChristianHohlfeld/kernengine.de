@@ -295,6 +295,22 @@ template <class K, class V> class SortedMap : public std::map<K, V> {
   const V& at(const K& k) const { return const_cast<SortedMap*>(this)->at(k); }
 };
 template <class K> using SortedSet = std::set<K>;
+/// A view of entries (kern::Span) as the source makes one - `Span<const f32>(m.m, 16)`, `Span<const f32>(v)`:
+/// handed to the engine, it is the list of its entries (the stand-ins take a Span as that list).
+template <class T> struct Span {
+  T* data = nullptr;
+  std::size_t size = 0;
+  constexpr Span() = default;
+  constexpr Span(T* d, std::size_t n) : data(d), size(n) {}
+  template <class C>
+    requires(!std::is_same_v<std::remove_cv_t<C>, Span> && requires(C& c) { c.data(); c.size(); })
+  constexpr Span(C& c) : data(c.data()), size(c.size()) {}
+  constexpr T& operator[](std::size_t i) const { return data[i]; }
+  constexpr T* begin() const { return data; }
+  constexpr T* end() const { return data + size; }
+  constexpr bool empty() const { return size == 0; }
+  template <class U> operator std::vector<U>() const { return std::vector<U>(data, data + size); }
+};
 }  // namespace wide
 
 /// A value of the source as the Blueprint holds it, where the two differ by more than their numbers: a
