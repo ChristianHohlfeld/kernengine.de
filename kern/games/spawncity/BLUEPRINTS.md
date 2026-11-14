@@ -428,7 +428,8 @@ Eine Form, die Gestalt oder Kosten ändert, ist keine von beiden.
 4. **Bibliotheken.** Eine Funktion eines Blueprints ohne Zustand ruft jeder andere Blueprint
    direkt – in der Klasse ein gewöhnlicher Aufruf. Damit steht jede Funktion einmal im Projekt
    (heute: in jedem Blueprint, der sie benutzt). *(In der Engine seit 14.11.2026, 00:50 –
-   `kern/docs/blueprint_cpp.md`, „Bibliotheken“; im Editor und im Konverter folgt es.)* So ist es
+   `kern/docs/blueprint_cpp.md`, „Bibliotheken“; im Editor seit 01:25 – `kern/docs/studio.md`; im
+   Konverter folgt es.)* So ist es
    festgelegt (13.11.2026, 23:45):
    - **Eine Bibliothek ist ein Blueprint, der nichts behält:** keine Variablen, keine Events,
      Timer oder Zustände, und kein Knoten, der zwischen zwei Aufrufen etwas behält (Do Once,

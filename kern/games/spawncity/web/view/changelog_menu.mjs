@@ -7,6 +7,9 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-14",time:"01:25",title:"Editor: Bibliotheken",items:[
+    "Unter der Haube: Im Editor lässt sich jetzt einstellen, dass ein Blueprint eine Bibliothek ist und welche Bibliotheken ein Blueprint benutzt – ihre Funktionen stehen dann im Knotenmenü, und wer eine Bibliothek benutzt, folgt ihren Änderungen im selben Schritt. Am Spiel ändert sich nichts.",
+  ]},
   {date:"2026-11-14",time:"00:50",title:"Sprache: Bibliotheken",items:[
     "Unter der Haube: Ein Blueprint, der nichts behält, ist jetzt eine Bibliothek – andere Blueprints haben seine Typen und rufen seine Funktionen direkt auf, auch mit Referenzen. Damit kann jede Funktion des Spiels einmal im Projekt stehen statt in jedem Blueprint, der sie benutzt. Am Spiel ändert sich nichts.",
   ]},

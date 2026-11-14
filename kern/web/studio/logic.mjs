@@ -626,7 +626,7 @@ export class LogicEditor {
   renderMy(data) {
     const live = this.trace?.variables || {};
     const q = this.el.myq.value.trim().toLowerCase();
-    const k = JSON.stringify([data.owner, data.view, data.variables, data.functions, data.otherFunctions, data.otherTypes, data.enums, data.structs, data.events, data.machines?.map(m => [m.id, m.name]), live, q, [...this.collapsed], this.selVar, this.selFn, this.selEnum, this.selStruct]);
+    const k = JSON.stringify([data.owner, data.view, data.variables, data.functions, data.otherFunctions, data.otherTypes, data.enums, data.structs, data.library, data.uses, data.libraries, data.events, data.machines?.map(m => [m.id, m.name]), live, q, [...this.collapsed], this.selVar, this.selFn, this.selEnum, this.selStruct]);
     if (k === this.myKey) return;
     this.myKey = k;
     const match = s => !q || s.toLowerCase().includes(q);
@@ -645,8 +645,8 @@ export class LogicEditor {
     const sig = f => `(${f.inputs.map(p => p.name).join(", ")})${f.outputs.length ? " → " + f.outputs.map(p => p.name).join(", ") : ""}`;
     const fns = (data.functions || []).filter(f => match(f.name)).map(f => `
         <div class="lg-item lg-fn${this.selFn === f.name ? " on" : ""}" draggable="true" data-fn="${lgEsc(f.name)}" title="${lgEsc(f.help || "Drag into the graph: a call of the function")}">
-          <i class="lg-fni"${f.external ? ' title="A function of another Blueprint: called on an actor"' : ""}>${f.external ? "↗" : "ƒ"}</i><span class="lg-vn">${lgEsc(f.name)}</span><span class="lg-vt">${lgEsc(sig(f))}</span>
-          <span class="lg-acts"><button data-call title="${f.external ? "Add a call of the function on an actor" : "Add a call of the function"}">Call</button>${f.external ? "" : `<button data-ret title="Add a Return node">Return</button>`}</span>
+          <i class="lg-fni"${f.external ? ' title="A function of another Blueprint: called on an actor"' : f.from ? ` title="A function of the library ${lgEsc(f.from)}: called directly, changed there"` : ""}>${f.external ? "↗" : f.from ? "L" : "ƒ"}</i><span class="lg-vn">${lgEsc(f.name)}</span><span class="lg-vt">${lgEsc(sig(f))}</span>
+          <span class="lg-acts"><button data-call title="${f.external ? "Add a call of the function on an actor" : "Add a call of the function"}">Call</button>${f.external || f.from ? "" : `<button data-ret title="Add a Return node">Return</button>`}</span>
         </div>`).join("") || `<div class="lg-none">No functions${q ? " match" : " yet: + adds one"}</div>`;
     // the functions of the level's other Blueprints: declared here, this Blueprint calls them on an actor
     const others = (data.otherFunctions || []).filter(f => match(f.name));
@@ -655,13 +655,13 @@ export class LogicEditor {
     // an enum: a type of this Blueprint with named values
     const enums = (data.enums || []).filter(e => match(e.name)).map(e => `
         <div class="lg-item lg-enum${this.selEnum === e.name ? " on" : ""}" data-enum="${lgEsc(e.name)}" title="${lgEsc(e.help || (e.project ? "An enum of the project: the same in every Blueprint of the level that has it" : "An enum: a type of this Blueprint with named values"))}">
-          <i class="lg-pill" style="--c:${LG_ENUM_COLOR}"></i><span class="lg-vn">${lgEsc(e.name)}</span>${e.project ? '<i class="lg-proj" title="A type of the project">P</i>' : ""}<span class="lg-vt">${lgEsc(e.values.join(", "))}</span>
+          <i class="lg-pill" style="--c:${LG_ENUM_COLOR}"></i><span class="lg-vn">${lgEsc(e.name)}</span>${e.project ? '<i class="lg-proj" title="A type of the project">P</i>' : ""}${e.from ? `<i class="lg-proj" title="A type of the library ${lgEsc(e.from)}: this Blueprint has it because it uses the library - it is changed there">L</i>` : ""}<span class="lg-vt">${lgEsc(e.values.join(", "))}</span>
           <span class="lg-acts"><button data-switch title="Add a Switch on the enum">Switch</button></span>
         </div>`).join("") || `<div class="lg-none">No enums${q ? " match" : " yet: + adds one"}</div>`;
     // a struct: a type of this Blueprint with named fields
     const structs = (data.structs || []).filter(s => match(s.name)).map(s => `
         <div class="lg-item lg-st${this.selStruct === s.name ? " on" : ""}" data-struct="${lgEsc(s.name)}" title="${lgEsc(s.help || (s.project ? "A struct of the project: the same in every Blueprint of the level that has it" : "A struct: a type of this Blueprint with named fields"))}">
-          <i class="lg-pill" style="--c:${LG_STRUCT_COLOR}"></i><span class="lg-vn">${lgEsc(s.name)}</span>${s.project ? '<i class="lg-proj" title="A type of the project">P</i>' : ""}<span class="lg-vt">${lgEsc(s.fields.map(f => f.name).join(", "))}</span>
+          <i class="lg-pill" style="--c:${LG_STRUCT_COLOR}"></i><span class="lg-vn">${lgEsc(s.name)}</span>${s.project ? '<i class="lg-proj" title="A type of the project">P</i>' : ""}${s.from ? `<i class="lg-proj" title="A type of the library ${lgEsc(s.from)}: this Blueprint has it because it uses the library - it is changed there">L</i>` : ""}<span class="lg-vt">${lgEsc(s.fields.map(f => f.name).join(", "))}</span>
           <span class="lg-acts"><button data-make title="Add a Make node of the struct">Make</button><button data-break title="Add a Break node of the struct">Break</button></span>
         </div>`).join("") || `<div class="lg-none">No structs${q ? " match" : " yet: + adds one"}</div>`;
     // the types of the level's other Blueprints: had here too, they are types of the project
@@ -674,7 +674,17 @@ export class LogicEditor {
         <div class="lg-item lg-ev" draggable="true" data-ev="${lgEsc(e)}" title="Drag into the graph: the event; Ctrl = Call">${lgIco("event", "red")}<span class="lg-vn">${lgEsc(e)}</span>
           <span class="lg-acts"><button data-on title="Add the event node">Event</button><button data-call title="Add a Call node">Call</button></span></div>`).join("") ||
       `<div class="lg-none">Custom events you add appear here</div>`;
-    this.el.mylist.innerHTML = section("graphs", "Graphs", "Add a state machine", graphs) + section("vars", "Variables", "Add a variable", vars) +
+    // libraries: is this Blueprint one (it keeps nothing: types and functions), and which does it use
+    const canUse = (data.libraries || []).filter(match);
+    const libs = `<label class="lg-item lg-libflag" title="A library keeps nothing - no variables, no events: it has types and functions. Other Blueprints of the level use it: they have its types and call its functions directly (in C++ it is one of their bases).">
+          <input type="checkbox" data-library${data.library ? " checked" : ""}${data.owner ? "" : " disabled"}><span class="lg-vn">This Blueprint is a library</span></label>` +
+      (data.uses || []).filter(match).map(n => `
+        <div class="lg-item lg-lib" data-lib="${lgEsc(n)}" title="This Blueprint uses the library ${lgEsc(n)}: it has its types, and its functions are in the node menu (${lgEsc(n)}::…)">
+          <i class="lg-fni">L</i><span class="lg-vn">${lgEsc(n)}</span><span class="lg-acts"><button data-unuse title="Do not use this library any more">×</button></span>
+        </div>`).join("") +
+      (canUse.length ? `<div class="lg-declare"><select data-use title="This Blueprint uses a library of this level: it has its types and calls its functions directly">
+        <option value="">+ Use a library…</option>${canUse.map(n => `<option value="${lgEsc(n)}">${lgEsc(n)}</option>`).join("")}</select></div>` : "");
+    this.el.mylist.innerHTML = section("graphs", "Graphs", "Add a state machine", graphs) + section("libs", "Libraries", "", libs) + section("vars", "Variables", "Add a variable", vars) +
       section("fns", "Functions", "Add a function", fns + declare) + section("enums", "Enums", "Add an enum", enums + adopt("enum")) + section("structs", "Structures", "Add a struct", structs + adopt("struct")) +
       section("events", "Events", "Add a custom event", events);
     for (const s of this.el.mylist.querySelectorAll(".lg-sec")) {
@@ -712,6 +722,18 @@ export class LogicEditor {
       const r = this.cmd({cmd: kind === "enum" ? "logicEnum" : "logicStruct", op: "adopt", name, from: +sel.value.slice(0, at)});
       sel.value = "";
       if (r?.ok !== false) { if (kind === "enum") this.selectEnum(name); else this.selectStruct(name); }
+    };
+    const libFlag = this.el.mylist.querySelector("[data-library]");
+    if (libFlag) libFlag.onchange = () => {
+      const r = this.cmd({cmd: "logicLibrary", op: "library", value: libFlag.checked});  // (what is in the way, the command says)
+      if (r && r.ok === false) libFlag.checked = !libFlag.checked;
+    };
+    for (const row of this.el.mylist.querySelectorAll(".lg-lib")) row.querySelector("[data-unuse]").onclick = () => this.cmd({cmd: "logicLibrary", op: "unuse", name: row.dataset.lib});
+    const useSel = this.el.mylist.querySelector("[data-use]");
+    if (useSel) useSel.onchange = () => {
+      if (!useSel.value) return;
+      this.cmd({cmd: "logicLibrary", op: "use", name: useSel.value});
+      useSel.value = "";
     };
     const declareSel = this.el.mylist.querySelector("[data-declare]");
     if (declareSel) declareSel.onchange = () => {
@@ -2708,6 +2730,7 @@ select.lg-par,select.lg-lit{padding:0 2px}
 .lg-dissue{display:flex;gap:6px;align-items:flex-start;padding:5px 7px;border-radius:4px;margin:4px 0;line-height:1.4}
 .lg-dissue.err{background:rgba(210,59,59,.15);color:#ffb3ae}.lg-dissue.warn{background:rgba(201,146,30,.14);color:#f5d27f}
 .lg-fni{width:14px;text-align:center;font:italic 600 13px Georgia,serif;color:#b79cff;flex:none}
+.lg-libflag{gap:6px;cursor:pointer}.lg-libflag input{margin:0;flex:none}
 .lg-proj{font:600 9px/14px var(--lg-font,system-ui,sans-serif);font-style:normal;width:14px;height:14px;border-radius:3px;text-align:center;background:#2c4a6e;color:#9fd0ff;flex:none;margin-left:4px}
 .lg-frow{display:flex;align-items:center;gap:4px;min-height:28px}
 .lg-frow input:not([type=checkbox]),.lg-frow select{height:24px;min-width:0;background:#0f0f0f;border:1px solid #3c3c3c;border-radius:3px;color:#fff;padding:0 5px;font:inherit}

@@ -378,6 +378,39 @@ logic::Blueprints blueprints_of(const game::Level& level) {
     return nullptr;
   };
 }
+/// Does a Blueprint use the library `name` - itself, or through the libraries it uses?
+bool uses_library(const game::Level& level, const logic::Graph& g, const std::string& name, int depth = 0) {
+  if (depth > 32) return false;
+  const logic::Blueprints all = blueprints_of(level);
+  for (const std::string& used : g.uses) {
+    if (used == name) return true;
+    if (const logic::Graph* l = all(used); l && l != &g && uses_library(level, *l, name, depth + 1)) return true;
+  }
+  return false;
+}
+/// After an edit of the Blueprint `g` of the actor `owner`: it holds of its libraries what it
+/// uses of them now (their types, how the functions look that it calls) - and the Blueprints of
+/// the level that use it follow. False: one of them cannot (`error` says which, and why) - the
+/// edit does not happen.
+bool libraries_follow(game::Level& level, u32 owner, logic::Graph& g, std::string& error) {
+  const logic::Blueprints all = blueprints_of(level);
+  bool holds = !g.uses.empty();
+  for (const logic::Function& f : g.functions) holds = holds || !f.from.empty();
+  for (const logic::EnumType& e : g.enums) holds = holds || !e.from.empty();
+  for (const logic::StructType& t : g.structs) holds = holds || !t.from.empty();
+  if (holds && !logic::take_libraries(g, all, &error)) return false;
+  const game::Actor* self = owner ? level.find(owner) : nullptr;
+  if (!self) return true;
+  for (game::Actor& a : level.actors) {
+    if (a.id == owner || !a.logic || !uses_library(level, *a.logic, self->name)) continue;
+    std::string why;
+    if (!logic::take_libraries(*a.logic, all, &why)) {
+      error = "the Blueprint of " + a.name + " uses this one: " + why;
+      return false;
+    }
+  }
+  return true;
+}
 /// What is wrong with a Blueprint. One that uses libraries is judged as the one graph it is
 /// with them (logic::link): the rules that follow calls see what a library's function does.
 std::vector<logic::Issue> whole_issues(const game::Level& level, const logic::Graph& g) {
@@ -623,6 +656,21 @@ json::Value Studio::logic_json() const {
   o.set("enums", graph["enums"].is_array() ? graph["enums"] : json::Value::array());
   o.set("structs", graph["structs"].is_array() ? graph["structs"] : json::Value::array());
   o.set("functions", graph["functions"].is_array() ? graph["functions"] : json::Value::array());
+  {
+    // Libraries: is this Blueprint one, which does it use, and which of the level's could it use.
+    // (A function and a type it has of a library say so themselves: "from".)
+    o.set("library", g->library);
+    json::Value uses = json::Value::array(), libraries = json::Value::array();
+    for (const std::string& used : g->uses) uses.push(used);
+    const game::Actor* self = logic_owner_ ? level_.find(logic_owner_) : nullptr;
+    for (const auto& [id, name, other] : other_blueprints(level_, logic_owner_)) {
+      if (!other->library || g->uses_library(name) || !id) continue;
+      if (self && uses_library(level_, *other, self->name)) continue;  // (a library does not use what uses it)
+      libraries.push(name);
+    }
+    o.set("uses", std::move(uses));
+    o.set("libraries", std::move(libraries));
+  }
   {
     // (the functions of the level's other Blueprints this one does not have or declare yet)
     json::Value offered = json::Value::array();
@@ -888,7 +936,17 @@ json::Value Studio::logic_palette(const json::Value& c) const {
       }
       consider({lib.title(named), d->category, d->help, d->type, {{"struct", s.name}}});
     }
+  // (the functions of the libraries it uses: called directly, by the library's name)
+  for (const std::string& used : g->uses) {
+    const logic::Graph* l = blueprints_of(level_)(used);
+    for (const logic::Function& f : l ? l->functions : std::vector<logic::Function>()) {
+      if (f.external || !f.from.empty()) continue;
+      const std::string full = logic::library_function(used, f.name);
+      consider({full, "Library " + used, f.help.empty() ? "Calls the function " + f.name + " of the library " + used : f.help, f.pure ? "func.pure" : "func.call", {{"function", full}}});
+    }
+  }
   for (const logic::Function& f : g->functions) {
+    if (!f.from.empty()) continue;  // (a function of a library: offered above, with all the others the library has)
     consider({f.name + " on Actor", "Functions", "Calls the function " + f.name + " of another actor's Blueprint (or the Level's)" + (f.help.empty() ? std::string() : ": " + f.help), "func.call_on",
               {{"function", f.name}}});
     if (f.external) continue;  // (a function of another Blueprint has no body here)
@@ -1215,7 +1273,8 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     const bool done = edit(label, [&](game::Level& l) {
       logic::Graph* g = graph_of(l, owner, true);
       if (!g) { error = "the graph's actor is gone"; return false; }
-      return fn(*g, l);
+      // (what it holds of its libraries follows the edit - and so do the Blueprints that use it)
+      return fn(*g, l) && libraries_follow(l, owner, *g, error);
     });
     if (!done && !error.empty()) return fail_result(error);
     result.set("ok", done || error.empty());
@@ -1238,6 +1297,8 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       }
       if (op == "share" || op == "local") {
         if (!g.enumeration(which) && !g.structure(which)) { error = "no type " + which; return false; }
+        if (const logic::EnumType* e = g.enumeration(which); e && !e->from.empty()) { error = which + " is a type of the library " + e->from + ": it is changed there"; return false; }
+        if (const logic::StructType* t = g.structure(which); t && !t->from.empty()) { error = which + " is a type of the library " + t->from + ": it is changed there"; return false; }
         if (op == "share") {
           make_project_type(g, which);
           if (const std::string conflict = project_type_conflict(level, owner, g); !conflict.empty()) { error = conflict; return false; }
@@ -1323,7 +1384,10 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
           result.set("function", fname);
         }
       }
-      if ((type == "func.return" || type == "func.call" || type == "func.pure" || type == "func.call_on") && !g.function(n.param("function"))) {
+      // (a call of a function of a library it uses - Workshop::skid -: what the function looks like
+      // comes with the edit, from the library)
+      const bool of_library = (type == "func.call" || type == "func.pure") && n.param("function").find("::") != std::string::npos;
+      if ((type == "func.return" || type == "func.call" || type == "func.pure" || type == "func.call_on") && !of_library && !g.function(n.param("function"))) {
         if (g.functions.empty()) { error = "this Blueprint has no function yet: add one in My Blueprint"; return false; }
         n.set_param("function", g.functions.front().name);
       }
@@ -1545,6 +1609,42 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       return true;
     });
   }
+  if (name == "logicLibrary") {
+    // A library is a Blueprint that keeps nothing; other Blueprints use it - they have its types
+    // and call its functions directly.
+    //   library  this Blueprint is one (value: true / false)
+    //   use      it uses the library `name` (the Blueprint of the actor of that name)
+    //   unuse    it does not use it any more (while it calls none of its functions and has nothing of its types)
+    const std::string op = str("op"), which = str("name");
+    return graph_edit(op == "library" ? "Library" : "Use Library", [&](logic::Graph& g, game::Level& level) {
+      if (op == "library") {
+        const bool on = c["value"].as_bool();
+        if (g.library == on) return false;
+        if (on && !owner) { error = "the level's own Blueprint is no library: a library is used by the name of its actor"; return false; }
+        g.library = on;
+        return true;
+      }
+      if (op == "use") {
+        const game::Actor* self = owner ? level.find(owner) : nullptr;
+        if (g.uses_library(which)) return false;
+        if (self && self->name == which) { error = "a Blueprint does not use itself"; return false; }
+        g.uses.push_back(which);  // (that it is there, and a library, says take_libraries - after the edit)
+        return true;
+      }
+      if (op == "unuse") {
+        if (!g.uses_library(which)) return false;
+        std::erase(g.uses, which);
+        // (what the Blueprint still has of it would be of nothing: the edit is refused then)
+        if (!logic::take_libraries(g, blueprints_of(level), &error)) return false;
+        logic::Graph probe;
+        std::string why;
+        if (!logic::graph_from_json(logic::graph_to_json(g), probe, &why)) { error = "the Blueprint still uses a type of the library " + which + ": " + why; return false; }
+        return true;
+      }
+      error = "unknown library edit " + op;
+      return false;
+    });
+  }
   if (name == "logicFunction") {
     // A function of the graph: its name, whether it is offered as a pure node, its help and its
     // pins. The function's nodes (entry, Return, calls) follow every change.
@@ -1582,6 +1682,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       }
       logic::Function* f = g.function(fname);
       if (!f) { error = "no function " + fname; return false; }
+      if (!f->from.empty()) { error = fname + " is a function of the library " + f->from + ": it is changed there"; return false; }
       auto uses = [&](const logic::Node& n) {
         return (n.type == "func.entry" || n.type == "func.return" || n.type == "func.call" || n.type == "func.pure" || n.type == "func.call_on") && n.param("function") == fname;
       };
@@ -1859,6 +1960,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       }
       logic::EnumType* e = g.enumeration(which);
       if (!e) { error = "no enum " + which; return false; }
+      if (!e->from.empty()) { error = which + " is a type of the library " + e->from + ": it is changed there"; return false; }
       const std::string old = e->name;
       // The settings of nodes that name this enum (a type setting: "Mode", "Mode_list").
       auto each_setting = [&](const std::function<void(logic::Node&, const logic::ParamDef&, bool list)>& fn) {
@@ -1967,6 +2069,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       }
       logic::StructType* s = g.structure(which);
       if (!s) { error = "no struct " + which; return false; }
+      if (!s->from.empty()) { error = which + " is a type of the library " + s->from + ": it is changed there"; return false; }
       const std::string old = s->name;
       // The settings of nodes that name this struct (a type setting: "Weapon", "Weapon_list").
       auto each_setting = [&](const std::function<void(logic::Node&, const logic::ParamDef&, bool list)>& fn) {

@@ -424,6 +424,16 @@ Eine Funktion hat einen Namen, typisierte Eingänge und typisierte Ausgänge. An
   dahinter erreicht ihn nicht mehr. Eine Funktion ruft sich nicht selbst auf, auch nicht über
   andere Funktionen: Das ist ein Compile-Fehler am aufrufenden Knoten (Wiederholen ist Sache der
   Schleifen-Knoten). Nach einem Delay ist sie zu Ende – sich dann aufzurufen, ist ein Timer.
+- **Bibliotheken:** Im Abschnitt *Libraries* von *My Blueprint* steht, ob dieser Blueprint eine
+  Bibliothek ist (*This Blueprint is a library*: er behält nichts – Typen und Funktionen, keine
+  Variablen, keine Events) und welche Bibliotheken des Levels er benutzt (*+ Use a library…*; eine
+  Bibliothek heißt wie der Actor, der sie hat). Wer eine Bibliothek benutzt, hat ihre Typen (in
+  den Listen mit einem **L**) und findet ihre Funktionen im Knotenmenü unter *Library <Name>*
+  (`Workshop::skid`); ein Aufruf ist ein Aufruf wie der einer eigenen Funktion, auch mit
+  Referenzen. Was der Bibliothek gehört, wird dort geändert – und wer sie benutzt, folgt in
+  demselben Schritt; eine Änderung, der ein Benutzer nicht folgen kann (eine Funktion entfernen,
+  die er aufruft), wird mit dem Grund abgelehnt. Im C++-Text ist die Bibliothek eine Basis:
+  `struct Garage : virtual kern::Blueprint, virtual Workshop`.
 - **Referenz-Eingänge:** In den Details der Funktion steht bei jedem Eingang, wie die Funktion ihn
   nimmt – *value* (sein Wert beim Aufruf), *&* (der Platz, den der Aufruf nennt: die Funktion
   ändert ihn dort) oder *const &* (sie liest ihn dort). Eine Referenz hat keinen Pin: Am Call-Knoten

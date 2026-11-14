@@ -9347,6 +9347,91 @@ TEST(studio_logic_reference_inputs) {
   CHECK(f.cmd(R"({"cmd":"logicCompile"})")["ok"].as_bool());
 }
 
+TEST(studio_logic_libraries) {
+  // A library with the editor's commands: a Blueprint that keeps nothing, used by another -
+  // which has its types and calls its functions directly. What the user holds of the library
+  // follows the library; what would break a user is refused.
+  StudioFixture f;
+  CHECK(f.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
+  f.cmd(R"({"cmd":"spawn","item":"cube"})");
+  f.cmd(R"({"cmd":"spawn","item":"cube"})");
+  CHECK(f.s->level().actors.size() >= 2);
+  if (f.s->level().actors.size() < 2) return;
+  const game::ActorId lib = f.s->level().actors[f.s->level().actors.size() - 2].id, user = f.s->level().actors.back().id;
+  auto cmd = [&](std::initializer_list<std::pair<const char*, json::Value>> fields) {
+    json::Value c = json::Value::object();
+    for (const auto& [k, v] : fields) c.set(k, v);
+    return f.s->command(c);
+  };
+  auto open = [&](game::ActorId id) { return cmd({{"cmd", "logicOpen"}, {"owner", static_cast<f64>(id)}})["ok"].as_bool(); };
+  CHECK(cmd({{"cmd", "rename"}, {"id", static_cast<f64>(lib)}, {"name", "Tally"}})["ok"].as_bool() && cmd({{"cmd", "rename"}, {"id", static_cast<f64>(user)}, {"name", "Crate"}})["ok"].as_bool());
+  // the library: its text says what it is
+  CHECK(open(lib));
+  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Tally : virtual kern::Library {\n  KERN_STRUCT(Hits) {\n    Int Count = 0;\n    Float Hardest = 0.0;\n  };\n\n  /// Counts a hit.\n"
+                                                "  void hit(Hits& hits, Float speed = 0.0) {\n    hits.Count += 1;\n    hits.Hardest = math_max(hits.Hardest, speed);\n  }\n\n"
+                                                "  struct worstResult { Float speed = 0.0; };\n  KERN_PURE worstResult worst(const Hits& hits) {\n    return {hits.Hardest};\n  }\n};\n"}})["ok"].as_bool());
+  json::Value st = f.s->state();
+  CHECK(st["logic"]["library"].as_bool() && st["logic"]["uses"].size() == 0);
+  // a library keeps nothing: a variable is refused when it compiles
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Kept"}, {"type", "float"}})["ok"].as_bool());
+  bool kept = false;
+  const json::Value with_variable = f.cmd(R"({"cmd":"logicCompile"})");
+  for (const json::Value& i : with_variable["issues"].items()) kept = kept || i["text"].as_string().find("a library keeps nothing: it has no variables") != std::string::npos;
+  CHECK(kept);
+  CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
+  // the Blueprint that uses it: the editor offers the library, then its functions; a call brings what the function looks like
+  CHECK(open(user));
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Bumps"}, {"type", "int"}})["ok"].as_bool());
+  st = f.s->state();
+  CHECK(!st["logic"]["library"].as_bool() && st["logic"]["libraries"].size() == 1 && st["logic"]["libraries"][0].as_string() == "Tally");
+  CHECK(cmd({{"cmd", "logicLibrary"}, {"op", "use"}, {"name", "Tally"}})["ok"].as_bool());
+  CHECK(!cmd({{"cmd", "logicLibrary"}, {"op", "use"}, {"name", "Nothing"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicLibrary"}, {"op", "use"}, {"name", "Crate"}})["error"].as_string().find("does not use itself") != std::string::npos);
+  st = f.s->state();
+  CHECK(st["logic"]["uses"].size() == 1 && st["logic"]["libraries"].size() == 0 && st["logic"]["structs"].size() == 1 && st["logic"]["structs"][0]["from"].as_string() == "Tally");
+  const json::Value pal = cmd({{"cmd", "logicPalette"}, {"query", "tally"}});
+  bool hit = false, worst = false;
+  for (const json::Value& e : pal["items"].items()) {
+    if (e["category"].as_string() != "Library Tally") continue;
+    hit = hit || (e["label"].as_string() == "Tally::hit" && e["type"].as_string() == "func.call" && e["params"]["function"].as_string() == "Tally::hit");
+    worst = worst || (e["label"].as_string() == "Tally::worst" && e["type"].as_string() == "func.pure");
+  }
+  CHECK(hit && worst);
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Taken"}, {"type", "Hits"}})["ok"].as_bool());
+  json::Value params = json::Value::object();
+  params.set("function", "Tally::hit");
+  CHECK(cmd({{"cmd", "logicAdd"}, {"type", "func.call"}, {"x", 0}, {"y", 0}, {"params", params}})["ok"].as_bool());
+  st = f.s->state();
+  bool held = false;
+  for (const json::Value& fn : st["logic"]["functions"].items()) held = held || (fn["name"].as_string() == "Tally::hit" && fn["from"].as_string() == "Tally" && fn["inputs"].size() == 2);
+  CHECK(held);
+  // what is the library's is changed there
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", "Tally::hit"}, {"side", "in"}})["error"].as_string().find("is a function of the library Tally: it is changed there") != std::string::npos);
+  CHECK(cmd({{"cmd", "logicStruct"}, {"op", "fieldAdd"}, {"name", "Hits"}})["error"].as_string().find("is a type of the library Tally: it is changed there") != std::string::npos);
+  // its one text, and back
+  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Crate : virtual kern::Blueprint, virtual Tally {\n  Int Bumps = 0;\n  Hits Taken = Hits{0, 0.0};\n  Float Worst = 0.0;\n\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n"
+                                                "    Bumps += 1;\n    Tally::hit(Taken, 2.5);\n    Tally::hit(Taken, 1.5);\n    Worst = Tally::worst(Taken).speed;\n  }\n};\n"}})["ok"].as_bool());
+  const std::string text = cmd({{"cmd", "logicCpp"}})["text"].as_string();
+  CHECK(text.find("struct Crate : virtual kern::Blueprint, virtual Tally {") != std::string::npos && text.find("    Tally::hit(Taken, 2.5);\n") != std::string::npos && text.find("KERN_STRUCT(Hits)") == std::string::npos);
+  json::Value compiled = f.cmd(R"({"cmd":"logicCompile"})");
+  for (const json::Value& i : compiled["issues"].items()) CHECK(!i["error"].as_bool());
+  CHECK(cmd({{"cmd", "logicExportCpp"}})["ok"].as_bool());
+  // it cannot stop using what it still uses
+  CHECK(!cmd({{"cmd", "logicLibrary"}, {"op", "unuse"}, {"name", "Tally"}})["ok"].as_bool());
+  // the library changes: who uses it follows - or the change is refused
+  CHECK(open(lib));
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinValue"}, {"name", "hit"}, {"side", "in"}, {"pin", "speed"}, {"value", 4}})["ok"].as_bool());
+  CHECK(f.s->level().find(user)->logic->function("Tally::hit")->inputs[1].value.as_number() == 4);
+  CHECK(cmd({{"cmd", "logicFunction"}, {"op", "remove"}, {"name", "hit"}})["error"].as_string().find("the Blueprint of Crate uses this one") != std::string::npos);
+  CHECK(cmd({{"cmd", "logicLibrary"}, {"op", "library"}, {"value", false}})["error"].as_string().find("the Blueprint of Crate uses this one") != std::string::npos);
+  CHECK(f.s->level().find(lib)->logic->library && f.s->level().find(lib)->logic->function("hit"));
+  // it plays: the crate calls the library's function with its own variable as the place
+  CHECK(f.cmd(R"({"cmd":"play"})")["ok"].as_bool());
+  logic::Instance* inst = f.s->world().logic_runtime() ? f.s->world().logic_runtime()->find(static_cast<logic::ActorRef>(user)) : nullptr;
+  CHECK(inst != nullptr);
+  if (inst) CHECK(inst->get("Bumps").as_int() == 1 && inst->get("Taken").field(0)->as_int() == 2 && inst->get("Taken").field(1)->as_number() == 2.5 && inst->get("Worst").as_number() == 2.5);
+}
+
 TEST(studio_logic_call_on_actor) {
   // A function of the Level's Blueprint, declared in an actor's Blueprint with the editor's
   // commands and called from there: the level plays it.
