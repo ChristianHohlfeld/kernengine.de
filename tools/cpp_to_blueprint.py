@@ -6205,7 +6205,7 @@ class TestWriter:
         return best
 
     def absolute(self, q):
-        return "::" + q if q.startswith(ENGINE + "::") else "::" + self.tree.namespace + "::" + q.lstrip(":")
+        return "::" + q if q.startswith((ENGINE + "::", "w64::")) else "::" + self.tree.namespace + "::" + q.lstrip(":")
 
     def local(self, q):
         d = self.tree.records.get(q) or self.tree.enums.get(q)
@@ -6700,23 +6700,55 @@ class TestWriter:
                 return "::".join(parts[:i])
         return q
 
-    def classes_of(self, scope):
-        """The classes a scope is in ("weapons::People::" -> ["People"]). A class the Blueprint does not
-        have is a namespace of its name in the test: what the source needs of it - types, constants,
+    def steps_of(self, scope):
+        """Where a scope stands in the test: its namespaces (within the program's own or the engine's) and
+        its classes, outermost first - [(name, is it a class)]. The test's source stands in the namespaces
+        the source does ("mvt::Decoder::" -> mvt, Decoder): two types of one name in two namespaces are
+        two types there too, and a name is looked up as C++ looks it up in the source. A class the test
+        does not compile along is a namespace of its name: what the source needs of it - types, constants,
         functions that do not use an object - stands there, and is named as the source names it."""
         parts = [x for x in scope.strip(":").split("::") if x]
-        return [parts[i] for i in range(len(parts)) if "::".join(parts[:i + 1]) in self.tree.records]
+        out = []
+        for i, part in enumerate(parts):
+            if i == 0 and part == ENGINE:
+                continue
+            out.append((part, "::".join(parts[:i + 1]) in self.tree.records))
+        return out
 
-    def in_classes(self, scope, text):
-        inside_of = self.classes_of(scope)
-        return "".join(f"namespace {c} {{ " for c in inside_of) + text + " }" * len(inside_of)
+    def classes_of(self, scope):
+        """The names of a scope in the test, outermost first (see steps_of)."""
+        return [name for name, _ in self.steps_of(scope)]
+
+    def in_classes(self, scope, text, local=None):
+        """`text` where it stands in the test (see steps_of) - with `local`: in the namespace of the pieces of
+        another file that are that file's own (see `items`), which stands where its namespace without a name
+        stood, in the innermost of its namespaces."""
+        names = self.local_path(scope, local)
+        return "".join(f"namespace {c} {{ " for c in names) + text + " }" * len(names)
+
+    def local_path(self, scope, local=None):
+        steps = self.steps_of(scope)
+        names = [n for n, _ in steps]
+        if local:
+            at = next((i for i, (_, is_class) in enumerate(steps) if is_class), len(steps))
+            names = names[:at] + [local] + names[at:]
+        return names
+
+    def spaces_of(self, scope):
+        """The namespaces of a scope, without its classes: where a function defined there stands."""
+        out = []
+        for name, is_class in self.steps_of(scope):
+            if is_class:
+                break
+            out.append(name)
+        return out
 
     def in_function(self, d):
         return any(f.decl.get("_file") == d.get("_file") and f.decl["_at"][0] <= d["_at"][0] < f.decl["_at"][1] for f in self.u.functions.values() if f.decl.get("_at") and f.decl["_at"][1])
 
     def absolute_of(self, d, name):
         scope = self.tree.scope_of.get(d["id"], "")
-        return "::" + (scope if scope.startswith(ENGINE + "::") else self.tree.namespace + "::" + scope) + name
+        return "::" + (scope if scope.startswith((ENGINE + "::", "w64::")) else self.tree.namespace + "::" + scope) + name
 
     def setup(self):
         """What the test of the whole Blueprint holds (`gather`), and its places guarded - once, for `write`
@@ -6946,26 +6978,48 @@ class TestWriter:
         return G
 
     # ---- the pieces of the test's source ----
-    def freed_text(self, d, freed, edits=None):
+    def freed_text(self, d, freed, edits=None, local=None):
         """A method that does not use its object, of a class the Blueprint does not have, as the test has it:
         a function in the namespace of its class's name."""
         _, head, body_at = freed
         owner = self.tree.owner.get(d["id"])
-        return self.in_classes(owner + "::", "inline " + head + self.tree.said(self.cut(d["_file"], body_at, d["_at"][1], edits)))
+        return self.in_classes(owner + "::", "inline " + head + self.tree.said(self.cut(d["_file"], body_at, d["_at"][1], edits)), local)
 
-    def enum_text(self, q):
-        return self.in_classes(q.rsplit("::", 1)[0] + "::" if "::" in q else "", self.piece(self.tree.enums[q]) + ";")
+    def in_spaces(self, d, text, local=None):
+        """A function's text where it stands in the test: in the namespaces its definition stands in (see
+        steps_of) - with `local`, in the namespace of another file's own pieces there."""
+        names = self.spaces_of(self.tree.scope_of.get(d["id"], "")) + ([local] if local else [])
+        return "".join(f"namespace {c} {{ " for c in names) + text + " }" * len(names)
 
-    def const_pieces(self, consts, decls, records):
+    def function_name(self, d, local=None):
+        """How the test names a function that stands in a namespace (see in_spaces)."""
+        return "::".join(self.spaces_of(self.tree.scope_of.get(d["id"], "")) + ([local] if local else []) + [d["name"]])
+
+    def enum_text(self, q, local=None):
+        return self.in_classes(q.rsplit("::", 1)[0] + "::" if "::" in q else "", self.piece(self.tree.enums[q]) + ";", local)
+
+    def statement_start(self, d):
+        """Where the statement that declares a constant begins: `const Vec3 kA{...}, kB = ...;` declares kB
+        too, and its text is that statement's as far as kB."""
+        raw = self.tree.text(d["_file"])
+        a = d["_at"][0]
+        if not re.match(r"\s*" + re.escape(d.get("name") or "?") + r"\b", raw[a:a + 256]):
+            return a
+        before = [v for v in self.tree.decl.values() if v.get("kind") == "VarDecl" and v.get("_file") == d["_file"] and v.get("_at", (None, None))[1] is not None
+                  and v["_at"][1] <= a and re.fullmatch(r"\s*,\s*", raw[v["_at"][1]:a])]
+        return self.statement_start(before[0]) if before else a
+
+    def const_pieces(self, consts, decls, records, local_of=lambda d: None):
         """The constants as the test has them: their own text. (Several declared in one statement - `constexpr
         f32 kA = 1, kB = 2` - are that statement as far as its last one that is needed.) [(the declaration
-        whose text it is, the text, the constants it declares that are needed, the names it gives (pairs))]."""
+        whose text it is, the text, the constants it declares that are needed, the names it gives (pairs))].
+        `local_of`: of a declaration, the namespace of another file's own pieces it stands in (see `items`)."""
         tree = self.tree
         by_start, said, pairs = {}, collections.defaultdict(list), collections.defaultdict(list)
         for d in consts.values():
             if self.inside(d, decls) is not None or self.in_function(d):
                 continue   # (in a class that is compiled along: there)
-            key = (d["_file"], d["_at"][0])
+            key = (d["_file"], self.statement_start(d))
             if key not in by_start or by_start[key]["_at"][1] < d["_at"][1]:
                 by_start[key] = d
             said[key].append(d)
@@ -6973,21 +7027,22 @@ class TestWriter:
             while first.get("previousDecl") in tree.decl:
                 first = tree.decl[first["previousDecl"]]
             if d.get("name") and self.top_of(tree.scope_of.get(first["id"], "").rstrip(":")) not in records:
-                pairs[key].append((self.absolute_of(first, d["name"]), "::".join(self.classes_of(tree.scope_of.get(first["id"], "")) + [d["name"]])))
+                pairs[key].append((self.absolute_of(first, d["name"]), "::".join(self.local_path(tree.scope_of.get(first["id"], ""), local_of(d)) + [d["name"]])))
         out = []
         for key, d in by_start.items():
             first = d
             while first.get("previousDecl") in tree.decl:
                 first = tree.decl[first["previousDecl"]]
-            text = self.piece(d) + ";"
+            text = tree.said(self.cut(d["_file"], key[1], d["_at"][1])) + ";"
             scope = tree.scope_of.get(first["id"], "")
-            if self.classes_of(scope) and self.top_of(scope.rstrip(":")) not in records:
-                # a constant of a class the Blueprint does not have: in the namespace of that name, by its own name
-                text = self.in_classes(scope, re.sub(r"(?:\b[A-Za-z_]\w*\s*::\s*)+(?=" + re.escape(d.get("name", "?")) + r"\b)", "", text, count=1) if first is not d else text)
+            if self.top_of(scope.rstrip(":")) not in records:
+                # where it stands: a constant of a class the Blueprint does not have in the namespace of that
+                # name, by its own name
+                text = self.in_classes(scope, re.sub(r"(?:\b[A-Za-z_]\w*\s*::\s*)+(?=" + re.escape(d.get("name", "?")) + r"\b)", "", text, count=1) if first is not d else text, local_of(d))
             out.append((d, text, said[key], pairs[key]))
         return out
 
-    def unnamed_pieces(self, unnamed, decls, records):
+    def unnamed_pieces(self, unnamed, decls, records, local_of=lambda d: None):
         """The enums without a name whose values the source names, as the test has them: their own text, like
         a constant's. [(the declaration, the text, the names it gives (pairs))]."""
         out = []
@@ -6996,15 +7051,15 @@ class TestWriter:
                 continue   # (in a class that is compiled along, in a function: there)
             scope = self.tree.scope_of.get(i, "")
             text, named = self.piece(d) + ";", []
-            if self.classes_of(scope) and self.top_of(scope.rstrip(":")) not in records:
-                text = self.in_classes(scope, text)
+            if self.top_of(scope.rstrip(":")) not in records:
+                text = self.in_classes(scope, text, local_of(d))
                 for c in kids(d):
                     if c.get("kind") == "EnumConstantDecl" and c.get("name"):
-                        named.append((self.absolute_of(d, c["name"]), "::".join(self.classes_of(scope) + [c["name"]])))
+                        named.append((self.absolute_of(d, c["name"]), "::".join(self.local_path(scope, local_of(d)) + [c["name"]])))
             out.append((d, text, named))
         return out
 
-    def alias_pieces(self, texts, decls):
+    def alias_pieces(self, texts, decls, local_of=lambda d: None):
         """The names the program gives types (`using Bytes32 = ...`), where the source in `texts` uses them:
         [(the declaration, its text, the name it gives (a pair))]."""
         numbers = {"f32", "f64", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64"}
@@ -7019,7 +7074,7 @@ class TestWriter:
                 taken.add(o["id"])
                 text = self.piece(o)
                 words.update(re.findall(r"[A-Za-z_]\w*", text))
-                out.append((o, text + ";", (self.absolute_of(o, o["name"]), o["name"])))
+                out.append((o, self.in_classes(scope, text + ";", local_of(o)), (self.absolute_of(o, o["name"]), "::".join(self.local_path(scope, local_of(o)) + [o["name"]]))))
         return out
 
     def members_of(self, q, functions, templates, kept=()):
@@ -7071,8 +7126,8 @@ class TestWriter:
         such pieces by that namespace)."""
         u, tree = self.u, self.tree
         main = os.path.abspath(tree.path)
-        home = u.name
-        within = f"{home}_local::"
+        home = u.job.replace("/", "__")   # (a part of a Blueprint: Game__game_net_cpp)
+        within = f"{home}_local"
         decls = [tree.records[q] for q in sorted(G.records)]
         def here(d):
             return os.path.abspath(d.get("_file") or "?") == main
@@ -7092,14 +7147,20 @@ class TestWriter:
             return here(d) and not (d.get("kind") in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXConversionDecl", "FunctionTemplateDecl") and outside(d))
         def namespace_level(d):
             return tree.owner.get(d["id"]) is None and tree.scope_of.get(d["id"], "").rstrip(":") not in tree.records
-        names = {q: "::".join(self.classes_of(q + "::")) for q in tree.records if self.top_of(q) in G.records}
-        enum_names = {q: "::".join(self.classes_of(q.rsplit("::", 1)[0] + "::" if "::" in q else "") + [q.split("::")[-1]]) for q in tree.enums if q in G.enums or self.top_of(q) in G.records}
-        # the types of this file alone the pieces declare: a function of a header that names one has it by a
-        # declaration at the start of its body
-        own_types = {names[q] for q in G.records if own(tree.records[q]) and "::" not in names[q]} | {enum_names[q] for q in G.enums if own(tree.enums[q]) and "::" not in enum_names[q]}
+        def local_of(d):   # (the namespace a piece of this file alone stands in, in the test that takes it)
+            return within if own(d) else None
+        def outer(q):
+            return q.rsplit("::", 1)[0] + "::" if "::" in q else ""
+        names = {q: "::".join(self.local_path(q + "::", local_of(tree.records[self.top_of(q)]))) for q in tree.records if self.top_of(q) in G.records}
+        enum_names = {q: "::".join(self.local_path(outer(q), local_of(tree.enums[q] if q in G.enums else tree.records[self.top_of(q)])) + [q.split("::")[-1]])
+                      for q in tree.enums if q in G.enums or self.top_of(q) in G.records}
+        # the types of this file alone the pieces declare, at the level of a namespace: a function of a header
+        # that names one has it by a declaration at the start of its body (its name -> its name in the test)
+        own_types = {q.split("::")[-1]: names[q] for q in G.records if own(tree.records[q]) and not any(c for _, c in self.steps_of(outer(q)))}
+        own_types.update({q.split("::")[-1]: enum_names[q] for q in G.enums if own(tree.enums[q]) and not any(c for _, c in self.steps_of(outer(q)))})
         sources = [tree.source(d) for d in [*G.functions.values(), *G.templates.values(), *G.consts.values(), *decls]]
-        aliases = self.alias_pieces(sources, decls)
-        own_types |= {o["name"] for o, _, _ in aliases if own(o)}
+        aliases = self.alias_pieces(sources, decls, local_of)
+        own_types.update({o["name"]: pair[1] for o, _, pair in aliases if own(o)})
         def qualify(d):
             """A function of a header that stands in this file: what it names of this file alone, by the
             namespace of this file's own pieces."""
@@ -7127,37 +7188,37 @@ class TestWriter:
                     a = n.get("_at", (None,))[0]
                     word = re.match(r"[A-Za-z_]\w*", raw[a:a + 256]) if a is not None else None
                     if word and word.group(0) in said and not raw[max(0, a - 64):a].rstrip().endswith(("::", ".", "->")):
-                        edits.append((a, 3, 0, a, within))
+                        scope = tree.scope_of.get((tree.enums[t["_enum"]] if t.get("kind") == "EnumConstantDecl" else t)["id"], "")
+                        edits.append((a, 3, 0, a, "::".join(self.local_path(scope, within)) + "::"))
                 if c.get("kind") == "CompoundStmt" and raw[c["_at"][0]:c["_at"][0] + 1] == "{":
                     named = set(re.findall(r"[A-Za-z_]\w*", raw[c["_at"][0]:c["_at"][1]]))
-                    for t in sorted(own_types & named):
+                    for t in sorted(set(own_types) & named):
                         if not (owner and (f"{owner}::{t}" in tree.records or f"{owner}::{t}" in tree.enums)):
-                            edits.append((c["_at"][0] + 1, 3, 0, c["_at"][0] + 1, f" using {within}{t};"))
+                            edits.append((c["_at"][0] + 1, 3, 0, c["_at"][0] + 1, f" using {own_types[t]};"))
             return edits
         out = []
         def put(d, piece, mine=None):
             piece.setdefault("pairs", [])
             piece["home"] = home if here(d) else None
-            piece["local"] = own(d if mine is None else mine)
-            if piece["local"]:
-                piece["pairs"] = [(a, n, within) for a, n in piece["pairs"]]
+            piece["local"] = own(d if mine is None else mine)   # (its text and names stand in the namespace `within` then)
             piece["spaces"] = re.findall(r"\bnamespace\s+(\w+)\s*=\s*(?:::)?([\w:]+)\s*;", tree.text(d["_file"]))
             out.append((tree.place(d), self.ident(d), piece))
         for d in [*G.functions.values(), *G.templates.values()]:
             before = chain(d)
             if d["id"] in G.freed:
-                put(d, {"kind": "freed", "text": self.freed_text(d, G.freed[d["id"]], self.in_turn([*self.guard_or_none(d), *qualify(d)])),
-                        "pairs": [(self.absolute(tree.owner.get(d["id"])) + "::" + d["name"], G.freed[d["id"]][0])], "decls": []})
+                owner = tree.owner.get(d["id"])
+                put(d, {"kind": "freed", "text": self.freed_text(d, G.freed[d["id"]], self.in_turn([*self.guard_or_none(d), *qualify(d)]), local_of(d)),
+                        "pairs": [(self.absolute(owner) + "::" + d["name"], "::".join(self.local_path(owner + "::", local_of(d)) + [d["name"]]))], "decls": []})
                 continue
             if self.inside(d, decls) is not None:
                 put(d, {"kind": "inside"})   # (declared in its class with its body: there)
                 continue
-            piece = {"kind": "template" if d["id"] in G.templates else "function", "text": self.guarded(d, qualify(d)), "decls": [self.ident(x) for x in before]}
+            piece = {"kind": "template" if d["id"] in G.templates else "function", "text": self.in_spaces(d, self.guarded(d, qualify(d)), local_of(d)), "decls": [self.ident(x) for x in before]}
             if tree.owner.get(d["id"]) is None and d.get("name"):
-                piece["pairs"] = [(self.absolute_of(d, d["name"]), d["name"])]
+                piece["pairs"] = [(self.absolute_of(d, d["name"]), self.function_name(d, local_of(d)))]
                 first = before[-1] if before else d
                 if first is not d and first.get("_at", (None, None))[1] is not None and self.inside(first, decls) is None:
-                    put(first, {"kind": "declaration", "text": self.piece(first) + ";"}, d)
+                    put(first, {"kind": "declaration", "text": self.in_spaces(first, self.piece(first) + ";", local_of(d))}, d)
             else:
                 for x in before:
                     if x["id"] in tree.owner and x.get("_at", (None, None))[1] is not None:
@@ -7182,15 +7243,14 @@ class TestWriter:
                 segments.append((text, None if m.get("explicitlyDefaulted") else self.ident(m), raw[ma:mb].count("\n")))
                 at = end
             segments.append((tree.said(self.cut(d["_file"], at, b0, [])), None, 0))
-            scope = q.rsplit("::", 1)[0] + "::" if "::" in q else ""
-            inside_of = self.classes_of(scope)
+            inside_of = self.local_path(outer(q), local_of(d))
             put(d, {"kind": "record", "segments": segments, "head": "".join(f"namespace {c} {{ " for c in inside_of), "tail": " }" * len(inside_of),
                     "pairs": [(self.absolute(x), names[x]) for x in names if self.top_of(x) == q] + [(self.absolute(x), enum_names[x]) for x in enum_names if self.top_of(x) == q and x not in G.enums]})
         for q in sorted(G.enums):
-            put(tree.enums[q], {"kind": "enum", "text": self.enum_text(q), "pairs": [(self.absolute(q), enum_names[q])]})
-        for d, text, said, pairs in self.const_pieces(G.consts, decls, G.records):
+            put(tree.enums[q], {"kind": "enum", "text": self.enum_text(q, local_of(tree.enums[q])), "pairs": [(self.absolute(q), enum_names[q])]})
+        for d, text, said, pairs in self.const_pieces(G.consts, decls, G.records, local_of):
             put(d, {"kind": "const", "text": text, "names": [self.ident(x) for x in said], "pairs": pairs})
-        for d, text, named in self.unnamed_pieces(G.unnamed, decls, G.records):
+        for d, text, named in self.unnamed_pieces(G.unnamed, decls, G.records, local_of):
             put(d, {"kind": "unnamed", "text": text, "pairs": named})
         for o, text, pair in aliases:
             put(o, {"kind": "alias", "text": text, "pairs": [pair]})
@@ -7282,18 +7342,18 @@ class TestWriter:
                 continue
             if self.inside(d, decls) is not None:
                 continue   # (declared in its class with its body: there)
-            fn_chunks.append((tree.place(d), ("function", d["id"]), self.piece(d)))
+            fn_chunks.append((tree.place(d), ("function", d["id"]), self.in_spaces(d, self.piece(d))))
             if tree.owner.get(d["id"]) is None and d.get("name"):
                 first = d
                 while first.get("previousDecl") in tree.decl:
                     first = tree.decl[first["previousDecl"]]
                 if first is not d and first.get("_at", (None, None))[1] is not None and self.inside(first, decls) is None:
                     # (declared before it is defined - in its header, as a rule: what stands in between may call it)
-                    fn_chunks.append((tree.place(first), ("function", d["id"]), self.piece(first) + ";"))
-                pairs.append((absolute(d, d["name"]), d["name"]))
+                    fn_chunks.append((tree.place(first), ("function", d["id"]), self.in_spaces(first, self.piece(first) + ";")))
+                pairs.append((absolute(d, d["name"]), self.function_name(d)))
         for d in G.declared.values():   # (a function declared here, its body in another file's pieces)
-            fn_chunks.append((tree.place(d), ("declaration", d["id"]), self.piece(d) + ";"))
-            pairs.append((absolute(d, d["name"]), d["name"]))
+            fn_chunks.append((tree.place(d), ("declaration", d["id"]), self.in_spaces(d, self.piece(d) + ";")))
+            pairs.append((absolute(d, d["name"]), self.function_name(d)))
         # what stands in other source files, as their tests hand it on (`exports`): after what this file's
         # headers declare, before this file's own source - a constant both say once
         main = os.path.abspath(tree.path)
@@ -7365,7 +7425,7 @@ class TestWriter:
                 here = f"{ns}::"   # (by its full name: the test's own function, whatever its arguments are)
                 target = (f"{self.names[owner]}({args})" if f.ctor else f"{self.names[owner]}::{d['name']}({args})" if owner and static
                           else f"s->{d['name']}({args})" if f.state
-                          else f"a0.{d['name']}({args})" if owner and f.self_type is not None else f"{self.names[owner]}{{}}.{d['name']}({args})" if owner else f"{here}{free or d['name']}({args})")
+                          else f"a0.{d['name']}({args})" if owner and f.self_type is not None else f"{self.names[owner]}{{}}.{d['name']}({args})" if owner else f"{here}{free or self.function_name(d)}({args})")
                 parts = {"self": "a0", "result": "r"}   # (what the call changed: run's own values, handed back as they are)
                 if f.state:
                     parts["state"] = f"{state['struct']}{{s.get()}}"   # (the object after the call: all its variables are compared)
@@ -7504,10 +7564,9 @@ class TestWriter:
                     continue
                 if key[0] == "foreign":
                     piece = G.foreign[key[1]]
-                    there = wide_of(piece)
-                    within = (f"namespace {piece['home']}_local {{ ", " }") if piece["local"] else ("", "")
+                    there = wide_of(piece)   # (a piece of another file alone stands in its namespace: its text says so - see `items`)
                     if piece["kind"] != "record":
-                        add(key, within[0] + there(piece["text"]) + within[1])
+                        add(key, there(piece["text"]))
                         continue
                     text, inner, lines_ = "", [], 0
                     for part, place, newlines in piece["segments"]:
@@ -7517,7 +7576,7 @@ class TestWriter:
                             if place is not None:
                                 inner.append((text.count("\n"), text.count("\n") + part.count("\n"), ("member", place)))
                             text += part
-                    first = add(key, within[0] + piece["head"] + re.sub(r"^\s*class\b", "struct", there(text)) + ";" + piece["tail"] + within[1])
+                    first = add(key, piece["head"] + re.sub(r"^\s*class\b", "struct", there(text)) + ";" + piece["tail"])
                     where.extend((first + x, first + y, k) for x, y, k in inner)
                     continue
                 if key[0] != "record":
