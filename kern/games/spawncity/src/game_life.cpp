@@ -161,8 +161,6 @@ void Game::life_update(f32 dt) {
   // the world as street life sees it
   LifeView v;
   v.physics = &w;
-  v.city = &city_;
-  v.ground_changes = &ground_changes_;
   v.focus = focus_position();
   v.player = player_position();
   if (mode_ == Mode::foot) v.player.z -= 0.73f;
@@ -255,7 +253,7 @@ void Game::life_update(f32 dt) {
   }
   G.blasts.clear();
   // ---- street life
-  G.life.update(dt, now, v, rng_, out);
+  G.life.update(dt, now, v, city_, ground_changes_, rng_, out);
   // people who got up again walk on from there
   std::vector<Ragdolls::Up> ups;
   G.life.ragdolls().take_ups(ups);
@@ -546,10 +544,9 @@ bool Game::life_command(const std::string& cmd, std::string& out) {
   if (cmd == "pigeons") {
     LifeView v;
     v.physics = &world_->physics();
-    v.city = &city_;
     v.focus = me;
     const Vec3 c = me + look * 9;
-    const bool ok = G.life.spawn_flock({c.x, c.y}, now, rng_, v);
+    const bool ok = G.life.spawn_flock({c.x, c.y}, now, rng_, v, city_);
     std::snprintf(b, sizeof b, "{\"ok\":%s,\"flocks\":%u}", ok ? "true" : "false", static_cast<u32>(G.life.flocks().size()));
     out = b;
     return true;
@@ -558,10 +555,9 @@ bool Game::life_command(const std::string& cmd, std::string& out) {
   if (cmd == "joggers") {
     LifeView v;
     v.physics = &world_->physics();
-    v.city = &city_;
     v.focus = v.player = me;
     v.eye = view_.cam.eye;
-    out = G.life.spawn_joggers(v, now, rng_) ? "ok" : "no street";
+    out = G.life.spawn_joggers(v, city_, now, rng_) ? "ok" : "no street";
     return true;
   }
   if (cmd == "ragdoll") {
@@ -660,9 +656,10 @@ bool Game::life_command(const std::string& cmd, std::string& out) {
     f32 bd = 1e9f;
     Vec3 to;
     for (const CityStream::BuildingRef& r : near) {
+      const MapFeatures::Building& b = city_.building(r);
       Interiors::Plan plan;
-      if (std::fabs(r.building->rings[0][0].x - me.x) + std::fabs(r.building->rings[0][0].y - me.y) > bd + 60) continue;
-      if (!Interiors::build(*r.building, r.building->base, plan) || !plan.has_core) continue;
+      if (std::fabs(b.rings[0][0].x - me.x) + std::fabs(b.rings[0][0].y - me.y) > bd + 60) continue;
+      if (!Interiors::build(b, b.base, plan) || !plan.has_core) continue;
       const Interiors::Door& d = plan.doors[0];
       const f32 dd = std::hypot(d.c.x - me.x, d.c.y - me.y);
       if (dd < bd) { bd = dd; to = {d.c.x + d.n.x * 1.5f, d.c.y + d.n.y * 1.5f, city_.ground_height(d.c.x + d.n.x * 1.5f, d.c.y + d.n.y * 1.5f)}; }
@@ -690,7 +687,7 @@ void Game::life_draw_ragdolls() {
   static std::vector<Ragdolls::Draw> bones;
   bones.clear();
   glife_->life.ragdolls().draw(bones);
-  people_art_.ragdolls(bones);
+  people_art_.ragdolls(bones, glife_->life.ragdolls());
 }
 
 }  // namespace sc

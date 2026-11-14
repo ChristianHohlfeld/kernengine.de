@@ -70,8 +70,8 @@ SC_TEST(stream_tile_pipeline) {
     u32 within = 0;
     for (const auto& b : near) {
       Vec2 c{};
-      for (Vec2 q : b.building->rings[0]) c = c + q;
-      c = c * (1.0f / static_cast<f32>(b.building->rings[0].size()));
+      for (Vec2 q : city.building(b).rings[0]) c = c + q;
+      c = c * (1.0f / static_cast<f32>(city.building(b).rings[0].size()));
       within += std::hypot(c.x, c.y) <= 340 ? 1 : 0;
     }
     SC_CHECK(within > 0 && city.stats().colliders == std::min<u32>(within, 480), "a collider per building of the working set (%u of %u)", city.stats().colliders, within);

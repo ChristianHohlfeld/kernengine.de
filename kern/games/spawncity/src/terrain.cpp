@@ -107,25 +107,26 @@ void bare_earth(std::vector<f32>& h, u32 n, f32 step, f32 open_m, f32 blur_m) {
 }
 
 namespace {
+/// A Terrarium tile in kDemJob's input: its size and where its heights lie in the bytes.
+struct DemBytes { u32 w, h; std::size_t at; };
+
 // kDemJob: Terrarium tiles -> the bare-earth grid (sample_dem + bare_earth, without engine state).
 void dem_grid_job(kern::Span<const u8> in, std::vector<u8>& out) {
-  const u8* p = in.data;
-  const u8* end = in.data + in.size;
+  std::size_t p = 0;  // where the next value lies in the bytes
   bool ok = true;
-  auto get = [&](void* v, std::size_t n) { if (end - p < static_cast<std::ptrdiff_t>(n)) { ok = false; return; } std::memcpy(v, p, n); p += n; };
+  auto get = [&](void* v, std::size_t n) { if (in.size - p < n) { ok = false; return; } std::memcpy(v, in.data + p, n); p += n; };
   f64 lon0 = 0, lat0 = 0;
   f32 x0 = 0, y0 = 0, step = 10, open = 160, blur = 30;
   u32 n = 0, count = 0;
   get(&lon0, 8); get(&lat0, 8); get(&x0, 4); get(&y0, 4); get(&step, 4); get(&n, 4); get(&open, 4); get(&blur, 4); get(&count, 4);
   if (!ok || n < 2 || n > 4096) return;
-  struct T { u32 w, h; const f32* v; };
-  std::unordered_map<u64, T> tiles;
+  std::unordered_map<u64, DemBytes> tiles;
   for (u32 k = 0; k < count && ok; ++k) {
     u32 x = 0, y = 0, w = 0, h = 0;
     get(&x, 4); get(&y, 4); get(&w, 4); get(&h, 4);
     const std::size_t bytes = static_cast<std::size_t>(w) * h * 4;
-    if (!ok || w < 2 || h < 2 || static_cast<std::size_t>(end - p) < bytes) return;
-    tiles[TileKey{Terrain::kDemZoom, static_cast<i32>(x), static_cast<i32>(y)}.hash()] = {w, h, reinterpret_cast<const f32*>(p)};
+    if (!ok || w < 2 || h < 2 || in.size - p < bytes) return;
+    tiles[TileKey{Terrain::kDemZoom, static_cast<i32>(x), static_cast<i32>(y)}.hash()] = {w, h, p};
     p += bytes;
   }
   kern::GeoProjector proj;
@@ -140,14 +141,14 @@ void dem_grid_job(kern::Span<const u8> in, std::vector<u8>& out) {
       const i32 tx = static_cast<i32>(std::floor(fx)), ty = static_cast<i32>(std::floor(fy));
       auto it = tiles.find(TileKey{Terrain::kDemZoom, tx, ty}.hash());
       if (it == tiles.end()) return;  // a hole: no grid (retried)
-      const T& t = it->second;
+      const DemBytes& t = it->second;
       // terrain_elevation.mjs: bilinear in the tile's pixels, clamped inside the tile
       const f64 px = std::min(t.w - 1.001, (fx - tx) * t.w), py = std::min(t.h - 1.001, (fy - ty) * t.h);
       const u32 a = static_cast<u32>(px), b = static_cast<u32>(py);
       const f32 ax = static_cast<f32>(px - a), ay = static_cast<f32>(py - b);
       f32 v0, v1, v2, v3;
-      const f32* h = t.v + static_cast<std::size_t>(b) * t.w + a;
-      std::memcpy(&v0, h, 4); std::memcpy(&v1, h + 1, 4); std::memcpy(&v2, h + t.w, 4); std::memcpy(&v3, h + t.w + 1, 4);
+      const std::size_t h = t.at + (static_cast<std::size_t>(b) * t.w + a) * 4;
+      std::memcpy(&v0, in.data + h, 4); std::memcpy(&v1, in.data + h + 4, 4); std::memcpy(&v2, in.data + h + static_cast<std::size_t>(t.w) * 4, 4); std::memcpy(&v3, in.data + h + (static_cast<std::size_t>(t.w) + 1) * 4, 4);
       grid[static_cast<std::size_t>(row) * n + i] = (v0 * (1 - ax) + v1 * ax) * (1 - ay) + (v2 * (1 - ax) + v3 * ax) * ay;
     }
   }
@@ -1002,9 +1003,13 @@ bool Terrain::has_collision(f32 x, f32 y) const {
   return collision_.count(k) && !dirty_collision_.count(k);
 }
 
+namespace {
+/// A tile want_tiles asks for: its distance from where it is wanted and its key.
+struct WantedTile { f32 d; u64 k; };
+}  // namespace
+
 void Terrain::want_tiles(Vec3 focus, Vec3 anchor) {
-  struct W { f32 d; u64 k; };
-  std::vector<W> render, coll, water;
+  std::vector<WantedTile> render, coll, water;
   // Render: 640 m blocks out to 3.2 km; blocks near the focus split into 160 m tiles (5 m nodes
   // near, 20 m further out).
   const i32 bi = static_cast<i32>(std::floor(focus.x / kBlock)), bj = static_cast<i32>(std::floor(focus.y / kBlock));
@@ -1049,10 +1054,10 @@ void Terrain::want_tiles(Vec3 focus, Vec3 anchor) {
     const f32 d = rect_distance(focus.x, focus.y, i * kWaterChunk, j * kWaterChunk, (i + 1) * kWaterChunk, (j + 1) * kWaterChunk);
     if (d < 2400) water.push_back({d, k});
   }
-  auto finish = [](std::vector<W>& v, std::vector<u64>& out) {
-    std::sort(v.begin(), v.end(), [](const W& a, const W& b) { return a.d < b.d; });
+  auto finish = [](std::vector<WantedTile>& v, std::vector<u64>& out) {
+    std::sort(v.begin(), v.end(), [](const WantedTile& a, const WantedTile& b) { return a.d < b.d; });
     out.clear();
-    for (const W& w : v)
+    for (const WantedTile& w : v)
       if (std::find(out.begin(), out.end(), w.k) == out.end()) out.push_back(w.k);
   };
   finish(render, want_render_);

@@ -313,6 +313,11 @@ struct BlueprintCore : logic::PureNodes {
   static Bool text_equal(const Text& a, const Text& b) { return a == b; }
   static Bool text_contains(const Text& a, const Text& b) { return a.view().find(b.view()) != std::string_view::npos; }
   static Int text_length(const Text& a) { return static_cast<i64>(a.size()); }
+  static Int text_code_at(const Text& a, Int index) {
+    const std::string_view v = a.view();
+    return index >= 0 && static_cast<u64>(index) < v.size() ? static_cast<i64>(static_cast<u8>(v[static_cast<std::size_t>(static_cast<i64>(index))])) : 0;
+  }
+  static Text text_of_code(Int code) { return std::string(1, static_cast<char>(static_cast<u8>(static_cast<i64>(code)))); }
   /// Format Text: text_format<"%02d:%06.3f">(most, minutes, seconds) - the values in the order of
   /// the format's conversions (logic::format).
   template <Setting Format, class... V> static Text text_format(Int most, const V&... values) {

@@ -40,7 +40,7 @@ u32 Destruction::blast(Vec3 at, f32 radius, f32 damage, bool missile, CityStream
   city.buildings_near({at.x, at.y}, r, near);
   u32 touched = 0;
   for (const CityStream::BuildingRef& ref : near) {
-    const MapFeatures::Building& b = *ref.building;
+    const MapFeatures::Building& b = city.building(ref);
     if (b.rings.empty() || b.rings[0].size() < 3 || b.leveled) continue;
     Vec2 lo{1e30f, 1e30f}, hi{-1e30f, -1e30f};
     for (Vec2 p : b.rings[0]) { lo = {std::fmin(lo.x, p.x), std::fmin(lo.y, p.y)}; hi = {std::fmax(hi.x, p.x), std::fmax(hi.y, p.y)}; }

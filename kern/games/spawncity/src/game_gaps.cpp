@@ -326,10 +326,9 @@ void Game::gaps_send_jets(bool strike, Vec3 p, f32 offset, f32 alt) {
 // ---------------------------------------------------------------------------------------------
 // spawn gates
 
-bool Game::gaps_can_spawn(Vec3 p, f32 height, f32 far_entry) const {
-  if (!gaps_ || !world_) return true;
-  if (gaps_->world_shown >= 0 && world_->sim_time() - gaps_->world_shown < kSpawnGraceS) return true;
-  std::vector<spawn::Viewer> vs;
+bool Game::gaps_spawn_viewers(std::vector<spawn::Viewer>& vs) const {
+  if (!gaps_ || !world_) return false;
+  if (gaps_->world_shown >= 0 && world_->sim_time() - gaps_->world_shown < kSpawnGraceS) return false;
   // the presented camera, judged with the unscoped field of view (spawnViewFovDeg)
   spawn::Viewer me;
   me.eye = view_.cam.eye;
@@ -356,6 +355,12 @@ bool Game::gaps_can_spawn(Vec3 p, f32 height, f32 far_entry) const {
     v.forward = kern::normalize(v.forward, {1, 0, 0});
     vs.push_back(v);
   }
+  return true;
+}
+
+bool Game::gaps_can_spawn(Vec3 p, f32 height, f32 far_entry) const {
+  std::vector<spawn::Viewer> vs;
+  if (!gaps_spawn_viewers(vs)) return true;
   // (whether buildings hide the point is the Blueprint's own question to the world: a ray against the channel "World")
   const bool ok = spawn::can_spawn(vs, p, far_entry, height);
   ++(ok ? gaps_->spawn_allowed : gaps_->spawn_denied);

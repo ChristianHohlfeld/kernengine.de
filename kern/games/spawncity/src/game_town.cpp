@@ -40,14 +40,16 @@ bool Game::line_of_sight(Vec3 a, Vec3 b) const {
 PeopleView Game::people_view() const {
   PeopleView v;
   v.physics = &world_->physics();
-  v.city = &city_;
   v.focus = focus_position();
   if (net_.hosting()) v.foci = mate_foci();  // MP: the citizens live around every player (game_worldsync.cpp)
   v.player = player_position();
   if (mode_ == Mode::foot) v.player.z -= 0.73f;
   v.player_on_foot = mode_ == Mode::foot;
   v.player_alive = !player_dead_;
-  v.can_spawn = [this](Vec3 p) { return gaps_can_spawn(p, 1.9f, mobile_ ? 125.0f : 150.0f); };  // spawn_visibility_guard.mjs (game_gaps.cpp)
+  // spawn_visibility_guard.mjs (game_gaps.cpp): who may not see a person appear
+  v.spawn_watched = gaps_spawn_viewers(v.spawn_viewers);
+  v.spawn_far_entry = mobile_ ? 125.0f : 150.0f;
+  v.spawn_height = 1.9f;
   for (std::size_t i = 0; i < cars_.size(); ++i) {
     const TrafficCar& c = cars_[i];
     if (!c.placed || !world_->actor_alive(c.actor)) continue;
@@ -872,7 +874,8 @@ void Game::update_town(f32 dt) {
   player_dead_ = dead;
   handle_shots();
   const PeopleView view = people_view();
-  people_.update(dt, now, view, rng_);
+  people_.update(dt, now, view, city_, rng_);
+  if (view.spawn_watched) { gaps_->spawn_allowed += people_.spawns_allowed(); gaps_->spawn_denied += people_.spawns_denied(); }
   // Burning and crashing cars (critical_damage_logic.mjs).
   for (std::size_t i = 0; i < cars_.size(); ++i) {
     TrafficCar& c = cars_[i];
@@ -1039,8 +1042,8 @@ std::string Game::minimap_json() {
   const f32 range = 420;  // the expanded map shows up to 380 m from the subject
   struct Feat { char kind; bool poly; const std::vector<Vec2>* pts; f32 d; };
   std::vector<Feat> feats;
-  std::vector<const MapFeatures*> tiles;
-  city_.ready_features(tiles);
+  std::vector<u64> tiles;
+  city_.ready_tiles(tiles);
   auto dist = [&](const std::vector<Vec2>& pts) {
     f32 best = 1e9f;
     for (std::size_t k = 0; k + 1 < pts.size(); ++k) {
@@ -1051,16 +1054,17 @@ std::string Game::minimap_json() {
     }
     return best;
   };
-  for (const MapFeatures* f : tiles) {
-    for (const auto& r : f->roads)
+  for (u64 tile : tiles) {
+    const MapFeatures& f = city_.features(tile);
+    for (const auto& r : f.roads)
       if (r.points.size() >= 2) feats.push_back({road_is_water(r.cls) ? 'w' : 'r', false, &r.points, dist(r.points)});
-    for (const auto& a : f->areas) {
+    for (const auto& a : f.areas) {
       if (a.rings.empty() || a.rings[0].size() < 3) continue;
       const char k = a.kind == AreaKind::water ? 'w' : (a.kind == AreaKind::sand ? 0 : 'g');
       if (k) feats.push_back({k, true, &a.rings[0], dist(a.rings[0])});
     }
     // buildings: a house is under 300 m across - one far corner rules it out before the outline
-    for (const auto& b : f->buildings) {
+    for (const auto& b : f.buildings) {
       if (b.rings.empty() || b.rings[0].size() < 3) continue;
       const Vec2 q = b.rings[0][0];
       if (std::fabs(q.x - me.x) > range + 300 || std::fabs(q.y - me.y) > range + 300) continue;

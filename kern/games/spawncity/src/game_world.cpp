@@ -92,7 +92,7 @@ void Game::update_world(f32 dt) {
   WorldLife& L = *life_;
   if (!L.sounds.ready && audio_.mixer.ready()) init_world_sounds(audio_.mixer, L.sounds);
   if (!L.art_ready) L.art_ready = L.art.init(engine_->renderer);
-  L.marks.update(world_->sim_time(), world_->physics());
+  L.marks.update(world_->sim_time(), city_, world_->physics());
   update_traffic_world(dt);
   const Terrain& t = city_.terrain();
   // Swimming (player_walk_mode_v4.mjs standHeightAt): in deep water the head stays above the
@@ -171,7 +171,7 @@ void Game::draw_world() {
   if (!life_ || !life_->art_ready) return;
   WorldLife& L = *life_;
   L.art.begin();
-  L.marks.draw(L.art, world_->physics(), world_->sim_time());
+  L.marks.draw(L.art, city_, world_->physics(), world_->sim_time());
   draw_traffic_lights();
   L.art.end();
 }

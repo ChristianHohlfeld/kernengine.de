@@ -86,10 +86,9 @@ class CityStream {
   void walls_near(Vec2 p, f32 r, std::vector<Wall>& out) const;
   /// The building whose footprint contains p (-1: none); its outer ring, base and top.
   bool building_at(Vec2 p, std::vector<Vec2>* ring = nullptr, f32* base = nullptr, f32* top = nullptr, u32* seed = nullptr) const;
-  /// The street furniture (tiles.h furnish) of every tile whose ground is final, in a fixed
-  /// order; `furniture_serial` changes whenever that set does.
-  struct Furniture { u64 tile; const std::vector<MapFeatures::Spot>* trees; const std::vector<MapFeatures::Spot>* lamps; };
-  void furniture(std::vector<Furniture>& out) const;
+  /// The tiles whose ground is final, in a fixed order: their street furniture (tiles.h furnish)
+  /// is features(tile).trees and .lamps; `furniture_serial` changes whenever that set does.
+  void furniture(std::vector<u64>& tiles) const;
   u32 furniture_serial() const { return furniture_serial_; }
   /// Where the ground changed since the last call (a crater, a new elevation window): what stands
   /// on it is put on it again.
@@ -109,12 +108,18 @@ class CityStream {
 
   // ---- street life and interiors (M3 life: life.h, interiors.h) ----
   /// A building or area of a built tile: tile hash + index (stable while the tile is loaded).
-  struct BuildingRef { u64 tile = 0; u32 index = 0; const MapFeatures::Building* building = nullptr; };
-  struct AreaRef { u64 key = 0; const MapFeatures::Area* area = nullptr; };
+  /// `key` names an area for as long as its tile is loaded (two references to one area have one key).
+  struct BuildingRef { u64 tile = 0; u32 index = 0; };
+  struct AreaRef { u64 key = 0; u64 tile = 0; u32 index = 0; };
+  /// The map features of a tile (of a tile that is not loaded: none).
+  const MapFeatures& features(u64 tile) const;
+  /// What a reference names, while its tile is loaded.
+  const MapFeatures::Building& building(const BuildingRef& ref) const { return features(ref.tile).buildings[ref.index]; }
+  const MapFeatures::Area& area(const AreaRef& ref) const { return features(ref.tile).areas[ref.index]; }
   /// Buildings of ready tiles whose outline's bounding box comes within `radius` of `p`.
   void buildings_near(Vec2 p, f32 radius, std::vector<BuildingRef>& out) const;
-  /// The map features of every built tile (the minimap, web/view.mjs).
-  void ready_features(std::vector<const MapFeatures*>& out) const;
+  /// Every built tile (their map features: the minimap, web/view.mjs).
+  void ready_tiles(std::vector<u64>& out) const;
   /// Areas of a kind (meadows: grass) of ready tiles within `radius` of `p`.
   void areas_near(Vec2 p, f32 radius, AreaKind kind, std::vector<AreaRef>& out) const;
   /// Leaves one building out of the static collision (an entered interior brings its own); the

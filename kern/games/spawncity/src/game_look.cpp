@@ -37,10 +37,10 @@ void glow_cyl(MeshData& m, f32 r, f32 len, Vec3 hdr, Vec3 at) { prim::append(m, 
 // Glow colours: linear HDR (above 1 the bloom picks them up), like the MeshBasicMaterial glows.
 constexpr Vec3 kGlowRed{3.2f, 0.12f, 0.12f}, kGlowAmber{3.0f, 1.25f, 0.1f}, kGlowOrange{3.0f, 0.9f, 0.18f};
 
-bool g_vm_arms = true;  // false: the VR set (the controller is the hand: no forearm, no sleeve)
-/// A gloved forearm and sleeve reaching back from a grip at `grip` (viewmodel_arms.mjs).
-void arm(MeshData& m, Vec3 grip, f32 side) {
-  if (!g_vm_arms) return;
+/// A gloved forearm and sleeve reaching back from a grip at `grip` (viewmodel_arms.mjs). `arms`
+/// false: the VR set (the controller is the hand: no forearm, no sleeve).
+void arm(MeshData& m, Vec3 grip, f32 side, bool arms) {
+  if (!arms) return;
   const Mat4 tilt = Mat4::translate(grip) * Mat4::trs({}, Quat::axis_angle({1, 0, 0}, -0.12f), {1, 1, 1});
   box(m, {0.075f, 0.08f, 0.1f}, 0x1d232c, {0, 0, 0.0f}, tilt);                 // glove
   cyl(m, 0.04f, 0.3f, 0xc58c66, {side * 0.012f, -0.03f, 0.2f}, 10, tilt);      // forearm
@@ -49,7 +49,7 @@ void arm(MeshData& m, Vec3 grip, f32 side) {
 }
 
 /// BOOMSTICK 40 mm (weapon_models.mjs buildBoomstick): drum launcher with hazard stripes.
-void boomstick(MeshData& m, MeshData& g) {
+void boomstick(MeshData& m, MeshData& g, bool arms) {
   box(m, {0.17f, 0.125f, 0.32f}, 0x4a5a3a, {0, 0.012f, -0.1f});     // body (profile -0.06 .. 0.26)
   box(m, {0.1f, 0.2f, 0.1f}, 0x8a5a3b, {0, -0.155f, -0.095f});      // wooden grip
   box(m, {0.13f, 0.12f, 0.24f}, 0x1d2024, {0, -0.02f, 0.18f});      // stock
@@ -66,14 +66,14 @@ void boomstick(MeshData& m, MeshData& g) {
   box(m, {0.04f, 0.06f, 0.03f}, 0x121316, {0, 0.1f, -0.32f});
   glow_cyl(g, 0.064f, 0.012f, kGlowOrange, {0, 0.03f, -0.842f});    // glowing muzzle ring
   glow_box(g, {0.02f, 0.04f, 0.02f}, kGlowOrange, {0, 0.16f, -0.3f});
-  arm(m, {0, -0.15f, -0.095f}, 1);
+  arm(m, {0, -0.15f, -0.095f}, 1, arms);
 }
 
 /// ROCKET LAUNCHER (Kern, after buildRocketLauncher): a compact olive shoulder tube - flared
 /// venturi behind, a shroud and the dark bore in front, two bands, an optic on top with its lens,
 /// the laser module with the red lens beside the tube, pistol and fore grip. Shorter than before
 /// (0.95 m instead of 1.13 m) and held lower and further right: it frames the view, not fills it.
-void rocket_launcher(MeshData& m, MeshData& g) {
+void rocket_launcher(MeshData& m, MeshData& g, bool arms) {
   constexpr u32 olive = 0x3e4a30, dark = 0x15181b, band = 0x262d1e, steel = 0x7d848b;
   cyl(m, 0.058f, 0.76f, olive, {0, 0.03f, -0.27f}, 20);              // main tube (+.11 .. -.65)
   cyl(m, 0.071f, 0.08f, dark, {0, 0.03f, -0.67f}, 20);               // muzzle shroud
@@ -97,17 +97,17 @@ void rocket_launcher(MeshData& m, MeshData& g) {
   box(m, {0.05f, 0.15f, 0.07f}, dark, {0, -0.1f, -0.1f});            // pistol grip
   box(m, {0.012f, 0.045f, 0.09f}, dark, {0, -0.035f, -0.135f});      // trigger guard
   box(m, {0.048f, 0.11f, 0.06f}, dark, {0, -0.075f, -0.4f});         // fore grip
-  arm(m, {0, -0.13f, -0.105f}, 1);
+  arm(m, {0, -0.13f, -0.105f}, 1, arms);
 }
 
 /// FISTS (buildFists): one taped fist with forearm and sleeve; the left one is its mirror.
-void fist(MeshData& m) {
+void fist(MeshData& m, bool arms) {
   box(m, {0.076f, 0.078f, 0.1f}, 0xc58c66, {0, 0.002f, -0.004f});    // fist body
   box(m, {0.09f, 0.05f, 0.04f}, 0xc58c66, {0, 0.012f, -0.045f});     // knuckle ridge
   cyl(m, 0.0405f, 0.018f, 0xe9e4d8, {0, 0.002f, 0.016f}, 10);         // tape band
   box(m, {0.03f, 0.03f, 0.06f}, 0xa9714f, {-0.022f, -0.03f, -0.03f}); // thumb
   cyl(m, 0.038f, 0.05f, 0xe9e4d8, {0, -0.002f, 0.066f}, 10);          // wrist wrap
-  if (!g_vm_arms) return;
+  if (!arms) return;
   const Mat4 back = Mat4::trs({}, Quat::axis_angle({1, 0, 0}, -0.12f), {1, 1, 1});
   cyl(m, 0.043f, 0.3f, 0xc58c66, {0.012f, -0.03f, 0.24f}, 10, back);  // forearm
   cyl(m, 0.06f, 0.16f, 0x2c3440, {0.02f, -0.05f, 0.43f}, 10, back);   // sleeve
@@ -115,8 +115,8 @@ void fist(MeshData& m) {
 }
 
 /// KNIFE (buildKnife): clip-point blade with fuller and guard in the right fist, blade forward-up.
-void knife(MeshData& m, MeshData& g) {
-  fist(m);
+void knife(MeshData& m, MeshData& g, bool arms) {
+  fist(m, arms);
   const f32 s = 1.45f * 1.08f;  // FIST_HAND_SCALE x 1.08
   const Mat4 grip = Mat4::trs({0, 0.01f, -0.02f}, Quat::axis_angle({1, 0, 0}, 0.32f) * Quat::axis_angle({0, 1, 0}, 0.18f) * Quat::axis_angle({0, 0, 1}, -0.5f), {s, s, s});
   box(m, {0.0054f, 0.032f, 0.2f}, 0x6e757b, {0, 0.002f, -0.15f}, grip);   // blade
@@ -573,14 +573,14 @@ void Game::look_view_models(f32 dt) {
   if (!L.vm_built) {
     L.vm_built = true;
     for (int set = 0; set < 2; ++set) {
-      g_vm_arms = set == 0;  // set 1: VR - the weapon alone
+      const bool arms = set == 0;  // set 1: VR - the weapon alone
       for (int i = 0; i < 4; ++i) {
         MeshData body, glow;
         switch (i) {
-          case 0: boomstick(body, glow); break;
-          case 1: rocket_launcher(body, glow); break;
-          case 2: fist(body); break;
-          default: knife(body, glow); break;
+          case 0: boomstick(body, glow, arms); break;
+          case 1: rocket_launcher(body, glow, arms); break;
+          case 2: fist(body, arms); break;
+          default: knife(body, glow, arms); break;
         }
         auto make = [&](const MeshData& d, bool g, u32& id) {
           if (d.positions.empty()) return;
@@ -594,7 +594,6 @@ void Game::look_view_models(f32 dt) {
         make(glow, true, set ? L.vm_glow_vr[i] : L.vm_glow[i]);
       }
     }
-    g_vm_arms = true;
   }
   Mat4 vr_probe;
   const bool vr_hand = vr_hand_matrix(1, vr_probe);
