@@ -7999,6 +7999,9 @@ class TestWriter:
             local = "".join(within) + local
             for i in range(len(parts) - keep):
                 table.setdefault("::".join(parts[i:]), local)
+            for i in range(max(0, len(parts) - keep), len(parts) - 1):   # (a name the test gives otherwise - World_types::Hit)
+                if "::".join(parts[i:]) != "::".join(local.split("::")[i - len(parts):]):
+                    table.setdefault("::".join(parts[i:]), local)
             if parts[0] in self.tree.spaces:   # (a name in a further namespace of the program, `::fc::V3` too: the test's)
                 table.setdefault("::".join(parts), local)
             for k in range(1, len(parts)):
@@ -8054,7 +8057,13 @@ class TestWriter:
         for i, part in enumerate(parts):
             if i == 0 and part == ENGINE:
                 continue
-            out.append((part, "::".join(parts[:i + 1]) in self.tree.records))
+            q = "::".join(parts[:i + 1])
+            if q in self.u.objects_seen:
+                # (a class of the engine with a life of its own is the test's stand-in of that name: what is declared
+                # in it - a struct of plain data - stands in a namespace of its own, `World_types`)
+                out.append((part + "_types", True))
+                continue
+            out.append((part, q in self.tree.records))
         return out
 
     USING = re.compile(r"^[ \t]*using\s+(?!namespace\b|enum\b)((?:::)?(?:\w+::)+\w+)\s*;", re.M)
@@ -8201,6 +8210,9 @@ class TestWriter:
                 return   # (of the engine's classes with a life of their own the test has stand-ins: see stand_ins)
             if t.startswith(ENGINE + "::") and u.object_of(t + "*"):
                 G.objects.add(t)   # (one the source names that the Blueprint does not touch - a field of a class compiled along: a stand-in too)
+                if q != t:   # (a struct declared in it: plain data, compiled along - see steps_of)
+                    G.records.add(q)
+                    todo.append(("record", tree.records[q]))
                 return
             G.records.add(t)
             todo.append(("record", d))
@@ -8245,6 +8257,9 @@ class TestWriter:
                 want_record(owner)   # (a constant of a class the Blueprint does not have stands for itself)
         def want_function(i):
             e = tree.template_of.get(i) or tree.body.get(i) or tree.decl.get(i) or {}
+            held = tree.owner.get(e.get("id")) or tree.owner.get(i)
+            if held and held.startswith(ENGINE + "::") and (held in u.objects_seen or u.object_of(held + "*")):
+                return   # (a method of a class of the engine with a life of its own: its stand-in has what the source calls - stand_ins)
             if (tree.owner.get(e.get("id")) or tree.owner.get(i) or tree.scope_of.get(e.get("id"), "")).startswith(ENGINE + "::logic"):
                 return   # (the engine's logic: its own in the test - see want_record)
             if i in tree.template_of:
