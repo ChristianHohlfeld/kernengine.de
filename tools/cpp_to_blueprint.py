@@ -713,6 +713,7 @@ class World:
         self.actors = {}       # the level's actors with a Blueprint: name -> {"library": does it keep nothing, "functions": {name: ([inputs], [outputs])}}
         self.pointer_lists = {}    # (a function's key, the place of a parameter that is a pointer into a list) -> the length of the list every call hands it ("list": any; "mixed", "other": see main)
         self.states = {}       # a class of the program there is one object of (see state_classes) -> the Blueprint it is the state of
+        self.state_functions = set()   # (keys of) the functions that are no methods of a state but functions of its Blueprint: they share a variable of the program (main)
         self.globals = {}      # a variable of a namespace of the program with external linkage (its qualified name) -> does it start at zero (as its definition says)
         self.parts = {}        # a part of a Blueprint of several source files (a job: "Game/game_net_cpp") -> that Blueprint
         self.part_numbers = {} # such a part -> its number among the parts of its Blueprint (the block of its nodes' ids)
@@ -1598,6 +1599,8 @@ class Unit:
             f.self_type, f.mutates, f.refs, f.value, f.ctor = e["self_type"], e["mutates"], list(e["refs"]), e["value"], e["ctor"]
             f.out_fields = [(n, t, tuple(src) if isinstance(src, list) else src) for n, t, src in e["out_fields"]]
             f.open, f.state = e["open"], e["state"]
+            if f.state and e["unit"] != self.name and not f.wait:
+                f.wait = f"a function of {e['unit']}, the Blueprint of the program's one object: only its own functions call it"
             f.on_actors = [(a, None) for a in e.get("actors", ())]   # (the actors whose Blueprints it calls on them, itself or through what it calls)
             f.pointers = list(e["pointers"])
             if not f.wait and f.open and d["id"] not in self.tree.body and self.world.closures is not None and key not in self.world.closures:
@@ -2217,7 +2220,7 @@ class Emit:
             raise Wait("a variadic function")
         ret = qtype(d).split("(")[0].strip()
         f.value = u.btype(ret) if d.get("kind") != "CXXConstructorDecl" else None
-        if u.state is not None and self.tree.owner.get(d["id"]) == u.state:
+        if u.state is not None and (self.tree.owner.get(d["id"]) == u.state or function_key(self.tree, d) in u.world.state_functions):
             # a method of the state the Blueprint is: its fields are the Blueprint's variables - no object is
             # handed in. It changes them unless it says it does not (const) and writes no mutable field.
             if d.get("kind") == "CXXConstructorDecl":
@@ -2228,7 +2231,8 @@ class Emit:
                     v = self.tree.decl.get(x["referencedDecl"]["id"])
                     if v is not None and v["id"] not in self.names and u.kept_by_state(v):
                         self.names[v["id"]], self.types[v["id"]] = u.state_static(v, os.path.splitext(os.path.basename(v.get("_file") or "file"))[0])
-            f.mutates = not qtype(d).rstrip().endswith("const") or any(
+            method = self.tree.owner.get(d["id"]) == u.state
+            f.mutates = (method and not qtype(d).rstrip().endswith("const")) or any(
                 x.get("kind") == "MemberExpr" and (u.state_fields.get(x.get("name")) or (None, None, {}))[2].get("mutable") and self.is_this(kids(x)[0] if kids(x) else {"kind": "CXXThisExpr"})
                 for x in walk(d))
             # (what it keeps from one call to the next, or of the file - changed or not: it may be)
@@ -5082,6 +5086,8 @@ class Emit:
         called by a step before the statement being written."""
         self.f.calls.append(g)
         self.f.indexes = self.f.indexes or g.indexes
+        if g.state and g.mutates and self.f.state and not self.f.mutates:
+            self.f.mutates, self.f.pure = True, False   # (what a function of the state it calls changes, it changes)
         texts = []
         params = g.params
         if any(x.get("kind") == "CXXDefaultArgExpr" for x in args):
@@ -8553,7 +8559,7 @@ class TestWriter:
                     self.helpers(owner)   # (a method that does not use its object: called on one as its class makes it)
                 here = f"{ns}::"   # (by its full name: the test's own function, whatever its arguments are)
                 target = (f"{self.names[owner]}({args})" if f.ctor else f"{self.names[owner]}::{d['name']}({args})" if owner and static
-                          else f"s->{d['name']}({args})" if f.state
+                          else f"s->{d['name']}({args})" if f.state and owner
                           else f"a0.{d['name']}({args})" if owner and f.self_type is not None else f"{self.names[owner]}{{}}.{d['name']}({args})" if owner else f"{here}{free or self.function_name(d)}({args})")
                 parts = {"self": "a0", "result": "r"}   # (what the call changed: run's own values, handed back as they are)
                 if f.state:
@@ -8939,9 +8945,11 @@ def survey_one(job):
         file = os.path.abspath(d["_file"])
         if file != me and not is_header(file):
             continue
-        calls = set()
+        calls, shares = set(), False
         params_of.update({p["id"]: (function_key(tree, d), k) for k, p in enumerate(x for x in kids(d) if x.get("kind") == "ParmVarDecl")})
         for n in walk(d):
+            if n.get("kind") == "DeclRefExpr" and (n.get("referencedDecl") or {}).get("kind") == "VarDecl" and not shares:
+                shares = shared_variable(tree, tree.decl.get(n["referencedDecl"]["id"]))
             if n.get("kind") in ("CallExpr", "CXXMemberCallExpr"):
                 c = callee(n)
                 rid = (c.get("referencedDecl") or {}).get("id") or c.get("referencedMemberDecl")
@@ -8964,7 +8972,7 @@ def survey_one(job):
                 calls.add(function_key(tree, t))
         a, b = d.get("_at", (None, None))
         functions.append({"key": function_key(tree, d), "file": file, "at": a or 0, "calls": sorted(calls), "lines": tree.text(d["_file"]).count("\n", a, b) + 1 if a is not None else 0,
-                          "name": Unit.cpp_name_of(tree, d), "owner": tree.owner.get(d["id"])})
+                          "name": Unit.cpp_name_of(tree, d), "owner": tree.owner.get(d["id"]), "shares": shares, "free": d.get("kind") == "FunctionDecl" and not tree.owner.get(d["id"])})
     types = [(q, os.path.abspath(o.get("_file") or "?")) for q, o in [*tree.records.items(), *tree.enums.items()] if o.get("_file")]
     statics, made = objects_made(tree)
     # (the variables of the program's namespaces that other files name too: whether each starts at zero)
@@ -8981,6 +8989,23 @@ def survey_one(job):
     # (what a caller's own parameter hands on: by the caller's key and the parameter's place)
     pointer_args = [(key, k, ("param", *params_of[src[1]]) if isinstance(src, tuple) and src[1] in params_of else "other" if isinstance(src, tuple) else src) for key, k, src in pointer_args]
     return {"path": path, "functions": functions, "types": types, "statics": statics, "made": made, "records": records, "pointer_args": pointer_args, "globals": starts}
+
+
+def shared_variable(tree, d):
+    """Is this a variable the whole program shares - of one of its namespaces (or a file's own), not const,
+    not the program's way to call an actor's Blueprint? (Unit.kept_by_state: a variable of the state.)"""
+    if d is None or d.get("kind") != "VarDecl" or d.get("constexpr") or re.search(r"\bconst\b", qtype(d)) or d["id"] not in tree.scope_of:
+        return False
+    scope = tree.scope_of[d["id"]]
+    if scope.rstrip(":") in tree.records or not any(scope.startswith(x + "::") for x in (tree.namespace, *tree.spaces)):
+        return False
+    def actor(t, depth=0):
+        c = re.sub(r"^const\s+", "", t).strip()
+        if c.endswith("logic::ActorBlueprint"):
+            return True
+        rec = next((r for q, r in tree.records.items() if q == c or q.endswith("::" + c) or c.endswith("::" + q)), None)
+        return depth < 8 and rec is not None and any(actor(b.get("type", {}).get("qualType", ""), depth + 1) for b in rec.get("bases", []) or [])
+    return not actor(qtype(d))
 
 
 def starts_at_zero(init):
@@ -9325,6 +9350,30 @@ def main(argv):
             part_of[part] = unit_of[k]
             world.parts[part] = world.states[f["owner"]]
             unit_of[k] = part
+    # A function that is no method but shares a variable of the program - or calls one that does -, when the
+    # program has one object (a state): a function of that state's Blueprint, in the part of its file. (A method
+    # of another class that does stays where it is, and waits: it would need its object and the state's.)
+    if len(set(world.states.values())) == 1:
+        state = next(iter(world.states.values()))
+        callers = collections.defaultdict(set)
+        for k, f in functions.items():
+            for c in f["calls"]:
+                callers[c].add(k)
+        kept = {k for k, f in functions.items() if f.get("shares") and f.get("free") and world.program(f["file"])}
+        todo = list(kept)
+        while todo:
+            for k in callers.get(todo.pop(), ()):
+                f = functions[k]
+                if k not in kept and f.get("free") and world.program(f["file"]):
+                    kept.add(k)
+                    todo.append(k)
+        for k in kept:
+            if unit_of[k] is not None and not unit_of[k].startswith(state + "/"):
+                part = state + "/" + unit_of[k]
+                part_of[part] = unit_of[k]
+                world.parts[part] = state
+                unit_of[k] = part
+        world.state_functions = kept
     for blueprint in sorted(set(world.parts.values())):
         for i, part in enumerate(sorted(p for p, b in world.parts.items() if b == blueprint)):
             world.part_numbers[part] = i
@@ -9373,7 +9422,7 @@ def main(argv):
         w = World(files, flags, more)
         w.units, w.type_names, w.taken, w.nodes, w.function_units, w.source_units = world.units, world.type_names, world.taken, world.nodes, world.function_units, world.source_units
         w.actors, w.states, w.parts, w.part_numbers = world.actors, world.states, world.parts, world.part_numbers
-        w.pointer_lists, w.globals = world.pointer_lists, world.globals
+        w.pointer_lists, w.globals, w.state_functions = world.pointer_lists, world.globals, world.state_functions
         w.table = {k: e for d in need for k, e in tables.get(d, {}).items()}
         if test:   # (the pieces of their source their tests hand on: what the test of this one holds of them)
             w.closures, w.pieces = {}, {}
