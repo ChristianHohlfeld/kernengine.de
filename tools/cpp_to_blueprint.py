@@ -2576,6 +2576,8 @@ class Emit:
                 return [f"{tmp} = {self.ex(a, t)};"] + self.store(a, lambda want: self.ex(b, want)) + self.store(b, self.typed(tmp, t))
             if name in ("sort", "stable_sort") and not self.own(ref.get("id")):
                 raise Wait(ORDER_WAIT.format(name))
+            if name in ("memset", "memcpy") and len(kids(n)) == 4 and not self.own(ref.get("id")):
+                return self.raw_memory(name, kids(n)[1:])
             raise Wait(f"call: {name}()")
         if k == "CXXMemberCallExpr":
             m = callee(n)
@@ -2612,6 +2614,44 @@ class Emit:
                 return before + self.list_step(name, base, lv, it, args) + after
             raise Wait(f"call: {name}() of an object")
         raise Wait(f"a statement: {k}")
+
+    def addressed(self, n):
+        """What a pointer handed to memset / memcpy points at, when it is the address of a place: `&n`, an
+        array (`r.m`, the address of its first entry). None: anything else - a pointer of its own."""
+        b = bare(n)
+        while b.get("kind") == "ImplicitCastExpr" and b.get("castKind") in ("BitCast", "NoOp", "ArrayToPointerDecay") and kids(b):
+            decayed = b.get("castKind") == "ArrayToPointerDecay"
+            b = bare(kids(b)[0])
+            if decayed:
+                return b
+        if b.get("kind") == "UnaryOperator" and b.get("opcode") == "&" and kids(b):
+            return bare(kids(b)[0])
+        return None
+
+    def raw_memory(self, name, a):
+        """memset(&x, 0, sizeof x) / memcpy(&x, &y, sizeof x) on a whole place: its bytes all zero / those of
+        a value of its own type - which is setting it to zero / to that value. Zero bytes are the zero of
+        numbers and of lists of numbers (of a struct they are not its defaults: that waits)."""
+        dst = self.addressed(a[0])
+        size = sized(bare(a[2]))
+        if dst is None or (name == "memcpy" and self.addressed(a[1]) is None):
+            raise Wait("a pointer")
+        if size is None or self.u.clean(size) != self.u.clean(qtype(dst)):
+            raise Wait(f"raw memory ({name}) of a part of a place")
+        t = self.tp(dst)
+        if name == "memcpy":
+            src = self.addressed(a[1])
+            if self.u.clean(qtype(src)) != self.u.clean(qtype(dst)):
+                raise Wait("raw memory (memcpy): the bytes of one type read as another")
+            return self.store(dst, lambda want: self.ex(src, want))
+        try:
+            zero_bytes = Const(self.u).number(a[1]) == 0
+        except Wait:
+            zero_bytes = False
+        it = t[5:-1] if t.startswith("List<") else t
+        if not zero_bytes or (it not in ("Int", "Float", "Bool") and it != self.whole64()):
+            raise Wait("raw memory (memset) that is not the zero of numbers")
+        return self.store(dst, lambda want: self.u.zero(want))
 
     def written_array(self, n, t):
         """An array of C++ written out - `{}`, `{1, 2}` for a T[N] or a std::array<T, N>: (the values it
