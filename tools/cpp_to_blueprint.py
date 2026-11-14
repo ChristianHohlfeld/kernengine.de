@@ -560,6 +560,8 @@ class Tree:
                 z = re.search(r"\[sizeof=(\d+)", line)
                 if z and name:
                     self.layouts.setdefault(name, (int(z.group(1)), fields))
+                    # (a record of a file's own namespace: the tree names it without that namespace - the compiler with it)
+                    self.layouts.setdefault(name.replace("(anonymous namespace)::", ""), (int(z.group(1)), fields))
                     name = ""
         # (the compiler names a record with all its namespaces; the tree without the one that is converted)
         for name in (q, f"{self.namespace}::{q}"):
@@ -2308,6 +2310,12 @@ class Const:
                 return self.number(v)
         if k in ("CXXNullPtrLiteralExpr", "GNUNullExpr") and ENGINE_NODES:   # (no object of the engine: the handle 0)
             return 0
+        if k == "UnaryExprOrTypeTraitExpr" and n.get("name") == "sizeof":
+            # (the bytes C++ gives the type - a number of a fixed width, a struct of them, an array: its layout's)
+            got = byte_size(self.unit, sized(n) or "")
+            if got is None:
+                raise Wait("sizeof")
+            return self.fit(got[0], n)
         raise Wait(f"a constant written as {k}")
 
     def field_of(self, value, field_id):
