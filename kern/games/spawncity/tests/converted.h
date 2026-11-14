@@ -470,6 +470,18 @@ template <class T> Value arg(const std::vector<T>& v);
 template <class T> bool same(const std::vector<T>& want, const Value& got);
 template <class T> bool defined(const std::vector<T>& v);
 template <class T> std::string text(const std::vector<T>& v);
+// a view (kern::Span) is the list of its entries - where the engine is handed one, or a struct of the
+// engine holds one (ShapeSettings::points, MeshInput::positions)
+template <class T> Value arg(const wide::Span<T>& s) { return arg(std::vector<std::remove_cv_t<T>>(s.begin(), s.end())); }
+template <class T> bool same(const wide::Span<T>& want, const Value& got) { return same(std::vector<std::remove_cv_t<T>>(want.begin(), want.end()), got); }
+template <class T> bool defined(const wide::Span<T>& s) { return defined(std::vector<std::remove_cv_t<T>>(s.begin(), s.end())); }
+template <class T> std::string text(const wide::Span<T>& s) { return text(std::vector<std::remove_cv_t<T>>(s.begin(), s.end())); }
+/// Entries the test keeps for a view to see (a drawn view, one the engine's stand-in gave): kept to the end.
+template <class U> wide::Span<const U> kept_span(std::vector<U> entries) {
+  static std::deque<std::vector<U>> kept;
+  kept.push_back(std::move(entries));
+  return {kept.back().data(), kept.back().size()};
+}
 
 inline Value arg(f64 x) { return Value::number(x); }
 inline Value arg(f32 x) { return Value::number(static_cast<f64>(x)); }
@@ -692,6 +704,12 @@ template <class S> struct Take<std::vector<S>> {
       Take<S>::to(item, v.item(k));
       target.push_back(std::move(item));
     }
+  }
+  /// (into a view: the entries, kept by the test - see kept_span)
+  template <class T> static void to(wide::Span<const T>& target, const Value& v) {
+    std::vector<T> entries;
+    to(entries, v);
+    target = kept_span(std::move(entries));
   }
 };
 template <class A, class B> struct Take<std::pair<A, B>> {

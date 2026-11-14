@@ -6196,6 +6196,10 @@ class TestWriter:
             if re.match(r"(?:const\s+)?std::unique_ptr<", self.u.clean(r)):
                 return f"std::make_unique<{self.object_name(q)}>(*{one})"
             return one if re.search(r"\*\s*(const)?$", r) else "*" + one
+        m = re.match(r"(?:kern::)?Span<\s*(?:const\s+)?(.+)>$", c)
+        if m:   # (a view: of entries the test keeps - converted::kept_span)
+            inner = m.group(1)
+            return f"converted::kept_span(draw_list(draw, [&]() -> {self.spell(inner)} {{ return {self.draw(inner)}; }}))"
         if c in W64:
             return f"static_cast<{self.spell(raw)}>(draw.bits())"
         if c in ("float", "double", "long double"):
@@ -6389,19 +6393,26 @@ class TestWriter:
         ret = "void" if ret_raw == "void" else self.spell(ret_raw)
         if ret_raw != "void" and not self.u.object_of(ret_raw):
             self.result_ok(ret_raw)
-        body = [f'const std::vector<converted::Value> out = converted::engine_call("{f["type"]}", {{{", ".join(values)}}});']
+        # (its own names begin with kern_: a parameter may be called `out` or `result` - hull_mesh's)
+        body = [f'const std::vector<converted::Value> kern_out = converted::engine_call("{f["type"]}", {{{", ".join(values)}}});']
         k = 0
         if ret != "void":
-            body.append(f"{ret} result{{}}; converted::take_as<{shape(ret)}>(result, out[0]);")
+            body.append(f"{ret} kern_result{{}}; converted::take_as<{shape(ret)}>(kern_result, kern_out[0]);")
             k = 1
         for name, t, optional in takes:
-            body.append(f"if ({name}) converted::take_as<{shape(t)}>(*{name}, out[{k}]);" if optional else f"converted::take_as<{shape(t)}>({name}, out[{k}]);")
+            body.append(f"if ({name}) converted::take_as<{shape(t)}>(*{name}, kern_out[{k}]);" if optional else f"converted::take_as<{shape(t)}>({name}, kern_out[{k}]);")
             k += 1
         if ret != "void":
-            body.append("return result;")
+            body.append("return kern_result;")
         const = " const" if cls and (not plain or qtype(d).rstrip().endswith("const")) else ""
         return (f"{ret} {d['name']}({', '.join(a + b for a, b in params)}){const};",
                 f"inline {ret} {cls + '::' if cls else ''}{d['name']}({', '.join(a for a, _ in params)}){const} {{ {' '.join(body)} }}")
+
+    @staticmethod
+    def no_stand_in(f, why):
+        """A function of the engine the test has no stand-in of (STAND_INS=1 names it with why)."""
+        if os.environ.get("STAND_INS"):
+            sys.stderr.write(f"no stand-in of {f['type']}: {why}\n")
 
     def stand_ins(self, pairs):
         """The engine as the test's source sees it: for every class of the engine the source holds an object of,
@@ -6427,7 +6438,8 @@ class TestWriter:
                             raise Wait(f"the class {q.split('::')[-1]} is not written")
                         self.result_ok(q)
                         _, b = self.stand_in(f, self.names[q], plain=True)
-                    except Wait:
+                    except Wait as w:
+                        self.no_stand_in(f, w)
                         continue   # (what it takes the test has no values of: a function that calls it is not compared)
                     defs.append((("engine", f["decl"]["id"]), b))
         for q in sorted(u.objects_seen | set(by_class)):
@@ -6439,7 +6451,8 @@ class TestWriter:
             for f in by_class.get(q, []):
                 try:
                     a, b = self.stand_in(f, name)
-                except Wait:
+                except Wait as w:
+                    self.no_stand_in(f, w)
                     continue   # (what it takes the test has no values of: a function that calls it is not compared)
                 decls.append("  " + a)
                 defs.append((("object", q), b))
@@ -6448,7 +6461,8 @@ class TestWriter:
             d = f["decl"]
             try:
                 a, b = self.stand_in(f, None)
-            except Wait:
+            except Wait as w:
+                self.no_stand_in(f, w)
                 continue
             spaces = [x for x in tree.scope_of.get(d["id"], "").strip(":").split("::") if x][1:]
             head, tail = "".join(f"namespace {x} {{ " for x in spaces), " }" * len(spaces)
