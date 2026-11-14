@@ -42,6 +42,10 @@ f32 quat_yaw_deg(Quat q) {
   return std::atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z)) / kDeg;
 }
 
+/// A component of the airframe for its mass properties (component_mass_model.mjs): mass, centre,
+/// size (a disc: radius, thickness).
+struct MassPart { f32 m; Vec3 pos, size; bool disk; };
+
 }  // namespace
 
 f32 clearance_rate(f32 axis) {
@@ -103,8 +107,7 @@ RigidSpec Drone::rigid_spec(const DroneParams& p) {
     r.colliders.push_back(sweep);
   }
   // Mass properties from the components (component_mass_model.mjs buildQuadComponents).
-  struct Part { f32 m; Vec3 pos, size; bool disk; };
-  std::vector<Part> parts;
+  std::vector<MassPart> parts;
   parts.push_back({p.m_frame, {0, 0, 0}, {p.span * 0.62f, p.span * 0.48f, 0.018f}, false});
   for (const Vec3& m : motors) {
     parts.push_back({p.m_motor, m, {0.036f, 0.036f, 0.025f}, false});
@@ -117,10 +120,10 @@ RigidSpec Drone::rigid_spec(const DroneParams& p) {
   parts.push_back({p.m_cam_vtx, {p.camera_x, 0, p.camera_z}, {0.04f, 0.03f, 0.025f}, false});
   f32 mass = 0;
   Vec3 c;
-  for (const Part& q : parts) { mass += q.m; c += q.pos * q.m; }
+  for (const MassPart& q : parts) { mass += q.m; c += q.pos * q.m; }
   c = c * (1.0f / mass);
   f32 I[6] = {};
-  for (const Part& q : parts) {
+  for (const MassPart& q : parts) {
     f32 l[3];
     if (q.disk) {
       const f32 rr = q.size.x, t = q.size.y;
