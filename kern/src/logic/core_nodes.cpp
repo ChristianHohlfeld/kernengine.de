@@ -1416,6 +1416,93 @@ void add_structs(Library& lib) {
     };
     lib.add(std::move(d));
   }
+  // The bytes of a struct of numbers, in the layout C++ gives it (logic::bytes, nodes.h): what
+  // std::bit_cast and std::memcpy between a struct and bytes see.
+  auto layout_problem = [of](const Node& n, const Graph& g) -> std::string {
+    const bytes::Layout l = bytes::layout(n.param("layout", ""));
+    if (l.error) return std::string("the layout: ") + l.error;
+    const StructType* st = of(n, g);
+    if (!st) return "which struct?";
+    if (st->fields.size() != l.count)
+      return "the layout has " + std::to_string(l.count) + " field(s), " + st->name + " has " + std::to_string(st->fields.size());
+    for (std::size_t k = 0; k < l.count; ++k)
+      if (st->fields[k].type.count || !bytes::suits(l.fields[k].code, st->fields[k].type.type))
+        return "the layout's field " + std::to_string(k + 1) + " does not suit " + st->name + "." + st->fields[k].name +
+               " (a Bool is bool; an Int u8 .. i32; an Int64 u64, i64; a Float f32, f64)";
+    return {};
+  };
+  auto layout_param = [] { return param("layout", "Layout", ParamDef::Kind::text, "4: i32@0"); };
+  {
+    NodeDef d = make("struct.bytes", "Bytes of Struct", "Structures", NodeKind::pure,
+                     "The bytes of a struct of numbers in the layout C++ gives it: \"20: u32@0 u16@4 ...\" - the size, then for each field the number it is "
+                     "(bool u8 i8 u16 i16 u32 i32 u64 i64 f32 f64) and where it begins. Little-endian; a byte no field covers is 0.",
+                     "bit cast memcpy binary bytes serialize wire packet");
+    d.params = {struct_param(), layout_param()};
+    d.inputs = {data("value", "Value", PinType::structure)};
+    d.outputs = {data("bytes", "Bytes", PinType::integer_list)};
+    d.title = [](const NodeDef&, const Node& n) { return "Bytes of " + n.param("struct", "?"); };
+    d.shape = [of](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>&) { retype(in[0], {PinType::structure, n.param("struct")}, g); };
+    d.problem = layout_problem;
+    d.run = [of](Context& c) {
+      const Graph& g = c.instance().graph();
+      const StructType* st = of(c.node(), g);
+      const bytes::Layout l = bytes::layout(c.param("layout", ""));
+      std::vector<i64> out(l.error ? 0 : l.size, 0);
+      if (st && !l.error) {
+        const Value value = c.in(std::size_t{0});
+        for (std::size_t k = 0; k < l.count && k < st->fields.size(); ++k) {
+          const Value f = field_of(value, *st, k, g);
+          const bytes::Field& at = l.fields[k];
+          const PinType t = st->fields[k].type.type;
+          const u64 v = t == PinType::number ? bytes::bits(at.code, f.as_number()) : t == PinType::boolean ? (f.as_bool() ? 1u : 0u)
+                        : t == PinType::int64 ? static_cast<u64>(f.i) : static_cast<u64>(f.as_int());
+          bytes::put(out.data(), at, v);
+        }
+      }
+      c.out(std::size_t{0}, Value::of(std::move(out)));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = make("struct.of_bytes", "Struct of Bytes", "Structures", NodeKind::pure,
+                     "The struct of numbers whose bytes begin at At in the list, in the layout C++ gives it (as Bytes of Struct). A byte is a number's last 8 bits; "
+                     "where the list has none, it is 0.",
+                     "bit cast memcpy binary bytes deserialize parse wire packet");
+    d.params = {struct_param(), layout_param()};
+    d.inputs = {data("bytes", "Bytes", PinType::integer_list), data("at", "At", PinType::integer, 0)};
+    d.outputs = {data("value", "Value", PinType::structure)};
+    d.title = [](const NodeDef&, const Node& n) { return n.param("struct", "?") + " of Bytes"; };
+    d.shape = [of](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>&, std::vector<PinDef>& out) { retype(out[0], {PinType::structure, n.param("struct")}, g); };
+    d.problem = layout_problem;
+    d.run = [of](Context& c) {
+      const Graph& g = c.instance().graph();
+      const StructType* st = of(c.node(), g);
+      const bytes::Layout l = bytes::layout(c.param("layout", ""));
+      const Value list = c.in(std::size_t{0});
+      const std::vector<i64>& held = list.items<i64>();
+      const i64 from = c.in_int("at");
+      auto byte = [&](u32 i) { return bytes::byte_at(held.data(), held.size(), from, i); };
+      std::vector<Value> fields;
+      if (st) {
+        for (std::size_t k = 0; k < st->fields.size(); ++k) {
+          if (l.error || k >= l.count) {
+            fields.push_back(field_of(Value(), *st, k, g));
+            continue;
+          }
+          const bytes::Field& at = l.fields[k];
+          const u64 v = bytes::take(at, byte);
+          const PinType t = st->fields[k].type.type;
+          fields.push_back(t == PinType::boolean ? Value::boolean(v != 0) : t == PinType::int64 ? Value::int64(v)
+                           : t == PinType::number ? Value::number(at.code == bytes::Code::f32 ? bytes::single_value(static_cast<u32>(v)) : std::bit_cast<f64>(v))
+                           : Value::integer(static_cast<i64>(v)));
+        }
+      }
+      c.out(std::size_t{0}, structs::make(std::move(fields)));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
   {
     // A list of structs read as a table: the row whose field is the value looked for.
     NodeDef d = make("list.find_row", "Find Row", "Lists", NodeKind::pure,
@@ -1529,6 +1616,8 @@ void add_math(Library& lib) {
   }
   lib.add(pure("math.clamp", "Clamp", "Math", {data("value", "Value", K::number, 0.0), data("min", "Min", K::number, 0.0), data("max", "Max", K::number, 1.0)}, number, of(&P::math_clamp)));
   lib.add(pure("math.abs", "Absolute", "Math", {data("a", "A", K::number, 0.0)}, number, of(&P::math_abs)));
+  lib.add(pure("math.copysign", "Copy Sign", "Math", {data("a", "Magnitude", K::number, 0.0), data("b", "Sign", K::number, 1.0)}, number, of(&P::math_copysign),
+               "The size of Magnitude with the sign of Sign - also the sign of -0 (Copy Sign of 1 and -0 is -1)", "copysign negative zero minus"));
   lib.add(pure("math.negate", "Negate", "Math", {data("a", "A", K::number, 0.0)}, number, of(&P::math_negate)));
   lib.add(pure("math.lerp", "Lerp", "Math", {data("a", "A", K::number, 0.0), data("b", "B", K::number, 1.0), data("alpha", "Alpha", K::number, 0.5)}, number, of(&P::math_lerp),
                "A + (B - A) × Alpha", "interpolate mix blend"));
@@ -1686,7 +1775,7 @@ void add_math(Library& lib) {
 void add_formula(Library& lib) {
   NodeDef d = make("math.formula", "Formula", "Math", NodeKind::pure,
                    "A formula as one node: every name in it becomes an input. Operators + - * / % ^, comparisons (1 when true), && || !, a ? b : c; "
-                   "functions min max clamp abs sign floor ceil round trunc sqrt pow exp log sin cos tan asin acos atan atan2 (radians; rad(), deg()) lerp; "
+                   "functions min max clamp abs sign copysign floor ceil round trunc sqrt pow exp log sin cos tan asin acos atan atan2 (radians; rad(), deg()) lerp; "
                    "whole numbers as a machine has them: band bor bxor shl shr, wrap32 wrap32s mul32 (32 bit); single (the number as a 32-bit float holds it); pi.");
   d.params = {param("formula", "Formula", ParamDef::Kind::text, "a + b")};
   d.outputs = {data("result", "", PinType::number)};

@@ -15,7 +15,7 @@ namespace {
 
 enum Code : u8 {
   kConst, kInput, kAdd, kSub, kMul, kDiv, kMod, kPow, kNeg, kNot, kLt, kLe, kGt, kGe, kEq, kNe, kAnd, kOr, kSelect,
-  kMin, kMax, kClamp, kAbs, kSign, kFloor, kCeil, kRound, kTrunc, kSqrt, kExp, kLog,
+  kMin, kMax, kClamp, kAbs, kSign, kCopysign, kFloor, kCeil, kRound, kTrunc, kSqrt, kExp, kLog,
   kSin, kCos, kTan, kAsin, kAcos, kAtan, kAtan2, kRad, kDeg, kLerp,
   kBand, kBor, kBxor, kShl, kShr, kWrap32, kWrap32s, kMul32, kSingle,
 };
@@ -25,7 +25,7 @@ constexpr Fn kFunctions[] = {
     {"min", kMin, 2},     {"max", kMax, 2},     {"clamp", kClamp, 3}, {"abs", kAbs, 1},     {"sign", kSign, 1},   {"floor", kFloor, 1}, {"ceil", kCeil, 1},
     {"round", kRound, 1}, {"trunc", kTrunc, 1}, {"sqrt", kSqrt, 1},   {"pow", kPow, 2},     {"exp", kExp, 1},     {"log", kLog, 1},     {"sin", kSin, 1},
     {"cos", kCos, 1},     {"tan", kTan, 1},     {"asin", kAsin, 1},   {"acos", kAcos, 1},   {"atan", kAtan, 1},   {"atan2", kAtan2, 2}, {"rad", kRad, 1},
-    {"deg", kDeg, 1},     {"lerp", kLerp, 3},   {"div", kDiv, 2},     {"mod", kMod, 2},
+    {"deg", kDeg, 1},     {"lerp", kLerp, 3},   {"div", kDiv, 2},     {"mod", kMod, 2},     {"copysign", kCopysign, 2},
     // whole numbers as a machine has them: their bits, and arithmetic that wraps around at 32 bit
     {"band", kBand, 2},   {"bor", kBor, 2},     {"bxor", kBxor, 2},   {"shl", kShl, 2},     {"shr", kShr, 2},     {"wrap32", kWrap32, 1}, {"wrap32s", kWrap32s, 1},
     {"mul32", kMul32, 2}, {"single", kSingle, 1},
@@ -385,6 +385,7 @@ f64 Formula::evaluate(const f64* values, std::size_t count) const {
       case kClamp: r = math::clamp(a, b, c); break;
       case kAbs: r = math::abs(a); break;
       case kSign: r = math::sign(a); break;
+      case kCopysign: r = math::copysign(a, b); break;
       case kFloor: r = math::floor(a); break;
       case kCeil: r = math::ceil(a); break;
       case kRound: r = math::round(a); break;

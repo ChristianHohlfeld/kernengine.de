@@ -1464,7 +1464,7 @@ template <class A, class B> constexpr A& rem_to(A& a, B b) { return a = static_c
 template <class A, class B> constexpr A& shl_to(A& a, B b) { return a = static_cast<A>(shl(a, b)); }
 template <class A, class B> constexpr A& shr_to(A& a, B b) { return a = static_cast<A>(shr(a, b)); }
 
-// A 64-bit bit pattern (the program's u64 and i64 - a Blueprint's Whole64, see tools/blueprint_whole64.h) is
+// A 64-bit bit pattern (the program's u64 and i64 - a Blueprint's Int64) is
 // computed around 2^64, as C++ computes with unsigned numbers: nothing to mark there. What C++ leaves open
 // marks the call: signed arithmetic that leaves the 64 bits, a division by zero, a shift by 64 or more.
 template <class R> constexpr R kept_bits(__int128 exact) {

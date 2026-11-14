@@ -54,58 +54,7 @@ KERN = os.path.join(os.path.dirname(HERE), "kern")
 HEADERS = ["core/base.h", "core/jobs.h", "app/app.h", "audio/audio.h", "audio/synth.h", "physics/physics.h", "gfx/mesh.h", "gfx/renderer.h",
            "geo/mesh_data.h", "geo/primitives.h", "geo/earcut.h", "geo/buildings.h", "geo/roads.h", "game/level.h", "game/sound.h", "game/runtime.h",
            "net/client_server.h"]
-Api, snake = c2b.Api, c2b.snake
-INT64 = {"Int64": ("int64", "l"), "List<Int64>": ("int64_list", "[l]")}   # (the pin type, the form of the value - see EngineStandIn)
-
-
-class EngineApi(Api):
-    """The engine's functions as nodes, with its 64-bit numbers as they are: a u64 or an i64 the engine
-    takes or gives (a mask of bits, a key, a counter of 64 bits) is an Int64 pin - 64 bits, as C++ has
-    them - and a list of them a List<Int64>. (What a struct of the engine holds in its fields is the
-    struct as tools/cpp_to_blueprint.py writes it.)"""
-
-    def wide(self, raw):
-        """The Blueprint type of a parameter's or a result's type when it is 64 bits as C++ has them
-        (u64, const i64&, std::vector<u64>&, Span<const u64>, const u64* with a count): Int64 or
-        List<Int64> - else None."""
-        r = re.sub(r"\s*(&&|&|\*\s*(const)?)$", "", raw.strip())
-        r = re.sub(r"^const\s+", "", r).strip()
-        c = self.u.clean(r)
-        if c in c2b.W64:
-            return "Int64"
-        m = re.match(r"(?:std::vector|(?:kern::)?Span)<\s*(?:const\s+)?(.+?)\s*>$", c)
-        if m and self.u.clean(m.group(1)) in c2b.W64:
-            return "List<Int64>"
-        return None
-
-    def handed(self, raw):
-        bt = self.wide(raw)
-        if bt is None:
-            return super().handed(raw)
-        r = raw.strip()
-        pointer = bool(re.search(r"\*\s*(const)?$", r))
-        writes = (r.endswith("&") and not r.endswith("&&") or pointer) and not re.match(r"const\b", r)
-        if pointer and writes:
-            raise Wait("a pointer it writes through")
-        if pointer:
-            bt = "List<Int64>"   # (the data it only reads: one value that may be missing, or the first of several)
-        return bt, writes and not pointer, None
-
-    def optional_out(self, p):
-        bt = self.wide(qtype(p))
-        if bt is not None and re.search(r"\*\s*$", qtype(p).strip()) and not re.match(r"const\b", qtype(p).strip()):
-            init = c2b.bare(kids(p)[-1]) if kids(p) else {}
-            while init.get("kind") == "ImplicitCastExpr" and kids(init):
-                init = c2b.bare(kids(init)[0])
-            if init.get("kind") in ("CXXNullPtrLiteralExpr", "GNUNullExpr"):
-                return bt
-        return super().optional_out(p)
-
-    def pin(self, bt):
-        return (INT64[bt][0], "") if bt in INT64 else super().pin(bt)
-
-    def shape(self, bt):
-        return INT64[bt][1] if bt in INT64 else super().shape(bt)
+Api, snake = c2b.Api, c2b.snake   # (the converter's own: a call in a game's source and its node have the same pins)
 
 
 def c_text(s):
@@ -258,7 +207,7 @@ def read_engine(flags=()):
 
 def main(argv):
     tree, unit = read_engine()
-    api = EngineApi(tree, unit)
+    api = Api(tree, unit)
     functions, waiting = [], []
     for d in sorted((x for x in tree.decl.values() if api.declared_only(x)), key=lambda x: (x.get("_file", ""), x.get("_at", (0,))[0] or 0)):
         try:

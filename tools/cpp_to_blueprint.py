@@ -106,7 +106,7 @@ constinit const_cast continue co_await co_return co_yield decltype default delet
 int long mutable namespace new noexcept not not_eq nullptr operator or or_eq private protected public register reinterpret_cast requires return short signed sizeof static
 static_assert static_cast struct switch template this thread_local throw true try typedef typeid typename union unsigned using virtual void volatile wchar_t while xor xor_eq
 Bool Int Float Vector Text Actor List loop machine entry detached kern""".split())
-FORMULA_WORDS = set("min max clamp abs sign floor ceil round trunc sqrt pow exp log sin cos tan asin acos atan atan2 rad deg lerp div mod pi band bor bxor shl shr wrap32 wrap32s mul32 single".split())
+FORMULA_WORDS = set("min max clamp abs sign copysign floor ceil round trunc sqrt pow exp log sin cos tan asin acos atan atan2 rad deg lerp div mod pi band bor bxor shl shr wrap32 wrap32s mul32 single".split())
 # What nothing of a Blueprint is called: a word of C++ or of the notation, a function of a formula, a node
 # (math_add, list_get ... - the engine says which there are: NODES, see main) or a name of the shape the
 # notation gives its nodes and paths (n12, go3 ...).
@@ -145,7 +145,8 @@ ZERO = {"Int64": "Int64{0x0}", "Float": "0.0", "Int": "0", "Bool": "false", "Vec
 MATH = {"sqrt": "sqrt", "sqrtf": "sqrt", "fabs": "abs", "fabsf": "abs", "abs": "abs", "fmin": "min", "fminf": "min", "min": "min", "min_of": "min", "fmax": "max", "fmaxf": "max", "max": "max",
         "max_of": "max", "floor": "floor", "floorf": "floor", "ceil": "ceil", "ceilf": "ceil", "round": "round", "roundf": "round", "lround": "round", "lroundf": "round", "trunc": "trunc",
         "truncf": "trunc", "pow": "pow", "powf": "pow", "exp": "exp", "expf": "exp", "log": "log", "logf": "log", "sin": "sin", "sinf": "sin", "cos": "cos", "cosf": "cos", "tan": "tan",
-        "tanf": "tan", "asin": "asin", "acos": "acos", "atan": "atan", "atan2": "atan2", "atan2f": "atan2", "fmod": "mod", "fmodf": "mod", "clamp": "clamp"}
+        "tanf": "tan", "asin": "asin", "acos": "acos", "atan": "atan", "atan2": "atan2", "atan2f": "atan2", "fmod": "mod", "fmodf": "mod", "clamp": "clamp",
+        "copysign": "copysign", "copysignf": "copysign"}
 
 
 VECTOR_FUNCTIONS = ("length", "dot", "cross", "distance", "normalize", "lerp", "length_sq", "distance_sq", "finite", "min_of", "max_of", "clamp", "hex_color", "vmin", "vmax")
@@ -332,6 +333,88 @@ def qtype(n):
 SKIP = ("ParenExpr", "ExprWithCleanups", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr", "ConstantExpr", "SubstNonTypeTemplateParmExpr", "FullExpr")
 
 
+# ---- the bytes of a value (Bytes of Struct, Struct of Bytes - kern/docs/blueprint_cpp.md) ----------------
+# The number a field is in a layout, by the type C++ gives it - its spelling first (uint32_t is 32 bits on every
+# platform), then what that is. What the platform decides (the width of a long, the sign of a char), a float (the
+# language holds it in 64 bits) and anything that is no number have no place in a layout yet.
+BYTE_CODES = {"bool": "bool", "uint8_t": "u8", "std::uint8_t": "u8", "u8": "u8", "int8_t": "i8", "std::int8_t": "i8", "i8": "i8",
+              "uint16_t": "u16", "std::uint16_t": "u16", "u16": "u16", "int16_t": "i16", "std::int16_t": "i16", "i16": "i16",
+              "uint32_t": "u32", "std::uint32_t": "u32", "u32": "u32", "int32_t": "i32", "std::int32_t": "i32", "i32": "i32",
+              "uint64_t": "u64", "std::uint64_t": "u64", "u64": "u64", "int64_t": "i64", "std::int64_t": "i64", "i64": "i64",
+              "double": "f64", "f64": "f64", "unsigned char": "u8", "signed char": "i8", "short": "i16", "unsigned short": "u16", "int": "i32",
+              "unsigned int": "u32", "long long": "i64", "unsigned long long": "u64"}
+BYTE_WIDTH = {"bool": 1, "u8": 1, "i8": 1, "u16": 2, "i16": 2, "u32": 4, "i32": 4, "u64": 8, "i64": 8, "f64": 8}
+# (the Blueprint type of a field of each such number)
+BYTE_FIELD = {"bool": "Bool", "u8": "Int", "i8": "Int", "u16": "Int", "i16": "Int", "u32": "Int", "i32": "Int", "u64": "Int64", "i64": "Int64", "f64": "Float"}
+# A pointer to bytes: what C++ reads any object's bytes through (and a void*, which is read as one of these)
+BYTE_POINTER = re.compile(r"const\s+(?:void|unsigned\s+char|uint8_t|std::uint8_t|u8|std::byte)\s*\*$")
+
+
+def byte_code(raw):
+    """The number of a layout a field's type is (BYTE_CODES) - Wait for one that has none."""
+    spelled = re.sub(r"^(?:const\s+|volatile\s+)+", "", (raw.get("qualType") or "").strip())
+    if spelled in BYTE_CODES:
+        return BYTE_CODES[spelled]
+    plain = re.sub(r"^(?:const\s+|volatile\s+)+", "", (raw.get("desugaredQualType") or spelled).strip())
+    if plain in BYTE_CODES:
+        return BYTE_CODES[plain]
+    if plain in ("float",) or spelled in ("float", "f32"):
+        raise Wait("the bytes of a float (the language holds it in 64 bits)")
+    if plain in ("char", "long", "unsigned long", "wchar_t") or spelled in ("size_t", "std::size_t", "usize"):
+        raise Wait(f"the bytes of a {spelled} (its width or its sign is the platform's)")
+    raise Wait(f"the bytes of a {spelled} (no number)")
+
+
+def record_bytes(tree, q):
+    """The layout of the record `q` as C++ gives it, for the bytes of its values: (the layout's text - "20: u32@0
+    u16@4 ..." -, the size, [(field, its number)]). Where C++ leaves bytes open (padding) or a field is no number
+    of a layout: Wait."""
+    rec = tree.records.get(q)
+    if rec is None:
+        raise Wait(f"the bytes of a {q} (its type is not known here)")
+    if rec.get("bases") or any(c.get("virtual") for c in kids(rec)) or rec.get("tagUsed") == "union":
+        raise Wait(f"the bytes of a {q.split('::')[-1]} (a base, a virtual function or a union)")
+    fields = [c for c in kids(rec) if c.get("kind") == "FieldDecl"]
+    if not fields:
+        raise Wait(f"the bytes of a {q.split('::')[-1]} (no field)")
+    codes = []
+    for c in fields:
+        if c.get("isBitfield"):
+            raise Wait("the bytes of a struct with a bitfield")
+        codes.append(byte_code(c.get("type") or {}))
+    size, offsets = tree.layout(q)
+    if len(offsets) != len(fields):
+        raise Wait(f"the bytes of a {q.split('::')[-1]} (the compiler lays out other fields)")
+    end = 0
+    for (at, _), code in zip(offsets, codes):
+        if at != end:
+            raise Wait(f"the bytes of a {q.split('::')[-1]} with padding (bytes C++ leaves open)")
+        end = at + BYTE_WIDTH[code]
+    if end != size:
+        raise Wait(f"the bytes of a {q.split('::')[-1]} with padding (bytes C++ leaves open)")
+    text = f"{size}: " + " ".join(f"{code}@{at}" for (at, _), code in zip(offsets, codes))
+    return text, size, [(c.get("name"), code) for c, code in zip(fields, codes)]
+
+
+def addressed_record(tree, a):
+    """`&x` (also cast to a pointer to bytes) where x is a value of a record: (x, the record's qualified name) - else None."""
+    x = bare(a)
+    while x.get("kind") in ("ImplicitCastExpr", "ParenExpr", "CXXStaticCastExpr", "CXXReinterpretCastExpr", "CStyleCastExpr") and kids(x):
+        k = x.get("kind")
+        if k == "ImplicitCastExpr" and x.get("castKind") not in ("BitCast", "NoOp"):
+            return None
+        if k in ("CXXStaticCastExpr", "CXXReinterpretCastExpr", "CStyleCastExpr") and not BYTE_POINTER.match(qtype(x).strip()):
+            return None   # (an explicit cast to anything but a pointer to bytes)
+        x = bare(kids(x)[0])
+    if x.get("kind") != "UnaryOperator" or x.get("opcode") != "&" or not kids(x):
+        return None
+    v = bare(kids(x)[0])
+    raw = re.sub(r"^(?:const\s+|volatile\s+)+", "", (v.get("type") or {}).get("desugaredQualType") or qtype(v)).strip()
+    raw = re.sub(r"^(?:struct|class)\s+", "", raw)
+    found = [raw] if raw in tree.records else [r for r in tree.records if r.endswith("::" + raw)]
+    return (v, found[0]) if len(found) == 1 else None
+
+
 def bare(n):
     """The expression without what only stands around it (brackets, temporaries)."""
     while n.get("kind") in SKIP and kids(n):
@@ -365,6 +448,38 @@ class Tree:
     the program's too (World.spaces): their declarations are the program's, named with their namespace
     (`fc::V3`, as `net::Session` is)."""
 
+    def layout(self, q):
+        """How the compiler lays out the record `q` (-fdump-record-layouts: what C++ fixes for it, also under
+        #pragma pack): (its size, [(the offset of each of its own fields, the field)]). Read from the compiler
+        once for this tree, when a layout is first asked for."""
+        if self.layouts is None:
+            self.layouts = {}
+            cmd = [os.environ.get("CLANGXX", "clang++"), "-std=c++20", "-fsyntax-only", "-Xclang", "-fdump-record-layouts", *self.flags, self.path]
+            r = subprocess.run(cmd, capture_output=True, text=True)
+            name, size, fields = None, None, []
+            for line in r.stdout.splitlines():
+                if line.startswith("*** Dumping AST Record Layout"):
+                    name, size, fields = None, None, []
+                    continue
+                m = re.match(r"\s*(\d+)(:\S+)? \| (\s*)(.*)$", line)
+                if m and name is None:
+                    h = re.match(r"(?:struct|class|union) (.+?)(?: \(empty\))?$", m.group(4))
+                    name = h.group(1) if h else ""
+                    continue
+                if m and name and len(m.group(3)) == 2:
+                    if m.group(2) or m.group(4).endswith("(base)") or m.group(4).endswith("(primary base)") or "vtable pointer" in m.group(4):
+                        name = ""   # (a bitfield, a base, a table of virtual functions: no layout of plain numbers)
+                        continue
+                    fields.append((int(m.group(1)), m.group(4)))
+                    continue
+                z = re.search(r"\[sizeof=(\d+)", line)
+                if z and name:
+                    self.layouts.setdefault(name, (int(z.group(1)), fields))
+                    name = ""
+        if q not in self.layouts:
+            raise Wait(f"the bytes of a {q.split('::')[-1]} (the compiler gives no layout of it here)")
+        return self.layouts[q]
+
     def __init__(self, path, namespace, flags, spaces=()):
         self.path = os.path.abspath(path)
         self.namespace = namespace
@@ -386,6 +501,7 @@ class Tree:
             annotate(o, st)
         self.texts = {}
         self.flags = flags
+        self.layouts = None   # (see `layout`: the compiler's layouts of the records, read when one is asked for)
         self.order = None     # (see `place`)
         self.decl = {}        # id -> the declaration
         self.body = {}        # id -> the declaration with the body (of a function declared earlier)
@@ -1164,6 +1280,20 @@ class Unit:
             raise Wait(f"the engine's {t.split('<')[0]}")
         raise Wait(f"the type {t.split('<')[0]}")
 
+    def byte_layout(self, q):
+        """The bytes of a value of the record `q` (Bytes of Struct, Struct of Bytes): (its struct in the Blueprint,
+        the layout's text, the size) - the layout as C++ gives it (record_bytes), each field of the struct of the
+        Blueprint type its number has. Else Wait."""
+        text, size, fields = record_bytes(self.tree, q)
+        st = self.struct(q)
+        mine = self.struct_fields.get(st, [])
+        if len(mine) != len(fields):
+            raise Wait(f"the bytes of a {q.split('::')[-1]} (its struct has other fields)")
+        for (_, ft, _, _), (name, code) in zip(mine, fields):
+            if ft != BYTE_FIELD[code]:
+                raise Wait(f"the bytes of a {q.split('::')[-1]} (its field {name} is a {ft}, its bytes a {code})")
+        return st, text, size
+
     def pointed(self, raw):
         """A parameter `const T*` the function reads entries through (`p[i]`, `*p`), hands on (`p + 2`) or asks
         whether it is null: a pointer into a list - in the Blueprint the list, read where it stands (a const
@@ -1174,7 +1304,9 @@ class Unit:
         if m is None or self.object_of(raw) or raw.replace(" ", "") in ("constchar*", "constchar*const"):
             return None
         inner = m.group(1).strip()
-        if inner == "void" or "*" in inner or "&" in inner:
+        if inner == "void":
+            return "Int"   # (a pointer to raw memory: what C++ can read through it are bytes - BYTE_POINTER)
+        if "*" in inner or "&" in inner:
             return None
         t = self.btype(inner)
         return t if t is not None and not t.startswith("List<") else None
@@ -2137,6 +2269,7 @@ class Emit:
         self.result_struct = None
         self.homes = {}       # decl id of an iterator (or of what insert() gave) -> the list it goes through
         self.pointers = {}    # decl id of a parameter that is a pointer into a list -> (the list's input, the place's input, the entries' type)
+        self.assigned_ids = set()   # (the variables the body changes - see assigned)
         self.keyed_vars = {}  # decl id of a name for an entry of a map or a set (a loop's variable, `auto& [k, v]`) -> (the map or set, its place)
         self.serial = 0       # the number of the statement being written (see `slot`)
 
@@ -2272,6 +2405,7 @@ class Emit:
             f.kinds.append("ref" if f.mutates else "const")
             self.self_name = name
         assigned = self.assigned(body)
+        self.assigned_ids = assigned
         copies = []
         for p in kids(d):
             if p.get("kind") != "ParmVarDecl":
@@ -2905,6 +3039,10 @@ class Emit:
                 if lam is not None:
                     out += self.local_function(v, lam)
                     continue
+                alias = self.pointer_alias(v)
+                if alias is not None:
+                    out += self.take_pre() + alias
+                    continue
                 if v.get("id") in self.named_places:
                     # (a name for a place: written out where it is used - what making the place does, a new row of a map, is done here)
                     if any(x.get("kind") == "CXXOperatorCallExpr" and self.is_slot(x) for x in walk(kids(v)[-1])):
@@ -3480,6 +3618,10 @@ class Emit:
                 return self.sorted_list(name, kids(n)[1:])
             if name in ("memmove", "memcpy") and len(kids(n)) == 4 and not self.own(ref.get("id")) and self.byte_places(kids(n)[1:3]) is not None:
                 return self.moved_bytes(name, kids(n)[1:])
+            if name in ("memcpy", "memmove") and len(kids(n)) == 4 and not self.own(ref.get("id")):
+                got = self.bytes_into(kids(n)[1:])
+                if got is not None:
+                    return got
             if name in ("memset", "memcpy") and len(kids(n)) == 4 and not self.own(ref.get("id")):
                 return self.raw_memory(name, kids(n)[1:])
             raise Wait(f"call: {name}()")
@@ -3553,6 +3695,22 @@ class Emit:
                 return None
             out.append((lst, at))
         return out
+
+    def bytes_into(self, a):
+        """memcpy(&value, bytes, sizeof value): the value whose bytes those are (Struct of Bytes) - from a list of
+        bytes, at the place the pointer stands at. None: it is no such memcpy."""
+        held = addressed_record(self.tree, a[0])
+        places = self.byte_places(a[1:2]) if held is not None else None
+        if not places:
+            return None
+        dst, q = held
+        size = sized(bare(a[2]))
+        if size is None or self.u.clean(size) != self.u.clean(qtype(dst)):
+            raise Wait("raw memory (memcpy) into a part of a value")
+        st, text, _ = self.u.byte_layout(q)
+        (lst, at), = places
+        sv = self.place_arg(lst, "List<Int>", "const", [])
+        return self.store(dst, lambda want: f"struct_of_bytes<{st}, {text_literal(text)}>({sv}, {at})")
 
     def moved_bytes(self, name, a):
         """memmove / memcpy of bytes between places of lists of bytes: entry by entry, as many as the count
@@ -4356,9 +4514,40 @@ class Emit:
 
     def pointer_of(self, n):
         """The parameter a pointer into a list is, where `n` names one: (the list's input, the place's input,
-        the entries' type) - else None."""
+        the entries' type) - else None. A pointer to bytes cast to another pointer to bytes (static_cast<const
+        uint8_t*>(data) of a const void*) is the same pointer."""
         b = self.unwrap(n)
+        while b.get("kind") in ("CXXStaticCastExpr", "CXXReinterpretCastExpr", "CStyleCastExpr", "ParenExpr") and kids(b):
+            inner = self.unwrap(kids(b)[0])
+            if b.get("kind") != "ParenExpr" and not (BYTE_POINTER.match(qtype(b).strip()) and BYTE_POINTER.match(qtype(inner).strip())):
+                return None
+            b = inner
         return self.pointers.get(b.get("referencedDecl", {}).get("id")) if b.get("kind") == "DeclRefExpr" else None
+
+    def pointer_alias(self, v):
+        """`const T* p = q;` - a name for a pointer into a list (a parameter, or one of these, or a place in one
+        of their lists further on: `q + 4`), never changed: p is that list and a place of its own in it. Gives
+        the lines that set the place - None: `v` is no such pointer."""
+        raw = qtype(v).strip()
+        init = self.init_of(v)
+        if init is None or not re.match(r"const\s+[^*&]+\*$", raw) or v.get("id") in self.assigned_ids:
+            return None
+        b = self.unwrap(init)
+        while b.get("kind") == "ParenExpr" and kids(b):
+            b = self.unwrap(kids(b)[0])
+        base = b
+        if b.get("kind") == "BinaryOperator" and b.get("opcode") in ("+", "-") and len(kids(b)) == 2 and "*" in qtype(kids(b)[0]):
+            base = kids(b)[0]
+        ptr = self.pointer_of(base)
+        if ptr is None:
+            return None
+        lst, at = self.place(init)
+        entries = ptr[2]
+        if lst.get("_type") != f"List<{entries}>":
+            return None
+        name = self.temp((v.get("name") or "p") + "_at", "Int")
+        self.pointers[v["id"]] = (lst["_text"], name, entries)
+        return [f"{name} = {at};"]
 
     def pointer_arg(self, a, entries, fixed=None):
         """What a call hands a pointer into a list (Unit.pointed): [the list, the place in it] - the list where it
@@ -4366,6 +4555,17 @@ class Emit:
         lt = f"List<{entries}>"
         if self.nothing(a):   # (null: no place - in a list of nothing)
             return [self.temp("none", lt, fixed), "-1"]
+        held = addressed_record(self.tree, a) if entries == "Int" else None
+        if held is not None:
+            # the address of a value handed to a pointer to bytes (`crc(&frame, n)`): the value's bytes - as many
+            # as it has, a list of that fixed length, made where the call is (Bytes of Struct)
+            v, q = held
+            st, text, size = self.u.byte_layout(q)
+            if fixed is not None and fixed != size:
+                raise Wait("a pointer to bytes handed values of another size")
+            tmp = self.temp("bytes", lt, size)
+            self.hoist([f"{tmp} = struct_bytes<{st}, {text_literal(text)}>({self.ex(v, st)});"])
+            return [tmp, "0"]
         lst, at = self.place(a)
         if self.tp(lst) != lt:
             raise Wait("a pointer into a list of entries of another type")
@@ -5243,7 +5443,7 @@ class Emit:
         if name in ("clamp", "clampf"):
             return count == 3
         if name in MATH:
-            return count == {"min": 2, "max": 2, "pow": 2, "atan2": 2, "mod": 2}.get(MATH[name], 1)
+            return count == {"min": 2, "max": 2, "pow": 2, "atan2": 2, "mod": 2, "copysign": 2}.get(MATH[name], 1)
         if name in ("hypot", "ldexp", "ldexpf"):
             return count == 2
         if name == "lerp":
@@ -5518,7 +5718,26 @@ class Emit:
             return self.value(kids(b)[0])
         if k == "UnaryExprOrTypeTraitExpr":
             raise Wait("sizeof")
+        if k == "OffsetOfExpr":
+            return str(self.offset_of(b)), "Int"
         raise Wait(f"an expression: {k}")
+
+    def offset_of(self, n):
+        """offsetof(S, field): where the field begins in a value of S, as the compiler lays S out (Tree.layout). The
+        compiler's tree does not say which field it is: the source does, where the macro is written."""
+        a = n.get("_at", (None, None))[0]
+        text = self.tree.text(n.get("_file", "")) if a is not None else ""
+        m = re.compile(r"(?:__builtin_)?offsetof\s*\(\s*([\w:]+)\s*,\s*(\w+)\s*\)").match(text, a or 0)
+        if m is None:
+            raise Wait("offsetof of a field of a field")
+        q = self.u.find_type(m.group(1))
+        if q is None or q not in self.tree.records:
+            raise Wait(f"offsetof of a {m.group(1)}")
+        fields = [c.get("name") for c in kids(self.tree.records[q]) if c.get("kind") == "FieldDecl"]
+        _, offsets = self.tree.layout(q)
+        if m.group(2) not in fields or len(offsets) != len(fields):
+            raise Wait(f"offsetof of {m.group(1)}::{m.group(2)}")
+        return offsets[fields.index(m.group(2))][0]
 
     def engine_constant(self, cpp, value, name):
         key = "engine:" + cpp
@@ -5702,7 +5921,7 @@ class Emit:
                     inner = [self.ex(x, "Float") for x in kids(b)[1:]]
                     return self.leaf(None, leaves, f"kern::formula([](Float v, Float lo, Float hi) -> Float {{ return v < lo ? lo : (hi < v ? hi : v); }}, {', '.join(inner)})")
                 return f"({v} < {lo} ? {lo} : ({hi} < {v} ? {hi} : {v}))"
-            if name in MATH and len(args) == {"min": 2, "max": 2, "pow": 2, "atan2": 2, "mod": 2}.get(MATH[name], 1):
+            if name in MATH and len(args) == {"min": 2, "max": 2, "pow": 2, "atan2": 2, "mod": 2, "copysign": 2}.get(MATH[name], 1):
                 return f"kern::math::{MATH[name]}({', '.join(args)})"
             if name == "hypot" and len(args) == 2:
                 return f"kern::math::sqrt(({args[0]} * {args[0]}) + ({args[1]} * {args[1]}))"
@@ -6405,7 +6624,9 @@ class Emit:
 ENGINE_SKIP = ("kern::logic::", "kern::json::", "kern::detail::", "kern::dm::", "kern::game::nodes::")
 # Functions that give something and change something (the rule below would call them values).
 ENGINE_STEPS = {"kern::jobs::submit", "kern::jobs::take"}
-ENGINE_PIN = {"Bool": "boolean", "Int": "integer", "Float": "number", "Vector": "vector", "Text": "text"}
+# (a u64 or an i64 the engine takes or gives - a mask of bits, a key, a counter of 64 bits - is an Int64 pin: 64
+# bits, as C++ has them; a list of them a List<Int64>)
+ENGINE_PIN = {"Bool": "boolean", "Int": "integer", "Float": "number", "Vector": "vector", "Text": "text", "Int64": "int64"}
 
 
 def snake(name):
@@ -6414,7 +6635,8 @@ def snake(name):
 
 class Api:
     """The engine's functions as nodes, from a compiler's tree that holds the engine's headers. (The
-    converter asks the same object: a call in a game's source and the node it becomes have one name.)"""
+    converter asks the same object: a call in a game's source and the node it becomes have one name, and
+    one set of pins - tools/engine_api.py writes the engine's table with this class.)"""
 
     def __init__(self, tree, unit):
         self.tree, self.u = tree, unit
@@ -6481,7 +6703,7 @@ class Api:
     def shape(self, bt):
         """A value's form, written out: n i b v t, e<values>, {fields}, [items]."""
         if bt in ENGINE_PIN:
-            return {"Bool": "b", "Int": "i", "Float": "n", "Vector": "v", "Text": "t"}[bt]
+            return {"Bool": "b", "Int": "i", "Float": "n", "Vector": "v", "Text": "t", "Int64": "l"}[bt]
         if bt in self.u.enum_values:
             return f"e{len(self.u.enum_values[bt])}"
         if bt in self.u.struct_fields:
@@ -6698,7 +6920,7 @@ class Api:
 # ---- the test: the Blueprint next to its source ------------------------------------------------------
 WIDE_MATH = {"sin": "kern::math::sin", "cos": "kern::math::cos", "tan": "kern::math::tan", "asin": "kern::math::asin", "acos": "kern::math::acos", "atan": "kern::math::atan",
              "atan2": "kern::math::atan2", "exp": "kern::math::exp", "log": "kern::math::log", "pow": "kern::math::pow", "sqrt": "kern::math::sqrt", "fmod": "kern::math::mod",
-             "hypot": "hypot_bp", "tanh": "tanh_bp", "sinh": "sinh_bp", "cosh": "cosh_bp", "asinh": "asinh_bp", "log2": "log2_bp", "log10": "log10_bp", "cbrt": "cbrt_bp", "ldexp": "ldexp_bp"}
+             "copysign": "kern::math::copysign", "hypot": "hypot_bp", "tanh": "tanh_bp", "sinh": "sinh_bp", "cosh": "cosh_bp", "asinh": "asinh_bp", "log2": "log2_bp", "log10": "log10_bp", "cbrt": "cbrt_bp", "ldexp": "ldexp_bp"}
 # What a test needs where the source reads through a pointer into a list (Unit.pointed): the lists the test
 # handed it, so that an entry through such a pointer is checked against its list as converted::at checks one -
 # outside it the call is marked (C++ leaves open what it reads there). A pointer into nothing the test handed
@@ -6877,12 +7099,20 @@ class TestWriter:
             except Wait:
                 return False
             return at == int(at) and 0 <= at < length
+        aliases = set()   # (local pointers that name a pointer into a list: `const auto* bytes = static_cast<const uint8_t*>(data);`)
         def into_list(n):
-            """Is this a parameter that is a pointer into a list (Unit.pointed)?"""
+            """Is this a parameter that is a pointer into a list (Unit.pointed) - or a local pointer that names one
+            (Emit.pointer_alias), or such a pointer cast to another pointer to bytes?"""
             x = bare(n)
-            while x.get("kind") == "ImplicitCastExpr" and kids(x):
+            while x.get("kind") in ("ImplicitCastExpr", "ParenExpr", "CXXStaticCastExpr", "CXXReinterpretCastExpr", "CStyleCastExpr") and kids(x):
+                if x.get("kind") not in ("ImplicitCastExpr", "ParenExpr") and not BYTE_POINTER.match(qtype(x).strip()):
+                    return False
                 x = bare(kids(x)[0])
+            if x.get("kind") == "BinaryOperator" and x.get("opcode") in ("+", "-") and len(kids(x)) == 2 and "*" in qtype(kids(x)[0]):
+                return into_list(kids(x)[0])
             r = x.get("referencedDecl") or {}
+            if x.get("kind") == "DeclRefExpr" and r.get("id") in aliases:
+                return True
             if x.get("kind") != "DeclRefExpr" or r.get("kind") != "ParmVarDecl":
                 return False
             try:
@@ -6894,6 +7124,8 @@ class TestWriter:
             if n.get("_call") is not None:   # (a place written out for a call: the source has the call)
                 return visit(n["_call"], depth)
             k, ks = n.get("kind"), kids(n)
+            if k == "VarDecl" and re.match(r"const\s+[^*&]+\*$", qtype(n).strip()) and n.get("init") and ks and into_list(ks[-1]):
+                aliases.add(n.get("id"))
             if n.get("id") is not None:
                 if n["id"] in visited:
                     return   # (a place with a name of its own - `T& x = a[i];` - is in the tree wherever x is used: guarded once, where it is written)
@@ -8514,6 +8746,8 @@ class TestWriter:
                 for p in params:
                     if self.u.pointed(qtype(p)) is not None:
                         entry = re.sub(r"\s*\*$", "", qtype(p).strip())
+                        if re.match(r"const\s+void$", entry):
+                            entry = "const unsigned char"   # (raw memory is read as bytes: the test hands it bytes)
                         inner = self.spell(entry)
                         lst, at = f"a{len(names)}", f"a{len(names) + 1}"
                         types += [f"std::vector<{inner}>", "long long"]
@@ -8911,14 +9145,22 @@ def declared_in_header_of(tree, d):
 
 
 # ---- the program ---------------------------------------------------------------------------------
-POINTER_PARAM = re.compile(r"const\s+(?!void\s*\*|char\s*\*)[^*&]+?\s*\*$")   # (a parameter that may be a pointer into a list: Unit.pointed)
+POINTER_PARAM = re.compile(r"const\s+(?!char\s*\*)[^*&]+?\s*\*$")   # (a parameter that may be a pointer into a list: Unit.pointed)
 
 
-def pointer_source(tree, a):
+def pointer_source(tree, a, param=""):
     """What a call hands a parameter that may be a pointer into a list (Unit.pointed), for the plan of the whole
     program: the fixed length of the list it points into (a.data() of a std::array<T, N>, an array T[N]),
     "list" (one of any length: a std::vector), "null", ("param", id) - the caller's own such parameter -, or
-    "other" (the address of anything else)."""
+    "other" (the address of anything else). A pointer to bytes (`param`: its type) handed the address of a value
+    points into the value's bytes: as many as the value has (record_bytes)."""
+    if BYTE_POINTER.match(param.strip()):
+        held = addressed_record(tree, a)
+        if held is not None:
+            try:
+                return record_bytes(tree, held[1])[1]
+            except Wait:
+                return "other"
     x = bare(a)
     while x.get("kind") in ("ImplicitCastExpr", "ParenExpr") and x.get("castKind") != "ArrayToPointerDecay" and kids(x):
         x = bare(kids(x)[0])
@@ -8935,7 +9177,7 @@ def pointer_source(tree, a):
         return length(qtype(kids(x)[0]))
     if k == "BinaryOperator" and x.get("opcode") in ("+", "-") and len(kids(x)) == 2:
         left, right = kids(x)
-        return pointer_source(tree, left if "*" in qtype(left) else right)
+        return pointer_source(tree, left if "*" in qtype(left) else right, param)
     if k == "DeclRefExpr" and (x.get("referencedDecl") or {}).get("kind") == "ParmVarDecl":
         return ("param", x["referencedDecl"]["id"])
     return "other"
@@ -8967,7 +9209,7 @@ def survey_one(job):
                 if t is not None and t.get("kind") in ("FunctionDecl", "CXXMethodDecl"):
                     for k, (p, a) in enumerate(zip([x for x in kids(t) if x.get("kind") == "ParmVarDecl"], kids(n)[1:])):
                         if POINTER_PARAM.match(qtype(p).strip()):
-                            pointer_args.append((function_key(tree, t), k, pointer_source(tree, a)))
+                            pointer_args.append((function_key(tree, t), k, pointer_source(tree, a, qtype(p))))
             ids = [n.get("referencedDecl", {}).get("id"), n.get("referencedMemberDecl")]
             if n.get("kind") == "CXXConstructExpr":
                 ids.append((constructor_of(tree, n) or {}).get("id"))
