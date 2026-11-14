@@ -1284,18 +1284,18 @@ bool Game::audio_init(u32 rate) {
   return true;
 }
 
-const f32* Game::audio_render(u32 frames) {
+const std::vector<f32>& Game::audio_render(u32 frames) {
   audio_out_.resize(static_cast<std::size_t>(frames) * 2);
   if (mixer_.ready()) {
     mixer_.render(audio_out_.data(), frames);
     // the page plays the original's own sound (game_audio_web.cpp): Kern's mix is not heard and
     // its music not made
     if (web_audio_) std::fill(audio_out_.begin(), audio_out_.end(), 0.0f);
-    else ui_render_music(audio_out_.data(), frames);  // title music and car radio (game_equipment.cpp)
+    else ui_render_music(audio_out_, frames);  // title music and car radio (game_equipment.cpp)
   }
   else std::fill(audio_out_.begin(), audio_out_.end(), 0.0f);
-  mix_voice(audio_out_.data(), frames);  // proximity voice of the other players (game_net.cpp)
-  return audio_out_.data();
+  mix_voice(audio_out_, frames);  // proximity voice of the other players (game_net.cpp)
+  return audio_out_;
 }
 
 void Game::update_sound(f32 dt) {
