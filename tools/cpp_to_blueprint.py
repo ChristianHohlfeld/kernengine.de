@@ -5711,7 +5711,21 @@ class Api:
             return False
         if d.get("previousDecl") or d["id"] in self.tree.template_of or not d.get("name") or d["name"].startswith("operator") or "(anonymous" in scope:
             return False
-        return not (d.get("kind") == "CXXMethodDecl" and d.get("access", "public") != "public")
+        return not (d.get("kind") == "CXXMethodDecl" and not self.public(d))
+
+    def public(self, d):
+        """Is the method `d` public in its class? (The compiler's tree says it by the access specifiers between
+        the members, not at a member: a class begins private, a struct public.)"""
+        rec = self.tree.records.get(self.tree.owner.get(d["id"], ""))
+        if rec is None:
+            return d.get("access", "public") == "public"
+        access = "private" if rec.get("tagUsed") == "class" else "public"
+        for c in kids(rec):
+            if c.get("kind") == "AccessSpecDecl":
+                access = c.get("access", access)
+            elif c.get("id") == d["id"]:
+                return access == "public"
+        return d.get("access", "public") == "public"
 
     def of_object(self, d):
         """Is `d` a method of a class of the engine that is an object (not plain data a Blueprint holds)?"""
