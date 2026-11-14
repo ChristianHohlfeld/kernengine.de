@@ -497,24 +497,26 @@ Eine Form, die Gestalt oder Kosten ändert, ist keine von beiden.
     steht, und lässt ihn leer – der Konverter schreibt damit `std::move` aus einem Feld
     (`take_points_log`), wo vorher „kopieren, dann leeren“ stand. Und Make (Struktur, Liste)
     reicht durch, was es bekommt. Im Klassentext des Levels steht `std::move` an 683 Stellen.
-  - **Der Stand:** Von 600 verglichenen Funktionen fordert die Klasse bei 478 nicht öfter an als
-    ihr Quelltext (vorher 470). Bei 122 tut sie es; der Test nennt jede (`cost:` in seiner
-    Ausgabe) und ist noch kein Fehler – er wird es, sobald die Liste leer ist. Die Messung hat
-    die Ursachen genauer gezeigt, als sie am Morgen dastanden. Nach Häufigkeit:
+  - **Listen in einem Zug (seit 14.11.2026, 10:30).** Vier Bausteine tun, was `std::vector` mit
+    einer Anforderung tut: Set Length (`list_resize`), Append List (`list_append`), Insert List
+    (`list_insert_list`) und Reserve (`list_reserve`) – `kern/docs/blueprint_cpp.md`, „Listen“.
+    Der Konverter schreibt damit `resize`, `assign`, `std::vector<T>(n)`, `insert` einer ganzen
+    Liste und `reserve` als je einen Schritt; vorher waren es Schleifen aus einzelnen Add, deren
+    Liste mehrmals wuchs (`SmokeField_new`: 7 statt 1, `People::take_deaths`: 4 statt 1).
+  - **Der Stand:** Von 600 verglichenen Funktionen fordert die Klasse bei 499 nicht öfter an als
+    ihr Quelltext (am Morgen 470). Bei 101 tut sie es; der Test nennt jede (`cost:` in seiner
+    Ausgabe) und ist noch kein Fehler – er wird es, sobald die Liste leer ist. Was bleibt, nach
+    Häufigkeit:
     1. **Listen fester Länge** (`f32 m[16]`, `std::array`) sind in der Sprache Listen und liegen
        im Speicher, im C++ nicht – etwa 45 Funktionen: jede `Mat4` und alles, was Matrizen baut
        (`*Art_put`: 9 statt 2), die 256-Bit-Zahlen in `nostr` (`powm`: 197.802 statt 0).
-       → Die Sprache bekommt Listen fester Länge.
-    2. **Listen in einem Zug** – etwa 28 Funktionen. `std::vector<T>(n)`, `resize`, `insert` eines
-       Bereichs, `reserve` sind in C++ eine Anforderung; im Blueprint sind sie heute Schleifen
-       aus einzelnen Add und Insert, deren Liste mehrmals wächst (`SmokeField_new`: 7 statt 1,
-       `People::take_deaths`: 4 statt 1). → Bausteine, die es in einem Zug tun: Länge setzen,
-       eine Liste anhängen, Platz vorhalten.
+       → Die Sprache bekommt Listen fester Länge (in Arbeit).
+    2. **Eine Funktion gibt in C++ eine Referenz zurück** (`const CarSpec& spec() const`), im
+       Blueprint eine Kopie (`Car_spec`, `Jet_spec`: 1 statt 0). → Ausgänge als Referenz.
     3. **Ein Text aus einem festen Wortlaut** (`const char*`) ist in der Klasse ein `std::string`
        – 10 Funktionen (die Shader-Texte: 1 statt 0).
-    4. **Rund 30 einzelne**, viele nur in einem von 300 Aufrufen teurer (`Field_near`,
-       `clock_ms` …): jede wird angesehen, sobald 1 bis 3 erledigt sind – ein Teil fällt mit
-       ihnen weg.
+    4. **Einzelne**, viele nur in einem von 300 Aufrufen teurer (`clock_ms`, `kind_of` …): jede
+       wird angesehen, sobald 1 bis 3 erledigt sind – ein Teil fällt mit ihnen weg.
 - **Gestalt:** Nach 1 bis 3 steht im Level keine Methode mehr, die ihr Objekt hinein- und
   herausbekommt; nach 5 und 6 keine Map als Liste und kein `Whole64`.
 

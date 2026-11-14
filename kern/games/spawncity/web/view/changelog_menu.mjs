@@ -7,6 +7,11 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-14",time:"10:30",title:"Blueprints: Listen in einem Zug",items:[
+    "Vier neue Bausteine für Listen: Länge setzen, Liste anhängen, Liste einfügen und Platz vorhalten. Sie tun in einem Schritt, wofür vorher eine Schleife aus einzelnen Einträgen nötig war.",
+    "Der Konverter schreibt damit resize, vector(n), insert einer ganzen Liste und reserve so, wie C++ sie ausführt: mit einer Speicheranforderung.",
+    "Kosten gemessen: Bei 499 von 600 verglichenen Funktionen fordert die Klasse nicht öfter Speicher an als der Quelltext (vorher 478). Alle 600 bleiben bitgleich.",
+  ]},
   {date:"2026-11-14",time:"09:15",title:"Blueprints: übergeben statt kopieren",items:[
     "Die Klasse eines Blueprints reicht einen Wert weiter, wo ihn danach nichts mehr braucht (std::move): eine lokale Variable an ihrer letzten Lesestelle, auch in Schleifen, und was der Schritt direkt davor gab.",
     "Der Text wird streng gelesen: std::move wird nur dort angenommen, wo der Wert wirklich nicht mehr gebraucht wird. Sonst wird er mit Zeile und Grund abgelehnt.",
