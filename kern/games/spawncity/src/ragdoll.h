@@ -44,9 +44,11 @@ class Ragdolls {
   kern::physics::Body bone_body(u64 key, Bone b) const { const i32 i = find(key); return i >= 0 && dolls_[i].active && !dolls_[i].getting_up ? dolls_[i].bodies[b] : kern::physics::Body{}; }
 
   /// Drawing: every active body's bones as box transforms (unit box scaled to the bone) + tint,
-  /// and the colours of the person the bone is of.
-  struct Draw { kern::Mat4 m; Vec3 tint; bool sphere; u8 bone = 0; Colors colors; kern::Mat4 pose; };  // pose: the bone's frame (unscaled)
+  /// and the body the bone is of (its colours: colors(doll)).
+  struct Draw { kern::Mat4 m; Vec3 tint; bool sphere; u8 bone = 0; u32 doll = 0; kern::Mat4 pose; };  // pose: the bone's frame (unscaled)
   void draw(std::vector<Draw>& out) const;
+  /// The colours of the person a body of draw() is.
+  const Colors& colors(u32 doll) const { return dolls_[doll].colors; }
 
   /// Bone sizes (rest pose, standing at the origin facing +X): centre, half extents (capsule:
   /// radius x radius x half length incl. caps).

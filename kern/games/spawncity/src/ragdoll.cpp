@@ -269,13 +269,14 @@ u32 Ragdolls::active() const {
 }
 
 void Ragdolls::draw(std::vector<Draw>& out) const {
-  for (const Doll& d : dolls_) {
+  for (u32 i = 0; i < dolls_.size(); ++i) {
+    const Doll& d = dolls_[i];
     if (!d.active) continue;
     for (u32 b = 0; b < kBones; ++b) {
       const Vec3 h = kDefs[b].half;
       const Vec3 tint = b == head || b == lower_arm_l || b == lower_arm_r ? d.colors.skin
                         : (b == chest || b == upper_arm_l || b == upper_arm_r) ? d.colors.shirt : d.colors.pants;
-      out.push_back({Mat4::trs(d.pose[b].position, d.pose[b].rotation, h * 2.0f), tint, b == head, static_cast<u8>(b), d.colors, Mat4::trs(d.pose[b].position, d.pose[b].rotation, {1, 1, 1})});
+      out.push_back({Mat4::trs(d.pose[b].position, d.pose[b].rotation, h * 2.0f), tint, b == head, static_cast<u8>(b), i, Mat4::trs(d.pose[b].position, d.pose[b].rotation, {1, 1, 1})});
     }
   }
 }

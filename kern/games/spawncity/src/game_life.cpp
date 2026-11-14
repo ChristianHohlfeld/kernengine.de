@@ -686,7 +686,7 @@ void Game::life_draw_ragdolls() {
   static std::vector<Ragdolls::Draw> bones;
   bones.clear();
   glife_->life.ragdolls().draw(bones);
-  people_art_.ragdolls(bones);
+  people_art_.ragdolls(bones, glife_->life.ragdolls());
 }
 
 }  // namespace sc

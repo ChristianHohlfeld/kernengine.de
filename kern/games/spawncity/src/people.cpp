@@ -193,9 +193,9 @@ void People::apply_snapshot(const std::vector<NetPerson>& list, f32 now) {
   }
 }
 
-void People::spawn(const PeopleView& view, Rng& rng, f32 now) {
+void People::spawn(const PeopleView& view, const CityStream& city, Rng& rng, f32 now) {
   if (puppets_) return;  // MP client: the host's citizens
-  const std::vector<Lane>& lanes = view.city->lanes();
+  const std::vector<Lane>& lanes = city.lanes();
   if (lanes.empty()) return;
   u32 alive = count(Kind::citizen, false);
   const f32 near = alive < budget_ / 2 ? 12.0f : 70.0f;  // the first fill may start close by
@@ -231,16 +231,21 @@ void People::spawn(const PeopleView& view, Rng& rng, f32 now) {
     const f32 d = near_any(view, at);
     const Vec3 around = view.foci.empty() || (attempt % (view.foci.size() + 1)) == 0 ? view.focus : view.foci[attempt % (view.foci.size() + 1) - 1];
     if (d < near || dist2d(at, around) > show_) continue;
-    if (inside_building(*view.physics, at, view.city->ground_height(at.x, at.y))) {
+    if (inside_building(*view.physics, at, city.ground_height(at.x, at.y))) {
       p.side = -p.side;  // the other pavement, else closer to the kerb
       route_point(p, lanes, at, heading);
-      if (inside_building(*view.physics, at, view.city->ground_height(at.x, at.y))) {
+      if (inside_building(*view.physics, at, city.ground_height(at.x, at.y))) {
         p.off = L.width * 0.5f + 0.5f;
         route_point(p, lanes, at, heading);
-        if (inside_building(*view.physics, at, view.city->ground_height(at.x, at.y))) continue;
+        if (inside_building(*view.physics, at, city.ground_height(at.x, at.y))) continue;
       }
     }
-    if (view.can_spawn && !view.can_spawn(at)) continue;  // nobody may see them appear
+    if (view.spawn_watched) {  // nobody may see them appear
+      // (whether buildings hide the point is the Blueprint's own question to the world)
+      const bool unseen = spawn::can_spawn(view.spawn_viewers, at, view.spawn_far_entry, view.spawn_height);
+      ++(unseen ? spawns_allowed_ : spawns_denied_);
+      if (!unseen) continue;
+    }
     const u32 seed = id;
     p.seed = seed;
     p.pos = at;
@@ -434,8 +439,8 @@ void People::blast(Vec3 at, f32 radius, f32 damage, bool by_player, f32 now) {
   frighten(at, radius * 2.5f, now, 1.6f);
 }
 
-void People::walk(Person& p, f32 dt, f32 now, const PeopleView& view, Rng& rng) {
-  const std::vector<Lane>& lanes = view.city->lanes();
+void People::walk(Person& p, f32 dt, f32 now, const PeopleView& view, const CityStream& city, Rng& rng) {
+  const std::vector<Lane>& lanes = city.lanes();
   const kern::physics::World& w = *view.physics;
   if (p.state == State::flee) {
     if (now < p.flee_until) {
@@ -542,8 +547,9 @@ void People::walk(Person& p, f32 dt, f32 now, const PeopleView& view, Rng& rng) 
   }
 }
 
-void People::update(f32 dt, f32 now, const PeopleView& view, Rng& rng) {
-  if (!view.physics || !view.city) return;
+void People::update(f32 dt, f32 now, const PeopleView& view, const CityStream& city, Rng& rng) {
+  spawns_allowed_ = spawns_denied_ = 0;
+  if (!view.physics) return;
   if (dt <= 0) return;
   for (Person& p : people_) {
     if (p.state == State::gone) continue;
@@ -563,11 +569,11 @@ void People::update(f32 dt, f32 now, const PeopleView& view, Rng& rng) {
       p.pos.y += d.y * k;
     } else if (p.kind == Kind::citizen) {
       if (near_any(view, p.pos) > hide_) { p.state = State::gone; continue; }
-      if (p.state != State::fight) walk(p, dt, now, view, rng);
+      if (p.state != State::fight) walk(p, dt, now, view, city, rng);
     }
     p.phase += p.v * dt * 3.4f;
     // On the terrain (terrain.h): everybody stands on the ground's surface.
-    p.pos.z = view.city->ground_height(p.pos.x, p.pos.y);
+    p.pos.z = city.ground_height(p.pos.x, p.pos.y);
     if (p.remote) continue;  // a mate's unit stands where he has it: nothing here throws it
     // Vehicles: knocked down by anything driving into them (SpawnCity: person-hit / person).
     for (const VehicleView& v : view.vehicles) {
@@ -602,7 +608,7 @@ void People::update(f32 dt, f32 now, const PeopleView& view, Rng& rng) {
       break;
     }
   }
-  spawn(view, rng, now);
+  spawn(view, city, rng, now);
 }
 
 }  // namespace sc

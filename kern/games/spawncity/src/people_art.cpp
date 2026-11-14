@@ -321,9 +321,9 @@ Vec3 PeopleArt::hair_color(const People::Person& p) {
   return kHair[(p.seed >> 5) % 6];
 }
 
-void PeopleArt::ragdolls(const std::vector<Ragdolls::Draw>& bones) {
+void PeopleArt::ragdolls(const std::vector<Ragdolls::Draw>& bones, const Ragdolls& dolls) {
   for (const Ragdolls::Draw& d : bones) {
-    const Ragdolls::Colors& c = d.colors;
+    const Ragdolls::Colors& c = dolls.colors(d.doll);
     switch (d.bone) {
       case Ragdolls::pelvis: put(rd_pelvis_, d.pose, c.pants); break;
       case Ragdolls::chest:

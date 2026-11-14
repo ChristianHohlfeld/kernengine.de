@@ -557,6 +557,8 @@ class Game {
   bool gaps_command(const std::string& cmd, std::string& out);
   void gaps_camera(kern::Camera& c);
   bool gaps_can_spawn(Vec3 p, f32 height, f32 far_entry) const;
+  /// Who watches arrivals now (gaps_can_spawn's viewers); false: nobody - anything may appear.
+  bool gaps_spawn_viewers(std::vector<spawn::Viewer>& vs) const;
   bool gaps_vehicle_spawn_ok(i32 car, Vec3 pos, f32 yaw) const;
   bool car_towed(i32 car) const;  // a tow truck has it as its job (game_traffic.cpp)
   bool gaps_drone_due(u32 slot, i32 stars);
