@@ -31,11 +31,11 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
-#include <cstring>
 
 #include "game.h"
 #include "game_life.h"
 #include "mp_rules.h"
+#include "wire.h"
 
 namespace sc {
 
@@ -55,22 +55,6 @@ constexpr f32 kCarReach = 460;       // ... the cars (the traffic lives within 3
 constexpr f32 kAnimalReach = 320;    // ... the cows, dogs, cats and pigeons
 constexpr u8 kCars = 1, kPeople = 2, kJoggers = 3, kCows = 5, kPets = 6, kFlocks = 7;  // (4 was the animals in one message)
 
-struct Wr {
-  std::vector<u8> b;
-  template <class T> void put(T v) { const u8* p = reinterpret_cast<const u8*>(&v); b.insert(b.end(), p, p + sizeof(T)); }
-};
-struct Rd {
-  const std::vector<u8>& b;
-  std::size_t at = 0;
-  bool ok = true;
-  template <class T> T get() {
-    T v{};
-    if (at + sizeof(T) > b.size()) { ok = false; return v; }
-    std::memcpy(&v, b.data() + at, sizeof(T));
-    at += sizeof(T);
-    return v;
-  }
-};
 i16 q16(f32 v) { return static_cast<i16>(std::lround(clampf(v, -1, 1) * 32767)); }
 f32 uq16(i16 v) { return static_cast<f32>(v) / 32767; }
 i16 cms(f32 v) { return static_cast<i16>(std::lround(clampf(v * 100, -32000, 32000))); }
@@ -183,11 +167,20 @@ void Game::worldsync_update(f32 dt) {
       struct List {
         Game* g; u8 to, type; Vec3 o; u32 t_ms;
         std::vector<u8> extra;  // after the header of every part (the list's own header)
-        Wr w;
+        std::vector<u8> w;
         u8 n = 0, part = 0;
-        void head() { w.b.clear(); w.put(type); w.put<u8>(0); w.put(part); w.put(o.x); w.put(o.y); w.put(o.z); w.put(t_ms); w.b.insert(w.b.end(), extra.begin(), extra.end()); n = 0; }
-        void flush(bool last) { w.b[1] = static_cast<u8>(n | (last ? 0x80 : 0)); g->net_.send_world_to(to, w.b); ++part; head(); }
-        void entry(const std::vector<u8>& e) { if (n >= 120 || w.b.size() + e.size() > 1100) flush(false); w.b.insert(w.b.end(), e.begin(), e.end()); ++n; }
+        void head() {
+          w.clear();
+          wire::put_u8(w, type);
+          wire::put_u8(w, 0);
+          wire::put_u8(w, part);
+          wire::put_f32(w, o.x); wire::put_f32(w, o.y); wire::put_f32(w, o.z);
+          wire::put_u32(w, t_ms);
+          w.insert(w.end(), extra.begin(), extra.end());
+          n = 0;
+        }
+        void flush(bool last) { w[1] = static_cast<u8>(n | (last ? 0x80 : 0)); g->net_.send_world_to(to, w); ++part; head(); }
+        void entry(const std::vector<u8>& e) { if (n >= 120 || w.size() + e.size() > 1100) flush(false); w.insert(w.end(), e.begin(), e.end()); ++n; }
       };
       auto list = [&](u8 type) { List l{this, to, type, o, t_ms, {}, {}, 0, 0}; return l; };
       if (send_cars) {
@@ -199,23 +192,23 @@ void Game::worldsync_update(f32 dt) {
           if (mode_ == Mode::car && static_cast<i32>(i) == car_index_) continue;  // ours: drawn as our car
           const BodyState s = state_of(c.actor);
           if (!near(s.position, kCarReach)) continue;
-          Wr e;
-          e.put(static_cast<u8>(i));
+          std::vector<u8> e;
+          wire::put_u8(e, static_cast<u8>(i));
           const u8 fl = static_cast<u8>((c.car->spec().radius > 0.4f ? 1 : 0) | (c.wreck ? 2 : 0) | (c.input.pedal < -0.05f ? 4 : 0) | (c.burn_until >= 0 ? 8 : 0));
           // at rest (standing, not turning): only named - it is where its last whole entry put it
           const bool rest = kern::length(s.velocity) < 0.03f && kern::length(s.angular) < 0.03f;
           if (rest && (world_tick_ + i) % kRestEvery != 0) {
-            e.put(static_cast<u8>(fl | 0x80));
-            L.entry(e.b);
+            wire::put_u8(e, static_cast<u8>(fl | 0x80));
+            L.entry(e);
             continue;
           }
-          e.put(fl);
-          e.put(static_cast<u16>(((col8(c.color.x) >> 3) << 11) | ((col8(c.color.y) >> 2) << 5) | (col8(c.color.z) >> 3)));
-          e.put(p5(s.position.x, o.x)); e.put(p5(s.position.y, o.y)); e.put(p1(s.position.z, o.z));
-          e.put(q16(s.rotation.x)); e.put(q16(s.rotation.y)); e.put(q16(s.rotation.z)); e.put(q16(s.rotation.w));
-          e.put(cms(s.velocity.x)); e.put(cms(s.velocity.y)); e.put(cms(s.velocity.z));
-          e.put(ang16(c.car->steer_angle()));
-          L.entry(e.b);
+          wire::put_u8(e, fl);
+          wire::put_u16(e, static_cast<u16>(((col8(c.color.x) >> 3) << 11) | ((col8(c.color.y) >> 2) << 5) | (col8(c.color.z) >> 3)));
+          wire::put_i16(e, p5(s.position.x, o.x)); wire::put_i16(e, p5(s.position.y, o.y)); wire::put_i16(e, p1(s.position.z, o.z));
+          wire::put_i16(e, q16(s.rotation.x)); wire::put_i16(e, q16(s.rotation.y)); wire::put_i16(e, q16(s.rotation.z)); wire::put_i16(e, q16(s.rotation.w));
+          wire::put_i16(e, cms(s.velocity.x)); wire::put_i16(e, cms(s.velocity.y)); wire::put_i16(e, cms(s.velocity.z));
+          wire::put_i16(e, ang16(c.car->steer_angle()));
+          L.entry(e);
         }
         L.flush(true);
         ++world_sent_;
@@ -228,14 +221,14 @@ void Game::worldsync_update(f32 dt) {
           for (std::size_t i = 0; i < all.size() && i < 255; ++i) {
             const People::Person& p = all[i];
             if (p.kind != People::Kind::citizen || p.state == People::State::gone || !near(p.pos, kReach)) continue;
-            Wr e;
-            e.put(static_cast<u8>(i));
-            e.put(static_cast<u8>((static_cast<u8>(p.state) & 15) | (now < p.knocked_until ? 16 : 0)));
-            e.put(p.seed);
-            e.put(p5(p.pos.x, o.x)); e.put(p5(p.pos.y, o.y));
-            e.put(ang8(p.yaw));
-            e.put(static_cast<u8>(std::lround(clampf(p.v * 20, 0, 255))));
-            L.entry(e.b);
+            std::vector<u8> e;
+            wire::put_u8(e, static_cast<u8>(i));
+            wire::put_u8(e, static_cast<u8>((static_cast<u8>(p.state) & 15) | (now < p.knocked_until ? 16 : 0)));
+            wire::put_u32(e, p.seed);
+            wire::put_i16(e, p5(p.pos.x, o.x)); wire::put_i16(e, p5(p.pos.y, o.y));
+            wire::put_u8(e, ang8(p.yaw));
+            wire::put_u8(e, static_cast<u8>(std::lround(clampf(p.v * 20, 0, 255))));
+            L.entry(e);
           }
           L.flush(true);
         }
@@ -244,20 +237,20 @@ void Game::worldsync_update(f32 dt) {
         // same round here at the same moment) and every pigeon of every flock near him
         if (glife_) {
           const Life& life = glife_->life;
-          auto quat = [](Wr& e, const Quat& q) { e.put(q16(q.x)); e.put(q16(q.y)); e.put(q16(q.z)); e.put(q16(q.w)); };
+          auto quat = [](std::vector<u8>& e, const Quat& q) { wire::put_i16(e, q16(q.x)); wire::put_i16(e, q16(q.y)); wire::put_i16(e, q16(q.z)); wire::put_i16(e, q16(q.w)); };
           {
             List L = list(kCows);
             L.head();
             for (const Life::Cow& c : life.cows()) {
               if (!near(c.pos, kAnimalReach)) continue;
-              Wr e;
-              e.put(c.key);
-              e.put(p5(c.pos.x, o.x)); e.put(p5(c.pos.y, o.y)); e.put(p1(c.pos.z, o.z));
-              e.put(ang8(c.yaw));
+              std::vector<u8> e;
+              wire::put_u64(e, c.key);
+              wire::put_i16(e, p5(c.pos.x, o.x)); wire::put_i16(e, p5(c.pos.y, o.y)); wire::put_i16(e, p1(c.pos.z, o.z));
+              wire::put_u8(e, ang8(c.yaw));
               const u8 fl = static_cast<u8>((c.dead ? 1 : 0) | (c.walking ? 2 : 0) | (c.carried ? 4 : 0));
-              e.put(fl);
+              wire::put_u8(e, fl);
               if (fl & 5) quat(e, c.rot);
-              L.entry(e.b);
+              L.entry(e);
             }
             L.flush(true);
           }
@@ -265,27 +258,27 @@ void Game::worldsync_update(f32 dt) {
             List L = list(kPets);
             const auto& pets = life.pets();
             {
-              Wr x;
-              x.put(life_epoch());
-              x.put(static_cast<u8>(std::min<std::size_t>(pets.size(), 255)));
+              std::vector<u8> x;
+              wire::put_f64(x, life_epoch());
+              wire::put_u8(x, static_cast<u8>(std::min<std::size_t>(pets.size(), 255)));
               const u8 na = static_cast<u8>(std::min<std::size_t>(life.pet_anchors().size(), 8));
-              x.put(na);
-              for (u8 k = 0; k < na; ++k) { x.put(life.pet_anchors()[k].x); x.put(life.pet_anchors()[k].y); }
-              L.extra = x.b;
+              wire::put_u8(x, na);
+              for (u8 k = 0; k < na; ++k) { wire::put_f32(x, life.pet_anchors()[k].x); wire::put_f32(x, life.pet_anchors()[k].y); }
+              L.extra = x;
             }
             L.head();
             for (std::size_t i = 0; i < pets.size() && i < 255; ++i) {
               const Life::Pet& p = pets[i];
               if ((!p.shown && p.dead_at < 0) || !near(p.pos, kAnimalReach)) continue;  // (in a house / the water, or not near him)
-              Wr e;
-              e.put(static_cast<u8>(i));
-              e.put(p5(p.pos.x, o.x)); e.put(p5(p.pos.y, o.y)); e.put(p1(p.pos.z, o.z));
-              e.put(ang8(p.yaw));
-              e.put(p5(p.off.x, 0)); e.put(p5(p.off.y, 0));
+              std::vector<u8> e;
+              wire::put_u8(e, static_cast<u8>(i));
+              wire::put_i16(e, p5(p.pos.x, o.x)); wire::put_i16(e, p5(p.pos.y, o.y)); wire::put_i16(e, p1(p.pos.z, o.z));
+              wire::put_u8(e, ang8(p.yaw));
+              wire::put_i16(e, p5(p.off.x, 0)); wire::put_i16(e, p5(p.off.y, 0));
               const u8 fl = static_cast<u8>((p.shown ? 1 : 0) | (p.dead_at >= 0 ? 2 : 0) | (p.carried ? 4 : 0));
-              e.put(fl);
+              wire::put_u8(e, fl);
               if (fl & 6) quat(e, p.rot);
-              L.entry(e.b);
+              L.entry(e);
             }
             L.flush(true);
           }
@@ -294,19 +287,19 @@ void Game::worldsync_update(f32 dt) {
             L.head();
             for (const Life::Flock& f : life.flocks()) {
               if (!near({f.at.x, f.at.y, 0}, kAnimalReach + 60)) continue;
-              Wr e;
-              e.put(f.id);
-              e.put(static_cast<u8>(f.air ? 1 : 0));
-              e.put(p5(f.at.x, o.x)); e.put(p5(f.at.y, o.y));
+              std::vector<u8> e;
+              wire::put_u32(e, f.id);
+              wire::put_u8(e, static_cast<u8>(f.air ? 1 : 0));
+              wire::put_i16(e, p5(f.at.x, o.x)); wire::put_i16(e, p5(f.at.y, o.y));
               const u8 nb = static_cast<u8>(std::min<std::size_t>(f.birds.size(), 100));
-              e.put(nb);
+              wire::put_u8(e, nb);
               for (u8 k = 0; k < nb; ++k) {
                 const Life::Pigeon& b = f.birds[k];
-                e.put(static_cast<u8>(b.dead_at >= 0 ? 1 : 0));
-                e.put(p5(b.pos.x, o.x)); e.put(p5(b.pos.y, o.y)); e.put(p1(b.pos.z, o.z));
-                e.put(ang8(b.yaw));
+                wire::put_u8(e, static_cast<u8>(b.dead_at >= 0 ? 1 : 0));
+                wire::put_i16(e, p5(b.pos.x, o.x)); wire::put_i16(e, p5(b.pos.y, o.y)); wire::put_i16(e, p1(b.pos.z, o.z));
+                wire::put_u8(e, ang8(b.yaw));
               }
-              L.entry(e.b);
+              L.entry(e);
             }
             L.flush(true);
           }
@@ -319,14 +312,14 @@ void Game::worldsync_update(f32 dt) {
             List L = list(kJoggers);
             L.head();
             if (running && close) {
-              Wr e;
-              e.put(ch.id);
+              std::vector<u8> e;
+              wire::put_u32(e, ch.id);
               for (const Life::Runner& rn : ch.runners) {
-                e.put<u8>(rn.alive ? 1 : 0);
-                e.put(p5(rn.pos.x, o.x)); e.put(p5(rn.pos.y, o.y));
-                e.put(ang8(rn.yaw));
+                wire::put_u8(e, rn.alive ? 1 : 0);
+                wire::put_i16(e, p5(rn.pos.x, o.x)); wire::put_i16(e, p5(rn.pos.y, o.y));
+                wire::put_u8(e, ang8(rn.yaw));
               }
-              L.entry(e.b);
+              L.entry(e);
             }
             L.flush(true);
           }
@@ -364,12 +357,12 @@ void Game::worldsync_update(f32 dt) {
   if (car_rest_q_.size() < cars_.size()) car_rest_q_.resize(cars_.size());
   const f64 now_ms = kern::now_ms();  // the real clock on both sides: the same pace everywhere
   for (const std::vector<u8>& blob : blobs) {
-    Rd r{blob};
-    const u8 type = r.get<u8>(), count = r.get<u8>(), part = r.get<u8>();
+    wire::Reader r;
+    const u8 type = r.get_u8(blob), count = r.get_u8(blob), part = r.get_u8(blob);
     const bool last = count & 0x80;
     const u8 n = count & 0x7f;
-    const f32 ox = r.get<f32>(), oy = r.get<f32>(), oz = r.get<f32>();
-    const u32 t_ms = r.get<u32>();
+    const f32 ox = r.get_f32(blob), oy = r.get_f32(blob), oz = r.get_f32(blob);
+    const u32 t_ms = r.get_u32(blob);
     if (!r.ok) continue;
     // the host's clock on ours: the smallest (now - his time) seen, rising slowly - every snapshot is
     // then placed at the moment it was taken, so the motion between snapshots is his, not a stepping
@@ -396,9 +389,9 @@ void Game::worldsync_update(f32 dt) {
     if (part < 64) P.mask |= 1ull << part;
     const bool whole = last && part < 64 && P.mask == (part == 63 ? ~0ull : (1ull << (part + 1)) - 1);
     auto un8 = [](u8 a) { return static_cast<f32>(static_cast<i8>(a)) / 128 * kPi; };
-    auto x5 = [&](f32 base) { return base + r.get<i16>() / 20.0f; };
-    auto x1 = [&](f32 base) { return base + r.get<i16>() / 100.0f; };
-    auto quat = [&]() { Quat q; q.x = uq16(r.get<i16>()); q.y = uq16(r.get<i16>()); q.z = uq16(r.get<i16>()); q.w = uq16(r.get<i16>()); const f32 l = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w); if (l > 1e-6f) { q.x /= l; q.y /= l; q.z /= l; q.w /= l; } else q = Quat{}; return q; };
+    auto x5 = [&](f32 base) { return base + r.get_i16(blob) / 20.0f; };
+    auto x1 = [&](f32 base) { return base + r.get_i16(blob) / 100.0f; };
+    auto quat = [&]() { Quat q; q.x = uq16(r.get_i16(blob)); q.y = uq16(r.get_i16(blob)); q.z = uq16(r.get_i16(blob)); q.w = uq16(r.get_i16(blob)); const f32 l = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w); if (l > 1e-6f) { q.x /= l; q.y /= l; q.z /= l; q.w /= l; } else q = Quat{}; return q; };
     if (type == kCars) {
       std::vector<bool>& seen = car_seen_;
       if (seen.size() != cars_.size()) seen.assign(cars_.size(), false);
@@ -417,7 +410,7 @@ void Game::worldsync_update(f32 dt) {
         c.input.pedal = (fl & 4) ? -0.5f : 0;
       };
       for (u8 k = 0; k < n && r.ok; ++k) {
-        const u8 idx = r.get<u8>(), flags = r.get<u8>();
+        const u8 idx = r.get_u8(blob), flags = r.get_u8(blob);
         if (flags & 0x80) {
           // at rest: named only - ours of that name stays as it is (one we do not have yet waits
           // for its whole entry)
@@ -430,14 +423,14 @@ void Game::worldsync_update(f32 dt) {
             }
           continue;
         }
-        const u16 c565 = r.get<u16>();
+        const u16 c565 = r.get_u16(blob);
         const Vec3 col{static_cast<f32>((c565 >> 11) & 31) / 31, static_cast<f32>((c565 >> 5) & 63) / 63, static_cast<f32>(c565 & 31) / 31};
         Vec3 p;
         p.x = x5(ox); p.y = x5(oy); p.z = x1(oz);
         const Quat q = quat();
         Vec3 v;
-        v.x = r.get<i16>() / 100.0f; v.y = r.get<i16>() / 100.0f; v.z = r.get<i16>() / 100.0f;
-        const f32 steer = static_cast<f32>(r.get<i16>()) / 32767 * kPi;
+        v.x = r.get_i16(blob) / 100.0f; v.y = r.get_i16(blob) / 100.0f; v.z = r.get_i16(blob) / 100.0f;
+        const f32 steer = static_cast<f32>(r.get_i16(blob)) / 32767 * kPi;
         if (!r.ok) break;
         // which of our cars plays his: the one that did, else a free one of the kind (car / bus)
         i32 local = -1;
@@ -493,20 +486,20 @@ void Game::worldsync_update(f32 dt) {
     } else if (type == kCows) {
       for (u8 k = 0; k < n && r.ok; ++k) {
         Life::NetCow c;
-        c.key = r.get<u64>();
+        c.key = r.get_u64(blob);
         c.pos.x = x5(ox); c.pos.y = x5(oy); c.pos.z = x1(oz);
-        c.yaw = un8(r.get<u8>());
-        const u8 fl = r.get<u8>();
+        c.yaw = un8(r.get_u8(blob));
+        const u8 fl = r.get_u8(blob);
         c.dead = fl & 1; c.walking = fl & 2; c.carried = fl & 4;
         c.rot = (fl & 5) ? quat() : Quat::axis_angle({0, 0, 1}, c.yaw);
         if (r.ok) cows_acc_.push_back(c);
       }
       if (whole && glife_) glife_->life.apply_cows(cows_acc_, now, snap_at);
     } else if (type == kPets) {
-      const f64 epoch = r.get<f64>();
-      const u8 pet_count = r.get<u8>(), na = r.get<u8>();
+      const f64 epoch = r.get_f64(blob);
+      const u8 pet_count = r.get_u8(blob), na = r.get_u8(blob);
       std::vector<Vec2> anchors(std::min<u8>(na, 8));
-      for (Vec2& a : anchors) { a.x = r.get<f32>(); a.y = r.get<f32>(); }
+      for (Vec2& a : anchors) { a.x = r.get_f32(blob); a.y = r.get_f32(blob); }
       if (!r.ok) continue;
       // the host's wall clock, counted on with ours
       {
@@ -517,11 +510,11 @@ void Game::worldsync_update(f32 dt) {
       }
       for (u8 k = 0; k < n && r.ok; ++k) {
         Life::NetPet p;
-        p.idx = r.get<u8>();
+        p.idx = r.get_u8(blob);
         p.pos.x = x5(ox); p.pos.y = x5(oy); p.pos.z = x1(oz);
-        p.yaw = un8(r.get<u8>());
-        p.off.x = r.get<i16>() / 20.0f; p.off.y = r.get<i16>() / 20.0f;
-        const u8 fl = r.get<u8>();
+        p.yaw = un8(r.get_u8(blob));
+        p.off.x = r.get_i16(blob) / 20.0f; p.off.y = r.get_i16(blob) / 20.0f;
+        const u8 fl = r.get_u8(blob);
         p.shown = fl & 1; p.dead = fl & 2; p.carried = fl & 4;
         p.rot = (fl & 6) ? quat() : Quat::axis_angle({0, 0, 1}, p.yaw);
         if (r.ok) pets_acc_.push_back(p);
@@ -530,45 +523,45 @@ void Game::worldsync_update(f32 dt) {
     } else if (type == kFlocks) {
       for (u8 k = 0; k < n && r.ok; ++k) {
         Life::NetFlock f;
-        f.id = r.get<u32>();
-        f.air = r.get<u8>() != 0;
+        f.id = r.get_u32(blob);
+        f.air = r.get_u8(blob) != 0;
         f.at.x = x5(ox); f.at.y = x5(oy);
-        const u8 nb = r.get<u8>();
+        const u8 nb = r.get_u8(blob);
         for (u8 j = 0; j < nb && r.ok; ++j) {
-          f.dead.push_back(r.get<u8>());
+          f.dead.push_back(r.get_u8(blob));
           Vec3 b;
           b.x = x5(ox); b.y = x5(oy); b.z = x1(oz);
           f.birds.push_back(b);
-          f.yaws.push_back(un8(r.get<u8>()));
+          f.yaws.push_back(un8(r.get_u8(blob)));
         }
         if (r.ok) flocks_acc_.push_back(std::move(f));
       }
       if (whole && glife_) glife_->life.apply_flocks(flocks_acc_, now, snap_at);
     } else if (type == kJoggers) {
       if (n == 0) continue;
-      const u32 id = r.get<u32>();
+      const u32 id = r.get_u32(blob);
       std::array<Vec3, 10> pos;
       std::array<f32, 10> yaw;
       std::array<bool, 10> alive;
       for (u32 k = 0; k < 10; ++k) {
-        alive[k] = r.get<u8>() != 0;
+        alive[k] = r.get_u8(blob) != 0;
         pos[k].x = x5(ox); pos[k].y = x5(oy);
         pos[k].z = city_.ground_height(pos[k].x, pos[k].y);
-        yaw[k] = un8(r.get<u8>());
+        yaw[k] = un8(r.get_u8(blob));
       }
       if (r.ok && glife_) glife_->life.apply_joggers(id, pos, yaw, alive, 10, now, snap_at);
     } else if (type == kPeople) {
       for (u8 k = 0; k < n && r.ok; ++k) {
         People::NetPerson np;
-        np.idx = r.get<u8>();
-        const u8 st = r.get<u8>();
+        np.idx = r.get_u8(blob);
+        const u8 st = r.get_u8(blob);
         np.state = st & 15;
         np.flags = (st & 16) ? 1 : 0;
-        np.seed = r.get<u32>();
+        np.seed = r.get_u32(blob);
         np.pos.x = x5(ox); np.pos.y = x5(oy);
         np.pos.z = city_.ground_height(np.pos.x, np.pos.y);
-        np.yaw = un8(r.get<u8>());
-        np.v = r.get<u8>() / 20.0f;
+        np.yaw = un8(r.get_u8(blob));
+        np.v = r.get_u8(blob) / 20.0f;
         np.at = snap_at;
         if (r.ok) people_acc_.push_back(np);
       }

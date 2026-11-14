@@ -20,11 +20,11 @@
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
 #include <algorithm>
 #include <cmath>
-#include <cstring>
 
 #include "game.h"
 #include "game_life.h"
 #include "mp_rules.h"
+#include "wire.h"
 
 namespace sc {
 
@@ -33,22 +33,6 @@ constexpr u8 kPerson = 0, kCow = 1, kPet = 2, kBird = 3;
 constexpr u8 kHeld = 1, kDone = 2;
 constexpr f32 kSendEvery = 0.05f, kQuiet = 0.5f;
 
-struct Out {
-  std::vector<u8> b;
-  template <class T> Out& put(T v) { const auto* p = reinterpret_cast<const u8*>(&v); b.insert(b.end(), p, p + sizeof(T)); return *this; }
-};
-struct In {
-  const std::vector<u8>& b;
-  std::size_t at = 0;
-  bool ok = true;
-  template <class T> T get() {
-    T v{};
-    if (at + sizeof(T) > b.size()) { ok = false; return v; }
-    std::memcpy(&v, b.data() + at, sizeof(T));
-    at += sizeof(T);
-    return v;
-  }
-};
 kern::i16 q16(f32 v) { return static_cast<kern::i16>(std::lround(clampf(v, -1, 1) * 32767)); }
 f32 uq16(kern::i16 v) { return static_cast<f32>(v) / 32767; }
 kern::i16 cms(f32 v) { return static_cast<kern::i16>(std::lround(clampf(v * 100, -32000, 32000))); }
@@ -135,37 +119,40 @@ void Game::toss_update(f32 dt) {
   t.clock += dt;
   if (t.clock >= kSendEvery && !recs.empty()) {
     t.clock = 0;
-    Out o;
-    o.put(static_cast<u32>(std::lround(static_cast<f64>(now) * 1000)));  // our clock: the others play the track on it
-    o.put(static_cast<u8>(std::min<std::size_t>(recs.size(), 16)));
+    std::vector<u8> o;
+    wire::put_u32(o, static_cast<u32>(std::lround(static_cast<f64>(now) * 1000)));  // our clock: the others play the track on it
+    wire::put_u8(o, static_cast<u8>(std::min<std::size_t>(recs.size(), 16)));
     for (std::size_t i = 0; i < recs.size() && i < 16; ++i) {
       const Rec& r = recs[i];
-      o.put(r.kind).put(r.flags).put(r.id).put(r.p.x).put(r.p.y).put(r.p.z);
-      o.put(q16(r.q.x)).put(q16(r.q.y)).put(q16(r.q.z)).put(q16(r.q.w));
-      o.put(cms(r.v.x)).put(cms(r.v.y)).put(cms(r.v.z));
+      wire::put_u8(o, r.kind);
+      wire::put_u8(o, r.flags);
+      wire::put_u64(o, r.id);
+      wire::put_f32(o, r.p.x); wire::put_f32(o, r.p.y); wire::put_f32(o, r.p.z);
+      wire::put_i16(o, q16(r.q.x)); wire::put_i16(o, q16(r.q.y)); wire::put_i16(o, q16(r.q.z)); wire::put_i16(o, q16(r.q.w));
+      wire::put_i16(o, cms(r.v.x)); wire::put_i16(o, cms(r.v.y)); wire::put_i16(o, cms(r.v.z));
     }
-    net_.send_toss(o.b);
+    net_.send_toss(o);
     ++t.sent;
   }
   t.own.erase(std::remove_if(t.own.begin(), t.own.end(), [](const TossState::Own& o) { return o.done_sent >= 3; }), t.own.end());
 
   // ---- theirs: the newest record of every toss
   for (const net::Session::Blob& m : net_.take_toss()) {
-    In in{m.data};
-    const u32 t_ms = in.get<u32>();
-    const u8 n = in.get<u8>();
+    wire::Reader in;
+    const u32 t_ms = in.get_u32(m.data);
+    const u8 n = in.get_u8(m.data);
     for (u8 k = 0; k < n && in.ok; ++k) {
       TossState::Remote r;
       r.from = m.from;
-      r.kind = in.get<u8>();
-      r.flags = in.get<u8>();
-      r.id = in.get<u64>();
-      r.p.x = in.get<f32>(); r.p.y = in.get<f32>(); r.p.z = in.get<f32>();
+      r.kind = in.get_u8(m.data);
+      r.flags = in.get_u8(m.data);
+      r.id = in.get_u64(m.data);
+      r.p.x = in.get_f32(m.data); r.p.y = in.get_f32(m.data); r.p.z = in.get_f32(m.data);
       Quat q;
-      q.x = uq16(in.get<kern::i16>()); q.y = uq16(in.get<kern::i16>()); q.z = uq16(in.get<kern::i16>()); q.w = uq16(in.get<kern::i16>());
+      q.x = uq16(in.get_i16(m.data)); q.y = uq16(in.get_i16(m.data)); q.z = uq16(in.get_i16(m.data)); q.w = uq16(in.get_i16(m.data));
       const f32 ql = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
       r.q = ql > 1e-6f ? Quat{q.x / ql, q.y / ql, q.z / ql, q.w / ql} : Quat{};
-      r.v.x = in.get<kern::i16>() / 100.0f; r.v.y = in.get<kern::i16>() / 100.0f; r.v.z = in.get<kern::i16>() / 100.0f;
+      r.v.x = in.get_i16(m.data) / 100.0f; r.v.y = in.get_i16(m.data) / 100.0f; r.v.z = in.get_i16(m.data) / 100.0f;
       if (!in.ok || !std::isfinite(r.p.x) || !std::isfinite(r.p.y) || !std::isfinite(r.p.z)) break;
       r.at = now;
       ++t.got;

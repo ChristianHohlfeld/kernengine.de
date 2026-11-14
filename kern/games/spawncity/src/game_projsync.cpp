@@ -12,11 +12,11 @@
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
 #include <algorithm>
 #include <cmath>
-#include <cstring>
 #include <map>
 
 #include "game.h"
 #include "mp_rules.h"
+#include "wire.h"
 
 namespace sc {
 
@@ -24,22 +24,6 @@ namespace {
 constexpr u8 kGone = 1;
 constexpr f32 kSendEvery = 0.05f, kQuiet = 0.6f;
 
-struct Out {
-  std::vector<u8> b;
-  template <class T> Out& put(T v) { const auto* p = reinterpret_cast<const u8*>(&v); b.insert(b.end(), p, p + sizeof(T)); return *this; }
-};
-struct In {
-  const std::vector<u8>& b;
-  std::size_t at = 0;
-  bool ok = true;
-  template <class T> T get() {
-    T v{};
-    if (at + sizeof(T) > b.size()) { ok = false; return v; }
-    std::memcpy(&v, b.data() + at, sizeof(T));
-    at += sizeof(T);
-    return v;
-  }
-};
 kern::i16 dms(f32 v) { return static_cast<kern::i16>(std::lround(clampf(v * 10, -32000, 32000))); }
 }  // namespace
 
@@ -89,33 +73,36 @@ void Game::projsync_update(f32 dt) {
     for (const Rec& r : recs) if (!(r.flags & kGone)) next.emplace_back(r.id, 0);
     S.sent = std::move(next);
     if (!recs.empty()) {
-      Out o;
-      o.put(static_cast<u32>(std::lround(now_ms)));
-      o.put(static_cast<u8>(std::min<std::size_t>(recs.size(), 48)));
+      std::vector<u8> o;
+      wire::put_u32(o, static_cast<u32>(std::lround(now_ms)));
+      wire::put_u8(o, static_cast<u8>(std::min<std::size_t>(recs.size(), 48)));
       for (std::size_t i = 0; i < recs.size() && i < 48; ++i) {
         const Rec& r = recs[i];
-        o.put(r.id).put(r.kind).put(r.flags);
+        wire::put_u16(o, r.id);
+        wire::put_u8(o, r.kind);
+        wire::put_u8(o, r.flags);
         if (r.flags & kGone) continue;
-        o.put(r.p.x).put(r.p.y).put(r.p.z).put(dms(r.v.x)).put(dms(r.v.y)).put(dms(r.v.z));
+        wire::put_f32(o, r.p.x); wire::put_f32(o, r.p.y); wire::put_f32(o, r.p.z);
+        wire::put_i16(o, dms(r.v.x)); wire::put_i16(o, dms(r.v.y)); wire::put_i16(o, dms(r.v.z));
       }
-      net_.send_proj(o.b);
+      net_.send_proj(o);
       ++S.sent_msgs;
     }
   }
 
   // ---- theirs: onto their timelines
   for (const net::Session::Blob& m : net_.take_proj()) {
-    In in{m.data};
-    const u32 t = in.get<u32>();
-    const u8 n = in.get<u8>();
+    wire::Reader in;
+    const u32 t = in.get_u32(m.data);
+    const u8 n = in.get_u8(m.data);
     for (u8 k = 0; k < n && in.ok; ++k) {
-      const u16 id = in.get<u16>();
-      const u8 kind = in.get<u8>(), flags = in.get<u8>();
+      const u16 id = in.get_u16(m.data);
+      const u8 kind = in.get_u8(m.data), flags = in.get_u8(m.data);
       const u32 key = static_cast<u32>(m.from) << 16 | id;
       if (flags & kGone) { if (auto it = S.ghosts.find(key); it != S.ghosts.end()) it->second.gone = true; continue; }
       Vec3 p, v;
-      p.x = in.get<f32>(); p.y = in.get<f32>(); p.z = in.get<f32>();
-      v.x = in.get<kern::i16>() / 10.0f; v.y = in.get<kern::i16>() / 10.0f; v.z = in.get<kern::i16>() / 10.0f;
+      p.x = in.get_f32(m.data); p.y = in.get_f32(m.data); p.z = in.get_f32(m.data);
+      v.x = in.get_i16(m.data) / 10.0f; v.y = in.get_i16(m.data) / 10.0f; v.z = in.get_i16(m.data) / 10.0f;
       if (!in.ok || !std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z)) break;
       ++S.got;
       auto [it, fresh] = S.ghosts.try_emplace(key);
