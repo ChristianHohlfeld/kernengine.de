@@ -2724,6 +2724,13 @@ class Emit:
             node = u.next_node
             u.next_node += 1
             out += ["", f"  KERN_EVENT(on{node}, event_begin)", f"  void on{node}() {{", f"    {f.name}();", "  }"]
+            # ... and ends when the program ends (its destructor - the compiler's: what its fields hold of the engine is
+            # released, in the reverse order of the fields): when the Blueprint's play ends, End Play
+            ended = self.state_ended()
+            if ended:
+                node = u.next_node
+                u.next_node += 1
+                out += ["", f"  KERN_EVENT(on{node}, event_end)", f"  void on{node}() {{", *["    " + x for x in ended], "  }"]
         f.local_names = set(self.taken)   # (its inputs and local variables: see convert_unit)
         f.text = "\n".join(out)
 
@@ -3314,6 +3321,27 @@ class Emit:
                 out += self.ended_box(what, p)
             else:
                 raise Wait(f"the end of a {short}: its field {c['name']} is a list, a map or an array of what ends with it")
+        return out
+
+    def state_ended(self):
+        """What ends with the one object of the state (its destructor): in the reverse order of its fields, each
+        object of the engine a variable of its Blueprint holds or owns is released, each value that holds some
+        ends the same way."""
+        parts, body = self.u.life(self.u.state)
+        if body:
+            short = self.u.state.split("::")[-1]
+            raise Wait(f"the end of the state {short} runs its destructor ~{short}(), which is not written yet")
+        out = []
+        for c, (kind, what) in reversed(parts):
+            name, _ = self.u.state_variable(c["name"])
+            if kind in ("object", "owned"):
+                out += self.release(what, name)
+            elif kind == "value":
+                out += self.ended_parts(what, name)
+            elif kind == "box":
+                out += self.ended_box(what, name)
+            else:
+                raise Wait(f"the end of the state: its field {c['name']} is a list, a map or an array of what ends with it")
         return out
 
     def ended_box(self, q, place):
