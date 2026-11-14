@@ -30,6 +30,7 @@ namespace kern {
 /// A list in a Blueprint's C++: List<Float>, List<Int>, List<Text> ... - a std::vector whose []
 /// never reaches beside the list (logic::List, nodes.h).
 template <class T> using List = logic::List<T>;
+template <class T, std::size_t N> using Fixed = logic::Fixed<T, N>;
 
 /// What a node keeps between runs: the member n<id> of a node with memory (a loop's index, Do
 /// Once, Gate ...). The same four numbers the interpreter keeps for the node.
@@ -92,6 +93,7 @@ struct BlueprintCore : logic::PureNodes {
   using Int = logic::Whole;
   /// A list of values of one type: List<Float>, List<Int> ...
   template <class T> using List = kern::List<T>;
+  template <class T, std::size_t N> using Fixed = kern::Fixed<T, N>;
 
   /// The world the Blueprint runs in (the engine sets it; see logic::BlueprintWorld).
   logic::BlueprintWorld kern_world;
@@ -258,17 +260,21 @@ struct BlueprintCore : logic::PureNodes {
   // What they do is logic::list (nodes.h): the functions the interpreter's nodes call. The values
   // take any list - the type of its items is their setting, list_get<Float>(Scores, 0); the steps
   // change a list variable - the member itself is their first value.
-  /// (each item is made once, where it stands in the list - what is handed over is not copied)
-  template <class T, Setting Count, class... V> static List<T> list_make(V&&... items) {
-    List<T> made;
-    made.reserve(sizeof...(V));
-    (made.emplace_back(T(std::forward<V>(items))), ...);
-    return made;
+  /// Make List gives its values as what they are - that many entries, each made once where it
+  /// stands (what is handed over is not copied): a list of a fixed length. Where a list is
+  /// needed it becomes one; set at a place of a fixed length it asks for no memory at all.
+  template <class T, Setting Count, class... V> static Fixed<T, sizeof...(V)> list_make(V&&... items) {
+    return Fixed<T, sizeof...(V)>(std::in_place, T(std::forward<V>(items))...);
   }
-  template <class T> static Int list_length(const std::type_identity_t<List<T>>& list) { return logic::list::length(list); }
-  template <class T> static const T& list_get(const std::type_identity_t<List<T>>& list, Int index) { return list[index]; }
-  template <class T> static Bool list_contains(const std::type_identity_t<List<T>>& list, const std::type_identity_t<T>& item) { return logic::list::contains(list, item); }
-  template <class T> static Int list_find(const std::type_identity_t<List<T>>& list, const std::type_identity_t<T>& item) { return logic::list::find(list, item); }
+  // (the values read the entries where they stand - of a List or of a Fixed: logic::Items)
+  template <class T> static Int list_length(logic::Items<T> list) { return static_cast<i64>(list.size()); }
+  template <class T> static const T& list_get(logic::Items<T> list, Int index) { return list[index]; }
+  template <class T> static Int list_find(logic::Items<T> list, const std::type_identity_t<T>& item) {
+    for (std::size_t k = 0; k < list.size(); ++k)
+      if (list.first[k] == item) return static_cast<i64>(k);
+    return -1;
+  }
+  template <class T> static Bool list_contains(logic::Items<T> list, const std::type_identity_t<T>& item) { return list_find<T>(list, item) >= 0; }
   template <class T> static void list_add(List<T>& list, std::type_identity_t<T> item) { logic::list::add(list, std::move(item)); }
   template <class N, class T> static void list_add(N& n, List<T>& list, std::type_identity_t<T> item) { n.index = logic::list::add(list, std::move(item)); }
   template <class T> static void list_insert(List<T>& list, Int index, std::type_identity_t<T> item) { logic::list::insert(list, index, std::move(item)); }
@@ -278,8 +284,10 @@ struct BlueprintCore : logic::PureNodes {
   template <class T> static void list_clear(List<T>& list) { logic::list::clear(list); }
   /// (in one go: what std::vector does in one request for memory - resize, insert of a range, reserve)
   template <class T> static void list_resize(List<T>& list, Int length, const std::type_identity_t<T>& value) { logic::list::resize(list, length, value); }
-  template <class T> static void list_append(List<T>& list, const std::type_identity_t<List<T>>& items) { logic::list::append(list, items); }
-  template <class T> static void list_insert_list(List<T>& list, Int index, const std::type_identity_t<List<T>>& items) { logic::list::insert_list(list, index, items); }
+  template <class T> static void list_append(List<T>& list, std::type_identity_t<logic::Items<T>> items) {
+    logic::list::insert_items(list, static_cast<i64>(list.size()), items.first, items.count);
+  }
+  template <class T> static void list_insert_list(List<T>& list, Int index, std::type_identity_t<logic::Items<T>> items) { logic::list::insert_items(list, index, items.first, items.count); }
   template <class T> static void list_reserve(List<T>& list, Int count) { logic::list::reserve(list, count); }
 
   // ---- variables ----

@@ -467,7 +467,7 @@ void add_variables(Library& lib) {
       const std::vector<i64> at = c.path();
       const Graph& g = c.instance().graph();
       Variable named;
-      const TypeRef type = g.place_of(c.node(), named) ? TypeRef{named.type, named.of} : TypeRef{value.type, {}};
+      const TypeRef type = g.place_of(c.node(), named) ? declared(named) : TypeRef{value.type, {}};  // (a list of a fixed length keeps its length)
       Value now;
       c.instance().change(c.node(), at, [&](Value& v) {
         v = from_outside(value, type, g);
@@ -492,7 +492,7 @@ void add_variables(Library& lib) {
       const std::vector<i64> at = c.path();
       const Graph& g = c.instance().graph();
       Variable named;
-      Value taken = g.place_of(c.node(), named) ? zero_of(TypeRef{named.type, named.of}, g) : Value();
+      Value taken = g.place_of(c.node(), named) ? zero_of(declared(named), g) : Value();
       c.instance().change(c.node(), at, [&](Value& v) { std::swap(taken, v); });
       c.out("value", taken);
       return 0;
@@ -702,8 +702,11 @@ void add_lists(Library& lib) {
   };
   auto needs_list = [](const Node& n, const Graph& g) {
     Variable named;
-      const Variable* v = g.place_of(n, named) ? &named : nullptr;
-    return v && !is_list(v->type) ? "needs a list variable: \"" + v->name + "\" is " + std::string(pin_type_name(v->type)) : std::string();
+    const Variable* v = g.place_of(n, named) ? &named : nullptr;
+    if (v && !is_list(v->type)) return "needs a list variable: \"" + v->name + "\" is " + std::string(pin_type_name(v->type));
+    if (v && v->count)
+      return "\"" + v->name + "\" is a list of a fixed length (" + std::to_string(v->count) + "): its entries are set (" + v->name + "[index] = value) - nothing is added to it or taken out";
+    return std::string();
   };
   // A step on the list variable of the node: `change(items, c)` with the vector of its items.
   // The inputs have been read by then (each exactly once, whatever the variable is).
@@ -722,6 +725,10 @@ void add_lists(Library& lib) {
   // node's own inputs have been read by then; the indices of its path are read here.
   auto on_list = [](Context& c, const std::function<void(Value&)>& change) {
     const std::vector<i64> at = c.path();
+    // (a list of a fixed length keeps its length: the check refuses these steps there - a graph
+    // that runs all the same changes nothing)
+    Variable named;
+    if (c.instance().graph().place_of(c.node(), named) && named.count) return;
     c.instance().change(c.node(), at, [&](Value& v) {
       if (is_list(v.type)) change(v);
     });
@@ -1052,8 +1059,11 @@ void add_structs(Library& lib) {
       retype(out[0], {PinType::structure, n.param("struct")}, g);
     };
     d.run = [](Context& c) {
+      const Graph& g = c.instance().graph();
+      const StructType* s = g.structure(c.param("struct"));
       std::vector<Value> fields;
-      for (std::size_t k = 0; k < c.input_count(); ++k) fields.push_back(c.in(k));  // (the fields one after the other, in their order)
+      // (the fields one after the other, in their order - a list of a fixed length at its length)
+      for (std::size_t k = 0; k < c.input_count(); ++k) fields.push_back(s && k < s->fields.size() && s->fields[k].type.count ? fitted(c.in(k), s->fields[k].type, g) : c.in(k));
       c.out(std::size_t{0}, structs::make(std::move(fields)));
       return kStop;
     };
@@ -1344,7 +1354,7 @@ void add_functions(Library& lib) {
       const Function* f = c.instance().graph().function(c.param("function"));
       std::vector<std::pair<std::string, Value>> values;
       if (f)
-        for (const FunctionPin& p : f->outputs) values.emplace_back(p.name, c.in(p.name));
+        for (const FunctionPin& p : f->outputs) values.emplace_back(p.name, p.count ? fitted(c.in(p.name), declared(p), c.instance().graph()) : c.in(p.name));
       c.instance().return_values(c.param("function"), values);
       return kStop;
     };

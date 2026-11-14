@@ -3912,6 +3912,93 @@ TEST(game_blueprints_as_classes) {
   }
 }
 
+TEST(logic_fixed_lists) {
+  // A place can be declared as a list of a fixed length - Fixed<Float, 3>, std::array in a
+  // Blueprint's C++: a variable, a field, an input, an output, a local variable. What flows
+  // through a pin stays a list; the place keeps its length.
+  const std::string head = "struct B : kern::Blueprint {\n  KERN_STRUCT(Mat) {\n    Fixed<Float, 4> m = Fixed<Float, 4>{1.0, 0.0, 0.0, 1.0};\n  };\n"
+                           "  Fixed<Float, 3> Axis = Fixed<Float, 3>{1.0, 2.0, 3.0};\n  List<Float> Any = List<Float>{};\n  Mat Now = Mat{Fixed<Float, 4>{1.0, 0.0, 0.0, 1.0}};\n";
+  auto in_event = [](const std::string& lines) { return "  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, Float value, Text text) {\n" + lines + "\n  }\n"; };
+  auto read = [&](const std::string& body, logic::Graph& g, std::string& error) { return logic::from_cpp(head + body + "};\n", g, nullptr, &error); };
+  auto says = [&](const std::string& body, const char* why) {
+    logic::Graph g;
+    std::string error;
+    const bool is_read = read(body, g, error);
+    if (is_read) error = logic::cpp_problem(g);
+    for (const logic::Issue& i : is_read ? logic::check(g) : std::vector<logic::Issue>())
+      if (i.error) error += " | " + i.text;
+    const bool right = error.find(why) != std::string::npos;
+    if (!right) std::printf("expected \"%s\", got: %s\n", why, error.empty() ? "(nothing is wrong with it)" : error.c_str());
+    return right;
+  };
+  {
+    // the text and the graph: the declaration with its length, the default with every entry
+    logic::Graph g, back;
+    std::string error, text, twice;
+    CHECK(read("  struct GiveResult { Fixed<Float, 3> v = Fixed<Float, 3>{0.0, 0.0, 0.0}; };\n  GiveResult Give(const Fixed<Float, 3>& seen, Fixed<Float, 3>& into, Fixed<Float, 3> v = Fixed<Float, 3>{1.0}) {\n"
+               "    Fixed<Float, 2> Pair = Fixed<Float, 2>{};\n    Pair[0] = v[0];\n    into[1] = seen[2];\n    return {v};\n  }\n" + in_event("    Axis[1] = value;\n    Any = Axis;\n    Axis = Any;\n    Now.m[3] = Axis[0];"),
+               g, error));
+    if (!error.empty()) std::printf("%s\n", error.c_str());
+    CHECK(g.variable("Axis") && g.variable("Axis")->count == 3 && g.variable("Axis")->type == logic::PinType::number_list && g.variable("Any")->count == 0);
+    CHECK(g.structure("Mat") && g.structure("Mat")->fields[0].type.count == 4);
+    const logic::Function* give = g.function("Give");
+    CHECK(give && give->input("v")->count == 3 && give->input("seen")->count == 3 && give->input("into")->ref && give->outputs[0].count == 3 && give->locals[0].count == 2);
+    CHECK(json::stringify(give->input("v")->value) == "[1,0,0]" && json::stringify(give->locals[0].value) == "[0,0]");  // (what a default does not say is zero)
+    CHECK(logic::to_cpp(g, "B", text, &error, logic::library(), false));
+    CHECK(text.find("  GiveResult Give(const Fixed<Float, 3>& seen, Fixed<Float, 3>& into, Fixed<Float, 3> v = Fixed<Float, 3>{1.0, 0.0, 0.0}) {\n    Fixed<Float, 2> Pair = Fixed<Float, 2>{0.0, 0.0};\n") != std::string::npos);
+    CHECK(logic::from_cpp(text, back, nullptr, &error) && logic::to_cpp(back, "B", twice, &error, logic::library(), false) && twice == text);
+    CHECK(logic::graph_from_json(logic::graph_to_json(g), back) && back == g);
+    std::string difference;
+    logic::Graph other = g;
+    other.variables[0].count = 4;
+    CHECK(!logic::same_blueprint(g, other, &difference));
+    for (const logic::Issue& i : logic::check(g)) CHECK(!i.error);
+    // every tier keeps the length: a longer list is cut, a shorter one filled up
+    for (bool jit : {false, true}) {
+      FakeLogicHost host;
+      logic::Runtime rt(host);
+      rt.jit = jit;
+      rt.native = false;
+      logic::Instance* inst = rt.add(g, 0, "Level");
+      rt.begin();
+      rt.call("Go", 0, {{"value", logic::Value::number(7)}});
+      CHECK(inst->get("Axis").as_text() == "[1, 7, 3]" && inst->get("Any").as_text() == "[1, 7, 3]" && inst->get("Now").field(0)->size() == 4 && host.errors.empty());
+      CHECK(inst->set("Axis", logic::Value::of(std::vector<f64>{5, 6})) && inst->get("Axis").as_text() == "[5, 6, 0]");
+      CHECK(inst->set("Axis", logic::Value::of(std::vector<f64>{1, 2, 3, 4, 5})) && inst->get("Axis").as_text() == "[1, 2, 3]");
+      std::vector<logic::Value> results;
+      CHECK(inst->call("Give", {logic::Value::of(std::vector<f64>{1}), logic::Value::of(std::vector<f64>{}), logic::Value::of(std::vector<f64>{9, 8, 7, 6})}, results));
+      CHECK(results.size() == 2 && results[0].as_text() == "[9, 8, 7]" && results[1].as_text() == "[0, 0, 0]");  // (what it gives, and what it made of the reference)
+    }
+  }
+  // what the notation refuses - with the reason
+  CHECK(says(in_event("    list_add(Axis, 1.0);"), "\"Axis\" is a list of a fixed length (3)"));
+  CHECK(says(in_event("    list_clear(Now.m);"), "is a list of a fixed length (4)"));
+  CHECK(says(in_event("    list_resize(Axis, 5, 0.0);"), "is a list of a fixed length (3)"));
+  CHECK(says("  Fixed<Float, 2> Two = Fixed<Float, 2>{1.0, 2.0, 3.0};\n", "Fixed<Float, 2> has 2 entries: this says 3"));
+  CHECK(says("  Fixed<Float, 0> None = Fixed<Float, 0>{};\n", "a list of a fixed length has 1 to 4096 entries"));
+  CHECK(says("  Fixed<Float, 2> Two = List<Float>{1.0, 2.0};\n", "this is List<Float>, but Fixed<Float, 2> is needed"));
+  CHECK(says("  List<Float> Two = Fixed<Float, 2>{1.0, 2.0};\n", "this is Fixed<Float, 2>, but List<Float> is needed"));
+  CHECK(says(in_event("    Any = Fixed<Float, 2>{1.0, 2.0};"), "a list of a fixed length is what a place is declared as"));
+  CHECK(says("  void Fill(List<Float>& list) {\n    list[0] = 1.0;\n  }\n" + in_event("    Fill(Axis);"), "is float_list, but Axis is float_list[3] - a reference is the place itself, nothing converts"));
+  CHECK(says("  void Fill(Fixed<Float, 4>& list) {\n    list[0] = 1.0;\n  }\n" + in_event("    Fill(Axis);"), "is float_list[4], but Axis is float_list[3]"));
+  CHECK(says("  void Fill(Fixed<Float, 3>& list) {\n    list[0] = 1.0;\n  }\n" + in_event("    Fill(Any);"), "is float_list[3], but Any is float_list"));
+  {
+    // ... and a graph that says it wrong
+    logic::Graph g;
+    g.variables.push_back({"N", logic::PinType::number, json::Value(0.0), {}, {}, 3});
+    json::Value two = json::Value::array();
+    two.push(1.0);
+    two.push(2.0);
+    g.variables.push_back({"L", logic::PinType::number_list, two, {}, {}, 3});
+    g.variables.push_back({"Big", logic::PinType::number_list, json::Value::array(), {}, {}, logic::kLongestFixed + 1});
+    std::string all;
+    for (const logic::Issue& i : logic::check(g)) all += i.text + "\n";
+    CHECK(all.find("variable \"N\" has a fixed length (3), but is float: a length is a list's") != std::string::npos);
+    CHECK(all.find("variable \"L\" is a list of 3 entries, its default has 2") != std::string::npos);
+    CHECK(all.find("variable \"Big\" is a list of 4097 entries") != std::string::npos);
+  }
+}
+
 TEST(logic_notation_hands_over) {
   // std::move stands in a Blueprint's C++ exactly where a value is needed by nothing again - a
   // local variable or an input by value of a function where it is read for the last time, what

@@ -37,7 +37,7 @@ const char* const kCppKeywords[] = {
     "xor", "xor_eq",
 };
 /// Names the notation itself uses inside a Blueprint's struct.
-const char* const kOwnWords[] = {"Bool", "Int", "Float", "Vector", "Text", "Actor", "List", "loop", "machine", "entry", "detached", "kern"};
+const char* const kOwnWords[] = {"Bool", "Int", "Float", "Vector", "Text", "Actor", "List", "Fixed", "loop", "machine", "entry", "detached", "kern"};
 
 bool is_start(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'; }
 bool is_digit(char c) { return c >= '0' && c <= '9'; }
@@ -82,6 +82,8 @@ const char* cpp_type(PinType t) {
 /// A type as the notation writes it: Float, List<Text>; an enum or a struct by its name - Mode,
 /// List<Mode>.
 std::string cpp_type(const TypeRef& t) {
+  // (a list of a fixed length, as a place is declared: Fixed<Float, 16>)
+  if (t.count && is_list(t.type)) return "Fixed<" + cpp_type(TypeRef{element_of(t.type), t.of}) + ", " + std::to_string(t.count) + ">";
   if (element_of(t.type) != PinType::enumeration && element_of(t.type) != PinType::structure) return cpp_type(t.type);
   return is_list(t.type) ? "List<" + t.of + ">" : t.of;
 }
@@ -170,12 +172,21 @@ std::string literal(const Value& v) {
 /// A value as the notation writes it, where it may be an enum's or a struct's: `of` says which,
 /// `g` has its declaration - Mode::Open, List<Mode>{Mode::Closed, Mode::Open}; a struct with
 /// every field, in their order: Weapon{"Knife", Kind::Melee, 25.0}.
-std::string literal(const Value& v, const std::string& of, const Graph& g, std::size_t depth = 0) {
+std::string literal(const Value& v, const std::string& of, const Graph& g, std::size_t depth = 0);
+/// The same for what a place is declared as: a list of a fixed length is written with its type,
+/// Fixed<Float, 3>{0.0, 0.0, 0.0} - every entry, as the place holds them.
+std::string literal(const Value& v, const TypeRef& declared, const Graph& g, std::size_t depth = 0) {
+  const std::string text = literal(v, declared.of, g, depth);
+  if (!declared.count || !is_list(declared.type) || v.type != declared.type) return text;
+  const std::size_t list = cpp_type(TypeRef{declared.type, declared.of}).size();  // ("List<Float>": what the list's own text begins with)
+  return text.size() >= list ? cpp_type(declared) + text.substr(list) : text;
+}
+std::string literal(const Value& v, const std::string& of, const Graph& g, std::size_t depth) {
   if (element_of(v.type) == PinType::structure) {
     const StructType* s = depth < g.structs.size() ? g.structure(of) : nullptr;  // (a struct holds structs declared above it: no deeper than there are structs)
     auto one = [&](const Value& x) {
       std::string r = of + "{";
-      for (std::size_t k = 0; s && k < s->fields.size(); ++k) r += (k ? ", " : "") + literal(field_of(x, *s, k, g), s->fields[k].type.of, g, depth + 1);
+      for (std::size_t k = 0; s && k < s->fields.size(); ++k) r += (k ? ", " : "") + literal(field_of(x, *s, k, g), s->fields[k].type, g, depth + 1);
       return r + "}";
     };
     if (v.type == PinType::structure) return one(v);
@@ -1687,7 +1698,7 @@ struct Writer {
         if (!st.from.empty()) continue;
         doc(1, st.help);
         line(1, std::string(st.project ? "KERN_PROJECT_STRUCT(" : "KERN_STRUCT(") + st.name + ") {");
-        for (const StructField& f : st.fields) line(2, cpp_type(f.type) + " " + f.name + " = " + literal(Value::from_json(f.value, f.type.type, g, f.type.of), f.type.of, g) + ";");
+        for (const StructField& f : st.fields) line(2, cpp_type(f.type) + " " + f.name + " = " + literal(Value::from_json(f.value, f.type, g), f.type, g) + ";");
         line(1, "};");
       }
     }
@@ -1696,7 +1707,7 @@ struct Writer {
       for (const Variable& v : g.variables) {
         if (!v.from.empty()) continue;  // (a constant of a library, in the one graph a Blueprint is with it: the library's text has it)
         doc(1, v.help);
-        line(1, std::string(v.constant ? "KERN_CONST " : "") + cpp_type(TypeRef{v.type, v.of}) + " " + v.name + " = " + literal(Value::from_json(v.value, v.type, g, v.of), v.of, g) + ";");
+        line(1, std::string(v.constant ? "KERN_CONST " : "") + cpp_type(declared(v)) + " " + v.name + " = " + literal(Value::from_json(v.value, declared(v), g), declared(v), g) + ";");
       }
     }
     if (!g.machines.empty()) {
@@ -1737,7 +1748,7 @@ struct Writer {
         first = false;
         if (!f.outputs.empty()) {
           std::string members;
-          for (const FunctionPin& p : f.outputs) members += cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type, g, p.of), p.of, g) + "; ";
+          for (const FunctionPin& p : f.outputs) members += cpp_type(declared(p)) + " " + p.name + " = " + literal(Value::from_json(p.value, declared(p), g), declared(p), g) + "; ";
           line(1, "struct " + f.name + "Result { " + members + "};");
         }
         doc(1, f.help);
@@ -1745,8 +1756,8 @@ struct Writer {
         // (an input by value has its default; a reference is the place the call names: Car& car, const Car& car)
         for (const FunctionPin& p : f.inputs)
           args += (args.empty() ? "" : ", ") +
-                  (p.ref ? std::string(p.constant ? "const " : "") + cpp_type(TypeRef{p.type, p.of}) + "& " + p.name
-                         : cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type, g, p.of), p.of, g));
+                  (p.ref ? std::string(p.constant ? "const " : "") + cpp_type(declared(p)) + "& " + p.name
+                         : cpp_type(declared(p)) + " " + p.name + " = " + literal(Value::from_json(p.value, declared(p), g), declared(p), g));
         if (f.external) {
           // (a function of another Blueprint: what it looks like - it is called on an actor)
           line(1, "KERN_EXTERN " + (f.outputs.empty() ? std::string("void") : f.name + "Result") + " " + f.name + "(" + args + ");");
@@ -1754,7 +1765,7 @@ struct Writer {
         }
         line(1, std::string(f.pure ? "KERN_PURE " : "") + (f.outputs.empty() ? std::string("void") : f.name + "Result") + " " + f.name + "(" + args + ") {");
         // (its local variables: every call starts with them as they stand here)
-        for (const FunctionPin& l : f.locals) line(2, cpp_type(TypeRef{l.type, l.of}) + " " + l.name + " = " + literal(Value::from_json(l.value, l.type, g, l.of), l.of, g) + ";");
+        for (const FunctionPin& l : f.locals) line(2, cpp_type(declared(l)) + " " + l.name + " = " + literal(Value::from_json(l.value, declared(l), g), declared(l), g) + ";");
         // (a path that ends without a Return gives the outputs' defaults)
         if (!body(e, 2) && !f.outputs.empty()) line(2, "return {};");
         line(1, "}");
@@ -2133,7 +2144,7 @@ struct Reader {
   /// A literal: true, 12, -0.5, "text", Vector{x, y, z}, Actor{n}. False (nothing read): none here.
   /// A value written out. `of`: which enum or struct it is of, when it is one's value (or a list
   /// of them).
-  bool literal_here(Value& v, std::string* of = nullptr) {
+  bool literal_here(Value& v, std::string* of = nullptr, u32* count = nullptr) {
     const Tok& t = peek();
     if (of) of->clear();
     if (t.kind == Tok::id && is("{", 1) && g.structure(t.s)) {
@@ -2202,23 +2213,38 @@ struct Reader {
       v = Value::actor(static_cast<ActorRef>(a));
       return true;
     }
-    if (t.kind == Tok::id && t.s == "List" && is("<", 1)) {
-      // List<Float>{1.0, 2.5}
+    if (t.kind == Tok::id && (t.s == "List" || t.s == "Fixed") && is("<", 1)) {
+      // List<Float>{1.0, 2.5} - and a list of a fixed length: Fixed<Float, 3>{1.0, 2.5} (what it
+      // does not say is the zero of its entries, as in C++; it says no more than it has)
       TypeRef list;
+      const std::size_t at = p;
       if (!type_here(list)) return true;
       if (!expect("{", "(a list written out is " + cpp_type(list) + "{...})")) return true;
       json::Value items = json::Value::array();
       std::vector<Value> structs;
+      std::size_t said = 0;
       while (!is("}")) {
         Value item;
         if (!typed_literal({element_of(list.type), list.of}, item, "a list's item")) return true;
         if (list.type == PinType::structure_list) structs.push_back(std::move(item));
         else items.push(item.to_json());
+        ++said;
         if (!accept(",")) break;
       }
       if (!expect("}")) return true;
+      if (list.count && said > list.count) {
+        fail(at, cpp_type(list) + " has " + std::to_string(list.count) + " entries: this says " + std::to_string(said));
+        return true;
+      }
       v = list.type == PinType::structure_list ? Value::structures(std::move(structs)) : Value::from_json(items, list.type);
+      if (list.count && !count) {
+        // (a value on its way through a pin is a list: only a place is declared with a length)
+        fail(at, "a list of a fixed length is what a place is declared as - a value written out is " + cpp_type(TypeRef{list.type, list.of}) + "{...}");
+        return true;
+      }
+      if (list.count) v = fitted(std::move(v), list, g);
       if (of) *of = list.of;
+      if (count) *count = list.count;
       return true;
     }
     return false;
@@ -2228,11 +2254,12 @@ struct Reader {
     const std::size_t at = p;
     Value v;
     std::string of;
-    if (!literal_here(v, &of)) return fail(p, what + ": a value of type " + cpp_type(want) + " expected, not " + shown(peek()));
+    u32 count = 0;
+    if (!literal_here(v, &of, &count)) return fail(p, what + ": a value of type " + cpp_type(want) + " expected, not " + shown(peek()));
     if (failed()) return false;
     if (v.type == PinType::integer && want.type == PinType::number) v = Value::number(static_cast<f64>(v.i));
-    if (v.type != want.type || of != want.of)
-      return fail(at, what + ": this is " + cpp_type(TypeRef{v.type, of}) + ", but " + cpp_type(want) + " is needed (like " + literal(zero_of(want, g), want.of, g) + ")");
+    if (v.type != want.type || of != want.of || count != want.count)
+      return fail(at, what + ": this is " + cpp_type(TypeRef{v.type, of, count}) + ", but " + cpp_type(want) + " is needed (like " + literal(zero_of(want, g), want, g) + ")");
     out = v;
     return true;
   }
@@ -2248,16 +2275,24 @@ struct Reader {
       t.of = toks[p++].s;
       return true;
     }
-    if (is("List") && is("<", 1)) {
-      // List<Float>: a list of values of one type
+    if ((is("List") || is("Fixed")) && is("<", 1)) {
+      // List<Float>: a list of values of one type. Fixed<Float, 16>: one of a fixed length - what a
+      // place is declared as (a variable, a field, an input, an output, a local variable).
+      const bool fixed = is("Fixed");
       const Tok inner = peek(2);
       PinType item = PinType::number;
       const bool value = inner.kind == Tok::id && type_of_cpp(inner.s, item);
       const bool of_enum = inner.kind == Tok::id && g.enumeration(inner.s), of_struct = inner.kind == Tok::id && g.structure(inner.s);
-      if ((!value && !of_enum && !of_struct) || !is(">", 3)) return fail(p + 2, shown(inner) + " is no type a list holds: a list is " + kListTypes);
+      if ((!value && !of_enum && !of_struct) || !is(fixed ? "," : ">", 3)) return fail(p + 2, shown(inner) + " is no type a list holds: a list is " + kListTypes);
       p += 4;
       t = value ? TypeRef{list_of(item), {}} : TypeRef{of_enum ? PinType::enumeration_list : PinType::structure_list, inner.s};
-      return true;
+      if (!fixed) return true;
+      const Tok length = peek();
+      const u64 entries = length.kind == Tok::number && !length.real ? std::strtoull(length.s.c_str(), nullptr, 10) : 0;
+      if (entries < 1 || entries > kLongestFixed) return fail(p, "a list of a fixed length has 1 to " + std::to_string(kLongestFixed) + " entries: Fixed<Float, 16>");
+      ++p;
+      t.count = static_cast<u32>(entries);
+      return expect(">");
     }
     return false;
   }
@@ -2443,7 +2478,7 @@ struct Reader {
         while (!is("}")) {
           StructField f;
           // (a field is of a type declared above the struct: the struct itself is none of them)
-          const Tok named = is("List") && is("<", 1) ? peek(2) : peek();
+          const Tok named = (is("List") || is("Fixed")) && is("<", 1) ? peek(2) : peek();
           if (named.kind == Tok::id && named.s == s.name) return fail(p, "the struct " + s.name + " cannot contain itself: a field is of a type declared above the struct");
           if (!type_here(f.type))
             return fail(p, "the struct " + s.name + ": " + shown(peek()) + " is no type here: a field is Bool, Int, Float, Vector, Text, Actor, an enum or a struct declared above this one, or a List of one of them");
@@ -2473,6 +2508,7 @@ struct Reader {
         v.constant = constant;
         v.type = type.type;
         v.of = type.of;
+        v.count = type.count;
         if (!word(v.name, "the variable's name")) return false;
         Value init = zero_of(type, g);
         if (accept("=") && !typed_literal(type, init, v.name)) return false;
@@ -2607,7 +2643,8 @@ struct Reader {
           auto r = results.find(fn);
           if (r == results.end()) return fail(at, "struct " + ret + " { ... }; must be declared above the function");
           for (std::size_t k = 0; k < r->second.first.size(); ++k)
-            f.outputs.push_back({r->second.first[k].first, r->second.first[k].second.type, r->second.second[k].to_json(g, r->second.first[k].second.of), r->second.first[k].second.of});
+            f.outputs.push_back({r->second.first[k].first, r->second.first[k].second.type, r->second.second[k].to_json(g, r->second.first[k].second.of), r->second.first[k].second.of,
+                                 r->second.first[k].second.count});
         }
         while (!is(")")) {
           FunctionPin in;
@@ -2616,6 +2653,7 @@ struct Reader {
           if (!type_here(in_type)) return fail(p, kTypes + shown(peek()));
           in.type = in_type.type;
           in.of = in_type.of;
+          in.count = in_type.count;
           in.ref = accept("&");
           if (in.constant && !in.ref) return fail(p, "a const input is a reference: const " + cpp_type(in_type) + "& name (an input by value is " + cpp_type(in_type) + " name = value)");
           if (!word(in.name, "the input's name")) return false;
@@ -2645,10 +2683,11 @@ struct Reader {
       if (it.kind == Item::function) {
         // Type Name = value;   its local variables, at the top of its body
         Function& f = g.functions.back();
-        for (TypeRef type; ((is("List") && is("<", 1)) || (peek(1).kind == Tok::id && (is("=", 2) || is(";", 2)))) && type_here(type);) {
+        for (TypeRef type; (((is("List") || is("Fixed")) && is("<", 1)) || (peek(1).kind == Tok::id && (is("=", 2) || is(";", 2)))) && type_here(type);) {
           FunctionPin l;
           l.type = type.type;
           l.of = type.of;
+          l.count = type.count;
           const std::size_t where = p;
           if (!word(l.name, "the local variable's name")) return false;
           if (f.local(l.name)) return fail(where, "the function " + f.name + " has the local variable " + l.name + " twice");
@@ -2680,11 +2719,11 @@ struct Reader {
   /// body it is, or a variable of the Blueprint (Graph::Root).
   Graph::Root root_here(const std::string& name, Variable& out) const {
     if (const FunctionPin* l = scope.function ? scope.function->local(name) : nullptr) {
-      out = Variable{l->name, l->type, l->value, {}, l->of};
+      out = Variable{l->name, l->type, l->value, {}, l->of, l->count};
       return Graph::Root::local;
     }
     if (const FunctionPin* in = scope.function ? scope.function->input(name) : nullptr) {
-      out = Variable{in->name, in->type, in->value, {}, in->of};
+      out = Variable{in->name, in->type, in->value, {}, in->of, in->count};
       return !in->ref ? Graph::Root::input : in->constant ? Graph::Root::constant_reference : Graph::Root::reference;
     }
     const Variable* v = g.variable(name);
@@ -4258,26 +4297,26 @@ std::vector<std::pair<std::string, std::string>> described(const Graph& g, const
   add("the number of structs", std::to_string(g.structs.size()));
   for (std::size_t i = 0; i < g.structs.size(); ++i) {
     std::string fields;
-    for (const StructField& f : g.structs[i].fields) fields += cpp_type(f.type) + " " + f.name + " = " + literal(Value::from_json(f.value, f.type.type, g, f.type.of), f.type.of, g) + "; ";
+    for (const StructField& f : g.structs[i].fields) fields += cpp_type(f.type) + " " + f.name + " = " + literal(Value::from_json(f.value, f.type, g), f.type, g) + "; ";
     add("struct " + std::to_string(i + 1), g.structs[i].name + " { " + fields + "}");
     add("the description of struct " + std::to_string(i + 1), g.structs[i].help);
   }
   add("the number of variables", std::to_string(g.variables.size()));
   for (std::size_t i = 0; i < g.variables.size(); ++i) {
     const Variable& v = g.variables[i];
-    add("variable " + std::to_string(i + 1), cpp_type(TypeRef{v.type, v.of}) + " " + v.name + " = " + literal(Value::from_json(v.value, v.type, g, v.of), v.of, g));
+    add("variable " + std::to_string(i + 1), cpp_type(declared(v)) + " " + v.name + " = " + literal(Value::from_json(v.value, declared(v), g), declared(v), g));
     add("the description of variable " + std::to_string(i + 1), v.help);
   }
   add("the number of functions", std::to_string(g.functions.size()));
   for (std::size_t i = 0; i < g.functions.size(); ++i) {
     const Function& f = g.functions[i];
     std::string sig = f.name + (f.pure ? " (pure)" : "") + (f.external ? " (of another Blueprint)" : "") + " (";
-    for (const FunctionPin& p : f.inputs) sig += cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type, g, p.of), p.of, g) + "; ";
+    for (const FunctionPin& p : f.inputs) sig += cpp_type(declared(p)) + " " + p.name + " = " + literal(Value::from_json(p.value, declared(p), g), declared(p), g) + "; ";
     sig += ") -> (";
-    for (const FunctionPin& p : f.outputs) sig += cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type, g, p.of), p.of, g) + "; ";
+    for (const FunctionPin& p : f.outputs) sig += cpp_type(declared(p)) + " " + p.name + " = " + literal(Value::from_json(p.value, declared(p), g), declared(p), g) + "; ";
     sig += ")";
     if (!f.locals.empty()) sig += " with the local variables (";
-    for (const FunctionPin& p : f.locals) sig += cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type, g, p.of), p.of, g) + "; ";
+    for (const FunctionPin& p : f.locals) sig += cpp_type(declared(p)) + " " + p.name + " = " + literal(Value::from_json(p.value, declared(p), g), declared(p), g) + "; ";
     add("function " + std::to_string(i + 1), sig + (f.locals.empty() ? "" : ")"));
     add("the description of function " + std::to_string(i + 1), f.help);
   }

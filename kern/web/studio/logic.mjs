@@ -1310,6 +1310,7 @@ export class LogicEditor {
       <div class="lg-dsec"><div class="lg-dst">Variable</div>
         <div class="lg-drow"><label>Name</label><div><input data-vk="name" value="${lgEsc(v.name)}" spellcheck="false"></div></div>
         <div class="lg-drow"><label>Type</label><div><select data-vk="type">${this.typeOptions(v.type)}</select></div></div>
+        ${lgIsList(v.type) ? `<div class="lg-drow"><label>Length</label><div><input data-vk="count" type="number" min="0" max="4096" step="1" value="${v.count || 0}" title="A list of a fixed length always has that many entries (in C++: Fixed&lt;Float, 16&gt; - std::array). 0: a list of any length."></div></div>` : ""}
         <div class="lg-drow"><label>Constant</label><div><label class="lg-check" title="A constant is read like a variable and never changed: no Set, no Add, no step that changes a list (in C++: KERN_CONST). A library has only constants."><input type="checkbox" data-vk="const"${v.const ? " checked" : ""}></label></div></div>
       </div>
       <div class="lg-dsec"><div class="lg-dst">Default Value</div><div class="lg-drow"><label>${lgEsc(v.name)}</label><div>${val}</div></div>
@@ -1328,7 +1329,7 @@ export class LogicEditor {
       : `<input data-pf="value" class="lg-fval" value="${lgEsc(p.type === "vector" ? (p.value || [0, 0, 0]).join(", ") : p.type === "text" ? (p.value ?? "") : lgNum(p.value))}" title="Default" spellcheck="false">`;
     const rows = (list, side) => list.map((p, i) => `<div class="lg-frow" data-side="${side}" data-pin="${lgEsc(p.name)}">
         <i class="lg-pill" style="--c:${lgColor(p.type)}"></i><input data-pf="name" class="lg-fname" value="${lgEsc(p.name)}" spellcheck="false" title="Name">
-        <select data-pf="type" title="Type">${this.typeOptions(p.type)}</select>${side === "in" ? `<select data-pf="ref" class="lg-fref" title="How the function takes it: its value - or the place the call names, to change it (&amp;) or to read it where it stands (const &amp;). Nothing is copied for a reference.">${[["", "value"], ["ref", "&"], ["const", "const &"]].map(([v, l]) => `<option value="${v}"${v === (p.ref === "const" ? "const" : p.ref ? "ref" : "") ? " selected" : ""}>${l}</option>`).join("")}</select>` : ""}${side === "in" && p.ref ? "" : value(p)}
+        <select data-pf="type" title="Type">${this.typeOptions(p.type)}</select>${lgIsList(p.type) ? `<input data-pf="count" class="lg-fcount" type="number" min="0" max="4096" step="1" value="${p.count || 0}" title="Length. A list of a fixed length always has that many entries (in C++: Fixed&lt;Float, 16&gt; - std::array). 0: a list of any length.">` : ""}${side === "in" ? `<select data-pf="ref" class="lg-fref" title="How the function takes it: its value - or the place the call names, to change it (&amp;) or to read it where it stands (const &amp;). Nothing is copied for a reference.">${[["", "value"], ["ref", "&"], ["const", "const &"]].map(([v, l]) => `<option value="${v}"${v === (p.ref === "const" ? "const" : p.ref ? "ref" : "") ? " selected" : ""}>${l}</option>`).join("")}</select>` : ""}${side === "in" && p.ref ? "" : value(p)}
         ${side === "local" || (side === "in" && p.ref) ? `<button data-pf="get" title="Add a Get node">Get</button>${side === "in" && p.ref === "const" ? "" : `<button data-pf="set" title="Add a Set node">Set</button>`}` : ""}<button data-pf="up" title="Move up"${i === 0 ? " disabled" : ""}>↑</button><button data-pf="remove" title="Remove">×</button></div>` +
         (this.structOf(p.type) ? `<div class="lg-lsub lg-vsub" data-side="${side}" data-fpin="${lgEsc(p.name)}">${this.partsEditor(p.type, p.value)}</div>`
           : lgIsList(p.type) ? `<div class="lg-lsub" data-side="${side}" data-fpin="${lgEsc(p.name)}">${lgListEditor(p.type, p.value, this.data)}</div>` : "")).join("") ||
@@ -1384,7 +1385,7 @@ export class LogicEditor {
       : `<input data-sf="value" class="lg-fval" value="${lgEsc(f.type === "vector" ? (f.value || [0, 0, 0]).join(", ") : f.type === "text" ? (f.value ?? "") : lgNum(f.value))}" title="Default" spellcheck="false">`;
     const rows = s.fields.map((f, i) => `<div class="lg-frow lg-srow" data-field="${lgEsc(f.name)}">
         <i class="lg-pill" style="--c:${lgColor(f.type)}"></i><input data-sf="name" class="lg-fname" value="${lgEsc(f.name)}" spellcheck="false" title="The field's name">
-        <select data-sf="type" title="Type">${this.typeOptions(f.type, without)}</select>${value(f)}
+        <select data-sf="type" title="Type">${this.typeOptions(f.type, without)}</select>${lgIsList(f.type) ? `<input data-sf="count" class="lg-fcount" type="number" min="0" max="4096" step="1" value="${f.count || 0}" title="Length. A list of a fixed length always has that many entries (in C++: Fixed&lt;Float, 16&gt; - std::array). 0: a list of any length.">` : ""}${value(f)}
         <button data-sf="up" title="Move up"${i === 0 ? " disabled" : ""}>↑</button><button data-sf="down" title="Move down"${i === s.fields.length - 1 ? " disabled" : ""}>↓</button>
         <button data-sf="remove" title="Remove this field"${s.fields.length === 1 ? " disabled" : ""}>×</button></div>` +
         (this.structOf(f.type) ? `<div class="lg-lsub lg-vsub" data-sfield="${lgEsc(f.name)}">${this.partsEditor(f.type, f.value)}</div>`
@@ -1504,6 +1505,7 @@ export class LogicEditor {
           else f.onchange = () => {
             if (k === "name") edit({op: "pinRename", side, pin, to: f.value.trim()});
             else if (k === "type") edit({op: "pinType", side, pin, type: f.value});
+            else if (k === "count") edit({op: "pinType", side, pin, type: def.type, count: Math.max(0, Math.floor(+f.value || 0))});
             else if (k === "ref") edit({op: "pinRef", side, pin, ref: f.value});
             else edit({op: "pinValue", side, pin, value: f.type === "checkbox" ? f.checked : def.type === "vector" ? f.value.split(/[,\s]+/).filter(Boolean).map(v => +v || 0) : def.type === "text" ? f.value : (+f.value || 0)});
           };
@@ -1559,6 +1561,7 @@ export class LogicEditor {
           else f.onchange = () => {
             if (k === "name") { if (edit({op: "renameField", field, to: f.value.trim()})?.ok === false) f.value = field; }
             else if (k === "type") { if (edit({op: "fieldType", field, type: f.value})?.ok === false) f.value = def.type; }
+            else if (k === "count") { if (edit({op: "fieldType", field, type: def.type, count: Math.max(0, Math.floor(+f.value || 0))})?.ok === false) f.value = def.count || 0; }
             else edit({op: "fieldValue", field, value: f.type === "checkbox" ? f.checked : f.tagName === "SELECT" ? +f.value : def.type === "vector" ? lgVector(f.value) : def.type === "text" ? f.value : (+f.value || 0)});
           };
         }
@@ -1577,6 +1580,7 @@ export class LogicEditor {
         const k = f.dataset.vk;
         if (k === "name") { if (this.cmd({cmd: "logicVariable", op: "rename", name: variable.name, to: f.value.trim()})?.ok !== false) this.selVar = f.value.trim(); }
         else if (k === "type") this.cmd({cmd: "logicVariable", op: "type", name: variable.name, type: f.value});
+        else if (k === "count") this.cmd({cmd: "logicVariable", op: "type", name: variable.name, type: variable.type, count: Math.max(0, Math.floor(+f.value || 0))});
         else if (k === "const") this.cmd({cmd: "logicVariable", op: "constant", name: variable.name, value: f.checked});
         else {
           const value = f.type === "checkbox" ? f.checked : variable.type === "vector" ? f.value.split(/[,\s]+/).filter(Boolean).map(s => +s || 0) : variable.type === "text" ? f.value : (+f.value || 0);
@@ -2740,6 +2744,7 @@ select.lg-par,select.lg-lit{padding:0 2px}
 .lg-frow .lg-fname{flex:1 1 0}
 .lg-frow select{flex:0 0 74px}
 .lg-frow .lg-fval{flex:0 0 56px}
+.lg-frow .lg-fcount{flex:0 0 46px}
 .lg-frow input[type=checkbox]{flex:0 0 56px;margin:0}
 .lg-frow .lg-dim{flex:0 0 56px}
 .lg-frow button{flex:none;width:22px;height:24px;padding:0;border:1px solid #444;border-radius:3px;background:#262626}

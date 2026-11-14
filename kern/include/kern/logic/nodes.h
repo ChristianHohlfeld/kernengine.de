@@ -5,10 +5,13 @@
 // Nothing here knows about graphs.
 #pragma once
 
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <deque>
+#include <functional>
 #include <initializer_list>
+#include <iterator>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -159,6 +162,77 @@ template <class T> struct List : std::vector<typename detail::Entry<T>::type> {
   }
 };
 
+/// A list of a fixed length in a Blueprint's C++ (Fixed<Float, 16>): what a place is declared as
+/// that always has that many entries - a variable, a field of a struct, an input, an output, a
+/// local variable. It is std::array: it lies where it stands, no memory is asked for. Its
+/// entries are read and set like a list's ([] never reaches beside it either); nothing changes
+/// its length. Given a list, it takes that list's entries - cut at its length, or filled up with
+/// the zero of its entries; where a list is needed it gives a list of its entries (a copy).
+template <class T, std::size_t N> struct Fixed {
+  using Item = typename detail::Entry<T>::type;
+  std::array<Item, N> items{};
+  Fixed() = default;
+  Fixed(std::initializer_list<Item> given) { take(given.begin(), given.size()); }                              // Fixed<Float, 3>{1.0, 2.5}
+  /// (each entry made where it stands: what Make List is given is handed over, not copied)
+  template <class... V>
+    requires(sizeof...(V) == N)
+  explicit Fixed(std::in_place_t, V&&... entries) : items{Item(std::forward<V>(entries))...} {}
+  Fixed(const std::vector<Item>& list) { take(list.data(), list.size()); }                                     // NOLINT (implicit: a list set at the place)
+  template <std::size_t M> Fixed(const Fixed<T, M>& other) { take(other.items.data(), M); }                    // NOLINT (implicit: a list of another length)
+  template <std::size_t M> Fixed(Fixed<T, M>&& other) {                                                        // NOLINT
+    for (std::size_t k = 0; k < N && k < M; ++k) items[k] = std::move(other.items[k]);
+  }
+  Fixed(const Fixed&) = default;
+  Fixed(Fixed&&) = default;
+  Fixed& operator=(const Fixed&) = default;
+  Fixed& operator=(Fixed&&) = default;
+  operator List<T>() const& { return List<T>(typename List<T>::Items(items.begin(), items.end())); }           // NOLINT (implicit: its entries as a list)
+  operator List<T>() && { return List<T>(typename List<T>::Items(std::make_move_iterator(items.begin()), std::make_move_iterator(items.end()))); }  // NOLINT
+  template <class I>
+    requires std::is_integral_v<I> || std::is_same_v<I, Whole>
+  Item& operator[](I index) {
+    const i64 at = static_cast<i64>(index);
+    if (at >= 0 && static_cast<std::size_t>(at) < N) return items[static_cast<std::size_t>(at)];
+    return beside::entry<Item>();
+  }
+  template <class I>
+    requires std::is_integral_v<I> || std::is_same_v<I, Whole>
+  const Item& operator[](I index) const {
+    const i64 at = static_cast<i64>(index);
+    if (at >= 0 && static_cast<std::size_t>(at) < N) return items[static_cast<std::size_t>(at)];
+    static const Item zero{};
+    return zero;
+  }
+  constexpr std::size_t size() const { return N; }
+  const Item* data() const { return items.data(); }
+  auto begin() const { return items.begin(); }
+  auto end() const { return items.end(); }
+  bool operator==(const Fixed&) const = default;
+
+ private:
+  void take(const Item* from, std::size_t count) {
+    for (std::size_t k = 0; k < N && k < count; ++k) items[k] = from[k];
+  }
+};
+/// The entries of a list as a node reads them - of a List or of a Fixed, where they stand:
+/// nothing is copied (std::span).
+template <class T> struct Items {
+  using Item = typename detail::Entry<T>::type;
+  const Item* first = nullptr;
+  std::size_t count = 0;
+  Items(const std::vector<Item>& list) : first(list.data()), count(list.size()) {}                   // NOLINT (implicit: a view of the list)
+  template <std::size_t N> Items(const Fixed<T, N>& list) : first(list.data()), count(N) {}          // NOLINT
+  std::size_t size() const { return count; }
+  const Item* begin() const { return first; }
+  const Item* end() const { return first + count; }
+  /// The entry at `index`; beyond the list: the zero of its type.
+  const Item& operator[](i64 index) const {
+    if (index >= 0 && static_cast<u64>(index) < count) return first[index];
+    static const Item zero{};
+    return zero;
+  }
+};
+
 /// A value of the interpreter as the C++ type of its pin, and back. A list is the vector of its
 /// items; a list of whole numbers is a vector of i64 in the interpreter and of Whole (`Int`) in a
 /// Blueprint's class.
@@ -274,6 +348,10 @@ template <NativeStruct S> struct Held<std::vector<S>> {
 template <class T> struct Held<List<T>> : Held<typename List<T>::Items> {
   static List<T> from(const Value& v) { return List<T>(Held<typename List<T>::Items>::from(v)); }
 };
+// A list of a fixed length: held as the list of its entries (a value on a pin is a list).
+template <class T, std::size_t N> struct Held<Fixed<T, N>> : Held<List<T>> {
+  static Fixed<T, N> from(const Value& v) { return Fixed<T, N>(Held<List<T>>::from(v)); }
+};
 }  // namespace detail
 template <class T> T from_value(const Value& v) { return detail::Held<T>::from(v); }
 /// What a function of the engine gives where a Blueprint's own type stands - one of its structs or
@@ -325,6 +403,7 @@ Value to_value(std::vector<E> v) {
 }
 inline Value to_value(const std::vector<Whole>& v) { return Value::of(std::vector<i64>(v.begin(), v.end())); }
 inline Value to_value(const std::vector<Truth>& v) { return Value::of(std::vector<bool>(v.begin(), v.end())); }
+template <class T, std::size_t N> Value to_value(const Fixed<T, N>& v) { return to_value(List<T>(v)); }  // (a list of a fixed length: its entries as a list)
 
 /// What the list nodes do, for a list of any item type - the node library and a Blueprint's C++
 /// call these. Every one is defined for every index: there is no reading or writing past a
@@ -390,8 +469,21 @@ template <class T> void resize(std::vector<T>& items, i64 length, const std::typ
 template <class T> void reserve(std::vector<T>& items, i64 count) {
   if (count > 0) items.reserve(static_cast<std::size_t>(count > kLongest ? kLongest : count));
 }
-/// Puts the items of `more`, in their order, in front of what is at `index` (before the first: at
-/// the start; past the end: at the end) - in one go. A list into itself: its items as they were.
+/// Puts `count` items from `more` on, in their order, in front of what is at `index` (before the
+/// first: at the start; past the end: at the end) - in one go. Items of the list itself: as they
+/// were.
+template <class T> void insert_items(std::vector<T>& items, i64 index, const T* more, std::size_t count) {
+  const std::ptrdiff_t at = index <= 0 ? 0 : static_cast<u64>(index) >= items.size() ? static_cast<std::ptrdiff_t>(items.size()) : static_cast<std::ptrdiff_t>(index);
+  if (count == 0) return;
+  const std::less<const T*> before;
+  if (!items.empty() && !before(more, items.data()) && before(more, items.data() + items.size())) {
+    const std::vector<T> were(more, more + count);
+    items.insert(items.begin() + at, were.begin(), were.end());
+    return;
+  }
+  items.insert(items.begin() + at, more, more + count);
+}
+/// The same with the items of another list (a list into itself: its items as they were).
 template <class T> void insert_list(std::vector<T>& items, i64 index, const std::vector<T>& more) {
   const std::ptrdiff_t at = index <= 0 ? 0 : static_cast<u64>(index) >= items.size() ? static_cast<std::ptrdiff_t>(items.size()) : static_cast<std::ptrdiff_t>(index);
   if (&more == &items) {
@@ -630,6 +722,7 @@ inline void native_set(Vec3& variable, const Value& v) { variable = v.as_vector(
 inline void native_set(std::string& variable, const Value& v) { variable = v.as_text(); }
 inline void native_set(ActorHandle& variable, const Value& v) { variable = {v.as_actor()}; }
 template <class T> void native_set(std::vector<T>& variable, const Value& v) { variable = from_value<std::vector<T>>(v.converted(pin_type_of<std::vector<T>>())); }
+template <class T, std::size_t N> void native_set(Fixed<T, N>& variable, const Value& v) { variable = from_value<Fixed<T, N>>(v.converted(pin_type_of<Fixed<T, N>>())); }
 template <class E>
   requires std::is_enum_v<E>
 void native_set(E& variable, const Value& v) {

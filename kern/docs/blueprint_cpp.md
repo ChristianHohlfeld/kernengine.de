@@ -206,7 +206,7 @@ KERN_LAYOUT(Demo) {
 | Get Variable | der Name der Variablen – oder der Platz, den der Knoten nennt: `Held.Damage`, `Cars[i].Wheels[j].Slip` |
 | Set / Add to Variable | `Heat = wert;` / `Heat += wert;` – an einem Platz genauso: `Held.Damage = wert;`, `Scores[i] = wert;`, `Cars[i].Speed += wert;`; wird ihr Ergebnis gelesen: `n5.value = (Heat += wert);` |
 | Take Variable | `var_take(Punkte);` – der Platz ist das Argument, eine Variable oder ein Platz in ihr (`var_take(Cars[i].Wheels);`); wird sein Ergebnis gelesen: `var_take(n7, Punkte);` und `n7.value`. Gibt, was am Platz steht, und lässt dort den leeren Wert des Typs (siehe „Übergeben statt kopieren“) |
-| Schritt, der eine Liste ändert (Add to List, Insert, Remove, Clear) | `list_add(Scores, wert);` – der Platz der Liste ist das erste Argument, eine Variable oder eine Liste darin (`list_add(Cars[i].Wheels, rad);`); wird sein Ergebnis gelesen: `list_add(n7, Scores, wert);` und `n7.index` |
+| Schritt, der eine Liste ändert (Add to List, Insert, Remove, Clear – und in einem Zug: Set Length, Append List, Insert List, Reserve) | `list_add(Scores, wert);` – der Platz der Liste ist das erste Argument, eine Variable oder eine Liste darin (`list_add(Cars[i].Wheels, rad);`); wird sein Ergebnis gelesen: `list_add(n7, Scores, wert);` und `n7.index` |
 | Wert-Knoten auf einer Liste (Length, Get Item, Contains, Find, Make List) | `list_get<Float>(Scores, 0)`, `list_make<Text, "2">("a", "b")` – die Einstellung „Type“ ist der Typ der Einträge |
 | For Each | `for (auto it9 = flow_for_each<Float>(n9, Scores); it9.next();) { ... }` – im Rumpf `n9.item` und `n9.index` |
 | Wert-Knoten einer Aufzählung (Equal, Enum to Text, Text to Enum, Enum to Index, Index to Enum, All Values) | `enum_name<Mode>(State)`, `enum_from_name<Mode>(text).value`, `enum_values<Mode>()` – die Einstellung „Enum“ ist die Aufzählung selbst |
@@ -247,6 +247,7 @@ Der Name einer Knotenfunktion ist der Knotentyp mit `_` statt `.` (`math.add` �
 | Liste eines dieser Typen | `List<Bool>`, `List<Int>`, `List<Float>`, `List<Vector>`, `List<Text>`, `List<Actor>` | `List<Float>{1.0, 2.5}`, leer: `List<Float>{}` |
 | Aufzählung des Blueprints, Liste ihrer Werte | ihr Name: `Mode`, `List<Mode>` | `Mode::Open`, `List<Mode>{Mode::Closed, Mode::Open}`, leer: `List<Mode>{}` |
 | Struktur des Blueprints, Liste davon | ihr Name: `Weapon`, `List<Weapon>` | `Weapon{"Knife", Kind::Melee, 25.0}` – ein Wert für jedes Feld, in der Reihenfolge der Deklaration; `List<Weapon>{Weapon{...}, Weapon{...}}`, leer: `List<Weapon>{}` |
+| Liste fester Länge – der Typ eines **Platzes**: einer Variablen, eines Felds, eines Ein- oder Ausgangs, einer lokalen Variablen (siehe „Listen fester Länge“) | `Fixed<Float, 16>`, `Fixed<Weapon, 4>` | `Fixed<Float, 3>{1.0, 2.5, 0.0}` – jeder Eintrag; was nicht dasteht, ist null (`Fixed<Float, 3>{1.0}`), mehr als die Länge ist ein Fehler |
 
 Zahlen stehen in der kürzesten Form, die genau denselben Wert wieder ergibt. Jeder Draht, dessen
 Enden verschiedene Typen haben, ist ein `kern::to<Typ>(...)` – keine stille Umwandlung. Der Wert
@@ -296,12 +297,71 @@ void on1(Actor actor, Float value, Text text) {
 - **Eine Liste wird nur zu Text.** `kern::to<Text>(Scores)` ergibt `[1, 2.5]`; sonst passt eine
   Liste nur in einen Eingang ihres eigenen Typs, und nichts wird still zu einer Liste. (Eine Liste
   einer Aufzählung wird auch nicht zu Text: die Namen ihrer Werte kennt nur die Aufzählung.)
+- **In einem Zug.** Was `std::vector` mit einer Anforderung von Speicher tut, tut ein Schritt:
+  `list_resize(Scores, 10, 0.0);` (Set Length: am Ende abgeschnitten oder mit dem Wert
+  aufgefüllt – kleiner als 0 ist leer, mehr als 16.777.216 Einträge werden es nicht),
+  `list_append(Scores, weitere);` und `list_insert_list(Scores, index, weitere);` (eine ganze
+  Liste hinein, in ihrer Reihenfolge – auch die Liste in sich selbst: ihre Einträge, wie sie
+  waren), `list_reserve(Scores, 64);` (Platz vorhalten: Nichts, was man lesen kann, ändert sich –
+  die Liste wächst danach so weit, ohne noch einmal Speicher anzufordern). Eine Schleife aus
+  einzelnen Add wächst mehrmals; darum gibt es diese Schritte.
 - **Die generischen Knoten** (Length, Get Item, Contains, Find, Make List, For Each, auch Select
   und Reroute) tragen den Typ als Einstellung; im Editor nimmt ein solcher Knoten den Typ des
   ersten Drahts an, der an ihn kommt.
 - **Was sie tun, steht einmal:** `kern::logic::list` in `kern/logic/nodes.h` – die Knoten des
   Interpreters und die Funktionen der Klasse rufen dieselben Funktionen auf.
 - Gameplay: „All Actors with Tag“ (`actor_all_with_tag(tag)`) gibt eine `List<Actor>`.
+
+### Listen fester Länge
+
+Ein **Platz** kann als Liste fester Länge deklariert sein: Er hat immer genau so viele Einträge.
+In C++ ist `Fixed<Float, 16>` ein `std::array` – es liegt dort, wo es steht, und fordert keinen
+Speicher an (eine `List` ist ein `std::vector`: Jede hat ihren eigenen Speicher). Damit kostet
+eine Matrix im Blueprint, was sie im C++ kostet.
+
+```cpp
+KERN_STRUCT(Mat4) {
+  Fixed<Float, 16> m = Fixed<Float, 16>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0};
+};
+Fixed<Float, 3> Axis = Fixed<Float, 3>{0.0, 0.0, 1.0};
+
+struct ScaledResult { Fixed<Float, 3> v = Fixed<Float, 3>{0.0, 0.0, 0.0}; };
+ScaledResult Scaled(const Fixed<Float, 3>& v, Float by = 2.0) {
+  Fixed<Float, 3> Made = Fixed<Float, 3>{0.0, 0.0, 0.0};
+  for (auto it3 = flow_for(n3, 0, 2); it3.next();) {
+    Made[n3.index] = math_mul(v[n3.index], by);
+  }
+  return {std::move(Made)};
+}
+```
+
+- **Die Länge gehört zur Deklaration des Platzes**, nicht zum Wert: Eine Variable, ein Feld einer
+  Struktur, ein Eingang (als Wert oder als Referenz), ein Ausgang und eine lokale Variable einer
+  Funktion können sie haben – 1 bis 4.096 Einträge. Was durch einen Pin fließt, ist eine Liste:
+  Ein Pin hat keine Länge, und die Knoten, die Listen lesen (Length, Get Item, Contains, Find, For
+  Each), lesen eine Liste fester Länge wie jede andere – in der Klasse dort, wo sie steht
+  (`kern::logic::Items`, ohne Kopie).
+- **Einträge werden gesetzt und gelesen wie die einer Liste** (`Axis[1] = wert;`,
+  `Jetzt.m[i]`), auch neben der Liste gilt dasselbe (siehe „Plätze“).
+- **Nichts ändert die Länge.** Add, Insert, Remove, Clear, Set Length, Append, Insert List und
+  Reserve an einem solchen Platz sind ein Fehler des Graphen (`"Axis" is a list of a fixed length
+  (3): its entries are set …`).
+- **Was als Ganzes dort gesetzt wird, hat danach die Länge des Platzes:** eine längere Liste wird
+  abgeschnitten, eine kürzere mit dem Nullwert ihrer Einträge aufgefüllt – bei einem Set, bei
+  Make einer Struktur, bei dem Wert, den ein Aufruf einem Eingang gibt, bei dem, was ein Return
+  gibt, bei einem Wert von außen (`Instance::set`). Ein Take lässt lauter Nullwerte zurück. In
+  der Klasse tut das die Zuweisung an `Fixed`, im Interpreter `logic::fitted`.
+- **Als Ganzes gelesen ist es eine Liste** – eine Kopie mit eigenem Speicher, wie
+  `std::vector(a.begin(), a.end())`. Von einem festen Platz an einen festen (`A.m = B.m;`) wird
+  nichts angefordert.
+- **Make List gibt, was es bekommt, als das, was es ist** – so viele Einträge, in der Klasse ein
+  `Fixed`: an einem festen Platz gesetzt (`Jetzt.m = list_make<Float, "16">(...)`,
+  `struct_make<Mat4>(list_make<Float, "16">(...))`) fordert es keinen Speicher an; wo eine Liste
+  gebraucht wird, wird es eine.
+- **Eine Referenz ist der Platz selbst, nichts wandelt um:** `Fixed<Float, 3>&` bekommt einen
+  Platz, der als `Fixed<Float, 3>` deklariert ist – keine `List<Float>` und keine andere Länge.
+- **Im Dokument** steht die Länge als `"count"` neben dem Typ; im Editor als „Length“ neben dem
+  Typ einer Variablen, eines Felds, eines Pins oder einer lokalen Variablen (0: beliebig lang).
 
 ### Aufzählungen
 
@@ -1105,13 +1165,17 @@ Aufruf Zeichen für Zeichen mit dem Interpreter** – Ergebnisse und alle Variab
 und beim Namen durch eine `logic::Instance`, die den Graphen als diese Klasse ausführt. Dazu
 spielen die Tier-Fälle (`logic_cases.h`), die ein Compiler schon ausführt, als Klassen dasselbe
 Szenario wie Interpreter und JIT – Begin Play, Events, Ticks, Wartezeiten, State Machines – mit
-demselben Ergebnis: alle 22, auch Aufrufe auf einem Blueprint (`call_on`: eine Funktion, die sich
+demselben Ergebnis: alle 24, auch Aufrufe auf einem Blueprint (`call_on`: eine Funktion, die sich
 so selbst aufruft, eine erklärte Funktion, die niemand hat, und Aufrufe ohne Ende), lokale Variablen (`locals`: Zahlen und ein Text, zwei
 Funktionen mit einer gleichnamigen, eine Pure-Funktion, die ihre eigene setzt, und ein Aufruf, den
 ein zweiter Aufruf derselben Funktion unterbricht), Übergeben (`handing_over`: ein Return, das eine
 lokale Variable und Eingänge weiterreicht, ein Set und ein Aufruf, die nehmen, was der Schritt davor
 gab – und daneben dieselben Werte dort, wo sie noch gebraucht und also kopiert werden; Take an einer
-Variablen, einem Feld, einem Listeneintrag, neben einer Liste und in einer lokalen Variablen), Listen (`lists`: jeder Schritt, For Each über eine Liste, die
+Variablen, einem Feld, einem Listeneintrag, neben einer Liste und in einer lokalen Variablen), Listen in
+einem Zug (`lists_at_once`: Set Length kürzt und füllt, Append und Insert List vorn, mittendrin, hinter dem
+Ende und in sich selbst, Reserve), Listen fester Länge (`fixed_lists`: Variable, Feld – auch von Strukturen in
+einer festen Liste –, Ein- und Ausgang, lokale Variable, Referenz; gesetzt mit längeren und kürzeren Listen,
+über Make und Take), Listen (`lists`: jeder Schritt, For Each über eine Liste, die
 ihr Rumpf ändert, und eine Schleife, deren Rumpf sie selbst wieder startet), Aufzählungen
 (`enums`: eine Variable und eine Liste vom Typ einer Aufzählung, Switch on Enum, der Weg zu Index
 und Name und zurück, alle Werte in einem For Each), Strukturen (`structs`: eine Variable und eine

@@ -280,6 +280,8 @@ struct Value {
   /// "Damage": 25} -, written with every field; read, a field that is missing has its default.
   json::Value to_json(const struct Graph& g, std::string_view of) const;
   static Value from_json(const json::Value& j, PinType type, const struct Graph& g, std::string_view of);
+  /// The same for what a place is declared as (TypeRef: a list of a fixed length has that length).
+  static Value from_json(const json::Value& j, const struct TypeRef& declared, const struct Graph& g);
   bool operator==(const Value& o) const;
 };
 
@@ -313,6 +315,9 @@ struct Variable {
   json::Value value;     // default
   std::string help;
   std::string of = {};   // a value of an enum or a struct (or a list of them): its name
+  /// A list of a fixed length: it always has that many entries (0: a list of any length). See
+  /// TypeRef::count.
+  u32 count = 0;
   /// A constant: what it is, it is - read like a variable, never changed (no Set, no Add, no
   /// step that changes a list, no reference that could). In the Blueprint's C++:
   /// KERN_CONST Float Gravity = 9.81;
@@ -343,8 +348,18 @@ struct EnumType {
 struct TypeRef {
   PinType type = PinType::number;
   std::string of;
+  /// What a place is declared as - a variable, a field of a struct, an input, an output or a
+  /// local variable of a function - can be a list of a fixed length: it always has `count`
+  /// entries (0: a list of any length). In a Blueprint's C++ it is Fixed<Float, 16> - std::array:
+  /// it lies where it stands, no memory is asked for. Its entries are read and set like a list's
+  /// (M.m[i]); nothing changes its length (the steps that would are an error of the graph), and
+  /// what is set there as a whole is cut to its length or filled up with zeros. What flows through
+  /// a pin is a list: a pin has no count.
+  u32 count = 0;
   bool operator==(const TypeRef&) const = default;
 };
+/// The longest list of a fixed length a place can be declared as.
+inline constexpr u32 kLongestFixed = 4096;
 /// Can what comes out of a pin of type `from` go into one of type `to`? (convertible, and two
 /// enums are the same enum, two structs the same struct.)
 bool fits(const TypeRef& from, const TypeRef& to);
@@ -411,6 +426,7 @@ struct FunctionPin {
   PinType type = PinType::number;
   json::Value value;     // default: an input nobody wired, an output no Return node set
   std::string of = {};   // a value of an enum or a struct (or a list of them): its name
+  u32 count = 0;         // a list of a fixed length: that many entries (TypeRef::count)
   /// An input that is a reference: the call gives no value but names a place - a variable, a
   /// field or a list entry in one (logic::ref_key) -, and the function works on that place where
   /// it stands. It changes it (Car& car), or - `constant` - only reads it (const Car& car):
@@ -554,8 +570,18 @@ bool is_value_of(const Value& v, const TypeRef& t, const Graph& g);
 void hold_fields(Value& v, const StructType& s, const Graph& g);
 /// What comes from outside (Instance::set, the arguments of Instance::call) as a value of type
 /// `t`: converted as a wire converts; an enum's value that is none of the enum's is the first; and
-/// what is no struct of that type is the struct's default.
+/// what is no struct of that type is the struct's default. A list of a fixed length
+/// (TypeRef::count) has that length: cut, or filled up with the zero of its entries.
 Value from_outside(const Value& v, const TypeRef& t, const Graph& g);
+/// What a place declared as `t` holds when it is given `v`, a value of its pin type: `v` - with
+/// every list of a fixed length in it (the place itself, the fields of its structs) at its
+/// length, cut or filled up with zeros. (A Set, a Make, a call's input, a function's output.)
+Value fitted(Value v, const TypeRef& t, const Graph& g);
+/// Is there a list of a fixed length in what `t` declares (itself, or in a field of its struct)?
+bool has_fixed(const TypeRef& t, const Graph& g);
+/// The type a variable, an input, an output or a local variable is declared as.
+inline TypeRef declared(const Variable& v) { return {v.type, v.of, v.count}; }
+inline TypeRef declared(const FunctionPin& p) { return {p.type, p.of, p.count}; }
 /// The structs `s` holds, directly or in its fields' structs (their names) - itself not among them.
 std::vector<std::string> structs_in(const StructType& s, const Graph& g);
 
