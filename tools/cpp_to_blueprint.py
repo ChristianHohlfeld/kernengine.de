@@ -1512,7 +1512,8 @@ class Unit:
 def blueprint_text(name, uses, types, variables, functions, members, state=False):
     """A library's text, of its parts - or, with `state`, that of a Blueprint that keeps something: the
     variables of a state (World.states)."""
-    out = [f"struct {name} : virtual kern::{'Blueprint' if state else 'Library'}" + "".join(f", virtual {u}" for u in uses) + " {"]
+    # (`virtual` is for a library and for what uses one: a Blueprint that uses none is a kern::Blueprint as such)
+    out = [f"struct {name} : {'virtual ' if uses or not state else ''}kern::{'Blueprint' if state else 'Library'}" + "".join(f", virtual {u}" for u in uses) + " {"]
     if types:
         out += ["  // ---- types ----", *types, ""]
     if variables:
@@ -5924,6 +5925,7 @@ class TestWriter:
         self.made = {}         # a class the test makes by a constructor -> (the constructor, the line that makes it without)
         self.objects = {}      # a class of the engine the source holds objects of -> its stand-in's name in the test
         self.whole = None      # what the test holds (`setup`)
+        self.state_info = None # of a part of the Blueprint of a state: its helpers' names (`state_helpers`) - or why there are none
         self.by_place = None   # the declarations of the tree by where they stand (`at`)
         # what the tests of other source files hand on (`exports`): a function's key -> the places of the
         # pieces its test holds, and the pieces by their places
@@ -6472,6 +6474,64 @@ class TestWriter:
         self.helped.move_to_end(q)   # (after the helpers of the classes it is made of)
         return name
 
+    def state_helpers(self):
+        """The helpers of the test of a part of the Blueprint of a state (World.states): an object of the class
+        whose fields that are the Blueprint's variables are drawn (the others as the class makes them - no
+        function of the Blueprint touches them), those variables as the Blueprint is given them
+        (converted::Variables), and what is compared after a call: every one of them. {draw, variables,
+        struct: the names}."""
+        q = self.u.state
+        if self.state_info is None:
+            try:
+                if q not in self.names:
+                    raise Wait(f"the class {q.split('::')[-1]} of the state is not part of the test")
+                t, key = self.names[q], re.sub(r"\W", "_", q.strip(":"))
+                info = {"draw": f"draw_state_{key}", "variables": f"variables_{key}", "struct": f"State_{key}"}
+                draws, values, checks, texts, fine = [], [], [], [], []
+                for c in kids(self.tree.records[q]):
+                    if c.get("kind") != "FieldDecl" or not c.get("name"):
+                        continue
+                    try:
+                        variable, _ = self.u.state_variable(c["name"])
+                    except Wait:
+                        continue   # (no variable: what touches it waits)
+                    ft = qtype(c)
+                    try:
+                        if "&" in ft or re.match(r"(?:kern::)?Span<", self.u.clean(ft)):
+                            raise Wait("a reference, a view")
+                        m = re.match(r"(.+?)\s*((?:\s*\[\d+\])+)$", self.u.clean(ft))
+                        if m:   # (an array of C++: a list of a fixed length in the Blueprint)
+                            rank = m.group(2).count("[")
+                            spelled = "std::vector<" * rank + self.spell(m.group(1)) + ">" * rank
+                            draws.append(f"  converted::fill_array(s->{c['name']}, [&]() -> {self.spell(m.group(1))} {{ return {self.draw(m.group(1))}; }});")
+                            of = lambda o, f=c["name"], sp=spelled: self.wrap(f"converted::array_list({o}{f})", sp)
+                        else:
+                            spelled = self.spell(ft)
+                            draws.append(f"  s->{c['name']} = {self.draw(ft)};")
+                            of = lambda o, f=c["name"], sp=spelled: self.wrap(f"{o}{f}", sp)
+                        self.result_ok(re.sub(r"\s*\[\d+\]", "", ft) if m is None else m.group(1))
+                    except Wait as w:
+                        raise Wait(f"the test has no values of the variable {variable} of {self.u.name}: {w}")
+                    values.append(f'{{"{variable}", arg({of("s.")})}}')
+                    checks.append(f"same({of('w.s->')}, (*got.rows)[{len(checks)}])")
+                    fine.append(f"defined({of('w.s->')})")
+                    texts.append(f'"{variable} = " + text({of("w.s->")})')
+                n = len(values)
+                self.helped[("state", q)] = [
+                    f"[[maybe_unused]] static std::unique_ptr<{t}> {info['draw']}(converted::Draw& draw) {{",
+                    f"  auto s = std::make_unique<{t}>();", *draws, "  return s;", "}",
+                    f"[[maybe_unused]] static converted::Variables {info['variables']}(const {t}& s) {{ return {{{', '.join(values)}}}; }}",
+                    f"struct {info['struct']} {{ const {t}* s; }};",
+                    f"[[maybe_unused]] static bool same(const {info['struct']}& w, const converted::Value& got) {{ return got.rows && got.rows->size() == {n}" + "".join(f" && {x}" for x in checks) + "; }",
+                    f"[[maybe_unused]] static bool defined(const {info['struct']}& w) {{ return " + (" && ".join(fine) or "true") + "; }",
+                    f"[[maybe_unused]] static std::string text(const {info['struct']}& w) {{ return std::string(\"{{\")" + "".join(f" + {'\", \" + ' if i else ''}{x}" for i, x in enumerate(texts)) + " + \"}\"; }"]
+                self.state_info = info
+            except Wait as w:
+                self.state_info = w
+        if isinstance(self.state_info, Wait):
+            raise Wait(str(self.state_info))
+        return self.state_info
+
     def plain_struct(self, name, fields):
         """A struct of the test itself (what a call gives and changes), with what the comparison needs."""
         lines = [f"struct {name} {{ " + " ".join(f"{t} {f};" for f, t in fields) + " };"]
@@ -6764,7 +6824,7 @@ class TestWriter:
             if f is None and not owner and tree.scope_of.get(d["id"], "").startswith(ENGINE + "::") and d.get("name") in VECTOR_FUNCTIONS and re.search(r"\bVec[23]\b", qtype(d)):
                 return   # (a vector's functions: the notation's own - converted.h has them)
             G.functions[d["id"]] = d
-            if owner and f is not None and f.self_type is None and not f.ctor and self.top_of(owner) not in self.struct_tops:
+            if owner and f is not None and f.self_type is None and not f.ctor and not f.state and self.top_of(owner) not in self.struct_tops:
                 # a method that does not use its object, of a class the Blueprint does not have: as a function
                 body_at = next((c["_at"][0] for c in kids(d) if c.get("kind") == "CompoundStmt" and c.get("_at")), None)
                 head = tree.said(self.cut(d["_file"], d["_at"][0], body_at)) if body_at is not None else ""
@@ -7172,7 +7232,7 @@ class TestWriter:
     def write(self):
         u, tree = self.u, self.tree
         src = tree.said(tree.text(self.path))
-        stem = u.name   # (the test is the Blueprint's: named like it)
+        stem = u.job.replace("/", "__")   # (the test is the Blueprint's - or a part's (Game/game_net_cpp: Game__game_net_cpp): named like it)
         skipped = []
         G = self.setup()
         unguarded = self.unguarded
@@ -7250,9 +7310,6 @@ class TestWriter:
             d = f.decl
             if f.lifted:
                 continue   # (a local function: in the source of the function it stands in, compared with it)
-            if f.state:
-                skipped.append((f, "a function of the Blueprint of a state: the test does not set and compare its variables yet"))
-                continue
             owner = tree.owner.get(d["id"])
             free = G.freed.get(d["id"], (None,))[0]
             if free:
@@ -7274,6 +7331,11 @@ class TestWriter:
                 # made of them is compared)
                 moved = set()
                 static = d.get("storageClass") == "static" or tree.decl.get(d.get("previousDecl"), {}).get("storageClass") == "static"
+                if f.state:
+                    # a function of the Blueprint of a state: called on an object of the class whose fields that are
+                    # variables are drawn - the Blueprint's variables start from the same values (converted::Variables)
+                    state = self.state_helpers()
+                    decl_lines.append(f"s = {state['draw']}(draw);")
                 if owner and f.self_type is not None and not f.ctor and not static:
                     types.append(self.names[owner])
                     decl_lines.append(f"{types[-1]} a0 = {self.helpers(owner)}(draw);")
@@ -7289,7 +7351,7 @@ class TestWriter:
                 ret = qtype(d).split("(")[0].strip()
                 if f.value is not None:
                     self.result_ok(ret)
-                if owner:
+                if owner and not f.state:
                     self.helpers(owner) if (f.mutates or f.ctor) else None
                 # (what the function takes by value is handed over, as a call hands a value it does not need
                 # again: the count of what the function asks for memory is of its own work - see converted.h)
@@ -7298,12 +7360,15 @@ class TestWriter:
                 # (a list the source writes in braces - std::initializer_list - is the drawn list as such a list: converted::listed)
                 braced = {n: f"l{n[1:]}" for n, p in zip(names[first:], params) if self.u.clean(qtype(p)).startswith("std::initializer_list<")}
                 args = ", ".join(braced[n] if n in braced else f"std::move({n})" if by_value(p) else n for n, p in zip(names[first:], params))
-                if owner and f.self_type is None and not f.ctor and not static:
+                if owner and f.self_type is None and not f.ctor and not static and not f.state:
                     self.helpers(owner)   # (a method that does not use its object: called on one as its class makes it)
                 here = f"{ns}::"   # (by its full name: the test's own function, whatever its arguments are)
                 target = (f"{self.names[owner]}({args})" if f.ctor else f"{self.names[owner]}::{d['name']}({args})" if owner and static
+                          else f"s->{d['name']}({args})" if f.state
                           else f"a0.{d['name']}({args})" if owner and f.self_type is not None else f"{self.names[owner]}{{}}.{d['name']}({args})" if owner else f"{here}{free or d['name']}({args})")
                 parts = {"self": "a0", "result": "r"}   # (what the call changed: run's own values, handed back as they are)
+                if f.state:
+                    parts["state"] = f"{state['struct']}{{s.get()}}"   # (the object after the call: all its variables are compared)
                 for place_ in f.refs:
                     parts[("ref", place_)] = f"a{place_}"
                 out_lines = []
@@ -7315,19 +7380,21 @@ class TestWriter:
                 if f.ctor:
                     give = f"return {counted};"
                 elif len(f.out_fields) > 1:
-                    fields = [(n, types[0] if src_ == "self" else self.spell(ret) if src_ == "result" else types[src_[1]]) for n, _, src_ in f.out_fields]
+                    fields = [(n, types[0] if src_ == "self" else state["struct"] if src_ == "state" else self.spell(ret) if src_ == "result" else types[src_[1]]) for n, _, src_ in f.out_fields]
                     out_lines = self.plain_struct(f"Out_{f.name}", fields)
-                    give = f"{'auto r = ' if f.value is not None else ''}{counted}; return Out_{f.name}{{{', '.join(f'std::move({parts[src_]})' for _, _, src_ in f.out_fields)}}};"
+                    give = f"{'auto r = ' if f.value is not None else ''}{counted}; return Out_{f.name}{{{', '.join(f'std::move({parts[src_]})' if src_ != "state" else parts[src_] for _, _, src_ in f.out_fields)}}};"
                 else:
                     src_ = f.out_fields[0][2]
                     give = f"return {counted};" if src_ == "result" else f"{counted}; return {parts[src_]};"
-                    want_type = types[0] if src_ == "self" else self.spell(ret) if src_ == "result" else types[src_[1]]
+                    want_type = types[0] if src_ == "self" else "" if src_ == "state" else self.spell(ret) if src_ == "result" else types[src_[1]]
             except Wait as w:
                 skipped.append((f, str(w)))
                 continue
             # where the Blueprint's call has what is compared: what it returns, then what it made of its
             # reference inputs that are not const, in their order (Instance::call)
-            layout = (["result"] if f.value is not None else []) + (["self"] if f.mutates and not f.ctor else []) + [("ref", place_) for place_ in f.refs]
+            # (of a function of the Blueprint of a state: then its variables, as converted::Tally reads them)
+            layout = ((["result"] if f.value is not None else []) + (["self"] if f.mutates and not f.ctor and not f.state else []) + [("ref", place_) for place_ in f.refs]
+                      + (["state"] if f.state and f.mutates else []))
             order = [layout.index(src_) for _, _, src_ in f.out_fields] if len(f.out_fields) > 1 else []
             # the arguments as the Blueprint function has its inputs (those by reference first)
             given = f.order() if len(names) == len(f.params) else list(range(len(names)))
@@ -7338,10 +7405,12 @@ class TestWriter:
                 f"  {{  // {f.cpp}",
                 f'    converted::Tally tally("{f.name}");',
                 "    converted::Draw draw;   // (every function its own arguments, the same in every run)",
+                *([f"    std::unique_ptr<{self.names[u.state]}> s;   // (the object of the state: drawn for every call)"] if f.state else []),
                 f"    const auto run = [&]({', '.join(f'[[maybe_unused]] {t} {n}' for t, n in zip(types, names))}) {{ {give} }};",
                 "    for (int i = 0; tally.more(i); ++i) {",
                 *[f"      {x}" for x in decl_lines],
                 f"      const std::vector<converted::Value> given = {{{given_args}}};   // (what the Blueprint is given: before the call)",
+                *([f"      const converted::Variables vars = {state['variables']}(*s);   // (and the variables of its state)"] if f.state else []),
                 "      const converted::Watch watch;",
                 "      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)",
                 "      converted::g_can_bail = true;",
@@ -7349,7 +7418,8 @@ class TestWriter:
                 f"      const auto want = {self.wrap('run(' + ', '.join(f'std::move({n})' if n in moved else n for n in names) + ')', want_type)};",
                 "      converted::g_can_bail = false;",
                 "      converted::may_bail(false);",
-                f"      tally.take(bp, given, want, watch.left(), [&] {{ return converted::shown_all(given); }}, {{{', '.join(str(k) for k in order)}}});",
+                f"      tally.take(bp, given, want, watch.left(), [&] {{ return converted::shown_all(given); }}, {{{', '.join(str(k) for k in order)}}}"
+                + (f", &vars, {'true' if f.mutates else 'false'}" if f.state else "") + ");",
                 "    }",
                 "  }"])))
         if not cases:
@@ -7476,7 +7546,9 @@ class TestWriter:
                 where.extend((first + x, first + y, key) for x, y, key in inner)
             add(None, "\n".join(["#undef private", "#undef protected", '#pragma GCC diagnostic pop', ""]))
             for q, hl in self.helped.items():
-                if hl and ("helper", q) not in dropped:
+                if hl and ("helper", q) not in dropped and not isinstance(q, str):
+                    add(("helper", q), "\n".join(hl))   # (of the state: see state_helpers)
+                elif hl and ("helper", q) not in dropped:
                     made = self.made.get(q)
                     hl = hl if not made or ("member", made[0]) not in dropped else [hl[0], made[1], *hl[2:]]
                     spaces = self.names[q].split("::")[:-1] if top_of(q) == q else []

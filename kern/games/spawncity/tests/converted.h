@@ -1000,6 +1000,30 @@ struct Blueprint {
   }
 };
 
+// ---- the Blueprint of a state (a class of the program there is one object of: its fields are the
+// Blueprint's variables, its methods the Blueprint's functions) ----
+/// The variables as the source's object has them before a call: by name, as the Blueprint holds them.
+using Variables = std::vector<std::pair<const char*, Value>>;
+/// Is this a variable of the Blueprint that a call may change? (A field whose variable no part of the
+/// Blueprint uses is none: no function of the Blueprint reads or changes it.)
+inline bool changeable(const kern::logic::Instance& inst, const char* name) {
+  const kern::logic::Variable* v = inst.graph().variable(name);
+  return v && !v->constant;
+}
+/// The Blueprint's variables set to the source's: false - one of them does not take its value.
+inline bool set_state(kern::logic::Instance& inst, const Variables& vars) {
+  for (const auto& [name, value] : vars)
+    if (changeable(inst, name) && !inst.set(name, value)) return false;
+  return true;
+}
+/// The variables after a call, as a struct of them in their order. Where the Blueprint has no such
+/// variable, what it was before: the source must have left that field as it was.
+inline Value read_state(const kern::logic::Instance& inst, const Variables& vars) {
+  std::vector<Value> out;
+  for (const auto& [name, value] : vars) out.push_back(changeable(inst, name) ? inst.get(name) : value);
+  return Value::structure(std::move(out));
+}
+
 /// The comparison of one function over its calls.
 struct Tally {
   const char* function;
@@ -1026,9 +1050,19 @@ struct Tally {
   /// the function returns and then what it made of its reference inputs that are not const, in their
   /// order (Instance::call); the test compares the object first, then what the C++ returns, then what was
   /// written through the parameters. Empty: the call gives the one thing that is compared.
-  template <class Want, class Describe> void take(Blueprint& bp, const std::vector<Value>& args, const Want& want, bool left, Describe describe, const std::vector<int>& order = {}) {
+  /// `state`: of a function of the Blueprint of a state, its variables as the source's object had them
+  /// before the call - both Blueprints start from them; of one that may change them (`changes`), what they
+  /// are after the call stands behind the call's outputs (the last part `order` names).
+  template <class Want, class Describe>
+  void take(Blueprint& bp, const std::vector<Value>& args, const Want& want, bool left, Describe describe, const std::vector<int>& order = {}, const Variables* state = nullptr,
+            bool changes = false) {
     if (!bp.interpreted.inst || !bp.compiled.inst) return;
     if (left || !defined(want)) { ++outside; return; }
+    if (state && !(set_state(*bp.compiled.inst, *state) && set_state(*bp.interpreted.inst, *state))) {
+      ++compared;
+      if (++wrong <= 3) std::printf("  %s(%s): the Blueprint's variables do not take the values of the source's object\n", function, describe().c_str());
+      return;
+    }
     const auto parts = [&](std::vector<Value>& given) {
       if (order.empty() || given.size() != order.size()) return;
       std::vector<Value> fields;
@@ -1049,6 +1083,10 @@ struct Tally {
     const double took = std::chrono::duration<double>(std::chrono::steady_clock::now() - before).count();
     const bool both = took < 0.005;
     const bool ia = both ? bp.interpreted.inst->call(function, args, a) : ib;
+    if (state && changes) {
+      b.push_back(read_state(*bp.compiled.inst, *state));
+      if (both) a.push_back(read_state(*bp.interpreted.inst, *state));
+    }
     // what the three asked the engine: the same calls, in the same order, with the same values
     const std::vector<std::string>& asked = g_source_engine.calls;
     const bool engine_same = bp.compiled.host.stand_in.calls == asked && (!both || bp.interpreted.host.stand_in.calls == asked);
