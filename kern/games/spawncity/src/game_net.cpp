@@ -706,8 +706,8 @@ void Game::draw_remote_vehicles() {
   if (net_.active()) {
     if (!remote_car_) remote_car_ = std::make_unique<Car>(CarSpec::car());
     if (!remote_bus_) remote_bus_ = std::make_unique<Car>(CarSpec::bus());
-    Vec3 motors[4];
-    f32 angles[4];
+    std::array<Vec3, 4> motors;
+    std::array<f32, 4> angles;
     for (const net::Remote& r : net_.remotes()) {
       const Vec3 color = mp::rgb(net_.color_of(r.state.slot));
       auto drone_at = [&](const kern::Mat4& mtx, bool armed) {

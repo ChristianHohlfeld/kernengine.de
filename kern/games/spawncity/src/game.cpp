@@ -1255,8 +1255,8 @@ void Game::draw_vehicles() {
       art_.jet(matrix_of(jet_actor_), jet_.gear_down(), jet_.nozzle(), jet_.thrust() / jet_.spec().thrust_max, mode_ == Mode::jet && view_.jet_cockpit);
     }
     if (vehicle_.drone_out) {
-      Vec3 motors[4];
-      f32 angles[4];
+      std::array<Vec3, 4> motors;
+      std::array<f32, 4> angles;
       for (int i = 0; i < 4; ++i) { motors[i] = drone_.motor_position(i); angles[i] = drone_.rotor_angle(i); }
       art_.drone(gaps_drone_matrix(), motors,  // visual_pose_stabilization.mjs (game_gaps.cpp)
                  angles, drone_.params().prop_d, drone_.telemetry().armed, mode_ == Mode::drone && view_.drone_cam == 0);

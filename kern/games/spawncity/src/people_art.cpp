@@ -216,11 +216,42 @@ void PeopleArt::street_lamp(Vec3 foot, f32 arm_yaw, f32 night) {
   put(lamp_head_, m * at({1.2f, 0, 5.88f}), Vec3{k, k * 0.92f, k * 0.75f});
 }
 
+void PeopleArt::clear(Part& p) {
+  p.transforms.clear();
+  p.tints.clear();
+}
+
 void PeopleArt::begin() {
-  for (Part* p : {&leg_, &torso_, &arm_, &head_, &hand_, &hair_, &vest_, &door_, &cap_, &bar_, &lamp_, &flame_, &pd_body_, &pd_rotor_, &shell_, &pole_, &lamp_head_, &rd_pelvis_, &rd_chest_, &rd_upper_, &rd_fore_, &rd_thigh_, &rd_shin_, &beacon_, &gun_pistol_, &gun_smg_, &gun_sniper_, &gun_tube_, &gun_rocket_, &gun_knife_}) {
-    p->transforms.clear();
-    p->tints.clear();
-  }
+  clear(leg_);
+  clear(torso_);
+  clear(arm_);
+  clear(head_);
+  clear(hand_);
+  clear(hair_);
+  clear(vest_);
+  clear(door_);
+  clear(cap_);
+  clear(bar_);
+  clear(lamp_);
+  clear(flame_);
+  clear(pd_body_);
+  clear(pd_rotor_);
+  clear(shell_);
+  clear(pole_);
+  clear(lamp_head_);
+  clear(rd_pelvis_);
+  clear(rd_chest_);
+  clear(rd_upper_);
+  clear(rd_fore_);
+  clear(rd_thigh_);
+  clear(rd_shin_);
+  clear(beacon_);
+  clear(gun_pistol_);
+  clear(gun_smg_);
+  clear(gun_sniper_);
+  clear(gun_tube_);
+  clear(gun_rocket_);
+  clear(gun_knife_);
 }
 
 void PeopleArt::put(Part& p, const Mat4& m, Vec3 tint) {
@@ -304,9 +335,12 @@ void PeopleArt::person(const People::Person& p, f32 now) {
     // a VR mate: the weapon in his real right hand along his aim; else at the meeting hands
     const Mat4 g = p.hands ? at(p.hand_r) * rot({0, 0, 1}, p.yaw) * rot({0, 1, 0}, ap) * at({w == W::rocket ? -0.35f : 0.0f, 0, w == W::rocket ? 0.1f : 0.0f})
                            : shoulder * at({0, -0.06f, 0}) * rot({0, 1, 0}, ap) * at({w == W::rocket ? 0.05f : 0.5f, 0, w == W::rocket ? 0.12f : -0.02f});
-    Part* part = w == W::glock ? &gun_pistol_ : w == W::smg ? &gun_smg_ : w == W::sniper ? &gun_sniper_ : w == W::grenade_launcher ? &gun_tube_
-                 : w == W::rocket ? &gun_rocket_ : w == W::knife ? &gun_knife_ : nullptr;
-    if (part) put(*part, g);
+    if (w == W::glock) put(gun_pistol_, g);
+    else if (w == W::smg) put(gun_smg_, g);
+    else if (w == W::sniper) put(gun_sniper_, g);
+    else if (w == W::grenade_launcher) put(gun_tube_, g);
+    else if (w == W::rocket) put(gun_rocket_, g);
+    else if (w == W::knife) put(gun_knife_, g);
   }
   put(head_, head, p.skin);
   put(hair_, head, hair_color(p));
@@ -396,14 +430,44 @@ void PeopleArt::projectile(Vec3 p, Vec3 dir, f32 radius, f32 length, bool flame)
   if (flame) put(flame_, m * at({0, 0, -length * 0.6f}) * Mat4::scale({radius * 1.6f, radius * 1.6f, radius * 3.2f}), Vec3{1.6f, 0.7f, 0.2f});
 }
 
+void PeopleArt::upload(Part& p) {
+  if (!p.id) return;
+  if (p.transforms.empty()) { r_->set_visible(p.id, false); return; }
+  r_->update_instances(p.id, kern::Span<const f32>(p.transforms), kern::Span<const f32>(p.tints));
+  r_->set_visible(p.id, true);
+}
+
 void PeopleArt::end() {
-  for (Part* p : {&leg_, &torso_, &arm_, &head_, &hand_, &hair_, &vest_, &door_, &cap_, &bar_, &lamp_, &flame_, &pd_body_, &pd_rotor_, &shell_, &pole_, &lamp_head_, &rd_pelvis_, &rd_chest_, &rd_upper_, &rd_fore_, &rd_thigh_, &rd_shin_, &beacon_, &gun_pistol_, &gun_smg_, &gun_sniper_, &gun_tube_, &gun_rocket_, &gun_knife_}) {
-    if (!p->id) continue;
-    if (p->transforms.empty()) { r_->set_visible(p->id, false); continue; }
-    r_->update_instances(p->id, kern::Span<const f32>(p->transforms.data(), p->transforms.size()),
-                         kern::Span<const f32>(p->tints.data(), p->tints.size()));
-    r_->set_visible(p->id, true);
-  }
+  upload(leg_);
+  upload(torso_);
+  upload(arm_);
+  upload(head_);
+  upload(hand_);
+  upload(hair_);
+  upload(vest_);
+  upload(door_);
+  upload(cap_);
+  upload(bar_);
+  upload(lamp_);
+  upload(flame_);
+  upload(pd_body_);
+  upload(pd_rotor_);
+  upload(shell_);
+  upload(pole_);
+  upload(lamp_head_);
+  upload(rd_pelvis_);
+  upload(rd_chest_);
+  upload(rd_upper_);
+  upload(rd_fore_);
+  upload(rd_thigh_);
+  upload(rd_shin_);
+  upload(beacon_);
+  upload(gun_pistol_);
+  upload(gun_smg_);
+  upload(gun_sniper_);
+  upload(gun_tube_);
+  upload(gun_rocket_);
+  upload(gun_knife_);
 }
 
 }  // namespace sc

@@ -94,30 +94,31 @@ void Ragdolls::remove(u64 key) {
 bool Ragdolls::spawn(u64 key, Vec3 feet, f32 yaw, Vec3 velocity, const Colors& colors, bool recover, f32 now) {
   if (!world_) return false;
   remove(key);
-  Doll* d = nullptr;
-  for (Doll& x : dolls_)
-    if (!x.active) { d = &x; break; }
-  if (!d && dolls_.size() < max_) { dolls_.emplace_back(); d = &dolls_.back(); }
-  if (!d) {
+  i32 at = -1;  // (the doll it becomes: its place in dolls_)
+  for (std::size_t i = 0; i < dolls_.size(); ++i)
+    if (!dolls_[i].active) { at = static_cast<i32>(i); break; }
+  if (at < 0 && dolls_.size() < max_) { dolls_.emplace_back(); at = static_cast<i32>(dolls_.size()) - 1; }
+  if (at < 0) {
     // The pool is full: the oldest goes (one that was going to get up does so right now).
-    Doll* old = &dolls_[0];
-    for (Doll& x : dolls_)
-      if (x.born < old->born) old = &x;
-    if (old->recover) {
+    std::size_t old = 0;
+    for (std::size_t i = 0; i < dolls_.size(); ++i)
+      if (dolls_[i].born < dolls_[old].born) old = i;
+    if (dolls_[old].recover) {
       Vec3 p; f32 y;
-      where(old->key, p, y);
-      ups_.push_back({old->key, {p.x, p.y, feet.z}, y});
+      where(dolls_[old].key, p, y);
+      ups_.push_back({dolls_[old].key, {p.x, p.y, feet.z}, y});
     }
-    release(*old);
-    d = old;
+    release(dolls_[old]);
+    at = static_cast<i32>(old);
   }
-  *d = Doll{};
-  d->active = true;
-  d->key = key;
-  d->recover = recover;
-  d->colors = colors;
-  d->born = now;
-  d->group = -(1 + (group_++ % 30000));  // one negative group per body: its bones never collide with each other
+  Doll& d = dolls_[static_cast<std::size_t>(at)];
+  d = Doll{};
+  d.active = true;
+  d.key = key;
+  d.recover = recover;
+  d.colors = colors;
+  d.born = now;
+  d.group = -(1 + (group_++ % 30000));  // one negative group per body: its bones never collide with each other
   ++spawned_;
   const Quat q = yaw_quat(yaw);
   for (u32 b = 0; b < kBones; ++b) {
@@ -132,7 +133,7 @@ bool Ragdolls::spawn(u64 key, Vec3 feet, f32 yaw, Vec3 velocity, const Colors& c
     bs.angular_velocity = {hash_noise(key, 40 + b) * 2, hash_noise(key, 60 + b) * 2, hash_noise(key, 80 + b)};
     bs.linear_damping = 0.05f;
     bs.angular_damping = 0.4f;
-    d->bodies[b] = world_->create_body(bs);
+    d.bodies[b] = world_->create_body(bs);
     ph::ShapeSettings ss;
     if (b == head) { ss.kind = ph::ShapeKind::sphere; ss.radius = def.half.x; }
     else if (def.capsule) { ss.kind = ph::ShapeKind::capsule; ss.radius = def.half.x; ss.length = 2 * (def.half.z - def.half.x); }
@@ -140,15 +141,15 @@ bool Ragdolls::spawn(u64 key, Vec3 feet, f32 yaw, Vec3 velocity, const Colors& c
     ss.material.density = 1000;  // about water: a 70 kg person
     ss.material.friction = 0.72f;
     ss.material.restitution = 0.05f;
-    ss.material.group_index = d->group;
+    ss.material.group_index = d.group;
     ss.material.category_bits = kCatWorld;
-    world_->create_shape(d->bodies[b], ss);
+    world_->create_shape(d.bodies[b], ss);
   }
   for (u32 b = 1; b < kBones; ++b) {
     const JointDef& j = kJoints[b];
     ph::JointSettings js;
-    js.body_a = d->bodies[j.parent];
-    js.body_b = d->bodies[b];
+    js.body_a = d.bodies[j.parent];
+    js.body_b = d.bodies[b];
     const Vec3 la = j.anchor - kDefs[j.parent].center, lb = j.anchor - kDefs[b].center;
     if (j.kind == 1) {
       js.type = ph::JointType::revolute;
@@ -171,9 +172,9 @@ bool Ragdolls::spawn(u64 key, Vec3 feet, f32 yaw, Vec3 velocity, const Colors& c
       js.enable_motor = true;
       js.max_motor_torque = kFriction * 0.5f;
     }
-    d->joints[b] = world_->create_joint(js);
+    d.joints[b] = world_->create_joint(js);
   }
-  for (u32 b = 0; b < kBones; ++b) d->pose[b] = world_->pose(d->bodies[b]);
+  for (u32 b = 0; b < kBones; ++b) d.pose[b] = world_->pose(d.bodies[b]);
   return true;
 }
 
