@@ -306,6 +306,36 @@ bool retype(logic::Graph& g, u32 id, const std::string& type, const std::string&
   return true;
 }
 
+/// A node of a map or a set (Length, Has Key, Key At, Find) that a map or set comes into takes
+/// its keys and values: its settings Key and Value become the map's (values typed into its key
+/// and value pins were of the old types and go). False: it is no such node, or it is of these.
+/// (The settings Key and Value with which the pin `pin` of a node of this kind is a map or a set of
+/// type `want` - false: it has no such pin and settings. A set's node has no Value: `value` stays empty.)
+bool keyed_params(const logic::NodeDef& def, const std::string& pin, const logic::TypeRef& want, std::string& key, std::string& value) {
+  if (!logic::is_keyed(want.type) || pin != (want.type == logic::PinType::map ? "map" : "set")) return false;
+  bool has_key = false, has_value = false;
+  for (const logic::ParamDef& pd : def.params) {
+    has_key = has_key || (pd.kind == logic::ParamDef::Kind::type && pd.key == "key" && pd.keys_only);
+    has_value = has_value || (pd.kind == logic::ParamDef::Kind::type && pd.key == "value");
+  }
+  if (!has_key || (want.type == logic::PinType::map) != has_value) return false;
+  key = logic::type_text(logic::key_type(want));
+  value = has_value ? logic::type_text(logic::value_type(want)) : std::string();
+  return true;
+}
+bool keyed_settings(logic::Graph& g, u32 id, const std::string& pin, const logic::TypeRef& want) {
+  logic::Node* node = g.find(id);
+  const logic::NodeDef* def = node ? logic::library().find(node->type) : nullptr;
+  std::string key, value;
+  if (!def || !keyed_params(*def, pin, want, key, value)) return false;
+  const bool has_value = !value.empty();
+  if (node->param("key", "int") == key && (!has_value || node->param("value", "float") == value)) return false;
+  node->set_param("key", key);
+  if (has_value) node->set_param("value", value);
+  node->values.erase(std::remove_if(node->values.begin(), node->values.end(), [](const auto& v) { return v.first == "key" || v.first == "value"; }), node->values.end());
+  return true;
+}
+
 /// Adds a link with the editor's rules: an exec output and a data input take one wire
 /// (the new one replaces the old); exec inputs and data outputs fan in / out freely. A generic
 /// node nothing is wired to yet takes the type of the wire (a Text List into Length makes it a
@@ -318,7 +348,8 @@ bool connect(logic::Graph& g, u32 from, const std::string& out, u32 to, const st
   auto type_of = [](const logic::PinDef& p) { return logic::TypeRef{p.type, p.of}; };
   if (!(type_of(po) == type_of(pi)) && po.type != logic::PinType::exec) {
     // (first the node the wire goes into, then the one it comes from)
-    if (const logic::Node* n = g.find(to); n && retype(g, to, type_setting_for(g, *n, in, false, type_of(po)), in)) pin_of(g, to, in, false, pi);
+    if (keyed_settings(g, to, in, type_of(po))) pin_of(g, to, in, false, pi);  // (a map into a map's node: its keys and values)
+    else if (const logic::Node* n = g.find(to); n && retype(g, to, type_setting_for(g, *n, in, false, type_of(po)), in)) pin_of(g, to, in, false, pi);
     else if (const logic::Node* m = g.find(from); m && !logic::fits(type_of(po), type_of(pi)) && retype(g, from, type_setting_for(g, *m, out, true, type_of(pi)))) pin_of(g, from, out, true, po);
   }
   if (!logic::fits(type_of(po), type_of(pi))) {
@@ -873,6 +904,16 @@ json::Value Studio::logic_palette(const json::Value& c) const {
       for (const logic::PinDef& p : from_output ? in : out)
         if (fits.empty() && p.type != logic::PinType::exec) fits = type_setting_for(*g, probe, p.id, !from_output, from_type);
       if (!fits.empty()) e.params.push_back({"type", fits});
+      if (fits.empty() && logic::is_keyed(from_type.type) && from_output) {
+        // (a node of a map or a set, from a map or a set: with its keys and values)
+        std::string key, value;
+        for (const logic::PinDef& p : in)
+          if (keyed_params(*d, p.id, from_type, key, value)) {
+            e.params.push_back({"key", key});
+            if (!value.empty()) e.params.push_back({"value", value});
+            break;
+          }
+      }
     }
     if (d->type == "func.entry") { e.label = "New Function"; e.help = "Adds a function to this Blueprint: its entry and a Return node. Inputs and outputs are set in Details."; }
     if (d->type == "event.state_enter" || d->type == "event.state_exit" || d->type == "state.set" || d->type == "state.is" || d->type == "state.get") {
@@ -910,6 +951,25 @@ json::Value Studio::logic_palette(const json::Value& c) const {
         named.set_param("path", "." + f.name);
         consider({lib.title(named), scope.empty() ? std::string("Structures") : category, "Changes the field " + f.name + " of " + what, named.type, with({{"variable", v.name}, {"path", "." + f.name}})});
       }
+    if (logic::is_keyed(v.type)) {
+      // a map variable: the Set of the value at a place (Cells[index]) -, and the steps of a map or a set that change it
+      if (v.type == logic::PinType::map) {
+        logic::Node named;
+        named.type = "var.set";
+        named.set_param("variable", v.name);
+        named.set_param("path", "[]");
+        consider({lib.title(named), scope.empty() ? std::string("Maps") : category, "Replaces the value of one entry of " + what + " by its place (beside the map: nothing)", named.type, with({{"variable", v.name}, {"path", "[]"}})});
+      }
+      const std::string prefix = v.type == logic::PinType::map ? "map." : "set.";
+      for (const auto& d : lib.all()) {
+        if (!variable_step(*d) || d->type.rfind(prefix, 0) != 0) continue;
+        logic::Node named;
+        named.type = d->type;
+        named.set_param("variable", v.name);
+        consider({lib.title(named), scope.empty() ? std::string(v.type == logic::PinType::map ? "Maps" : "Sets") : category, d->help, d->type, with({{"variable", v.name}})});
+      }
+      return;
+    }
     if (!logic::is_list(v.type)) return;
     // a list variable: the Set of one of its entries - a Set at that place (Scores[index]) -, and the steps that change it
     {
