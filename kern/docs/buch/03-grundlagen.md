@@ -57,7 +57,7 @@ bool screen_ray(const Camera& camera, f32 x, f32 y, f32 width, f32 height, Ray& 
   if (!(width > 0 && height > 0) || !std::isfinite(x) || !std::isfinite(y)) return fail("invalid viewport coordinates");
   if (!camera_valid(camera)) return fail("invalid camera");
   bool ok = false;
-  const Mat4 view = Mat4::look_at(camera.eye, camera.target, camera.up, &ok);
+  const Mat4 view = Mat4::look_at(camera.eye, camera.target, camera.up, ok);
   if (!ok) return fail("degenerate camera direction/up");
   const Mat4 vp = projection_matrix(camera, width / height) * view;
   f64 inv[16];
@@ -384,7 +384,7 @@ damit Rotationen, die in die Simulation eingehen, überall dieselben Bits ergebe
 | `trs(t, q, s)` | Translation × Rotation × Skalierung in einem Schritt |
 | `perspective(fov, aspect, near, far)` | Perspektive; `fov` ist der **vertikale** Öffnungswinkel in Radiant |
 | `ortho(l, r, b, t, n, f)` | Parallelprojektion |
-| `look_at(eye, target, up, &ok)` | Sichtmatrix; bei entarteter Basis Einheitsmatrix und `ok = false` |
+| `look_at(eye, target, up[, ok])` | Sichtmatrix; bei entarteter Basis Einheitsmatrix (und `ok = false`, eine Referenz) |
 
 Freie Funktionen:
 
@@ -457,7 +457,7 @@ struct Camera {
 Die View-Projection-Matrix ergibt sich wie in `screen_ray` (siehe Abschnitt 3.1):
 
 ```cpp
-  const Mat4 view = Mat4::look_at(camera.eye, camera.target, camera.up, &ok);
+  const Mat4 view = Mat4::look_at(camera.eye, camera.target, camera.up, ok);
   const Mat4 vp = projection_matrix(camera, width / height) * view;
 ```
 
@@ -467,7 +467,7 @@ Test `math_camera` prüft, dass das Ziel in der Bildmitte landet:
 ```cpp
   const Vec3 eye{10, -5, 4}, target{0, 3, 1};
   bool ok = false;
-  const Mat4 view = Mat4::look_at(eye, target, {0, 0, 1}, &ok);
+  const Mat4 view = Mat4::look_at(eye, target, {0, 0, 1}, ok);
   CHECK(ok);
   const Mat4 vp = Mat4::perspective(1.0f, 1.6f, 0.1f, 500.0f) * view;
   const Vec4 c = vp.transform({target, 1});

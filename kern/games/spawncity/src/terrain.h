@@ -116,15 +116,15 @@ class Terrain {
   void remove_tints(u64 owner);
 
   // ---- road corridors (terrain_craters.mjs setRoadCorridors) ----
-  /// A street's corridor: its centre line and its width with the pavements (road width + 3.4 m).
-  struct RoadLine { const std::vector<Vec2>* points; f32 width; };
   /// The streets of one map tile (`owner`, its square `bounds`): inside that square the ground is
   /// level across every street and smooth along it (the height of the street's smoothed centre
   /// line, blending back to the natural ground over 4.5 m) - physics, the ground mesh, the roads
   /// and the walkers all read this one height. Only the tile's own streets shape its square (a
   /// tile's data holds every street within reach of it), so the ground there does not depend on
   /// which neighbours are loaded. The elevation under the streets must be known (covers).
-  void set_corridors(u64 owner, const kern::Vec4& bounds, const std::vector<RoadLine>& roads);
+  /// A street's corridor is its centre line and `widths` of it: its width with the pavements (road
+  /// width + 3.4 m); a street of width 0 has none.
+  void set_corridors(u64 owner, const kern::Vec4& bounds, const std::vector<MapFeatures::Road>& roads, const std::vector<f32>& widths);
   void remove_corridors(u64 owner);
   /// Whether the streets of the map tile at (x, y) have shaped the ground there (or no city runs).
   bool corridors_at(f32 x, f32 y) const;

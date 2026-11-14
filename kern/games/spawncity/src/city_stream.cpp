@@ -310,10 +310,12 @@ void CityStream::finish_features(Tile& t) {
   // and tracks, its width + 3.4 m of pavements): the ground of this tile is final with them, and
   // the houses, the streets and everything else are put on it.
   {
-    std::vector<Terrain::RoadLine> lines;
-    for (const MapFeatures::Road& r : t.features.roads)
-      if (!road_is_water(r.cls) && r.cls != RoadClass::path && r.cls != RoadClass::track) lines.push_back({&r.points, road_width(r.cls) + 3.4f});
-    terrain_.set_corridors(t.key.hash(), t.bounds, lines);
+    std::vector<f32> widths(t.features.roads.size());
+    for (std::size_t i = 0; i < widths.size(); ++i) {
+      const MapFeatures::Road& r = t.features.roads[i];
+      if (!road_is_water(r.cls) && r.cls != RoadClass::path && r.cls != RoadClass::track) widths[i] = road_width(r.cls) + 3.4f;
+    }
+    terrain_.set_corridors(t.key.hash(), t.bounds, t.features.roads, widths);
   }
   // Footprint and road streams for the engine's builders, lanes for the traffic.
   t.cent.clear();
@@ -385,15 +387,15 @@ void CityStream::select_cells(Vec3 focus, bool force) {
     const f32 t = ab2 > 1 ? clampf(((p.x - a.x) * ab.x + (p.y - a.y) * ab.y) / ab2, 0, 1) : 0;
     return std::hypot(p.x - a.x - ab.x * t, p.y - a.y - ab.y * t);
   };
-  struct Pick { f32 d; Tile* t; u64 cell; u32 n; };
+  struct Pick { f32 d; u32 tile; u64 cell; u32 n; };  // (tile: its place among tiles_)
   std::vector<Pick> picks;
-  for (auto& [k, tp] : tiles_) {
-    Tile& t = *tp;
+  for (auto it = tiles_.begin(); it != tiles_.end(); ++it) {
+    const Tile& t = *it->second;
     if (!t.prepared) continue;
     for (const auto& [cell, items] : t.cell_items) {
       const i32 cx = static_cast<i32>(static_cast<u32>(cell >> 32)), cy = static_cast<i32>(static_cast<u32>(cell));
       const f32 d = way_distance({(static_cast<f32>(cx) + 0.5f) * kChunk, (static_cast<f32>(cy) + 0.5f) * kChunk});
-      if (d <= kR + kKeep) picks.push_back({d, &t, cell, static_cast<u32>(items.size())});
+      if (d <= kR + kKeep) picks.push_back({d, static_cast<u32>(it - tiles_.begin()), cell, static_cast<u32>(items.size())});
     }
   }
   std::stable_sort(picks.begin(), picks.end(), [](const Pick& x, const Pick& y) { return x.d < y.d || (x.d == y.d && x.cell < y.cell); });
@@ -403,11 +405,11 @@ void CityStream::select_cells(Vec3 focus, bool force) {
   for (const Pick& p : picks) {
     if (p.d > kR) break;
     if (total >= building_budget && p.d > 240) { reach = p.d; break; }  // (what is next to the player is always drawn)
-    p.t->want_cells.insert(p.cell);
+    (tiles_.begin() + p.tile)->second->want_cells.insert(p.cell);
     total += p.n;
   }
   for (const Pick& p : picks) {
-    Tile& t = *p.t;
+    Tile& t = *(tiles_.begin() + p.tile)->second;
     const bool want = t.want_cells.count(p.cell) != 0, built = t.cell_ids.count(p.cell) != 0;
     if (want && !built) t.dirty_cells.insert(p.cell);
     if (!want && !built) t.dirty_cells.erase(p.cell);
@@ -664,13 +666,14 @@ bool CityStream::damage_of(u32 seed, DamageRec& out) const {
 
 bool CityStream::merge_damage(const std::vector<DamageRec>& list, bool log) {
   if (list.empty()) return false;
-  kern::Map<u32, const DamageRec*> want;
+  kern::Map<u32, u32> want;  // seed -> the place of its record in list (the last one of the seed)
   bool changed = false;
-  for (const DamageRec& r : list) {
+  for (u32 i = 0; i < list.size(); ++i) {
+    const DamageRec& r = list[i];
     if (!(r.height >= 0) || !std::isfinite(r.height)) continue;
     auto it = damage_.find(r.seed);
     if (it != damage_.end() && it->second.height <= r.height + 0.01f && (it->second.leveled || !r.leveled)) continue;  // ours is as low already
-    want[r.seed] = &r;
+    want[r.seed] = i;
   }
   if (want.empty()) return false;
   damage_quiet_ = !log;
@@ -682,17 +685,19 @@ bool CityStream::merge_damage(const std::vector<DamageRec>& list, bool log) {
       auto w = want.find(t.features.buildings[i].seed);
       if (w == want.end()) continue;
       const MapFeatures::Building& b = t.features.buildings[i];
-      if (damage_building(k, i, b.base + w->second->height, w->second->leveled)) changed = true;
+      const DamageRec& r = list[w->second];
+      if (damage_building(k, i, b.base + r.height, r.leveled)) changed = true;
     }
   }
   // the rest (not loaded here): kept for when the tile comes (prepare applies damage_)
-  for (auto& [seed, r] : want) {
+  for (const auto& [seed, at] : want) {
+    const DamageRec& r = list[at];
     auto it = damage_.find(seed);
     if (it == damage_.end()) {
-      damage_[seed] = Damage{r->height, r->leveled};
-    } else if (r->height < it->second.height - 0.01f || (r->leveled && !it->second.leveled)) {
-      it->second.height = std::fmin(it->second.height, r->height);
-      it->second.leveled = it->second.leveled || r->leveled;
+      damage_[seed] = Damage{r.height, r.leveled};
+    } else if (r.height < it->second.height - 0.01f || (r.leveled && !it->second.leveled)) {
+      it->second.height = std::fmin(it->second.height, r.height);
+      it->second.leveled = it->second.leveled || r.leveled;
     } else {
       continue;
     }
@@ -1024,7 +1029,7 @@ void CityStream::walls_near(Vec2 p, f32 r, std::vector<Wall>& out) const {
   }
 }
 
-bool CityStream::building_at(Vec2 p, std::vector<Vec2>* ring_out, f32* base, f32* top, u32* seed) const {
+bool CityStream::building_at(Vec2 p) const {
   for (const auto& [k, tp] : tiles_) {
     const Tile& t = *tp;
     if (t.state != Tile::State::ready) continue;
@@ -1037,10 +1042,6 @@ bool CityStream::building_at(Vec2 p, std::vector<Vec2>* ring_out, f32* base, f32
       for (std::size_t i = 0, j = ring.size() - 1; i < ring.size(); j = i++)
         if ((ring[i].y > p.y) != (ring[j].y > p.y) && p.x < (ring[j].x - ring[i].x) * (p.y - ring[i].y) / (ring[j].y - ring[i].y) + ring[i].x) inside = !inside;
       if (!inside) continue;
-      if (ring_out) *ring_out = ring;
-      if (base) *base = b.base;
-      if (top) *top = b.top;
-      if (seed) *seed = b.seed;
       return true;
     }
   }

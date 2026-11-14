@@ -165,7 +165,7 @@ the renderer, geometry, particles and math).
 | `input` | keyboard, mouse, touch for this frame |
 | `set_status(text)` | text to the page (which displays it); identical texts are not sent again |
 | `request_pointer_lock(bool)` | the page captures or releases the mouse |
-| `arg(key, fallback)`, `arg_number(key, fallback)` | start parameters, by default from the page's query (`?time=0.6`) |
+| `arg(key, fallback)`, `arg_number(key, fallback)`, `has_arg(key)` | start parameters, by default from the page's query (`?time=0.6`); whether one was given |
 | `width()`, `height()`, `aspect()` | size of the drawing buffer |
 | `stats()` | statistics of the last frame (draw calls, triangles …) |
 | `clear_color` | clear color where no sky is drawn |

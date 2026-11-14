@@ -24,7 +24,7 @@ struct WantedBlueprint {
   WantedBlueprint() {
     kern::logic::Graph g;
     std::string error;
-    if (!rules::actor_graph("Wanted", g, &error)) { problems = error; return; }
+    if (!rules::actor_graph("Wanted", g, error)) { problems = error; return; }
     for (const kern::logic::Issue& i : kern::logic::check(g)) problems += (i.error ? "error: " : "warning: ") + i.text + "\n";
     inst = rt.add(g, 1, "Wanted");
     rt.begin();
@@ -94,7 +94,7 @@ SC_TEST(rules_wanted_blueprint_is_its_cpp) {
   // the same Blueprint, the text is the same again, and the rules give the same numbers.
   kern::logic::Graph g, back, twice;
   std::string error, text, again, difference, name;
-  SC_CHECK(rules::actor_graph("Wanted", g, &error), "the level has the Wanted Blueprint (%s)", error.c_str());
+  SC_CHECK(rules::actor_graph("Wanted", g, error), "the level has the Wanted Blueprint (%s)", error.c_str());
   SC_CHECK(kern::logic::to_cpp(g, "Wanted", text, &error), "it is written as C++ (%s)", error.c_str());
   SC_CHECK(kern::logic::from_cpp(text, back, &name, &error) && name == "Wanted", "the C++ is read back (%s)", error.c_str());
   SC_CHECK(kern::logic::same_blueprint(g, back, &difference), "it is the same Blueprint (%s)", difference.c_str());

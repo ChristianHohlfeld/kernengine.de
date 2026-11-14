@@ -695,7 +695,7 @@ bool Renderer::render(const RenderParams& params, RenderStats& stats) {
   }
   if (!camera_valid(camera_)) return fail("invalid camera projection");
   bool ok = false;
-  const Mat4 view = Mat4::look_at(camera_.eye, camera_.target, camera_.up, &ok);
+  const Mat4 view = Mat4::look_at(camera_.eye, camera_.target, camera_.up, ok);
   if (!ok) return fail("degenerate camera direction/up");
   const f32 aspect = static_cast<f32>(rect.width) / static_cast<f32>(rect.height);
   const Mat4 vp = projection_matrix(camera_, aspect) * view;

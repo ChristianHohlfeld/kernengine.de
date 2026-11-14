@@ -190,7 +190,7 @@ void LifeArt::end() {
   auto show = [&](const Part& p) {
     if (!p.id) return;
     const bool any = !p.transforms.empty();
-    if (any) r_->update_instances(p.id, kern::Span<const f32>(p.transforms.data(), p.transforms.size()), kern::Span<const f32>(p.tints.data(), p.tints.size()));
+    if (any) r_->update_instances(p.id, p.transforms, p.tints);
     r_->set_visible(p.id, any);
   };
   show(box_);

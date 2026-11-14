@@ -180,7 +180,7 @@ void Game::look_begin(kern::Engine& e, const kern::Frame& f) {
     L.started = true;
     L.gov.reset(mobile_ ? perf::kMobileStart : perf::kDesktopStart, mobile_ ? perf::kMobileMax : perf::kTiers - 1);
     // ?quality=0..4 fixes a level (tests, slow machines); the setting can be changed with "quality".
-    if (e.arg("quality")) {
+    if (e.has_arg("quality")) {
       const f64 q = e.arg_number("quality", -1);
       if (q >= 0 && q < perf::kTiers) L.gov.set_fixed(static_cast<i32>(q));
     }

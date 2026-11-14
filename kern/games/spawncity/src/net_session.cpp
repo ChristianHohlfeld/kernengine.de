@@ -763,7 +763,7 @@ void Session::on_pose(const PlayerState& s) {
   for (std::size_t i = 0; i < remotes_.size(); ++i) if (remotes_[i].state.slot == s.slot) at = i;
   if (at == remotes_.size()) {
     remotes_.emplace_back();
-    Remote& added = remotes_.back();
+    Remote& added = remotes_[at];
     added.shown = s.position;
     added.shown_rotation = s.rotation;
     added.person_shown = s.avatar;

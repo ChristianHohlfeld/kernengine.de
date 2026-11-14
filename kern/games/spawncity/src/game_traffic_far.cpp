@@ -174,7 +174,7 @@ void Game::traffic_far_step(TrafficCar& c, std::size_t i, f32 h) {
   want = std::fmin(want, traffic_rules(static_cast<i32>(i), s.position, fwd, c.far_speed));
   {
     i32 limiter = -1;
-    const f32 free_way = traffic_gap(static_cast<i32>(i), s.position, fwd, &limiter);
+    const f32 free_way = traffic_gap(static_cast<i32>(i), s.position, fwd, limiter);
     c.ahead = free_way < 0.6f ? limiter : -1;
     want = std::fmin(want, free_way);
   }

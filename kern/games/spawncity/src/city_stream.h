@@ -85,7 +85,7 @@ class CityStream {
   /// Walls of loaded buildings whose outline comes within `r` of p.
   void walls_near(Vec2 p, f32 r, std::vector<Wall>& out) const;
   /// The building whose footprint contains p (-1: none); its outer ring, base and top.
-  bool building_at(Vec2 p, std::vector<Vec2>* ring = nullptr, f32* base = nullptr, f32* top = nullptr, u32* seed = nullptr) const;
+  bool building_at(Vec2 p) const;
   /// The tiles whose ground is final, in a fixed order: their street furniture (tiles.h furnish)
   /// is features(tile).trees and .lamps; `furniture_serial` changes whenever that set does.
   void furniture(std::vector<u64>& tiles) const;

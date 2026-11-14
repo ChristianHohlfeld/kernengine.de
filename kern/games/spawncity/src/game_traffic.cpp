@@ -71,8 +71,8 @@ f32 Game::traffic_lane_distance(const TrafficCar& c) const {
   return lane_distance(lanes[static_cast<std::size_t>(c.lane)], {p.x, p.y});
 }
 
-f32 Game::traffic_gap(i32 car, Vec3 pos, Vec3 fwd, i32* limiter) {
-  if (limiter) *limiter = -1;
+f32 Game::traffic_gap(i32 car, Vec3 pos, Vec3 fwd, i32& limiter) {
+  limiter = -1;
   if (!life_ || car < 0) return 1e9f;
   WorldLife& L = *life_;
   // every vehicle on the road, once a step: the cars (by index; with or without physics), then
@@ -97,7 +97,7 @@ f32 Game::traffic_gap(i32 car, Vec3 pos, Vec3 fwd, i32* limiter) {
   const Vec2 f2 = fl > 1e-4f ? Vec2{fwd.x / fl, fwd.y / fl} : Vec2{1, 0};
   i32 who = -1;
   const f32 v = TrafficRules::gap_speed(car, {pos.x, pos.y}, f2, cars_[static_cast<std::size_t>(car)].car->spec().radius > 0.4f, L.vehicles, who);
-  if (limiter) *limiter = who >= 0 && who < static_cast<i32>(cars_.size()) ? who : -1;
+  limiter = who >= 0 && who < static_cast<i32>(cars_.size()) ? who : -1;
   return v;
 }
 

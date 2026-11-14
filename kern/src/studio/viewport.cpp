@@ -73,7 +73,7 @@ bool Studio::to_screen(const Viewport& v, Vec3 p, f32& x, f32& y) const {
   Camera c = camera_of(v);
   if (play_ == PlayState::playing && !ejected_ && v.index == active_view_ && play_camera_valid_) c = play_camera_;
   bool ok = false;
-  const Mat4 view = Mat4::look_at(c.eye, c.target, c.up, &ok);
+  const Mat4 view = Mat4::look_at(c.eye, c.target, c.up, ok);
   if (!ok) return false;
   const Vec4 clip = (projection_matrix(c, v.css_width / max_of(1.0f, v.css_height)) * view).transform({p.x, p.y, p.z, 1});
   if (clip.w <= 1e-6f) return false;

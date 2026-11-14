@@ -61,6 +61,8 @@ template <class Core> struct EngineNodesOf : Core {
   void engine_engine_request_pointer_lock(Int engine, Bool lock) { this->kern_engine("engine.engine.request_pointer_lock", {to_value(engine), to_value(lock)}, {}); }
   /// Launch parameter `key` from the host (the page's query string by default), or `fallback`.
   Text engine_engine_arg(Int engine, const Text& key, const Text& fallback) const { return from_value<Text>(this->kern_engine("engine.engine.arg", {to_value(engine), to_value(key), to_value(fallback)}, {PinType::text})[0].converted(pin_type_of<Text>())); }
+  /// Whether the host gave the launch parameter `key` (also when it is empty).
+  Bool engine_engine_has_arg(Int engine, const Text& key) const { return from_value<Bool>(this->kern_engine("engine.engine.has_arg", {to_value(engine), to_value(key)}, {PinType::boolean})[0].converted(pin_type_of<Bool>())); }
   Float engine_engine_arg_number(Int engine, const Text& key, Float fallback) const { return from_value<Float>(this->kern_engine("engine.engine.arg_number", {to_value(engine), to_value(key), to_value(fallback)}, {PinType::number})[0].converted(pin_type_of<Float>())); }
   /// Platform side: "k=v&k2=v2" (URL-encoded) launch parameters.
   void engine_engine_set_args(Int engine, const Text& text, Int length) { this->kern_engine("engine.engine.set_args", {to_value(engine), to_value(text), to_value(length)}, {}); }

@@ -19,7 +19,7 @@ inline const kern::logic::Graph* level_blueprint(std::string_view actor, std::st
   if (at == known.end()) {
     auto held = std::make_unique<kern::logic::Graph>();
     std::string why;
-    if (!rules::actor_graph(actor, *held, &why)) held.reset();
+    if (!rules::actor_graph(actor, *held, why)) held.reset();
     at = known.emplace(std::string(actor), std::make_pair(std::move(held), std::move(why))).first;
   }
   if (!at->second.first && error) *error = at->second.second;

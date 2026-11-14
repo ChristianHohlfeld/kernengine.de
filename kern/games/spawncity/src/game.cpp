@@ -245,7 +245,7 @@ bool Game::start(kern::Engine& e) {
   lon_ = e.arg_number("lon", kKonstanzLon);
   fpv_tilt_deg_ = static_cast<f32>(kern::clamp(e.arg_number("fpvtilt", -15), -15.0, 50.0));
   sensitivity_ = static_cast<f32>(kern::clamp(e.arg_number("mouse", 100), 20.0, 300.0)) / 100;  // mouse_settings.mjs 20..300 %
-  if (const char* s = e.arg("start")) start_mode_ = s;
+  if (e.has_arg("start")) start_mode_ = e.arg("start", "");
 
   register_node();
   const bool coarse = e.arg_number("coarse", mobile_ ? 1 : 0) > 0;
@@ -301,12 +301,16 @@ bool Game::start(kern::Engine& e) {
     if (!multiplayer || multiplayer->disabled()) return kern::fail("the level's Blueprint \"Multiplayer\" is missing or has errors");
     mp::bind(multiplayer);
     // the combat and event rules (combat_rules.h)
-    const struct { const char* actor; bool (*bind)(kern::logic::Instance*); } combat_rules[] = {
-        {"Military", &combat::bind_military}, {"Zombies", &combat::bind_zombies}, {"Sandbox", &combat::bind_sandbox}, {"Fun", &combat::bind_fun}, {"Race", &combat::bind_race}};
-    for (const auto& r : combat_rules) {
-      kern::logic::Instance* running = logic ? logic->find(world_->find_actor(r.actor)) : nullptr;
-      if (!running || running->disabled() || !r.bind(running)) return kern::fail("the level's Blueprint \"%s\" is missing, has errors or a table the game cannot read", r.actor);
-    }
+    kern::logic::Instance* military = logic ? logic->find(world_->find_actor("Military")) : nullptr;
+    if (!military || military->disabled() || !combat::bind_military(military)) return kern::fail("the level's Blueprint \"Military\" is missing, has errors or a table the game cannot read");
+    kern::logic::Instance* zombies = logic ? logic->find(world_->find_actor("Zombies")) : nullptr;
+    if (!zombies || zombies->disabled() || !combat::bind_zombies(zombies)) return kern::fail("the level's Blueprint \"Zombies\" is missing, has errors or a table the game cannot read");
+    kern::logic::Instance* sandbox = logic ? logic->find(world_->find_actor("Sandbox")) : nullptr;
+    if (!sandbox || sandbox->disabled() || !combat::bind_sandbox(sandbox)) return kern::fail("the level's Blueprint \"Sandbox\" is missing, has errors or a table the game cannot read");
+    kern::logic::Instance* fun = logic ? logic->find(world_->find_actor("Fun")) : nullptr;
+    if (!fun || fun->disabled() || !combat::bind_fun(fun)) return kern::fail("the level's Blueprint \"Fun\" is missing, has errors or a table the game cannot read");
+    kern::logic::Instance* race = logic ? logic->find(world_->find_actor("Race")) : nullptr;
+    if (!race || race->disabled() || !combat::bind_race(race)) return kern::fail("the level's Blueprint \"Race\" is missing, has errors or a table the game cannot read");
   }
   ctl_.dev.platform(!coarse, coarse, coarse ? 5 : 0);  // the page reports the real device (game_controls.cpp)
   soldier_ = world_->find_actor("Player");
@@ -832,7 +836,7 @@ void Game::drive_traffic(f32 h) {
     // service's: game_traffic.cpp)
     {
       i32 limiter = -1;
-      const f32 free_way = traffic_gap(static_cast<i32>(i), s.position, fwd, &limiter);
+      const f32 free_way = traffic_gap(static_cast<i32>(i), s.position, fwd, limiter);
       c.ahead = free_way < 0.6f ? limiter : -1;
       want_speed = std::fmin(want_speed, free_way);
     }
