@@ -43,14 +43,14 @@ struct Robot { Text state; Bool fallen = false; Float speed = 0; };
 // ---- actors: values ----
 Actor actor_player(GameWorld& w, Self self, Int index);
 Int actor_player_count(GameWorld& w, Self self);
-Actor actor_find(GameWorld& w, Self self, const Text& name);
-Found actor_find_tag(GameWorld& w, Self self, const Text& tag);
+Actor actor_find(GameWorld& w, Self self, std::string_view name);
+Found actor_find_tag(GameWorld& w, Self self, std::string_view tag);
 /// Every living actor with the tag, as a list.
-std::vector<Actor> actor_all_with_tag(GameWorld& w, Self self, const Text& tag);
+std::vector<Actor> actor_all_with_tag(GameWorld& w, Self self, std::string_view tag);
 /// One living actor with the tag, at random: the node's own sequence (logic::random; `memory`
 /// is the node's, `seed` the Blueprint's).
-Actor actor_random_tag(GameWorld& w, Self self, f64* memory, u32 seed, u32 node, const Text& tag);
-Bool actor_has_tag(GameWorld& w, Self self, Actor target, const Text& tag);
+Actor actor_random_tag(GameWorld& w, Self self, f64* memory, u32 seed, u32 node, std::string_view tag);
+Bool actor_has_tag(GameWorld& w, Self self, Actor target, std::string_view tag);
 Text actor_name(GameWorld& w, Self self, Actor target);
 Bool actor_valid(GameWorld& w, Self self, Actor target);
 Vector actor_location(GameWorld& w, Self self, Actor target);
@@ -76,15 +76,15 @@ void actor_explode(GameWorld& w, Self self, Vector location, Float radius, Float
 Actor actor_spawn(GameWorld& w, Self self, logic::Host& host, std::string_view named, Actor tpl, Vector location, Vector rotation);
 void actor_destroy(GameWorld& w, Self self, Actor target);
 void actor_enable(GameWorld& w, Self self, Actor target, Bool enabled);
-void actor_set_property(GameWorld& w, Self self, logic::Host& host, Actor target, const Text& path, const Text& value);
+void actor_set_property(GameWorld& w, Self self, logic::Host& host, Actor target, std::string_view path, std::string_view value);
 void actor_set_light(GameWorld& w, Self self, Actor target, Vector color, Float intensity, Float range);
 void actor_set_color(GameWorld& w, Self self, Actor target, Vector color);
 
 // ---- the game ----
-void game_message(GameWorld& w, Self self, const Text& text);
+void game_message(GameWorld& w, Self self, std::string_view text);
 void game_add_score(GameWorld& w, Self self, Float points);
-void game_win(GameWorld& w, Self self, const Text& message);
-void game_lose(GameWorld& w, Self self, const Text& message);
+void game_win(GameWorld& w, Self self, std::string_view message);
+void game_lose(GameWorld& w, Self self, std::string_view message);
 void game_sound(GameWorld& w, Self self, std::string_view sound, Vector location, Float volume, Float pitch, Bool spatial);
 void game_particles(GameWorld& w, Self self, Vector location, Vector color);
 void game_shake(GameWorld& w, Self self, Float amount);
@@ -94,16 +94,16 @@ void combat_kill(GameWorld& w, Self self, Actor target);
 void combat_ammo(GameWorld& w, Self self, Actor target, Int rounds);
 Trace physics_trace(GameWorld& w, Self self, Vector start, Vector end, Actor ignore);
 Trace physics_trace_channels(GameWorld& w, Self self, Vector start, Vector end, Actor ignore, Int mask, Int category);
-Int physics_channels(GameWorld& w, Self self, const Text& names);
+Int physics_channels(GameWorld& w, Self self, std::string_view names);
 /// For Each Actor with Tag: the living actors with the tag, as the loop starts.
-std::vector<logic::ActorRef> actors_with_tag(GameWorld& w, const Text& tag);
+std::vector<logic::ActorRef> actors_with_tag(GameWorld& w, std::string_view tag);
 
 // ---- robots (walkers, the Micro Duck): the robot's own units (m/s, degrees); Robot 0 in the
 // level's Blueprint is the first robot ----
 void walker_move(GameWorld& w, Self self, Actor target, Float forward, Float strafe, Float turn, Float duration);
 void walker_look(GameWorld& w, Self self, Actor target, Float yaw, Float pitch, Float duration);
 void walker_autonomous(GameWorld& w, Self self, Actor target, Bool enable);
-void walker_skill(GameWorld& w, Self self, Actor target, const Text& move);
+void walker_skill(GameWorld& w, Self self, Actor target, std::string_view move);
 void walker_beak(GameWorld& w, Self self, Actor target, Float open);
 void walker_pet(GameWorld& w, Self self, Actor target, Float seconds);
 void walker_hear(GameWorld& w, Self self, Actor target, Bool voice);
@@ -123,7 +123,7 @@ template <class Core> struct BlueprintNodesOf : Core {
   using Int = logic::Whole;
   using Float = f64;
   using Vector = Vec3;
-  using Text = std::string;
+  using Text = logic::Text;
   using Actor = logic::ActorHandle;
   template <class T> using List = logic::List<T>;
 

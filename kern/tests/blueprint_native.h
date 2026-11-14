@@ -1576,13 +1576,13 @@ inline const char* builtin_cpp_type(PinType t) {
     case PinType::integer: return "kern::i64";
     case PinType::number: return "kern::f64";
     case PinType::vector: return "kern::Vec3";
-    case PinType::text: return "std::string";
+    case PinType::text: return "kern::logic::Text";
     case PinType::actor: return "kern::logic::ActorHandle";
     case PinType::boolean_list: return "kern::List<bool>";
     case PinType::integer_list: return "kern::List<kern::logic::Whole>";
     case PinType::number_list: return "kern::List<kern::f64>";
     case PinType::vector_list: return "kern::List<kern::Vec3>";
-    case PinType::text_list: return "kern::List<std::string>";
+    case PinType::text_list: return "kern::List<kern::logic::Text>";
     case PinType::actor_list: return "kern::List<kern::logic::ActorHandle>";
     default: return "void";
   }

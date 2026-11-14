@@ -16,7 +16,7 @@ template <class Core> struct EngineNodesOf : Core {
   using Int = logic::Whole;
   using Float = f64;
   using Vector = Vec3;
-  using Text = std::string;
+  using Text = logic::Text;
   template <class T> using List = logic::List<T>;
 
   /// One call of the engine: the inputs as values to the host, what it gives as values back (zeros where it has no such function).

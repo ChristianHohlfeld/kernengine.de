@@ -7,11 +7,13 @@
 
 #include <array>
 #include <cmath>
+#include <compare>
 #include <cstddef>
 #include <deque>
 #include <functional>
 #include <initializer_list>
 #include <iterator>
+#include <new>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -101,6 +103,81 @@ struct Whole {
     v = whole_add(v, amount.v);
     return *this;
   }
+};
+
+/// `Text` in a Blueprint's C++. A text written out in the program - "abc": a value typed into a
+/// pin, the default of a variable or of a field - is part of the program: a Text made of it
+/// refers to those characters. Nothing is copied and no memory is asked for, however long the
+/// text is and however often the value is handed on - as a const char* to a literal in C++. A
+/// text made while the Blueprint runs (Append, a number as a text, what the engine gives) holds
+/// its characters itself, as a std::string does.
+class Text {
+ public:
+  constexpr Text() : written_() {}
+  /// "abc": a text the program holds for good - a literal, a constant of the program. It is not
+  /// copied, so it must stay where it is. A buffer that is written to (char b[64]) is refused
+  /// here: its characters go into a std::string or a std::string_view, and those are copied.
+  template <std::size_t N> constexpr Text(const char (&written)[N]) : written_(written, N - 1) {}  // NOLINT (implicit: a text written out is a Text)
+  template <std::size_t N> Text(char (&)[N]) = delete;
+  Text(std::string made) : made_(std::move(made)), holds_(true) {}                                // NOLINT (implicit: a text made while running)
+  explicit Text(std::string_view copied) : made_(copied), holds_(true) {}
+  /// A text the program holds for good, by its characters - the name of an enum's value:
+  /// referred to, not copied. (Only for what stays where it is as long as the program runs.)
+  static Text of_program(std::string_view held) {
+    Text t;
+    t.written_ = held;
+    return t;
+  }
+  Text(const Text& o) : holds_(o.holds_) {
+    if (holds_) new (&made_) std::string(o.made_);
+    else new (&written_) std::string_view(o.written_);
+  }
+  Text(Text&& o) noexcept : holds_(o.holds_) {
+    if (holds_) new (&made_) std::string(std::move(o.made_));
+    else new (&written_) std::string_view(o.written_);
+  }
+  Text& operator=(const Text& o) {
+    if (this == &o) return *this;
+    if (holds_ && o.holds_) made_ = o.made_;  // (into the characters it has: std::string's own assignment)
+    else if (o.holds_) hold(std::string(o.made_));
+    else refer(o.written_);
+    return *this;
+  }
+  Text& operator=(Text&& o) noexcept {
+    if (this == &o) return *this;
+    if (holds_ && o.holds_) made_ = std::move(o.made_);
+    else if (o.holds_) hold(std::move(o.made_));
+    else refer(o.written_);
+    return *this;
+  }
+  constexpr ~Text() {
+    if (holds_) made_.~basic_string();
+  }
+  /// Its characters, where they are.
+  constexpr std::string_view view() const { return holds_ ? std::string_view(made_) : written_; }
+  constexpr operator std::string_view() const { return view(); }  // NOLINT (implicit: read as its characters)
+  constexpr std::size_t size() const { return view().size(); }
+  constexpr bool empty() const { return view().empty(); }
+  /// Its characters as a std::string of their own (a copy), and handed on without one where it holds them.
+  std::string str() const& { return std::string(view()); }
+  std::string str() && { return holds_ ? std::move(made_) : std::string(written_); }
+  friend bool operator==(const Text& a, const Text& b) { return a.view() == b.view(); }
+  friend auto operator<=>(const Text& a, const Text& b) { return a.view() <=> b.view(); }
+
+ private:
+  void hold(std::string made) {
+    if (holds_) made_ = std::move(made);
+    else new (&made_) std::string(std::move(made)), holds_ = true;
+  }
+  void refer(std::string_view written) {
+    if (holds_) made_.~basic_string(), holds_ = false;
+    new (&written_) std::string_view(written);
+  }
+  union {
+    std::string_view written_;  // a text of the program: its characters there
+    std::string made_;          // a text made while running: its characters here
+  };
+  bool holds_ = false;
 };
 
 /// What a list of a Blueprint's class holds of an item: the item - every entry of a list is an
@@ -271,6 +348,10 @@ template <> struct Held<std::string> {
   static constexpr PinType type = PinType::text;
   static std::string from(const Value& v) { return v.as_text(); }
 };
+template <> struct Held<Text> {
+  static constexpr PinType type = PinType::text;
+  static Text from(const Value& v) { return Text(v.as_text()); }
+};
 template <> struct Held<ActorHandle> {
   static constexpr PinType type = PinType::actor;
   static ActorHandle from(const Value& v) { return {v.as_actor()}; }
@@ -284,6 +365,13 @@ template <> struct Held<std::vector<Whole>> {
   static std::vector<Whole> from(const Value& v) {
     const std::vector<i64>& items = v.items<i64>();
     return std::vector<Whole>(items.begin(), items.end());
+  }
+};
+template <> struct Held<std::vector<Text>> {
+  static constexpr PinType type = PinType::text_list;
+  static std::vector<Text> from(const Value& v) {
+    const std::vector<std::string>& items = v.items<std::string>();
+    return std::vector<Text>(items.begin(), items.end());
   }
 };
 template <> struct Held<std::vector<Truth>> {
@@ -380,6 +468,8 @@ inline Value to_value(Whole v) { return Value::integer(v); }
 inline Value to_value(f64 v) { return Value::number(v); }
 inline Value to_value(Vec3 v) { return Value::vector(v); }
 inline Value to_value(std::string v) { return Value::text(std::move(v)); }
+inline Value to_value(const Text& v) { return Value::text(v.str()); }
+inline Value to_value(Text&& v) { return Value::text(std::move(v).str()); }
 inline Value to_value(ActorHandle v) { return Value::actor(v.id); }
 inline Value to_value(Value v) { return v; }  // (a struct in the interpreter)
 template <class T> Value to_value(std::vector<T> v) { return Value::of(std::move(v)); }
@@ -403,6 +493,12 @@ Value to_value(std::vector<E> v) {
 }
 inline Value to_value(const std::vector<Whole>& v) { return Value::of(std::vector<i64>(v.begin(), v.end())); }
 inline Value to_value(const std::vector<Truth>& v) { return Value::of(std::vector<bool>(v.begin(), v.end())); }
+inline Value to_value(const std::vector<Text>& v) {
+  std::vector<std::string> items;
+  items.reserve(v.size());
+  for (const Text& item : v) items.push_back(item.str());
+  return Value::of(std::move(items));
+}
 template <class T, std::size_t N> Value to_value(const Fixed<T, N>& v) { return to_value(List<T>(v)); }  // (a list of a fixed length: its entries as a list)
 
 /// What the list nodes do, for a list of any item type - the node library and a Blueprint's C++
@@ -720,6 +816,7 @@ inline void native_set(Whole& variable, const Value& v) { variable = whole(v.as_
 inline void native_set(f64& variable, const Value& v) { variable = v.as_number(); }
 inline void native_set(Vec3& variable, const Value& v) { variable = v.as_vector(); }
 inline void native_set(std::string& variable, const Value& v) { variable = v.as_text(); }
+inline void native_set(Text& variable, const Value& v) { variable = Text(v.as_text()); }
 inline void native_set(ActorHandle& variable, const Value& v) { variable = {v.as_actor()}; }
 template <class T> void native_set(std::vector<T>& variable, const Value& v) { variable = from_value<std::vector<T>>(v.converted(pin_type_of<std::vector<T>>())); }
 template <class T, std::size_t N> void native_set(Fixed<T, N>& variable, const Value& v) { variable = from_value<Fixed<T, N>>(v.converted(pin_type_of<Fixed<T, N>>())); }
@@ -935,7 +1032,7 @@ inline f64 tween_step(f64* m, f64 now, std::string_view ease, bool first, bool& 
 /// Switch on Int with `cases` cases: the exec output (the case, or `cases` for Default).
 inline int switch_int(int cases, i64 selection) { return selection >= 0 && selection < cases ? static_cast<int>(selection) : cases; }
 /// Switch on Text: the exec output (the case that equals the selection, or the count for Default).
-inline int switch_text(std::string_view cases, const std::string& selection) {
+inline int switch_text(std::string_view cases, std::string_view selection) {
   const std::vector<std::string> list = setting_cases(cases);
   for (std::size_t i = 0; i < list.size(); ++i) if (list[i] == selection) return static_cast<int>(i);
   return static_cast<int>(list.size());
@@ -974,6 +1071,10 @@ template <> struct To<Vec3> {
 };
 template <> struct To<std::string> {
   template <class S> static std::string from(const S& v) { return to_value(v).as_text(); }  // (everything prints, as the interpreter prints it)
+};
+template <> struct To<Text> {
+  static Text from(const Text& v) { return v; }
+  template <class S> static Text from(const S& v) { return Text(to_value(v).as_text()); }  // (everything prints, as the interpreter prints it)
 };
 template <> struct To<ActorHandle> {
   static ActorHandle from(ActorHandle v) { return v; }

@@ -648,6 +648,30 @@ LeerenResult Leeren() {
   Für die Regel der gehaltenen Listeneinträge (Referenz-Eingänge) ist ein Take ein Set: Er setzt
   etwas an die Stelle dessen, was dort stand.
 
+### Texte des Programms
+
+Ein Text, der im Blueprint ausgeschrieben ist – der Wert an einem Pin, der Default einer Variablen
+oder eines Felds, ein Eintrag einer ausgeschriebenen Liste –, gehört zum Programm. In der Klasse
+ist `Text` deshalb kein `std::string`, sondern `kern::logic::Text` (`nodes.h`):
+
+- **Ein ausgeschriebener Text wird nicht kopiert.** `Text Name = "spawncity-facades";` verweist auf
+  die Zeichen, die das Programm ohnehin hält – wie ein `const char*` auf ein Literal in C++. Den
+  Wert weiterzugeben, in eine Struktur zu setzen, aus einer Funktion zu geben, zu vergleichen
+  fordert keinen Speicher an, wie lang der Text auch ist.
+- **Ein Text, der beim Laufen entsteht**, hält seine Zeichen selbst, so wie ein `std::string`:
+  Append, eine Zahl als Text, was die Engine gibt. Ihn zu kopieren kostet, was es in C++ kostet;
+  wo er zum letzten Mal gelesen wird, reicht `std::move` ihn weiter.
+- **Die Knoten lesen die Zeichen, wo sie stehen** (`text_equal`, `text_contains`, `text_length`);
+  `text_append` fordert für das Ergebnis einmal Speicher an. Der Name eines Werts einer
+  Aufzählung (`enum_name`) ist ebenfalls ein Text des Programms.
+- **Im Interpreter ändert sich nichts**: Dort ist ein Text ein Wert wie jeder andere. Was ein
+  Blueprint rechnet, ist in jeder Stufe dasselbe, Zeichen für Zeichen.
+
+Wer die Klasse von Hand aus C++ ruft: Ein `std::string` wird zu einem `Text` (er wird gehalten),
+ein Literal auch (es wird referenziert). Ein Puffer, in den geschrieben wird (`char b[64]`), wird
+abgelehnt – seine Zeichen gehören in einen `std::string`. Gelesen wird ein `Text` als
+`std::string_view` (`text.view()`), als eigener `std::string` mit `text.str()`.
+
 ### Referenz-Eingänge
 
 Ein Eingang einer Funktion ist ein **Wert** – der Wert, den er beim Aufruf hatte – oder eine

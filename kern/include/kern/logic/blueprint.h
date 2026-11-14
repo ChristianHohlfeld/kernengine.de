@@ -91,6 +91,9 @@ struct Layout {
 struct BlueprintCore : logic::PureNodes {
   /// A whole number as a Blueprint holds it (the functions of nodes.h take and give i64).
   using Int = logic::Whole;
+  /// A text as a Blueprint's class holds it: one written out in the program is referred to, one
+  /// made while running is held (logic::Text, nodes.h).
+  using Text = logic::Text;
   /// A list of values of one type: List<Float>, List<Int> ...
   template <class T> using List = kern::List<T>;
   template <class T, std::size_t N> using Fixed = kern::Fixed<T, N>;
@@ -100,13 +103,13 @@ struct BlueprintCore : logic::PureNodes {
 
   // ---- the world ----
   void debug_print(const Text& text, Bool screen) {
-    if (kern_world.host) kern_world.host->print(text, screen);
+    if (kern_world.host) kern_world.host->print(text.str(), screen);
   }
   Float time_now() const { return kern_world.host ? kern_world.host->time() : 0.0; }
   /// Call Event: raises the Custom Event `Name` on Target's graph (on every graph: Actor{0}).
   template <Setting Name> void flow_call(Actor target, Actor actor, Float value, const Text& text) {
     if (kern_world.runtime)
-      kern_world.runtime->call(Name.view(), target.id, {{"actor", logic::Value::actor(actor.id)}, {"value", logic::Value::number(value)}, {"text", logic::Value::text(text)}});
+      kern_world.runtime->call(Name.view(), target.id, {{"actor", logic::Value::actor(actor.id)}, {"value", logic::Value::number(value)}, {"text", logic::to_value(text)}});
   }
 
   /// Call on Actor: runs the function `Name` of the Blueprint of `target` (Actor{0}: the Level's)
@@ -297,6 +300,20 @@ struct BlueprintCore : logic::PureNodes {
   template <class T> static void var_take(T& place) { place = T{}; }
   template <class N, class T> static void var_take(N& n, T& place) { n.value = std::exchange(place, T{}); }
 
+  // ---- text ----
+  // The text nodes on a Blueprint's Text: read where the characters are - a text is copied only
+  // where a new one is made (what they give is what logic::PureNodes gives, character for character).
+  static Text value_text(Text value) { return value; }
+  static Text text_append(const Text& a, const Text& b, const Text& c) {
+    std::string made;
+    made.reserve(a.size() + b.size() + c.size());
+    made.append(a.view()).append(b.view()).append(c.view());
+    return made;
+  }
+  static Bool text_equal(const Text& a, const Text& b) { return a == b; }
+  static Bool text_contains(const Text& a, const Text& b) { return a.view().find(b.view()) != std::string_view::npos; }
+  static Int text_length(const Text& a) { return static_cast<i64>(a.size()); }
+
   // ---- enums ----
   // An enum the Blueprint declares with KERN_ENUM; the nodes' setting "Enum" is the type:
   // enum_name<Mode>(State). What they do is logic::enums (nodes.h).
@@ -313,7 +330,12 @@ struct BlueprintCore : logic::PureNodes {
     Bool valid = false;
   };
   template <class E> static Bool enum_equal(std::type_identity_t<E> a, std::type_identity_t<E> b) { return a == b; }
-  template <class E> static Text enum_name(std::type_identity_t<E> value) { return logic::enums::name(kern_enum_values<E>(), static_cast<i64>(value)); }
+  /// (The names of an enum's values are part of the program: the text refers to the name.)
+  template <class E> static Text enum_name(std::type_identity_t<E> value) {
+    const std::vector<std::string>& names = kern_enum_values<E>();
+    const i64 at = static_cast<i64>(value);
+    return logic::enums::is_value(names.size(), at) ? Text::of_program(names[static_cast<std::size_t>(at)]) : Text();
+  }
   template <class E> static EnumFound<E> enum_from_name(const Text& name) {
     const i64 at = logic::enums::find(kern_enum_values<E>(), name);
     return {static_cast<E>(at < 0 ? 0 : at), at >= 0};

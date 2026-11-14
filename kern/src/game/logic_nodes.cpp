@@ -38,25 +38,25 @@ Actor actor_player(GameWorld& w, Self, Int index) {
   return {a};
 }
 Int actor_player_count(GameWorld& w, Self) { return static_cast<Int>(w.pawns().size()); }
-Actor actor_find(GameWorld& w, Self, const Text& name) { return {w.find_actor(name)}; }
-Found actor_find_tag(GameWorld& w, Self, const Text& tag) {
+Actor actor_find(GameWorld& w, Self, std::string_view name) { return {w.find_actor(name)}; }
+Found actor_find_tag(GameWorld& w, Self, std::string_view tag) {
   std::vector<ActorId> v;
   w.actors_with_tag(tag, v);
   return {{v.empty() ? 0 : v.front()}, static_cast<Int>(v.size())};
 }
-std::vector<Actor> actor_all_with_tag(GameWorld& w, Self, const Text& tag) {
+std::vector<Actor> actor_all_with_tag(GameWorld& w, Self, std::string_view tag) {
   std::vector<ActorId> v;
   w.actors_with_tag(tag, v);
   std::vector<Actor> all;
   for (ActorId id : v) all.push_back({id});
   return all;
 }
-Actor actor_random_tag(GameWorld& w, Self, f64* memory, u32 seed, u32 node, const Text& tag) {
+Actor actor_random_tag(GameWorld& w, Self, f64* memory, u32 seed, u32 node, std::string_view tag) {
   std::vector<ActorId> v;
   w.actors_with_tag(tag, v);
   return {v.empty() ? 0 : v[logic::random::next(memory, seed, node) % v.size()]};
 }
-Bool actor_has_tag(GameWorld& w, Self self, Actor target, const Text& tag) { return w.has_tag(or_self(target, self), tag); }
+Bool actor_has_tag(GameWorld& w, Self self, Actor target, std::string_view tag) { return w.has_tag(or_self(target, self), tag); }
 Text actor_name(GameWorld& w, Self self, Actor target) {
   const game::Actor* a = w.level().find(or_self(target, self));
   return a ? a->name : Text();
@@ -125,10 +125,10 @@ Actor actor_spawn(GameWorld& w, Self, logic::Host& host, std::string_view named,
 }
 void actor_destroy(GameWorld& w, Self self, Actor target) { w.destroy_actor(or_self(target, self)); }
 void actor_enable(GameWorld& w, Self self, Actor target, Bool enabled) { w.set_alive(or_self(target, self), enabled); }
-void actor_set_property(GameWorld& w, Self self, logic::Host& host, Actor target, const Text& path, const Text& value) {
+void actor_set_property(GameWorld& w, Self self, logic::Host& host, Actor target, std::string_view path, std::string_view value) {
   json::Value v;
   if (!json::parse(value, v)) v = json::Value(value);
-  if (!w.set_property(or_self(target, self), path, v)) host.error(std::string("Set Property: ") + last_error());
+  if (!w.set_property(or_self(target, self), std::string(path), v)) host.error(std::string("Set Property: ") + last_error());
 }
 void actor_set_light(GameWorld& w, Self self, Actor target, Vector color, Float intensity, Float range) {
   const ActorId t = or_self(target, self);
@@ -147,10 +147,10 @@ void actor_set_color(GameWorld& w, Self self, Actor target, Vector color) {
   w.set_property(or_self(target, self), "components.mesh.material.color", json::Value(hex));
 }
 
-void game_message(GameWorld& w, Self, const Text& text) { w.show_message(text); }
+void game_message(GameWorld& w, Self, std::string_view text) { w.show_message(std::string(text)); }
 void game_add_score(GameWorld& w, Self, Float points) { w.add_score(static_cast<f32>(points)); }
-void game_win(GameWorld& w, Self, const Text& message) { w.end_game(true, message); }
-void game_lose(GameWorld& w, Self, const Text& message) { w.end_game(false, message); }
+void game_win(GameWorld& w, Self, std::string_view message) { w.end_game(true, std::string(message)); }
+void game_lose(GameWorld& w, Self, std::string_view message) { w.end_game(false, std::string(message)); }
 void game_sound(GameWorld& w, Self self, std::string_view sound, Vector location, Float volume, Float pitch, Bool spatial) {
   Vec3 at = location;
   if (length_sq(at) == 0 && self) at = position(w, self);
@@ -181,8 +181,8 @@ Trace physics_trace_channels(GameWorld& w, Self, Vector start, Vector end, Actor
   const bool hit = w.line_trace(start, end, ignore.id, a, p, n, physics::QueryFilter(as_bits(mask), as_bits(category)));
   return {hit, {a}, p, n};
 }
-Int physics_channels(GameWorld& w, Self, const Text& names) { return static_cast<Int>(channel_bits(w.level().world, names)); }
-std::vector<logic::ActorRef> actors_with_tag(GameWorld& w, const Text& tag) {
+Int physics_channels(GameWorld& w, Self, std::string_view names) { return static_cast<Int>(channel_bits(w.level().world, names)); }
+std::vector<logic::ActorRef> actors_with_tag(GameWorld& w, std::string_view tag) {
   std::vector<ActorId> v;
   w.actors_with_tag(tag, v);
   return v;
@@ -196,7 +196,7 @@ void walker_look(GameWorld& w, Self self, Actor target, Float yaw, Float pitch, 
   w.walker_look(or_self(target, self), static_cast<f32>(yaw * k), static_cast<f32>(pitch * k), static_cast<f32>(duration));
 }
 void walker_autonomous(GameWorld& w, Self self, Actor target, Bool enable) { w.walker_set_autonomous(or_self(target, self), enable); }
-void walker_skill(GameWorld& w, Self self, Actor target, const Text& move) { w.walker_skill(or_self(target, self), move); }
+void walker_skill(GameWorld& w, Self self, Actor target, std::string_view move) { w.walker_skill(or_self(target, self), move); }
 void walker_beak(GameWorld& w, Self self, Actor target, Float open) { w.walker_mouth(or_self(target, self), static_cast<f32>(open)); }
 void walker_pet(GameWorld& w, Self self, Actor target, Float seconds) { w.walker_pet(or_self(target, self), static_cast<f32>(seconds)); }
 void walker_hear(GameWorld& w, Self self, Actor target, Bool voice) { w.walker_hear(or_self(target, self), voice); }
@@ -276,6 +276,16 @@ void give(Context& c, std::size_t first, const nodes::Robot& r) {
   c.out(first + 1, Value::boolean(r.fallen));
   c.out(first + 2, Value::number(r.speed));
 }
+/// An input of a node as its function takes it. A text is read where the value holds it
+/// (std::string_view): nothing is copied.
+template <class T> T taken(Value& v) {
+  if constexpr (std::is_same_v<T, std::string_view>) {
+    if (v.type != logic::PinType::text) v = Value::text(v.as_text());
+    return v.s;
+  } else {
+    return logic::from_value<T>(v);
+  }
+}
 /// Runs `f` for the node: every input is read once, in its order - with a game or without (the
 /// arguments of a call); without a game the node does nothing and gives nothing.
 template <class R, class... A, std::size_t... I>
@@ -284,8 +294,8 @@ void run_typed(R (*f)(GameWorld&, logic::ActorRef, A...), Context& c, std::size_
   for (std::size_t i = 0; i < sizeof...(A); ++i) v[i] = c.in(first + i);
   GameWorld* w = world(c);
   if (!w) return;
-  if constexpr (std::is_void_v<R>) f(*w, c.self(), logic::from_value<std::decay_t<A>>(v[I])...);
-  else give(c, first, f(*w, c.self(), logic::from_value<std::decay_t<A>>(v[I])...));
+  if constexpr (std::is_void_v<R>) f(*w, c.self(), taken<std::decay_t<A>>(v[I])...);
+  else give(c, first, f(*w, c.self(), taken<std::decay_t<A>>(v[I])...));
 }
 
 /// The node to bind: described in logic_node_shapes.cpp, not bound yet. (A node that stays

@@ -81,7 +81,7 @@ def class_text(api, functions):
              "#pragma once", "", "#include <initializer_list>", "#include <string_view>", "#include <type_traits>", "#include <vector>", "", '#include "kern/logic/nodes.h"', "",
              "namespace kern::logic {", "",
              "template <class Core> struct EngineNodesOf : Core {",
-             "  using Bool = bool;", "  using Int = logic::Whole;", "  using Float = f64;", "  using Vector = Vec3;", "  using Text = std::string;",
+             "  using Bool = bool;", "  using Int = logic::Whole;", "  using Float = f64;", "  using Vector = Vec3;", "  using Text = logic::Text;",
              "  template <class T> using List = logic::List<T>;", "",
              "  /// One call of the engine: the inputs as values to the host, what it gives as values back (zeros where it has no such function).",
              "  std::vector<Value> kern_engine(std::string_view function, const std::vector<Value>& in, std::initializer_list<PinType> outputs) const {",

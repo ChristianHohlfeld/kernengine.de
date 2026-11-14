@@ -27,6 +27,7 @@
 #include "kern/studio/studio.h"
 #include "kern/net/client_server.h"
 #include "kern/game/net_game.h"
+#include "kern/logic/blueprint.h"
 #include "kern/logic/logic.h"
 #include "blueprint_native.h"
 #include "game_cases.h"
@@ -4027,6 +4028,82 @@ TEST(logic_fixed_lists) {
     for (const logic::Issue& i : logic::check(g)) all += i.text + "\n";
     CHECK(all.find("variable \"L\" is a list of 3 entries, its default has 4") != std::string::npos);
   }
+}
+
+// A Blueprint as its C++ class, for the test below: texts written out in the program.
+namespace text_of_the_program {
+inline constexpr char kTitle[] = "the title of this Blueprint, longer than a small text";
+inline constexpr char kName[] = "a name that is longer than fifteen characters";
+struct B : kern::Blueprint {
+  KERN_ENUM(Mode, Closed, Open);
+  KERN_STRUCT(Spec) { Text Name = kName; Float Mass = 1.0; };
+  Text Title = kTitle;
+  Spec Car = Spec{kName, 2.0};
+  struct NameResult { Text out = ""; };
+  NameResult Name() { return {kTitle}; }
+  struct SpecResult { Spec out = Spec{kName, 1.0}; };
+  SpecResult GetSpec() { return {Car}; }
+};
+}  // namespace text_of_the_program
+
+TEST(logic_text_of_the_program) {
+  // `Text` in a Blueprint's class (logic::Text): a text written out in the program is referred
+  // to - its characters are the program's, nothing is copied and no memory is asked for, however
+  // often the value is handed on (a const char* to a literal in C++). A text made while running
+  // holds its characters itself, as a std::string does.
+  using logic::Text;
+  using namespace text_of_the_program;
+  auto of_program = [](const Text& t, const char* written) { return t.view().data() == written; };
+  B b;
+  CHECK(of_program(b.Title, kTitle) && of_program(b.Car.Name, kName) && b.Title.size() == sizeof kTitle - 1);
+  const auto name = b.Name();
+  const auto spec = b.GetSpec();
+  Text copy = b.Title;
+  Text moved = std::move(copy);
+  const B::Spec made = B::struct_make<B::Spec>(kName, 3.0);
+  const auto list = B::list_make<Text, "2">(kTitle, b.Title);
+  CHECK(of_program(name.out, kTitle) && of_program(spec.out.Name, kName) && of_program(moved, kTitle) && of_program(made.Name, kName) && of_program(list[0], kTitle) && of_program(list[1], kTitle));
+  CHECK(B::text_equal(b.Title, kTitle) && !B::text_equal(b.Title, kName) && B::text_contains(b.Title, "longer than") && B::text_length(b.Title) == static_cast<i64>(sizeof kTitle - 1));
+  CHECK(of_program(B::value_text(b.Title), kTitle));
+  // (the name of an enum's value is the program's too: referred to, where the class holds the names)
+  CHECK(B::enum_name<B::Mode>(B::Mode::Open) == "Open" && B::enum_name<B::Mode>(B::Mode::Open).view().data() == B::kern_enum_values<B::Mode>()[1].data());
+  CHECK(B::enum_name<B::Mode>(static_cast<B::Mode>(7)).empty() && B::enum_from_name<B::Mode>("Open").found && !B::enum_from_name<B::Mode>(b.Title).found);
+
+  // a text made while running: its own characters
+  const Text joined = B::text_append(b.Title, " / ", name.out);
+  CHECK(joined == Text(std::string(kTitle) + " / " + kTitle) && !of_program(joined, kTitle));
+  Text held = joined;
+  CHECK(held == joined && held.view().data() != joined.view().data());
+  held = kName;  // held -> the program's
+  CHECK(of_program(held, kName));
+  held = joined;  // the program's -> held
+  CHECK(held == joined && held.view().data() != joined.view().data());
+  Text& same = held;
+  held = same;  // itself
+  CHECK(held == joined);
+  Text other = std::string("made at run time, also longer than fifteen");
+  held = other;  // held -> held
+  CHECK(held == other && !(held == joined));
+  held = std::move(other);
+  CHECK(held == "made at run time, also longer than fifteen");
+  const Text none;
+  CHECK(none.empty() && none == "" && (none <=> held) < 0 && (held <=> none) > 0 && B::text_append("a", "b", "c") == "abc");
+  held = none;
+  CHECK(held.empty());
+
+  // as values of the interpreter and back; a list of texts; everything prints
+  const kern::List<Text> names{"x", kName, "z"};
+  CHECK(B::list_find<Text>(names, "z") == 2 && B::list_contains<Text>(names, kName) && B::list_get<Text>(names, 7) == "");
+  const logic::Value v = logic::to_value(names);
+  CHECK(v.type == logic::PinType::text_list && v.size() == 3 && v.item(1).as_text() == kName);
+  const kern::List<Text> back = logic::from_value<kern::List<Text>>(v);
+  CHECK(back.size() == 3 && back[1] == names[1] && logic::to_value(b.Title).as_text() == kTitle && logic::from_value<Text>(logic::Value::text("t")) == "t");
+  CHECK(kern::to<Text>(1.5) == "1.5" && kern::to<Text>(true) == "true" && kern::to<Text>(Text("t")) == "t");
+  const kern::Fixed<Text, 2> pair{"only one"};
+  CHECK(pair[0] == "only one" && pair[1] == "" && pair[5] == "");
+  Text set;
+  logic::native_set(set, logic::Value::number(2.5));
+  CHECK(set == "2.5");
 }
 
 TEST(logic_notation_hands_over) {
