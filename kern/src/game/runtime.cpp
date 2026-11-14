@@ -1421,6 +1421,7 @@ void GameWorld::init_combat(ActorId id) {
 
 void GameWorld::stop() {
   if (!running()) return;
+  if (logic_) logic_->end();   // (End Play: while the world still is what it was)
   release_soldier_art();
   grab_.end();
   walkers_.clear();

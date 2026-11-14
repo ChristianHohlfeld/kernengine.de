@@ -131,6 +131,13 @@ void add_events(Library& lib) {
     lib.add(std::move(d));
   }
   {
+    NodeDef d = make("event.end", "End Play", "Events", NodeKind::event, "Runs once when play stops (or when the actor is taken out of the world) - after it began.");
+    d.outputs = {exec_out()};
+    d.event = "logic.end";
+    d.color = 0xb4232f;
+    lib.add(std::move(d));
+  }
+  {
     NodeDef d = make("event.tick", "Event Tick", "Events", NodeKind::event, "Runs every simulation step. Delta is the step in seconds.");
     d.outputs = {exec_out(), data("delta", "Delta Seconds", PinType::number)};
     d.event = "logic.tick";

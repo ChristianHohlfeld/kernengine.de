@@ -2227,6 +2227,55 @@ TEST(logic_local_variables) {
   CHECK(error.find("local variable L") != std::string::npos);
 }
 
+TEST(logic_end_play) {
+  // End Play runs once when play stops (Runtime::end) or the actor is taken out (remove) - after it began, in
+  // every stage the same; as C++ notation: KERN_EVENT(onN, event_end).
+  const char* text = R"kn(
+struct Ends : kern::Blueprint {
+  Int Began = 0;
+  Int Ended = 0;
+
+  KERN_EVENT(on1, event_begin)
+  void on1() {
+    Began += 1;
+  }
+
+  KERN_EVENT(on2, event_end)
+  void on2() {
+    Ended = kern::to<Int>(math_add(kern::to<Float>(Began), 10.0));
+  }
+};
+)kn";
+  logic::Graph g;
+  std::string error;
+  CHECK(logic::from_cpp(text, g, nullptr, &error));
+  if (!error.empty()) std::printf("%s\n", error.c_str());
+  CHECK(no_errors(logic::check(g)));
+  std::string again;
+  CHECK(logic::to_cpp(g, "Ends", again, &error) && again.find("KERN_EVENT(on2, event_end)") != std::string::npos);
+  for (bool jit : {false, true}) {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.jit = jit;
+    logic::Instance* a = rt.add(g, 7, "A");
+    logic::Instance* b = rt.add(g, 8, "B");
+    logic::Instance* late = rt.add(g, 9, "Late");
+    CHECK(a && b && late);
+    if (!a || !b || !late) continue;
+    rt.begin();
+    rt.remove(9);   // (it began: its End Play runs as it goes)
+    CHECK(a->get("Ended").i == 0 && b->get("Ended").i == 0);
+    rt.end();
+    CHECK(a->get("Ended").i == 11 && b->get("Ended").i == 11);
+    a->set("Ended", logic::Value::integer(0));
+    rt.end();   // (once)
+    CHECK(a->get("Ended").i == 0);
+    logic::Instance* fresh = rt.add(g, 10, "Fresh");
+    rt.end();   // (it never began: no End Play)
+    CHECK(fresh && fresh->get("Ended").i == 0 && fresh->get("Began").i == 0);
+  }
+}
+
 TEST(logic_call_on_actor_by_its_name) {
   // A function of another Blueprint named here otherwise (KERN_EXTERN_AS): Call on Actor calls it by the
   // name that Blueprint has it under - two actors' "Stars" that look different, each named by its actor.

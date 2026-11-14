@@ -202,6 +202,7 @@ KERN_LAYOUT(Demo) {
 | Platz (eine Variable, ein Feld davon, ein Eintrag einer Liste darin – beliebig tief) | wie C++ ihn schreibt: `Cars[i].Wheels[j].Slip` – die Einstellung „path“ des Knotens (`[].Wheels[].Slip`), jeder Index ein Eingang (siehe „Plätze“) |
 | Return | `return {wert, wert};` bzw. `return;` |
 | Event | `KERN_EVENT(on5, event_custom<"Hit">)` und `void on5(Actor actor, Float value, Text text) { ... }` |
+| Begin Play, End Play | `KERN_EVENT(on1, event_begin)` · `KERN_EVENT(on2, event_end)` – End Play läuft einmal, wenn das Spiel endet (`Runtime::end`, `GameWorld::stop`) oder der Actor die Welt verlässt (`Runtime::remove`), und nur, wenn Begin Play gelaufen ist; in jeder Stufe gleich |
 | State Machine | `kern::Machine machine3 = machine("Door").state(...).on_event(...).after(...).when(...).automatic(...);` |
 | Knoten-Einstellungen (Parameter) | Template-Argumente: `flow_tween<"smooth">`, `event_custom<"Hit">` |
 | Einstellung, die einen Typ nennt („Type“ von Select, Reroute, den Listen-Knoten; „Enum“ der Knoten einer Aufzählung; „Struct“ von Make und Break) | der Typ selbst: `logic_select<Float>(pick, a, b)`, `value_reroute<List<Text>>(x)`, `list_make<Vector, "2">(a, b)`, `enum_name<Mode>(wert)`, `struct_make<Weapon>(...)` |
