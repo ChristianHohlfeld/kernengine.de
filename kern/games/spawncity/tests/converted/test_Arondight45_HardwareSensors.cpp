@@ -485,7 +485,7 @@ SC_TEST(converted_Arondight45_HardwareSensors) {
     const auto run = [&]([[maybe_unused]] const std::vector<unsigned char>& a0, [[maybe_unused]] long long a1, [[maybe_unused]] fc::Imu a2) { auto r = converted::counted([&] { return converted_Arondight45_HardwareSensors::hwcontract::decode_icm42688_registers((a1 < 0 ? nullptr : a0.data() + a1), a2); }); return Out_decode_icm42688_registers{std::move(r), std::move(a2)}; };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0(14); for (auto& e : a0) e = static_cast<unsigned char>(draw.below(40));
-      const long long a1 = draw.below(8) == 0 ? -1 : static_cast<long long>(draw.below(static_cast<u32>(a0.size()) + 1));
+      const long long a1 = draw.below(8) == 0 ? -1 : static_cast<long long>(draw.below(static_cast<u32>(a0.size() - 14) + 1));
       fc::Imu a2 = draw_fc__Imu(draw);
       converted_pointed_lists = {{reinterpret_cast<const unsigned char*>(a0.data()), reinterpret_cast<const unsigned char*>(a0.data() + a0.size())}};
       const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a1)};   // (what the Blueprint is given: before the call)
