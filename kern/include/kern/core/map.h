@@ -65,10 +65,10 @@ class KeyIndex {
   /// Before an entry is added: room for `count` entries (the table at most half full).
   template <class HashOf> void room(std::size_t count, const HashOf& hash_of) {
     if (count * 2 <= slots_.size()) return;
-    std::size_t size = 16;
-    while (size < count * 2) size *= 2;
-    rebuild(size, count - 1, hash_of);
+    rebuild(size_for(count), count - 1, hash_of);
   }
+  /// The index of `count` entries, each where it is (a copy's).
+  template <class HashOf> void build(std::size_t count, const HashOf& hash_of) { rebuild(size_for(count), count, hash_of); }
   /// The entry at `at` is there now (its key is new).
   void add(std::size_t at, u64 hash) {
     const std::size_t mask = slots_.size() - 1;
@@ -84,15 +84,17 @@ class KeyIndex {
   template <class HashOf> void moved(std::size_t count, const HashOf& hash_of) { rebuild(slots_.size(), count, hash_of); }
   void clear() { slots_.assign(slots_.size(), 0); }
   void reserve(std::size_t count) {
-    if (count * 2 > slots_.size()) {
-      std::size_t size = 16;
-      while (size < count * 2) size *= 2;
-      slots_.reserve(size);
-    }
+    if (count * 2 > slots_.size()) slots_.reserve(size_for(count));
   }
   static constexpr std::size_t npos = static_cast<std::size_t>(-1);
 
  private:
+  /// A table for `count` entries: a power of two, at least twice as many slots.
+  static std::size_t size_for(std::size_t count) {
+    std::size_t size = 16;
+    while (size < count * 2) size *= 2;
+    return size;
+  }
   std::vector<u32> slots_;
 };
 }  // namespace detail
@@ -210,9 +212,7 @@ template <class K, class V, class Hash = KeyHash<K>> class Map {
  private:
   void index() {
     index_ = {};
-    if (entries_.empty()) return;
-    index_.room(entries_.size(), [this](std::size_t k) { return hash_(entries_[k].first); });
-    index_.moved(entries_.size(), [this](std::size_t k) { return hash_(entries_[k].first); });
+    if (!entries_.empty()) index_.build(entries_.size(), [this](std::size_t k) { return hash_(entries_[k].first); });
   }
   std::vector<value_type> entries_;
   detail::KeyIndex index_;
@@ -310,9 +310,7 @@ template <class K, class Hash = KeyHash<K>> class Set {
  private:
   void index() {
     index_ = {};
-    if (keys_.empty()) return;
-    index_.room(keys_.size(), [this](std::size_t k) { return hash_(keys_[k]); });
-    index_.moved(keys_.size(), [this](std::size_t k) { return hash_(keys_[k]); });
+    if (!keys_.empty()) index_.build(keys_.size(), [this](std::size_t k) { return hash_(keys_[k]); });
   }
   std::vector<K> keys_;
   detail::KeyIndex index_;
