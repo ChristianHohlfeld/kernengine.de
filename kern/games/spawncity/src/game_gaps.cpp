@@ -129,7 +129,7 @@ constexpr f32 kSpawnGraceS = 6;      // SPAWN_GRACE_MS: right after the world is
 void Game::gaps_init(kern::Engine& e) {
   gaps_ = std::make_unique<GapsState>();
   GapsState& g = *gaps_;
-  g.smoke = gaps::SmokeField(mobile_ ? 48 : 78);  // MAX_PUFFS
+  g.smoke = gaps::SmokeField::of(mobile_ ? 48 : 78);  // MAX_PUFFS
   g.renderer = &e.renderer;
   const kern::MeshData disc = smoke_disc();
   for (GapsState::Part* p : {&g.disc, &g.ember}) {

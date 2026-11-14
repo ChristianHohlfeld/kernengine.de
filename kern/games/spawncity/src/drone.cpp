@@ -170,9 +170,9 @@ void Drone::reset() {
   sbus_elapsed_ = nav_elapsed_ = 0.01f;
   nav_seq_ = 1;
   reset_flag_ = true;
-  noise_ = Rng(0x45a31f27u);
-  nav_noise_ = Rng(0x7193ab21u);
-  heading_noise_ = Rng(0x45a1d1a5u);
+  noise_ = Rng{0x45a31f27u};
+  nav_noise_ = Rng{0x7193ab21u};
+  heading_noise_ = Rng{0x45a1d1a5u};
   gyro_bias_[0] = 0.08f; gyro_bias_[1] = -0.05f; gyro_bias_[2] = 0.04f;
   acc_bias_[0] = 0.001f; acc_bias_[1] = -0.0015f; acc_bias_[2] = 0.002f;
   parked_steps_ = 0;

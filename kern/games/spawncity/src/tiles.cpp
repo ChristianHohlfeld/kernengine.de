@@ -440,7 +440,7 @@ void training_level(MapFeatures& out) {
 void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out) {
   // A walled-town grid with a market square: blocks of narrow terraced houses (3-6 storeys),
   // a ring road, a park and a lake shore to the north. Nothing here comes from real map data.
-  Rng rng(seed);
+  Rng rng = Rng::seeded(seed);
   out.procedural = true;
   const f32 pitch = 76, street = 12;
   const int blocks = std::max(3, static_cast<int>(size / pitch));

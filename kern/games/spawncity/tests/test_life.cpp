@@ -119,7 +119,7 @@ SC_TEST(life_cows_birds_shots) {
   v.physics = &w;
   v.city = &city;
   v.focus = v.player = v.eye = {0, -20, 0};
-  Rng rng(5);
+  Rng rng{5};
   LifeOut out;
   f32 now = 10;
   SC_CHECK(life.spawn_herd({0, 0}, 14, 5, now), "a herd");
@@ -162,7 +162,7 @@ SC_TEST(life_dogs_cats_black_cat) {
   v.focus = v.player = v.eye = {0, 0, 0};
   v.head = {0, 0, 1.68f};
   v.epoch = 1000;  // floor(1000 / 120) = 8: the black cat is out (every other two minutes)
-  Rng rng(9);
+  Rng rng{9};
   LifeOut out;
   f32 now = 1;
   for (int i = 0; i < 10; ++i) {

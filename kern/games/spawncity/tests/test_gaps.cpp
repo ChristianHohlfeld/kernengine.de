@@ -151,7 +151,7 @@ SC_TEST(gaps_sirens) {
 
 SC_TEST(gaps_smoke) {
   RuleBlueprint bp("Sirens", &gaps::bind_sirens);
-  gaps::SmokeField f(78);
+  gaps::SmokeField f = gaps::SmokeField::of(78);
   const f32 at = f.start("car-1", {0, 0, 1}, 0.92f, 2.45f, 10);
   SC_CHECK(std::fabs(at - 12.45f) < 1e-4f && f.live_puffs() == 1, "first puff at once");
   SC_CHECK(std::fabs(f.start("car-1", {1, 0, 1}, 0.92f, 9, 11) - 12.45f) < 1e-4f, "a running effect keeps its clock");

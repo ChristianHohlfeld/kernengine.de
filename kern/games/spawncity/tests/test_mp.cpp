@@ -48,7 +48,7 @@ SC_TEST(mp_rules_damage_regen_spawn_vote) {
   SC_CHECK(mp::judge_hit(true, true, false, true, 100, 0, 0) == mp::HitVerdict::already_down, "down");
   SC_CHECK(mp::regen(50, 4000, 0, 1) == 50, "no regen within 5 s");
   SC_CHECK(mp::regen(50, 6000, 0, 1) == 62, "12 HP/s");
-  Rng rng(7);
+  Rng rng{7};
   for (int i = 0; i < 50; ++i) {
     const Vec2 o = mp::respawn_offset(rng);
     const f32 r = std::hypot(o.x, o.y);
