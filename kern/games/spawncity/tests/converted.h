@@ -41,6 +41,8 @@
 #include "kern/core/map.h"
 #include "kern/logic/nodes.h"
 #include "cost.h"
+#include "kern/game/runtime.h"
+#include "kern/kern.h"
 #include "rule_blueprint.h"
 #include "test_util.h"
 
@@ -886,17 +888,163 @@ inline void class_runs(bool begins) {
   }
 }
 
-/// A converted source file's Blueprint, in the interpreter and as its compiled class.
+/// Is what the Blueprint gives this very value, bit for bit? (Numbers by their bits; a struct, a list, a map
+/// entry for entry.)
+inline bool same_value(const Value& a, const Value& b) {
+  using kern::logic::PinType;
+  if (a.type != b.type) return false;
+  if (a.type == PinType::number) return same_bits(a.n, b.n);
+  if (a.type == PinType::vector) return same_bits(a.v.x, b.v.x) && same_bits(a.v.y, b.v.y) && same_bits(a.v.z, b.v.z);
+  if (a.type == PinType::structure) {
+    const std::size_t n = a.rows ? a.rows->size() : 0;
+    if (n != (b.rows ? b.rows->size() : 0)) return false;
+    for (std::size_t k = 0; k < n; ++k) if (!same_value((*a.rows)[k], (*b.rows)[k])) return false;
+    return true;
+  }
+  if (a.type == PinType::map || a.type == PinType::set) {
+    if (a.size() != b.size()) return false;
+    for (std::size_t k = 0; k < a.size(); ++k)
+      if (!(a.keyed().key_at(k) == b.keyed().key_at(k)) || (a.type == PinType::map && !same_value(a.keyed().value_at(k), b.keyed().value_at(k)))) return false;
+    return true;
+  }
+  if (kern::logic::is_list(a.type)) {
+    if (a.size() != b.size()) return false;
+    for (std::size_t k = 0; k < a.size(); ++k) if (!same_value(a.item(k), b.item(k))) return false;
+    return true;
+  }
+  return a == b;
+}
+
+/// The Blueprints of the level's actors a converted Blueprint calls on them (Call on Actor, Get Variable on
+/// Actor - kern::logic::ActorBlueprint in the source), running in a game world of their own: one for the
+/// source (bound to its ActorBlueprints), one with the Blueprint in the interpreter, one with it as its
+/// class. Every call begins with the actors' variables as they were when the world started, in all three,
+/// and they must be the same after it.
+struct ActorWorld {
+  kern::Renderer renderer;
+  kern::game::NightWindows windows;
+  std::unique_ptr<kern::game::GameWorld> world;
+  std::string problems;
+  std::vector<kern::game::ActorId> ids;
+  std::vector<std::pair<kern::logic::Instance*, std::vector<std::pair<std::string, Value>>>> started;   // (the actors' variables at the start)
+  ActorWorld(const std::vector<std::string>& actors, bool native) {
+    kern::ShaderExtension* ext[1] = {&windows};
+    kern::RendererOptions o;
+    renderer.init(o, kern::Span<kern::ShaderExtension* const>(ext, 1));
+    world = std::make_unique<kern::game::GameWorld>(renderer, &windows);
+    world->logic_native = native;
+    kern::game::Level level;
+    level.world.ground = false;
+    // (the libraries the Blueprints use are Blueprints of the level's actors too: with them)
+    std::vector<std::string> all;
+    for (const std::string& name : actors) {
+      std::vector<std::string> libraries;
+      std::string why;
+      if (const kern::logic::Graph* g = level_blueprint(name, &why)) {
+        if (!kern::logic::libraries_of(*g, [](std::string_view n) { return level_blueprint(n); }, libraries, &why)) problems += name + ": " + why + "\n";
+      } else {
+        problems += why + "\n";
+      }
+      for (const std::string& l : libraries)
+        if (std::find(all.begin(), all.end(), l) == all.end()) all.push_back(l);
+      if (std::find(all.begin(), all.end(), name) == all.end()) all.push_back(name);
+    }
+    for (const std::string& name : all) {
+      kern::game::Actor a;
+      a.name = name;
+      if (const kern::logic::Graph* g = level_blueprint(name)) a.logic = *g;
+      ids.push_back(level.add(std::move(a)).id);
+    }
+    if (!world->start(level, kern::game::SimMode::simulate)) problems += "the world does not start\n";
+    if (kern::logic::Runtime* rt = world->logic_runtime()) rt->budget = 2000000000u;
+    for (const std::string& name : actors)
+      if (kern::logic::Instance* i = find(name)) {
+        std::vector<std::pair<std::string, Value>> vars;
+        for (const kern::logic::Variable& v : i->graph().variables)
+          if (!v.constant) vars.emplace_back(v.name, i->get(v.name));
+        started.emplace_back(i, std::move(vars));
+      }
+  }
+  ~ActorWorld() {
+    world.reset();
+    renderer.shutdown();
+  }
+  kern::logic::Instance* find(std::string_view name) {
+    kern::logic::Runtime* rt = world->logic_runtime();
+    return rt ? rt->find(static_cast<kern::logic::ActorRef>(world->find_actor(name))) : nullptr;
+  }
+  /// The actors' variables as they were at the start.
+  void restore() {
+    for (auto& [inst, vars] : started)
+      for (const auto& [name, value] : vars) inst->set(name, value);
+  }
+  /// What the actors' variables are now (of those the converted Blueprint calls).
+  std::vector<Value> now() const {
+    std::vector<Value> out;
+    for (const auto& [inst, vars] : started)
+      for (const auto& [name, value] : vars) out.push_back(inst->get(name));
+    return out;
+  }
+};
+
+/// A converted source file's Blueprint, in the interpreter and as its compiled class. (`actors`: the
+/// level's actors whose Blueprints it calls on them - see ActorWorld; then the engine of the test is the
+/// world's own, and a converted function that asks it anything is not one the test compares.)
 struct Blueprint {
-  RuleBlueprint interpreted, compiled;
-  explicit Blueprint(const char* actor) : interpreted(actor, [](kern::logic::Instance*) {}, false), compiled(actor, [](kern::logic::Instance*) {}, true) {
-    // (The loop guard is the host's: a program whose functions loop long - a sound computed sample by
-    // sample, a number raised to a 256-bit power - sets it to what they take.)
-    interpreted.rt.budget = compiled.rt.budget = 2000000000u;
-    SC_CHECK(interpreted.inst && compiled.inst, "%s: %s%s", actor, interpreted.problems.c_str(), compiled.problems.c_str());
-    SC_CHECK(interpreted.problems.empty(), "%s: %s", actor, interpreted.problems.c_str());
-    SC_CHECK(compiled.inst && std::string(compiled.inst->tier()) == "native C++", "%s runs as its C++ class (it runs: %s)", actor, compiled.inst ? compiled.inst->tier() : "not at all");
+  std::unique_ptr<RuleBlueprint> interpreted, compiled;
+  std::unique_ptr<ActorWorld> interpreted_world, compiled_world, source_world;
+  kern::logic::Instance* interp = nullptr;
+  kern::logic::Instance* native = nullptr;
+  explicit Blueprint(const char* actor, std::vector<std::string> actors = {}) {
+    if (actors.empty()) {
+      interpreted = std::make_unique<RuleBlueprint>(actor, [](kern::logic::Instance*) {}, false);
+      compiled = std::make_unique<RuleBlueprint>(actor, [](kern::logic::Instance*) {}, true);
+      // (The loop guard is the host's: a program whose functions loop long - a sound computed sample by
+      // sample, a number raised to a 256-bit power - sets it to what they take.)
+      interpreted->rt.budget = compiled->rt.budget = 2000000000u;
+      interp = interpreted->inst;
+      native = compiled->inst;
+      SC_CHECK(interp && native, "%s: %s%s", actor, interpreted->problems.c_str(), compiled->problems.c_str());
+      SC_CHECK(interpreted->problems.empty(), "%s: %s", actor, interpreted->problems.c_str());
+    } else {
+      std::vector<std::string> mine = actors;
+      mine.insert(mine.begin(), actor);
+      interpreted_world = std::make_unique<ActorWorld>(mine, false);
+      compiled_world = std::make_unique<ActorWorld>(mine, true);
+      source_world = std::make_unique<ActorWorld>(actors, true);
+      interp = interpreted_world->find(actor);
+      native = compiled_world->find(actor);
+      SC_CHECK(interp && native, "%s: %s%s", actor, interpreted_world->problems.c_str(), compiled_world->problems.c_str());
+      SC_CHECK(interpreted_world->problems.empty() && source_world->problems.empty(), "%s: %s%s", actor, interpreted_world->problems.c_str(), source_world->problems.c_str());
+    }
+    SC_CHECK(native && std::string(native->tier()) == "native C++", "%s runs as its C++ class (it runs: %s)", actor, native ? native->tier() : "not at all");
     kern::logic::native_probe = class_runs;
+  }
+  /// The running Blueprint of an actor for the source's ActorBlueprint (kern::logic::ActorBlueprint::running).
+  kern::logic::Instance* source_actor(const char* name) { return source_world ? source_world->find(name) : nullptr; }
+  /// Before the source's call: the actors' Blueprints as they started.
+  void before_source() {
+    if (source_world) source_world->restore();
+  }
+  /// What the Blueprint asked the engine's stand-in (in the actors' world: the engine is the world's own -
+  /// nothing).
+  const std::vector<std::string>& calls(bool in_class) {
+    static const std::vector<std::string> none;
+    RuleBlueprint* r = in_class ? compiled.get() : interpreted.get();
+    return r ? r->host.stand_in.calls : none;
+  }
+  void before_call(bool in_class) {
+    if (RuleBlueprint* r = in_class ? compiled.get() : interpreted.get()) r->host.stand_in.calls.clear();
+    if (ActorWorld* w = in_class ? compiled_world.get() : interpreted_world.get()) w->restore();
+  }
+  /// The actors' variables after the calls: the same in the source's world and in the Blueprint's.
+  bool actors_same(bool both) const {
+    if (!source_world) return true;
+    const std::vector<Value> want = source_world->now(), b = compiled_world->now(), a = both ? interpreted_world->now() : b;
+    if (want.size() != a.size() || want.size() != b.size()) return false;
+    for (std::size_t k = 0; k < want.size(); ++k)
+      if (!same_value(want[k], a[k]) || !same_value(want[k], b[k])) return false;
+    return true;
   }
 };
 
@@ -956,9 +1104,9 @@ struct Tally {
   template <class Want, class Describe>
   void take(Blueprint& bp, const std::vector<Value>& args, const Want& want, bool left, Describe describe, const std::vector<int>& order = {}, const Variables* state = nullptr,
             bool changes = false) {
-    if (!bp.interpreted.inst || !bp.compiled.inst) return;
+    if (!bp.interp || !bp.native) return;
     if (left || !defined(want)) { ++outside; return; }
-    if (state && !(set_state(*bp.compiled.inst, *state) && set_state(*bp.interpreted.inst, *state))) {
+    if (state && !(set_state(*bp.native, *state) && set_state(*bp.interp, *state))) {
       ++compared;
       if (++wrong <= 3) std::printf("  %s(%s): the Blueprint's variables do not take the values of the source's object\n", function, describe().c_str());
       return;
@@ -973,32 +1121,37 @@ struct Tally {
     // raised to a 256-bit power) would take the interpreter minutes: such a call is compared with the class
     // alone, and the function's line says so (~Tally).
     std::vector<Value> a, b;
-    bp.compiled.host.stand_in.calls.clear();
-    bp.interpreted.host.stand_in.calls.clear();
+    bp.before_call(true);
     const auto before = std::chrono::steady_clock::now();
     const long source_asks = g_source_asks;
     g_class_asks = 0;
-    const bool ib = bp.compiled.inst->call(function, args, b);
+    const bool ib = bp.native->call(function, args, b);
     const long class_asks = g_class_asks;
     const double took = std::chrono::duration<double>(std::chrono::steady_clock::now() - before).count();
     const bool both = took < 0.005;
-    const bool ia = both ? bp.interpreted.inst->call(function, args, a) : ib;
+    if (both) bp.before_call(false);
+    const bool ia = both ? bp.interp->call(function, args, a) : ib;
     if (state && changes) {
-      b.push_back(read_state(*bp.compiled.inst, *state));
-      if (both) a.push_back(read_state(*bp.interpreted.inst, *state));
+      b.push_back(read_state(*bp.native, *state));
+      if (both) a.push_back(read_state(*bp.interp, *state));
     }
     // what the three asked the engine: the same calls, in the same order, with the same values
     const std::vector<std::string>& asked = g_source_engine.calls;
-    const bool engine_same = bp.compiled.host.stand_in.calls == asked && (!both || bp.interpreted.host.stand_in.calls == asked);
+    const bool engine_same = bp.calls(true) == asked && (!both || bp.calls(false) == asked);
     if (!engine_same) {
       ++compared;
       if (++wrong <= 3) {
-        const std::vector<std::string>& got = bp.compiled.host.stand_in.calls == asked ? bp.interpreted.host.stand_in.calls : bp.compiled.host.stand_in.calls;
+        const std::vector<std::string>& got = bp.calls(true) == asked ? bp.calls(false) : bp.calls(true);
         std::size_t k = 0;
         while (k < asked.size() && k < got.size() && asked[k] == got[k]) ++k;
         std::printf("  %s(%s): call %zu of the engine - the source asks %s, the Blueprint %s (%zu and %zu calls)\n", function, describe().c_str(), k + 1,
                     k < asked.size() ? asked[k].c_str() : "nothing more", k < got.size() ? got[k].c_str() : "nothing more", asked.size(), got.size());
       }
+      return;
+    }
+    if (!bp.actors_same(both)) {   // (what the call did to the Blueprints of the actors it calls on)
+      ++compared;
+      if (++wrong <= 3) std::printf("  %s(%s): the Blueprints of the actors it calls are not the same after the call in the source's world and in the Blueprint's\n", function, describe().c_str());
       return;
     }
     parts(b);

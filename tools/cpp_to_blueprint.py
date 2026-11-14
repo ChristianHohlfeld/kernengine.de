@@ -1521,11 +1521,8 @@ class Unit:
                 Emit(self, f).run()
             finally:
                 self.local_scope = outer
-            if f.on_actors:
-                # The test calls the function's source and the Blueprint with the same arguments: the source
-                # calls the actor's Blueprint as the program binds it, the Blueprint calls it on that actor.
-                f.text = None
-                raise Wait(f"its test cannot compare it yet (it calls a function on the Blueprint of the actor {f.on_actors[0][0]}, which the test does not run)")
+            # (what calls a function on the Blueprint of an actor of the level: its test runs that Blueprint - the
+            # source calls it as the program binds it, the Blueprint calls it on that actor; TestWriter)
             self.order.append(f)
         except Wait as w:
             f.wait = str(w)
@@ -1562,6 +1559,7 @@ class Unit:
             f.self_type, f.mutates, f.refs, f.value, f.ctor = e["self_type"], e["mutates"], list(e["refs"]), e["value"], e["ctor"]
             f.out_fields = [(n, t, tuple(src) if isinstance(src, list) else src) for n, t, src in e["out_fields"]]
             f.open, f.state = e["open"], e["state"]
+            f.on_actors = [(a, None) for a in e.get("actors", ())]   # (the actors whose Blueprints it calls on them, itself or through what it calls)
             f.pointers = list(e["pointers"])
             if not f.wait and f.open and d["id"] not in self.tree.body and self.world.closures is not None and key not in self.world.closures:
                 # A function is written when its test compares it, and the test holds the source of all it
@@ -1593,7 +1591,8 @@ class Unit:
         return {"unit": self.name, "name": f.name, "cpp": f.cpp, "wait": (f.wait or (self.PLACE if f.place else None)) if not f.text else None, "pure": f.pure, "params": f.params, "kinds": f.kinds, "result": f.result,
                 "fixed": dict(f.fixed), "result_fixed": f.result_fixed,
                 "indexes": f.indexes, "self_type": f.self_type, "mutates": f.mutates, "refs": f.refs, "value": f.value, "ctor": f.ctor, "out_fields": f.out_fields,
-                "open": self.job in self.world.source_units, "state": f.state, "pointers": f.pointers}
+                "open": self.job in self.world.source_units, "state": f.state, "pointers": f.pointers,
+                "actors": sorted(actors_called(f))}
 
     def uses(self):
         """The Blueprints whose functions the written functions call."""
@@ -1653,6 +1652,18 @@ class Unit:
         Blueprint together from what all files say)."""
         variables, functions, members, types = self.parts()
         return blueprint_text(self.name, self.uses(), [line for _, line, _ in types.values()], variables, functions, members, state=self.state is not None)
+
+
+def actors_called(f, met=None):
+    """The actors of the level whose Blueprints a function calls on them - itself, or through what it calls."""
+    met = set() if met is None else met
+    if id(f) in met:
+        return set()
+    met.add(id(f))
+    out = {a for a, _ in f.on_actors}
+    for g in f.calls:
+        out |= actors_called(g, met)
+    return out
 
 
 def blueprint_text(name, uses, types, variables, functions, members, state=False):
@@ -6860,11 +6871,24 @@ class TestWriter:
         """The class or enum of the program a type of the test's values names - the one it names by its full
         name. (A class this file only declares - its definition stands in another source file - is none
         the test has: its values wait.)"""
-        q = self.u.find_type(c)
         named = c[len(self.tree.namespace) + 2:] if c.startswith(self.tree.namespace + "::") else c
+        q = named if named in self.tree.records or named in self.tree.enums else self.u.find_type(c)
         if q is not None and "::" in named and q != named and not q.endswith("::" + named):
             raise Wait(f"the test has no values of {c} (its class is defined in another file)")
         return q
+
+    def actor_blueprint(self, t):
+        """Is this the type of the program's way to call the Blueprint of an actor of the level - the engine's
+        kern::logic::ActorBlueprint, or a class of the program made of it?"""
+        c = re.sub(r"^const\s+", "", self.u.clean(t)).strip()
+        if c == ENGINE + "::logic::ActorBlueprint":
+            return True
+        try:
+            q = self.record_named(c)
+        except Wait:
+            return False
+        d = self.tree.records.get(q)
+        return d is not None and any(self.actor_blueprint(b.get("type", {}).get("qualType", "")) for b in d.get("bases", []) or [])
 
     def draw(self, raw):
         c = self.u.clean(raw)
@@ -7414,6 +7438,8 @@ class TestWriter:
         def want_record(q):
             t = self.top_of(q)
             d = tree.records.get(t)
+            if t.startswith(ENGINE + "::logic::"):
+                return   # (the engine's logic - how C++ calls a Blueprint: in a test the engine's own, which runs the Blueprints)
             if q in vectors or d is None or t in G.records or d.get("_at", (None, None))[1] is None or t in u.objects_seen or t in G.objects or q in tree.local_types:
                 return   # (of the engine's classes with a life of their own the test has stand-ins: see stand_ins)
             G.records.add(t)
@@ -7458,6 +7484,9 @@ class TestWriter:
             if owner in tree.records and self.top_of(owner) in self.struct_tops:
                 want_record(owner)   # (a constant of a class the Blueprint does not have stands for itself)
         def want_function(i):
+            e = tree.template_of.get(i) or tree.body.get(i) or tree.decl.get(i) or {}
+            if (tree.owner.get(e.get("id")) or tree.owner.get(i) or tree.scope_of.get(e.get("id"), "")).startswith(ENGINE + "::logic"):
+                return   # (the engine's logic: its own in the test - see want_record)
             if i in tree.template_of:
                 t = tree.template_of[i]
                 if t.get("_at", (None, None))[1] is not None and t["id"] not in G.templates:
@@ -7875,7 +7904,8 @@ class TestWriter:
         for q in sorted(G.enums):
             put(tree.enums[q], {"kind": "enum", "text": self.enum_text(q, local_of(tree.enums[q])), "pairs": [(self.absolute(q), enum_names[q])]})
         for d, text, said, pairs in self.const_pieces(G.consts, decls, G.records, local_of):
-            put(d, {"kind": "const", "text": text, "names": [self.ident(x) for x in said], "pairs": pairs})
+            put(d, {"kind": "const", "text": text, "names": [self.ident(x) for x in said], "pairs": pairs,
+                    "actors": ["::".join(self.local_path(tree.scope_of.get(x["id"], ""), local_of(x)) + [x["name"]]) for x in said if self.actor_blueprint(qtype(x))]})
         for d, text, named in self.unnamed_pieces(G.unnamed, decls, G.records, local_of):
             put(d, {"kind": "unnamed", "text": text, "pairs": named})
         for o, text, pair in aliases:
@@ -8005,10 +8035,26 @@ class TestWriter:
                     continue
                 said_consts.add(self.widen(piece["text"]))
             foreign_chunks.append(((first[0], first[1] - 0.5, i), ("foreign", place), None))
+        # The Blueprints of the level's actors the source calls on them (kern::logic::ActorBlueprint): the test runs
+        # them (converted::ActorWorld) - for the source, bound to the objects it calls them by, and for the
+        # Blueprint, where actor_find finds them.
+        actors = sorted({a for f in u.order for a in actors_called(f)})
+        bindings = []
+        for v in G.consts.values():
+            first = v
+            while first.get("previousDecl") in tree.decl:
+                first = tree.decl[first["previousDecl"]]
+            if v.get("name") and self.actor_blueprint(qtype(v)) and self.inside(v, [tree.records[q] for q in sorted(G.records)]) is None:
+                bindings.append("::".join(classes_of(tree.scope_of.get(first["id"], "")) + [v["name"]]))
+        bindings += [name for p in G.foreign.values() for name in p.get("actors", ())]
+        engine_too = bool(actors) and bool(u.engine_calls or self.engine_called(G))
         for f in u.order:
             d = f.decl
             if f.lifted:
                 continue   # (a local function: in the source of the function it stands in, compared with it)
+            if engine_too:
+                skipped.append((f, "its Blueprint calls the engine and the Blueprint of an actor of the level: the world that runs the actor's Blueprint has the engine itself, not the test's stand-in"))
+                continue
             owner = tree.owner.get(d["id"])
             free = G.freed.get(d["id"], (None,))[0]
             if free:
@@ -8141,6 +8187,7 @@ class TestWriter:
                 "      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)",
                 "      converted::g_can_bail = true;",
                 "      converted::may_bail(true);",
+                "      bp.before_source();   // (the Blueprints of the actors it calls, as they started)",
                 f"      const auto want = {self.wrap('run(' + ', '.join(f'std::move({n})' if n in moved else n for n in names) + ')', want_type)};",
                 "      converted::g_can_bail = false;",
                 "      converted::may_bail(false);",
@@ -8199,7 +8246,7 @@ class TestWriter:
                 renamers[h] = self.renamer([*mine, *pairs, *outer], named_spaces)
             return lambda text: renamers[h](self.widen(text))
         # a name of the program or the engine that is still written out in full: not the test's own
-        foreign = re.compile(r"(?<![\w:])(?:::)?(?:" + "|".join(re.escape(x) for x in (tree.namespace, *tree.spaces, ENGINE)) + r")::(?!math::)(\w+)")
+        foreign = re.compile(r"(?<![\w:])(?:::)?(?:" + "|".join(re.escape(x) for x in (tree.namespace, *tree.spaces, ENGINE)) + r")::(?!math::|logic::)(\w+)")
         def is_record(key):
             return key[0] == "record" or (key[0] == "foreign" and G.foreign[key[1]]["kind"] == "record")
 
@@ -8290,7 +8337,11 @@ class TestWriter:
             for key, text in outs:
                 if key not in dropped and text:
                     add(key, text)
-            add(None, "\n".join(["", f"SC_TEST(converted_{stem}) {{", f'  converted::Blueprint bp("{u.name}");']))
+            add(None, "\n".join(["", f"SC_TEST(converted_{stem}) {{",
+                                  f'  converted::Blueprint bp("{u.name}"' + (", {" + ", ".join(text_literal(a) for a in actors) + "}" if actors else "") + ");"]))
+            for b in dict.fromkeys(bindings):
+                if ("bind", b) not in dropped:   # (the source calls the actor's Blueprint as the program binds it)
+                    add(("bind", b), f"  {b}.running = bp.source_actor({b}.actor);")
             for key, text in cases:
                 if key not in dropped:
                     add(key, text)
