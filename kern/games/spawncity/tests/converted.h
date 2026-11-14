@@ -38,6 +38,7 @@
 #include "../src/blueprint_call.h"
 #include "kern/logic/engine_api.h"
 #include "../src/common.h"
+#include "kern/core/map.h"
 #include "kern/logic/nodes.h"
 #include "cost.h"
 #include "rule_blueprint.h"
@@ -47,11 +48,13 @@ namespace sc::converted {
 
 using Value = kern::logic::Value;
 
-/// A 64-bit bit pattern of the program (its u64, i64) as the test hands it to a Blueprint: the Blueprint's
-/// Whole64, two 32-bit halves (tools/blueprint_whole64.h). In C++ a u64 and a size_t are one type; the
-/// program's spelling tells them apart, and the generated test says which is which (shaped, below).
+/// A 64-bit bit pattern of the program (its u64, i64) as the test hands it to a Blueprint: the language's
+/// Int64 (Value::int64). In C++ a u64 and a size_t are one type; the program's spelling tells them apart,
+/// and the generated test says which is which (shaped, below).
 struct Whole {
   unsigned long long v = 0;
+  bool operator==(const Whole&) const = default;
+  kern::u64 hash() const { return kern::KeyHash<unsigned long long>{}(v); }   // (a key of a map, as the u64 it is)
 };
 struct SignedWhole {};
 
@@ -143,170 +146,15 @@ inline double log2_bp(double x) { return kern::math::div(kern::math::log(x), 0.6
 inline double log10_bp(double x) { return kern::math::div(kern::math::log(x), 2.302585092994046); }
 inline double cbrt_bp(double x) { return (kern::math::sign(x) * kern::math::pow(kern::math::abs(x), 0.3333333333333333)); }
 
-// A map and a set as the Blueprint language has them: the rows in the order they were put in (a
-// Blueprint's map is the list of its rows, its set the list of its keys). What std::unordered_map and
-// std::unordered_set leave open - the order - is this order. They have what the program uses of the
-// standard ones. (std::map and std::set keep their keys in order: they are themselves, SortedMap and
-// SortedSet.) What C++ leaves open marks the call (g_open, below): at() of a key that is not there.
-inline void mark_open();
-template <class K, class V> class Map {
- public:
-  using key_type = K;
-  using mapped_type = V;
-  using value_type = std::pair<const K, V>;
-  using iterator = typename std::list<value_type>::iterator;
-  using const_iterator = typename std::list<value_type>::const_iterator;
-  using size_type = std::size_t;
-  Map() = default;
-  Map(std::initializer_list<value_type> rows) {
-    for (const value_type& r : rows) insert(r);
-  }
-  Map(const Map& o) : rows_(o.rows_) {}
-  Map(Map&&) = default;
-  Map& operator=(const Map& o) {
-    if (this != &o) {
-      rows_.clear();
-      for (const value_type& r : o.rows_) rows_.push_back(r);
-    }
-    return *this;
-  }
-  Map& operator=(Map&&) = default;
-  iterator begin() { return rows_.begin(); }
-  iterator end() { return rows_.end(); }
-  const_iterator begin() const { return rows_.begin(); }
-  const_iterator end() const { return rows_.end(); }
-  const_iterator cbegin() const { return rows_.begin(); }
-  const_iterator cend() const { return rows_.end(); }
-  std::size_t size() const { return rows_.size(); }
-  bool empty() const { return rows_.empty(); }
-  void clear() { rows_.clear(); }
-  void reserve(std::size_t) {}
-  void rehash(std::size_t) {}
-  iterator find(const K& k) {
-    for (iterator it = rows_.begin(); it != rows_.end(); ++it)
-      if (it->first == k) return it;
-    return rows_.end();
-  }
-  const_iterator find(const K& k) const {
-    for (const_iterator it = rows_.begin(); it != rows_.end(); ++it)
-      if (it->first == k) return it;
-    return rows_.end();
-  }
-  std::size_t count(const K& k) const { return find(k) != end() ? 1 : 0; }
-  bool contains(const K& k) const { return find(k) != end(); }
-  V& operator[](const K& k) { return try_emplace(k).first->second; }
-  V& at(const K& k) {
-    const iterator it = find(k);
-    if (it != end()) return it->second;
-    mark_open();
-    static V none;
-    none = V{};
-    return none;
-  }
-  const V& at(const K& k) const { return const_cast<Map*>(this)->at(k); }
-  template <class... A> std::pair<iterator, bool> try_emplace(const K& k, A&&... a) {
-    const iterator it = find(k);
-    if (it != end()) return {it, false};
-    rows_.emplace_back(std::piecewise_construct, std::forward_as_tuple(k), std::forward_as_tuple(std::forward<A>(a)...));
-    return {std::prev(rows_.end()), true};
-  }
-  template <class... A> std::pair<iterator, bool> emplace(A&&... a) { return put(value_type(std::forward<A>(a)...)); }
-  std::pair<iterator, bool> insert(const value_type& r) { return put(r); }
-  template <class P>
-    requires std::is_constructible_v<value_type, P&&>
-  std::pair<iterator, bool> insert(P&& r) { return put(value_type(std::forward<P>(r))); }
-  template <class M> std::pair<iterator, bool> insert_or_assign(const K& k, M&& v) {
-    const iterator it = find(k);
-    if (it != end()) {
-      it->second = std::forward<M>(v);
-      return {it, false};
-    }
-    rows_.emplace_back(k, std::forward<M>(v));
-    return {std::prev(rows_.end()), true};
-  }
-  std::size_t erase(const K& k) {
-    const iterator it = find(k);
-    if (it == end()) return 0;
-    rows_.erase(it);
-    return 1;
-  }
-  iterator erase(iterator it) { return rows_.erase(it); }
-  iterator erase(const_iterator it) { return rows_.erase(it); }
-  void swap(Map& o) { rows_.swap(o.rows_); }
-
- private:
-  std::pair<iterator, bool> put(const value_type& r) {
-    const iterator it = find(r.first);
-    if (it != end()) return {it, false};
-    rows_.push_back(r);
-    return {std::prev(rows_.end()), true};
-  }
-  std::list<value_type> rows_;
-};
-template <class K> class Set {
- public:
-  using key_type = K;
-  using value_type = K;
-  using iterator = typename std::list<K>::const_iterator;
-  using const_iterator = iterator;
-  Set() = default;
-  Set(std::initializer_list<K> keys) {
-    for (const K& k : keys) insert(k);
-  }
-  iterator begin() const { return keys_.begin(); }
-  iterator end() const { return keys_.end(); }
-  iterator cbegin() const { return keys_.begin(); }
-  iterator cend() const { return keys_.end(); }
-  std::size_t size() const { return keys_.size(); }
-  bool empty() const { return keys_.empty(); }
-  void clear() { keys_.clear(); }
-  void reserve(std::size_t) {}
-  void rehash(std::size_t) {}
-  iterator find(const K& k) const {
-    for (iterator it = keys_.begin(); it != keys_.end(); ++it)
-      if (*it == k) return it;
-    return keys_.end();
-  }
-  std::size_t count(const K& k) const { return find(k) != end() ? 1 : 0; }
-  bool contains(const K& k) const { return find(k) != end(); }
-  std::pair<iterator, bool> insert(const K& k) {
-    const iterator it = find(k);
-    if (it != end()) return {it, false};
-    keys_.push_back(k);
-    return {std::prev(keys_.end()), true};
-  }
-  template <class... A> std::pair<iterator, bool> emplace(A&&... a) { return insert(K(std::forward<A>(a)...)); }
-  std::size_t erase(const K& k) {
-    const iterator it = find(k);
-    if (it == end()) return 0;
-    keys_.erase(it);
-    return 1;
-  }
-  iterator erase(iterator it) { return keys_.erase(it); }
-  void swap(Set& o) { keys_.swap(o.keys_); }
-
- private:
-  std::list<K> keys_;
-};
-template <class K, class V> class SortedMap : public std::map<K, V> {
- public:
-  using std::map<K, V>::map;
-  V& at(const K& k) {
-    const auto it = this->find(k);
-    if (it != this->end()) return it->second;
-    mark_open();
-    static V none;
-    none = V{};
-    return none;
-  }
-  const V& at(const K& k) const { return const_cast<SortedMap*>(this)->at(k); }
-};
-template <class K> using SortedSet = std::set<K>;
+// A map and a set (kern::Map, kern::Set - the program's): the language's Map and Set are these very
+// containers, in the order the keys came (kern/core/map.h). The test's source holds them as they are.
+using kern::Map;
+using kern::Set;
 }  // namespace wide
 
 /// A value of the source as the Blueprint holds it, where the two differ by more than their numbers: a
-/// 64-bit bit pattern is a Whole, a map the list of its rows (pairs of key and value), a set the list of
-/// its keys. S is the type as the program spells it, with Whole where it says u64 or i64.
+/// 64-bit bit pattern is a Whole - also in a list, a pair, a map or a set. S is the type as the program
+/// spells it, with Whole where it says u64 or i64.
 template <class S> struct Shape {
   template <class T> static const T& of(const T& v) { return v; }
 };
@@ -332,27 +180,19 @@ template <class S, std::size_t N> struct Shape<std::array<S, N>> {   // (a list 
 template <class A, class B> struct Shape<std::pair<A, B>> {
   template <class X, class Y> static auto of(const std::pair<X, Y>& p) { return std::pair<Shaped<A, X>, Shaped<B, Y>>(Shape<A>::of(p.first), Shape<B>::of(p.second)); }
 };
-template <class SK, class SV, class M> auto shaped_rows(const M& m) {
-  std::vector<std::pair<Shaped<SK, typename M::key_type>, Shaped<SV, typename M::mapped_type>>> rows;
-  for (const auto& r : m) rows.emplace_back(Shape<SK>::of(r.first), Shape<SV>::of(r.second));
-  return rows;
-}
-template <class SK, class M> auto shaped_keys(const M& m) {
-  std::vector<Shaped<SK, typename M::key_type>> keys;
-  for (const auto& k : m) keys.push_back(Shape<SK>::of(k));
-  return keys;
-}
-template <class K, class V> struct Shape<wide::Map<K, V>> {
-  template <class M> static auto of(const M& m) { return shaped_rows<K, V>(m); }
+template <class SK, class SV> struct Shape<kern::Map<SK, SV>> {
+  template <class K, class V> static auto of(const kern::Map<K, V>& m) {
+    kern::Map<Shaped<SK, K>, Shaped<SV, V>> out;
+    for (const auto& [k, v] : m) out.try_emplace(Shape<SK>::of(k), Shape<SV>::of(v));
+    return out;
+  }
 };
-template <class K, class V> struct Shape<wide::SortedMap<K, V>> {
-  template <class M> static auto of(const M& m) { return shaped_rows<K, V>(m); }
-};
-template <class K> struct Shape<wide::Set<K>> {
-  template <class M> static auto of(const M& m) { return shaped_keys<K>(m); }
-};
-template <class K> struct Shape<std::set<K>> {
-  template <class M> static auto of(const M& m) { return shaped_keys<K>(m); }
+template <class SK> struct Shape<kern::Set<SK>> {
+  template <class K> static auto of(const kern::Set<K>& s) {
+    kern::Set<Shaped<SK, K>> out;
+    for (const K& k : s) out.insert(Shape<SK>::of(k));
+    return out;
+  }
 };
 
 /// The arguments a function is tried with: the same in every run.
@@ -557,6 +397,14 @@ template <class T>
   requires(!std::is_base_of_v<EngineObject, T>)
 std::string text(const std::unique_ptr<T>& p);
 template <class T> std::string text(const std::optional<T>& p);
+template <class K, class V, class H> Value arg(const kern::Map<K, V, H>& m);
+template <class K, class H> Value arg(const kern::Set<K, H>& s);
+template <class K, class V, class H> bool same(const kern::Map<K, V, H>& want, const Value& got);
+template <class K, class H> bool same(const kern::Set<K, H>& want, const Value& got);
+template <class K, class V, class H> bool defined(const kern::Map<K, V, H>& m);
+template <class K, class H> bool defined(const kern::Set<K, H>& s);
+template <class K, class V, class H> std::string text(const kern::Map<K, V, H>& m);
+template <class K, class H> std::string text(const kern::Set<K, H>& s);
 template <class A, class B> Value arg(const std::pair<A, B>& p);
 template <class A, class B> bool same(const std::pair<A, B>& want, const Value& got);
 template <class A, class B> bool defined(const std::pair<A, B>& p);
@@ -571,7 +419,7 @@ template <class U> wide::Span<const U> kept_span(std::vector<U> entries) {
 inline Value arg(f64 x) { return Value::number(x); }
 inline Value arg(f32 x) { return Value::number(static_cast<f64>(x)); }
 inline Value arg(bool x) { return Value::boolean(x); }
-inline Value arg(Whole w) { return Value::structure({Value::integer(static_cast<kern::i64>(w.v >> 32)), Value::integer(static_cast<kern::i64>(w.v & 0xFFFFFFFFull))}); }
+inline Value arg(Whole w) { return Value::int64(w.v); }
 inline Value arg(Vec3 v) { return Value::vector(v); }
 inline Value arg(Vec2 v) { return Value::vector({v.x, v.y, 0}); }
 inline Value arg(wide::Vec3 v) { return arg(kern::Vec3(v)); }
@@ -631,9 +479,7 @@ inline bool same(Vec2 want, const Value& got) {
   const Vec3 v = got.as_vector();
   return same_bits(want.x, v.x) && same_bits(want.y, v.y);
 }
-inline bool same(Whole want, const Value& got) {
-  return got.rows && got.rows->size() == 2 && (*got.rows)[0].as_int() == static_cast<kern::i64>(want.v >> 32) && (*got.rows)[1].as_int() == static_cast<kern::i64>(want.v & 0xFFFFFFFFull);
-}
+inline bool same(Whole want, const Value& got) { return got.type == kern::logic::PinType::int64 && static_cast<unsigned long long>(got.i) == want.v; }
 inline bool same(wide::Vec3 want, const Value& got) { return same(kern::Vec3(want), got); }
 inline bool same(wide::Vec2 want, const Value& got) { return same(kern::Vec2(want), got); }
 inline bool same(const EngineObject* want, const Value& got) { return got.as_int() == (want ? want->kern_handle : 0); }
@@ -766,6 +612,52 @@ template <class T, std::size_t N> bool same(const std::array<T, N>& want, const 
 template <class T, std::size_t N> bool defined(const std::array<T, N>& a) { return defined(as_list(a)); }
 template <class T, std::size_t N> std::string text(const std::array<T, N>& a) { return text(as_list(a)); }
 
+// ---- a map, a set (kern::Map, kern::Set): the language's, their entries in their order ----
+template <class K, class V, class H> Value arg(const kern::Map<K, V, H>& m) {
+  Value r = Value::zero(kern::logic::PinType::map);
+  if (m.empty()) return r;
+  kern::logic::MapEntries& e = r.own_entries();
+  e.reserve(m.size());
+  for (const auto& [k, v] : m) e.try_emplace(kern::logic::key_of(arg(k)), arg(v));
+  return r;
+}
+template <class K, class H> Value arg(const kern::Set<K, H>& s) {
+  Value r = Value::zero(kern::logic::PinType::set);
+  if (s.empty()) return r;
+  kern::logic::MapEntries& e = r.own_entries();
+  e.reserve(s.size());
+  for (const K& k : s) e.try_emplace(kern::logic::key_of(arg(k)));
+  return r;
+}
+template <class K, class V, class H> bool same(const kern::Map<K, V, H>& want, const Value& got) {
+  if (got.type != kern::logic::PinType::map || got.size() != want.size()) return false;
+  for (std::size_t k = 0; k < want.size(); ++k)
+    if (!(kern::logic::key_of(arg(want.key_at(k))) == got.keyed().key_at(k)) || !same(want.value_at(k), got.keyed().value_at(k))) return false;
+  return true;
+}
+template <class K, class H> bool same(const kern::Set<K, H>& want, const Value& got) {
+  if (got.type != kern::logic::PinType::set || got.size() != want.size()) return false;
+  std::size_t k = 0;
+  for (const K& key : want)
+    if (!(kern::logic::key_of(arg(key)) == got.keyed().key_at(k++))) return false;
+  return true;
+}
+template <class K, class V, class H> bool defined(const kern::Map<K, V, H>& m) {
+  for (const auto& [k, v] : m) if (!defined(v)) return false;
+  return true;
+}
+template <class K, class H> bool defined(const kern::Set<K, H>&) { return true; }
+template <class K, class V, class H> std::string text(const kern::Map<K, V, H>& m) {
+  std::string out = "{";
+  for (const auto& [k, v] : m) out += (out.size() > 1 ? ", " : "") + text(k) + ": " + text(v);
+  return out + "}";
+}
+template <class K, class H> std::string text(const kern::Set<K, H>& s) {
+  std::string out = "{";
+  for (const K& k : s) out += (out.size() > 1 ? ", " : "") + text(k);
+  return out + "}";
+}
+
 // ---- what may be there or not (std::unique_ptr, std::optional of a value): as the Blueprint has it, a
 // list of no entry or one ----
 /// (Without a copy of what is there: a class may be one that is not to be copied.)
@@ -839,9 +731,7 @@ template <class S> struct Take {
   template <class T> static void to(T& target, const Value& v) { take(target, v); }
 };
 template <> struct Take<Whole> {
-  template <class T> static void to(T& target, const Value& v) {
-    target = v.rows && v.rows->size() == 2 ? static_cast<T>((static_cast<unsigned long long>((*v.rows)[0].as_int()) << 32) | static_cast<unsigned long long>((*v.rows)[1].as_int())) : T{};
-  }
+  template <class T> static void to(T& target, const Value& v) { target = v.type == kern::logic::PinType::int64 ? static_cast<T>(static_cast<unsigned long long>(v.i)) : T{}; }
 };
 template <class S> struct Take<std::vector<S>> {
   template <class T> static void to(std::vector<T>& target, const Value& v) {
@@ -910,38 +800,29 @@ template <class A, class B> struct Take<std::pair<A, B>> {
     Take<B>::to(target.second, (*v.rows)[1]);
   }
 };
-/// A map from its rows, a set from its keys.
-template <class SK, class SV, class M> void take_rows(M& target, const Value& v) {
-  target.clear();
-  for (std::size_t k = 0; k < v.size(); ++k) {
-    const Value row = v.item(k);
-    if (!row.rows || row.rows->size() != 2) continue;
-    typename M::key_type key{};
-    typename M::mapped_type held{};
-    Take<SK>::to(key, (*row.rows)[0]);
-    Take<SV>::to(held, (*row.rows)[1]);
-    target.insert_or_assign(std::move(key), std::move(held));
-  }
+/// A map, a set: its entries in their order, each key as the value it is (a key of the type S says).
+template <class SK, class K> K key_from(const kern::logic::MapKey& key) {
+  K out{};
+  Take<SK>::to(out, kern::logic::key_value(key, arg(shaped<SK>(K{})).type));
+  return out;
 }
-template <class SK, class M> void take_keys(M& target, const Value& v) {
-  target.clear();
-  for (std::size_t k = 0; k < v.size(); ++k) {
-    typename M::key_type key{};
-    Take<SK>::to(key, v.item(k));
-    target.insert(std::move(key));
+template <class SK, class SV> struct Take<kern::Map<SK, SV>> {
+  template <class K, class V> static void to(kern::Map<K, V>& target, const Value& v) {
+    target.clear();
+    if (v.type != kern::logic::PinType::map) return;
+    for (std::size_t k = 0; k < v.size(); ++k) {
+      V held{};
+      Take<SV>::to(held, v.keyed().value_at(k));
+      target.insert_or_assign(key_from<SK, K>(v.keyed().key_at(k)), std::move(held));
+    }
   }
-}
-template <class K, class V> struct Take<wide::Map<K, V>> {
-  template <class M> static void to(M& target, const Value& v) { take_rows<K, V>(target, v); }
 };
-template <class K, class V> struct Take<wide::SortedMap<K, V>> {
-  template <class M> static void to(M& target, const Value& v) { take_rows<K, V>(target, v); }
-};
-template <class K> struct Take<wide::Set<K>> {
-  template <class M> static void to(M& target, const Value& v) { take_keys<K>(target, v); }
-};
-template <class K> struct Take<std::set<K>> {
-  template <class M> static void to(M& target, const Value& v) { take_keys<K>(target, v); }
+template <class SK> struct Take<kern::Set<SK>> {
+  template <class K> static void to(kern::Set<K>& target, const Value& v) {
+    target.clear();
+    if (v.type != kern::logic::PinType::set) return;
+    for (std::size_t k = 0; k < v.size(); ++k) target.insert(key_from<SK, K>(v.keyed().key_at(k)));
+  }
 };
 template <class S, class T> void take_as(T& target, const Value& v) { Take<S>::to(target, v); }
 template <class T> void take(std::vector<T>& to, const Value& v) { Take<std::vector<T>>::to(to, v); }
@@ -1185,7 +1066,6 @@ inline void open_read() {
     std::longjmp(g_bail, 1);
   }
 }
-inline void wide::mark_open() { g_open = true; }
 
 /// How many entries a list has: a container, an array - or a view (kern::Span says its length as a field).
 template <class C> constexpr std::size_t entries(const C& c) {

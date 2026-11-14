@@ -6055,7 +6055,6 @@ using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converte
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;"""
 
 
-KEYED_TEST = {"unordered_map": "Map", "unordered_set": "Set", "map": "SortedMap", "set": "SortedSet"}
 
 
 class Held:
@@ -6137,8 +6136,6 @@ class TestWriter:
         text = re.sub(r"(?<![\w.])((?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?)[fF]\b", lambda m: m.group(1) if re.search(r"[.eE]", m.group(1)) else m.group(1) + ".0", text)
         text = re.sub(r"\bfloat\b", "double", text)
         text = re.sub(r"\b(?:std::)?(u?)int64_t\b", lambda m: "u64" if m.group(1) else "i64", text)
-        # (a map and a set as the Blueprint language has them: rows in the order they were put in - converted.h)
-        text = re.sub(r"\bstd::(unordered_map|unordered_set|map|set)\s*<", lambda m: "converted::wide::" + KEYED_TEST[m.group(1)] + "<", text)
         text = re.sub(r"\b(?:" + ENGINE + r"::)?dm::(" + "|".join(WIDE_MATH) + r")\s*\(", lambda m: WIDE_MATH[m.group(1)] + "(", text)   # (the engine's own functions of numbers: the formula's)
         return re.sub(r"\bstd::(" + "|".join(WIDE_MATH) + r")f?\s*\(", lambda m: WIDE_MATH[m.group(1)] + "(", text)
 
@@ -6203,7 +6200,7 @@ class TestWriter:
                 while callee.get("kind") == "ImplicitCastExpr" and kids(callee):
                     callee = bare(kids(callee)[0])
                 name = (callee.get("referencedDecl") or {}).get("name")
-            if name == "operator[]" and KEYED.match(self.u.clean(qtype(ks[1]))):
+            if name == "operator[]" and (KEYED.match(self.u.clean(qtype(ks[1]))) or KEYED_KERN.match(self.u.clean(qtype(ks[1])))):
                 pass   # (m[key] is said for every key)
             elif k == "ArraySubscriptExpr" or name == "operator[]":
                 base, index = ks[-2:]
@@ -6216,7 +6213,7 @@ class TestWriter:
                 edits.append((a, 2, depth, a, "converted::at("))
                 swap(bb, ia, "[", ", ")
                 swap(ib, b, "]", ")")
-            elif k == "CXXMemberCallExpr" and ks and ks[0].get("kind") == "MemberExpr" and ks[0].get("name") in ("at", "front", "back") and kids(ks[0]) and not KEYED.match(self.u.clean(qtype(kids(ks[0])[0]))):
+            elif k == "CXXMemberCallExpr" and ks and ks[0].get("kind") == "MemberExpr" and ks[0].get("name") in ("at", "front", "back") and kids(ks[0]) and not KEYED.match(self.u.clean(qtype(kids(ks[0])[0]))) and not KEYED_KERN.match(self.u.clean(qtype(kids(ks[0])[0]))):
                 base = kids(ks[0])[0]
                 if ks[0].get("isArrow") or base.get("kind") == "CXXThisExpr":
                     raise Wait("an entry by a pointer")
@@ -6387,9 +6384,9 @@ class TestWriter:
     @staticmethod
     def wrap(expr, spelled):
         """A value of the test as the Blueprint has it where the two differ by more than their numbers: a
-        64-bit bit pattern (the program's u64) is the Blueprint's Whole64, a map the list of its rows, a
-        set the list of its keys - converted::shaped makes it that, by the type as the program spells it."""
-        if not re.search(r"\b[ui]64\b|converted::wide::(?:Sorted)?(?:Map|Set)<", spelled):
+        64-bit bit pattern (the program's u64, i64) is the language's Int64 - also in a list, a pair, a map
+        or a set: converted::shaped makes it that, by the type as the program spells it."""
+        if not re.search(r"\b[ui]64\b", spelled):
             return expr
         return f"converted::shaped<{re.sub(r'\b[ui]64\b', 'converted::Whole', spelled)}>({expr})"
 
@@ -6437,11 +6434,10 @@ class TestWriter:
             if "[" in inner:
                 raise Wait("the test has no values of a list inside a list")
             return f"std::vector<{self.spell(inner)}>"
-        m = KEYED.match(c)
-        if m and not m.group(2):
+        m = KEYED_KERN.match(c)
+        if m:   # (a map, a set: the program's kern::Map, kern::Set - the language's very containers, of the test's values)
             a = template_args(c)
-            name = "converted::wide::" + KEYED_TEST[(m.group(1) or "") + m.group(3)]
-            return f"{name}<{self.spell(a[0])}>" if m.group(3) == "set" else f"{name}<{self.spell(a[0])}, {self.spell(a[1])}>"
+            return f"converted::wide::Set<{self.spell(a[0])}>" if m.group(1) == "Set" else f"converted::wide::Map<{self.spell(a[0])}, {self.spell(a[1])}>"
         if c.startswith("std::pair<"):
             a = template_args(c)
             return f"std::pair<{self.spell(a[0])}, {self.spell(a[1])}>"
@@ -6510,11 +6506,11 @@ class TestWriter:
         if m:
             inner = template_args(c)[0]
             return f"draw_list(draw, [&]() -> {self.spell(inner)} {{ return {self.draw(inner)}; }})" if self.u.clean(inner) != "bool" else "draw_list(draw, [&] { return draw.flag(); })"
-        m = KEYED.match(c)
-        if m and not m.group(2):
+        m = KEYED_KERN.match(c)
+        if m:   # (each key once: one drawn again is put in once, where it came first)
             a = template_args(c)
             key = f"[&]() -> {self.spell(a[0])} {{ return {self.draw(a[0])}; }}"
-            if m.group(3) == "set":
+            if m.group(1) == "Set":
                 return f"converted::draw_set<{self.spell(raw)}>(draw, {key})"
             return f"converted::draw_map<{self.spell(raw)}>(draw, {key}, [&]() -> {self.spell(a[1])} {{ return {self.draw(a[1])}; }})"
         if c.startswith("std::pair<"):
@@ -6544,10 +6540,10 @@ class TestWriter:
             """The classes a type is made of, through lists, maps, sets and pairs."""
             if re.match(r"std::(vector|array|unique_ptr|optional|initializer_list)<", c):
                 return parts(template_args(c)[0])
-            m = KEYED.match(c)
+            m = KEYED_KERN.match(c)
             if m or c.startswith("std::pair<"):
                 a = template_args(c)
-                return parts(a[0]) + (parts(a[1]) if not (m and m.group(3) == "set") else [])
+                return parts(a[0]) + (parts(a[1]) if not (m and m.group(1) == "Set") else [])
             return [c]
         for part in parts(c):
             q = self.u.find_type(part)
@@ -7537,7 +7533,7 @@ class TestWriter:
         pairs += [(f"::{ENGINE}::Vec3", "Vec3"), (f"::{ENGINE}::Vec2", "Vec2"), (f"::{ENGINE}::Span", "Span"), (f"::{tree.namespace}::Vec3", "Vec3"), (f"::{tree.namespace}::Vec2", "Vec2")]
         pairs += [(f"::{space}::{n}", n) for space in (ENGINE, tree.namespace) for n in ("f32", "f64", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64")]
         # (by their full names: a local variable of a function may have the name of one - `const f32 length = kern::length(d)`)
-        pairs += [(f"::{ENGINE}::{n}", n, "converted::wide::") for n in ("dot", "cross", "length", "length_sq", "distance", "distance_sq", "finite", "lerp", "vmin", "vmax", "normalize", "hex_color", "Span")]
+        pairs += [(f"::{ENGINE}::{n}", n, "converted::wide::") for n in ("dot", "cross", "length", "length_sq", "distance", "distance_sq", "finite", "lerp", "vmin", "vmax", "normalize", "hex_color", "Span", "Map", "Set")]
         # (an enum of a class of the engine the test has a stand-in of - logic::Runtime::Chain - stands in that stand-in)
         self.object_enums.clear()
         in_objects = set()
