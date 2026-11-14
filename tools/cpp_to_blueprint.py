@@ -6138,10 +6138,15 @@ class TestWriter:
             return c.split("::")[-1]   # (the test's vector: converted::wide)
         if (c in TEXT or c.startswith("std::basic_string<char")) and "string_view" not in c and "*" not in c:
             return "std::string"
+        if re.match(r"std::(?:basic_string_view<char(?:,\s*std::char_traits<char>)?>|string_view)$", c):
+            return "std::string_view"   # (a view of a text: of one the test keeps - in the Blueprint the text)
+        m = re.match(r"std::array<(.+),\s*(\d+)U?L?L?>$", c)
+        if m:   # (a list of a fixed length: one of the test's values, a list in the Blueprint)
+            return f"std::array<{self.spell(template_args(c)[0])}, {m.group(2)}>"
         m = re.match(r"std::vector<(.+)>$", c)
         if m:
             inner = template_args(c)[0]
-            if inner.startswith("std::array<") or "[" in inner:
+            if "[" in inner:
                 raise Wait("the test has no values of a list inside a list")
             return f"std::vector<{self.spell(inner)}>"
         m = KEYED.match(c)
@@ -6156,7 +6161,7 @@ class TestWriter:
         if m:   # (what may be there or not - in the Blueprint a list of no entry or one; a list in braces: the drawn list, see converted::listed)
             inner = self.spell(template_args(c)[0])
             return f"std::vector<{inner}>" if m.group(1) == "initializer_list" else f"std::{m.group(1)}<{inner}>"
-        q = self.u.find_type(c)
+        q = self.record_named(c)
         if q in self.tree.enums:
             if q not in self.enum_names:
                 raise Wait(f"the enum {q.split('::')[-1]} is not written")
@@ -6166,6 +6171,16 @@ class TestWriter:
                 raise Wait(f"the class {q.split('::')[-1]} is not written")
             return self.names[q]
         raise Wait(f"the test has no values of {c}")
+
+    def record_named(self, c):
+        """The class or enum of the program a type of the test's values names - the one it names by its full
+        name. (A class this file only declares - its definition stands in another source file - is none
+        the test has: its values wait.)"""
+        q = self.u.find_type(c)
+        named = c[len(self.tree.namespace) + 2:] if c.startswith(self.tree.namespace + "::") else c
+        if q is not None and "::" in named and q != named and not q.endswith("::" + named):
+            raise Wait(f"the test has no values of {c} (its class is defined in another file)")
+        return q
 
     def draw(self, raw):
         c = self.u.clean(raw)
@@ -6193,6 +6208,12 @@ class TestWriter:
             return self.draw("std::vector<" + re.sub(r"^const\s+", "", m.group(1)) + ">")
         if self.spell(raw) == "std::string":
             return "draw.word()"
+        if self.spell(raw) == "std::string_view":
+            return "std::string_view(draw.c_word())"   # (the drawn words live as long as the test)
+        m = re.match(r"std::array<(.+),\s*(\d+)U?L?L?>$", c)
+        if m:
+            inner = template_args(c)[0]
+            return f"converted::draw_array<{self.spell(raw)}>([&]() -> {self.spell(inner)} {{ return {self.draw(inner)}; }})"
         m = re.match(r"std::vector<(.+)>$", c)
         if m:
             inner = template_args(c)[0]
@@ -6214,7 +6235,7 @@ class TestWriter:
             if m.group(1) == "initializer_list":   # (a list written in braces: a few entries)
                 return f"converted::draw_few(draw, {one})"
             return f"converted::draw_maybe<{self.spell(raw)}>(draw, {one})"
-        q = self.u.find_type(c)
+        q = self.record_named(c)
         if q in self.tree.enums:
             return f"static_cast<{self.spell(raw)}>(draw.below({len(self.u.enum_values[self.u.enums[q]])}))"
         if q in self.tree.records:
@@ -6229,7 +6250,7 @@ class TestWriter:
         self.spell(raw)
         def parts(c):
             """The classes a type is made of, through lists, maps, sets and pairs."""
-            if re.match(r"std::(vector|unique_ptr|optional|initializer_list)<", c):
+            if re.match(r"std::(vector|array|unique_ptr|optional|initializer_list)<", c):
                 return parts(template_args(c)[0])
             m = KEYED.match(c)
             if m or c.startswith("std::pair<"):
@@ -7058,7 +7079,8 @@ class TestWriter:
         top = sorted(records)
         types_at_top = [self.names[q] for q in top] + [self.enum_names[q] for q in enums]
         if len(set(types_at_top)) != len(types_at_top):
-            return None, [(f, "two types of one name") for f in u.order if not f.lifted]
+            twice = sorted({n for n in types_at_top if types_at_top.count(n) > 1})
+            return None, [(f, f"two types of one name ({', '.join(twice)})") for f in u.order if not f.lifted]
         pairs = [(self.absolute(q), self.names[q]) for q in self.names] + [(self.absolute(q), self.enum_names[q]) for q in self.enum_names]
         pairs += [(f"::{ENGINE}::Vec3", "Vec3"), (f"::{ENGINE}::Vec2", "Vec2"), (f"::{tree.namespace}::Vec3", "Vec3"), (f"::{tree.namespace}::Vec2", "Vec2")]
         pairs += [(f"::{space}::{n}", n) for space in (ENGINE, tree.namespace) for n in ("f32", "f64", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64")]
@@ -7436,6 +7458,10 @@ class TestWriter:
         full = text.replace('#include "../converted.h"', f'#include "{os.path.abspath(os.path.join(self.test_dir, "..", "converted.h"))}"').replace(f'#include "{self.source_dir}/', f'#include "{os.path.dirname(self.path)}/')
         assert len(full.split("\n")) == len(head)
         open(path, "w").write(full)
+        if os.environ.get("TEST_KEEP"):   # (to look at: every text of the tests, as it was compiled - numbered)
+            os.makedirs(os.environ["TEST_KEEP"], exist_ok=True)
+            n = len([x for x in os.listdir(os.environ["TEST_KEEP"]) if x.startswith(f"test_{stem}.")])
+            shutil.copy(path, os.path.join(os.environ["TEST_KEEP"], f"test_{stem}.{n}.cpp"))
         r = subprocess.run([os.environ.get("CXX", "g++"), "-std=c++20", "-fsyntax-only", "-ffp-contract=off", "-fno-exceptions", "-fno-rtti", "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter",
                             *self.flags, "-I" + os.path.join(ROOT, "kern", "tests"), path], capture_output=True, text=True)
         errors = []
