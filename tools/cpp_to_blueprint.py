@@ -3314,6 +3314,12 @@ class Emit:
             return code
         raise Wait(f"a character of a text as a {c}")
 
+    def text_piece(self, n):
+        """What `text += x` appends: a text - or one byte, a char (Text of Code: its 8 bits, as a char holds them)."""
+        if re.sub(r"^const\s+", "", self.u.clean(self.ctype(n))).strip() in ("char", "signed char", "unsigned char"):
+            return f"text_of_code({self.ex(n, 'Int')})"
+        return self.ex(n, "Text")
+
     def for_each_char(self, s, v, raw, src, body):
         """for (char c : text): a loop over the bytes of a text - each read where it stands (Code At)."""
         if "&" in raw and not re.search(r"\bconst\b", raw):
@@ -3625,7 +3631,7 @@ class Emit:
                 synth = {"kind": "CXXOperatorCallExpr", "type": ops[0].get("type", {}), "_op": "operator" + name[8], "inner": [kids(n)[0], ops[0], ops[1]]}
                 return self.store(ops[0], lambda t: self.ex(synth, t))
             if name == "operator+=" and self.tp(ops[0]) == "Text":
-                return self.store(ops[0], lambda t: f'text_append({self.ex(ops[0], "Text")}, {self.ex(ops[1], "Text")}, "")')
+                return self.store(ops[0], lambda t: f'text_append({self.ex(ops[0], "Text")}, {self.text_piece(ops[1])}, "")')
         if k == "CallExpr":
             name = callee_name(n)
             ref = callee(n).get("referencedDecl", {})
