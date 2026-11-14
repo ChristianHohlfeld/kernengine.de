@@ -1300,6 +1300,12 @@ constexpr bool suits(Code c, PinType t) {
 }
 /// The byte of a number of a list of bytes: its last 8 bits.
 inline u64 byte_of(i64 v) { return static_cast<u64>(v) & 0xffu; }
+/// The i-th byte from `from` on of `count` entries (before them, beyond them: 0).
+template <class E> u64 byte_at(const E* items, std::size_t count, i64 from, u32 i) {
+  if (from >= 0 && static_cast<u64>(from) >= count) return 0;  // (and no sum beyond the end of an i64)
+  const i64 k = from + static_cast<i64>(i);
+  return k >= 0 && static_cast<u64>(k) < count ? byte_of(static_cast<i64>(items[static_cast<std::size_t>(k)])) : 0;
+}
 }  // namespace bytes
 
 /// A whole number written as text, as settings hold them ("3", " 12"): leading blanks, a sign,

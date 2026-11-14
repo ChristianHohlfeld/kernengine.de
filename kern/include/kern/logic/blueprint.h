@@ -486,7 +486,7 @@ struct BlueprintCore : logic::PureNodes {
     static_assert(kLayout.count == logic::structs::field_count<S>(), "the layout has a field for each field of the struct");
     S out{};
     const i64 from = at;
-    auto byte = [&](u32 i) { return logic::bytes::byte_of(static_cast<i64>(bytes[from + static_cast<i64>(i)])); };
+    auto byte = [&](u32 i) { return logic::bytes::byte_at(bytes.first, bytes.count, from, i); };
     std::size_t k = 0;
     logic::structs::fields(out, [&](auto&... field) { (take_bytes(field, kLayout.fields[k++], byte), ...); });
     return out;

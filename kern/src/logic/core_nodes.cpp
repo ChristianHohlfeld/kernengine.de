@@ -1451,7 +1451,9 @@ void add_structs(Library& lib) {
         for (std::size_t k = 0; k < l.count && k < st->fields.size(); ++k) {
           const Value f = field_of(value, *st, k, g);
           const bytes::Field& at = l.fields[k];
-          const u64 v = bytes::floating(at.code) ? bytes::bits(at.code, f.as_number()) : at.code == bytes::Code::boolean ? (f.as_bool() ? 1u : 0u) : static_cast<u64>(f.i);
+          const PinType t = st->fields[k].type.type;
+          const u64 v = t == PinType::number ? bytes::bits(at.code, f.as_number()) : t == PinType::boolean ? (f.as_bool() ? 1u : 0u)
+                        : t == PinType::int64 ? static_cast<u64>(f.i) : static_cast<u64>(f.as_int());
           bytes::put(out.data(), at, v);
         }
       }
@@ -1478,10 +1480,7 @@ void add_structs(Library& lib) {
       const Value list = c.in(std::size_t{0});
       const std::vector<i64>& held = list.items<i64>();
       const i64 from = c.in_int("at");
-      auto byte = [&](u32 i) {
-        const i64 k = from + static_cast<i64>(i);
-        return k >= 0 && static_cast<u64>(k) < held.size() ? bytes::byte_of(held[static_cast<std::size_t>(k)]) : u64{0};
-      };
+      auto byte = [&](u32 i) { return bytes::byte_at(held.data(), held.size(), from, i); };
       std::vector<Value> fields;
       if (st) {
         for (std::size_t k = 0; k < st->fields.size(); ++k) {
