@@ -761,6 +761,10 @@ class Tree:
                 if c.get("kind") in ("CXXMethodDecl", "CXXConstructorDecl", "CXXDestructorDecl", "FieldDecl") and "id" in c:
                     self.owner[c["id"]] = q
                 self.take(c, q + "::", seen)
+                if "id" in c:
+                    # (a member stands in its class - also when the dump named it on its own first: -ast-dump-filter
+                    # gives every declaration whose name has the namespace in it, a method outside its class too)
+                    self.scope_of[c["id"]] = q + "::"
         elif k in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXDestructorDecl", "VarDecl", "FieldDecl", "FunctionTemplateDecl", "ClassTemplateDecl", "LinkageSpecDecl"):
             if k in ("CXXMethodDecl", "CXXConstructorDecl", "CXXDestructorDecl") and o.get("parentDeclContextId") and o["id"] not in self.owner:
                 r = self.decl.get(o["parentDeclContextId"])
@@ -1162,6 +1166,14 @@ class Unit:
 
     def find_type(self, t):
         """The program's record or enum a type name means (its qualified name), or None."""
+        if self.lookup_scope and not t.startswith("::"):
+            # (as C++ looks a name up from where it is written: the innermost namespace or class around it that
+            # has it first - `Mode` in a method of Jet is Jet::Mode, also where the program has a Mode of its own)
+            s = self.lookup_scope
+            while s:
+                if s + t in self.tree.records or s + t in self.tree.enums:
+                    return s + t
+                s = s[:-2].rsplit("::", 1)[0] + "::" if "::" in s[:-2] else ""
         if t in self.tree.records or t in self.tree.enums:
             return t
         t = t.replace("(anonymous namespace)::", "")
