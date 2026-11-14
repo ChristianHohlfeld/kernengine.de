@@ -7162,7 +7162,8 @@ class TestWriter:
                     self.helpers(owner) if (f.mutates or f.ctor) else None
                 # (what the function takes by value is handed over, as a call hands a value it does not need
                 # again: the count of what the function asks for memory is of its own work - see converted.h)
-                by_value = lambda p: not any(ch in qtype(p) for ch in "&*") and not self.u.object_of(qtype(p))
+                # (a view of a list - kern::Span - shows the list the test keeps: it is not handed over)
+                by_value = lambda p: not any(ch in qtype(p) for ch in "&*") and not self.u.object_of(qtype(p)) and not re.match(r"(?:kern::)?Span<", self.u.clean(qtype(p)))
                 # (a list the source writes in braces - std::initializer_list - is the drawn list as such a list: converted::listed)
                 braced = {n: f"l{n[1:]}" for n, p in zip(names[first:], params) if self.u.clean(qtype(p)).startswith("std::initializer_list<")}
                 args = ", ".join(braced[n] if n in braced else f"std::move({n})" if by_value(p) else n for n, p in zip(names[first:], params))
