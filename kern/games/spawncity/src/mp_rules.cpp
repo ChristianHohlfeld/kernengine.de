@@ -319,7 +319,13 @@ f32 decode_mulaw(u8 byte) {
 }
 
 f32 proximity_gain(f32 d) { return voice_gain(d, false); }
-f32 voice_gain(f32 d, bool everywhere) { return std::isfinite(d) ? static_cast<f32>(g_rules.number("VoiceGain", rules::decimal(d), everywhere)) : everywhere ? voice_gain(1e9f, true) : 0; }
+f32 voice_gain(f32 d, bool everywhere) {
+  if (!std::isfinite(d)) {
+    if (!everywhere) return 0;
+    d = 1e9f;   // (heard everywhere: as far as anything is)
+  }
+  return static_cast<f32>(g_rules.number("VoiceGain", rules::decimal(d), everywhere));
+}
 
 bool VoiceStream::push(u32 seq, const std::vector<u8>& mulaw, f32 gain) {
   if (gain <= 0 || mulaw.empty() || mulaw.size() > 800) return false;
