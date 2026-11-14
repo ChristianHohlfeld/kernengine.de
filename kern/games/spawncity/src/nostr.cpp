@@ -127,21 +127,18 @@ U256 reduce(const U256& a, const U256& m) {  // a < 2m for the moduli here
   return r;
 }
 
-const U256& P() { static const U256 v = from_hex256("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F"); return v; }
-const U256& N() { static const U256 v = from_hex256("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141"); return v; }
+// (the numbers of the curve, least significant word first: from_hex256 of the hex the standard gives -
+// P = FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F, N = FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141)
+constexpr U256 kP{{0xFFFFFC2F, 0xFFFFFFFE, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF}};
+constexpr U256 kN{{0xD0364141, 0xBFD25E8C, 0xAF48A03B, 0xBAAEDCE6, 0xFFFFFFFE, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF}};
+const U256& P() { return kP; }
+const U256& N() { return kN; }
 
 // ---- secp256k1 points (Jacobian, a = 0, b = 7) ----
 struct Pt { U256 x, y, z; };  // z = 0: infinity
-const Pt& G() {
-  static const Pt g = [] {
-    Pt p;
-    p.x = from_hex256("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798");
-    p.y = from_hex256("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8");
-    p.z.w[0] = 1;
-    return p;
-  }();
-  return g;
-}
+// (the generator: x = 79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798, y = 483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8, z = 1)
+constexpr Pt kG{{{0x16F81798, 0x59F2815B, 0x2DCE28D9, 0x029BFCDB, 0xCE870B07, 0x55A06295, 0xF9DCBBAC, 0x79BE667E}}, {{0xFB10D4B8, 0x9C47D08F, 0xA6855419, 0xFD17B448, 0x0E1108A8, 0x5DA4FBFC, 0x26A3C465, 0x483ADA77}}, {{1}}};
+const Pt& G() { return kG; }
 U256 fm(const U256& a, const U256& b) { return mulm(a, b, P()); }
 U256 fa(const U256& a, const U256& b) { return addm(a, b, P()); }
 U256 fs(const U256& a, const U256& b) { return subm(a, b, P()); }
