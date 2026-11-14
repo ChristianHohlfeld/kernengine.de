@@ -209,7 +209,7 @@ void Game::townsync_update(f32 dt) {
     // a mate who joined gets the whole state once
     for (const net::Remote& r : net_.remotes())
       if (std::find(t.known.begin(), t.known.end(), r.state.slot) == t.known.end()) { townsync_send_full(r.state.slot); t.known.push_back(r.state.slot); }
-    t.known.erase(std::remove_if(t.known.begin(), t.known.end(), [&](u8 s) { return !net_.remote(s); }), t.known.end());
+    t.known.erase(std::remove_if(t.known.begin(), t.known.end(), [&](u8 s) { return net_.remote_index(s) < 0; }), t.known.end());
     for (const std::vector<u8>& part : town::pack_lamps(t.lamps_out)) net_.town_to_all(part);
     t.lamps_out.clear();
     return;
