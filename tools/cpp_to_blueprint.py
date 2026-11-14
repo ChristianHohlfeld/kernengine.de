@@ -977,6 +977,8 @@ class Unit:
             return None
         if ITERATOR.match(t):
             return "Int"
+        if t == "std::_Bit_reference":
+            return "Bool"   # (std::vector<bool>'s entry where it stands: in a List<Bool> a place like any other - see member_call, for_each)
         if "*" in t:
             raise Wait("a pointer")
         m = re.match(r"(?:kern::)?Span<\s*(.+)>$", t)
@@ -2123,7 +2125,7 @@ class Emit:
                         out += self.take_pre()
                     continue
                 raw = qtype(v)
-                if "&" in raw and not re.search(r"\bconst\b", raw) and not self.u.object_of(raw):
+                if ("&" in raw and not re.search(r"\bconst\b", raw) and not self.u.object_of(raw)) or self.u.clean(raw) == "std::_Bit_reference":
                     raise Wait("a reference to something it changes")
                 wide_init = kids(v) and v.get("init") and self.u.clean(raw) in ("unsigned long", "long", "unsigned long long", "long long") and self.is64(kids(v)[-1])
                 init = kids(v)[-1] if kids(v) and v.get("init") else None
@@ -2350,7 +2352,7 @@ class Emit:
         entry = f"{place}[{index}]"
         loop = self.enter_loop(body)
         first = []
-        if "&" in raw:
+        if "&" in raw or self.u.clean(raw) == "std::_Bit_reference":   # (std::vector<bool>'s entry by value: still the entry where it stands)
             self.names[v["id"]] = entry
             self.types[v["id"]] = it
         else:
@@ -4934,6 +4936,8 @@ class Emit:
             raise Wait("a pointer" if name in ("get", "release") else f"{name}() of an owned or optional value")
         bt = self.tp(base)
         a = kids(b)[1:]
+        if name == "operator bool" and not a and self.ctype(base) == "std::_Bit_reference":
+            return self.value(base)   # (an entry of a std::vector<bool>, read)
         if name == "operator bool" and not a and self.u.object_of(qtype(base)):
             # (what holds an object of the engine - std::unique_ptr - as a Bool: is there one; none is the handle 0)
             return f'math_compare<"!=">(kern::to<Float>({self.ex(base, "Int")}), 0.0)', "Bool"
