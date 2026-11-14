@@ -139,15 +139,16 @@ u32 hash_u32(u64 v) {
 void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector& proj, MapFeatures& out) {
   std::vector<std::vector<std::vector<Vec2>>> polys;
   std::vector<std::vector<Vec2>> apron;
-  if (const mvt::Layer* l = tile.layer("building")) {
-    const Projector P(key, proj, static_cast<f64>(l->extent));
-    for (const mvt::Feature& f : l->features) {
+  if (const i32 at = tile.layer("building"); at >= 0) {
+    const mvt::Layer& l = tile.layers[static_cast<std::size_t>(at)];
+    const Projector P(key, proj, static_cast<f64>(l.extent));
+    for (const mvt::Feature& f : l.features) {
       if (f.type != mvt::GeomType::polygon) continue;
-      const mvt::Value* hide = l->tag(f, "hide_3d");
-      if (hide && hide->kind == mvt::Value::Kind::boolean && hide->b) continue;
-      f32 top = static_cast<f32>(l->number(f, "render_height", -1));
+      const i32 hide = l.tag(f, "hide_3d");
+      if (hide >= 0 && l.values[static_cast<std::size_t>(hide)].kind == mvt::Value::Kind::boolean && l.values[static_cast<std::size_t>(hide)].b) continue;
+      f32 top = static_cast<f32>(l.number(f, "render_height", -1));
       if (!(top > 0)) top = 8;  // SpawnCity's default (real_world_bootstrap.mjs:443)
-      const f32 base = static_cast<f32>(std::fmax(0.0, l->number(f, "render_min_height", 0)));
+      const f32 base = static_cast<f32>(std::fmax(0.0, l.number(f, "render_min_height", 0)));
       polygons(f, polys);
       u32 n = 0;
       for (auto& poly : polys) {
@@ -155,7 +156,7 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
         b.base = base;
         b.top = std::fmax(top, base + 1.0f);
         b.seed = hash_u32(f.id * 31 + (n++) + static_cast<u64>(key.x) * 7919 + static_cast<u64>(key.y) * 104729);
-        const f32 ext = static_cast<f32>(l->extent);
+        const f32 ext = static_cast<f32>(l.extent);
         if (!poly.empty()) {
           // an outline that reaches over the tile's edge: kept whole for the furniture's clearance
           bool over = false;
@@ -174,13 +175,14 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
       }
     }
   }
-  if (const mvt::Layer* l = tile.layer("transportation")) {
-    const Projector P(key, proj, static_cast<f64>(l->extent));
-    for (const mvt::Feature& f : l->features) {
+  if (const i32 at = tile.layer("transportation"); at >= 0) {
+    const mvt::Layer& l = tile.layers[static_cast<std::size_t>(at)];
+    const Projector P(key, proj, static_cast<f64>(l.extent));
+    for (const mvt::Feature& f : l.features) {
       if (f.type != mvt::GeomType::line) continue;
       RoadClass c;
-      if (!parse_road(l->text(f, "class"), c)) continue;
-      const std::string_view brunnel = l->text(f, "brunnel");
+      if (!parse_road(l.text(f, "class"), c)) continue;
+      const std::string_view brunnel = l.text(f, "brunnel");
       if (brunnel == "tunnel") continue;
       for (const auto& part : f.parts) {
         if (part.size() < 2) continue;
@@ -192,13 +194,14 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
       }
     }
   }
-  if (const mvt::Layer* l = tile.layer("waterway")) {
-    const Projector P(key, proj, static_cast<f64>(l->extent));
-    for (const mvt::Feature& f : l->features) {
+  if (const i32 at = tile.layer("waterway"); at >= 0) {
+    const mvt::Layer& l = tile.layers[static_cast<std::size_t>(at)];
+    const Projector P(key, proj, static_cast<f64>(l.extent));
+    for (const mvt::Feature& f : l.features) {
       if (f.type != mvt::GeomType::line) continue;
-      const std::string_view cls = l->text(f, "class");
+      const std::string_view cls = l.text(f, "class");
       const RoadClass c = cls == "river" ? RoadClass::river : cls == "canal" ? RoadClass::canal : RoadClass::stream;
-      if (l->text(f, "brunnel") == "tunnel") continue;
+      if (l.text(f, "brunnel") == "tunnel") continue;
       for (const auto& part : f.parts) {
         if (part.size() < 2) continue;
         MapFeatures::Road r;
@@ -209,13 +212,14 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
     }
   }
   auto areas = [&](const char* layer, auto kind_of) {
-    const mvt::Layer* l = tile.layer(layer);
-    if (!l) return;
-    const Projector P(key, proj, static_cast<f64>(l->extent));
-    for (const mvt::Feature& f : l->features) {
+    const i32 at = tile.layer(layer);
+    if (at < 0) return;
+    const mvt::Layer& l = tile.layers[static_cast<std::size_t>(at)];
+    const Projector P(key, proj, static_cast<f64>(l.extent));
+    for (const mvt::Feature& f : l.features) {
       if (f.type != mvt::GeomType::polygon) continue;
       AreaKind kind;
-      if (!kind_of(*l, f, kind)) continue;
+      if (!kind_of(l, f, kind)) continue;
       polygons(f, polys);
       for (auto& poly : polys) {
         MapFeatures::Area a;

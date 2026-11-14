@@ -260,12 +260,12 @@ std::string CityStream::take_requests() {
   return s + "]";
 }
 
-void CityStream::provide(const TileKey& key, const u8* bytes, std::size_t length) {
+void CityStream::provide(const TileKey& key, kern::Span<const u8> bytes) {
   Tile* t = tile(key);
   if (!t || t->state != Tile::State::requested) return;
   if (key == origin_tile_ && ms_.t_data < 0) ms_.t_data = kern::now_ms() - start_ms_;
   // decoded off the frame (a Web Worker / thread): the frame only takes the finished features
-  t->tile_job = kern::jobs::submit(cityjobs::kTile, cityjobs::tile_input(key, proj_.lon0, proj_.lat0, bytes, length));
+  t->tile_job = kern::jobs::submit(cityjobs::kTile, cityjobs::tile_input(key, proj_.lon0, proj_.lat0, bytes));
   t->state = Tile::State::decoding;
 }
 

@@ -58,7 +58,7 @@ class CityStream {
   /// Tiles to fetch now, as JSON [[z,x,y],...] (each tile once).
   std::string take_requests();
   /// Uncompressed MVT bytes of a requested tile (copied).
-  void provide(const TileKey& key, const u8* bytes, std::size_t length);
+  void provide(const TileKey& key, kern::Span<const u8> bytes);
   void fail(const TileKey& key);
   /// No map service: the procedural stand-in town around the origin.
   void go_offline();
