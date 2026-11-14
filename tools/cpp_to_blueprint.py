@@ -2502,8 +2502,10 @@ class Emit:
                     break
                 if target.get("kind") in ("MemberExpr", "ArraySubscriptExpr", "ImplicitCastExpr") and kids(target):
                     target = kids(target)[0]
-                elif target.get("kind") == "CXXOperatorCallExpr" and callee_name(target) == "operator[]":
-                    target = kids(target)[1]
+                elif target.get("kind") == "CXXOperatorCallExpr" and callee_name(target) in ("operator[]", "operator*", "operator->") and len(kids(target)) >= 2:
+                    target = kids(target)[1]   # (an entry of a list, a map's value - and what an owned value holds: *life_)
+                elif target.get("kind") == "UnaryOperator" and target.get("opcode") == "*" and kids(target):
+                    target = kids(target)[0]
                 else:
                     target = None
             if not own and (root is None or root not in self.names):

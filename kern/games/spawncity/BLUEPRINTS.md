@@ -526,6 +526,25 @@ der Konverter um die Ersatzform kürzer, alles wird neu gewandelt, verglichen un
 Was unten zu `Whole64`, zu „Maps und Sets sind Listen“ und zu Methoden auf einem Objekt steht,
 beschreibt den Stand davor und wird Schritt für Schritt ersetzt.
 
+**Stand 14.11.2026, 16:00 (auf `work`, geschrieben, Schlusslauf steht aus).**
+- **`Game` als Blueprint:** Eine Klasse, von der das Programm genau ein Objekt mit statischer
+  Lebensdauer hält und sonst keins macht (ohne Basisklasse, ohne virtuelle Funktionen), ist der
+  Zustand eines Blueprints (`state_classes`): Felder → Variablen, Methoden → Funktionen ohne
+  `self`. Ihre Methoden stehen in vielen Dateien; jede ist ein Teil (`Game/game_net_cpp`), im Baum
+  ihrer Datei gewandelt, `main` setzt die Teile zu einem `kern::Blueprint` zusammen. Einheiten, die
+  sich gegenseitig rufen, werden neu gewandelt, sobald etwas geschrieben ist, das sie rufen
+  wollten (bis zum Fixpunkt). Der Test eines Teils setzt und vergleicht alle Variablen.
+- **Schritt 5 – Map, Set:** `kern::Map`/`kern::Set` (kern/core/map.h) halten die Reihenfolge, in
+  der die Schlüssel kamen (wie eine Map des JavaScript-Originals), mit einem Index über einen
+  überall gleichen Hash. Das Spiel benutzt sie statt der Container der Standardbibliothek; die
+  Sprache hat sie als Map/Set (Knoten, Plätze `M[i]`, Notation `Map<Int64, List<Int>>`); keine Map
+  als Liste mehr.
+- **Schritt 6 – Int64:** 64 Bit wie u64/i64 von C++, die Knoten wie WebAssemblys i64; `Whole64`
+  und tools/blueprint_whole64.h sind entfernt.
+- **Regel-Blueprints:** Get Variable on Actor (`func_get_on`), Call on Actor mit einem Ausgang als
+  Wert (`number`, `flag`); Aufrufe mit Strukturen und Listen als Werten gehen noch über Listen von
+  Values.
+
 #### Der Konverter heute
 `tools/cpp_to_blueprint.py` liest die Quellen mit dem Parser des Compilers (clangs Syntaxbaum)
 und schreibt sie in der Schreibweise:
