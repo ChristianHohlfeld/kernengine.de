@@ -4201,6 +4201,10 @@ TEST(logic_notation_refuses_with_place_and_reason) {
     // an entry of a list that is held stays where it is
     CHECK(says("  void Grow(Car& car) {\n    list_add(Cars, car);\n  }\n" + in_event("    Grow(Cars[0]);"), "while Grow holds it, the length of Cars is changed"));
     CHECK(says("  void Swap(Car& car) {\n    Cars = List<Car>{};\n    car.Speed = 1.0;\n  }\n" + in_event("    Swap(Cars[0]);"), "while Swap holds it, what stands at Cars is changed"));
+    // (so do the steps that work on a list in one go - and a Reserve: nothing one can read changes, but in the class the list moves)
+    for (const char* step : {"list_resize(Cars, 9, car)", "list_append(Cars, Cars)", "list_insert_list(Cars, 0, Cars)", "list_reserve(Cars, 99)"})
+      CHECK(says("  void Grow(Car& car) {\n    " + std::string(step) + ";\n  }\n" + in_event("    Grow(Cars[0]);"), "while Grow holds it, the length of Cars is changed"));
+    CHECK(says("  void Take(Car& car) {\n    var_take(Cars);\n    car.Speed = 1.0;\n  }\n" + in_event("    Take(Cars[0]);"), "while Take holds it, what stands at Cars is changed"));
     CHECK(says(bump + "  void Clear(Car& car) {\n    list_clear(car.Marks);\n  }\n  void Both(Car& car) {\n    Clear(car);\n  }\n  void Mark(Float& mark, Car& car) {\n    Both(car);\n    mark += 1.0;\n  }\n" +
                    in_event("    Mark(Mine.Marks[0], Mine);"),
                "while Mark holds it, the length of Mine.Marks is changed"));

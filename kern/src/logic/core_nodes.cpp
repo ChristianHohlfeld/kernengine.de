@@ -694,8 +694,10 @@ void add_lists(Library& lib) {
     Variable named;
       const Variable* v = g.place_of(n, named) ? &named : nullptr;
     const TypeRef e = v && is_list(v->type) ? TypeRef{element_of(v->type), v->of} : TypeRef{};
-    for (PinDef& p : in)
-      if (p.id == "item") retype(p, e, g);
+    for (PinDef& p : in) {
+      if (p.id == "item" || p.id == "value") retype(p, e, g);
+      if (p.id == "items") retype(p, TypeRef{list_of(e.type), e.of}, g);  // (a list of its kind)
+    }
     (void)out;
   };
   auto needs_list = [](const Node& n, const Graph& g) {
@@ -784,6 +786,75 @@ void add_lists(Library& lib) {
           c.out("removed", Value::boolean(list::remove(v.template edit<T>(), from_value<T>(item))));
         });
       });
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = step("list.resize", "Set Length",
+                     "Makes a list variable that long in one go: cut at its end, or filled up with the value. Less than 0: empty; it does not grow beyond 16,777,216 items.",
+                     "resize size count fill length array", {data("length", "Length", PinType::integer, 0), data("value", "Value", PinType::number, 0.0)}, {});
+    d.title = [](const NodeDef&, const Node& n) { return "Set Length of " + place_title(n); };
+    d.run = [on_list](Context& c) {
+      const i64 length = c.in_int("length");
+      const Value value = c.in("value");
+      on_list(c, [&](Value& v) {
+        with_items(element_of(v.type), [&](auto type) {
+          using T = typename decltype(type)::type;
+          list::resize(v.template edit<T>(), length, from_value<T>(value));
+        });
+      });
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = step("list.append", "Append List", "Adds the items of another list at the end of a list variable, in their order and in one go.", "add all extend concat join array",
+                     {data("items", "Items", PinType::number_list)}, {});
+    d.title = [](const NodeDef&, const Node& n) { return "Append to " + place_title(n); };
+    d.run = [on_list](Context& c) {
+      const Value items = c.in("items");
+      on_list(c, [&](Value& v) {
+        if (items.type != v.type) return;
+        with_items(element_of(v.type), [&](auto type) {
+          using T = typename decltype(type)::type;
+          // (the node's own value of the items: a list into itself reads them as they were)
+          const std::vector<T>& more = items.template items<T>();
+          list::append(v.template edit<T>(), more);
+        });
+      });
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = step("list.insert_list", "Insert List",
+                     "Puts the items of another list in front of the item at the index, in their order and in one go (0: at the start; past the end: at the end).", "add all at array",
+                     {data("index", "Index", PinType::integer, 0), data("items", "Items", PinType::number_list)}, {});
+    d.title = [](const NodeDef&, const Node& n) { return "Insert List into " + place_title(n); };
+    d.run = [on_list](Context& c) {
+      const i64 index = c.in_int("index");
+      const Value items = c.in("items");
+      on_list(c, [&](Value& v) {
+        if (items.type != v.type) return;
+        with_items(element_of(v.type), [&](auto type) {
+          using T = typename decltype(type)::type;
+          const std::vector<T>& more = items.template items<T>();
+          list::insert_list(v.template edit<T>(), index, more);
+        });
+      });
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = step("list.reserve", "Reserve",
+                     "Makes room for that many items in a list variable: nothing one can read changes - the list then grows that far without asking for memory again.",
+                     "capacity room memory array", {data("count", "Count", PinType::integer, 0)}, {});
+    d.title = [](const NodeDef&, const Node& n) { return "Reserve in " + place_title(n); };
+    d.run = [](Context& c) {
+      // (a list of the interpreter has no room to make: the step reads its input and goes on)
+      (void)c.in_int("count");
       return 0;
     };
     lib.add(std::move(d));

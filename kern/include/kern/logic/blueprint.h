@@ -276,6 +276,11 @@ struct BlueprintCore : logic::PureNodes {
   template <class T> static void list_remove(List<T>& list, const std::type_identity_t<T>& item) { logic::list::remove(list, item); }
   template <class N, class T> static void list_remove(N& n, List<T>& list, const std::type_identity_t<T>& item) { n.removed = logic::list::remove(list, item); }
   template <class T> static void list_clear(List<T>& list) { logic::list::clear(list); }
+  /// (in one go: what std::vector does in one request for memory - resize, insert of a range, reserve)
+  template <class T> static void list_resize(List<T>& list, Int length, const std::type_identity_t<T>& value) { logic::list::resize(list, length, value); }
+  template <class T> static void list_append(List<T>& list, const std::type_identity_t<List<T>>& items) { logic::list::append(list, items); }
+  template <class T> static void list_insert_list(List<T>& list, Int index, const std::type_identity_t<List<T>>& items) { logic::list::insert_list(list, index, items); }
+  template <class T> static void list_reserve(List<T>& list, Int count) { logic::list::reserve(list, count); }
 
   // ---- variables ----
   // Get, Set and Add are C++'s own (Heat, Heat = value, Heat += value). A Take gives what
