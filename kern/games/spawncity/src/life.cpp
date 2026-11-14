@@ -1078,9 +1078,10 @@ Vec3 Life::sample(f32 s, f32& yaw, Vec2& normal) const {
 
 bool Life::spawn_joggers(const LifeView& view, const CityStream& city, f32 now, Rng& rng) {
   const std::vector<Lane>& lanes = city.lanes();
-  const Lane* best = nullptr;
+  std::size_t best = lanes.size();  // (the place of the best lane in lanes; none: the end)
   f32 best_score = -1e9f;
-  for (const Lane& l : lanes) {
+  for (std::size_t at = 0; at < lanes.size(); ++at) {
+    const Lane& l = lanes[at];
     if (!l.alive || l.points.size() < 2 || l.width > 14) continue;
     f32 len = 0, near = 1e9f;
     for (std::size_t i = 1; i < l.points.size(); ++i) len += dist2d(l.points[i], l.points[i - 1]);
@@ -1088,16 +1089,17 @@ bool Life::spawn_joggers(const LifeView& view, const CityStream& city, f32 now, 
     for (Vec2 q : l.points) near = std::fmin(near, std::hypot(q.x - view.player.x, q.y - view.player.y));
     if (near < 35 || near > 150) continue;
     const f32 score = std::fmin(len, 260.0f) - near * 0.6f + rng.unit() * 40;
-    if (score > best_score) { best_score = score; best = &l; }
+    if (score > best_score) { best_score = score; best = at; }
   }
-  if (!best) return false;
+  if (best == lanes.size()) return false;
+  const Lane& lane = lanes[best];
   const i32 side0 = rng.unit() < 0.5f ? 1 : -1;
   for (i32 side : {side0, -side0})
     for (f32 kerb : {1.7f, 1.2f, 2.4f}) {
       Chain c;
       c.side = side;
-      c.off = best->width * 0.5f + kerb;
-      const std::vector<Vec2>& pts = best->points;
+      c.off = lane.width * 0.5f + kerb;
+      const std::vector<Vec2>& pts = lane.points;
       for (std::size_t i = 0; i < pts.size(); ++i) {
         const Vec2 a = pts[i == 0 ? 0 : i - 1], b = pts[std::min(pts.size() - 1, i + 1)];
         Vec2 d = b - a;

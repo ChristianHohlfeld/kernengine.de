@@ -127,7 +127,8 @@ W64 = ("whole64u", "whole64s")     # (a type's name, cleaned: a 64-bit bit patte
 KEYED = re.compile(r"std::(unordered_)?(multi)?(map|set)<")
 # kern::Map, kern::Set (kern/core/map.h): the language's Map and Set - values under keys, keys, in the order the keys came
 KEYED_KERN = re.compile(r"kern::(Map|Set)<")
-ITERATOR = re.compile(r"std::__detail::_Node_(?:const_)?iterator(?:_base)?<|std::_Rb_tree_(?:const_)?iterator<|__gnu_cxx::__normal_iterator<")
+ITERATOR = re.compile(r"std::__detail::_Node_(?:const_)?iterator(?:_base)?<|std::_Rb_tree_(?:const_)?iterator<|__gnu_cxx::__normal_iterator<"
+                      r"|(?:[\w:]+(?:<.*>)?::)?(?:const_)?iterator$")   # (the last: an iterator that is a pointer - pointer_iterators)
 UNSIGNED = {"unsigned char", "unsigned short", "unsigned int", "unsigned long", "unsigned long long"}
 # An unsigned 64-bit whole number is, in a Blueprint, the whole number its bits are read with a sign
 # (2^64 - 1 is -1): what C++ adds, subtracts and multiplies around 2^64 comes out the same, exactly,
@@ -307,6 +308,118 @@ def annotate(o, st):
         o["_at"] = (b.get("offset"), (e.get("offset") or 0) + e.get("tokLen", 0) if e.get("offset") is not None else None)
 
 
+# kern::Map and kern::Set (kern/core/map.h) - like std::array - go through their entries by pointers: their
+# iterator is a pointer to an entry, spelled by the container's own name for it (`iterator`,
+# `const_iterator`, `kern::Map<u64, Tile>::iterator`). An iterator is the place it stands at, whatever C++
+# makes it of (see ITERATOR): such a pointer is written as the iterators of the other containers are.
+POINTER_ITERATOR = re.compile(r"^(?:const\s+)?((?:[\w:]+(?:<.*>)?::)?(?:const_)?iterator)$")
+POINTER_ITERATOR_PAIR = re.compile(r"^std::pair<((?:[\w:]+(?:<.*>)?::)?(?:const_)?iterator), bool>$")
+
+
+def pointer_iterators(o):
+    """The iterators of a container that are pointers (POINTER_ITERATOR), in the shape the iterators of
+    the other containers have: their type says `iterator` (what insert() gives `std::pair<iterator, bool>`),
+    and what C++ does with them as pointers - `*it`, `it->x`, `++it`, `it == end`, `it + n`, `it = x` - is
+    the iterator's operator (a CXXOperatorCallExpr, as clang writes it for an iterator that is a class).
+    The same operations, the same order: only the shape of the tree changes."""
+    pairs = {}   # (the id of a binding that is the first part of what insert() gave -> the iterator's type)
+
+    def of(n):
+        """The iterator type `n` has (its spelling), "pair:<that>" for what insert() gives, or None."""
+        t = n.get("type") or {}
+        spelled, real = t.get("qualType", ""), t.get("desugaredQualType") or t.get("qualType", "")
+        if t.get("_iterator"):
+            return t["_iterator"]
+        m = POINTER_ITERATOR.match(spelled)
+        if m and re.search(r"\*\s*(const)?$", real):
+            return m.group(1)
+        m = POINTER_ITERATOR_PAIR.match(spelled)
+        if m and re.search(r"\*\s*, bool>$", real):
+            return "pair:" + m.group(1)
+        return None
+
+    def mark(n, it):
+        n["type"] = {"qualType": f"std::pair<{it[5:]}, bool>" if it.startswith("pair:") else it, "_iterator": it}
+
+    def under(n):
+        b = n
+        while b.get("kind") in SKIP + ("ImplicitCastExpr",) and kids(b):
+            b = kids(b)[0]
+        return b
+
+    def call(n, op, operands):
+        keep = {k: n[k] for k in ("id", "range", "_at", "_file", "type", "valueCategory") if k in n}
+        n.clear()
+        n.update(keep)
+        n["kind"] = "CXXOperatorCallExpr"
+        n["inner"] = [{"kind": "DeclRefExpr", "referencedDecl": {"kind": "CXXMethodDecl", "name": op}, "type": {"qualType": "<an iterator's operator>"}}] + operands
+
+    def one(n):
+        """Is `n` an iterator (not what insert() gives)?"""
+        it = of(n)
+        return it is not None and not it.startswith("pair:")
+
+    def visit(n):
+        if isinstance(n, list):
+            for c in n:
+                visit(c)
+            return
+        if not isinstance(n, dict):
+            return
+        for key, v in n.items():
+            if isinstance(v, (dict, list)) and key not in ("type", "range", "loc", "referencedDecl", "referencedMemberDecl"):
+                visit(v)
+        k = n.get("kind")
+        if not k:
+            return
+        ks = kids(n)
+        it = of(n)
+        if it is None and len(ks) == 1 and k in SKIP + ("ImplicitCastExpr",) and of(ks[0]):
+            # (what only stands around an iterator - LValueToRValue, NoOp to its const version - is one too)
+            inner = of(ks[0])
+            if inner.startswith("pair:"):
+                it = inner
+            elif re.search(r"\*\s*(const)?$", qtype(n)):
+                it = re.sub(r"(?:^|(?<=::))iterator$", "const_iterator", inner) if qtype(n).lstrip().startswith("const ") else inner
+        elif it is None and k == "MemberExpr" and n.get("name") == "first" and not n.get("isArrow") and ks and (of(under(ks[0])) or "").startswith("pair:"):
+            it = of(under(ks[0]))[5:]   # (what insert() gave: its first part is the iterator)
+        elif it is None and k == "DeclRefExpr" and n.get("referencedDecl", {}).get("id") in pairs:
+            it = pairs[n["referencedDecl"]["id"]]
+        if k == "DecompositionDecl" and (of(n) or "").startswith("pair:"):
+            binds = [c for c in ks if c.get("kind") == "BindingDecl"]
+            if binds:
+                pairs[binds[0].get("id")] = of(n)[5:]
+        if it is not None:
+            mark(n, it)
+        if k == "UnaryOperator" and ks and one(ks[0]):
+            op = n.get("opcode")
+            if op == "*":
+                call(n, "operator*", [ks[0]])
+            elif op in ("++", "--"):
+                was = of(ks[0])
+                call(n, f"operator{op}", [ks[0]] + ([{"kind": "IntegerLiteral", "value": "0", "type": {"qualType": "int"}}] if n.get("isPostfix") else []))
+                mark(n, was)
+        elif k == "MemberExpr" and n.get("isArrow") and ks and one(ks[0]):
+            base = ks[0]
+            arrow = {"kind": "CXXOperatorCallExpr", "type": dict(base.get("type", {})), "valueCategory": "prvalue"}
+            for x in ("range", "_at", "_file"):
+                if x in base:
+                    arrow[x] = base[x]
+            call(arrow, "operator->", [base])
+            n["inner"] = [arrow if c is base else c for c in n["inner"]]
+        elif k in ("BinaryOperator", "CompoundAssignOperator") and len(ks) == 2 and (one(ks[0]) or one(ks[1])):
+            op = n.get("opcode")
+            if op in ("==", "!=", "<", ">", "<=", ">=", "+", "-", "=", "+=", "-="):
+                # (it + n, it = x: an iterator again - of the iterator's type)
+                was = of(ks[0]) if one(ks[0]) else of(ks[1])
+                pointer = re.search(r"\*\s*(const)?$", qtype(n)) is not None or one(n)
+                call(n, f"operator{op}", ks)
+                if pointer:
+                    mark(n, was)
+
+    visit(o)
+
+
 def kids(n):
     """The parts of a node (without the comments and attributes that stand with a declaration)."""
     return [c for c in n.get("inner", []) or [] if isinstance(c, dict) and c.get("kind") and not c["kind"].endswith("Comment") and not c["kind"].endswith("Attr")]
@@ -384,6 +497,8 @@ class Tree:
         st = {"file": ""}
         for o in self.engine:
             annotate(o, st)
+        for o in self.dumps + [d for _, dumps in self.more for d in dumps] + self.engine:
+            pointer_iterators(o)
         self.texts = {}
         self.flags = flags
         self.order = None     # (see `place`)

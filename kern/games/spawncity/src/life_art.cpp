@@ -44,7 +44,11 @@ bool LifeArt::init(kern::Renderer& r) {
 }
 
 void LifeArt::begin() {
-  for (Part* p : {&box_, &ball_, &cyl_, &glow_}) { p->transforms.clear(); p->tints.clear(); }
+  auto empty = [](Part& p) { p.transforms.clear(); p.tints.clear(); };
+  empty(box_);
+  empty(ball_);
+  empty(cyl_);
+  empty(glow_);
 }
 
 void LifeArt::put(Part& p, const Mat4& m, Vec3 tint) {
@@ -183,12 +187,16 @@ void LifeArt::life(const Life& life, f32 now, Vec3 eye, f32 range) {
 }
 
 void LifeArt::end() {
-  for (Part* p : {&box_, &ball_, &cyl_, &glow_}) {
-    if (!p->id) continue;
-    const bool any = !p->transforms.empty();
-    if (any) r_->update_instances(p->id, kern::Span<const f32>(p->transforms.data(), p->transforms.size()), kern::Span<const f32>(p->tints.data(), p->tints.size()));
-    r_->set_visible(p->id, any);
-  }
+  auto show = [&](const Part& p) {
+    if (!p.id) return;
+    const bool any = !p.transforms.empty();
+    if (any) r_->update_instances(p.id, kern::Span<const f32>(p.transforms.data(), p.transforms.size()), kern::Span<const f32>(p.tints.data(), p.tints.size()));
+    r_->set_visible(p.id, any);
+  };
+  show(box_);
+  show(ball_);
+  show(cyl_);
+  show(glow_);
 }
 
 }  // namespace sc

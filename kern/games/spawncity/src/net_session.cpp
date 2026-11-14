@@ -758,28 +758,30 @@ void Session::deliver(u16 type, const std::vector<u8>& d) {
 void Session::on_pose(const PlayerState& s) {
   if (s.slot == self_slot_) return;
   const f64 now = now_ms();
-  Remote* r = nullptr;
-  for (Remote& x : remotes_) if (x.state.slot == s.slot) r = &x;
-  if (!r) {
+  // the remote of this slot: its place in remotes_ (the last one of the slot), a new one at the end if none
+  std::size_t at = remotes_.size();
+  for (std::size_t i = 0; i < remotes_.size(); ++i) if (remotes_[i].state.slot == s.slot) at = i;
+  if (at == remotes_.size()) {
     remotes_.emplace_back();
-    r = &remotes_.back();
-    r->shown = s.position;
-    r->shown_rotation = s.rotation;
-    r->person_shown = s.avatar;
+    Remote& added = remotes_.back();
+    added.shown = s.position;
+    added.shown_rotation = s.rotation;
+    added.person_shown = s.avatar;
     if (role_ == Role::host) { scores_.ensure(s.slot); send_scores(); }
   }
+  Remote& r = remotes_[at];
   // A mode change or a jump (respawn, new vehicle) starts the timelines over.
-  if (r->state.mode != s.mode || kern::length(r->body.last_position() - s.position) > mp::kTeleportM) r->body.reset();
-  if (kern::length(r->person.last_position() - s.avatar) > mp::kTeleportM) r->person.reset();
-  r->state = s;
-  r->received_ms = now;
-  r->body.push(s.position, s.rotation, s.velocity, true, s.t_ms, now);
-  r->person.push(s.avatar, yaw_quat(s.avatar_yaw), {}, false, s.t_ms, now);
+  if (r.state.mode != s.mode || kern::length(r.body.last_position() - s.position) > mp::kTeleportM) r.body.reset();
+  if (kern::length(r.person.last_position() - s.avatar) > mp::kTeleportM) r.person.reset();
+  r.state = s;
+  r.received_ms = now;
+  r.body.push(s.position, s.rotation, s.velocity, true, s.t_ms, now);
+  r.person.push(s.avatar, yaw_quat(s.avatar_yaw), {}, false, s.t_ms, now);
   if (s.mode == PlayerMode::car || s.mode == PlayerMode::jet) {
     const Vec3 fwd = s.rotation.rotate(s.mode == PlayerMode::jet ? Vec3{0, 1, 0} : Vec3{1, 0, 0});
-    r->nav.push(s.position, std::atan2(fwd.x, fwd.y), static_cast<u8>(s.mode), now);
+    r.nav.push(s.position, std::atan2(fwd.x, fwd.y), static_cast<u8>(s.mode), now);
   } else {
-    r->nav.reset();
+    r.nav.reset();
   }
 }
 

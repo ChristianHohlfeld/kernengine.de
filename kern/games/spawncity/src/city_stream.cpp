@@ -117,10 +117,16 @@ void CityStream::clear() {
 }
 
 void CityStream::remove(Tile& t) {
-  if (r_)
-    for (const std::vector<u32>* list : {&t.meshes, &t.lay_meshes, &t.old_lay})
-      for (u32 id : *list) r_->remove(id);
-  for (u32* j : {&t.tile_job, &t.build_job, &t.cell_job}) if (*j) { kern::jobs::cancel(*j); *j = 0; }
+  if (r_) {
+    auto drop = [&](const std::vector<u32>& list) { for (u32 id : list) r_->remove(id); };
+    drop(t.meshes);
+    drop(t.lay_meshes);
+    drop(t.old_lay);
+  }
+  auto cancel = [](u32& job) { if (job) { kern::jobs::cancel(job); job = 0; } };
+  cancel(t.tile_job);
+  cancel(t.build_job);
+  cancel(t.cell_job);
   t.cell_ids.clear();
   t.dirty_cells.clear();
   t.job_cells.clear();
