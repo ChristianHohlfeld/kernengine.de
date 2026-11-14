@@ -1189,6 +1189,9 @@ bool take_types(Graph& g, const std::vector<std::string>& libraries, const Bluep
     for (const Node& n : g.nodes) {
       const NodeDef* d = lib.find(n.type);
       if (!d) continue;
+      // (a node's own pins of a type a library declares: the engine's nodes - an enum of the engine's API)
+      for (const auto* pins : {&d->inputs, &d->outputs})
+        for (const PinDef& p : *pins) name(p.of);
       for (const ParamDef& pd : d->params) {
         if (pd.kind != ParamDef::Kind::type) continue;
         std::string v = n.param(pd.key, pd.def);
