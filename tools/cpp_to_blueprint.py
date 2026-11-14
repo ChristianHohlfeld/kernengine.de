@@ -788,6 +788,8 @@ class Unit:
         # the types and declarations of the variables used, the mutable ones
         self.state = next((q for q, b in self.world.states.items() if b == name), None)
         self.state_fields, self.state_types, self.state_lines, self.state_mutable = {}, {}, {}, set()
+        self.state_statics = {}     # a variable kept by a method of the state, or one of the file only its methods use -> (variable, type)
+        self.state_users = None     # (see kept_by_state)
         self.enums = {}             # qualified C++ name -> Blueprint name
         self.structs = {}           # qualified C++ name -> Blueprint name
         self.types = []             # the declarations, in the order they must stand
@@ -1321,7 +1323,7 @@ class Unit:
             if c.get("kind") == "FieldDecl":
                 name = self.fresh(c.get("name") or "field")
                 self.names.add(name)
-                self.state_fields[c.get("name")] = (len(self.state_fields), name, c)
+                self.state_fields[c.get("name")] = ((0, len(self.state_fields)), name, c)
         for c in kids(rec):
             if c.get("kind") in ("CXXMethodDecl", "CXXConstructorDecl") and not c.get("isImplicit") and c["id"] not in self.function_names:
                 name = self.fresh(c.get("name") if c.get("kind") == "CXXMethodDecl" and not c.get("name", "").startswith("operator") else self.wanted_name(c))
@@ -1352,8 +1354,49 @@ class Unit:
         self.state_types[field] = t
         return name, t
 
+    def state_static(self, d, owner):
+        """A variable a method of the state keeps from one call to the next (`static int last_tick = 0;`), or one
+        of the file only the state's methods use: there is one object of the state, so this is part of its
+        state - a variable of its Blueprint, called by where it stands (the method's name or the file's, and
+        its own) and starting at its initializer. (its name, its type)"""
+        if d["id"] in self.state_statics:
+            return self.state_statics[d["id"]]
+        want = f"{owner}_{d.get('name') or 'kept'}"
+        name = sane_name(want)
+        if name in self.names:
+            raise Wait(f"the variable {d.get('name')} kept by {owner}: the Blueprint {self.name} has something called {name}")
+        t = self.btype(qtype(d))
+        init = kids(d)[-1] if kids(d) and d.get("init") else None
+        try:
+            default = Const(self).literal(init, t) if init is not None else self.zero(t)
+        except Wait as w:
+            raise Wait(f"the variable {d.get('name')} kept by {owner} starts with what is computed when it is first met ({w})")
+        self.names.add(name)
+        self.state_lines[(1, name)] = [f"  /// (kept by {owner})", f"  {self.dtype(qtype(d), t)} {name} = {default};"]
+        self.state_statics[d["id"]] = (name, t)
+        return name, t
+
+    def kept_by_state(self, d):
+        """Is this variable of a source file one only the state's methods use - one the file has for itself
+        (static, or in a namespace without a name) and changes, that no other function of the file names?"""
+        if self.state is None or d.get("kind") != "VarDecl" or d.get("constexpr") or re.search(r"\bconst\b", qtype(d)):
+            return False
+        if not (d.get("storageClass") == "static" or "_GLOBAL__N_" in (d.get("mangledName") or "")) or is_header(d.get("_file", "")):
+            return False
+        if self.state_users is None:
+            users = collections.defaultdict(set)
+            for f in {id(x): x for x in self.tree.body.values()}.values():
+                if f.get("kind") == "VarDecl":
+                    continue
+                state = self.tree.owner.get(f["id"]) == self.state
+                for n in walk(f):
+                    if n.get("kind") == "DeclRefExpr" and (n.get("referencedDecl") or {}).get("kind") == "VarDecl":
+                        users[n["referencedDecl"]["id"]].add(state)
+            self.state_users = users
+        return self.state_users.get(d["id"]) == {True}
+
     def is_state_variable(self, name):
-        return self.state is not None and any(name == n for _, n, _ in self.state_fields.values())
+        return self.state is not None and (any(name == n for _, n, _ in self.state_fields.values()) or any(name == n for n, _ in self.state_statics.values()))
 
     def place_named(self, d):
         """`const CarSpec& spec() const { return s_; }` - a function of the program that gives a reference
@@ -2020,9 +2063,17 @@ class Emit:
             if d.get("kind") == "CXXConstructorDecl":
                 raise Wait(f"the constructor of the state {u.name} (what it does would run when the Blueprint begins)")
             f.state = True
+            for x in walk(d):   # (what the file keeps for the state's methods alone: variables of its Blueprint - Unit.kept_by_state)
+                if x.get("kind") == "DeclRefExpr" and (x.get("referencedDecl") or {}).get("kind") == "VarDecl":
+                    v = self.tree.decl.get(x["referencedDecl"]["id"])
+                    if v is not None and v["id"] not in self.names and u.kept_by_state(v):
+                        self.names[v["id"]], self.types[v["id"]] = u.state_static(v, os.path.splitext(os.path.basename(v.get("_file") or "file"))[0])
             f.mutates = not qtype(d).rstrip().endswith("const") or any(
                 x.get("kind") == "MemberExpr" and (u.state_fields.get(x.get("name")) or (None, None, {}))[2].get("mutable") and self.is_this(kids(x)[0] if kids(x) else {"kind": "CXXThisExpr"})
                 for x in walk(d))
+            # (what it keeps from one call to the next, or of the file - changed or not: it may be)
+            f.mutates = f.mutates or any(x.get("kind") == "VarDecl" and x.get("storageClass") == "static" and not x.get("constexpr") and not re.search(r"\bconst\b", qtype(x)) for x in walk(d)) \
+                or any(i in self.names and self.names[i] in {n for n, _ in u.state_statics.values()} for i in self.assigned(d))
             if f.mutates:
                 f.pure = False   # (it changes the Blueprint's variables: a step)
         if d.get("kind") == "CXXConstructorDecl":
@@ -2622,6 +2673,12 @@ class Emit:
                 if v.get("storageClass") == "static":
                     if v.get("constexpr") or re.search(r"\bconst\b", qtype(v)):
                         self.u.constant(v)
+                        continue
+                    if self.f.state:   # (kept by a method of the one object there is: a variable of its Blueprint)
+                        name, t = self.u.state_static(v, self.f.name)
+                        self.names[v["id"]], self.types[v["id"]] = name, t
+                        if t.startswith("List<") and self.u.fixed(qtype(v)):
+                            self.lengths[name] = self.u.fixed(qtype(v))
                         continue
                     raise Wait("a static local variable (kept from one call to the next: a library keeps nothing)")
                 lam = self.lambda_of(kids(v)[-1]) if kids(v) and v.get("init") else None
@@ -8494,8 +8551,8 @@ def main(argv):
         for p in mine:
             r = results[p]
             for at, lines in r["state"].items():
-                if state.setdefault(int(at), lines) != lines:
-                    raise SystemExit(f"the variable {lines[-1].strip()} of {blueprint} is not the same in every part ({p}: {state[int(at)]})")
+                if state.setdefault(tuple(at), lines) != lines:
+                    raise SystemExit(f"the variable {lines[-1].strip()} of {blueprint} is not the same in every part ({p}: {state[tuple(at)]})")
             variables, functions_, members_ = r["parts"]
             held = {line for lines in r["state"].values() for line in lines}
             block = []
