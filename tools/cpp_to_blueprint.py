@@ -2541,6 +2541,12 @@ class Emit:
             if self.is_slot(n):
                 self.slot(n)   # (m[key]; - the key's row is made)
                 return []
+            inner = self.unwrap(ops[1]) if name == "operator=" and len(ops) == 2 else {}
+            while inner.get("kind") in ("CXXConstructExpr", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr") and len(kids(inner)) == 1:
+                inner = self.unwrap(kids(inner)[0])
+            if inner.get("kind") == "CXXOperatorCallExpr" and not inner.get("_op") and callee_name(inner) == "operator=" and len(kids(inner)) == 3:
+                # a = b = v of a class (a vector, a struct): first b, then a is what b is now
+                return self.effect(inner) + self.store(ops[0], lambda t: self.ex(kids(inner)[1], t))
             if name == "operator=":
                 self.moved_into(ops[1], qtype(callee(n)))
                 if self.is_box(ops[0]) and self.nothing(ops[1]):
