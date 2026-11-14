@@ -3662,6 +3662,44 @@ class Emit:
         base = kids(m)[0]
         return base if re.sub(r"^const\s+", "", self.ctype(base)).strip() == ENGINE + "::logic::ActorBlueprint" else None
 
+    def crosses(self, t, their, of, target, depth=0):
+        """Does a value of the Blueprint type `t` (of this Blueprint) cross as a value of the pin type
+        `their` (`of`: its struct or enum) of the actor's Blueprint `target`, unchanged? Call on Actor
+        hands a value over as it is: a flag, a whole number, a decimal number, a vector, a text, a
+        value of an enum with as many values, a struct whose fields cross one by one in their order,
+        a list of any of these. None where it does, else what it is instead."""
+        u = self.u
+        simple = {"Bool": "bool", "Int": "int", "Float": "float", "Vector": "vector", "Text": "text"}
+        if depth > 16:
+            raise Wait("a struct of an actor's Blueprint that holds itself")
+        if t.startswith("List<") and t.endswith(">"):
+            if not their.endswith("_list"):
+                return f"a {their}, and the call gives a {t}"
+            return self.crosses(t[5:-1], their[:-5], of, target, depth + 1)
+        if t in simple:   # (a value on its own is converted as on a wire - in every stage the same; a field of a struct and an item of a list are not)
+            return None if simple[t] == their or depth == 0 else f"a {their}, and the call gives a {t}"
+        if t in u.enum_values:
+            if u.enum_numbers.get(t):
+                return f"a {their}, and the call gives {t}, an enum whose values are numbers of their own"
+            if depth == 0 and their != "enum":
+                return None
+            if their != "enum" or target.get("enums", {}).get(of) != len(u.enum_values[t]):
+                return f"a {their} {of}, and the call gives the enum {t} of {len(u.enum_values[t])} values"
+            return None
+        if t in u.struct_fields:
+            fields = target.get("structs", {}).get(of)
+            if their != "struct" or fields is None:
+                return f"a {their} {of}, and the call gives the struct {t}"
+            mine = u.struct_fields[t]
+            if len(mine) != len(fields):
+                return f"the struct {of} of {len(fields)} fields, and the call gives the struct {t} of {len(mine)}"
+            for (name, ft, _, _), (fthem, fof) in zip(mine, fields):
+                why = self.crosses(ft, fthem, fof, target, depth + 1)
+                if why:
+                    return f"the struct {of}, and the field {name} of the struct {t} the call gives does not cross: {why}"
+            return None
+        return f"a {their}, and the call gives a {t} (a call on an actor's Blueprint gives and takes flags, whole and decimal numbers, vectors, texts, enum values, structs of them and lists)"
+
     def call_on(self, n, obj, gives_type=None):
         """rules.call("Fn", std::tie(a, b), x, y): the Blueprint of the actor `rules` names runs its function Fn -
         Call on Actor, on the actor found by its name, as the program binds it. The Blueprint says what Fn
@@ -3699,9 +3737,11 @@ class Emit:
         if is_word(function) or any(not re.fullmatch(r"[A-Za-z_]\w*", x) or x in CPP_WORDS for x in [function, *ins, *gives]):
             raise Wait(f"a call of {function} on the Blueprint of the actor {actor}, which names it or a pin of it with a word of C++ or of the Blueprint language")
         in_types, out_types = [self.tp(a) for a in values], [gives_type if p is None else self.tp(p) for p in places]
-        for t in in_types + out_types:
-            if t.startswith("List<") or t.startswith("Fixed<") or t in u.struct_fields or (t in u.enum_values and u.enum_numbers.get(t)):
-                raise Wait(f"a call of {function} on the Blueprint of the actor {actor} with a {t} (a call on an actor's Blueprint gives and takes flags, numbers, vectors, texts and enum values)")
+        theirs = target.get("pins", {}).get(function, ([], []))
+        for t, (their, of), what in [*zip(in_types, theirs[0], ins), *zip(out_types, theirs[1], gives)]:
+            why = self.crosses(t, their, of, target)
+            if why:
+                raise Wait(f"a call of {function} on the Blueprint of the actor {actor}: its pin {what} is {why}")
         pins = (list(zip(ins, in_types)), list(zip(gives, out_types)))
         held = u.externs.get(function)
         if held is None:
@@ -8771,6 +8811,10 @@ def main(argv):
             if g and a.get("name"):
                 world.actors[a["name"]] = {"library": bool(g.get("library")), "functions": {
                     f["name"]: ([p["name"] for p in f.get("inputs", [])], [p["name"] for p in f.get("outputs", [])]) for f in g.get("functions", []) if f.get("name")},
+                    "pins": {f["name"]: ([(p.get("type", "float"), p.get("of", "")) for p in f.get("inputs", [])], [(p.get("type", "float"), p.get("of", "")) for p in f.get("outputs", [])])
+                             for f in g.get("functions", []) if f.get("name")},
+                    "structs": {t["name"]: [(x.get("type", "float"), x.get("of", "")) for x in t.get("fields", [])] for t in g.get("structs", []) if t.get("name")},
+                    "enums": {t["name"]: len(t.get("values", [])) for t in g.get("enums", []) if t.get("name")},
                     "variables": {v["name"]: v.get("type", "float") for v in g.get("variables", []) if v.get("name")}}
 
     # ---- the plan: every source file read once - its functions, what they call, the types ----
