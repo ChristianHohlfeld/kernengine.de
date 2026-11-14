@@ -142,13 +142,6 @@ std::string FlightLog::json() const {
 // four-chord progression, drums from noise and pitched sines, bass, lead and pad from simple
 // oscillators. Everything is generated here; no recording is played.
 
-const MusicSynth::Station MusicSynth::kStations[] = {
-    {"KERN FM", "Synthwave", 100, 11},
-    {"BODENSEE BEATS", "House", 124, 23},
-    {"LOFI LAGUNE", "Lo-Fi", 78, 37},
-    {"8-BIT RADIO", "Chiptune", 144, 41},
-    {"NACHTSCHICHT", "Techno", 132, 53},
-};
 i32 MusicSynth::station_count() { return static_cast<i32>(sizeof kStations / sizeof kStations[0]); }
 
 namespace {

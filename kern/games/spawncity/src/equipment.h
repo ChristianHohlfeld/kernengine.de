@@ -98,7 +98,13 @@ class MusicSynth {
  public:
   struct Station { const char* name; const char* genre; f32 bpm; u32 seed; };
   static constexpr i32 kMenu = -1;
-  static const Station kStations[];
+  static constexpr Station kStations[] = {
+      {"KERN FM", "Synthwave", 100, 11},
+      {"BODENSEE BEATS", "House", 124, 23},
+      {"LOFI LAGUNE", "Lo-Fi", 78, 37},
+      {"8-BIT RADIO", "Chiptune", 144, 41},
+      {"NACHTSCHICHT", "Techno", 132, 53},
+  };
   static i32 station_count();
 
   void init(u32 rate);
