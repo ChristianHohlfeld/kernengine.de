@@ -499,12 +499,14 @@ template <class S, class Key> S draw_set(Draw& draw, Key key) {
 // an object of the engine is a handle in the Blueprint), the Blueprint through its host. The two must
 // have asked the same, call for call (Tally::take).
 // An object the source makes (a stand-in's constructor: the engine's <class>.make) is its own: its
-// destructor releases it (<class>.release). A copy, and the test's own objects, are not made: quiet.
+// destructor releases it (<class>.release) - and so is one the test puts where the source owns one (a
+// copy of one of the test's objects, as the Blueprint has a handle there: it is released as the
+// Blueprint releases it). The test's own objects (engine_object) are not made: quiet.
 struct EngineObject {
   long long kern_handle = 0;
   bool kern_owned = false;
   EngineObject() = default;
-  EngineObject(const EngineObject& o) : kern_handle(o.kern_handle) {}
+  EngineObject(const EngineObject& o) : kern_handle(o.kern_handle), kern_owned(true) {}
   EngineObject& operator=(const EngineObject& o) {
     kern_handle = o.kern_handle;
     return *this;
@@ -851,14 +853,10 @@ void take(T& to, const Value& v) { to = *engine_object<T>(v.as_int()); }
 template <class T>
   requires std::is_base_of_v<EngineObject, T>
 void take(std::unique_ptr<T>& to, const Value& v) {
-  // (the object the Blueprint has there is owned there: the source's is too - what this replaces is the
-  // test's handing over, not the source's: no release)
+  // (what this replaces is the test's handing over, not the source's: no release)
   g_keeping = true;
   if (v.as_int() == 0) to.reset();
-  else {
-    to = std::make_unique<T>(*engine_object<T>(v.as_int()));
-    to->kern_owned = true;
-  }
+  else to = std::make_unique<T>(*engine_object<T>(v.as_int()));
   g_keeping = false;
 }
 template <class T> void take(std::vector<T>& to, const Value& v);

@@ -3252,7 +3252,8 @@ class Emit:
                     raise Wait("a pointer")
                 self.invoke(self.u.function(m["referencedMemberDecl"]), kids(n)[1:], obj=base)
                 return []
-            if base is not None and not self.is_this(base) and self.owned_object(base) and name == "reset" and len(kids(n)) == 1:
+            if (base is not None and not self.is_this(base) and self.owned_object(base) and name == "reset"
+                    and all(x.get("kind") == "CXXDefaultArgExpr" or self.nothing(x) for x in kids(n)[1:])):   # (reset(), reset(nullptr))
                 q = self.owned_object(base)
                 old = self.temp("old", "Int")
                 return [f"{old} = {self.ex(base, 'Int')};"] + self.store(base, lambda t: "0") + self.release(q, old)
