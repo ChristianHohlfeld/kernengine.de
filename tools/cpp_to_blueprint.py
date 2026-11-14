@@ -316,6 +316,28 @@ def annotate(o, st):
         e = e.get("expansionLoc", e)
         o["_file"] = b.get("_file", "")
         o["_at"] = (b.get("offset"), (e.get("offset") or 0) + e.get("tokLen", 0) if e.get("offset") is not None else None)
+    if o.get("kind") in ("VarDecl", "DecompositionDecl") and o.get("init"):
+        bound_type(o)
+
+
+def bound_type(v):
+    """`const auto& ring = rings[i];` - the compiler names the type of a reference it deduced by the name
+    the library gives it (`const value_type &`) and does not say what that is; what the reference is bound
+    to says it (the type of the expression it starts with, without the name): the reference's type is that."""
+    t = v.get("type") or {}
+    spelled = t.get("qualType", "")
+    if t.get("desugaredQualType") or not spelled.endswith("&") or not UNSPELLED.search(spelled):
+        return
+    init = next((c for c in reversed(v.get("inner") or []) if isinstance(c, dict) and c.get("kind", "").endswith("Expr")), None)
+    if init is None:
+        return
+    it = init.get("type") or {}
+    base = (it.get("desugaredQualType") or it.get("qualType") or "").strip()
+    if not base or base.endswith("&") or UNSPELLED.search(base):
+        return
+    if spelled.startswith("const ") and not base.startswith("const "):
+        base = "const " + base
+    t["desugaredQualType"] = f"{base} {'&&' if spelled.endswith('&&') else '&'}"
 
 
 def kids(n):
