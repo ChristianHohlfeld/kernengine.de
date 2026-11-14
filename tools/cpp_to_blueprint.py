@@ -7964,7 +7964,8 @@ class TestWriter:
             if any(f.get("role") == "make" for f in by_class.get(q, [])) and not made:
                 decls.insert(0, f"  {name}() = default;")   # (the test's own objects of it - see converted::engine_object)
             over = ", ".join(f"public {self.object_name(b)}" for b in self.engine_bases(q)) or "converted::EngineObject"
-            chunks.append((tree.place(tree.records[q]), ("object", q), "\n".join([f"struct {name} : {over} {{", *self.object_enums.get(q, []), *decls, "};"])))
+            inherit = [f"  using {self.object_name(b)}::{self.object_name(b)};" for b in self.engine_bases(q)] or ["  using converted::EngineObject::EngineObject;"]
+            chunks.append((tree.place(tree.records[q]), ("object", q), "\n".join([f"struct {name} : {over} {{", *inherit, *self.object_enums.get(q, []), *decls, "};"])))
         for f in free:
             d = f["decl"]
             try:

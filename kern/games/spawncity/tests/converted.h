@@ -351,6 +351,12 @@ struct EngineObject {
   long long kern_handle = 0;
   bool kern_owned = false;
   EngineObject() = default;
+  /// One the source makes with what the engine's class is made with, where it has no constructor of its
+  /// own (`kern::LightPool lights{kMaxPointLights, 96}`, a field of a class compiled along): the stand-in
+  /// answers what the source asks it, whatever it was made with.
+  template <class A, class... B>
+    requires(!std::is_base_of_v<EngineObject, std::remove_cvref_t<A>>)
+  explicit EngineObject(const A&, const B&...) {}
   EngineObject(const EngineObject& o) : kern_handle(o.kern_handle), kern_owned(true) {}
   EngineObject& operator=(const EngineObject& o) {
     kern_handle = o.kern_handle;
