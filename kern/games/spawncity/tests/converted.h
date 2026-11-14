@@ -751,10 +751,14 @@ inline constexpr int kCalls = 300;
 // `counted` - and while the class's function runs: the class's glue says when (logic::native_probe).
 // What makes the arguments and takes the results is outside on both sides.
 inline long g_source_asks = 0, g_class_asks = 0;
+inline cost::Trace g_source_trace, g_class_trace;   // (from where they asked: kept for the function SC_COST_WHERE names - cost.h)
 /// The source's own call, counted: from where it begins until it has returned what it gives.
 template <class Call> decltype(auto) counted(Call&& call) {
   struct Ends {
-    ~Ends() { g_source_asks = cost::end(); }
+    ~Ends() {
+      g_source_asks = cost::end();
+      if (cost::tracing) g_source_trace = cost::now;
+    }
   };
   cost::begin();
   const Ends ends;
@@ -766,6 +770,7 @@ inline void class_runs(bool begins) {
     if (depth++ == 0) cost::begin();
   } else if (--depth == 0) {
     g_class_asks = cost::end();
+    if (cost::tracing) g_class_trace = cost::now;
   }
 }
 
@@ -791,7 +796,7 @@ struct Tally {
   long most_class = 0, with_source = 0;  // (the one with the most: how often the class, how often the source)
   double slowest = 0;
   std::chrono::steady_clock::time_point began = std::chrono::steady_clock::now();
-  explicit Tally(const char* f) : function(f) {}
+  explicit Tally(const char* f) : function(f) { cost::tracing = cost::where() && std::strcmp(cost::where(), f) == 0; }
   /// Is there another call to make? Up to kCalls compared ones; of a function that takes long, as many
   /// as two seconds have room for, but twenty at least. (What the source says nothing for is drawn again.)
   bool more(int tried) const {
@@ -855,7 +860,12 @@ struct Tally {
     }
     ++compared;
     if (class_asks > source_asks) {
-      ++costlier;
+      if (++costlier == 1 && cost::tracing) {
+        // (SC_COST_WHERE names this function: from where the source and the class asked, in the first such call)
+        std::printf("  cost of %s(%s):\n", function, describe().c_str());
+        cost::print("the source", g_source_trace, source_asks);
+        cost::print("the class", g_class_trace, class_asks);
+      }
       if (class_asks - source_asks > most_class - with_source) most_class = class_asks, with_source = source_asks;
     }
     if (ia && ib && a.size() == 1 && b.size() == 1 && a[0] == b[0] && same(want, a[0]) && same(want, b[0])) return;
@@ -866,6 +876,7 @@ struct Tally {
   /// A call the source was given up in (open_read): counted with those it has nothing to compare for.
   void given_up() { ++outside; }
   ~Tally() {
+    cost::tracing = false;
     if (class_only > 0)
       std::printf("  note: %s: %d of %d calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to %.0f ms - is not run in the interpreter)\n",
                   function, class_only, compared, slowest * 1000);
