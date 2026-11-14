@@ -4495,6 +4495,10 @@ class Emit:
             return f"kern::math::band({text}, 255.0)"
         if want == "unsigned short":
             return f"kern::math::band({text}, 65535.0)"
+        if want in ("short", "signed char"):
+            # (the low bits, read with their sign - two's complement, as C++20 converts: (v ^ 0x8000) - 0x8000)
+            top = 32768.0 if want == "short" else 128.0
+            return f"(kern::math::bxor(kern::math::band({text}, {flit(top * 2 - 1)}), {flit(top)}) - {flit(top)})"
         raise Wait(f"a whole number cut to {want}")
 
     def known_positive(self, n):
