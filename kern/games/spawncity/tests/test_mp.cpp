@@ -129,7 +129,7 @@ struct Wire {
         u64 to;
         std::vector<u8> b;
         while (s->take(to, b))
-          if (peers.count(to) && !(lose && lose(id, to, b.size()))) peers[to]->push(id, b.data(), static_cast<u32>(b.size()));
+          if (peers.count(to) && !(lose && lose(id, to, b.size()))) peers[to]->push(id, b);
       }
   }
 };
@@ -264,8 +264,8 @@ SC_TEST(mp_sessions_host_two_clients) {
     SC_CHECK(b.take_swarm_hits().size() == 1, "the host's hit on a client's helicopter");
   }
   // The pose timeline shows a mate where he is.
-  const net::Remote* ra = b.remote(a.self_slot());
-  SC_CHECK(ra && std::fabs(ra->body.sample(b.now_ms()).p.x - 5) < 0.2f, "a seen at x=5");
+  const i32 ra = b.remote_index(a.self_slot());
+  SC_CHECK(ra >= 0 && std::fabs(b.remotes()[static_cast<std::size_t>(ra)].body.sample(b.now_ms()).p.x - 5) < 0.2f, "a seen at x=5");
 }
 
 // A client that does not reach the host in time - the host's page is still loading, its tab is in
@@ -615,7 +615,7 @@ SC_TEST(mp_town_state_for_a_late_joiner) {
   b.join(33, 11);
   b_in = true;
   run(2);
-  SC_CHECK(b.connected() && host.remote(b.self_slot()), "b is in");
+  SC_CHECK(b.connected() && host.remote_index(b.self_slot()) >= 0, "b is in");
   a.take_town();
   for (const std::vector<u8>& part : town::pack_state(3, lamp_state, plank_state, mark_state)) host.town_to(b.self_slot(), part);
   run(0.3);

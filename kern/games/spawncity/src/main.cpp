@@ -140,7 +140,7 @@ KERN_EXPORT(sc_command) const char* sc_command(const char* text, kern::u32 lengt
 // ---- multiplayer: the page moves the datagrams (KernNet) ----
 /// A datagram from peer `from` (split into two 32-bit halves).
 KERN_EXPORT(sc_net_push) void sc_net_push(kern::u32 from_lo, kern::u32 from_hi, const kern::u8* bytes, kern::u32 length) {
-  sc::game().net().push((static_cast<kern::u64>(from_hi) << 32) | from_lo, bytes, length);
+  sc::game().net().push((static_cast<kern::u64>(from_hi) << 32) | from_lo, {bytes, length});
 }
 /// The next datagram to send: [u32 length][u32 to_lo][u32 to_hi][bytes], or 0 when none.
 KERN_EXPORT(sc_net_take) const kern::u8* sc_net_take() {

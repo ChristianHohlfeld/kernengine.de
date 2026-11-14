@@ -166,7 +166,7 @@ class Session {
   u8 self_slot() const { return self_slot_; }
 
   // ---- host page ----
-  void push(u64 from, const u8* bytes, u32 length) { transport_.push_incoming({from}, bytes, static_cast<int>(length)); }
+  void push(u64 from, kern::Span<const u8> bytes) { transport_.push_incoming({from}, bytes.data, static_cast<int>(bytes.size)); }
   bool take(u64& to, std::vector<u8>& bytes) { kern::net::Address a; const bool ok = transport_.take_outgoing(a, bytes); to = a.id; return ok; }
 
   /// Per frame: networking; `me` is this player's state (sent at 30 Hz).
@@ -233,7 +233,8 @@ class Session {
 
   std::vector<Remote>& remotes() { return remotes_; }
   const std::vector<Remote>& remotes() const { return remotes_; }
-  const Remote* remote(u8 slot) const;
+  /// The place of the player in `slot` among remotes(), -1: no such player here.
+  i32 remote_index(u8 slot) const;
   /// The participants (sorted slots, ourselves included) and their colours (vs_multiplayer.mjs).
   std::vector<u8> roster() const;
   u32 color_of(u8 slot) const;

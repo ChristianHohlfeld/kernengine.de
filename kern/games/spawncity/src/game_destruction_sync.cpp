@@ -230,7 +230,7 @@ void Game::dsync_update(f32 dt) {
     // a mate who joined gets the whole state once
     for (const net::Remote& r : net_.remotes())
       if (std::find(d.known.begin(), d.known.end(), r.state.slot) == d.known.end()) { dsync_send_full(r.state.slot); d.known.push_back(r.state.slot); }
-    d.known.erase(std::remove_if(d.known.begin(), d.known.end(), [&](u8 s) { return !net_.remote(s); }), d.known.end());
+    d.known.erase(std::remove_if(d.known.begin(), d.known.end(), [&](u8 s) { return net_.remote_index(s) < 0; }), d.known.end());
     d.delta_clock += dt;
     if (d.delta_clock >= kDeltaEvery) {
       d.delta_clock = 0;
