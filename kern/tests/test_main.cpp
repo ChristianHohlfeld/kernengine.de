@@ -4556,7 +4556,7 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused("  List<Float> Other = List<Int>{1};", "this is List<Int>, but List<Float> is needed (like List<Float>{})");
   refused("  List<Float> Other = List<Float>{1.0, \"a\"};", "a list's item: this is Text, but Float is needed");
   refused("  List<Float> Other = 1.0;", "this is Float, but List<Float> is needed");
-  refused("  List<Double> Other;", "\"Double\" is no type a list holds: a list is List<Bool>, List<Int>, List<Float>, List<Vector>, List<Text>, List<Actor>, List<an enum> or List<a struct of the Blueprint>", "line 5, column 8:");
+  refused("  List<Double> Other;", "\"Double\" is no type a list holds: a list is List<Bool>, List<Int>, List<Float>, List<Vector>, List<Text>, List<Actor>, List<Int64>, List<an enum> or List<a struct of the Blueprint>", "line 5, column 8:");
   refused("  List<List<Float>> Other;", "\"List\" is no type a list holds");
   refused("  List<Float> Other = List<Float>;", "a list written out is List<Float>{...}");
   refused("  List<Float> Items = List<Float>{};\n" + in_event("    list_add(1.0);"), "list_add changes a variable: that variable is its first value - list_add(Variable, ...) - not \"1.0\"");
