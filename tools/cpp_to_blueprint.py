@@ -663,6 +663,9 @@ class World:
         self.function_units = {}   # a function's key -> the Blueprint it stands in (see unit_of_function)
         self.source_units = set()  # the Blueprints of source files: what stands there is not in another file's tree
         self.actors = {}       # the level's actors with a Blueprint: name -> {"library": does it keep nothing, "functions": {name: ([inputs], [outputs])}}
+        self.states = {}       # a class of the program there is one object of (see state_classes) -> the Blueprint it is the state of
+        self.parts = {}        # a part of a Blueprint of several source files (a job: "Game/game_net_cpp") -> that Blueprint
+        self.part_numbers = {} # such a part -> its number among the parts of its Blueprint (the block of its nodes' ids)
         self.closures = None   # with tests: a function's key -> the places of the pieces its test holds, as its file's test hands them on (TestWriter.exports)
         self.pieces = None     # those pieces, by their places
 
@@ -693,11 +696,17 @@ class World:
             self.units[p] = name
         return self.units[p]
 
-    def unit_of_function(self, tree, d):
-        """The Blueprint a function stands in: the one of the file its body is in - a header's function
-        that needs a source file (it calls what stands in one) stands with that source file. The plan of
-        the whole program says which (main)."""
+    def part_of_function(self, tree, d):
+        """What a function is converted with (a job of main): the Blueprint of the file its body is in - a
+        header's function that needs a source file (it calls what stands in one) stands with that source
+        file -, or the part of a Blueprint of several files (a method of a state: the part of its file).
+        The plan of the whole program says which (main)."""
         return self.function_units.get(function_key(tree, d), self.unit_of(d.get("_file") or "?"))
+
+    def unit_of_function(self, tree, d):
+        """The Blueprint a function stands in."""
+        part = self.part_of_function(tree, d)
+        return self.parts.get(part, part)
 
 
 def is_header(path):
@@ -753,6 +762,7 @@ class Function:
         self.open = False     # it stands in a source file's Blueprint: a test in another file holds its source as that file's test hands it on
         self.place = False    # it names a place (`const T& spec() const { return s_; }`): no function of the Blueprint - where it is called, the place stands
         self.on_actors = []   # (actor, function): what it calls on the Blueprint of an actor of the level (Call on Actor)
+        self.state = False    # a method of a state (World.states): a function of that Blueprint, its fields are the Blueprint's variables
 
     def order(self):
         """The parameters in the order the Blueprint function has its inputs: those by reference first, then those
@@ -764,9 +774,10 @@ class Function:
 class Unit:
     """A source file and the Blueprint it becomes."""
 
-    def __init__(self, tree, name, world=None):
+    def __init__(self, tree, name, world=None, part=None):
         self.tree = tree
         self.name = name
+        self.job = part or name    # the job it is converted in: the Blueprint - or one of its parts (World.parts)
         self.world = world or World()
         self.names = {name} | self.world.taken   # what a name of the Blueprint must not be again
         self.reserved = set()       # what a local variable or an input is not called (see convert_unit): the names the Blueprint has in the end
@@ -775,7 +786,12 @@ class Unit:
         self.type_parts = {}        # a type -> the types its declaration names
         self.function_names = {}    # the functions of its files (decl id) -> their names, given before any is written
         self.stubs = {}             # a function of another Blueprint (its key) -> what a call needs of it (Function)
-        self.missing = set()        # (Blueprint, key): functions it would call of Blueprints that are not written yet
+        self.missing = set()        # (Blueprint or part, key): functions it would call of Blueprints that are not written yet
+        self.asked = set()          # the functions of other Blueprints it would call that wait (their keys)
+        # the Blueprint of a state (World.states): the class, its fields (C++ name -> (place, variable, declaration)),
+        # the types and declarations of the variables used, the mutable ones
+        self.state = next((q for q, b in self.world.states.items() if b == name), None)
+        self.state_fields, self.state_types, self.state_lines, self.state_mutable = {}, {}, {}, set()
         self.enums = {}             # qualified C++ name -> Blueprint name
         self.structs = {}           # qualified C++ name -> Blueprint name
         self.types = []             # the declarations, in the order they must stand
@@ -790,7 +806,8 @@ class Unit:
         self.functions = {}         # id of the function's body -> Function
         self.order = []             # the written functions, callees first
         self.members = []
-        self.next_node = 10
+        # (the nodes of a part of a Blueprint of several files have ids of their own: a block of 2^20 for each part)
+        self.next_node = 10 + (self.world.part_numbers.get(self.job, 0) << 20)
         self.enum_aliases = {}      # (enum, a value's name) -> the earlier value of the same number it is
         self.lambdas = {}           # a local function (the id of its call operator) -> how it is called (see Emit.local_function)
         self.engine = None          # the engine's functions as nodes (Api), made when the first one is called
@@ -1085,6 +1102,8 @@ class Unit:
         return name
 
     def struct(self, q):
+        if q in self.world.states:
+            raise Wait(f"the state of the Blueprint {self.world.states[q]} (its one object is that Blueprint, no value)")
         if q in self.structs:
             if self.structs[q] is None:
                 raise Wait(f"the struct {q.split('::')[-1]} contains itself")
@@ -1217,7 +1236,7 @@ class Unit:
     # ---- functions ----
     def mine(self, d):
         """Is this function one of this Blueprint's?"""
-        return bool(d.get("_mine")) or (bool(d.get("_file")) and self.world.unit_of_function(self.tree, d) == self.name)
+        return bool(d.get("_mine")) or (bool(d.get("_file")) and self.world.part_of_function(self.tree, d) == self.job)
 
     @staticmethod
     def cpp_name_of(tree, d):
@@ -1240,13 +1259,63 @@ class Unit:
 
     def name_functions(self, decls):
         """The functions of the Blueprint's files get their names - in the order they stand in, before any
-        is written: whichever of them are written this time, each is called the same."""
+        is written: whichever of them are written this time, each is called the same. (The Blueprint of a
+        state: first its variables, then its functions, in the order the class declares them - the class
+        is the same in every file, and so is each name in every part.)"""
+        if self.state is not None:
+            self.plan_state()
+            decls = [d for d in decls if d["id"] not in self.function_names]
         for d in decls:
             name = self.fresh(self.wanted_name(d))
             self.names.add(name)
             self.function_names[d["id"]] = name
 
     PLACE = "it names a place: where it is called, the place stands - here the call could not be written so"
+
+    # ---- the Blueprint of a state (World.states) ----
+    def plan_state(self):
+        """The names of the variables and the functions of the Blueprint of a state: its fields' and its
+        methods', in the order the class has them."""
+        rec = self.tree.records.get(self.state)
+        if rec is None:
+            raise SystemExit(f"{self.job}: the class {self.state} is not known here")
+        for c in kids(rec):
+            if c.get("kind") == "FieldDecl":
+                name = self.fresh(c.get("name") or "field")
+                self.names.add(name)
+                self.state_fields[c.get("name")] = (len(self.state_fields), name, c)
+        for c in kids(rec):
+            if c.get("kind") in ("CXXMethodDecl", "CXXConstructorDecl") and not c.get("isImplicit") and c["id"] not in self.function_names:
+                name = self.fresh(c.get("name") if c.get("kind") == "CXXMethodDecl" and not c.get("name", "").startswith("operator") else self.wanted_name(c))
+                self.names.add(name)
+                self.function_names[c["id"]] = name
+                d = self.tree.body.get(c["id"])
+                if d is not None:   # (defined outside the class: the definition is called the same)
+                    self.function_names[d["id"]] = name
+
+    def state_variable(self, field):
+        """The variable a field of the state is: (its name, its type) - declared where it is first used, with
+        the field's default. A field whose type the language does not have is no variable: what uses it waits."""
+        if field not in self.state_fields:
+            raise Wait(f"the state {self.name} has no field {field}")
+        at, name, c = self.state_fields[field]
+        if field in self.state_types:
+            return name, self.state_types[field]
+        try:
+            t = self.btype(qtype(c))
+            init = kids(c)[-1] if kids(c) and c.get("hasInClassInitializer") else None
+            default = Const(self).literal(init, t) if init is not None else self.zero(t)
+        except Wait as w:
+            raise Wait(f"the variable {name} of {self.name}: {w}")
+        if c.get("mutable"):
+            self.state_mutable.add(name)
+        doc = self.comment_of(c)
+        self.state_lines[at] = ([f"  /// {doc}"] if doc else []) + [f"  {self.dtype(qtype(c), t)} {name} = {default};"]
+        self.state_types[field] = t
+        return name, t
+
+    def is_state_variable(self, name):
+        return self.state is not None and any(name == n for _, n, _ in self.state_fields.values())
 
     def place_named(self, d):
         """`const CarSpec& spec() const { return s_; }` - a function of the program that gives a reference
@@ -1331,14 +1400,15 @@ class Unit:
         key = function_key(self.tree, d)
         f = self.stubs.get(key)
         if f is None:
-            unit = self.world.unit_of_function(self.tree, d)
+            part = self.world.part_of_function(self.tree, d)
             e = self.world.table.get(key)
-            if unit is None:
+            if part is None:
                 raise Wait("what it calls stands in a header and needs a source file that is not converted")
             if e is None:
-                self.missing.add((unit, key))
-                raise Wait(f"{self.cpp_name(d)}() of the Blueprint {unit} is not written")
-            f = Function(f"{e['unit']}::{e['name']}")
+                self.missing.add((part, key))
+                raise Wait(f"{self.cpp_name(d)}() of the Blueprint {self.world.parts.get(part, part)} is not written")
+            # (a function of another part of this Blueprint is one of its own: called by its name)
+            f = Function(e["name"] if e["unit"] == self.name else f"{e['unit']}::{e['name']}")
             f.unit, f.key, f.cpp, f.decl, f.file = e["unit"], key, e["cpp"], d, d.get("_file", "")
             f.wait = e["wait"]
             f.text = "" if e["wait"] else "(of another Blueprint)"
@@ -1346,7 +1416,7 @@ class Unit:
             f.fixed, f.result_fixed = {int(k): v for k, v in e["fixed"].items()}, e["result_fixed"]
             f.self_type, f.mutates, f.refs, f.value, f.ctor = e["self_type"], e["mutates"], list(e["refs"]), e["value"], e["ctor"]
             f.out_fields = [(n, t, tuple(src) if isinstance(src, list) else src) for n, t, src in e["out_fields"]]
-            f.open = e["open"]
+            f.open, f.state = e["open"], e["state"]
             if not f.wait and f.open and d["id"] not in self.tree.body and key not in (self.world.closures or {}):
                 # A function is written when its test compares it, and the test holds the source of all it
                 # calls once more: what stands in another source file, as the test of that file hands it on.
@@ -1367,6 +1437,8 @@ class Unit:
                     raise SystemExit(f"{self.name}: {f.cpp}() of {f.unit} takes and gives {told} there and {seen} here")
             self.stubs[key] = f
         if f.wait:
+            if (self.world.table.get(key) or {}).get("wait"):
+                self.asked.add(key)   # (it waits where it stands: should it be written later, this Blueprint is converted again - main)
             raise Wait(f.wait if f.open else f"it calls {f.cpp}(), which waits")
         return f
 
@@ -1375,11 +1447,11 @@ class Unit:
         return {"unit": self.name, "name": f.name, "cpp": f.cpp, "wait": (f.wait or (self.PLACE if f.place else None)) if not f.text else None, "pure": f.pure, "params": f.params, "kinds": f.kinds, "result": f.result,
                 "fixed": dict(f.fixed), "result_fixed": f.result_fixed,
                 "indexes": f.indexes, "self_type": f.self_type, "mutates": f.mutates, "refs": f.refs, "value": f.value, "ctor": f.ctor, "out_fields": f.out_fields,
-                "open": self.name in self.world.source_units}
+                "open": self.job in self.world.source_units, "state": f.state}
 
     def uses(self):
         """The Blueprints whose functions the written functions call."""
-        return sorted({g.unit for f in self.order for g in f.calls if g.unit})
+        return sorted({g.unit for f in self.order for g in f.calls if g.unit and g.unit != self.name})
 
     def parts(self):
         """The Blueprint's text in its parts: its constants, its functions, what its nodes give and keep -
@@ -1397,6 +1469,12 @@ class Unit:
                  or re.match(r"\s*[\w:]+Result (n\d+);", line))
             return m.group(1) if m else None
         variables = []
+        self.state_used = {}
+        for at in sorted(self.state_lines):   # (the variables of a state, in the order of its fields)
+            if name_of(self.state_lines[at][-1]) in used:
+                variables += self.state_lines[at]
+                self.state_used[at] = self.state_lines[at]
+                used.update(word.findall(self.state_lines[at][-1]))
         pending = []
         for line in self.variable_lines:   # (a /// line belongs to the constant below it)
             if line.strip().startswith("///"):
@@ -1428,12 +1506,13 @@ class Unit:
         way those they use - the types among them, wherever they are declared in the end (main puts every
         Blueprint together from what all files say)."""
         variables, functions, members, types = self.parts()
-        return blueprint_text(self.name, self.uses(), [line for _, line, _ in types.values()], variables, functions, members)
+        return blueprint_text(self.name, self.uses(), [line for _, line, _ in types.values()], variables, functions, members, state=self.state is not None)
 
 
-def blueprint_text(name, uses, types, variables, functions, members):
-    """A library's text, of its parts."""
-    out = [f"struct {name} : virtual kern::Library" + "".join(f", virtual {u}" for u in uses) + " {"]
+def blueprint_text(name, uses, types, variables, functions, members, state=False):
+    """A library's text, of its parts - or, with `state`, that of a Blueprint that keeps something: the
+    variables of a state (World.states)."""
+    out = [f"struct {name} : virtual kern::{'Blueprint' if state else 'Library'}" + "".join(f", virtual {u}" for u in uses) + " {"]
     if types:
         out += ["  // ---- types ----", *types, ""]
     if variables:
@@ -1893,6 +1972,17 @@ class Emit:
             raise Wait("a variadic function")
         ret = qtype(d).split("(")[0].strip()
         f.value = u.btype(ret) if d.get("kind") != "CXXConstructorDecl" else None
+        if u.state is not None and self.tree.owner.get(d["id"]) == u.state:
+            # a method of the state the Blueprint is: its fields are the Blueprint's variables - no object is
+            # handed in. It changes them unless it says it does not (const) and writes no mutable field.
+            if d.get("kind") == "CXXConstructorDecl":
+                raise Wait(f"the constructor of the state {u.name} (what it does would run when the Blueprint begins)")
+            f.state = True
+            f.mutates = not qtype(d).rstrip().endswith("const") or any(
+                x.get("kind") == "MemberExpr" and (u.state_fields.get(x.get("name")) or (None, None, {}))[2].get("mutable") and self.is_this(kids(x)[0] if kids(x) else {"kind": "CXXThisExpr"})
+                for x in walk(d))
+            if f.mutates:
+                f.pure = False   # (it changes the Blueprint's variables: a step)
         if d.get("kind") == "CXXConstructorDecl":
             # a constructor: a function that makes the object - it begins as the struct's default (the
             # defaults of the class's data), then what the constructor sets
@@ -1910,7 +2000,7 @@ class Emit:
         self.dissolve(d)   # (a call of a function that names a place: the place)
         # a method: its object is the first parameter - a reference to a value of the struct its class's data is:
         # the place the call names, changed where it stands (a const method reads it there)
-        if d.get("kind") == "CXXMethodDecl" and d.get("storageClass") != "static" and any(x.get("kind") == "CXXThisExpr" for x in walk(d)):
+        if d.get("kind") == "CXXMethodDecl" and d.get("storageClass") != "static" and not f.state and any(x.get("kind") == "CXXThisExpr" for x in walk(d)):
             owner = self.tree.owner.get(d["id"])
             if owner is None:
                 raise Wait("the state of its object (its class is not known here)")
@@ -1953,7 +2043,9 @@ class Emit:
             f.pure = False   # (it changes a place of its caller: a step, not a value)
         # what a call changes or gives, as the test compares it: the object, what the C++ returns, what it wrote
         # through its parameters. The function itself gives what the C++ returns (a constructor: the object).
-        if f.mutates:
+        if f.mutates and f.state:
+            f.out_fields.append(("State", u.name, "state"))   # (the test compares all the Blueprint's variables)
+        elif f.mutates:
             f.out_fields.append(("Self", f.self_type, "self"))
         if f.value is not None:
             f.out_fields.append(("Result", f.value, "result"))
@@ -2152,6 +2244,8 @@ class Emit:
                 up = parents[-1] if parents else {}
                 if up.get("kind") == "UnaryExprOrTypeTraitExpr" and up.get("name") == "sizeof":
                     return
+                if up.get("kind") == "LambdaExpr":
+                    return   # (captured by a local function: what it does with it is among the uses walked here)
                 if not (up.get("kind") == "ImplicitCastExpr" and up.get("castKind") == "ArrayToPointerDecay"):
                     ok = False
                     return
@@ -3171,9 +3265,15 @@ class Emit:
         if not by_ref and any(c for _, _, c in free):
             raise Wait("a local function that changes its own copy of what it captured (mutable)")
         lines, args, params = [], [], []
+        for entry in free:
+            if self.types.get(entry[0]) == "Text" and re.fullmatch(r"(?:const\s+)?char\s*\[\d+\]", re.sub(r"\s*&+\s*$", "", qtype(entry[1]))):
+                # (a text buffer of the function: the text it holds - snprintf into it in here changes it)
+                entry[2] = entry[2] or any(x.get("kind") == "CallExpr" and callee_name(x) == "snprintf" and len(kids(x)) > 1 and self.refers(kids(x)[1], entry[0]) for x in walk(body))
         for i, node, is_changed in free:
             raw = re.sub(r"\s*&+\s*$", "", qtype(node))
             raw = re.sub(r"^const\s+", "", raw)
+            if self.types.get(i) == "Text" and re.fullmatch(r"char\s*\[\d+\]", raw):
+                raw = "std::string"
             params.append({"id": i, "kind": "ParmVarDecl", "name": re.sub(r"\W+", "_", self.names[i]).strip("_"), "type": {"qualType": raw + " &" if is_changed else "const " + raw + " &"}})
             if by_ref:
                 args.append(node)
@@ -4082,13 +4182,14 @@ class Emit:
     def is_local(self, name):
         """Is this a name a place can start at in the function being written: one of its variables or one of
         its inputs (not what a node gives)?"""
-        return any(name == n for n, _ in self.locals) or any(name == n for n, _ in self.f.params)
+        return any(name == n for n, _ in self.locals) or any(name == n for n, _ in self.f.params) or (self.f.state and self.u.is_state_variable(name))
 
     def writable(self, place):
         """Can this place be changed: does it start at a variable of the function or at a reference input
         that is not const? (An input by value and a const reference are read.)"""
         root = re.match(r"\w+", place).group(0)
-        return any(root == n for n, _ in self.locals) or any(root == n and kind == "ref" for (n, _), kind in zip(self.f.params, self.f.kinds))
+        return (any(root == n for n, _ in self.locals) or any(root == n and kind == "ref" for (n, _), kind in zip(self.f.params, self.f.kinds))
+                or (self.f.state and self.u.is_state_variable(root)))   # (a variable of the Blueprint: C++ said whether the method may change it)
 
     def place_arg(self, n, t, kind, after, fixed=None):
         """What a call gives a reference input: the place the argument is. Where the argument is none of the
@@ -4131,9 +4232,9 @@ class Emit:
             name = self.names.get(i)
             # (a variable or an input of the function - or the entry a loop over a list is at: a place that starts at one)
             return (name, self.types[i]) if name is not None and self.is_local(re.match(r"\w*", name).group(0)) else None
-        if self.is_this(b):
-            return (self.self_name, self.f.self_type) if self.f.self_type is not None and self.is_local(self.self_name) else None
-        if k == "UnaryOperator" and b.get("opcode") == "*" and kids(b) and self.is_this(kids(b)[0]):
+        if self.is_this(b) or (k == "UnaryOperator" and b.get("opcode") == "*" and kids(b) and self.is_this(kids(b)[0])):
+            if self.f.state:
+                return None   # (the state as a whole is the Blueprint: no place of it)
             return (self.self_name, self.f.self_type) if self.f.self_type is not None and self.is_local(self.self_name) else None
         holder = self.box(b)
         if holder is not None:   # the value an owned or optional value holds: the one entry of its list
@@ -4145,6 +4246,8 @@ class Emit:
         if k == "MemberExpr":
             base = kids(b)[0] if kids(b) else None
             if base is None or self.is_this(base):
+                if self.f.state:
+                    return self.u.state_variable(b["name"])   # (a field of the state: the Blueprint's variable)
                 if self.f.self_type is None or not self.is_local(self.self_name):
                     return None
                 fname, ft = self.u.field(self.f.self_type, b["name"])
@@ -4281,6 +4384,8 @@ class Emit:
                 self.hoist([f"{put} = {text};"])
                 return self.store(self.held_by(t), lambda _t: put)
         if self.is_this(t):
+            if self.f.state:
+                raise Wait(f"the whole state of {self.u.name} is set")
             return [f"{self.self_var()} = {value(self.f.self_type)};"]
         holder = self.box(t)
         if holder is not None:   # the value an owned or optional value holds: the one entry of its list
@@ -4290,6 +4395,9 @@ class Emit:
         if k == "MemberExpr":
             base = kids(t)[0] if kids(t) else None
             if base is None or self.is_this(base):
+                if self.f.state:
+                    name, ft = self.u.state_variable(t["name"])
+                    return [f"{name} = {value(ft)};"]
                 if self.f.self_type is None:
                     raise Wait("the state of its object (a method)")
                 fname, ft = self.u.field(self.f.self_type, t["name"])
@@ -4363,6 +4471,8 @@ class Emit:
             args = filled
         kinds = g.kinds
         after = []   # (what is stored back after the call: reference arguments that are no places of the notation)
+        if g.state and obj is not None and not self.is_this(obj):
+            raise Wait(f"a function of the Blueprint {self.u.name} on another object of its state")
         if g.self_type is not None and not g.ctor:
             if obj is None or self.is_this(obj):
                 if self.f.self_type != g.self_type:
@@ -4605,6 +4715,8 @@ class Emit:
                 return got
             base = kids(b)[0] if kids(b) else None
             if base is None or self.is_this(base):
+                if self.f.state:
+                    return u.state_variable(b["name"])
                 if self.f.self_type is None:
                     raise Wait("the state of its object (a method)")
                 fname, ft = u.field(self.f.self_type, b["name"])
@@ -4631,6 +4743,8 @@ class Emit:
             op = b.get("opcode")
             if op == "!":
                 return f"logic_not({self.bx(kids(b)[0])})", "Bool"
+            if op == "*" and self.is_this(b) and self.f.state:
+                raise Wait(f"the whole state of {self.u.name} as a value")
             if op == "*" and self.is_this(b) and self.f.self_type is not None:
                 return self.self_name, self.f.self_type
             if op in ("*", "&") and (self.u.object_of(qtype(b), by_value=True) or self.u.object_of(qtype(kids(b)[0]), by_value=True)):
@@ -7136,6 +7250,9 @@ class TestWriter:
             d = f.decl
             if f.lifted:
                 continue   # (a local function: in the source of the function it stands in, compared with it)
+            if f.state:
+                skipped.append((f, "a function of the Blueprint of a state: the test does not set and compare its variables yet"))
+                continue
             owner = tree.owner.get(d["id"])
             free = G.freed.get(d["id"], (None,))[0]
             if free:
@@ -7532,17 +7649,87 @@ def survey_one(job):
                 calls.add(function_key(tree, t))
         a, b = d.get("_at", (None, None))
         functions.append({"key": function_key(tree, d), "file": file, "at": a or 0, "calls": sorted(calls), "lines": tree.text(d["_file"]).count("\n", a, b) + 1 if a is not None else 0,
-                          "name": Unit.cpp_name_of(tree, d)})
+                          "name": Unit.cpp_name_of(tree, d), "owner": tree.owner.get(d["id"])})
     types = [(q, os.path.abspath(o.get("_file") or "?")) for q, o in [*tree.records.items(), *tree.enums.items()] if o.get("_file")]
-    return {"path": path, "functions": functions, "types": types}
+    statics, made = objects_made(tree)
+    records = {q: {"file": os.path.abspath(tree.records[q].get("_file") or "?"), "bases": bool(tree.records[q].get("bases")),
+                   "virtual": any(c.get("virtual") for c in kids(tree.records[q]))} for q in statics if q in tree.records}
+    return {"path": path, "functions": functions, "types": types, "statics": statics, "made": made, "records": records}
+
+
+def objects_made(tree):
+    """The objects of the program's classes this file makes: those with static storage - a variable of a
+    namespace, or `static T x;` in a function - by their place ({class: {(file, offset)}}), and the classes
+    it makes objects of in any other way: a field, a local variable, a parameter or a result by value, a
+    list of them, new, a temporary (see state_classes)."""
+    short = {q.split("::")[-1]: q for q in tree.records}
+    word = re.compile(r"[A-Za-z_]\w*(?:::[A-Za-z_]\w*)*")
+    def by_value(t):
+        """The classes a type holds by value (not through a reference or a pointer)."""
+        t = re.sub(r"\bconst\b|\bvolatile\b|\bstruct\b|\bclass\b", " ", t)
+        out = set()
+        for m in word.finditer(t):
+            q = short.get(m.group(0).split("::")[-1])
+            if q is not None and m.group(0).split("::")[-1] == q.split("::")[-1] and not re.match(r"\s*[&*]", t[m.end():]) and not re.match(r"\s*::", t[m.end():]):
+                out.add(q)
+        return out
+    statics, made = collections.defaultdict(set), set()
+    def visit(n, in_function):
+        k = n.get("kind")
+        t = (n.get("type") or {}).get("qualType", "")
+        if k == "VarDecl":
+            held = by_value(t)
+            static = not in_function or n.get("storageClass") == "static"
+            if static and len(held) == 1 and re.sub(r"\bconst\b|\s+|\w+::", "", t) == next(iter(held)).split("::")[-1]:
+                statics[next(iter(held))].add((os.path.abspath(n.get("_file") or "?"), n.get("_at", (None,))[0]))
+                for c in kids(n):   # (what makes it is that object itself)
+                    if c.get("kind") not in ("CXXConstructExpr", "ExprWithCleanups", "InitListExpr", "CXXDefaultInitExpr"):
+                        visit(c, in_function)
+                return
+            made.update(held)
+        elif k in ("FieldDecl", "ParmVarDecl", "CXXNewExpr", "CXXTemporaryObjectExpr", "MaterializeTemporaryExpr", "TypeAliasDecl", "TypedefDecl", "CompoundLiteralExpr"):
+            made.update(by_value(t))
+        elif k in ("FunctionDecl", "CXXMethodDecl") and not n.get("isImplicit"):
+            made.update(by_value(t.split("(")[0]))   # (what it gives by value)
+            in_function = True
+        elif k == "CXXConstructExpr" and in_function:
+            made.update(by_value(t))
+        elif k in ("CXXConstructorDecl", "CXXDestructorDecl", "LambdaExpr"):
+            in_function = True
+        for c in kids(n):
+            visit(c, in_function)
+    for o in tree.dumps:
+        visit(o, False)
+    return {q: sorted(v, key=str) for q, v in statics.items()}, sorted(made)
+
+
+def state_classes(world, surveys):
+    """The classes of the program that are the state of a Blueprint: of each the program has exactly one
+    object, with static storage (`Game& game() { static Game g; return g; }`), and it makes none in any other
+    way - and the class has no base class and no virtual function (an object of the engine's kind). Its
+    fields are the variables of a Blueprint, its methods that Blueprint's functions: {class: Blueprint}."""
+    statics, made, records = collections.defaultdict(set), set(), {}
+    for r in surveys:
+        for q, places in r["statics"].items():
+            statics[q].update(tuple(p) for p in places)
+        made.update(r["made"])
+        records.update(r["records"])
+    out = {}
+    for q, places in statics.items():
+        info = records.get(q)
+        if len(places) != 1 or q in made or info is None or not world.program(info["file"]) or info["bases"] or info["virtual"]:
+            continue
+        out[q] = type_name_of(q)
+    return out
 
 
 def convert_unit(job):
     """One Blueprint: the functions of its files, converted as far as they are, and - with a test directory
     - its test written. What main needs of it, as plain values (a process of its own does this for every
     Blueprint). `source`: the source file that is the Blueprint's, or None - then its headers are read by
-    themselves."""
-    name, source, files, namespace, flags, world, test = job
+    themselves. `part`: the job - the Blueprint, or one of its parts (World.parts)."""
+    part, source, files, namespace, flags, world, test = job
+    name = world.parts.get(part, part)
     NODES.update(world.nodes)
     said = io.StringIO()
     keep, sys.stderr = sys.stderr, said
@@ -7551,14 +7738,14 @@ def convert_unit(job):
         path = source
         if path is None:   # (headers alone: a file that includes them is what the compiler reads)
             scratch = tempfile.mkdtemp(prefix="kern-cpp-to-blueprint-")
-            path = os.path.join(scratch, name + ".cpp")
+            path = os.path.join(scratch, part.replace("/", "_") + ".cpp")
             open(path, "w").write("".join(f'#include "{os.path.abspath(f)}"\n' for f in files if os.path.abspath(f) != os.path.abspath(W64_HEADER)) or "\n")
         tree = Tree(path, namespace, flags)
         main_file = os.path.abspath(source or files[0])
         # its functions, in the order they stand in: those of a header first (a source file's Blueprint has
         # the functions of its header that need the source file), then the source file's
         mine = [d for i, d in tree.body.items() if i == d["id"] and d.get("_file") and d.get("kind") != "VarDecl"
-                and not (d.get("isImplicit") or d.get("explicitlyDefaulted") or d.get("kind") == "CXXDestructorDecl") and world.unit_of_function(tree, d) == name]
+                and not (d.get("isImplicit") or d.get("explicitlyDefaulted") or d.get("kind") == "CXXDestructorDecl") and world.part_of_function(tree, d) == part]
         mine.sort(key=lambda d: (not is_header(d["_file"]), os.path.abspath(d["_file"]), d.get("_at", (0, 0))[0] or 0))
         # A function is written only when its test compares it: what the test cannot compare yet waits,
         # and with it what calls it - the file is converted again without those. And no input or local
@@ -7567,7 +7754,7 @@ def convert_unit(job):
         barred, reserved = {}, set()
         while True:
             writer = None
-            unit = Unit(tree, name, world)
+            unit = Unit(tree, name, world, part)
             unit.barred, unit.reserved = dict(barred), set(reserved)
             unit.name_functions(mine)
             unit.all = []
@@ -7611,7 +7798,7 @@ def convert_unit(job):
             "done_lines": sum(f.lines for f in written), "waits": [(f.wait, f.lines) for f in fs if f.wait],
             "said": [f"    {f.cpp} ({f.lines}): " + ("written" if f.text else "a name for a place - written where it is called" if f.place else f.wait) for f in fs],
             "table": {f.key: unit.entry_of(f) for f in unit.functions.values() if not f.lifted and f.key}, "written": len(unit.order),
-            "parts": (variables, functions, members), "types": types, "uses": unit.uses(), "missing": sorted(unit.missing),
+            "parts": (variables, functions, members), "types": types, "uses": unit.uses(), "missing": sorted(unit.missing), "asked": sorted(unit.asked), "state": unit.state_used,
             "test": (unit.test[0], [(f.cpp, why) for f, why in unit.test[1]]), "exports": exports, "errors": said.getvalue()}
 
 
@@ -7731,10 +7918,14 @@ def main(argv):
             raise SystemExit(f"{path} and {sources[unit]} would both be the Blueprint {unit}")
         sources[unit] = os.path.abspath(path)
     world.source_units = set(sources)
-    for r in pool.map(survey_one, [(path, namespace, flags) for path in files]):
+    surveys = list(pool.map(survey_one, [(path, namespace, flags) for path in files]))
+    for r in surveys:
         for f in r["functions"]:
             functions.setdefault(f["key"], f)
         types.update((q, file) for q, file in r["types"])
+    # The classes there is one object of: each is the state of a Blueprint - no type (state_classes)
+    world.states = state_classes(world, surveys)
+    types = {(q, file) for q, file in types if q not in world.states}
     # A header's function stands in the header's Blueprint when all it calls stands in headers too
     # (whoever includes the header has all of it); one that needs a source file - it calls what stands in
     # one - stands with the source file of the header's name.
@@ -7748,8 +7939,22 @@ def main(argv):
     unit_of = {}
     for k, f in functions.items():
         unit_of[k] = world.unit_of(f["file"]) if is_closed(k) or not is_header(f["file"]) else source_of.get(os.path.splitext(f["file"])[0])
+    # A method of a state is a function of the state's Blueprint. Its methods stand in many files: each file
+    # is a part of the Blueprint, converted in that file's tree ("Game/game_net_cpp"), and main puts the
+    # parts together. (A method of a header stands in the part its function would stand in.)
+    part_of = {}
+    for k, f in functions.items():
+        if f.get("owner") in world.states and unit_of[k] is not None:
+            part = world.states[f["owner"]] + "/" + unit_of[k]
+            part_of[part] = unit_of[k]
+            world.parts[part] = world.states[f["owner"]]
+            unit_of[k] = part
+    for blueprint in sorted(set(world.parts.values())):
+        for i, part in enumerate(sorted(p for p, b in world.parts.items() if b == blueprint)):
+            world.part_numbers[part] = i
+    world.source_units |= {p for p, u in part_of.items() if u in sources}
     world.function_units = unit_of
-    program = {world.unit_of(f["file"]) for f in functions.values() if world.program(f["file"])} | set(sources)
+    program = {world.unit_of(f["file"]) for f in functions.values() if world.program(f["file"])} | set(sources) | set(world.parts)
     # of the Blueprints that are not the program's own (headers of the engine): what the program calls
     wanted = collections.defaultdict(set)
     todo, seen = [k for k, f in functions.items() if world.program(f["file"])], set()
@@ -7771,13 +7976,17 @@ def main(argv):
             unit_files[unit_of[k]].add(functions[k]["file"])
     for u, path in sources.items():
         unit_files[u].add(path)
+    for p, u in part_of.items():   # (a part is converted in the tree of its file)
+        unit_files[p] |= {sources[u]} if u in sources else set()
+    for u in set(sources) - set(unit_of.values()):   # (a source file all of whose functions stand in parts has no Blueprint of its own)
+        unit_files.pop(u, None)
     # A Blueprint is written after those it calls - the headers' Blueprints and those of other source files:
     # its test holds the source of what it calls there as the tests of those files hand it on (exports).
     deps = {u: set() for u in unit_files}
     for k in seen:
         if unit_of[k] is not None:
             deps[unit_of[k]].update(unit_of[c] for c in functions[k]["calls"] if c in functions and unit_of[c] not in (None, unit_of[k]) and unit_of[c] in deps)
-    plan_names(world, types, set(deps) | {world.unit_of(f["file"]) for f in functions.values()} | {world.unit_of(file) for _, file in types})
+    plan_names(world, types, (set(deps) - set(world.parts)) | set(world.parts.values()) | {world.unit_of(f["file"]) for f in functions.values()} | {world.unit_of(file) for _, file in types})
 
     def job_of(u):
         files_ = sorted(unit_files[u], key=lambda f: (not is_header(f), f))
@@ -7789,7 +7998,7 @@ def main(argv):
                 stack += deps.get(d, ())
         w = World(files, flags)
         w.units, w.type_names, w.taken, w.nodes, w.function_units, w.source_units = world.units, world.type_names, world.taken, world.nodes, world.function_units, world.source_units
-        w.actors = world.actors
+        w.actors, w.states, w.parts, w.part_numbers = world.actors, world.states, world.parts, world.part_numbers
         w.table = {k: e for d in need for k, e in tables.get(d, {}).items()}
         if test:   # (the pieces of their source their tests hand on: what the test of this one holds of them)
             w.closures, w.pieces = {}, {}
@@ -7799,7 +8008,7 @@ def main(argv):
                 for place, piece in pieces.items():
                     w.pieces.setdefault(place, piece)
         w.wanted = None if u in program else set(wanted[u])
-        return (u, sources.get(u), files_, namespace, flags, w, test)
+        return (u, sources.get(part_of.get(u, u)), files_, namespace, flags, w, test)
 
     def reaches(a, b):
         stack, met = [a], set()
@@ -7817,10 +8026,11 @@ def main(argv):
     while len(done) < len(deps):
         ready = sorted(u for u in deps if u not in done and u not in running.values() and all(d in done or (u, d) in cut_calls for d in deps[u]))
         if not ready and not running:
-            # Blueprints that call each other: a library calls nothing of what uses it. The one that waits for
-            # the fewest goes first; what it would call of those waits.
+            # Blueprints that call each other (the parts of one Blueprint do): the one that waits for the fewest
+            # goes first, and what it would call of those waits - until it is written: then it is converted
+            # again (below). What calls itself through them waits for good, as a function that calls itself.
             u = min((u for u in deps if u not in done), key=lambda u: (len([d for d in deps[u] if d not in done]), u))
-            print(f"{u} and {', '.join(sorted(d for d in deps[u] if d not in done))} call each other: what {u} would call of them waits", flush=True)
+            print(f"{u} and {', '.join(sorted(d for d in deps[u] if d not in done))} call each other: {u} goes first", flush=True)
             cut_calls.update((u, d) for d in deps[u] if d not in done)
             continue
         for u in ready[:max(0, workers - len(running))]:
@@ -7855,6 +8065,13 @@ def main(argv):
             results[u] = r
             tables[u] = r["table"]
             exports[u] = r["exports"]
+            # What waited for a function of this one that is written now is converted again - the functions of
+            # a Blueprint only go from not there to waiting to written, so this ends.
+            now = {k for k, e in r["table"].items() if not e["wait"]}
+            for v in sorted(done - {u}):
+                if (set(results[v]["asked"]) | {k for d, k in results[v]["missing"] if d == u}) & now:
+                    done.discard(v)
+                    print(f"{v} is converted again: what it calls of {u} is written now", flush=True)
             sys.stderr.write(r["errors"])
             print(f"{u:28} {r['done']:4} / {r['total']:4} functions   {r['done_lines']:6} / {r['total_lines']:6} lines" + ("" if u in program else "   (what the program calls of it)"), flush=True)
             if os.environ.get("FUNCTIONS"):
@@ -7862,14 +8079,47 @@ def main(argv):
                     print(line)
     pool.shutdown()
 
+    # ---- the parts of a Blueprint of several files: one Blueprint ----
+    blue = {u: r for u, r in results.items() if u not in world.parts}
+    for blueprint in sorted(set(world.parts.values())):
+        mine = sorted((p for p in results if world.parts.get(p) == blueprint), key=lambda p: world.part_numbers[p])
+        state, constants, said_by, texts_, members, types_, uses_ = {}, [], {}, [], [], {}, set()
+        for p in mine:
+            r = results[p]
+            for at, lines in r["state"].items():
+                if state.setdefault(int(at), lines) != lines:
+                    raise SystemExit(f"the variable {lines[-1].strip()} of {blueprint} is not the same in every part ({p}: {state[int(at)]})")
+            variables, functions_, members_ = r["parts"]
+            held = {line for lines in r["state"].values() for line in lines}
+            block = []
+            for line in variables:   # (the constants: each once - a /// line belongs to the one below it)
+                if line in held:
+                    continue
+                block.append(line)
+                if line.strip().startswith("///"):
+                    continue
+                key = re.sub(r"\s*=.*", "", line).split()[-1]
+                if key in said_by and said_by[key] != block:
+                    raise SystemExit(f"{blueprint}: two parts have a constant {key} that is not the same:\n{said_by[key]}\n{block} ({p})")
+                if key not in said_by:
+                    said_by[key] = block
+                    constants += block
+                block = []
+            texts_ += functions_
+            members += members_
+            types_.update(r["types"])
+            uses_.update(r["uses"])
+        blue[blueprint] = {"written": sum(results[p]["written"] for p in mine), "types": types_, "uses": sorted(uses_ - {blueprint}),
+                           "parts": ([line for at in sorted(state) for line in state[at]] + constants, texts_, members), "state": True}
+
     # ---- the types: each declared once, in the Blueprint of the file that defines it ----
     declared = {}   # a type -> (the Blueprint that declares it or None for a shape, its declaration, the types that names)
-    for u in sorted(results):
-        for name, (home, line, parts) in results[u]["types"].items():
+    for u in sorted(blue):
+        for name, (home, line, parts) in blue[u]["types"].items():
             if name in declared and declared[name][1] != line:
                 raise SystemExit(f"the type {name} is not the same in every Blueprint:\n{declared[name][1]}\n{line} (in {u})")
             declared.setdefault(name, (home, line, list(parts)))
-    written = {u for u, r in results.items() if r["written"]}
+    written = {u for u, r in blue.items() if r["written"]}
     def components(name):
         """The Blueprints the types stand in that a type is made of (a shape: those its parts are made of)."""
         if name not in declared:
@@ -7882,8 +8132,8 @@ def main(argv):
         if home is not None:
             base[home].update(h for p in parts for h in components(p) if h != home)
     for u in written:
-        base[u].update(results[u]["uses"])
-        base[u].update(h for n in results[u]["types"] for h in components(n) if h != u)
+        base[u].update(blue[u]["uses"])
+        base[u].update(h for n in blue[u]["types"] for h in components(n) if h != u)
     depth = {}
     def depth_of(unit, open_=()):
         """How deep a Blueprint stands: above all it uses."""
@@ -7912,8 +8162,8 @@ def main(argv):
     uses = {}
     for u in set(homes) | written:
         mine = sorted(homes.get(u, ()), key=lambda n: (place(n), n))
-        called = set(results[u]["uses"]) if u in written else set()
-        named = {home_of(p) for n in mine for p in declared[n][2] if p in declared} | ({home_of(n) for n in results[u]["types"]} if u in written else set())
+        called = set(blue[u]["uses"]) if u in written else set()
+        named = {home_of(p) for n in mine for p in declared[n][2] if p in declared} | ({home_of(n) for n in blue[u]["types"]} if u in written else set())
         uses[u] = sorted((called | named) - {u})
     def through(a, b, met=None):
         met = met if met is not None else set()
@@ -7921,11 +8171,11 @@ def main(argv):
     blueprints = {}
     for u in uses:
         mine = sorted(homes.get(u, ()), key=lambda n: (place(n), n))
-        called = set(results[u]["uses"]) if u in written else set()
+        called = set(blue[u]["uses"]) if u in written else set()
         # (a Blueprint that comes along with another one it uses is not named again - unless its functions are called)
         direct = [x for x in uses[u] if x in called or not any(y != x and through(y, x) for y in uses[u])]
-        variables, texts_, members = results[u]["parts"] if u in written else ([], [], [])
-        blueprints[u] = blueprint_text(u, direct, [declared[n][1] for n in mine], variables, texts_, members)
+        variables, texts_, members = blue[u]["parts"] if u in written else ([], [], [])
+        blueprints[u] = blueprint_text(u, direct, [declared[n][1] for n in mine], variables, texts_, members, state=bool(blue[u].get("state")) if u in blue else False)
     order, left = [], dict(uses)
     while left:   # (a library before the Blueprints that use it)
         free = sorted(u for u in left if all(x not in left for x in left[u]))
@@ -7956,7 +8206,7 @@ def main(argv):
                 not_compared[why] += 1
                 if os.environ.get("FUNCTIONS") and why != "it gives nothing":
                     print(f"    not compared: {cpp}: {why}")
-            name = os.path.join(test, f"test_{u}.cpp")
+            name = os.path.join(test, f"test_{u.replace('/', '__')}.cpp")   # (a part of a Blueprint: Game/game_net_cpp - test_Game__game_net_cpp.cpp)
             if body:
                 os.makedirs(test, exist_ok=True)
                 if not os.path.exists(name) or open(name).read() != body:
@@ -7975,8 +8225,9 @@ def main(argv):
             waits["what it calls stands in a source file that is not converted"] += 1
             wait_lines["what it calls stands in a source file that is not converted"] += f["lines"]
     others = sum(results[u]["done"] for u in results if u not in program)
+    states = set(world.parts.values())
     print(f"\n{done_n} of {total} functions of the program are written as Blueprints ({done_lines} of {total_lines} lines)" + (f", and {others} of the engine's headers that they call" if others else "")
-          + f": {len(order)} Blueprints - {sum(1 for u in order if u in sources)} of source files, {sum(1 for u in order if u not in sources)} of headers and of shapes")
+          + f": {len(order)} Blueprints - {sum(1 for u in order if u in sources)} of source files, {sum(1 for u in order if u in states)} of states, {sum(1 for u in order if u not in sources and u not in states)} of headers and of shapes")
     if test:
         if os.path.isdir(test) and whole:
             for name in os.listdir(test):   # (tests of files that have nothing converted any more)
