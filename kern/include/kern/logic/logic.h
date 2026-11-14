@@ -313,6 +313,13 @@ struct Variable {
   json::Value value;     // default
   std::string help;
   std::string of = {};   // a value of an enum or a struct (or a list of them): its name
+  /// A constant: what it is, it is - read like a variable, never changed (no Set, no Add, no
+  /// step that changes a list, no reference that could). In the Blueprint's C++:
+  /// KERN_CONST Float Gravity = 9.81;
+  bool constant = false;
+  /// In the one graph a Blueprint is with its libraries (logic::link): the library this constant
+  /// is of - its name there is "Library::Name". (A Blueprint's own text has none of these.)
+  std::string from = {};
 };
 
 /// An enumeration a Blueprint declares: a type with named values. A value of it is held as its
@@ -457,8 +464,8 @@ struct Graph {
   std::vector<StructType> structs;     // (a struct after the structs its fields are of)
   std::vector<CommentBox> comments;    // editor only: no effect on what runs
   u32 next_id = 1;
-  /// A library: a Blueprint that keeps nothing - no variables, events or state machines, and no
-  /// node that keeps something between two calls. It has types and functions; the Blueprints
+  /// A library: a Blueprint that keeps nothing - no variables but constants, no events or state
+  /// machines, and no node that keeps something between two calls. It has types and functions; the Blueprints
   /// that use it call them directly and have its types. In C++:
   /// struct Random : virtual kern::Blueprint { ... };
   bool library = false;
@@ -482,7 +489,7 @@ struct Graph {
   /// - "variable", "scope", "path" -; "<input>.": the place a call gives the reference input of
   /// that name, logic::ref_key): a variable of the Blueprint, a local variable of the function
   /// the node stands in, or one of that function's inputs. `out` holds it.
-  enum class Root : u8 { none, variable, local, reference, constant_reference, input };
+  enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant };
   Root root_of(const Node& n, Variable& out, std::string_view prefix = {}) const;
   /// Can what the node names there be changed (a variable, a local variable, a reference input
   /// that is not const)?

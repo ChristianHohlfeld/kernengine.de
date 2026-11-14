@@ -538,7 +538,7 @@ Graph::Root Graph::root_of(const Node& n, Variable& out, std::string_view prefix
   if (!scope.empty() && prefix.empty()) return Root::none;
   const Variable* v = variable(name);
   if (v) out = *v;
-  return v ? Root::variable : Root::none;
+  return !v ? Root::none : v->constant ? Root::constant : Root::variable;
 }
 bool path_steps(std::string_view path, std::vector<std::string>& steps) {
   steps.clear();
@@ -942,7 +942,10 @@ bool link(const Graph& g, const Blueprints& all, Graph& out, std::string* error,
       Node n = *from;
       n.id = ids[id] = next++;
       // The names it has of its own library are the names they have here: a function of the
-      // library (its entry, its returns, a call of it), the function a local variable is of.
+      // library (its entry, its returns, a call of it), the function a local variable is of -
+      // and a constant of the library (where the node names no local variable or input of its
+      // function by that name).
+      const Function* body = n.param("scope").empty() ? nullptr : l->function(n.param("scope"));
       for (auto& [key, value] : n.params) {
         if (value.empty() || value.find("::") != std::string::npos) continue;
         if (key == "scope") {
@@ -950,6 +953,17 @@ bool link(const Graph& g, const Blueprints& all, Graph& out, std::string* error,
         } else if (key == "function") {
           const Function* named = l->function(value);
           if (named && !named->external) value = library_function(library, value);
+        } else if (key == "variable" || (key.size() > 9 && key.compare(key.size() - 9, 9, ".variable") == 0)) {
+          const Variable* constant = l->variable(value);
+          if (!constant || (body && (body->local(value) || body->input(value)))) continue;
+          const std::string name = library_function(library, value);
+          if (!out.variable(name)) {
+            Variable here = *constant;
+            here.name = name;
+            here.from = library;
+            out.variables.push_back(std::move(here));
+          }
+          value = name;
         }
       }
       if (calls_function(n)) todo.push_back(n.param("function"));
@@ -1014,6 +1028,8 @@ json::Value graph_to_json(const Graph& g) {
     if (!v.of.empty()) o.set("of", v.of);
     o.set("value", v.value);
     if (!v.help.empty()) o.set("help", v.help);
+    if (v.constant) o.set("const", true);
+    if (!v.from.empty()) o.set("from", v.from);
     vars.push(std::move(o));
   }
   root.set("variables", std::move(vars));
@@ -1239,6 +1255,8 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
     if (!type_of(v, var.type, var.of)) return bad("variable \"" + var.name + "\" has an unknown type");
     var.value = Value::from_json(v["value"], var.type, g, var.of).to_json(g, var.of);
     var.help = v["help"].as_string();
+    var.constant = v["const"].as_bool();
+    var.from = v["from"].as_string();
     g.variables.push_back(std::move(var));
   }
   for (const json::Value& v : j["nodes"].items()) {
@@ -1585,7 +1603,11 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
   // A library keeps nothing: what it has are types and functions, and no node of it keeps
   // something between two calls. So a Blueprint that uses it has nothing of it but its functions.
   if (g.library) {
-    if (!g.variables.empty()) err(0, "a library keeps nothing: it has no variables (\"" + g.variables[0].name + "\") - what a function works on, its call gives it (a reference input)");
+    for (const Variable& v : g.variables)
+      if (!v.constant) {
+        err(0, "a library keeps nothing: it has no variables (\"" + v.name + "\") but constants - what a function works on, its call gives it (a reference input)");
+        break;
+      }
     if (!g.machines.empty()) err(0, "a library keeps nothing: it has no state machines");
     for (const Node& n : g.nodes) {
       const NodeDef* d = lib.find(n.type);
@@ -1622,6 +1644,7 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
       if (!reads && (root == Graph::Root::input || root == Graph::Root::constant_reference))
         err(n.id, lib.title(n) + ": " + v.name + " is " + (root == Graph::Root::input ? "an input by value" : "a const reference") + " of " + n.param("scope") +
                       " - it is read, not changed (an input that is changed where the caller has it is a reference: " + type_text({v.type, v.of}) + "& " + v.name + ")");
+      if (!reads && root == Graph::Root::constant) err(n.id, lib.title(n) + ": " + v.name + " is a constant - it is read, not changed");
       if (reads && root == Graph::Root::input && n.param("path").empty())
         err(n.id, lib.title(n) + ": an input by value is read from the Function Entry; a Get names a place in it (" + v.name + ".Field, " + v.name + "[index])");
     }
@@ -1643,7 +1666,7 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
       } else if (v.type != in.type || v.of != in.of) {
         err(n.id, what + " is " + type_text({in.type, in.of}) + ", but " + v.name + " is " + type_text({v.type, v.of}) + " - a reference is the place itself, nothing converts");
       } else if (Variable root; !in.constant && !Graph::writable(g.root_of(n, root, prefix))) {
-        err(n.id, what + " is changed by the function, but " + root.name + " is only read here (an input by value or a const reference)");
+        err(n.id, what + " is changed by the function, but " + root.name + " is only read here (a constant, an input by value or a const reference)");
       }
     }
   }
@@ -2413,6 +2436,7 @@ Value* Instance::variable(std::string_view name) {
   return it == vars_.end() ? nullptr : &it->second;
 }
 bool Instance::set(std::string_view variable, const Value& v) {
+  if (const Variable* named = graph_.variable(variable); named && named->constant) return false;  // (a constant is what it is)
   if (blueprint_) return blueprint_->set(variable, v);
   return variable.find('.') == std::string_view::npos && hold(std::string(variable), v);
 }

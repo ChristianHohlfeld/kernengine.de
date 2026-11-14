@@ -395,6 +395,9 @@ using Library = Blueprint;
   struct Name
 /// KERN_PROJECT_STRUCT(Weapon) { ... }; is a struct of the project (see KERN_PROJECT_ENUM).
 #define KERN_PROJECT_STRUCT(Name) KERN_STRUCT(Name)
+/// KERN_CONST Float Gravity = 9.81; is a constant: read like a variable, never changed. (One for
+/// the class, not one in every Blueprint of it - and a library may have it: it keeps nothing.)
+#define KERN_CONST static inline const
 /// A function that is offered as a value node (no exec pins).
 #define KERN_PURE
 /// KERN_EXTERN FnResult Fn(Float x = 0.0); says what a function of another Blueprint looks like:

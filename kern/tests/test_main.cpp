@@ -4323,6 +4323,85 @@ TEST(logic_libraries) {
   if (logic::cpp_problem(linked).find("while Lists::grow holds it") == std::string::npos) std::printf("Grows: %s | %s\n", error.c_str(), logic::cpp_problem(linked).c_str());
 }
 
+TEST(logic_constants) {
+  // A constant is read like a variable and never changed. A library may have it - it keeps
+  // nothing -, and in the one graph a Blueprint is with its libraries the library's constants
+  // are the library's: a constant of the Blueprint's own with the same name is another one.
+  auto says = [&](const std::string& body, const char* why) {
+    logic::Graph g;
+    std::string error;
+    if (logic::from_cpp("struct B : kern::Blueprint {\n  KERN_CONST Float Gravity = 9.81;\n  KERN_CONST List<Float> Table = List<Float>{1.0, 2.0};\n  Float Speed = 0.0;\n" + body + "};\n", g, nullptr, &error))
+      for (const logic::Issue& i : logic::check(g)) if (i.error) error += i.text + "\n";
+    if (error.find(why) == std::string::npos) std::printf("expected \"%s\", got: %s\n", why, error.empty() ? "(nothing wrong)" : error.c_str());
+    return error.find(why) != std::string::npos;
+  };
+  const char* text = "struct B : kern::Blueprint {\n  // ---- variables ----\n  /// How fast things fall.\n  KERN_CONST Float Gravity = 9.81;\n  KERN_CONST List<Float> Table = List<Float>{1.0, 2.0};\n  Float Speed = 0.0;\n\n"
+                     "  // ---- functions ----\n  struct fallResult { Float speed = 0.0; };\n  fallResult fall(Float time = 1.0, Int at = 0) {\n    Speed += math_mul(Gravity, time);\n"
+                     "    return {math_add(Speed, Table[at])};\n  }\n};\n";
+  logic::Graph g, back;
+  std::string error, written;
+  CHECK(logic::from_cpp(text, g, nullptr, &error) && no_errors(logic::check(g)) && g.variable("Gravity")->constant && g.variable("Table")->constant && !g.variable("Speed")->constant);
+  CHECK(logic::to_cpp(g, "B", written, &error, logic::library(), false) && written.find(text) != std::string::npos);
+  CHECK(logic::graph_from_json(logic::graph_to_json(g), back) && back == g && back.variable("Gravity")->constant);
+  {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.jit = false;
+    rt.native = false;
+    logic::Instance* inst = rt.add(g, 0, "B");
+    std::vector<logic::Value> out;
+    CHECK(inst->call("fall", {logic::Value::number(2), logic::Value::integer(1)}, out) && out.size() == 1 && out[0].as_number() == 9.81 * 2 + 2);
+    CHECK(inst->call("fall", {logic::Value::number(0), logic::Value::integer(5)}, out) && out[0].as_number() == 9.81 * 2);  // (beside the constant list: the zero)
+    // from outside it is read, not set
+    CHECK(inst->get("Gravity").as_number() == 9.81 && !inst->set("Gravity", logic::Value::number(1)) && inst->get("Gravity").as_number() == 9.81 && inst->set("Speed", logic::Value::number(1)));
+  }
+  // nothing changes a constant
+  CHECK(says("  void f() {\n    Gravity = 1.0;\n  }\n", "Gravity is a constant: it is read, not changed"));
+  CHECK(says("  void f() {\n    Gravity += 1.0;\n  }\n", "Gravity is a constant: it is read, not changed"));
+  CHECK(says("  void f() {\n    Table[0] = 1.0;\n  }\n", "Table is a constant: it is read, not changed"));
+  CHECK(says("  void f() {\n    list_add(Table, 1.0);\n  }\n", "Table is a constant"));
+  CHECK(says("  void bump(Float& x) {\n    x += 1.0;\n  }\n  void f() {\n    bump(Gravity);\n  }\n", "Gravity is a constant"));
+  CHECK(says("  KERN_CONST void f() {\n  }\n", "KERN_CONST stands in front of a constant"));
+  {
+    // by a const reference it is read where it stands
+    logic::Graph r;
+    CHECK(logic::from_cpp("struct B : kern::Blueprint {\n  KERN_CONST List<Float> Table = List<Float>{1.0, 2.0};\n  Int Seen = 0;\n\n  struct sizeResult { Int n = 0; };\n"
+                          "  KERN_PURE sizeResult size(const List<Float>& list) {\n    return {list_length<Float>(list)};\n  }\n  void f() {\n    Seen = size(Table).n;\n  }\n};\n", r, nullptr, &error) && no_errors(logic::check(r)));
+  }
+  // a library's constant and a constant of the Blueprint that uses it, with one name: each its own
+  std::map<std::string, logic::Graph> project;
+  const logic::Blueprints all = [&](std::string_view name) -> const logic::Graph* {
+    auto it = project.find(std::string(name));
+    return it == project.end() ? nullptr : &it->second;
+  };
+  CHECK(logic::from_cpp("struct Steps : virtual kern::Library {\n  KERN_CONST Float Step = 0.25;\n\n  struct nextResult { Float value = 0.0; };\n  KERN_PURE nextResult next(Float from = 0.0) {\n    return {math_add(from, Step)};\n  }\n};\n",
+                        project["Steps"], nullptr, &error, logic::library(), all) && no_errors(logic::check(project["Steps"])) && project["Steps"].library);
+  CHECK(logic::from_cpp("struct Walk : virtual kern::Blueprint, virtual Steps {\n  KERN_CONST Float Step = 10.0;\n  Float At = 0.0;\n\n  void go() {\n    At = math_add(Steps::next(At).value, Step);\n  }\n};\n",
+                        project["Walk"], nullptr, &error, logic::library(), all) && no_errors(logic::check(project["Walk"])));
+  logic::Graph linked;
+  CHECK(logic::link(project["Walk"], all, linked, &error) && linked.variable("Step") && linked.variable("Step")->from.empty() && linked.variable("Steps::Step") && linked.variable("Steps::Step")->from == "Steps" &&
+        linked.variable("Steps::Step")->constant);
+  CHECK(no_errors(logic::check(linked)) && logic::cpp_problem(linked).empty());
+  if (!logic::cpp_problem(linked).empty()) std::printf("linked: %s\n", logic::cpp_problem(linked).c_str());
+  {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.jit = false;
+    rt.native = false;
+    rt.blueprints = all;
+    logic::Instance* inst = rt.add(project["Walk"], 0, "Walk");
+    std::vector<logic::Value> out;
+    CHECK(inst->call("go", {}, out) && inst->get("At").as_number() == 10.25 && inst->call("go", {}, out) && inst->get("At").as_number() == 20.5 && host.errors.empty());
+  }
+  // a library keeps nothing: a variable that is no constant is none of its
+  project.erase("Walk");
+  logic::Graph kept;
+  CHECK(logic::from_cpp("struct Kept : virtual kern::Library {\n  KERN_CONST Float Fine = 1.0;\n  Float Sum = 0.0;\n};\n", kept, nullptr, &error));
+  bool refused = false;
+  for (const logic::Issue& i : logic::check(kept)) refused = refused || i.text.find("a library keeps nothing: it has no variables (\"Sum\") but constants") != std::string::npos;
+  CHECK(refused);
+}
+
 TEST(logic_notation_rules_are_errors_of_the_graph) {
   // What C++ cannot say, no Blueprint may be: check() reports it, on the node it is about.
   auto problem = [](const char* graph, const char* why, u32 node = 0) {
@@ -9381,6 +9460,21 @@ TEST(studio_logic_libraries) {
   const json::Value with_variable = f.cmd(R"({"cmd":"logicCompile"})");
   for (const json::Value& i : with_variable["issues"].items()) kept = kept || i["text"].as_string().find("a library keeps nothing: it has no variables") != std::string::npos;
   CHECK(kept);
+  // ... but a constant it may have: read like a variable, never changed
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "constant"}, {"name", "Kept"}, {"value", true}})["ok"].as_bool());
+  const json::Value with_constant = f.cmd(R"({"cmd":"logicCompile"})");
+  for (const json::Value& i : with_constant["issues"].items()) CHECK(!i["error"].as_bool());
+  st = f.s->state();
+  CHECK(st["logic"]["variables"].size() == 1 && st["logic"]["variables"][0]["const"].as_bool());
+  bool get = false, set = false;
+  const json::Value kept_nodes = cmd({{"cmd", "logicPalette"}, {"query", "kept"}});
+  for (const json::Value& e : kept_nodes["items"].items()) {
+    get = get || e["label"].as_string() == "Get Kept";
+    set = set || e["label"].as_string() == "Set Kept";
+  }
+  CHECK(get && !set);
+  CHECK(cmd({{"cmd", "logicCpp"}})["text"].as_string().find("  KERN_CONST Float Kept = 0.0;\n") != std::string::npos);
+  CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
   CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
   // the Blueprint that uses it: the editor offers the library, then its functions; a call brings what the function looks like
   CHECK(open(user));

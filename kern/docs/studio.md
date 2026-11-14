@@ -424,6 +424,10 @@ Eine Funktion hat einen Namen, typisierte Eingänge und typisierte Ausgänge. An
   dahinter erreicht ihn nicht mehr. Eine Funktion ruft sich nicht selbst auf, auch nicht über
   andere Funktionen: Das ist ein Compile-Fehler am aufrufenden Knoten (Wiederholen ist Sache der
   Schleifen-Knoten). Nach einem Delay ist sie zu Ende – sich dann aufzurufen, ist ein Timer.
+- **Konstanten:** In den Details einer Variablen macht *Constant* sie zu einer Konstanten: Sie
+  wird gelesen wie eine Variable und nie geändert – das Knotenmenü bietet nur noch *Get* an, und
+  ein Knoten, der sie ändern würde, ist ein Compile-Fehler. Im C++-Text: `KERN_CONST Float Gravity
+  = 9.81;`. Eine Bibliothek hat nur Konstanten.
 - **Bibliotheken:** Im Abschnitt *Libraries* von *My Blueprint* steht, ob dieser Blueprint eine
   Bibliothek ist (*This Blueprint is a library*: er behält nichts – Typen und Funktionen, keine
   Variablen, keine Events) und welche Bibliotheken des Levels er benutzt (*+ Use a library…*; eine

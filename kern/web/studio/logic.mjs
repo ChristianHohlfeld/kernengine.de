@@ -639,7 +639,7 @@ export class LogicEditor {
         <div class="lg-item lg-var${this.selVar === v.name ? " on" : ""}" draggable="true" data-var="${lgEsc(v.name)}" title="Drag into the graph: Ctrl = Get, Alt = Set">
           <i class="lg-pill" style="--c:${lgColor(v.type)}"></i><span class="lg-vn">${lgEsc(v.name)}</span>
           ${v.name in live ? `<span class="lg-live" title="Value while playing">${lgEsc(lgValueText(live[v.name], v.type, data))}</span>` : `<span class="lg-vt">${lgEsc(lgTypeName(v.type))}</span>`}
-          <span class="lg-acts"><button data-get title="Add a Get node">Get</button><button data-set title="Add a Set node">Set</button></span>
+          <span class="lg-acts"><button data-get title="Add a Get node">Get</button>${v.const ? "" : `<button data-set title="Add a Set node">Set</button>`}</span>
         </div>`).join("") || `<div class="lg-none">No variables${q ? " match" : " yet: + adds one"}</div>`;
     // a function's signature in short: (x, y) -> result
     const sig = f => `(${f.inputs.map(p => p.name).join(", ")})${f.outputs.length ? " → " + f.outputs.map(p => p.name).join(", ") : ""}`;
@@ -701,7 +701,8 @@ export class LogicEditor {
       const name = row.dataset.var;
       row.onclick = e => { if (e.target.closest("button")) return; this.selectVariable(name); };
       row.querySelector("[data-get]").onclick = () => this.addAtCenter("var.get", {variable: name});
-      row.querySelector("[data-set]").onclick = () => this.addAtCenter("var.set", {variable: name});
+      const set = row.querySelector("[data-set]");
+      if (set) set.onclick = () => this.addAtCenter("var.set", {variable: name});
       row.ondragstart = e => { e.dataTransfer.setData("text/x-kern-var", name); e.dataTransfer.effectAllowed = "copy"; };
       row.oncontextmenu = e => { e.preventDefault(); this.variableMenu(name, e.clientX, e.clientY); };
     }
@@ -1309,6 +1310,7 @@ export class LogicEditor {
       <div class="lg-dsec"><div class="lg-dst">Variable</div>
         <div class="lg-drow"><label>Name</label><div><input data-vk="name" value="${lgEsc(v.name)}" spellcheck="false"></div></div>
         <div class="lg-drow"><label>Type</label><div><select data-vk="type">${this.typeOptions(v.type)}</select></div></div>
+        <div class="lg-drow"><label>Constant</label><div><label class="lg-check" title="A constant is read like a variable and never changed: no Set, no Add, no step that changes a list (in C++: KERN_CONST). A library has only constants."><input type="checkbox" data-vk="const"${v.const ? " checked" : ""}></label></div></div>
       </div>
       <div class="lg-dsec"><div class="lg-dst">Default Value</div><div class="lg-drow"><label>${lgEsc(v.name)}</label><div>${val}</div></div>
         ${parts ? `<div class="lg-lsub lg-vsub" data-var="${lgEsc(v.name)}">${parts}</div>` : list ? `<div class="lg-lsub" data-var="${lgEsc(v.name)}">${lgListEditor(v.type, v.value, this.data)}</div>` : ""}
@@ -1575,6 +1577,7 @@ export class LogicEditor {
         const k = f.dataset.vk;
         if (k === "name") { if (this.cmd({cmd: "logicVariable", op: "rename", name: variable.name, to: f.value.trim()})?.ok !== false) this.selVar = f.value.trim(); }
         else if (k === "type") this.cmd({cmd: "logicVariable", op: "type", name: variable.name, type: f.value});
+        else if (k === "const") this.cmd({cmd: "logicVariable", op: "constant", name: variable.name, value: f.checked});
         else {
           const value = f.type === "checkbox" ? f.checked : variable.type === "vector" ? f.value.split(/[,\s]+/).filter(Boolean).map(s => +s || 0) : variable.type === "text" ? f.value : (+f.value || 0);
           this.cmd({cmd: "logicVariable", op: "value", name: variable.name, value});

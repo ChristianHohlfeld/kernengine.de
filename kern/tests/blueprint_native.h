@@ -165,8 +165,8 @@ struct Places : kern::Blueprint {
 };
 )kn";
 
-// Libraries: Blueprints that keep nothing - types, and functions - and a Blueprint that uses
-// them: it has their types and calls their functions directly, with values and with references
+// Libraries: Blueprints that keep nothing - types, constants and functions - and a Blueprint that
+// uses them (a constant of its own with the name of one of the library's is its own): it has their types and calls their functions directly, with values and with references
 // (an entry of its own list, also beside it). Each function is there once: in the class the
 // library is a base, in the interpreter the Blueprint runs as one graph with its libraries.
 inline const char* kParts = R"kn(
@@ -186,6 +186,10 @@ struct Parts : virtual kern::Library {
 )kn";
 inline const char* kWorkshop = R"kn(
 struct Workshop : virtual kern::Library, virtual Parts {
+  /// What a library keeps: constants - read, never changed.
+  KERN_CONST Float Step = 0.25;
+  KERN_CONST List<Float> Table = List<Float>{1.0, 2.0, 4.0};
+
   /// Changes the wheel the call names.
   void skid(Wheel& wheel, Float by = 0.5) {
     wheel.Slip += by;
@@ -201,10 +205,14 @@ struct Workshop : virtual kern::Library, virtual Parts {
   twiceResult twice(Wheel& wheel, Int times = 2) {
     Int Passes = 0;
     for (auto it10 = flow_for(n10, 1, times); it10.next();) {
-      skid(wheel, 0.25);
+      skid(wheel, Step);
       Passes += 1;
     }
     return {wear(wheel).slip, Passes};
+  }
+  struct tableResult { Float value = 0.0; Int length = 0; Float step = 0.0; };
+  KERN_PURE tableResult table(Int at = 0) {
+    return {Table[at], list_length<Float>(Table), Step};
   }
   void fit(List<Wheel>& wheels, const Wheel& like, Int count = 1) {
     for (auto it20 = flow_for(n20, 1, count); it20.next();) {
@@ -226,8 +234,9 @@ struct Garage : virtual kern::Blueprint, virtual Workshop, virtual Parts {
   List<Car> Cars = List<Car>{Car{"a", List<Wheel>{Wheel{0.25, Side::Rear, List<Float>{}}}}};
   Wheel Spare = Wheel{1.0, Side::Front, List<Float>{}};
   Float Seen = 0.0;
+  KERN_CONST Float Step = 10.0;
 
-  struct RunResult { Float slip = 0.0; Int marks = 0; Side at = Side::Front; Int passes = 0; Int wheels = 0; Side flipped = Side::Front; };
+  struct RunResult { Float slip = 0.0; Int marks = 0; Side at = Side::Front; Int passes = 0; Int wheels = 0; Side flipped = Side::Front; Float table = 0.0; Float step = 0.0; Float own = 0.0; };
   /// Calls of the libraries' functions: a place of its own as a reference - a variable, an entry
   /// of a list in an entry of a list, also beside the lists -, a value read of one.
   RunResult Run(Int car = 0, Int wheel = 0, Float by = 1.0) {
@@ -237,7 +246,7 @@ struct Garage : virtual kern::Blueprint, virtual Workshop, virtual Parts {
     Workshop::skid(Spare, by);
     Workshop::fit(Cars[car].Wheels, Spare, 2);
     return {Workshop::wear(Cars[car].Wheels[wheel]).slip, Workshop::wear(Cars[car].Wheels[wheel]).marks, Cars[car].Wheels[wheel].At, n5.passes, list_length<Wheel>(Cars[car].Wheels),
-            Parts::flipped(Spare.At).side};
+            Parts::flipped(Spare.At).side, Workshop::table(wheel).value, Workshop::table(wheel).step, Step};
   }
 
   Workshop::twiceResult n5;
@@ -1431,6 +1440,7 @@ inline std::vector<Case> cases() {
       w.calls.push_back({"wear", {wheel}});
       w.calls.push_back({"twice", {wheel, I(3)}});
     }
+    for (i64 at : {i64{0}, i64{2}, i64{3}, i64{-1}}) w.calls.push_back({"table", {I(at)}});
     w.calls.push_back({"fit", {Value::structures({}), samples({PinType::structure, "Wheel"}, w.graph).front(), I(2)}});
     Case& r = read("rng", kRng);
     r.calls.push_back({"next", {samples({PinType::structure, "Rng"}, r.graph).front(), I(5)}});

@@ -884,6 +884,13 @@ struct Shape {
       }
     }
     for (const Variable& v : g.variables) {
+      if (!v.from.empty()) {
+        // (a constant of a library, in the one graph a Blueprint is with it: "Library::Name", both names of C++)
+        if (!v.constant || v.name.rfind(v.from + "::", 0) != 0 || !name_ok(v.name.substr(v.from.size() + 2), "the constant")) return fail("\"" + v.name + "\" is no constant of the library " + v.from);
+        if (!names.insert(v.name).second) return fail("the constant " + v.name + " is held twice");
+        if (!typed_ok("the constant " + v.name, v.type, v.of, v.value)) return false;
+        continue;
+      }
       if (!name_ok(v.name, "the variable")) return false;
       if (!names.insert(v.name).second) return fail("the name \"" + v.name + "\" is used twice");
       if (!typed_ok("the variable " + v.name, v.type, v.of, v.value)) return false;
@@ -1478,8 +1485,9 @@ struct Writer {
     if (!g.variables.empty()) {
       section("variables");
       for (const Variable& v : g.variables) {
+        if (!v.from.empty()) continue;  // (a constant of a library, in the one graph a Blueprint is with it: the library's text has it)
         doc(1, v.help);
-        line(1, cpp_type(TypeRef{v.type, v.of}) + " " + v.name + " = " + literal(Value::from_json(v.value, v.type, g, v.of), v.of, g) + ";");
+        line(1, std::string(v.constant ? "KERN_CONST " : "") + cpp_type(TypeRef{v.type, v.of}) + " " + v.name + " = " + literal(Value::from_json(v.value, v.type, g, v.of), v.of, g) + ";");
       }
     }
     if (!g.machines.empty()) {
@@ -2244,10 +2252,14 @@ struct Reader {
         g.structs.push_back(std::move(s));
         continue;
       }
+      // KERN_CONST Float Gravity = 9.81;   a constant: read like a variable, never changed
+      const bool constant = accept("KERN_CONST");
       TypeRef type;
-      if (type_here(type)) {
+      if (constant && !type_here(type)) return fail(p, "KERN_CONST stands in front of a constant: KERN_CONST Float Name = 1.0;");
+      if (constant || type_here(type)) {
         // a variable
         Variable v;
+        v.constant = constant;
         v.type = type.type;
         v.of = type.of;
         if (!word(v.name, "the variable's name")) return false;
@@ -2466,7 +2478,7 @@ struct Reader {
     }
     const Variable* v = g.variable(name);
     if (v) out = *v;
-    return v ? Graph::Root::variable : Graph::Root::none;
+    return !v ? Graph::Root::none : v->constant ? Graph::Root::constant : Graph::Root::variable;
   }
   /// Is `name` read and set like a variable here: a variable, a local variable, a reference
   /// input of the function? (An input by value is the function's own value: its parameter.)
@@ -2612,6 +2624,7 @@ struct Reader {
     Variable named;
     const Graph::Root root = root_here(var, named);
     if (root == Graph::Root::none) return fail(tok, "\"" + var + "\" is no variable");
+    if (set && root == Graph::Root::constant) return fail(tok, var + " is a constant: it is read, not changed");
     if (set && !Graph::writable(root))
       return fail(tok, var + " is " + (root == Graph::Root::input ? "an input by value" : "a const reference") + ": it is read, not changed (an input that is changed where the caller has it: " +
                            cpp_type(TypeRef{named.type, named.of}) + "& " + var + ")");
@@ -4454,7 +4467,8 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
   for (const Variable& v : g.variables) s += "    if (variable == \"" + v.name + "\") { out = kern::logic::to_value(self." + v.name + "); return true; }\n";
   s += "    return false;\n  }\n"
        "  bool set(std::string_view variable, const kern::logic::Value& value) override {\n    (void)value;\n";
-  for (const Variable& v : g.variables) s += "    if (variable == \"" + v.name + "\") { kern::logic::native_set(self." + v.name + ", value); return true; }\n";
+  for (const Variable& v : g.variables)
+    if (!v.constant) s += "    if (variable == \"" + v.name + "\") { kern::logic::native_set(self." + v.name + ", value); return true; }\n";
   s += "    return false;\n  }\n};\n"
        "[[maybe_unused]] const bool " + name + "_registered =\n"
        "    (kern::logic::register_native_blueprint(" + hash + ", [] { return std::unique_ptr<kern::logic::NativeBlueprint>(new " + name + "_Native()); }), true);\n"

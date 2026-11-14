@@ -7,6 +7,9 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-14",time:"02:25",title:"Sprache: Konstanten",items:[
+    "Unter der Haube: Ein Blueprint kann jetzt Konstanten haben (KERN_CONST Float Gravity = 9.81;) – Werte, die gelesen, aber nie geändert werden, im Editor mit einem Haken an der Variable. Auch eine Bibliothek darf sie haben. Am Spiel selbst ändert sich nichts.",
+  ]},
   {date:"2026-11-14",time:"01:25",title:"Editor: Bibliotheken",items:[
     "Unter der Haube: Im Editor lässt sich jetzt einstellen, dass ein Blueprint eine Bibliothek ist und welche Bibliotheken ein Blueprint benutzt – ihre Funktionen stehen dann im Knotenmenü, und wer eine Bibliothek benutzt, folgt ihren Änderungen im selben Schritt. Am Spiel ändert sich nichts.",
   ]},

@@ -649,6 +649,7 @@ json::Value Studio::logic_json() const {
     x.set("type", logic::pin_type_name(v.type));
     if (!v.of.empty()) x.set("of", v.of);
     x.set("value", logic::Value::from_json(v.value, v.type, *g, v.of).to_json(*g, v.of));
+    if (v.constant) x.set("const", true);  // (a constant: read, never changed)
     vars.push(std::move(x));
   }
   o.set("variables", std::move(vars));
@@ -880,6 +881,7 @@ json::Value Studio::logic_palette(const json::Value& c) const {
     const std::string category = scope.empty() ? std::string("Variables") : "Local Variables of " + scope;
     const std::string what = scope.empty() ? v.name : "the local variable " + v.name + " of " + scope;
     consider({"Get " + v.name, category, "Reads " + what, "var.get", with({{"variable", v.name}})});
+    if (v.constant) return;  // (a constant is read: nothing changes it)
     consider({"Set " + v.name, category, "Writes " + what, "var.set", with({{"variable", v.name}})});
     if (v.type == logic::PinType::number || v.type == logic::PinType::integer)
       consider({"Add to " + v.name, category, "Adds to " + what, "var.add", with({{"variable", v.name}})});
@@ -1936,6 +1938,14 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       }
       if (op == "value") {
         v->value = logic::Value::from_json(c["value"], v->type, g, v->of).to_json(g, v->of);
+        return true;
+      }
+      if (op == "constant") {
+        // A constant is read like a variable and never changed (the nodes that would change it are
+        // errors when the Blueprint compiles: they say where).
+        const bool on = c["value"].as_bool();
+        if (v->constant == on) return false;
+        v->constant = on;
         return true;
       }
       error = "unknown variable operation";

@@ -75,6 +75,8 @@ tools/export_game.sh, .mjs           der native Export: ein Level als Spiel, die
   eine Liste, die Ein- und Ausgänge einer Funktion und Pins können von so einem Typ sein. Make
   baut einen Wert aus seinen Feldern, Break gibt die Felder – in beiden Schreibweisen und in
   jeder Stufe gleich (siehe „Strukturen“).
+- **Fertig: Konstanten.** `KERN_CONST Float Gravity = 9.81;` wird gelesen wie eine Variable und
+  nie geändert – die Prüfung meldet jeden Knoten, der es täte. Auch eine Bibliothek hat sie.
 - **Fertig: Bibliotheken.** Ein Blueprint, der nichts behält, wird von anderen benutzt: Sie haben
   seine Typen und rufen seine Funktionen direkt – `Workshop::skid(Spare[i], 1.0);` –, auch mit
   Referenzen. Jede Funktion steht einmal im Projekt (siehe „Bibliotheken“).
@@ -180,6 +182,7 @@ KERN_LAYOUT(Demo) {
 | Aufzählung (mit Beschreibung) | `/// Beschreibung` und `KERN_ENUM(Mode, Closed, Opening, Open);` – im Abschnitt „types“, über den Variablen |
 | Struktur (mit Beschreibung) | `/// Beschreibung` und `KERN_STRUCT(Weapon) { Text Name = ""; Float Damage = 10.0; };` – im Abschnitt „types“, nach den Aufzählungen und über den Variablen; jedes Feld steht da wie eine Variable |
 | Variable (mit Beschreibung) | `/// Beschreibung` und `Float Heat = 0.0;` |
+| Konstante (gelesen wie eine Variable, nie geändert) | `KERN_CONST Float Gravity = 9.81;` – in C++ `static inline const`: eine für die Klasse. Kein Set, kein Add, kein Listen-Schritt, keine Referenz, die sie ändern könnte; von außen (`Instance::set`) nicht setzbar |
 | Funktion mit Ausgängen | `struct FnResult { Float y = 0.0; };` und `FnResult Fn(Float x = 1.5) { ... }` |
 | Funktion ohne Ausgänge | `void Fn(...) { ... }` |
 | Funktion „pure“ (als Wert-Knoten angeboten) | `KERN_PURE` vor der Funktion |
@@ -591,8 +594,8 @@ void on1(Float delta) {
 
 ### Bibliotheken
 
-Eine **Bibliothek** ist ein Blueprint, der nichts behält: Er hat Typen und Funktionen, keine
-Variablen, keine Events, keine State Machines – und keinen Knoten, der zwischen zwei Aufrufen
+Eine **Bibliothek** ist ein Blueprint, der nichts behält: Er hat Typen, Konstanten
+(`KERN_CONST`) und Funktionen, keine Variablen, keine Events, keine State Machines – und keinen Knoten, der zwischen zwei Aufrufen
 etwas behält (Do Once, Gate, Flip Flop, die eigene Folge eines Random, ein Warten). Andere
 Blueprints **benutzen** sie: Sie haben dann ihre Typen und rufen ihre Funktionen direkt auf. So
 steht jede Funktion einmal im Projekt.
@@ -642,6 +645,10 @@ struct Garage : virtual kern::Blueprint, virtual Workshop {     // ein Blueprint
   benutzt –, ohne sie noch einmal zu deklarieren: In C++ ist `Wheel` *ein* Typ, darum bindet eine
   Referenz. Zwei Bibliotheken deklarieren nicht denselben Namen; ein Blueprint deklariert keinen
   Typ, den eine seiner Bibliotheken hat.
+- **Die Konstanten einer Bibliothek sind ihre eigenen.** Ihre Funktionen lesen sie; wer die
+  Bibliothek benutzt, hat seine eigenen – auch unter demselben Namen (in C++ verdeckt der eigene
+  Member den der Basis; im einen Graphen des Interpreters heißt die der Bibliothek
+  `Workshop::Step`).
 - **Der Graph hält, was er von seinen Bibliotheken benutzt:** ihre Typen (`from`: die
   Bibliothek, die sie deklariert) und wie die Funktionen aussehen, die er aufruft (Funktionen
   ohne Rumpf, `from` und der Name `Workshop::skid`). Der Text zeigt beides nicht noch einmal. Wer

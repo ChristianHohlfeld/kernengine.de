@@ -433,7 +433,13 @@ Eine Form, die Gestalt oder Kosten ändert, ist keine von beiden.
    festgelegt (13.11.2026, 23:45):
    - **Eine Bibliothek ist ein Blueprint, der nichts behält:** keine Variablen, keine Events,
      Timer oder Zustände, und kein Knoten, der zwischen zwei Aufrufen etwas behält (Do Once,
-     Gate, Flip Flop, die eigene Folge eines Random, ein Warten). Sie hat Typen und Funktionen.
+     Gate, Flip Flop, die eigene Folge eines Random, ein Warten). Sie hat Typen, Konstanten und
+     Funktionen.
+   - **Eine Konstante ist eine Variable, die gelesen, aber nie geändert wird** (seit 14.11.2026,
+     02:25): `KERN_CONST Float Gravity = 9.81;` – in C++ `static inline const`. Jeder Blueprint
+     kann sie haben; eine Bibliothek hat nur solche. Wer sie ändern will, bekommt in Text, Editor
+     und Lauf dieselbe Absage. Die Konstanten einer Bibliothek sind ihre eigenen: Wer die
+     Bibliothek benutzt, hat seine – auch unter demselben Namen.
      Im Text: `struct Random : virtual kern::Library { … };` (`kern::Library` ist
      `kern::Blueprint`: der Name sagt, was der Blueprint ist).
    - **Ein Blueprint benutzt Bibliotheken:** `struct Destruction : virtual kern::Blueprint, virtual
