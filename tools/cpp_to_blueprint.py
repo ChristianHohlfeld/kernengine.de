@@ -2297,6 +2297,8 @@ class Emit:
         raw = qtype(v)
         src = kids(kids(rng)[0])[-1]
         lt = self.tp(src)
+        if lt == "Text":
+            raise Wait("a loop over the characters of a text (the language has no step that reads a character of a text)")
         if not lt.startswith("List<"):
             raise Wait("a loop over something that is not a list")
         it = lt[5:-1]
