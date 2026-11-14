@@ -2234,7 +2234,7 @@ TEST(logic_call_on_actor_by_its_name) {
 struct Level : kern::Blueprint {
   struct StarsResult { Int stars = -1; };
   StarsResult Stars(Int base = 1) {
-    return {math_add(base, 10)};
+    return {kern::to<Int>(math_add(kern::to<Float>(base), 10.0))};
   }
 };
 )kn";
