@@ -566,8 +566,33 @@ class Tree:
         for i, n in list(self.decl.items()):  # (a constant declared in a header and defined later)
             if n.get("kind") == "VarDecl" and n.get("init") and n.get("previousDecl"):
                 self.body.setdefault(n["previousDecl"], n)
+        self.join_dumps()
         self.take_locals(seen)
         self.number_names()
+
+    def join_dumps(self):
+        """A function of another namespace of the program that a dump names by an address the dump of its own
+        namespace does not give it (the runs agree on the addresses of their nodes, but not always on every one:
+        fc::FirmwareRuntime::step calls hwcontract::decode_icm42688_registers) - the one function of that name and
+        type there is: under that address too."""
+        by_sig = collections.defaultdict(list)
+        for d in self.decl.values():
+            if d.get("kind") in ("FunctionDecl", "CXXMethodDecl") and d.get("name"):
+                by_sig[(d["kind"], d["name"], qtype(d))].append(d)
+        missing = {}
+        for dumps in [self.dumps, *[ds for _, ds in self.more], self.engine]:
+            for o in dumps:
+                for n in walk(o):
+                    r = n.get("referencedDecl")
+                    if r and r.get("id") and r.get("kind") in ("FunctionDecl", "CXXMethodDecl") and r["id"] not in self.decl and r.get("name"):
+                        missing[r["id"]] = (r["kind"], r["name"], qtype(r))
+        for rid, sig in missing.items():
+            same = {self.body.get(d["id"], d)["id"]: d for d in by_sig.get(sig, ())}
+            if len(same) == 1:
+                d = next(iter(same.values()))
+                self.decl[rid] = d
+                if d["id"] in self.body:
+                    self.body[rid] = self.body[d["id"]]
 
     def take_locals(self, seen):
         """The types a function declares in its body - `struct Seg { Vec2 m; f32 len; };` between its
@@ -7500,7 +7525,7 @@ class Api:
     def siblings(self, d):
         home = self.home(d)
         if home not in self.by_class:
-            self.by_class[home] = [x for x in self.tree.decl.values() if self.declared_only(x) and self.home(x) == home]
+            self.by_class[home] = list({x["id"]: x for x in self.tree.decl.values() if self.declared_only(x) and self.home(x) == home}.values())
         return self.by_class[home]
 
     def type_of(self, d):
