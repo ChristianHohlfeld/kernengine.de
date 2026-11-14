@@ -831,6 +831,8 @@ def own_function(tree, decl_id):
     owner = tree.owner.get(d["id"]) or tree.owner.get(decl_id) or ""
     if owner in (ENGINE + "::Vec3", ENGINE + "::Vec2"):
         return False
+    if owner == ENGINE + "::logic::ActorBlueprint":
+        return False   # (the program's way to call an actor's Blueprint: Call on Actor, Get Variable on Actor, Has Blueprint - nodes)
     if not owner and tree.scope_of.get(d["id"], "").startswith(ENGINE + "::") and d.get("name") in VECTOR_FUNCTIONS:
         return False
     return True
@@ -10203,6 +10205,8 @@ def survey_one(job):
         file = os.path.abspath(d["_file"])
         if file != me and not is_header(file):
             continue
+        if tree.owner.get(d["id"]) == ENGINE + "::logic::ActorBlueprint":
+            continue   # (no function of a Blueprint: its calls are nodes - own_function)
         calls, shares = set(), False
         params_of.update({p["id"]: (function_key(tree, d), k) for k, p in enumerate(x for x in kids(d) if x.get("kind") == "ParmVarDecl")})
         for n in walk(d):
