@@ -40,9 +40,10 @@ struct ActorBlueprint {
   /// actor has the zeros.
   template <class... O, class... A> void call(const char* function, std::tuple<O&...> out, const A&... args) const {
     static_assert(!(std::is_same_v<A, f32> || ...), "a 32-bit number goes in as the decimal it stands for, a 64-bit one (f64)");
+    const std::vector<Value> in{argument(args)...};  // (first the values: one may be read from a place an output goes to)
     std::apply([](O&... o) { ((o = O{}), ...); }, out);
     std::vector<Value> results;
-    if (!running || !running->call(function, {argument(args)...}, results)) return;
+    if (!running || !running->call(function, in, results)) return;
     take(results, out, std::index_sequence_for<O...>{});
   }
 

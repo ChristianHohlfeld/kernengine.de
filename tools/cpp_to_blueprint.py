@@ -583,6 +583,7 @@ class World:
         self.nodes = set()     # the names of the engine's nodes (NODES)
         self.function_units = {}   # a function's key -> the Blueprint it stands in (see unit_of_function)
         self.source_units = set()  # the Blueprints of source files: what stands there, a test in another file does not hold
+        self.actors = {}       # the level's actors with a Blueprint: name -> {"library": does it keep nothing, "functions": {name: ([inputs], [outputs])}}
 
     def program(self, file):
         """Is this a file of the program itself - one of those to convert as a whole?"""
@@ -670,6 +671,7 @@ class Function:
         self.key = None       # its name in the whole program (function_key)
         self.open = False     # it stands in a source file's Blueprint: a test in another file does not hold its source
         self.place = False    # it names a place (`const T& spec() const { return s_; }`): no function of the Blueprint - where it is called, the place stands
+        self.on_actors = []   # (actor, function): what it calls on the Blueprint of an actor of the level (Call on Actor)
 
     def order(self):
         """The parameters in the order the Blueprint function has its inputs: those by reference first, then those
@@ -713,6 +715,7 @@ class Unit:
         self.engine = None          # the engine's functions as nodes (Api), made when the first one is called
         self.engine_calls = {}      # the engine's functions this Blueprint calls: decl id -> its node (Api.function)
         self.objects_seen = set()   # the engine's classes it holds handles of
+        self.externs = {}           # a function of an actor's Blueprint it calls on that actor -> (its inputs, its outputs: [(name, type)], its declaration)
         self.working = set()
         self.short = collections.defaultdict(list)
         for q in list(tree.records) + list(tree.enums):
@@ -1203,6 +1206,12 @@ class Unit:
             if d["id"] in getattr(self, "barred", {}):
                 raise Wait(self.barred[d["id"]])
             Emit(self, f).run()
+            if f.on_actors:
+                # The test calls the function's source and the Blueprint with the same arguments: the source
+                # calls the actor's Blueprint as the program binds it, the Blueprint calls it on that actor.
+                actor, function = f.on_actors[0]
+                f.text = None
+                raise Wait(f"its test cannot compare it yet (it calls {function} on the Blueprint of the actor {actor}, which the test does not run)")
             self.order.append(f)
         except Wait as w:
             f.wait = str(w)
@@ -1278,6 +1287,9 @@ class Unit:
         used = set()
         for f in self.order:
             used.update(word.findall(f.text))
+        for name, (_, _, lines) in self.externs.items():   # (what a function of an actor's Blueprint looks like: where it is called)
+            if name in used:
+                used.update(word.findall(" ".join(lines)))
         def name_of(line):
             m = (re.match(r"\s*KERN_(?:ENUM|STRUCT)\((\w+)", line) or re.match(r"\s*(?:KERN_CONST\s+)?(?:Fixed<[\w<>:]+,\s*\d+>|[\w<>:]+)\s+(\w+)\s*=", line) or re.search(r"\}\s*(n\d+);", line)
                  or re.match(r"\s*[\w:]+Result (n\d+);", line))
@@ -1306,7 +1318,8 @@ class Unit:
                 name = name_of(line)
                 types[name] = (self.type_home[name], line, self.type_parts[name])
         members = [line for line in self.members if name_of(line) in used]
-        return variables, [f.text for f in self.order], members, types
+        externs = ["\n".join(lines) for name, (_, _, lines) in self.externs.items() if name in used]
+        return variables, externs + [f.text for f in self.order], members, types
 
     def text(self):
         """The Blueprint as this file alone knows it: its functions, and of the declarations made on the
@@ -2729,6 +2742,8 @@ class Emit:
             m = callee(n)
             base = kids(m)[0] if kids(m) else None
             name = m.get("name")
+            if self.on_actor(n) is not None:
+                return self.call_on(n, self.on_actor(n))
             d = self.engine_decl(m.get("referencedMemberDecl"))
             if d is not None:
                 return self.engine(d, base, kids(n)[1:])[0]
@@ -2866,6 +2881,93 @@ class Emit:
 
     def is_local_call(self, n):
         return n.get("kind") == "CXXOperatorCallExpr" and callee_name(n) == "operator()" and callee(n).get("referencedDecl", {}).get("id") in self.u.lambdas
+
+    # ---- a function of the Blueprint of an actor of the level: Call on Actor ----
+    def on_actor(self, n):
+        """Is this C++'s Call on Actor - a call of kern::logic::ActorBlueprint::call (the Blueprint of an actor
+        of the level, as the program's C++ calls it)? Then the object it is called on, else None."""
+        m = callee(n)
+        if n.get("kind") != "CXXMemberCallExpr" or m.get("kind") != "MemberExpr" or m.get("name") != "call" or not kids(m):
+            return None
+        base = kids(m)[0]
+        return base if re.sub(r"^const\s+", "", self.ctype(base)).strip() == ENGINE + "::logic::ActorBlueprint" else None
+
+    def actor_named(self, obj):
+        """The actor whose Blueprint `obj` is: named where it is made (ActorBlueprint rules{"Lamps"}). The name
+        is a constant of the object (`const char* const actor`) - the same for as long as it lives."""
+        b = self.unwrap(obj)
+        d = self.tree.decl.get(b.get("referencedDecl", {}).get("id")) if b.get("kind") == "DeclRefExpr" else None
+        if d is None or d.get("kind") != "VarDecl" or qtype(d).rstrip().endswith("&"):
+            raise Wait("a call on an actor's Blueprint that is not one the program makes and names here (its actor)")
+        made = bare(kids(d)[-1]) if kids(d) else {}
+        while made.get("kind") in ("ExprWithCleanups", "CXXFunctionalCastExpr", "MaterializeTemporaryExpr") and len(kids(made)) == 1:
+            made = bare(kids(made)[0])
+        said = [self.unwrap(x) for x in kids(made) if x.get("kind") != "CXXDefaultArgExpr"] if made.get("kind") == "CXXConstructExpr" else []
+        if len(said) != 1 or said[0].get("kind") != "StringLiteral":
+            raise Wait("a call on an actor's Blueprint whose actor is not named in so many words where it is made")
+        return c_string(said[0]["value"]).decode("utf-8")
+
+    def call_on(self, n, obj):
+        """rules.call("Fn", std::tie(a, b), x, y): the Blueprint of the actor `rules` names runs its function Fn -
+        Call on Actor, on the actor found by its name, as the program binds it. The Blueprint says what Fn
+        looks like (KERN_EXTERN): its inputs and outputs as the actor's Blueprint names them, of the types of
+        the values the call gives and takes, and the zero of each type as its default - what the call gives
+        where the actor's Blueprint has no such function, in C++ as in the Blueprint. What the call gives is
+        stored in the places std::tie names, one after the other."""
+        u = self.u
+        args = kids(n)[1:]
+        if len(args) < 2:
+            raise Wait("a call on an actor's Blueprint without its function and its outputs")
+        named, outs = self.unwrap(args[0]), self.unwrap(args[1])
+        while outs.get("kind") in ("MaterializeTemporaryExpr", "CXXBindTemporaryExpr", "CXXConstructExpr", "CXXFunctionalCastExpr") and len(kids(outs)) == 1:
+            outs = self.unwrap(kids(outs)[0])
+        if named.get("kind") != "StringLiteral":
+            raise Wait("a call on an actor's Blueprint whose function is not named in so many words")
+        if outs.get("kind") != "CallExpr" or callee_name(outs) != "tie" or not self.ctype(outs).startswith("std::tuple<"):
+            raise Wait("a call on an actor's Blueprint whose outputs are not the places std::tie names")
+        function, actor = c_string(named["value"]).decode("utf-8"), self.actor_named(obj)
+        places, values = kids(outs)[1:], args[2:]
+        target = u.world.actors.get(actor)
+        if target is None:
+            raise Wait(f"a call on the Blueprint of the actor {actor}, which the level does not have")
+        if target["library"]:
+            raise Wait(f"a call on the Blueprint of the actor {actor}, which is a library: its functions are called directly ({actor}::{function})")
+        if function not in target["functions"]:
+            raise Wait(f"a call of {function} on the Blueprint of the actor {actor}, which has no such function")
+        ins, gives = target["functions"][function]
+        if len(ins) != len(values) or len(gives) != len(places):
+            raise Wait(f"a call of {function} on the Blueprint of the actor {actor} with {len(values)} values and {len(places)} outputs, where the function takes {len(ins)} and gives {len(gives)}")
+        if is_word(function) or any(not re.fullmatch(r"[A-Za-z_]\w*", x) or x in CPP_WORDS for x in [function, *ins, *gives]):
+            raise Wait(f"a call of {function} on the Blueprint of the actor {actor}, which names it or a pin of it with a word of C++ or of the Blueprint language")
+        in_types, out_types = [self.tp(a) for a in values], [self.tp(p) for p in places]
+        for t in in_types + out_types:
+            if t.startswith("List<") or t.startswith("Fixed<") or t in u.struct_fields or (t in u.enum_values and u.enum_numbers.get(t)):
+                raise Wait(f"a call of {function} on the Blueprint of the actor {actor} with a {t} (a call on an actor's Blueprint gives and takes flags, numbers, vectors, texts and enum values)")
+        pins = (list(zip(ins, in_types)), list(zip(gives, out_types)))
+        held = u.externs.get(function)
+        if held is None:
+            if function in u.names or function + "Result" in u.names:
+                raise Wait(f"a call of {function} on the Blueprint of the actor {actor}: the Blueprint has something of that name")
+            lines = []
+            if gives:
+                lines.append(f"  struct {function}Result {{ " + " ".join(f"{t} {o} = {u.zero(t)};" for o, t in pins[1]) + " };")
+            lines.append(f"  /// (of the Blueprint of the actor {actor}, called on it)")
+            lines.append(f"  KERN_EXTERN {function + 'Result' if gives else 'void'} {function}(" + ", ".join(f"{t} {x} = {u.zero(t)}" for x, t in pins[0]) + ");")
+            u.names.update({function, function + "Result"})
+            u.externs[function] = (*pins, lines)
+        elif held[:2] != pins:
+            raise Wait(f"two calls of {function} on Blueprints of actors with other values (a Blueprint says once what a function of another one looks like)")
+        texts = [self.ex(a, t) for a, t in zip(values, in_types)]
+        self.f.pure = False   # (a step: what the other Blueprint does is not known here)
+        self.f.on_actors.append((actor, function))
+        node = u.next_node
+        u.next_node += 1
+        if gives:
+            u.members.append("  struct { " + " ".join(f"{t} {o} = {u.zero(t)};" for o, t in pins[1]) + f" }} n{node};")
+        lines = [f'func_call_on<"{function}">(actor_find({text_literal(actor)}), kern::out({", ".join(f"n{node}.{o}" for o in gives)}){"".join(", " + x for x in texts)});']
+        for p, (o, t) in zip(places, pins[1]):
+            lines += self.store(p, self.typed(f"n{node}.{o}", t))
+        return lines
 
     # ---- the engine: what only it can do is a node ----
     def engine_decl(self, decl_id):
@@ -6537,6 +6639,12 @@ def main(argv):
     pool = concurrent.futures.ProcessPoolExecutor(workers)
     world = World(files, flags)
     world.nodes = set(NODES)
+    if level:   # (the Blueprints of the level's actors: what the program calls on them looks as they have it)
+        for a in json.load(open(level, encoding="utf-8")).get("actors", []):
+            g = (a.get("components") or {}).get("logic")
+            if g and a.get("name"):
+                world.actors[a["name"]] = {"library": bool(g.get("library")), "functions": {
+                    f["name"]: ([p["name"] for p in f.get("inputs", [])], [p["name"] for p in f.get("outputs", [])]) for f in g.get("functions", []) if f.get("name")}}
 
     # ---- the plan: every source file read once - its functions, what they call, the types ----
     functions, types, sources = {}, set(), {}
@@ -6604,6 +6712,7 @@ def main(argv):
                 stack += deps.get(d, ())
         w = World(files, flags)
         w.units, w.type_names, w.taken, w.nodes, w.function_units, w.source_units = world.units, world.type_names, world.taken, world.nodes, world.function_units, world.source_units
+        w.actors = world.actors
         w.table = {k: e for d in need for k, e in tables.get(d, {}).items()}
         w.wanted = None if u in program else set(wanted[u])
         return (u, sources.get(u), files_, namespace, flags, w, test)
