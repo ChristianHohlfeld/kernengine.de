@@ -1006,7 +1006,9 @@ class Unit:
             return f"List<{self.entry(template_args(t)[0])}>"
         if t.startswith("std::shared_ptr"):
             raise Wait("a shared pointer (shared_ptr)")
-        if t.startswith("std::function") or "(lambda" in t:
+        if t.startswith("std::function"):
+            raise Wait("a function value (std::function: the language has no function values)")
+        if "(lambda" in t:
             raise Wait("a function value (lambda / std::function)")
         if t.startswith("std::pair<"):
             a_, b_ = template_args(t)
@@ -2109,7 +2111,7 @@ class Emit:
                     if v.get("constexpr") or re.search(r"\bconst\b", qtype(v)):
                         self.u.constant(v)
                         continue
-                    raise Wait("a static local variable")
+                    raise Wait("a static local variable (kept from one call to the next: a library keeps nothing)")
                 lam = self.lambda_of(kids(v)[-1]) if kids(v) and v.get("init") else None
                 if lam is not None:
                     out += self.local_function(v, lam)
