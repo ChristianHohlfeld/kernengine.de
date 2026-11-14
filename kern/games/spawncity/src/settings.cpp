@@ -43,13 +43,13 @@ std::string num(f32 v) {
 bool bind_settings(kern::logic::Instance* blueprint) {
   g_rules.running = blueprint;
   g_specs.clear();
-  g_rows = g_rules.get<std::vector<Option>>("Options");  // (the rows stay as they are now: the specs point into their texts)
+  g_rows = g_rules.get<std::vector<Option>>("Options");
   if (g_rows.size() != kCount) {
     g_rows.clear();
     return false;
   }
   for (const Option& t : g_rows)
-    g_specs.push_back({t.key.c_str(), t.section.c_str(), t.label.c_str(), t.help.c_str(), static_cast<f32>(t.min), static_cast<f32>(t.max), static_cast<f32>(t.step), static_cast<f32>(t.def),
+    g_specs.push_back({t.key, t.section, t.label, t.help, static_cast<f32>(t.min), static_cast<f32>(t.max), static_cast<f32>(t.step), static_cast<f32>(t.def),
                        t.toggle, t.live});
   return true;
 }

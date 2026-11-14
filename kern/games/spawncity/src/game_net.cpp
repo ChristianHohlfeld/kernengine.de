@@ -117,9 +117,9 @@ std::string Game::world_rules_json() const {
   std::string o = net_.active() && !net_.hosting() ? ",\"worldLocked\":true,\"worldRules\":{" : ",\"worldLocked\":false,\"worldRules\":{";
   bool first = true;
   for (Opt w : kWorldRules) {
-    const char* key = opt_spec(w).key;  // "world.people"
+    const std::string& key = opt_spec(w).key;  // "world.people": the name after "world."
     o += first ? "\"" : ",\"";
-    o += key + 6;
+    for (std::size_t c = 6; c < key.size(); ++c) o += key[c];
     o += ui_.settings.on(w) ? "\":true" : "\":false";
     first = false;
   }
