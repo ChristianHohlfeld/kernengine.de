@@ -2888,7 +2888,7 @@ class Emit:
             changed = self.assigned(rest)
             if re.search(r"\bconst\b", raw) and not own and root not in changed:
                 continue
-            if (self.reads(init) - {root}) & changed:
+            if (self.reads(init) - {root}) & self.changed_while_named(stmts[i + 1:], v["id"]):
                 raise Wait("a reference to an entry at a place that changes while the reference lives")
             if v.get("kind") == "DecompositionDecl":   # (auto& [a, b] = place; - a and b are parts of the place)
                 self.bind(v, self.tp(init))
@@ -2899,6 +2899,45 @@ class Emit:
             self.named_places.add(v["id"])
 
     named_places = frozenset()
+
+    def changed_while_named(self, stmts, vid):
+        """What the statements change while a name declared before them is still used: all they change up to
+        its last use - on the ways that come to it. A branch that leaves the block (return, break, continue)
+        ends the name there: what it changes after its own last use of the name is after. A loop in which the
+        name is used: all it changes (its next pass may use it again)."""
+        def uses(n):
+            return any(x.get("kind") == "DeclRefExpr" and (x.get("referencedDecl") or {}).get("id") == vid for x in walk(n))
+        def leaves(n):
+            k = n.get("kind")
+            if k in ("ReturnStmt", "BreakStmt", "ContinueStmt"):
+                return True
+            return k == "CompoundStmt" and bool(kids(n)) and leaves(kids(n)[-1])
+        last = max((k for k, st in enumerate(stmts) if uses(st)), default=None)
+        if last is None:
+            return set()
+        out = set()
+        for st in stmts[:last]:
+            out |= self.branch_changes(st, vid, uses, leaves)
+        st = stmts[last]
+        if st.get("kind") == "CompoundStmt":
+            return out | self.changed_while_named(kids(st), vid)
+        if st.get("kind") == "IfStmt":
+            return out | self.branch_changes(st, vid, uses, leaves, last_use=True)
+        return out | self.assigned(st)
+
+    def branch_changes(self, st, vid, uses, leaves, last_use=False):
+        """What a statement changes while the name lives (changed_while_named): an if whose branch leaves the
+        block, or holds the name's last use, changes only what comes before that branch's own last use."""
+        if st.get("kind") != "IfStmt" or st.get("hasInit") or st.get("hasVar"):
+            return self.assigned(st)
+        c = kids(st)
+        out = self.assigned(c[0]) if c else set()
+        for branch in c[1:]:
+            if leaves(branch) or (last_use and uses(branch)):
+                out |= self.changed_while_named(kids(branch) if branch.get("kind") == "CompoundStmt" else [branch], vid)
+            else:
+                out |= self.assigned(branch)
+        return out
 
     def block(self, stmts):
         self.scopes.append([])
