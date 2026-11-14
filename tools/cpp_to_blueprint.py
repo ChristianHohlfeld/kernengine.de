@@ -2741,6 +2741,9 @@ class Emit:
                 args.append({"kind": "_Text", "_text": snap, "_type": self.types[i]})
         outer = self.f.decl
         raw_type = qtype(method)
+        trailing = re.match(r"auto\s*(\(.*\)[^()]*?)\s*->\s*(.+)$", raw_type)
+        if trailing:   # (a lambda without its own list of inputs, `[&] { ... }`: its type is spelled "auto () const -> void")
+            raw_type = f"{trailing.group(2)} {trailing.group(1)}"
         if uses_this:
             raw_type = re.sub(r"\s*\bconst\s*$", "", raw_type) + (" const" if not self.f.mutates else "")
         synth = {"id": method["id"], "_mine": True, "kind": "CXXMethodDecl" if uses_this else "FunctionDecl", "name": f"{outer.get('name', 'f')}_{v.get('name', 'local')}",
