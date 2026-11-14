@@ -415,7 +415,7 @@ inline constexpr u32 kLongestFixed = 65536;
 bool fits(const TypeRef& from, const TypeRef& to);
 /// A map's and a set's types (TypeRef::of beside PinType::map / set): the keys' and, of a map,
 /// the values' - "int>float", "enum:Mode>struct_list:Weapon", of a set "int". A key is a Bool,
-/// an Int, an enum's value or a Text; a value is any type a variable can be but a map or a set.
+/// an Int, an Int64, an enum's value or a Text; a value is any type a variable can be but a map or a set.
 TypeRef key_type(const TypeRef& keyed);
 TypeRef value_type(const TypeRef& map);
 /// What TypeRef::of says of a map with these keys and values (`value` null: of a set).
@@ -731,7 +731,7 @@ struct ParamDef {
   bool enums_only = false;  // Kind::type: an enum of the Blueprint and nothing else (the enum nodes' "Enum")
   bool structs_only = false;  // Kind::type: a struct of the Blueprint and nothing else (the struct nodes' "Struct")
   bool optional = false;      // Kind::function: it may name none (Sort List without an Order: the items' own)
-  bool keys_only = false;     // Kind::type: a type a map's or a set's keys can be (Bool, Int, an enum, Text)
+  bool keys_only = false;     // Kind::type: a type a map's or a set's keys can be (Bool, Int, Int64, an enum, Text)
 };
 /// The types a Kind::type setting can name in the Blueprint `g` - its enums and structs among
 /// them -, in the order they are offered.

@@ -111,8 +111,10 @@ template <class K, class V, class Hash = KeyHash<K>> class Map {
   static constexpr std::size_t npos = detail::KeyIndex::npos;
 
   Map() = default;
+  /// (a key said twice: its first entry - as std::unordered_map takes it)
   Map(std::initializer_list<value_type> entries) {
-    for (const value_type& e : entries) insert_or_assign(e.first, e.second);
+    reserve(entries.size());
+    for (const value_type& e : entries) try_emplace(e.first, e.second);
   }
   Map(const Map& o) : entries_(o.entries_) { index(); }
   Map(Map&& o) noexcept : entries_(std::move(o.entries_)), index_(std::move(o.index_)) { o.entries_.clear(), o.index_ = {}; }
@@ -230,6 +232,7 @@ template <class K, class Hash = KeyHash<K>> class Set {
 
   Set() = default;
   Set(std::initializer_list<K> keys) {
+    reserve(keys.size());
     for (const K& k : keys) insert(k);
   }
   template <class It> Set(It first, It last) {

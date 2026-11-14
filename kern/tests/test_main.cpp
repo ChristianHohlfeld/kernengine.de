@@ -4121,6 +4121,298 @@ TEST(logic_text_of_the_program) {
   CHECK(set == "2.5");
 }
 
+TEST(kern_map_keeps_the_order_its_keys_came) {
+  // kern::Map and kern::Set against the plainest thing that does the same: a vector of entries and
+  // a search through it - thousands of random steps (put in, take out by key and by place, clear,
+  // reserve, copy, move), and after every one the same entries in the same order.
+  u64 state = 0x9e3779b97f4a7c15ull;
+  auto next = [&] {
+    state ^= state << 13, state ^= state >> 7, state ^= state << 17;
+    return state;
+  };
+  for (int round = 0; round < 40; ++round) {
+    kern::Map<i64, i64> map;
+    kern::Set<std::string> set;
+    std::vector<std::pair<i64, i64>> want;
+    std::vector<std::string> want_keys;
+    const i64 keys = 1 + static_cast<i64>(next() % 300);  // (few keys: many come again)
+    auto at = [&](i64 k) { for (std::size_t i = 0; i < want.size(); ++i) if (want[i].first == k) return static_cast<i64>(i); return i64{-1}; };
+    auto at_key = [&](const std::string& k) { for (std::size_t i = 0; i < want_keys.size(); ++i) if (want_keys[i] == k) return static_cast<i64>(i); return i64{-1}; };
+    bool same = true;
+    for (int step = 0; step < 2000 && same; ++step) {
+      const i64 k = static_cast<i64>(next() % static_cast<u64>(keys)) - keys / 2;
+      const std::string word = "k" + std::to_string(k);
+      switch (next() % 10) {
+        case 0: case 1: case 2: {  // insert_or_assign / Set: new at the end, else the value changes
+          const i64 v = static_cast<i64>(next() % 1000);
+          const auto [it, fresh] = map.insert_or_assign(k, v);
+          const i64 i = at(k);
+          same = same && fresh == (i < 0) && it->second == v;
+          if (i < 0) want.push_back({k, v});
+          else want[static_cast<std::size_t>(i)].second = v;
+          break;
+        }
+        case 3: {  // try_emplace / Add: nothing changes when the key is there
+          const auto [it, fresh] = map.try_emplace(k, 5);
+          const i64 i = at(k);
+          same = same && fresh == (i < 0) && it->first == k;
+          if (i < 0) want.push_back({k, 5});
+          break;
+        }
+        case 4: {  // erase by key: the others keep their order
+          const i64 i = at(k);
+          same = same && map.erase(k) == (i < 0 ? 0u : 1u);
+          if (i >= 0) want.erase(want.begin() + i);
+          break;
+        }
+        case 5: {  // erase by place
+          if (want.empty()) break;
+          const std::size_t i = static_cast<std::size_t>(next() % want.size());
+          map.erase_at(i);
+          want.erase(want.begin() + static_cast<std::ptrdiff_t>(i));
+          break;
+        }
+        case 6: {  // [] makes the entry with the zero
+          map[k] += 1;
+          const i64 i = at(k);
+          if (i < 0) want.push_back({k, 1});
+          else want[static_cast<std::size_t>(i)].second += 1;
+          break;
+        }
+        case 7: {  // a set: insert and erase
+          const i64 i = at_key(word);
+          if (next() % 2) {
+            same = same && set.insert(word).second == (i < 0);
+            if (i < 0) want_keys.push_back(word);
+          } else {
+            same = same && set.erase(word) == (i < 0 ? 0u : 1u);
+            if (i >= 0) want_keys.erase(want_keys.begin() + i);
+          }
+          break;
+        }
+        case 8: {  // copies and moves keep the entries and find them
+          if (next() % 2) { kern::Map<i64, i64> copy = map; map = std::move(copy); }
+          else { kern::Set<std::string> copy(set); set = copy; }
+          if (next() % 50 == 0) map.reserve(static_cast<std::size_t>(next() % 1000));
+          break;
+        }
+        default:
+          if (next() % 40 == 0) { map.clear(); want.clear(); }
+          if (next() % 40 == 0) { set.clear(); want_keys.clear(); }
+          break;
+      }
+      // the same entries in the same order - and every key found where it stands
+      same = same && map.size() == want.size() && set.size() == want_keys.size();
+      for (std::size_t i = 0; same && i < want.size(); ++i)
+        same = map.key_at(i) == want[i].first && map.value_at(i) == want[i].second && map.index_of(want[i].first) == i && map.find(want[i].first) == map.begin() + i;
+      for (std::size_t i = 0; same && i < want_keys.size(); ++i) same = set.key_at(i) == want_keys[i] && set.index_of(want_keys[i]) == i && set.contains(want_keys[i]);
+      same = same && map.contains(k) == (at(k) >= 0) && set.contains(word) == (at_key(word) >= 0);
+      same = same && (at(keys + 1) < 0 && !map.contains(keys + 1) && map.find(keys + 1) == map.end());
+    }
+    CHECK(same);
+    // going through it is the order the keys came, on every machine
+    std::size_t i = 0;
+    for (const auto& [k, v] : map) {
+      CHECK(k == want[i].first && v == want[i].second);
+      ++i;
+    }
+  }
+  // a key that comes again after it was taken out goes to the end
+  kern::Map<std::string, int> m{{"a", 1}, {"b", 2}, {"c", 3}};
+  m.erase("a");
+  m["a"] = 4;
+  CHECK(m.key_at(0) == "b" && m.key_at(1) == "c" && m.key_at(2) == "a" && m.value_at(2) == 4);
+  // (a key said twice in what makes the map: the first - as std::unordered_map takes it)
+  kern::Map<int, int> twice{{1, 1}, {2, 2}, {1, 3}};
+  CHECK(twice.size() == 2 && twice.key_at(0) == 1 && twice.value_at(0) == 1);
+  CHECK((kern::Map<int, int>{{1, 2}} == kern::Map<int, int>{{1, 2}}) && !(kern::Map<int, int>{{1, 2}, {3, 4}} == kern::Map<int, int>{{3, 4}, {1, 2}}));
+}
+
+TEST(logic_int64_is_u64_and_i64) {
+  // Every Int64 node against what u64 and i64 of C++ do - with random bits (and the edges: 0, 1,
+  // -1, the smallest and the largest i64); where C++ leaves it open, the node's own answer.
+  using P = logic::PureNodes;
+  using I = logic::Int64;
+  u64 state = 0x2545f4914f6cdd1dull;
+  auto next = [&] {
+    state ^= state << 13, state ^= state >> 7, state ^= state << 17;
+    return state;
+  };
+  const u64 edges[] = {0, 1, ~u64{0}, u64{1} << 63, (u64{1} << 63) - 1, 2, 63, 64, 0xffffffffull, 0x100000000ull};
+  auto draw = [&] { return next() % 4 == 0 ? edges[next() % (sizeof edges / sizeof edges[0])] : next() >> (next() % 64); };
+  bool same = true;
+  for (int k = 0; k < 20000 && same; ++k) {
+    const u64 a = draw(), b = draw();
+    const i64 sa = static_cast<i64>(a), sb = static_cast<i64>(b);
+    const i64 by = static_cast<i64>(next() % 200) - 50;
+    const unsigned sh = static_cast<unsigned>(static_cast<u64>(by) & 63);
+    same = same && P::int64_add(I(a), I(b)).bits == a + b && P::int64_sub(I(a), I(b)).bits == a - b && P::int64_mul(I(a), I(b)).bits == a * b;
+    same = same && P::int64_div_unsigned(I(a), I(b)).bits == (b ? a / b : 0) && P::int64_rem_unsigned(I(a), I(b)).bits == (b ? a % b : 0);
+    if (sb != 0 && !(sb == -1 && sa == std::numeric_limits<i64>::min()))
+      same = same && P::int64_div(I(a), I(b)).bits == static_cast<u64>(sa / sb) && P::int64_rem(I(a), I(b)).bits == static_cast<u64>(sa % sb);
+    same = same && P::int64_and(I(a), I(b)).bits == (a & b) && P::int64_or(I(a), I(b)).bits == (a | b) && P::int64_xor(I(a), I(b)).bits == (a ^ b) && P::int64_not(I(a)).bits == ~a;
+    same = same && P::int64_shift_left(I(a), by).bits == (a << sh) && P::int64_shift_right_unsigned(I(a), by).bits == (a >> sh) && P::int64_shift_right(I(a), by).bits == static_cast<u64>(sa >> sh);
+    same = same && P::int64_rotate_left(I(a), by).bits == std::rotl(a, static_cast<int>(sh)) && P::int64_rotate_right(I(a), by).bits == std::rotr(a, static_cast<int>(sh));
+    same = same && P::int64_equal(I(a), I(b)) == (a == b) && P::int64_less(I(a), I(b)) == (sa < sb) && P::int64_less_unsigned(I(a), I(b)) == (a < b);
+    same = same && P::int64_high(I(a)) == static_cast<i64>(a >> 32) && P::int64_low(I(a)) == static_cast<i64>(a & 0xffffffffull) && P::int64_of_halves(P::int64_high(I(a)), P::int64_low(I(a))).bits == a;
+    same = same && P::int64_count_ones(I(a)) == std::popcount(a) && P::int64_leading_zeros(I(a)) == std::countl_zero(a) && P::int64_trailing_zeros(I(a)) == std::countr_zero(a);
+    same = same && P::int64_bits_of_float(P::int64_float_of_bits(I(a))).bits == a;  // (a no-number's bits too)
+    same = same && P::int64_of_text(P::int64_text(I(a))).bits == a && P::int64_of_text(P::int64_text_signed(I(a))).bits == a && P::int64_of_text("0x" + P::int64_text_hex(I(a))).bits == a;
+    same = same && P::int64_text(I(a)) == std::to_string(a) && P::int64_text_signed(I(a)) == std::to_string(sa);
+    same = same && P::int64_to_float(I(a)) == static_cast<f64>(sa) && P::int64_to_float_unsigned(I(a)) == static_cast<f64>(a) && P::int64_to_int(I(a)) == logic::normal(sa);
+    const f64 x = static_cast<f64>(sa) * 0.75;
+    same = same && P::int64_of_float(x).bits == static_cast<u64>(static_cast<i64>(x));
+    if (!same) std::printf("Int64: %llx %llx by %lld\n", static_cast<unsigned long long>(a), static_cast<unsigned long long>(b), static_cast<long long>(by));
+  }
+  CHECK(same);
+  // what C++ leaves open, defined: by 0, the smallest i64 by -1, Floats beyond the ends and no number, texts that are none
+  const u64 min = u64{1} << 63;
+  CHECK(P::int64_div(I(5), I(0)).bits == 0 && P::int64_rem(I(5), I(0)).bits == 0 && P::int64_div_unsigned(I(5), I(0)).bits == 0 && P::int64_rem_unsigned(I(5), I(0)).bits == 0);
+  CHECK(P::int64_div(I(min), I(~u64{0})).bits == min && P::int64_rem(I(min), I(~u64{0})).bits == 0);
+  CHECK(P::int64_of_float(1e30).bits == static_cast<u64>(std::numeric_limits<i64>::max()) && P::int64_of_float(-1e30).bits == min && P::int64_of_float(std::nan("")).bits == 0);
+  CHECK(P::int64_of_float(-9223372036854775808.0).bits == min && P::int64_of_float(9223372036854775808.0).bits == static_cast<u64>(std::numeric_limits<i64>::max()));
+  CHECK(P::int64_of_float_unsigned(-1).bits == 0 && P::int64_of_float_unsigned(1e30).bits == ~u64{0} && P::int64_of_float_unsigned(3.75).bits == 3 && P::int64_of_float_unsigned(std::nan("")).bits == 0);
+  CHECK(P::int64_of_text("").bits == 0 && P::int64_of_text("zz").bits == 0 && P::int64_of_text("18446744073709551616").bits == 0 && P::int64_of_text("-5").bits == ~u64{0} - 4);
+  CHECK(P::int64_of_text("0x1F").bits == 31 && P::int64_text_hex(I(255)) == "ff" && P::int64_of_int(-1).bits == ~u64{0} && P::int64_to_int_unsigned(I(7)) == 7);
+  // the value of the language: its bits, as JSON a text of their u64, as a literal Int64{0x...}
+  const logic::Value v = logic::Value::int64(~u64{0});
+  CHECK(json::stringify(v.to_json()) == "\"18446744073709551615\"" && logic::Value::from_json(v.to_json(), logic::PinType::int64).i == v.i && v.as_text() == "18446744073709551615");
+  CHECK(logic::Value::from_json(json::Value(5.0), logic::PinType::int64).i == 5 && logic::Value::from_json(json::Value("0x10"), logic::PinType::int64).i == 16);
+  CHECK(!logic::convertible(logic::PinType::int64, logic::PinType::number) && !logic::convertible(logic::PinType::integer, logic::PinType::int64) && !logic::convertible(logic::PinType::int64, logic::PinType::text));
+  CHECK(logic::list_of(logic::PinType::int64) == logic::PinType::int64_list && logic::element_of(logic::PinType::int64_list) == logic::PinType::int64 && logic::is_list(logic::PinType::int64_list));
+  CHECK(!logic::is_list(logic::PinType::map) && !logic::is_list(logic::PinType::set) && logic::is_keyed(logic::PinType::map) && std::string(logic::pin_type_name(logic::PinType::int64_list)) == "int64_list");
+}
+
+TEST(logic_maps_and_sets) {
+  // Maps and sets of a Blueprint: types, values, JSON, the text, the check - and that a call that
+  // holds an entry of a map keeps it where it is.
+  const std::string head = "struct B : kern::Blueprint {\n  KERN_ENUM(Kind, A, B, C);\n  KERN_STRUCT(Cell) {\n    Int Count = 0;\n    List<Text> Tags = List<Text>{};\n  };\n"
+                           "  Map<Int, Float> Scores = Map<Int, Float>{{3, 1.5}, {1, 2.0}};\n  Map<Text, Cell> Cells = Map<Text, Cell>{};\n  Map<Kind, List<Float>> Lists = Map<Kind, List<Float>>{};\n"
+                           "  Set<Int64> Seen = Set<Int64>{Int64{0x5}};\n  Map<Int64, Text> Big = Map<Int64, Text>{{Int64{0xffffffffffffffff}, \"max\"}};\n  Float Got = 0.0;\n  Int N = 0;\n";
+  auto in_event = [](const std::string& lines) { return "  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, Float value, Text text) {\n" + lines + "\n  }\n"; };
+  auto read = [&](const std::string& body, logic::Graph& g, std::string& error) { return logic::from_cpp(head + body + "};\n", g, nullptr, &error); };
+  auto says = [&](const std::string& body, const char* why) {
+    logic::Graph g;
+    std::string error;
+    const bool is_read = read(body, g, error);
+    if (is_read) error = logic::cpp_problem(g);
+    for (const logic::Issue& i : is_read ? logic::check(g) : std::vector<logic::Issue>())
+      if (i.error) error += " | " + i.text;
+    const bool right = error.find(why) != std::string::npos;
+    if (!right) std::printf("expected \"%s\", got: %s\n", why, error.empty() ? "(nothing is wrong with it)" : error.c_str());
+    return right;
+  };
+  {
+    // the types and what TypeRef::of says of them
+    const logic::TypeRef cells{logic::PinType::map, "text>struct:Cell"}, seen{logic::PinType::set, "int64"};
+    CHECK(logic::key_type(cells).type == logic::PinType::text && logic::value_type(cells).type == logic::PinType::structure && logic::value_type(cells).of == "Cell");
+    CHECK(logic::key_type(seen).type == logic::PinType::int64 && logic::value_type(seen).type == logic::PinType::exec);
+    const logic::TypeRef kind{logic::PinType::enumeration, "Kind"}, floats{logic::PinType::number_list, {}};
+    CHECK(logic::keyed_of(kind, &floats) == "enum:Kind>float_list" && logic::keyed_of(kind, nullptr) == "enum:Kind");
+    CHECK(logic::type_text(cells) == "map<text>struct:Cell>" && logic::type_label(cells) == "Map of Text to Cell" && logic::type_label(seen) == "Set of Int64");
+    CHECK(logic::key_type_ok(logic::PinType::int64) && !logic::key_type_ok(logic::PinType::number) && !logic::key_type_ok(logic::PinType::vector) && !logic::key_type_ok(logic::PinType::map));
+    CHECK(logic::fits(cells, cells) && !logic::fits(cells, {logic::PinType::map, "text>struct:Other"}) && !logic::fits(seen, {logic::PinType::set, "int"}));
+  }
+  {
+    // the text and the graph: every node, a value of a map as a place, literals of each kind of key
+    logic::Graph g, back;
+    std::string error, text, twice;
+    CHECK(read(in_event("    map_set(Scores, 7, value);\n    map_add(Cells, \"a\");\n    Cells[0].Count += 1;\n    list_add(Cells[0].Tags, text);\n"
+                        "    map_set(Lists, Kind::B, List<Float>{value, 2.5});\n    set_add(Seen, Int64{0x10000000000000});\n    map_set(Big, Int64{0x20000000000001}, \"far\");\n"
+                        "    Got = map_find<Int, Float>(Scores, 7).value;\n    N = map_length<Int, Float>(Scores);\n    map_remove(Scores, 3);\n    set_remove_at(Seen, 0);"),
+               g, error));
+    if (!error.empty()) std::printf("%s\n", error.c_str());
+    for (const logic::Issue& i : logic::check(g)) {
+      if (i.error) std::printf("%s\n", i.text.c_str());
+      CHECK(!i.error);
+    }
+    CHECK(g.variable("Scores") && g.variable("Scores")->type == logic::PinType::map && g.variable("Scores")->of == "int>float" && json::stringify(g.variable("Scores")->value) == "[[3,1.5],[1,2]]");
+    CHECK(g.variable("Seen") && g.variable("Seen")->type == logic::PinType::set && g.variable("Seen")->of == "int64" && json::stringify(g.variable("Seen")->value) == "[\"5\"]");
+    CHECK(g.variable("Big") && json::stringify(g.variable("Big")->value) == "[[\"18446744073709551615\",\"max\"]]" && g.variable("Lists")->of == "enum:Kind>float_list");
+    CHECK(logic::to_cpp(g, "B", text, &error, logic::library(), false));
+    CHECK(text.find("  Map<Int, Float> Scores = Map<Int, Float>{{3, 1.5}, {1, 2.0}};\n") != std::string::npos && text.find("  Set<Int64> Seen = Set<Int64>{Int64{0x5}};\n") != std::string::npos);
+    CHECK(text.find("  Map<Kind, List<Float>> Lists = Map<Kind, List<Float>>{};\n") != std::string::npos && text.find("Int64{0xffffffffffffffff}") != std::string::npos);
+    CHECK(logic::from_cpp(text, back, nullptr, &error) && logic::to_cpp(back, "B", twice, &error, logic::library(), false) && twice == text);
+    CHECK(logic::graph_from_json(logic::graph_to_json(g), back) && back == g);
+    // every tier the same: the order the keys came, an entry taken out of the middle
+    for (bool jit : {false, true}) {
+      FakeLogicHost host;
+      logic::Runtime rt(host);
+      rt.jit = jit;
+      rt.native = false;
+      logic::Instance* inst = rt.add(g, 0, "Level");
+      rt.begin();
+      rt.call("Go", 0, {{"value", logic::Value::number(4.5)}, {"text", logic::Value::text("t")}});
+      const logic::Value scores = inst->get("Scores"), cells_now = inst->get("Cells"), seen_now = inst->get("Seen");
+      CHECK(scores.size() == 2 && scores.keyed().key_at(0).i == 1 && scores.keyed().key_at(1).i == 7 && scores.keyed().value_at(1).as_number() == 4.5);
+      CHECK(inst->get("Got").as_number() == 4.5 && inst->get("N").as_int() == 3 && host.errors.empty());
+      CHECK(cells_now.size() == 1 && cells_now.keyed().key_at(0).s == "a" && cells_now.keyed().value_at(0).field(0)->as_int() == 1 && cells_now.keyed().value_at(0).field(1)->size() == 1);
+      CHECK(seen_now.size() == 1 && static_cast<u64>(seen_now.keyed().key_at(0).i) == 0x10000000000000ull);
+      const logic::Value big = inst->get("Big");
+      CHECK(big.size() == 2 && static_cast<u64>(big.keyed().key_at(0).i) == ~u64{0} && static_cast<u64>(big.keyed().key_at(1).i) == 0x20000000000001ull && big.keyed().value_at(1).as_text() == "far");
+    }
+  }
+  {
+    // a map's value at its place: what stands there, and beside the map an entry of its own
+    logic::Graph g;
+    std::string error;
+    CHECK(read(in_event("    map_add(Cells, \"a\");\n    Cells[5].Count += 1;\n    N = struct_break<Cell>(Cells[0]).Count;"), g, error));
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.native = false;
+    logic::Instance* inst = rt.add(g, 0, "Level");
+    rt.begin();
+    rt.call("Go", 0, {{"value", logic::Value::number(1)}});
+    CHECK(inst->get("Cells").size() == 1 && inst->get("N").as_int() == 0 && host.errors.empty());
+  }
+  // what the notation and the check refuse - with the reason
+  CHECK(says("  Map<Float, Int> Wrong = Map<Float, Int>{};\n", "the keys of a map or a set are Bool, Int, Int64, Text or an enum"));
+  CHECK(says("  Set<Vector> Wrong = Set<Vector>{};\n", "the keys of a map or a set are Bool, Int, Int64, Text or an enum"));
+  CHECK(says("  Map<Int, Map<Int, Float>> Wrong = Map<Int, Map<Int, Float>>{};\n", "the values of a map are a type a variable can be, but no map, set or list of a fixed length"));
+  CHECK(says("  Map<Int, Fixed<Float, 3>> Wrong = Map<Int, Fixed<Float, 3>>{};\n", "the values of a map are a type a variable can be, but no map, set or list of a fixed length"));
+  CHECK(says("  Map<Int, Float> Twice = Map<Int, Float>{{1, 2.0}, {1, 3.0}};\n", "the key 1 is said twice"));
+  CHECK(says(in_event("    map_add(Scores, 2);\n    list_add(Scores, 1.0);"), "Scores"));
+  CHECK(says("  void Touch(Cell& c) {\n    map_add(Cells, \"b\");\n    c.Count += 1;\n  }\n" + in_event("    map_add(Cells, \"a\");\n    Touch(Cells[0]);"), "an entry that is held stays where it is"));
+  CHECK(says("  void Touch(Cell& c) {\n    map_remove(Cells, \"b\");\n    c.Count += 1;\n  }\n" + in_event("    Touch(Cells[0]);"), "an entry that is held stays where it is"));
+  {
+    // ... and a graph that says it wrong: a key of a Float, a map in a map, a map with a fixed length
+    auto issues = [](logic::Graph g) {
+      std::string all;
+      for (const logic::Issue& i : logic::check(g)) all += i.error ? i.text + " | " : "";
+      return all;
+    };
+    logic::Graph g;
+    g.variables.push_back({"M", logic::PinType::map, json::Value::array(), {}, "float>int"});
+    CHECK(issues(g).find("variable \"M\" is map<float>int>, which this Blueprint cannot have") != std::string::npos);
+    g.variables[0].of = "int>map:int>float";
+    CHECK(issues(g).find("which this Blueprint cannot have") != std::string::npos);
+    g.variables[0].of = "int>float";
+    g.variables[0].count = 3;
+    CHECK(issues(g).find("variable \"M\" has a fixed length (3), but is map<int>float>: a length is a list's") != std::string::npos);
+    g.variables[0].count = 0;
+    g.variables[0].of = "enum:Nope>int";
+    CHECK(issues(g).find("which this Blueprint cannot have") != std::string::npos);
+    // (in a file: a type it cannot have is no graph)
+    logic::Graph none;
+    json::Value j;
+    CHECK(json::parse(R"({"variables":[{"name":"M","type":"map","of":"float>int","value":[]}],"nodes":[],"links":[]})", j) && !logic::graph_from_json(j, none));
+  }
+  {
+    // JSON: [[key, value], ...] in the order of the entries; a key said again: the first
+    logic::Graph g;
+    const logic::TypeRef scores{logic::PinType::map, "int>float"}, words{logic::PinType::set, "text"};
+    json::Value j;
+    CHECK(json::parse("[[2, 1.5], [1, 3], [2, 9], 7]", j));
+    const logic::Value m = logic::Value::from_json(j, scores, g);
+    CHECK(m.size() == 2 && m.keyed().key_at(0).i == 2 && m.keyed().value_at(0).as_number() == 1.5 && m.keyed().key_at(1).i == 1);
+    CHECK(json::stringify(m.to_json(g, scores)) == "[[2,1.5],[1,3]]");
+    CHECK(json::parse("[\"b\", \"a\", \"b\"]", j));
+    const logic::Value s = logic::Value::from_json(j, words, g);
+    CHECK(s.size() == 2 && s.keyed().key_at(0).s == "b" && json::stringify(s.to_json(g, words)) == "[\"b\",\"a\"]");
+    CHECK(logic::Value::from_json(m.to_json(g, scores), scores, g) == m && !(m == s));
+  }
+}
+
 TEST(logic_notation_hands_over) {
   // std::move stands in a Blueprint's C++ exactly where a value is needed by nothing again - a
   // local variable or an input by value of a function where it is read for the last time, what
