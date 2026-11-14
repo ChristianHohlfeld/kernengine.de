@@ -1017,6 +1017,9 @@ class Unit:
             return self.pair(self.btype(a_), self.btype(b_))
         if t.startswith("std::tuple") or t.startswith("std::variant"):
             raise Wait("tuple / variant")
+        if t.startswith("std::priority_queue<"):
+            # (which of two entries of the same priority comes first, the library's heap says)
+            raise Wait("the type std::priority_queue (a list kept in an order: the language has no step for it)")
         q = self.find_type(t)
         if q in self.tree.enums:
             return self.enum(q)
