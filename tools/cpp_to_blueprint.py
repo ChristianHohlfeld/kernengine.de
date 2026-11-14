@@ -1172,6 +1172,9 @@ class Unit:
         # last name that is defined: what it is, this file does not know)
         last = t.split("::")[-1]
         for q in self.tree.declared:
+            outer = q[: len(q) - len(last)].rstrip(":")
+            if outer in self.tree.records and q != t and not (self.lookup_scope or "").startswith(outer + "::") and not t.startswith(outer.split("::")[-1] + "::"):
+                continue   # (a class declared in a class - Mixer::Voice: by its short name only in that class)
             if q.split("::")[-1] == last and q not in self.tree.records and (q.endswith("::" + t) or q == t) and not any(q == c or q.endswith("::" + c) for c in cands):
                 raise Wait(f"the type {t} is only declared here (its definition is in another file)")
         if len(cands) == 1:
