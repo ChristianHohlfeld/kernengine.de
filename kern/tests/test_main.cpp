@@ -27,6 +27,7 @@
 #include "kern/studio/studio.h"
 #include "kern/net/client_server.h"
 #include "kern/game/net_game.h"
+#include "kern/logic/actor_blueprint.h"
 #include "kern/logic/blueprint.h"
 #include "kern/logic/logic.h"
 #include "blueprint_native.h"
@@ -2551,6 +2552,208 @@ struct Cop : kern::Blueprint {
   CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  struct FResult { Float a = 0.0; Float b = 0.0; };\n  KERN_EXTERN FResult F();\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n"
                          "    func_call_on<\"F\">(Actor{0}, kern::out(n2.b, n2.a));\n  }\n  struct { Float a = 0.0; Float b = 0.0; } n2;\n};\n", none, nullptr, &error));
   CHECK(error.find("in their order") != std::string::npos);
+}
+
+TEST(logic_actor_blueprint_from_cpp) {
+  // The program's C++ calls a Blueprint of an actor (kern::logic::ActorBlueprint) the one way a Blueprint
+  // does (Call on Actor, Get Variable on Actor, Has Blueprint): bound to the logic, it finds the actor by
+  // its name at every call, and the runtime's one way decides the rest - a target without a Blueprint
+  // that runs, the Level for a name nobody has, how deep calls nest, a Blueprint in the middle of a call.
+  CHECK(game::logic_nodes_registered());
+  const char* rules_text = R"kn(
+struct Rules : kern::Blueprint {
+  Float Speed = 2.5;
+  Int Laps = 3;
+  Text Name = "fast";
+  Int Depth = 0;
+
+  struct TwiceResult { Float out = 0.0; Int laps = 0; };
+  TwiceResult Twice(Float x = 0.0) {
+    Laps += 1;
+    return {math_add(math_mul(x, 2.0), Speed), Laps};
+  }
+
+  struct KeepResult { Int kept = 0; };
+  KeepResult Keep(Int n = 0) {
+    Int Mine = 0;
+    Mine = n;
+    debug_print("keep", false);
+    return {Mine};
+  }
+
+  struct KeepOnResult { Int kept = 0; };
+  KeepOnResult KeepOn(Int n = 0) {
+    Int Mine = 0;
+    Mine = n;
+    if (math_compare<">">(kern::to<Float>(n), 0.0)) {
+      func_call_on<"KeepOn">(actor_find("Rules"), kern::out(n30.kept), 0);
+    }
+    return {Mine};
+  }
+
+  void Forever() {
+    debug_print("again", false);
+  }
+
+  void Deeper() {
+    Depth += 1;
+    func_call_on<"Deeper">(actor_find("Rules"), kern::out());
+  }
+
+  struct { Int kept = 0; } n30;
+};
+)kn";
+  const char* level_text = R"kn(
+struct Level : kern::Blueprint {
+  struct TwiceResult { Float out = 0.0; Int laps = 0; };
+  TwiceResult Twice(Float x = 0.0) {
+    return {math_mul(x, 3.0), 0};
+  }
+};
+)kn";
+  const char* caller_text = R"kn(
+struct Caller : kern::Blueprint {
+  Float Got = 0.0;
+  Int GotLaps = 0;
+  Float AtLevel = 0.0;
+  Float Speed = 0.0;
+  Float LapsRead = 0.0;
+  Float Nobody = 0.0;
+  Float Wrong = 0.0;
+  Text Name = "";
+  Bool Has = false;
+  Bool HasLost = false;
+
+  struct TwiceResult { Float out = 0.0; Int laps = 0; };
+  KERN_EXTERN TwiceResult Twice(Float x = 0.0);
+
+  KERN_EVENT(on1, event_custom<"Ask">)
+  void on1(Actor actor, Float value, Text text) {
+    func_call_on<"Twice">(actor_find("Rules"), kern::out(n2.out, n2.laps), value);
+    Got = n2.out;
+    GotLaps = n2.laps;
+    func_call_on<"Twice">(actor_find("Lost"), kern::out(n3.out, n3.laps), value);
+    AtLevel = n3.out;
+    Speed = func_get_on<"Speed", Float>(actor_find("Rules"));
+    LapsRead = func_get_on<"Laps", Float>(actor_find("Rules"));
+    Nobody = func_get_on<"Missing", Float>(actor_find("Rules"));
+    Wrong = func_get_on<"Name", Float>(actor_find("Rules"));
+    Name = func_get_on<"Name", Text>(actor_find("Rules"));
+    Has = func_has_blueprint(actor_find("Rules"));
+    HasLost = func_has_blueprint(actor_find("Lost"));
+  }
+
+  struct { Float out = 0.0; Int laps = 0; } n2;
+  struct { Float out = 0.0; Int laps = 0; } n3;
+};
+)kn";
+  struct CallingHost : FakeLogicHost {
+    logic::ActorRef rules_id = 7;
+    logic::ActorBlueprint* rules = nullptr;
+    int again = 0;
+    bool keep_once = false;
+    i64 inner = -1;
+    logic::ActorRef find_actor(std::string_view name) override { return name == "Rules" ? rules_id : name == "Caller" ? 9 : 0; }
+    void print(const std::string& text, bool screen) override {
+      FakeLogicHost::print(text, screen);
+      if (!rules) return;
+      if (text == "again") {
+        ++again;
+        rules->call("Forever", std::tie());
+      } else if (text == "keep" && keep_once) {
+        keep_once = false;
+        i64 k = -1;
+        rules->call("Keep", std::tie(k), i64{0});
+        inner = k;
+      }
+    }
+  };
+  logic::Graph rules_g, level_g, caller_g, broken = logic_graph(R"({"variables":[{"name":"Speed","type":"float","value":7}],"nodes":[{"id":1,"type":"no.such.node"}],"links":[]})");
+  std::string error;
+  CHECK(logic::from_cpp(rules_text, rules_g, nullptr, &error));
+  CHECK(logic::from_cpp(level_text, level_g, nullptr, &error));
+  CHECK(logic::from_cpp(caller_text, caller_g, nullptr, &error));
+  if (!error.empty()) std::printf("%s\n", error.c_str());
+  CHECK(no_errors(logic::check(rules_g)) && no_errors(logic::check(level_g)) && no_errors(logic::check(caller_g)));
+  // Has Blueprint as C++ and back: the same Blueprint
+  std::string text;
+  CHECK(logic::to_cpp(caller_g, "Caller", text, &error) && text.find("    Has = func_has_blueprint(actor_find(\"Rules\"));\n") != std::string::npos);
+  logic::Graph read;
+  CHECK(logic::from_cpp(text, read, nullptr, &error) && read == caller_g);
+  CHECK(logic::native_ready(caller_g, &error));
+  for (bool jit : {false, true}) {
+    CallingHost host;
+    logic::Runtime rt(host);
+    rt.jit = jit;
+    logic::ActorBlueprint rules{"Rules"}, lost{"Lost"};
+    // unbound: the zeros
+    CHECK(rules.number("Twice", 1.0) == 0 && rules.get<f64>("Speed") == 0 && !rules.flag("Twice", 1.0));
+    logic::Instance* r = rt.add(rules_g, 7, "Rules");
+    logic::Instance* c = rt.add(caller_g, 9, "Caller");
+    CHECK(r && c && !r->disabled() && !c->disabled());
+    if (!r || !c) continue;
+    rt.begin();
+    // bound: Has Blueprint - of the actor, and of a name nobody has: the Level, which has none yet
+    CHECK(rules.bind(rt) && !lost.bind(rt));
+    rt.call("Ask", 9, {{"actor", logic::Value::actor(0)}, {"value", logic::Value::number(4)}, {"text", logic::Value::text("")}});
+    CHECK(c->get("Has").b && !c->get("HasLost").b);
+    // the call: what the Blueprint gives and does, in both forms
+    CHECK_NEAR(c->get("Got").as_number(), 10.5, 1e-12);
+    CHECK(c->get("GotLaps").i == 4);
+    f64 out = 0;
+    i64 laps = 0;
+    rules.call("Twice", std::tie(out, laps), 4.0);
+    CHECK(out == 10.5 && laps == 5 && r->get("Laps").i == 5);
+    // ... an output as the type of its place: a whole number as a decimal one, and back
+    rules.call("Twice", std::tie(laps, out), 4.0);
+    CHECK(laps == 10 && out == 6);
+    // a name nobody has is no actor: the Level - without a Blueprint, the declared defaults, the zeros
+    CHECK(c->get("AtLevel").as_number() == 0 && lost.number("Twice", 4.0) == 0);
+    // the variables: as their reader reads them - a whole number as a decimal one, a text as none (the zero)
+    CHECK(c->get("Speed").as_number() == 2.5 && rules.get<f64>("Speed") == 2.5);
+    CHECK(c->get("LapsRead").as_number() == 4 && rules.get<f64>("Laps") == 6);
+    CHECK(c->get("Nobody").as_number() == 0 && rules.get<f64>("Missing") == 0);
+    CHECK(c->get("Wrong").as_number() == 0 && rules.get<f64>("Name") == 0);
+    CHECK(c->get("Name").as_text() == "fast" && rules.get<std::string>("Name") == "fast" && rules.get<i64>("Speed") == 2);
+    // a Blueprint in the middle of a call of the function: the call it is in has its own values back
+    host.rules = &rules;
+    host.keep_once = true;
+    i64 kept = -1;
+    rules.call("Keep", std::tie(kept), i64{5});
+    CHECK(kept == 5 && host.inner == 0);
+    std::vector<logic::Value> got;
+    CHECK(r->call("KeepOn", {logic::Value::integer(6)}, got) && got.size() == 1 && got[0].i == 6);
+    // calls nest at most 64 deep, the same from C++ and from a node: then the call is left out and reported
+    const std::size_t before = host.errors.size();
+    rules.call("Forever", std::tie());
+    CHECK(host.again == 64 && host.errors.size() == before + 1);
+    CHECK(host.errors.back().find("the program's C++: calls on other Blueprints nest more than 64 deep - the call of Forever") != std::string::npos);
+    rules.call("Deeper", std::tie());
+    CHECK(r->get("Depth").i == 64 && host.errors.size() == before + 2);
+    CHECK(host.errors.back().find("Rules: calls on other Blueprints nest more than 64 deep - the call of Deeper") != std::string::npos);
+    host.rules = nullptr;
+    // the Level's Blueprint: what a name nobody has reaches
+    logic::Instance* lv = rt.add(level_g, 0, "Level");
+    CHECK(lv && lost.bind(rt) && lost.number("Twice", 4.0) == 12);
+    rt.call("Ask", 9, {{"actor", logic::Value::actor(0)}, {"value", logic::Value::number(4)}, {"text", logic::Value::text("")}});
+    CHECK(c->get("AtLevel").as_number() == 12 && c->get("HasLost").b);
+    // by its name, at every call: the actor's Blueprint taken out and one with errors put in its place -
+    // nothing runs there (the defaults; Has Blueprint is false) ...
+    rt.remove(7);
+    logic::Instance* bad = rt.add(broken, 7, "Rules");
+    CHECK(bad && bad->disabled() && !rules.bind(rt));
+    CHECK(rules.number("Twice", 1.0) == 0 && rules.get<f64>("Speed") == 7);  // (its variables are there to read: Get Variable on Actor)
+    rt.call("Ask", 9, {{"actor", logic::Value::actor(0)}, {"value", logic::Value::number(4)}, {"text", logic::Value::text("")}});
+    CHECK(c->get("Got").as_number() == 0 && !c->get("Has").b && c->get("Speed").as_number() == 7);
+    // ... a new one: reached as it is, without binding again; and another actor of the name: that one
+    rt.remove(7);
+    logic::Instance* fresh = rt.add(rules_g, 7, "Rules");
+    logic::Instance* other = rt.add(rules_g, 8, "Other rules");
+    CHECK(fresh && other && other->set("Speed", logic::Value::number(9)));
+    CHECK(rules.number("Twice", 1.0) == 4.5 && fresh->get("Laps").i == 4 && rules.get<f64>("Speed") == 2.5);
+    host.rules_id = 8;
+    CHECK(rules.get<f64>("Speed") == 9 && rules.number("Twice", 1.0) == 11 && other->get("Laps").i == 4);
+  }
 }
 
 TEST(logic_functions) {
