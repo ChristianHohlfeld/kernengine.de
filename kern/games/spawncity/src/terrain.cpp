@@ -107,30 +107,40 @@ void bare_earth(std::vector<f32>& h, u32 n, f32 step, f32 open_m, f32 blur_m) {
 }
 
 namespace {
+/// kDemJob's input, as its numbers lie in the bytes one after the other (each struct holds them as
+/// C++ lays it out - no byte between them, little-endian): where the window is on the earth, how its
+/// grid lies and is filtered, how many tiles follow - then each tile's head and its heights (w * h
+/// floats).
+struct DemOrigin { f64 lon0 = 0, lat0 = 0; };
+struct DemWindow { f32 x0 = 0, y0 = 0, step = 10; u32 n = 0; f32 open = 160, blur = 30; u32 count = 0; };
+struct DemTileHead { u32 x = 0, y = 0, w = 0, h = 0; };
 /// A Terrarium tile in kDemJob's input: its size and where its heights lie in the bytes.
 struct DemBytes { u32 w, h; std::size_t at; };
 
 // kDemJob: Terrarium tiles -> the bare-earth grid (sample_dem + bare_earth, without engine state).
 void dem_grid_job(kern::Span<const u8> in, std::vector<u8>& out) {
-  std::size_t p = 0;  // where the next value lies in the bytes
-  bool ok = true;
-  auto get = [&](void* v, std::size_t n) { if (in.size - p < n) { ok = false; return; } std::memcpy(v, in.data + p, n); p += n; };
-  f64 lon0 = 0, lat0 = 0;
-  f32 x0 = 0, y0 = 0, step = 10, open = 160, blur = 30;
-  u32 n = 0, count = 0;
-  get(&lon0, 8); get(&lat0, 8); get(&x0, 4); get(&y0, 4); get(&step, 4); get(&n, 4); get(&open, 4); get(&blur, 4); get(&count, 4);
-  if (!ok || n < 2 || n > 4096) return;
+  DemOrigin origin;
+  DemWindow win;
+  if (in.size < sizeof origin + sizeof win) return;
+  std::memcpy(&origin, in.data, sizeof origin);
+  std::memcpy(&win, in.data + sizeof origin, sizeof win);
+  if (win.n < 2 || win.n > 4096) return;
+  const u32 n = win.n;
+  const f32 x0 = win.x0, y0 = win.y0, step = win.step;
+  std::size_t p = sizeof origin + sizeof win;  // where the next tile lies in the bytes
   kern::Map<u64, DemBytes> tiles;
-  for (u32 k = 0; k < count && ok; ++k) {
-    u32 x = 0, y = 0, w = 0, h = 0;
-    get(&x, 4); get(&y, 4); get(&w, 4); get(&h, 4);
-    const std::size_t bytes = static_cast<std::size_t>(w) * h * 4;
-    if (!ok || w < 2 || h < 2 || in.size - p < bytes) return;
-    tiles[TileKey{Terrain::kDemZoom, static_cast<i32>(x), static_cast<i32>(y)}.hash()] = {w, h, p};
+  for (u32 k = 0; k < win.count; ++k) {
+    DemTileHead head;
+    if (in.size - p < sizeof head) return;
+    std::memcpy(&head, in.data + p, sizeof head);
+    p += sizeof head;
+    const std::size_t bytes = static_cast<std::size_t>(head.w) * head.h * 4;
+    if (head.w < 2 || head.h < 2 || in.size - p < bytes) return;
+    tiles[TileKey{Terrain::kDemZoom, static_cast<i32>(head.x), static_cast<i32>(head.y)}.hash()] = {head.w, head.h, p};
     p += bytes;
   }
   kern::GeoProjector proj;
-  if (!proj.init(lon0, lat0)) return;
+  if (!proj.init(origin.lon0, origin.lat0)) return;
   std::vector<f32> grid(static_cast<std::size_t>(n) * n);
   for (u32 row = 0; row < n; ++row) {
     const f32 y = y0 + static_cast<f32>(row) * step;
@@ -146,13 +156,15 @@ void dem_grid_job(kern::Span<const u8> in, std::vector<u8>& out) {
       const f64 px = std::min(t.w - 1.001, (fx - tx) * t.w), py = std::min(t.h - 1.001, (fy - ty) * t.h);
       const u32 a = static_cast<u32>(px), b = static_cast<u32>(py);
       const f32 ax = static_cast<f32>(px - a), ay = static_cast<f32>(py - b);
-      f32 v0, v1, v2, v3;
+      // the pixel and the one right of it, then the two below them: two floats each, side by side in the bytes
+      f32 v[4];
       const std::size_t h = t.at + (static_cast<std::size_t>(b) * t.w + a) * 4;
-      std::memcpy(&v0, in.data + h, 4); std::memcpy(&v1, in.data + h + 4, 4); std::memcpy(&v2, in.data + h + static_cast<std::size_t>(t.w) * 4, 4); std::memcpy(&v3, in.data + h + (static_cast<std::size_t>(t.w) + 1) * 4, 4);
-      grid[static_cast<std::size_t>(row) * n + i] = (v0 * (1 - ax) + v1 * ax) * (1 - ay) + (v2 * (1 - ax) + v3 * ax) * ay;
+      std::memcpy(v, in.data + h, 8);
+      std::memcpy(v + 2, in.data + h + static_cast<std::size_t>(t.w) * 4, 8);
+      grid[static_cast<std::size_t>(row) * n + i] = (v[0] * (1 - ax) + v[1] * ax) * (1 - ay) + (v[2] * (1 - ax) + v[3] * ax) * ay;
     }
   }
-  bare_earth(grid, n, step, open, blur);
+  bare_earth(grid, n, step, win.open, win.blur);
   out.resize(grid.size() * 4);
   std::memcpy(out.data(), grid.data(), out.size());
 }
@@ -401,20 +413,23 @@ bool Terrain::run_job(f64 deadline) {
   if (!j.id) {
     // Sampling the window (641k points) and the bare-earth filter run off the frame (a Web
     // Worker / thread), like MapLibre's raster-dem workers do it for the original.
-    std::vector<u8> in;
-    auto put = [&](const void* p, std::size_t n) { const std::size_t at = in.size(); in.resize(at + n); std::memcpy(in.data() + at, p, n); };
-    auto put32 = [&](u32 v) { put(&v, 4); };
-    auto putf = [&](f32 v) { put(&v, 4); };
-    put(&proj_.lon0, 8); put(&proj_.lat0, 8);
-    putf(g.x0); putf(g.y0); putf(g.step); put32(g.n); putf(kOpen); putf(kBlur);
-    u32 count = 0;
+    // (kDemJob's input - see dem_grid_job: the numbers of each struct as their bytes, the heights of
+    // each tile as theirs, one after the other)
     auto mine = [&](const DemTile& t) { return !t.h.empty() && t.key.x >= j.x0 && t.key.x <= j.x1 && t.key.y >= j.y0 && t.key.y <= j.y1; };
+    u32 count = 0;
     for (const auto& [k, t] : dem_tiles_) count += mine(t) ? 1 : 0;
-    put32(count);
+    const DemOrigin origin{proj_.lon0, proj_.lat0};
+    const DemWindow win{g.x0, g.y0, g.step, g.n, kOpen, kBlur, count};
+    std::vector<u8> in(sizeof origin + sizeof win);
+    std::memcpy(in.data(), &origin, sizeof origin);
+    std::memcpy(in.data() + sizeof origin, &win, sizeof win);
     for (const auto& [k, t] : dem_tiles_) {
       if (!mine(t)) continue;
-      put32(static_cast<u32>(t.key.x)); put32(static_cast<u32>(t.key.y)); put32(t.w); put32(t.hgt);
-      put(t.h.data(), t.h.size() * 4);
+      const DemTileHead head{static_cast<u32>(t.key.x), static_cast<u32>(t.key.y), t.w, t.hgt};
+      const std::size_t at = in.size();
+      in.resize(at + sizeof head + t.h.size() * 4);
+      std::memcpy(in.data() + at, &head, sizeof head);
+      std::memcpy(in.data() + at + sizeof head, t.h.data(), t.h.size() * 4);
     }
     j.id = kern::jobs::submit(kDemJob, std::move(in));
     return false;
