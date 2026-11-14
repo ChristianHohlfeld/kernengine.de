@@ -20,7 +20,8 @@ struct Reader {
     u64 v = 0;
     int shift = 0;
     while (p < end && shift < 64) {
-      const u8 b = bytes[p++];
+      const u8 b = bytes[p];
+      ++p;
       v |= static_cast<u64>(b & 0x7f) << shift;
       if (!(b & 0x80)) return v;
       shift += 7;
