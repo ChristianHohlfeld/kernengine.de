@@ -83,50 +83,6 @@ void put_footprint(kern::FootprintStream& fs, const MapFeatures::Building& b, Ve
 
 }  // namespace
 
-struct CityStream::Tile {
-  enum class State : u8 { requested, decoding, terrain_wait, building, roads, areas, collision, ready, failed } state = State::requested;
-  TileKey key;
-  u32 tries = 0;       // failed requests so far
-  f64 retry_ms = 0;    // when a failed tile is asked for again
-  bool procedural = false;
-  MapFeatures features;
-  kern::FootprintStream footprints;
-  kern::RoadStream roads;
-  kern::BuildingBuilder buildings;
-  kern::RoadBuilder road_builder;
-  std::vector<u32> meshes;
-  kern::physics::Body body;
-  std::size_t collide_next = 0, upload_next = 0;
-  u32 colliders = 0, triangles = 0;
-  Vec2 center;
-  // terrain: road and area meshes are re-laid when the ground under them changes (craters, water)
-  kern::Vec4 bounds;  // the tile's square (x0, y0, x1, y1), set where the tile is made
-  std::vector<u32> lay_meshes, old_lay;
-  bool relay = false, relay_again = false;
-  Vec2 roads_at{1e9f, 1e9f};  // where the streets were last laid around (REBUILD_MOVE_M 260)
-  // the buildings' centres, and the buildings by chunk cell (160 m): the drawn city is made of
-  // cells - each wanted cell is extruded once, off the frame, and stays until it is far behind
-  std::vector<Vec2> cent;
-  kern::Map<u64, std::vector<u32>> cell_items;
-  kern::Set<u64> want_cells;                     // the cells to be drawn now (select_cells)
-  kern::Map<u64, std::vector<u32>> cell_old;     // meshes a finished job replaces (go when its uploads are done)
-  bool cell_uploading = false;
-  // jobs off the frame thread (city_jobs.h): the tile's decoding, the drawn buildings' extrusion
-  u32 tile_job = 0, build_job = 0;
-  // destruction: the building chunk meshes by chunk cell; damaged cells are rebuilt alone
-  kern::Map<u64, std::vector<u32>> cell_ids;
-  kern::Set<u64> dirty_cells;
-  std::vector<u64> job_cells;
-  u32 cell_job = 0;
-  std::vector<u8> built_bytes;        // the kBuildings job's output, read one chunk per step
-  std::size_t built_at = 0;
-  bool prepared = false;
-  // interiors (M3 life): one building left out, the collision rebuilt beside the old body
-  i32 skip = -1;
-  kern::physics::Body old_body;
-  bool recollide = false;
-};
-
 CityStream::CityStream() = default;
 CityStream::~CityStream() = default;
 

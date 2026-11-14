@@ -113,6 +113,8 @@ W64 = ("whole64u", "whole64s")     # (a type's name, cleaned: a 64-bit bit patte
 # keys). An iterator into one, or into a list, is the place it stands at - a whole number; the end is the
 # list's length.
 KEYED = re.compile(r"std::(unordered_)?(multi)?(map|set)<")
+# kern::Map, kern::Set (kern/core/map.h): the language's Map and Set - values under keys, keys, in the order the keys came
+KEYED_KERN = re.compile(r"kern::(Map|Set)<")
 ITERATOR = re.compile(r"std::__detail::_Node_(?:const_)?iterator(?:_base)?<|std::_Rb_tree_(?:const_)?iterator<|__gnu_cxx::__normal_iterator<")
 W64_HEADER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "blueprint_whole64.h")
 UNSIGNED = {"unsigned char", "unsigned short", "unsigned int", "unsigned long", "unsigned long long"}
@@ -126,7 +128,7 @@ TEXT = {"const char *", "std::basic_string<char>", "std::string", "std::basic_st
 ALIAS = {"f32": "float", "f64": "double", "i8": "signed char", "i16": "short", "i32": "int", "i64": "whole64s", "u8": "unsigned char", "u16": "unsigned short", "u32": "unsigned int",
          "u64": "whole64u", "uint64_t": "whole64u", "int64_t": "whole64s", "usize": "unsigned long", "size_t": "unsigned long", "Vec2": "kern::Vec2", "Vec3": "kern::Vec3", "Vec4": "kern::Vec4", "Quat": "kern::Quat",
          "Mat4": "kern::Mat4"}
-ZERO = {"Float": "0.0", "Int": "0", "Bool": "false", "Vector": "Vector{0.0, 0.0, 0.0}", "Text": '""'}
+ZERO = {"Int64": "Int64{0x0}", "Float": "0.0", "Int": "0", "Bool": "false", "Vector": "Vector{0.0, 0.0, 0.0}", "Text": '""'}
 # (functions of numbers a formula has, by the names C++ calls them)
 MATH = {"sqrt": "sqrt", "sqrtf": "sqrt", "fabs": "abs", "fabsf": "abs", "abs": "abs", "fmin": "min", "fminf": "min", "min": "min", "min_of": "min", "fmax": "max", "fmaxf": "max", "max": "max",
         "max_of": "max", "floor": "floor", "floorf": "floor", "ceil": "ceil", "ceilf": "ceil", "round": "round", "roundf": "round", "lround": "round", "lroundf": "round", "trunc": "trunc",
@@ -363,6 +365,7 @@ class Tree:
         self.decl = {}        # id -> the declaration
         self.body = {}        # id -> the declaration with the body (of a function declared earlier)
         self.records = {}     # qualified name -> record
+        self.declared = set() # qualified names of the records declared without their definition (struct Tile;)
         self.enums = {}       # qualified name -> enum
         self.owner = {}       # id of a method -> its record's qualified name
         self.scope_of = {}    # id -> the qualified scope it stands in ("sc::combat::")
@@ -529,6 +532,8 @@ class Tree:
             if o.get("completeDefinition"):
                 self.records[q] = o
                 o["_q"] = q
+            else:
+                self.declared.add(q)   # (declared here - defined here too, or not: then `records` has it not)
             for c in kids(o):
                 if c.get("kind") in ("CXXMethodDecl", "CXXConstructorDecl", "CXXDestructorDecl", "FieldDecl") and "id" in c:
                     self.owner[c["id"]] = q
@@ -849,7 +854,10 @@ class Unit:
         self.type_parts[name] = [p for p in parts if p in self.type_line]
 
     def part(self, t):
-        """The type a declaration names with `t`: the struct or enum (of a list: its entries')."""
+        """The type a declaration names with `t`: the struct or enum (of a list: its entries'; of a map: its
+        values' - of a set: its keys')."""
+        if t.startswith(("Map<", "Set<")):
+            return self.part(template_args(t)[-1])
         return t[5:-1] if t.startswith("List<") else t
 
     # ---- types ----
@@ -883,6 +891,11 @@ class Unit:
         cands = [q for q in cands if q not in local or (self.local_scope and local[q] == self.local_scope)]
         if any(q in local for q in cands):
             cands = [q for q in cands if q in local]
+        # (a name of a class only declared here - struct Tile; in a class - is that class, not another one of its
+        # last name that is defined: what it is, this file does not know)
+        if not cands or "::" not in t:
+            if any(q.split("::")[-1] == t.split("::")[-1] and q not in self.tree.records and (q.endswith("::" + t) or q == t) for q in self.tree.declared):
+                raise Wait(f"the type {t} is only declared here (its definition is in another file)")
         if len(cands) == 1:
             return cands[0]
         if len(cands) > 1:
@@ -1029,9 +1042,7 @@ class Unit:
         if t in NUMBER:
             return NUMBER[t]
         if t in W64:
-            if "w64::Whole64" not in self.tree.records:
-                raise Wait("a 64-bit whole number that wraps around or is shifted (a Blueprint's are exact up to 2^53)")
-            return self.struct("w64::Whole64")
+            return "Int64"   # (64 bits as C++ holds them: the language's Int64 - what they mean, its nodes say)
         if t in TEXT or t.startswith("std::basic_string<char") or t.startswith("std::basic_string_view<char"):
             return "Text"
         if t in ("kern::Vec3", "kern::Vec2"):
@@ -1047,17 +1058,25 @@ class Unit:
         m = re.match(r"(?:kern::)?Span<\s*(.+)>$", t)
         if m and ENGINE_NODES:   # (a view of a list: the list)
             return f"List<{self.entry(m.group(1))}>"
-        m = KEYED.match(t)
+        m = KEYED_KERN.match(t)
         if m:
             a = template_args(t)
-            if m.group(2):
-                raise Wait("a multimap or multiset")
-            extra = a[1:] if m.group(3) == "set" else a[2:]
-            if extra and not re.match(r"std::(hash|less)<", extra[0]):
-                raise Wait("a map or set with an order or a hash of its own")
-            if m.group(3) == "set":
-                return f"List<{self.element(self.btype(a[0]))}>"
-            return f"List<{self.pair(self.btype(a[0]), self.btype(a[1]))}>"
+            if len(a) > (1 if m.group(1) == "Set" else 2):
+                raise Wait("a map or set with a hash of its own")
+            key = self.btype(a[0])
+            if key not in ("Int", "Int64", "Text", "Bool") and key not in self.enum_values:
+                raise Wait(f"a map or set whose keys are {key} (a key is a Bool, an Int, an Int64, a Text or an enum's value)")
+            if m.group(1) == "Set":
+                return f"Set<{key}>"
+            value = self.btype(a[1])
+            if value.startswith(("Map<", "Set<")):
+                raise Wait("a map of maps or sets")
+            return f"Map<{key}, {value}>"
+        m = KEYED.match(t)
+        if m:
+            # (std::unordered_map goes through its entries in the order of the library; std::map in the order
+            # of its keys: the language's Map in the order the keys came - kern::Map is the one of the program)
+            raise Wait("a map or set of the standard library (the program's are kern::Map, kern::Set: in the order the keys came)")
         m = re.match(r"std::vector<(.+)>$", t)
         if m:
             return f"List<{self.entry(template_args(t)[0])}>"
@@ -1195,7 +1214,7 @@ class Unit:
             return ZERO[t]
         if re.match(r"Fixed<(.+), (\d+)>$", t):   # (a list of a fixed length: what its text does not say is zero)
             return t + "{}"
-        if t.startswith("List<"):
+        if t.startswith(("List<", "Map<", "Set<")):
             return t + "{}"
         if t in self.enum_values:
             return f"{t}::{self.enum_values[t][0]}"
@@ -1492,7 +1511,7 @@ class Unit:
             if name in used:
                 used.update(word.findall(" ".join(lines)))
         def name_of(line):
-            m = (re.match(r"\s*KERN_(?:ENUM|STRUCT)\((\w+)", line) or re.match(r"\s*(?:KERN_CONST\s+)?(?:Fixed<[\w<>:]+,\s*\d+>|[\w<>:]+)\s+(\w+)\s*=", line) or re.search(r"\}\s*(n\d+);", line)
+            m = (re.match(r"\s*KERN_(?:ENUM|STRUCT)\((\w+)", line) or re.match(r"\s*(?:KERN_CONST\s+)?[\w:]+(?:<[^=]*>)?\s+(\w+)\s*=", line) or re.search(r"\}\s*(n\d+);", line)
                  or re.match(r"\s*[\w:]+Result (n\d+);", line))
             return m.group(1) if m else None
         variables = []
@@ -1784,9 +1803,11 @@ class Const:
         inlined = self.inlined(n)
         if inlined is not None:
             return self.literal(inlined, t)
-        if t == u.structs.get("w64::Whole64") and t is not None and k not in ("InitListExpr", "CXXConstructExpr"):
-            v = int(self.number(n)) % (1 << 64)   # (a 64-bit number written out: its two halves)
-            return f"{t}{{{v >> 32}, {v & 0xFFFFFFFF}}}"
+        if t == "Int64" and k not in ("InitListExpr", "CXXConstructExpr"):
+            v = int(self.number(n)) % (1 << 64)   # (a 64-bit number written out: its bits)
+            return f"Int64{{{v:#x}}}"
+        if t == "Int64":
+            return f"Int64{{{int(self.number(kids(n)[0])) % (1 << 64):#x}}}" if kids(n) else "Int64{0x0}"
         if t == "Float":
             return flit(self.decimal(n))
         if t == "Int":
@@ -1917,6 +1938,7 @@ class Emit:
         self.frozen = None    # while the list of a loop is named: the lines that hold its indexes (see `fixed`)
         self.result_struct = None
         self.homes = {}       # decl id of an iterator (or of what insert() gave) -> the list it goes through
+        self.keyed_vars = {}  # decl id of a name for an entry of a map or a set (a loop's variable, `auto& [k, v]`) -> (the map or set, its place)
         self.serial = 0       # the number of the statement being written (see `slot`)
 
     # ---- types ----
@@ -2228,7 +2250,7 @@ class Emit:
                     targets.append(kids(callee(n))[0])
             elif k == "CXXMemberCallExpr" and callee(n).get("name") in ("find", "begin", "end") and kids(callee(n)) and re.match(r"std::__detail::_Node_iterator<|std::_Rb_tree_iterator<|__gnu_cxx::__normal_iterator<(?!const )", qtype(n)):
                 targets.append(kids(callee(n))[0])   # (an iterator through which the list may be changed)
-            elif k == "CXXOperatorCallExpr" and callee_name(n) == "operator[]" and len(kids(n)) == 3 and KEYED.match(self.u.clean(qtype(kids(n)[1]))):
+            elif k == "CXXOperatorCallExpr" and callee_name(n) == "operator[]" and len(kids(n)) == 3 and KEYED_KERN.match(self.u.clean(qtype(kids(n)[1]))):
                 targets.append(kids(n)[1])   # (m[key] makes the key's row when there is none)
             if k in ("CallExpr", "CXXMemberCallExpr", "CXXOperatorCallExpr"):
                 c = callee(n)
@@ -2863,11 +2885,10 @@ class Emit:
         lt = self.tp(src)
         if lt == "Text":
             return self.for_each_char(s, v, raw, src, body)
-        if not lt.startswith("List<"):
+        keyed = lt.startswith(("Map<", "Set<"))
+        if not lt.startswith("List<") and not keyed:
             raise Wait("a loop over something that is not a list")
-        it = lt[5:-1]
-        if v.get("kind") == "DecompositionDecl":   # for (auto& [key, value] : map): the names are the parts of the row
-            self.bind(v, it)
+        it = lt[5:-1] if not keyed else None
         mark, self.frozen = len(self.pre), []
         try:
             got = self.spot(src)
@@ -2894,17 +2915,33 @@ class Emit:
         entry = f"{place}[{index}]"
         loop = self.enter_loop(body)
         first = []
-        if "&" in raw or self.u.clean(raw) == "std::_Bit_reference":   # (std::vector<bool>'s entry by value: still the entry where it stands)
+        if keyed:
+            # for (auto& [key, value] : map), for (auto& e : map), for (K key : set): the entry at its place - its key
+            # read there, a map's value the place place[index]
+            kind = "map" if lt.startswith("Map<") else "set"
+            src_place = {"kind": "_Text", "_text": place, "_type": lt, "_bt": lt, "_place": True}
+            if kind == "set":
+                key_text = f"set_key_at<{lt[4:-1]}>({place}, {index})"
+                if v.get("kind") == "DecompositionDecl":
+                    raise Wait("names for the parts of a set's key")
+                first = [f"{self.local(v, lt[4:-1])} = {key_text};"]
+            else:
+                self.keyed_vars[v["id"]] = (src_place, index)
+                if v.get("kind") == "DecompositionDecl":
+                    self.bind(v, "Entry")
+            count_text = f"{kind}_length<{lt[4:-1]}>({place})"
+        elif "&" in raw or self.u.clean(raw) == "std::_Bit_reference":   # (std::vector<bool>'s entry by value: still the entry where it stands)
             self.names[v["id"]] = entry
             self.types[v["id"]] = it
         else:
             first = [f"{self.local(v, it)} = {entry};"]
+        length = count_text if keyed else f"list_length<{it}>({place})"
         if has_break:
-            lines = first + self.loop_body(loop, [body], [f"{at} += 1;"])
-            cond = f'math_compare<"<">(kern::to<Float>({at}), kern::to<Float>({count}))'
-            return before + [f"{count} = list_length<{it}>({place});", f"{at} = 0;"] + self.loop_lines(cond, [], lines, loop)
+            lines = first + self.loop_body(loop, [body], [f"{index} += 1;"])
+            cond = f'math_compare<"<">(kern::to<Float>({index}), kern::to<Float>({count}))'
+            return before + [f"{count} = {length};", f"{index} = 0;"] + self.loop_lines(cond, [], lines, loop)
         lines = first + self.loop_body(loop, [body])
-        last = self.whole_math("-", f"list_length<{it}>({place})", "1")
+        last = self.whole_math("-", length, "1")
         return before + [f"for (auto it{node} = flow_for(n{node}, 0, {last}); it{node}.next();) {{", *["  " + ln for ln in lines], "}"]
 
     def switch(self, s):
@@ -3157,13 +3194,22 @@ class Emit:
                 if name == "reset" and len(kids(n)) == 1:
                     return self.store(base, lambda t: t + "{}")
                 raise Wait(f"{name}() of an owned or optional value")
+            if base is not None and not self.is_this(base) and self.tp(base).startswith(("Map<", "Set<")):
+                kind, _ = self.keyed(base)
+                args = kids(n)[1:]
+                if name in ("insert", "emplace", "try_emplace", "insert_or_assign", "erase") and not (name == "erase" and len(args) != 1):
+                    return self.keyed_change(base, name, args)[0]
+                before, lv, after = self.variable_of(base, self.tp(base))
+                if name == "clear" and not args:
+                    return before + [f"{kind}_clear({lv});"] + after
+                if name == "reserve" and len(args) == 1:
+                    return before + [f"{kind}_reserve({lv}, {self.ex(args[0], 'Int')});"] + after
+                raise Wait(f"{kind}: {name}()")
             if base is not None and not self.is_this(base) and self.tp(base).startswith("List<"):
                 it = self.tp(base)[5:-1]
                 args = kids(n)[1:]
-                if name in ("shrink_to_fit", "rehash", "max_load_factor") or (name == "reserve" and (self.keyed(base) or len(args) != 1)):
+                if name in ("shrink_to_fit", "rehash", "max_load_factor") or (name == "reserve" and len(args) != 1):
                     return []
-                if self.keyed(base) and name in ("insert", "emplace", "try_emplace", "insert_or_assign", "erase") and not (name == "erase" and len(args) != 1):
-                    return self.keyed_change(base, name, args)[0]
                 before, lv, after = self.variable_of(base, self.tp(base))
                 if name in ("push_back", "emplace_back") and len(args) == 1 and (name == "push_back" or it not in self.u.struct_fields or self.tp(args[0]) == it):
                     return before + [f"list_add({lv}, {self.ex(args[0], it)});"] + after
@@ -3541,68 +3587,52 @@ class Emit:
         self.hoist(lines)
         return text, t
 
-    # ---- maps and sets: lists of rows by their keys; iterators: places ----
+    # ---- maps and sets (the language's Map, Set); iterators: places ----
     def keyed(self, n):
-        """Is this a map or a set? ("map" or "set", is it kept in the order of its keys) - else None."""
-        m = KEYED.match(self.ctype(n))
-        return (m.group(3), not m.group(1)) if m else None
+        """Is this a map or a set? ("map" or "set", False) - else None."""
+        t = self.tp_or_none(n) or ""
+        return ("map" if t.startswith("Map<") else "set", False) if t.startswith(("Map<", "Set<")) else None
 
     def is_iter(self, n):
         return ITERATOR.match(self.ctype(n)) is not None
 
     def rows(self, n):
-        """(the list's type, a row's, a key's, what a row holds - None in a set) of a map or set."""
+        """(the map's or set's type, its type's settings - "K, V" or "K" -, a key's type, a value's - None in a set)."""
         lt = self.tp(n)
-        row = lt[5:-1]
-        if self.keyed(n)[0] == "map":
-            fields = self.u.struct_fields[row]
-            return lt, row, fields[0][1], fields[1][1]
-        return lt, row, row, None
+        args = template_args(lt)
+        return lt, ", ".join(args), args[0], (args[1] if lt.startswith("Map<") else None)
 
     def found(self, kind, row, lst, key):
-        """Is there a row of this key?"""
-        return f"list_find_row<&{row}::first>({lst}, {key}).found" if kind == "map" else f"list_contains<{row}>({lst}, {key})"
+        """Is there an entry of this key?"""
+        return f"{kind}_contains<{row}>({lst}, {key})"
 
     def found_at(self, kind, row, lst, key):
-        """The place of a key's row, -1 when there is none."""
-        return f"list_find_row<&{row}::first>({lst}, {key}).index" if kind == "map" else f"list_find<{row}>({lst}, {key})"
+        """The place of a key's entry, -1 when there is none."""
+        return f"map_find<{row}>({lst}, {key}).index" if kind == "map" else f"set_find<{row}>({lst}, {key})"
 
-    def less(self, raw_key, kt, a, b):
-        """Does the key a come before b, as std::map and std::set order their keys?"""
-        whole = self.u.structs.get("w64::Whole64")
-        if whole is not None and kt == whole:
-            return self.w64("w64_less_signed" if raw_key in ("whole64s", "long", "long long") else "w64_less", a, b)
-        if kt in ("Int", "Float", "Bool") or kt in self.u.enum_values:
-            return f'math_compare<"<">({self.conv(a, kt, "Float")}, {self.conv(b, kt, "Float")})'
-        raise Wait(f"a map or set in the order of its keys, which are {kt}")
+    def keyed_node(self):
+        """A node that puts a key in and gives (was it new, its place) - Add Key, Set at Key."""
+        node = self.u.next_node
+        self.u.next_node += 1
+        self.u.members.append(f"  struct {{ Bool added = false; Int index = 0; }} n{node};")
+        return f"n{node}"
 
     def put_row(self, base, key, value=None, assign=False):
         """Steps that put a key into a map or set unless it is there (insert, emplace, m[key]): (the steps,
-        the place of the key's row, was it new). `key` and `value`: variables of the key's type and of what a
-        row holds (no value: its zero). `assign`: a row that is there gets the value (insert_or_assign)."""
-        kind, in_order = self.keyed(base)
-        lt, row, kt, vt = self.rows(base)
-        lst = self.ex(base, lt)
-        at, fresh = self.temp("at", "Int"), self.temp("fresh", "Bool")
-        new = f"struct_make<{row}>({key}, {value if value is not None else self.u.zero(vt)})" if kind == "map" else key
+        the place of the key's entry, was it new). `key` and `value`: variables of the key's and of the
+        values' type (no value: its zero). `assign`: an entry that is there gets the value (insert_or_assign)."""
+        kind, _ = self.keyed(base)
+        lt, _, kt, vt = self.rows(base)
         before, lv, after = self.variable_of(base, lt)
-        lines = [f"{at} = {self.found_at(kind, row, lst, key)};", f'{fresh} = math_compare<"<">(kern::to<Float>({at}), 0.0);', f"if ({fresh}) {{"]
-        body = list(before)
-        if in_order:
-            here = f"list_get<{row}>({lv}, {at})"
-            if kind == "map":
-                here = f"struct_break<{row}>({here}).first"
-            less = self.less(template_args(self.ctype(base))[0], kt, here, key)
-            body += [f"{at} = 0;", f'while (loop(logic_and(math_compare<"<">(kern::to<Float>({at}), kern::to<Float>(list_length<{row}>({lv}))), {less}))) {{', f"  {at} += 1;", "}",
-                     f"list_insert({lv}, {at}, {new});"]
-        else:
-            body += [f"{at} = list_length<{row}>({lv});", f"list_add({lv}, {new});"]
-        lines += ["  " + ln for ln in body + after]
-        if assign and kind == "map":
-            held = self.temp("row", row)
-            lines += ["} else {"] + ["  " + ln for ln in before + [f"{held} = list_get<{row}>({lv}, {at});", f"{held}.second = {value};", f"{lv}[{at}] = {held};"] + after]
-        lines.append("}")
-        return lines, at, fresh
+        n = self.keyed_node()
+        if kind == "set":
+            return before + [f"set_add({n}, {lv}, {key});"] + after, f"{n}.index", f"{n}.added"
+        if assign:
+            return before + [f"map_set({n}, {lv}, {key}, {value});"] + after, f"{n}.index", f"{n}.added"
+        lines = [f"map_add({n}, {lv}, {key});"]
+        if value is not None:   # (what the new entry holds: its value; one that is there keeps its own)
+            lines += [f"if ({n}.added) {{", f"  {lv}[{n}.index] = {value};", "}"]
+        return before + lines + after, f"{n}.index", f"{n}.added"
 
     def slot(self, n):
         """m[key]: the place of the key's row. Steps before the statement find it - and add the row when the
@@ -3628,10 +3658,27 @@ class Emit:
         return {"kind": "ArraySubscriptExpr", "_bt": row, "type": {"qualType": "int"}, "inner": [lst, at]}
 
     def held_by(self, n):
-        """m[key] as the place it is: what the key's row holds."""
+        """m[key] as the place it is: the value of the key's entry."""
         base = kids(n)[1]
-        _, row, _, vt = self.rows(base)
-        return {"kind": "MemberExpr", "name": "second", "_bt": vt, "type": {"qualType": "int"}, "inner": [self.entry(base, self.slot(n), row)]}
+        _, _, _, vt = self.rows(base)
+        return self.entry(base, self.slot(n), vt)
+
+    def keyed_entry(self, n):
+        """An entry of a map or a set as C++ names it - `*it`, `it->`, the variable of a loop over one, a pair of
+        its key and value -: (the map or set, its place - a node or a text), else None."""
+        b = self.unwrap(n)
+        if "_keyed" in b:
+            return b["_keyed"]
+        if b.get("kind") == "DeclRefExpr" and b.get("referencedDecl", {}).get("id") in self.keyed_vars:
+            return self.keyed_vars[b["referencedDecl"]["id"]]
+        return None
+
+    def keyed_key(self, e):
+        """The key of an entry (keyed_entry), as a value: (text, type)."""
+        base, at = e
+        kind, _ = self.keyed(base)
+        lt, row, kt, _ = self.rows(base)
+        return f"{kind}_key_at<{row}>({self.ex(base, lt)}, {at if isinstance(at, str) else self.ex(at, 'Int')})", kt
 
     def iter_node(self, n):
         """An iterator's expression without what only converts it (an iterator made a const_iterator)."""
@@ -3645,6 +3692,8 @@ class Emit:
         b = self.unwrap(n)
         if b.get("kind") == "CXXOperatorCallExpr" and not b.get("_op") and callee_name(b) in ("operator->", "operator*") and len(kids(b)) == 2 and self.is_iter(kids(b)[1]):
             home = self.home(kids(b)[1])
+            if self.keyed(home):   # (an entry of a map or a set: its key and value - keyed_entry)
+                return {"kind": "_Entry", "_keyed": (home, kids(b)[1]), "type": {"qualType": "int"}, "_bt": "Entry"}
             return self.entry(home, kids(b)[1], self.tp(home)[5:-1])
         return None
 
@@ -3660,7 +3709,7 @@ class Emit:
         if k == "CXXMemberCallExpr":
             m = callee(b)
             base = kids(m)[0] if kids(m) else None
-            if base is not None and not self.is_this(base) and m.get("name") in ("begin", "cbegin", "end", "cend", "find", "erase", "insert", "lower_bound", "upper_bound") and (self.tp_or_none(base) or "").startswith("List<"):
+            if base is not None and not self.is_this(base) and m.get("name") in ("begin", "cbegin", "end", "cend", "find", "erase", "insert", "lower_bound", "upper_bound") and (self.tp_or_none(base) or "").startswith(("List<", "Map<", "Set<")):
                 return base
         if k == "MemberExpr" and b.get("name") == "first" and kids(b):   # (what insert() and emplace() give: the place and whether the key was new)
             x = self.unwrap(kids(b)[0])
@@ -3726,20 +3775,23 @@ class Emit:
             return None
 
     def keyed_change(self, base, name, a):
-        """A call that changes a map or set, as steps: (the steps, the place of the key's row, a flag - was
+        """A call that changes a map or set, as steps: (the steps, the place of the key's entry, a flag - was
         the key new; of erase: was it there)."""
         kind, _ = self.keyed(base)
         lt, row, kt, vt = self.rows(base)
         if name == "erase" and len(a) == 1:
-            at = self.temp("at", "Int")
-            if self.is_iter(a[0]):
+            if self.is_iter(a[0]):   # (erase(it): the entry at that place goes - the next one is there then)
+                at = self.temp("at", "Int")
                 place = self.ex(a[0], "Int")
                 before, lv, after = self.variable_of(base, lt)
-                return before + [f"{at} = {place};", f"list_remove_at({lv}, {at});"] + after, at, "true"
-            key, gone = self.temp("key", kt), self.temp("gone", "Bool")
-            lines = [f"{key} = {self.ex(a[0], kt)};", f"{at} = {self.found_at(kind, row, self.ex(base, lt), key)};", f'{gone} = math_compare<">=">(kern::to<Float>({at}), 0.0);']
+                return before + [f"{at} = {place};", f"{kind}_remove_at({lv}, {at});"] + after, at, "true"
+            key = self.temp("key", kt)
+            lines = [f"{key} = {self.ex(a[0], kt)};"]
             before, lv, after = self.variable_of(base, lt)
-            return lines + [f"if ({gone}) {{", *["  " + ln for ln in before + [f"list_remove_at({lv}, {at});"] + after], "}"], at, gone
+            node = self.u.next_node
+            self.u.next_node += 1
+            self.u.members.append(f"  struct {{ Bool removed = false; }} n{node};")
+            return lines + before + [f"{kind}_remove(n{node}, {lv}, {key});"] + after, "-1", f"n{node}.removed"
         if name in ("insert", "emplace", "try_emplace", "insert_or_assign") and a:
             key_node, value = a[0], None
             if kind == "set":
@@ -3755,7 +3807,7 @@ class Emit:
                 elif name == "insert" or (name == "emplace" and len(a) != 2):
                     raise Wait(f"{name}() of a map with other arguments")
                 if not rest:
-                    value = lambda: self.u.zero(vt)
+                    value = None
                 elif len(rest) == 1 and (vt not in self.u.struct_fields or self.tp_or_none(rest[0]) == vt):
                     value = lambda: self.ex(rest[0], vt)
                 elif vt in self.u.struct_fields:
@@ -3765,7 +3817,7 @@ class Emit:
             key = self.temp("key", kt)
             lines = [f"{key} = {self.ex(key_node, kt)};"]
             held = None
-            if kind == "map":
+            if kind == "map" and value is not None:
                 held = self.temp("value", vt)
                 lines.append(f"{held} = {value()};")
             more, at, fresh = self.put_row(base, key, held, assign=name == "insert_or_assign")
@@ -3773,11 +3825,19 @@ class Emit:
         raise Wait(f"{name}() of a map or set")
 
     def keyed_call(self, b, base, name, a):
-        """A call of a map or set, as a value (None: one a list has as well - size, empty ...)."""
+        """A call of a map or set, as a value."""
         kind, _ = self.keyed(base)
         lt, row, kt, vt = self.rows(base)
+        lst = self.ex(base, lt)
+        if name == "size" and not a:
+            return f"{kind}_length<{row}>({lst})", "Int"
+        if name == "empty" and not a:
+            return f'math_compare<"==">(kern::to<Float>({kind}_length<{row}>({lst})), 0.0)', "Bool"
+        if name in ("begin", "cbegin", "end", "cend") and not a and self.is_iter(b):
+            # an iterator is the place it stands at: the first entry's is 0, the end the length
+            return ("0" if "begin" in name else f"{kind}_length<{row}>({lst})"), "Int"
         if name in ("find", "count", "contains", "at") and len(a) == 1:
-            lst, key = self.ex(base, lt), self.ex(a[0], kt)
+            key = self.ex(a[0], kt)
             if name == "contains":
                 return self.found(kind, row, lst, key), "Bool"
             if name == "count":
@@ -3785,10 +3845,9 @@ class Emit:
             if name == "at":
                 if kind != "map":
                     raise Wait("at() of a set")
-                self.f.indexes = True
-                return f"struct_break<{row}>(list_find_row<&{row}::first>({lst}, {key}).row).second", vt
+                return f"map_find<{row}>({lst}, {key}).value", vt
             return (f"kern::to<Int>(kern::formula([](Float at, Float count) -> Float {{ return at < 0.0 ? count : at; }}, "
-                    f"kern::to<Float>({self.found_at(kind, row, lst, key)}), kern::to<Float>(list_length<{row}>({lst}))))"), "Int"
+                    f"kern::to<Float>({self.found_at(kind, row, lst, key)}), kern::to<Float>({kind}_length<{row}>({lst}))))"), "Int"
         if name in ("insert", "emplace", "try_emplace", "insert_or_assign", "erase") and not (name == "erase" and len(a) != 1):
             lines, at, flag = self.keyed_change(base, name, a)
             self.hoist(lines)
@@ -3807,6 +3866,19 @@ class Emit:
         is written out (the first field of the value, the second ...)."""
         fields = self.u.struct_fields.get(bt)
         binds = [c for c in kids(d) if c.get("kind") == "BindingDecl"]
+        if bt == "Entry":
+            # `auto& [key, value]` of an entry of a map (keyed_vars): its key, and its value where it stands
+            if len(binds) != 2:
+                raise Wait("names for the parts of an entry of a map")
+            names = {binds[0]["id"]: "first", binds[1]["id"]: "second"}
+            for n in walk(self.f.decl):
+                if n.get("kind") == "DeclRefExpr" and n.get("referencedDecl", {}).get("id") in names:
+                    whole = {"kind": "DeclRefExpr", "referencedDecl": {"id": d["id"], "kind": "VarDecl", "name": d.get("name", "")}, "type": d.get("type", {})}
+                    was = n.get("type", {})
+                    part = names[n["referencedDecl"]["id"]]
+                    n.clear()
+                    n.update({"kind": "MemberExpr", "name": part, "isArrow": False, "type": was, "inner": [whole]})
+            return
         lt = self.u.rows.get(bt, bt)
         if lt.startswith("List<") and self.u.fixed(re.sub(r"&", "", qtype(d))) == len(binds):
             # `auto& [x, y, w] = an_array;` - the names are its entries: x is the entry 0, where it stands
@@ -4267,6 +4339,8 @@ class Emit:
     def spot_held(self, n):
         b = self.unwrap(n)
         k = b.get("kind")
+        if k == "_Text" and b.get("_place"):   # (a place the converter has named itself: the map a loop goes through)
+            return b["_text"], b["_type"]
         if k == "DeclRefExpr":
             i = b.get("referencedDecl", {}).get("id")
             name = self.names.get(i)
@@ -4299,6 +4373,11 @@ class Emit:
                 if self.box(base) is None:
                     return None
                 base = self.boxed(self.box(base))
+            e = self.keyed_entry(base)
+            if e is not None:   # an entry of a map: its value is a place (its key is none - a key is not changed where it stands)
+                if b.get("name") != "second" or self.keyed(e[0])[0] != "map":
+                    return None
+                return self.spot(self.entry(e[0], e[1], self.rows(e[0])[3]))
             if self.is_vec(base):
                 return None
             got = self.spot(base)
@@ -4318,6 +4397,9 @@ class Emit:
             if self.is_vec(base):
                 return None
             got = self.spot(base)
+            if got is not None and got[1].startswith("Map<") and k == "ArraySubscriptExpr":   # (the value of a map's entry at its place: entry)
+                self.f.indexes = True
+                return f"{got[0]}[{self.fixed(self.ex(idx, 'Int'))}]", template_args(got[1])[1]
             if got is None or not got[1].startswith("List<"):
                 return None
             self.f.indexes = True
@@ -4553,10 +4635,9 @@ class Emit:
     def conv(self, text, have, want):
         if want is None or have == want:
             return text
-        whole = self.u.structs.get("w64::Whole64")
-        if whole is not None and want == whole and have in ("Int", "Float", "Bool"):
+        if want == "Int64" and have in ("Int", "Float", "Bool"):
             return self.to64(text, have)
-        if whole is not None and have == whole and want in ("Int", "Float", "Bool"):
+        if have == "Int64" and want in ("Int", "Float", "Bool"):
             return self.from64(text, "whole64u", "long" if want == "Int" else "double", want)
         if want == "Float" and have == "Int" and re.fullmatch(r"-?\d+", text):
             return flit(float(text))
@@ -4649,6 +4730,11 @@ class Emit:
         k = b.get("kind")
         if k == "_Text":
             return b["_text"], b["_type"]
+        e = self.keyed_entry(b) or (self.keyed_entry(self.entry_of(b)) if self.entry_of(b) is not None else None)
+        if e is not None:   # an entry of a set: its key; of a map: its key and value are read each by itself
+            if self.keyed(e[0])[0] == "set":
+                return self.keyed_key(e)
+            raise Wait("an entry of a map as a value (its key and its value are read each by itself)")
         if k == "ImplicitCastExpr" and b.get("castKind") in ("NoOp", "ArrayToPointerDecay") and self.text_buffer_of(b) is not None:
             x = b   # (a text buffer read as a text: its text)
             while x.get("kind") in ("ImplicitCastExpr", "ParenExpr") and kids(x):
@@ -4756,6 +4842,11 @@ class Emit:
             if got is not None:   # a field at a place: read where it stands
                 return got
             base = kids(b)[0] if kids(b) else None
+            e = self.keyed_entry(self.entry_of(base) or base) if base is not None else None
+            if e is not None:   # an entry of a map or a set: its key - its value where it stands (above)
+                if b.get("name") == "first":
+                    return self.keyed_key(e)
+                return self.value(self.entry(e[0], e[1], self.rows(e[0])[3]))
             if base is None or self.is_this(base):
                 if self.f.state:
                     return u.state_variable(b["name"])
@@ -5133,23 +5224,21 @@ class Emit:
 
     # ---- 64-bit bit patterns ----
     def whole64(self):
-        return self.u.btype("whole64u")
+        return "Int64"
 
     def is64(self, n):
         """Is this value a 64-bit bit pattern (a Whole64 in the Blueprint)? Its type's spelling says so; where
         the compiler's tree has lost the spelling, what it is made of does."""
         b = bare(n)
         if "_bt" in b:
-            return b["_bt"] == self.u.structs.get("w64::Whole64", "")
+            return b["_bt"] == "Int64"
         c = self.ctype(b)
         if c in W64:
             return True
         if c not in ("unsigned long", "long", "unsigned long long", "long long"):
             return False
         k, ks = b.get("kind"), kids(b)
-        whole = self.u.structs.get("w64::Whole64")
-        if whole is None:
-            return False
+        whole = "Int64"
         if k == "MemberExpr" or (k == "CXXOperatorCallExpr" and callee_name(b) in ("operator*", "operator[]")):
             return self.tp_or_none(b) == whole   # (a field, a key of a map, what an iterator stands at: as the Blueprint holds it)
         if k == "DeclRefExpr":
@@ -5173,14 +5262,23 @@ class Emit:
             return self.tp_or_none(kids(callee(b))[0]) == f"List<{whole}>"
         return False
 
+    # What C++ computes with 64 bits, the language's Int64 nodes compute (kern/logic/nodes.h, PureNodes::int64_*).
+    INT64 = {"w64_add": "int64_add", "w64_subtract": "int64_sub", "w64_multiply": "int64_mul", "w64_bit_and": "int64_and", "w64_bit_or": "int64_or",
+             "w64_bit_xor": "int64_xor", "w64_bit_not": "int64_not", "w64_divide": "int64_div_unsigned", "w64_divide_signed": "int64_div",
+             "w64_remainder": "int64_rem_unsigned", "w64_remainder_signed": "int64_rem", "w64_shift_left": "int64_shift_left",
+             "w64_shift_right": "int64_shift_right_unsigned", "w64_shift_right_signed": "int64_shift_right", "w64_equal": "int64_equal",
+             "w64_less": "int64_less_unsigned", "w64_less_signed": "int64_less", "w64_to_number": "int64_to_float_unsigned",
+             "w64_to_signed_number": "int64_to_float"}
+
     def w64(self, name, *texts):
-        """A call of one of the functions of 64-bit numbers (tools/blueprint_whole64.h, converted like the program's own)."""
-        i = self.tree.whole.get(name)
-        if i is None:
-            raise Wait("a 64-bit whole number that wraps around or is shifted (a Blueprint's are exact up to 2^53)")
-        g = self.u.function(i)
-        self.f.calls.append(g)
-        return f"{g.name}({', '.join(texts)}).Result"
+        """What C++ computes with 64 bits: an Int64 node."""
+        if name == "w64_negate":
+            return f"int64_sub(Int64{{0x0}}, {texts[0]})"
+        if name == "w64_is_zero":
+            return f"int64_equal({texts[0]}, Int64{{0x0}})"
+        if name == "w64_from_number":
+            return f"int64_of_float({texts[0]})"
+        return f"{self.INT64[name]}({', '.join(texts)})"
 
     def to64(self, text, have):
         """A number as 64 bits: a whole number as it is (a negative one in two's complement), another one cut off."""
@@ -5189,19 +5287,17 @@ class Emit:
         if have == "Float":
             text = f"kern::formula([](Float x) -> Float {{ return kern::math::trunc(x); }}, {text})"
         elif re.fullmatch(r"-?\d+", text):
-            v = int(text) % (1 << 64)
-            return f"struct_make<{self.whole64()}>({v >> 32}, {v & 0xFFFFFFFF})"
-        else:
-            text = self.conv(text, have, "Float")
+            return f"Int64{{{int(text) % (1 << 64):#x}}}"
+        elif have in ("Int", "Bool"):
+            return f"int64_of_int({self.conv(text, have, 'Int')})"   # (a whole number as it is: one below 0 in two's complement)
         return self.w64("w64_from_number", text)
 
     def ex64(self, n):
         lit = bare(n)
         while lit.get("kind") in CAST and kids(lit):
             lit = bare(kids(lit)[-1])
-        if lit.get("kind") == "IntegerLiteral":   # (a number written out: its two halves, whatever its size)
-            v = int(lit["value"]) % (1 << 64)
-            return f"struct_make<{self.whole64()}>({v >> 32}, {v & 0xFFFFFFFF})"
+        if lit.get("kind") == "IntegerLiteral":   # (a number written out: its bits, whatever its size)
+            return f"Int64{{{int(lit['value']) % (1 << 64):#x}}}"
         text, have = self.value(n)
         return text if have == self.whole64() else self.to64(text, have)
 
@@ -5215,11 +5311,11 @@ class Emit:
             return self.w64("w64_to_signed_number" if signed else "w64_to_number", text)
         if want == "Int" or want in self.u.enum_values:
             if Const.BITS.get(target, 64) >= 64 or target in W64:
-                got = f"kern::to<Int>({self.w64('w64_to_signed_number', text)})"   # (a number to count with: read with its sign)
+                got = f"int64_to_int({text})"   # (a number to count with: read with its sign)
             else:
-                low = f"kern::to<Float>(struct_break<{whole}>({text}).low)"
+                low = f"kern::to<Float>(int64_low({text}))"
                 cut = self.narrow("x", "unsigned int", target, None)
-                got = f"struct_break<{whole}>({text}).low" if cut == "x" else f"kern::to<Int>(kern::formula([](Float x) -> Float {{ return {cut}; }}, {low}))"
+                got = f"int64_low({text})" if cut == "x" else f"kern::to<Int>(kern::formula([](Float x) -> Float {{ return {cut}; }}, {low}))"
             return got if want == "Int" else self.conv(got, "Int", want)
         raise Wait(f"a 64-bit number where a {want} is needed")
 
@@ -5230,12 +5326,11 @@ class Emit:
         signed = self.ctype(b) in ("whole64s", "long", "long long")
         b["_w64"] = True   # (said to the test: this is computed around 2^64 - see TestWriter.guard)
         if k == "IntegerLiteral":
-            v = int(b["value"]) % (1 << 64)
-            return f"struct_make<{whole}>({v >> 32}, {v & 0xFFFFFFFF})", whole
+            return f"Int64{{{int(b['value']) % (1 << 64):#x}}}", whole
         if k in CAST:
             return self.ex64(ks[-1]), whole
         if k == "InitListExpr":   # (u64{x}, u64{})
-            return (self.ex64(ks[0]) if ks else f"struct_make<{whole}>(0, 0)"), whole
+            return (self.ex64(ks[0]) if ks else "Int64{0x0}"), whole
         if k == "BinaryOperator":
             op = b["opcode"]
             x, y = ks
@@ -5686,10 +5781,11 @@ class Emit:
         if bt.startswith("List<") and name in ("begin", "cbegin", "end", "cend") and not a and self.is_iter(b):
             # an iterator is the place it stands at: the first entry's is 0, the end the list's length
             return ("0" if "begin" in name else f"list_length<{bt[5:-1]}>({self.ex(base, bt)})"), "Int"
-        if bt.startswith("List<") and self.keyed(base):
+        if bt.startswith(("Map<", "Set<")):
             got = self.keyed_call(b, base, name, a)
             if got is not None:
                 return got
+            raise Wait(f"{'map' if bt.startswith('Map<') else 'set'}: {name}()")
         if bt.startswith("List<"):
             it = bt[5:-1]
             lst = self.ex(base, bt)

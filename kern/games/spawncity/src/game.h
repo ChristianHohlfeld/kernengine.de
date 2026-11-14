@@ -8,7 +8,6 @@
 // jet (F at the jet; F in the air = ejection seat and parachute). Switching never loads anything.
 #pragma once
 
-#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -266,7 +265,7 @@ class Game {
   std::vector<i32> car_net_;           // client: the host's index each of our cars plays (-1 none)
   std::vector<mp::PoseTimeline> car_line_;   // client: the host's poses of each of his cars
   std::vector<Quat> car_rest_q_;             // ... and how each last stood (a car at rest is only named)
-  std::map<u8, WorldParts> world_parts_;
+  kern::Map<u8, WorldParts> world_parts_;
   std::vector<Life::NetCow> cows_acc_;
   std::vector<Life::NetPet> pets_acc_;
   std::vector<Life::NetFlock> flocks_acc_;
