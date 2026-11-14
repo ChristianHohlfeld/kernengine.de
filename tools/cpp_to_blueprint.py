@@ -69,7 +69,9 @@ writes anew.
 Needs clang++ (CLANGXX overrides the binary).
 """
 import collections
+import copy
 import io
+import itertools
 import json
 import os
 import re
@@ -323,6 +325,17 @@ def walk(n):
     yield n
     for c in kids(n):
         yield from walk(c)
+
+
+def walk_source(n):
+    """The tree as the source has it: where a call of a function that names a place was written out as
+    that place (Emit.dissolve), the call - the source calls the function, and so does the test's."""
+    if n.get("_call") is not None:
+        yield from walk_source(n["_call"])
+        return
+    yield n
+    for c in kids(n):
+        yield from walk_source(c)
 
 
 ENGINE = os.environ.get("KERN_ENGINE_NAMESPACE", "kern")
@@ -656,6 +669,7 @@ class Function:
         self.unit = None      # a function of another Blueprint (a library this one uses): that Blueprint's name
         self.key = None       # its name in the whole program (function_key)
         self.open = False     # it stands in a source file's Blueprint: a test in another file does not hold its source
+        self.place = False    # it names a place (`const T& spec() const { return s_; }`): no function of the Blueprint - where it is called, the place stands
 
     def order(self):
         """The parameters in the order the Blueprint function has its inputs: those by reference first, then those
@@ -1128,12 +1142,37 @@ class Unit:
             self.names.add(name)
             self.function_names[d["id"]] = name
 
+    PLACE = "it names a place: where it is called, the place stands - here the call could not be written so"
+
+    def place_named(self, d):
+        """`const CarSpec& spec() const { return s_; }` - a function of the program that gives a reference
+        and does nothing but name what it refers to: a name for a place, as `T& x = a.b[i];` is one. It is
+        no function of the Blueprint: where it is called, the place stands (Emit.dissolve) - nothing is
+        copied, as nothing is in C++. The expression it returns; None: the function is none such. (Only
+        what every caller sees: a function of a header, or one no header declares.)"""
+        if d is None or d.get("kind") not in ("FunctionDecl", "CXXMethodDecl") or d.get("virtual") or d.get("variadic") or not d.get("_file"):
+            return None
+        if not self.world.program(os.path.abspath(d["_file"])):
+            return None   # (the engine's own: its objects are handles, its functions nodes)
+        ret = qtype(d).split("(")[0].strip()
+        if not ret.endswith("&") or ret.endswith("&&"):
+            return None
+        if not is_header(d["_file"]) and declared_in_header_of(self.tree, d):
+            return None
+        body = next((c for c in kids(d) if c.get("kind") == "CompoundStmt"), None)
+        stmts = kids(body) if body is not None else []
+        if len(stmts) != 1 or stmts[0].get("kind") != "ReturnStmt" or not kids(stmts[0]):
+            return None
+        return kids(stmts[0])[0]
+
     def function(self, decl_id):
         d = self.tree.body.get(decl_id)
         if d is None or not self.mine(d):
             return self.foreign(decl_id, d)
         f = self.functions.get(d["id"])
         if f is not None:
+            if f.place:
+                raise Wait(f"{f.cpp}(): {self.PLACE}")
             if f.wait:
                 raise Wait(f"it calls {f.cpp}(), which waits")
             if f.text is None:
@@ -1151,6 +1190,9 @@ class Unit:
         a, b = d.get("_at", (None, None))
         f.lines = self.tree.text(f.file).count("\n", a, b) + 1 if a is not None else 0
         self.functions[d["id"]] = f
+        if self.place_named(d) is not None:
+            f.place = True
+            raise Wait(f"{f.cpp}(): {self.PLACE}")
         try:
             if f.key in self.world.bars:
                 raise Wait(self.world.bars[f.key])
@@ -1215,7 +1257,7 @@ class Unit:
 
     def entry_of(self, f):
         """What a call of a function of this Blueprint needs to know, for the table of the whole program."""
-        return {"unit": self.name, "name": f.name, "cpp": f.cpp, "wait": f.wait if not f.text else None, "pure": f.pure, "params": f.params, "kinds": f.kinds, "result": f.result,
+        return {"unit": self.name, "name": f.name, "cpp": f.cpp, "wait": (f.wait or (self.PLACE if f.place else None)) if not f.text else None, "pure": f.pure, "params": f.params, "kinds": f.kinds, "result": f.result,
                 "fixed": dict(f.fixed), "result_fixed": f.result_fixed,
                 "indexes": f.indexes, "self_type": f.self_type, "mutates": f.mutates, "refs": f.refs, "value": f.value, "ctor": f.ctor, "out_fields": f.out_fields,
                 "open": self.name in self.world.source_units}
@@ -1628,6 +1670,7 @@ class Emit:
         if "&" in ret and not re.search(r"\bconst\b", ret):
             raise Wait("a function that gives a reference to something to change")
         body = next(c for c in kids(d) if c.get("kind") == "CompoundStmt")
+        self.dissolve(d)   # (a call of a function that names a place: the place)
         # a method: its object is the first parameter - a reference to a value of the struct its class's data is:
         # the place the call names, changed where it stands (a const method reads it there)
         if d.get("kind") == "CXXMethodDecl" and d.get("storageClass") != "static" and any(x.get("kind") == "CXXThisExpr" for x in walk(d)):
@@ -1852,6 +1895,115 @@ class Emit:
                 if i is not None:
                     out.add(i)
         return out
+
+    # ---- a function that names a place ----
+    PLAIN = frozenset(("DeclRefExpr", "MemberExpr", "ImplicitCastExpr", "ParenExpr", "IntegerLiteral", "FloatingLiteral", "CXXBoolLiteralExpr", "CharacterLiteral", "StringLiteral",
+                       "ArraySubscriptExpr", "CStyleCastExpr", "CXXStaticCastExpr", "CXXFunctionalCastExpr", "CXXThisExpr", "ConstantExpr", "MaterializeTemporaryExpr",
+                       "CXXNullPtrLiteralExpr", "SubstNonTypeTemplateParmExpr"))
+    fresh_ids = itertools.count(1)
+
+    def plain(self, n):
+        """Can an expression be worked out any number of times - it changes nothing and calls nothing?"""
+        for x in walk(n):
+            k = x.get("kind")
+            if k in self.PLAIN:
+                continue
+            if k == "UnaryOperator" and x.get("opcode") not in ("++", "--"):
+                continue
+            if k == "BinaryOperator" and x.get("opcode") not in ("=", ","):
+                continue
+            return False
+        return True
+
+    def copied(self, n):
+        """A copy of an expression of the tree, each node an expression of its own (ids of its own)."""
+        c = copy.deepcopy(n)
+        for x in walk(c):
+            x.pop("_call", None)
+            if "id" in x and not x.get("kind", "").endswith("Decl"):
+                x["id"] = f"{x['id']}~{next(self.fresh_ids)}"
+        return c
+
+    def placed(self, n, inside=()):
+        """The place a call names, written out: the expression the called function returns (Unit.place_named)
+        - of the object the call names, with what the call gives for its parameters. None: the call is none
+        of a function that names a place, or it cannot be written so (what it is given would be worked out
+        another number of times than the call works it out)."""
+        c = callee(n)
+        obj, arrow = None, False
+        if n.get("kind") == "CXXMemberCallExpr":
+            if c.get("kind") != "MemberExpr" or not kids(c):
+                return None
+            i, obj, arrow = c.get("referencedMemberDecl"), kids(c)[0], bool(c.get("isArrow"))
+        elif n.get("kind") == "CallExpr":
+            if c.get("kind") != "DeclRefExpr":
+                return None
+            i = c.get("referencedDecl", {}).get("id")
+        else:
+            return None
+        d = self.tree.body.get(i) if i else None
+        e = self.u.place_named(d)
+        if e is None or d["id"] in inside:
+            return None
+        params = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
+        args = kids(n)[1:]
+        if len(args) != len(params) or any(a.get("kind") == "CXXDefaultArgExpr" for a in args):
+            return None
+        by = {p["id"]: a for p, a in zip(params, args)}
+        uses = collections.Counter(x.get("referencedDecl", {}).get("id") for x in walk(e) if x.get("kind") == "DeclRefExpr")
+        if any(uses.get(p["id"], 0) != 1 and not self.plain(a) for p, a in zip(params, args)):
+            return None
+        if obj is not None and sum(1 for x in walk(e) if x.get("kind") == "CXXThisExpr") != 1 and not self.plain(obj):
+            return None
+        out = self.copied(e)
+        def put(x, member=None):
+            k = x.get("kind")
+            if k == "DeclRefExpr" and x.get("referencedDecl", {}).get("id") in by:
+                arg = self.copied(by[x["referencedDecl"]["id"]])
+                x.clear()
+                x.update(arg)
+                return True
+            if k == "CXXThisExpr":
+                if obj is None:
+                    return True   # (a method called without naming an object: the caller's own - it stays `this`)
+                if not arrow and member is None:
+                    return False   # (`this` as a pointer: no place stands for that here)
+                held = self.copied(obj)
+                x.clear()
+                x.update(held)
+                if not arrow:
+                    member["isArrow"] = False
+                return True
+            if k == "UnaryOperator" and x.get("opcode") == "*" and obj is not None and not arrow and kids(x) and bare(kids(x)[0]).get("kind") == "CXXThisExpr":
+                held = self.copied(obj)   # (`*this`: the object)
+                x.clear()
+                x.update(held)
+                return True
+            return all(put(y, x if k == "MemberExpr" else member if k in ("ImplicitCastExpr", "ParenExpr") else None) for y in kids(x))
+        if not put(out):
+            return None
+        # (what the place itself calls: written out too)
+        for x in list(walk(out)):
+            if x.get("kind") in ("CallExpr", "CXXMemberCallExpr"):
+                inner = self.placed(x, (*inside, d["id"]))
+                if inner is not None:
+                    x.clear()
+                    x.update(inner)
+        return out
+
+    def dissolve(self, node):
+        """Every call of a function that names a place, in `node`: written out as that place - as
+        `T& x = a.b[i];` makes x a name for a.b[i] (name_references). The call stays with the node (`_call`)
+        for the test: its source calls the function, as the program does (walk_source)."""
+        for n in list(walk(node)):
+            if n.get("kind") not in ("CallExpr", "CXXMemberCallExpr") or n.get("_call") is not None:
+                continue
+            place = self.placed(n)
+            if place is not None:
+                call = dict(n)
+                n.clear()
+                n.update(place)
+                n["_call"] = call
 
     # ---- statements ----
     def name_references(self, stmts, i):
@@ -4916,6 +5068,8 @@ class TestWriter:
             return n.get("kind") == "IntegerLiteral" and n.get("value") not in ("0", None)
         visited = set()
         def visit(n, depth):
+            if n.get("_call") is not None:   # (a place written out for a call: the source has the call)
+                return visit(n["_call"], depth)
             k, ks = n.get("kind"), kids(n)
             if n.get("id") is not None:
                 if n["id"] in visited:
@@ -5045,7 +5199,7 @@ class TestWriter:
             if d["id"] in out or d.get("_at", (None, None))[1] is None or not d.get("_file"):
                 continue
             out[d["id"]] = d
-            for x in walk(d):
+            for x in walk_source(d):
                 ids = [x.get("referencedDecl", {}).get("id"), x.get("referencedMemberDecl")]
                 if x.get("kind") == "CXXConstructExpr":
                     ids.append((constructor_of(tree, x) or {}).get("id"))
@@ -5556,7 +5710,7 @@ class TestWriter:
                 want_record(owner)
             todo.append(("function", d))
         def scan(n):
-            for x in walk(n):
+            for x in walk_source(n):
                 k = x.get("kind")
                 t = x.get("type")
                 if isinstance(t, dict) and t.get("qualType"):
@@ -6121,11 +6275,11 @@ def convert_unit(job):
         if scratch:
             shutil.rmtree(scratch, ignore_errors=True)
     fs = unit.all
-    written = [f for f in fs if f.text]
+    written = [f for f in fs if f.text or f.place]   # (a name for a place is written where it is called)
     variables, functions, members, types = unit.parts()
     return {"name": name, "path": main_file, "program": world.program(main_file), "total": len(fs), "done": len(written), "total_lines": sum(f.lines for f in fs),
             "done_lines": sum(f.lines for f in written), "waits": [(f.wait, f.lines) for f in fs if f.wait],
-            "said": [f"    {f.cpp} ({f.lines}): " + ("written" if f.text else f.wait) for f in fs],
+            "said": [f"    {f.cpp} ({f.lines}): " + ("written" if f.text else "a name for a place - written where it is called" if f.place else f.wait) for f in fs],
             "table": {f.key: unit.entry_of(f) for f in unit.functions.values() if not f.lifted and f.key}, "written": len(unit.order),
             "parts": (variables, functions, members), "types": types, "uses": unit.uses(), "missing": sorted(unit.missing),
             "test": (unit.test[0], [(f.cpp, why) for f, why in unit.test[1]]), "errors": said.getvalue()}
