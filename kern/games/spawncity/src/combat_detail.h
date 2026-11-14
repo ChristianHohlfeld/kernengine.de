@@ -16,10 +16,10 @@
 
 namespace sc::detail {
 
-/// The running Blueprint of the actor "CombatDetail" (the game binds it once its world has
-/// started; tests bind the one they run). Unbound, every rule answers 0 / false.
-void bind(kern::logic::Instance* blueprint);
-kern::logic::Instance* blueprint();
+/// Binds the rules to the logic the level's Blueprints run in (the game once its world has started,
+/// tests the one they run): the Blueprint of the actor "CombatDetail" is found by its name at every call.
+/// True: the actor has a Blueprint that runs there. Unbound, every rule answers 0 / false.
+bool bind(kern::logic::Runtime& logic);
 
 // ---------------------------------------------------------------- critical_damage_logic.mjs
 /// The Blueprint's enum Critical (the same order).

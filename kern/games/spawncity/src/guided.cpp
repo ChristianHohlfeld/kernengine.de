@@ -37,8 +37,7 @@ void take(const MissileRun& f, Missile& m) {
 }
 }  // namespace
 
-void bind(kern::logic::Instance* blueprint) { g_rules.running = blueprint; }
-kern::logic::Instance* blueprint() { return g_rules.running; }
+bool bind(kern::logic::Runtime& logic) { return g_rules.bind(logic); }
 
 f32 speed() { return static_cast<f32>(g_rules.get<f64>("Speed")); }
 f32 turn_g() { return static_cast<f32>(g_rules.get<f64>("TurnG")); }

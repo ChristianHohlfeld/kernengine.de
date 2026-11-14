@@ -3,6 +3,7 @@
 // in Kern Logic and call it the way the game does (wanted.h).
 #include "../src/rules.h"
 #include "../src/wanted.h"
+#include "rule_blueprint.h"
 #include "test_util.h"
 
 using namespace sc;
@@ -28,9 +29,9 @@ struct WantedBlueprint {
     for (const kern::logic::Issue& i : kern::logic::check(g)) problems += (i.error ? "error: " : "warning: ") + i.text + "\n";
     inst = rt.add(g, 1, "Wanted");
     rt.begin();
-    wanted::bind(inst);
+    wanted::bind(rt);
   }
-  ~WantedBlueprint() { wanted::bind(nullptr); }
+  ~WantedBlueprint() { wanted::bind(sc::no_logic()); }
 };
 }  // namespace
 
@@ -84,7 +85,7 @@ SC_TEST(rules_wanted_blueprint) {
 
 SC_TEST(rules_wanted_unbound) {
   // without the Blueprint there are no rules (the game refuses to start without it)
-  SC_CHECK(wanted::blueprint() == nullptr && wanted::police_count(5) == 0 && wanted::arrival_delay_ms(1) == 0, "unbound: nothing");
+  SC_CHECK(!wanted::bind(sc::no_logic()) && wanted::police_count(5) == 0 && wanted::arrival_delay_ms(1) == 0, "unbound: nothing");
   wanted::report(wanted::Crime::police_car, true);
   SC_CHECK(wanted::stars() == 0 && wanted::heat() == 0, "unbound: no heat");
 }

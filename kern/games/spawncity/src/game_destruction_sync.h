@@ -15,14 +15,14 @@ namespace sc {
 
 struct DestroySync {
   using Craters = std::vector<Terrain::CraterRec>;
-  using Damage = std::vector<CityStream::DamageRec>;
+  using DamageList = std::vector<CityStream::DamageRec>;
   using Points = std::vector<std::pair<u32, f32>>;
   u32 epoch = 1;                 // the host's (a client: the one he has)
   f32 delta_clock = 0, digest_clock = 0;
   Craters sent;                  // host: the list as last sent; client: the host's list
   struct Mine { Terrain::CraterRec r; f32 at = 0; bool told = false; };
   std::vector<Mine> mine;        // client: own craters not yet in the host's list (when dug, told)
-  Damage dmg_out;                // what this machine still has to tell (merged per seed)
+  DamageList dmg_out;            // what this machine still has to tell (merged per seed)
   Points pts_out;
   std::vector<u8> known;         // host: the slots that have the whole state
   u32 mismatches = 0;

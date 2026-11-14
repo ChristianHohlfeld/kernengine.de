@@ -21,9 +21,10 @@ namespace sc {
 /// (the Blueprint's struct Pack) and how the game's C++ asks.
 class Jetpack {
  public:
-  /// The running Blueprint of the actor "Jetpack" (the game binds it once its world has started;
-  /// tests bind the one they run).
-  static void bind(kern::logic::Instance* blueprint);
+  /// Binds the rules to the logic the level's Blueprints run in (the game once its world has started,
+  /// tests the one they run): the Blueprint of the actor "Jetpack" is found by its name at every call.
+  /// True: the actor has a Blueprint that runs there.
+  static bool bind(kern::logic::Runtime& logic);
   // The Blueprint's variables Acc, AirAccel, MaxClimb, Gravity, FallSafe and IgnitionDamp.
   static f32 acc();
   static f32 air_accel();

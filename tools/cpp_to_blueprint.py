@@ -367,17 +367,18 @@ SKIP = ("ParenExpr", "ExprWithCleanups", "MaterializeTemporaryExpr", "CXXBindTem
 
 # ---- the bytes of a value (Bytes of Struct, Struct of Bytes - kern/docs/blueprint_cpp.md) ----------------
 # The number a field is in a layout, by the type C++ gives it - its spelling first (uint32_t is 32 bits on every
-# platform), then what that is. What the platform decides (the width of a long, the sign of a char), a float (the
-# language holds it in 64 bits) and anything that is no number have no place in a layout yet.
+# platform), then what that is. A float is f32: the field is a Float, its bytes those of the number as a float
+# (rounded as C++ rounds it to one). What the platform decides (the width of a long, the sign of a char) and
+# anything that is no number have no place in a layout yet.
 BYTE_CODES = {"bool": "bool", "uint8_t": "u8", "std::uint8_t": "u8", "u8": "u8", "int8_t": "i8", "std::int8_t": "i8", "i8": "i8",
               "uint16_t": "u16", "std::uint16_t": "u16", "u16": "u16", "int16_t": "i16", "std::int16_t": "i16", "i16": "i16",
               "uint32_t": "u32", "std::uint32_t": "u32", "u32": "u32", "int32_t": "i32", "std::int32_t": "i32", "i32": "i32",
               "uint64_t": "u64", "std::uint64_t": "u64", "u64": "u64", "int64_t": "i64", "std::int64_t": "i64", "i64": "i64",
-              "double": "f64", "f64": "f64", "unsigned char": "u8", "signed char": "i8", "short": "i16", "unsigned short": "u16", "int": "i32",
+              "float": "f32", "f32": "f32", "double": "f64", "f64": "f64", "unsigned char": "u8", "signed char": "i8", "short": "i16", "unsigned short": "u16", "int": "i32",
               "unsigned int": "u32", "long long": "i64", "unsigned long long": "u64"}
-BYTE_WIDTH = {"bool": 1, "u8": 1, "i8": 1, "u16": 2, "i16": 2, "u32": 4, "i32": 4, "u64": 8, "i64": 8, "f64": 8}
+BYTE_WIDTH = {"bool": 1, "u8": 1, "i8": 1, "u16": 2, "i16": 2, "u32": 4, "i32": 4, "u64": 8, "i64": 8, "f32": 4, "f64": 8}
 # (the Blueprint type of a field of each such number)
-BYTE_FIELD = {"bool": "Bool", "u8": "Int", "i8": "Int", "u16": "Int", "i16": "Int", "u32": "Int", "i32": "Int", "u64": "Int64", "i64": "Int64", "f64": "Float"}
+BYTE_FIELD = {"bool": "Bool", "u8": "Int", "i8": "Int", "u16": "Int", "i16": "Int", "u32": "Int", "i32": "Int", "u64": "Int64", "i64": "Int64", "f32": "Float", "f64": "Float"}
 # A pointer to bytes: what C++ reads any object's bytes through (and a void*, which is read as one of these)
 BYTE_POINTER = re.compile(r"const\s+(?:void|unsigned\s+char|uint8_t|std::uint8_t|u8|std::byte)\s*\*$")
 
@@ -390,8 +391,6 @@ def byte_code(raw):
     plain = re.sub(r"^(?:const\s+|volatile\s+)+", "", (raw.get("desugaredQualType") or spelled).strip())
     if plain in BYTE_CODES:
         return BYTE_CODES[plain]
-    if plain in ("float",) or spelled in ("float", "f32"):
-        raise Wait("the bytes of a float (the language holds it in 64 bits)")
     if plain in ("char", "long", "unsigned long", "wchar_t") or spelled in ("size_t", "std::size_t", "usize"):
         raise Wait(f"the bytes of a {spelled} (its width or its sign is the platform's)")
     raise Wait(f"the bytes of a {spelled} (no number)")
@@ -428,6 +427,19 @@ def record_bytes(tree, q):
     return text, size, [(c.get("name"), code) for c, code in zip(fields, codes)]
 
 
+def record_of(tree, v):
+    """The qualified name of the record the expression v is a value of - None: it is none (or one of several of
+    that name)."""
+    raw = re.sub(r"^(?:const\s+|volatile\s+)+", "", (v.get("type") or {}).get("desugaredQualType") or qtype(v)).strip()
+    raw = re.sub(r"^(?:struct|class)\s+", "", raw)
+    if raw in tree.records:
+        return raw
+    # (the tree names a record without the namespace that is converted - `sc::wire::F32` is `wire::F32`)
+    found = [r for r in tree.records if raw.endswith("::" + r) or r.endswith("::" + raw)]
+    longest = [r for r in found if len(r) == max(map(len, found))]
+    return longest[0] if len(longest) == 1 else None
+
+
 def addressed_record(tree, a):
     """`&x` (also cast to a pointer to bytes) where x is a value of a record: (x, the record's qualified name) - else None."""
     x = bare(a)
@@ -441,10 +453,8 @@ def addressed_record(tree, a):
     if x.get("kind") != "UnaryOperator" or x.get("opcode") != "&" or not kids(x):
         return None
     v = bare(kids(x)[0])
-    raw = re.sub(r"^(?:const\s+|volatile\s+)+", "", (v.get("type") or {}).get("desugaredQualType") or qtype(v)).strip()
-    raw = re.sub(r"^(?:struct|class)\s+", "", raw)
-    found = [raw] if raw in tree.records else [r for r in tree.records if r.endswith("::" + raw)]
-    return (v, found[0]) if len(found) == 1 else None
+    q = record_of(tree, v)
+    return (v, q) if q is not None else None
 
 
 def bare(n):
@@ -508,9 +518,11 @@ class Tree:
                 if z and name:
                     self.layouts.setdefault(name, (int(z.group(1)), fields))
                     name = ""
-        if q not in self.layouts:
-            raise Wait(f"the bytes of a {q.split('::')[-1]} (the compiler gives no layout of it here)")
-        return self.layouts[q]
+        # (the compiler names a record with all its namespaces; the tree without the one that is converted)
+        for name in (q, f"{self.namespace}::{q}"):
+            if name in self.layouts:
+                return self.layouts[name]
+        raise Wait(f"the bytes of a {q.split('::')[-1]} (the compiler gives no layout of it here)")
 
     def __init__(self, path, namespace, flags, spaces=()):
         self.path = os.path.abspath(path)
@@ -856,6 +868,8 @@ def own_function(tree, decl_id):
     owner = tree.owner.get(d["id"]) or tree.owner.get(decl_id) or ""
     if owner in (ENGINE + "::Vec3", ENGINE + "::Vec2"):
         return False
+    if owner == ENGINE + "::logic::ActorBlueprint":
+        return False   # (the program's way to call an actor's Blueprint: Call on Actor, Get Variable on Actor, Has Blueprint - nodes)
     if not owner and tree.scope_of.get(d["id"], "").startswith(ENGINE + "::") and d.get("name") in VECTOR_FUNCTIONS:
         return False
     return True
@@ -1028,6 +1042,7 @@ class Function:
         self.on_actors = []   # (actor, function): what it calls on the Blueprint of an actor of the level (Call on Actor)
         self.pointers = []    # the parameters (by place) that are a pointer into a list: the list, read where it stands - the next parameter is the place in it (Unit.pointed)
         self.state = False    # a method of a state (World.states): a function of that Blueprint, its fields are the Blueprint's variables
+        self.logic = []       # the parameters of the C++ (by their place among its parameters) that are the logic the Blueprint runs in (Unit.is_logic): no input
 
     def order(self):
         """The parameters in the order the Blueprint function has its inputs: those by reference first, then those
@@ -1160,6 +1175,9 @@ class Unit:
         # last name that is defined: what it is, this file does not know)
         last = t.split("::")[-1]
         for q in self.tree.declared:
+            outer = q[: len(q) - len(last)].rstrip(":")
+            if outer in self.tree.records and q != t and not (self.lookup_scope or "").startswith(outer + "::") and not t.startswith(outer.split("::")[-1] + "::"):
+                continue   # (a class declared in a class - Mixer::Voice: by its short name only in that class)
             if q.split("::")[-1] == last and q not in self.tree.records and (q.endswith("::" + t) or q == t) and not any(q == c or q.endswith("::" + c) for c in cands):
                 raise Wait(f"the type {t} is only declared here (its definition is in another file)")
         if len(cands) == 1:
@@ -1400,6 +1418,12 @@ class Unit:
             if ft != BYTE_FIELD[code]:
                 raise Wait(f"the bytes of a {q.split('::')[-1]} (its field {name} is a {ft}, its bytes a {code})")
         return st, text, size
+
+    def is_logic(self, raw):
+        """A parameter `kern::logic::Runtime&`: the logic the level's Blueprints run in. A Blueprint runs in one
+        logic, its own (BlueprintWorld::runtime) - what it is given there it has: no input of the function, and
+        a call hands it nothing. (Who calls hands on the logic it was given itself: Emit.logic_arg.)"""
+        return re.sub(r"\s*&$", "", re.sub(r"^const\s+", "", self.clean(raw)).strip()).strip() == ENGINE + "::logic::Runtime" and raw.strip().endswith("&")
 
     def pointed(self, raw):
         """A parameter `const T*` the function reads entries through (`p[i]`, `*p`), hands on (`p + 2`) or asks
@@ -1987,6 +2011,7 @@ class Unit:
                 f.wait = f"a function of {e['unit']}, the Blueprint of the program's one object: only its own functions call it"
             f.on_actors = [(a, None) for a in e.get("actors", ())]   # (the actors whose Blueprints it calls on them, itself or through what it calls)
             f.pointers = list(e["pointers"])
+            f.logic = list(e.get("logic", ()))
             if not f.wait and f.open and d["id"] not in self.tree.body and self.world.closures is not None and key not in self.world.closures:
                 # A function is written when its test compares it, and the test holds the source of all it
                 # calls once more: what stands in another source file, as the test of that file hands it on.
@@ -2021,7 +2046,7 @@ class Unit:
         return {"unit": self.name, "name": f.name, "cpp": f.cpp, "wait": (f.wait or (self.PLACE if f.place else None)) if not f.text else None, "pure": f.pure, "params": f.params, "kinds": f.kinds, "result": f.result,
                 "fixed": dict(f.fixed), "result_fixed": f.result_fixed,
                 "indexes": f.indexes, "self_type": f.self_type, "mutates": f.mutates, "refs": f.refs, "value": f.value, "ctor": f.ctor, "out_fields": f.out_fields,
-                "open": self.job in self.world.source_units, "state": f.state, "pointers": f.pointers,
+                "open": self.job in self.world.source_units, "state": f.state, "pointers": f.pointers, "logic": f.logic,
                 "actors": sorted(actors_called(f))}
 
     def uses(self):
@@ -2529,6 +2554,7 @@ class Emit:
         self.keyed_vars = {}  # decl id of a name for an entry of a map or a set (a loop's variable, `auto& [k, v]`) -> (the map or set, its place)
         self.serial = 0       # the number of the statement being written (see `slot`)
         self.writing = object()   # (this writing of the function: the tree is shared - another writing of it, a later conversion of its file, has nodes of its own)
+        self.logic_params = set()   # decl ids of the parameters that are the logic the Blueprint runs in (Unit.is_logic)
 
     # ---- types ----
     def tp(self, n):
@@ -2669,6 +2695,13 @@ class Emit:
             if p.get("kind") != "ParmVarDecl":
                 continue
             raw = qtype(p)
+            if u.is_logic(raw):
+                # the logic the Blueprint runs in: its own - no input (Unit.is_logic)
+                if re.search(r"\bconst\b", raw):
+                    raise Wait("the logic the Blueprint runs in, as a constant (a Blueprint binds its rules to its own)")
+                f.logic.append([x["id"] for x in kids(d) if x.get("kind") == "ParmVarDecl"].index(p["id"]))
+                self.logic_params.add(p["id"])
+                continue
             entries = u.pointed(raw)
             if entries is not None:
                 # a pointer into a list: the list, read where it stands, and the place in it (Unit.pointed)
@@ -3892,6 +3925,7 @@ class Emit:
             b = bare(kids(b)[-1])
         if b.get("kind") == "IntegerLiteral":
             return str(int(b["value"]) - 1)
+        # (a bound that is itself a conversion - `i < from + n` - is a value of its own first: conv)
         return f"kern::to<Int>(kern::formula([](Float n) -> Float {{ return n - 1.0; }}, {self.conv(text, 'Int', 'Float')}))"
 
     def refers(self, n, decl_id):
@@ -4305,6 +4339,9 @@ class Emit:
             name = m.get("name")
             if self.on_actor(n) is not None:
                 return self.call_on(n, self.on_actor(n))
+            if self.actor_bind(n) is not None:
+                self.has_blueprint(n, self.actor_bind(n))   # (what it gives is not used: binding is the Blueprint's own, nothing to do)
+                return []
             d = self.engine_decl(m.get("referencedMemberDecl"))
             if d is not None:
                 return self.engine(d, base, kids(n)[1:])[0]
@@ -4587,7 +4624,10 @@ class Emit:
 
     def get_on(self, n, obj):
         """Get Variable on Actor: func_get_on<"Speed", Float>(actor_find("Guided")) - the variable as the program
-        binds the actor's Blueprint, of the type the C++ reads it as."""
+        binds the actor's Blueprint, of the type the C++ reads it as. The runtime reads it where its type becomes
+        that one (Runtime::get_on: as on a wire for a value on its own; a struct field by field, a list of its
+        kind - the reader's own type says which struct): checked against the actor's Blueprint as a call's pins
+        are (crosses), else the read would give the zero in both forms."""
         args = kids(n)[1:]
         named = self.unwrap(args[0]) if len(args) == 1 else {}
         if named.get("kind") != "StringLiteral":
@@ -4599,10 +4639,49 @@ class Emit:
         if name not in target.get("variables", {}):
             raise Wait(f"the variable {name} of the Blueprint of the actor {actor}, which has no such variable")
         t = self.tp(n)
-        if t not in ("Float", "Int", "Bool", "Vector", "Text") and t not in self.u.enum_values:
-            raise Wait(f"the variable {name} of the Blueprint of the actor {actor} as a {t}")
+        their, of = target["variables"][name]
+        simple = {"Bool": "bool", "Int": "int", "Float": "float", "Vector": "vector", "Text": "text"}
+        if t in simple:   # (a value on its own: as on a wire - logic::convertible)
+            numbers = ("bool", "int", "float")
+            if not (simple[t] == their or (simple[t] in numbers and their in numbers) or t == "Text" or (t == "Vector" and their in ("int", "float"))):
+                raise Wait(f"the variable {name} of the Blueprint of the actor {actor}, a {their}, as a {t} (it does not become one)")
+        else:
+            why = self.crosses(t, their, of, target, 1)   # (an enum's value, a struct, a list: of their kind, as in a struct)
+            if why:
+                raise Wait(f"the variable {name} of the Blueprint of the actor {actor}: it is {why}")
         self.f.on_actors.append((actor, name))
         return f'func_get_on<"{name}", {t}>(actor_find({text_literal(actor)}))', t
+
+    def actor_bind(self, n):
+        """rules.bind(logic) - kern::logic::ActorBlueprint::bind: the program binds the actor's Blueprint to the logic
+        it runs in. The object it is called on, else None."""
+        m = callee(n)
+        if n.get("kind") != "CXXMemberCallExpr" or m.get("kind") != "MemberExpr" or m.get("name") != "bind" or not kids(m):
+            return None
+        base = kids(m)[0]
+        return base if re.sub(r"^const\s+", "", self.ctype(base)).strip() == ENGINE + "::logic::ActorBlueprint" else None
+
+    def has_blueprint(self, n, obj):
+        """rules.bind(logic): what it gives is Has Blueprint - func_has_blueprint(actor_find("Wanted")): does the
+        actor have a Blueprint that runs in the logic? A Blueprint is bound to its own logic, always; the logic
+        the C++ binds is the one the function was given (logic_arg) - which a Blueprint does not need given."""
+        args = kids(n)[1:]
+        if len(args) != 1:
+            raise Wait("an actor's Blueprint bound otherwise than to a logic")
+        self.logic_arg(args[0])
+        actor = self.actor_named(obj)
+        if actor not in self.u.world.actors:
+            raise Wait(f"the Blueprint of the actor {actor}, which the level does not have")
+        self.f.on_actors.append((actor, None))
+        return f"func_has_blueprint(actor_find({text_literal(actor)}))", "Bool"
+
+    def logic_arg(self, a):
+        """The logic a call hands on (to ActorBlueprint::bind, to a function's `kern::logic::Runtime&`): in a
+        Blueprint it is its own, so it must be the one this function was given itself - the same logic all the
+        way down, whoever binds."""
+        b = self.unwrap(a)
+        if b.get("kind") != "DeclRefExpr" or b.get("referencedDecl", {}).get("id") not in self.logic_params:
+            raise Wait("a logic handed on that is not the one the function was given (a Blueprint runs in its own)")
 
     def actor_named(self, obj):
         """The actor whose Blueprint `obj` is: named where it is made (ActorBlueprint rules{"Lamps"}). The name
@@ -4708,7 +4787,12 @@ class Emit:
             why = self.crosses(t, their, of, target)
             if why:
                 raise Wait(f"a call of {function} on the Blueprint of the actor {actor}: its pin {what} is {why}")
-        pins = (list(zip(ins, in_types)), list(zip(gives, out_types)))
+        # (an input is named here as the actor's Blueprint names it - unless this Blueprint has a variable or a
+        # function of that name: then one of its own. Call on Actor gives the values in their order, by no name.)
+        named_in = []
+        for x in ins:
+            named_in.append(u.fresh(x, set(named_in)) if x in u.names or x in named_in else x)
+        pins = (list(zip(named_in, in_types)), list(zip(gives, out_types)))
         # (named here by its actor and its own name - KERN_EXTERN_AS: two actors' Blueprints may each have a
         # function of that name that looks different; every part of a Blueprint names it the same)
         local = re.sub(r"\W", "_", actor) + "_" + function
@@ -6059,10 +6143,13 @@ class Emit:
             params = params[1:]
             kinds = kinds[1:]
         first = len(g.params) - len(params)   # (a method: its object is the first input)
-        if len(args) != len(params) - len(g.pointers):
+        if len(args) - len(g.logic) != len(params) - len(g.pointers):
             raise Wait("a call with default arguments")
         j = 0
-        for a in args:
+        for i, a in enumerate(args):
+            if i in g.logic:   # (the logic the Blueprint runs in: the call hands it on, as its own - no input)
+                self.logic_arg(a)
+                continue
             if first + j in g.pointers:   # (a pointer into a list: the list and the place in it - Unit.pointed)
                 texts += self.pointer_arg(a, params[j][1][5:-1], g.fixed.get(first + j))
                 j += 2
@@ -6283,6 +6370,8 @@ class Emit:
                 return self.names[i], self.types[i]
             if i in self.pointers:
                 raise Wait("a pointer into a list used as more than its entries, its place in a call or whether it is null")
+            if i in self.logic_params:
+                raise Wait("the logic the Blueprint runs in, used otherwise than to bind an actor's Blueprint or to hand it on")
             if ref.get("kind") == "EnumConstantDecl":
                 d = self.tree.decl.get(i)
                 q = d.get("_enum") if d else None
@@ -6453,6 +6542,25 @@ class Emit:
         if k == "OffsetOfExpr":
             return str(self.offset_of(b)), "Int"
         raise Wait(f"an expression: {k}")
+
+    def bit_cast(self, b, x):
+        """std::bit_cast<std::array<u8, N>>(value), the value one of a struct of numbers: its bytes (Bytes of Struct,
+        in the layout C++ gives the struct) - a list of that fixed length, made where the cast is; nothing is asked
+        for, as for the std::array. A cast to anything else waits."""
+        c = self.ctype(b)
+        if not c.startswith("std::array<"):
+            return self.number_bits(b, x)   # (between a float and a whole number of its width)
+        entry = template_args(c)[0] if c.startswith("std::array<") else None
+        q = record_of(self.tree, bare(x))
+        if entry is None or self.u.clean(entry) != "unsigned char" or q is None:
+            raise Wait("std::bit_cast to anything but the bytes of a struct")
+        st, text, size = self.u.byte_layout(q)
+        if self.u.fixed(qtype(b)) != size:
+            raise Wait("std::bit_cast to bytes of another size")   # (C++ does not take that either)
+        lt = "List<Int>"
+        tmp = self.temp("bytes", lt, size)
+        self.hoist([f"{tmp} = struct_bytes<{st}, {text_literal(text)}>({self.ex(x, st)});"])
+        return tmp, lt
 
     def offset_of(self, n):
         """offsetof(S, field): where the field begins in a value of S, as the compiler lays S out (Tree.layout). The
@@ -6786,7 +6894,7 @@ class Emit:
         text, have = self.value(n)
         return text if have == self.whole64() else self.to64(text, have)
 
-    def bit_cast(self, n, x):
+    def number_bits(self, n, x):
         """std::bit_cast between a float and a whole number of its width: the same bits read as the other type -
         32 bits (Bits of Float 32, Float 32 of Bits: a u32 is 0 .. 2^32 - 1, an i32 its two's complement) and
         64 bits (Bits of Float, Float of Bits: the Int64 the 64-bit number is)."""
@@ -7289,8 +7397,9 @@ class Emit:
                     if n in (f"list_length<{it}>({self.ex(lst, t)})", str(u.fixed(qtype(lst)))):
                         return self.ex(lst, t), t
                 raise Wait("a view (Span) of a part of a list")
-            if len(a) in (1, 2) and self.tp_or_none(a[0]) in ("Int", "Float") and (len(a) == 1 or self.tp_or_none(a[1]) is not None):
-                # std::vector<T>(n) and (n, x): n entries, each T's zero or x
+            if len(a) in (1, 2) and self.tp_or_none(a[0]) in ("Int", "Float") and (len(a) == 1 or self.tp_or_none(a[1]) is not None) and not (len(a) == 2 and self.is_iter(a[0])):
+                # std::vector<T>(n) and (n, x): n entries, each T's zero or x (a place in a list is an Int as well:
+                # two of them are the range below)
                 made = self.temp("made", t)
                 self.hoist([f"{made} = {t}{{}};", f"list_resize({made}, {self.ex(a[0], 'Int')}, {self.ex(a[1], it) if len(a) == 2 else u.zero(it)});"])
                 return made, t
@@ -7302,8 +7411,10 @@ class Emit:
                     raise Wait("a list made of a range of another type")
                 if self.whole_list(a[0], a[1]):
                     return self.ex(s0, st), t   # (the whole list: a copy of it)
-                made, src, i0, i1 = self.temp("made", t), self.temp("from", st), self.temp("first", "Int"), self.temp("last", "Int")
-                self.hoist([f"{made} = {t}{{}};", f"{src} = {self.ex(s0, st)};", f"{i0} = {first};", f"{i1} = {self.whole_math('-', last, '1')};",
+                # (the entries read where the list stands - nothing is copied but them, as in C++)
+                src = self.place_arg(s0, st, "const", [])
+                made, i0, i1 = self.temp("made", t), self.temp("first", "Int"), self.temp("last", "Int")
+                self.hoist([f"{made} = {t}{{}};", f"{i0} = {first};", f"{i1} = {self.whole_math('-', last, '1')};",
                             f"list_reserve({made}, {self.whole_math('+', self.whole_math('-', i1, i0), '1')});"]
                            + self.count_loop(i0, i1, lambda i: [f"list_add({made}, list_get<{it}>({src}, {i}));"]))
                 return made, t
@@ -7316,6 +7427,8 @@ class Emit:
         name = m.get("name")
         if self.actor_get(b) is not None:
             return self.get_on(b, self.actor_get(b))
+        if self.actor_bind(b) is not None:
+            return self.has_blueprint(b, self.actor_bind(b))
         if self.actor_value(b) is not None:
             return self.call_on(b, self.actor_value(b), "Float" if name == "number" else "Bool")
         d = self.engine_decl(m.get("referencedMemberDecl"))
@@ -7895,11 +8008,72 @@ class TestWriter:
                 return self.u.pointed(qtype(r)) is not None
             except Wait:
                 return False
+        def wide_layout(q):
+            """The fields of the record q where the test holds them otherwise than the program (a float of the
+            program is a 64-bit number there): ([(field, its number, its place)], the size) - None where the test
+            holds every field as the program does (record_bytes)."""
+            try:
+                text, size, fields = record_bytes(self.tree, q) if q is not None else (None, None, ())
+            except Wait:
+                return None
+            if not any(code == "f32" for _, code in fields):
+                return None
+            places = [int(f.split("@")[1]) for f in text.split(":", 1)[1].split()]
+            return [(name, code, at) for (name, code), at in zip(fields, places)], size
+        def bytes_text(value, layout):
+            """The bytes of a value as the program lays it out (converted::layout)."""
+            fields, size = layout
+            steps = " ".join("converted::layout::%s(o_ + %d, v_.%s);" % ("single_to" if code == "f32" else "raw_to", at, name) for name, code, at in fields)
+            return "converted::layout::bytes_of<%d>(%s, [](const auto& v_, kern::u8* o_) { %s })" % (size, value, steps)
+        def text_of(x):
+            xa, xb = span(x)
+            return raw[xa:xb]
         visited = set()
         def visit(n, depth):
             if n.get("_call") is not None:   # (a place written out for a call: the source has the call)
                 return visit(n["_call"], depth)
             k, ks = n.get("kind"), kids(n)
+            # the bytes of a value of a struct with a float, as the program lays them out (Bytes of Struct,
+            # Struct of Bytes): the test holds the float as a 64-bit number
+            if k == "CallExpr" and callee_name(n) == "bit_cast" and len(ks) == 2:
+                # the bits of a float of the program (the test holds it as a 64-bit number): of the float it is
+                plain = lambda x: re.sub(r"\bconst\b", "", qtype(x)).strip()
+                to, frm = plain(n), plain(ks[1])
+                if frm == "float" and to in ("unsigned int", "int"):
+                    a, b = span(n)
+                    edits.append((a, 1, 0, b, "static_cast<%s>(converted::layout::float_bits(%s))" % (to, text_of(ks[1]))))
+                    return
+                if to == "float" and frm in ("unsigned int", "int"):
+                    a, b = span(n)
+                    edits.append((a, 1, 0, b, "converted::layout::float_of_bits(static_cast<kern::u32>(%s))" % text_of(ks[1])))
+                    return
+                lay = wide_layout(record_of(self.tree, bare(ks[1])))
+                if lay is not None:
+                    a, b = span(n)
+                    edits.append((a, 1, 0, b, bytes_text(text_of(ks[1]), lay)))
+                    return
+            if k == "CallExpr" and callee_name(n) in ("memcpy", "memmove") and len(ks) == 4:
+                held = addressed_record(self.tree, ks[1])
+                lay = wide_layout(held[1]) if held is not None else None
+                if lay is not None:
+                    a, b = span(n)
+                    steps = " ".join("converted::layout::%s(v_.%s, p_ + %d);" % ("single_from" if code == "f32" else "raw_from", name, at) for name, code, at in lay[0])
+                    edits.append((a, 1, 0, b, "converted::layout::of_bytes(%s, %s, [](auto& v_, const kern::u8* p_) { %s })" % (text_of(held[0]), text_of(ks[2]), steps)))
+                    return
+            if k in ("CallExpr", "CXXMemberCallExpr"):
+                # the address of such a value handed to a pointer to bytes: its bytes, for the call
+                member = k == "CXXMemberCallExpr" and bool(ks) and ks[0].get("kind") == "MemberExpr"
+                fn = bare(ks[0]) if ks else {}
+                while fn.get("kind") in ("ImplicitCastExpr", "ParenExpr") and kids(fn):
+                    fn = bare(kids(fn)[0])
+                target = ks[0].get("referencedMemberDecl") if member else (fn.get("referencedDecl") or {}).get("id")
+                params = [p for p in kids(self.tree.decl.get(target) or {}) if p.get("kind") == "ParmVarDecl"]
+                for x, p in zip(ks[1:], params):
+                    held = addressed_record(self.tree, x) if BYTE_POINTER.match(qtype(p).strip()) else None
+                    lay = wide_layout(held[1]) if held is not None else None
+                    if lay is not None:
+                        xa, xb = span(x)
+                        edits.append((xa, 1, 0, xb, bytes_text(text_of(held[0]), lay) + ".data()"))
             if k == "VarDecl" and re.match(r"const\s+[^*&]+\*$", qtype(n).strip()) and n.get("init") and ks and into_list(ks[-1]):
                 aliases.add(n.get("id"))
             if n.get("id") is not None:
@@ -8680,7 +8854,10 @@ class TestWriter:
                         self.no_stand_in(f, w)
                         continue   # (what it takes the test has no values of: a function that calls it is not compared)
                     defs.append((("engine", f["decl"]["id"]), b))
-        objects = {q for q in u.objects_seen | set(by_class) | self.more_objects | set(self.object_enums) if q in tree.records and u.engine_object(q)}
+        # (the logic the level's Blueprints run in, and the program's way to call them, are the test's own: it
+        # runs the actors' Blueprints in a real one - converted::Blueprint, RuleBlueprint)
+        own_logic = (ENGINE + "::logic::Runtime", ENGINE + "::logic::ActorBlueprint")
+        objects = {q for q in u.objects_seen | set(by_class) | self.more_objects | set(self.object_enums) if q in tree.records and u.engine_object(q) and q not in own_logic}
         for q in sorted(objects):   # (the classes of the engine they derive from: stand-ins too - HostTransport is a Transport)
             for b in self.engine_bases(q):
                 objects.add(b)
@@ -9685,6 +9862,8 @@ class TestWriter:
                 first = len(names)
                 held_lists = []   # (the lists the source gets a pointer into: the list and the place - Unit.pointed)
                 for p in params:
+                    if self.u.is_logic(qtype(p)):
+                        continue   # (the logic the actors' Blueprints run in: the source's own - no input of the Blueprint)
                     if self.u.pointed(qtype(p)) is not None:
                         entry = re.sub(r"\s*\*$", "", qtype(p).strip())
                         if re.match(r"const\s+void$", entry):
@@ -9720,6 +9899,9 @@ class TestWriter:
                 # (a list the source writes in braces - std::initializer_list - is the drawn list as such a list: converted::listed)
                 braced, handed, at_ = {}, [], first
                 for p in params:
+                    if self.u.is_logic(qtype(p)):   # (the logic the source's ActorBlueprints are bound to: converted::Blueprint)
+                        handed.append("bp.source_logic()")
+                        continue
                     if self.u.pointed(qtype(p)) is not None:   # (the pointer: into the list the run was given, at its place)
                         handed.append(f"({names[at_ + 1]} < 0 ? nullptr : {names[at_]}.data() + {names[at_ + 1]})")
                         at_ += 2
@@ -9969,7 +10151,7 @@ class TestWriter:
                                   f'  converted::Blueprint bp("{u.name}"' + (", {" + ", ".join(text_literal(a) for a in actors) + "}" if actors else "") + ");"]))
             for b in dict.fromkeys(bindings):
                 if ("bind", b) not in dropped:   # (the source calls the actor's Blueprint as the program binds it)
-                    add(("bind", b), f"  {b}.running = bp.source_actor({b}.actor);")
+                    add(("bind", b), f"  {b}.bind(bp.source_logic());")
             for key, text in cases:
                 if key not in dropped:
                     add(key, text)
@@ -10171,6 +10353,8 @@ def survey_one(job):
         file = os.path.abspath(d["_file"])
         if file != me and not is_header(file):
             continue
+        if tree.owner.get(d["id"]) == ENGINE + "::logic::ActorBlueprint":
+            continue   # (no function of a Blueprint: its calls are nodes - own_function)
         calls, shares = set(), False
         params_of.update({p["id"]: (function_key(tree, d), k) for k, p in enumerate(x for x in kids(d) if x.get("kind") == "ParmVarDecl")})
         for n in walk(d):
@@ -10535,7 +10719,7 @@ def main(argv):
                              for f in g.get("functions", []) if f.get("name")},
                     "structs": {t["name"]: [(x.get("type", "float"), x.get("of", "")) for x in t.get("fields", [])] for t in g.get("structs", []) if t.get("name")},
                     "enums": {t["name"]: len(t.get("values", [])) for t in g.get("enums", []) if t.get("name")},
-                    "variables": {v["name"]: v.get("type", "float") for v in g.get("variables", []) if v.get("name")}}
+                    "variables": {v["name"]: (v.get("type", "float"), v.get("of", "")) for v in g.get("variables", []) if v.get("name")}}
 
     # ---- the plan: every source file read once - its functions, what they call, the types ----
     functions, types, sources = {}, set(), {}

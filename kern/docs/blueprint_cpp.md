@@ -196,7 +196,8 @@ KERN_LAYOUT(Demo) {
 | Typ des Projekts (mehrere Blueprints des Levels haben ihn, alle gleich) | `KERN_PROJECT_ENUM(Mode, Closed, Open);` · `KERN_PROJECT_STRUCT(Door) { Mode State = Mode::Closed; };` – sonst wie `KERN_ENUM` / `KERN_STRUCT` |
 | Funktion eines anderen Blueprints | `KERN_EXTERN FnResult Fn(Float x = 1.5);` – wie sie aussieht, ohne Rumpf (mit `struct FnResult { ... };` darüber, wenn sie Ausgänge hat) |
 | Call on Actor | `func_call_on<"Fn">(target, kern::out(n7.y), x);` – erst das Target (`Actor{0}`: der Blueprint des Levels), dann `kern::out(...)` mit allen Ausgängen in ihrer Reihenfolge als Felder des Members `n7` (oder `kern::out()`, wenn niemand sie liest), dann die Eingänge |
-| Get Variable on Actor | `func_get_on<"Speed", Float>(target)` – was die Variable des Namens im Blueprint von Target jetzt hält, als Wert des Typs der Einstellung (die Null des Typs, wo Target keine solche Variable dieses Typs hat); ein Wert-Knoten |
+| Get Variable on Actor | `func_get_on<"Speed", Float>(target)` – was die Variable des Namens im Blueprint von Target jetzt hält, als Wert des Typs der Einstellung (die Null des Typs, wo Target keine solche Variable hat oder eine, deren Typ nicht zu ihm wird: „Ein Weg“); ein Wert-Knoten |
+| Has Blueprint | `func_has_blueprint(target)` – ob Target (`Actor{0}`: das Level) einen Blueprint hat, der läuft (ohne Fehler, nicht gestoppt); ein Wert-Knoten |
 | Function Entry | der Anfang des Funktionsrumpfs; seine Ausgänge sind die Parameter |
 | Lokale Variable einer Funktion | `Float Total = 0.0;` als erste Zeilen des Funktionsrumpfs – eine lokale Variable von C++; gelesen und gesetzt wie jede Variable (`Total`, `Total = x;`, `Total += x;`, `Hit.Damage = x;`, `list_add(n7, Seen, x);`) |
 | Platz (eine Variable, ein Feld davon, ein Eintrag einer Liste darin – beliebig tief) | wie C++ ihn schreibt: `Cars[i].Wheels[j].Slip` – die Einstellung „path“ des Knotens (`[].Wheels[].Slip`), jeder Index ein Eingang (siehe „Plätze“) |
@@ -711,10 +712,14 @@ Frame Back = struct_of_bytes<Frame, "10: u32@0 u16@4 u16@6 i16@8">(Bytes, 0);
   liest er beim Compiler ab (`-fdump-record-layouts`, das, was C++ für diese Struktur festlegt,
   auch unter `#pragma pack`); `memcpy(&wert, bytes, sizeof wert)` ist S of Bytes; ein Zeiger auf
   Bytes (`const void*`, `const uint8_t*`), dem ein Aufruf `&wert` gibt, bekommt die Bytes des
-  Werts (Bytes of S, eine Liste fester Länge); `offsetof(S, feld)` ist die Zahl, die das Layout
-  sagt. Eine Struktur mit Füllung, mit einem `float` (die Sprache hält ihn in 64 Bit), einer Zahl,
-  deren Breite die Plattform bestimmt (`long`, `size_t`, `char`), einer Aufzählung, einem
-  Bitfeld oder einem Feld, das keine Zahl ist, hat dort noch keine Bytes und wartet mit Grund.
+  Werts (Bytes of S, eine Liste fester Länge); `std::bit_cast<std::array<uint8_t, N>>(wert)` sind
+  seine Bytes ebenso (Bytes of S, N so groß wie die Struktur); `offsetof(S, feld)` ist die Zahl, die
+  das Layout sagt. Ein `float` ist im Layout `f32` (das Feld ein Float). Eine Struktur mit Füllung,
+  einer Zahl, deren Breite die Plattform bestimmt (`long`, `size_t`, `char`), einer Aufzählung,
+  einem Bitfeld oder einem Feld, das keine Zahl ist, hat dort noch keine Bytes und wartet mit Grund.
+  Der Test hält einen `float` des Programms als 64-Bit-Zahl; wo das Programm die Bytes einer
+  Struktur mit einem nimmt, schreibt er sie aus, wie das Layout des Programms sie legt (der `float`
+  als seine 32 Bit, gerundet, wie C++ einen `double` zu einem `float` macht – `converted::layout`).
 - **Die Bits einer Zahl** (`std::bit_cast` zwischen einer Gleitkommazahl und einer ganzen Zahl
   ihrer Breite) sind eigene Knoten: Bits of Float 32 (`math_bits_of_float32(x)`: die 32 Bit der
   Zahl als `float`, 0 bis 2^32 − 1) und Float 32 of Bits (`math_float32_of_bits(b)`: der `float`
@@ -1106,18 +1111,54 @@ und Get Variable on Actor treffen sie, wie sie im Spiel die Actors des Levels tr
 
 **Aufrufe aus C++.** Das C++ eines Programms ruft eine Funktion des Blueprints eines Actors so, wie
 Call on Actor sie ruft: `kern::logic::ActorBlueprint` (kern/logic/actor_blueprint.h) ist der
-Blueprint eines Actors des Levels, beim Namen des Actors gemacht; das Programm bindet `running`, wenn
-seine Welt läuft. Ein Aufruf gibt die Werte typisiert hinein und nimmt die Ausgänge der Reihe nach in
-die Plätze, die `std::tie` nennt:
+Blueprint eines Actors des Levels, beim Namen des Actors gemacht. Das Programm bindet ihn an die Logik,
+in der die Blueprints des Levels laufen (`bool bind(kern::logic::Runtime&)`), sobald seine Welt läuft;
+danach findet **jeder Aufruf** den Actor beim Namen (`Host::find_actor`) und dessen laufenden Blueprint
+(`Runtime::find`) – wie `actor_find("Military")` im Blueprint, bei jedem Aufruf. Kein Zeiger auf einen
+Blueprint wird gehalten: Ein Actor, dessen Blueprint ersetzt wird, wird mit dem neuen gerufen, ein
+Name, den der Host nicht kennt, ist kein Actor – der Blueprint des Levels. Ein Aufruf gibt die Werte
+typisiert hinein und nimmt die Ausgänge der Reihe nach in die Plätze, die `std::tie` nennt:
 
 ```cpp
 kern::logic::ActorBlueprint rules{"Military"};
+if (!rules.bind(logic)) return false;   // (der Actor hat keinen Blueprint, der läuft)
 f64 chance = 0;
 rules.call("HitChance", std::tie(chance), distance, speed);
 ```
 
-ist als Blueprint `func_call_on<"HitChance">(actor_find("Military"), kern::out(n7.chance), distance,
-speed);` – mit `KERN_EXTERN HitChanceResult HitChance(Float d = 0.0, Float speed = 0.0);`. Werte sind
+ist als Blueprint `if (!func_has_blueprint(actor_find("Military"))) …` und
+`func_call_on<"HitChance">(actor_find("Military"), kern::out(n7.chance), distance, speed);` – mit
+`KERN_EXTERN HitChanceResult HitChance(Float d = 0.0, Float speed = 0.0);`. `bind` gibt zurück, ob der
+Actor einen Blueprint hat, der läuft (ohne Fehler, nicht gestoppt): **Has Blueprint**
+(`func_has_blueprint(Actor)`, unter „Functions“; Target leer: das Level). Die Logik, an die gebunden
+wird, ist im Blueprint seine eigene – ein Blueprint läuft in genau einer, der seines Levels. Darum
+ist ein Parameter `kern::logic::Runtime&` einer Funktion im Blueprint kein Pin: Er nennt die Logik, in
+der die Funktion läuft, und die gibt der Aufruf nicht noch einmal mit (der Konverter schreibt eine
+Funktion mit einem solchen Parameter, wo jeder Aufruf ihr die Logik weitergibt, die er selbst
+bekommen hat).
+
+**Ein Weg.** Call on Actor und Get Variable on Actor gehen durch denselben Weg der Laufzeit, gleich wer
+ruft – ein Knoten (mit den Pins, die sein Blueprint erklärt) oder das C++ des Programms (mit seinen
+Typen), in jeder Stufe: `Runtime::call_on(target, function, args, got, caller)` und
+`Runtime::get_on(target, name, as, out)`. Dort ist festgelegt:
+
+- Ziel 0 ist der Blueprint des Levels.
+- Hat das Ziel keinen Blueprint, oder einen, der nicht läuft (`disabled`: Fehler, gestoppt), oder hat
+  er die Funktion nicht, gibt der Aufruf nichts: Der Knoten hat die erklärten Defaults, das C++ die
+  Nullen seiner Typen.
+- Aufrufe auf Blueprints schachteln höchstens 64 tief; darüber wird der Aufruf ausgelassen und
+  gemeldet (mit dem Namen dessen, der ruft – im C++: „the program's C++“).
+- Ist der Blueprint des Ziels mitten in einem Aufruf derselben Funktion (Interpreter, JIT), hat der
+  unterbrochene Aufruf danach seine eigenen Werte zurück – wie in der Klasse, deren Methoden ihre
+  Parameter und lokalen Variablen selbst halten.
+- Eine Variable wird gelesen, wenn ihr Typ zu dem wird, als den der Leser sie liest
+  (`logic::convertible`: eine Zahl zu einer Zahl, der Wert einer Aufzählung zu dem einer Aufzählung,
+  eine Struktur zu einer Struktur, eine Liste zu einer Liste ihrer Art); sonst ist es die Null des
+  Typs. Welche Struktur und welche Aufzählung der Leser meint, sagt sein eigener Typ: Der Wert wird zu
+  ihm wie ein Wert von außen (was keiner seiner Werte ist, ist sein Default) – wie die Ausgänge eines
+  Aufrufs, über deren Namen der Blueprint des Ziels auch nichts sagt.
+
+Werte sind
 Flags, ganze Zahlen, Kommazahlen (64 Bit: eine 32-Bit-Zahl geht als die Dezimalzahl hinein, für die
 sie steht), Vektoren (`Vec3` oder ein eigener Typ des Programms, der zu einem `Vec3` wird und aus einem
 gemacht wird), Texte, Werte von Aufzählungen, Strukturen und Listen von all dem. Eine Struktur
@@ -1125,19 +1166,22 @@ ist eine einfache Struktur des Programms (ein Aggregat: öffentliche Felder, kei
 keine Basis), deren Felder der Reihe nach die des Structs im Blueprint des Actors sind –
 `kern::fields_of(s)` (kern/core/fields.h) nennt sie, ohne dass eine Liste der Felder daneben steht.
 Ein Feld ist selbst ein solcher Wert, eine Kommazahl darin hat 64 Bit. Der Konverter prüft jeden Pin
-gegen den Blueprint des Actors: ein Wert für sich wird umgewandelt wie an einem Draht, ein Feld einer
+gegen den Blueprint des Actors: ein Wert für sich wird umgewandelt wie an einem Draht (im C++ in den
+Typ seines Platzes, im Blueprint in den erklärten), ein Feld einer
 Struktur und ein Eintrag einer Liste nicht – sie müssen den Typ des Blueprints haben, sonst wartet
 der Aufruf mit Grund. Jeder Ausgang beginnt mit der Null seines
-Typs: Ist kein Blueprint gebunden oder hat er die Funktion nicht, gibt der Aufruf das – wie Call on
-Actor die erklärten Defaults gibt, und die Erklärung einer Funktion eines anderen Blueprints hat die
-Nullen. Die Werte werden vor den Ausgängen genommen: Ein Wert darf aus einem Platz kommen, in den ein
-Ausgang geht.
+Typs: Ist kein Blueprint gebunden, hat der Actor keinen, der läuft, oder hat er die Funktion nicht,
+gibt der Aufruf das – wie Call on Actor die erklärten Defaults gibt, und die Erklärung einer Funktion
+eines anderen Blueprints hat die Nullen. Die Werte werden vor den Ausgängen genommen: Ein Wert darf aus
+einem Platz kommen, in den ein Ausgang geht.
 
 Eine Funktion mit einem Ausgang ist dort auch ein Wert: `f64 s = rules.number("Speed", x);`,
 `bool seen = rules.flag("Seen", p);` – als Blueprint derselbe Call on Actor mit einem Ausgang. Eine
 Variable des Blueprints liest `rules.get<f64>("MaxSpeed")` – als Blueprint
-`func_get_on<"MaxSpeed", Float>(actor_find("Military"))` (Get Variable on Actor); wo kein Blueprint
-gebunden ist oder er die Variable nicht hat, ist es die Null des Typs.
+`func_get_on<"MaxSpeed", Float>(actor_find("Military"))` (Get Variable on Actor), eine Liste von
+Strukturen `rules.get<std::vector<GateRow>>("Gates")` – `func_get_on<"Gates", List<GateRow>>(…)`;
+wo kein Blueprint gebunden ist, der Actor keinen hat oder der die Variable nicht, ist es die Null des
+Typs.
 
 **Wie tief es geht.** Gezählt werden Events, die aus Handlern heraus Handler erreichen: höchstens
 64 ineinander, dann wird die Kette gestoppt und es wird gemeldet – in jeder Stufe beim selben

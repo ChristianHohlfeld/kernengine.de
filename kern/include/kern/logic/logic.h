@@ -1308,8 +1308,25 @@ class Runtime {
   void call_on(Instance& caller, std::string_view function, ActorRef target, const std::vector<Value>& args, std::vector<Value>& results);
   /// Get Variable on Actor: the variable `name` of the Blueprint of `target` as a value of `type` (what
   /// a variable of that type holds when nothing else is said - its zero - where the target has none:
-  /// no such Blueprint, no such variable, one of another type).
+  /// no such Blueprint, no such variable, one of a type that does not become `type`).
   Value get_on(const Instance& caller, std::string_view name, ActorRef target, const TypeRef& type);
+  /// The one way of Call on Actor, whoever calls: a Blueprint's node (call_on above, with the pins it
+  /// declares) and the program's C++ (ActorBlueprint, with its own types) - in every tier. Runs
+  /// `function` of the Blueprint of `target` (0: the Level's) with `args` to its end; `got`: what the
+  /// function gives, as it gives it. False: the call gives nothing - the target has no Blueprint, one
+  /// that does not run (disabled: it has errors or was stopped), none of that function, or calls on
+  /// Blueprints nest more than 64 deep (it is reported, naming `caller`). A Blueprint that is in the
+  /// middle of a call of that function has its own values back afterwards.
+  bool call_on(ActorRef target, std::string_view function, const std::vector<Value>& args, std::vector<Value>& got, std::string_view caller);
+  /// The one way of Get Variable on Actor, whoever reads (get_on above, ActorBlueprint::get): the
+  /// variable `name` of the Blueprint of `target` (0: the Level's) as that Blueprint holds it. False:
+  /// the target has no Blueprint, no such variable, or one whose type does not become `as` (a number
+  /// becomes a number, a value of an enum one of an enum, a struct a struct, a list a list of its kind:
+  /// logic::convertible - which struct and which enum the reader means, it says by its own type).
+  bool get_on(ActorRef target, std::string_view name, PinType as, Value& out);
+  /// Has Blueprint: does `target` (0: the Level) have a Blueprint that runs - one without errors that
+  /// has not been stopped? What Call on Actor and Get Variable on Actor reach when it has one.
+  bool has_blueprint(ActorRef target);
   /// For a Blueprint's class (NativeBlueprint): its node with the id `node` waits `seconds`; then
   /// the runtime runs it again (NativeBlueprint::run with `entry`) - the waits of every tier are
   /// kept and served in one place. cancel_waits: the node's waits are off.

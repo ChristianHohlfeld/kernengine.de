@@ -11,8 +11,7 @@ using rules::decimal;
 rules::Blueprint g_rules{"CombatDetail"};
 }  // namespace
 
-void bind(kern::logic::Instance* blueprint) { g_rules.running = blueprint; }
-kern::logic::Instance* blueprint() { return g_rules.running; }
+bool bind(kern::logic::Runtime& logic) { return g_rules.bind(logic); }
 
 bool is_critical(Critical k, f32 hp, f32 max_hp) {
   bool critical = false;

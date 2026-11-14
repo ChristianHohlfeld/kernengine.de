@@ -20,10 +20,10 @@
 
 namespace sc::lamps {
 
-/// The running Blueprint of the actor "Lamps" (the game binds it once its world has started;
-/// tests bind the one they run). Unbound, nothing happens to a lamp.
-void bind(kern::logic::Instance* blueprint);
-kern::logic::Instance* blueprint();
+/// Binds the rules to the logic the level's Blueprints run in (the game once its world has started,
+/// tests the one they run): the Blueprint of the actor "Lamps" is found by its name at every call.
+/// True: the actor has a Blueprint that runs there. Unbound, nothing happens to a lamp.
+bool bind(kern::logic::Runtime& logic);
 /// The Blueprint's variable PoleRadius.
 f32 pole_radius();
 

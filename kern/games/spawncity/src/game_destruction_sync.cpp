@@ -24,13 +24,12 @@
 //
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
 #include <algorithm>
-#include <bit>
 #include <cmath>
 #include <cstdio>
-#include <cstring>
 
 #include "game.h"
 #include "game_life.h"
+#include "wire.h"
 
 namespace sc {
 
@@ -39,55 +38,38 @@ constexpr u8 kEdit = 1, kState = 2, kDigest = 3, kAsk = 4;
 constexpr f32 kDeltaEvery = 0.15f, kDigestEvery = 2.0f;
 constexpr std::size_t kPerMessage = 400;  // building records per message (a full state is split)
 
-struct Out {
-  std::vector<u8> b;
-  template <class T> Out& put(T v) { const auto* p = reinterpret_cast<const u8*>(&v); b.insert(b.end(), p, p + sizeof(T)); return *this; }
-};
-struct In {
-  const std::vector<u8>& b;
-  std::size_t at = 0;
-  bool ok = true;
-  template <class T> T get() {
-    T v{};
-    if (at + sizeof(T) > b.size()) { ok = false; return v; }
-    std::memcpy(&v, b.data() + at, sizeof(T));
-    at += sizeof(T);
-    return v;
-  }
-};
-
 using Craters = DestroySync::Craters;
-using Damage = DestroySync::Damage;
+using DamageList = DestroySync::DamageList;
 using Points = DestroySync::Points;
 
-void put_craters(Out& o, const Craters& c) {
-  o.put(static_cast<u8>(std::min<std::size_t>(c.size(), 255)));
-  for (std::size_t i = 0; i < c.size() && i < 255; ++i) o.put(c[i].x).put(c[i].y).put(c[i].r).put(c[i].depth);
+void put_craters(std::vector<u8>& o, const Craters& c) {
+  wire::put_u8(o, static_cast<u8>(std::min<std::size_t>(c.size(), 255)));
+  for (std::size_t i = 0; i < c.size() && i < 255; ++i) { wire::put_f32(o, c[i].x); wire::put_f32(o, c[i].y); wire::put_f32(o, c[i].r); wire::put_f32(o, c[i].depth); }
 }
-bool get_craters(In& in, Craters& c) {
-  const u8 n = in.get<u8>();
+bool get_craters(wire::Reader& in, const std::vector<u8>& b, Craters& c) {
+  const u8 n = in.get_u8(b);
   c.clear();
-  for (u8 i = 0; i < n && in.ok; ++i) { Terrain::CraterRec r; r.x = in.get<f32>(); r.y = in.get<f32>(); r.r = in.get<f32>(); r.depth = in.get<f32>(); c.push_back(r); }
+  for (u8 i = 0; i < n && in.ok; ++i) { Terrain::CraterRec r; r.x = in.get_f32(b); r.y = in.get_f32(b); r.r = in.get_f32(b); r.depth = in.get_f32(b); c.push_back(r); }
   return in.ok;
 }
-void put_damage(Out& o, const Damage& d, std::size_t from, std::size_t n) {
-  o.put(static_cast<u16>(n));
-  for (std::size_t i = from; i < from + n; ++i) o.put(d[i].seed).put(d[i].height).put(static_cast<u8>(d[i].leveled));
+void put_damage(std::vector<u8>& o, const DamageList& d, std::size_t from, std::size_t n) {
+  wire::put_u16(o, static_cast<u16>(n));
+  for (std::size_t i = from; i < from + n; ++i) { wire::put_u32(o, d[i].seed); wire::put_f32(o, d[i].height); wire::put_u8(o, static_cast<u8>(d[i].leveled)); }
 }
-bool get_damage(In& in, Damage& d) {
-  const u16 n = in.get<u16>();
+bool get_damage(wire::Reader& in, const std::vector<u8>& b, DamageList& d) {
+  const u16 n = in.get_u16(b);
   d.clear();
-  for (u16 i = 0; i < n && in.ok; ++i) { CityStream::DamageRec r; r.seed = in.get<u32>(); r.height = in.get<f32>(); r.leveled = in.get<u8>() != 0; d.push_back(r); }
+  for (u16 i = 0; i < n && in.ok; ++i) { CityStream::DamageRec r; r.seed = in.get_u32(b); r.height = in.get_f32(b); r.leveled = in.get_u8(b) != 0; d.push_back(r); }
   return in.ok;
 }
-void put_points(Out& o, const Points& p, std::size_t from, std::size_t n) {
-  o.put(static_cast<u16>(n));
-  for (std::size_t i = from; i < from + n; ++i) o.put(p[i].first).put(p[i].second);
+void put_points(std::vector<u8>& o, const Points& p, std::size_t from, std::size_t n) {
+  wire::put_u16(o, static_cast<u16>(n));
+  for (std::size_t i = from; i < from + n; ++i) { wire::put_u32(o, p[i].first); wire::put_f32(o, p[i].second); }
 }
-bool get_points(In& in, Points& p) {
-  const u16 n = in.get<u16>();
+bool get_points(wire::Reader& in, const std::vector<u8>& b, Points& p) {
+  const u16 n = in.get_u16(b);
   p.clear();
-  for (u16 i = 0; i < n && in.ok; ++i) { const u32 s = in.get<u32>(); const f32 hp = in.get<f32>(); p.emplace_back(s, hp); }
+  for (u16 i = 0; i < n && in.ok; ++i) { const u32 s = in.get_u32(b); const f32 hp = in.get_f32(b); p.emplace_back(s, hp); }
   return in.ok;
 }
 // FNV-1a over the craters (exact) and the damage (to the centimetre, by seed)
@@ -102,9 +84,14 @@ void fnv_word(u32& h, u32 v) {
   fnv_byte(h, (v >> 16) & 0xff);
   fnv_byte(h, v >> 24);
 }
-u32 digest_of(const Craters& c, const Damage& d) {
+// ... and of a 32-bit float (its bits, as a message holds them)
+void fnv_float(u32& h, f32 v) {
+  const std::array<u8, 4> b = wire::f32_bytes(v);
+  for (u8 x : b) fnv_byte(h, x);
+}
+u32 digest_of(const Craters& c, const DamageList& d) {
   u32 h = 2166136261u;
-  for (const Terrain::CraterRec& r : c) { fnv_word(h, std::bit_cast<u32>(r.x)); fnv_word(h, std::bit_cast<u32>(r.y)); fnv_word(h, std::bit_cast<u32>(r.r)); fnv_word(h, std::bit_cast<u32>(r.depth)); }
+  for (const Terrain::CraterRec& r : c) { fnv_float(h, r.x); fnv_float(h, r.y); fnv_float(h, r.r); fnv_float(h, r.depth); }
   for (const CityStream::DamageRec& r : d) {
     const i32 cm = static_cast<i32>(std::lround(r.height * 100));
     fnv_word(h, r.seed); fnv_word(h, static_cast<u32>(cm)); fnv_byte(h, r.leveled ? 1 : 0);
@@ -130,20 +117,22 @@ void Game::dsync_send_full(i32 to) {
   DestroySync& d = *dsync_;
   Craters c;
   city_.terrain().crater_list(c);
-  Damage dm;
+  DamageList dm;
   city_.damage_list(dm);
   Points pt;
   destruction_.points_list(pt);
   const std::size_t parts = std::max<std::size_t>(1, (std::max(dm.size(), pt.size()) + kPerMessage - 1) / kPerMessage);
   for (std::size_t k = 0; k < parts; ++k) {
-    Out o;
-    o.put(kState).put(d.epoch).put(static_cast<u8>(k == 0 ? 1 : 0));
+    std::vector<u8> o;
+    wire::put_u8(o, kState);
+    wire::put_u32(o, d.epoch);
+    wire::put_u8(o, static_cast<u8>(k == 0 ? 1 : 0));
     put_craters(o, c);
     const std::size_t a = std::min(dm.size(), k * kPerMessage), b = std::min(pt.size(), k * kPerMessage);
     put_damage(o, dm, a, std::min(kPerMessage, dm.size() - a));
     put_points(o, pt, b, std::min(kPerMessage, pt.size() - b));
-    if (to < 0) net_.destroy_to_all(o.b, true);
-    else net_.destroy_to(static_cast<u8>(to), o.b);
+    if (to < 0) net_.destroy_to_all(o, true);
+    else net_.destroy_to(static_cast<u8>(to), o);
     ++d.sent_states;
   }
   if (to < 0) d.sent = c;
@@ -180,17 +169,17 @@ void Game::dsync_update(f32 dt) {
   }
 
   for (const net::Session::Blob& m : net_.take_destroy()) {
-    In in{m.data};
-    const u8 kind = in.get<u8>();
-    const u32 epoch = in.get<u32>();
+    wire::Reader in;
+    const u8 kind = in.get_u8(m.data);
+    const u32 epoch = in.get_u32(m.data);
     if (!in.ok) continue;
     if (host) {
       if (kind == kAsk || epoch != d.epoch) { ++d.asks; dsync_send_full(m.from); continue; }  // a client behind: the whole state
       if (kind != kEdit) continue;
       Craters c;
-      Damage dm;
+      DamageList dm;
       Points pt;
-      if (!get_craters(in, c) || !get_damage(in, dm) || !get_points(in, pt)) continue;
+      if (!get_craters(in, m.data, c) || !get_damage(in, m.data, dm) || !get_points(in, m.data, pt)) continue;
       // his craters join the list (in the order they reach the authority), his damage the city
       for (const Terrain::CraterRec& r : c) {
         Craters cur;
@@ -203,11 +192,11 @@ void Game::dsync_update(f32 dt) {
     }
     // client
     if (kind == kDigest) {
-      const u32 theirs = in.get<u32>();
+      const u32 theirs = in.get_u32(m.data);
       if (!in.ok) continue;
       Craters c;
       terrain.crater_list(c);
-      Damage dm;
+      DamageList dm;
       city_.damage_list(dm);
       // the check, not a repair: the protocol keeps the cities equal by construction (one
       // authority, reliable ordered deltas, merges that only ever lower, the whole state for a
@@ -219,14 +208,20 @@ void Game::dsync_update(f32 dt) {
       continue;
     }
     if (kind != kState) continue;
-    const u8 full = in.get<u8>();
+    const u8 full = in.get_u8(m.data);
     Craters c;
-    Damage dm;
+    DamageList dm;
     Points pt;
-    if (!in.ok || !get_craters(in, c) || !get_damage(in, dm) || !get_points(in, pt)) continue;
+    if (!in.ok || !get_craters(in, m.data, c) || !get_damage(in, m.data, dm) || !get_points(in, m.data, pt)) continue;
     ++d.got_states;
     if (epoch != d.epoch) {
-      if (!full && d.epoch != 0) { Out o; o.put(kAsk).put(d.epoch); net_.destroy_to_host(o.b); continue; }  // missed the start of it
+      if (!full && d.epoch != 0) {  // missed the start of it
+        std::vector<u8> o;
+        wire::put_u8(o, kAsk);
+        wire::put_u32(o, d.epoch);
+        net_.destroy_to_host(o);
+        continue;
+      }
       // the host's new epoch (a RESET there, or our first state): our city as his from scratch
       if (d.epoch != 0) { destruction_.reset(city_); d.mine.clear(); d.dmg_out.clear(); d.pts_out.clear(); }
       d.epoch = epoch;
@@ -250,13 +245,15 @@ void Game::dsync_update(f32 dt) {
       terrain.crater_list(c);
       if (c != d.sent || !d.dmg_out.empty() || !d.pts_out.empty()) {
         for (std::size_t a = 0; a == 0 || a < std::max(d.dmg_out.size(), d.pts_out.size()); a += kPerMessage) {
-          Out o;
-          o.put(kState).put(d.epoch).put(static_cast<u8>(0));
+          std::vector<u8> o;
+          wire::put_u8(o, kState);
+          wire::put_u32(o, d.epoch);
+          wire::put_u8(o, static_cast<u8>(0));
           put_craters(o, c);
           const std::size_t da = std::min(d.dmg_out.size(), a), pa = std::min(d.pts_out.size(), a);
           put_damage(o, d.dmg_out, da, std::min(kPerMessage, d.dmg_out.size() - da));
           put_points(o, d.pts_out, pa, std::min(kPerMessage, d.pts_out.size() - pa));
-          net_.destroy_to_all(o.b, true);
+          net_.destroy_to_all(o, true);
           ++d.sent_states;
         }
         d.sent = c;
@@ -269,11 +266,13 @@ void Game::dsync_update(f32 dt) {
       d.digest_clock = 0;
       Craters c;
       terrain.crater_list(c);
-      Damage dm;
+      DamageList dm;
       city_.damage_list(dm);
-      Out o;
-      o.put(kDigest).put(d.epoch).put(digest_of(c, dm));
-      net_.destroy_to_all(o.b, false);
+      std::vector<u8> o;
+      wire::put_u8(o, kDigest);
+      wire::put_u32(o, d.epoch);
+      wire::put_u32(o, digest_of(c, dm));
+      net_.destroy_to_all(o, false);
     }
     return;
   }
@@ -297,13 +296,14 @@ void Game::dsync_update(f32 dt) {
   for (const DestroySync::Mine& q : d.mine) if (!q.told) tell.push_back(q.r);
   if (d.epoch == 0 || d.delta_clock < kDeltaEvery || (tell.empty() && d.dmg_out.empty() && d.pts_out.empty())) return;  // (the host's state first)
   d.delta_clock = 0;
-  Out o;
-  o.put(kEdit).put(d.epoch);
+  std::vector<u8> o;
+  wire::put_u8(o, kEdit);
+  wire::put_u32(o, d.epoch);
   put_craters(o, tell);
   const std::size_t nd = std::min(d.dmg_out.size(), kPerMessage), np = std::min(d.pts_out.size(), kPerMessage);
   put_damage(o, d.dmg_out, 0, nd);
   put_points(o, d.pts_out, 0, np);
-  net_.destroy_to_host(o.b);
+  net_.destroy_to_host(o);
   d.told_at = now;
   for (DestroySync::Mine& q : d.mine) q.told = true;
   d.dmg_out.erase(d.dmg_out.begin(), d.dmg_out.begin() + static_cast<std::ptrdiff_t>(nd));
@@ -315,7 +315,7 @@ std::string Game::dsync_json() {
   DestroySync& d = *dsync_;
   Craters c;
   city_.terrain().crater_list(c);
-  Damage dm;
+  DamageList dm;
   city_.damage_list(dm);
   char b[256];
   std::snprintf(b, sizeof b, "{\"epoch\":%u,\"craters\":%zu,\"damaged\":%zu,\"digest\":%u,\"sent\":%u,\"got\":%u,\"asks\":%u,\"pending\":%zu,\"mismatches\":%u}", d.epoch, c.size(), dm.size(),

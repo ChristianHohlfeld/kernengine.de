@@ -20,8 +20,7 @@ bool worse(u8 state, u8 to) {
 i64 grid_key(f32 x, f32 y) { return (static_cast<i64>(std::floor(x / kGridM)) << 32) ^ (static_cast<i64>(std::floor(y / kGridM)) & 0xffffffffll); }
 }  // namespace
 
-void bind(kern::logic::Instance* blueprint) { g_rules.running = blueprint; }
-kern::logic::Instance* blueprint() { return g_rules.running; }
+bool bind(kern::logic::Runtime& logic) { return g_rules.bind(logic); }
 f32 pole_radius() { return static_cast<f32>(g_rules.get<f64>("PoleRadius")); }
 
 i64 cell_key(f32 x, f32 y) { return (static_cast<i64>(std::lround(x / 8)) << 32) ^ (static_cast<i64>(std::lround(y / 8)) & 0xffffffffll); }

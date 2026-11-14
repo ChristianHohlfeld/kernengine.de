@@ -24,8 +24,7 @@ struct Print {
 Print print_of(const Footprint& f) { return {Vec3{f.center.x, f.center.y, 0}, rules::decimal(f.yaw), Vec3{f.half.x, f.half.y, 0}}; }
 }  // namespace
 
-void bind(kern::logic::Instance* blueprint) { g_rules.running = blueprint; }
-kern::logic::Instance* blueprint() { return g_rules.running; }
+bool bind(kern::logic::Runtime& logic) { return g_rules.bind(logic); }
 
 f32 default_far() { return static_cast<f32>(g_rules.get<f64>("DefaultFar")); }
 

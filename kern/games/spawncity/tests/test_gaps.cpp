@@ -71,10 +71,10 @@ struct SpawnGuardWorld {
     }
     if (!world->start(level, kern::game::SimMode::simulate)) problems += "the world does not start\n";
     inst = world->logic_runtime() ? world->logic_runtime()->find(id) : nullptr;
-    spawn::bind(inst);
+    if (world->logic_runtime()) spawn::bind(*world->logic_runtime());
   }
   ~SpawnGuardWorld() {
-    spawn::bind(nullptr);
+    spawn::bind(no_logic());
     world.reset();
     renderer.shutdown();
   }

@@ -125,10 +125,16 @@ struct BlueprintCore : logic::PureNodes {
 
   /// Get Variable on Actor: what the variable `Name` of the Blueprint of `target` holds, as a T -
   /// func_get_on<"MaxStars", Float>(actor_find("Wanted")).
+  /// (Which struct or enum it is, T says: the variable's value becomes a T as a value from outside does -
+  /// what is no value of T is T's default.)
   template <Setting Name, class T> T func_get_on(Actor target) {
-    if (!kern_world.runtime || !kern_world.instance) return T{};
-    return logic::from_value<T>(kern_world.runtime->get_on(*kern_world.instance, Name.view(), target.id, logic::TypeRef{logic::pin_type_of<T>(), {}}));
+    logic::Value held;
+    if (!kern_world.runtime || !kern_world.runtime->get_on(target.id, Name.view(), logic::pin_type_of<T>(), held)) return T{};
+    return logic::from_value<T>(held.converted(logic::pin_type_of<T>()));
   }
+  /// Has Blueprint: does `target` (Actor{0}: the Level) have a Blueprint that runs - what Call on Actor
+  /// and Get Variable on Actor reach? func_has_blueprint(actor_find("Wanted")).
+  Bool func_has_blueprint(Actor target) const { return kern_world.runtime && kern_world.runtime->has_blueprint(target.id); }
 
   // ---- random ----
   /// Where the Random nodes start from: the instance's seed (a class without a world: its host's

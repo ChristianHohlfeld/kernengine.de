@@ -20,9 +20,10 @@ namespace sc::gaps {
 // These rules are a Blueprint: the level's actor "Sirens" (level/spawncity.klevel, open it in Kern
 // Studio) - its variables hold the pitches, levels and distances, its functions the laws. What
 // follows is only how the game's C++ calls them.
-/// The running Blueprint of the actor "Sirens" (the game binds it once its world has started;
-/// tests bind the one they run). Unbound, every rule answers 0.
-void bind_sirens(kern::logic::Instance* blueprint);
+/// Binds the rules to the logic the level's Blueprints run in (the game once its world has started,
+/// tests the one they run): the Blueprint of the actor "Sirens" is found by its name at every call.
+/// True: the actor has a Blueprint that runs there. Unbound, every rule answers 0.
+bool bind_sirens(kern::logic::Runtime& logic);
 // The Blueprint's variables HornLow, HornHigh, CarGain, DroneGain and WhoopBase.
 f32 horn_low();
 f32 horn_high();
