@@ -1574,6 +1574,7 @@ class Unit:
             q = self.tree.scope_of[d["id"]] + (d.get("name") or "")
             inner = q[len(self.tree.namespace) + 2:] if q.startswith(self.tree.namespace + "::") else q
             owner = "_".join(inner.split("::")[:-1]) or "program"
+        want = f"{owner}_{d.get('name') or 'kept'}"
         name = sane_name(want)
         if name in self.names:
             raise Wait(f"the variable {d.get('name')} kept by {owner}: the Blueprint {self.name} has something called {name}")
@@ -7981,8 +7982,14 @@ class TestWriter:
         if not table:
             return lambda text: text
         pattern = re.compile(r"(?<![\w:])(?:::)?(" + "|".join(re.escape(k) for k in sorted(table, key=len, reverse=True)) + r")\b")
-        using = re.compile(r"\busing\s+(?!namespace\b|enum\b)(?:::)?((?:\w+::)+\w+)\s*;")   # (`using kern::Mat4;` of what is the test's own: nothing to say)
-        return lambda text: self.in_code(text, lambda code: pattern.sub(lambda m: table[m.group(1)], using.sub(lambda m: "" if m.group(1) in table else m.group(0), code)))
+        # (`using kern::Mat4;` of what the test has where it stands: nothing to say - of what stands in a namespace
+        # of the test, `using audio::Wave;`)
+        using = re.compile(r"\busing\s+(?!namespace\b|enum\b)(?:::)?((?:\w+::)+\w+)\s*;")
+        def said(m):
+            if m.group(1) not in table:
+                return m.group(0)
+            return f"using {table[m.group(1)]};" if "::" in table[m.group(1)] else ""
+        return lambda text: self.in_code(text, lambda code: pattern.sub(lambda m: table[m.group(1)], using.sub(said, code)))
 
     # ---- what a test holds: the source of what it compares, and all that source names ----
     @staticmethod
@@ -8024,6 +8031,32 @@ class TestWriter:
                 continue
             out.append((part, "::".join(parts[:i + 1]) in self.tree.records))
         return out
+
+    USING = re.compile(r"^[ \t]*using\s+(?!namespace\b|enum\b)((?:::)?(?:\w+::)+\w+)\s*;", re.M)
+
+    def usings_in(self, files):
+        """The names the files give to what stands in a namespace (`using weapons::Id;`) - as the source names
+        them there, of the program's and the engine's own (not the standard library's)."""
+        out = []
+        for file in files:
+            for name in self.USING.findall(self.tree.text(file)):
+                if not name.lstrip(":").startswith("std::") and name not in out:
+                    out.append(name)
+        return out
+
+    def with_usings(self, text, usings, rename, own=()):
+        """A piece of the source with the using-declarations of its files that it needs before it (in the test
+        the names stand in their namespaces: `Id` the source has from `using weapons::Id;`)."""
+        words = set(re.findall(r"[A-Za-z_]\w*", text))
+        said = []
+        for name in usings:
+            last = name.split("::")[-1]
+            if last not in words or last in own:
+                continue
+            there = rename(name.lstrip(":"))
+            if "::" in there and f"using {there};" not in said:
+                said.append(f"using {there};")
+        return (" ".join(said) + " " if said else "") + text
 
     def compiled_top(self, q, records):
         """The class among `records` (those the test compiles along, outermost) whose text holds this type - or
@@ -8563,6 +8596,7 @@ class TestWriter:
             piece["home"] = home if here(d) else None
             piece["local"] = own(d if mine is None else mine)   # (its text and names stand in the namespace `within` then)
             piece["spaces"] = re.findall(r"\bnamespace\s+(\w+)\s*=\s*(?:::)?([\w:]+)\s*;", tree.text(d["_file"]))
+            piece["usings"] = self.usings_in([d["_file"]])
             out.append((tree.place(d), self.ident(d), piece))
         for d in [*G.functions.values(), *G.templates.values()]:
             before = chain(d)
@@ -8966,6 +9000,9 @@ class TestWriter:
         # all of it in the order of the translation unit: what a piece uses stands before it there
         source = sorted([*enum_chunks, *[(tree.place(tree.records[q]), ("record", q), None) for q in top], *const_chunks, *fn_chunks, *alias_chunks, *object_chunks, *foreign_chunks], key=lambda c: c[0])
 
+        # (the names the files of the translation unit give what stands in a namespace: before the pieces that use them)
+        tu_usings = self.usings_in([self.path, *[f for f in list(self.tree.texts) if self.u.world.program(f)]])
+
         def assemble(dropped):
             """The test without the pieces in `dropped`, and the lines each of its pieces has."""
             lines, where = [], []   # where: (first line, last line, piece), a piece inside a piece after it
@@ -8994,7 +9031,7 @@ class TestWriter:
                     piece = G.foreign[key[1]]
                     there = wide_of(piece)   # (a piece of another file alone stands in its namespace: its text says so - see `items`)
                     if piece["kind"] != "record":
-                        add(key, there(piece["text"]))
+                        add(key, self.with_usings(there(piece["text"]), piece.get("usings", ()), there, () if piece["kind"] not in ("enum", "alias") else set(re.findall(r"\b(?:enum\s+(?:class\s+|struct\s+)?|using\s+)(\w+)", piece["text"]))))
                         continue
                     text, inner, lines_ = "", [], 0
                     for part, place, newlines in piece["segments"]:
@@ -9008,7 +9045,8 @@ class TestWriter:
                     where.extend((first + x, first + y, k) for x, y, k in inner)
                     continue
                 if key[0] != "record":
-                    add(key, wide(text))
+                    own_names = set(re.findall(r"\b(?:enum\s+(?:class\s+|struct\s+)?|using\s+)(\w+)", text)) if key[0] in ("enum", "alias") else ()
+                    add(key, self.with_usings(wide(text), tu_usings, wide, own_names) if key[0] not in ("object", "engine") else wide(text))
                     continue
                 q = key[1]
                 d = tree.records[q]
