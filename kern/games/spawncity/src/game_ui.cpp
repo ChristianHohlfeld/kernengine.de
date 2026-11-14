@@ -232,11 +232,12 @@ void Game::ui_draw_gps(f32 dt) {
 void Game::ui_draw_helpers() {
   kern::Renderer& r = engine_->renderer();
   const Settings& st = ui_.settings;
-  auto line_mesh = [&](u32& id, const std::vector<f32>& pos, const std::vector<f32>* col, Vec3 color) {
+  // (colored: every point has its colour in col; else all are `color`)
+  auto line_mesh = [&](u32& id, const std::vector<f32>& pos, bool colored, const std::vector<f32>& col, Vec3 color) {
     if (!id) id = r.allocate_id();
     kern::MeshData m;
     for (std::size_t i = 0; i + 2 < pos.size(); i += 3) {
-      const Vec3 c = col ? Vec3{(*col)[i], (*col)[i + 1], (*col)[i + 2]} : color;
+      const Vec3 c = colored ? Vec3{col[i], col[i + 1], col[i + 2]} : color;
       m.push({pos[i], pos[i + 1], pos[i + 2]}, {0, 0, 1}, c, {0, 0});
     }
     kern::MeshLook look;
@@ -244,7 +245,7 @@ void Game::ui_draw_helpers() {
     look.material.unlit = true;
     look.material.cast_shadow = false;
     look.material.frustum_culled = false;
-    look.material.linear_colors = col != nullptr;
+    look.material.linear_colors = colored;
     look.visible = !pos.empty();
     if (!kern::upsert(r, id, m, look)) { r.release_id(id); id = 0; }
   };
@@ -263,7 +264,7 @@ void Game::ui_draw_helpers() {
           p.insert(p.end(), {cx + o, cy + a, city_.ground_height(cx + o, cy + a) + 0.03f, cx + o, cy + b, city_.ground_height(cx + o, cy + b) + 0.03f});
         }
       }
-      line_mesh(ui_.grid_mesh, p, nullptr, {0.55f, 0.85f, 1.0f});
+      line_mesh(ui_.grid_mesh, p, false, {}, {0.55f, 0.85f, 1.0f});
     }
   } else if (ui_.grid_mesh) { r.set_visible(ui_.grid_mesh, false); ui_.grid_at = {1e9f, 1e9f, 0}; }
   if (st.on(Opt::debug_colliders) && world_placed_) {
@@ -271,7 +272,7 @@ void Game::ui_draw_helpers() {
     if (static_cast<int>(ui_.collider_clock) % 6 == 0) {  // ten times a second is plenty
       std::vector<f32> pos, col;
       world_->debug_lines(true, false, false, pos, col);
-      line_mesh(ui_.collider_mesh, pos, &col, {});
+      line_mesh(ui_.collider_mesh, pos, true, col, {});
     }
   } else if (ui_.collider_mesh) r.set_visible(ui_.collider_mesh, false);
 }
@@ -358,8 +359,8 @@ void Game::ui_apply_settings() {
   Settings& st = ui_.settings;
   if (ui_.applied == 0 && engine_) {
     // Start parameters (?mouse=, ?fpvtilt=) are settings too.
-    if (engine_->arg("mouse")) st.set(Opt::mouse_sensitivity, static_cast<f32>(engine_->arg_number("mouse", 100)));
-    if (engine_->arg("fpvtilt")) st.set(Opt::cam_fpv_tilt, static_cast<f32>(engine_->arg_number("fpvtilt", -15)));
+    if (engine_->has_arg("mouse")) st.set(Opt::mouse_sensitivity, static_cast<f32>(engine_->arg_number("mouse", 100)));
+    if (engine_->has_arg("fpvtilt")) st.set(Opt::cam_fpv_tilt, static_cast<f32>(engine_->arg_number("fpvtilt", -15)));
   }
   if (ui_.applied == st.version()) return;
   ui_.applied = st.version();

@@ -114,13 +114,13 @@ TEST(math_matrices) {
 TEST(math_camera) {
   const Vec3 eye{10, -5, 4}, target{0, 3, 1};
   bool ok = false;
-  const Mat4 view = Mat4::look_at(eye, target, {0, 0, 1}, &ok);
+  const Mat4 view = Mat4::look_at(eye, target, {0, 0, 1}, ok);
   CHECK(ok);
   const Mat4 vp = Mat4::perspective(1.0f, 1.6f, 0.1f, 500.0f) * view;
   const Vec4 c = vp.transform({target, 1});
   CHECK_NEAR(c.x / c.w, 0.0f, 1e-5f);
   CHECK_NEAR(c.y / c.w, 0.0f, 1e-5f);
-  Mat4::look_at(eye, eye, {0, 0, 1}, &ok);
+  Mat4::look_at(eye, eye, {0, 0, 1}, ok);
   CHECK(!ok);
   const Frustum f = Frustum::from_matrix(vp);
   CHECK(f.sphere_visible({target, 1}));

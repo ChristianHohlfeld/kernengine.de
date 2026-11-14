@@ -505,7 +505,7 @@ f32 Terrain::road_field(f32 x, f32 y) const {
   return sum / wsum;
 }
 
-void Terrain::set_corridors(u64 owner, const kern::Vec4& bounds, const std::vector<RoadLine>& roads) {
+void Terrain::set_corridors(u64 owner, const kern::Vec4& bounds, const std::vector<MapFeatures::Road>& roads, const std::vector<f32>& widths) {
   remove_corridors(owner);
   auto set = std::make_unique<CorridorSet>();
   set->owner = owner;
@@ -513,18 +513,20 @@ void Terrain::set_corridors(u64 owner, const kern::Vec4& bounds, const std::vect
   set->box = {1e30f, 1e30f, -1e30f, -1e30f};
   std::vector<Vec2> pts;
   std::vector<f32> hs;
-  for (const RoadLine& r : roads) {
-    if (!r.points || r.points->size() < 2 || !(r.width > 0)) continue;
+  for (std::size_t s = 0; s < roads.size(); ++s) {
+    const std::vector<Vec2>& points = roads[s].points;
+    const f32 width = widths[s];
+    if (points.size() < 2 || !(width > 0)) continue;
     // the centre line every 5 m, its heights from the smooth field
     pts.clear();
-    for (std::size_t i = 0; i + 1 < r.points->size(); ++i) {
-      const Vec2 a = (*r.points)[i], b = (*r.points)[i + 1];
+    for (std::size_t i = 0; i + 1 < points.size(); ++i) {
+      const Vec2 a = points[i], b = points[i + 1];
       const i32 k = std::max(1, static_cast<i32>(std::ceil(std::hypot(b.x - a.x, b.y - a.y) / 5)));
       for (i32 q = 0; q < k; ++q) pts.push_back(a + (b - a) * (static_cast<f32>(q) / static_cast<f32>(k)));
     }
-    pts.push_back(r.points->back());
+    pts.push_back(points.back());
     hs.resize(pts.size());
-    const f32 half = r.width / 2, reach = half + kRoadBlend;
+    const f32 half = width / 2, reach = half + kRoadBlend;
     // (only what can reach into the tile's own square)
     auto near = [&](Vec2 p) { return p.x > bounds.x - reach - 6 && p.x < bounds.z + reach + 6 && p.y > bounds.y - reach - 6 && p.y < bounds.w + reach + 6; };
     for (std::size_t i = 0; i < pts.size(); ++i) hs[i] = near(pts[i]) ? road_field(pts[i].x, pts[i].y) : 0;

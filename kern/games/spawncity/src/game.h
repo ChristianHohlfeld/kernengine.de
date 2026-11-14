@@ -449,7 +449,7 @@ class Game {
   f32 traffic_rules(i32 car, Vec3 pos, Vec3 fwd, f32 speed);
   /// The speed the vehicle ahead leaves car `car` (world_traffic.h gap_speed); `limiter`: the car
   /// it is (an index into cars_), or -1.
-  f32 traffic_gap(i32 car, Vec3 pos, Vec3 fwd, i32* limiter = nullptr);
+  f32 traffic_gap(i32 car, Vec3 pos, Vec3 fwd, i32& limiter);
   f32 traffic_lane_distance(const TrafficCar& c) const;  // how far it is off its lane's line (tests)
   void eject_driver(i32 car);
   void update_traffic_world(f32 dt);

@@ -179,7 +179,7 @@ Die API steht in `kern/include/kern/app/app.h` und wird mit `#include "kern/kern
 | `input` | Tastatur, Maus, Touch dieses Frames |
 | `set_status(text)` | Text an die Seite (sie zeigt ihn an); gleiche Texte werden nicht erneut gesendet |
 | `request_pointer_lock(bool)` | die Seite fängt die Maus bzw. gibt sie frei |
-| `arg(key, fallback)`, `arg_number(key, fallback)` | Startparameter, standardmäßig aus der Query der Seite (`?time=0.6`) |
+| `arg(key, fallback)`, `arg_number(key, fallback)`, `has_arg(key)` | Startparameter, standardmäßig aus der Query der Seite (`?time=0.6`); ob einer gegeben ist |
 | `width()`, `height()`, `aspect()` | Größe des Drawing Buffers |
 | `stats()` | Statistik des letzten Frames (Draw Calls, Dreiecke …) |
 | `clear_color` | Löschfarbe, wo kein Himmel gezeichnet wird |
