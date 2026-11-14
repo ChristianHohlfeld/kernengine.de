@@ -1,12 +1,30 @@
 // A rule actor of the level as the tests run it (see blueprint_call.h for how the game calls one).
 #pragma once
+#include <map>
+#include <memory>
 #include <string>
+#include <utility>
 
 #include "../src/rules.h"
 #include "kern/logic/engine_api.h"
 #include "kern/logic/logic.h"
 
 namespace sc {
+
+/// The Blueprint of an actor of the level, read once for all the tests (null: the level has none of
+/// that name, and `error` says so).
+inline const kern::logic::Graph* level_blueprint(std::string_view actor, std::string* error = nullptr) {
+  static std::map<std::string, std::pair<std::unique_ptr<kern::logic::Graph>, std::string>, std::less<>> known;
+  auto at = known.find(actor);
+  if (at == known.end()) {
+    auto held = std::make_unique<kern::logic::Graph>();
+    std::string why;
+    if (!rules::actor_graph(actor, *held, &why)) held.reset();
+    at = known.emplace(std::string(actor), std::make_pair(std::move(held), std::move(why))).first;
+  }
+  if (!at->second.first && error) *error = at->second.second;
+  return at->second.first.get();
+}
 
 /// A rule actor of the level running in a logic runtime of its own, bound to the C++ that calls it.
 struct RuleBlueprint {
@@ -25,10 +43,16 @@ struct RuleBlueprint {
   std::string problems;
   void (*bind)(kern::logic::Instance*) = nullptr;
   RuleBlueprint(const char* actor, void (*binder)(kern::logic::Instance*), bool native = true) : bind(binder) {
-    kern::logic::Graph g;
     std::string error;
-    if (!rules::actor_graph(actor, g, &error)) { problems = error; return; }
-    for (const kern::logic::Issue& i : kern::logic::check(g)) problems += (i.error ? "error: " : "warning: ") + i.text + "\n";
+    const kern::logic::Graph* held = level_blueprint(actor, &error);
+    if (!held) { problems = error; return; }
+    const kern::logic::Graph& g = *held;
+    // The libraries a Blueprint uses are the Blueprints of the level's other actors, by their names:
+    // with them it is one graph, and the rules that follow calls judge that one.
+    rt.blueprints = [](std::string_view name) { return level_blueprint(name); };
+    kern::logic::Graph whole;
+    if (!kern::logic::link(g, rt.blueprints, whole, &error)) { problems = error; return; }
+    for (const kern::logic::Issue& i : kern::logic::check(whole)) problems += (i.error ? "error: " : "warning: ") + i.text + "\n";
     rt.native = native;
     inst = rt.add(g, 2, actor);
     rt.begin();

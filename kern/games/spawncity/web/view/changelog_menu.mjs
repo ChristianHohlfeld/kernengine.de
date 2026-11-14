@@ -7,6 +7,9 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-14",time:"06:00",title:"Konverter: jede Funktion einmal",items:[
+    "Unter der Haube: Der Konverter schreibt das Spiel jetzt als Bibliotheken – jeder Header und jede Quelldatei ist ein Blueprint, jede Funktion und jeder Typ steht einmal im Projekt, Aufrufe gehen direkt. 572 von 1.748 Funktionen stehen so im Level (118 Bibliotheken), 600 Vergleiche Bit für Bit mit dem Quelltext. Am Spiel selbst ändert sich nichts.",
+  ]},
   {date:"2026-11-14",time:"03:35",title:"Bibliotheken: nur was benutzt wird",items:[
     "Unter der Haube: Ein Blueprint hält von seinen Bibliotheken nur noch, was er benutzt – die Funktionen, die er aufruft, und die Typen, die er nennt. Bekommt eine Bibliothek etwas dazu, bleiben alle anderen, wie sie sind. Am Spiel selbst ändert sich nichts.",
   ]},

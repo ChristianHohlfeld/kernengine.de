@@ -14,8 +14,10 @@ every game, not for one:
   - what a function writes through a parameter (std::vector<u64>& out) is a further output;
   - an object of the engine with a life of its own (a class: the physics world, the renderer, the
     mixer) is a handle, a whole number the host gives - the first input of its class's nodes;
-  - a plain struct of the engine (Pose, BodySettings, RayHit) is a struct the Blueprint declares
-    with the same fields: the pin names it.
+  - a plain struct of the engine (physics::Pose, physics::BodySettings, physics::RayHit) is a
+    struct the Blueprint declares with the same fields: the pin names it, by the name every type
+    has in a Blueprint - the namespaces it stands in are part of it (physics_Pose; see
+    type_name_of in tools/cpp_to_blueprint.py).
 
 Every tier calls them through one door, logic::Host::engine(function, in, out): the game binds the
 engine there, a test a stand-in.

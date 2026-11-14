@@ -369,7 +369,7 @@ Eine Form, die Gestalt oder Kosten ändert, ist keine von beiden.
 | Klasse mit Feldern | Struktur des Projekts |
 | Methode `Car::step(dt)` | Funktion `Car_step(Car& self, Float dt)`: eine Referenz auf das Objekt, geändert am Platz |
 | das eine Objekt mit dem Zustand des Spiels (`Game`, über alle seine Dateien) | ein Blueprint: seine Felder sind die Variablen, seine Methoden die Funktionen |
-| Quelldatei | Blueprint im Ordner „Source“; hält er keinen Zustand, ist er eine Bibliothek: jede Funktion steht einmal im Projekt, jeder ruft sie direkt |
+| Quelldatei, Header | je ein Blueprint im Ordner „Source“; hält er keinen Zustand, ist er eine Bibliothek: jede Funktion und jeder Typ steht einmal im Projekt, jeder ruft sie direkt |
 | `a.b[i].c = x;`, `a.items.push_back(x);` | derselbe Schritt auf demselben Platz |
 | Parameter `T&` | Referenz-Parameter |
 | Parameter `const T&` oder Wert | Eingang |
@@ -427,9 +427,9 @@ Eine Form, die Gestalt oder Kosten ändert, ist keine von beiden.
    Level stehen damit 273 `struct_break` (am Morgen: 2.471), 60 `list_get` (367) und kein For Each des Konverters mehr (62); zwei Funktionen mehr sind geschrieben (Schleifen, die ihre Einträge ändern und von innen zurückkehren).
 4. **Bibliotheken.** Eine Funktion eines Blueprints ohne Zustand ruft jeder andere Blueprint
    direkt – in der Klasse ein gewöhnlicher Aufruf. Damit steht jede Funktion einmal im Projekt
-   (heute: in jedem Blueprint, der sie benutzt). *(In der Engine seit 14.11.2026, 00:50 –
+   (davor: in jedem Blueprint, der sie benutzt). *(In der Engine seit 14.11.2026, 00:50 –
    `kern/docs/blueprint_cpp.md`, „Bibliotheken“; im Editor seit 01:25 – `kern/docs/studio.md`; im
-   Konverter folgt es.)* So ist es
+   Konverter seit 06:00 – „Der Konverter heute“ unten.)* So ist es
    festgelegt (13.11.2026, 23:45):
    - **Eine Bibliothek ist ein Blueprint, der nichts behält:** keine Variablen, keine Events,
      Timer oder Zustände, und kein Knoten, der zwischen zwei Aufrufen etwas behält (Do Once,
@@ -460,7 +460,15 @@ Eine Form, die Gestalt oder Kosten ändert, ist keine von beiden.
      Bibliotheksfunktion ein Aufruf wie jeder andere – auch mit Referenzen. Keine zweite
      Laufzeit, kein Sonderweg.
    - **Der Konverter** schreibt jede Quelldatei und jeden Header als einen Blueprint, jede
-     Funktion einmal, und jeden Typ in der Bibliothek, die ihn definiert.
+     Funktion einmal, und jeden Typ in der Bibliothek, die ihn definiert. *(Seit 14.11.2026,
+     06:00.)* `car.h` ist die Bibliothek `car` (ihre Typen, ihre `inline`-Funktionen), `car.cpp`
+     die Bibliothek `car_cpp`, `kern/math/math.h` – soweit das Programm es aufruft –
+     `engine_math_math`. Was ein Header definiert, steht dort, wo es jeder hat, der den Header
+     einbindet; darum folgt, wer wen benutzt, der Reihenfolge der `#include` – ohne Kreise. Eine
+     Funktion eines Headers, die eine Quelldatei braucht, steht bei dieser. Eine Funktion, die in
+     einer *anderen* Quelldatei steht, ruft noch niemand auf: Der Test einer Datei hält den
+     Quelltext alles dessen, was eine Funktion aufruft, und den einer anderen Quelldatei hat er
+     nicht – das ist der nächste Schritt (die Tests teilen ihre Quelltexte).
 5. **Map und Set** als Typen, mit ihren Knoten.
 6. **`Int64`**: die ganze Zahl mit 64 Bit, die bei 2^64 umbricht, mit ihren Rechen- und Bit-Knoten.
 7. **Engine-Aufrufe direkt** in der Klasse (heute: durch `Host::engine`, beim Namen, mit
@@ -488,10 +496,25 @@ beschreibt den Stand davor und wird Schritt für Schritt ersetzt.
 `tools/cpp_to_blueprint.py` liest die Quellen mit dem Parser des Compilers (clangs Syntaxbaum)
 und schreibt sie in der Schreibweise:
 
-- Jede Quelldatei wird der Blueprint eines Actors im Ordner „Source“ des Levels (`terrain.cpp` →
-  „Terrain“): ihre Funktionen sind seine Funktionen, ihre Konstanten seine Variablen, die
-  Aufzählungen und Strukturen, mit denen sie rechnet, seine Typen. Hilfsfunktionen aus Headern
-  (`inline`) stehen in jedem Blueprint, der sie benutzt – wie in C++ in jeder Übersetzungseinheit.
+- Jeder Header und jede Quelldatei wird der Blueprint eines Actors im Ordner „Source“ des Levels
+  (`terrain.h` → `terrain`, `terrain.cpp` → `terrain_cpp`) – eine Bibliothek: ihre Funktionen sind
+  seine Funktionen, die Konstanten, die sie benutzen, seine Konstanten, die Typen, die die Datei
+  definiert, seine Typen. Wer mit einem Typ rechnet oder eine Funktion aufruft, benutzt den
+  Blueprint, in dem sie stehen (`common::clampf(v, 0.0, 1.0)`): Jede Funktion und jeder Typ steht
+  einmal im Projekt. Eine Funktion eines Headers, die eine Quelldatei braucht (sie ruft etwas auf,
+  das in einer steht), steht bei der Quelldatei gleichen Namens. Von den Headern der Engine wird
+  ebenso geschrieben, was das Programm aufruft (`kern/math/math.h` → `engine_math_math`).
+- Ein Typ hat im ganzen Projekt einen Namen, gebildet aus seinem eigenen: Die Namensräume und
+  Klassen, in denen er steht, gehören dazu (`net::Session` ist `net_Session`, `Car::Wheel`
+  `Car_Wheel`, `kern::physics::Body` `physics_Body`). Die Knoten der Engine nennen die Typen der
+  Engine genauso (`tools/engine_api.py`). Typen, die der Konverter aus denen der Sprache bildet
+  (die Zeile einer Liste von Listen, ein Paar), stehen in der Bibliothek `shapes` – oder, aus
+  Typen des Programms gebildet, beim letzten von ihnen.
+- So läuft er: Zuerst wird jede Quelldatei einmal gelesen, für den Plan des Ganzen – welche
+  Funktionen es gibt, welche welche aufruft, wie die Typen heißen. Dann wird jeder Blueprint nach
+  denen geschrieben, die er aufruft, mit dem, was ein Aufruf ihrer Funktionen wissen muss. Am
+  Ende wird jeder Blueprint aus dem zusammengesetzt, was alle Dateien über ihn sagen, und alles
+  ins Level gelesen – eine Bibliothek vor denen, die sie benutzen, alle oder keiner.
 - Gerechnet wird mit der Arithmetik der Blueprint-Sprache: Zahlen in 64 Bit, ganze Zahlen exakt,
   eine Division durch null ergibt 0, Vektoren in 32 Bit. Das ist in Interpreter, JIT und Klasse
   und auf jeder Maschine gleich. Wo das C++ eine Zahl ausdrücklich auf 32 Bit bringt (das Kreuzprodukt
@@ -566,11 +589,15 @@ sagt, in den Zahlen der Sprache – überall gleich. Er sagt nicht, dass das die
 heutigen Programm: Das rechnet dieselben Formeln mit `f32` in 32 Bit, die Sprache in 64 Bit (wie das
 JavaScript-Original). Das ist die Festlegung der Sprache, kein Spielraum des Tests.
 
-Stand (13.11.2026, 23:42): 358 von 1.428 Funktionen (2.723 von 28.544 Zeilen) aus 58 von 77 Dateien stehen
-als Blueprints im Level (58 Actors im Ordner „Source“). Der Test vergleicht jede davon, die etwas
-gibt oder ändert, Bit für Bit mit ihrem Quelltext – 516 Vergleiche, weil Funktionen aus Headern (und die der
-64-Bit-Zahlen) in jedem Blueprint stehen, der sie benutzt (das endet mit Schritt 4); keine ist ausgenommen. Das Spiel führt für diese Dateien weiter
-ihr C++ aus (Stufe 5).
+Stand (14.11.2026, 06:00): 572 von 1.748 Funktionen des Programms (3.107 von 29.089 Zeilen) stehen
+als Blueprints im Level, dazu 30 Funktionen aus Headern der Engine, die sie aufrufen: 118
+Bibliotheken im Ordner „Source“ – 58 von Quelldateien, 60 von Headern (und `shapes`) –, mit 222
+Typen, jeder einmal. Gezählt werden jetzt auch die Funktionen, die in Headern stehen (davor: die
+1.428 der Quelldateien, von denen 358 geschrieben waren; jede davon ist es weiter). Der Test
+vergleicht jede Funktion, die etwas gibt oder ändert, Bit für Bit mit ihrem Quelltext – 600
+Vergleiche, jede Funktion einmal, in dem Blueprint, in dem sie steht (davor 516, weil Funktionen
+aus Headern in jedem Blueprint standen, der sie benutzt: 379 verschiedene); keine ist
+ausgenommen. Das Spiel führt für diese Dateien weiter ihr C++ aus (Stufe 5).
 
 Worauf die anderen warten, nach Zeilen: der Zustand von `Game` (328 Funktionen, 13.818 Zeilen:
 geteilte Zeiger, Typen der Engine mit eigenem Innenleben); Klassen mit einem Zeiger auf die Welt,
@@ -683,13 +710,16 @@ Was als Nächstes dazukommt, in der Reihenfolge der Zeilen, die darauf warten:
        (`kern/src/logic/engine_api.gen.cpp`), die Funktionen der Blueprint-Klasse
        (`kern/include/kern/logic/engine_nodes.gen.h`) und den Fall der Engine-Tests
        (`kern/tests/engine_case.gen.h`): 540 Funktionen sind Knoten, 54 warten (Zeiger, durch die
-       die Engine schreibt; Typen mit eigenem Innenleben als Wert). Ein Zeiger auf Daten, die nur
+       die Engine schreibt; Typen mit eigenem Innenleben als Wert) – seit 14.11.2026, 06:00, neu
+       erzeugt nach dem Stand der Header: 531 Knoten, 63 warten, und die Pins nennen die Typen
+       der Engine bei dem Namen, den jeder Typ in einem Blueprint hat (`physics_Body`,
+       `game_PlayInput` – davor `Body`, und bei gleichen Namen `Shape_2`). Ein Zeiger auf Daten, die nur
        gelesen werden (`const Vec3* rotation`, `const f32* samples` mit ihrer Anzahl daneben), ist
        die Liste dieser Daten – leer für `nullptr`. Die Tür ist `logic::Host::engine`; der
        Stellvertreter der Tests ist `logic::EngineStandIn` (antwortet aus der Form der Ausgänge,
        abhängig vom Aufruf und davon, wie viele vor ihm kamen, und hält jeden Aufruf fest). Die
        Engine prüft jeden Knoten ihrer Bibliothek in jeder Stufe: Der erzeugte Blueprint „Engine"
-       ruft jede der 540 Funktionen einmal, im Interpreter und als kompilierte Klasse.
+       ruft jede dieser Funktionen einmal, im Interpreter und als kompilierte Klasse.
      - [x] (c) Der Konverter schreibt Engine-Aufrufe als diese Knoten (eingeschaltet seit 13.11.,
        15:55): 353 Funktionen, 2.682 Zeilen, 58 Dateien, 511 Vergleiche. Was er dabei
        tut: Ein Zeiger oder eine Referenz auf ein Objekt der Engine, dessen Daten keine Struktur
