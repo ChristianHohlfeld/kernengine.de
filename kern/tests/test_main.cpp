@@ -2227,6 +2227,64 @@ TEST(logic_local_variables) {
   CHECK(error.find("local variable L") != std::string::npos);
 }
 
+TEST(logic_call_on_actor_by_its_name) {
+  // A function of another Blueprint named here otherwise (KERN_EXTERN_AS): Call on Actor calls it by the
+  // name that Blueprint has it under - two actors' "Stars" that look different, each named by its actor.
+  const char* level_text = R"kn(
+struct Level : kern::Blueprint {
+  struct StarsResult { Int stars = -1; };
+  StarsResult Stars(Int base = 1) {
+    return {math_add(base, 10)};
+  }
+};
+)kn";
+  const char* caller_text = R"kn(
+struct Caller : kern::Blueprint {
+  Int Got = 0;
+
+  struct Level_StarsResult { Int stars = 3; };
+  /// (of the Level, called on it)
+  KERN_EXTERN_AS("Stars") Level_StarsResult Level_Stars(Int base = 1);
+
+  KERN_EVENT(on1, event_custom<"Ask">)
+  void on1(Actor actor, Float value, Text text) {
+    func_call_on<"Level_Stars">(Actor{0}, kern::out(n2.stars), kern::to<Int>(value));
+    Got = n2.stars;
+  }
+
+  struct { Int stars = 0; } n2;
+};
+)kn";
+  logic::Graph level, caller;
+  std::string error;
+  CHECK(logic::from_cpp(level_text, level, nullptr, &error) && logic::from_cpp(caller_text, caller, nullptr, &error));
+  if (!error.empty()) std::printf("%s\n", error.c_str());
+  CHECK(caller.function("Level_Stars") && caller.function("Level_Stars")->external && caller.function("Level_Stars")->remote == "Stars");
+  CHECK(no_errors(logic::check(caller)));
+  logic::Graph back;
+  CHECK(logic::graph_from_json(logic::graph_to_json(caller), back) && back == caller);
+  std::string text;
+  CHECK(logic::to_cpp(caller, "Caller", text, &error) && text.find("  KERN_EXTERN_AS(\"Stars\") Level_StarsResult Level_Stars(Int base = 1);\n") != std::string::npos);
+  logic::Graph read;
+  CHECK(logic::from_cpp(text, read, nullptr, &error) && read == caller);
+  for (bool jit : {false, true}) {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.jit = jit;
+    logic::Instance* lv = rt.add(level, 0, "Level");
+    logic::Instance* c = rt.add(caller, 7, "Caller");
+    CHECK(lv && c);
+    if (!lv || !c) continue;
+    rt.begin();
+    rt.call("Ask", 7, {{"actor", logic::Value::actor(0)}, {"value", logic::Value::number(4)}, {"text", logic::Value::text("")}});
+    CHECK(c->get("Got").i == 14);
+  }
+  // (a name of another Blueprint's function is only for a function of another Blueprint)
+  logic::Graph bad = level;
+  bad.functions[0].remote = "Other";
+  CHECK(!logic::graph_from_json(logic::graph_to_json(bad), back));
+}
+
 TEST(logic_call_on_actor) {
   // A Blueprint calls a function of another one: it declares what the function looks like
   // (KERN_EXTERN) and calls it on an actor - or on the Level (no target).

@@ -1804,7 +1804,7 @@ struct Writer {
                          : cpp_type(declared(p)) + " " + p.name + " = " + literal(Value::from_json(p.value, declared(p), g), declared(p), g));
         if (f.external) {
           // (a function of another Blueprint: what it looks like - it is called on an actor)
-          line(1, "KERN_EXTERN " + (f.outputs.empty() ? std::string("void") : f.name + "Result") + " " + f.name + "(" + args + ");");
+          line(1, (f.remote.empty() ? std::string("KERN_EXTERN ") : "KERN_EXTERN_AS(" + text_literal(f.remote) + ") ") + (f.outputs.empty() ? std::string("void") : f.name + "Result") + " " + f.name + "(" + args + ");");
           continue;
         }
         line(1, std::string(f.pure ? "KERN_PURE " : "") + (f.outputs.empty() ? std::string("void") : f.name + "Result") + " " + f.name + "(" + args + ") {");
@@ -2543,6 +2543,7 @@ struct Reader {
   bool declarations() {
     std::string docs;
     bool has_docs = false, pure = false, external = false, has_event = false;
+    std::string remote;  // (KERN_EXTERN_AS: the name the other Blueprint has the function under)
     Item event;
     auto take_docs = [&] {
       std::string r = has_docs ? docs : std::string();
@@ -2704,6 +2705,13 @@ struct Reader {
         external = true;
         continue;
       }
+      if (accept("KERN_EXTERN_AS")) {
+        // KERN_EXTERN_AS("Update") ZombiesUpdateResult Zombies_Update(...);   (the name the other Blueprint has it under)
+        if (!expect("(") || !string(remote, "the name the other Blueprint has the function under") || !expect(")")) return false;
+        if (remote.empty()) return fail(p, "KERN_EXTERN_AS names the function of the other Blueprint: KERN_EXTERN_AS(\"Update\")");
+        external = true;
+        continue;
+      }
       if (t.kind != Tok::id) return fail(p, shown(t) + " is not part of a Blueprint");
       // void name(...) {   <Function>Result name(...) {   <Function>Result n<id>;
       std::string ret = toks[p++].s, fn;
@@ -2752,6 +2760,8 @@ struct Reader {
         f.name = fn;
         f.pure = pure;
         f.external = external;
+        f.remote = std::move(remote);
+        remote.clear();
         if (pure && external) return fail(at, "a function of another Blueprint is called as a step: KERN_EXTERN, not KERN_PURE");
         if (g.function(fn)) return fail(at + 1, "the function " + fn + " is declared twice");
         if (ret != "void") {

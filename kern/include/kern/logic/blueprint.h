@@ -575,6 +575,10 @@ using Library = Blueprint;
 /// KERN_EXTERN FnResult Fn(Float x = 0.0); says what a function of another Blueprint looks like:
 /// it has no body here and is called on an actor (func_call_on<"Fn">).
 #define KERN_EXTERN
+/// KERN_EXTERN_AS("Update") ZombiesUpdateResult Zombies_Update(...); the same, for a function the other
+/// Blueprint has under another name (Call on Actor calls it by that one): two actors' Blueprints may each
+/// have an "Update" that looks different.
+#define KERN_EXTERN_AS(name)
 /// KERN_EVENT(on5, event_custom<"Hit">) says that the method on5 is the handler of that event
 /// node (for the reader and the editor). Which events reach it decides the runtime, for every
 /// tier the same; the engine calls the method through the Blueprint's glue (logic::native_glue).

@@ -4070,19 +4070,22 @@ class Emit:
             if why:
                 raise Wait(f"a call of {function} on the Blueprint of the actor {actor}: its pin {what} is {why}")
         pins = (list(zip(ins, in_types)), list(zip(gives, out_types)))
-        held = u.externs.get(function)
+        # (named here by its actor and its own name - KERN_EXTERN_AS: two actors' Blueprints may each have a
+        # function of that name that looks different; every part of a Blueprint names it the same)
+        local = re.sub(r"\W", "_", actor) + "_" + function
+        held = u.externs.get(local)
         if held is None:
-            if function in u.names or function + "Result" in u.names:
-                raise Wait(f"a call of {function} on the Blueprint of the actor {actor}: the Blueprint has something of that name")
+            if local in u.names or local + "Result" in u.names or is_word(local):
+                raise Wait(f"a call of {function} on the Blueprint of the actor {actor}: the Blueprint has something called {local}")
             lines = []
             if gives:
-                lines.append(f"  struct {function}Result {{ " + " ".join(f"{t} {o} = {u.zero(t)};" for o, t in pins[1]) + " };")
+                lines.append(f"  struct {local}Result {{ " + " ".join(f"{t} {o} = {u.zero(t)};" for o, t in pins[1]) + " };")
             lines.append(f"  /// (of the Blueprint of the actor {actor}, called on it)")
-            lines.append(f"  KERN_EXTERN {function + 'Result' if gives else 'void'} {function}(" + ", ".join(f"{t} {x} = {u.zero(t)}" for x, t in pins[0]) + ");")
-            u.names.update({function, function + "Result"})
-            u.externs[function] = (*pins, lines)
+            lines.append(f"  KERN_EXTERN_AS({text_literal(function)}) {local + 'Result' if gives else 'void'} {local}(" + ", ".join(f"{t} {x} = {u.zero(t)}" for x, t in pins[0]) + ");")
+            u.names.update({local, local + "Result"})
+            u.externs[local] = (*pins, lines)
         elif held[:2] != pins:
-            raise Wait(f"two calls of {function} on Blueprints of actors with other values (a Blueprint says once what a function of another one looks like)")
+            raise Wait(f"two calls of {function} on the Blueprint of the actor {actor} with other values (a Blueprint says once what a function of another one looks like)")
         texts = [self.ex(a, t) for a, t in zip(values, in_types)]
         self.f.pure = False   # (a step: what the other Blueprint does is not known here)
         self.f.on_actors.append((actor, function))
@@ -4090,7 +4093,7 @@ class Emit:
         u.next_node += 1
         if gives:
             u.members.append("  struct { " + " ".join(f"{t} {o} = {u.zero(t)};" for o, t in pins[1]) + f" }} n{node};")
-        lines = [f'func_call_on<"{function}">(actor_find({text_literal(actor)}), kern::out({", ".join(f"n{node}.{o}" for o in gives)}){"".join(", " + x for x in texts)});']
+        lines = [f'func_call_on<"{local}">(actor_find({text_literal(actor)}), kern::out({", ".join(f"n{node}.{o}" for o in gives)}){"".join(", " + x for x in texts)});']
         if gives_type:
             self.hoist(lines)
             return f"n{node}.{gives[0]}", gives_type
@@ -9829,7 +9832,8 @@ def main(argv):
                     said_by[key] = block
                     constants += block
                 block = []
-            texts_ += functions_
+            # (what a function of an actor's Blueprint looks like: once, also where several parts call it)
+            texts_ += [t for t in functions_ if not ("KERN_EXTERN" in t and t in texts_)]
             members += members_
             types_.update(r["types"])
             uses_.update(r["uses"])

@@ -1372,7 +1372,7 @@ bool link(const Graph& g, const Blueprints& all, Graph& out, std::string* error,
         // (a function of another actor's Blueprint the library calls: what it looks like comes along)
         const Function* named = l->function(n.param("function"));
         const Function* held = named ? out.function(named->name) : nullptr;
-        if (named && held && (!held->external || !same_pins(held->inputs, named->inputs) || !same_pins(held->outputs, named->outputs)))
+        if (named && held && (!held->external || held->remote != named->remote || !same_pins(held->inputs, named->inputs) || !same_pins(held->outputs, named->outputs)))
           return say(error, "the library " + library + " calls " + named->name + " on an actor, and the Blueprint has another function of that name");
         if (named && !held) out.functions.push_back(*named);
       }
@@ -1567,6 +1567,7 @@ json::Value graph_to_json(const Graph& g) {
       o.set("name", f.name);
       if (f.pure) o.set("pure", true);
       if (f.external) o.set("external", true);
+      if (!f.remote.empty()) o.set("remote", f.remote);
       if (!f.from.empty()) o.set("from", f.from);
       if (!f.help.empty()) o.set("help", f.help);
       o.set("inputs", pins(f.inputs));
@@ -1767,6 +1768,8 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
     if (g.function(f.name)) return bad("function \"" + f.name + "\" is declared twice");
     f.pure = v["pure"].as_bool();
     f.external = v["external"].as_bool();
+    f.remote = v["remote"].as_string();
+    if (!f.remote.empty() && !f.external) return bad("function \"" + f.name + "\" has the name of another Blueprint's function, but is none of another Blueprint");
     f.help = v["help"].as_string();
     auto pins = [&](const json::Value& list, std::vector<FunctionPin>& out, const char* what) {
       for (const json::Value& x : list.items()) {
@@ -3012,7 +3015,7 @@ void Runtime::call_on(Instance& caller, std::string_view function, ActorRef targ
   Instance::Held held;
   if (at_work) held = to->held_calls();
   std::vector<Value> got;
-  const bool known = to->call(function, args, got);
+  const bool known = to->call(declared && !declared->remote.empty() ? std::string_view(declared->remote) : function, args, got);
   if (at_work) to->set_held_calls(std::move(held));
   if (!known || !declared) return;
   for (std::size_t k = 0; k < results.size() && k < got.size(); ++k)
