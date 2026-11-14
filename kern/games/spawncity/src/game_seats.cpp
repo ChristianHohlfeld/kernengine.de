@@ -32,7 +32,7 @@ bool Game::gaps_ride_pose(Vec3& p, Quat& q) const {
 // nearestRemoteBoardable: a mate's landed jet or his car standing (nearly) still, he at the wheel
 // (his pilot seat in the table), within reach - -1 for none. The hint, the touch button and the
 // press all ask this one.
-i32 Game::gaps_boardable(f32* dist) const {
+i32 Game::gaps_boardable(f32& dist) const {
   if (!gaps_ || !net_.active() || mode_ != Mode::foot || player_dead_ || gaps_->riding) return -1;
   const Vec3 me = matrix_of(soldier_).translation();
   i32 best = -1;
@@ -46,8 +46,13 @@ i32 Game::gaps_boardable(f32* dist) const {
     const f32 d = std::hypot(r.shown.x - me.x, r.shown.y - me.y);
     if (d < (car ? 5.5f : kBoardM) && d < bd) { bd = d; best = r.state.slot; }
   }
-  if (dist) *dist = bd;
+  dist = bd;
   return best;
+}
+
+i32 Game::gaps_boardable() const {
+  f32 dist = 0;
+  return gaps_boardable(dist);
 }
 
 bool Game::gaps_seat_press() {
@@ -57,7 +62,7 @@ bool Game::gaps_seat_press() {
   if (mode_ != Mode::foot || player_dead_ || g.seat_pending_until > world_->sim_time()) return false;
   const Vec3 me = matrix_of(soldier_).translation();
   f32 bd = kBoardM;
-  const i32 best = gaps_boardable(&bd);
+  const i32 best = gaps_boardable(bd);
   if (best < 0) return false;
   if (jet_placed_ && mode_ == Mode::foot) {
     // our own (empty) jet clearly nearer: that one; a manned one of his right there: ride along

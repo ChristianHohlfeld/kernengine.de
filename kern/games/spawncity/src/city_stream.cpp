@@ -408,14 +408,14 @@ void CityStream::select_cells(Vec3 focus, bool force) {
     (tiles_.begin() + p.tile)->second->want_cells.insert(p.cell);
     total += p.n;
   }
-  for (const Pick& p : picks) {
-    Tile& t = *(tiles_.begin() + p.tile)->second;
+  auto settle = [&](Tile& t, const Pick& p) {
     const bool want = t.want_cells.count(p.cell) != 0, built = t.cell_ids.count(p.cell) != 0;
     if (want && !built) t.dirty_cells.insert(p.cell);
     if (!want && !built) t.dirty_cells.erase(p.cell);
     // a built cell stays while it is near the drawn radius (no flicker at its edge)
     if (!want && built && p.d > reach + kKeep * 0.5f && !t.cell_job && !t.cell_uploading) drop_cell(t, p.cell);
-  }
+  };
+  for (const Pick& p : picks) settle(*(tiles_.begin() + p.tile)->second, p);
   // cells beyond every radius (the player was put somewhere else): gone
   for (auto& [k, tp] : tiles_) {
     Tile& t = *tp;
@@ -1036,7 +1036,7 @@ bool CityStream::building_at(Vec2 p) const {
     if (p.x < t.bounds.x - 200 || p.x > t.bounds.z + 200 || p.y < t.bounds.y - 200 || p.y > t.bounds.w + 200) continue;
     for (const MapFeatures::Building& b : t.features.buildings) {
       if (b.rings.empty() || b.rings[0].size() < 3) continue;
-      const auto& ring = b.rings[0];
+      const std::vector<Vec2>& ring = b.rings[0];
       if (std::fabs(ring[0].x - p.x) > 150 || std::fabs(ring[0].y - p.y) > 150) continue;
       bool inside = false;
       for (std::size_t i = 0, j = ring.size() - 1; i < ring.size(); j = i++)
