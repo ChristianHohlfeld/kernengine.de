@@ -545,7 +545,7 @@ void Game::combat_hud(std::string& s) {
                 C.military.active ? "on" : C.military.alert_at >= 0 ? "alert" : "off", C.helis.size(), C.tanks.size(), soldiers, flak_alive, C.flak_destroyed,
                 C.flak_hits, C.flak_rounds.size(), C.jets.size(), C.bombs.size(), std::fmax(0.0f, kStrikeCooldownS - (now - C.last_strike)), fighters,
                 C.gangster_shots, C.enemies.size(), C.zombies.active ? "true" : "false", C.zombies.round, C.zombie_ai.size(), C.zombies.points, C.chaos.score,
-                C.chaos.combo, C.chaos.flow, C.fun.score, C.fun.at_risk, C.fun.high_score, C.fun.combo, C.fun.multiplier(now), k.name, k.hint,
+                C.chaos.combo, C.chaos.flow, C.fun.score, C.fun.at_risk, C.fun.high_score, C.fun.combo, C.fun.multiplier(now), k.name.c_str(), k.hint.c_str(),
                 C.fun.contract_progress, k.target, C.fun.contract_complete ? "true" : "false", C.scope ? "true" : "false", C.debris.size(),
                 std::fmax(0.0f, C.drone_ready_at - now));
   s += b;
