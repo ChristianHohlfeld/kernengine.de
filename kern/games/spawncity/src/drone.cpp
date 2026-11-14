@@ -1,8 +1,6 @@
 // SpawnCity drone plant + the Arondight45 firmware (see drone.h).
 #include "drone.h"
 
-#include <cstring>
-
 namespace sc {
 
 namespace {

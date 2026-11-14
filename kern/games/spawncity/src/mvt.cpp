@@ -1,7 +1,7 @@
 // MVT decoder / minimal writer (see mvt.h). Spec: github.com/mapbox/vector-tile-spec (2.1).
 #include "mvt.h"
 
-#include <cstring>
+#include <bit>
 
 #include "kern/core/base.h"
 
@@ -53,17 +53,17 @@ struct Reader {
     }
     if (p > end) ok = false;
   }
+  // (little-endian, as protobuf writes them: the low byte first)
+  u32 le32(kern::Span<const u8> bytes, std::size_t at) const { return u32{bytes[at]} | u32{bytes[at + 1]} << 8 | u32{bytes[at + 2]} << 16 | u32{bytes[at + 3]} << 24; }
   f64 fixed64(kern::Span<const u8> bytes) {
     if (end < p + 8) { ok = false; return 0; }
-    f64 d;
-    std::memcpy(&d, bytes.data + p, 8);
+    const f64 d = std::bit_cast<f64>(u64{le32(bytes, p + 4)} << 32 | le32(bytes, p));
     p += 8;
     return d;
   }
   f32 fixed32(kern::Span<const u8> bytes) {
     if (end < p + 4) { ok = false; return 0; }
-    f32 f;
-    std::memcpy(&f, bytes.data + p, 4);
+    const f32 f = std::bit_cast<f32>(le32(bytes, p));
     p += 4;
     return f;
   }
