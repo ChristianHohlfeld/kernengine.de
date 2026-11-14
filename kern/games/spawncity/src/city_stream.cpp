@@ -100,7 +100,7 @@ struct CityStream::Tile {
   u32 colliders = 0, triangles = 0;
   Vec2 center;
   // terrain: road and area meshes are re-laid when the ground under them changes (craters, water)
-  kern::Vec4 bounds{-1e9f, -1e9f, 1e9f, 1e9f};
+  kern::Vec4 bounds;  // the tile's square (x0, y0, x1, y1), set where the tile is made
   std::vector<u32> lay_meshes, old_lay;
   bool relay = false, relay_again = false;
   Vec2 roads_at{1e9f, 1e9f};  // where the streets were last laid around (REBUILD_MOVE_M 260)
@@ -296,6 +296,7 @@ void CityStream::go_offline() {
   auto t = std::make_unique<Tile>();
   t->procedural = true;
   t->key = TileKey{0, -1, -1};
+  t->bounds = {-1e9f, -1e9f, 1e9f, 1e9f};  // the stand-in town has no square: it is everywhere
   if (training_offline) training_level(t->features);  // training_test_level_v2.mjs
   else procedural_city(0, 0, 760, 20261029, t->features);
   furnish(t->features, t->bounds, {});
