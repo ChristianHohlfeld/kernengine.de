@@ -8494,7 +8494,9 @@ class TestWriter:
             for o, scope in self.tree.alias_decls:
                 if o["id"] in taken or o.get("name") in numbers or o.get("name") not in words:
                     continue
-                if o.get("_at", (None, None))[0] is None or o["_at"][1] is None or scope.rstrip(":") in self.tree.records or self.inside(o, decls) is not None or self.in_function(o):
+                # (one in a class the test compiles along stands in its text; one in a class it does not has the
+                # namespace of the class's name - in_classes)
+                if o.get("_at", (None, None))[0] is None or o["_at"][1] is None or self.inside(o, decls) is not None or self.in_function(o):
                     continue
                 taken.add(o["id"])
                 text = self.piece(o)

@@ -787,7 +787,7 @@ template <class E>
 void take(E& to, const Value& v) { to = static_cast<E>(v.i); }
 template <class T>
   requires std::is_base_of_v<EngineObject, T>
-void take(T*& to, const Value& v) { to = engine_object<T>(v.as_int()); }
+void take(T*& to, const Value& v) { to = engine_object<std::remove_const_t<T>>(v.as_int()); }   // (one the source may only read: the same object)
 template <class T>
   requires std::is_base_of_v<EngineObject, T>
 void take(T& to, const Value& v) { to = *engine_object<T>(v.as_int()); }
