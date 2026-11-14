@@ -7835,6 +7835,9 @@ class TestWriter:
                 inner = re.sub(r"^const\s+", "", inner)
                 params.append((f"converted::wide::Span<{const}{self.spell(inner)}> {name}", default))
                 values.append(f"arg({self.wrap(f'converted::as_list({name})', f'std::vector<{self.spell(inner)}>')})")
+            elif self.spell(raw) == "const char*":   # (a text in so many words: as it is given)
+                params.append((f"const char* {name}", default))
+                values.append(f"arg({name})")
             else:
                 t = self.spell(raw)
                 writes = raw.endswith("&") and not raw.endswith("&&") and not re.match(r"const\b", raw)
