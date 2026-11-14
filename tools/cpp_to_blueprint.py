@@ -6253,6 +6253,13 @@ class Emit:
                 v = self.ex(a[0], "Vector")
                 fb = self.ex(a[1], "Vector") if len(a) > 1 else "Vector{0.0, 0.0, 1.0}"
                 return f'logic_select<Vector>(math_compare<">">(vector_length({v}), {flit(struct.unpack("f", struct.pack("f", 1e-9))[0])}), vector_normalize({v}), {fb})', "Vector"
+            if name == "hex_color" and len(a) == 1 and self.tp(a[0]) == "Int":
+                # kern::hex_color(0xRRGGBB): each byte / 255 in 32 bit - a quotient of two exact numbers, which the
+                # vector's 32-bit part rounds as the 32-bit division does
+                h = self.held_once(a[0], "Int")
+                hv = self.ex(h, "Int")
+                parts = [f"kern::formula([](Float h) -> Float {{ return kern::math::div({'kern::math::band(kern::math::shr(h, ' + str(sh) + '.0), 255.0)' if sh else 'kern::math::band(h, 255.0)'}, 255.0); }}, kern::to<Float>({hv}))" for sh in (16, 8, 0)]
+                return f"vector_make({', '.join(parts)})", "Vector"
             if name == "finite" and vec == [True]:
                 v = self.ex(a[0], "Vector")
                 return (f'math_compare<"==">(kern::formula([](Float x, Float y, Float z) -> Float {{ return (x - x) + (y - y) + (z - z); }}, '
