@@ -1048,7 +1048,8 @@ rules.call("HitChance", std::tie(chance), distance, speed);
 ist als Blueprint `func_call_on<"HitChance">(actor_find("Military"), kern::out(n7.chance), distance,
 speed);` – mit `KERN_EXTERN HitChanceResult HitChance(Float d = 0.0, Float speed = 0.0);`. Werte sind
 Flags, ganze Zahlen, Kommazahlen (64 Bit: eine 32-Bit-Zahl geht als die Dezimalzahl hinein, für die
-sie steht), Vektoren, Texte, Werte von Aufzählungen, Strukturen und Listen von all dem. Eine Struktur
+sie steht), Vektoren (`Vec3` oder ein eigener Typ des Programms, der zu einem `Vec3` wird und aus einem
+gemacht wird), Texte, Werte von Aufzählungen, Strukturen und Listen von all dem. Eine Struktur
 ist eine einfache Struktur des Programms (ein Aggregat: öffentliche Felder, kein eigener Konstruktor,
 keine Basis), deren Felder der Reihe nach die des Structs im Blueprint des Actors sind –
 `kern::fields_of(s)` (kern/core/fields.h) nennt sie, ohne dass eine Liste der Felder daneben steht.
