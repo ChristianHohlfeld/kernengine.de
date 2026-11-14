@@ -12,7 +12,7 @@ namespace {
 constexpr f32 kCell = 40;       // junction lookup grid
 constexpr f32 kMerge = 3;       // street vertices closer than this are one node
 using kern::logic::Value;
-rules::Blueprint g_rules;  // the Blueprint of the level's actor "Traffic": the laws (see world_traffic.h)
+rules::Blueprint g_rules{"Traffic"};  // the laws (see world_traffic.h)
 /// The Blueprint's distances and times the loops below compare with (read when it is bound).
 struct Laws { f32 ahead_min = 0, ahead_max = 0, stop_line = 0, first_come = 0, claim_s = 0, patience_s = 0; } g_laws;
 f32 num(const char* function, const std::vector<Value>& args) { return static_cast<f32>(g_rules.number(function, args)); }

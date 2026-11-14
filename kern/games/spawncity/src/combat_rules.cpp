@@ -79,7 +79,7 @@ f32 kCourseScale = 0;
 
 namespace {
 using kern::logic::Value;
-rules::Blueprint g_military, g_zombies, g_sandbox, g_fun, g_race;
+rules::Blueprint g_military{"Military"}, g_zombies{"Zombies"}, g_sandbox{"Sandbox"}, g_fun{"Fun"}, g_race{"Race"};
 Value N(f32 x) { return rules::number(x); }
 Value I(i64 x) { return Value::integer(x); }
 Value B(bool x) { return Value::boolean(x); }
@@ -167,12 +167,36 @@ MilEvent MilitaryClock::update(f32 now, i32 stars, f32 heat, bool enabled) {
   next_reinforce = f(*r[0].field(3));
   return static_cast<MilEvent>(r[1].i);
 }
-f32 heli_hit_chance(f32 d, f32 speed) { return num(g_military, "HeliHitChance", {N(d), N(speed)}); }
-f32 soldier_hit_chance(f32 d, f32 speed) { return num(g_military, "SoldierHitChance", {N(d), N(speed)}); }
-f32 tank_aim_error(f32 d, f32 speed) { return num(g_military, "TankAimError", {N(d), N(speed)}); }
-f32 gangster_hit_chance(f32 d, f32 speed) { return num(g_military, "GangsterHitChance", {N(d), N(speed)}); }
-f32 strike_launch_time(f32 now) { return num(g_military, "StrikeLaunchTime", {N(now)}); }
-f32 flak_burst_damage(f32 d) { return num(g_military, "FlakBurstDamage", {N(d)}); }
+f32 heli_hit_chance(f32 d, f32 speed) {
+  f64 chance = 0;
+  g_military.call("HeliHitChance", std::tie(chance), rules::decimal(d), rules::decimal(speed));
+  return static_cast<f32>(chance);
+}
+f32 soldier_hit_chance(f32 d, f32 speed) {
+  f64 chance = 0;
+  g_military.call("SoldierHitChance", std::tie(chance), rules::decimal(d), rules::decimal(speed));
+  return static_cast<f32>(chance);
+}
+f32 tank_aim_error(f32 d, f32 speed) {
+  f64 metres = 0;
+  g_military.call("TankAimError", std::tie(metres), rules::decimal(d), rules::decimal(speed));
+  return static_cast<f32>(metres);
+}
+f32 gangster_hit_chance(f32 d, f32 speed) {
+  f64 chance = 0;
+  g_military.call("GangsterHitChance", std::tie(chance), rules::decimal(d), rules::decimal(speed));
+  return static_cast<f32>(chance);
+}
+f32 strike_launch_time(f32 now) {
+  f64 time = 0;
+  g_military.call("StrikeLaunchTime", std::tie(time), rules::decimal(now));
+  return static_cast<f32>(time);
+}
+f32 flak_burst_damage(f32 d) {
+  f64 damage = 0;
+  g_military.call("FlakBurstDamage", std::tie(damage), rules::decimal(d));
+  return static_cast<f32>(damage);
+}
 
 // flak_battery.mjs hash() and rand(): a cell's own numbers
 u32 hash_text(const std::string& s) {
@@ -195,23 +219,27 @@ bool flak_cell(i64 cx, i64 cy, u32& seed) {
   char key[64];
   std::snprintf(key, sizeof key, "flak:l%lld:%lld", static_cast<long long>(cx), static_cast<long long>(cy));
   seed = hash_text(key);
-  return g_military.flag("FlakHasGun", {N(cell_rand(seed, 0))});
+  bool gun = false;
+  g_military.call("FlakHasGun", std::tie(gun), rules::decimal(cell_rand(seed, 0)));
+  return gun;
 }
 
 // pedestrian_agents.mjs agentRandom: a person's own number
 f32 agent_random(u32 seed) { return static_cast<f32>((seed * 2246822519u) >> 8) * (1.0f / 16777216.0f); }
 
 Temper temper_of(u32 seed) {
-  std::vector<Value> r;
-  return g_military.call("TemperOf", {N(agent_random(seed))}, r) && !r.empty() ? static_cast<Temper>(r[0].i) : Temper::fearful;
+  Temper temper = Temper::fearful;
+  g_military.call("TemperOf", std::tie(temper), rules::decimal(agent_random(seed)));
+  return temper;
 }
 
 Arms arms_of(u32 seed) {
   // (his second number, from the first)
   u32 h = (static_cast<u32>(static_cast<f64>(agent_random(seed)) * 4294967296.0) ^ 0x9e3779b9u) * 2654435761u;
   h ^= h >> 15;
-  std::vector<Value> r;
-  return g_military.call("ArmsOf", {rules::of_enum(temper_of(seed)), rules::number(static_cast<f64>(h % 10000) / 10000.0)}, r) && !r.empty() ? static_cast<Arms>(r[0].i) : Arms::fists;
+  Arms arms = Arms::fists;
+  g_military.call("ArmsOf", std::tie(arms), temper_of(seed), static_cast<f64>(h % 10000) / 10000.0);
+  return arms;
 }
 
 // ---------------------------------------------------------------- "Zombies"
@@ -257,8 +285,16 @@ void ZombieRounds::next_round(f32 now) {
   std::vector<Value> r;
   if (g_zombies.call("NextRound", {to_value(*this), N(now)}, r) && !r.empty()) take(r[0], *this);
 }
-f32 ZombieRounds::hp() const { return num(g_zombies, "Hp", {I(round)}); }
-f32 ZombieRounds::speed(f32 r_fast, f32 r_speed) const { return num(g_zombies, "Speed", {I(round), N(r_fast), N(r_speed)}); }
+f32 ZombieRounds::hp() const {
+  f64 hp = 0;
+  g_zombies.call("Hp", std::tie(hp), round);
+  return static_cast<f32>(hp);
+}
+f32 ZombieRounds::speed(f32 r_fast, f32 r_speed) const {
+  f64 mps = 0;
+  g_zombies.call("Speed", std::tie(mps), round, rules::decimal(r_fast), rules::decimal(r_speed));
+  return static_cast<f32>(mps);
+}
 
 // ---------------------------------------------------------------- "Sandbox"
 bool bind_sandbox(kern::logic::Instance* blueprint) {
@@ -290,10 +326,15 @@ bool choose_enemy(i32 stars, f32 r, i32 heavies, EnemyType& out) {
   out = static_cast<EnemyType>(v[0].i);
   return true;
 }
-f32 enemy_hit_chance(const EnemySpec& s, f32 d, f32 moving) { return num(g_sandbox, "EnemyHitChance", {N(s.acc), N(d), N(moving)}); }
+f32 enemy_hit_chance(const EnemySpec& s, f32 d, f32 moving) {
+  f64 chance = 0;
+  g_sandbox.call("EnemyHitChance", std::tie(chance), rules::decimal(s.acc), rules::decimal(d), rules::decimal(moving));
+  return static_cast<f32>(chance);
+}
 i32 enemy_budget(i32 stars) {
-  std::vector<Value> v;
-  return g_sandbox.call("Budget", {I(stars)}, v) && !v.empty() ? whole(v[0]) : 0;
+  i32 enemies = 0;
+  g_sandbox.call("Budget", std::tie(enemies), stars);
+  return enemies;
 }
 
 namespace {
@@ -381,7 +422,11 @@ std::string Fun::apply(FunEvent e, f32 now, i32 stars_now, f32 amount) {
   return r[1].as_text();
 }
 f32 Fun::multiplier(f32 now) const { return num(g_fun, "Multiplier", {to_value(*this), N(now)}); }
-f32 Fun::police_damage_scale() const { return num(g_fun, "PoliceDamageScale", {I(mercy)}); }
+f32 Fun::police_damage_scale() const {
+  f64 scale = 0;
+  g_fun.call("PoliceDamageScale", std::tie(scale), mercy);
+  return static_cast<f32>(scale);
+}
 
 // ---------------------------------------------------------------- "Race"
 bool bind_race(kern::logic::Instance* blueprint) {
@@ -417,7 +462,11 @@ void gate_axes(i32 i, Vec2& normal, Vec2& right) {
 
 void Race::reset() { *this = Race{}; }
 
-bool Race::crossed(i32 gi, Vec3 a, Vec3 b) { return g_race.flag("Crossed", {I(gi), Value::vector(a), Value::vector(b)}); }
+bool Race::crossed(i32 gi, Vec3 a, Vec3 b) {
+  bool crossed = false;
+  g_race.call("Crossed", std::tie(crossed), gi, a, b);
+  return crossed;
+}
 
 i32 Race::update(Vec3 p, f32 t) {
   std::vector<Value> r;

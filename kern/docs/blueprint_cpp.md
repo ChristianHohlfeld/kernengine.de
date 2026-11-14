@@ -900,6 +900,27 @@ Parametern und lokalen Variablen, in C++ ohnehin, im Interpreter und im JIT, wei
 unterbrochenen Aufruf die seinen zurückgibt. Was Knoten geben und behalten (`n7`), gehört wie immer
 dem Blueprint, nicht dem Aufruf.
 
+**Aufrufe aus C++.** Das C++ eines Programms ruft eine Funktion des Blueprints eines Actors so, wie
+Call on Actor sie ruft: `kern::logic::ActorBlueprint` (kern/logic/actor_blueprint.h) ist der
+Blueprint eines Actors des Levels, beim Namen des Actors gemacht; das Programm bindet `running`, wenn
+seine Welt läuft. Ein Aufruf gibt die Werte typisiert hinein und nimmt die Ausgänge der Reihe nach in
+die Plätze, die `std::tie` nennt:
+
+```cpp
+kern::logic::ActorBlueprint rules{"Military"};
+f64 chance = 0;
+rules.call("HitChance", std::tie(chance), distance, speed);
+```
+
+ist als Blueprint `func_call_on<"HitChance">(actor_find("Military"), kern::out(n7.chance), distance,
+speed);` – mit `KERN_EXTERN HitChanceResult HitChance(Float d = 0.0, Float speed = 0.0);`. Werte sind
+Flags, ganze Zahlen, Kommazahlen (64 Bit: eine 32-Bit-Zahl geht als die Dezimalzahl hinein, für die
+sie steht), Vektoren, Texte und Werte von Aufzählungen. Jeder Ausgang beginnt mit der Null seines
+Typs: Ist kein Blueprint gebunden oder hat er die Funktion nicht, gibt der Aufruf das – wie Call on
+Actor die erklärten Defaults gibt, und die Erklärung einer Funktion eines anderen Blueprints hat die
+Nullen. Die Werte werden vor den Ausgängen genommen: Ein Wert darf aus einem Platz kommen, in den ein
+Ausgang geht.
+
 **Wie tief es geht.** Gezählt werden Events, die aus Handlern heraus Handler erreichen: höchstens
 64 ineinander, dann wird die Kette gestoppt und es wird gemeldet – in jeder Stufe beim selben
 Event. Funktionsaufrufe zählen nicht mit: Sie können sich nicht selbst erreichen, und in C++ sind

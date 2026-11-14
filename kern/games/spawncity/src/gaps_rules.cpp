@@ -10,9 +10,8 @@ namespace sc::gaps {
 
 // ---- police_sirens.mjs, the dispatch grace, the organic crack: the Blueprint of the actor "Sirens"
 namespace {
-using kern::logic::Value;
-rules::Blueprint g_sirens;
-f32 num(const char* function, const std::vector<Value>& args) { return static_cast<f32>(g_sirens.number(function, args)); }
+using rules::decimal;
+rules::Blueprint g_sirens{"Sirens"};
 }  // namespace
 void bind_sirens(kern::logic::Instance* blueprint) { g_sirens.running = blueprint; }
 f32 horn_low() { return static_cast<f32>(g_sirens.variable("HornLow")); }
@@ -23,24 +22,45 @@ f32 whoop_base() { return static_cast<f32>(g_sirens.variable("WhoopBase")); }
 f32 organic_gain() { return static_cast<f32>(g_sirens.variable("OrganicGain")); }
 f32 organic_min_gap_s() { return static_cast<f32>(g_sirens.variable("OrganicMinGapS")); }
 
-f32 horn_hz(f32 t) { return num("HornHz", {rules::number(t)}); }
-f32 whoop_hz(f32 t) { return num("WhoopHz", {rules::number(t)}); }
-f32 siren_gain(f32 base, f32 d, f32 level) { return num("SirenGain", {rules::number(base), rules::number(d), rules::number(level)}); }
-f32 siren_cutoff(f32 d) { return num("SirenCutoff", {rules::number(d)}); }
-
-f32 SirenVoice::update(f32 d, f32 dt, f32 base, f32 level) {
-  std::vector<Value> r;
-  if (!g_sirens.call("VoiceUpdate", {rules::number(d), rules::number(dt), rules::number(base), rules::number(level), Value::boolean(have_d), rules::number(last_d), rules::number(doppler)}, r) ||
-      r.size() < 4)
-    return 0;
-  have_d = r[1].b;
-  last_d = static_cast<f32>(r[2].as_number());
-  doppler = static_cast<f32>(r[3].as_number());
-  return static_cast<f32>(r[0].as_number());
+f32 horn_hz(f32 t) {
+  f64 hz = 0;
+  g_sirens.call("HornHz", std::tie(hz), decimal(t));
+  return static_cast<f32>(hz);
+}
+f32 whoop_hz(f32 t) {
+  f64 hz = 0;
+  g_sirens.call("WhoopHz", std::tie(hz), decimal(t));
+  return static_cast<f32>(hz);
+}
+f32 siren_gain(f32 base, f32 d, f32 level) {
+  f64 gain = 0;
+  g_sirens.call("SirenGain", std::tie(gain), decimal(base), decimal(d), decimal(level));
+  return static_cast<f32>(gain);
+}
+f32 siren_cutoff(f32 d) {
+  f64 hz = 0;
+  g_sirens.call("SirenCutoff", std::tie(hz), decimal(d));
+  return static_cast<f32>(hz);
 }
 
-f32 post_arrival_grace_ms(i32 stars) { return num("PostArrivalGraceMs", {Value::integer(stars)}); }
-f32 organic_rate(Organic k) { return num("OrganicRate", {rules::of_enum(k)}); }
+f32 SirenVoice::update(f32 d, f32 dt, f32 base, f32 level) {
+  f64 gain = 0, next_last_d = 0, next_doppler = 0;
+  g_sirens.call("VoiceUpdate", std::tie(gain, have_d, next_last_d, next_doppler), decimal(d), decimal(dt), decimal(base), decimal(level), have_d, decimal(last_d), decimal(doppler));
+  last_d = static_cast<f32>(next_last_d);
+  doppler = static_cast<f32>(next_doppler);
+  return static_cast<f32>(gain);
+}
+
+f32 post_arrival_grace_ms(i32 stars) {
+  f64 ms = 0;
+  g_sirens.call("PostArrivalGraceMs", std::tie(ms), stars);
+  return static_cast<f32>(ms);
+}
+f32 organic_rate(Organic k) {
+  f64 rate = 0;
+  g_sirens.call("OrganicRate", std::tie(rate), k);
+  return static_cast<f32>(rate);
+}
 
 // ---- world_critical_damage_fx.mjs
 u32 hash_text(const std::string& s) {

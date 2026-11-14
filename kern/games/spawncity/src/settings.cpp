@@ -13,7 +13,7 @@ namespace sc {
 
 namespace {
 using kern::logic::Value;
-rules::Blueprint g_rules;
+rules::Blueprint g_rules{"Settings"};
 /// The table as the Blueprint has it: a row's texts (the specs point into them), the specs, and
 /// each row as the Blueprint's value (what Snap and InSection take).
 struct Row { std::string key, section, label, help; };

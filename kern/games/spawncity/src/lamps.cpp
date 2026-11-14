@@ -9,10 +9,14 @@
 namespace sc::lamps {
 
 namespace {
-using kern::logic::Value;
-rules::Blueprint g_rules;  // the level's actor "Lamps": what happens to one lamp
+using rules::decimal;
+rules::Blueprint g_rules{"Lamps"};  // what happens to one lamp
 /// The Blueprint's function Worse: may a lamp in `state` become `to`?
-bool worse(u8 state, u8 to) { return g_rules.flag("Worse", {Value::integer(state), Value::integer(to)}); }
+bool worse(u8 state, u8 to) {
+  bool worse = false;
+  g_rules.call("Worse", std::tie(worse), state, to);
+  return worse;
+}
 i64 grid_key(f32 x, f32 y) { return (static_cast<i64>(std::floor(x / kGridM)) << 32) ^ (static_cast<i64>(std::floor(y / kGridM)) & 0xffffffffll); }
 }  // namespace
 
@@ -115,42 +119,43 @@ i32 Field::shot(Vec3 a, Vec3 b) const {
   const f32 L = kern::length(b - a), mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
   i32 best = -1;
   f64 first = 1e9;
-  std::vector<Value> r;
   for (i32 k : near(mx, my, L / 2 + 2)) {
     const Lamp& l = lamps_[static_cast<std::size_t>(k)];
     // (the Blueprint's ShotAt: does the round pass this lamp's head, and how far down its path)
-    if (!g_rules.call("ShotAt", {Value::vector(a), Value::vector(b), Value::vector({l.head.x, l.head.y, l.foot.z + kHeadZ}), Value::integer(l.state)}, r) || r.size() < 2 || !r[0].b) continue;
-    if (r[1].as_number() < first) { first = r[1].as_number(); best = k; }
+    bool hit = false;
+    f64 along = 0;
+    g_rules.call("ShotAt", std::tie(hit, along), a, b, Vec3{l.head.x, l.head.y, l.foot.z + kHeadZ}, l.state);
+    if (!hit) continue;
+    if (along < first) { first = along; best = k; }
   }
   return best;
 }
 
 std::vector<Field::BlastHit> Field::blast(Vec3 p, f32 radius) const {
   std::vector<BlastHit> out;
-  const f32 reach = static_cast<f32>(g_rules.number("BlastReach", {rules::number(radius)}));
-  std::vector<Value> r;
+  f64 blast_reach = 0;
+  g_rules.call("BlastReach", std::tie(blast_reach), decimal(radius));
+  const f32 reach = static_cast<f32>(blast_reach);
   for (i32 k : near(p.x, p.y, reach)) {
     const Lamp& l = lamps_[static_cast<std::size_t>(k)];
-    if (!g_rules.call("BlastFate", {Value::vector(l.foot), Value::vector(p), rules::number(reach)}, r) || r.size() < 3) continue;
-    const Vec3 push = r[1].as_vector();
-    out.push_back({k, static_cast<u8>(r[0].i), {push.x, push.y}, static_cast<f32>(r[2].as_number())});
+    u8 state = 0;
+    Vec3 push{};
+    f64 speed = 0;
+    g_rules.call("BlastFate", std::tie(state, push, speed), l.foot, p, decimal(reach));
+    out.push_back({k, state, {push.x, push.y}, static_cast<f32>(speed)});
   }
   return out;
 }
 
 std::vector<Field::CarHit> Field::car(Vec3 pos, f32 yaw, Vec3 v, f32 hl, f32 hw, f32 m) const {
   std::vector<CarHit> out;
-  std::vector<Value> r;
   for (i32 k : near(pos.x, pos.y, hl + 1)) {
     const Lamp& l = lamps_[static_cast<std::size_t>(k)];
-    if (!g_rules.call("CarFate", {Value::vector(l.foot), Value::integer(l.state), Value::vector(pos), rules::number(yaw), Value::vector(v), rules::number(hl), rules::number(hw), rules::number(m)}, r) ||
-        r.size() < 4 || !r[0].b)
-      continue;
+    bool hit = false;
     CarHit h;
+    g_rules.call("CarFate", std::tie(hit, h.topple, h.impulse, h.clang), l.foot, l.state, pos, decimal(yaw), v, decimal(hl), decimal(hw), decimal(m));
+    if (!hit) continue;
     h.lamp = k;
-    h.topple = r[1].b;
-    h.impulse = r[2].as_vector();
-    h.clang = r[3].b;
     out.push_back(h);
   }
   return out;

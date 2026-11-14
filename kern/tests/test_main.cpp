@@ -10350,7 +10350,7 @@ TEST(studio_logic_lists) {
     ++steps;
     bare |= it["params"]["variable"].as_string().empty();
   }
-  CHECK(add_to && !bare && steps == 18 && entries == 2);  // (nine steps and the Set of an entry for each of the two list variables)
+  CHECK(add_to && !bare && steps == 20 && entries == 2);  // (ten steps and the Set of an entry for each of the two list variables)
   {
     // A list of a fixed length: the command says its length ("count"); its default has that many entries,
     // the palette offers its Get and the Set of an entry - no step that would change its length.
