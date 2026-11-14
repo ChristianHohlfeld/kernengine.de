@@ -7,9 +7,7 @@
 #include <string>
 #include <type_traits>
 #include <vector>
-#include <map>
 #include <memory>
-#include <unordered_map>
 #include "../../src/car.h"
 #include "../../src/city_stream.h"
 #include "../../src/facades.h"
@@ -22,9 +20,17 @@
 #include "../../src/drone.h"
 #include "../../src/game_ui.h"
 #include "../../src/game_combat.h"
+#include "../../src/game_destruction_sync.h"
 #include "../../src/game_gaps.h"
+#include "../../src/game_life.h"
 #include "../../src/game_look.h"
+#include "../../src/game_net.h"
+#include "../../src/game_projsync.h"
+#include "../../src/game_toss.h"
+#include "../../src/game_townsync.h"
+#include "../../src/game_world.h"
 #include "../../src/jet.h"
+#include "kern/core/map.h"
 #include "kern/app/app.h"
 #include "kern/audio/audio.h"
 #include "kern/game/runtime.h"
@@ -52,10 +58,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -68,27 +74,9 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct World : converted::EngineObject {
-};
 enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
-struct Renderer : converted::EngineObject {
-};
-enum class Kind : u8 { shot, pistol, hit, crack, damage, scream, explosion, step, bounce, reward, fail, count };
-enum class Key : u8 {
-  unknown = 0,
-  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
-  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
-  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
-  count
-};
-namespace TouchControls { namespace Finger { enum Kind : u8 { move, look, fire, look_drag, button }; } }
-struct Connection : converted::EngineObject {
-};
-struct Transport : converted::EngineObject {
-};
-struct HostTransport : converted::EngineObject {
-};
-enum class ClientState : i8 {
+namespace combat_audio { enum class Kind : u8 { shot, pistol, hit, crack, damage, scream, explosion, step, bounce, reward, fail, count }; }
+namespace net { enum class ClientState : i8 {
   denied = -3,          // server full
   timed_out = -2,
   error = -1,           // connection error (desync, bad packets)
@@ -96,9 +84,15 @@ enum class ClientState : i8 {
   connecting = 1,       // sending requests
   challenged = 2,       // sending responses
   connected = 3,
+}; }
+enum class Key : u8 {
+  unknown = 0,
+  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
+  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
+  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
+  count
 };
-struct Server : converted::EngineObject {
-};
+namespace game { namespace TouchControls { namespace Finger { enum Kind : u8 { move, look, fire, look_drag, button }; } } }
 struct PadState {
   bool connected = false;
   f32 lx = 0, ly = 0, rx = 0, ry = 0, lt = 0, rt = 0;  // ly / ry: up positive
@@ -138,16 +132,19 @@ SC_TEST(converted_game) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] PadState a0, [[maybe_unused]] int a1) { return converted::counted([&] { return a0.down(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const PadState a0 = draw_PadState(draw);
-      const int a1 = static_cast<int>(draw.whole());
+      PadState a0 = draw_PadState(draw);
+      int a1 = static_cast<int>(draw.whole());
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // PadState::hit
@@ -155,16 +152,19 @@ SC_TEST(converted_game) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] PadState a0, [[maybe_unused]] int a1) { return converted::counted([&] { return a0.hit(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const PadState a0 = draw_PadState(draw);
-      const int a1 = static_cast<int>(draw.whole());
+      PadState a0 = draw_PadState(draw);
+      int a1 = static_cast<int>(draw.whole());
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

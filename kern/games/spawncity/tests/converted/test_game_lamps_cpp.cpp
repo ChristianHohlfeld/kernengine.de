@@ -19,10 +19,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -96,10 +96,10 @@ struct Mat4 {
     const f32 xx = q.x * x2, xy = q.x * y2, xz = q.x * z2, yy = q.y * y2, yz = q.y * z2, zz = q.z * z2;
     const f32 wx = q.w * x2, wy = q.w * y2, wz = q.w * z2;
     Mat4 r;
-    converted::at(r.m, 0) = (1 - yy - zz) * s.x; converted::at(r.m, 1) = (xy + wz) * s.x; converted::at(r.m, 2) = (xz - wy) * s.x; converted::at(r.m, 3) = 0;
-    converted::at(r.m, 4) = (xy - wz) * s.y; converted::at(r.m, 5) = (1 - xx - zz) * s.y; converted::at(r.m, 6) = (yz + wx) * s.y; converted::at(r.m, 7) = 0;
-    converted::at(r.m, 8) = (xz + wy) * s.z; converted::at(r.m, 9) = (yz - wx) * s.z; converted::at(r.m, 10) = (1 - xx - yy) * s.z; converted::at(r.m, 11) = 0;
-    converted::at(r.m, 12) = t.x; converted::at(r.m, 13) = t.y; converted::at(r.m, 14) = t.z; converted::at(r.m, 15) = 1;
+    r.m[0] = (1 - yy - zz) * s.x; r.m[1] = (xy + wz) * s.x; r.m[2] = (xz - wy) * s.x; r.m[3] = 0;
+    r.m[4] = (xy - wz) * s.y; r.m[5] = (1 - xx - zz) * s.y; r.m[6] = (yz + wx) * s.y; r.m[7] = 0;
+    r.m[8] = (xz + wy) * s.z; r.m[9] = (yz - wx) * s.z; r.m[10] = (1 - xx - yy) * s.z; r.m[11] = 0;
+    r.m[12] = t.x; r.m[13] = t.y; r.m[14] = t.z; r.m[15] = 1;
     return r;
   }
 
@@ -138,14 +138,21 @@ struct Mat4 {
 
 
 
+  /// The same, where nobody asks whether it is one.
+  
+
+
+
 };
 constexpr f32 kPi = 3.14159265358979323846;
 enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
-enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, count
-};
+namespace logic { enum class PinType : u8 {
+  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
+  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
+  map, set, count
+}; }
 namespace GpsLive { enum class View : u8 { eye, follow, map }; }
+namespace seats { enum class Result : u8 { ok, unchanged, invalid, owner_only_pilot, already_seated, seat_occupied, no_pilot, not_occupant }; }
 enum class Key : u8 {
   unknown = 0,
   a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
@@ -153,7 +160,6 @@ enum class Key : u8 {
   left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
   count
 };
-enum class Result : u8 { ok, unchanged, invalid, owner_only_pilot, already_seated, seat_occupied, no_pilot, not_occupant };
 Mat4 yaw_at(Vec3 p, f32 yaw) { return Mat4::trs(p, Quat::axis_angle({0, 0, 1}, yaw), {1, 1, 1}); }
 Vec3 rgb(u32 hex) { return {static_cast<f32>((hex >> 16) & 255) / 255, static_cast<f32>((hex >> 8) & 255) / 255, static_cast<f32>(hex & 255) / 255}; }
 std::vector<f32> glass_pcm(u32 rate) {
@@ -190,14 +196,14 @@ std::vector<f32> clang_pcm(u32 rate) {
 
 [[maybe_unused]] static Mat4 draw_kern__Mat4(converted::Draw& draw) {
   Mat4 s{};
-  for (auto& e : s.m) e = draw.number();
+  converted::fill_array(s.m, [&]() -> double { return draw.number(); });
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const Mat4& s) { return converted::Value::structure({arg(std::vector<double>(std::begin(s.m), std::end(s.m)))}); }
-[[maybe_unused]] static bool same(const Mat4& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(std::vector<double>(std::begin(want.m), std::end(want.m)), (*got.rows)[0]); }
-[[maybe_unused]] static bool defined(const Mat4& s) { return defined(std::vector<double>(std::begin(s.m), std::end(s.m))); }
-[[maybe_unused]] static std::string text(const Mat4& s) { return std::string("{") + text(std::vector<double>(std::begin(s.m), std::end(s.m))) + "}"; }
-[[maybe_unused]] static void take(Mat4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[0]); for (std::size_t k = 0; k < items.size() && k < std::size(s.m); ++k) s.m[k] = items[k]; } }
+[[maybe_unused]] static converted::Value arg(const Mat4& s) { return converted::Value::structure({arg(converted::array_list(s.m))}); }
+[[maybe_unused]] static bool same(const Mat4& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::array_list(want.m), (*got.rows)[0]); }
+[[maybe_unused]] static bool defined(const Mat4& s) { return defined(converted::array_list(s.m)); }
+[[maybe_unused]] static std::string text(const Mat4& s) { return std::string("{") + text(converted::array_list(s.m)) + "}"; }
+[[maybe_unused]] static void take(Mat4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[0]); converted::array_from(s.m, items); } }
 
 SC_TEST(converted_game_lamps_cpp) {
   converted::Blueprint bp("game_lamps_cpp");
@@ -206,16 +212,19 @@ SC_TEST(converted_game_lamps_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_game_lamps_cpp::yaw_at(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Vec3 a0 = draw.vector();
-      const double a1 = draw.number();
+      Vec3 a0 = draw.vector();
+      double a1 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // rgb
@@ -223,15 +232,18 @@ SC_TEST(converted_game_lamps_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_game_lamps_cpp::rgb(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // glass_pcm
@@ -239,15 +251,18 @@ SC_TEST(converted_game_lamps_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_game_lamps_cpp::glass_pcm(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // clang_pcm
@@ -255,15 +270,18 @@ SC_TEST(converted_game_lamps_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_game_lamps_cpp::clang_pcm(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

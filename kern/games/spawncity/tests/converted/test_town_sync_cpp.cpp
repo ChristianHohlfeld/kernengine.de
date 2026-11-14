@@ -8,8 +8,8 @@
 #include <type_traits>
 #include <vector>
 #include <algorithm>
-#include <cstring>
 #include "../../src/town_sync.h"
+#include "../../src/wire.h"
 #include "../converted.h"
 
 namespace converted_town_sync_cpp {
@@ -19,10 +19,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -35,21 +35,93 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Whole64 {
-  u32 high = 0;
-  u32 low = 0;
-};
-enum class Kind : u8 { none = 0, car_hit = 1, person_hit = 2, lamps = 3, plank_step = 4, planks = 5, state = 6, ask = 7 };
-Kind kind_of(const std::vector<u8>& blob);
-struct LampRec { i64 key = 0; u8 state = 0; bool operator==(const LampRec&) const = default; };
-struct PlankRec { i64 key = 0; u8 door = 0, doors = 0, planks = 0; bool operator==(const PlankRec&) const = default; };
-struct MarkRec { Vec3 at; f32 radius = 0, strength = 0; };
-constexpr u8 kPlanksMax = 6, kDoorsMax = 64;
-std::vector<u8> pack_ask();
-struct In {
-  const std::vector<u8>& b;
+namespace town { enum class Kind : u8 { none = 0, car_hit = 1, person_hit = 2, lamps = 3, plank_step = 4, planks = 5, state = 6, ask = 7 }; }
+namespace town { Kind kind_of(const std::vector<u8>& blob); }
+namespace town { enum class Cause : u8 { other = 0, round = 1, blast = 2, kLast = blast }; }
+namespace town { struct CarHit { u8 car = 0; f32 damage = 0; Cause cause = Cause::other; }; }
+namespace town { struct PersonHit { u8 person = 0; u32 seed = 0; f32 damage = 0; u8 by = 0; Vec3 push; }; }
+namespace town { struct LampRec { i64 key = 0; u8 state = 0; bool operator==(const LampRec&) const = default; }; }
+namespace town { struct PlankRec { i64 key = 0; u8 door = 0, doors = 0, planks = 0; bool operator==(const PlankRec&) const = default; }; }
+namespace town { struct PlankStep { i64 key = 0; u8 door = 0, doors = 0; i8 step = 0; }; }
+namespace town { struct MarkRec { Vec3 at; f32 radius = 0, strength = 0; }; }
+namespace town { constexpr u8 kPlanksMax = 6, kDoorsMax = 64; }
+namespace town { std::vector<u8> pack(const CarHit& h); }
+namespace town { bool unpack(const std::vector<u8>& blob, CarHit& h); }
+namespace town { std::vector<u8> pack(const PersonHit& h); }
+namespace town { bool unpack(const std::vector<u8>& blob, PersonHit& h); }
+namespace town { std::vector<std::vector<u8>> pack_lamps(const std::vector<LampRec>& lamps); }
+namespace town { bool unpack_lamps(const std::vector<u8>& blob, std::vector<LampRec>& lamps); }
+namespace town { std::vector<u8> pack(const PlankStep& s); }
+namespace town { bool unpack(const std::vector<u8>& blob, PlankStep& s); }
+namespace town { std::vector<u8> pack(const PlankRec& r); }
+namespace town { bool unpack(const std::vector<u8>& blob, PlankRec& r); }
+namespace town { std::vector<u8> pack_ask(); }
+namespace town { struct State {
+  u32 epoch = 0;
+  bool first = false, last = false;
+  std::vector<LampRec> lamps;
+  std::vector<PlankRec> planks;
+  std::vector<MarkRec> marks;
+}; }
+namespace town { constexpr std::size_t kStateBytes = 1000; }
+namespace town { std::vector<std::vector<u8>> pack_state(u32 epoch, const std::vector<LampRec>& lamps, const std::vector<PlankRec>& planks, const std::vector<MarkRec>& marks); }
+namespace town { bool unpack_state(const std::vector<u8>& blob, State& s); }
+namespace wire { struct I8 { i8 v = 0; }; }
+namespace wire { struct U16 { u16 v = 0; }; }
+namespace wire { struct U32 { u32 v = 0; }; }
+namespace wire { struct I64 { i64 v = 0; }; }
+namespace wire { struct F32 { f32 v = 0; }; }
+namespace wire { struct V3 { f32 x = 0, y = 0, z = 0; }; }
+namespace wire { inline std::array<u8, 4> f32_bytes(f32 v) { return converted::layout::bytes_of<4>(F32{v}, [](const auto& v_, u8* o_) { converted::layout::single_to(o_ + 0, v_.v); }); } }
+namespace wire { inline void put_u8(std::vector<u8>& b, u8 v) { b.push_back(v); } }
+namespace wire { inline void put_i8(std::vector<u8>& b, i8 v) {
+  const std::array<u8, 1> x = std::bit_cast<std::array<u8, 1>>(I8{v});
+  b.insert(b.end(), x.begin(), x.end());
+} }
+namespace wire { inline void put_u16(std::vector<u8>& b, u16 v) {
+  const std::array<u8, 2> x = std::bit_cast<std::array<u8, 2>>(U16{v});
+  b.insert(b.end(), x.begin(), x.end());
+} }
+namespace wire { inline void put_u32(std::vector<u8>& b, u32 v) {
+  const std::array<u8, 4> x = std::bit_cast<std::array<u8, 4>>(U32{v});
+  b.insert(b.end(), x.begin(), x.end());
+} }
+namespace wire { inline void put_i64(std::vector<u8>& b, i64 v) {
+  const std::array<u8, 8> x = std::bit_cast<std::array<u8, 8>>(I64{v});
+  b.insert(b.end(), x.begin(), x.end());
+} }
+namespace wire { inline void put_f32(std::vector<u8>& b, f32 v) {
+  const std::array<u8, 4> x = f32_bytes(v);
+  b.insert(b.end(), x.begin(), x.end());
+} }
+namespace wire { inline void put_vec3(std::vector<u8>& b, Vec3 v) {
+  const std::array<u8, 12> x = converted::layout::bytes_of<12>(V3{v.x, v.y, v.z}, [](const auto& v_, u8* o_) { converted::layout::single_to(o_ + 0, v_.x); converted::layout::single_to(o_ + 4, v_.y); converted::layout::single_to(o_ + 8, v_.z); });
+  b.insert(b.end(), x.begin(), x.end());
+} }
+namespace wire { struct Reader {
   std::size_t at = 0;
   bool ok = true;
+
+  u8 get_u8(const std::vector<u8>& b) {
+    if (converted::plus(at, 1) > b.size()) { ok = false; return 0; }
+    const u8 v = converted::at(b, at);
+    converted::plus_to(at, 1);
+    return v;
+  }
+  i8 get_i8(const std::vector<u8>& b) {
+    if (converted::plus(at, 1) > b.size()) { ok = false; return 0; }
+    I8 x;
+    std::memcpy(&x, b.data() + at, sizeof x);
+    converted::plus_to(at, 1);
+    return x.v;
+  }
+  u16 get_u16(const std::vector<u8>& b) {
+    if (converted::plus(at, 2) > b.size()) { ok = false; return 0; }
+    U16 x;
+    std::memcpy(&x, b.data() + at, sizeof x);
+    converted::plus_to(at, 2);
+    return x.v;
+  }
   
 
 
@@ -57,182 +129,726 @@ struct In {
 
 
 
-  bool done() const { return ok && at == b.size(); }
-};
-bool vec_finite(Vec3 v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z); }
-bool lamp_ok(const LampRec& r) { return r.state == 1 || r.state == 2; }
-bool plank_ok(const PlankRec& r) { return r.doors >= 1 && r.doors <= kDoorsMax && r.door < r.doors && r.planks <= kPlanksMax; }
-bool mark_ok(const MarkRec& m) { return vec_finite(m.at) && std::fabs(m.at.x) < 1e6 && std::fabs(m.at.y) < 1e6 && m.radius > 0 && m.radius < 200 && m.strength >= 0 && m.strength <= 4; }
-Kind kind_of(const std::vector<u8>& blob) {
+  u32 get_u32(const std::vector<u8>& b) {
+    if (converted::plus(at, 4) > b.size()) { ok = false; return 0; }
+    U32 x;
+    std::memcpy(&x, b.data() + at, sizeof x);
+    converted::plus_to(at, 4);
+    return x.v;
+  }
+  
+
+
+
+
+
+
+  i64 get_i64(const std::vector<u8>& b) {
+    if (converted::plus(at, 8) > b.size()) { ok = false; return 0; }
+    I64 x;
+    std::memcpy(&x, b.data() + at, sizeof x);
+    converted::plus_to(at, 8);
+    return x.v;
+  }
+  f32 get_f32(const std::vector<u8>& b) {
+    if (converted::plus(at, 4) > b.size()) { ok = false; return 0; }
+    F32 x;
+    converted::layout::of_bytes(x, b.data() + at, [](auto& v_, const u8* p_) { converted::layout::single_from(v_.v, p_ + 0); });
+    converted::plus_to(at, 4);
+    return x.v;
+  }
+  
+
+
+
+
+
+
+  Vec3 get_vec3(const std::vector<u8>& b) {
+    if (converted::plus(at, 12) > b.size()) { ok = false; return {}; }
+    V3 x;
+    converted::layout::of_bytes(x, b.data() + at, [](auto& v_, const u8* p_) { converted::layout::single_from(v_.x, p_ + 0); converted::layout::single_from(v_.y, p_ + 4); converted::layout::single_from(v_.z, p_ + 8); });
+    converted::plus_to(at, 12);
+    return {x.x, x.y, x.z};
+  }
+  
+
+
+
+
+
+
+  /// A list of bytes (put_bytes): empty where it is not all there.
+  
+
+
+
+
+
+
+  /// Every number was there, and the message has no more.
+  bool done(const std::vector<u8>& b) const { return ok && at == b.size(); }
+}; }
+namespace town { bool vec_finite(Vec3 v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z); } }
+namespace town { bool lamp_ok(const LampRec& r) { return r.state == 1 || r.state == 2; } }
+namespace town { bool plank_ok(const PlankRec& r) { return r.doors >= 1 && r.doors <= kDoorsMax && r.door < r.doors && r.planks <= kPlanksMax; } }
+namespace town { bool mark_ok(const MarkRec& m) { return vec_finite(m.at) && std::fabs(m.at.x) < 1e6 && std::fabs(m.at.y) < 1e6 && m.radius > 0 && m.radius < 200 && m.strength >= 0 && m.strength <= 4; } }
+namespace town { constexpr std::size_t kLampBytes = 9, kPlankBytes = 11, kMarkBytes = 20; }
+namespace town { Kind kind_of(const std::vector<u8>& blob) {
   if (blob.empty() || converted::at(blob, 0) < 1 || converted::at(blob, 0) > static_cast<u8>(Kind::ask)) return Kind::none;
   return static_cast<Kind>(converted::among({0, 1, 2, 3, 4, 5, 6, 7}, converted::at(blob, 0)));
-}
-std::vector<u8> pack_ask() { return {static_cast<u8>(Kind::ask)}; }
+} }
+namespace town { std::vector<u8> pack(const CarHit& h) {
+  std::vector<u8> o;
+  wire::put_u8(o, static_cast<u8>(Kind::car_hit));
+  wire::put_u8(o, h.car);
+  wire::put_f32(o, h.damage);
+  wire::put_u8(o, static_cast<u8>(h.cause));
+  return o;
+} }
+namespace town { bool unpack(const std::vector<u8>& blob, CarHit& h) {
+  wire::Reader in;
+  if (in.get_u8(blob) != static_cast<u8>(Kind::car_hit)) return false;
+  h.car = in.get_u8(blob);
+  h.damage = in.get_f32(blob);
+  const u8 cause = in.get_u8(blob);
+  if (!in.done(blob) || cause > static_cast<u8>(Cause::kLast) || !std::isfinite(h.damage) || !(h.damage > 0) || h.damage > 1e4) return false;
+  h.cause = static_cast<Cause>(converted::among({0, 1, 2, 2}, cause));
+  return true;
+} }
+namespace town { std::vector<u8> pack(const PersonHit& h) {
+  std::vector<u8> o;
+  wire::put_u8(o, static_cast<u8>(Kind::person_hit));
+  wire::put_u8(o, h.person);
+  wire::put_u32(o, h.seed);
+  wire::put_f32(o, h.damage);
+  wire::put_u8(o, h.by);
+  wire::put_vec3(o, h.push);
+  return o;
+} }
+namespace town { bool unpack(const std::vector<u8>& blob, PersonHit& h) {
+  wire::Reader in;
+  if (in.get_u8(blob) != static_cast<u8>(Kind::person_hit)) return false;
+  h.person = in.get_u8(blob);
+  h.seed = in.get_u32(blob);
+  h.damage = in.get_f32(blob);
+  h.by = in.get_u8(blob);
+  h.push = in.get_vec3(blob);
+  return in.done(blob) && h.by <= 2 && std::isfinite(h.damage) && h.damage > 0 && h.damage <= 1e4 && vec_finite(h.push) && converted::wide::length(h.push) <= 40;
+} }
+namespace town { std::vector<std::vector<u8>> pack_lamps(const std::vector<LampRec>& lamps) {
+  std::vector<std::vector<u8>> out;
+  for (std::size_t from = 0; from < lamps.size(); converted::plus_to(from, 255)) {
+    const std::size_t n = std::min<std::size_t>(255, converted::minus(lamps.size(), from));
+    std::vector<u8> o;
+    wire::put_u8(o, static_cast<u8>(Kind::lamps));
+    wire::put_u8(o, static_cast<u8>(n));
+    for (std::size_t i = from; i < converted::plus(from, n); converted::pre_inc(i)) { wire::put_i64(o, converted::at(lamps, i).key); wire::put_u8(o, converted::at(lamps, i).state); }
+    out.push_back(std::move(o));
+  }
+  return out;
+} }
+namespace town { bool unpack_lamps(const std::vector<u8>& blob, std::vector<LampRec>& lamps) {
+  wire::Reader in;
+  lamps.clear();
+  if (in.get_u8(blob) != static_cast<u8>(Kind::lamps)) return false;
+  const u8 n = in.get_u8(blob);
+  for (u8 i = 0; i < n && in.ok; ++i) {
+    LampRec r;
+    r.key = in.get_i64(blob);
+    r.state = in.get_u8(blob);
+    if (!in.ok || !lamp_ok(r)) return false;
+    lamps.push_back(r);
+  }
+  return in.done(blob);
+} }
+namespace town { std::vector<u8> pack(const PlankStep& s) {
+  std::vector<u8> o;
+  wire::put_u8(o, static_cast<u8>(Kind::plank_step));
+  wire::put_i64(o, s.key);
+  wire::put_u8(o, s.door);
+  wire::put_u8(o, s.doors);
+  wire::put_i8(o, s.step);
+  return o;
+} }
+namespace town { bool unpack(const std::vector<u8>& blob, PlankStep& s) {
+  wire::Reader in;
+  if (in.get_u8(blob) != static_cast<u8>(Kind::plank_step)) return false;
+  s.key = in.get_i64(blob);
+  s.door = in.get_u8(blob);
+  s.doors = in.get_u8(blob);
+  s.step = in.get_i8(blob);
+  return in.done(blob) && s.doors >= 1 && s.doors <= kDoorsMax && s.door < s.doors && (s.step == 1 || s.step == -1);
+} }
+namespace town { std::vector<u8> pack(const PlankRec& r) {
+  std::vector<u8> o;
+  wire::put_u8(o, static_cast<u8>(Kind::planks));
+  wire::put_i64(o, r.key);
+  wire::put_u8(o, r.door);
+  wire::put_u8(o, r.doors);
+  wire::put_u8(o, r.planks);
+  return o;
+} }
+namespace town { bool unpack(const std::vector<u8>& blob, PlankRec& r) {
+  wire::Reader in;
+  if (in.get_u8(blob) != static_cast<u8>(Kind::planks)) return false;
+  r.key = in.get_i64(blob);
+  r.door = in.get_u8(blob);
+  r.doors = in.get_u8(blob);
+  r.planks = in.get_u8(blob);
+  return in.done(blob) && plank_ok(r);
+} }
+namespace town { std::vector<u8> pack_ask() { return {static_cast<u8>(Kind::ask)}; } }
+namespace town { std::vector<std::vector<u8>> pack_state(u32 epoch, const std::vector<LampRec>& lamps, const std::vector<PlankRec>& planks, const std::vector<MarkRec>& marks) {
+  // a part: kind, epoch, flags (1 first, 2 last), then three counted lists (u16 each); the records
+  // are dealt out in their order - lamps, planks, marks - a part taking what fits
+  std::vector<std::vector<u8>> out;
+  std::size_t li = 0, pi = 0, mi = 0;
+  do {
+    std::size_t room = converted::minus(kStateBytes, 12);
+    const std::size_t nl = std::min(converted::minus(lamps.size(), li), converted::quot(room, kLampBytes));
+    converted::minus_to(room, converted::times(nl, kLampBytes));
+    const std::size_t np = converted::plus(li, nl) == lamps.size() ? std::min(converted::minus(planks.size(), pi), converted::quot(room, kPlankBytes)) : 0;
+    converted::minus_to(room, converted::times(np, kPlankBytes));
+    const std::size_t nm = converted::plus(li, nl) == lamps.size() && converted::plus(pi, np) == planks.size() ? std::min(converted::minus(marks.size(), mi), converted::quot(room, kMarkBytes)) : 0;
+    const bool last = converted::plus(li, nl) == lamps.size() && converted::plus(pi, np) == planks.size() && converted::plus(mi, nm) == marks.size();
+    std::vector<u8> o;
+    wire::put_u8(o, static_cast<u8>(Kind::state));
+    wire::put_u32(o, epoch);
+    wire::put_u8(o, static_cast<u8>((out.empty() ? 1 : 0) | (last ? 2 : 0)));
+    wire::put_u16(o, static_cast<u16>(nl));
+    for (std::size_t i = li; i < converted::plus(li, nl); converted::pre_inc(i)) { wire::put_i64(o, converted::at(lamps, i).key); wire::put_u8(o, converted::at(lamps, i).state); }
+    wire::put_u16(o, static_cast<u16>(np));
+    for (std::size_t i = pi; i < converted::plus(pi, np); converted::pre_inc(i)) { wire::put_i64(o, converted::at(planks, i).key); wire::put_u8(o, converted::at(planks, i).door); wire::put_u8(o, converted::at(planks, i).doors); wire::put_u8(o, converted::at(planks, i).planks); }
+    wire::put_u16(o, static_cast<u16>(nm));
+    for (std::size_t i = mi; i < converted::plus(mi, nm); converted::pre_inc(i)) { wire::put_vec3(o, converted::at(marks, i).at); wire::put_f32(o, converted::at(marks, i).radius); wire::put_f32(o, converted::at(marks, i).strength); }
+    out.push_back(std::move(o));
+    converted::plus_to(li, nl);
+    converted::plus_to(pi, np);
+    converted::plus_to(mi, nm);
+  } while (li < lamps.size() || pi < planks.size() || mi < marks.size());
+  return out;
+} }
+namespace town { bool unpack_state(const std::vector<u8>& blob, State& s) {
+  wire::Reader in;
+  s = State{};
+  if (in.get_u8(blob) != static_cast<u8>(Kind::state)) return false;
+  s.epoch = in.get_u32(blob);
+  const u8 flags = in.get_u8(blob);
+  s.first = flags & 1;
+  s.last = flags & 2;
+  const u16 nl = in.get_u16(blob);
+  for (u16 i = 0; i < nl && in.ok; ++i) {
+    LampRec r;
+    r.key = in.get_i64(blob);
+    r.state = in.get_u8(blob);
+    if (!in.ok || !lamp_ok(r)) return false;
+    s.lamps.push_back(r);
+  }
+  const u16 np = in.get_u16(blob);
+  for (u16 i = 0; i < np && in.ok; ++i) {
+    PlankRec r;
+    r.key = in.get_i64(blob);
+    r.door = in.get_u8(blob);
+    r.doors = in.get_u8(blob);
+    r.planks = in.get_u8(blob);
+    if (!in.ok || !plank_ok(r)) return false;
+    s.planks.push_back(r);
+  }
+  const u16 nm = in.get_u16(blob);
+  for (u16 i = 0; i < nm && in.ok; ++i) {
+    MarkRec m;
+    m.at = in.get_vec3(blob);
+    m.radius = in.get_f32(blob);
+    m.strength = in.get_f32(blob);
+    if (!in.ok || !mark_ok(m)) return false;
+    s.marks.push_back(m);
+  }
+  return in.done(blob);
+} }
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
 
-[[maybe_unused]] static In draw_town__In(converted::Draw& draw) {
-  static std::deque<std::vector<unsigned char>> kept_b;
-  kept_b.push_back(draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); }));
-  In s{.b = kept_b.back()};
-  s.at = static_cast<unsigned long>(draw.below(40));
-  s.ok = draw.flag();
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const In& s) { return converted::Value::structure({arg(s.b), arg(s.at), arg(s.ok)}); }
-[[maybe_unused]] static bool same(const In& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.b, (*got.rows)[0]) && same(want.at, (*got.rows)[1]) && same(want.ok, (*got.rows)[2]); }
-[[maybe_unused]] static bool defined(const In& s) { return defined(s.b) && defined(s.at) && defined(s.ok); }
-[[maybe_unused]] static std::string text(const In& s) { return std::string("{") + text(s.b) + ", " + text(s.at) + ", " + text(s.ok) + "}"; }
-[[maybe_unused]] static void take(In& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned long>(s.at, (*v.rows)[1]); converted::take_as<bool>(s.ok, (*v.rows)[2]); }
-[[maybe_unused]] static LampRec draw_town__LampRec(converted::Draw& draw) {
-  LampRec s{};
+[[maybe_unused]] static town::LampRec draw_town__LampRec(converted::Draw& draw) {
+  town::LampRec s{};
   s.key = static_cast<i64>(draw.bits());
   s.state = static_cast<unsigned char>(draw.below(40));
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const LampRec& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.key)), arg(s.state)}); }
-[[maybe_unused]] static bool same(const LampRec& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]) && same(want.state, (*got.rows)[1]); }
-[[maybe_unused]] static bool defined(const LampRec& s) { return defined(converted::shaped<converted::Whole>(s.key)) && defined(s.state); }
-[[maybe_unused]] static std::string text(const LampRec& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(s.state) + "}"; }
-[[maybe_unused]] static void take(LampRec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<converted::Whole>(s.key, (*v.rows)[0]); converted::take_as<unsigned char>(s.state, (*v.rows)[1]); }
-[[maybe_unused]] static PlankRec draw_town__PlankRec(converted::Draw& draw) {
-  PlankRec s{};
+namespace town { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const town::LampRec& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.key)), arg(s.state)}); }
+[[maybe_unused]] static bool same(const town::LampRec& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]) && same(want.state, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const town::LampRec& s) { return defined(converted::shaped<converted::Whole>(s.key)) && defined(s.state); }
+[[maybe_unused]] static std::string text(const town::LampRec& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(s.state) + "}"; }
+[[maybe_unused]] static void take(town::LampRec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<converted::Whole>(s.key, (*v.rows)[0]); converted::take_as<unsigned char>(s.state, (*v.rows)[1]); }
+}
+[[maybe_unused]] static town::PlankRec draw_town__PlankRec(converted::Draw& draw) {
+  town::PlankRec s{};
   s.key = static_cast<i64>(draw.bits());
   s.door = static_cast<unsigned char>(draw.below(40));
   s.doors = static_cast<unsigned char>(draw.below(40));
   s.planks = static_cast<unsigned char>(draw.below(40));
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const PlankRec& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.key)), arg(s.door), arg(s.doors), arg(s.planks)}); }
-[[maybe_unused]] static bool same(const PlankRec& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]) && same(want.door, (*got.rows)[1]) && same(want.doors, (*got.rows)[2]) && same(want.planks, (*got.rows)[3]); }
-[[maybe_unused]] static bool defined(const PlankRec& s) { return defined(converted::shaped<converted::Whole>(s.key)) && defined(s.door) && defined(s.doors) && defined(s.planks); }
-[[maybe_unused]] static std::string text(const PlankRec& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(s.door) + ", " + text(s.doors) + ", " + text(s.planks) + "}"; }
-[[maybe_unused]] static void take(PlankRec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<converted::Whole>(s.key, (*v.rows)[0]); converted::take_as<unsigned char>(s.door, (*v.rows)[1]); converted::take_as<unsigned char>(s.doors, (*v.rows)[2]); converted::take_as<unsigned char>(s.planks, (*v.rows)[3]); }
-[[maybe_unused]] static MarkRec draw_town__MarkRec(converted::Draw& draw) {
-  MarkRec s{};
+namespace town { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const town::PlankRec& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.key)), arg(s.door), arg(s.doors), arg(s.planks)}); }
+[[maybe_unused]] static bool same(const town::PlankRec& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]) && same(want.door, (*got.rows)[1]) && same(want.doors, (*got.rows)[2]) && same(want.planks, (*got.rows)[3]); }
+[[maybe_unused]] static bool defined(const town::PlankRec& s) { return defined(converted::shaped<converted::Whole>(s.key)) && defined(s.door) && defined(s.doors) && defined(s.planks); }
+[[maybe_unused]] static std::string text(const town::PlankRec& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(s.door) + ", " + text(s.doors) + ", " + text(s.planks) + "}"; }
+[[maybe_unused]] static void take(town::PlankRec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<converted::Whole>(s.key, (*v.rows)[0]); converted::take_as<unsigned char>(s.door, (*v.rows)[1]); converted::take_as<unsigned char>(s.doors, (*v.rows)[2]); converted::take_as<unsigned char>(s.planks, (*v.rows)[3]); }
+}
+[[maybe_unused]] static town::MarkRec draw_town__MarkRec(converted::Draw& draw) {
+  town::MarkRec s{};
   s.at = draw.vector();
   s.radius = draw.number();
   s.strength = draw.number();
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const MarkRec& s) { return converted::Value::structure({arg(s.at), arg(s.radius), arg(s.strength)}); }
-[[maybe_unused]] static bool same(const MarkRec& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.at, (*got.rows)[0]) && same(want.radius, (*got.rows)[1]) && same(want.strength, (*got.rows)[2]); }
-[[maybe_unused]] static bool defined(const MarkRec& s) { return defined(s.at) && defined(s.radius) && defined(s.strength); }
-[[maybe_unused]] static std::string text(const MarkRec& s) { return std::string("{") + text(s.at) + ", " + text(s.radius) + ", " + text(s.strength) + "}"; }
-[[maybe_unused]] static void take(MarkRec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<Vec3>(s.at, (*v.rows)[0]); converted::take_as<double>(s.radius, (*v.rows)[1]); converted::take_as<double>(s.strength, (*v.rows)[2]); }
+namespace town { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const town::MarkRec& s) { return converted::Value::structure({arg(s.at), arg(s.radius), arg(s.strength)}); }
+[[maybe_unused]] static bool same(const town::MarkRec& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.at, (*got.rows)[0]) && same(want.radius, (*got.rows)[1]) && same(want.strength, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const town::MarkRec& s) { return defined(s.at) && defined(s.radius) && defined(s.strength); }
+[[maybe_unused]] static std::string text(const town::MarkRec& s) { return std::string("{") + text(s.at) + ", " + text(s.radius) + ", " + text(s.strength) + "}"; }
+[[maybe_unused]] static void take(town::MarkRec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<Vec3>(s.at, (*v.rows)[0]); converted::take_as<double>(s.radius, (*v.rows)[1]); converted::take_as<double>(s.strength, (*v.rows)[2]); }
+}
+[[maybe_unused]] static town::CarHit draw_town__CarHit(converted::Draw& draw) {
+  town::CarHit s{};
+  s.car = static_cast<unsigned char>(draw.below(40));
+  s.damage = draw.number();
+  s.cause = static_cast<town::Cause>(draw.below(3));
+  return s;
+}
+namespace town { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const town::CarHit& s) { return converted::Value::structure({arg(s.car), arg(s.damage), arg(s.cause)}); }
+[[maybe_unused]] static bool same(const town::CarHit& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.car, (*got.rows)[0]) && same(want.damage, (*got.rows)[1]) && same(want.cause, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const town::CarHit& s) { return defined(s.car) && defined(s.damage) && defined(s.cause); }
+[[maybe_unused]] static std::string text(const town::CarHit& s) { return std::string("{") + text(s.car) + ", " + text(s.damage) + ", " + text(s.cause) + "}"; }
+[[maybe_unused]] static void take(town::CarHit& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned char>(s.car, (*v.rows)[0]); converted::take_as<double>(s.damage, (*v.rows)[1]); converted::take_as<town::Cause>(s.cause, (*v.rows)[2]); }
+}
+[[maybe_unused]] static town::PersonHit draw_town__PersonHit(converted::Draw& draw) {
+  town::PersonHit s{};
+  s.person = static_cast<unsigned char>(draw.below(40));
+  s.seed = static_cast<unsigned int>(draw.below(40));
+  s.damage = draw.number();
+  s.by = static_cast<unsigned char>(draw.below(40));
+  s.push = draw.vector();
+  return s;
+}
+namespace town { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const town::PersonHit& s) { return converted::Value::structure({arg(s.person), arg(s.seed), arg(s.damage), arg(s.by), arg(s.push)}); }
+[[maybe_unused]] static bool same(const town::PersonHit& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.person, (*got.rows)[0]) && same(want.seed, (*got.rows)[1]) && same(want.damage, (*got.rows)[2]) && same(want.by, (*got.rows)[3]) && same(want.push, (*got.rows)[4]); }
+[[maybe_unused]] static bool defined(const town::PersonHit& s) { return defined(s.person) && defined(s.seed) && defined(s.damage) && defined(s.by) && defined(s.push); }
+[[maybe_unused]] static std::string text(const town::PersonHit& s) { return std::string("{") + text(s.person) + ", " + text(s.seed) + ", " + text(s.damage) + ", " + text(s.by) + ", " + text(s.push) + "}"; }
+[[maybe_unused]] static void take(town::PersonHit& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<unsigned char>(s.person, (*v.rows)[0]); converted::take_as<unsigned int>(s.seed, (*v.rows)[1]); converted::take_as<double>(s.damage, (*v.rows)[2]); converted::take_as<unsigned char>(s.by, (*v.rows)[3]); converted::take_as<Vec3>(s.push, (*v.rows)[4]); }
+}
+[[maybe_unused]] static town::PlankStep draw_town__PlankStep(converted::Draw& draw) {
+  town::PlankStep s{};
+  s.key = static_cast<i64>(draw.bits());
+  s.door = static_cast<unsigned char>(draw.below(40));
+  s.doors = static_cast<unsigned char>(draw.below(40));
+  s.step = static_cast<signed char>(draw.whole());
+  return s;
+}
+namespace town { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const town::PlankStep& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.key)), arg(s.door), arg(s.doors), arg(s.step)}); }
+[[maybe_unused]] static bool same(const town::PlankStep& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]) && same(want.door, (*got.rows)[1]) && same(want.doors, (*got.rows)[2]) && same(want.step, (*got.rows)[3]); }
+[[maybe_unused]] static bool defined(const town::PlankStep& s) { return defined(converted::shaped<converted::Whole>(s.key)) && defined(s.door) && defined(s.doors) && defined(s.step); }
+[[maybe_unused]] static std::string text(const town::PlankStep& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(s.door) + ", " + text(s.doors) + ", " + text(s.step) + "}"; }
+[[maybe_unused]] static void take(town::PlankStep& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<converted::Whole>(s.key, (*v.rows)[0]); converted::take_as<unsigned char>(s.door, (*v.rows)[1]); converted::take_as<unsigned char>(s.doors, (*v.rows)[2]); converted::take_as<signed char>(s.step, (*v.rows)[3]); }
+}
+[[maybe_unused]] static town::State draw_town__State(converted::Draw& draw) {
+  town::State s{};
+  s.epoch = static_cast<unsigned int>(draw.below(40));
+  s.first = draw.flag();
+  s.last = draw.flag();
+  s.lamps = draw_list(draw, [&]() -> town::LampRec { return draw_town__LampRec(draw); });
+  s.planks = draw_list(draw, [&]() -> town::PlankRec { return draw_town__PlankRec(draw); });
+  s.marks = draw_list(draw, [&]() -> town::MarkRec { return draw_town__MarkRec(draw); });
+  return s;
+}
+namespace town { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const town::State& s) { return converted::Value::structure({arg(s.epoch), arg(s.first), arg(s.last), arg(s.lamps), arg(s.planks), arg(s.marks)}); }
+[[maybe_unused]] static bool same(const town::State& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.epoch, (*got.rows)[0]) && same(want.first, (*got.rows)[1]) && same(want.last, (*got.rows)[2]) && same(want.lamps, (*got.rows)[3]) && same(want.planks, (*got.rows)[4]) && same(want.marks, (*got.rows)[5]); }
+[[maybe_unused]] static bool defined(const town::State& s) { return defined(s.epoch) && defined(s.first) && defined(s.last) && defined(s.lamps) && defined(s.planks) && defined(s.marks); }
+[[maybe_unused]] static std::string text(const town::State& s) { return std::string("{") + text(s.epoch) + ", " + text(s.first) + ", " + text(s.last) + ", " + text(s.lamps) + ", " + text(s.planks) + ", " + text(s.marks) + "}"; }
+[[maybe_unused]] static void take(town::State& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<unsigned int>(s.epoch, (*v.rows)[0]); converted::take_as<bool>(s.first, (*v.rows)[1]); converted::take_as<bool>(s.last, (*v.rows)[2]); converted::take_as<std::vector<town::LampRec>>(s.lamps, (*v.rows)[3]); converted::take_as<std::vector<town::PlankRec>>(s.planks, (*v.rows)[4]); converted::take_as<std::vector<town::MarkRec>>(s.marks, (*v.rows)[5]); }
+}
+struct Out_unpack { bool Result; town::CarHit h; };
+[[maybe_unused]] static bool same(const Out_unpack& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.h, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_unpack& s) { return defined(s.Result) && defined(s.h); }
+[[maybe_unused]] static std::string text(const Out_unpack& s) { return std::string("{") + text(s.Result) + ", " + text(s.h) + "}"; }
+struct Out_unpack_2 { bool Result; town::PersonHit h; };
+[[maybe_unused]] static bool same(const Out_unpack_2& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.h, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_unpack_2& s) { return defined(s.Result) && defined(s.h); }
+[[maybe_unused]] static std::string text(const Out_unpack_2& s) { return std::string("{") + text(s.Result) + ", " + text(s.h) + "}"; }
+struct Out_unpack_lamps { bool Result; std::vector<town::LampRec> lamps; };
+[[maybe_unused]] static bool same(const Out_unpack_lamps& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.lamps, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_unpack_lamps& s) { return defined(s.Result) && defined(s.lamps); }
+[[maybe_unused]] static std::string text(const Out_unpack_lamps& s) { return std::string("{") + text(s.Result) + ", " + text(s.lamps) + "}"; }
+struct Out_unpack_3 { bool Result; town::PlankStep s; };
+[[maybe_unused]] static bool same(const Out_unpack_3& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.s, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_unpack_3& s) { return defined(s.Result) && defined(s.s); }
+[[maybe_unused]] static std::string text(const Out_unpack_3& s) { return std::string("{") + text(s.Result) + ", " + text(s.s) + "}"; }
+struct Out_unpack_4 { bool Result; town::PlankRec r; };
+[[maybe_unused]] static bool same(const Out_unpack_4& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.r, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_unpack_4& s) { return defined(s.Result) && defined(s.r); }
+[[maybe_unused]] static std::string text(const Out_unpack_4& s) { return std::string("{") + text(s.Result) + ", " + text(s.r) + "}"; }
+struct Out_unpack_state { bool Result; town::State s; };
+[[maybe_unused]] static bool same(const Out_unpack_state& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.s, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_unpack_state& s) { return defined(s.Result) && defined(s.s); }
+[[maybe_unused]] static std::string text(const Out_unpack_state& s) { return std::string("{") + text(s.Result) + ", " + text(s.s) + "}"; }
 
 SC_TEST(converted_town_sync_cpp) {
   converted::Blueprint bp("town_sync_cpp");
-  {  // In::done
-    converted::Tally tally("In_done");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] In a0) { return converted::counted([&] { return a0.done(); }); };
-    for (int i = 0; tally.more(i); ++i) {
-      const In a0 = draw_town__In(draw);
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      const auto want = run(a0);
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
-    }
-  }
   {  // vec_finite
     converted::Tally tally("vec_finite");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted::counted([&] { return converted_town_sync_cpp::vec_finite(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted::counted([&] { return converted_town_sync_cpp::town::vec_finite(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Vec3 a0 = draw.vector();
+      Vec3 a0 = draw.vector();
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // lamp_ok
     converted::Tally tally("lamp_ok");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] LampRec a0) { return converted::counted([&] { return converted_town_sync_cpp::lamp_ok(a0); }); };
+    const auto run = [&]([[maybe_unused]] town::LampRec a0) { return converted::counted([&] { return converted_town_sync_cpp::town::lamp_ok(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const LampRec a0 = draw_town__LampRec(draw);
+      town::LampRec a0 = draw_town__LampRec(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // plank_ok
     converted::Tally tally("plank_ok");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PlankRec a0) { return converted::counted([&] { return converted_town_sync_cpp::plank_ok(a0); }); };
+    const auto run = [&]([[maybe_unused]] town::PlankRec a0) { return converted::counted([&] { return converted_town_sync_cpp::town::plank_ok(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const PlankRec a0 = draw_town__PlankRec(draw);
+      town::PlankRec a0 = draw_town__PlankRec(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // mark_ok
     converted::Tally tally("mark_ok");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MarkRec a0) { return converted::counted([&] { return converted_town_sync_cpp::mark_ok(a0); }); };
+    const auto run = [&]([[maybe_unused]] town::MarkRec a0) { return converted::counted([&] { return converted_town_sync_cpp::town::mark_ok(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const MarkRec a0 = draw_town__MarkRec(draw);
+      town::MarkRec a0 = draw_town__MarkRec(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // kind_of
     converted::Tally tally("kind_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0) { return converted::counted([&] { return converted_town_sync_cpp::kind_of(a0); }); };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0) { return converted::counted([&] { return converted_town_sync_cpp::town::kind_of(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // pack
+    converted::Tally tally("pack");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] town::CarHit a0) { return converted::counted([&] { return converted_town_sync_cpp::town::pack(a0); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      town::CarHit a0 = draw_town__CarHit(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // unpack
+    converted::Tally tally("unpack");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] town::CarHit a1) { auto r = converted::counted([&] { return converted_town_sync_cpp::town::unpack(a0, a1); }); return Out_unpack{std::move(r), std::move(a1)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      town::CarHit a1 = draw_town__CarHit(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
+    }
+  }
+  {  // pack
+    converted::Tally tally("pack_2");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] town::PersonHit a0) { return converted::counted([&] { return converted_town_sync_cpp::town::pack(a0); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      town::PersonHit a0 = draw_town__PersonHit(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // unpack
+    converted::Tally tally("unpack_2");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] town::PersonHit a1) { auto r = converted::counted([&] { return converted_town_sync_cpp::town::unpack(a0, a1); }); return Out_unpack_2{std::move(r), std::move(a1)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      town::PersonHit a1 = draw_town__PersonHit(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
+    }
+  }
+  {  // pack_lamps
+    converted::Tally tally("pack_lamps");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<town::LampRec> a0) { return converted::counted([&] { return converted_town_sync_cpp::town::pack_lamps(a0); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      std::vector<town::LampRec> a0 = draw_list(draw, [&]() -> town::LampRec { return draw_town__LampRec(draw); });
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // unpack_lamps
+    converted::Tally tally("unpack_lamps");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] std::vector<town::LampRec> a1) { auto r = converted::counted([&] { return converted_town_sync_cpp::town::unpack_lamps(a0, a1); }); return Out_unpack_lamps{std::move(r), std::move(a1)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      std::vector<town::LampRec> a1 = draw_list(draw, [&]() -> town::LampRec { return draw_town__LampRec(draw); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
+    }
+  }
+  {  // pack
+    converted::Tally tally("pack_3");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] town::PlankStep a0) { return converted::counted([&] { return converted_town_sync_cpp::town::pack(a0); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      town::PlankStep a0 = draw_town__PlankStep(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // unpack
+    converted::Tally tally("unpack_3");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] town::PlankStep a1) { auto r = converted::counted([&] { return converted_town_sync_cpp::town::unpack(a0, a1); }); return Out_unpack_3{std::move(r), std::move(a1)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      town::PlankStep a1 = draw_town__PlankStep(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
+    }
+  }
+  {  // pack
+    converted::Tally tally("pack_4");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] town::PlankRec a0) { return converted::counted([&] { return converted_town_sync_cpp::town::pack(a0); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      town::PlankRec a0 = draw_town__PlankRec(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // unpack
+    converted::Tally tally("unpack_4");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] town::PlankRec a1) { auto r = converted::counted([&] { return converted_town_sync_cpp::town::unpack(a0, a1); }); return Out_unpack_4{std::move(r), std::move(a1)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      town::PlankRec a1 = draw_town__PlankRec(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
   {  // pack_ask
     converted::Tally tally("pack_ask");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted::counted([&] { return converted_town_sync_cpp::pack_ask(); }); };
+    const auto run = [&]() { return converted::counted([&] { return converted_town_sync_cpp::town::pack_ask(); }); };
     for (int i = 0; tally.more(i); ++i) {
+      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run();
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // pack_state
+    converted::Tally tally("pack_state");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] std::vector<town::LampRec> a1, [[maybe_unused]] std::vector<town::PlankRec> a2, [[maybe_unused]] std::vector<town::MarkRec> a3) { return converted::counted([&] { return converted_town_sync_cpp::town::pack_state(std::move(a0), a1, a2, a3); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      std::vector<town::LampRec> a1 = draw_list(draw, [&]() -> town::LampRec { return draw_town__LampRec(draw); });
+      std::vector<town::PlankRec> a2 = draw_list(draw, [&]() -> town::PlankRec { return draw_town__PlankRec(draw); });
+      std::vector<town::MarkRec> a3 = draw_list(draw, [&]() -> town::MarkRec { return draw_town__MarkRec(draw); });
+      const std::vector<converted::Value> given = {arg(a1), arg(a2), arg(a3), arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // unpack_state
+    converted::Tally tally("unpack_state");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] town::State a1) { auto r = converted::counted([&] { return converted_town_sync_cpp::town::unpack_state(a0, a1); }); return Out_unpack_state{std::move(r), std::move(a1)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      town::State a1 = draw_town__State(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
 }

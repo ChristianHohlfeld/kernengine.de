@@ -18,10 +18,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -34,155 +34,14 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter };
-enum class Type : u8 { null, boolean, number, string, array, object };
-using ActorRef = u32;
-enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, count
-};
-struct ActorHandle {
-  ActorRef id = 0;
-  bool operator==(const ActorHandle&) const = default;
-};
-using ListItems = std::tuple<std::vector<bool>, std::vector<i64>, std::vector<f64>, std::vector<Vec3>, std::vector<std::string>, std::vector<ActorHandle>>;
-struct Value {
-  PinType type = PinType::number;
-  bool b = false;
-  i64 i = 0;
-  f64 n = 0;
-  Vec3 v;
-  std::string s;
-  ActorRef a = 0;
-  /// A list's items (none: an empty list). They are shared: a list on a wire is not copied, and
-  /// whoever changes one (edit) changes its own.
-  std::shared_ptr<const ListItems> list;
-  /// A struct's fields, in the order its declaration has them; of a list of structs: the structs.
-  /// Shared like a list's items. A struct that holds none (Value::zero) has every field at its
-  /// declared default - what a field is, is read through the declaration (logic::field_of).
-  std::shared_ptr<const std::vector<Value>> rows;
-
-  
-  
-  
-  
-  
-  
-  /// A value of an enum: its place among the enum's values (the first is 0).
-  
-  /// A list of values of an enum.
-  
-
-
-
-
-
-  /// A value of a struct: its fields' values, in the order of the declaration.
-  
-
-
-
-
-
-  /// A list of structs.
-  
-
-
-
-
-
-  
-  /// A list of these items (T: bool, i64, f64, Vec3, std::string or ActorHandle; Value: structs).
-  /// Whole numbers are held as every Int is (logic::normal).
-  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  /// The items of a list of T - none if this is no such list.
-  
-
-
-
-
-  /// Is this a list whose items are held as T? (A list of enum values holds them as i64, a list
-  /// of structs as Value.)
-  
-
-
-
-  /// The items of a list of T, to change them: this value's own (it becomes that list if it is
-  /// none).
-  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  /// The field of a struct at `index`, as the value holds it (null: it holds none there - the
-  /// field is at its declared default).
-  
-  /// How many fields a struct's value holds.
-  
-  /// The rows (a struct's fields, the structs of a list), to change them: this value's own.
-  
-
-
-
-
-  /// How many items a list has (no list: 0).
-  
-  /// A list's item as a value (beyond its end, or no list: the zero of the item's type).
-  
-
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  /// The same where the value may be a struct's (or hold one): `of` names the struct or the enum
-  /// in the Blueprint `g`. A struct is an object of its fields by their names - {"Name": "Knife",
-  /// "Damage": 25} -, written with every field; read, a field that is missing has its default.
-  
-  
-  
-};
-namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; }
-enum class NodeKind : u8 { event, action, pure, flow };
-struct Event {
-  std::string type;
-  ActorRef target = 0;                 // only instances whose Self is target (0 = every instance)
-  bool level = false;                  // with a target: the level graph (Self = none) receives it too
-  std::string key;                     // event-specific match (custom event name, key code, action...)
-  std::vector<std::pair<std::string, Value>> args;
-  
-};
+namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
+namespace json { enum class Type : u8 { null, boolean, number, string, array, object }; }
+namespace logic { enum class PinType : u8 {
+  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
+  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
+  map, set, count
+}; }
+namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
 struct Flight {
   u32 id = 0;
   f32 start = 0, duration = 0, distance = 0, max_speed = 0, max_agl = 0, max_alt = 0, volts_start = 0, volts_end = 0, volts_min = 0;
@@ -197,7 +56,7 @@ struct FlightLog {
   /// Ends a running flight (drone stowed, crash, reset).
   
   
-  const std::vector<Flight>& flights() const { return flights_; }  // newest first
+  // newest first
   bool flying() const { return active_; }
   u32 serial() const { return serial_; }  // counts finished flights and events
   
@@ -212,6 +71,41 @@ struct FlightLog {
   Vec3 last_;
   f32 last_t_ = 0, last_path_ = -1e9;
   u32 next_id_ = 1, serial_ = 0;
+};
+struct MusicSynth {
+ public:
+  struct Station { const char* name; const char* genre; f32 bpm; u32 seed; };
+  static constexpr i32 kMenu = -1;
+  static constexpr Station kStations[] = {
+      {"KERN FM", "Synthwave", 100, 11},
+      {"BODENSEE BEATS", "House", 124, 23},
+      {"LOFI LAGUNE", "Lo-Fi", 78, 37},
+      {"8-BIT RADIO", "Chiptune", 144, 41},
+      {"NACHTSCHICHT", "Techno", 132, 53},
+  };
+  
+
+  
+  /// The programme to play (kMenu, a station index, or -2 = silence) and its level 0..1.
+  
+  /// Adds `frames` stereo frames into `out` (interleaved).
+  
+  i32 programme() const { return programme_; }
+  f32 level() const { return gain_; }
+  f32 peak = 0;  // of the last block (tests)
+
+ private:
+  struct Voice { f32 phase = 0, freq = 0, env = 0, decay = 0.9995, amp = 0, phase2 = 0; };
+  
+  
+  u32 rate_ = 0;
+  i32 programme_ = -2, want_ = -2;
+  f32 gain_ = 0, target_ = 0, fade_ = 1;  // fade: 1 = the current programme fully in
+  u64 sample_ = 0;
+  u32 step_ = 0, samples_per_step_ = 1, until_step_ = 0, rng_ = 1;
+  Voice kick_, snare_, hat_, bass_, lead_, pad_[3];
+  f32 lp_ = 0, bass_lp_ = 0, echo_[24000] = {};
+  u32 echo_at_ = 0;
 };
 #undef private
 #undef protected
@@ -268,39 +162,72 @@ struct FlightLog {
 [[maybe_unused]] static bool defined(const FlightLog& s) { return defined(s.flights_) && defined(s.events_) && defined(s.cur_) && defined(s.active_) && defined(s.have_last_) && defined(s.last_) && defined(s.last_t_) && defined(s.last_path_) && defined(s.next_id_) && defined(s.serial_); }
 [[maybe_unused]] static std::string text(const FlightLog& s) { return std::string("{") + text(s.flights_) + ", " + text(s.events_) + ", " + text(s.cur_) + ", " + text(s.active_) + ", " + text(s.have_last_) + ", " + text(s.last_) + ", " + text(s.last_t_) + ", " + text(s.last_path_) + ", " + text(s.next_id_) + ", " + text(s.serial_) + "}"; }
 [[maybe_unused]] static void take(FlightLog& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 10) return; converted::take_as<std::vector<Flight>>(s.flights_, (*v.rows)[0]); converted::take_as<std::vector<FlightLog::Event>>(s.events_, (*v.rows)[1]); converted::take_as<Flight>(s.cur_, (*v.rows)[2]); converted::take_as<bool>(s.active_, (*v.rows)[3]); converted::take_as<bool>(s.have_last_, (*v.rows)[4]); converted::take_as<Vec3>(s.last_, (*v.rows)[5]); converted::take_as<double>(s.last_t_, (*v.rows)[6]); converted::take_as<double>(s.last_path_, (*v.rows)[7]); converted::take_as<unsigned int>(s.next_id_, (*v.rows)[8]); converted::take_as<unsigned int>(s.serial_, (*v.rows)[9]); }
+[[maybe_unused]] static MusicSynth::Voice draw_MusicSynth__Voice(converted::Draw& draw) {
+  MusicSynth::Voice s{};
+  s.phase = draw.number();
+  s.freq = draw.number();
+  s.env = draw.number();
+  s.decay = draw.number();
+  s.amp = draw.number();
+  s.phase2 = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const MusicSynth::Voice& s) { return converted::Value::structure({arg(s.phase), arg(s.freq), arg(s.env), arg(s.decay), arg(s.amp), arg(s.phase2)}); }
+[[maybe_unused]] static bool same(const MusicSynth::Voice& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.phase, (*got.rows)[0]) && same(want.freq, (*got.rows)[1]) && same(want.env, (*got.rows)[2]) && same(want.decay, (*got.rows)[3]) && same(want.amp, (*got.rows)[4]) && same(want.phase2, (*got.rows)[5]); }
+[[maybe_unused]] static bool defined(const MusicSynth::Voice& s) { return defined(s.phase) && defined(s.freq) && defined(s.env) && defined(s.decay) && defined(s.amp) && defined(s.phase2); }
+[[maybe_unused]] static std::string text(const MusicSynth::Voice& s) { return std::string("{") + text(s.phase) + ", " + text(s.freq) + ", " + text(s.env) + ", " + text(s.decay) + ", " + text(s.amp) + ", " + text(s.phase2) + "}"; }
+[[maybe_unused]] static void take(MusicSynth::Voice& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<double>(s.phase, (*v.rows)[0]); converted::take_as<double>(s.freq, (*v.rows)[1]); converted::take_as<double>(s.env, (*v.rows)[2]); converted::take_as<double>(s.decay, (*v.rows)[3]); converted::take_as<double>(s.amp, (*v.rows)[4]); converted::take_as<double>(s.phase2, (*v.rows)[5]); }
+[[maybe_unused]] static MusicSynth draw_MusicSynth(converted::Draw& draw) {
+  MusicSynth s{};
+  s.peak = draw.number();
+  s.rate_ = static_cast<unsigned int>(draw.below(40));
+  s.programme_ = static_cast<int>(draw.whole());
+  s.want_ = static_cast<int>(draw.whole());
+  s.gain_ = draw.number();
+  s.target_ = draw.number();
+  s.fade_ = draw.number();
+  s.sample_ = static_cast<u64>(draw.bits());
+  s.step_ = static_cast<unsigned int>(draw.below(40));
+  s.samples_per_step_ = static_cast<unsigned int>(draw.below(40));
+  s.until_step_ = static_cast<unsigned int>(draw.below(40));
+  s.rng_ = static_cast<unsigned int>(draw.below(40));
+  s.kick_ = draw_MusicSynth__Voice(draw);
+  s.snare_ = draw_MusicSynth__Voice(draw);
+  s.hat_ = draw_MusicSynth__Voice(draw);
+  s.bass_ = draw_MusicSynth__Voice(draw);
+  s.lead_ = draw_MusicSynth__Voice(draw);
+  converted::fill_array(s.pad_, [&]() -> MusicSynth::Voice { return draw_MusicSynth__Voice(draw); });
+  s.lp_ = draw.number();
+  s.bass_lp_ = draw.number();
+  converted::fill_array(s.echo_, [&]() -> double { return draw.number(); });
+  s.echo_at_ = static_cast<unsigned int>(draw.below(40));
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const MusicSynth& s) { return converted::Value::structure({arg(s.peak), arg(s.rate_), arg(s.programme_), arg(s.want_), arg(s.gain_), arg(s.target_), arg(s.fade_), arg(converted::shaped<converted::Whole>(s.sample_)), arg(s.step_), arg(s.samples_per_step_), arg(s.until_step_), arg(s.rng_), arg(s.kick_), arg(s.snare_), arg(s.hat_), arg(s.bass_), arg(s.lead_), arg(converted::array_list(s.pad_)), arg(s.lp_), arg(s.bass_lp_), arg(converted::array_list(s.echo_)), arg(s.echo_at_)}); }
+[[maybe_unused]] static bool same(const MusicSynth& want, const converted::Value& got) { return got.rows && got.rows->size() == 22 && same(want.peak, (*got.rows)[0]) && same(want.rate_, (*got.rows)[1]) && same(want.programme_, (*got.rows)[2]) && same(want.want_, (*got.rows)[3]) && same(want.gain_, (*got.rows)[4]) && same(want.target_, (*got.rows)[5]) && same(want.fade_, (*got.rows)[6]) && same(converted::shaped<converted::Whole>(want.sample_), (*got.rows)[7]) && same(want.step_, (*got.rows)[8]) && same(want.samples_per_step_, (*got.rows)[9]) && same(want.until_step_, (*got.rows)[10]) && same(want.rng_, (*got.rows)[11]) && same(want.kick_, (*got.rows)[12]) && same(want.snare_, (*got.rows)[13]) && same(want.hat_, (*got.rows)[14]) && same(want.bass_, (*got.rows)[15]) && same(want.lead_, (*got.rows)[16]) && same(converted::array_list(want.pad_), (*got.rows)[17]) && same(want.lp_, (*got.rows)[18]) && same(want.bass_lp_, (*got.rows)[19]) && same(converted::array_list(want.echo_), (*got.rows)[20]) && same(want.echo_at_, (*got.rows)[21]); }
+[[maybe_unused]] static bool defined(const MusicSynth& s) { return defined(s.peak) && defined(s.rate_) && defined(s.programme_) && defined(s.want_) && defined(s.gain_) && defined(s.target_) && defined(s.fade_) && defined(converted::shaped<converted::Whole>(s.sample_)) && defined(s.step_) && defined(s.samples_per_step_) && defined(s.until_step_) && defined(s.rng_) && defined(s.kick_) && defined(s.snare_) && defined(s.hat_) && defined(s.bass_) && defined(s.lead_) && defined(converted::array_list(s.pad_)) && defined(s.lp_) && defined(s.bass_lp_) && defined(converted::array_list(s.echo_)) && defined(s.echo_at_); }
+[[maybe_unused]] static std::string text(const MusicSynth& s) { return std::string("{") + text(s.peak) + ", " + text(s.rate_) + ", " + text(s.programme_) + ", " + text(s.want_) + ", " + text(s.gain_) + ", " + text(s.target_) + ", " + text(s.fade_) + ", " + text(converted::shaped<converted::Whole>(s.sample_)) + ", " + text(s.step_) + ", " + text(s.samples_per_step_) + ", " + text(s.until_step_) + ", " + text(s.rng_) + ", " + text(s.kick_) + ", " + text(s.snare_) + ", " + text(s.hat_) + ", " + text(s.bass_) + ", " + text(s.lead_) + ", " + text(converted::array_list(s.pad_)) + ", " + text(s.lp_) + ", " + text(s.bass_lp_) + ", " + text(converted::array_list(s.echo_)) + ", " + text(s.echo_at_) + "}"; }
+[[maybe_unused]] static void take(MusicSynth& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 22) return; converted::take_as<double>(s.peak, (*v.rows)[0]); converted::take_as<unsigned int>(s.rate_, (*v.rows)[1]); converted::take_as<int>(s.programme_, (*v.rows)[2]); converted::take_as<int>(s.want_, (*v.rows)[3]); converted::take_as<double>(s.gain_, (*v.rows)[4]); converted::take_as<double>(s.target_, (*v.rows)[5]); converted::take_as<double>(s.fade_, (*v.rows)[6]); converted::take_as<converted::Whole>(s.sample_, (*v.rows)[7]); converted::take_as<unsigned int>(s.step_, (*v.rows)[8]); converted::take_as<unsigned int>(s.samples_per_step_, (*v.rows)[9]); converted::take_as<unsigned int>(s.until_step_, (*v.rows)[10]); converted::take_as<unsigned int>(s.rng_, (*v.rows)[11]); converted::take_as<MusicSynth::Voice>(s.kick_, (*v.rows)[12]); converted::take_as<MusicSynth::Voice>(s.snare_, (*v.rows)[13]); converted::take_as<MusicSynth::Voice>(s.hat_, (*v.rows)[14]); converted::take_as<MusicSynth::Voice>(s.bass_, (*v.rows)[15]); converted::take_as<MusicSynth::Voice>(s.lead_, (*v.rows)[16]); { std::vector<MusicSynth::Voice> items; converted::take_as<std::vector<MusicSynth::Voice>>(items, (*v.rows)[17]); converted::array_from(s.pad_, items); } converted::take_as<double>(s.lp_, (*v.rows)[18]); converted::take_as<double>(s.bass_lp_, (*v.rows)[19]); { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[20]); converted::array_from(s.echo_, items); } converted::take_as<unsigned int>(s.echo_at_, (*v.rows)[21]); }
 
 SC_TEST(converted_equipment) {
   converted::Blueprint bp("equipment");
-  {  // FlightLog::flights
-    converted::Tally tally("FlightLog_flights");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] FlightLog a0) { return converted::counted([&] { return a0.flights(); }); };
-    for (int i = 0; tally.more(i); ++i) {
-      const FlightLog a0 = draw_FlightLog(draw);
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      const auto want = run(a0);
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
-    }
-  }
   {  // FlightLog::flying
     converted::Tally tally("FlightLog_flying");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] FlightLog a0) { return converted::counted([&] { return a0.flying(); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const FlightLog a0 = draw_FlightLog(draw);
+      FlightLog a0 = draw_FlightLog(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // FlightLog::serial
@@ -308,15 +235,56 @@ SC_TEST(converted_equipment) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] FlightLog a0) { return converted::counted([&] { return a0.serial(); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const FlightLog a0 = draw_FlightLog(draw);
+      FlightLog a0 = draw_FlightLog(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // MusicSynth::programme
+    converted::Tally tally("MusicSynth_programme");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] MusicSynth a0) { return converted::counted([&] { return a0.programme(); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      MusicSynth a0 = draw_MusicSynth(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // MusicSynth::level
+    converted::Tally tally("MusicSynth_level");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] MusicSynth a0) { return converted::counted([&] { return a0.level(); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      MusicSynth a0 = draw_MusicSynth(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

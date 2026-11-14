@@ -18,10 +18,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -34,6 +34,14 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+struct Vec4 {
+  f32 x = 0, y = 0, z = 0, w = 0;
+  constexpr Vec4() = default;
+  constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}
+  
+  
+  
+};
 struct Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
   static Quat axis_angle(Vec3 axis, f32 radians) {
@@ -64,30 +72,30 @@ struct Mat4 {
 
 
 
+  Mat4 operator*(const Mat4& b) const {
+    Mat4 r;
+    for (int c = 0; c < 4; ++c) {
+      const f32 b0 = converted::at(b.m, 4 * c), b1 = converted::at(b.m, 4 * c + 1), b2 = converted::at(b.m, 4 * c + 2), b3 = converted::at(b.m, 4 * c + 3);
+      for (int k = 0; k < 4; ++k)
+        converted::at(r.m, 4 * c + k) = converted::at(m, k) * b0 + converted::at(m, 4 + k) * b1 + converted::at(m, 8 + k) * b2 + converted::at(m, 12 + k) * b3;
+    }
+    return r;
+  }
+  
+
+
+
+  
+
+
+
   
 
 
 
 
-
-
-
-
-  
-
-
-
-  
-
-
-
-  
-
-
-
-
-  static Mat4 translate(Vec3 t) { Mat4 r; converted::at(r.m, 12) = t.x; converted::at(r.m, 13) = t.y; converted::at(r.m, 14) = t.z; return r; }
-  static Mat4 scale(Vec3 s) { Mat4 r; converted::at(r.m, 0) = s.x; converted::at(r.m, 5) = s.y; converted::at(r.m, 10) = s.z; return r; }
+  static Mat4 translate(Vec3 t) { Mat4 r; r.m[12] = t.x; r.m[13] = t.y; r.m[14] = t.z; return r; }
+  static Mat4 scale(Vec3 s) { Mat4 r; r.m[0] = s.x; r.m[5] = s.y; r.m[10] = s.z; return r; }
 
   /// Translation * rotation * scale.
   static Mat4 trs(Vec3 t, Quat q, Vec3 s) {
@@ -95,10 +103,10 @@ struct Mat4 {
     const f32 xx = q.x * x2, xy = q.x * y2, xz = q.x * z2, yy = q.y * y2, yz = q.y * z2, zz = q.z * z2;
     const f32 wx = q.w * x2, wy = q.w * y2, wz = q.w * z2;
     Mat4 r;
-    converted::at(r.m, 0) = (1 - yy - zz) * s.x; converted::at(r.m, 1) = (xy + wz) * s.x; converted::at(r.m, 2) = (xz - wy) * s.x; converted::at(r.m, 3) = 0;
-    converted::at(r.m, 4) = (xy - wz) * s.y; converted::at(r.m, 5) = (1 - xx - zz) * s.y; converted::at(r.m, 6) = (yz + wx) * s.y; converted::at(r.m, 7) = 0;
-    converted::at(r.m, 8) = (xz + wy) * s.z; converted::at(r.m, 9) = (yz - wx) * s.z; converted::at(r.m, 10) = (1 - xx - yy) * s.z; converted::at(r.m, 11) = 0;
-    converted::at(r.m, 12) = t.x; converted::at(r.m, 13) = t.y; converted::at(r.m, 14) = t.z; converted::at(r.m, 15) = 1;
+    r.m[0] = (1 - yy - zz) * s.x; r.m[1] = (xy + wz) * s.x; r.m[2] = (xz - wy) * s.x; r.m[3] = 0;
+    r.m[4] = (xy - wz) * s.y; r.m[5] = (1 - xx - zz) * s.y; r.m[6] = (yz + wx) * s.y; r.m[7] = 0;
+    r.m[8] = (xz + wy) * s.z; r.m[9] = (yz - wx) * s.z; r.m[10] = (1 - xx - yy) * s.z; r.m[11] = 0;
+    r.m[12] = t.x; r.m[13] = t.y; r.m[14] = t.z; r.m[15] = 1;
     return r;
   }
 
@@ -137,40 +145,655 @@ struct Mat4 {
 
 
 
+  /// The same, where nobody asks whether it is one.
+  
+
+
+
 };
-struct Material : converted::EngineObject {
+constexpr u32 kMaxExtensionAttributes = 2;
+constexpr u32 kMaxMaterialParams = 8;
+enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
+struct Material {
+  Vec4 color{1, 1, 1, 1};
+  AlphaMode alpha = AlphaMode::opaque;
+  f32 alpha_cutoff = 0.5;
+  f32 roughness = 1.0;
+  f32 metalness = 0.0;
+  Vec3 emissive{0, 0, 0};      // linear HDR colour added after lighting (feeds bloom)
+  bool unlit = false;
+  bool double_sided = false;
+  bool cast_shadow = true;
+  bool frustum_culled = true;
+  bool viewmodel = false;      // first-person layer: drawn last after a depth clear
+  bool linear_colors = false;  // vertex colours are linear (skip the sRGB decode)
+  bool lines = false;          // line list (pairs of vertices), always unlit, never casts shadows or is picked
+  /// Parameters owned by shader extensions (see ShaderExtension::material_keys).
+  i32 params[kMaxMaterialParams] = {};
+
+  
+};
+struct Mesh : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Program : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct UniformCache : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct SunShadowMap : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
+struct BloomPass : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct AmbientOcclusionPass : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct ShaderExtension : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Bvh : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
 };
 struct Renderer : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
   unsigned int allocate_id() const;
+  void release_id(const unsigned int& id) const;
+  bool update_instances(const unsigned int& id, converted::wide::Span<const double> transforms, converted::wide::Span<const double> tints, bool* changed = nullptr) const;
+  bool set_visible(const unsigned int& id, const bool& visible) const;
 };
-struct MeshData : converted::EngineObject {
+struct KeyIndex : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
 };
-namespace LifeArt { struct Part {
+struct MeshData {
+  std::vector<f32> positions, normals, colors, uvs;
+  std::vector<f32> extra;  // optional per-vertex stream (extra_size floats each)
+  u32 extra_size = 0;
+  std::vector<u32> indices;
+
+  
+  
+  
+
+
+  
+
+
+
+
+
+  
+  
+
+
+  /// Borrowed MeshInput view (geometry only; material etc. stay default).
+  
+};
+struct MeshLook {
+  Material material;
+  u32 extra_slot = 0;   // the extension stream `extra` goes to (kMaxExtensionAttributes: none)
+  u32 texture = 0;      // GPU texture handle (0 = none)
+  bool visible = true;
+  u32 layers = 1;       // view layers this mesh belongs to (RenderParams::layers)
+  bool pick_bvh = true; // false: no picking BVH (MeshInput::pick_bvh)
+};
+struct Renderer; bool upsert(Renderer& renderer, const unsigned int& id, const MeshData& mesh, const MeshLook& look, converted::wide::Span<const double> transforms = {}, converted::wide::Span<const double> tints = {});
+struct HeightSampler : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct BuildingBuilder : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct FootprintStream : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct RoadBuilder : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct RoadStream : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
+namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { struct Body { u64 id = 0; }; }
+namespace physics { struct Joint { u64 id = 0; }; }
+namespace physics { struct Pose {
+  Vec3 position;
+  Quat rotation;
+}; }
+struct World : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct MouseGrab : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct CharacterMover : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+constexpr f32 kPi = 3.14159265358979323846;
+inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
+namespace mvt { enum class GeomType : u8 { unknown = 0, point = 1, line = 2, polygon = 3 }; }
+namespace mvt { namespace Value { enum class Kind : u8 { none, string, number, boolean }; } }
+enum class RoadClass : u8 { motorway, trunk, primary, secondary, tertiary, minor, service, track, path, pedestrian, river, canal, stream };
+enum class AreaKind : u8 { water, park, wood, grass, sand, pitch };
+struct Ragdolls {
+ public:
+  enum Bone : u8 { pelvis, chest, head, upper_arm_l, upper_arm_r, lower_arm_l, lower_arm_r, thigh_l, thigh_r, shin_l, shin_r, kBones };
+  struct Colors { Vec3 shirt{0.35, 0.44, 0.53}, pants{0.17, 0.19, 0.22}, skin{0.82, 0.66, 0.53}, hair{0.18, 0.11, 0.06}; bool cap = false, vest = false; };
+  /// A person who stood up again (reverse ragdoll): where and facing which way.
+  struct Up { u64 key; Vec3 feet; f32 yaw; };
+
+  
+  // MAX_RAGDOLLS
+  /// Throws a person standing at `feet` (facing `yaw`) with `velocity` (m/s). `recover`: the person
+  /// gets up again when the body has settled. Reuses the oldest body when the pool is full.
+  
+  
+  /// A blast pushes every body in range (world_person_ragdoll: the bodies are in the same world).
+  
+  
+  
+  
+  /// The pelvis of a body (where it lies), false when there is none.
+  
+  
+  
+  
+    // still Box3D bodies (not getting up)
+  /// A bone's body (VR grab: the hand takes the doll by its chest), invalid when there is none.
+  
+
+  /// Drawing: every active body's bones as box transforms (unit box scaled to the bone) + tint,
+  /// and the body the bone is of (its colours: colors(doll)).
+  struct Draw { Mat4 m; Vec3 tint; bool sphere; u8 bone = 0; u32 doll = 0; Mat4 pose; };  // pose: the bone's frame (unscaled)
+  
+  /// The colours of the person a body of draw() is.
+  
+
+  /// Bone sizes (rest pose, standing at the origin facing +X): centre, half extents (capsule:
+  /// radius x radius x half length incl. caps).
+  
+  
+
+ private:
+  struct Doll {
+    bool active = false, recover = false, getting_up = false;
+    u64 key = 0;
+    physics::Body bodies[kBones];
+    physics::Joint joints[kBones];
+    physics::Pose pose[kBones], from[kBones], stand[kBones];
+    Colors colors;
+    f32 born = 0, settled = 0, getup_at = 0, stand_yaw = 0;
+    Vec3 stand_feet;
+    i32 group = 0;
+  };
+  
+  
+  
+  World* world_ = nullptr;
+  std::vector<Doll> dolls_;
+  std::vector<Up> ups_;
+  u32 max_ = 10, spawned_ = 0;
+  i32 group_ = 0;
+};
+struct LifeOut {
+  enum class Sound : u8 { moo, moo_pain, coo, flap, squawk, thud, stomp, stomp_accent, jingle, horn, horn_bus, scream, scream_f, dog, cat, hiss, yowl, screech, kCount };
+  struct Play { Sound sound; Vec3 at; f32 volume, pitch; };
+  struct Say { std::string text; f32 pitch = 1, rate = 1, volume = 1, delay = 0; };  // browser speech (de-DE)
+  struct Bubble { Vec3 at; std::string text; std::string mood; f32 until; };
+  struct Impulse { i32 car; Vec3 impulse; };
+  struct Burst { Vec3 at; Vec3 color; };
+  std::vector<Play> sounds;
+  std::vector<Say> speech;
+  std::vector<Impulse> impulses;
+  std::vector<Burst> bursts;
+  std::string banner;   // big call-out (jogger streak)
+  f32 banner_for = 0;
+  bool kill_player = false;  // the black cat got him
+  struct CowDeath { Vec3 at, impulse; };
+  std::vector<CowDeath> cow_deaths;  // for the other players (cows.mjs sendDeath)
+  
+};
+struct Life {
+ public:
+  struct Cow {
+    u64 key = 0;
+    i32 meadow = -1;
+    Vec2 home, off;
+    Vec3 pos;
+    f32 yaw = 0, hp = 100, phase = 0, next_moo = 0, flee_until = 0, flinch_at = -9, last_hit = -9;
+    Vec2 flee_v;
+    Vec3 color;
+    Quat rot;  // the dead body's orientation
+    bool dead = false, walking = false, carried = false;  // carried: picked up / thrown alive (a VR hand)
+    f32 carried_still = 0;
+    physics::Body body;  // the dead cow, or the carried one: a 600 kg Box3D body
+    Vec3 net_to, net_v;        // MP client: where the host has it, and its pace there
+    f32 net_at = 0;
+    Quat net_rot;
+    bool net_dead = false;
+  };
+  struct Pigeon { Vec2 o, v; Vec3 pos; f32 yaw = 0, walk_until = 0, peck = 0, flap = 0, lag = 0, dead_at = -1; Vec3 fall_v; Vec3 net_to, net_v; f32 net_yaw = 0, net_at = 0; };
+  struct Flock {
+    u32 id = 0;  // its own for good (the host's: a client knows a flock by it)
+    bool air = false;
+    Vec2 at;
+    f32 next_flight = 0, t = 0, coo_at = 0;
+    // flight: loops round a centre, then a glide onto the destination
+    Vec2 c, from, dest;
+    f32 r = 12, h = 12, dir = 1, a0 = 0, dur = 10;
+    std::vector<Pigeon> birds;
+  };
+  struct Bird { u32 seed = 0; Vec3 pos; f32 yaw = 0, flap = 1, dead_until = -1, dying_until = -1, spin = 0; Vec3 fall_v; Vec2 center; bool down = false; };
+  struct Runner { Vec3 pos; f32 yaw = 0, yaw_s = 0, lat = 0, phase = 0; bool alive = true; Vec3 net_to, net_v; f32 net_at = 0; };
+  struct Chain {
+    u32 id = 0;
+    std::vector<Vec2> path;  // the pavement line
+    std::vector<f32> cum;
+    f32 len = 0, s = 0, born = 0, next_call = 0, next_beat = 0, off = 4;
+    i32 call = 0, beat = 0, side = 1;
+    Runner runners[10];
+  };
+  struct Tree { Vec3 foot; f32 scale = 1; u32 lane = 0; f32 fell_at = -1; Vec2 fall_dir{1, 0}; u64 tile = 0; u32 index = 0; };  // fell_at: blown over (falls about its foot); tile / index: which of the map tile's trees
+  // dogs and cats (world_procedural_population.mjs ambient animals; #1 is the black cat now and then)
+  enum class Species : u8 { dog, cat, black_cat };
+  struct Pet {
+    f32 radius = 20, omega = 0.05, phase = 0, wobble_omega = 0.2, wobble_r = 2, scale = 1;
+    Vec3 pos;
+    f32 yaw = 0, gait = 0, speed = 0, dead_at = -1;
+    bool shown = false, has_pose = false, carried = false;  // carried: picked up / thrown alive (a VR hand)
+    f32 carried_still = 0;
+    Vec2 off;  // where a throw left it, off its round (back to it over some seconds)
+    i32 punches = 0;
+    Vec3 color;
+    physics::Body body;  // the dead animal
+    Quat rot;
+    Quat net_rot;  // MP client: the host's carried / dead pose
+  };
+  struct CatAttack { bool on = false; i32 phase = 0; Vec3 p, from; f32 yaw = 0, start = 0, leap_at = 0, last_cry = -9, away_yaw = 0, leave_at = 0; i32 cries = 0; };
+  struct Voice { Vec3 at; std::string text, mood; f32 until; };
+
+  
+  
+  
+
+  /// A bullet from `from` to `to`: cows, birds and joggers. Returns true when something was hit
+  /// (`to` shortened to the hit).
+  
+  /// Another player's cow died (cows.mjs onFx): the cow there falls the same way.
+  
+  /// A shot was fired / passed (scares cows and pigeons).
+  
+  
+  /// Street voices (street_voices.mjs): a short spoken line with a bubble, rate-limited.
+  
+  
+  
+
+  // tests / commands
+  
+  
+  
+  
+
+  
+  
+  const std::vector<Cow>& cows() const { return cows_; }
+  const std::vector<Flock>& flocks() const { return flocks_; }
+  
+  const std::vector<Bird>& birds() const { return birds_; }
+  const std::vector<Tree>& trees() const { return trees_; }
+  const std::vector<Pet>& pets() const { return pets_; }
+  Species species(u32 i, f64 epoch) const;
+  const CatAttack& cat_attack() const { return cat_; }
+  f64 epoch() const { return epoch_; }
+    // tests: the black cat charges
+  
+  /// The running club (as it was last, when has_chain() says there is none now).
+  
+  /// MP client: the running club is the host's (game_worldsync.cpp) - no own chain, his runners
+  /// eased to where his snapshots have them; none heard for 1.5 s: gone.
+  
+  
+  /// MP client: the animals are the host's too (game_worldsync.cpp): no herds, pets or flocks of
+  /// our own; his cows (by key - the same on every machine), dogs and cats (by his index) and
+  /// pigeon flocks (by his index) eased to where his snapshots have them. An animal that is a
+  /// body here (in our hand, thrown by us, killed here) is ours until it stands or lies again.
+  struct NetCow { u64 key = 0; Vec3 pos; Quat rot; f32 yaw = 0; bool dead = false, walking = false, carried = false; };
+  struct NetPet { u8 idx = 0; Vec3 pos; Quat rot; f32 yaw = 0, speed = 0; Vec2 off; bool shown = false, dead = false, carried = false; };
+  struct NetFlock { u32 id = 0; bool air = false; Vec2 at; std::vector<Vec3> birds; std::vector<f32> yaws; std::vector<u8> dead; };
+  /// Which animal a body is (a carried / thrown one): 1 a cow (id: its key), 2 a dog or cat (id:
+  /// its index); 0 none.
+  
+
+
+
+
+  
+  
+  
+  
+  /// The host's animals as he has them around us (game_worldsync.cpp), each list whole: what a
+  /// list does not name is not there. `at`: when the list was taken, on our clock.
+  
+  
+  
+  /// The neighbourhoods of the dogs and cats: the player's first, then (host) one round every mate
+  /// far from it; pet i belongs to anchor i / base.
+  
+  
+  /// Thrown things (game_toss.cpp): the body of an animal another player throws, made here so
+  /// it flies here too (the host's cow by key / pet by index); invalid when there is none.
+  
+  
+  /// A pigeon in another player's hand / let go by him (`key` his and the bird's): drawn here.
+  
+  /// A dog or cat killed on a client: the host's dies too (and every snapshot says so).
+  
+  
+  
+  
+  
+  
+  
+
+  /// Pure helpers (tests).
+  
+  
+
+  /// A hand grabs the nearest live animal within `reach` of `at` (a dog, a cat, a cow): it becomes a
+  /// Box3D body for as long as it is held and flies; it gets up where it lands. The body, or none.
+  
+  /// A pigeon caught by hand (VR): crept up on, the hand slow and right on it - and even then
+  /// only every other try, a miss sends the flock up. Returns its id (-1: it got away).
+  
+  /// The animal with this body is in a hand this frame: it does not stand up there (held still).
+  
+
+
+
+  
+  /// Let go: it flies off from there, with the hand's throw.
+  
+  struct LooseBird { i32 id = 0; Vec3 pos, vel; f32 yaw = 0, flap = 0, t = 0; bool held = true; u64 net = 0; };
+  const std::vector<LooseBird>& loose_birds() const { return loose_; }
+ private:
+  std::vector<LooseBird> loose_;
+  i32 loose_serial_ = 0;
+  bool remote_animals_ = false;
+  std::vector<Vec2> pet_anchors_;
+  u32 pet_base_ = 20;
+  f32 remote_animals_at_ = -9;
+  std::vector<Vec3> pet_net_to_;
+  std::vector<f32> pet_net_yaw_;
+  std::vector<u64> loose_keys_;  // net_bird: whose loose bird (0: ours)
+  bool remote_joggers_ = false;
+  f32 remote_joggers_at_ = -9;
+  struct Meadow { std::vector<std::vector<Vec2>> rings; Vec2 lo, hi, centre; f32 area = 0; u64 key = 0; bool alive = true; };
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+
+  World* world_ = nullptr;
+  bool mobile_ = false;
+  Ragdolls ragdolls_;
+  std::vector<Meadow> meadows_;
+  std::vector<Cow> cows_;
+  std::vector<u64> dead_cows_;
+  Vec2 herds_for_{1e9, 1e9};
+  f32 last_herd_check_ = -99, last_moo_ = -99, herds_at_ = -99;
+  std::vector<Flock> flocks_;
+  u32 flock_serial_ = 0;
+  u32 trees_down_ = 0, tree_ground_cursor_ = 0;
+  std::vector<Bird> birds_;
+  std::vector<Tree> trees_;
+  std::vector<Pet> pets_;
+  CatAttack cat_;
+  Vec2 pet_anchor_{1e9, 1e9};
+  f64 epoch_ = 0;
+  u32 tree_serial_ = ~0u;                       // the city's furniture set the trees were taken from
+  converted::wide::Set<u64> trees_gone_;          // blown over and cleared away (stays so while its tile is loaded)
+  Chain chain_;
+  bool chain_alive_ = false;
+  f32 next_chain_ = -1, streak_at_ = -99;
+  u32 chain_serial_ = 0, streak_n_ = 0, streak_chain_ = 0;
+  std::vector<Voice> voices_;
+  f32 last_shout_ = -99, last_honk_ = -99, last_scream_ = -99, last_coo_ = -99, ambient_chirp_ = 0;
+  std::vector<std::pair<u32, f32>> source_gap_;
+  u32 cow_hits_ = 0, bird_hits_ = 0, shouts_ = 0, honks_ = 0;
+};
+struct LifeArt {
+ public:
+  bool init(Renderer& r);
+  void begin();
+  void box(const Mat4& m, Vec3 tint) { put(box_, m, tint); }
+  void ball(const Mat4& m, Vec3 tint) { put(ball_, m, tint); }
+  void cylinder(const Mat4& m, Vec3 tint) { put(cyl_, m, tint); }
+  void glow(const Mat4& m, Vec3 tint) { put(glow_, m, tint); }
+  /// Everything of street life around `eye` (cows, pigeons, birds, trees, ragdolls).
+  void life(const Life& life, f32 now, Vec3 eye, f32 range);
+  void end();
+
+ private:
+  struct Part {
     u32 id = 0;
     std::vector<f32> transforms, tints;
-  }; }
+  };
+  bool make(Renderer& r, Part& p, const MeshData& mesh, const Material& m);
+  void put(Part& p, const Mat4& m, Vec3 tint);
+  void cow(const Life::Cow& c, f32 now);
+  Renderer* r_ = nullptr;
+  Part box_, ball_, cyl_, glow_;
+  std::vector<Ragdolls::Draw> bones_;
+};
+namespace primitives { MeshData box(const Vec3& size, const Vec3& color = {1, 1, 1}); }
+namespace primitives { MeshData sphere(const double& radius, const unsigned int& segments = 24, const unsigned int& rings = 16, const Vec3& color = {1, 1, 1}); }
+namespace primitives { MeshData cylinder(const double& radius, const double& height, const unsigned int& segments = 20, const Vec3& color = {1, 1, 1}); }
+Life::Species Life::species(u32 i, f64 epoch) const {
+  if (i == 1 && (converted::rem_bits(static_cast<i64>(converted::fits<converted::SignedWhole>(std::floor(epoch / 120))), 2) == 0 || cat_.on)) return Species::black_cat;
+  return (pet_base_ ? converted::rem(i, pet_base_) : i) % 3 == 2 ? Species::cat : Species::dog;  // every neighbourhood the same mix
+}
 Mat4 rot(Vec3 axis, f32 a) { return Mat4::trs({}, Quat::axis_angle(axis, a), {1, 1, 1}); }
 Mat4 at(Vec3 p) { return Mat4::translate(p); }
 Mat4 sc3(Vec3 s) { return Mat4::scale(s); }
 Vec3 rgb(u32 h) { return {((h >> 16) & 255) / 255.0, ((h >> 8) & 255) / 255.0, (h & 255) / 255.0}; }
-namespace LifeArt { inline void put(Part& p, const Mat4& m, Vec3 tint) {
+bool LifeArt::make(Renderer& r, Part& p, const MeshData& mesh, const Material& m) {
+  p.id = r.allocate_id();
+  MeshLook look;
+  look.material = m;
+  look.extra_slot = kMaxExtensionAttributes;
+  look.visible = false;
+  const Mat4 parked = Mat4::translate({0, 0, -1000});
+  if (!upsert(r, p.id, mesh, look, Span<const f32>(parked.m, 16))) { r.release_id(p.id); p.id = 0; return false; }
+  return true;
+}
+bool LifeArt::init(Renderer& r) {
+  r_ = &r;
+  const Vec3 white{1, 1, 1};
+  Material m;
+  m.roughness = 0.85;
+  if (!make(r, box_, primitives::box({1, 1, 1}, white), m)) return false;
+  if (!make(r, ball_, primitives::sphere(0.5, 10, 7, white), m)) return false;
+  if (!make(r, cyl_, primitives::cylinder(0.5, 1, 8, white), m)) return false;
+  Material g = m;
+  g.emissive = {2.6, 2.4, 2.0};
+  g.unlit = true;
+  g.cast_shadow = false;
+  return make(r, glow_, primitives::box({1, 1, 1}, white), g);
+}
+void LifeArt::begin() {
+  auto empty = [](Part& p) { p.transforms.clear(); p.tints.clear(); };
+  empty(box_);
+  empty(ball_);
+  empty(cyl_);
+  empty(glow_);
+}
+void LifeArt::put(Part& p, const Mat4& m, Vec3 tint) {
   p.transforms.insert(p.transforms.end(), m.m, m.m + 16);
   p.tints.insert(p.tints.end(), {tint.x, tint.y, tint.z, 1});
-} }
+}
+void LifeArt::cow(const Life::Cow& c, f32 now) {
+  // x forward, origin between the feet; coat tint, dark spots, pink udder and muzzle
+  Mat4 M;
+  if (c.dead || c.carried) M = Mat4::trs(c.pos, c.rot, {1, 1, 1}) * at({0, 0, -1.12});  // the Box3D body (centre 1.12 m over the feet)
+  else {
+    const f32 bob = c.walking && now < c.flee_until ? std::fabs(kern::math::sin(c.phase)) * 0.05 : 0;
+    M = at(c.pos + Vec3{0, 0, bob}) * rot({0, 0, 1}, c.yaw);
+    const f32 ft = (now - c.flinch_at) / 0.26;
+    if (ft < 1) M = M * rot({1, 0, 0}, kern::math::sin(ft * kPi) * 0.12);  // the hit rocks the body sideways
+  }
+  const Vec3 coat = c.color, dark = rgb(0x1a1714);
+  auto part = [&](Vec3 size, Vec3 p, Vec3 tint) { box(M * at(p) * sc3(size), tint); };
+  part({1.62, 0.66, 0.7}, {0, 0, 1.15}, coat);
+  part({0.5, 0.672, 0.4}, {-0.25, 0, 1.28}, dark);
+  part({0.36, 0.672, 0.3}, {0.42, 0, 1.08}, dark);
+  part({0.3, 0.3, 0.16}, {-0.35, 0, 0.74}, rgb(0xd99a9a));
+  part({0.05, 0.05, 0.6}, {-0.83, 0, 1.05}, coat);  // tail
+  part({0.3, 0.5, 0.12}, {0.72, 0, 1.5}, coat);
+  const bool graze = !c.dead && !c.walking;
+  const f32 pitch = c.dead ? 0.2 : graze ? 0.95 + 0.08 * kern::math::sin(now / 0.6 + c.phase) : 0.12;
+  const Mat4 H = M * at({0.86, 0, 1.36}) * rot({0, 1, 0}, pitch);
+  box(H * at({0.2, 0, 0}) * sc3({0.42, 0.32, 0.34}), coat);
+  box(H * at({0.46, 0, -0.07}) * sc3({0.16, 0.3, 0.2}), rgb(0xe2a7a2));
+  box(H * at({0.08, 0.15, 0.18}) * sc3({0.04, 0.04, 0.12}), rgb(0xe9e2cf));
+  box(H * at({0.08, -0.15, 0.18}) * sc3({0.04, 0.04, 0.12}), rgb(0xe9e2cf));
+  const f32 amp = c.dead ? 0 : now < c.flee_until ? 0.6 : c.walking ? 0.32 : 0;
+  for (int k = 0; k < 4; ++k) {
+    const f32 hx = k < 2 ? 0.6 : -0.58, hy = k % 2 ? 0.2 : -0.2;
+    const f32 sw = amp * kern::math::sin(c.phase + (k == 0 || k == 3 ? 0 : kPi));
+    const Mat4 L = M * at({hx, hy, 0.8}) * rot({0, 1, 0}, sw);
+    box(L * at({0, 0, -0.35}) * sc3({0.14, 0.14, 0.7}), coat);
+    box(L * at({0, 0, -0.75}) * sc3({0.15, 0.15, 0.1}), rgb(0x2a2522));
+  }
+}
+void LifeArt::life(const Life& life, f32 now, Vec3 eye, f32 range) {
+  auto near = [&](Vec3 p) { return std::fabs(p.x - eye.x) < range && std::fabs(p.y - eye.y) < range; };
+  for (const Life::Cow& c : life.cows()) {
+    if (!near(c.pos)) continue;
+    cow(c, now);
+  }
+  // pigeons: a plump grey body, darker head, beak; wings only in the air
+  const Vec3 grey = rgb(0x8d93a0), head = rgb(0x5d6575), breast = rgb(0x7d6f8c), wing = rgb(0x7f8592);
+  for (const Life::Flock& f : life.flocks()) {
+    for (const Life::Pigeon& b : f.birds) {
+      if (!near(b.pos)) continue;
+      const bool moving = hypot_bp(b.v.x, b.v.y) > 0.05;
+      const f32 nod = f.air ? -0.25 : moving ? kern::math::sin(b.peck) * 0.12 : (kern::math::sin(b.peck * 0.7) > 0.85 ? 0.55 : 0.0);
+      // a dead pigeon lies on its side
+      const Mat4 M = b.dead_at >= 0 ? at(b.pos + Vec3{0, 0, 0.06}) * rot({0, 0, 1}, b.yaw) * rot({1, 0, 0}, 1.45) : at(b.pos) * rot({0, 0, 1}, b.yaw) * rot({0, 1, 0}, nod);
+      ball(M * at({0, 0, 0.13}) * sc3({0.3, 0.19, 0.18}), grey);
+      ball(M * at({0.07, 0, 0.15}) * sc3({0.14, 0.14, 0.14}), breast);
+      ball(M * at({0.15, 0, 0.24}) * sc3({0.1, 0.1, 0.1}), head);
+      box(M * at({0.205, 0, 0.235}) * sc3({0.04, 0.015, 0.015}), rgb(0x3a3330));
+      box(M * at({-0.17, 0, 0.12}) * sc3({0.13, 0.09, 0.018}), rgb(0x4f5562));
+      if (f.air && b.dead_at < 0) {
+        const f32 flap = kern::math::sin(b.flap) * 0.9;
+        for (f32 s : {-1.0, 1.0}) box(M * at({0, s * 0.02, 0.16}) * rot({1, 0, 0}, s * flap) * at({0, s * 0.18, 0}) * sc3({0.16, 0.36, 0.01}), wing);
+      }
+    }
+  }
+  // a pigeon in a hand (VR) or flying off from it
+  for (const Life::LooseBird& b : life.loose_birds()) {
+    if (!near(b.pos)) continue;
+    const Mat4 M = at(b.pos - Vec3{0, 0, 0.15}) * rot({0, 0, 1}, b.yaw);
+    ball(M * at({0, 0, 0.13}) * sc3({0.3, 0.19, 0.18}), grey);
+    ball(M * at({0.07, 0, 0.15}) * sc3({0.14, 0.14, 0.14}), breast);
+    ball(M * at({0.15, 0, 0.24}) * sc3({0.1, 0.1, 0.1}), head);
+    box(M * at({0.205, 0, 0.235}) * sc3({0.04, 0.015, 0.015}), rgb(0x3a3330));
+    const f32 flap = kern::math::sin(b.flap) * 0.9;
+    for (f32 s : {-1.0, 1.0}) box(M * at({0, s * 0.02, 0.16}) * rot({1, 0, 0}, s * flap) * at({0, s * 0.18, 0}) * sc3({0.16, 0.36, 0.01}), wing);
+  }
+  // birds over the roofs: a dark V that flaps
+  for (const Life::Bird& b : life.birds()) {
+    if (now < b.dead_until && now >= b.dying_until) continue;
+    if (!near(b.pos)) continue;
+    const f32 s = 0.48 + static_cast<f32>(b.seed % 14) / 100;
+    const Vec3 col = rgb(0x2f3942 + (b.seed % 5) * 0x101010);
+    const Mat4 M = at(b.pos) * rot({0, 0, 1}, b.yaw) * sc3({s, s, s});
+    box(M * sc3({0.6, 0.12, 0.08}), col);
+    const f32 flap = now < b.dying_until ? 0.2 : (b.flap - 0.82) * 3;
+    for (f32 sd : {-1.0, 1.0}) box(M * rot({1, 0, 0}, sd * flap) * at({-0.08, sd * 0.42, 0}) * sc3({0.32, 0.78, 0.03}), col);
+  }
+  // dogs and cats (world_procedural_population.mjs quadrupedBody/Head/Leg, gait, the black cat)
+  for (std::size_t i = 0; i < life.pets().size(); converted::pre_inc(i)) {
+    const Life::Pet& p = converted::at(life.pets(), i);
+    if (!p.shown || !near(p.pos)) continue;
+    const bool dead = p.dead_at >= 0;
+    if (dead && now - p.dead_at > 7) continue;
+    const bool dog = life.species(static_cast<u32>(i), life.epoch()) == Life::Species::dog;
+    const f32 sc = dog ? p.scale : p.scale * 0.62;
+    Mat4 M = dead || p.carried ? Mat4::trs(p.pos, p.rot, {sc, sc, sc}) * at({0, 0, -0.27}) : at(p.pos) * rot({0, 0, 1}, p.yaw) * sc3({sc, sc, sc});
+    const Life::CatAttack& cat = life.cat_attack();
+    if (!dead && i == 1 && cat.on && cat.phase == 1) M = M * rot({0, 1, 0}, -0.5);
+    const f32 bob = dead ? 0 : std::fabs(kern::math::sin(p.gait * kPi * 2)) * std::fmin(0.03, p.speed * 0.01);
+    const f32 torso = 0.25 + 0.11 + bob;  // the box over the ground (.25) + ANIMAL_TORSO_UP
+    box(M * at({0, 0, torso}) * sc3({0.66, 0.26, 0.27}), p.color);
+    box(M * at({-0.44, 0, torso + 0.1}) * rot({0, 1, 0}, -0.6) * sc3({0.3, 0.055, 0.055}), p.color);  // tail
+    box(M * at({0.3, 0, torso + 0.12}) * rot({0, 1, 0}, 0.5) * sc3({0.16, 0.16, 0.2}), p.color);    // neck
+    const Mat4 H = M * at({0.43, 0, torso + 0.16});
+    ball(H * sc3({0.3, 0.3, 0.3}), p.color);
+    box(H * at({0.13, 0, -0.04}) * sc3({0.15, 0.1, 0.09}), p.color);
+    for (f32 s : {-1.0, 1.0}) box(H * at({-0.02, s * 0.08, 0.14}) * sc3({0.06, 0.05, 0.11}), p.color);  // ears
+    const f32 amp = dead ? 0 : std::fmin(0.7, p.speed * 0.35);
+    const f32 offs[4] = {0.25, 0.75, 0, 0.5};
+    const f32 hips[4][2] = {{0.24, 0.09}, {0.24, -0.09}, {-0.24, 0.09}, {-0.24, -0.09}};
+    for (int k = 0; k < 4; ++k) {
+      const f32 sw = dead ? 0.35 * (k < 2 ? 1 : -1) : amp * kern::math::sin((p.gait + converted::at(offs, k)) * kPi * 2);
+      box(M * at({converted::at(hips, k)[0], converted::at(hips, k)[1], torso - 0.1}) * rot({0, 1, 0}, sw) * at({0, 0, -0.135}) * sc3({0.075, 0.075, 0.27}), p.color);
+    }
+  }
+  // trees: trunk 2.3 m and a crown
+  for (const Life::Tree& t : life.trees()) {
+    if (!near(t.foot)) continue;
+    const f32 s = t.scale;
+    // the unit cylinder stands on z = 0 (prim::cylinder): the trunk from the foot up 2.3 m, its foot
+    // 0.4 m in the ground so a slope (or a crater since) never shows it standing on air
+    // a blown-over tree turns about its foot (accelerating, 1.1 s) and lies there
+    Mat4 base = at(t.foot);
+    if (t.fell_at >= 0) {
+      const f32 u = clampf((now - t.fell_at) / 1.1, 0, 1), ang = 1.5 * u * u;
+      base = base * rot(converted::wide::normalize(Vec3{-t.fall_dir.y, t.fall_dir.x, 0}, {1, 0, 0}), ang);
+    }
+    cylinder(base * at({0, 0, -0.4}) * sc3({0.25 * s, 0.25 * s, 2.3 * s + 0.4}), rgb(0x6a523d));
+    ball(base * at({0, 0, 2.75 * s}) * sc3({1.95 * s, 1.95 * s, 2.35 * s}), rgb(0x4f8658));
+  }
+  // ragdolls
+  // (the ragdolls are PeopleArt's: Game::life_draw_ragdolls - the same body as standing)
+}
+void LifeArt::end() {
+  auto show = [&](const Part& p) {
+    if (!p.id) return;
+    const bool any = !p.transforms.empty();
+    if (any) r_->update_instances(p.id, p.transforms, p.tints);
+    r_->set_visible(p.id, any);
+  };
+  show(box_);
+  show(ball_);
+  show(cyl_);
+  show(glow_);
+}
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
 
-[[maybe_unused]] static Mat4 draw_kern__Mat4(converted::Draw& draw) {
-  Mat4 s{};
-  for (auto& e : s.m) e = draw.number();
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const Mat4& s) { return converted::Value::structure({arg(std::vector<double>(std::begin(s.m), std::end(s.m)))}); }
-[[maybe_unused]] static bool same(const Mat4& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(std::vector<double>(std::begin(want.m), std::end(want.m)), (*got.rows)[0]); }
-[[maybe_unused]] static bool defined(const Mat4& s) { return defined(std::vector<double>(std::begin(s.m), std::end(s.m))); }
-[[maybe_unused]] static std::string text(const Mat4& s) { return std::string("{") + text(std::vector<double>(std::begin(s.m), std::end(s.m))) + "}"; }
-[[maybe_unused]] static void take(Mat4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[0]); for (std::size_t k = 0; k < items.size() && k < std::size(s.m); ++k) s.m[k] = items[k]; } }
 [[maybe_unused]] static LifeArt::Part draw_LifeArt__Part(converted::Draw& draw) {
   LifeArt::Part s{};
   s.id = static_cast<unsigned int>(draw.below(40));
@@ -178,32 +801,690 @@ namespace LifeArt { inline void put(Part& p, const Mat4& m, Vec3 tint) {
   s.tints = draw_list(draw, [&]() -> double { return draw.number(); });
   return s;
 }
-namespace LifeArt { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const LifeArt::Part& s) { return converted::Value::structure({arg(s.id), arg(s.transforms), arg(s.tints)}); }
 [[maybe_unused]] static bool same(const LifeArt::Part& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.id, (*got.rows)[0]) && same(want.transforms, (*got.rows)[1]) && same(want.tints, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const LifeArt::Part& s) { return defined(s.id) && defined(s.transforms) && defined(s.tints); }
 [[maybe_unused]] static std::string text(const LifeArt::Part& s) { return std::string("{") + text(s.id) + ", " + text(s.transforms) + ", " + text(s.tints) + "}"; }
 [[maybe_unused]] static void take(LifeArt::Part& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.transforms, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.tints, (*v.rows)[2]); }
+[[maybe_unused]] static Mat4 draw_kern__Mat4(converted::Draw& draw) {
+  Mat4 s{};
+  converted::fill_array(s.m, [&]() -> double { return draw.number(); });
+  return s;
 }
-inline unsigned int Renderer::allocate_id() const { const std::vector<converted::Value> out = converted::engine_call("engine.renderer.allocate_id", {arg(*this)}); unsigned int result{}; converted::take_as<unsigned int>(result, out[0]); return result; }
+[[maybe_unused]] static converted::Value arg(const Mat4& s) { return converted::Value::structure({arg(converted::array_list(s.m))}); }
+[[maybe_unused]] static bool same(const Mat4& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::array_list(want.m), (*got.rows)[0]); }
+[[maybe_unused]] static bool defined(const Mat4& s) { return defined(converted::array_list(s.m)); }
+[[maybe_unused]] static std::string text(const Mat4& s) { return std::string("{") + text(converted::array_list(s.m)) + "}"; }
+[[maybe_unused]] static void take(Mat4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[0]); converted::array_from(s.m, items); } }
+[[maybe_unused]] static Ragdolls::Draw draw_Ragdolls__Draw(converted::Draw& draw) {
+  Ragdolls::Draw s{};
+  s.m = draw_kern__Mat4(draw);
+  s.tint = draw.vector();
+  s.sphere = draw.flag();
+  s.bone = static_cast<unsigned char>(draw.below(40));
+  s.doll = static_cast<unsigned int>(draw.below(40));
+  s.pose = draw_kern__Mat4(draw);
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Ragdolls::Draw& s) { return converted::Value::structure({arg(s.m), arg(s.tint), arg(s.sphere), arg(s.bone), arg(s.doll), arg(s.pose)}); }
+[[maybe_unused]] static bool same(const Ragdolls::Draw& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.m, (*got.rows)[0]) && same(want.tint, (*got.rows)[1]) && same(want.sphere, (*got.rows)[2]) && same(want.bone, (*got.rows)[3]) && same(want.doll, (*got.rows)[4]) && same(want.pose, (*got.rows)[5]); }
+[[maybe_unused]] static bool defined(const Ragdolls::Draw& s) { return defined(s.m) && defined(s.tint) && defined(s.sphere) && defined(s.bone) && defined(s.doll) && defined(s.pose); }
+[[maybe_unused]] static std::string text(const Ragdolls::Draw& s) { return std::string("{") + text(s.m) + ", " + text(s.tint) + ", " + text(s.sphere) + ", " + text(s.bone) + ", " + text(s.doll) + ", " + text(s.pose) + "}"; }
+[[maybe_unused]] static void take(Ragdolls::Draw& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<Mat4>(s.m, (*v.rows)[0]); converted::take_as<Vec3>(s.tint, (*v.rows)[1]); converted::take_as<bool>(s.sphere, (*v.rows)[2]); converted::take_as<unsigned char>(s.bone, (*v.rows)[3]); converted::take_as<unsigned int>(s.doll, (*v.rows)[4]); converted::take_as<Mat4>(s.pose, (*v.rows)[5]); }
+[[maybe_unused]] static LifeArt draw_LifeArt(converted::Draw& draw) {
+  LifeArt s{};
+  s.r_ = converted::engine_object<Renderer>(1 + draw.below(6));
+  s.box_ = draw_LifeArt__Part(draw);
+  s.ball_ = draw_LifeArt__Part(draw);
+  s.cyl_ = draw_LifeArt__Part(draw);
+  s.glow_ = draw_LifeArt__Part(draw);
+  s.bones_ = draw_list(draw, [&]() -> Ragdolls::Draw { return draw_Ragdolls__Draw(draw); });
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const LifeArt& s) { return converted::Value::structure({arg(s.r_), arg(s.box_), arg(s.ball_), arg(s.cyl_), arg(s.glow_), arg(s.bones_)}); }
+[[maybe_unused]] static bool same(const LifeArt& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.r_, (*got.rows)[0]) && same(want.box_, (*got.rows)[1]) && same(want.ball_, (*got.rows)[2]) && same(want.cyl_, (*got.rows)[3]) && same(want.glow_, (*got.rows)[4]) && same(want.bones_, (*got.rows)[5]); }
+[[maybe_unused]] static bool defined(const LifeArt& s) { return defined(s.r_) && defined(s.box_) && defined(s.ball_) && defined(s.cyl_) && defined(s.glow_) && defined(s.bones_); }
+[[maybe_unused]] static std::string text(const LifeArt& s) { return std::string("{") + text(s.r_) + ", " + text(s.box_) + ", " + text(s.ball_) + ", " + text(s.cyl_) + ", " + text(s.glow_) + ", " + text(s.bones_) + "}"; }
+[[maybe_unused]] static void take(LifeArt& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<Renderer*>(s.r_, (*v.rows)[0]); converted::take_as<LifeArt::Part>(s.box_, (*v.rows)[1]); converted::take_as<LifeArt::Part>(s.ball_, (*v.rows)[2]); converted::take_as<LifeArt::Part>(s.cyl_, (*v.rows)[3]); converted::take_as<LifeArt::Part>(s.glow_, (*v.rows)[4]); converted::take_as<std::vector<Ragdolls::Draw>>(s.bones_, (*v.rows)[5]); }
+[[maybe_unused]] static MeshData draw_kern__MeshData(converted::Draw& draw) {
+  MeshData s{};
+  s.positions = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.normals = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.colors = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.uvs = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.extra = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.extra_size = static_cast<unsigned int>(draw.below(40));
+  s.indices = draw_list(draw, [&]() -> unsigned int { return static_cast<unsigned int>(draw.below(40)); });
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const MeshData& s) { return converted::Value::structure({arg(s.positions), arg(s.normals), arg(s.colors), arg(s.uvs), arg(s.extra), arg(s.extra_size), arg(s.indices)}); }
+[[maybe_unused]] static bool same(const MeshData& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.positions, (*got.rows)[0]) && same(want.normals, (*got.rows)[1]) && same(want.colors, (*got.rows)[2]) && same(want.uvs, (*got.rows)[3]) && same(want.extra, (*got.rows)[4]) && same(want.extra_size, (*got.rows)[5]) && same(want.indices, (*got.rows)[6]); }
+[[maybe_unused]] static bool defined(const MeshData& s) { return defined(s.positions) && defined(s.normals) && defined(s.colors) && defined(s.uvs) && defined(s.extra) && defined(s.extra_size) && defined(s.indices); }
+[[maybe_unused]] static std::string text(const MeshData& s) { return std::string("{") + text(s.positions) + ", " + text(s.normals) + ", " + text(s.colors) + ", " + text(s.uvs) + ", " + text(s.extra) + ", " + text(s.extra_size) + ", " + text(s.indices) + "}"; }
+[[maybe_unused]] static void take(MeshData& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<std::vector<double>>(s.positions, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.normals, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.colors, (*v.rows)[2]); converted::take_as<std::vector<double>>(s.uvs, (*v.rows)[3]); converted::take_as<std::vector<double>>(s.extra, (*v.rows)[4]); converted::take_as<unsigned int>(s.extra_size, (*v.rows)[5]); converted::take_as<std::vector<unsigned int>>(s.indices, (*v.rows)[6]); }
+[[maybe_unused]] static Vec4 draw_kern__Vec4(converted::Draw& draw) {
+  if (draw.flag()) return Vec4(draw.number(), draw.number(), draw.number(), draw.number());
+  Vec4 s{};
+  s.x = draw.number();
+  s.y = draw.number();
+  s.z = draw.number();
+  s.w = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Vec4& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
+[[maybe_unused]] static bool same(const Vec4& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
+[[maybe_unused]] static bool defined(const Vec4& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
+[[maybe_unused]] static std::string text(const Vec4& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
+[[maybe_unused]] static void take(Vec4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
+[[maybe_unused]] static Material draw_kern__Material(converted::Draw& draw) {
+  Material s{};
+  s.color = draw_kern__Vec4(draw);
+  s.alpha = static_cast<AlphaMode>(draw.below(3));
+  s.alpha_cutoff = draw.number();
+  s.roughness = draw.number();
+  s.metalness = draw.number();
+  s.emissive = draw.vector();
+  s.unlit = draw.flag();
+  s.double_sided = draw.flag();
+  s.cast_shadow = draw.flag();
+  s.frustum_culled = draw.flag();
+  s.viewmodel = draw.flag();
+  s.linear_colors = draw.flag();
+  s.lines = draw.flag();
+  converted::fill_array(s.params, [&]() -> int { return static_cast<int>(draw.whole()); });
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Material& s) { return converted::Value::structure({arg(s.color), arg(s.alpha), arg(s.alpha_cutoff), arg(s.roughness), arg(s.metalness), arg(s.emissive), arg(s.unlit), arg(s.double_sided), arg(s.cast_shadow), arg(s.frustum_culled), arg(s.viewmodel), arg(s.linear_colors), arg(s.lines), arg(converted::array_list(s.params))}); }
+[[maybe_unused]] static bool same(const Material& want, const converted::Value& got) { return got.rows && got.rows->size() == 14 && same(want.color, (*got.rows)[0]) && same(want.alpha, (*got.rows)[1]) && same(want.alpha_cutoff, (*got.rows)[2]) && same(want.roughness, (*got.rows)[3]) && same(want.metalness, (*got.rows)[4]) && same(want.emissive, (*got.rows)[5]) && same(want.unlit, (*got.rows)[6]) && same(want.double_sided, (*got.rows)[7]) && same(want.cast_shadow, (*got.rows)[8]) && same(want.frustum_culled, (*got.rows)[9]) && same(want.viewmodel, (*got.rows)[10]) && same(want.linear_colors, (*got.rows)[11]) && same(want.lines, (*got.rows)[12]) && same(converted::array_list(want.params), (*got.rows)[13]); }
+[[maybe_unused]] static bool defined(const Material& s) { return defined(s.color) && defined(s.alpha) && defined(s.alpha_cutoff) && defined(s.roughness) && defined(s.metalness) && defined(s.emissive) && defined(s.unlit) && defined(s.double_sided) && defined(s.cast_shadow) && defined(s.frustum_culled) && defined(s.viewmodel) && defined(s.linear_colors) && defined(s.lines) && defined(converted::array_list(s.params)); }
+[[maybe_unused]] static std::string text(const Material& s) { return std::string("{") + text(s.color) + ", " + text(s.alpha) + ", " + text(s.alpha_cutoff) + ", " + text(s.roughness) + ", " + text(s.metalness) + ", " + text(s.emissive) + ", " + text(s.unlit) + ", " + text(s.double_sided) + ", " + text(s.cast_shadow) + ", " + text(s.frustum_culled) + ", " + text(s.viewmodel) + ", " + text(s.linear_colors) + ", " + text(s.lines) + ", " + text(converted::array_list(s.params)) + "}"; }
+[[maybe_unused]] static void take(Material& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 14) return; converted::take_as<Vec4>(s.color, (*v.rows)[0]); converted::take_as<AlphaMode>(s.alpha, (*v.rows)[1]); converted::take_as<double>(s.alpha_cutoff, (*v.rows)[2]); converted::take_as<double>(s.roughness, (*v.rows)[3]); converted::take_as<double>(s.metalness, (*v.rows)[4]); converted::take_as<Vec3>(s.emissive, (*v.rows)[5]); converted::take_as<bool>(s.unlit, (*v.rows)[6]); converted::take_as<bool>(s.double_sided, (*v.rows)[7]); converted::take_as<bool>(s.cast_shadow, (*v.rows)[8]); converted::take_as<bool>(s.frustum_culled, (*v.rows)[9]); converted::take_as<bool>(s.viewmodel, (*v.rows)[10]); converted::take_as<bool>(s.linear_colors, (*v.rows)[11]); converted::take_as<bool>(s.lines, (*v.rows)[12]); { std::vector<int> items; converted::take_as<std::vector<int>>(items, (*v.rows)[13]); converted::array_from(s.params, items); } }
+[[maybe_unused]] static Quat draw_kern__Quat(converted::Draw& draw) {
+  Quat s{};
+  s.x = draw.number();
+  s.y = draw.number();
+  s.z = draw.number();
+  s.w = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Quat& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
+[[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
+[[maybe_unused]] static bool defined(const Quat& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
+[[maybe_unused]] static std::string text(const Quat& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
+[[maybe_unused]] static void take(Quat& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
+[[maybe_unused]] static physics::Body draw_kern__physics__Body(converted::Draw& draw) {
+  physics::Body s{};
+  s.id = static_cast<u64>(draw.bits());
+  return s;
+}
+namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const physics::Body& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
+[[maybe_unused]] static bool same(const physics::Body& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
+[[maybe_unused]] static bool defined(const physics::Body& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
+[[maybe_unused]] static std::string text(const physics::Body& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
+[[maybe_unused]] static void take(physics::Body& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
+}
+[[maybe_unused]] static Life::Cow draw_Life__Cow(converted::Draw& draw) {
+  Life::Cow s{};
+  s.key = static_cast<u64>(draw.bits());
+  s.meadow = static_cast<int>(draw.whole());
+  s.home = draw.vector2();
+  s.off = draw.vector2();
+  s.pos = draw.vector();
+  s.yaw = draw.number();
+  s.hp = draw.number();
+  s.phase = draw.number();
+  s.next_moo = draw.number();
+  s.flee_until = draw.number();
+  s.flinch_at = draw.number();
+  s.last_hit = draw.number();
+  s.flee_v = draw.vector2();
+  s.color = draw.vector();
+  s.rot = draw_kern__Quat(draw);
+  s.dead = draw.flag();
+  s.walking = draw.flag();
+  s.carried = draw.flag();
+  s.carried_still = draw.number();
+  s.body = draw_kern__physics__Body(draw);
+  s.net_to = draw.vector();
+  s.net_v = draw.vector();
+  s.net_at = draw.number();
+  s.net_rot = draw_kern__Quat(draw);
+  s.net_dead = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Life::Cow& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.key)), arg(s.meadow), arg(s.home), arg(s.off), arg(s.pos), arg(s.yaw), arg(s.hp), arg(s.phase), arg(s.next_moo), arg(s.flee_until), arg(s.flinch_at), arg(s.last_hit), arg(s.flee_v), arg(s.color), arg(s.rot), arg(s.dead), arg(s.walking), arg(s.carried), arg(s.carried_still), arg(s.body), arg(s.net_to), arg(s.net_v), arg(s.net_at), arg(s.net_rot), arg(s.net_dead)}); }
+[[maybe_unused]] static bool same(const Life::Cow& want, const converted::Value& got) { return got.rows && got.rows->size() == 25 && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]) && same(want.meadow, (*got.rows)[1]) && same(want.home, (*got.rows)[2]) && same(want.off, (*got.rows)[3]) && same(want.pos, (*got.rows)[4]) && same(want.yaw, (*got.rows)[5]) && same(want.hp, (*got.rows)[6]) && same(want.phase, (*got.rows)[7]) && same(want.next_moo, (*got.rows)[8]) && same(want.flee_until, (*got.rows)[9]) && same(want.flinch_at, (*got.rows)[10]) && same(want.last_hit, (*got.rows)[11]) && same(want.flee_v, (*got.rows)[12]) && same(want.color, (*got.rows)[13]) && same(want.rot, (*got.rows)[14]) && same(want.dead, (*got.rows)[15]) && same(want.walking, (*got.rows)[16]) && same(want.carried, (*got.rows)[17]) && same(want.carried_still, (*got.rows)[18]) && same(want.body, (*got.rows)[19]) && same(want.net_to, (*got.rows)[20]) && same(want.net_v, (*got.rows)[21]) && same(want.net_at, (*got.rows)[22]) && same(want.net_rot, (*got.rows)[23]) && same(want.net_dead, (*got.rows)[24]); }
+[[maybe_unused]] static bool defined(const Life::Cow& s) { return defined(converted::shaped<converted::Whole>(s.key)) && defined(s.meadow) && defined(s.home) && defined(s.off) && defined(s.pos) && defined(s.yaw) && defined(s.hp) && defined(s.phase) && defined(s.next_moo) && defined(s.flee_until) && defined(s.flinch_at) && defined(s.last_hit) && defined(s.flee_v) && defined(s.color) && defined(s.rot) && defined(s.dead) && defined(s.walking) && defined(s.carried) && defined(s.carried_still) && defined(s.body) && defined(s.net_to) && defined(s.net_v) && defined(s.net_at) && defined(s.net_rot) && defined(s.net_dead); }
+[[maybe_unused]] static std::string text(const Life::Cow& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(s.meadow) + ", " + text(s.home) + ", " + text(s.off) + ", " + text(s.pos) + ", " + text(s.yaw) + ", " + text(s.hp) + ", " + text(s.phase) + ", " + text(s.next_moo) + ", " + text(s.flee_until) + ", " + text(s.flinch_at) + ", " + text(s.last_hit) + ", " + text(s.flee_v) + ", " + text(s.color) + ", " + text(s.rot) + ", " + text(s.dead) + ", " + text(s.walking) + ", " + text(s.carried) + ", " + text(s.carried_still) + ", " + text(s.body) + ", " + text(s.net_to) + ", " + text(s.net_v) + ", " + text(s.net_at) + ", " + text(s.net_rot) + ", " + text(s.net_dead) + "}"; }
+[[maybe_unused]] static void take(Life::Cow& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 25) return; converted::take_as<converted::Whole>(s.key, (*v.rows)[0]); converted::take_as<int>(s.meadow, (*v.rows)[1]); converted::take_as<Vec2>(s.home, (*v.rows)[2]); converted::take_as<Vec2>(s.off, (*v.rows)[3]); converted::take_as<Vec3>(s.pos, (*v.rows)[4]); converted::take_as<double>(s.yaw, (*v.rows)[5]); converted::take_as<double>(s.hp, (*v.rows)[6]); converted::take_as<double>(s.phase, (*v.rows)[7]); converted::take_as<double>(s.next_moo, (*v.rows)[8]); converted::take_as<double>(s.flee_until, (*v.rows)[9]); converted::take_as<double>(s.flinch_at, (*v.rows)[10]); converted::take_as<double>(s.last_hit, (*v.rows)[11]); converted::take_as<Vec2>(s.flee_v, (*v.rows)[12]); converted::take_as<Vec3>(s.color, (*v.rows)[13]); converted::take_as<Quat>(s.rot, (*v.rows)[14]); converted::take_as<bool>(s.dead, (*v.rows)[15]); converted::take_as<bool>(s.walking, (*v.rows)[16]); converted::take_as<bool>(s.carried, (*v.rows)[17]); converted::take_as<double>(s.carried_still, (*v.rows)[18]); converted::take_as<physics::Body>(s.body, (*v.rows)[19]); converted::take_as<Vec3>(s.net_to, (*v.rows)[20]); converted::take_as<Vec3>(s.net_v, (*v.rows)[21]); converted::take_as<double>(s.net_at, (*v.rows)[22]); converted::take_as<Quat>(s.net_rot, (*v.rows)[23]); converted::take_as<bool>(s.net_dead, (*v.rows)[24]); }
+[[maybe_unused]] static Life::LooseBird draw_Life__LooseBird(converted::Draw& draw) {
+  Life::LooseBird s{};
+  s.id = static_cast<int>(draw.whole());
+  s.pos = draw.vector();
+  s.vel = draw.vector();
+  s.yaw = draw.number();
+  s.flap = draw.number();
+  s.t = draw.number();
+  s.held = draw.flag();
+  s.net = static_cast<u64>(draw.bits());
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Life::LooseBird& s) { return converted::Value::structure({arg(s.id), arg(s.pos), arg(s.vel), arg(s.yaw), arg(s.flap), arg(s.t), arg(s.held), arg(converted::shaped<converted::Whole>(s.net))}); }
+[[maybe_unused]] static bool same(const Life::LooseBird& want, const converted::Value& got) { return got.rows && got.rows->size() == 8 && same(want.id, (*got.rows)[0]) && same(want.pos, (*got.rows)[1]) && same(want.vel, (*got.rows)[2]) && same(want.yaw, (*got.rows)[3]) && same(want.flap, (*got.rows)[4]) && same(want.t, (*got.rows)[5]) && same(want.held, (*got.rows)[6]) && same(converted::shaped<converted::Whole>(want.net), (*got.rows)[7]); }
+[[maybe_unused]] static bool defined(const Life::LooseBird& s) { return defined(s.id) && defined(s.pos) && defined(s.vel) && defined(s.yaw) && defined(s.flap) && defined(s.t) && defined(s.held) && defined(converted::shaped<converted::Whole>(s.net)); }
+[[maybe_unused]] static std::string text(const Life::LooseBird& s) { return std::string("{") + text(s.id) + ", " + text(s.pos) + ", " + text(s.vel) + ", " + text(s.yaw) + ", " + text(s.flap) + ", " + text(s.t) + ", " + text(s.held) + ", " + text(converted::shaped<converted::Whole>(s.net)) + "}"; }
+[[maybe_unused]] static void take(Life::LooseBird& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 8) return; converted::take_as<int>(s.id, (*v.rows)[0]); converted::take_as<Vec3>(s.pos, (*v.rows)[1]); converted::take_as<Vec3>(s.vel, (*v.rows)[2]); converted::take_as<double>(s.yaw, (*v.rows)[3]); converted::take_as<double>(s.flap, (*v.rows)[4]); converted::take_as<double>(s.t, (*v.rows)[5]); converted::take_as<bool>(s.held, (*v.rows)[6]); converted::take_as<converted::Whole>(s.net, (*v.rows)[7]); }
+[[maybe_unused]] static physics::Joint draw_kern__physics__Joint(converted::Draw& draw) {
+  physics::Joint s{};
+  s.id = static_cast<u64>(draw.bits());
+  return s;
+}
+namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const physics::Joint& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
+[[maybe_unused]] static bool same(const physics::Joint& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
+[[maybe_unused]] static bool defined(const physics::Joint& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
+[[maybe_unused]] static std::string text(const physics::Joint& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
+[[maybe_unused]] static void take(physics::Joint& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
+}
+[[maybe_unused]] static physics::Pose draw_kern__physics__Pose(converted::Draw& draw) {
+  physics::Pose s{};
+  s.position = draw.vector();
+  s.rotation = draw_kern__Quat(draw);
+  return s;
+}
+namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const physics::Pose& s) { return converted::Value::structure({arg(s.position), arg(s.rotation)}); }
+[[maybe_unused]] static bool same(const physics::Pose& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.position, (*got.rows)[0]) && same(want.rotation, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const physics::Pose& s) { return defined(s.position) && defined(s.rotation); }
+[[maybe_unused]] static std::string text(const physics::Pose& s) { return std::string("{") + text(s.position) + ", " + text(s.rotation) + "}"; }
+[[maybe_unused]] static void take(physics::Pose& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<Vec3>(s.position, (*v.rows)[0]); converted::take_as<Quat>(s.rotation, (*v.rows)[1]); }
+}
+[[maybe_unused]] static Ragdolls::Colors draw_Ragdolls__Colors(converted::Draw& draw) {
+  Ragdolls::Colors s{};
+  s.shirt = draw.vector();
+  s.pants = draw.vector();
+  s.skin = draw.vector();
+  s.hair = draw.vector();
+  s.cap = draw.flag();
+  s.vest = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Ragdolls::Colors& s) { return converted::Value::structure({arg(s.shirt), arg(s.pants), arg(s.skin), arg(s.hair), arg(s.cap), arg(s.vest)}); }
+[[maybe_unused]] static bool same(const Ragdolls::Colors& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.shirt, (*got.rows)[0]) && same(want.pants, (*got.rows)[1]) && same(want.skin, (*got.rows)[2]) && same(want.hair, (*got.rows)[3]) && same(want.cap, (*got.rows)[4]) && same(want.vest, (*got.rows)[5]); }
+[[maybe_unused]] static bool defined(const Ragdolls::Colors& s) { return defined(s.shirt) && defined(s.pants) && defined(s.skin) && defined(s.hair) && defined(s.cap) && defined(s.vest); }
+[[maybe_unused]] static std::string text(const Ragdolls::Colors& s) { return std::string("{") + text(s.shirt) + ", " + text(s.pants) + ", " + text(s.skin) + ", " + text(s.hair) + ", " + text(s.cap) + ", " + text(s.vest) + "}"; }
+[[maybe_unused]] static void take(Ragdolls::Colors& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<Vec3>(s.shirt, (*v.rows)[0]); converted::take_as<Vec3>(s.pants, (*v.rows)[1]); converted::take_as<Vec3>(s.skin, (*v.rows)[2]); converted::take_as<Vec3>(s.hair, (*v.rows)[3]); converted::take_as<bool>(s.cap, (*v.rows)[4]); converted::take_as<bool>(s.vest, (*v.rows)[5]); }
+[[maybe_unused]] static Ragdolls::Doll draw_Ragdolls__Doll(converted::Draw& draw) {
+  Ragdolls::Doll s{};
+  s.active = draw.flag();
+  s.recover = draw.flag();
+  s.getting_up = draw.flag();
+  s.key = static_cast<u64>(draw.bits());
+  converted::fill_array(s.bodies, [&]() -> physics::Body { return draw_kern__physics__Body(draw); });
+  converted::fill_array(s.joints, [&]() -> physics::Joint { return draw_kern__physics__Joint(draw); });
+  converted::fill_array(s.pose, [&]() -> physics::Pose { return draw_kern__physics__Pose(draw); });
+  converted::fill_array(s.from, [&]() -> physics::Pose { return draw_kern__physics__Pose(draw); });
+  converted::fill_array(s.stand, [&]() -> physics::Pose { return draw_kern__physics__Pose(draw); });
+  s.colors = draw_Ragdolls__Colors(draw);
+  s.born = draw.number();
+  s.settled = draw.number();
+  s.getup_at = draw.number();
+  s.stand_yaw = draw.number();
+  s.stand_feet = draw.vector();
+  s.group = static_cast<int>(draw.whole());
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Ragdolls::Doll& s) { return converted::Value::structure({arg(s.active), arg(s.recover), arg(s.getting_up), arg(converted::shaped<converted::Whole>(s.key)), arg(converted::array_list(s.bodies)), arg(converted::array_list(s.joints)), arg(converted::array_list(s.pose)), arg(converted::array_list(s.from)), arg(converted::array_list(s.stand)), arg(s.colors), arg(s.born), arg(s.settled), arg(s.getup_at), arg(s.stand_yaw), arg(s.stand_feet), arg(s.group)}); }
+[[maybe_unused]] static bool same(const Ragdolls::Doll& want, const converted::Value& got) { return got.rows && got.rows->size() == 16 && same(want.active, (*got.rows)[0]) && same(want.recover, (*got.rows)[1]) && same(want.getting_up, (*got.rows)[2]) && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[3]) && same(converted::array_list(want.bodies), (*got.rows)[4]) && same(converted::array_list(want.joints), (*got.rows)[5]) && same(converted::array_list(want.pose), (*got.rows)[6]) && same(converted::array_list(want.from), (*got.rows)[7]) && same(converted::array_list(want.stand), (*got.rows)[8]) && same(want.colors, (*got.rows)[9]) && same(want.born, (*got.rows)[10]) && same(want.settled, (*got.rows)[11]) && same(want.getup_at, (*got.rows)[12]) && same(want.stand_yaw, (*got.rows)[13]) && same(want.stand_feet, (*got.rows)[14]) && same(want.group, (*got.rows)[15]); }
+[[maybe_unused]] static bool defined(const Ragdolls::Doll& s) { return defined(s.active) && defined(s.recover) && defined(s.getting_up) && defined(converted::shaped<converted::Whole>(s.key)) && defined(converted::array_list(s.bodies)) && defined(converted::array_list(s.joints)) && defined(converted::array_list(s.pose)) && defined(converted::array_list(s.from)) && defined(converted::array_list(s.stand)) && defined(s.colors) && defined(s.born) && defined(s.settled) && defined(s.getup_at) && defined(s.stand_yaw) && defined(s.stand_feet) && defined(s.group); }
+[[maybe_unused]] static std::string text(const Ragdolls::Doll& s) { return std::string("{") + text(s.active) + ", " + text(s.recover) + ", " + text(s.getting_up) + ", " + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(converted::array_list(s.bodies)) + ", " + text(converted::array_list(s.joints)) + ", " + text(converted::array_list(s.pose)) + ", " + text(converted::array_list(s.from)) + ", " + text(converted::array_list(s.stand)) + ", " + text(s.colors) + ", " + text(s.born) + ", " + text(s.settled) + ", " + text(s.getup_at) + ", " + text(s.stand_yaw) + ", " + text(s.stand_feet) + ", " + text(s.group) + "}"; }
+[[maybe_unused]] static void take(Ragdolls::Doll& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 16) return; converted::take_as<bool>(s.active, (*v.rows)[0]); converted::take_as<bool>(s.recover, (*v.rows)[1]); converted::take_as<bool>(s.getting_up, (*v.rows)[2]); converted::take_as<converted::Whole>(s.key, (*v.rows)[3]); { std::vector<physics::Body> items; converted::take_as<std::vector<physics::Body>>(items, (*v.rows)[4]); converted::array_from(s.bodies, items); } { std::vector<physics::Joint> items; converted::take_as<std::vector<physics::Joint>>(items, (*v.rows)[5]); converted::array_from(s.joints, items); } { std::vector<physics::Pose> items; converted::take_as<std::vector<physics::Pose>>(items, (*v.rows)[6]); converted::array_from(s.pose, items); } { std::vector<physics::Pose> items; converted::take_as<std::vector<physics::Pose>>(items, (*v.rows)[7]); converted::array_from(s.from, items); } { std::vector<physics::Pose> items; converted::take_as<std::vector<physics::Pose>>(items, (*v.rows)[8]); converted::array_from(s.stand, items); } converted::take_as<Ragdolls::Colors>(s.colors, (*v.rows)[9]); converted::take_as<double>(s.born, (*v.rows)[10]); converted::take_as<double>(s.settled, (*v.rows)[11]); converted::take_as<double>(s.getup_at, (*v.rows)[12]); converted::take_as<double>(s.stand_yaw, (*v.rows)[13]); converted::take_as<Vec3>(s.stand_feet, (*v.rows)[14]); converted::take_as<int>(s.group, (*v.rows)[15]); }
+[[maybe_unused]] static Ragdolls::Up draw_Ragdolls__Up(converted::Draw& draw) {
+  Ragdolls::Up s{};
+  s.key = static_cast<u64>(draw.bits());
+  s.feet = draw.vector();
+  s.yaw = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Ragdolls::Up& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.key)), arg(s.feet), arg(s.yaw)}); }
+[[maybe_unused]] static bool same(const Ragdolls::Up& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]) && same(want.feet, (*got.rows)[1]) && same(want.yaw, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const Ragdolls::Up& s) { return defined(converted::shaped<converted::Whole>(s.key)) && defined(s.feet) && defined(s.yaw); }
+[[maybe_unused]] static std::string text(const Ragdolls::Up& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(s.feet) + ", " + text(s.yaw) + "}"; }
+[[maybe_unused]] static void take(Ragdolls::Up& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<converted::Whole>(s.key, (*v.rows)[0]); converted::take_as<Vec3>(s.feet, (*v.rows)[1]); converted::take_as<double>(s.yaw, (*v.rows)[2]); }
+[[maybe_unused]] static Ragdolls draw_Ragdolls(converted::Draw& draw) {
+  Ragdolls s{};
+  s.world_ = converted::engine_object<World>(1 + draw.below(6));
+  s.dolls_ = draw_list(draw, [&]() -> Ragdolls::Doll { return draw_Ragdolls__Doll(draw); });
+  s.ups_ = draw_list(draw, [&]() -> Ragdolls::Up { return draw_Ragdolls__Up(draw); });
+  s.max_ = static_cast<unsigned int>(draw.below(40));
+  s.spawned_ = static_cast<unsigned int>(draw.below(40));
+  s.group_ = static_cast<int>(draw.whole());
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Ragdolls& s) { return converted::Value::structure({arg(s.world_), arg(s.dolls_), arg(s.ups_), arg(s.max_), arg(s.spawned_), arg(s.group_)}); }
+[[maybe_unused]] static bool same(const Ragdolls& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.world_, (*got.rows)[0]) && same(want.dolls_, (*got.rows)[1]) && same(want.ups_, (*got.rows)[2]) && same(want.max_, (*got.rows)[3]) && same(want.spawned_, (*got.rows)[4]) && same(want.group_, (*got.rows)[5]); }
+[[maybe_unused]] static bool defined(const Ragdolls& s) { return defined(s.world_) && defined(s.dolls_) && defined(s.ups_) && defined(s.max_) && defined(s.spawned_) && defined(s.group_); }
+[[maybe_unused]] static std::string text(const Ragdolls& s) { return std::string("{") + text(s.world_) + ", " + text(s.dolls_) + ", " + text(s.ups_) + ", " + text(s.max_) + ", " + text(s.spawned_) + ", " + text(s.group_) + "}"; }
+[[maybe_unused]] static void take(Ragdolls& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<World*>(s.world_, (*v.rows)[0]); converted::take_as<std::vector<Ragdolls::Doll>>(s.dolls_, (*v.rows)[1]); converted::take_as<std::vector<Ragdolls::Up>>(s.ups_, (*v.rows)[2]); converted::take_as<unsigned int>(s.max_, (*v.rows)[3]); converted::take_as<unsigned int>(s.spawned_, (*v.rows)[4]); converted::take_as<int>(s.group_, (*v.rows)[5]); }
+[[maybe_unused]] static Life::Meadow draw_Life__Meadow(converted::Draw& draw) {
+  Life::Meadow s{};
+  s.rings = draw_list(draw, [&]() -> std::vector<Vec2> { return draw_list(draw, [&]() -> Vec2 { return draw.vector2(); }); });
+  s.lo = draw.vector2();
+  s.hi = draw.vector2();
+  s.centre = draw.vector2();
+  s.area = draw.number();
+  s.key = static_cast<u64>(draw.bits());
+  s.alive = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Life::Meadow& s) { return converted::Value::structure({arg(s.rings), arg(s.lo), arg(s.hi), arg(s.centre), arg(s.area), arg(converted::shaped<converted::Whole>(s.key)), arg(s.alive)}); }
+[[maybe_unused]] static bool same(const Life::Meadow& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.rings, (*got.rows)[0]) && same(want.lo, (*got.rows)[1]) && same(want.hi, (*got.rows)[2]) && same(want.centre, (*got.rows)[3]) && same(want.area, (*got.rows)[4]) && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[5]) && same(want.alive, (*got.rows)[6]); }
+[[maybe_unused]] static bool defined(const Life::Meadow& s) { return defined(s.rings) && defined(s.lo) && defined(s.hi) && defined(s.centre) && defined(s.area) && defined(converted::shaped<converted::Whole>(s.key)) && defined(s.alive); }
+[[maybe_unused]] static std::string text(const Life::Meadow& s) { return std::string("{") + text(s.rings) + ", " + text(s.lo) + ", " + text(s.hi) + ", " + text(s.centre) + ", " + text(s.area) + ", " + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(s.alive) + "}"; }
+[[maybe_unused]] static void take(Life::Meadow& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<std::vector<std::vector<Vec2>>>(s.rings, (*v.rows)[0]); converted::take_as<Vec2>(s.lo, (*v.rows)[1]); converted::take_as<Vec2>(s.hi, (*v.rows)[2]); converted::take_as<Vec2>(s.centre, (*v.rows)[3]); converted::take_as<double>(s.area, (*v.rows)[4]); converted::take_as<converted::Whole>(s.key, (*v.rows)[5]); converted::take_as<bool>(s.alive, (*v.rows)[6]); }
+[[maybe_unused]] static Life::Pigeon draw_Life__Pigeon(converted::Draw& draw) {
+  Life::Pigeon s{};
+  s.o = draw.vector2();
+  s.v = draw.vector2();
+  s.pos = draw.vector();
+  s.yaw = draw.number();
+  s.walk_until = draw.number();
+  s.peck = draw.number();
+  s.flap = draw.number();
+  s.lag = draw.number();
+  s.dead_at = draw.number();
+  s.fall_v = draw.vector();
+  s.net_to = draw.vector();
+  s.net_v = draw.vector();
+  s.net_yaw = draw.number();
+  s.net_at = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Life::Pigeon& s) { return converted::Value::structure({arg(s.o), arg(s.v), arg(s.pos), arg(s.yaw), arg(s.walk_until), arg(s.peck), arg(s.flap), arg(s.lag), arg(s.dead_at), arg(s.fall_v), arg(s.net_to), arg(s.net_v), arg(s.net_yaw), arg(s.net_at)}); }
+[[maybe_unused]] static bool same(const Life::Pigeon& want, const converted::Value& got) { return got.rows && got.rows->size() == 14 && same(want.o, (*got.rows)[0]) && same(want.v, (*got.rows)[1]) && same(want.pos, (*got.rows)[2]) && same(want.yaw, (*got.rows)[3]) && same(want.walk_until, (*got.rows)[4]) && same(want.peck, (*got.rows)[5]) && same(want.flap, (*got.rows)[6]) && same(want.lag, (*got.rows)[7]) && same(want.dead_at, (*got.rows)[8]) && same(want.fall_v, (*got.rows)[9]) && same(want.net_to, (*got.rows)[10]) && same(want.net_v, (*got.rows)[11]) && same(want.net_yaw, (*got.rows)[12]) && same(want.net_at, (*got.rows)[13]); }
+[[maybe_unused]] static bool defined(const Life::Pigeon& s) { return defined(s.o) && defined(s.v) && defined(s.pos) && defined(s.yaw) && defined(s.walk_until) && defined(s.peck) && defined(s.flap) && defined(s.lag) && defined(s.dead_at) && defined(s.fall_v) && defined(s.net_to) && defined(s.net_v) && defined(s.net_yaw) && defined(s.net_at); }
+[[maybe_unused]] static std::string text(const Life::Pigeon& s) { return std::string("{") + text(s.o) + ", " + text(s.v) + ", " + text(s.pos) + ", " + text(s.yaw) + ", " + text(s.walk_until) + ", " + text(s.peck) + ", " + text(s.flap) + ", " + text(s.lag) + ", " + text(s.dead_at) + ", " + text(s.fall_v) + ", " + text(s.net_to) + ", " + text(s.net_v) + ", " + text(s.net_yaw) + ", " + text(s.net_at) + "}"; }
+[[maybe_unused]] static void take(Life::Pigeon& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 14) return; converted::take_as<Vec2>(s.o, (*v.rows)[0]); converted::take_as<Vec2>(s.v, (*v.rows)[1]); converted::take_as<Vec3>(s.pos, (*v.rows)[2]); converted::take_as<double>(s.yaw, (*v.rows)[3]); converted::take_as<double>(s.walk_until, (*v.rows)[4]); converted::take_as<double>(s.peck, (*v.rows)[5]); converted::take_as<double>(s.flap, (*v.rows)[6]); converted::take_as<double>(s.lag, (*v.rows)[7]); converted::take_as<double>(s.dead_at, (*v.rows)[8]); converted::take_as<Vec3>(s.fall_v, (*v.rows)[9]); converted::take_as<Vec3>(s.net_to, (*v.rows)[10]); converted::take_as<Vec3>(s.net_v, (*v.rows)[11]); converted::take_as<double>(s.net_yaw, (*v.rows)[12]); converted::take_as<double>(s.net_at, (*v.rows)[13]); }
+[[maybe_unused]] static Life::Flock draw_Life__Flock(converted::Draw& draw) {
+  Life::Flock s{};
+  s.id = static_cast<unsigned int>(draw.below(40));
+  s.air = draw.flag();
+  s.at = draw.vector2();
+  s.next_flight = draw.number();
+  s.t = draw.number();
+  s.coo_at = draw.number();
+  s.c = draw.vector2();
+  s.from = draw.vector2();
+  s.dest = draw.vector2();
+  s.r = draw.number();
+  s.h = draw.number();
+  s.dir = draw.number();
+  s.a0 = draw.number();
+  s.dur = draw.number();
+  s.birds = draw_list(draw, [&]() -> Life::Pigeon { return draw_Life__Pigeon(draw); });
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Life::Flock& s) { return converted::Value::structure({arg(s.id), arg(s.air), arg(s.at), arg(s.next_flight), arg(s.t), arg(s.coo_at), arg(s.c), arg(s.from), arg(s.dest), arg(s.r), arg(s.h), arg(s.dir), arg(s.a0), arg(s.dur), arg(s.birds)}); }
+[[maybe_unused]] static bool same(const Life::Flock& want, const converted::Value& got) { return got.rows && got.rows->size() == 15 && same(want.id, (*got.rows)[0]) && same(want.air, (*got.rows)[1]) && same(want.at, (*got.rows)[2]) && same(want.next_flight, (*got.rows)[3]) && same(want.t, (*got.rows)[4]) && same(want.coo_at, (*got.rows)[5]) && same(want.c, (*got.rows)[6]) && same(want.from, (*got.rows)[7]) && same(want.dest, (*got.rows)[8]) && same(want.r, (*got.rows)[9]) && same(want.h, (*got.rows)[10]) && same(want.dir, (*got.rows)[11]) && same(want.a0, (*got.rows)[12]) && same(want.dur, (*got.rows)[13]) && same(want.birds, (*got.rows)[14]); }
+[[maybe_unused]] static bool defined(const Life::Flock& s) { return defined(s.id) && defined(s.air) && defined(s.at) && defined(s.next_flight) && defined(s.t) && defined(s.coo_at) && defined(s.c) && defined(s.from) && defined(s.dest) && defined(s.r) && defined(s.h) && defined(s.dir) && defined(s.a0) && defined(s.dur) && defined(s.birds); }
+[[maybe_unused]] static std::string text(const Life::Flock& s) { return std::string("{") + text(s.id) + ", " + text(s.air) + ", " + text(s.at) + ", " + text(s.next_flight) + ", " + text(s.t) + ", " + text(s.coo_at) + ", " + text(s.c) + ", " + text(s.from) + ", " + text(s.dest) + ", " + text(s.r) + ", " + text(s.h) + ", " + text(s.dir) + ", " + text(s.a0) + ", " + text(s.dur) + ", " + text(s.birds) + "}"; }
+[[maybe_unused]] static void take(Life::Flock& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 15) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<bool>(s.air, (*v.rows)[1]); converted::take_as<Vec2>(s.at, (*v.rows)[2]); converted::take_as<double>(s.next_flight, (*v.rows)[3]); converted::take_as<double>(s.t, (*v.rows)[4]); converted::take_as<double>(s.coo_at, (*v.rows)[5]); converted::take_as<Vec2>(s.c, (*v.rows)[6]); converted::take_as<Vec2>(s.from, (*v.rows)[7]); converted::take_as<Vec2>(s.dest, (*v.rows)[8]); converted::take_as<double>(s.r, (*v.rows)[9]); converted::take_as<double>(s.h, (*v.rows)[10]); converted::take_as<double>(s.dir, (*v.rows)[11]); converted::take_as<double>(s.a0, (*v.rows)[12]); converted::take_as<double>(s.dur, (*v.rows)[13]); converted::take_as<std::vector<Life::Pigeon>>(s.birds, (*v.rows)[14]); }
+[[maybe_unused]] static Life::Bird draw_Life__Bird(converted::Draw& draw) {
+  Life::Bird s{};
+  s.seed = static_cast<unsigned int>(draw.below(40));
+  s.pos = draw.vector();
+  s.yaw = draw.number();
+  s.flap = draw.number();
+  s.dead_until = draw.number();
+  s.dying_until = draw.number();
+  s.spin = draw.number();
+  s.fall_v = draw.vector();
+  s.center = draw.vector2();
+  s.down = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Life::Bird& s) { return converted::Value::structure({arg(s.seed), arg(s.pos), arg(s.yaw), arg(s.flap), arg(s.dead_until), arg(s.dying_until), arg(s.spin), arg(s.fall_v), arg(s.center), arg(s.down)}); }
+[[maybe_unused]] static bool same(const Life::Bird& want, const converted::Value& got) { return got.rows && got.rows->size() == 10 && same(want.seed, (*got.rows)[0]) && same(want.pos, (*got.rows)[1]) && same(want.yaw, (*got.rows)[2]) && same(want.flap, (*got.rows)[3]) && same(want.dead_until, (*got.rows)[4]) && same(want.dying_until, (*got.rows)[5]) && same(want.spin, (*got.rows)[6]) && same(want.fall_v, (*got.rows)[7]) && same(want.center, (*got.rows)[8]) && same(want.down, (*got.rows)[9]); }
+[[maybe_unused]] static bool defined(const Life::Bird& s) { return defined(s.seed) && defined(s.pos) && defined(s.yaw) && defined(s.flap) && defined(s.dead_until) && defined(s.dying_until) && defined(s.spin) && defined(s.fall_v) && defined(s.center) && defined(s.down); }
+[[maybe_unused]] static std::string text(const Life::Bird& s) { return std::string("{") + text(s.seed) + ", " + text(s.pos) + ", " + text(s.yaw) + ", " + text(s.flap) + ", " + text(s.dead_until) + ", " + text(s.dying_until) + ", " + text(s.spin) + ", " + text(s.fall_v) + ", " + text(s.center) + ", " + text(s.down) + "}"; }
+[[maybe_unused]] static void take(Life::Bird& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 10) return; converted::take_as<unsigned int>(s.seed, (*v.rows)[0]); converted::take_as<Vec3>(s.pos, (*v.rows)[1]); converted::take_as<double>(s.yaw, (*v.rows)[2]); converted::take_as<double>(s.flap, (*v.rows)[3]); converted::take_as<double>(s.dead_until, (*v.rows)[4]); converted::take_as<double>(s.dying_until, (*v.rows)[5]); converted::take_as<double>(s.spin, (*v.rows)[6]); converted::take_as<Vec3>(s.fall_v, (*v.rows)[7]); converted::take_as<Vec2>(s.center, (*v.rows)[8]); converted::take_as<bool>(s.down, (*v.rows)[9]); }
+[[maybe_unused]] static Life::Tree draw_Life__Tree(converted::Draw& draw) {
+  Life::Tree s{};
+  s.foot = draw.vector();
+  s.scale = draw.number();
+  s.lane = static_cast<unsigned int>(draw.below(40));
+  s.fell_at = draw.number();
+  s.fall_dir = draw.vector2();
+  s.tile = static_cast<u64>(draw.bits());
+  s.index = static_cast<unsigned int>(draw.below(40));
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Life::Tree& s) { return converted::Value::structure({arg(s.foot), arg(s.scale), arg(s.lane), arg(s.fell_at), arg(s.fall_dir), arg(converted::shaped<converted::Whole>(s.tile)), arg(s.index)}); }
+[[maybe_unused]] static bool same(const Life::Tree& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.foot, (*got.rows)[0]) && same(want.scale, (*got.rows)[1]) && same(want.lane, (*got.rows)[2]) && same(want.fell_at, (*got.rows)[3]) && same(want.fall_dir, (*got.rows)[4]) && same(converted::shaped<converted::Whole>(want.tile), (*got.rows)[5]) && same(want.index, (*got.rows)[6]); }
+[[maybe_unused]] static bool defined(const Life::Tree& s) { return defined(s.foot) && defined(s.scale) && defined(s.lane) && defined(s.fell_at) && defined(s.fall_dir) && defined(converted::shaped<converted::Whole>(s.tile)) && defined(s.index); }
+[[maybe_unused]] static std::string text(const Life::Tree& s) { return std::string("{") + text(s.foot) + ", " + text(s.scale) + ", " + text(s.lane) + ", " + text(s.fell_at) + ", " + text(s.fall_dir) + ", " + text(converted::shaped<converted::Whole>(s.tile)) + ", " + text(s.index) + "}"; }
+[[maybe_unused]] static void take(Life::Tree& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<Vec3>(s.foot, (*v.rows)[0]); converted::take_as<double>(s.scale, (*v.rows)[1]); converted::take_as<unsigned int>(s.lane, (*v.rows)[2]); converted::take_as<double>(s.fell_at, (*v.rows)[3]); converted::take_as<Vec2>(s.fall_dir, (*v.rows)[4]); converted::take_as<converted::Whole>(s.tile, (*v.rows)[5]); converted::take_as<unsigned int>(s.index, (*v.rows)[6]); }
+[[maybe_unused]] static Life::Pet draw_Life__Pet(converted::Draw& draw) {
+  Life::Pet s{};
+  s.radius = draw.number();
+  s.omega = draw.number();
+  s.phase = draw.number();
+  s.wobble_omega = draw.number();
+  s.wobble_r = draw.number();
+  s.scale = draw.number();
+  s.pos = draw.vector();
+  s.yaw = draw.number();
+  s.gait = draw.number();
+  s.speed = draw.number();
+  s.dead_at = draw.number();
+  s.shown = draw.flag();
+  s.has_pose = draw.flag();
+  s.carried = draw.flag();
+  s.carried_still = draw.number();
+  s.off = draw.vector2();
+  s.punches = static_cast<int>(draw.whole());
+  s.color = draw.vector();
+  s.body = draw_kern__physics__Body(draw);
+  s.rot = draw_kern__Quat(draw);
+  s.net_rot = draw_kern__Quat(draw);
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Life::Pet& s) { return converted::Value::structure({arg(s.radius), arg(s.omega), arg(s.phase), arg(s.wobble_omega), arg(s.wobble_r), arg(s.scale), arg(s.pos), arg(s.yaw), arg(s.gait), arg(s.speed), arg(s.dead_at), arg(s.shown), arg(s.has_pose), arg(s.carried), arg(s.carried_still), arg(s.off), arg(s.punches), arg(s.color), arg(s.body), arg(s.rot), arg(s.net_rot)}); }
+[[maybe_unused]] static bool same(const Life::Pet& want, const converted::Value& got) { return got.rows && got.rows->size() == 21 && same(want.radius, (*got.rows)[0]) && same(want.omega, (*got.rows)[1]) && same(want.phase, (*got.rows)[2]) && same(want.wobble_omega, (*got.rows)[3]) && same(want.wobble_r, (*got.rows)[4]) && same(want.scale, (*got.rows)[5]) && same(want.pos, (*got.rows)[6]) && same(want.yaw, (*got.rows)[7]) && same(want.gait, (*got.rows)[8]) && same(want.speed, (*got.rows)[9]) && same(want.dead_at, (*got.rows)[10]) && same(want.shown, (*got.rows)[11]) && same(want.has_pose, (*got.rows)[12]) && same(want.carried, (*got.rows)[13]) && same(want.carried_still, (*got.rows)[14]) && same(want.off, (*got.rows)[15]) && same(want.punches, (*got.rows)[16]) && same(want.color, (*got.rows)[17]) && same(want.body, (*got.rows)[18]) && same(want.rot, (*got.rows)[19]) && same(want.net_rot, (*got.rows)[20]); }
+[[maybe_unused]] static bool defined(const Life::Pet& s) { return defined(s.radius) && defined(s.omega) && defined(s.phase) && defined(s.wobble_omega) && defined(s.wobble_r) && defined(s.scale) && defined(s.pos) && defined(s.yaw) && defined(s.gait) && defined(s.speed) && defined(s.dead_at) && defined(s.shown) && defined(s.has_pose) && defined(s.carried) && defined(s.carried_still) && defined(s.off) && defined(s.punches) && defined(s.color) && defined(s.body) && defined(s.rot) && defined(s.net_rot); }
+[[maybe_unused]] static std::string text(const Life::Pet& s) { return std::string("{") + text(s.radius) + ", " + text(s.omega) + ", " + text(s.phase) + ", " + text(s.wobble_omega) + ", " + text(s.wobble_r) + ", " + text(s.scale) + ", " + text(s.pos) + ", " + text(s.yaw) + ", " + text(s.gait) + ", " + text(s.speed) + ", " + text(s.dead_at) + ", " + text(s.shown) + ", " + text(s.has_pose) + ", " + text(s.carried) + ", " + text(s.carried_still) + ", " + text(s.off) + ", " + text(s.punches) + ", " + text(s.color) + ", " + text(s.body) + ", " + text(s.rot) + ", " + text(s.net_rot) + "}"; }
+[[maybe_unused]] static void take(Life::Pet& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 21) return; converted::take_as<double>(s.radius, (*v.rows)[0]); converted::take_as<double>(s.omega, (*v.rows)[1]); converted::take_as<double>(s.phase, (*v.rows)[2]); converted::take_as<double>(s.wobble_omega, (*v.rows)[3]); converted::take_as<double>(s.wobble_r, (*v.rows)[4]); converted::take_as<double>(s.scale, (*v.rows)[5]); converted::take_as<Vec3>(s.pos, (*v.rows)[6]); converted::take_as<double>(s.yaw, (*v.rows)[7]); converted::take_as<double>(s.gait, (*v.rows)[8]); converted::take_as<double>(s.speed, (*v.rows)[9]); converted::take_as<double>(s.dead_at, (*v.rows)[10]); converted::take_as<bool>(s.shown, (*v.rows)[11]); converted::take_as<bool>(s.has_pose, (*v.rows)[12]); converted::take_as<bool>(s.carried, (*v.rows)[13]); converted::take_as<double>(s.carried_still, (*v.rows)[14]); converted::take_as<Vec2>(s.off, (*v.rows)[15]); converted::take_as<int>(s.punches, (*v.rows)[16]); converted::take_as<Vec3>(s.color, (*v.rows)[17]); converted::take_as<physics::Body>(s.body, (*v.rows)[18]); converted::take_as<Quat>(s.rot, (*v.rows)[19]); converted::take_as<Quat>(s.net_rot, (*v.rows)[20]); }
+[[maybe_unused]] static Life::CatAttack draw_Life__CatAttack(converted::Draw& draw) {
+  Life::CatAttack s{};
+  s.on = draw.flag();
+  s.phase = static_cast<int>(draw.whole());
+  s.p = draw.vector();
+  s.from = draw.vector();
+  s.yaw = draw.number();
+  s.start = draw.number();
+  s.leap_at = draw.number();
+  s.last_cry = draw.number();
+  s.away_yaw = draw.number();
+  s.leave_at = draw.number();
+  s.cries = static_cast<int>(draw.whole());
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Life::CatAttack& s) { return converted::Value::structure({arg(s.on), arg(s.phase), arg(s.p), arg(s.from), arg(s.yaw), arg(s.start), arg(s.leap_at), arg(s.last_cry), arg(s.away_yaw), arg(s.leave_at), arg(s.cries)}); }
+[[maybe_unused]] static bool same(const Life::CatAttack& want, const converted::Value& got) { return got.rows && got.rows->size() == 11 && same(want.on, (*got.rows)[0]) && same(want.phase, (*got.rows)[1]) && same(want.p, (*got.rows)[2]) && same(want.from, (*got.rows)[3]) && same(want.yaw, (*got.rows)[4]) && same(want.start, (*got.rows)[5]) && same(want.leap_at, (*got.rows)[6]) && same(want.last_cry, (*got.rows)[7]) && same(want.away_yaw, (*got.rows)[8]) && same(want.leave_at, (*got.rows)[9]) && same(want.cries, (*got.rows)[10]); }
+[[maybe_unused]] static bool defined(const Life::CatAttack& s) { return defined(s.on) && defined(s.phase) && defined(s.p) && defined(s.from) && defined(s.yaw) && defined(s.start) && defined(s.leap_at) && defined(s.last_cry) && defined(s.away_yaw) && defined(s.leave_at) && defined(s.cries); }
+[[maybe_unused]] static std::string text(const Life::CatAttack& s) { return std::string("{") + text(s.on) + ", " + text(s.phase) + ", " + text(s.p) + ", " + text(s.from) + ", " + text(s.yaw) + ", " + text(s.start) + ", " + text(s.leap_at) + ", " + text(s.last_cry) + ", " + text(s.away_yaw) + ", " + text(s.leave_at) + ", " + text(s.cries) + "}"; }
+[[maybe_unused]] static void take(Life::CatAttack& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 11) return; converted::take_as<bool>(s.on, (*v.rows)[0]); converted::take_as<int>(s.phase, (*v.rows)[1]); converted::take_as<Vec3>(s.p, (*v.rows)[2]); converted::take_as<Vec3>(s.from, (*v.rows)[3]); converted::take_as<double>(s.yaw, (*v.rows)[4]); converted::take_as<double>(s.start, (*v.rows)[5]); converted::take_as<double>(s.leap_at, (*v.rows)[6]); converted::take_as<double>(s.last_cry, (*v.rows)[7]); converted::take_as<double>(s.away_yaw, (*v.rows)[8]); converted::take_as<double>(s.leave_at, (*v.rows)[9]); converted::take_as<int>(s.cries, (*v.rows)[10]); }
+[[maybe_unused]] static Life::Runner draw_Life__Runner(converted::Draw& draw) {
+  Life::Runner s{};
+  s.pos = draw.vector();
+  s.yaw = draw.number();
+  s.yaw_s = draw.number();
+  s.lat = draw.number();
+  s.phase = draw.number();
+  s.alive = draw.flag();
+  s.net_to = draw.vector();
+  s.net_v = draw.vector();
+  s.net_at = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Life::Runner& s) { return converted::Value::structure({arg(s.pos), arg(s.yaw), arg(s.yaw_s), arg(s.lat), arg(s.phase), arg(s.alive), arg(s.net_to), arg(s.net_v), arg(s.net_at)}); }
+[[maybe_unused]] static bool same(const Life::Runner& want, const converted::Value& got) { return got.rows && got.rows->size() == 9 && same(want.pos, (*got.rows)[0]) && same(want.yaw, (*got.rows)[1]) && same(want.yaw_s, (*got.rows)[2]) && same(want.lat, (*got.rows)[3]) && same(want.phase, (*got.rows)[4]) && same(want.alive, (*got.rows)[5]) && same(want.net_to, (*got.rows)[6]) && same(want.net_v, (*got.rows)[7]) && same(want.net_at, (*got.rows)[8]); }
+[[maybe_unused]] static bool defined(const Life::Runner& s) { return defined(s.pos) && defined(s.yaw) && defined(s.yaw_s) && defined(s.lat) && defined(s.phase) && defined(s.alive) && defined(s.net_to) && defined(s.net_v) && defined(s.net_at); }
+[[maybe_unused]] static std::string text(const Life::Runner& s) { return std::string("{") + text(s.pos) + ", " + text(s.yaw) + ", " + text(s.yaw_s) + ", " + text(s.lat) + ", " + text(s.phase) + ", " + text(s.alive) + ", " + text(s.net_to) + ", " + text(s.net_v) + ", " + text(s.net_at) + "}"; }
+[[maybe_unused]] static void take(Life::Runner& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 9) return; converted::take_as<Vec3>(s.pos, (*v.rows)[0]); converted::take_as<double>(s.yaw, (*v.rows)[1]); converted::take_as<double>(s.yaw_s, (*v.rows)[2]); converted::take_as<double>(s.lat, (*v.rows)[3]); converted::take_as<double>(s.phase, (*v.rows)[4]); converted::take_as<bool>(s.alive, (*v.rows)[5]); converted::take_as<Vec3>(s.net_to, (*v.rows)[6]); converted::take_as<Vec3>(s.net_v, (*v.rows)[7]); converted::take_as<double>(s.net_at, (*v.rows)[8]); }
+[[maybe_unused]] static Life::Chain draw_Life__Chain(converted::Draw& draw) {
+  Life::Chain s{};
+  s.id = static_cast<unsigned int>(draw.below(40));
+  s.path = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+  s.cum = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.len = draw.number();
+  s.s = draw.number();
+  s.born = draw.number();
+  s.next_call = draw.number();
+  s.next_beat = draw.number();
+  s.off = draw.number();
+  s.call = static_cast<int>(draw.whole());
+  s.beat = static_cast<int>(draw.whole());
+  s.side = static_cast<int>(draw.whole());
+  converted::fill_array(s.runners, [&]() -> Life::Runner { return draw_Life__Runner(draw); });
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Life::Chain& s) { return converted::Value::structure({arg(s.id), arg(s.path), arg(s.cum), arg(s.len), arg(s.s), arg(s.born), arg(s.next_call), arg(s.next_beat), arg(s.off), arg(s.call), arg(s.beat), arg(s.side), arg(converted::array_list(s.runners))}); }
+[[maybe_unused]] static bool same(const Life::Chain& want, const converted::Value& got) { return got.rows && got.rows->size() == 13 && same(want.id, (*got.rows)[0]) && same(want.path, (*got.rows)[1]) && same(want.cum, (*got.rows)[2]) && same(want.len, (*got.rows)[3]) && same(want.s, (*got.rows)[4]) && same(want.born, (*got.rows)[5]) && same(want.next_call, (*got.rows)[6]) && same(want.next_beat, (*got.rows)[7]) && same(want.off, (*got.rows)[8]) && same(want.call, (*got.rows)[9]) && same(want.beat, (*got.rows)[10]) && same(want.side, (*got.rows)[11]) && same(converted::array_list(want.runners), (*got.rows)[12]); }
+[[maybe_unused]] static bool defined(const Life::Chain& s) { return defined(s.id) && defined(s.path) && defined(s.cum) && defined(s.len) && defined(s.s) && defined(s.born) && defined(s.next_call) && defined(s.next_beat) && defined(s.off) && defined(s.call) && defined(s.beat) && defined(s.side) && defined(converted::array_list(s.runners)); }
+[[maybe_unused]] static std::string text(const Life::Chain& s) { return std::string("{") + text(s.id) + ", " + text(s.path) + ", " + text(s.cum) + ", " + text(s.len) + ", " + text(s.s) + ", " + text(s.born) + ", " + text(s.next_call) + ", " + text(s.next_beat) + ", " + text(s.off) + ", " + text(s.call) + ", " + text(s.beat) + ", " + text(s.side) + ", " + text(converted::array_list(s.runners)) + "}"; }
+[[maybe_unused]] static void take(Life::Chain& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 13) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<std::vector<Vec2>>(s.path, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.cum, (*v.rows)[2]); converted::take_as<double>(s.len, (*v.rows)[3]); converted::take_as<double>(s.s, (*v.rows)[4]); converted::take_as<double>(s.born, (*v.rows)[5]); converted::take_as<double>(s.next_call, (*v.rows)[6]); converted::take_as<double>(s.next_beat, (*v.rows)[7]); converted::take_as<double>(s.off, (*v.rows)[8]); converted::take_as<int>(s.call, (*v.rows)[9]); converted::take_as<int>(s.beat, (*v.rows)[10]); converted::take_as<int>(s.side, (*v.rows)[11]); { std::vector<Life::Runner> items; converted::take_as<std::vector<Life::Runner>>(items, (*v.rows)[12]); converted::array_from(s.runners, items); } }
+[[maybe_unused]] static Life::Voice draw_Life__Voice(converted::Draw& draw) {
+  Life::Voice s{};
+  s.at = draw.vector();
+  s.text = draw.word();
+  s.mood = draw.word();
+  s.until = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Life::Voice& s) { return converted::Value::structure({arg(s.at), arg(s.text), arg(s.mood), arg(s.until)}); }
+[[maybe_unused]] static bool same(const Life::Voice& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.at, (*got.rows)[0]) && same(want.text, (*got.rows)[1]) && same(want.mood, (*got.rows)[2]) && same(want.until, (*got.rows)[3]); }
+[[maybe_unused]] static bool defined(const Life::Voice& s) { return defined(s.at) && defined(s.text) && defined(s.mood) && defined(s.until); }
+[[maybe_unused]] static std::string text(const Life::Voice& s) { return std::string("{") + text(s.at) + ", " + text(s.text) + ", " + text(s.mood) + ", " + text(s.until) + "}"; }
+[[maybe_unused]] static void take(Life::Voice& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<Vec3>(s.at, (*v.rows)[0]); converted::take_as<std::string>(s.text, (*v.rows)[1]); converted::take_as<std::string>(s.mood, (*v.rows)[2]); converted::take_as<double>(s.until, (*v.rows)[3]); }
+[[maybe_unused]] static Life draw_Life(converted::Draw& draw) {
+  Life s{};
+  s.loose_ = draw_list(draw, [&]() -> Life::LooseBird { return draw_Life__LooseBird(draw); });
+  s.loose_serial_ = static_cast<int>(draw.whole());
+  s.remote_animals_ = draw.flag();
+  s.pet_anchors_ = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+  s.pet_base_ = static_cast<unsigned int>(draw.below(40));
+  s.remote_animals_at_ = draw.number();
+  s.pet_net_to_ = draw_list(draw, [&]() -> Vec3 { return draw.vector(); });
+  s.pet_net_yaw_ = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.loose_keys_ = draw_list(draw, [&]() -> u64 { return static_cast<u64>(draw.bits()); });
+  s.remote_joggers_ = draw.flag();
+  s.remote_joggers_at_ = draw.number();
+  s.world_ = converted::engine_object<World>(1 + draw.below(6));
+  s.mobile_ = draw.flag();
+  s.ragdolls_ = draw_Ragdolls(draw);
+  s.meadows_ = draw_list(draw, [&]() -> Life::Meadow { return draw_Life__Meadow(draw); });
+  s.cows_ = draw_list(draw, [&]() -> Life::Cow { return draw_Life__Cow(draw); });
+  s.dead_cows_ = draw_list(draw, [&]() -> u64 { return static_cast<u64>(draw.bits()); });
+  s.herds_for_ = draw.vector2();
+  s.last_herd_check_ = draw.number();
+  s.last_moo_ = draw.number();
+  s.herds_at_ = draw.number();
+  s.flocks_ = draw_list(draw, [&]() -> Life::Flock { return draw_Life__Flock(draw); });
+  s.flock_serial_ = static_cast<unsigned int>(draw.below(40));
+  s.trees_down_ = static_cast<unsigned int>(draw.below(40));
+  s.tree_ground_cursor_ = static_cast<unsigned int>(draw.below(40));
+  s.birds_ = draw_list(draw, [&]() -> Life::Bird { return draw_Life__Bird(draw); });
+  s.trees_ = draw_list(draw, [&]() -> Life::Tree { return draw_Life__Tree(draw); });
+  s.pets_ = draw_list(draw, [&]() -> Life::Pet { return draw_Life__Pet(draw); });
+  s.cat_ = draw_Life__CatAttack(draw);
+  s.pet_anchor_ = draw.vector2();
+  s.epoch_ = draw.number();
+  s.tree_serial_ = static_cast<unsigned int>(draw.below(40));
+  s.trees_gone_ = converted::draw_set<converted::wide::Set<u64>>(draw, [&]() -> u64 { return static_cast<u64>(draw.bits()); });
+  s.chain_ = draw_Life__Chain(draw);
+  s.chain_alive_ = draw.flag();
+  s.next_chain_ = draw.number();
+  s.streak_at_ = draw.number();
+  s.chain_serial_ = static_cast<unsigned int>(draw.below(40));
+  s.streak_n_ = static_cast<unsigned int>(draw.below(40));
+  s.streak_chain_ = static_cast<unsigned int>(draw.below(40));
+  s.voices_ = draw_list(draw, [&]() -> Life::Voice { return draw_Life__Voice(draw); });
+  s.last_shout_ = draw.number();
+  s.last_honk_ = draw.number();
+  s.last_scream_ = draw.number();
+  s.last_coo_ = draw.number();
+  s.ambient_chirp_ = draw.number();
+  s.source_gap_ = draw_list(draw, [&]() -> std::pair<unsigned int, double> { return std::pair<unsigned int, double>(static_cast<unsigned int>(draw.below(40)), draw.number()); });
+  s.cow_hits_ = static_cast<unsigned int>(draw.below(40));
+  s.bird_hits_ = static_cast<unsigned int>(draw.below(40));
+  s.shouts_ = static_cast<unsigned int>(draw.below(40));
+  s.honks_ = static_cast<unsigned int>(draw.below(40));
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Life& s) { return converted::Value::structure({arg(s.loose_), arg(s.loose_serial_), arg(s.remote_animals_), arg(s.pet_anchors_), arg(s.pet_base_), arg(s.remote_animals_at_), arg(s.pet_net_to_), arg(s.pet_net_yaw_), arg(converted::shaped<std::vector<converted::Whole>>(s.loose_keys_)), arg(s.remote_joggers_), arg(s.remote_joggers_at_), arg(s.world_), arg(s.mobile_), arg(s.ragdolls_), arg(s.meadows_), arg(s.cows_), arg(converted::shaped<std::vector<converted::Whole>>(s.dead_cows_)), arg(s.herds_for_), arg(s.last_herd_check_), arg(s.last_moo_), arg(s.herds_at_), arg(s.flocks_), arg(s.flock_serial_), arg(s.trees_down_), arg(s.tree_ground_cursor_), arg(s.birds_), arg(s.trees_), arg(s.pets_), arg(s.cat_), arg(s.pet_anchor_), arg(s.epoch_), arg(s.tree_serial_), arg(converted::shaped<converted::wide::Set<converted::Whole>>(s.trees_gone_)), arg(s.chain_), arg(s.chain_alive_), arg(s.next_chain_), arg(s.streak_at_), arg(s.chain_serial_), arg(s.streak_n_), arg(s.streak_chain_), arg(s.voices_), arg(s.last_shout_), arg(s.last_honk_), arg(s.last_scream_), arg(s.last_coo_), arg(s.ambient_chirp_), arg(s.source_gap_), arg(s.cow_hits_), arg(s.bird_hits_), arg(s.shouts_), arg(s.honks_)}); }
+[[maybe_unused]] static bool same(const Life& want, const converted::Value& got) { return got.rows && got.rows->size() == 51 && same(want.loose_, (*got.rows)[0]) && same(want.loose_serial_, (*got.rows)[1]) && same(want.remote_animals_, (*got.rows)[2]) && same(want.pet_anchors_, (*got.rows)[3]) && same(want.pet_base_, (*got.rows)[4]) && same(want.remote_animals_at_, (*got.rows)[5]) && same(want.pet_net_to_, (*got.rows)[6]) && same(want.pet_net_yaw_, (*got.rows)[7]) && same(converted::shaped<std::vector<converted::Whole>>(want.loose_keys_), (*got.rows)[8]) && same(want.remote_joggers_, (*got.rows)[9]) && same(want.remote_joggers_at_, (*got.rows)[10]) && same(want.world_, (*got.rows)[11]) && same(want.mobile_, (*got.rows)[12]) && same(want.ragdolls_, (*got.rows)[13]) && same(want.meadows_, (*got.rows)[14]) && same(want.cows_, (*got.rows)[15]) && same(converted::shaped<std::vector<converted::Whole>>(want.dead_cows_), (*got.rows)[16]) && same(want.herds_for_, (*got.rows)[17]) && same(want.last_herd_check_, (*got.rows)[18]) && same(want.last_moo_, (*got.rows)[19]) && same(want.herds_at_, (*got.rows)[20]) && same(want.flocks_, (*got.rows)[21]) && same(want.flock_serial_, (*got.rows)[22]) && same(want.trees_down_, (*got.rows)[23]) && same(want.tree_ground_cursor_, (*got.rows)[24]) && same(want.birds_, (*got.rows)[25]) && same(want.trees_, (*got.rows)[26]) && same(want.pets_, (*got.rows)[27]) && same(want.cat_, (*got.rows)[28]) && same(want.pet_anchor_, (*got.rows)[29]) && same(want.epoch_, (*got.rows)[30]) && same(want.tree_serial_, (*got.rows)[31]) && same(converted::shaped<converted::wide::Set<converted::Whole>>(want.trees_gone_), (*got.rows)[32]) && same(want.chain_, (*got.rows)[33]) && same(want.chain_alive_, (*got.rows)[34]) && same(want.next_chain_, (*got.rows)[35]) && same(want.streak_at_, (*got.rows)[36]) && same(want.chain_serial_, (*got.rows)[37]) && same(want.streak_n_, (*got.rows)[38]) && same(want.streak_chain_, (*got.rows)[39]) && same(want.voices_, (*got.rows)[40]) && same(want.last_shout_, (*got.rows)[41]) && same(want.last_honk_, (*got.rows)[42]) && same(want.last_scream_, (*got.rows)[43]) && same(want.last_coo_, (*got.rows)[44]) && same(want.ambient_chirp_, (*got.rows)[45]) && same(want.source_gap_, (*got.rows)[46]) && same(want.cow_hits_, (*got.rows)[47]) && same(want.bird_hits_, (*got.rows)[48]) && same(want.shouts_, (*got.rows)[49]) && same(want.honks_, (*got.rows)[50]); }
+[[maybe_unused]] static bool defined(const Life& s) { return defined(s.loose_) && defined(s.loose_serial_) && defined(s.remote_animals_) && defined(s.pet_anchors_) && defined(s.pet_base_) && defined(s.remote_animals_at_) && defined(s.pet_net_to_) && defined(s.pet_net_yaw_) && defined(converted::shaped<std::vector<converted::Whole>>(s.loose_keys_)) && defined(s.remote_joggers_) && defined(s.remote_joggers_at_) && defined(s.world_) && defined(s.mobile_) && defined(s.ragdolls_) && defined(s.meadows_) && defined(s.cows_) && defined(converted::shaped<std::vector<converted::Whole>>(s.dead_cows_)) && defined(s.herds_for_) && defined(s.last_herd_check_) && defined(s.last_moo_) && defined(s.herds_at_) && defined(s.flocks_) && defined(s.flock_serial_) && defined(s.trees_down_) && defined(s.tree_ground_cursor_) && defined(s.birds_) && defined(s.trees_) && defined(s.pets_) && defined(s.cat_) && defined(s.pet_anchor_) && defined(s.epoch_) && defined(s.tree_serial_) && defined(converted::shaped<converted::wide::Set<converted::Whole>>(s.trees_gone_)) && defined(s.chain_) && defined(s.chain_alive_) && defined(s.next_chain_) && defined(s.streak_at_) && defined(s.chain_serial_) && defined(s.streak_n_) && defined(s.streak_chain_) && defined(s.voices_) && defined(s.last_shout_) && defined(s.last_honk_) && defined(s.last_scream_) && defined(s.last_coo_) && defined(s.ambient_chirp_) && defined(s.source_gap_) && defined(s.cow_hits_) && defined(s.bird_hits_) && defined(s.shouts_) && defined(s.honks_); }
+[[maybe_unused]] static std::string text(const Life& s) { return std::string("{") + text(s.loose_) + ", " + text(s.loose_serial_) + ", " + text(s.remote_animals_) + ", " + text(s.pet_anchors_) + ", " + text(s.pet_base_) + ", " + text(s.remote_animals_at_) + ", " + text(s.pet_net_to_) + ", " + text(s.pet_net_yaw_) + ", " + text(converted::shaped<std::vector<converted::Whole>>(s.loose_keys_)) + ", " + text(s.remote_joggers_) + ", " + text(s.remote_joggers_at_) + ", " + text(s.world_) + ", " + text(s.mobile_) + ", " + text(s.ragdolls_) + ", " + text(s.meadows_) + ", " + text(s.cows_) + ", " + text(converted::shaped<std::vector<converted::Whole>>(s.dead_cows_)) + ", " + text(s.herds_for_) + ", " + text(s.last_herd_check_) + ", " + text(s.last_moo_) + ", " + text(s.herds_at_) + ", " + text(s.flocks_) + ", " + text(s.flock_serial_) + ", " + text(s.trees_down_) + ", " + text(s.tree_ground_cursor_) + ", " + text(s.birds_) + ", " + text(s.trees_) + ", " + text(s.pets_) + ", " + text(s.cat_) + ", " + text(s.pet_anchor_) + ", " + text(s.epoch_) + ", " + text(s.tree_serial_) + ", " + text(converted::shaped<converted::wide::Set<converted::Whole>>(s.trees_gone_)) + ", " + text(s.chain_) + ", " + text(s.chain_alive_) + ", " + text(s.next_chain_) + ", " + text(s.streak_at_) + ", " + text(s.chain_serial_) + ", " + text(s.streak_n_) + ", " + text(s.streak_chain_) + ", " + text(s.voices_) + ", " + text(s.last_shout_) + ", " + text(s.last_honk_) + ", " + text(s.last_scream_) + ", " + text(s.last_coo_) + ", " + text(s.ambient_chirp_) + ", " + text(s.source_gap_) + ", " + text(s.cow_hits_) + ", " + text(s.bird_hits_) + ", " + text(s.shouts_) + ", " + text(s.honks_) + "}"; }
+[[maybe_unused]] static void take(Life& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 51) return; converted::take_as<std::vector<Life::LooseBird>>(s.loose_, (*v.rows)[0]); converted::take_as<int>(s.loose_serial_, (*v.rows)[1]); converted::take_as<bool>(s.remote_animals_, (*v.rows)[2]); converted::take_as<std::vector<Vec2>>(s.pet_anchors_, (*v.rows)[3]); converted::take_as<unsigned int>(s.pet_base_, (*v.rows)[4]); converted::take_as<double>(s.remote_animals_at_, (*v.rows)[5]); converted::take_as<std::vector<Vec3>>(s.pet_net_to_, (*v.rows)[6]); converted::take_as<std::vector<double>>(s.pet_net_yaw_, (*v.rows)[7]); converted::take_as<std::vector<converted::Whole>>(s.loose_keys_, (*v.rows)[8]); converted::take_as<bool>(s.remote_joggers_, (*v.rows)[9]); converted::take_as<double>(s.remote_joggers_at_, (*v.rows)[10]); converted::take_as<World*>(s.world_, (*v.rows)[11]); converted::take_as<bool>(s.mobile_, (*v.rows)[12]); converted::take_as<Ragdolls>(s.ragdolls_, (*v.rows)[13]); converted::take_as<std::vector<Life::Meadow>>(s.meadows_, (*v.rows)[14]); converted::take_as<std::vector<Life::Cow>>(s.cows_, (*v.rows)[15]); converted::take_as<std::vector<converted::Whole>>(s.dead_cows_, (*v.rows)[16]); converted::take_as<Vec2>(s.herds_for_, (*v.rows)[17]); converted::take_as<double>(s.last_herd_check_, (*v.rows)[18]); converted::take_as<double>(s.last_moo_, (*v.rows)[19]); converted::take_as<double>(s.herds_at_, (*v.rows)[20]); converted::take_as<std::vector<Life::Flock>>(s.flocks_, (*v.rows)[21]); converted::take_as<unsigned int>(s.flock_serial_, (*v.rows)[22]); converted::take_as<unsigned int>(s.trees_down_, (*v.rows)[23]); converted::take_as<unsigned int>(s.tree_ground_cursor_, (*v.rows)[24]); converted::take_as<std::vector<Life::Bird>>(s.birds_, (*v.rows)[25]); converted::take_as<std::vector<Life::Tree>>(s.trees_, (*v.rows)[26]); converted::take_as<std::vector<Life::Pet>>(s.pets_, (*v.rows)[27]); converted::take_as<Life::CatAttack>(s.cat_, (*v.rows)[28]); converted::take_as<Vec2>(s.pet_anchor_, (*v.rows)[29]); converted::take_as<double>(s.epoch_, (*v.rows)[30]); converted::take_as<unsigned int>(s.tree_serial_, (*v.rows)[31]); converted::take_as<converted::wide::Set<converted::Whole>>(s.trees_gone_, (*v.rows)[32]); converted::take_as<Life::Chain>(s.chain_, (*v.rows)[33]); converted::take_as<bool>(s.chain_alive_, (*v.rows)[34]); converted::take_as<double>(s.next_chain_, (*v.rows)[35]); converted::take_as<double>(s.streak_at_, (*v.rows)[36]); converted::take_as<unsigned int>(s.chain_serial_, (*v.rows)[37]); converted::take_as<unsigned int>(s.streak_n_, (*v.rows)[38]); converted::take_as<unsigned int>(s.streak_chain_, (*v.rows)[39]); converted::take_as<std::vector<Life::Voice>>(s.voices_, (*v.rows)[40]); converted::take_as<double>(s.last_shout_, (*v.rows)[41]); converted::take_as<double>(s.last_honk_, (*v.rows)[42]); converted::take_as<double>(s.last_scream_, (*v.rows)[43]); converted::take_as<double>(s.last_coo_, (*v.rows)[44]); converted::take_as<double>(s.ambient_chirp_, (*v.rows)[45]); converted::take_as<std::vector<std::pair<unsigned int, double>>>(s.source_gap_, (*v.rows)[46]); converted::take_as<unsigned int>(s.cow_hits_, (*v.rows)[47]); converted::take_as<unsigned int>(s.bird_hits_, (*v.rows)[48]); converted::take_as<unsigned int>(s.shouts_, (*v.rows)[49]); converted::take_as<unsigned int>(s.honks_, (*v.rows)[50]); }
+[[maybe_unused]] static MeshLook draw_kern__MeshLook(converted::Draw& draw) {
+  MeshLook s{};
+  s.material = draw_kern__Material(draw);
+  s.extra_slot = static_cast<unsigned int>(draw.below(40));
+  s.texture = static_cast<unsigned int>(draw.below(40));
+  s.visible = draw.flag();
+  s.layers = static_cast<unsigned int>(draw.below(40));
+  s.pick_bvh = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const MeshLook& s) { return converted::Value::structure({arg(s.material), arg(s.extra_slot), arg(s.texture), arg(s.visible), arg(s.layers), arg(s.pick_bvh)}); }
+[[maybe_unused]] static bool same(const MeshLook& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.material, (*got.rows)[0]) && same(want.extra_slot, (*got.rows)[1]) && same(want.texture, (*got.rows)[2]) && same(want.visible, (*got.rows)[3]) && same(want.layers, (*got.rows)[4]) && same(want.pick_bvh, (*got.rows)[5]); }
+[[maybe_unused]] static bool defined(const MeshLook& s) { return defined(s.material) && defined(s.extra_slot) && defined(s.texture) && defined(s.visible) && defined(s.layers) && defined(s.pick_bvh); }
+[[maybe_unused]] static std::string text(const MeshLook& s) { return std::string("{") + text(s.material) + ", " + text(s.extra_slot) + ", " + text(s.texture) + ", " + text(s.visible) + ", " + text(s.layers) + ", " + text(s.pick_bvh) + "}"; }
+[[maybe_unused]] static void take(MeshLook& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<Material>(s.material, (*v.rows)[0]); converted::take_as<unsigned int>(s.extra_slot, (*v.rows)[1]); converted::take_as<unsigned int>(s.texture, (*v.rows)[2]); converted::take_as<bool>(s.visible, (*v.rows)[3]); converted::take_as<unsigned int>(s.layers, (*v.rows)[4]); converted::take_as<bool>(s.pick_bvh, (*v.rows)[5]); }
+inline unsigned int Renderer::allocate_id() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.allocate_id", {converted::value_of(*this)}); unsigned int kern_result = converted::quiet<unsigned int>(); converted::take_as<unsigned int>(kern_result, kern_out[0]); return kern_result; }
+inline void Renderer::release_id(const unsigned int& id) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.release_id", {converted::value_of(*this), converted::value_of(id)}); }
+inline bool Renderer::update_instances(const unsigned int& id, converted::wide::Span<const double> transforms, converted::wide::Span<const double> tints, bool* changed) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.update_instances", {converted::value_of(*this), converted::value_of(id), converted::value_of(converted::as_list(transforms)), converted::value_of(converted::as_list(tints))}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); if (changed) converted::take_as<bool>(*changed, kern_out[1]); return kern_result; }
+inline bool Renderer::set_visible(const unsigned int& id, const bool& visible) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.set_visible", {converted::value_of(*this), converted::value_of(id), converted::value_of(visible)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline bool upsert(Renderer& renderer, const unsigned int& id, const MeshData& mesh, const MeshLook& look, converted::wide::Span<const double> transforms, converted::wide::Span<const double> tints) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.upsert", {converted::value_of(renderer), converted::value_of(id), converted::value_of(mesh), converted::value_of(look), converted::value_of(converted::as_list(transforms)), converted::value_of(converted::as_list(tints))}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+namespace primitives { inline MeshData box(const Vec3& size, const Vec3& color) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.box", {converted::value_of(size), converted::value_of(color)}); MeshData kern_result = converted::quiet<MeshData>(); converted::take_as<MeshData>(kern_result, kern_out[0]); return kern_result; } }
+namespace primitives { inline MeshData sphere(const double& radius, const unsigned int& segments, const unsigned int& rings, const Vec3& color) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.sphere", {converted::value_of(radius), converted::value_of(segments), converted::value_of(rings), converted::value_of(color)}); MeshData kern_result = converted::quiet<MeshData>(); converted::take_as<MeshData>(kern_result, kern_out[0]); return kern_result; } }
+namespace primitives { inline MeshData cylinder(const double& radius, const double& height, const unsigned int& segments, const Vec3& color) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.cylinder", {converted::value_of(radius), converted::value_of(height), converted::value_of(segments), converted::value_of(color)}); MeshData kern_result = converted::quiet<MeshData>(); converted::take_as<MeshData>(kern_result, kern_out[0]); return kern_result; } }
+struct Out_LifeArt_make { bool Result; LifeArt::Part p; };
+[[maybe_unused]] static bool same(const Out_LifeArt_make& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.p, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_LifeArt_make& s) { return defined(s.Result) && defined(s.p); }
+[[maybe_unused]] static std::string text(const Out_LifeArt_make& s) { return std::string("{") + text(s.Result) + ", " + text(s.p) + "}"; }
+struct Out_LifeArt_init { LifeArt Self; bool Result; };
+[[maybe_unused]] static bool same(const Out_LifeArt_init& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_LifeArt_init& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_LifeArt_init& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 
 SC_TEST(converted_life_art_cpp) {
   converted::Blueprint bp("life_art_cpp");
+  {  // LifeArt::put
+    converted::Tally tally("LifeArt_put");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] LifeArt::Part a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { converted::counted([&] { return LifeArt{}.put(a0, a1, std::move(a2)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      LifeArt::Part a0 = draw_LifeArt__Part(draw);
+      Mat4 a1 = draw_kern__Mat4(draw);
+      Vec3 a2 = draw.vector();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // LifeArt::box
+    converted::Tally tally("LifeArt_box");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] LifeArt a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { converted::counted([&] { return a0.box(a1, std::move(a2)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      LifeArt a0 = draw_LifeArt(draw);
+      Mat4 a1 = draw_kern__Mat4(draw);
+      Vec3 a2 = draw.vector();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // LifeArt::ball
+    converted::Tally tally("LifeArt_ball");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] LifeArt a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { converted::counted([&] { return a0.ball(a1, std::move(a2)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      LifeArt a0 = draw_LifeArt(draw);
+      Mat4 a1 = draw_kern__Mat4(draw);
+      Vec3 a2 = draw.vector();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // LifeArt::cylinder
+    converted::Tally tally("LifeArt_cylinder");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] LifeArt a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { converted::counted([&] { return a0.cylinder(a1, std::move(a2)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      LifeArt a0 = draw_LifeArt(draw);
+      Mat4 a1 = draw_kern__Mat4(draw);
+      Vec3 a2 = draw.vector();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // LifeArt::glow
+    converted::Tally tally("LifeArt_glow");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] LifeArt a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { converted::counted([&] { return a0.glow(a1, std::move(a2)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      LifeArt a0 = draw_LifeArt(draw);
+      Mat4 a1 = draw_kern__Mat4(draw);
+      Vec3 a2 = draw.vector();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
   {  // rot
     converted::Tally tally("rot");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_life_art_cpp::rot(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Vec3 a0 = draw.vector();
-      const double a1 = draw.number();
+      Vec3 a0 = draw.vector();
+      double a1 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // at
@@ -211,15 +1492,18 @@ SC_TEST(converted_life_art_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted::counted([&] { return converted_life_art_cpp::at(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Vec3 a0 = draw.vector();
+      Vec3 a0 = draw.vector();
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // sc3
@@ -227,15 +1511,18 @@ SC_TEST(converted_life_art_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted::counted([&] { return converted_life_art_cpp::sc3(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Vec3 a0 = draw.vector();
+      Vec3 a0 = draw.vector();
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // rgb
@@ -243,33 +1530,142 @@ SC_TEST(converted_life_art_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_life_art_cpp::rgb(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
-  {  // LifeArt::put
-    converted::Tally tally("LifeArt_put");
+  {  // LifeArt::make
+    converted::Tally tally("LifeArt_make");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] LifeArt::Part a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { converted::counted([&] { return converted_life_art_cpp::LifeArt::put(a0, a1, std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] Renderer& a0, [[maybe_unused]] LifeArt::Part a1, [[maybe_unused]] MeshData a2, [[maybe_unused]] Material a3) { auto r = converted::counted([&] { return LifeArt{}.make(a0, a1, a2, a3); }); return Out_LifeArt_make{std::move(r), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
-      const LifeArt::Part a0 = draw_LifeArt__Part(draw);
-      const Mat4 a1 = draw_kern__Mat4(draw);
-      const Vec3 a2 = draw.vector();
+      Renderer& a0 = *converted::engine_object<Renderer>(1 + draw.below(6));
+      LifeArt::Part a1 = draw_LifeArt__Part(draw);
+      MeshData a2 = draw_kern__MeshData(draw);
+      Material a3 = draw_kern__Material(draw);
+      const std::vector<converted::Value> given = {arg(a1), arg(a2), arg(a3), arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(a0, std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
+    }
+  }
+  {  // LifeArt::init
+    converted::Tally tally("LifeArt_init");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] LifeArt a0, [[maybe_unused]] Renderer& a1) { auto r = converted::counted([&] { return a0.init(a1); }); return Out_LifeArt_init{std::move(a0), std::move(r)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      LifeArt a0 = draw_LifeArt(draw);
+      Renderer& a1 = *converted::engine_object<Renderer>(1 + draw.below(6));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), a1);
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
+    }
+  }
+  {  // LifeArt::begin
+    converted::Tally tally("LifeArt_begin");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] LifeArt a0) { converted::counted([&] { return a0.begin(); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      LifeArt a0 = draw_LifeArt(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // LifeArt::cow
+    converted::Tally tally("LifeArt_cow");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] LifeArt a0, [[maybe_unused]] Life::Cow a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.cow(a1, std::move(a2)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      LifeArt a0 = draw_LifeArt(draw);
+      Life::Cow a1 = draw_Life__Cow(draw);
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // LifeArt::life
+    converted::Tally tally("LifeArt_life");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] LifeArt a0, [[maybe_unused]] Life a1, [[maybe_unused]] double a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] double a4) { converted::counted([&] { return a0.life(a1, std::move(a2), std::move(a3), std::move(a4)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      LifeArt a0 = draw_LifeArt(draw);
+      Life a1 = draw_Life(draw);
+      double a2 = draw.number();
+      Vec3 a3 = draw.vector();
+      double a4 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // LifeArt::end
+    converted::Tally tally("LifeArt_end");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] LifeArt a0) { converted::counted([&] { return a0.end(); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      LifeArt a0 = draw_LifeArt(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

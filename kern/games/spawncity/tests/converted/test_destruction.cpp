@@ -8,10 +8,10 @@
 #include <type_traits>
 #include <vector>
 #include <algorithm>
-#include <unordered_map>
 #include "../../src/city_stream.h"
 #include "../../src/combat_art.h"
 #include "../../src/common.h"
+#include "kern/core/map.h"
 #include "../converted.h"
 
 namespace converted_destruction {
@@ -21,10 +21,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -38,8 +38,10 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #define private public
 #define protected public
 struct Renderer : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
 };
-enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh };
+namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
+namespace CityStream { namespace Tile { enum class State : u8 { requested, decoding, terrain_wait, building, roads, areas, collision, ready, failed }; } }
 struct Destruction {
  public:
   static constexpr u32 kPieces = 2000, kTorn = 40;
@@ -55,11 +57,15 @@ struct Destruction {
   
 
   struct Stats { u32 pieces = 0, torn = 0, hits = 0, collapsed = 0; };
-  const Stats& stats() const { return stats_; }
+  
   /// Destruction sync: the structural points left per building (seed) - only ever fewer. The
   /// points a blast here took (since the last call), and those another machine reports.
   std::vector<std::pair<u32, f32>> take_points_log() { return std::move(points_log_); }
-  
+  void points_list(std::vector<std::pair<u32, f32>>& out) const {
+    out.clear();
+    for (const auto& [seed, hp] : points_) out.emplace_back(seed, hp);
+    std::stable_sort(out.begin(), out.end(), [](const std::pair<u32, f32>& a, const std::pair<u32, f32>& b) { return a.first < b.first || (!(b.first < a.first) && a.second < b.second); });
+  }
   
 
  private:
@@ -172,10 +178,10 @@ struct Destruction {
   s.stats_ = draw_Destruction__Stats(draw);
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const Destruction& s) { return converted::Value::structure({arg(s.r_), arg(converted::shaped<converted::wide::Map<unsigned int, double>>(s.points_)), arg(s.points_log_), arg(s.pieces_), arg(s.torn_), arg(s.stats_)}); }
-[[maybe_unused]] static bool same(const Destruction& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.r_, (*got.rows)[0]) && same(converted::shaped<converted::wide::Map<unsigned int, double>>(want.points_), (*got.rows)[1]) && same(want.points_log_, (*got.rows)[2]) && same(want.pieces_, (*got.rows)[3]) && same(want.torn_, (*got.rows)[4]) && same(want.stats_, (*got.rows)[5]); }
-[[maybe_unused]] static bool defined(const Destruction& s) { return defined(s.r_) && defined(converted::shaped<converted::wide::Map<unsigned int, double>>(s.points_)) && defined(s.points_log_) && defined(s.pieces_) && defined(s.torn_) && defined(s.stats_); }
-[[maybe_unused]] static std::string text(const Destruction& s) { return std::string("{") + text(s.r_) + ", " + text(converted::shaped<converted::wide::Map<unsigned int, double>>(s.points_)) + ", " + text(s.points_log_) + ", " + text(s.pieces_) + ", " + text(s.torn_) + ", " + text(s.stats_) + "}"; }
+[[maybe_unused]] static converted::Value arg(const Destruction& s) { return converted::Value::structure({arg(s.r_), arg(s.points_), arg(s.points_log_), arg(s.pieces_), arg(s.torn_), arg(s.stats_)}); }
+[[maybe_unused]] static bool same(const Destruction& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.r_, (*got.rows)[0]) && same(want.points_, (*got.rows)[1]) && same(want.points_log_, (*got.rows)[2]) && same(want.pieces_, (*got.rows)[3]) && same(want.torn_, (*got.rows)[4]) && same(want.stats_, (*got.rows)[5]); }
+[[maybe_unused]] static bool defined(const Destruction& s) { return defined(s.r_) && defined(s.points_) && defined(s.points_log_) && defined(s.pieces_) && defined(s.torn_) && defined(s.stats_); }
+[[maybe_unused]] static std::string text(const Destruction& s) { return std::string("{") + text(s.r_) + ", " + text(s.points_) + ", " + text(s.points_log_) + ", " + text(s.pieces_) + ", " + text(s.torn_) + ", " + text(s.stats_) + "}"; }
 [[maybe_unused]] static void take(Destruction& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<Renderer*>(s.r_, (*v.rows)[0]); converted::take_as<converted::wide::Map<unsigned int, double>>(s.points_, (*v.rows)[1]); converted::take_as<std::vector<std::pair<unsigned int, double>>>(s.points_log_, (*v.rows)[2]); converted::take_as<std::vector<Destruction::Piece>>(s.pieces_, (*v.rows)[3]); converted::take_as<std::vector<Destruction::Torn>>(s.torn_, (*v.rows)[4]); converted::take_as<Destruction::Stats>(s.stats_, (*v.rows)[5]); }
 struct Out_Destruction_take_points_log { Destruction Self; std::vector<std::pair<unsigned int, double>> Result; };
 [[maybe_unused]] static bool same(const Out_Destruction_take_points_log& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
@@ -189,48 +195,58 @@ SC_TEST(converted_destruction) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Destruction a0, [[maybe_unused]] Renderer& a1) { converted::counted([&] { return a0.init(a1); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
-      const Destruction a0 = draw_Destruction(draw);
+      Destruction a0 = draw_Destruction(draw);
       Renderer& a1 = *converted::engine_object<Renderer>(1 + draw.below(6));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), a1);
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
-    }
-  }
-  {  // Destruction::stats
-    converted::Tally tally("Destruction_stats");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Destruction a0) { return converted::counted([&] { return a0.stats(); }); };
-    for (int i = 0; tally.more(i); ++i) {
-      const Destruction a0 = draw_Destruction(draw);
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      const auto want = run(a0);
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Destruction::take_points_log
     converted::Tally tally("Destruction_take_points_log");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Destruction a0) { const auto r = converted::counted([&] { return a0.take_points_log(); }); return Out_Destruction_take_points_log{a0, r}; };
+    const auto run = [&]([[maybe_unused]] Destruction a0) { auto r = converted::counted([&] { return a0.take_points_log(); }); return Out_Destruction_take_points_log{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
-      const Destruction a0 = draw_Destruction(draw);
+      Destruction a0 = draw_Destruction(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {1, 0});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
+    }
+  }
+  {  // Destruction::points_list
+    converted::Tally tally("the_Destruction_points_list_");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Destruction a0, [[maybe_unused]] std::vector<std::pair<unsigned int, double>> a1) { converted::counted([&] { return a0.points_list(a1); }); return a1; };
+    for (int i = 0; tally.more(i); ++i) {
+      Destruction a0 = draw_Destruction(draw);
+      std::vector<std::pair<unsigned int, double>> a1 = draw_list(draw, [&]() -> std::pair<unsigned int, double> { return std::pair<unsigned int, double>(static_cast<unsigned int>(draw.below(40)), draw.number()); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

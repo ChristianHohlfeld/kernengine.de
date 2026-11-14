@@ -24,10 +24,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -40,28 +40,47 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Renderer : converted::EngineObject {
+namespace mp { enum class Weapon : u8 { other, smg, glock, sniper, fists, knife, launcher, rocket, grenade, drone_gun, drone_rocket, jet_gun, jet_missile, jet_bomb, explosion }; }
+enum class Key : u8 {
+  unknown = 0,
+  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
+  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
+  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
+  count
 };
-enum class Weapon : u8 { other, smg, glock, sniper, fists, knife, launcher, rocket, grenade, drone_gun, drone_rocket, jet_gun, jet_missile, jet_bomb, explosion };
-enum class Id : u8 { smg, glock, sniper, grenade_launcher, rocket, fists, knife, hand_grenade, drone_gun, drone_rockets, drone_guided, jet_cannon, jet_missile, jet_bomb };
-Weapon mp_weapon(Id id) {
-  
-  switch (id) {
-    case Id::smg: return Weapon::smg;
-    case Id::glock: return Weapon::glock;
-    case Id::sniper: return Weapon::sniper;
-    case Id::fists: return Weapon::fists;
-    case Id::knife: return Weapon::knife;
-    case Id::grenade_launcher: return Weapon::launcher;
-    case Id::rocket: return Weapon::rocket;
-    case Id::hand_grenade: return Weapon::grenade;
-    case Id::drone_gun: return Weapon::drone_gun;
-    case Id::drone_rockets: case Id::drone_guided: return Weapon::drone_rocket;
-    case Id::jet_cannon: return Weapon::jet_gun;
-    case Id::jet_missile: return Weapon::jet_missile;
-    case Id::jet_bomb: return Weapon::jet_bomb;
+namespace weapons { enum class Id : u8 { smg, glock, sniper, grenade_launcher, rocket, fists, knife, hand_grenade, drone_gun, drone_rockets, drone_guided, jet_cannon, jet_missile, jet_bomb }; }
+std::string esc(const std::string& s) {
+  std::string o;
+  for (char c : s) {
+    if (c == '"' || c == '\\') { o += '\\'; o += c; }
+    else if (static_cast<unsigned char>(c) < 0x20) o += ' ';
+    else o += c;
   }
-  return Weapon::other;
+  return o;
+}
+std::string hex(u32 c) {
+  char b[16];
+  std::snprintf(b, sizeof b, "#%06x", c & 0xffffff);
+  return b;
+}
+using weapons::Id; mp::Weapon mp_weapon(weapons::Id id) {
+  using weapons::Id;
+  switch (id) {
+    case Id::smg: return mp::Weapon::smg;
+    case Id::glock: return mp::Weapon::glock;
+    case Id::sniper: return mp::Weapon::sniper;
+    case Id::fists: return mp::Weapon::fists;
+    case Id::knife: return mp::Weapon::knife;
+    case Id::grenade_launcher: return mp::Weapon::launcher;
+    case Id::rocket: return mp::Weapon::rocket;
+    case Id::hand_grenade: return mp::Weapon::grenade;
+    case Id::drone_gun: return mp::Weapon::drone_gun;
+    case Id::drone_rockets: case Id::drone_guided: return mp::Weapon::drone_rocket;
+    case Id::jet_cannon: return mp::Weapon::jet_gun;
+    case Id::jet_missile: return mp::Weapon::jet_missile;
+    case Id::jet_bomb: return mp::Weapon::jet_bomb;
+  }
+  return mp::Weapon::other;
 }
 #undef private
 #undef protected
@@ -70,20 +89,61 @@ Weapon mp_weapon(Id id) {
 
 SC_TEST(converted_game_net_cpp) {
   converted::Blueprint bp("game_net_cpp");
-  {  // mp_weapon
-    converted::Tally tally("mp_weapon");
+  {  // esc
+    converted::Tally tally("esc");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Id a0) { return converted::counted([&] { return converted_game_net_cpp::mp_weapon(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] std::string a0) { return converted::counted([&] { return converted_game_net_cpp::esc(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Id a0 = static_cast<Id>(draw.below(14));
+      std::string a0 = draw.word();
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // hex
+    converted::Tally tally("hex");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_game_net_cpp::hex(std::move(a0)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // mp_weapon
+    converted::Tally tally("mp_weapon");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] weapons::Id a0) { return converted::counted([&] { return converted_game_net_cpp::mp_weapon(std::move(a0)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      weapons::Id a0 = static_cast<weapons::Id>(draw.below(14));
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

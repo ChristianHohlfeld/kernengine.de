@@ -19,10 +19,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -35,38 +35,49 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter };
-enum class Type : u8 { null, boolean, number, string, array, object };
-struct Value : converted::EngineObject {
-};
-using ActorRef = u32;
-enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, count
-};
-struct EngineValue : converted::EngineObject {
-};
-namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; }
-enum class NodeKind : u8 { event, action, pure, flow };
-struct NodeDef : converted::EngineObject {
-};
-struct NativeBlueprint : converted::EngineObject {
-};
-struct Spot : converted::EngineObject {
-};
-struct CNode : converted::EngineObject {
-};
-struct Machine : converted::EngineObject {
-};
-struct Event {
-  std::string type;
-  ActorRef target = 0;                 // only instances whose Self is target (0 = every instance)
-  bool level = false;                  // with a target: the level graph (Self = none) receives it too
-  std::string key;                     // event-specific match (custom event name, key code, action...)
-  std::vector<std::pair<std::string, Value>> args;
-  
-};
-struct Runtime : converted::EngineObject {
+namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
+inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
+namespace json { enum class Type : u8 { null, boolean, number, string, array, object }; }
+namespace logic { enum class PinType : u8 {
+  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
+  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
+  map, set, count
+}; }
+namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
+struct Jetpack {
+ public:
+  /// Binds the rules to the logic the level's Blueprints run in (the game once its world has started,
+  /// tests the one they run): the Blueprint of the actor "Jetpack" is found by its name at every call.
+  /// True: the actor has a Blueprint that runs there.
+  static bool bind(::kern::logic::Runtime& logic);
+  // The Blueprint's variables Acc, AirAccel, MaxClimb, Gravity, FallSafe and IgnitionDamp.
+  static f32 acc();
+  static f32 air_accel();
+  static f32 max_climb();
+  static f32 gravity();
+  static f32 fall_safe();
+  /// vz is scaled by this at ignition (a falling player is caught: `jump.vz *= .35`).
+  static f32 ignition_damp();
+  /// The second JUMP press in the air: ignition (false without fuel).
+  bool ignite(f32 vz);
+  /// One frame. `airborne`, vertical speed, height of the feet above what is below, jump held.
+  /// Returns the upward acceleration of the thrust this frame (0 = not burning).
+  f32 update(f32 dt, f32 now, bool airborne, f32 vz, f32 height, bool hold);
+  f32 fuel = 1;
+  bool thrusting = false, used = false;
+  u32 ignitions = 0;
+
+ private:
+  /// The Blueprint's struct Pack, as it takes and gives it.
+  struct Pack {
+    f64 fuel = 1;
+    bool thrusting = false, used = false;
+    u32 ignitions = 0;
+    f64 burst_left = 0, ground_since = -1, last_thrust = -99;
+  };
+  Pack pack() const;
+  void take(const Pack& p);
+  f32 burst_left_ = 0, ground_since_ = -1, last_thrust_ = -99;
 };
 struct FlightSample {
   f32 t = 0;            // simulation time
@@ -84,14 +95,14 @@ struct FlightLog {
  public:
   static constexpr u32 kMaxFlights = 50, kMaxPath = 600, kMaxEvents = 120;
   static constexpr f32 kPathInterval = 0.5;
-  
+  void observe(const FlightSample& s, const char* disarm_reason = "FC_DISARM");
   /// Ends a running flight (drone stowed, crash, reset).
   void finish(const char* reason);
   void network(const std::string& stage, f32 t);
   // newest first
   
   // counts finished flights and events
-  
+  std::string json() const;
 
  private:
   void record(const FlightSample& s, bool force);
@@ -104,18 +115,120 @@ struct FlightLog {
   f32 last_t_ = 0, last_path_ = -1e9;
   u32 next_id_ = 1, serial_ = 0;
 };
-namespace MusicSynth { struct Station { const char* name; const char* genre; f32 bpm; u32 seed; }; }
-namespace MusicSynth { static constexpr i32 kMenu = -1; }
+struct MusicSynth {
+ public:
+  struct Station { const char* name; const char* genre; f32 bpm; u32 seed; };
+  static constexpr i32 kMenu = -1;
+  static constexpr Station kStations[] = {
+      {"KERN FM", "Synthwave", 100, 11},
+      {"BODENSEE BEATS", "House", 124, 23},
+      {"LOFI LAGUNE", "Lo-Fi", 78, 37},
+      {"8-BIT RADIO", "Chiptune", 144, 41},
+      {"NACHTSCHICHT", "Techno", 132, 53},
+  };
+  static i32 station_count();
+
+  void init(u32 rate);
+  /// The programme to play (kMenu, a station index, or -2 = silence) and its level 0..1.
+  void select(i32 programme, f32 level);
+  /// Adds `frames` stereo frames into `out` (interleaved).
+  
+  
+  
+  f32 peak = 0;  // of the last block (tests)
+
+ private:
+  struct Voice { f32 phase = 0, freq = 0, env = 0, decay = 0.9995, amp = 0, phase2 = 0; };
+  void step();
+  
+  u32 rate_ = 0;
+  i32 programme_ = -2, want_ = -2;
+  f32 gain_ = 0, target_ = 0, fade_ = 1;  // fade: 1 = the current programme fully in
+  u64 sample_ = 0;
+  u32 step_ = 0, samples_per_step_ = 1, until_step_ = 0, rng_ = 1;
+  Voice kick_, snare_, hat_, bass_, lead_, pad_[3];
+  f32 lp_ = 0, bass_lp_ = 0, echo_[24000] = {};
+  u32 echo_at_ = 0;
+};
+namespace rules { inline f64 decimal(f32 x) {
+  const f64 d = static_cast<f64>(x);
+  const f64 a = std::fabs(d);
+  if (!(a >= 1e-9 && a < 1e7) || d == std::trunc(d)) return d;
+  f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
+  for (f64 m = a; m < 1; m *= 10) scale *= 10;
+  for (f64 m = a; m >= 10; m /= 10) scale /= 10;
+  for (int digits = 1; digits <= 9; ++digits, scale *= 10) {
+    const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
+    if (static_cast<f32>(c) == x) return c;
+  }
+  return d;
+} }
+namespace rules { struct Blueprint : ::kern::logic::ActorBlueprint {
+  using ActorBlueprint::ActorBlueprint;
+}; }
+rules::Blueprint g_jetpack{"Jetpack"};
+bool Jetpack::bind(::kern::logic::Runtime& logic) { return g_jetpack.bind(logic); }
+f32 Jetpack::acc() { return static_cast<f32>(g_jetpack.get<f64>("Acc")); }
+f32 Jetpack::air_accel() { return static_cast<f32>(g_jetpack.get<f64>("AirAccel")); }
+f32 Jetpack::max_climb() { return static_cast<f32>(g_jetpack.get<f64>("MaxClimb")); }
+f32 Jetpack::gravity() { return static_cast<f32>(g_jetpack.get<f64>("Gravity")); }
+f32 Jetpack::fall_safe() { return static_cast<f32>(g_jetpack.get<f64>("FallSafe")); }
+f32 Jetpack::ignition_damp() { return static_cast<f32>(g_jetpack.get<f64>("IgnitionDamp")); }
+bool Jetpack::ignite(f32 vz) {
+  (void)vz;
+  Pack p;
+  bool lit = false;
+  g_jetpack.call("Ignite", std::tie(p, lit), pack());
+  take(p);
+  return lit;
+}
+f32 Jetpack::update(f32 dt, f32 now, bool airborne, f32 vz, f32 height, bool hold) {
+  Pack p;
+  f64 thrust = 0;
+  g_jetpack.call("Update", std::tie(p, thrust), pack(), rules::decimal(dt), rules::decimal(now), airborne, rules::decimal(vz), rules::decimal(height), hold);
+  take(p);
+  return static_cast<f32>(thrust);
+}
+Jetpack::Pack Jetpack::pack() const {
+  return {rules::decimal(fuel), thrusting, used, ignitions, rules::decimal(burst_left_), rules::decimal(ground_since_), rules::decimal(last_thrust_)};
+}
+void Jetpack::take(const Pack& p) {
+  fuel = static_cast<f32>(p.fuel);
+  thrusting = p.thrusting;
+  used = p.used;
+  ignitions = p.ignitions;
+  burst_left_ = static_cast<f32>(p.burst_left);
+  ground_since_ = static_cast<f32>(p.ground_since);
+  last_thrust_ = static_cast<f32>(p.last_thrust);
+}
+void FlightLog::observe(const FlightSample& s, const char* disarm_reason) {
+  if (s.armed && !active_) {
+    cur_ = Flight{};
+    cur_.id = next_id_++;
+    cur_.start = s.t;
+    cur_.volts_start = cur_.volts_end = cur_.volts_min = s.volts;
+    cur_.max_alt = s.pos.z;
+    active_ = true;
+    have_last_ = false;
+    last_path_ = -1e9;
+    record(s, true);
+    return;
+  }
+  if (!active_) return;
+  if (s.t + 1e-4 < last_t_) { finish("SIM_RESET"); return; }
+  record(s, false);
+  if (!s.armed) finish(disarm_reason);
+}
 void FlightLog::record(const FlightSample& s, bool force) {
   if (have_last_) {
-    const f32 step = length(s.pos - last_);
+    const f32 step = converted::wide::length(s.pos - last_);
     if (step < 20) cur_.distance += step;  // a teleport is no flight
   }
   last_ = s.pos;
   have_last_ = true;
   last_t_ = s.t;
   cur_.duration = s.t - cur_.start;
-  cur_.max_speed = std::fmax(cur_.max_speed, length(s.vel));
+  cur_.max_speed = std::fmax(cur_.max_speed, converted::wide::length(s.vel));
   if (s.agl >= 0) cur_.max_agl = std::fmax(cur_.max_agl, s.agl);
   cur_.max_alt = std::fmax(cur_.max_alt, s.pos.z);
   cur_.volts_end = s.volts;
@@ -138,13 +251,30 @@ void FlightLog::network(const std::string& stage, f32 t) {
   if (events_.size() > kMaxEvents) events_.resize(converted::count(kMaxEvents));
   ++serial_;
 }
-namespace MusicSynth { const MusicSynth::Station kStations[] = {
-    {"KERN FM", "Synthwave", 100, 11},
-    {"BODENSEE BEATS", "House", 124, 23},
-    {"LOFI LAGUNE", "Lo-Fi", 78, 37},
-    {"8-BIT RADIO", "Chiptune", 144, 41},
-    {"NACHTSCHICHT", "Techno", 132, 53},
-}; }
+std::string FlightLog::json() const {
+  std::string o = "{\"flights\":[";
+  char b[256];
+  for (std::size_t i = 0; i < flights_.size(); converted::pre_inc(i)) {
+    const Flight& f = converted::at(flights_, i);
+    std::snprintf(b, sizeof b, "%s{\"id\":%u,\"start\":%.2f,\"duration\":%.2f,\"distance\":%.1f,\"maxSpeed\":%.2f,\"maxAgl\":%.2f,\"maxAlt\":%.2f,\"voltsStart\":%.2f,\"voltsEnd\":%.2f,\"voltsMin\":%.2f,\"reason\":\"%s\",\"path\":[",
+                  i ? "," : "", f.id, static_cast<double>(f.start), static_cast<double>(f.duration), static_cast<double>(f.distance), static_cast<double>(f.max_speed), static_cast<double>(f.max_agl), static_cast<double>(f.max_alt), static_cast<double>(f.volts_start), static_cast<double>(f.volts_end), static_cast<double>(f.volts_min), f.reason.c_str());
+    o += b;
+    for (std::size_t k = 0; k < f.path.size(); converted::pre_inc(k)) {
+      std::snprintf(b, sizeof b, "%s[%.1f,%.1f,%.1f]", k ? "," : "", static_cast<double>(converted::at(f.path, k).x), static_cast<double>(converted::at(f.path, k).y), static_cast<double>(converted::at(f.path, k).z));
+      o += b;
+    }
+    o += "]}";
+  }
+  o += "],\"events\":[";
+  for (std::size_t i = 0; i < events_.size(); converted::pre_inc(i)) {
+    std::string stage;
+    for (char c : converted::at(events_, i).stage) stage += (c == '"' || c == '\\') ? '\'' : (static_cast<unsigned char>(c) < 0x20 ? ' ' : c);
+    std::snprintf(b, sizeof b, "%s{\"t\":%.1f,\"stage\":\"", i ? "," : "", static_cast<double>(converted::at(events_, i).t));
+    o += b + stage + "\"}";
+  }
+  return o + "]}";
+}
+i32 MusicSynth::station_count() { return static_cast<i32>(converted::quot(sizeof kStations, sizeof kStations[0])); }
 enum Genre { synthwave, house, lofi, chip, techno };
 struct Prog { Genre genre; f32 bpm; u32 seed; i32 root; bool minor; };
 Prog prog_of(i32 p) {
@@ -154,10 +284,89 @@ Prog prog_of(i32 p) {
   return {g, s.bpm, s.seed, g == house ? 53 : g == lofi ? 55 : g == techno ? 50 : 52, g != house};
 }
 f32 midi(f32 n) { return 440.0 * kern::math::pow(2.0, (n - 69) / 12); }
+constexpr i32 kMinorProg[4] = {0, 8, 3, 10};
+constexpr i32 kMajorProg[4] = {0, 7, 9, 5};
+constexpr i32 kMinorScale[7] = {0, 2, 3, 5, 7, 8, 10};
+constexpr i32 kMajorScale[7] = {0, 2, 4, 5, 7, 9, 11};
+void MusicSynth::init(u32 rate) { rate_ = rate; }
+void MusicSynth::select(i32 programme, f32 level) {
+  want_ = programme;
+  target_ = clampf(level, 0, 1);
+}
+void MusicSynth::step() {
+  const Prog p = prog_of(programme_);
+  const u32 pos = step_ % 16, bar = step_ / 16;
+  auto rnd = [&]() { rng_ = rng_ * 1664525u + 1013904223u; return static_cast<f32>(rng_ >> 8) / 16777216.0; };
+  const i32 chord = converted::at((p.minor ? kMinorProg : kMajorProg), bar % 4);
+  const f32 rate = static_cast<f32>(rate_);
+  auto decay = [&](f32 tau) { return kern::math::exp(-1.0 / (tau * rate)); };
+  // drums
+  bool kick = false, snare = pos == 4 || pos == 12, hat = false;
+  switch (p.genre) {
+    case house: case techno: kick = pos % 4 == 0; hat = p.genre == house ? pos % 4 == 2 : true; break;
+    case synthwave: kick = pos == 0 || pos == 8 || pos == 10; hat = pos % 2 == 0; break;
+    case lofi: kick = pos == 0 || pos == 7 || pos == 10; hat = pos % 2 == 0 && rnd() < 0.8; break;
+    case chip: kick = pos % 8 == 0 || pos == 14; hat = pos % 2 == 1; break;
+  }
+  if (p.genre == techno) snare = pos == 4 || pos == 12 ? rnd() < 0.5 : false;
+  if (kick) { kick_.env = 1; kick_.phase = 0; kick_.decay = decay(0.16); }
+  if (snare) { snare_.env = 1; snare_.decay = decay(p.genre == lofi ? 0.09 : 0.12); }
+  if (hat) { hat_.env = p.genre == techno && pos % 2 ? 0.5 : 1; hat_.decay = decay(p.genre == techno ? 0.03 : 0.045); }
+  // bass on the chord root
+  const bool bass_hit = p.genre == house ? pos % 4 == 2 : p.genre == techno ? pos % 2 == 1 : p.genre == lofi ? (pos == 0 || pos == 10) : pos % 2 == 0;
+  if (bass_hit) { bass_.freq = midi(static_cast<f32>(p.root - 12 + chord)); bass_.env = 1; bass_.decay = decay(p.genre == lofi ? 0.5 : 0.18); }
+  // lead: an arpeggio through the scale above the chord
+  const f32 lead_prob = p.genre == chip ? 0.85 : p.genre == synthwave ? 0.55 : p.genre == lofi ? 0.3 : 0.25;
+  if ((pos % 2 == 0 || p.genre == chip) && rnd() < lead_prob) {
+    const i32 deg = static_cast<i32>(converted::fits<int>(rnd() * 7)) % 7, oct = rnd() < 0.3 ? 12 : 0;
+    lead_.freq = midi(static_cast<f32>(p.root + 12 + chord + (p.minor ? converted::at(kMinorScale, deg) : converted::at(kMajorScale, deg)) + oct));
+    lead_.env = 1;
+    lead_.decay = decay(p.genre == chip ? 0.09 : 0.22);
+  }
+  // pad: the chord, a new one every bar
+  if (pos == 0 && p.genre != chip && p.genre != techno) {
+    const i32 third = p.minor ? 3 : 4;
+    const i32 tones[3] = {0, third, 7};
+    for (int i = 0; i < 3; ++i) { converted::at(pad_, i).freq = midi(static_cast<f32>(p.root + chord + converted::at(tones, i))); converted::at(pad_, i).env = 1; converted::at(pad_, i).decay = decay(1.6); }
+  }
+  ++step_;
+}
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
 
+[[maybe_unused]] static Jetpack draw_Jetpack(converted::Draw& draw) {
+  Jetpack s{};
+  s.fuel = draw.number();
+  s.thrusting = draw.flag();
+  s.used = draw.flag();
+  s.ignitions = static_cast<unsigned int>(draw.below(40));
+  s.burst_left_ = draw.number();
+  s.ground_since_ = draw.number();
+  s.last_thrust_ = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Jetpack& s) { return converted::Value::structure({arg(s.fuel), arg(s.thrusting), arg(s.used), arg(s.ignitions), arg(s.burst_left_), arg(s.ground_since_), arg(s.last_thrust_)}); }
+[[maybe_unused]] static bool same(const Jetpack& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.fuel, (*got.rows)[0]) && same(want.thrusting, (*got.rows)[1]) && same(want.used, (*got.rows)[2]) && same(want.ignitions, (*got.rows)[3]) && same(want.burst_left_, (*got.rows)[4]) && same(want.ground_since_, (*got.rows)[5]) && same(want.last_thrust_, (*got.rows)[6]); }
+[[maybe_unused]] static bool defined(const Jetpack& s) { return defined(s.fuel) && defined(s.thrusting) && defined(s.used) && defined(s.ignitions) && defined(s.burst_left_) && defined(s.ground_since_) && defined(s.last_thrust_); }
+[[maybe_unused]] static std::string text(const Jetpack& s) { return std::string("{") + text(s.fuel) + ", " + text(s.thrusting) + ", " + text(s.used) + ", " + text(s.ignitions) + ", " + text(s.burst_left_) + ", " + text(s.ground_since_) + ", " + text(s.last_thrust_) + "}"; }
+[[maybe_unused]] static void take(Jetpack& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<double>(s.fuel, (*v.rows)[0]); converted::take_as<bool>(s.thrusting, (*v.rows)[1]); converted::take_as<bool>(s.used, (*v.rows)[2]); converted::take_as<unsigned int>(s.ignitions, (*v.rows)[3]); converted::take_as<double>(s.burst_left_, (*v.rows)[4]); converted::take_as<double>(s.ground_since_, (*v.rows)[5]); converted::take_as<double>(s.last_thrust_, (*v.rows)[6]); }
+[[maybe_unused]] static Jetpack::Pack draw_Jetpack__Pack(converted::Draw& draw) {
+  Jetpack::Pack s{};
+  s.fuel = draw.number();
+  s.thrusting = draw.flag();
+  s.used = draw.flag();
+  s.ignitions = static_cast<unsigned int>(draw.below(40));
+  s.burst_left = draw.number();
+  s.ground_since = draw.number();
+  s.last_thrust = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Jetpack::Pack& s) { return converted::Value::structure({arg(s.fuel), arg(s.thrusting), arg(s.used), arg(s.ignitions), arg(s.burst_left), arg(s.ground_since), arg(s.last_thrust)}); }
+[[maybe_unused]] static bool same(const Jetpack::Pack& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.fuel, (*got.rows)[0]) && same(want.thrusting, (*got.rows)[1]) && same(want.used, (*got.rows)[2]) && same(want.ignitions, (*got.rows)[3]) && same(want.burst_left, (*got.rows)[4]) && same(want.ground_since, (*got.rows)[5]) && same(want.last_thrust, (*got.rows)[6]); }
+[[maybe_unused]] static bool defined(const Jetpack::Pack& s) { return defined(s.fuel) && defined(s.thrusting) && defined(s.used) && defined(s.ignitions) && defined(s.burst_left) && defined(s.ground_since) && defined(s.last_thrust); }
+[[maybe_unused]] static std::string text(const Jetpack::Pack& s) { return std::string("{") + text(s.fuel) + ", " + text(s.thrusting) + ", " + text(s.used) + ", " + text(s.ignitions) + ", " + text(s.burst_left) + ", " + text(s.ground_since) + ", " + text(s.last_thrust) + "}"; }
+[[maybe_unused]] static void take(Jetpack::Pack& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<double>(s.fuel, (*v.rows)[0]); converted::take_as<bool>(s.thrusting, (*v.rows)[1]); converted::take_as<bool>(s.used, (*v.rows)[2]); converted::take_as<unsigned int>(s.ignitions, (*v.rows)[3]); converted::take_as<double>(s.burst_left, (*v.rows)[4]); converted::take_as<double>(s.ground_since, (*v.rows)[5]); converted::take_as<double>(s.last_thrust, (*v.rows)[6]); }
 [[maybe_unused]] static Flight draw_Flight(converted::Draw& draw) {
   Flight s{};
   s.id = static_cast<unsigned int>(draw.below(40));
@@ -238,25 +447,293 @@ f32 midi(f32 n) { return 440.0 * kern::math::pow(2.0, (n - 69) / 12); }
 [[maybe_unused]] static bool defined(const Prog& s) { return defined(s.genre) && defined(s.bpm) && defined(s.seed) && defined(s.root) && defined(s.minor); }
 [[maybe_unused]] static std::string text(const Prog& s) { return std::string("{") + text(s.genre) + ", " + text(s.bpm) + ", " + text(s.seed) + ", " + text(s.root) + ", " + text(s.minor) + "}"; }
 [[maybe_unused]] static void take(Prog& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<Genre>(s.genre, (*v.rows)[0]); converted::take_as<double>(s.bpm, (*v.rows)[1]); converted::take_as<unsigned int>(s.seed, (*v.rows)[2]); converted::take_as<int>(s.root, (*v.rows)[3]); converted::take_as<bool>(s.minor, (*v.rows)[4]); }
+[[maybe_unused]] static MusicSynth::Voice draw_MusicSynth__Voice(converted::Draw& draw) {
+  MusicSynth::Voice s{};
+  s.phase = draw.number();
+  s.freq = draw.number();
+  s.env = draw.number();
+  s.decay = draw.number();
+  s.amp = draw.number();
+  s.phase2 = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const MusicSynth::Voice& s) { return converted::Value::structure({arg(s.phase), arg(s.freq), arg(s.env), arg(s.decay), arg(s.amp), arg(s.phase2)}); }
+[[maybe_unused]] static bool same(const MusicSynth::Voice& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.phase, (*got.rows)[0]) && same(want.freq, (*got.rows)[1]) && same(want.env, (*got.rows)[2]) && same(want.decay, (*got.rows)[3]) && same(want.amp, (*got.rows)[4]) && same(want.phase2, (*got.rows)[5]); }
+[[maybe_unused]] static bool defined(const MusicSynth::Voice& s) { return defined(s.phase) && defined(s.freq) && defined(s.env) && defined(s.decay) && defined(s.amp) && defined(s.phase2); }
+[[maybe_unused]] static std::string text(const MusicSynth::Voice& s) { return std::string("{") + text(s.phase) + ", " + text(s.freq) + ", " + text(s.env) + ", " + text(s.decay) + ", " + text(s.amp) + ", " + text(s.phase2) + "}"; }
+[[maybe_unused]] static void take(MusicSynth::Voice& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<double>(s.phase, (*v.rows)[0]); converted::take_as<double>(s.freq, (*v.rows)[1]); converted::take_as<double>(s.env, (*v.rows)[2]); converted::take_as<double>(s.decay, (*v.rows)[3]); converted::take_as<double>(s.amp, (*v.rows)[4]); converted::take_as<double>(s.phase2, (*v.rows)[5]); }
+[[maybe_unused]] static MusicSynth draw_MusicSynth(converted::Draw& draw) {
+  MusicSynth s{};
+  s.peak = draw.number();
+  s.rate_ = static_cast<unsigned int>(draw.below(40));
+  s.programme_ = static_cast<int>(draw.whole());
+  s.want_ = static_cast<int>(draw.whole());
+  s.gain_ = draw.number();
+  s.target_ = draw.number();
+  s.fade_ = draw.number();
+  s.sample_ = static_cast<u64>(draw.bits());
+  s.step_ = static_cast<unsigned int>(draw.below(40));
+  s.samples_per_step_ = static_cast<unsigned int>(draw.below(40));
+  s.until_step_ = static_cast<unsigned int>(draw.below(40));
+  s.rng_ = static_cast<unsigned int>(draw.below(40));
+  s.kick_ = draw_MusicSynth__Voice(draw);
+  s.snare_ = draw_MusicSynth__Voice(draw);
+  s.hat_ = draw_MusicSynth__Voice(draw);
+  s.bass_ = draw_MusicSynth__Voice(draw);
+  s.lead_ = draw_MusicSynth__Voice(draw);
+  converted::fill_array(s.pad_, [&]() -> MusicSynth::Voice { return draw_MusicSynth__Voice(draw); });
+  s.lp_ = draw.number();
+  s.bass_lp_ = draw.number();
+  converted::fill_array(s.echo_, [&]() -> double { return draw.number(); });
+  s.echo_at_ = static_cast<unsigned int>(draw.below(40));
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const MusicSynth& s) { return converted::Value::structure({arg(s.peak), arg(s.rate_), arg(s.programme_), arg(s.want_), arg(s.gain_), arg(s.target_), arg(s.fade_), arg(converted::shaped<converted::Whole>(s.sample_)), arg(s.step_), arg(s.samples_per_step_), arg(s.until_step_), arg(s.rng_), arg(s.kick_), arg(s.snare_), arg(s.hat_), arg(s.bass_), arg(s.lead_), arg(converted::array_list(s.pad_)), arg(s.lp_), arg(s.bass_lp_), arg(converted::array_list(s.echo_)), arg(s.echo_at_)}); }
+[[maybe_unused]] static bool same(const MusicSynth& want, const converted::Value& got) { return got.rows && got.rows->size() == 22 && same(want.peak, (*got.rows)[0]) && same(want.rate_, (*got.rows)[1]) && same(want.programme_, (*got.rows)[2]) && same(want.want_, (*got.rows)[3]) && same(want.gain_, (*got.rows)[4]) && same(want.target_, (*got.rows)[5]) && same(want.fade_, (*got.rows)[6]) && same(converted::shaped<converted::Whole>(want.sample_), (*got.rows)[7]) && same(want.step_, (*got.rows)[8]) && same(want.samples_per_step_, (*got.rows)[9]) && same(want.until_step_, (*got.rows)[10]) && same(want.rng_, (*got.rows)[11]) && same(want.kick_, (*got.rows)[12]) && same(want.snare_, (*got.rows)[13]) && same(want.hat_, (*got.rows)[14]) && same(want.bass_, (*got.rows)[15]) && same(want.lead_, (*got.rows)[16]) && same(converted::array_list(want.pad_), (*got.rows)[17]) && same(want.lp_, (*got.rows)[18]) && same(want.bass_lp_, (*got.rows)[19]) && same(converted::array_list(want.echo_), (*got.rows)[20]) && same(want.echo_at_, (*got.rows)[21]); }
+[[maybe_unused]] static bool defined(const MusicSynth& s) { return defined(s.peak) && defined(s.rate_) && defined(s.programme_) && defined(s.want_) && defined(s.gain_) && defined(s.target_) && defined(s.fade_) && defined(converted::shaped<converted::Whole>(s.sample_)) && defined(s.step_) && defined(s.samples_per_step_) && defined(s.until_step_) && defined(s.rng_) && defined(s.kick_) && defined(s.snare_) && defined(s.hat_) && defined(s.bass_) && defined(s.lead_) && defined(converted::array_list(s.pad_)) && defined(s.lp_) && defined(s.bass_lp_) && defined(converted::array_list(s.echo_)) && defined(s.echo_at_); }
+[[maybe_unused]] static std::string text(const MusicSynth& s) { return std::string("{") + text(s.peak) + ", " + text(s.rate_) + ", " + text(s.programme_) + ", " + text(s.want_) + ", " + text(s.gain_) + ", " + text(s.target_) + ", " + text(s.fade_) + ", " + text(converted::shaped<converted::Whole>(s.sample_)) + ", " + text(s.step_) + ", " + text(s.samples_per_step_) + ", " + text(s.until_step_) + ", " + text(s.rng_) + ", " + text(s.kick_) + ", " + text(s.snare_) + ", " + text(s.hat_) + ", " + text(s.bass_) + ", " + text(s.lead_) + ", " + text(converted::array_list(s.pad_)) + ", " + text(s.lp_) + ", " + text(s.bass_lp_) + ", " + text(converted::array_list(s.echo_)) + ", " + text(s.echo_at_) + "}"; }
+[[maybe_unused]] static void take(MusicSynth& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 22) return; converted::take_as<double>(s.peak, (*v.rows)[0]); converted::take_as<unsigned int>(s.rate_, (*v.rows)[1]); converted::take_as<int>(s.programme_, (*v.rows)[2]); converted::take_as<int>(s.want_, (*v.rows)[3]); converted::take_as<double>(s.gain_, (*v.rows)[4]); converted::take_as<double>(s.target_, (*v.rows)[5]); converted::take_as<double>(s.fade_, (*v.rows)[6]); converted::take_as<converted::Whole>(s.sample_, (*v.rows)[7]); converted::take_as<unsigned int>(s.step_, (*v.rows)[8]); converted::take_as<unsigned int>(s.samples_per_step_, (*v.rows)[9]); converted::take_as<unsigned int>(s.until_step_, (*v.rows)[10]); converted::take_as<unsigned int>(s.rng_, (*v.rows)[11]); converted::take_as<MusicSynth::Voice>(s.kick_, (*v.rows)[12]); converted::take_as<MusicSynth::Voice>(s.snare_, (*v.rows)[13]); converted::take_as<MusicSynth::Voice>(s.hat_, (*v.rows)[14]); converted::take_as<MusicSynth::Voice>(s.bass_, (*v.rows)[15]); converted::take_as<MusicSynth::Voice>(s.lead_, (*v.rows)[16]); { std::vector<MusicSynth::Voice> items; converted::take_as<std::vector<MusicSynth::Voice>>(items, (*v.rows)[17]); converted::array_from(s.pad_, items); } converted::take_as<double>(s.lp_, (*v.rows)[18]); converted::take_as<double>(s.bass_lp_, (*v.rows)[19]); { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[20]); converted::array_from(s.echo_, items); } converted::take_as<unsigned int>(s.echo_at_, (*v.rows)[21]); }
+struct Out_Jetpack_ignite { Jetpack Self; bool Result; };
+[[maybe_unused]] static bool same(const Out_Jetpack_ignite& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_Jetpack_ignite& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_Jetpack_ignite& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
+struct Out_Jetpack_update { Jetpack Self; double Result; };
+[[maybe_unused]] static bool same(const Out_Jetpack_update& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_Jetpack_update& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_Jetpack_update& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 
 SC_TEST(converted_equipment_cpp) {
-  converted::Blueprint bp("equipment_cpp");
+  converted::Blueprint bp("equipment_cpp", {"Jetpack"});
+  g_jetpack.bind(bp.source_logic());
+  {  // Jetpack::bind
+    converted::Tally tally("Jetpack_bind");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]() { return converted::counted([&] { return Jetpack::bind(bp.source_logic()); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Jetpack::acc
+    converted::Tally tally("Jetpack_acc");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]() { return converted::counted([&] { return Jetpack::acc(); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Jetpack::air_accel
+    converted::Tally tally("Jetpack_air_accel");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]() { return converted::counted([&] { return Jetpack::air_accel(); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Jetpack::max_climb
+    converted::Tally tally("Jetpack_max_climb");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]() { return converted::counted([&] { return Jetpack::max_climb(); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Jetpack::gravity
+    converted::Tally tally("Jetpack_gravity");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]() { return converted::counted([&] { return Jetpack::gravity(); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Jetpack::fall_safe
+    converted::Tally tally("Jetpack_fall_safe");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]() { return converted::counted([&] { return Jetpack::fall_safe(); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Jetpack::ignition_damp
+    converted::Tally tally("Jetpack_ignition_damp");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]() { return converted::counted([&] { return Jetpack::ignition_damp(); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Jetpack::pack
+    converted::Tally tally("Jetpack_pack");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Jetpack a0) { return converted::counted([&] { return a0.pack(); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      Jetpack a0 = draw_Jetpack(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Jetpack::take
+    converted::Tally tally("Jetpack_take");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Jetpack a0, [[maybe_unused]] Jetpack::Pack a1) { converted::counted([&] { return a0.take(a1); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      Jetpack a0 = draw_Jetpack(draw);
+      Jetpack::Pack a1 = draw_Jetpack__Pack(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Jetpack::ignite
+    converted::Tally tally("Jetpack_ignite");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Jetpack a0, [[maybe_unused]] double a1) { auto r = converted::counted([&] { return a0.ignite(std::move(a1)); }); return Out_Jetpack_ignite{std::move(a0), std::move(r)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      Jetpack a0 = draw_Jetpack(draw);
+      double a1 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
+    }
+  }
+  {  // Jetpack::update
+    converted::Tally tally("Jetpack_update");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Jetpack a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] bool a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5, [[maybe_unused]] bool a6) { auto r = converted::counted([&] { return a0.update(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6)); }); return Out_Jetpack_update{std::move(a0), std::move(r)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      Jetpack a0 = draw_Jetpack(draw);
+      double a1 = draw.number();
+      double a2 = draw.number();
+      bool a3 = draw.flag();
+      double a4 = draw.number();
+      double a5 = draw.number();
+      bool a6 = draw.flag();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5), arg(a6)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
+    }
+  }
   {  // FlightLog::record
     converted::Tally tally("FlightLog_record");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] FlightLog a0, [[maybe_unused]] FlightSample a1, [[maybe_unused]] bool a2) { converted::counted([&] { return a0.record(a1, std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
-      const FlightLog a0 = draw_FlightLog(draw);
-      const FlightSample a1 = draw_FlightSample(draw);
-      const bool a2 = draw.flag();
+      FlightLog a0 = draw_FlightLog(draw);
+      FlightSample a1 = draw_FlightSample(draw);
+      bool a2 = draw.flag();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // FlightLog::finish
@@ -264,16 +741,40 @@ SC_TEST(converted_equipment_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] FlightLog a0, [[maybe_unused]] const char* a1) { converted::counted([&] { return a0.finish(a1); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
-      const FlightLog a0 = draw_FlightLog(draw);
+      FlightLog a0 = draw_FlightLog(draw);
       const char* a1 = draw.c_word();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), a1);
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // FlightLog::observe
+    converted::Tally tally("FlightLog_observe");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] FlightLog a0, [[maybe_unused]] FlightSample a1, [[maybe_unused]] const char* a2) { converted::counted([&] { return a0.observe(a1, a2); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      FlightLog a0 = draw_FlightLog(draw);
+      FlightSample a1 = draw_FlightSample(draw);
+      const char* a2 = draw.c_word();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), a2);
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // FlightLog::network
@@ -281,17 +782,57 @@ SC_TEST(converted_equipment_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] FlightLog a0, [[maybe_unused]] std::string a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.network(a1, std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
-      const FlightLog a0 = draw_FlightLog(draw);
-      const std::string a1 = draw.word();
-      const double a2 = draw.number();
+      FlightLog a0 = draw_FlightLog(draw);
+      std::string a1 = draw.word();
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // FlightLog::json
+    converted::Tally tally("FlightLog_json");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] FlightLog a0) { return converted::counted([&] { return a0.json(); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      FlightLog a0 = draw_FlightLog(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // MusicSynth::station_count
+    converted::Tally tally("MusicSynth_station_count");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]() { return converted::counted([&] { return MusicSynth::station_count(); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // prog_of
@@ -299,15 +840,18 @@ SC_TEST(converted_equipment_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] int a0) { return converted::counted([&] { return converted_equipment_cpp::prog_of(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const int a0 = static_cast<int>(draw.whole());
+      int a0 = static_cast<int>(draw.whole());
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // midi
@@ -315,15 +859,78 @@ SC_TEST(converted_equipment_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_equipment_cpp::midi(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const double a0 = draw.number();
+      double a0 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // MusicSynth::init
+    converted::Tally tally("MusicSynth_init");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] MusicSynth a0, [[maybe_unused]] unsigned int a1) { converted::counted([&] { return a0.init(std::move(a1)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      MusicSynth a0 = draw_MusicSynth(draw);
+      unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // MusicSynth::select
+    converted::Tally tally("MusicSynth_select");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] MusicSynth a0, [[maybe_unused]] int a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.select(std::move(a1), std::move(a2)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      MusicSynth a0 = draw_MusicSynth(draw);
+      int a1 = static_cast<int>(draw.whole());
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // MusicSynth::step
+    converted::Tally tally("MusicSynth_step");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] MusicSynth a0) { converted::counted([&] { return a0.step(); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      MusicSynth a0 = draw_MusicSynth(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

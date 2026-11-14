@@ -19,10 +19,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -36,16 +36,17 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #define private public
 #define protected public
 enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
-struct Code {
+namespace qr { struct Code {
   i32 version = 0, size = 0;
   std::vector<u8> modules;  // size * size, 1 = dark, row major
   bool dark(i32 x, i32 y) const { return x >= 0 && y >= 0 && x < size && y < size && converted::at(modules, static_cast<std::size_t>(y * size + x)); }
-};
-bool read_format(const Code& c, u32& level_bits, u32& mask);
-constexpr i32 kEccPerBlock[41] = {-1, 7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28, 28, 28, 30, 30, 26, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30};
-constexpr i32 kBlocks[41] = {-1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4, 4, 4, 4, 4, 6, 6, 6, 6, 7, 8, 8, 9, 9, 10, 12, 12, 12, 13, 14, 15, 16, 17, 18, 19, 19, 20, 21, 22, 24, 25};
-constexpr u32 kLevelL = 1;
-i32 raw_modules(i32 v) {
+}; }
+namespace qr { bool encode(const std::string& text, Code& out); }
+namespace qr { bool read_format(const Code& c, u32& level_bits, u32& mask); }
+namespace qr { constexpr i32 kEccPerBlock[41] = {-1, 7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28, 28, 28, 30, 30, 26, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30}; }
+namespace qr { constexpr i32 kBlocks[41] = {-1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4, 4, 4, 4, 4, 6, 6, 6, 6, 7, 8, 8, 9, 9, 10, 12, 12, 12, 13, 14, 15, 16, 17, 18, 19, 19, 20, 21, 22, 24, 25}; }
+namespace qr { constexpr u32 kLevelL = 1; }
+namespace qr { i32 raw_modules(i32 v) {
   i32 r = (16 * v + 128) * v + 64;
   if (v >= 2) {
     const i32 n = v / 7 + 2;
@@ -53,17 +54,17 @@ i32 raw_modules(i32 v) {
     if (v >= 7) r -= 36;
   }
   return r;
-}
-i32 data_codewords(i32 v) { return raw_modules(v) / 8 - converted::at(kEccPerBlock, v) * converted::at(kBlocks, v); }
-u8 gf_mul(u8 x, u8 y) {
+} }
+namespace qr { i32 data_codewords(i32 v) { return raw_modules(v) / 8 - converted::at(kEccPerBlock, v) * converted::at(kBlocks, v); } }
+namespace qr { u8 gf_mul(u8 x, u8 y) {
   u32 z = 0;
   for (i32 i = 7; i >= 0; --i) {
     z = (z << 1) ^ ((z >> 7) * 0x11D);
     z ^= ((converted::shr(y, i)) & 1u) * x;
   }
   return static_cast<u8>(z);
-}
-std::vector<u8> rs_divisor(i32 degree) {
+} }
+namespace qr { std::vector<u8> rs_divisor(i32 degree) {
   std::vector<u8> r(converted::count(static_cast<std::size_t>(degree)), 0);
   converted::back(r) = 1;
   u8 root = 1;
@@ -75,8 +76,8 @@ std::vector<u8> rs_divisor(i32 degree) {
     root = gf_mul(root, 2);
   }
   return r;
-}
-std::vector<u8> rs_remainder(const std::vector<u8>& data, const std::vector<u8>& div) {
+} }
+namespace qr { std::vector<u8> rs_remainder(const std::vector<u8>& data, const std::vector<u8>& div) {
   std::vector<u8> r(converted::count(div.size()), 0);
   for (u8 b : data) {
     const u8 f = b ^ converted::at(r, 0);
@@ -85,8 +86,8 @@ std::vector<u8> rs_remainder(const std::vector<u8>& data, const std::vector<u8>&
     for (std::size_t i = 0; i < r.size(); converted::pre_inc(i)) converted::at(r, i) ^= gf_mul(converted::at(div, i), f);
   }
   return r;
-}
-std::vector<i32> alignment_positions(i32 v) {
+} }
+namespace qr { std::vector<i32> alignment_positions(i32 v) {
   if (v == 1) return {};
   const i32 n = v / 7 + 2, size = v * 4 + 17;
   const i32 step = v == 32 ? 26 : converted::quot((v * 4 + n * 2 + 1), (n * 2 - 2)) * 2;
@@ -94,13 +95,13 @@ std::vector<i32> alignment_positions(i32 v) {
   converted::at(r, 0) = 6;
   for (i32 i = n - 1, pos = size - 7; i >= 1; --i, pos -= step) converted::at(r, static_cast<std::size_t>(i)) = pos;
   return r;
-}
-struct Grid {
+} }
+namespace qr { struct Grid {
   i32 size;
   std::vector<u8> m, fn;
   void set(i32 x, i32 y, bool dark) { converted::at(m, static_cast<std::size_t>(y * size + x)) = dark; converted::at(fn, static_cast<std::size_t>(y * size + x)) = 1; }
-};
-void finder(Grid& g, i32 cx, i32 cy) {
+}; }
+namespace qr { void finder(Grid& g, i32 cx, i32 cy) {
   for (i32 dy = -4; dy <= 4; ++dy)
     for (i32 dx = -4; dx <= 4; ++dx) {
       const i32 x = cx + dx, y = cy + dy;
@@ -108,8 +109,8 @@ void finder(Grid& g, i32 cx, i32 cy) {
       const i32 d = std::max(std::abs(dx), std::abs(dy));
       g.set(x, y, d != 2 && d != 4);
     }
-}
-void format_bits(Grid& g, u32 mask) {
+} }
+namespace qr { void format_bits(Grid& g, u32 mask) {
   const u32 data = kLevelL << 3 | mask;
   u32 rem = data;
   for (i32 i = 0; i < 10; ++i) rem = (rem << 1) ^ ((rem >> 9) * 0x537);
@@ -123,8 +124,94 @@ void format_bits(Grid& g, u32 mask) {
   for (i32 i = 0; i < 8; ++i) g.set(g.size - 1 - i, 8, bit(i));
   for (i32 i = 8; i < 15; ++i) g.set(8, g.size - 15 + i, bit(i));
   g.set(8, g.size - 8, true);  // the dark module
-}
-bool read_format(const Code& c, u32& level_bits, u32& mask) {
+} }
+namespace qr { bool encode(const std::string& text, Code& out) {
+  const i32 n = static_cast<i32>(text.size());
+  i32 v = 1;
+  for (; v <= 40; ++v) {
+    const i32 count_bits = v <= 9 ? 8 : 16;
+    if (4 + count_bits + 8 * n <= data_codewords(v) * 8 && (count_bits == 16 || n < 256)) break;
+  }
+  if (v > 40) return false;
+  // Data bits: byte mode, length, bytes, terminator, padding.
+  std::vector<bool> bits;
+  auto put = [&](u32 val, i32 len) { for (i32 i = len - 1; i >= 0; --i) bits.push_back(((converted::shr(val, i)) & 1) != 0); };
+  put(4, 4);
+  put(static_cast<u32>(n), v <= 9 ? 8 : 16);
+  for (unsigned char c : text) put(c, 8);
+  const std::size_t cap = converted::times(static_cast<std::size_t>(data_codewords(v)), 8);
+  put(0, static_cast<i32>(std::min<std::size_t>(4, converted::minus(cap, bits.size()))));
+  while (converted::rem(bits.size(), 8)) bits.push_back(false);
+  for (u8 pad = 0xEC; bits.size() < cap; pad ^= 0xEC ^ 0x11) put(pad, 8);
+  std::vector<u8> data(converted::count(converted::quot(bits.size(), 8)), 0);
+  for (std::size_t i = 0; i < bits.size(); converted::pre_inc(i)) if (converted::at(bits, i)) converted::at(data, converted::shr(i, 3)) |= static_cast<u8>(converted::shl(1, (converted::minus(7, (i & 7)))));
+  // Error correction per block and interleaving.
+  const i32 blocks = converted::at(kBlocks, v), ecc = converted::at(kEccPerBlock, v), raw = raw_modules(v) / 8;
+  const i32 short_blocks = blocks - converted::rem(raw, blocks), short_len = converted::quot(raw, blocks);
+  const std::vector<u8> div = rs_divisor(ecc);
+  std::vector<std::vector<u8>> bl;
+  for (i32 i = 0, k = 0; i < blocks; ++i) {
+    const i32 len = short_len - ecc + (i < short_blocks ? 0 : 1);
+    std::vector<u8> d(data.begin() + k, data.begin() + k + len);
+    k += len;
+    const std::vector<u8> e = rs_remainder(d, div);
+    if (i < short_blocks) d.push_back(0);
+    d.insert(d.end(), e.begin(), e.end());
+    bl.push_back(d);
+  }
+  std::vector<u8> words;
+  for (std::size_t i = 0; i < converted::at(bl, 0).size(); converted::pre_inc(i))
+    for (std::size_t j = 0; j < bl.size(); converted::pre_inc(j))
+      if (i != static_cast<std::size_t>(short_len - ecc) || j >= static_cast<std::size_t>(short_blocks)) words.push_back(converted::at(converted::at(bl, j), i));
+  // Function patterns.
+  Grid g{v * 4 + 17, {}, {}};
+  g.m.assign(converted::count(static_cast<std::size_t>(g.size * g.size)), 0);
+  g.fn.assign(converted::count(g.m.size()), 0);
+  for (i32 i = 0; i < g.size; ++i) { g.set(6, i, i % 2 == 0); g.set(i, 6, i % 2 == 0); }
+  finder(g, 3, 3);
+  finder(g, g.size - 4, 3);
+  finder(g, 3, g.size - 4);
+  const std::vector<i32> al = alignment_positions(v);
+  for (std::size_t i = 0; i < al.size(); converted::pre_inc(i))
+    for (std::size_t j = 0; j < al.size(); converted::pre_inc(j)) {
+      if ((i == 0 && j == 0) || (i == 0 && j == converted::minus(al.size(), 1)) || (i == converted::minus(al.size(), 1) && j == 0)) continue;
+      for (i32 dy = -2; dy <= 2; ++dy)
+        for (i32 dx = -2; dx <= 2; ++dx) g.set(converted::at(al, i) + dx, converted::at(al, j) + dy, std::max(std::abs(dx), std::abs(dy)) != 1);
+    }
+  format_bits(g, 0);  // reserve (the real bits follow after masking)
+  if (v >= 7) {
+    u32 rem = static_cast<u32>(v);
+    for (i32 i = 0; i < 12; ++i) rem = (rem << 1) ^ ((rem >> 11) * 0x1F25);
+    const u32 vb = static_cast<u32>(v) << 12 | rem;
+    for (i32 i = 0; i < 18; ++i) {
+      const bool b = ((converted::shr(vb, i)) & 1) != 0;
+      const i32 a = g.size - 11 + i % 3, c = i / 3;
+      g.set(a, c, b);
+      g.set(c, a, b);
+    }
+  }
+  // Codewords in the zig-zag, then mask 0 ((x + y) even) on the data modules.
+  std::size_t i = 0;
+  for (i32 right = g.size - 1; right >= 1; right -= 2) {
+    if (right == 6) right = 5;
+    for (i32 vert = 0; vert < g.size; ++vert)
+      for (i32 j = 0; j < 2; ++j) {
+        const i32 x = right - j;
+        const bool up = ((right + 1) & 2) == 0;
+        const i32 y = up ? g.size - 1 - vert : vert;
+        const std::size_t at = static_cast<std::size_t>(y * g.size + x);
+        if (converted::at(g.fn, at)) continue;
+        if (i < converted::times(words.size(), 8)) { converted::at(g.m, at) = (converted::shr(converted::at(words, converted::shr(i, 3)), (converted::minus(7, (i & 7))))) & 1; converted::pre_inc(i); }
+        if ((x + y) % 2 == 0) converted::at(g.m, at) ^= 1;
+      }
+  }
+  format_bits(g, 0);
+  out.version = v;
+  out.size = g.size;
+  out.modules = std::move(g.m);
+  return true;
+} }
+namespace qr { bool read_format(const Code& c, u32& level_bits, u32& mask) {
   u32 bits = 0;
   for (i32 i = 0; i <= 5; ++i) bits |= converted::shl(static_cast<u32>(c.dark(8, i)), i);
   bits |= static_cast<u32>(c.dark(8, 7)) << 6;
@@ -138,35 +225,43 @@ bool read_format(const Code& c, u32& level_bits, u32& mask) {
   u32 rem = bits >> 10;
   for (i32 i = 0; i < 10; ++i) rem = (rem << 1) ^ ((rem >> 9) * 0x537);
   return (rem & 0x3ff) == (bits & 0x3ff);
-}
+} }
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
 
-[[maybe_unused]] static Grid draw_qr__Grid(converted::Draw& draw) {
-  Grid s{};
+[[maybe_unused]] static qr::Grid draw_qr__Grid(converted::Draw& draw) {
+  qr::Grid s{};
   s.size = static_cast<int>(draw.whole());
   s.m = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
   s.fn = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const Grid& s) { return converted::Value::structure({arg(s.size), arg(s.m), arg(s.fn)}); }
-[[maybe_unused]] static bool same(const Grid& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.size, (*got.rows)[0]) && same(want.m, (*got.rows)[1]) && same(want.fn, (*got.rows)[2]); }
-[[maybe_unused]] static bool defined(const Grid& s) { return defined(s.size) && defined(s.m) && defined(s.fn); }
-[[maybe_unused]] static std::string text(const Grid& s) { return std::string("{") + text(s.size) + ", " + text(s.m) + ", " + text(s.fn) + "}"; }
-[[maybe_unused]] static void take(Grid& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<int>(s.size, (*v.rows)[0]); converted::take_as<std::vector<unsigned char>>(s.m, (*v.rows)[1]); converted::take_as<std::vector<unsigned char>>(s.fn, (*v.rows)[2]); }
-[[maybe_unused]] static Code draw_qr__Code(converted::Draw& draw) {
-  Code s{};
+namespace qr { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const qr::Grid& s) { return converted::Value::structure({arg(s.size), arg(s.m), arg(s.fn)}); }
+[[maybe_unused]] static bool same(const qr::Grid& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.size, (*got.rows)[0]) && same(want.m, (*got.rows)[1]) && same(want.fn, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const qr::Grid& s) { return defined(s.size) && defined(s.m) && defined(s.fn); }
+[[maybe_unused]] static std::string text(const qr::Grid& s) { return std::string("{") + text(s.size) + ", " + text(s.m) + ", " + text(s.fn) + "}"; }
+[[maybe_unused]] static void take(qr::Grid& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<int>(s.size, (*v.rows)[0]); converted::take_as<std::vector<unsigned char>>(s.m, (*v.rows)[1]); converted::take_as<std::vector<unsigned char>>(s.fn, (*v.rows)[2]); }
+}
+[[maybe_unused]] static qr::Code draw_qr__Code(converted::Draw& draw) {
+  qr::Code s{};
   s.version = static_cast<int>(draw.whole());
   s.size = static_cast<int>(draw.whole());
   s.modules = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const Code& s) { return converted::Value::structure({arg(s.version), arg(s.size), arg(s.modules)}); }
-[[maybe_unused]] static bool same(const Code& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.version, (*got.rows)[0]) && same(want.size, (*got.rows)[1]) && same(want.modules, (*got.rows)[2]); }
-[[maybe_unused]] static bool defined(const Code& s) { return defined(s.version) && defined(s.size) && defined(s.modules); }
-[[maybe_unused]] static std::string text(const Code& s) { return std::string("{") + text(s.version) + ", " + text(s.size) + ", " + text(s.modules) + "}"; }
-[[maybe_unused]] static void take(Code& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<int>(s.version, (*v.rows)[0]); converted::take_as<int>(s.size, (*v.rows)[1]); converted::take_as<std::vector<unsigned char>>(s.modules, (*v.rows)[2]); }
+namespace qr { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const qr::Code& s) { return converted::Value::structure({arg(s.version), arg(s.size), arg(s.modules)}); }
+[[maybe_unused]] static bool same(const qr::Code& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.version, (*got.rows)[0]) && same(want.size, (*got.rows)[1]) && same(want.modules, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const qr::Code& s) { return defined(s.version) && defined(s.size) && defined(s.modules); }
+[[maybe_unused]] static std::string text(const qr::Code& s) { return std::string("{") + text(s.version) + ", " + text(s.size) + ", " + text(s.modules) + "}"; }
+[[maybe_unused]] static void take(qr::Code& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<int>(s.version, (*v.rows)[0]); converted::take_as<int>(s.size, (*v.rows)[1]); converted::take_as<std::vector<unsigned char>>(s.modules, (*v.rows)[2]); }
+}
+struct Out_encode { bool Result; qr::Code out; };
+[[maybe_unused]] static bool same(const Out_encode& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.out, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_encode& s) { return defined(s.Result) && defined(s.out); }
+[[maybe_unused]] static std::string text(const Out_encode& s) { return std::string("{") + text(s.Result) + ", " + text(s.out) + "}"; }
 struct Out_read_format { bool Result; unsigned int level_bits; unsigned int mask; };
 [[maybe_unused]] static bool same(const Out_read_format& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Result, (*got.rows)[0]) && same(want.level_bits, (*got.rows)[1]) && same(want.mask, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const Out_read_format& s) { return defined(s.Result) && defined(s.level_bits) && defined(s.mask); }
@@ -177,171 +272,221 @@ SC_TEST(converted_qr_code_cpp) {
   {  // raw_modules
     converted::Tally tally("raw_modules");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0) { return converted::counted([&] { return converted_qr_code_cpp::raw_modules(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] int a0) { return converted::counted([&] { return converted_qr_code_cpp::qr::raw_modules(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const int a0 = static_cast<int>(draw.whole());
+      int a0 = static_cast<int>(draw.whole());
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // data_codewords
     converted::Tally tally("data_codewords");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0) { return converted::counted([&] { return converted_qr_code_cpp::data_codewords(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] int a0) { return converted::counted([&] { return converted_qr_code_cpp::qr::data_codewords(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const int a0 = static_cast<int>(draw.whole());
+      int a0 = static_cast<int>(draw.whole());
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // gf_mul
     converted::Tally tally("gf_mul");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned char a0, [[maybe_unused]] unsigned char a1) { return converted::counted([&] { return converted_qr_code_cpp::gf_mul(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned char a0, [[maybe_unused]] unsigned char a1) { return converted::counted([&] { return converted_qr_code_cpp::qr::gf_mul(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const unsigned char a0 = static_cast<unsigned char>(draw.below(40));
-      const unsigned char a1 = static_cast<unsigned char>(draw.below(40));
+      unsigned char a0 = static_cast<unsigned char>(draw.below(40));
+      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // rs_divisor
     converted::Tally tally("rs_divisor");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0) { return converted::counted([&] { return converted_qr_code_cpp::rs_divisor(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] int a0) { return converted::counted([&] { return converted_qr_code_cpp::qr::rs_divisor(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const int a0 = static_cast<int>(draw.whole());
+      int a0 = static_cast<int>(draw.whole());
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // rs_remainder
     converted::Tally tally("rs_remainder");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] std::vector<unsigned char> a1) { return converted::counted([&] { return converted_qr_code_cpp::rs_remainder(a0, a1); }); };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] std::vector<unsigned char> a1) { return converted::counted([&] { return converted_qr_code_cpp::qr::rs_remainder(a0, a1); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
-      const std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // alignment_positions
     converted::Tally tally("alignment_positions");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0) { return converted::counted([&] { return converted_qr_code_cpp::alignment_positions(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] int a0) { return converted::counted([&] { return converted_qr_code_cpp::qr::alignment_positions(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const int a0 = static_cast<int>(draw.whole());
+      int a0 = static_cast<int>(draw.whole());
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Grid::set
     converted::Tally tally("Grid_set");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Grid a0, [[maybe_unused]] int a1, [[maybe_unused]] int a2, [[maybe_unused]] bool a3) { converted::counted([&] { return a0.set(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] qr::Grid a0, [[maybe_unused]] int a1, [[maybe_unused]] int a2, [[maybe_unused]] bool a3) { converted::counted([&] { return a0.set(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
-      const Grid a0 = draw_qr__Grid(draw);
-      const int a1 = static_cast<int>(draw.whole());
-      const int a2 = static_cast<int>(draw.whole());
-      const bool a3 = draw.flag();
+      qr::Grid a0 = draw_qr__Grid(draw);
+      int a1 = static_cast<int>(draw.whole());
+      int a2 = static_cast<int>(draw.whole());
+      bool a3 = draw.flag();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // finder
     converted::Tally tally("finder");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Grid a0, [[maybe_unused]] int a1, [[maybe_unused]] int a2) { converted::counted([&] { return converted_qr_code_cpp::finder(a0, std::move(a1), std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] qr::Grid a0, [[maybe_unused]] int a1, [[maybe_unused]] int a2) { converted::counted([&] { return converted_qr_code_cpp::qr::finder(a0, std::move(a1), std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
-      const Grid a0 = draw_qr__Grid(draw);
-      const int a1 = static_cast<int>(draw.whole());
-      const int a2 = static_cast<int>(draw.whole());
+      qr::Grid a0 = draw_qr__Grid(draw);
+      int a1 = static_cast<int>(draw.whole());
+      int a2 = static_cast<int>(draw.whole());
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // format_bits
     converted::Tally tally("format_bits");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Grid a0, [[maybe_unused]] unsigned int a1) { converted::counted([&] { return converted_qr_code_cpp::format_bits(a0, std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] qr::Grid a0, [[maybe_unused]] unsigned int a1) { converted::counted([&] { return converted_qr_code_cpp::qr::format_bits(a0, std::move(a1)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
-      const Grid a0 = draw_qr__Grid(draw);
-      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      qr::Grid a0 = draw_qr__Grid(draw);
+      unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // encode
+    converted::Tally tally("encode");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::string a0, [[maybe_unused]] qr::Code a1) { auto r = converted::counted([&] { return converted_qr_code_cpp::qr::encode(a0, a1); }); return Out_encode{std::move(r), std::move(a1)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      std::string a0 = draw.word();
+      qr::Code a1 = draw_qr__Code(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
   {  // read_format
     converted::Tally tally("read_format");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Code a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] unsigned int a2) { const auto r = converted::counted([&] { return converted_qr_code_cpp::read_format(a0, a1, a2); }); return Out_read_format{r, a1, a2}; };
+    const auto run = [&]([[maybe_unused]] qr::Code a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] unsigned int a2) { auto r = converted::counted([&] { return converted_qr_code_cpp::qr::read_format(a0, a1, a2); }); return Out_read_format{std::move(r), std::move(a1), std::move(a2)}; };
     for (int i = 0; tally.more(i); ++i) {
-      const Code a0 = draw_qr__Code(draw);
-      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
-      const unsigned int a2 = static_cast<unsigned int>(draw.below(40));
+      qr::Code a0 = draw_qr__Code(draw);
+      unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      unsigned int a2 = static_cast<unsigned int>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {0, 1, 2});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1, 2});
     }
   }
 }

@@ -18,10 +18,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -34,6 +34,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+constexpr f32 kPi = 3.14159265358979323846;
 struct Vec4 {
   f32 x = 0, y = 0, z = 0, w = 0;
   constexpr Vec4() = default;
@@ -66,7 +67,7 @@ struct Mat4 {
   
   
   
-  Vec3 translation() const { return {converted::at(m, 12), converted::at(m, 13), converted::at(m, 14)}; }
+  Vec3 translation() const { return {m[12], m[13], m[14]}; }
   
 
 
@@ -82,20 +83,20 @@ struct Mat4 {
     return r;
   }
   Vec3 transform_point(Vec3 p) const {
-    return {converted::at(m, 0) * p.x + converted::at(m, 4) * p.y + converted::at(m, 8) * p.z + converted::at(m, 12), converted::at(m, 1) * p.x + converted::at(m, 5) * p.y + converted::at(m, 9) * p.z + converted::at(m, 13),
-            converted::at(m, 2) * p.x + converted::at(m, 6) * p.y + converted::at(m, 10) * p.z + converted::at(m, 14)};
+    return {m[0] * p.x + m[4] * p.y + m[8] * p.z + m[12], m[1] * p.x + m[5] * p.y + m[9] * p.z + m[13],
+            m[2] * p.x + m[6] * p.y + m[10] * p.z + m[14]};
   }
   Vec3 transform_vector(Vec3 v) const {
-    return {converted::at(m, 0) * v.x + converted::at(m, 4) * v.y + converted::at(m, 8) * v.z, converted::at(m, 1) * v.x + converted::at(m, 5) * v.y + converted::at(m, 9) * v.z,
-            converted::at(m, 2) * v.x + converted::at(m, 6) * v.y + converted::at(m, 10) * v.z};
+    return {m[0] * v.x + m[4] * v.y + m[8] * v.z, m[1] * v.x + m[5] * v.y + m[9] * v.z,
+            m[2] * v.x + m[6] * v.y + m[10] * v.z};
   }
   Vec4 transform(Vec4 p) const {
-    return {converted::at(m, 0) * p.x + converted::at(m, 4) * p.y + converted::at(m, 8) * p.z + converted::at(m, 12) * p.w, converted::at(m, 1) * p.x + converted::at(m, 5) * p.y + converted::at(m, 9) * p.z + converted::at(m, 13) * p.w,
-            converted::at(m, 2) * p.x + converted::at(m, 6) * p.y + converted::at(m, 10) * p.z + converted::at(m, 14) * p.w, converted::at(m, 3) * p.x + converted::at(m, 7) * p.y + converted::at(m, 11) * p.z + converted::at(m, 15) * p.w};
+    return {m[0] * p.x + m[4] * p.y + m[8] * p.z + m[12] * p.w, m[1] * p.x + m[5] * p.y + m[9] * p.z + m[13] * p.w,
+            m[2] * p.x + m[6] * p.y + m[10] * p.z + m[14] * p.w, m[3] * p.x + m[7] * p.y + m[11] * p.z + m[15] * p.w};
   }
 
-  static Mat4 translate(Vec3 t) { Mat4 r; converted::at(r.m, 12) = t.x; converted::at(r.m, 13) = t.y; converted::at(r.m, 14) = t.z; return r; }
-  static Mat4 scale(Vec3 s) { Mat4 r; converted::at(r.m, 0) = s.x; converted::at(r.m, 5) = s.y; converted::at(r.m, 10) = s.z; return r; }
+  static Mat4 translate(Vec3 t) { Mat4 r; r.m[12] = t.x; r.m[13] = t.y; r.m[14] = t.z; return r; }
+  static Mat4 scale(Vec3 s) { Mat4 r; r.m[0] = s.x; r.m[5] = s.y; r.m[10] = s.z; return r; }
 
   /// Translation * rotation * scale.
   static Mat4 trs(Vec3 t, Quat q, Vec3 s) {
@@ -103,49 +104,70 @@ struct Mat4 {
     const f32 xx = q.x * x2, xy = q.x * y2, xz = q.x * z2, yy = q.y * y2, yz = q.y * z2, zz = q.z * z2;
     const f32 wx = q.w * x2, wy = q.w * y2, wz = q.w * z2;
     Mat4 r;
-    converted::at(r.m, 0) = (1 - yy - zz) * s.x; converted::at(r.m, 1) = (xy + wz) * s.x; converted::at(r.m, 2) = (xz - wy) * s.x; converted::at(r.m, 3) = 0;
-    converted::at(r.m, 4) = (xy - wz) * s.y; converted::at(r.m, 5) = (1 - xx - zz) * s.y; converted::at(r.m, 6) = (yz + wx) * s.y; converted::at(r.m, 7) = 0;
-    converted::at(r.m, 8) = (xz + wy) * s.z; converted::at(r.m, 9) = (yz - wx) * s.z; converted::at(r.m, 10) = (1 - xx - yy) * s.z; converted::at(r.m, 11) = 0;
-    converted::at(r.m, 12) = t.x; converted::at(r.m, 13) = t.y; converted::at(r.m, 14) = t.z; converted::at(r.m, 15) = 1;
+    r.m[0] = (1 - yy - zz) * s.x; r.m[1] = (xy + wz) * s.x; r.m[2] = (xz - wy) * s.x; r.m[3] = 0;
+    r.m[4] = (xy - wz) * s.y; r.m[5] = (1 - xx - zz) * s.y; r.m[6] = (yz + wx) * s.y; r.m[7] = 0;
+    r.m[8] = (xz + wy) * s.z; r.m[9] = (yz - wx) * s.z; r.m[10] = (1 - xx - yy) * s.z; r.m[11] = 0;
+    r.m[12] = t.x; r.m[13] = t.y; r.m[14] = t.z; r.m[15] = 1;
     return r;
   }
 
-  
+  static Mat4 perspective(f32 fov, f32 aspect, f32 near, f32 far) {
+    const f32 f = 1.0 / kern::math::tan(fov * 0.5), nf = 1.0 / (near - far);
+    Mat4 r;
+    std::memset(r.m, 0, std::size_t{64});
+    r.m[0] = f / aspect; r.m[5] = f; r.m[10] = (far + near) * nf; r.m[11] = -1; r.m[14] = 2 * far * near * nf;
+    return r;
+  }
 
-
-
-
-
-
-
-  
-
-
-
-
-
-
+  static Mat4 ortho(f32 l, f32 r_, f32 b, f32 t, f32 n, f32 f) {
+    Mat4 r;
+    std::memset(r.m, 0, std::size_t{64});
+    r.m[0] = 2 / (r_ - l); r.m[5] = 2 / (t - b); r.m[10] = -2 / (f - n);
+    r.m[12] = -(r_ + l) / (r_ - l); r.m[13] = -(t + b) / (t - b); r.m[14] = -(f + n) / (f - n); r.m[15] = 1;
+    return r;
+  }
 
   /// View matrix. Returns identity (and false in `ok`) for a degenerate basis.
-  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  static Mat4 look_at(Vec3 eye, Vec3 target, Vec3 up, bool& ok) {
+    Vec3 z = eye - target;
+    f32 len = length(z);
+    Mat4 r;
+    if (!(len > 1e-10)) { ok = false; return r; }
+    z = z / len;
+    Vec3 x = cross(up, z);
+    len = length(x);
+    if (!(len > 1e-10)) { ok = false; return r; }
+    x = x / len;
+    const Vec3 y = cross(z, x);
+    r.m[0] = x.x; r.m[1] = y.x; r.m[2] = z.x; r.m[3] = 0;
+    r.m[4] = x.y; r.m[5] = y.y; r.m[6] = z.y; r.m[7] = 0;
+    r.m[8] = x.z; r.m[9] = y.z; r.m[10] = z.z; r.m[11] = 0;
+    r.m[12] = -dot(x, eye); r.m[13] = -dot(y, eye); r.m[14] = -dot(z, eye); r.m[15] = 1;
+    ok = true;
+    return r;
+  }
+  /// The same, where nobody asks whether it is one.
+  static Mat4 look_at(Vec3 eye, Vec3 target, Vec3 up) {
+    bool ok = false;
+    return look_at(eye, target, up, ok);
+  }
 };
+struct Camera {
+  Vec3 eye{0, -18, 8}, target{0, 0, 2}, up{0, 0, 1};
+  f32 fov = kPi / 3, near = 0.05, far = 1800;
+  bool orthographic = false;  // parallel projection (editor top/front/side views)
+  f32 ortho_height = 20;      // orthographic: visible height in metres
+  // An explicit projection (a WebXR eye: asymmetric frustum) instead of fov / aspect; the view
+  // still comes from eye / target / up.
+  bool has_projection = false;
+  Mat4 projection = Mat4{};
+};
+inline Mat4 projection_matrix(const Camera& c, f32 aspect) {
+  if (c.has_projection) return c.projection;
+  if (!c.orthographic) return Mat4::perspective(c.fov, aspect, c.near, c.far);
+  const f32 h = c.ortho_height * 0.5, w = h * aspect;
+  return Mat4::ortho(-w, w, -h, h, c.near, c.far);
+}
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
@@ -179,14 +201,37 @@ struct Mat4 {
 [[maybe_unused]] static void take(Quat& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
 [[maybe_unused]] static Mat4 draw_kern__Mat4(converted::Draw& draw) {
   Mat4 s{};
-  for (auto& e : s.m) e = draw.number();
+  converted::fill_array(s.m, [&]() -> double { return draw.number(); });
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const Mat4& s) { return converted::Value::structure({arg(std::vector<double>(std::begin(s.m), std::end(s.m)))}); }
-[[maybe_unused]] static bool same(const Mat4& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(std::vector<double>(std::begin(want.m), std::end(want.m)), (*got.rows)[0]); }
-[[maybe_unused]] static bool defined(const Mat4& s) { return defined(std::vector<double>(std::begin(s.m), std::end(s.m))); }
-[[maybe_unused]] static std::string text(const Mat4& s) { return std::string("{") + text(std::vector<double>(std::begin(s.m), std::end(s.m))) + "}"; }
-[[maybe_unused]] static void take(Mat4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[0]); for (std::size_t k = 0; k < items.size() && k < std::size(s.m); ++k) s.m[k] = items[k]; } }
+[[maybe_unused]] static converted::Value arg(const Mat4& s) { return converted::Value::structure({arg(converted::array_list(s.m))}); }
+[[maybe_unused]] static bool same(const Mat4& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::array_list(want.m), (*got.rows)[0]); }
+[[maybe_unused]] static bool defined(const Mat4& s) { return defined(converted::array_list(s.m)); }
+[[maybe_unused]] static std::string text(const Mat4& s) { return std::string("{") + text(converted::array_list(s.m)) + "}"; }
+[[maybe_unused]] static void take(Mat4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[0]); converted::array_from(s.m, items); } }
+[[maybe_unused]] static Camera draw_kern__Camera(converted::Draw& draw) {
+  Camera s{};
+  s.eye = draw.vector();
+  s.target = draw.vector();
+  s.up = draw.vector();
+  s.fov = draw.number();
+  s.near = draw.number();
+  s.far = draw.number();
+  s.orthographic = draw.flag();
+  s.ortho_height = draw.number();
+  s.has_projection = draw.flag();
+  s.projection = draw_kern__Mat4(draw);
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Camera& s) { return converted::Value::structure({arg(s.eye), arg(s.target), arg(s.up), arg(s.fov), arg(s.near), arg(s.far), arg(s.orthographic), arg(s.ortho_height), arg(s.has_projection), arg(s.projection)}); }
+[[maybe_unused]] static bool same(const Camera& want, const converted::Value& got) { return got.rows && got.rows->size() == 10 && same(want.eye, (*got.rows)[0]) && same(want.target, (*got.rows)[1]) && same(want.up, (*got.rows)[2]) && same(want.fov, (*got.rows)[3]) && same(want.near, (*got.rows)[4]) && same(want.far, (*got.rows)[5]) && same(want.orthographic, (*got.rows)[6]) && same(want.ortho_height, (*got.rows)[7]) && same(want.has_projection, (*got.rows)[8]) && same(want.projection, (*got.rows)[9]); }
+[[maybe_unused]] static bool defined(const Camera& s) { return defined(s.eye) && defined(s.target) && defined(s.up) && defined(s.fov) && defined(s.near) && defined(s.far) && defined(s.orthographic) && defined(s.ortho_height) && defined(s.has_projection) && defined(s.projection); }
+[[maybe_unused]] static std::string text(const Camera& s) { return std::string("{") + text(s.eye) + ", " + text(s.target) + ", " + text(s.up) + ", " + text(s.fov) + ", " + text(s.near) + ", " + text(s.far) + ", " + text(s.orthographic) + ", " + text(s.ortho_height) + ", " + text(s.has_projection) + ", " + text(s.projection) + "}"; }
+[[maybe_unused]] static void take(Camera& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 10) return; converted::take_as<Vec3>(s.eye, (*v.rows)[0]); converted::take_as<Vec3>(s.target, (*v.rows)[1]); converted::take_as<Vec3>(s.up, (*v.rows)[2]); converted::take_as<double>(s.fov, (*v.rows)[3]); converted::take_as<double>(s.near, (*v.rows)[4]); converted::take_as<double>(s.far, (*v.rows)[5]); converted::take_as<bool>(s.orthographic, (*v.rows)[6]); converted::take_as<double>(s.ortho_height, (*v.rows)[7]); converted::take_as<bool>(s.has_projection, (*v.rows)[8]); converted::take_as<Mat4>(s.projection, (*v.rows)[9]); }
+struct Out_Mat4_look_at { Mat4 Result; bool ok; };
+[[maybe_unused]] static bool same(const Out_Mat4_look_at& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.ok, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_Mat4_look_at& s) { return defined(s.Result) && defined(s.ok); }
+[[maybe_unused]] static std::string text(const Out_Mat4_look_at& s) { return std::string("{") + text(s.Result) + ", " + text(s.ok) + "}"; }
 
 SC_TEST(converted_engine_math_math) {
   converted::Blueprint bp("engine_math_math");
@@ -195,18 +240,21 @@ SC_TEST(converted_engine_math_math) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return converted::counted([&] { return Vec4(std::move(a0), std::move(a1), std::move(a2), std::move(a3)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const double a0 = draw.number();
-      const double a1 = draw.number();
-      const double a2 = draw.number();
-      const double a3 = draw.number();
+      double a0 = draw.number();
+      double a1 = draw.number();
+      double a2 = draw.number();
+      double a3 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Quat::axis_angle
@@ -214,16 +262,19 @@ SC_TEST(converted_engine_math_math) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return converted::counted([&] { return Quat::axis_angle(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Vec3 a0 = draw.vector();
-      const double a1 = draw.number();
+      Vec3 a0 = draw.vector();
+      double a1 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Quat::operator*
@@ -231,16 +282,19 @@ SC_TEST(converted_engine_math_math) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Quat a0, [[maybe_unused]] Quat a1) { return converted::counted([&] { return a0.operator*(a1); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Quat a0 = draw_kern__Quat(draw);
-      const Quat a1 = draw_kern__Quat(draw);
+      Quat a0 = draw_kern__Quat(draw);
+      Quat a1 = draw_kern__Quat(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Quat::rotate
@@ -248,16 +302,19 @@ SC_TEST(converted_engine_math_math) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Quat a0, [[maybe_unused]] Vec3 a1) { return converted::counted([&] { return a0.rotate(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Quat a0 = draw_kern__Quat(draw);
-      const Vec3 a1 = draw.vector();
+      Quat a0 = draw_kern__Quat(draw);
+      Vec3 a1 = draw.vector();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Mat4::translation
@@ -265,15 +322,18 @@ SC_TEST(converted_engine_math_math) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Mat4 a0) { return converted::counted([&] { return a0.translation(); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Mat4 a0 = draw_kern__Mat4(draw);
+      Mat4 a0 = draw_kern__Mat4(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Mat4::operator*
@@ -281,16 +341,19 @@ SC_TEST(converted_engine_math_math) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Mat4 a0, [[maybe_unused]] Mat4 a1) { return converted::counted([&] { return a0.operator*(a1); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Mat4 a0 = draw_kern__Mat4(draw);
-      const Mat4 a1 = draw_kern__Mat4(draw);
+      Mat4 a0 = draw_kern__Mat4(draw);
+      Mat4 a1 = draw_kern__Mat4(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Mat4::transform_point
@@ -298,16 +361,19 @@ SC_TEST(converted_engine_math_math) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Mat4 a0, [[maybe_unused]] Vec3 a1) { return converted::counted([&] { return a0.transform_point(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Mat4 a0 = draw_kern__Mat4(draw);
-      const Vec3 a1 = draw.vector();
+      Mat4 a0 = draw_kern__Mat4(draw);
+      Vec3 a1 = draw.vector();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Mat4::transform_vector
@@ -315,16 +381,19 @@ SC_TEST(converted_engine_math_math) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Mat4 a0, [[maybe_unused]] Vec3 a1) { return converted::counted([&] { return a0.transform_vector(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Mat4 a0 = draw_kern__Mat4(draw);
-      const Vec3 a1 = draw.vector();
+      Mat4 a0 = draw_kern__Mat4(draw);
+      Vec3 a1 = draw.vector();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Mat4::transform
@@ -332,16 +401,19 @@ SC_TEST(converted_engine_math_math) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Mat4 a0, [[maybe_unused]] Vec4 a1) { return converted::counted([&] { return a0.transform(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Mat4 a0 = draw_kern__Mat4(draw);
-      const Vec4 a1 = draw_kern__Vec4(draw);
+      Mat4 a0 = draw_kern__Mat4(draw);
+      Vec4 a1 = draw_kern__Vec4(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Mat4::translate
@@ -349,15 +421,18 @@ SC_TEST(converted_engine_math_math) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted::counted([&] { return Mat4::translate(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Vec3 a0 = draw.vector();
+      Vec3 a0 = draw.vector();
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Mat4::scale
@@ -365,15 +440,18 @@ SC_TEST(converted_engine_math_math) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted::counted([&] { return Mat4::scale(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Vec3 a0 = draw.vector();
+      Vec3 a0 = draw.vector();
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Mat4::trs
@@ -381,17 +459,129 @@ SC_TEST(converted_engine_math_math) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Quat a1, [[maybe_unused]] Vec3 a2) { return converted::counted([&] { return Mat4::trs(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Vec3 a0 = draw.vector();
-      const Quat a1 = draw_kern__Quat(draw);
-      const Vec3 a2 = draw.vector();
+      Vec3 a0 = draw.vector();
+      Quat a1 = draw_kern__Quat(draw);
+      Vec3 a2 = draw.vector();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Mat4::perspective
+    converted::Tally tally("Mat4_perspective");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return converted::counted([&] { return Mat4::perspective(std::move(a0), std::move(a1), std::move(a2), std::move(a3)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      double a0 = draw.number();
+      double a1 = draw.number();
+      double a2 = draw.number();
+      double a3 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Mat4::ortho
+    converted::Tally tally("Mat4_ortho");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { return converted::counted([&] { return Mat4::ortho(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      double a0 = draw.number();
+      double a1 = draw.number();
+      double a2 = draw.number();
+      double a3 = draw.number();
+      double a4 = draw.number();
+      double a5 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Mat4::look_at
+    converted::Tally tally("Mat4_look_at");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] bool a3) { auto r = converted::counted([&] { return Mat4::look_at(std::move(a0), std::move(a1), std::move(a2), a3); }); return Out_Mat4_look_at{std::move(r), std::move(a3)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      Vec3 a0 = draw.vector();
+      Vec3 a1 = draw.vector();
+      Vec3 a2 = draw.vector();
+      bool a3 = draw.flag();
+      const std::vector<converted::Value> given = {arg(a3), arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
+    }
+  }
+  {  // Mat4::look_at
+    converted::Tally tally("Mat4_look_at_2");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2) { return converted::counted([&] { return Mat4::look_at(std::move(a0), std::move(a1), std::move(a2)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      Vec3 a0 = draw.vector();
+      Vec3 a1 = draw.vector();
+      Vec3 a2 = draw.vector();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // projection_matrix
+    converted::Tally tally("projection_matrix");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Camera a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_engine_math_math::projection_matrix(a0, std::move(a1)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      Camera a0 = draw_kern__Camera(draw);
+      double a1 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

@@ -18,10 +18,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -34,10 +34,57 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-enum class Surface : u8 { none, cloth, tpu, floor };
-namespace WaterLook { inline const char* vertex_declarations()  { return "out vec3 vWater;\n"; } }
-namespace WaterLook { inline const char* vertex()  { return "  vWater = aWater;\n"; } }
-namespace WaterLook { inline const char* fragment_declarations()  {
+struct Mesh : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct HeightSampler : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
+struct World : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct MouseGrab : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct CharacterMover : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Program : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+  unsigned int location(const char* name) const;
+};
+struct UniformCache : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct ExtensionAttribute {
+  const char* key;   // name used by hosts to supply the stream (e.g. "facade")
+  u32 size;          // 1..4 floats per vertex
+  const char* glsl;  // attribute name in GLSL (e.g. "aFacade")
+};
+struct ShaderExtension : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct WaterLook final {
+ public:
+  f32 time = 0;  // seconds (uTime)
+  
+  Span<const ExtensionAttribute> attributes() const;
+  const char* vertex_declarations() const;
+  const char* vertex() const;
+  const char* fragment_declarations() const;
+  const char* fragment_surface() const;
+  void bind(const Program& p);
+  
+
+ private:
+  u32 u_time_ = 0;
+};
+constexpr ExtensionAttribute kWater[] = {{"water", 3, "aWater"}};
+Span<const ExtensionAttribute> WaterLook::attributes() const { return {kWater, 1}; }
+const char* WaterLook::vertex_declarations() const { return "out vec3 vWater;\n"; }
+const char* WaterLook::vertex() const { return "  vWater = aWater;\n"; }
+const char* WaterLook::fragment_declarations() const {
   return R"GLSL(
 in vec3 vWater;
 uniform float uWaterTime;
@@ -45,8 +92,8 @@ vec2 waveGrad(vec2 p, vec2 dir, float k, float sp, float a) { float ph = dot(p, 
 float wh(vec2 p) { return fract(sin(dot(floor(p), vec2(41.3, 289.1))) * 43758.5); }
 float wn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(wh(i), wh(i + vec2(1, 0)), f.x), mix(wh(i + vec2(0, 1)), wh(i + vec2(1, 1)), f.x), f.y); }
 )GLSL";
-} }
-namespace WaterLook { inline const char* fragment_surface()  {
+}
+const char* WaterLook::fragment_surface() const {
   // world_water.mjs makeMaterial, line for line (diffuseColor is linear there, as `base` here)
   return R"GLSL(
   if (vWater.x > 0.5) {
@@ -67,72 +114,147 @@ namespace WaterLook { inline const char* fragment_surface()  {
     n = normalize(vec3(-g.x, -g.y, 1.0));
   }
 )GLSL";
-} }
+}
+void WaterLook::bind(const Program& p) { u_time_ = p.location("uWaterTime"); }
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
 
+[[maybe_unused]] static ExtensionAttribute draw_kern__ExtensionAttribute(converted::Draw& draw) {
+  ExtensionAttribute s{};
+  s.key = draw.c_word();
+  s.size = static_cast<unsigned int>(draw.below(40));
+  s.glsl = draw.c_word();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const ExtensionAttribute& s) { return converted::Value::structure({arg(s.key), arg(s.size), arg(s.glsl)}); }
+[[maybe_unused]] static bool same(const ExtensionAttribute& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.key, (*got.rows)[0]) && same(want.size, (*got.rows)[1]) && same(want.glsl, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const ExtensionAttribute& s) { return defined(s.key) && defined(s.size) && defined(s.glsl); }
+[[maybe_unused]] static std::string text(const ExtensionAttribute& s) { return std::string("{") + text(s.key) + ", " + text(s.size) + ", " + text(s.glsl) + "}"; }
+[[maybe_unused]] static void take(ExtensionAttribute& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<const char*>(s.key, (*v.rows)[0]); converted::take_as<unsigned int>(s.size, (*v.rows)[1]); converted::take_as<const char*>(s.glsl, (*v.rows)[2]); }
+[[maybe_unused]] static WaterLook draw_WaterLook(converted::Draw& draw) {
+  WaterLook s{};
+  s.time = draw.number();
+  s.u_time_ = static_cast<unsigned int>(draw.below(40));
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const WaterLook& s) { return converted::Value::structure({arg(s.time), arg(s.u_time_)}); }
+[[maybe_unused]] static bool same(const WaterLook& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.time, (*got.rows)[0]) && same(want.u_time_, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const WaterLook& s) { return defined(s.time) && defined(s.u_time_); }
+[[maybe_unused]] static std::string text(const WaterLook& s) { return std::string("{") + text(s.time) + ", " + text(s.u_time_) + "}"; }
+[[maybe_unused]] static void take(WaterLook& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<double>(s.time, (*v.rows)[0]); converted::take_as<unsigned int>(s.u_time_, (*v.rows)[1]); }
+inline unsigned int Program::location(const char* name) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.program.location", {converted::value_of(*this), converted::value_of(name)}); unsigned int kern_result = converted::quiet<unsigned int>(); converted::take_as<unsigned int>(kern_result, kern_out[0]); return kern_result; }
 
 SC_TEST(converted_water_look_cpp) {
   converted::Blueprint bp("water_look_cpp");
-  {  // WaterLook::vertex_declarations
-    converted::Tally tally("WaterLook_vertex_declarations");
+  {  // WaterLook::attributes
+    converted::Tally tally("WaterLook_attributes");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted::counted([&] { return converted_water_look_cpp::WaterLook::vertex_declarations(); }); };
+    const auto run = [&]() { return converted::counted([&] { return WaterLook{}.attributes(); }); };
     for (int i = 0; tally.more(i); ++i) {
+      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run();
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // WaterLook::vertex_declarations
+    converted::Tally tally("WaterLook_vertex_declarations");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]() { return converted::counted([&] { return WaterLook{}.vertex_declarations(); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // WaterLook::vertex
     converted::Tally tally("WaterLook_vertex");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted::counted([&] { return converted_water_look_cpp::WaterLook::vertex(); }); };
+    const auto run = [&]() { return converted::counted([&] { return WaterLook{}.vertex(); }); };
     for (int i = 0; tally.more(i); ++i) {
+      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run();
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // WaterLook::fragment_declarations
     converted::Tally tally("WaterLook_fragment_declarations");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted::counted([&] { return converted_water_look_cpp::WaterLook::fragment_declarations(); }); };
+    const auto run = [&]() { return converted::counted([&] { return WaterLook{}.fragment_declarations(); }); };
     for (int i = 0; tally.more(i); ++i) {
+      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run();
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // WaterLook::fragment_surface
     converted::Tally tally("WaterLook_fragment_surface");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted::counted([&] { return converted_water_look_cpp::WaterLook::fragment_surface(); }); };
+    const auto run = [&]() { return converted::counted([&] { return WaterLook{}.fragment_surface(); }); };
     for (int i = 0; tally.more(i); ++i) {
+      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run();
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // WaterLook::bind
+    converted::Tally tally("WaterLook_bind");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] WaterLook a0, [[maybe_unused]] const Program& a1) { converted::counted([&] { return a0.bind(a1); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      WaterLook a0 = draw_WaterLook(draw);
+      const Program& a1 = *converted::engine_object<Program>(1 + draw.below(6));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), a1);
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }
