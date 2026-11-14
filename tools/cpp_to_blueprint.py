@@ -10195,11 +10195,16 @@ def survey_one(job):
                 # functions of numbers - should one be called as a function after all, its file says so: main)
                 if not own_function(tree, t["id"]) or (tree.scope_of.get(t["id"], "").startswith(ENGINE + "::") and (t.get("name") in MATH or t.get("name") in MORE_MATH)):
                     continue
-                if t.get("kind") == "CXXConstructorDecl" and (tree.owner.get(t["id"]) or "").startswith(ENGINE + "::"):
+                if t.get("kind") in ("CXXConstructorDecl", "CXXMethodDecl") and (tree.owner.get(t["id"]) or "").startswith(ENGINE + "::"):
                     if kinds is None:
                         kinds = Unit(tree, "survey")
-                    if kinds.engine_object(tree.owner[t["id"]]):
+                    if t.get("kind") == "CXXConstructorDecl" and kinds.engine_object(tree.owner[t["id"]]):
                         continue   # (an object of the engine is made by its node <class>.make: no function of a Blueprint)
+                    if t.get("kind") == "CXXMethodDecl" and ENGINE_NODES and (kinds.api().declared_only(t) or kinds.api().declared_only(tree.decl.get(rid, t))):
+                        # (a method of an object of the engine is its node - also where its header defines it,
+                        # `int width() const { return width_; }`: what the object holds is the engine's. The call is
+                        # the node; no Blueprint has it as a function, none is written or tested as one.)
+                        continue
                 calls.add(function_key(tree, t))
         a, b = d.get("_at", (None, None))
         functions.append({"key": function_key(tree, d), "file": file, "at": a or 0, "calls": sorted(calls), "lines": tree.text(d["_file"]).count("\n", a, b) + 1 if a is not None else 0,
