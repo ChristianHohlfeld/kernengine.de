@@ -1039,6 +1039,14 @@ template <class SK> struct Take<kern::Set<SK>> {
   }
 };
 template <class S, class T> void take_as(T& target, const Value& v) { Take<S>::to(target, v); }
+/// What the engine writes through a pointer, their count beside it (kern::logic::EnginePin::count): the
+/// entries of the list the stand-in gives, one after the other from `first` on - no more than the count
+/// says (the room the call says it has; the stand-in gives no more than that either).
+template <class S, class T, class N> void take_into(T* first, const N& count, const Value& v) {
+  std::vector<T> items;
+  Take<std::vector<S>>::to(items, v);
+  for (std::size_t k = 0; k < items.size() && static_cast<long long>(k) < static_cast<long long>(count); ++k) first[k] = std::move(items[k]);
+}
 template <class T> void take(std::vector<T>& to, const Value& v) { Take<std::vector<T>>::to(to, v); }
 
 /// A value of the Blueprint as text, every number with all its digits.

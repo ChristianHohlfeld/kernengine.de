@@ -1069,6 +1069,33 @@ struct Garage : virtual kern::Blueprint, virtual Workshop {     // ein Blueprint
   Bibliothek, passt die übersetzte Klasse ihrer Benutzer nicht mehr, und sie laufen im
   Interpreter, bis neu gebaut ist.
 
+### Knoten der Engine
+
+Was nur die Engine kann – ein Strahl durch die Physik, ein Mesh zeichnen, einen Ton mischen –, ist
+ein Knoten (`tools/engine_api.py` liest die Header der Engine und schreibt die Tabelle
+`kern/src/logic/engine_api.gen.cpp`, die Funktionen der Klasse `engine_nodes.gen.h` und den Fall
+`kern/tests/engine_case.gen.h`, der jeden Knoten einmal aufruft): `kern::physics::World::cast_ray`
+ist `engine.world.cast_ray`, im Text `engine_world_cast_ray(world, from, to …)`. Jede Stufe ruft
+ihn durch eine Tür, `logic::Host::engine`; ein Test bindet dort den Stellvertreter
+`logic::EngineStandIn`, der aus der Form jedes Ausgangs antwortet – gleich in jeder Stufe.
+
+- **Eine Methode eines Objekts der Engine ist ihr Knoten** (ein Objekt mit einem Leben für sich:
+  eine Klasse – die Physik, der Renderer, der Mixer –, eine Struktur, die nicht kopiert werden kann
+  oder ein solches Objekt hält; im Blueprint ein Handle). Das gilt auch, wo ihr Header sie
+  definiert (`int width() const { return width_; }`, `bool ready() const`): was das Objekt hält,
+  ist das der Engine. Der Konverter schreibt einen Aufruf von ihr als den Knoten, und keine Funktion
+  eines Blueprints – der Plan des Programms folgt ihm nicht, kein Blueprint eines Headers der Engine
+  wird darum geschrieben oder als solche Funktion getestet.
+- **Was eine Funktion durch einen Parameter schreibt, ist ein weiterer Ausgang:** durch eine
+  Referenz (`std::vector<u64>& out`), durch einen Zeiger, der null sein darf (`bool* changed =
+  nullptr` – der Aufruf nimmt den Wert, wo er ihn will, oder nirgends), und durch einen Zeiger auf
+  Zahlen mit ihrer Anzahl daneben (`void render(f32* out, u32 frames)`): eine Liste der Zahlen,
+  die die Engine dort hinschreibt (`out`, List<Float>), die Anzahl bleibt ein Eingang. In der
+  Tabelle nennt der Ausgang seine Anzahl (`EnginePin::count`); der Stellvertreter gibt nicht mehr
+  Einträge, als sie sagt – den Platz, den der Aufruf ihm gibt. Der Aufruf `mixer_.render(out_.data(),
+  frames)` schreibt die Zahlen des Knotens in die Liste, auf die der Zeiger zeigt, ab dem Eintrag,
+  auf den er zeigt, einen nach dem anderen; die Liste behält ihre Länge, wie in C++.
+
 ### Formeln
 
 Eine Formel ist der Ausdruck selbst, als Lambda über ihre Eingänge. Operatoren, die in C++ etwas

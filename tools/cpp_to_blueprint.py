@@ -1361,7 +1361,7 @@ class Unit:
                 text = open(os.path.join(ROOT, "kern", "src", "logic", "engine_api.gen.cpp")).read()
             except OSError:
                 text = ""
-            pins = lambda t: [(m.group(1), m.group(2), m.group(3)) for m in re.finditer(r'\{"(\w+)", PinType::(\w+), "(\w*)", "[^"]*"\}', t)]
+            pins = lambda t: [(m.group(1), m.group(2), m.group(3)) for m in re.finditer(r'\{"(\w+)", PinType::(\w+), "(\w*)", "[^"]*"(?:, "\w*")?\}', t)]
             for m in re.finditer(r'\{"(engine\.[\w.]+)", (?:"(?:\\.|[^"\\])*", ){4}(true|false),\n\s*\{(.*)\},\n\s*\{(.*)\}\},', text):
                 self._table[m.group(1)] = (m.group(2) == "true", pins(m.group(3)), pins(m.group(4)))
         return self._table
@@ -4970,12 +4970,24 @@ class Emit:
         params = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
         nodes = {}   # pin -> the argument it is (an output: where the call wants it - None: nowhere)
         in_pins = {name: bt for name, bt, _ in ins}
+        out_pins = {name: bt for name, bt, _ in f["outs"]}
+        first = []   # (steps before the call: where in a list the engine writes - worked out as C++ works out its arguments)
         for i, (pin_in, pin_out) in enumerate(f["params"]):
             a = args[i] if i < len(args) else None
             if a is None or a.get("kind") == "CXXDefaultArgExpr":   # (left out: the default the header gives it)
                 a = kids(params[i])[-1] if kids(params[i]) else None
                 if a is None:
                     raise Wait("a call of the engine with a default argument that is declared elsewhere")
+            if pin_in is None and pin_out in f.get("counts", {}):
+                # numbers the engine writes through a pointer (Api.written_list): into the list the pointer points
+                # into, from the entry it points at on - the node's list, entry by entry, where they are written
+                lst, at = self.place(a)
+                if self.tp(lst) != out_pins[pin_out]:
+                    raise Wait(f"numbers the engine writes as {out_pins[pin_out][5:-1]} into a list of {self.tp(lst)[5:-1] if self.tp(lst).startswith('List<') else self.tp(lst)}")
+                held = self.temp("at", "Int")
+                first.append(f"{held} = {at};")
+                nodes[pin_out] = ("into", lst, held)
+                continue
             if pin_in is None:
                 # what the function reports if it is asked to (`bool* changed`): into the place the call
                 # names (&changed), or nowhere (nullptr) - the node gives it either way
@@ -5003,14 +5015,14 @@ class Emit:
         outs = f["outs"]
         if f["value"]:
             tmp = self.temp(d["name"], outs[0][1])
-            return [f"{tmp} = {fn}({', '.join(texts)});"], tmp, outs[0][1]
+            return first + [f"{tmp} = {fn}({', '.join(texts)});"], tmp, outs[0][1]
         self.f.pure = False   # (a step of the engine: the function changes something outside itself)
         if not outs:
-            return [f"{fn}({', '.join(texts)});"], None, None
+            return first + [f"{fn}({', '.join(texts)});"], None, None
         node = u.next_node
         u.next_node += 1
         u.members.append("  struct { " + " ".join(f"{bt} {o} = {u.zero(bt)};" for o, bt, _ in outs) + f" }} n{node};")
-        lines, got = [f"{fn}({', '.join([f'n{node}'] + texts)});"], (None, None)
+        lines, got = first + [f"{fn}({', '.join([f'n{node}'] + texts)});"], (None, None)
         for o, bt, _ in outs:
             if o == "result":
                 tmp = self.temp(d["name"], bt)
@@ -5018,6 +5030,15 @@ class Emit:
                 got = (tmp, bt)
             elif o == "self":
                 lines += self.store(own, self.typed(f"n{node}.self", bt))
+            elif isinstance(nodes.get(o), tuple):
+                # (what the engine wrote there: its numbers into the list one after the other from that entry on -
+                # the list keeps its length; the engine writes no more than the room the call gives it)
+                _, lst, at = nodes[o]
+                it = bt[5:-1]
+                before, lv, after = self.variable_of(lst, bt)
+                last = self.temp("last", "Int")
+                lines += before + [f"{last} = {self.whole_math('-', f'list_length<{it}>(n{node}.{o})', '1')};"]
+                lines += self.count_loop("0", last, lambda i: [f"{lv}[{self.whole_math('+', at, i)}] = list_get<{it}>(n{node}.{o}, {i});"]) + after
             elif nodes.get(o) is not None:
                 lines += self.store(nodes[o], self.typed(f"n{node}.{o}", bt))
         return lines, *got
@@ -7842,12 +7863,21 @@ class Api:
                     outs.append(("self", st, None))
         changes = False   # (an object of the engine it is handed to change - Renderer&, physics::World*: a step)
         params = []   # per parameter of the C++ function: (its input pin or None, its output pin or None)
-        for i, p in enumerate(x for x in kids(d) if x.get("kind") == "ParmVarDecl"):
+        counts = {}   # an output list the engine writes through a pointer -> the input that is its count (written_list)
+        all_params = [x for x in kids(d) if x.get("kind") == "ParmVarDecl"]
+        for i, p in enumerate(all_params):
             optional = self.optional_out(p)
             if optional is not None:
                 name = name_of(p.get("name") or f"value{i + 1}")
                 outs.append((name, optional, None))
                 params.append((None, name))
+                continue
+            written = self.written_list(p, all_params[i + 1] if i + 1 < len(all_params) else None)
+            if written is not None:
+                name = name_of(p.get("name") or f"value{i + 1}")
+                outs.append((name, written, None))
+                params.append((None, name))
+                counts[name] = i + 1   # (the parameter after it - its input's name is known once it is read)
                 continue
             bt, writes, handle = self.handed(qtype(p))
             name = name_of(p.get("name") or f"value{i + 1}")
@@ -7857,6 +7887,7 @@ class Api:
             params.append((name, name if writes else None))
             if handle and re.search(r"(&|\*\s*(const)?)$", qtype(p).strip()) and not re.match(r"const\b", qtype(p).strip()):
                 changes = True
+        counts = {name: params[k][0] for name, k in counts.items()}
         ret = qtype(d).split("(")[0].strip()
         if ret != "void":
             bt, _, handle = self.handed(ret)
@@ -7868,7 +7899,33 @@ class Api:
             self.shape(bt)
         words = d["name"].replace("_", " ").title()
         return {"type": self.type_of(d), "cpp": qualified, "label": words, "category": "Engine: " + self.home(d).split("::")[-1].replace("kern", "Engine"),
-                "help": u.comment_of(d), "value": value, "ins": ins, "outs": outs, "params": params, "decl": d}
+                "help": u.comment_of(d), "value": value, "ins": ins, "outs": outs, "params": params, "decl": d, "counts": counts}
+
+    def written_list(self, p, after):
+        """A parameter that is a pointer to numbers the function writes through, with their count beside it -
+        the parameter after it, a whole number (`void render(f32* out, u32 frames)`): what the engine writes
+        there is a further output, the list of those numbers (List<Float> ...); the count stays an input.
+        None for any other parameter. (A call hands it a place in a list - `buf.data()`, `buf.data() + k`: the
+        engine's numbers go there, entry by entry; the list keeps its length. The stand-in of the tests gives
+        no more of them than the count says - the room the call says it has.)"""
+        raw = qtype(p).strip()
+        if after is None or not re.search(r"\*\s*$", raw) or re.match(r"const\b", raw) or kids(p):
+            return None
+        inner = re.sub(r"\*\s*$", "", raw).strip()
+        if "*" in inner or "&" in inner or re.search(r"\bconst\b", inner) or self.u.object_of(raw) is not None:
+            return None   # (a pointer to an object of the engine is its handle)
+        count = self.u.clean(qtype(after).strip())
+        if NUMBER.get(count) != "Int" or count in ("bool", "char"):
+            return None
+        if self.u.clean(inner) == "char":
+            return None   # (characters: a text's, not numbers)
+        try:
+            bt = self.u.btype(inner)
+        except Wait:
+            return None
+        if bt not in ("Int", "Float", "Int64"):
+            return None   # (numbers: a pointer to anything else the function writes through has no node)
+        return f"List<{bt}>"
 
     def optional_out(self, p):
         """A parameter that is a pointer to plain data the function writes through, null by default
@@ -8836,6 +8893,13 @@ class TestWriter:
             raw = qtype(p).strip()
             default = self.tree.source(kids(p)[-1]).strip().lstrip("=").strip() if kids(p) else ""   # (`= {}`: the tree has the sign with it)
             default = " = " + default if default else ""
+            if pin_in is None and pin_out in f.get("counts", {}):
+                # numbers it writes through a pointer, their count beside it (Api.written_list): the entries the
+                # stand-in gives, one after the other from there on - no more than the count says
+                inner = self.spell(re.sub(r"\*\s*$", "", raw))
+                params.append((f"{inner}* {pin_out}", default))
+                takes.append((pin_out, inner, ("into", f["counts"][pin_out])))
+                continue
             if pin_in is None:
                 # what the function reports if it is asked to: written where the pointer says, if it says
                 inner = self.spell(re.sub(r"\*\s*$", "", raw))
@@ -8890,7 +8954,10 @@ class TestWriter:
             body.append(f"{ret} kern_result = converted::quiet<{ret}>(); converted::take_as<{shape(ret)}>(kern_result, kern_out[0]);")
             k = 1
         for name, t, optional in takes:
-            body.append(f"if ({name}) converted::take_as<{shape(t)}>(*{name}, kern_out[{k}]);" if optional else f"converted::take_as<{shape(t)}>({name}, kern_out[{k}]);")
+            if isinstance(optional, tuple):   # (into the entries the pointer points at, as many as the count beside it allows)
+                body.append(f"converted::take_into<{shape(t)}>({name}, {optional[1]}, kern_out[{k}]);")
+            else:
+                body.append(f"if ({name}) converted::take_as<{shape(t)}>(*{name}, kern_out[{k}]);" if optional else f"converted::take_as<{shape(t)}>({name}, kern_out[{k}]);")
             k += 1
         if ret != "void":
             body.append("return kern_result;")

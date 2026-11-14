@@ -2,6 +2,7 @@
 // (kern/logic/engine_api.h).
 #include "kern/logic/engine_api.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <unordered_map>
@@ -96,8 +97,9 @@ u64 next(u64& state) {
 }
 
 /// A value of a form (EnginePin::shape), read from `at` on. Numbers are eighths, so that the engine's
-/// 32-bit numbers hold them exactly; whole numbers are small enough for every whole type.
-Value answer(std::string_view shape, std::size_t& at, u64& state) {
+/// 32-bit numbers hold them exactly; whole numbers are small enough for every whole type. A list has
+/// no more than `most` entries.
+Value answer(std::string_view shape, std::size_t& at, u64& state, u64 most = ~u64{0}) {
   const char c = at < shape.size() ? shape[at++] : 'n';
   switch (c) {
     case 'b': return Value::boolean(next(state) % 2 != 0);
@@ -124,7 +126,7 @@ Value answer(std::string_view shape, std::size_t& at, u64& state) {
     }
     case '[': {
       const std::size_t item = at;
-      const std::size_t count = next(state) % 3;
+      const std::size_t count = static_cast<std::size_t>(std::min<u64>(next(state) % 3, most));
       std::vector<Value> items;
       std::size_t end = at;
       for (std::size_t k = 0; k < count; ++k) {
@@ -171,8 +173,13 @@ bool EngineStandIn::engine(std::string_view function, const std::vector<Value>& 
   u64 state = 1469598103934665603ull + calls.size();
   for (const char ch : call) state = (state ^ static_cast<unsigned char>(ch)) * 1099511628211ull;
   for (std::size_t k = 0; k < f->outputs.size() && k < out.size(); ++k) {
+    // (what the engine writes through a pointer: no more entries than its count says - the room there is)
+    u64 most = ~u64{0};
+    if (f->outputs[k].count[0])
+      for (std::size_t j = 0; j < f->inputs.size() && j < in.size(); ++j)
+        if (std::strcmp(f->inputs[j].id, f->outputs[k].count) == 0) most = in[j].i > 0 ? static_cast<u64>(in[j].i) : 0;
     std::size_t at = 0;
-    out[k] = answer(f->outputs[k].shape, at, state);
+    out[k] = answer(f->outputs[k].shape, at, state, most);
   }
   calls.push_back(std::move(call));
   return true;
