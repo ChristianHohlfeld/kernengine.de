@@ -4767,6 +4767,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     const std::string text = literal(v);
     if (v.type == PinType::vector) return "kern::Vec3" + text.substr(6);
     if (v.type == PinType::actor) return "kern::logic::ActorHandle" + text.substr(5);
+    if (v.type == PinType::int64) return "kern::logic::" + text;   // (outside the class: Int64{0x1f} with its namespace)
     if (!is_list(v.type)) return text;
     std::string r = type(v.type, of) + "{";
     for (std::size_t k = 0, n = v.size(); k < n; ++k) r += (k ? ", " : "") + spelled(v.item(k), of);

@@ -1612,12 +1612,14 @@ inline const char* builtin_cpp_type(PinType t) {
     case PinType::vector: return "kern::Vec3";
     case PinType::text: return "kern::logic::Text";
     case PinType::actor: return "kern::logic::ActorHandle";
+    case PinType::int64: return "kern::logic::Int64";
     case PinType::boolean_list: return "kern::List<bool>";
     case PinType::integer_list: return "kern::List<kern::logic::Whole>";
     case PinType::number_list: return "kern::List<kern::f64>";
     case PinType::vector_list: return "kern::List<kern::Vec3>";
     case PinType::text_list: return "kern::List<kern::logic::Text>";
     case PinType::actor_list: return "kern::List<kern::logic::ActorHandle>";
+    case PinType::int64_list: return "kern::List<kern::logic::Int64>";
     default: return "void";
   }
 }
@@ -1644,6 +1646,7 @@ inline std::string cpp_value(const Value& v, const std::string& of = {}, const s
     case PinType::vector: return "kern::Vec3{" + number(v.v.x, "f") + ", " + number(v.v.y, "f") + ", " + number(v.v.z, "f") + "}";
     case PinType::text: return "std::string(" + c_string(v.s) + ")";
     case PinType::actor: std::snprintf(b, sizeof b, "kern::logic::ActorHandle{%lluu}", static_cast<unsigned long long>(v.a)); return b;
+    case PinType::int64: std::snprintf(b, sizeof b, "kern::logic::Int64{0x%llxull}", static_cast<unsigned long long>(static_cast<u64>(v.i))); return b;
     case PinType::enumeration: return "static_cast<" + owner + "::" + of + ">(" + std::to_string(v.i) + ")";
     case PinType::structure: {
       const logic::StructType* s = g ? g->structure(of) : nullptr;
