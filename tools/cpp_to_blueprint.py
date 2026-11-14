@@ -7298,6 +7298,14 @@ class TestWriter:
                     swap(bb, span(ks[1])[0], f".{ks[0]['name']}(", ", ")
                 else:
                     swap(bb, b, f".{ks[0]['name']}()", ")")
+            elif k == "CallExpr" and callee_name(n) in ("snprintf", "sprintf", "printf", "fprintf") and len(ks) > 2:
+                # a number formatted as text: a 32-bit one goes as the double it is promoted to (in the test a
+                # vector's component is converted::wide::Num32 - one that is not a number goes nowhere as such)
+                for x in ks[1:]:
+                    if self.u.clean(qtype(x)) == "float":
+                        xa, xb = span(x)
+                        edits.append((xa, 2, depth + 1, xa, "static_cast<double>("))
+                        edits.append((xb, 0, -depth - 1, xb, ")"))
             elif n.get("_w64") and k in ("BinaryOperator", "CompoundAssignOperator") and n.get("opcode") in ("+", "-", "*", "/", "%", "<<", ">>", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=") and len(ks) == 2:
                 # a 64-bit bit pattern (a Blueprint's Whole64): computed around 2^64 - only what C++ leaves open marks the call
                 op = n["opcode"]
