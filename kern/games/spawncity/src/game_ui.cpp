@@ -168,10 +168,10 @@ void Game::ui_draw_gps(f32 dt) {
       mat.alpha = alpha < 1 ? kern::AlphaMode::blend : kern::AlphaMode::opaque;
       mat.double_sided = true;
       id = r.allocate_id();
-      kern::MeshInput in = m.as_input();
-      in.material = mat;
-      in.visible = false;
-      if (!r.upsert(id, in)) { r.release_id(id); id = 0; }
+      kern::MeshLook look;
+      look.material = mat;
+      look.visible = false;
+      if (!kern::upsert(r, id, m, look)) { r.release_id(id); id = 0; }
     };
     const Vec3 blue{0.26f, 0.52f, 0.96f};  // 0x4285f4
     make(ui_.puck_acc, prim::cylinder(1, 0.01f, 40), blue, 0.16f);
@@ -214,13 +214,13 @@ void Game::ui_draw_gps(f32 dt) {
       for (std::size_t i = 1; i < ui_.trail.size(); ++i) {
         for (const Vec2& q : {ui_.trail[i - 1], ui_.trail[i]}) line.push({q.x, q.y, city_.ground_height(q.x, q.y) + 0.12f}, {0, 0, 1}, blue, {0, 0});
       }
-      kern::MeshInput in = line.as_input();
-      in.material.lines = true;
-      in.material.unlit = true;
-      in.material.cast_shadow = false;
-      in.material.frustum_culled = false;
-      in.visible = true;
-      if (!r.upsert(ui_.trail_mesh, in)) { r.release_id(ui_.trail_mesh); ui_.trail_mesh = 0; }
+      kern::MeshLook look;
+      look.material.lines = true;
+      look.material.unlit = true;
+      look.material.cast_shadow = false;
+      look.material.frustum_culled = false;
+      look.visible = true;
+      if (!kern::upsert(r, ui_.trail_mesh, line, look)) { r.release_id(ui_.trail_mesh); ui_.trail_mesh = 0; }
     }
   }
   if (ui_.trail_mesh && !g.active()) r.set_visible(ui_.trail_mesh, false);
@@ -239,14 +239,14 @@ void Game::ui_draw_helpers() {
       const Vec3 c = col ? Vec3{(*col)[i], (*col)[i + 1], (*col)[i + 2]} : color;
       m.push({pos[i], pos[i + 1], pos[i + 2]}, {0, 0, 1}, c, {0, 0});
     }
-    kern::MeshInput in = m.as_input();
-    in.material.lines = true;
-    in.material.unlit = true;
-    in.material.cast_shadow = false;
-    in.material.frustum_culled = false;
-    in.material.linear_colors = col != nullptr;
-    in.visible = !pos.empty();
-    if (!r.upsert(id, in)) { r.release_id(id); id = 0; }
+    kern::MeshLook look;
+    look.material.lines = true;
+    look.material.unlit = true;
+    look.material.cast_shadow = false;
+    look.material.frustum_culled = false;
+    look.material.linear_colors = col != nullptr;
+    look.visible = !pos.empty();
+    if (!kern::upsert(r, id, m, look)) { r.release_id(id); id = 0; }
   };
   const bool grid = st.on(Opt::view_grid) && world_placed_;
   if (grid) {

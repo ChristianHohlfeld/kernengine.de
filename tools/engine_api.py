@@ -10,10 +10,17 @@ every game, not for one:
   kern::physics::World::cast_ray   is the node   engine.world.cast_ray
                                    in a Blueprint's C++   engine_world_cast_ray(world, from, to ...)
 
-  - a const method and a function that only gives something is a value, everything else a step;
-  - what a function writes through a parameter (std::vector<u64>& out) is a further output;
+  - a const method and a function that only gives something is a value, everything else a step (a
+    function handed an object of the engine to change - Renderer& - changes something: a step);
+  - what a function writes through a parameter (std::vector<u64>& out) is a further output, and so is
+    what it reports through a pointer that is null by default (bool* changed = nullptr: the node gives
+    it; the call takes it where it wants it, or nowhere);
   - an object of the engine with a life of its own (a class: the physics world, the renderer, the
-    mixer) is a handle, a whole number the host gives - the first input of its class's nodes;
+    mixer; a struct that cannot be copied or holds such an object itself: a Mesh) is a handle, a whole
+    number the host gives - the first input of its class's nodes. Every public method of such an
+    object is a node, also where its header defines it: what the object holds is the engine's;
+  - a method of plain data the engine only declares (MeshData::as_input) takes the value as its first
+    input; what a method that is not const makes of it is its output `self`;
   - a plain struct of the engine (physics::Pose, physics::BodySettings, physics::RayHit) is a
     struct the Blueprint declares with the same fields: the pin names it, by the name every type
     has in a Blueprint - the namespaces it stands in are part of it (physics_Pose; see
