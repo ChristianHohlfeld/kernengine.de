@@ -8052,8 +8052,13 @@ class TestWriter:
             for k in range(1, len(parts)):
                 for name in other.get("::".join(parts[:k]), ()):
                     table.setdefault("::".join([name, *parts[k:]]), local)
+        # (the engine's logic - how C++ runs and calls a Blueprint - is in a test the engine's own: `logic::Graph`
+        # in the engine's source is ::kern::logic::Graph there, see gather)
+        logic = re.compile(r"(?<![\w:.>])(?:::)?(?:" + ENGINE + r"::)?logic::")
+        def own(code):
+            return logic.sub(f"::{ENGINE}::logic::", code)
         if not table:
-            return lambda text: text
+            return lambda text: self.in_code(text, own)
         pattern = re.compile(r"(?<![\w:])(?:::)?(" + "|".join(re.escape(k) for k in sorted(table, key=len, reverse=True)) + r")\b")
         # (`using kern::Mat4;` of what the test has where it stands: nothing to say - of what stands in a namespace
         # of the test, `using audio::Wave;`)
@@ -8062,7 +8067,7 @@ class TestWriter:
             if m.group(1) not in table:
                 return m.group(0)
             return f"using {table[m.group(1)]};" if "::" in table[m.group(1)] else ""
-        return lambda text: self.in_code(text, lambda code: pattern.sub(lambda m: table[m.group(1)], using.sub(said, code)))
+        return lambda text: self.in_code(text, lambda code: own(pattern.sub(lambda m: table[m.group(1)], using.sub(said, code))))
 
     # ---- what a test holds: the source of what it compares, and all that source names ----
     @staticmethod
