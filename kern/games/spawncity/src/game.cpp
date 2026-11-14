@@ -261,56 +261,29 @@ bool Game::start(kern::Engine& e) {
   life_ = std::make_unique<WorldLife>();  // M3 world state (game_world.h)
   world_ = std::make_unique<GameWorld>(e.renderer());  // the night of the facades: game_look.cpp (windows_.night)
   if (!world_->start(build_level(), kern::game::SimMode::play)) return kern::fail("level start: %s", kern::last_error());
-  // The rules that are Blueprints of the level's actors: bound to the C++ that still calls them.
+  // The rules that are Blueprints of the level's actors: the C++ that still calls them is bound to the
+  // logic they run in, and finds each by its name at every call (as a Blueprint does).
   {
     kern::logic::Runtime* logic = world_->logic_runtime();
-    kern::logic::Instance* wanted = logic ? logic->find(world_->find_actor("Wanted")) : nullptr;
-    if (!wanted || wanted->disabled()) return kern::fail("the level's Blueprint \"Wanted\" is missing or has errors");
-    wanted::bind(wanted);
-    kern::logic::Instance* combat_detail = logic ? logic->find(world_->find_actor("CombatDetail")) : nullptr;
-    if (!combat_detail || combat_detail->disabled()) return kern::fail("the level's Blueprint \"CombatDetail\" is missing or has errors");
-    detail::bind(combat_detail);
-    kern::logic::Instance* guided_rules = logic ? logic->find(world_->find_actor("Guided")) : nullptr;
-    if (!guided_rules || guided_rules->disabled()) return kern::fail("the level's Blueprint \"Guided\" is missing or has errors");
-    guided::bind(guided_rules);
-    kern::logic::Instance* spawn_guard = logic ? logic->find(world_->find_actor("SpawnGuard")) : nullptr;
-    if (!spawn_guard || spawn_guard->disabled()) return kern::fail("the level's Blueprint \"SpawnGuard\" is missing or has errors");
-    spawn::bind(spawn_guard);
-    kern::logic::Instance* jet_seats = logic ? logic->find(world_->find_actor("JetSeats")) : nullptr;
-    if (!jet_seats || jet_seats->disabled()) return kern::fail("the level's Blueprint \"JetSeats\" is missing or has errors");
-    seats::bind(jet_seats);
-    kern::logic::Instance* lamp_rules = logic ? logic->find(world_->find_actor("Lamps")) : nullptr;
-    if (!lamp_rules || lamp_rules->disabled()) return kern::fail("the level's Blueprint \"Lamps\" is missing or has errors");
-    lamps::bind(lamp_rules);
-    kern::logic::Instance* sirens = logic ? logic->find(world_->find_actor("Sirens")) : nullptr;
-    if (!sirens || sirens->disabled()) return kern::fail("the level's Blueprint \"Sirens\" is missing or has errors");
-    gaps::bind_sirens(sirens);
-    kern::logic::Instance* control_rules = logic ? logic->find(world_->find_actor("Controls")) : nullptr;
-    if (!control_rules || control_rules->disabled()) return kern::fail("the level's Blueprint \"Controls\" is missing or has errors");
-    controls::bind(control_rules);
-    kern::logic::Instance* settings = logic ? logic->find(world_->find_actor("Settings")) : nullptr;
-    if (!settings || settings->disabled() || !bind_settings(settings)) return kern::fail("the level's Blueprint \"Settings\" is missing, has errors or not one row per setting");
+    if (!logic || !wanted::bind(*logic)) return kern::fail("the level's Blueprint \"Wanted\" is missing or has errors");
+    if (!detail::bind(*logic)) return kern::fail("the level's Blueprint \"CombatDetail\" is missing or has errors");
+    if (!guided::bind(*logic)) return kern::fail("the level's Blueprint \"Guided\" is missing or has errors");
+    if (!spawn::bind(*logic)) return kern::fail("the level's Blueprint \"SpawnGuard\" is missing or has errors");
+    if (!seats::bind(*logic)) return kern::fail("the level's Blueprint \"JetSeats\" is missing or has errors");
+    if (!lamps::bind(*logic)) return kern::fail("the level's Blueprint \"Lamps\" is missing or has errors");
+    if (!gaps::bind_sirens(*logic)) return kern::fail("the level's Blueprint \"Sirens\" is missing or has errors");
+    if (!controls::bind(*logic)) return kern::fail("the level's Blueprint \"Controls\" is missing or has errors");
+    if (!bind_settings(*logic)) return kern::fail("the level's Blueprint \"Settings\" is missing, has errors or not one row per setting");
     ui_.settings = Settings();  // every setting at the table's default (the page replays the player's own with "set")
-    kern::logic::Instance* jetpack = logic ? logic->find(world_->find_actor("Jetpack")) : nullptr;
-    if (!jetpack || jetpack->disabled()) return kern::fail("the level's Blueprint \"Jetpack\" is missing or has errors");
-    Jetpack::bind(jetpack);
-    kern::logic::Instance* traffic = logic ? logic->find(world_->find_actor("Traffic")) : nullptr;
-    if (!traffic || traffic->disabled()) return kern::fail("the level's Blueprint \"Traffic\" is missing or has errors");
-    TrafficRules::bind(traffic);
-    kern::logic::Instance* multiplayer = logic ? logic->find(world_->find_actor("Multiplayer")) : nullptr;
-    if (!multiplayer || multiplayer->disabled()) return kern::fail("the level's Blueprint \"Multiplayer\" is missing or has errors");
-    mp::bind(multiplayer);
+    if (!Jetpack::bind(*logic)) return kern::fail("the level's Blueprint \"Jetpack\" is missing or has errors");
+    if (!TrafficRules::bind(*logic)) return kern::fail("the level's Blueprint \"Traffic\" is missing or has errors");
+    if (!mp::bind(*logic)) return kern::fail("the level's Blueprint \"Multiplayer\" is missing or has errors");
     // the combat and event rules (combat_rules.h)
-    kern::logic::Instance* military = logic ? logic->find(world_->find_actor("Military")) : nullptr;
-    if (!military || military->disabled() || !combat::bind_military(military)) return kern::fail("the level's Blueprint \"Military\" is missing, has errors or a table the game cannot read");
-    kern::logic::Instance* zombies = logic ? logic->find(world_->find_actor("Zombies")) : nullptr;
-    if (!zombies || zombies->disabled() || !combat::bind_zombies(zombies)) return kern::fail("the level's Blueprint \"Zombies\" is missing, has errors or a table the game cannot read");
-    kern::logic::Instance* sandbox = logic ? logic->find(world_->find_actor("Sandbox")) : nullptr;
-    if (!sandbox || sandbox->disabled() || !combat::bind_sandbox(sandbox)) return kern::fail("the level's Blueprint \"Sandbox\" is missing, has errors or a table the game cannot read");
-    kern::logic::Instance* fun = logic ? logic->find(world_->find_actor("Fun")) : nullptr;
-    if (!fun || fun->disabled() || !combat::bind_fun(fun)) return kern::fail("the level's Blueprint \"Fun\" is missing, has errors or a table the game cannot read");
-    kern::logic::Instance* race = logic ? logic->find(world_->find_actor("Race")) : nullptr;
-    if (!race || race->disabled() || !combat::bind_race(race)) return kern::fail("the level's Blueprint \"Race\" is missing, has errors or a table the game cannot read");
+    if (!combat::bind_military(*logic)) return kern::fail("the level's Blueprint \"Military\" is missing, has errors or a table the game cannot read");
+    if (!combat::bind_zombies(*logic)) return kern::fail("the level's Blueprint \"Zombies\" is missing, has errors or a table the game cannot read");
+    if (!combat::bind_sandbox(*logic)) return kern::fail("the level's Blueprint \"Sandbox\" is missing, has errors or a table the game cannot read");
+    if (!combat::bind_fun(*logic)) return kern::fail("the level's Blueprint \"Fun\" is missing, has errors or a table the game cannot read");
+    if (!combat::bind_race(*logic)) return kern::fail("the level's Blueprint \"Race\" is missing, has errors or a table the game cannot read");
   }
   ctl_.dev.platform(!coarse, coarse, coarse ? 5 : 0);  // the page reports the real device (game_controls.cpp)
   soldier_ = world_->find_actor("Player");

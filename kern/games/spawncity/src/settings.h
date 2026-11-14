@@ -53,9 +53,11 @@ struct OptSpec {
   bool live;            // false: a WORLD kind the game does not have yet (shown as "bald")
 };
 
-/// Takes the table from the running Blueprint of the actor "Settings" (the game binds it once its
-/// world has started; tests bind the one they run). False when it has not one row per Opt.
-bool bind_settings(kern::logic::Instance* blueprint);
+/// Binds the settings to the logic the level's Blueprints run in (the game once its world has started,
+/// tests the one they run) - the Blueprint of the actor "Settings", found by its name at every call -
+/// and takes its table. False when the actor has no Blueprint that runs there or the table has not
+/// one row per Opt.
+bool bind_settings(kern::logic::Runtime& logic);
 /// A setting's row (an empty one while no Blueprint is bound).
 const OptSpec& opt_spec(Opt o);
 bool find_opt(std::string_view key, Opt& out);

@@ -17,8 +17,8 @@ rules::Blueprint g_rules{"Multiplayer"};
 std::vector<u32> g_palette;
 }  // namespace
 
-void bind(kern::logic::Instance* blueprint) {
-  g_rules.running = blueprint;
+bool bind(kern::logic::Runtime& logic) {
+  const bool runs = g_rules.bind(logic);
   g_palette.clear();
   kSpawnProtectMs = g_rules.get<f64>("SpawnProtectMs");
   kRegenDelayMs = g_rules.get<f64>("RegenDelayMs");
@@ -33,6 +33,7 @@ void bind(kern::logic::Instance* blueprint) {
   kVoiceRadius = static_cast<f32>(g_rules.get<f64>("VoiceRadius"));
   kPingRemoveM = static_cast<f32>(g_rules.get<f64>("PingRemoveM"));
   g_palette = g_rules.get<std::vector<u32>>("Palette");
+  return runs;
 }
 const std::vector<u32>& palette() { return g_palette; }
 

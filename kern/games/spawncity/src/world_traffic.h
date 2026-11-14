@@ -47,9 +47,10 @@ class TrafficRules {
     bool wait = false, yielding = false, honk = false;
   };
 
-  /// The running Blueprint of the actor "Traffic" (the game binds it once its world has started;
-  /// tests bind the one they run).
-  static void bind(kern::logic::Instance* blueprint);
+  /// Binds the rules to the logic the level's Blueprints run in (the game once its world has started,
+  /// tests the one they run) - the Blueprint of the actor "Traffic", found by its name at every call -
+  /// and takes its distances and times. True: the actor has a Blueprint that runs there.
+  static bool bind(kern::logic::Runtime& logic);
   void rebuild(const std::vector<Lane>& lanes);
   u64 built_from = ~0ull;
   /// The signals' clock (seconds; the game sets it every frame from the wall clock - in a session

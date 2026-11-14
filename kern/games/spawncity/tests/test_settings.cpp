@@ -8,10 +8,10 @@
 using namespace sc;
 
 SC_TEST(settings_defaults_and_ranges) {
-  RuleBlueprint bp("Settings", [](kern::logic::Instance* i) { bind_settings(i); });
+  RuleBlueprint bp("Settings", &bind_settings);
   SC_CHECK(bp.inst && bp.problems.empty() && !bp.inst->disabled(), "the level's Settings Blueprint compiles and runs: %s", bp.problems.c_str());
   SC_CHECK(bp.inst && std::string(bp.inst->tier()) == "native C++", "it runs as its C++ class");
-  SC_CHECK(bind_settings(bp.inst), "its table has one row per setting");
+  SC_CHECK(bp.bound && bind_settings(bp.rt), "its table has one row per setting");
   Settings s;
   SC_CHECK(s.get(Opt::mouse_sensitivity) == 100 && !s.on(Opt::mouse_invert_y), "mouse 100 %%, not inverted");
   SC_CHECK(s.get(Opt::drone_max_speed_kmh) == 90 && std::fabs(s.get(Opt::drone_hover_agl) - 1.2f) < 1e-6f, "drone 90 km/h, hover 1.2 m");

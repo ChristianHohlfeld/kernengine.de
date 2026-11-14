@@ -41,8 +41,9 @@ inline f64 decimal(f32 x) {
 /// (A 64-bit number - a time in milliseconds, a number counted in 64 bit - is passed as it is: no
 /// decimal() of it.)
 
-/// The Blueprint of one of the level's actors - Blueprint g_rules{"Lamps"}: the game binds `running` once its
-/// world has started, tests bind the one they run.
+/// The Blueprint of one of the level's actors - Blueprint g_rules{"Lamps"}: bound to the logic the level's
+/// Blueprints run in (the game once its world has started, tests the one they run), it finds the actor by
+/// its name at every call.
 struct Blueprint : kern::logic::ActorBlueprint {
   using ActorBlueprint::ActorBlueprint;
 };

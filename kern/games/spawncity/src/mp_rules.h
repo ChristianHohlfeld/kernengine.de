@@ -28,9 +28,10 @@
 
 namespace sc::mp {
 
-/// The running Blueprint of the actor "Multiplayer" (the game binds it once its world has
-/// started; tests bind the one they run).
-void bind(kern::logic::Instance* blueprint);
+/// Binds the rules to the logic the level's Blueprints run in (the game once its world has started,
+/// tests the one they run) - the Blueprint of the actor "Multiplayer", found by its name at every
+/// call - and takes its numbers. True: the actor has a Blueprint that runs there.
+bool bind(kern::logic::Runtime& logic);
 
 // ---- pose timeline (vs_pose_sync.mjs) ----------------------------------------------------------
 constexpr f64 kInterpolationDelayMs = 90;    // VS_POSE_INTERPOLATION_DELAY_MS

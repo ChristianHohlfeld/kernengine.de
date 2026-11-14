@@ -27,7 +27,20 @@ inline const kern::logic::Graph* level_blueprint(std::string_view actor, std::st
   return at->second.first.get();
 }
 
-/// A rule actor of the level running in a logic runtime of its own, bound to the C++ that calls it -
+/// A logic in which no actor has a Blueprint: rules bound to it answer with the zeros, as unbound ones do
+/// (a test that is over binds its rules there - its own logic is gone with it).
+inline kern::logic::Runtime& no_logic() {
+  static struct None : kern::logic::Host {
+    kern::f64 time() const override { return 0; }
+    void print(const std::string&, bool) override {}
+    void error(const std::string&) override {}
+    kern::u32 random() override { return 4; }
+  } host;
+  static kern::logic::Runtime logic{host};
+  return logic;
+}
+
+/// A rule actor of the level running in a logic runtime of its own, the C++ that calls it bound to that -
 /// with the Blueprints of other actors of the level beside it (`others`), each by its name: Find Actor by
 /// Name finds them (the host's find_actor), and Call on Actor and Get Variable on Actor reach them as in
 /// the game. (`actor` null: only those others.)
@@ -55,8 +68,11 @@ struct RuleBlueprint {
   kern::logic::Runtime rt{host};
   kern::logic::Instance* inst = nullptr;
   std::string problems;
-  void (*bind)(kern::logic::Instance*) = nullptr;
-  RuleBlueprint(const char* actor, void (*binder)(kern::logic::Instance*), bool native = true, const std::vector<std::string>& others = {}) : bind(binder) {
+  /// How the game binds the C++ that calls it (null: nothing to bind), and what that gave (Has Blueprint,
+  /// and whether its tables are as the game needs them).
+  bool (*bind)(kern::logic::Runtime&) = nullptr;
+  bool bound = false;
+  RuleBlueprint(const char* actor, bool (*binder)(kern::logic::Runtime&), bool native = true, const std::vector<std::string>& others = {}) : bind(binder) {
     std::string error;
     // The libraries a Blueprint uses are the Blueprints of the level's other actors, by their names:
     // with them it is one graph, and the rules that follow calls judge that one.
@@ -82,7 +98,7 @@ struct RuleBlueprint {
       ++next;
     }
     rt.begin();
-    if (bind) bind(inst);
+    if (bind) bound = bind(rt);
   }
   /// The running Blueprint of the actor of this name (null: none here).
   kern::logic::Instance* find(std::string_view name) {
@@ -90,7 +106,7 @@ struct RuleBlueprint {
     return id ? rt.find(id) : nullptr;
   }
   ~RuleBlueprint() {
-    if (bind) bind(nullptr);
+    if (bind) bind(no_logic());
   }
 };
 

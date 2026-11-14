@@ -17,7 +17,7 @@ namespace sc {
 namespace {
 rules::Blueprint g_jetpack{"Jetpack"};
 }  // namespace
-void Jetpack::bind(kern::logic::Instance* blueprint) { g_jetpack.running = blueprint; }
+bool Jetpack::bind(kern::logic::Runtime& logic) { return g_jetpack.bind(logic); }
 f32 Jetpack::acc() { return static_cast<f32>(g_jetpack.get<f64>("Acc")); }
 f32 Jetpack::air_accel() { return static_cast<f32>(g_jetpack.get<f64>("AirAccel")); }
 f32 Jetpack::max_climb() { return static_cast<f32>(g_jetpack.get<f64>("MaxClimb")); }

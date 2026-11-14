@@ -11,10 +11,10 @@
 
 namespace sc::wanted {
 
-/// The running Blueprint of the actor "Wanted" (the game binds it once its world has started;
-/// tests bind the one they run). Unbound, every rule answers 0.
-void bind(kern::logic::Instance* blueprint);
-kern::logic::Instance* blueprint();
+/// Binds the rules to the logic the level's Blueprints run in (the game once its world has started,
+/// tests the one they run): the Blueprint of the actor "Wanted" is found by its name at every call.
+/// True: the actor has a Blueprint that runs there. Unbound, every rule answers 0.
+bool bind(kern::logic::Runtime& logic);
 
 /// The Blueprint's crime numbers (its function Severity).
 enum class Crime : u8 { person, person_hit, player, car, bus, police_drone, police_officer, police_car, carjacking, bird };
