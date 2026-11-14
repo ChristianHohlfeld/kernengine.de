@@ -4844,6 +4844,9 @@ class Emit:
             raise Wait("a pointer" if name in ("get", "release") else f"{name}() of an owned or optional value")
         bt = self.tp(base)
         a = kids(b)[1:]
+        if name == "operator bool" and not a and self.u.object_of(qtype(base)):
+            # (what holds an object of the engine - std::unique_ptr - as a Bool: is there one; none is the handle 0)
+            return f'math_compare<"!=">(kern::to<Float>({self.ex(base, "Int")}), 0.0)', "Bool"
         if bt.startswith("List<") and name in ("begin", "cbegin", "end", "cend") and not a and self.is_iter(b):
             # an iterator is the place it stands at: the first entry's is 0, the end the list's length
             return ("0" if "begin" in name else f"list_length<{bt[5:-1]}>({self.ex(base, bt)})"), "Int"
