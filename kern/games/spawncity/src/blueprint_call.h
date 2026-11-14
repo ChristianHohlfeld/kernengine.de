@@ -37,6 +37,8 @@ inline f64 decimal(f32 x) {
   }
   return d;
 }
+/// (A 64-bit number - a time in milliseconds, a number counted in 64 bit - is passed as it is.)
+inline f64 decimal(f64 x) { return x; }
 inline kern::logic::Value number(f32 x) { return kern::logic::Value::number(decimal(x)); }
 /// (A 64-bit number - a time in milliseconds, a number counted in 64 bit - is passed as it is.)
 inline kern::logic::Value number(f64 x) { return kern::logic::Value::number(x); }
@@ -47,13 +49,15 @@ struct Blueprint : kern::logic::ActorBlueprint {
   using Value = kern::logic::Value;
   using ActorBlueprint::ActorBlueprint;
   using ActorBlueprint::call;
+  using ActorBlueprint::number;
+  using ActorBlueprint::flag;
 
   /// Calls a function; false (and no results) while no Blueprint is bound or it has no such function.
   bool call(const char* function, const std::vector<Value>& args, std::vector<Value>& results) const {
     results.clear();
     return running && running->call(function, args, results);
   }
-  /// A function's first result as a number (0 without one).
+  /// (the same with a list of values - where a value is a struct or a list, which a typed call does not take yet)
   f64 number(const char* function, const std::vector<Value>& args) const {
     std::vector<Value> r;
     return call(function, args, r) && !r.empty() ? r[0].as_number() : 0;
@@ -62,7 +66,6 @@ struct Blueprint : kern::logic::ActorBlueprint {
     std::vector<Value> r;
     return call(function, args, r) && !r.empty() && r[0].b;
   }
-  f64 variable(const char* name) const { return running ? running->get(name).as_number() : 0; }
 };
 
 /// A value of one of the Blueprint's enums: the C++ enum has the same values in the same order.

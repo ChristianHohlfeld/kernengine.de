@@ -67,10 +67,9 @@ mp::Weapon mp_weapon(weapons::Id id) {
 }
 }  // namespace
 
-MpLocal& Game::mp_local() {
+void Game::mp_local_ready() {
   if (!mp_) mp_ = std::make_unique<MpLocal>();
   if (!mp_->art.ready() && engine_) mp_->art.init(engine_->renderer);
-  return *mp_;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -92,7 +91,8 @@ bool Game::world_rule_locked(Opt o) const {
 
 void Game::net_world_rules() {
   Settings& st = ui_.settings;
-  MpLocal& m = mp_local();
+  mp_local_ready();
+  MpLocal& m = *mp_;
   if (!net_.active()) {
     // out of the session: our own switches again
     if (m.world_saved) { for (u32 i = 0; i < std::size(kWorldRules); ++i) st.set(kWorldRules[i], m.world_own[i]); m.world_saved = false; }
@@ -253,7 +253,8 @@ void Game::rebase_origin(f64 lon, f64 lat) {
 // per frame
 
 void Game::update_net(f32 dt) {
-  MpLocal& m = mp_local();
+  mp_local_ready();
+  MpLocal& m = *mp_;
   ++m.frames;
   const f64 now = time_ * 1000;
   m.pings.expire(now);
@@ -453,7 +454,8 @@ void Game::update_net(f32 dt) {
 
 void Game::mp_input(kern::Engine& e, f32 dt) {
   (void)dt;
-  MpLocal& m = mp_local();
+  mp_local_ready();
+  MpLocal& m = *mp_;
   (void)e;
   // H / K, Z / middle mouse, M and the pad's R3, R3+Y, D-pad right, VIEW hold are read with every
   // other control in game_controls.cpp (voice_control_bindings.mjs, ping_marker.mjs, pad_actions.mjs).
@@ -466,7 +468,8 @@ void Game::mp_input(kern::Engine& e, f32 dt) {
 }
 
 void Game::voice_capture(kern::Span<const f32> samples, u32 rate) {
-  MpLocal& m = mp_local();
+  mp_local_ready();
+  MpLocal& m = *mp_;
   if (m.mic && !m.muted) m.capture.push(samples, rate);
 }
 
@@ -581,7 +584,8 @@ bool Game::hit_remotes(Vec3 from, Vec3& to, f32 damage, bool melee) {
   const net::Remote& r = rs[static_cast<std::size_t>(best)];
   const bool body_zone = r.state.mode == net::PlayerMode::foot || r.state.mode == net::PlayerMode::drone || r.state.mode == net::PlayerMode::parachute;
   const mp::Zone zone = body_zone ? best_zone : mp::Zone::torso;
-  mp_local().shot_zone = static_cast<u8>(zone);
+  mp_local_ready();
+  mp_->shot_zone = static_cast<u8>(zone);
   const mp::Weapon w = mp_weapon(wid);
   net_.request_hit(r.state.slot, mp::round_damage(w, zone), static_cast<u8>(w), static_cast<u8>(zone), from);
   return true;
@@ -821,7 +825,8 @@ bool Game::project_screen(Vec3 p, f32& x, f32& y, f32& depth) const {
 }
 
 std::string Game::mp_hud_json() {
-  MpLocal& m = mp_local();
+  mp_local_ready();
+  MpLocal& m = *mp_;
   const f64 now = time_ * 1000;
   std::string s;
   char b[512];
@@ -946,7 +951,8 @@ std::string Game::mp_hud_json() {
 std::string Game::bigmap_json(f32 cx, f32 cy, f32 range) {
   // The big map (world_map_full.mjs, "a world it draws itself"): streets, players, pings,
   // destination and route around (cx, cy) in local metres.
-  MpLocal& m = mp_local();
+  mp_local_ready();
+  MpLocal& m = *mp_;
   std::string o;
   char b[256];
   const Vec3 me = focus_position();
@@ -1016,7 +1022,8 @@ std::string Game::bigmap_json(f32 cx, f32 cy, f32 range) {
 // commands (the page and the tests)
 
 std::string Game::net_command(const std::string& cmd) {
-  MpLocal& m = mp_local();
+  mp_local_ready();
+  MpLocal& m = *mp_;
   auto starts = [&](const char* p) { return cmd.rfind(p, 0) == 0; };
   const f64 now = time_ * 1000;
   if (starts("net ")) {
@@ -1074,7 +1081,9 @@ std::string Game::net_command(const std::string& cmd) {
       Vec3 to = steep ? c + Vec3{-2, 0, -4} : c + Vec3{-3, 0, 0};
       const Vec3 from = steep ? c + Vec3{2, 0, 4} : c + Vec3{3, 0, 0};
       const bool hit = hit_remotes(from, to, static_cast<f32>(std::atof(rest.c_str() + 4)));
-      return hit ? std::string("hit ") + mp::zone_name(static_cast<mp::Zone>(mp_local().shot_zone)) : "miss";
+      if (!hit) return "miss";
+      mp_local_ready();
+      return std::string("hit ") + mp::zone_name(static_cast<mp::Zone>(mp_->shot_zone));
     }
     if (rest.rfind("blast", 0) == 0) {
       if (net_.remotes().empty()) return "nobody";

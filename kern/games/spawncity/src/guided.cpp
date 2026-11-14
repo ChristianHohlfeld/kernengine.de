@@ -36,14 +36,14 @@ bool to_missile(const Value& v, Missile& m) {
 void bind(kern::logic::Instance* blueprint) { g_rules.running = blueprint; }
 kern::logic::Instance* blueprint() { return g_rules.running; }
 
-f32 speed() { return static_cast<f32>(g_rules.variable("Speed")); }
-f32 turn_g() { return static_cast<f32>(g_rules.variable("TurnG")); }
-f32 blast_radius() { return static_cast<f32>(g_rules.variable("BlastRadius")); }
-f32 damage() { return static_cast<f32>(g_rules.variable("Damage")); }
-f32 cooldown() { return static_cast<f32>(g_rules.variable("Cooldown")); }
-f32 pick_px() { return static_cast<f32>(g_rules.variable("PickPx")); }
-f32 range() { return static_cast<f32>(g_rules.variable("Range")); }
-f32 ignite() { return static_cast<f32>(g_rules.variable("Ignite")); }
+f32 speed() { return static_cast<f32>(g_rules.get<f64>("Speed")); }
+f32 turn_g() { return static_cast<f32>(g_rules.get<f64>("TurnG")); }
+f32 blast_radius() { return static_cast<f32>(g_rules.get<f64>("BlastRadius")); }
+f32 damage() { return static_cast<f32>(g_rules.get<f64>("Damage")); }
+f32 cooldown() { return static_cast<f32>(g_rules.get<f64>("Cooldown")); }
+f32 pick_px() { return static_cast<f32>(g_rules.get<f64>("PickPx")); }
+f32 range() { return static_cast<f32>(g_rules.get<f64>("Range")); }
+f32 ignite() { return static_cast<f32>(g_rules.get<f64>("Ignite")); }
 
 Dodge update_dodge(Dodge state, Vec2 previous, Vec2 current, f32 dt, bool pedestrian) {
   std::vector<Value> r;
@@ -54,7 +54,7 @@ Dodge update_dodge(Dodge state, Vec2 previous, Vec2 current, f32 dt, bool pedest
 }
 
 f32 pick_score(Vec3 eye, Vec3 forward, f32 fov, f32 height_px, Vec3 target) {
-  return static_cast<f32>(g_rules.number("PickScore", {Value::vector(eye), Value::vector(forward), rules::number(fov), rules::number(height_px), Value::vector(target)}));
+  return static_cast<f32>(g_rules.number("PickScore", Vec3(eye), Vec3(forward), rules::decimal(fov), rules::decimal(height_px), Vec3(target)));
 }
 
 Missile launch(Vec3 start, Vec3 target, f32 now, bool pedestrian) {

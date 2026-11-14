@@ -1293,6 +1293,10 @@ class Runtime {
   /// chains nest: at most 64, then the call is left out and reported), and a Blueprint that is in
   /// the middle of a call of that function has its own values back afterwards.
   void call_on(Instance& caller, std::string_view function, ActorRef target, const std::vector<Value>& args, std::vector<Value>& results);
+  /// Get Variable on Actor: the variable `name` of the Blueprint of `target` as a value of `type` (what
+  /// a variable of that type holds when nothing else is said - its zero - where the target has none:
+  /// no such Blueprint, no such variable, one of another type).
+  Value get_on(const Instance& caller, std::string_view name, ActorRef target, const TypeRef& type);
   /// For a Blueprint's class (NativeBlueprint): its node with the id `node` waits `seconds`; then
   /// the runtime runs it again (NativeBlueprint::run with `entry`) - the waits of every tier are
   /// kept and served in one place. cancel_waits: the node's waits are off.

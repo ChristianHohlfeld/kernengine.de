@@ -123,6 +123,13 @@ struct BlueprintCore : logic::PureNodes {
     out.take(results);
   }
 
+  /// Get Variable on Actor: what the variable `Name` of the Blueprint of `target` holds, as a T -
+  /// func_get_on<"MaxStars", Float>(actor_find("Wanted")).
+  template <Setting Name, class T> T func_get_on(Actor target) {
+    if (!kern_world.runtime || !kern_world.instance) return T{};
+    return logic::from_value<T>(kern_world.runtime->get_on(*kern_world.instance, Name.view(), target.id, logic::TypeRef{logic::pin_type_of<T>(), {}}));
+  }
+
   // ---- random ----
   /// Where the Random nodes start from: the instance's seed (a class without a world: its host's
   /// first number, or 0).

@@ -43,9 +43,8 @@ struct In {
 kern::i16 dms(f32 v) { return static_cast<kern::i16>(std::lround(clampf(v * 10, -32000, 32000))); }
 }  // namespace
 
-ProjSync& Game::projsync() {
+void Game::projsync_ready() {
   if (!projsync_) projsync_ = std::make_unique<ProjSync>();
-  return *projsync_;
 }
 
 void Game::projsync_blast(u8 owner, Vec3 at) {
@@ -59,7 +58,8 @@ void Game::projsync_blast(u8 owner, Vec3 at) {
 }
 
 void Game::projsync_update(f32 dt) {
-  ProjSync& S = projsync();
+  projsync_ready();
+  ProjSync& S = *projsync_;
   if (!net_.active()) {
     if (!S.ghosts.empty()) { for (Projectile& p : projectiles_) if (p.ghost) p.alive = false; S.ghosts.clear(); }
     (void)net_.take_proj();

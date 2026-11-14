@@ -7,7 +7,14 @@ This tool reads such sources with the compiler's own parser (clang's syntax tree
 in the notation, function by function:
 
   tools/cpp_to_blueprint.py --convert <namespace> --level <level.klevel> [--folder <name>]
-      [--test <dir>] [--texts <dir>] <include flags...> -- <file.cpp>...
+      [--test <dir>] [--texts <dir>] [--program <folder>=<namespace>[,<namespace>...]]...
+      <include flags...> -- <file.cpp>...
+
+  - the program is the folders of the sources, in the namespace given - and the further folders named
+    with --program, each with the namespaces its files declare (vendored code the program includes:
+    --program firmware=fc,hwcontract). Their headers are the program's like the sources' own, each a
+    Blueprint; their types are named with their namespace (fc::V3 is fc_V3, as net::Session is
+    net_Session);
 
   - every header and every source file becomes the Blueprint of one actor of the level (terrain.h
     -> "terrain", terrain.cpp -> "terrain_cpp"): a library - a Blueprint that keeps nothing. Its
@@ -125,7 +132,8 @@ TEXT = {"const char *", "std::basic_string<char>", "std::string", "std::basic_st
         "std::basic_string_view<char, std::char_traits<char>>"}
 # (the names the engine writes these types with, where clang gives the name as written)
 ALIAS = {"f32": "float", "f64": "double", "i8": "signed char", "i16": "short", "i32": "int", "i64": "whole64s", "u8": "unsigned char", "u16": "unsigned short", "u32": "unsigned int",
-         "u64": "whole64u", "uint64_t": "whole64u", "int64_t": "whole64s", "usize": "unsigned long", "size_t": "unsigned long", "Vec2": "kern::Vec2", "Vec3": "kern::Vec3", "Vec4": "kern::Vec4", "Quat": "kern::Quat",
+         "u64": "whole64u", "uint64_t": "whole64u", "int64_t": "whole64s", "uint8_t": "unsigned char", "uint16_t": "unsigned short",
+         "uint32_t": "unsigned int", "int8_t": "signed char", "int16_t": "short", "int32_t": "int", "usize": "unsigned long", "size_t": "unsigned long", "Vec2": "kern::Vec2", "Vec3": "kern::Vec3", "Vec4": "kern::Vec4", "Quat": "kern::Quat",
          "Mat4": "kern::Mat4"}
 ZERO = {"Int64": "Int64{0x0}", "Float": "0.0", "Int": "0", "Bool": "false", "Vector": "Vector{0.0, 0.0, 0.0}", "Text": '""'}
 # (functions of numbers a formula has, by the names C++ calls them)
@@ -224,7 +232,11 @@ def c_string(v):
 def run_clang(path, namespace, flags):
     """The compiler's tree of the declarations of a namespace, as it reads the file now (nothing is kept
     between runs: a tree of another state of the sources is another tree)."""
-    cmd = [os.environ.get("CLANGXX", "clang++"), "-std=c++20", "-fsyntax-only", "-Xclang", "-ast-dump=json", "-Xclang", f"-ast-dump-filter={namespace}::", *flags, path]
+    # (The filter is an argument of its own: the runs for the several namespaces of one file differ in that short
+    # word alone - what the compiler allocates before it reads the file is then the same in each, and so are the
+    # addresses its nodes are named by - see STEADY. Written in one, `-ast-dump-filter=hwcontract::` was longer
+    # than `-ast-dump-filter=fc::` by more than the allocator rounds away, and every node had another address.)
+    cmd = [os.environ.get("CLANGXX", "clang++"), "-std=c++20", "-fsyntax-only", "-Xclang", "-ast-dump=json", "-Xclang", "-ast-dump-filter", "-Xclang", f"{namespace}::", *flags, path]
     if STEADY:
         cmd = ["setarch", "-R", *cmd]
     r = subprocess.run(cmd, capture_output=True, text=True)
@@ -343,15 +355,25 @@ ENGINE = os.environ.get("KERN_ENGINE_NAMESPACE", "kern")
 
 
 class Tree:
-    """One source file as the compiler read it."""
+    """One source file as the compiler read it. `namespace` is the program's own namespace (its names are
+    the program's names, without it); `spaces` are further namespaces of the program - of folders that are
+    the program's too (World.spaces): their declarations are the program's, named with their namespace
+    (`fc::V3`, as `net::Session` is)."""
 
-    def __init__(self, path, namespace, flags):
+    def __init__(self, path, namespace, flags, spaces=()):
         self.path = os.path.abspath(path)
         self.namespace = namespace
+        self.spaces = tuple(s for s in spaces if s != namespace)
         self.dumps = run_clang(path, namespace, flags)
         st = {"file": ""}
         for o in self.dumps:
             annotate(o, st)
+        # (the further namespaces of the program, each dumped as the engine's is: by its own name)
+        self.more = [(space, run_clang(path, space, flags) if STEADY else []) for space in self.spaces]
+        for _, dumps in self.more:
+            st = {"file": ""}
+            for o in dumps:
+                annotate(o, st)
         # the engine the program is written against: its types and the functions its headers define
         self.engine = run_clang(path, ENGINE, flags) if STEADY and ENGINE and ENGINE != namespace else []
         st = {"file": ""}
@@ -376,6 +398,9 @@ class Tree:
         seen = set()
         for o in self.dumps:
             self.take(o, self.scope_from(o), seen)
+        for space, dumps in self.more:
+            for o in dumps:
+                self.take(o, space + "::", seen)
         for o in self.engine:
             self.take(o, ENGINE + "::", seen)
         for i, n in list(self.decl.items()):
@@ -433,7 +458,7 @@ class Tree:
         declares constants, and no type anybody names. Where one is used, the tree has the number it is,
         of the enum's underlying type - as C++ converts it there. (`_unnamed`: the enum it is of; the
         source a test holds names it.)"""
-        for o in [*self.dumps, *self.engine]:
+        for o in [*self.dumps, *(o for _, dumps in self.more for o in dumps), *self.engine]:
             for n in walk(o):
                 if n.get("kind") != "DeclRefExpr" or (n.get("referencedDecl") or {}).get("kind") != "EnumConstantDecl":
                     continue
@@ -446,6 +471,18 @@ class Tree:
     def scope_from(self, o):
         """The scope a dumped declaration stands in: clang says it for those defined outside their class."""
         return ""
+
+    def program_space(self, q):
+        """The further namespace of the program a qualified name stands in (`fc::V3`: fc), or None."""
+        parts = q.lstrip(":").split("::")
+        return parts[0] if len(parts) > 1 and parts[0] in self.spaces else None
+
+    def absolute(self, q):
+        """A qualified name as C++ writes it from outside every namespace: a name of the engine or of a further
+        namespace of the program has its namespace in it already, one of the program's own namespace stands
+        in that."""
+        q = q.lstrip(":")
+        return "::" + q if q.startswith((ENGINE + "::", "w64::")) or self.program_space(q) else "::" + self.namespace + "::" + q
 
     def place(self, d):
         """Where a declaration stands in the translation unit (what stands before it can be used in it)."""
@@ -646,8 +683,13 @@ class World:
     file's functions stand in, what the types are called, and the functions of the Blueprints that are
     written already."""
 
-    def __init__(self, sources=(), flags=()):
-        self.program_dirs = sorted({os.path.dirname(os.path.abspath(f)) for f in sources})
+    def __init__(self, sources=(), flags=(), more=()):
+        # The program is the folders of the sources - and further folders, each with the namespaces its files
+        # declare (`more`: [(folder, [namespace])], --program): their files are the program's like the
+        # sources' headers, each a Blueprint of its own, their functions the program's functions.
+        self.program_dirs = sorted({os.path.dirname(os.path.abspath(f)) for f in sources} | {os.path.abspath(d) for d, _ in more})
+        self.more = [(os.path.abspath(d), list(spaces)) for d, spaces in more]
+        self.spaces = [s for _, spaces in self.more for s in spaces]   # (the program's further namespaces: Tree.spaces)
         self.include_dirs = sorted((os.path.abspath(f[2:]) for f in flags if f.startswith("-I") and len(f) > 2), key=len, reverse=True)
         self.units = {}        # a file -> the Blueprint its functions stand in
         self.type_names = {}   # (a type's qualified name, the file that defines it) -> its name, where it is not type_name_of's
@@ -659,6 +701,7 @@ class World:
         self.function_units = {}   # a function's key -> the Blueprint it stands in (see unit_of_function)
         self.source_units = set()  # the Blueprints of source files: what stands there is not in another file's tree
         self.actors = {}       # the level's actors with a Blueprint: name -> {"library": does it keep nothing, "functions": {name: ([inputs], [outputs])}}
+        self.pointer_lists = {}    # (a function's key, the place of a parameter that is a pointer into a list) -> the length of the list every call hands it ("list": any; "mixed", "other": see main)
         self.states = {}       # a class of the program there is one object of (see state_classes) -> the Blueprint it is the state of
         self.parts = {}        # a part of a Blueprint of several source files (a job: "Game/game_net_cpp") -> that Blueprint
         self.part_numbers = {} # such a part -> its number among the parts of its Blueprint (the block of its nodes' ids)
@@ -758,6 +801,7 @@ class Function:
         self.open = False     # it stands in a source file's Blueprint: a test in another file holds its source as that file's test hands it on
         self.place = False    # it names a place (`const T& spec() const { return s_; }`): no function of the Blueprint - where it is called, the place stands
         self.on_actors = []   # (actor, function): what it calls on the Blueprint of an actor of the level (Call on Actor)
+        self.pointers = []    # the parameters (by place) that are a pointer into a list: the list, read where it stands - the next parameter is the place in it (Unit.pointed)
         self.state = False    # a method of a state (World.states): a function of that Blueprint, its fields are the Blueprint's variables
 
     def order(self):
@@ -788,6 +832,8 @@ class Unit:
         # the types and declarations of the variables used, the mutable ones
         self.state = next((q for q, b in self.world.states.items() if b == name), None)
         self.state_fields, self.state_types, self.state_lines, self.state_mutable = {}, {}, {}, set()
+        self.state_statics = {}     # a variable kept by a method of the state, or one of the file only its methods use -> (variable, type)
+        self.state_users = None     # (see kept_by_state)
         self.enums = {}             # qualified C++ name -> Blueprint name
         self.structs = {}           # qualified C++ name -> Blueprint name
         self.types = []             # the declarations, in the order they must stand
@@ -856,7 +902,7 @@ class Unit:
         if "enum at " in t:   # (a place of an enum without a name holds a number of its underlying type)
             t = re.sub(r"(?:[A-Za-z_]\w*::)*(\((?:unnamed|anonymous) enum at [^)]*\))", lambda m: self.tree.unnamed.get(m.group(1), m.group(0)), t)
         t = re.sub(r"\b(const|volatile|struct|class|enum)\b", " ", t).replace("&&", " ").replace("&", " ")
-        t = re.sub(r"(?<![\w:])(?:kern::|std::)?(f32|f64|i8|i16|i32|i64|u8|u16|u32|u64|uint64_t|int64_t|usize|Vec2|Vec3|Vec4|Quat|Mat4|size_t)\b", lambda m: ALIAS[m.group(1)], t)
+        t = re.sub(r"(?<![\w:])(?:kern::|std::)?(f32|f64|i8|i16|i32|i64|u8|u16|u32|u64|uint64_t|int64_t|uint8_t|uint16_t|uint32_t|int8_t|int16_t|int32_t|usize|Vec2|Vec3|Vec4|Quat|Mat4|size_t)\b", lambda m: ALIAS[m.group(1)], t)
         t = t.replace("std::size_t", "unsigned long").replace("(anonymous namespace)::", "")
         for _ in range(4):   # (the names the program itself gives types)
             before = t
@@ -869,7 +915,7 @@ class Unit:
 
     def clean0(self, t):
         t = re.sub(r"\b(const|volatile|struct|class|enum)\b", " ", t).replace("&&", " ").replace("&", " ").replace("(anonymous namespace)::", "")
-        return re.sub(r"(?<![\w:])(?:kern::|std::)?(f32|f64|i8|i16|i32|i64|u8|u16|u32|u64|uint64_t|int64_t|usize|Vec2|Vec3|Vec4|Quat|Mat4|size_t)\b", lambda m: ALIAS[m.group(1)], t)
+        return re.sub(r"(?<![\w:])(?:kern::|std::)?(f32|f64|i8|i16|i32|i64|u8|u16|u32|u64|uint64_t|int64_t|uint8_t|uint16_t|uint32_t|int8_t|int16_t|int32_t|usize|Vec2|Vec3|Vec4|Quat|Mat4|size_t)\b", lambda m: ALIAS[m.group(1)], t)
 
     def find_type(self, t):
         """The program's record or enum a type name means (its qualified name), or None."""
@@ -1106,6 +1152,26 @@ class Unit:
             raise Wait(f"the engine's {t.split('<')[0]}")
         raise Wait(f"the type {t.split('<')[0]}")
 
+    def pointed(self, raw):
+        """A parameter `const T*` the function reads entries through (`p[i]`, `*p`), hands on (`p + 2`) or asks
+        whether it is null: a pointer into a list - in the Blueprint the list, read where it stands (a const
+        reference input), and the place in it (an Int; null is the place -1). What a call hands it is that pair:
+        `a.data() + k` is (a, k), an array is (it, 0), nullptr (an empty list, -1). The Blueprint type of its
+        entries; None: the parameter is no such pointer."""
+        m = re.match(r"const\s+(.+?)\s*\*$", raw.strip())
+        if m is None or self.object_of(raw) or raw.replace(" ", "") in ("constchar*", "constchar*const"):
+            return None
+        inner = m.group(1).strip()
+        if inner == "void" or "*" in inner or "&" in inner:
+            return None
+        t = self.btype(inner)
+        return t if t is not None and not t.startswith("List<") else None
+
+    def param_types(self, p):
+        """The Blueprint inputs a parameter of the program is: its type - a pointer into a list two (Unit.pointed)."""
+        t = self.pointed(qtype(p))
+        return [f"List<{t}>", "Int"] if t is not None else [self.btype(qtype(p))]
+
     def enum(self, q):
         if q in self.enums:
             return self.enums[q]
@@ -1321,7 +1387,7 @@ class Unit:
             if c.get("kind") == "FieldDecl":
                 name = self.fresh(c.get("name") or "field")
                 self.names.add(name)
-                self.state_fields[c.get("name")] = (len(self.state_fields), name, c)
+                self.state_fields[c.get("name")] = ((0, len(self.state_fields)), name, c)
         for c in kids(rec):
             if c.get("kind") in ("CXXMethodDecl", "CXXConstructorDecl") and not c.get("isImplicit") and c["id"] not in self.function_names:
                 name = self.fresh(c.get("name") if c.get("kind") == "CXXMethodDecl" and not c.get("name", "").startswith("operator") else self.wanted_name(c))
@@ -1352,8 +1418,49 @@ class Unit:
         self.state_types[field] = t
         return name, t
 
+    def state_static(self, d, owner):
+        """A variable a method of the state keeps from one call to the next (`static int last_tick = 0;`), or one
+        of the file only the state's methods use: there is one object of the state, so this is part of its
+        state - a variable of its Blueprint, called by where it stands (the method's name or the file's, and
+        its own) and starting at its initializer. (its name, its type)"""
+        if d["id"] in self.state_statics:
+            return self.state_statics[d["id"]]
+        want = f"{owner}_{d.get('name') or 'kept'}"
+        name = sane_name(want)
+        if name in self.names:
+            raise Wait(f"the variable {d.get('name')} kept by {owner}: the Blueprint {self.name} has something called {name}")
+        t = self.btype(qtype(d))
+        init = kids(d)[-1] if kids(d) and d.get("init") else None
+        try:
+            default = Const(self).literal(init, t) if init is not None else self.zero(t)
+        except Wait as w:
+            raise Wait(f"the variable {d.get('name')} kept by {owner} starts with what is computed when it is first met ({w})")
+        self.names.add(name)
+        self.state_lines[(1, name)] = [f"  /// (kept by {owner})", f"  {self.dtype(qtype(d), t)} {name} = {default};"]
+        self.state_statics[d["id"]] = (name, t)
+        return name, t
+
+    def kept_by_state(self, d):
+        """Is this variable of a source file one only the state's methods use - one the file has for itself
+        (static, or in a namespace without a name) and changes, that no other function of the file names?"""
+        if self.state is None or d.get("kind") != "VarDecl" or d.get("constexpr") or re.search(r"\bconst\b", qtype(d)):
+            return False
+        if not (d.get("storageClass") == "static" or "_GLOBAL__N_" in (d.get("mangledName") or "")) or is_header(d.get("_file", "")):
+            return False
+        if self.state_users is None:
+            users = collections.defaultdict(set)
+            for f in {id(x): x for x in self.tree.body.values()}.values():
+                if f.get("kind") == "VarDecl":
+                    continue
+                state = self.tree.owner.get(f["id"]) == self.state
+                for n in walk(f):
+                    if n.get("kind") == "DeclRefExpr" and (n.get("referencedDecl") or {}).get("kind") == "VarDecl":
+                        users[n["referencedDecl"]["id"]].add(state)
+            self.state_users = users
+        return self.state_users.get(d["id"]) == {True}
+
     def is_state_variable(self, name):
-        return self.state is not None and any(name == n for _, n, _ in self.state_fields.values())
+        return self.state is not None and (any(name == n for _, n, _ in self.state_fields.values()) or any(name == n for n, _ in self.state_statics.values()))
 
     def place_named(self, d):
         """`const CarSpec& spec() const { return s_; }` - a function of the program that gives a reference
@@ -1455,7 +1562,8 @@ class Unit:
             f.self_type, f.mutates, f.refs, f.value, f.ctor = e["self_type"], e["mutates"], list(e["refs"]), e["value"], e["ctor"]
             f.out_fields = [(n, t, tuple(src) if isinstance(src, list) else src) for n, t, src in e["out_fields"]]
             f.open, f.state = e["open"], e["state"]
-            if not f.wait and f.open and d["id"] not in self.tree.body and key not in (self.world.closures or {}):
+            f.pointers = list(e["pointers"])
+            if not f.wait and f.open and d["id"] not in self.tree.body and self.world.closures is not None and key not in self.world.closures:
                 # A function is written when its test compares it, and the test holds the source of all it
                 # calls once more: what stands in another source file, as the test of that file hands it on.
                 f.wait = "what it calls stands in another source file, whose test does not hand its source on"
@@ -1467,7 +1575,7 @@ class Unit:
                 if f.self_type is not None:
                     mine = self.struct(self.tree.owner.get(d["id"]))
                     seen += [mine] if not f.ctor else []
-                seen += [self.btype(qtype(x)) for x in kids(d) if x.get("kind") == "ParmVarDecl"]
+                seen += [t for x in kids(d) if x.get("kind") == "ParmVarDecl" for t in self.param_types(x)]
                 if f.value is not None:
                     seen.append(self.btype(qtype(d).split("(")[0].strip()))
                 told = [t for _, t in f.params] + ([f.value] if f.value is not None else [])
@@ -1485,7 +1593,7 @@ class Unit:
         return {"unit": self.name, "name": f.name, "cpp": f.cpp, "wait": (f.wait or (self.PLACE if f.place else None)) if not f.text else None, "pure": f.pure, "params": f.params, "kinds": f.kinds, "result": f.result,
                 "fixed": dict(f.fixed), "result_fixed": f.result_fixed,
                 "indexes": f.indexes, "self_type": f.self_type, "mutates": f.mutates, "refs": f.refs, "value": f.value, "ctor": f.ctor, "out_fields": f.out_fields,
-                "open": self.job in self.world.source_units, "state": f.state}
+                "open": self.job in self.world.source_units, "state": f.state, "pointers": f.pointers}
 
     def uses(self):
         """The Blueprints whose functions the written functions call."""
@@ -1680,9 +1788,43 @@ class Const:
             raise Wait(f"a constant computed with {name}()")
         if k == "CXXDefaultInitExpr" or k == "ImplicitValueInitExpr" or k == "CXXScalarValueInitExpr":
             return 0.0
+        if k == "InitListExpr" and len(kids(n)) <= 1 and (NUMBER.get(self.unit.clean(qtype(n))) or self.unit.clean(qtype(n)) in W64):
+            # a number in braces: `f32 x{}` is zero, `u32 dt{kNominalDtUs}` the number in them
+            return self.number(kids(n)[0]) if kids(n) else 0.0
+        if k == "MemberExpr" and kids(n) and not n.get("isArrow"):
+            # a field of a value that is known: the part of it that sets the field (`gains.d_cutoff_hz` of the
+            # `Gains{...}` a constructor was given), else the field's own default
+            v = self.field_of(kids(n)[0], n.get("referencedMemberDecl"))
+            if v is not None:
+                return self.number(v)
         if k in ("CXXNullPtrLiteralExpr", "GNUNullExpr") and ENGINE_NODES:   # (no object of the engine: the handle 0)
             return 0
         raise Wait(f"a constant written as {k}")
+
+    def field_of(self, value, field_id):
+        """What sets the field `field_id` in a value made of known parts - an aggregate's braces
+        (`Gains{0.003f, ...}`), copied or not -: that part, or the field's default (an ImplicitValueInitExpr:
+        zero). None: the value is none such."""
+        v = bare(value)
+        while v.get("kind") in ("ImplicitCastExpr", "CXXFunctionalCastExpr", "CXXStaticCastExpr") and kids(v):
+            v = bare(kids(v)[-1])
+        if v.get("kind") == "CXXConstructExpr" and len(kids(v)) == 1 and self.unit.clean(qtype(kids(v)[0])) == self.unit.clean(qtype(v)):
+            return self.field_of(kids(v)[0], field_id)   # (a copy)
+        if v.get("kind") != "InitListExpr":
+            return None
+        q = self.unit.find_type(self.unit.clean(qtype(v)))
+        record = self.unit.tree.records.get(q)
+        if record is None or record.get("bases"):
+            return None
+        fields = [c for c in kids(record) if c.get("kind") == "FieldDecl"]
+        at = next((i for i, c in enumerate(fields) if c.get("id") == field_id), None)
+        if at is None:
+            return None
+        parts = kids(v)
+        if at < len(parts) and parts[at].get("kind") not in ("ImplicitValueInitExpr", "CXXDefaultInitExpr"):
+            return parts[at]
+        f = fields[at]
+        return kids(f)[-1] if kids(f) and f.get("hasInClassInitializer") else {"kind": "ImplicitValueInitExpr"}
 
     def inlined(self, n):
         """A call of a constexpr function that returns one expression of its parameters
@@ -1714,12 +1856,15 @@ class Const:
         return out
 
     def constructed(self, n):
-        """A value made by a constexpr constructor that only sets fields from what it is given
-        (`constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}`): its fields
-        by their C++ names -> the expressions they are set to, the parameters standing for what is
-        given. Fields it does not set have their defaults. None: the constructor is none such."""
+        """A value made by a constructor that only sets fields from what it is given
+        (`constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}`, `explicit
+        PT1(f32 cutoff) : cutoff_(cutoff) {}`): its fields by their C++ names -> the expressions they are
+        set to, the parameters standing for what is given. Fields it does not set have their defaults.
+        (Constexpr or not, such a constructor makes the same value of the same arguments: what the
+        expressions are is worked out as a constant - `number`, `literal` -, or the constant waits.) None:
+        the constructor is none such."""
         d = constructor_of(self.unit.tree, n)
-        if d is None or not d.get("constexpr"):
+        if d is None:
             return None
         params = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
         args = [a for a in kids(n)]
@@ -1832,6 +1977,8 @@ class Const:
                 return ZERO["Vector"]
             raise Wait(f"a vector constant written as {k}")
         if t in u.enum_values:
+            if k == "InitListExpr" and len(kids(n)) == 1:   # (`FaultCode fault{kFaultNone}`)
+                return self.literal(kids(n)[0], t)
             if k == "DeclRefExpr" and n.get("referencedDecl", {}).get("kind") == "EnumConstantDecl":
                 return f"{t}::{enum_value(u, t, n['referencedDecl']['name'])}"
             if k in ("CXXDefaultInitExpr", "ImplicitValueInitExpr", "InitListExpr") and not kids(n):
@@ -1871,6 +2018,10 @@ class Const:
                         return self.literal(args[0], t)
                     if args:
                         raise Wait("a list constant made by a constructor")
+                if len(args) == 1 and bare(args[0]).get("kind") == "InitListExpr" and qtype(args[0]).rstrip().endswith("]"):
+                    args = kids(bare(args[0]))   # (std::array's braces: those of the array it holds)
+                elif len(args) == 1 and bare(args[0]).get("kind") == "ImplicitValueInitExpr" and qtype(args[0]).rstrip().endswith("]"):
+                    args = []   # (`std::array<u16, 16> ch{}`: the array it holds is zero)
                 # (an array of C++ - a constant, the default of a field - is declared with its length: what
                 # is not written is zero there, in the Blueprint as in C++)
                 return t + "{" + ", ".join(self.literal(c, it) for c in args) + "}"
@@ -1931,6 +2082,7 @@ class Emit:
         self.frozen = None    # while the list of a loop is named: the lines that hold its indexes (see `fixed`)
         self.result_struct = None
         self.homes = {}       # decl id of an iterator (or of what insert() gave) -> the list it goes through
+        self.pointers = {}    # decl id of a parameter that is a pointer into a list -> (the list's input, the place's input, the entries' type)
         self.keyed_vars = {}  # decl id of a name for an entry of a map or a set (a loop's variable, `auto& [k, v]`) -> (the map or set, its place)
         self.serial = 0       # the number of the statement being written (see `slot`)
 
@@ -2020,9 +2172,17 @@ class Emit:
             if d.get("kind") == "CXXConstructorDecl":
                 raise Wait(f"the constructor of the state {u.name} (what it does would run when the Blueprint begins)")
             f.state = True
+            for x in walk(d):   # (what the file keeps for the state's methods alone: variables of its Blueprint - Unit.kept_by_state)
+                if x.get("kind") == "DeclRefExpr" and (x.get("referencedDecl") or {}).get("kind") == "VarDecl":
+                    v = self.tree.decl.get(x["referencedDecl"]["id"])
+                    if v is not None and v["id"] not in self.names and u.kept_by_state(v):
+                        self.names[v["id"]], self.types[v["id"]] = u.state_static(v, os.path.splitext(os.path.basename(v.get("_file") or "file"))[0])
             f.mutates = not qtype(d).rstrip().endswith("const") or any(
                 x.get("kind") == "MemberExpr" and (u.state_fields.get(x.get("name")) or (None, None, {}))[2].get("mutable") and self.is_this(kids(x)[0] if kids(x) else {"kind": "CXXThisExpr"})
                 for x in walk(d))
+            # (what it keeps from one call to the next, or of the file - changed or not: it may be)
+            f.mutates = f.mutates or any(x.get("kind") == "VarDecl" and x.get("storageClass") == "static" and not x.get("constexpr") and not re.search(r"\bconst\b", qtype(x)) for x in walk(d)) \
+                or any(i in self.names and self.names[i] in {n for n, _ in u.state_statics.values()} for i in self.assigned(d))
             if f.mutates:
                 f.pure = False   # (it changes the Blueprint's variables: a step)
         if d.get("kind") == "CXXConstructorDecl":
@@ -2062,6 +2222,27 @@ class Emit:
             if p.get("kind") != "ParmVarDecl":
                 continue
             raw = qtype(p)
+            entries = u.pointed(raw)
+            if entries is not None:
+                # a pointer into a list: the list, read where it stands, and the place in it (Unit.pointed)
+                if p["id"] in assigned:
+                    raise Wait("a pointer that is moved (the place it holds changes)")
+                into = u.world.pointer_lists.get((f.key, [x["id"] for x in kids(d) if x.get("kind") == "ParmVarDecl"].index(p["id"])), "list")
+                if into == "mixed":
+                    raise Wait("a pointer into lists of different lengths (the language has no view of a list: a reference input is one type)")
+                if into == "other":
+                    raise Wait("a pointer into something that is no list (the address of a value)")
+                if isinstance(into, int):
+                    f.fixed[len(f.params)] = into   # (the list it points into: of that fixed length, as every call hands it)
+                lname = u.fresh(p.get("name") or f"arg{len(f.params) + 1}", self.taken)
+                self.taken.add(lname)
+                aname = u.fresh(lname + "_at", self.taken)
+                self.taken.add(aname)
+                f.pointers.append(len(f.params))
+                f.params += [(lname, f"List<{entries}>"), (aname, "Int")]
+                f.kinds += ["const", ""]
+                self.pointers[p["id"]] = (lname, aname, entries)
+                continue
             t = u.btype(raw)
             # A reference of C++ is a reference input: the place the call names. T& - the function changes it
             # there; const T& - it reads it there (a struct, a list, a text: a number, a vector, an enum's value
@@ -2502,8 +2683,10 @@ class Emit:
                     break
                 if target.get("kind") in ("MemberExpr", "ArraySubscriptExpr", "ImplicitCastExpr") and kids(target):
                     target = kids(target)[0]
-                elif target.get("kind") == "CXXOperatorCallExpr" and callee_name(target) == "operator[]":
-                    target = kids(target)[1]
+                elif target.get("kind") == "CXXOperatorCallExpr" and callee_name(target) in ("operator[]", "operator*", "operator->") and len(kids(target)) >= 2:
+                    target = kids(target)[1]   # (an entry of a list, a map's value - and what an owned value holds: *life_)
+                elif target.get("kind") == "UnaryOperator" and target.get("opcode") == "*" and kids(target):
+                    target = kids(target)[0]
                 else:
                     target = None
             if not own and (root is None or root not in self.names):
@@ -2620,6 +2803,12 @@ class Emit:
                 if v.get("storageClass") == "static":
                     if v.get("constexpr") or re.search(r"\bconst\b", qtype(v)):
                         self.u.constant(v)
+                        continue
+                    if self.f.state:   # (kept by a method of the one object there is: a variable of its Blueprint)
+                        name, t = self.u.state_static(v, self.f.name)
+                        self.names[v["id"]], self.types[v["id"]] = name, t
+                        if t.startswith("List<") and self.u.fixed(qtype(v)):
+                            self.lengths[name] = self.u.fixed(qtype(v))
                         continue
                     raise Wait("a static local variable (kept from one call to the next: a library keeps nothing)")
                 lam = self.lambda_of(kids(v)[-1]) if kids(v) and v.get("init") else None
@@ -3166,6 +3355,8 @@ class Emit:
                 return [f"{tmp} = {self.ex(a, t)};"] + self.store(a, lambda want: self.ex(b, want)) + self.store(b, self.typed(tmp, t))
             if name in ("sort", "stable_sort") and not self.own(ref.get("id")):
                 raise Wait(ORDER_WAIT.format(name))
+            if name in ("memmove", "memcpy") and len(kids(n)) == 4 and not self.own(ref.get("id")) and self.byte_places(kids(n)[1:3]) is not None:
+                return self.moved_bytes(name, kids(n)[1:])
             if name in ("memset", "memcpy") and len(kids(n)) == 4 and not self.own(ref.get("id")):
                 return self.raw_memory(name, kids(n)[1:])
             raise Wait(f"call: {name}()")
@@ -3218,6 +3409,41 @@ class Emit:
                 return before + self.list_step(name, base, lv, it, args) + after
             raise Wait(f"call: {name}() of an object")
         raise Wait(f"a statement: {k}")
+
+    def byte_places(self, pointers):
+        """Pointers to entries of lists of bytes (`buf.data() + i` of a std::array<u8, N>, an array of char):
+        [(the list, the place)] - None: they are none such."""
+        out = []
+        for x in pointers:
+            try:
+                lst, at = self.place(x)
+            except Wait:
+                return None
+            c = self.ctype(lst)
+            entry = template_args(c)[0] if c.startswith(("std::array<", "std::vector<")) else re.sub(r"\s*\[\d*\]$", "", c) if c.endswith("]") else None
+            if entry is None or self.u.clean(entry) not in ("unsigned char", "signed char", "char") or self.tp(lst) != "List<Int>":
+                return None
+            out.append((lst, at))
+        return out
+
+    def moved_bytes(self, name, a):
+        """memmove / memcpy of bytes between places of lists of bytes: entry by entry, as many as the count
+        says - from the first on, or from the last on where the bytes move up in the same list (memmove: what
+        is read is read before it is written over). Nothing is asked for; C++ copies the same bytes."""
+        (dst, at), (src, frm) = self.byte_places(a[:2])
+        before, lv, after = self.variable_of(dst, "List<Int>")
+        sv = self.place_arg(src, "List<Int>", "const", [])
+        count, to, fro = self.temp("count", "Int"), self.temp("to", "Int"), self.temp("from", "Int")
+        lines = [f"{count} = {self.ex(a[2], 'Int')};", f"{to} = {at};", f"{fro} = {frm};"]
+        last = self.temp("last", "Int")
+        lines.append(f"{last} = {self.whole_math('-', count, '1')};")
+        up = self.count_loop("0", last, lambda i: [f"{lv}[{self.whole_math('+', to, i)}] = list_get<Int>({sv}, {self.whole_math('+', fro, i)});"])
+        if name == "memcpy" or not self.same_list(dst, src):
+            return before + lines + up + after
+        k = self.temp("k", "Int")
+        down = [f"{k} = {last};", f'while (loop(math_compare<">=">(kern::to<Float>({k}), 0.0))) {{',
+                f"  {lv}[{self.whole_math('+', to, k)}] = list_get<Int>({sv}, {self.whole_math('+', fro, k)});", f"  {k} = {self.whole_math('-', k, '1')};", "}"]
+        return before + lines + [f'if (math_compare<"<=">(kern::to<Float>({to}), kern::to<Float>({fro}))) {{', *["  " + x for x in up], "} else {", *["  " + x for x in down], "}"] + after
 
     def addressed(self, n):
         """What a pointer handed to memset / memcpy points at, when it is the address of a place: `&n`, an
@@ -3384,6 +3610,34 @@ class Emit:
         base = kids(m)[0]
         return base if re.sub(r"^const\s+", "", self.ctype(base)).strip() == ENGINE + "::logic::ActorBlueprint" else None
 
+    def actor_get(self, n):
+        """rules.get<f64>("Speed") - kern::logic::ActorBlueprint::get: a variable of the Blueprint of an actor of
+        the level, read (Get Variable on Actor). The object it is read of, else None."""
+        m = callee(n)
+        if n.get("kind") != "CXXMemberCallExpr" or m.get("kind") != "MemberExpr" or m.get("name") != "get" or not kids(m):
+            return None
+        base = kids(m)[0]
+        return base if re.sub(r"^const\s+", "", self.ctype(base)).strip() == ENGINE + "::logic::ActorBlueprint" else None
+
+    def get_on(self, n, obj):
+        """Get Variable on Actor: func_get_on<"Speed", Float>(actor_find("Guided")) - the variable as the program
+        binds the actor's Blueprint, of the type the C++ reads it as."""
+        args = kids(n)[1:]
+        named = self.unwrap(args[0]) if len(args) == 1 else {}
+        if named.get("kind") != "StringLiteral":
+            raise Wait("a variable of an actor's Blueprint that is not named in so many words")
+        name, actor = c_string(named["value"]).decode("utf-8"), self.actor_named(obj)
+        target = self.u.world.actors.get(actor)
+        if target is None:
+            raise Wait(f"a variable of the Blueprint of the actor {actor}, which the level does not have")
+        if name not in target.get("variables", {}):
+            raise Wait(f"the variable {name} of the Blueprint of the actor {actor}, which has no such variable")
+        t = self.tp(n)
+        if t not in ("Float", "Int", "Bool", "Vector", "Text") and t not in self.u.enum_values:
+            raise Wait(f"the variable {name} of the Blueprint of the actor {actor} as a {t}")
+        self.f.on_actors.append((actor, name))
+        return f'func_get_on<"{name}", {t}>(actor_find({text_literal(actor)}))', t
+
     def actor_named(self, obj):
         """The actor whose Blueprint `obj` is: named where it is made (ActorBlueprint rules{"Lamps"}). The name
         is a constant of the object (`const char* const actor`) - the same for as long as it lives."""
@@ -3399,7 +3653,16 @@ class Emit:
             raise Wait("a call on an actor's Blueprint whose actor is not named in so many words where it is made")
         return c_string(said[0]["value"]).decode("utf-8")
 
-    def call_on(self, n, obj):
+    def actor_value(self, n):
+        """rules.number("Speed", x), rules.flag("Seen", y) - kern::logic::ActorBlueprint's Call on Actor with one
+        output, as a value: the object it is called on, else None."""
+        m = callee(n)
+        if n.get("kind") != "CXXMemberCallExpr" or m.get("kind") != "MemberExpr" or m.get("name") not in ("number", "flag") or not kids(m):
+            return None
+        base = kids(m)[0]
+        return base if re.sub(r"^const\s+", "", self.ctype(base)).strip() == ENGINE + "::logic::ActorBlueprint" else None
+
+    def call_on(self, n, obj, gives_type=None):
         """rules.call("Fn", std::tie(a, b), x, y): the Blueprint of the actor `rules` names runs its function Fn -
         Call on Actor, on the actor found by its name, as the program binds it. The Blueprint says what Fn
         looks like (KERN_EXTERN): its inputs and outputs as the actor's Blueprint names them, of the types of
@@ -3408,17 +3671,21 @@ class Emit:
         stored in the places std::tie names, one after the other."""
         u = self.u
         args = kids(n)[1:]
-        if len(args) < 2:
+        if len(args) < (1 if gives_type else 2):
             raise Wait("a call on an actor's Blueprint without its function and its outputs")
-        named, outs = self.unwrap(args[0]), self.unwrap(args[1])
-        while outs.get("kind") in ("MaterializeTemporaryExpr", "CXXBindTemporaryExpr", "CXXConstructExpr", "CXXFunctionalCastExpr") and len(kids(outs)) == 1:
-            outs = self.unwrap(kids(outs)[0])
+        named = self.unwrap(args[0])
         if named.get("kind") != "StringLiteral":
             raise Wait("a call on an actor's Blueprint whose function is not named in so many words")
-        if outs.get("kind") != "CallExpr" or callee_name(outs) != "tie" or not self.ctype(outs).startswith("std::tuple<"):
-            raise Wait("a call on an actor's Blueprint whose outputs are not the places std::tie names")
+        if gives_type:   # (one output, the value of the call: number(), flag())
+            places, values = [None], args[1:]
+        else:
+            outs = self.unwrap(args[1])
+            while outs.get("kind") in ("MaterializeTemporaryExpr", "CXXBindTemporaryExpr", "CXXConstructExpr", "CXXFunctionalCastExpr") and len(kids(outs)) == 1:
+                outs = self.unwrap(kids(outs)[0])
+            if outs.get("kind") != "CallExpr" or callee_name(outs) != "tie" or not self.ctype(outs).startswith("std::tuple<"):
+                raise Wait("a call on an actor's Blueprint whose outputs are not the places std::tie names")
+            places, values = kids(outs)[1:], args[2:]
         function, actor = c_string(named["value"]).decode("utf-8"), self.actor_named(obj)
-        places, values = kids(outs)[1:], args[2:]
         target = u.world.actors.get(actor)
         if target is None:
             raise Wait(f"a call on the Blueprint of the actor {actor}, which the level does not have")
@@ -3431,7 +3698,7 @@ class Emit:
             raise Wait(f"a call of {function} on the Blueprint of the actor {actor} with {len(values)} values and {len(places)} outputs, where the function takes {len(ins)} and gives {len(gives)}")
         if is_word(function) or any(not re.fullmatch(r"[A-Za-z_]\w*", x) or x in CPP_WORDS for x in [function, *ins, *gives]):
             raise Wait(f"a call of {function} on the Blueprint of the actor {actor}, which names it or a pin of it with a word of C++ or of the Blueprint language")
-        in_types, out_types = [self.tp(a) for a in values], [self.tp(p) for p in places]
+        in_types, out_types = [self.tp(a) for a in values], [gives_type if p is None else self.tp(p) for p in places]
         for t in in_types + out_types:
             if t.startswith("List<") or t.startswith("Fixed<") or t in u.struct_fields or (t in u.enum_values and u.enum_numbers.get(t)):
                 raise Wait(f"a call of {function} on the Blueprint of the actor {actor} with a {t} (a call on an actor's Blueprint gives and takes flags, numbers, vectors, texts and enum values)")
@@ -3457,6 +3724,9 @@ class Emit:
         if gives:
             u.members.append("  struct { " + " ".join(f"{t} {o} = {u.zero(t)};" for o, t in pins[1]) + f" }} n{node};")
         lines = [f'func_call_on<"{function}">(actor_find({text_literal(actor)}), kern::out({", ".join(f"n{node}.{o}" for o in gives)}){"".join(", " + x for x in texts)});']
+        if gives_type:
+            self.hoist(lines)
+            return f"n{node}.{gives[0]}", gives_type
         for p, (o, t) in zip(places, pins[1]):
             lines += self.store(p, self.typed(f"n{node}.{o}", t))
         return lines
@@ -3916,20 +4186,42 @@ class Emit:
             return f"kern::to<Int>(kern::formula([](Float b) -> Float {{ return {flit(float(a))} {op} b; }}, {self.conv(b, 'Int', 'Float')}))"
         return f"kern::to<Int>(kern::formula([](Float a, Float b) -> Float {{ return a {op} b; }}, {self.conv(a, 'Int', 'Float')}, {self.conv(b, 'Int', 'Float')}))"
 
+    def pointer_of(self, n):
+        """The parameter a pointer into a list is, where `n` names one: (the list's input, the place's input,
+        the entries' type) - else None."""
+        b = self.unwrap(n)
+        return self.pointers.get(b.get("referencedDecl", {}).get("id")) if b.get("kind") == "DeclRefExpr" else None
+
+    def pointer_arg(self, a, entries, fixed=None):
+        """What a call hands a pointer into a list (Unit.pointed): [the list, the place in it] - the list where it
+        stands, read there (nothing is copied). `fixed`: the input is a list of that fixed length."""
+        lt = f"List<{entries}>"
+        if self.nothing(a):   # (null: no place - in a list of nothing)
+            return [self.temp("none", lt, fixed), "-1"]
+        lst, at = self.place(a)
+        if self.tp(lst) != lt:
+            raise Wait("a pointer into a list of entries of another type")
+        if lst.get("kind") == "_Text":
+            return [lst["_text"], at]
+        return [self.place_arg(lst, lt, "const", []), at]
+
     def place(self, n):
-        """A place in a list as C++ names it (v.begin() + i, v.end(), an array's first entry + n): the
-        list and the place as a whole number."""
+        """A place in a list as C++ names it (v.begin() + i, v.end(), an array's first entry + n, v.data(), a
+        pointer into a list): the list and the place as a whole number."""
         b = self.unwrap(n)
         k = b.get("kind")
+        ptr = self.pointer_of(b)
+        if ptr is not None:
+            return {"kind": "_Text", "_text": ptr[0], "_type": f"List<{ptr[2]}>", "_bt": f"List<{ptr[2]}>"}, ptr[1]
         while k in ("CXXConstructExpr", "CXXFunctionalCastExpr", "CXXStaticCastExpr") and len(kids(b)) == 1 and not self.tp_or_none(b):
             b = self.unwrap(kids(b)[0])   # (an iterator made of an iterator)
             k = b.get("kind")
         if k == "CXXMemberCallExpr":
             m = callee(b)
             base = kids(m)[0] if kids(m) else None
-            if base is not None and not self.is_this(base) and m.get("name") in ("begin", "cbegin", "end", "cend") and (self.tp_or_none(base) or "").startswith("List<"):
+            if base is not None and not self.is_this(base) and m.get("name") in ("begin", "cbegin", "end", "cend", "data") and not kids(b)[1:] and (self.tp_or_none(base) or "").startswith("List<"):
                 lt = self.tp(base)
-                return base, ("0" if "begin" in m["name"] else f"list_length<{lt[5:-1]}>({self.ex(base, lt)})")
+                return base, ("0" if "begin" in m["name"] or m["name"] == "data" else f"list_length<{lt[5:-1]}>({self.ex(base, lt)})")
         if k in ("CXXOperatorCallExpr", "BinaryOperator"):
             op = callee_name(b)[-1] if k == "CXXOperatorCallExpr" else b.get("opcode")
             ops = kids(b)[1:] if k == "CXXOperatorCallExpr" else kids(b)
@@ -4037,6 +4329,11 @@ class Emit:
             # (assign: what it is given is worked out before the list is emptied)
             n, fill = self.temp("count", "Int"), self.temp("fill", it)
             return [f"{n} = {self.ex(args[0], 'Int')};", f"{fill} = {self.ex(args[1], it)};", f"list_clear({lv});", f"list_resize({lv}, {n}, {fill});"]
+        if name == "fill" and len(args) == 1:
+            # every entry this value (std::array::fill): worked out once, then set where each entry stands -
+            # the loop C++ runs, nothing asked for
+            fill, last = self.temp("fill", it), self.temp("last", "Int")
+            return [f"{fill} = {self.ex(args[0], it)};", f"{last} = {self.whole_math('-', f'list_length<{it}>({lv})', '1')};"] + self.count_loop("0", last, lambda i: [f"{lv}[{i}] = {fill};"])
         raise Wait(f"list: {name}()")
 
     # ---- algorithms over a range of a list (<algorithm>): a loop over its places ----
@@ -4343,6 +4640,10 @@ class Emit:
             if self.f.state:
                 return None   # (the state as a whole is the Blueprint: no place of it)
             return (self.self_name, self.f.self_type) if self.f.self_type is not None and self.is_local(self.self_name) else None
+        if k == "UnaryOperator" and b.get("opcode") == "*" and kids(b) and self.pointer_of(kids(b)[0]) is not None:
+            lname, aname, et = self.pointer_of(kids(b)[0])   # (what a pointer into a list points at: the entry at its place)
+            self.f.indexes = True
+            return f"{lname}[{aname}]", et
         holder = self.box(b)
         if holder is not None:   # the value an owned or optional value holds: the one entry of its list
             got = self.spot(holder)
@@ -4387,6 +4688,10 @@ class Emit:
                 base, idx = kids(b)
                 while bare(base).get("kind") == "ImplicitCastExpr":
                     base = kids(bare(base))[0]
+                if self.pointer_of(base) is not None:   # (an entry through a pointer into a list: counted from its place)
+                    lname, aname, et = self.pointer_of(base)
+                    self.f.indexes = True
+                    return f"{lname}[{self.fixed(self.whole_math('+', aname, self.ex(idx, 'Int')))}]", et
             if self.is_vec(base):
                 return None
             got = self.spot(base)
@@ -4545,8 +4850,17 @@ class Emit:
             else:
                 base, idx = kids(t)
             base = self.unwrap(base) if not self.is_this(base) else base
-            if self.is_vec(base):
+            if self.is_vec(base) and self.ctype(base) != "kern::Vec3":
                 raise Wait("a component of a vector by its number is set")
+            if self.is_vec(base):
+                # a component of a vector by its number, as the vector's operator[] picks it (0: x, 1: y, any
+                # other: z) - the number and the value worked out once, the vector set anew where it stands
+                at, put = self.temp("at", "Float"), self.temp("put", "Float")
+                lines = [f"{at} = {self.ex(idx, 'Float')};", f"{put} = {value('Float')};"]
+                old = self.ex(base, "Vector")
+                parts = [f"kern::formula([](Float i, Float v, Float c) -> Float {{ return {cond} ? v : c; }}, {at}, {put}, vector_break({old}).{c})"
+                         for cond, c in (("i == 0.0", "x"), ("i == 1.0", "y"), ("i != 0.0 && i != 1.0", "z"))]
+                return lines + self.store(base, lambda _t: f"vector_make({', '.join(parts)})")
             lt = self.tp(base)
             if not lt.startswith("List<"):
                 raise Wait("an entry of something that is not a list is set")
@@ -4599,11 +4913,18 @@ class Emit:
                 texts.append(self.place_arg(obj, g.self_type, kinds[0], after))
             params = params[1:]
             kinds = kinds[1:]
-        if len(args) != len(params):
-            raise Wait("a call with default arguments")
         first = len(g.params) - len(params)   # (a method: its object is the first input)
-        for i, (a, (_, pt), kind) in enumerate(zip(args, params, kinds)):
-            texts.append(self.place_arg(a, pt, kind, after, g.fixed.get(first + i)) if kind else self.ex(a, pt))
+        if len(args) != len(params) - len(g.pointers):
+            raise Wait("a call with default arguments")
+        j = 0
+        for a in args:
+            if first + j in g.pointers:   # (a pointer into a list: the list and the place in it - Unit.pointed)
+                texts += self.pointer_arg(a, params[j][1][5:-1], g.fixed.get(first + j))
+                j += 2
+                continue
+            (_, pt), kind = params[j], kinds[j]
+            texts.append(self.place_arg(a, pt, kind, after, g.fixed.get(first + j)) if kind else self.ex(a, pt))
+            j += 1
         gives = g.self_type if g.ctor else g.value
         texts = [texts[i] for i in g.order()]   # (as the Blueprint function has its inputs: those by reference first)
         call = f"{g.name}({', '.join(texts)}).Result"
@@ -4791,6 +5112,8 @@ class Emit:
         if k in CAST:
             inner = kids(b)[-1]
             ck = b.get("castKind", "")
+            if ck == "PointerToBoolean" and self.pointer_of(inner) is not None:   # (a pointer into a list: not null - it has a place)
+                return f'math_compare<">=">(kern::to<Float>({self.pointer_of(inner)[1]}), 0.0)', "Bool"
             if ck == "NullToPointer" and self.u.object_of(qtype(b)):
                 return "0", "Int"   # (no object of the engine: the handle 0)
             if ck in ("FunctionToPointerDecay", "BuiltinFnToFnPtr"):
@@ -4813,6 +5136,8 @@ class Emit:
             i = ref.get("id")
             if i in self.names:
                 return self.names[i], self.types[i]
+            if i in self.pointers:
+                raise Wait("a pointer into a list used as more than its entries, its place in a call or whether it is null")
             if ref.get("kind") == "EnumConstantDecl":
                 d = self.tree.decl.get(i)
                 q = d.get("_enum") if d else None
@@ -4903,6 +5228,9 @@ class Emit:
                     if not ENGINE_NODES:
                         raise
                     return self.either(op, left, y)
+            if op in ("==", "!=") and (self.pointer_of(x) is not None and self.nothing(y) or self.pointer_of(y) is not None and self.nothing(x)):
+                at = (self.pointer_of(x) or self.pointer_of(y))[1]   # (a pointer into a list and null: has it no place)
+                return f'math_compare<"{"<" if op == "==" else ">="}">(kern::to<Float>({at}), 0.0)', "Bool"
             if op in COMPARE:
                 tx, ty = self.tp(x), self.tp(y)
                 if op in ("==", "!=") and "Float" in (tx, ty) and tx in ("Float", "Int") and ty in ("Float", "Int"):
@@ -5741,6 +6069,10 @@ class Emit:
         m = callee(b)
         base = kids(m)[0] if kids(m) else None
         name = m.get("name")
+        if self.actor_get(b) is not None:
+            return self.get_on(b, self.actor_get(b))
+        if self.actor_value(b) is not None:
+            return self.call_on(b, self.actor_value(b), "Float" if name == "number" else "Bool")
         d = self.engine_decl(m.get("referencedMemberDecl"))
         if d is not None:
             return self.engine_value(d, base, kids(b)[1:])
@@ -6043,6 +6375,28 @@ class Api:
 WIDE_MATH = {"sin": "kern::math::sin", "cos": "kern::math::cos", "tan": "kern::math::tan", "asin": "kern::math::asin", "acos": "kern::math::acos", "atan": "kern::math::atan",
              "atan2": "kern::math::atan2", "exp": "kern::math::exp", "log": "kern::math::log", "pow": "kern::math::pow", "sqrt": "kern::math::sqrt", "fmod": "kern::math::mod",
              "hypot": "hypot_bp", "tanh": "tanh_bp", "sinh": "sinh_bp", "cosh": "cosh_bp", "asinh": "asinh_bp", "log2": "log2_bp", "log10": "log10_bp", "cbrt": "cbrt_bp", "ldexp": "ldexp_bp"}
+# What a test needs where the source reads through a pointer into a list (Unit.pointed): the lists the test
+# handed it, so that an entry through such a pointer is checked against its list as converted::at checks one -
+# outside it the call is marked (C++ leaves open what it reads there). A pointer into nothing the test handed
+# reads as the source reads it; null is marked.
+POINTED_PRELUDE = """inline std::vector<std::pair<const unsigned char*, const unsigned char*>> converted_pointed_lists;
+template <class T> const T& converted_pointed(const T* p, long long i) {
+  const auto at = reinterpret_cast<std::uintptr_t>(p);
+  bool held = false;
+  for (const auto& [first, last] : converted_pointed_lists) {
+    const auto a = reinterpret_cast<std::uintptr_t>(first), b = reinterpret_cast<std::uintptr_t>(last);
+    if (at < a || at > b || (at - a) % sizeof(T) != 0) continue;
+    held = true;
+    const long long e = static_cast<long long>((at - a) / sizeof(T)) + i;
+    if (e >= 0 && e < static_cast<long long>((b - a) / sizeof(T))) return reinterpret_cast<const T*>(first)[e];
+    break;
+  }
+  if (p != nullptr && !held) return p[i];
+  converted::open_read();
+  static T none;
+  none = T{};
+  return none;
+}"""
 WIDE_PRELUDE = """// the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
@@ -6095,6 +6449,7 @@ class TestWriter:
         self.object_enums = collections.defaultdict(list)   # a class of the engine the test has a stand-in of -> its enums the test needs
         self.made = {}         # a class the test makes by a constructor -> (the constructor, the line that makes it without)
         self.objects = {}      # a class of the engine the source holds objects of -> its stand-in's name in the test
+        self.pointed = False   # the source reads through a pointer into a list the test hands it (see POINTED_PRELUDE)
         self.whole = None      # what the test holds (`setup`)
         self.state_info = None # of a part of the Blueprint of a state: its helpers' names (`state_helpers`) - or why there are none
         self.by_place = None   # the declarations of the tree by where they stand (`at`)
@@ -6181,6 +6536,35 @@ class TestWriter:
             while n.get("kind") in ("ImplicitCastExpr", "CStyleCastExpr", "CXXStaticCastExpr", "CXXFunctionalCastExpr") and kids(n):
                 n = bare(kids(n)[-1])
             return n.get("kind") == "IntegerLiteral" and n.get("value") not in ("0", None)
+        def within(base, index):
+            """An entry of a list of fixed length (T[N], std::array<T, N>) at a constant place inside it."""
+            inner = bare(base)
+            while inner.get("kind") == "ImplicitCastExpr" and inner.get("castKind") in ("ArrayToPointerDecay", "NoOp") and kids(inner):
+                inner = bare(kids(inner)[0])
+            length = self.u.entries(qtype(inner))
+            i = bare(index)
+            while i.get("kind") in CAST and kids(i):
+                i = bare(kids(i)[-1])
+            ref = self.tree.decl.get((i.get("referencedDecl") or {}).get("id")) if i.get("kind") == "DeclRefExpr" else None
+            if length is None or not (i.get("kind") == "IntegerLiteral" or (ref is not None and ref.get("kind") == "VarDecl" and (ref.get("constexpr") or re.search(r"\bconst\b", qtype(ref))))):
+                return False
+            try:
+                at = Const(self.u).number(i)
+            except Wait:
+                return False
+            return at == int(at) and 0 <= at < length
+        def into_list(n):
+            """Is this a parameter that is a pointer into a list (Unit.pointed)?"""
+            x = bare(n)
+            while x.get("kind") == "ImplicitCastExpr" and kids(x):
+                x = bare(kids(x)[0])
+            r = x.get("referencedDecl") or {}
+            if x.get("kind") != "DeclRefExpr" or r.get("kind") != "ParmVarDecl":
+                return False
+            try:
+                return self.u.pointed(qtype(r)) is not None
+            except Wait:
+                return False
         visited = set()
         def visit(n, depth):
             if n.get("_call") is not None:   # (a place written out for a call: the source has the call)
@@ -6202,6 +6586,22 @@ class TestWriter:
                 name = (callee.get("referencedDecl") or {}).get("name")
             if name == "operator[]" and (KEYED.match(self.u.clean(qtype(ks[1]))) or KEYED_KERN.match(self.u.clean(qtype(ks[1])))):
                 pass   # (m[key] is said for every key)
+            elif name == "operator[]" and self.u.clean(qtype(ks[1])) == "kern::Vec3":
+                pass   # (a vector's component by its number: x, y - and z for any other number; there for every call)
+            elif (k == "ArraySubscriptExpr" or name == "operator[]") and within(*ks[-2:]):
+                pass   # (an entry of an array of fixed length at a constant place inside it: there for every call)
+            elif k == "ArraySubscriptExpr" and into_list(ks[0]):
+                # an entry through a pointer into a list (Unit.pointed): checked against the list the test handed it
+                (a, b), (ba, bb), (ia, ib) = span(n), span(ks[0]), span(ks[1])
+                edits.append((a, 2, depth, a, "converted_pointed("))
+                swap(bb, ia, "[", ", ")
+                swap(ib, b, "]", ")")
+                self.pointed = True
+            elif k == "UnaryOperator" and n.get("opcode") == "*" and ks and into_list(ks[0]):
+                (a, b), (xa, xb) = span(n), span(ks[0])
+                swap(a, xa, "*", "converted_pointed(")
+                edits.append((b, 0, -depth, b, ", 0)"))
+                self.pointed = True
             elif k == "ArraySubscriptExpr" or name == "operator[]":
                 base, index = ks[-2:]
                 inner = bare(base)
@@ -6374,7 +6774,7 @@ class TestWriter:
         return best
 
     def absolute(self, q):
-        return "::" + q if q.startswith((ENGINE + "::", "w64::")) else "::" + self.tree.namespace + "::" + q.lstrip(":")
+        return self.tree.absolute(q)
 
     def local(self, q):
         d = self.tree.records.get(q) or self.tree.enums.get(q)
@@ -6595,7 +6995,7 @@ class TestWriter:
                 # other object is the one the constructor makes, the others have every field drawn on its own
                 make = f"  if (draw.flag()) return {built[1]};\n" + make
                 self.made[q] = (built[0], f"  {t} s{{}};")
-            arrays, lines, viewed = {}, [f"[[maybe_unused]] static {t} {name}(converted::Draw& draw) {{", make], set()
+            arrays, lines, viewed, standard = {}, [f"[[maybe_unused]] static {t} {name}(converted::Draw& draw) {{", make], set(), {}
             held = []
             for f, ft in fields:
                 if "&" in ft:
@@ -6611,6 +7011,16 @@ class TestWriter:
                     lines += [f"  static std::deque<{arrays[f]}> kept_{f};", f"  kept_{f}.push_back({self.draw('std::vector<' + inner + '>')});",
                               f"  s.{f} = {{kept_{f}.back().data(), kept_{f}.back().size()}};"]
                     continue
+                if self.u.clean(ft).startswith("std::array<"):
+                    # (a std::array: the list of its entries, each drawn on its own - and taken back entry by entry,
+                    # where it stands: an entry need not be made of nothing, a class without a default constructor)
+                    entry = template_args(self.u.clean(ft))[0]
+                    if entry.startswith("std::array<") or "[" in entry:
+                        raise Wait("the test has no values of an array of arrays")
+                    arrays[f] = f"std::vector<{self.spell(entry)}>"
+                    standard[f] = self.spell(entry)
+                    lines.append(f"  for (auto& e : s.{f}) e = {self.draw(entry)};")
+                    continue
                 m = re.match(r"(.+?)\s*((?:\s*\[\d+\])+)$", self.u.clean(ft))   # (T[3][2]: 3 entries of T[2] - a list of lists in the Blueprint)
                 if m:
                     rank = m.group(2).count("[")
@@ -6625,7 +7035,7 @@ class TestWriter:
             lines[lines.index(make)] = f"  {t} s{{{', '.join(f'.{f} = kept_{f}.back()' for f in held)}}};"
         spelled = {f: arrays[f] if f in arrays else self.spell(ft) for f, ft in fields if f not in held}
         def of(f, obj="s"):
-            return self.wrap(f"{arrays[f]}({obj}.{f}.begin(), {obj}.{f}.end())" if f in viewed else f"converted::array_list({obj}.{f})" if f in arrays else f"{obj}.{f}", spelled.get(f, ""))
+            return self.wrap(f"{arrays[f]}({obj}.{f}.begin(), {obj}.{f}.end())" if f in viewed or f in standard else f"converted::array_list({obj}.{f})" if f in arrays else f"{obj}.{f}", spelled.get(f, ""))
         lines += ["  return s;", "}"]
         lines.append(f"[[maybe_unused]] static converted::Value arg(const {t}& s) {{ return converted::Value::structure({{{', '.join(f'arg({of(f)})' for f, _ in fields)}}}); }}")
         lines.append(f"[[maybe_unused]] static bool same(const {t}& want, const converted::Value& got) {{ return got.rows && got.rows->size() == {len(fields)}"
@@ -6638,7 +7048,10 @@ class TestWriter:
             if f in held or f in viewed:
                 continue   # (a reference, a view: what they show the Blueprint's value does not give them)
             if f in arrays:
-                takes.append(f"{{ {spelled[f]} items; converted::take_as<{shape(spelled[f])}>(items, (*v.rows)[{i}]); converted::array_from(s.{f}, items); }}")
+                if f in standard:   # (entry by entry where it stands: an entry need not be made of nothing)
+                    takes.append(f"{{ const converted::Value& items = (*v.rows)[{i}]; for (std::size_t k = 0; k < items.size() && k < std::size(s.{f}); ++k) converted::take_as<{shape(standard[f])}>(s.{f}[k], items.item(k)); }}")
+                else:
+                    takes.append(f"{{ {spelled[f]} items; converted::take_as<{shape(spelled[f])}>(items, (*v.rows)[{i}]); converted::array_from(s.{f}, items); }}")
             else:
                 takes.append(f"converted::take_as<{shape(spelled[f])}>(s.{f}, (*v.rows)[{i}]);")
         lines.append(f"[[maybe_unused]] static void take({t}& s, const converted::Value& v) {{ if (!v.rows || v.rows->size() != {len(fields)}) return; {' '.join(takes)} }}")
@@ -6713,8 +7126,8 @@ class TestWriter:
         lines = [f"struct {name} {{ " + " ".join(f"{t} {f};" for f, t in fields) + " };"]
         lines.append(f"[[maybe_unused]] static bool same(const {name}& want, const converted::Value& got) {{ return got.rows && got.rows->size() == {len(fields)}"
                      + "".join(f" && same({self.wrap(f'want.{f}', t)}, (*got.rows)[{i}])" for i, (f, t) in enumerate(fields)) + "; }")
-        lines.append(f"[[maybe_unused]] static bool defined(const {name}& s) {{ return " + " && ".join(f"defined(s.{f})" for f, _ in fields) + "; }")
-        lines.append(f"[[maybe_unused]] static std::string text(const {name}& s) {{ return std::string(\"{{\") + " + ' + ", " + '.join(f"text(s.{f})" for f, _ in fields) + ' + "}"; }')
+        lines.append(f"[[maybe_unused]] static bool defined(const {name}& s) {{ return " + " && ".join(f"defined({self.wrap(f's.{f}', t)})" if t.startswith("std::array<") else f"defined(s.{f})" for f, t in fields) + "; }")
+        lines.append(f"[[maybe_unused]] static std::string text(const {name}& s) {{ return std::string(\"{{\") + " + ' + ", " + '.join(f"text({self.wrap(f's.{f}', t)})" if t.startswith("std::array<") else f"text(s.{f})" for f, t in fields) + ' + "}"; }')
         return lines
 
     # ---- the engine in the test: stand-ins that keep every call ----
@@ -6871,7 +7284,7 @@ class TestWriter:
         other = {}   # kern::physics -> [ph]
         named = [(name, what) for file in [self.path, *self.tree.texts] for name, what in re.findall(r"\bnamespace\s+(\w+)\s*=\s*(?:::)?([\w:]+)\s*;", self.tree.text(file))]
         for name, what in [*named, *spaces]:
-            other.setdefault(what if what.startswith(ENGINE + "::") or what.startswith(self.tree.namespace + "::") else self.tree.namespace + "::" + what, set()).add(name)
+            other.setdefault(what if what.split("::")[0] in (ENGINE, self.tree.namespace, *self.tree.spaces) else self.tree.namespace + "::" + what, set()).add(name)
         for absolute, local, *within in pairs:
             parts, keep = absolute.strip(":").split("::"), len(local.split("::"))
             local = "".join(within) + local
@@ -6959,8 +7372,7 @@ class TestWriter:
         return any(f.decl.get("_file") == d.get("_file") and f.decl["_at"][0] <= d["_at"][0] < f.decl["_at"][1] for f in self.u.functions.values() if f.decl.get("_at") and f.decl["_at"][1])
 
     def absolute_of(self, d, name):
-        scope = self.tree.scope_of.get(d["id"], "")
-        return "::" + (scope if scope.startswith((ENGINE + "::", "w64::")) else self.tree.namespace + "::" + scope) + name
+        return self.tree.absolute(self.tree.scope_of.get(d["id"], "") + name)
 
     def setup(self):
         """What the test of the whole Blueprint holds (`gather`), and its places guarded - once, for `write`
@@ -7530,6 +7942,11 @@ class TestWriter:
             twice = sorted({n for n in types_at_top if types_at_top.count(n) > 1})
             return None, [(f, f"two types of one name ({', '.join(twice)})") for f in u.order if not f.lifted]
         pairs = [(self.absolute(q), self.names[q]) for q in self.names] + [(self.absolute(q), self.enum_names[q]) for q in self.enum_names]
+        for q in self.enum_names:   # (the values of an enum that is not scoped stand in the scope around it: `fc::kFaultNone` is the test's kFaultNone)
+            if tree.enums[q].get("scopedEnumTag"):
+                continue
+            outer = q.rsplit("::", 1)[0] + "::" if "::" in q else ""
+            pairs += [(tree.absolute(outer + c["name"]), "::".join(classes_of(outer) + [c["name"]])) for c in kids(tree.enums[q]) if c.get("kind") == "EnumConstantDecl" and c.get("name")]
         pairs += [(f"::{ENGINE}::Vec3", "Vec3"), (f"::{ENGINE}::Vec2", "Vec2"), (f"::{ENGINE}::Span", "Span"), (f"::{tree.namespace}::Vec3", "Vec3"), (f"::{tree.namespace}::Vec2", "Vec2")]
         pairs += [(f"::{space}::{n}", n) for space in (ENGINE, tree.namespace) for n in ("f32", "f64", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64")]
         # (by their full names: a local variable of a function may have the name of one - `const f32 length = kern::length(d)`)
@@ -7624,12 +8041,29 @@ class TestWriter:
                     moved.add("a0")
                     names.append("a0")
                 first = len(names)
+                held_lists = []   # (the lists the source gets a pointer into: the list and the place - Unit.pointed)
                 for p in params:
+                    if self.u.pointed(qtype(p)) is not None:
+                        entry = re.sub(r"\s*\*$", "", qtype(p).strip())
+                        inner = self.spell(entry)
+                        lst, at = f"a{len(names)}", f"a{len(names) + 1}"
+                        types += [f"std::vector<{inner}>", "long long"]
+                        # (never empty - an empty list's data() may be null -; now and then null itself, the place -1)
+                        n_fixed = f.fixed.get(len(names))   # (the list it points into has a fixed length: that many entries)
+                        decl_lines += [f"std::vector<{inner}> {lst}({n_fixed}); for (auto& e : {lst}) e = {self.draw(entry)};" if n_fixed else
+                                       f"std::vector<{inner}> {lst} = draw_list(draw, [&]() -> {inner} {{ return {self.draw(entry)}; }}); {lst}.push_back({self.draw(entry)});",
+                                       f"const long long {at} = draw.below(8) == 0 ? -1 : static_cast<long long>(draw.below(static_cast<u32>({lst}.size()) + 1));"]
+                        names += [lst, at]
+                        held_lists.append(lst)
+                        continue
                     types.append(self.spell(qtype(p)))
                     decl_lines.append(f"{types[-1]} a{len(names)} = {self.draw(qtype(p))};")
                     if not types[-1].startswith("const ") and not types[-1].endswith("&"):
                         moved.add(f"a{len(names)}")
                     names.append(f"a{len(names)}")
+                if held_lists:
+                    self.pointed = True
+                    decl_lines.append("converted_pointed_lists = {" + ", ".join(f"{{reinterpret_cast<const unsigned char*>({x}.data()), reinterpret_cast<const unsigned char*>({x}.data() + {x}.size())}}" for x in held_lists) + "};")
                 ret = qtype(d).split("(")[0].strip()
                 if f.value is not None:
                     self.result_ok(ret)
@@ -7640,8 +8074,18 @@ class TestWriter:
                 # (a view of a list - kern::Span - shows the list the test keeps: it is not handed over)
                 by_value = lambda p: not any(ch in qtype(p) for ch in "&*") and not self.u.object_of(qtype(p)) and not re.match(r"(?:kern::)?Span<", self.u.clean(qtype(p)))
                 # (a list the source writes in braces - std::initializer_list - is the drawn list as such a list: converted::listed)
-                braced = {n: f"l{n[1:]}" for n, p in zip(names[first:], params) if self.u.clean(qtype(p)).startswith("std::initializer_list<")}
-                args = ", ".join(braced[n] if n in braced else f"std::move({n})" if by_value(p) else n for n, p in zip(names[first:], params))
+                braced, handed, at_ = {}, [], first
+                for p in params:
+                    if self.u.pointed(qtype(p)) is not None:   # (the pointer: into the list the run was given, at its place)
+                        handed.append(f"({names[at_ + 1]} < 0 ? nullptr : {names[at_]}.data() + {names[at_ + 1]})")
+                        at_ += 2
+                        continue
+                    n = names[at_]
+                    if self.u.clean(qtype(p)).startswith("std::initializer_list<"):
+                        braced[n] = f"l{n[1:]}"
+                    handed.append(braced[n] if n in braced else f"std::move({n})" if by_value(p) else n)
+                    at_ += 1
+                args = ", ".join(handed)
                 if owner and f.self_type is None and not f.ctor and not static and not f.state:
                     self.helpers(owner)   # (a method that does not use its object: called on one as its class makes it)
                 here = f"{ns}::"   # (by its full name: the test's own function, whatever its arguments are)
@@ -7688,7 +8132,7 @@ class TestWriter:
                 f'    converted::Tally tally("{f.name}");',
                 "    converted::Draw draw;   // (every function its own arguments, the same in every run)",
                 *([f"    std::unique_ptr<{self.names[u.state]}> s;   // (the object of the state: drawn for every call)"] if f.state else []),
-                f"    const auto run = [&]({', '.join(f'[[maybe_unused]] {t} {n}' for t, n in zip(types, names))}) {{ {give} }};",
+                f"    const auto run = [&]({', '.join(f'[[maybe_unused]] const {t}& {n}' if n in held_lists else f'[[maybe_unused]] {t} {n}' for t, n in zip(types, names))}) {{ {give} }};",
                 "    for (int i = 0; tally.more(i); ++i) {",
                 *[f"      {x}" for x in decl_lines],
                 f"      const std::vector<converted::Value> given = {{{given_args}}};   // (what the Blueprint is given: before the call)",
@@ -7707,6 +8151,8 @@ class TestWriter:
         if not cases:
             return None, skipped
         system, own = ["#include <cfenv>", "#include <cmath>", "#include <cstdio>", "#include <string>", "#include <type_traits>", "#include <vector>"], []
+        if self.pointed:
+            system.append("#include <cstdint>")
         for m in re.finditer(r'^#include\s+(["<])([^">]+)[">]', src, re.M):
             if m.group(1) == "<":
                 if f"#include <{m.group(2)}>" not in system:
@@ -7753,7 +8199,7 @@ class TestWriter:
                 renamers[h] = self.renamer([*mine, *pairs, *outer], named_spaces)
             return lambda text: renamers[h](self.widen(text))
         # a name of the program or the engine that is still written out in full: not the test's own
-        foreign = re.compile(r"(?<![\w:])(?:::)?(?:" + re.escape(tree.namespace) + "|" + re.escape(ENGINE) + r")::(?!math::)(\w+)")
+        foreign = re.compile(r"(?<![\w:])(?:::)?(?:" + "|".join(re.escape(x) for x in (tree.namespace, *tree.spaces, ENGINE)) + r")::(?!math::)(\w+)")
         def is_record(key):
             return key[0] == "record" or (key[0] == "foreign" and G.foreign[key[1]]["kind"] == "record")
 
@@ -7776,7 +8222,7 @@ class TestWriter:
                 *system, *own, '#include "../converted.h"', "",
                 f"namespace {ns} {{", f"namespace converted = ::{tree.namespace}::converted;",
                 "using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;",
-                WIDE_PRELUDE, *usings, "",
+                WIDE_PRELUDE, *([POINTED_PRELUDE] if self.pointed else []), *usings, "",
                 f"// ---- {os.path.basename(self.path)} and what it uses, as it stands ----",
                 '#pragma GCC diagnostic push', '#pragma GCC diagnostic ignored "-Wunused-function"', '#pragma GCC diagnostic ignored "-Wunused-const-variable"',
                 '#pragma GCC diagnostic ignored "-Wunused-variable"', '#pragma GCC diagnostic ignored "-Wnarrowing"', '#pragma GCC diagnostic ignored "-Wunused-but-set-variable"',
@@ -7973,14 +8419,44 @@ def declared_in_header_of(tree, d):
 
 
 # ---- the program ---------------------------------------------------------------------------------
+POINTER_PARAM = re.compile(r"const\s+(?!void\s*\*|char\s*\*)[^*&]+?\s*\*$")   # (a parameter that may be a pointer into a list: Unit.pointed)
+
+
+def pointer_source(tree, a):
+    """What a call hands a parameter that may be a pointer into a list (Unit.pointed), for the plan of the whole
+    program: the fixed length of the list it points into (a.data() of a std::array<T, N>, an array T[N]),
+    "list" (one of any length: a std::vector), "null", ("param", id) - the caller's own such parameter -, or
+    "other" (the address of anything else)."""
+    x = bare(a)
+    while x.get("kind") in ("ImplicitCastExpr", "ParenExpr") and x.get("castKind") != "ArrayToPointerDecay" and kids(x):
+        x = bare(kids(x)[0])
+    k = x.get("kind")
+    def length(raw):
+        c = re.sub(r"\b(const|volatile)\b|&", " ", raw).strip()
+        m = re.match(r"std::array<.*,\s*(\d+)U?L*>$", c) or re.match(r"[^\[]*\[(\d+)\]$", c)
+        return int(m.group(1)) if m else "list" if c.startswith("std::vector<") else "other"
+    if k in ("CXXNullPtrLiteralExpr", "GNUNullExpr"):
+        return "null"
+    if k == "CXXMemberCallExpr" and callee(x).get("name") == "data" and len(kids(x)) == 1 and kids(callee(x)):
+        return length(qtype(kids(callee(x))[0]))
+    if k == "ImplicitCastExpr" and x.get("castKind") == "ArrayToPointerDecay" and kids(x):
+        return length(qtype(kids(x)[0]))
+    if k == "BinaryOperator" and x.get("opcode") in ("+", "-") and len(kids(x)) == 2:
+        left, right = kids(x)
+        return pointer_source(tree, left if "*" in qtype(left) else right)
+    if k == "DeclRefExpr" and (x.get("referencedDecl") or {}).get("kind") == "ParmVarDecl":
+        return ("param", x["referencedDecl"]["id"])
+    return "other"
+
+
 def survey_one(job):
     """One source file as the compiler reads it, for the plan of the whole program: the functions that
     have a body there (their key, their file, the functions they call - with a body or only declared) and
     the types (qualified name, file). Nothing is converted."""
-    path, namespace, flags = job
-    tree = Tree(path, namespace, flags)
+    path, namespace, flags, spaces = job
+    tree = Tree(path, namespace, flags, spaces)
     me = os.path.abspath(path)
-    functions = []
+    functions, pointer_args, params_of = [], [], {}
     for i, d in tree.body.items():
         if i != d["id"] or not d.get("_file") or d.get("kind") == "VarDecl" or d.get("isImplicit") or d.get("explicitlyDefaulted") or d.get("kind") == "CXXDestructorDecl":
             continue
@@ -7988,7 +8464,16 @@ def survey_one(job):
         if file != me and not is_header(file):
             continue
         calls = set()
+        params_of.update({p["id"]: (function_key(tree, d), k) for k, p in enumerate(x for x in kids(d) if x.get("kind") == "ParmVarDecl")})
         for n in walk(d):
+            if n.get("kind") in ("CallExpr", "CXXMemberCallExpr"):
+                c = callee(n)
+                rid = (c.get("referencedDecl") or {}).get("id") or c.get("referencedMemberDecl")
+                t = (tree.body.get(rid) or tree.decl.get(rid)) if rid else None
+                if t is not None and t.get("kind") in ("FunctionDecl", "CXXMethodDecl"):
+                    for k, (p, a) in enumerate(zip([x for x in kids(t) if x.get("kind") == "ParmVarDecl"], kids(n)[1:])):
+                        if POINTER_PARAM.match(qtype(p).strip()):
+                            pointer_args.append((function_key(tree, t), k, pointer_source(tree, a)))
             ids = [n.get("referencedDecl", {}).get("id"), n.get("referencedMemberDecl")]
             if n.get("kind") == "CXXConstructExpr":
                 ids.append((constructor_of(tree, n) or {}).get("id"))
@@ -8008,7 +8493,9 @@ def survey_one(job):
     statics, made = objects_made(tree)
     records = {q: {"file": os.path.abspath(tree.records[q].get("_file") or "?"), "bases": bool(tree.records[q].get("bases")),
                    "virtual": any(c.get("virtual") for c in kids(tree.records[q]))} for q in statics if q in tree.records}
-    return {"path": path, "functions": functions, "types": types, "statics": statics, "made": made, "records": records}
+    # (what a caller's own parameter hands on: by the caller's key and the parameter's place)
+    pointer_args = [(key, k, ("param", *params_of[src[1]]) if isinstance(src, tuple) and src[1] in params_of else "other" if isinstance(src, tuple) else src) for key, k, src in pointer_args]
+    return {"path": path, "functions": functions, "types": types, "statics": statics, "made": made, "records": records, "pointer_args": pointer_args}
 
 
 def objects_made(tree):
@@ -8052,7 +8539,7 @@ def objects_made(tree):
             in_function = True
         for c in kids(n):
             visit(c, in_function)
-    for o in tree.dumps:
+    for o in [*tree.dumps, *(o for _, dumps in tree.more for o in dumps)]:
         visit(o, False)
     return {q: sorted(v, key=str) for q, v in statics.items()}, sorted(made)
 
@@ -8094,7 +8581,7 @@ def convert_unit(job):
             scratch = tempfile.mkdtemp(prefix="kern-cpp-to-blueprint-")
             path = os.path.join(scratch, part.replace("/", "_") + ".cpp")
             open(path, "w").write("".join(f'#include "{os.path.abspath(f)}"\n' for f in files) or "\n")
-        tree = Tree(path, namespace, flags)
+        tree = Tree(path, namespace, flags, world.spaces)
         main_file = os.path.abspath(source or files[0])
         # its functions, in the order they stand in: those of a header first (a source file's Blueprint has
         # the functions of its header that need the source file), then the source file's
@@ -8232,14 +8719,20 @@ def main(argv):
     cut = argv.index("--")
     opts, files = argv[3:cut], argv[cut + 1:]
     level = folder = test = texts = None
-    flags = []
+    flags, more = [], []
     i = 0
     while i < len(opts):
-        if opts[i] in ("--level", "--folder", "--test", "--texts"):
+        if opts[i] in ("--level", "--folder", "--test", "--texts", "--program"):
             v = opts[i + 1]
             if opts[i] == "--level": level = v
             elif opts[i] == "--folder": folder = v
             elif opts[i] == "--test": test = v
+            elif opts[i] == "--program":
+                # a further folder of the program and the namespaces its files declare: <folder>=<namespace>[,<namespace>...]
+                d, _, spaces = v.partition("=")
+                if not d or not spaces or not all(re.fullmatch(r"[A-Za-z_]\w*", s) for s in spaces.split(",")) or not os.path.isdir(d):
+                    raise SystemExit(f"--program {v}: give a folder and its namespaces, <folder>=<namespace>[,<namespace>...]")
+                more.append((d, spaces.split(",")))
             else: texts = v
             i += 2
         else:
@@ -8255,14 +8748,15 @@ def main(argv):
         raise SystemExit("the engine's node names are not to be had (tools/blueprint_cpp.sh --node-names): " + (r.stderr or r.stdout).strip()[:500])
     NODES.update(r.stdout.split())
     pool = concurrent.futures.ProcessPoolExecutor(workers)
-    world = World(files, flags)
+    world = World(files, flags, more)
     world.nodes = set(NODES)
     if level:   # (the Blueprints of the level's actors: what the program calls on them looks as they have it)
         for a in json.load(open(level, encoding="utf-8")).get("actors", []):
             g = (a.get("components") or {}).get("logic")
             if g and a.get("name"):
                 world.actors[a["name"]] = {"library": bool(g.get("library")), "functions": {
-                    f["name"]: ([p["name"] for p in f.get("inputs", [])], [p["name"] for p in f.get("outputs", [])]) for f in g.get("functions", []) if f.get("name")}}
+                    f["name"]: ([p["name"] for p in f.get("inputs", [])], [p["name"] for p in f.get("outputs", [])]) for f in g.get("functions", []) if f.get("name")},
+                    "variables": {v["name"]: v.get("type", "float") for v in g.get("variables", []) if v.get("name")}}
 
     # ---- the plan: every source file read once - its functions, what they call, the types ----
     functions, types, sources = {}, set(), {}
@@ -8272,11 +8766,27 @@ def main(argv):
             raise SystemExit(f"{path} and {sources[unit]} would both be the Blueprint {unit}")
         sources[unit] = os.path.abspath(path)
     world.source_units = set(sources)
-    surveys = list(pool.map(survey_one, [(path, namespace, flags) for path in files]))
+    surveys = list(pool.map(survey_one, [(path, namespace, flags, world.spaces) for path in files]))
+    handed = collections.defaultdict(set)   # (a function, a parameter that may be a pointer into a list) -> what the calls hand it
     for r in surveys:
         for f in r["functions"]:
             functions.setdefault(f["key"], f)
         types.update((q, file) for q, file in r["types"])
+        for key, k, src in r["pointer_args"]:
+            handed[(key, k)].add(src)
+    # A pointer into a list is the list it points into, read where it stands: of the type every call hands it
+    # (a std::array<T, N> - Fixed<T, N> -, or a list of any length). Calls that hand lists of other lengths, or
+    # the address of anything else, it cannot take (World.pointer_lists).
+    def pointer_list(at, open_=()):
+        if at in open_:
+            return set()
+        out = set()
+        for src in handed.get(at, ()):
+            out |= pointer_list((src[1], src[2]), (*open_, at)) if isinstance(src, tuple) else {src}
+        return out
+    for at in list(handed):
+        got = pointer_list(at) - {"null"}
+        world.pointer_lists[at] = "other" if "other" in got else "mixed" if len(got) > 1 else next(iter(got)) if got else "list"
     # The classes there is one object of: each is the state of a Blueprint - no type (state_classes)
     world.states = state_classes(world, surveys)
     types = {(q, file) for q, file in types if q not in world.states}
@@ -8348,9 +8858,10 @@ def main(argv):
             if d not in need:
                 need.add(d)
                 stack += deps.get(d, ())
-        w = World(files, flags)
+        w = World(files, flags, more)
         w.units, w.type_names, w.taken, w.nodes, w.function_units, w.source_units = world.units, world.type_names, world.taken, world.nodes, world.function_units, world.source_units
         w.actors, w.states, w.parts, w.part_numbers = world.actors, world.states, world.parts, world.part_numbers
+        w.pointer_lists = world.pointer_lists
         w.table = {k: e for d in need for k, e in tables.get(d, {}).items()}
         if test:   # (the pieces of their source their tests hand on: what the test of this one holds of them)
             w.closures, w.pieces = {}, {}
@@ -8439,8 +8950,8 @@ def main(argv):
         for p in mine:
             r = results[p]
             for at, lines in r["state"].items():
-                if state.setdefault(int(at), lines) != lines:
-                    raise SystemExit(f"the variable {lines[-1].strip()} of {blueprint} is not the same in every part ({p}: {state[int(at)]})")
+                if state.setdefault(tuple(at), lines) != lines:
+                    raise SystemExit(f"the variable {lines[-1].strip()} of {blueprint} is not the same in every part ({p}: {state[tuple(at)]})")
             variables, functions_, members_ = r["parts"]
             held = {line for lines in r["state"].values() for line in lines}
             block = []

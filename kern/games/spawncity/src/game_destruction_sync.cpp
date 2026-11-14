@@ -114,19 +114,20 @@ u32 digest_of(const Craters& c, const Damage& d) {
 bool has(const Craters& v, const Terrain::CraterRec& c) { return std::find(v.begin(), v.end(), c) != v.end(); }
 }  // namespace
 
-DestroySync& Game::dsync() {
+void Game::dsync_ready() {
   if (!dsync_) dsync_ = std::make_unique<DestroySync>();
-  return *dsync_;
 }
 
 void Game::dsync_reset_epoch() {
   // RESET while hosting: a new epoch - every machine clears its city with the next state
-  DestroySync& d = dsync();
+  dsync_ready();
+  DestroySync& d = *dsync_;
   if (net_.hosting()) { ++d.epoch; dsync_send_full(-1); }
 }
 
 void Game::dsync_send_full(i32 to) {
-  DestroySync& d = dsync();
+  dsync_ready();
+  DestroySync& d = *dsync_;
   Craters c;
   city_.terrain().crater_list(c);
   Damage dm;
@@ -149,7 +150,8 @@ void Game::dsync_send_full(i32 to) {
 }
 
 void Game::dsync_update(f32 dt) {
-  DestroySync& d = dsync();
+  dsync_ready();
+  DestroySync& d = *dsync_;
   Terrain& terrain = city_.terrain();
   const bool active = net_.active();
   if (!active) {
@@ -309,7 +311,8 @@ void Game::dsync_update(f32 dt) {
 }
 
 std::string Game::dsync_json() {
-  DestroySync& d = dsync();
+  dsync_ready();
+  DestroySync& d = *dsync_;
   Craters c;
   city_.terrain().crater_list(c);
   Damage dm;
