@@ -41,7 +41,7 @@ f64 merc_y(f64 lat, i32 z) {
 f64 merc_x(f64 lon, i32 z) { return (lon + 180) / 360 * std::ldexp(1.0, z); }
 
 // Sliding-window min (op < 0) / max (op > 0) along lines (monotonic deque), window 2r+1.
-void slide(const f32* src, f32* dst, u32 n, u32 stride, u32 line_stride, i32 r, i32 op, std::vector<i32>& q) {
+void slide(const std::vector<f32>& src, std::vector<f32>& dst, u32 n, u32 stride, u32 line_stride, i32 r, i32 op, std::vector<i32>& q) {
   q.resize(n);
   for (u32 l = 0; l < n; ++l) {
     const u32 base = l * line_stride;
@@ -59,7 +59,7 @@ void slide(const f32* src, f32* dst, u32 n, u32 stride, u32 line_stride, i32 r, 
     }
   }
 }
-void box_blur(const f32* src, f32* dst, u32 n, u32 stride, u32 line_stride, i32 r) {
+void box_blur(const std::vector<f32>& src, std::vector<f32>& dst, u32 n, u32 stride, u32 line_stride, i32 r) {
   for (u32 l = 0; l < n; ++l) {
     const u32 base = l * line_stride;
     f64 sum = 0;
@@ -76,12 +76,12 @@ void box_blur(const f32* src, f32* dst, u32 n, u32 stride, u32 line_stride, i32 
 // One filter pass of bare_earth (0..7).
 void filter_pass(std::vector<f32>& h, std::vector<f32>& t, u32 n, i32 pass, i32 ro, i32 rb, std::vector<i32>& q) {
   switch (pass) {
-    case 0: slide(h.data(), t.data(), n, 1, n, ro, -1, q); break;  // erode rows
-    case 1: slide(t.data(), h.data(), n, n, 1, ro, -1, q); break;  // erode columns
-    case 2: slide(h.data(), t.data(), n, 1, n, ro, 1, q); break;   // dilate rows
-    case 3: slide(t.data(), h.data(), n, n, 1, ro, 1, q); break;   // dilate columns
-    case 4: case 6: box_blur(h.data(), t.data(), n, 1, n, rb); break;
-    case 5: case 7: box_blur(t.data(), h.data(), n, n, 1, rb); break;
+    case 0: slide(h, t, n, 1, n, ro, -1, q); break;  // erode rows
+    case 1: slide(t, h, n, n, 1, ro, -1, q); break;  // erode columns
+    case 2: slide(h, t, n, 1, n, ro, 1, q); break;   // dilate rows
+    case 3: slide(t, h, n, n, 1, ro, 1, q); break;   // dilate columns
+    case 4: case 6: box_blur(h, t, n, 1, n, rb); break;
+    case 5: case 7: box_blur(t, h, n, n, 1, rb); break;
   }
 }
 
@@ -238,14 +238,14 @@ std::string Terrain::take_requests() {
   return s + "]";
 }
 
-void Terrain::provide(const TileKey& key, const u8* rgba, u32 width, u32 height) {
+void Terrain::provide(const TileKey& key, kern::Span<const u8> rgba, u32 width, u32 height) {
   auto it = dem_tiles_.find(key.hash());
-  if (it == dem_tiles_.end() || width == 0 || height == 0) return;
+  if (it == dem_tiles_.end() || width == 0 || height == 0 || rgba.size < static_cast<std::size_t>(width) * height * 4) return;
   DemTile& t = it->second;
   t.w = width;
   t.hgt = height;
   t.h.resize(static_cast<std::size_t>(width) * height);
-  for (std::size_t i = 0; i < t.h.size(); ++i) t.h[i] = terrarium_height(rgba + i * 4);
+  for (std::size_t i = 0; i < t.h.size(); ++i) t.h[i] = terrarium_height(rgba[i * 4], rgba[i * 4 + 1], rgba[i * 4 + 2]);
   t.failed = false;
 }
 
@@ -266,8 +266,8 @@ f32 Terrain::sample_dem(f64 lon, f64 lat, bool& ok) const {
   const f64 px = std::min(t.w - 1.001, (fx - tx) * t.w), py = std::min(t.hgt - 1.001, (fy - ty) * t.hgt);
   const u32 i = static_cast<u32>(px), j = static_cast<u32>(py);
   const f32 ax = static_cast<f32>(px - i), ay = static_cast<f32>(py - j);
-  const f32* h = t.h.data() + static_cast<std::size_t>(j) * t.w + i;
-  return (h[0] * (1 - ax) + h[1] * ax) * (1 - ay) + (h[t.w] * (1 - ax) + h[t.w + 1] * ax) * ay;
+  const std::size_t at = static_cast<std::size_t>(j) * t.w + i;
+  return (t.h[at] * (1 - ax) + t.h[at + 1] * ax) * (1 - ay) + (t.h[at + t.w] * (1 - ax) + t.h[at + t.w + 1] * ax) * ay;
 }
 
 // Host: the elevation round a mate too far for the player's own window (8 km) - a window of his own
@@ -466,8 +466,8 @@ f32 Terrain::grid_at(const Grid& g, f32 x, f32 y) const {
   const f32 fx = clampf((x - g.x0) / g.step, 0, lim), fy = clampf((y - g.y0) / g.step, 0, lim);
   const u32 i = static_cast<u32>(fx), j = static_cast<u32>(fy);
   const f32 tx = fx - i, ty = fy - j;
-  const f32* h = g.h.data() + static_cast<std::size_t>(j) * g.n + i;
-  return (h[0] * (1 - tx) + h[1] * tx) * (1 - ty) + (h[g.n] * (1 - tx) + h[g.n + 1] * tx) * ty;
+  const std::size_t at = static_cast<std::size_t>(j) * g.n + i;
+  return (g.h[at] * (1 - tx) + g.h[at + 1] * tx) * (1 - ty) + (g.h[at + g.n] * (1 - tx) + g.h[at + g.n + 1] * tx) * ty;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -831,9 +831,9 @@ void Terrain::plan_images(Vec3 focus) {
   }
 }
 
-void Terrain::provide_image(const TileKey& key, const u8* rgba, u32 width, u32 height) {
+void Terrain::provide_image(const TileKey& key, kern::Span<const u8> rgba, u32 width, u32 height) {
   auto it = images_.find(key.hash());
-  if (it == images_.end() || width == 0 || height == 0) return;
+  if (it == images_.end() || width == 0 || height == 0 || rgba.size < static_cast<std::size_t>(width) * height * 4) return;
   // the mosaic: 64 px per tile (an area average in the image's own sRGB, as the canvas draws it)
   constexpr u32 P = kImagePixels;
   std::vector<u8> small(P * P * 4);
@@ -842,7 +842,7 @@ void Terrain::provide_image(const TileKey& key, const u8* rgba, u32 width, u32 h
       const u32 x0 = i * width / P, x1 = std::max(x0 + 1, (i + 1) * width / P), y0 = j * height / P, y1 = std::max(y0 + 1, (j + 1) * height / P);
       u32 sum[4] = {}, n = 0;
       for (u32 y = y0; y < y1; ++y)
-        for (u32 x = x0; x < x1; ++x) { const u8* p = rgba + (static_cast<std::size_t>(y) * width + x) * 4; for (int c = 0; c < 4; ++c) sum[c] += p[c]; ++n; }
+        for (u32 x = x0; x < x1; ++x) { const std::size_t at = (static_cast<std::size_t>(y) * width + x) * 4; for (int c = 0; c < 4; ++c) sum[c] += rgba[at + c]; ++n; }
       for (int c = 0; c < 4; ++c) small[(j * P + i) * 4 + c] = static_cast<u8>(sum[c] / std::max(1u, n));
     }
   // per pixel: the 3 x 3 around it in linear light (transparent ones skipped), then the albedo
@@ -855,9 +855,9 @@ void Terrain::provide_image(const TileKey& key, const u8* rgba, u32 width, u32 h
       for (i32 dy = -1; dy <= 1; ++dy)
         for (i32 dx = -1; dx <= 1; ++dx) {
           const u32 qx = static_cast<u32>(std::clamp<i32>(static_cast<i32>(i) + dx, 0, P - 1)), qy = static_cast<u32>(std::clamp<i32>(static_cast<i32>(j) + dy, 0, P - 1));
-          const u8* p = &small[(qy * P + qx) * 4];
-          if (p[3] < 10) continue;
-          s = s + Vec3{srgb_lin8(p[0]), srgb_lin8(p[1]), srgb_lin8(p[2])};
+          const std::size_t at = (qy * P + qx) * 4;
+          if (small[at + 3] < 10) continue;
+          s = s + Vec3{srgb_lin8(small[at]), srgb_lin8(small[at + 1]), srgb_lin8(small[at + 2])};
           ++n;
         }
       const Vec3 a = albedo(n ? s * (1.0f / static_cast<f32>(n)) : Vec3{0.12f, 0.16f, 0.08f});
@@ -882,8 +882,9 @@ bool Terrain::ground_albedo(f32 x, f32 y, Vec3& lin) const {
   auto it = images_.find(TileKey{kImageZoom, tx, ty}.hash());
   if (it == images_.end() || it->second.albedo.empty()) return false;
   const i32 px = std::clamp(static_cast<i32>((fx - tx) * kImagePixels), 0, kImagePixels - 1), py = std::clamp(static_cast<i32>((fy - ty) * kImagePixels), 0, kImagePixels - 1);
-  const f32* a = &it->second.albedo[(static_cast<std::size_t>(py) * kImagePixels + px) * 3];
-  lin = {a[0], a[1], a[2]};
+  const std::vector<f32>& texels = it->second.albedo;
+  const std::size_t at = (static_cast<std::size_t>(py) * kImagePixels + px) * 3;
+  lin = {texels[at], texels[at + 1], texels[at + 2]};
   return true;
 }
 
