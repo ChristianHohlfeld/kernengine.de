@@ -3,8 +3,6 @@
 
 #include <cstring>
 
-#include "../firmware/Arondight45_FirmwareRuntime.hpp"
-
 namespace sc {
 
 namespace {
@@ -46,11 +44,6 @@ f32 quat_yaw_deg(Quat q) {
 
 }  // namespace
 
-class DroneFirmware {
- public:
-  fc::FirmwareRuntime runtime;
-};
-
 f32 clearance_rate(f32 axis) {
   const f32 x = clampf(axis, -1, 1), m = std::fabs(x);
   if (m <= 0.08f) return 0;
@@ -65,7 +58,7 @@ f32 clearance_lead(f32 v) {
   return up ? e : -e;
 }
 
-Drone::Drone(const DroneParams& p) : p_(p), fw_(new DroneFirmware()) {
+Drone::Drone(const DroneParams& p) : p_(p) {
   const f32 a = p_.span / (2 * std::sqrt(2.0f));
   motor_pos_[0] = {-a, -a, 0};
   motor_pos_[1] = {-a, a, 0};
@@ -77,8 +70,6 @@ Drone::Drone(const DroneParams& p) : p_(p), fw_(new DroneFirmware()) {
   cdA_ = Vec3{0.035f, 0.035f, 0.07f} * p_.drag_scale;
   reset();
 }
-
-Drone::~Drone() { delete fw_; }
 
 RigidSpec Drone::rigid_spec(const DroneParams& p) {
   RigidSpec r;
@@ -158,7 +149,7 @@ RigidSpec Drone::rigid_spec(const DroneParams& p) {
 }
 
 void Drone::reset() {
-  fw_->runtime.reset();
+  fw_.reset();
   for (int i = 0; i < 4; ++i) { omega_[i] = current_[i] = motor_torque_[i] = prop_torque_[i] = 0; pulses_[i] = 1000; }
   soc_ = 1;
   vbatt_ = battery_ocv(1, p_.cells);
@@ -331,8 +322,8 @@ void Drone::step(kern::physics::World& world, kern::physics::Body body, f32 h, c
                                                                heading, true);
       hw.navigation_present = true;
     }
-    if (reset_flag_) { fw_->runtime.reset(); reset_flag_ = false; }
-    out = fw_->runtime.step(hw);
+    if (reset_flag_) { fw_.reset(); reset_flag_ = false; }
+    out = fw_.step(hw);
     for (int i = 0; i < 4; ++i) pulses_[i] = sticks.kill ? 1000 : out.motor_us[i];
     motor_tick(dt, s, altitude, thrust, yaw_torque);
   }
