@@ -238,7 +238,8 @@ void VehicleArt::drone(const Mat4& body, const std::array<Vec3, 4>& motors, cons
   for (int i = 0; i < 4; ++i) {
     put(drone_motor_, body * at(motors[i] + Vec3{0, 0, -0.004f}));
     const Mat4 p = body * at(motors[i] + Vec3{0, 0, 0.018f}) * rot({0, 0, 1}, rotor_angles[i]) * Mat4::scale({prop_d, 1, 1});
-    put(i % 2 ? drone_prop_b_ : drone_prop_a_, p);
+    if (i % 2) put(drone_prop_b_, p);
+    else put(drone_prop_a_, p);
   }
   put(drone_led_, body * at({0.06f, 0, 0.018f}), armed ? Vec3{4, 0.2f, 0.1f} : Vec3{0.3f, 0.3f, 0.3f});
 }

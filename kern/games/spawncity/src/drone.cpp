@@ -22,8 +22,8 @@ f32 battery_under_load(f32 ocv, f32 amps, f32 r, f32 cells) {
   return clampf(ocv - std::fmax(0.0f, amps) * r, 3 * cells, 4.2f * cells);
 }
 
-void encode_sbus(const u16 ch[16], u8* p) {
-  std::memset(p, 0, 25);
+void encode_sbus(const u16 (&ch)[16], std::array<u8, 25>& p) {
+  p.fill(0);
   p[0] = 0x0F;
   for (int c = 0; c < 16; ++c)
     for (int bit = 0; bit < 11; ++bit)
@@ -33,11 +33,12 @@ void encode_sbus(const u16 ch[16], u8* p) {
       }
 }
 
-void put_be16(u8* p, f32 v) {
+// a big-endian 16-bit register pair at `at`
+void put_be16(std::array<u8, 14>& out, u32 at, f32 v) {
   const long r = std::lround(clampf(v, -32767, 32767));
   const u16 u = static_cast<u16>(static_cast<int16_t>(r));
-  p[0] = static_cast<u8>(u >> 8);
-  p[1] = static_cast<u8>(u & 0xff);
+  out[at] = static_cast<u8>(u >> 8);
+  out[at + 1] = static_cast<u8>(u & 0xff);
 }
 
 f32 quat_yaw_deg(Quat q) {
@@ -180,7 +181,7 @@ void Drone::reset() {
   tele_ = {};
 }
 
-void Drone::imu_bytes(f32 dt, const BodyState& s, u8 out[14]) {
+void Drone::imu_bytes(f32 dt, const BodyState& s, std::array<u8, 14>& out) {
   for (int i = 0; i < 3; ++i) {
     gyro_bias_[i] += noise_.gaussian() * 0.002f * std::sqrt(dt);
     acc_bias_[i] += noise_.gaussian() * 0.00002f * std::sqrt(dt);
@@ -196,16 +197,17 @@ void Drone::imu_bytes(f32 dt, const BodyState& s, u8 out[14]) {
     accel[i] += acc_bias_[i] * kG + noise_.gaussian() * 0.0025f * kG;
     gyro[i] += gyro_bias_[i] + noise_.gaussian() * 0.035f;
   }
-  out[0] = out[1] = 0;
-  put_be16(out + 2, accel.x / kG * 2048);
-  put_be16(out + 4, accel.y / kG * 2048);
-  put_be16(out + 6, accel.z / kG * 2048);
-  put_be16(out + 8, gyro.x * 16.4f);
-  put_be16(out + 10, gyro.y * 16.4f);
-  put_be16(out + 12, gyro.z * 16.4f);
+  out[0] = 0;
+  out[1] = 0;
+  put_be16(out, 2, accel.x / kG * 2048);
+  put_be16(out, 4, accel.y / kG * 2048);
+  put_be16(out, 6, accel.z / kG * 2048);
+  put_be16(out, 8, gyro.x * 16.4f);
+  put_be16(out, 10, gyro.y * 16.4f);
+  put_be16(out, 12, gyro.z * 16.4f);
 }
 
-void Drone::motor_tick(f32 dt, const BodyState& s, f32 altitude, f32 thrust_out[4], f32 torque_out[4]) {
+void Drone::motor_tick(f32 dt, const BodyState& s, f32 altitude, f32 (&thrust_out)[4], f32 (&torque_out)[4]) {
   const f32 ocv = battery_ocv(soc_, p_.cells);
   const f32 limit = std::fmin(p_.motor_limit_a, p_.esc_limit_a);
   f32 total = 0;
@@ -307,14 +309,12 @@ void Drone::step(kern::physics::World& world, kern::physics::Body body, f32 h, c
     now_us_ += static_cast<f64>(dt) * 1e6;
     hw.now_us = static_cast<uint64_t>(now_us_);
     hw.dt_us = static_cast<uint32_t>(std::lround(dt * 1e6f));
-    u8 imu[14];
-    imu_bytes(dt, s, imu);
-    std::memcpy(hw.imu_registers.data(), imu, 14);
+    imu_bytes(dt, s, hw.imu_registers);
     hw.imu_present = true;
     sbus_elapsed_ += dt;
     if (sbus_elapsed_ >= 0.01f) {
       sbus_elapsed_ -= 0.01f;
-      encode_sbus(ch, hw.sbus_frame.data());
+      encode_sbus(ch, hw.sbus_frame);
       hw.sbus_present = true;
     }
     nav_elapsed_ += dt;

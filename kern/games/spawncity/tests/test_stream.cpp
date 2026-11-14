@@ -46,7 +46,7 @@ SC_TEST(stream_tile_pipeline) {
   std::snprintf(want, sizeof want, "[[%d,%d,%d]]", key.z, key.x, key.y);
   SC_CHECK(req == want, "requests the player's tile: %s", req.c_str());
   const std::vector<u8> bytes = sample_tile();
-  city.provide(key, bytes.data(), bytes.size());
+  city.provide(key, bytes);
   int frames = 0;
   f64 worst = 0;
   // ready_at is true at once (the game starts like the original); the tile builds in jobs

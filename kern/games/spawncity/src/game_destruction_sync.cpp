@@ -24,6 +24,7 @@
 //
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -90,14 +91,23 @@ bool get_points(In& in, Points& p) {
   return in.ok;
 }
 // FNV-1a over the craters (exact) and the damage (to the centimetre, by seed)
+void fnv_byte(u32& h, u32 byte) {
+  h ^= byte;
+  h *= 16777619u;
+}
+// the four bytes of a 32-bit value in the order memory holds them (little-endian: the low one first)
+void fnv_word(u32& h, u32 v) {
+  fnv_byte(h, v & 0xff);
+  fnv_byte(h, (v >> 8) & 0xff);
+  fnv_byte(h, (v >> 16) & 0xff);
+  fnv_byte(h, v >> 24);
+}
 u32 digest_of(const Craters& c, const Damage& d) {
   u32 h = 2166136261u;
-  auto mix = [&](const void* p, std::size_t n) { const u8* q = static_cast<const u8*>(p); for (std::size_t i = 0; i < n; ++i) { h ^= q[i]; h *= 16777619u; } };
-  for (const Terrain::CraterRec& r : c) { mix(&r.x, 4); mix(&r.y, 4); mix(&r.r, 4); mix(&r.depth, 4); }
+  for (const Terrain::CraterRec& r : c) { fnv_word(h, std::bit_cast<u32>(r.x)); fnv_word(h, std::bit_cast<u32>(r.y)); fnv_word(h, std::bit_cast<u32>(r.r)); fnv_word(h, std::bit_cast<u32>(r.depth)); }
   for (const CityStream::DamageRec& r : d) {
     const i32 cm = static_cast<i32>(std::lround(r.height * 100));
-    const u8 l = r.leveled;
-    mix(&r.seed, 4); mix(&cm, 4); mix(&l, 1);
+    fnv_word(h, r.seed); fnv_word(h, static_cast<u32>(cm)); fnv_byte(h, r.leveled ? 1 : 0);
   }
   return h;
 }

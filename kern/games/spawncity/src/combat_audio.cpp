@@ -168,7 +168,7 @@ std::vector<f32> scream(u32 rate, u32 v) {
   Random random(0xc0ffee + v * 1297);
   const double bases[4] = {238, 276, 218, 258}, formants[4][3] = {{760, 1280, 2480}, {870, 1430, 2670}, {690, 1130, 2320}, {820, 1510, 2580}};
   const double base = bases[v % 4];
-  const double* fm = formants[v % 4];
+  const u32 which = v % 4;  // (its formants: formants[which])
   double phase = 0, breath = 0;
   for (std::size_t i = 0; i < data.size(); ++i) {
     const double t = static_cast<double>(i) / rate, p = t / duration, rise = std::sin(std::fmin(1.0, p / 0.34) * 3.141592653589793 / 2);
@@ -177,7 +177,7 @@ std::vector<f32> scream(u32 rate, u32 v) {
     phase += TAU * f0 / rate;
     double voice = 0;
     for (int h = 1; h <= 12; ++h) {
-      const double hz = f0 * h, shape = 0.18 + 1.35 * gaussian(hz, fm[0], 260) + 1.02 * gaussian(hz, fm[1], 390) + 0.55 * gaussian(hz, fm[2], 620);
+      const double hz = f0 * h, shape = 0.18 + 1.35 * gaussian(hz, formants[which][0], 260) + 1.02 * gaussian(hz, formants[which][1], 390) + 0.55 * gaussian(hz, formants[which][2], 620);
       voice += std::sin(phase * h + h * 0.31 * v) * shape / std::pow(static_cast<double>(h), 0.82);
     }
     const double white = random() * 2 - 1;

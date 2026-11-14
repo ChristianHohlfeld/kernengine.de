@@ -41,7 +41,7 @@ SC_TEST(destruction_floors_collapse_and_reset) {
   city.update({0, 0, 0}, 2);
   city.take_requests();
   const std::vector<u8> bytes = one_house_tile();
-  city.provide(key, bytes.data(), bytes.size());
+  city.provide(key, bytes);
   const f64 give_up = kern::now_ms() + 60000;
   while ((city.stats().t_built < 0 || city.stats().t_collision < 0) && kern::now_ms() < give_up) city.update({0, 0, 0}, 3);
   SC_CHECK(std::fabs(roof(world) - 21) < 0.05f, "the house stands 21 m (%.2f)", roof(world));

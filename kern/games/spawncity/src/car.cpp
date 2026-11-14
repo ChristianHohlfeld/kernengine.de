@@ -12,9 +12,13 @@ const f32 kAlphaPeak = std::tan(6.5f * kPi / 180);
 constexpr f32 kAsphaltMu = 1.0f;  // terrain_craters.mjs groundSurfaceAt: asphalt / default ground
 
 /// Combined-slip tyre force (longitudinal, lateral) on the friction ellipse.
-void tyre(f32 kappa, f32 tan_a, f32 muN, f32 out[2]) {
+void tyre(f32 kappa, f32 tan_a, f32 muN, f32 (&out)[2]) {
   const f32 sx = kappa / kKappaPeak, sy = tan_a / kAlphaPeak, s = std::hypot(sx, sy);
-  if (s < 1e-6f || !(muN > 0)) { out[0] = out[1] = 0; return; }
+  if (s < 1e-6f || !(muN > 0)) {
+    out[0] = 0;
+    out[1] = 0;
+    return;
+  }
   const f32 g = s < 1 ? s * (2 - s) : 1 - (1 - kSlideGrip) * std::fmin(1.0f, (s - 1) / 2.5f);
   const f32 F = muN * g;
   out[0] = F * sx / s;

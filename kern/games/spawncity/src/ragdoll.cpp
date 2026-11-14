@@ -97,7 +97,7 @@ bool Ragdolls::spawn(u64 key, Vec3 feet, f32 yaw, Vec3 velocity, const Colors& c
   i32 at = -1;  // (the doll it becomes: its place in dolls_)
   for (std::size_t i = 0; i < dolls_.size(); ++i)
     if (!dolls_[i].active) { at = static_cast<i32>(i); break; }
-  if (at < 0 && dolls_.size() < max_) { dolls_.emplace_back(); at = static_cast<i32>(dolls_.size()) - 1; }
+  if (at < 0 && dolls_.size() < max_) { dolls_.push_back(Doll{}); at = static_cast<i32>(dolls_.size()) - 1; }
   if (at < 0) {
     // The pool is full: the oldest goes (one that was going to get up does so right now).
     std::size_t old = 0;

@@ -102,31 +102,32 @@ bool SmokeField::active(const std::string& id) const {
 void SmokeField::emit(SmokeEffect& e, f32 now) {
   if (puffs_.empty()) return;
   // choosePuff: a free one, else the oldest
-  Puff* p = nullptr;
-  for (Puff& q : puffs_)
-    if (!q.alive) { p = &q; break; }
-  if (!p) {
-    p = &puffs_[0];
-    for (Puff& q : puffs_)
-      if (q.born < p->born) p = &q;
+  i32 at = -1;  // (its place in puffs_)
+  for (std::size_t i = 0; i < puffs_.size(); ++i)
+    if (!puffs_[i].alive) { at = static_cast<i32>(i); break; }
+  if (at < 0) {
+    at = 0;
+    for (std::size_t i = 0; i < puffs_.size(); ++i)
+      if (puffs_[i].born < puffs_[static_cast<std::size_t>(at)].born) at = static_cast<i32>(i);
   }
   const f32 progress = clampf((now - e.started) / std::fmax(1e-3f, e.expires - e.started), 0, 1);
   const u32 serial = e.serial++;
   const u32 seed = hash_text(e.id + ":" + std::to_string(serial));
   const f32 a = unit_hash(seed) * 2 * kPi, side = (unit_hash(seed + 17) - 0.5f) * (0.22f + e.scale * 0.18f);
   const bool ember = progress > 0.67f && serial % 5 == 0;
-  p->alive = true;
-  p->ember = ember;
-  p->pos = e.at + Vec3{std::cos(a) * side, std::sin(a) * side, 0};
-  p->vel = {std::cos(a) * (0.07f + unit_hash(seed + 31) * 0.19f), std::sin(a) * (0.07f + unit_hash(seed + 47) * 0.19f), 0.46f + unit_hash(seed + 61) * 0.40f + progress * 0.30f};
-  p->born = now;
-  p->expires = now + (ember ? 0.42f : 1.25f + unit_hash(seed + 79) * 0.52f);
-  p->s0 = e.scale * (ember ? 0.10f : 0.38f + unit_hash(seed + 97) * 0.19f);
-  p->s1 = e.scale * (ember ? 0.035f : 1.32f + unit_hash(seed + 113) * 0.42f);
-  p->serial = serial;
-  p->rotation = 0;
-  p->color = ember ? rgb(0xff8a3d) : progress > 0.55f ? rgb(0xb9bec6) : rgb(0x8f949c);
-  p->opacity = ember ? 0.94f : 0.54f + progress * 0.18f;
+  Puff& p = puffs_[static_cast<std::size_t>(at)];
+  p.alive = true;
+  p.ember = ember;
+  p.pos = e.at + Vec3{std::cos(a) * side, std::sin(a) * side, 0};
+  p.vel = {std::cos(a) * (0.07f + unit_hash(seed + 31) * 0.19f), std::sin(a) * (0.07f + unit_hash(seed + 47) * 0.19f), 0.46f + unit_hash(seed + 61) * 0.40f + progress * 0.30f};
+  p.born = now;
+  p.expires = now + (ember ? 0.42f : 1.25f + unit_hash(seed + 79) * 0.52f);
+  p.s0 = e.scale * (ember ? 0.10f : 0.38f + unit_hash(seed + 97) * 0.19f);
+  p.s1 = e.scale * (ember ? 0.035f : 1.32f + unit_hash(seed + 113) * 0.42f);
+  p.serial = serial;
+  p.rotation = 0;
+  p.color = ember ? rgb(0xff8a3d) : progress > 0.55f ? rgb(0xb9bec6) : rgb(0x8f949c);
+  p.opacity = ember ? 0.94f : 0.54f + progress * 0.18f;
 }
 
 void SmokeField::update(f32 now, f32 dt) {

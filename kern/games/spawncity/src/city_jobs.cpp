@@ -130,13 +130,13 @@ KERN_JOB(kBuildings, run_buildings);
 
 }  // namespace
 
-std::vector<u8> tile_input(const TileKey& key, f64 lon0, f64 lat0, const u8* mvt, std::size_t length) {
+std::vector<u8> tile_input(const TileKey& key, f64 lon0, f64 lat0, kern::Span<const u8> mvt) {
   std::vector<u8> b;
-  b.reserve(length + 28);
+  b.reserve(mvt.size + 28);
   Writer w{b};
   w.put<i32>(key.z); w.put<i32>(key.x); w.put<i32>(key.y);
   w.put<f64>(lon0); w.put<f64>(lat0);
-  b.insert(b.end(), mvt, mvt + length);
+  b.insert(b.end(), mvt.begin(), mvt.end());
   return b;
 }
 

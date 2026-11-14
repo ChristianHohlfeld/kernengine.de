@@ -843,9 +843,9 @@ void Game::drone_input(kern::Engine& e, f32 dt) {
   const DroneTelemetry& t = drone_.telemetry();
   const f32 now = C.clock;
   // pad sample (xbox_gamepad.mjs): neutral while the release latch holds
-  const f32 latch_vals[9] = {pad.down(kPadA) ? 1.0f : 0.0f, pad.down(kPadB) ? 1.0f : 0.0f, pad.down(kPadX) ? 1.0f : 0.0f, pad.down(kPadY) ? 1.0f : 0.0f,
+  const std::array<f32, 9> latch_vals = {pad.down(kPadA) ? 1.0f : 0.0f, pad.down(kPadB) ? 1.0f : 0.0f, pad.down(kPadX) ? 1.0f : 0.0f, pad.down(kPadY) ? 1.0f : 0.0f,
                              pad.down(kPadRB) ? 1.0f : 0.0f, pad.lt, pad.rt, pad.down(kPadView) ? 1.0f : 0.0f, pad.down(kPadMenu) ? 1.0f : 0.0f};
-  const bool pad_on = pad.connected && !C.latch.step(latch_vals, 9);
+  const bool pad_on = pad.connected && !C.latch.step(latch_vals);
   // VR (Quest controllers): mode 2 like a real drone's remote - left stick throttle (up / down) and
   // yaw, right stick pitch and roll, the right trigger fires, A arms, B the weapon
   const bool vr_pad = pad_on && engine_ && engine_->xr;

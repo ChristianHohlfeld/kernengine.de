@@ -85,7 +85,7 @@ KERN_EXPORT(sc_result_length) kern::u32 sc_result_length() { return static_cast<
 // ---- map tiles: the page fetches what the game asks for ----
 KERN_EXPORT(sc_tile_requests) const char* sc_tile_requests() { return result(sc::game().city().take_requests()); }
 KERN_EXPORT(sc_tile_data) void sc_tile_data(kern::i32 z, kern::i32 x, kern::i32 y, const kern::u8* bytes, kern::u32 length) {
-  sc::game().city().provide(sc::TileKey{z, x, y}, bytes, length);
+  sc::game().city().provide(sc::TileKey{z, x, y}, {bytes, length});
 }
 KERN_EXPORT(sc_tile_failed) void sc_tile_failed(kern::i32 z, kern::i32 x, kern::i32 y) { sc::game().city().fail(sc::TileKey{z, x, y}); }
 KERN_EXPORT(sc_offline) void sc_offline() { sc::game().city().go_offline(); }

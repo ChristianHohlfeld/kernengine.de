@@ -80,11 +80,13 @@ inline kern::physics::Body create_body(kern::physics::World& w, const RigidSpec&
 }
 
 /// Solid box inertia (xx yy zz) of mass m and full extents s.
-inline void box_inertia(f32 m, Vec3 s, f32 out[6]) {
+inline void box_inertia(f32 m, Vec3 s, f32 (&out)[6]) {
   out[0] = m * (s.y * s.y + s.z * s.z) / 12;
   out[1] = m * (s.x * s.x + s.z * s.z) / 12;
   out[2] = m * (s.x * s.x + s.y * s.y) / 12;
-  out[3] = out[4] = out[5] = 0;
+  out[3] = 0;
+  out[4] = 0;
+  out[5] = 0;
 }
 
 }  // namespace sc

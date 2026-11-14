@@ -19,6 +19,7 @@
 //   hand_grenade.mjs                GrenadePull, GrenadeDrag, GrenadeRelease, GrenadeStep
 #pragma once
 
+#include <array>
 #include <string>
 
 #include "common.h"
@@ -111,7 +112,7 @@ struct VoiceChord {
 struct ReleaseLatch {
   bool armed = false;
   /// values: the nine buttons' values. True while the pad must stay neutral.
-  bool step(const f32* values, int n);
+  bool step(const std::array<f32, 9>& values);
 };
 
 // ---- hand grenade: the Blueprint's struct Cook ------------------------------------------------

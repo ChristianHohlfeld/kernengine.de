@@ -58,7 +58,7 @@ class CityStream {
   /// Tiles to fetch now, as JSON [[z,x,y],...] (each tile once).
   std::string take_requests();
   /// Uncompressed MVT bytes of a requested tile (copied).
-  void provide(const TileKey& key, const u8* bytes, std::size_t length);
+  void provide(const TileKey& key, kern::Span<const u8> bytes);
   void fail(const TileKey& key);
   /// No map service: the procedural stand-in town around the origin.
   void go_offline();
@@ -154,7 +154,6 @@ class CityStream {
   u32 furniture_serial_ = 0;
   std::vector<kern::Vec4> ground_changes_;
   struct Tile;
-  Tile* tile(const TileKey& k);
   void request_around(Vec3 focus, i32 ring_of);
   void unload_far(Vec3 focus);
   kern::Vec4 ring_bounds(Vec3 focus, i32 r) const;
