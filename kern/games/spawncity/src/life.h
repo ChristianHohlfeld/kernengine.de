@@ -5,6 +5,7 @@
 // carries out what it asks for (sounds, speech, impulses on cars, ragdolls, particles).
 #pragma once
 
+#include <array>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -154,11 +155,13 @@ class Life {
   const CatAttack& cat_attack() const { return cat_; }
   f64 epoch() const { return epoch_; }
   bool provoke_cat(f32 now);  // tests: the black cat charges
-  const Chain* chain() const { return chain_alive_ ? &chain_ : nullptr; }
+  bool has_chain() const { return chain_alive_; }
+  /// The running club (as it was last, when has_chain() says there is none now).
+  const Chain& chain() const { return chain_; }
   /// MP client: the running club is the host's (game_worldsync.cpp) - no own chain, his runners
   /// eased to where his snapshots have them; none heard for 1.5 s: gone.
   void set_remote_joggers(bool on) { if (on != remote_joggers_) { remote_joggers_ = on; chain_alive_ = false; } }
-  void apply_joggers(u32 id, const Vec3* pos, const f32* yaw, const bool* alive, u32 n, f32 now, f32 at);
+  void apply_joggers(u32 id, const std::array<Vec3, 10>& pos, const std::array<f32, 10>& yaw, const std::array<bool, 10>& alive, u32 n, f32 now, f32 at);
   /// MP client: the animals are the host's too (game_worldsync.cpp): no herds, pets or flocks of
   /// our own; his cows (by key - the same on every machine), dogs and cats (by his index) and
   /// pigeon flocks (by his index) eased to where his snapshots have them. An animal that is a

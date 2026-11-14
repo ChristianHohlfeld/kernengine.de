@@ -312,15 +312,16 @@ void Game::worldsync_update(f32 dt) {
           }
           // the running club (jogger_chain.mjs): its id and its runners, when it runs near him
           {
-            const Life::Chain* ch = life.chain();
+            const bool running = life.has_chain();
+            const Life::Chain& ch = life.chain();
             bool close = false;
-            if (ch) for (const Life::Runner& rn : ch->runners) if (rn.alive && near(rn.pos, kReach)) close = true;
+            if (running) for (const Life::Runner& rn : ch.runners) if (rn.alive && near(rn.pos, kReach)) close = true;
             List L = list(kJoggers);
             L.head();
-            if (ch && close) {
+            if (running && close) {
               Wr e;
-              e.put(ch->id);
-              for (const Life::Runner& rn : ch->runners) {
+              e.put(ch.id);
+              for (const Life::Runner& rn : ch.runners) {
                 e.put<u8>(rn.alive ? 1 : 0);
                 e.put(p5(rn.pos.x, o.x)); e.put(p5(rn.pos.y, o.y));
                 e.put(ang8(rn.yaw));
@@ -546,9 +547,9 @@ void Game::worldsync_update(f32 dt) {
     } else if (type == kJoggers) {
       if (n == 0) continue;
       const u32 id = r.get<u32>();
-      Vec3 pos[10];
-      f32 yaw[10];
-      bool alive[10];
+      std::array<Vec3, 10> pos;
+      std::array<f32, 10> yaw;
+      std::array<bool, 10> alive;
       for (u32 k = 0; k < 10; ++k) {
         alive[k] = r.get<u8>() != 0;
         pos[k].x = x5(ox); pos[k].y = x5(oy);
