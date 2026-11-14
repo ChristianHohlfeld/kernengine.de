@@ -55,6 +55,10 @@ tools/export_game.sh, .mjs           der native Export: ein Level als Spiel, die
   C++-Klassen in eine Quelle des Spiels (`tools/blueprint_cpp.sh`); `logic::Runtime` lässt einen
   Graphen, dessen Klasse im Programm steckt, als diese Klasse laufen (Stufe „native C++“).
   SpawnCitys Regel-Blueprint „Wanted“ läuft so im ausgelieferten Spiel.
+- **Fertig: Maps, Sets und Int64.** `Map<Int, Float>`, `Set<Text>` in der Reihenfolge, in der ihre
+  Schlüssel kamen (`kern::Map`, `kern::Set`), und 64 Bit wie `u64`/`i64` von C++ (`Int64`) – als
+  Typen von Variablen, Feldern, Pins und lokalen Variablen, mit ihren Knoten, in jeder Stufe
+  dasselbe (siehe „Maps und Sets“, „Int64“).
 - **Fertig: ein C++ je Blueprint.** Den früheren Export (eine Schleife über Knotennummern, die in
   die Knoten-Bibliothek zurückrief) gibt es nicht mehr.
 - **Fertig: der native Export.** `tools/export_game.sh level.klevel spiel.html` schreibt ein Level
@@ -94,7 +98,7 @@ tools/export_game.sh, .mjs           der native Export: ein Level als Spiel, die
   „Plätze“).
 - **Die Stufen stimmen überein:** Was Interpreter, JIT und Klasse verschieden taten – Funktionen,
   die über Events wieder aufgerufen werden, die Tiefe von Events und Werten, ganze Zahlen an
-  ihren Enden, der Stapel des JIT –, ist gleichgezogen (21 Tier-Fälle, in jeder Stufe dasselbe).
+  ihren Enden, der Stapel des JIT –, ist gleichgezogen (28 Tier-Fälle, in jeder Stufe dasselbe).
 
 ## Im Editor
 
@@ -208,6 +212,9 @@ KERN_LAYOUT(Demo) {
 | Take Variable | `var_take(Punkte);` – der Platz ist das Argument, eine Variable oder ein Platz in ihr (`var_take(Cars[i].Wheels);`); wird sein Ergebnis gelesen: `var_take(n7, Punkte);` und `n7.value`. Gibt, was am Platz steht, und lässt dort den leeren Wert des Typs (siehe „Übergeben statt kopieren“) |
 | Schritt, der eine Liste ändert (Add to List, Insert, Remove, Clear – und in einem Zug: Set Length, Append List, Insert List, Reserve) | `list_add(Scores, wert);` – der Platz der Liste ist das erste Argument, eine Variable oder eine Liste darin (`list_add(Cars[i].Wheels, rad);`); wird sein Ergebnis gelesen: `list_add(n7, Scores, wert);` und `n7.index` |
 | Wert-Knoten auf einer Liste (Length, Get Item, Contains, Find, Make List) | `list_get<Float>(Scores, 0)`, `list_make<Text, "2">("a", "b")` – die Einstellung „Type“ ist der Typ der Einträge |
+| Schritt, der eine Map oder ein Set ändert (Set at Key, Add Key, Remove Key, Remove Index, Clear, Reserve) | `map_set(Cells, key, wert);`, `set_add(Seen, key);` – der Platz ist das erste Argument; wird sein Ergebnis gelesen: `map_add(n7, Cells, key);` und `n7.added`, `n7.index` (siehe „Maps und Sets“) |
+| Wert-Knoten auf einer Map oder einem Set (Length, Has Key, Key At, Find) | `map_find<Int, Float>(Scores, 7).value`, `set_contains<Text>(Words, "a")` – die Einstellungen „Key“ und „Value“ sind die Typen der Schlüssel und Werte |
+| Rechnen mit 64 Bit (Int64 Add, Divide Unsigned, Shift Right, Less Unsigned …) | `int64_add(a, b)`, `int64_div_unsigned(a, b)`, `int64_less(a, b)` – was die 64 Bit bedeuten, sagt der Knoten (siehe „Int64“) |
 | For Each | `for (auto it9 = flow_for_each<Float>(n9, Scores); it9.next();) { ... }` – im Rumpf `n9.item` und `n9.index` |
 | Wert-Knoten einer Aufzählung (Equal, Enum to Text, Text to Enum, Enum to Index, Index to Enum, All Values) | `enum_name<Mode>(State)`, `enum_from_name<Mode>(text).value`, `enum_values<Mode>()` – die Einstellung „Enum“ ist die Aufzählung selbst |
 | Make und Break einer Struktur | `struct_make<Weapon>("Bow", Kind::Ranged, 12.0)` – ein Wert je Feld, in der Reihenfolge der Felder; `struct_break<Weapon>(Held).Damage` – das Feld bei seinem Namen |
@@ -247,6 +254,9 @@ Der Name einer Knotenfunktion ist der Knotentyp mit `_` statt `.` (`math.add` �
 | Liste eines dieser Typen | `List<Bool>`, `List<Int>`, `List<Float>`, `List<Vector>`, `List<Text>`, `List<Actor>` | `List<Float>{1.0, 2.5}`, leer: `List<Float>{}` |
 | Aufzählung des Blueprints, Liste ihrer Werte | ihr Name: `Mode`, `List<Mode>` | `Mode::Open`, `List<Mode>{Mode::Closed, Mode::Open}`, leer: `List<Mode>{}` |
 | Struktur des Blueprints, Liste davon | ihr Name: `Weapon`, `List<Weapon>` | `Weapon{"Knife", Kind::Melee, 25.0}` – ein Wert für jedes Feld, in der Reihenfolge der Deklaration; `List<Weapon>{Weapon{...}, Weapon{...}}`, leer: `List<Weapon>{}` |
+| Int64 – 64 Bit, wie `u64` und `i64` von C++ sie halten (siehe „Int64“) | `Int64`, Liste: `List<Int64>` | `Int64{0x1f}` – die Bits, hexadezimal geschrieben; gelesen wird jede ganze Zahl, die C++ schreibt (`Int64{31}`) |
+| Map – Werte eines Typs unter Schlüsseln, in der Reihenfolge, in der die Schlüssel kamen (siehe „Maps und Sets“) | `Map<Int, Float>`, `Map<Text, Cell>`, `Map<Kind, List<Float>>` | `Map<Int, Float>{{3, 1.5}, {1, 2.0}}` – die Einträge in ihrer Reihenfolge, je `{Schlüssel, Wert}`; leer: `Map<Int, Float>{}` |
+| Set – Schlüssel in der Reihenfolge, in der sie kamen | `Set<Int>`, `Set<Int64>`, `Set<Text>` | `Set<Text>{"a", "b"}`, leer: `Set<Text>{}` |
 | Liste fester Länge – der Typ eines **Platzes**: einer Variablen, eines Felds, eines Ein- oder Ausgangs, einer lokalen Variablen (siehe „Listen fester Länge“) | `Fixed<Float, 16>`, `Fixed<Weapon, 4>` | `Fixed<Float, 3>{1.0, 2.5}` – die Einträge bis zum letzten, der nicht null ist: Was nicht dasteht, ist null, wie in C++ (lauter Nullen: `Fixed<Float, 3>{}`); mehr als die Länge ist ein Fehler |
 
 Zahlen stehen in der kürzesten Form, die genau denselben Wert wieder ergibt. Jeder Draht, dessen
@@ -362,6 +372,120 @@ ScaledResult Scaled(const Fixed<Float, 3>& v, Float by = 2.0) {
   Platz, der als `Fixed<Float, 3>` deklariert ist – keine `List<Float>` und keine andere Länge.
 - **Im Dokument** steht die Länge als `"count"` neben dem Typ; im Editor als „Length“ neben dem
   Typ einer Variablen, eines Felds, eines Pins oder einer lokalen Variablen (0: beliebig lang).
+
+### Maps und Sets
+
+Eine **Map** hält Werte eines Typs, jeden unter einem Schlüssel; ein **Set** hält Schlüssel. Ihre
+Einträge stehen in der Reihenfolge, in der ihre Schlüssel kamen – wie eine `Map` und ein `Set`
+von JavaScript: Wer durch eine geht, bekommt diese Reihenfolge, auf jeder Maschine, in jeder Stufe
+und in jedem Build. In C++ ist `Map<Int, Float>` ein `kern::Map` (`kern/core/map.h`, für den
+Blueprint `kern::logic::Map`), `Set<Int>` ein `kern::Set` – derselbe Behälter, den ein Programm
+statt `std::unordered_map` und `std::unordered_set` benutzt; ein Schlüssel wird über einen Index
+gefunden, dessen Hash überall derselbe ist (er entscheidet nur, wie schnell, nie, wo ein Eintrag
+steht).
+
+```cpp
+KERN_STRUCT(Cell) {
+  Int Count = 0;
+  List<Text> Tags = List<Text>{};
+};
+Map<Int, Float> Scores = Map<Int, Float>{{3, 1.5}, {1, 2.0}};
+Map<Text, Cell> Cells = Map<Text, Cell>{};
+Set<Int64> Seen = Set<Int64>{};
+
+KERN_EVENT(on1, event_custom<"Hit">)
+void on1(Actor actor, Float value, Text text) {
+  map_set(Scores, 7, value);
+  map_add(n4, Cells, text);
+  Cells[n4.index].Count += 1;
+  list_add(Cells[n4.index].Tags, "hit");
+  Total = map_find<Int, Float>(Scores, 7).value;
+  map_remove(Scores, 3);
+}
+```
+
+- **Schlüssel** sind Bool, Int, Int64, Text oder der Wert einer Aufzählung – Typen, deren Gleichheit
+  genau ist. Ein Float, ein Vector, eine Liste, eine Struktur ist kein Schlüssel (`the keys of a map
+  or a set are Bool, Int, Int64, Text or an enum`). **Werte** einer Map sind jeder Typ, den eine
+  Variable haben kann, auch Listen und Strukturen – aber keine Map, kein Set und keine Liste fester
+  Länge (eine Map in einer Map ist eine Map, deren Werte eine Struktur mit einer Map als Feld sind –
+  so, wie eine Liste von Listen).
+- **Der Typ** steht im Dokument als `"type": "map"` mit `"of": "int>float"` (Schlüssel `>` Wert;
+  ein Typ des Blueprints mit seinem Namen: `"text>struct:Cell"`, `"enum:Kind>float_list"`), ein Set
+  mit `"of": "int64"`. Im Text der Fehler und im Editor: `map<int>float>`, „Map of Integer to Float“.
+- **Ein Eintrag kommt ans Ende.** Set at Key gibt einem Schlüssel seinen Wert – seinem Eintrag oder
+  einem neuen am Ende; Add Key legt einen neuen Eintrag mit dem Nullwert des Werttyps an (eine
+  Struktur mit ihren Defaults), es sei denn, der Schlüssel hat schon einen. Beide sagen, ob er neu
+  war (`added`), und wo er steht (`index`). Kommt ein Schlüssel wieder, nachdem er herausgenommen
+  wurde, steht er am Ende.
+- **Herausnehmen** – Remove Key, Remove Index – lässt die anderen Einträge in ihrer Reihenfolge;
+  der nach dem herausgenommenen steht danach an dessen Stelle. Remove Index jenseits der Map tut
+  nichts.
+- **Kein Index führt ins Leere.** Key At jenseits gibt den Nullwert des Schlüsseltyps, Find gibt
+  `found = false`, den Nullwert des Werttyps und `index = -1`.
+- **Ein Wert einer Map ist ein Platz – bei der Stelle seines Eintrags:** `Cells[i]`, `Cells[i].Count
+  += 1`, `list_add(Cells[i].Tags, x)` (siehe „Plätze“). Die Stelle ist die in der Reihenfolge der
+  Schlüssel, nicht der Schlüssel selbst: Den Schlüssel findet Find, Set at Key und Add Key geben
+  seine Stelle. Ein Platz neben der Map ist ein eigener Eintrag mit den Defaults, von dem nichts
+  bleibt – wie neben einer Liste. Ein Schlüssel ist kein Platz: Er wird nie geändert, wo er steht.
+- **Ein gehaltener Eintrag bleibt, wo er ist:** Hält ein Aufruf einen Platz in einer Map
+  (`Touch(Cells[i])`), tut nichts in ihm einen Schritt, der Einträge hinein- oder herausnimmt –
+  auch Set at Key und Reserve nicht (`check()`, siehe „Referenz-Eingänge“). In der Klasse stehen die
+  Einträge hintereinander im Speicher; ein neuer kann sie verschieben.
+- **Eine Map auf einem Draht ist ein Wert**, wie eine Liste: Wer sie liest, hat sie, wie sie war.
+  Sie passt nur in einen Eingang derselben Schlüssel und Werte und wird in nichts umgewandelt,
+  auch nicht in Text.
+- **Im Dokument** steht eine Map als `[[schlüssel, wert], ...]` in der Reihenfolge ihrer Einträge,
+  ein Set als `[schlüssel, ...]`; ein Int64 als Schlüssel ist der Text seiner Bits als u64
+  (`"18446744073709551615"`). Steht ein Schlüssel zweimal da, gilt der erste; im Text ist das ein
+  Fehler (`the key 1 is said twice`).
+- **Was sie tun, steht einmal:** `kern::logic::map` und `kern::logic::set` in `kern/logic/nodes.h`
+  – die Knoten des Interpreters (auf `MapEntries`, einer `kern::Map` der Werte des Interpreters)
+  und die Funktionen der Klasse (auf `kern::logic::Map`) rufen dieselben Funktionen auf dem
+  gleichen Behälter auf. Der JIT ruft die Knotenfunktionen.
+- **Kosten in der Klasse**, wie das C++, das der Blueprint ist: Find, Has Key und Set at Key eines
+  vorhandenen Schlüssels fordern keinen Speicher an; ein neuer Eintrag hängt sich an einen
+  `std::vector` an (Reserve hält Platz vor, wie bei einer Liste), der Index wächst, wenn er halb voll
+  ist. Herausnehmen schiebt die folgenden Einträge nach vorn und baut den Index neu – das kostet so
+  viel, wie Einträge hinter dem herausgenommenen stehen.
+
+### Int64
+
+`Int64` sind 64 Bit, wie ein `u64` oder ein `i64` von C++ sie hält: ein Schlüssel aus zwei
+32-Bit-Zahlen, ein Hash, der Zustand eines Zufallsgenerators. Ein `Int` ist eine ganze Zahl, wie
+ein Blueprint sie hält – bis 2^53 genau; ein `Int64` hat alle 64 Bit. **Was die Bits bedeuten, sagt
+der Knoten**, der sie liest – wie in WebAssembly: Int64 Less vergleicht sie als `i64`, Int64 Less
+Unsigned als `u64`; Divide und Remainder gibt es als `i64` und als `u64`, Shift Right mit und ohne
+Vorzeichen.
+
+```cpp
+Int64 State = Int64{0x853c49e6748fea9b};
+
+KERN_PURE Int64 Next(Int64 s) {
+  return int64_add(int64_mul(s, Int64{0x5851f42d4c957f2d}), Int64{0x14057b7ef767814f});
+}
+```
+
+- **Wie C++, für jeden Wert festgelegt:** Add, Subtract und Multiply gehen bei 2^64 herum, Shift
+  Left auch. Wo C++ nichts festlegt, legt der Knoten es fest, in jeder Stufe gleich: Divide und
+  Remainder durch 0 geben 0, das kleinste `i64` durch −1 gibt sich selbst (Remainder 0); ein Shift und
+  ein Rotate gehen um die letzten 6 Bit ihres Betrags; Float to Int64 gibt für „keine Zahl“ 0 und
+  jenseits der Enden das nächste Ende (Unsigned: unter 0 ist 0).
+- **Umwandeln sagt ein Knoten**, keiner still: Int to Int64 (die Bits eines `i64`), Int64 to Int
+  und Int64 to Int Unsigned (die Bits als `i64` bzw. `u64`, so genau, wie ein Int es hält), Int64
+  to Float (Unsigned), Float to Int64 (Unsigned), Bits of Float und Float of Bits (IEEE 754), Int64
+  of Halves, High, Low (je 32 Bit), Count Ones, Leading Zeros, Trailing Zeros, Int64 to Text (als
+  `u64`, als `i64`, hexadezimal) und Text to Int64 (dezimal, `0x`, ein `-` davor: das
+  Zweierkomplement; was keine Zahl ist: 0). Ein Draht von Int64 zu Int, Float oder Text ist ein
+  Fehler.
+- **Im Text** ist ein Int64 `Int64{0x1f}` (die Bits, hexadezimal), im Dokument der Text seiner
+  Bits als `u64` (`"18446744073709551615"` – mehr, als eine Zahl von JSON genau hält). Es kann
+  Schlüssel einer Map und eines Sets sein, und eine `List<Int64>` sortiert nach den Bits als `u64`.
+- **Was sie tun, steht einmal:** `PureNodes::int64_*` in `kern/logic/nodes.h` – der Knoten und die
+  Klasse rufen dieselbe Funktion; in der Klasse ist ein Int64 ein `kern::logic::Int64` (ein `u64`),
+  ein Knoten ein Ausdruck auf ihm, ohne Speicher anzufordern.
+- Ein `u64` oder `i64` eines Programms, das ein Bitmuster ist, ist im Blueprint ein `Int64`; die
+  Knoten der Engine nehmen und geben ihre 64-Bit-Zahlen als Int64-Pins (`tools/engine_api.py`).
 
 ### Aufzählungen
 
@@ -1016,8 +1140,11 @@ Verstöße als Fehler am betroffenen Knoten; der Editor nimmt solche Namen gar n
   anderen Blueprints (`KERN_EXTERN`) keine. Die Referenzen stehen vor den Eingängen als Wert
   (die haben einen Default, und in C++ hat nach einem Parameter mit Default jeder weitere einen).
 - **Ein Eintrag, der gehalten wird, bleibt, wo er ist:** Solange ein Aufruf einen Platz in einer
-  Liste hält, ändert nichts in ihm die Länge dieser Liste oder ersetzt sie, und nichts in ihm
+  Liste oder einer Map hält, ändert nichts in ihm die Länge dieser Liste oder Map oder ersetzt sie, und nichts in ihm
   kann Handler starten (siehe „Referenz-Eingänge“).
+- **Eine Map und ein Set** haben Schlüssel vom Typ Bool, Int, Int64, Text oder einer Aufzählung; die
+  Werte einer Map sind keine Map, kein Set und keine Liste fester Länge. Eine Map hat keine feste
+  Länge (`"count"` steht nur bei einer Liste).
 - **Add to Variable** zählt Zahlen: Integer oder Float. Menge und Ergebnis haben den Typ der
   Variablen – eine ganze Zahl wird ganzzahlig erhöht (`Count += 1;`).
 
@@ -1233,7 +1360,7 @@ Aufruf Zeichen für Zeichen mit dem Interpreter** – Ergebnisse und alle Variab
 und beim Namen durch eine `logic::Instance`, die den Graphen als diese Klasse ausführt. Dazu
 spielen die Tier-Fälle (`logic_cases.h`), die ein Compiler schon ausführt, als Klassen dasselbe
 Szenario wie Interpreter und JIT – Begin Play, Events, Ticks, Wartezeiten, State Machines – mit
-demselben Ergebnis: alle 24, auch Aufrufe auf einem Blueprint (`call_on`: eine Funktion, die sich
+demselben Ergebnis: alle 28, auch Aufrufe auf einem Blueprint (`call_on`: eine Funktion, die sich
 so selbst aufruft, eine erklärte Funktion, die niemand hat, und Aufrufe ohne Ende), lokale Variablen (`locals`: Zahlen und ein Text, zwei
 Funktionen mit einer gleichnamigen, eine Pure-Funktion, die ihre eigene setzt, und ein Aufruf, den
 ein zweiter Aufruf derselben Funktion unterbricht), Übergeben (`handing_over`: ein Return, das eine
@@ -1241,7 +1368,12 @@ lokale Variable und Eingänge weiterreicht, ein Set und ein Aufruf, die nehmen, 
 gab – und daneben dieselben Werte dort, wo sie noch gebraucht und also kopiert werden; Take an einer
 Variablen, einem Feld, einem Listeneintrag, neben einer Liste und in einer lokalen Variablen), Listen in
 einem Zug (`lists_at_once`: Set Length kürzt und füllt, Append und Insert List vorn, mittendrin, hinter dem
-Ende und in sich selbst, Reserve), Listen fester Länge (`fixed_lists`: Variable, Feld – auch von Strukturen in
+Ende und in sich selbst, Reserve), Maps und Sets (`maps`: Schlüssel vom Typ Int,
+Text, Aufzählung, Int64 und Bool, Werte als Zahlen, Texte, Listen und Strukturen, jeder Knoten beider,
+ein Wert einer Map als Platz – `Cells[i].Count += 1`, eine Liste darin, ein Platz neben der Map –,
+Herausnehmen mitten aus der Reihenfolge und ein Schlüssel, der danach wieder ans Ende kommt), Int64
+(`int64`: jeder Knoten, Werte über 2^53, Division durch 0 und das kleinste `i64` durch −1, Shifts um
+mehr als 63, Floats jenseits der Enden, Texte, die keine Zahl sind), Listen fester Länge (`fixed_lists`: Variable, Feld – auch von Strukturen in
 einer festen Liste –, Ein- und Ausgang, lokale Variable, Referenz; gesetzt mit längeren und kürzeren Listen,
 über Make und Take), Listen (`lists`: jeder Schritt, For Each über eine Liste, die
 ihr Rumpf ändert, und eine Schleife, deren Rumpf sie selbst wieder startet), Aufzählungen

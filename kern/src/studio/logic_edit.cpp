@@ -306,6 +306,36 @@ bool retype(logic::Graph& g, u32 id, const std::string& type, const std::string&
   return true;
 }
 
+/// A node of a map or a set (Length, Has Key, Key At, Find) that a map or set comes into takes
+/// its keys and values: its settings Key and Value become the map's (values typed into its key
+/// and value pins were of the old types and go). False: it is no such node, or it is of these.
+/// (The settings Key and Value with which the pin `pin` of a node of this kind is a map or a set of
+/// type `want` - false: it has no such pin and settings. A set's node has no Value: `value` stays empty.)
+bool keyed_params(const logic::NodeDef& def, const std::string& pin, const logic::TypeRef& want, std::string& key, std::string& value) {
+  if (!logic::is_keyed(want.type) || pin != (want.type == logic::PinType::map ? "map" : "set")) return false;
+  bool has_key = false, has_value = false;
+  for (const logic::ParamDef& pd : def.params) {
+    has_key = has_key || (pd.kind == logic::ParamDef::Kind::type && pd.key == "key" && pd.keys_only);
+    has_value = has_value || (pd.kind == logic::ParamDef::Kind::type && pd.key == "value");
+  }
+  if (!has_key || (want.type == logic::PinType::map) != has_value) return false;
+  key = logic::type_text(logic::key_type(want));
+  value = has_value ? logic::type_text(logic::value_type(want)) : std::string();
+  return true;
+}
+bool keyed_settings(logic::Graph& g, u32 id, const std::string& pin, const logic::TypeRef& want) {
+  logic::Node* node = g.find(id);
+  const logic::NodeDef* def = node ? logic::library().find(node->type) : nullptr;
+  std::string key, value;
+  if (!def || !keyed_params(*def, pin, want, key, value)) return false;
+  const bool has_value = !value.empty();
+  if (node->param("key", "int") == key && (!has_value || node->param("value", "float") == value)) return false;
+  node->set_param("key", key);
+  if (has_value) node->set_param("value", value);
+  node->values.erase(std::remove_if(node->values.begin(), node->values.end(), [](const auto& v) { return v.first == "key" || v.first == "value"; }), node->values.end());
+  return true;
+}
+
 /// Adds a link with the editor's rules: an exec output and a data input take one wire
 /// (the new one replaces the old); exec inputs and data outputs fan in / out freely. A generic
 /// node nothing is wired to yet takes the type of the wire (a Text List into Length makes it a
@@ -318,7 +348,8 @@ bool connect(logic::Graph& g, u32 from, const std::string& out, u32 to, const st
   auto type_of = [](const logic::PinDef& p) { return logic::TypeRef{p.type, p.of}; };
   if (!(type_of(po) == type_of(pi)) && po.type != logic::PinType::exec) {
     // (first the node the wire goes into, then the one it comes from)
-    if (const logic::Node* n = g.find(to); n && retype(g, to, type_setting_for(g, *n, in, false, type_of(po)), in)) pin_of(g, to, in, false, pi);
+    if (keyed_settings(g, to, in, type_of(po))) pin_of(g, to, in, false, pi);  // (a map into a map's node: its keys and values)
+    else if (const logic::Node* n = g.find(to); n && retype(g, to, type_setting_for(g, *n, in, false, type_of(po)), in)) pin_of(g, to, in, false, pi);
     else if (const logic::Node* m = g.find(from); m && !logic::fits(type_of(po), type_of(pi)) && retype(g, from, type_setting_for(g, *m, out, true, type_of(pi)))) pin_of(g, from, out, true, po);
   }
   if (!logic::fits(type_of(po), type_of(pi))) {
@@ -873,6 +904,16 @@ json::Value Studio::logic_palette(const json::Value& c) const {
       for (const logic::PinDef& p : from_output ? in : out)
         if (fits.empty() && p.type != logic::PinType::exec) fits = type_setting_for(*g, probe, p.id, !from_output, from_type);
       if (!fits.empty()) e.params.push_back({"type", fits});
+      if (fits.empty() && logic::is_keyed(from_type.type) && from_output) {
+        // (a node of a map or a set, from a map or a set: with its keys and values)
+        std::string key, value;
+        for (const logic::PinDef& p : in)
+          if (keyed_params(*d, p.id, from_type, key, value)) {
+            e.params.push_back({"key", key});
+            if (!value.empty()) e.params.push_back({"value", value});
+            break;
+          }
+      }
     }
     if (d->type == "func.entry") { e.label = "New Function"; e.help = "Adds a function to this Blueprint: its entry and a Return node. Inputs and outputs are set in Details."; }
     if (d->type == "event.state_enter" || d->type == "event.state_exit" || d->type == "state.set" || d->type == "state.is" || d->type == "state.get") {
@@ -910,6 +951,25 @@ json::Value Studio::logic_palette(const json::Value& c) const {
         named.set_param("path", "." + f.name);
         consider({lib.title(named), scope.empty() ? std::string("Structures") : category, "Changes the field " + f.name + " of " + what, named.type, with({{"variable", v.name}, {"path", "." + f.name}})});
       }
+    if (logic::is_keyed(v.type)) {
+      // a map variable: the Set of the value at a place (Cells[index]) -, and the steps of a map or a set that change it
+      if (v.type == logic::PinType::map) {
+        logic::Node named;
+        named.type = "var.set";
+        named.set_param("variable", v.name);
+        named.set_param("path", "[]");
+        consider({lib.title(named), scope.empty() ? std::string("Maps") : category, "Replaces the value of one entry of " + what + " by its place (beside the map: nothing)", named.type, with({{"variable", v.name}, {"path", "[]"}})});
+      }
+      const std::string prefix = v.type == logic::PinType::map ? "map." : "set.";
+      for (const auto& d : lib.all()) {
+        if (!variable_step(*d) || d->type.rfind(prefix, 0) != 0) continue;
+        logic::Node named;
+        named.type = d->type;
+        named.set_param("variable", v.name);
+        consider({lib.title(named), scope.empty() ? std::string(v.type == logic::PinType::map ? "Maps" : "Sets") : category, d->help, d->type, with({{"variable", v.name}})});
+      }
+      return;
+    }
     if (!logic::is_list(v.type)) return;
     // a list variable: the Set of one of its entries - a Set at that place (Scores[index]) -, and the steps that change it
     {
@@ -1016,6 +1076,14 @@ json::Value Studio::logic_palette(const json::Value& c) const {
 
 /// A default kept through a change of type: converted where the types convert; a value of an
 /// enum or a struct starts at the default of another one.
+/// Does a place of this type name the enum or struct `name` - itself, its items, a map's keys or
+/// values, a set's keys?
+static bool names_type(const logic::TypeRef& t, const std::string& name) {
+  for (const logic::TypeRef& named : logic::types_named(t))
+    if (named.of == name) return true;
+  return false;
+}
+
 static json::Value retyped_default(const logic::Graph& g, const json::Value& value, const logic::TypeRef& from, const logic::TypeRef& to) {
   const bool declared = logic::element_of(to.type) == logic::PinType::enumeration || logic::element_of(to.type) == logic::PinType::structure;
   const bool same = from.type == to.type && from.of == to.of;  // (the same type - a list of another length is one)
@@ -1108,6 +1176,18 @@ static void move_enum_values(logic::Graph& g, const std::string& name, const std
       else if (v.size() > 0)
         for (i64& x : v.edit<i64>()) x = to(x);
       j = v.to_json();
+      return;
+    }
+    if (logic::is_keyed(t.type)) {
+      // (a map or a set: its keys where they are of the enum - [[key, value], ...], [key, ...] -, a map's values as what they are)
+      if (!j.is_array()) return;
+      const logic::TypeRef key = logic::key_type(t), value = t.type == logic::PinType::map ? logic::value_type(t) : logic::TypeRef{};
+      const bool keys = key.type == logic::PinType::enumeration && key.of == name;
+      for (json::Value& entry : j.items()) {
+        json::Value* k = t.type == logic::PinType::set ? &entry : entry.is_array() && entry.size() == 2 ? &entry.items()[0] : nullptr;
+        if (keys && k && k->is_number()) *k = json::Value(static_cast<f64>(to(static_cast<i64>(k->as_number()))));
+        if (t.type == logic::PinType::map && entry.is_array() && entry.size() == 2) moved(entry.items()[1], value, depth + 1);
+      }
       return;
     }
     // (a struct: the fields that are of the enum, or hold it)
@@ -2029,12 +2109,12 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       };
       if (op == "remove") {
         std::string user;
-        for (const logic::Variable& v : g.variables) if (user.empty() && v.of == old) user = "the variable " + v.name;
+        for (const logic::Variable& v : g.variables) if (user.empty() && names_type(logic::declared(v), old)) user = "the variable " + v.name;
         for (const logic::Function& f : g.functions)
           for (const auto* pins : {&f.inputs, &f.outputs, &f.locals})
-            for (const logic::FunctionPin& fp : *pins) if (user.empty() && fp.of == old) user = "\"" + fp.name + "\" of the function " + f.name;
+            for (const logic::FunctionPin& fp : *pins) if (user.empty() && names_type(logic::declared(fp), old)) user = "\"" + fp.name + "\" of the function " + f.name;
         for (const logic::StructType& s : g.structs)
-          for (const logic::StructField& f : s.fields) if (user.empty() && f.type.of == old) user = "the field " + f.name + " of the struct " + s.name;
+          for (const logic::StructField& f : s.fields) if (user.empty() && names_type(f.type, old)) user = "the field " + f.name + " of the struct " + s.name;
         each_setting([&](logic::Node& n, const logic::ParamDef&, bool) { if (user.empty()) user = logic::library().title(n); });
         if (!user.empty()) { error = old + " is in use: " + user; return false; }
         g.enums.erase(std::remove_if(g.enums.begin(), g.enums.end(), [&](const logic::EnumType& x) { return x.name == old; }), g.enums.end());
@@ -2047,12 +2127,12 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         if (const std::string why = name_problem(g, to); !why.empty()) { error = why; return false; }
         if (const std::string why = type_name_problem(g, to); !why.empty()) { error = why; return false; }
         each_setting([&](logic::Node& n, const logic::ParamDef& pd, bool list) { n.set_param(pd.key, list ? to + "_list" : to); });
-        for (logic::Variable& v : g.variables) if (v.of == old) v.of = to;
+        for (logic::Variable& v : g.variables) v.of = logic::type_renamed(logic::declared(v), old, to).of;  // (also where a map's keys or values are of it)
         for (logic::Function& f : g.functions)
           for (auto* pins : {&f.inputs, &f.outputs, &f.locals})
-            for (logic::FunctionPin& fp : *pins) if (fp.of == old) fp.of = to;
+            for (logic::FunctionPin& fp : *pins) fp.of = logic::type_renamed(logic::declared(fp), old, to).of;
         for (logic::StructType& s : g.structs)
-          for (logic::StructField& f : s.fields) if (f.type.of == old) f.type.of = to;
+          for (logic::StructField& f : s.fields) f.type = logic::type_renamed(f.type, old, to);
         e->name = to;
         return true;
       }
@@ -2138,12 +2218,12 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       };
       if (op == "remove") {
         std::string user;
-        for (const logic::Variable& v : g.variables) if (user.empty() && v.of == old) user = "the variable " + v.name;
+        for (const logic::Variable& v : g.variables) if (user.empty() && names_type(logic::declared(v), old)) user = "the variable " + v.name;
         for (const logic::Function& f : g.functions)
           for (const auto* pins : {&f.inputs, &f.outputs, &f.locals})
-            for (const logic::FunctionPin& fp : *pins) if (user.empty() && fp.of == old) user = "\"" + fp.name + "\" of the function " + f.name;
+            for (const logic::FunctionPin& fp : *pins) if (user.empty() && names_type(logic::declared(fp), old)) user = "\"" + fp.name + "\" of the function " + f.name;
         for (const logic::StructType& other : g.structs)
-          for (const logic::StructField& f : other.fields) if (user.empty() && f.type.of == old) user = "the field " + f.name + " of the struct " + other.name;
+          for (const logic::StructField& f : other.fields) if (user.empty() && names_type(f.type, old)) user = "the field " + f.name + " of the struct " + other.name;
         each_setting([&](logic::Node& n, const logic::ParamDef&, bool) { if (user.empty()) user = logic::library().title(n); });
         if (!user.empty()) { error = old + " is in use: " + user; return false; }
         g.structs.erase(std::remove_if(g.structs.begin(), g.structs.end(), [&](const logic::StructType& x) { return x.name == old; }), g.structs.end());
@@ -2156,12 +2236,12 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         if (const std::string why = name_problem(g, to); !why.empty()) { error = why; return false; }
         if (const std::string why = type_name_problem(g, to); !why.empty()) { error = why; return false; }
         each_setting([&](logic::Node& n, const logic::ParamDef& pd, bool list) { n.set_param(pd.key, list ? to + "_list" : to); });
-        for (logic::Variable& v : g.variables) if (v.of == old) v.of = to;
+        for (logic::Variable& v : g.variables) v.of = logic::type_renamed(logic::declared(v), old, to).of;  // (also where a map's keys or values are of it)
         for (logic::Function& f : g.functions)
           for (auto* pins : {&f.inputs, &f.outputs, &f.locals})
-            for (logic::FunctionPin& fp : *pins) if (fp.of == old) fp.of = to;
+            for (logic::FunctionPin& fp : *pins) fp.of = logic::type_renamed(logic::declared(fp), old, to).of;
         for (logic::StructType& other : g.structs)
-          for (logic::StructField& f : other.fields) if (f.type.of == old) f.type.of = to;
+          for (logic::StructField& f : other.fields) f.type = logic::type_renamed(f.type, old, to);
         s->name = to;
         return true;
       }
@@ -2178,11 +2258,13 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       auto field_type = [&](const std::string& text, logic::TypeRef& t) {
         if (!logic::type_from_text(text.empty() ? "float" : text, g, t)) { error = "unknown type"; return false; }
         if (!with_count(t, error)) return false;
-        if (logic::element_of(t.type) != logic::PinType::structure) return true;
-        const logic::StructType* inner = g.structure(t.of);
-        if (t.of == old) { error = "a struct cannot contain itself"; return false; }
-        const std::vector<std::string> holds = logic::structs_in(*inner, g);
-        if (std::find(holds.begin(), holds.end(), old) != holds.end()) { error = t.of + " holds " + old + ": a struct cannot contain itself"; return false; }
+        for (const logic::TypeRef& named : logic::types_named(t)) {  // (a struct, a list of one, a map of one)
+          if (logic::element_of(named.type) != logic::PinType::structure) continue;
+          const logic::StructType* inner = g.structure(named.of);
+          if (named.of == old) { error = "a struct cannot contain itself"; return false; }
+          const std::vector<std::string> holds = inner ? logic::structs_in(*inner, g) : std::vector<std::string>();
+          if (std::find(holds.begin(), holds.end(), old) != holds.end()) { error = named.of + " holds " + old + ": a struct cannot contain itself"; return false; }
+        }
         return true;
       };
       /// Puts the structs in an order in which each stands after the structs its fields are of
@@ -2195,8 +2277,9 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
           for (std::size_t k = 0; k < rest.size() && !placed; ++k) {
             bool ready = true;
             for (const logic::StructField& f : rest[k].fields)
-              if (logic::element_of(f.type.type) == logic::PinType::structure)
-                ready = ready && std::any_of(sorted.begin(), sorted.end(), [&](const logic::StructType& x) { return x.name == f.type.of; });
+              for (const logic::TypeRef& named : logic::types_named(f.type))
+                if (logic::element_of(named.type) == logic::PinType::structure)
+                  ready = ready && std::any_of(sorted.begin(), sorted.end(), [&](const logic::StructType& x) { return x.name == named.of; });
             if (!ready) continue;
             sorted.push_back(std::move(rest[k]));
             rest.erase(rest.begin() + static_cast<std::ptrdiff_t>(k));

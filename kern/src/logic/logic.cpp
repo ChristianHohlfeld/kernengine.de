@@ -147,6 +147,25 @@ TypeRef value_type(const TypeRef& map) {
 }
 std::string keyed_of(const TypeRef& key, const TypeRef* value) { return type_named(key) + (value ? ">" + type_named(*value) : std::string()); }
 
+std::vector<TypeRef> types_named(const TypeRef& t) {
+  std::vector<TypeRef> r;
+  auto one = [&](const TypeRef& x) { if (declared_type(element_of(x.type)) && !x.of.empty()) r.push_back({x.type, x.of}); };
+  if (is_keyed(t.type)) {
+    one(key_type(t));
+    if (t.type == PinType::map) one(value_type(t));
+  } else {
+    one(t);
+  }
+  return r;
+}
+TypeRef type_renamed(const TypeRef& t, const std::string& from, const std::string& to) {
+  if (!is_keyed(t.type)) return declared_type(element_of(t.type)) && t.of == from ? TypeRef{t.type, to, t.count} : t;
+  TypeRef key = key_type(t), value = t.type == PinType::map ? value_type(t) : TypeRef{};
+  if (declared_type(element_of(key.type)) && key.of == from) key.of = to;
+  if (declared_type(element_of(value.type)) && value.of == from) value.of = to;
+  return {t.type, keyed_of(key, t.type == PinType::map ? &value : nullptr), t.count};
+}
+
 MapKey key_of(const Value& v) {
   MapKey k;
   if (v.type == PinType::text) k.s = v.s;
@@ -698,12 +717,13 @@ std::vector<std::string> structs_in(const StructType& s, const Graph& g) {
   while (!todo.empty()) {
     const StructType* at = todo.back();
     todo.pop_back();
-    for (const StructField& f : at->fields) {
-      if (element_of(f.type.type) != PinType::structure || f.type.of == s.name) continue;
-      if (std::find(names.begin(), names.end(), f.type.of) != names.end()) continue;
-      names.push_back(f.type.of);
-      if (const StructType* inner = g.structure(f.type.of)) todo.push_back(inner);
-    }
+    for (const StructField& f : at->fields)
+      for (const TypeRef& named : types_named(f.type)) {  // (a field of a struct, a list of one, a map of one)
+        if (element_of(named.type) != PinType::structure || named.of == s.name) continue;
+        if (std::find(names.begin(), names.end(), named.of) != names.end()) continue;
+        names.push_back(named.of);
+        if (const StructType* inner = g.structure(named.of)) todo.push_back(inner);
+      }
   }
   return names;
 }

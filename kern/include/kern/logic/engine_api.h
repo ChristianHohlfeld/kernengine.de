@@ -32,7 +32,7 @@ struct EnginePin {
   const char* id;     // the pin: the parameter's name in the engine's header ("result": what the function returns)
   PinType type;
   const char* of;     // a struct or an enum (or a list of them): its name
-  const char* shape;  // the value's form, written out: n i b v t, e<values>, {fields}, [items]
+  const char* shape;  // the value's form, written out: n i b v t, l (Int64), e<values>, {fields}, [items]
 };
 
 struct EngineFunction {

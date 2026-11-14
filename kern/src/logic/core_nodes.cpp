@@ -822,7 +822,7 @@ void add_lists(Library& lib) {
     // before the second?), or by the items' own order; stable (nodes.h, list::sort)
     NodeDef d = step("list.sort", "Sort List",
                      "Puts the items of a list variable in order: by Order, a pure function that takes two items and gives whether the first goes before the second - "
-                     "or, without one, by their own order (numbers, whole numbers, booleans, texts, enum values). Items that are equal in that order keep theirs.",
+                     "or, without one, by their own order (numbers, whole numbers, booleans, texts, enum values, Int64 by their bits as a u64). Items that are equal in that order keep theirs.",
                      "sort order arrange rank array", {}, {});
     d.params.push_back(param("function", "Order", ParamDef::Kind::function, ""));
     d.params.back().optional = true;
@@ -865,6 +865,7 @@ void add_lists(Library& lib) {
           case PinType::number: return a.n < b.n;
           case PinType::boolean: return a.b < b.b;
           case PinType::text: return a.s < b.s;
+          case PinType::int64: return static_cast<u64>(a.i) < static_cast<u64>(b.i);  // (by the bits as a u64 - logic::Int64's <)
           default: return false;
         }
       };

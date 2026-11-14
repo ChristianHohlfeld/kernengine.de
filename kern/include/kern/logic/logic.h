@@ -415,11 +415,16 @@ inline constexpr u32 kLongestFixed = 65536;
 bool fits(const TypeRef& from, const TypeRef& to);
 /// A map's and a set's types (TypeRef::of beside PinType::map / set): the keys' and, of a map,
 /// the values' - "int>float", "enum:Mode>struct_list:Weapon", of a set "int". A key is a Bool,
-/// an Int, an enum's value or a Text; a value is any type a variable can be but a map or a set.
+/// an Int, an Int64, an enum's value or a Text; a value is any type a variable can be but a map or a set.
 TypeRef key_type(const TypeRef& keyed);
 TypeRef value_type(const TypeRef& map);
 /// What TypeRef::of says of a map with these keys and values (`value` null: of a set).
 std::string keyed_of(const TypeRef& key, const TypeRef* value);
+/// The types of the Blueprint (enums and structs) a type names: itself or its items - of a map its
+/// keys and its values, of a set its keys. (Each with the type it has there: Mode, Weapon_list.)
+std::vector<TypeRef> types_named(const TypeRef& t);
+/// The type with the enum or struct `from` called `to` wherever it names it (a map's keys, values).
+TypeRef type_renamed(const TypeRef& t, const std::string& from, const std::string& to);
 /// Can a map's or a set's keys be of this type?
 constexpr bool key_type_ok(PinType t) { return t == PinType::boolean || t == PinType::integer || t == PinType::int64 || t == PinType::enumeration || t == PinType::text; }
 /// The key of an entry as the interpreter holds it, and back (`key`: the keys' type).
@@ -731,7 +736,7 @@ struct ParamDef {
   bool enums_only = false;  // Kind::type: an enum of the Blueprint and nothing else (the enum nodes' "Enum")
   bool structs_only = false;  // Kind::type: a struct of the Blueprint and nothing else (the struct nodes' "Struct")
   bool optional = false;      // Kind::function: it may name none (Sort List without an Order: the items' own)
-  bool keys_only = false;     // Kind::type: a type a map's or a set's keys can be (Bool, Int, an enum, Text)
+  bool keys_only = false;     // Kind::type: a type a map's or a set's keys can be (Bool, Int, Int64, an enum, Text)
 };
 /// The types a Kind::type setting can name in the Blueprint `g` - its enums and structs among
 /// them -, in the order they are offered.

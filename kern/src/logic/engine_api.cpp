@@ -59,6 +59,17 @@ std::string engine_shown(const Value& v) {
     case PinType::vector: std::snprintf(b, sizeof b, "(%.9g, %.9g, %.9g)", static_cast<f64>(v.v.x), static_cast<f64>(v.v.y), static_cast<f64>(v.v.z)); return b;
     case PinType::text: return "\"" + v.s + "\"";
     case PinType::actor: std::snprintf(b, sizeof b, "actor %u", v.a); return b;
+    case PinType::int64: std::snprintf(b, sizeof b, "0x%llx", static_cast<unsigned long long>(static_cast<u64>(v.i))); return b;  // (its 64 bits)
+    case PinType::map:
+    case PinType::set: {  // (its entries in their order: {key: value, ...}, {key, ...} - a key's bits as the map holds them)
+      std::string s = "{";
+      const MapEntries& e = v.keyed();
+      for (std::size_t k = 0; k < e.size(); ++k) {
+        s += (k ? ", " : "") + (e.key_at(k).s.empty() ? std::to_string(e.key_at(k).i) : "\"" + e.key_at(k).s + "\"");
+        if (v.type == PinType::map) s += ": " + engine_shown(e.value_at(k));
+      }
+      return s + "}";
+    }
     case PinType::structure: {
       std::string s = "{";
       if (v.rows)
@@ -98,6 +109,7 @@ Value answer(std::string_view shape, std::size_t& at, u64& state) {
       return Value::vector(v);
     }
     case 't': return Value::text(std::string(1, static_cast<char>('a' + next(state) % 5)));
+    case 'l': return Value::int64(next(state));  // (an Int64: all of its 64 bits)
     case 'e': {
       i64 count = 0;
       while (at < shape.size() && shape[at] >= '0' && shape[at] <= '9') count = count * 10 + (shape[at++] - '0');
@@ -135,6 +147,7 @@ Value answer(std::string_view shape, std::size_t& at, u64& state) {
       if (what == 'i') { std::vector<i64> v; for (const Value& x : items) v.push_back(x.i); return Value::of(std::move(v)); }
       if (what == 'v') { std::vector<Vec3> v; for (const Value& x : items) v.push_back(x.v); return Value::of(std::move(v)); }
       if (what == 't') { std::vector<std::string> v; for (const Value& x : items) v.push_back(x.s); return Value::of(std::move(v)); }
+      if (what == 'l') { std::vector<Int64> v; for (const Value& x : items) v.push_back(Int64(static_cast<u64>(x.i))); return Value::of(std::move(v)); }
       std::vector<f64> v;
       for (const Value& x : items) v.push_back(x.n);
       return Value::of(std::move(v));

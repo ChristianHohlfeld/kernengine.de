@@ -1876,8 +1876,8 @@ struct Writer {
 // ---------------------------------------------------------------------------
 // reading
 
-const char* const kTypes = "a type (Bool, Int, Float, Vector, Text, Actor, an enum or a struct of the Blueprint, or List<one of them>) expected, not ";
-const char* const kListTypes = "List<Bool>, List<Int>, List<Float>, List<Vector>, List<Text>, List<Actor>, List<an enum> or List<a struct of the Blueprint>";
+const char* const kTypes = "a type (Bool, Int, Float, Vector, Text, Actor, Int64, an enum or a struct of the Blueprint, List<one of them>, Map<key, value> or Set<key>) expected, not ";
+const char* const kListTypes = "List<Bool>, List<Int>, List<Float>, List<Vector>, List<Text>, List<Actor>, List<Int64>, List<an enum> or List<a struct of the Blueprint>";
 
 struct Tok {
   enum Kind : u8 { id, number, text, punct, doc, end } kind = end;
@@ -2355,12 +2355,12 @@ struct Reader {
     }
     if ((is("Map") || is("Set")) && is("<", 1)) {
       // Map<Int, Float>: values under keys; Set<Int>: keys - in the order the keys came. A key is a
-      // Bool, an Int, an enum's value or a Text; a value any type but a map or a set.
+      // Bool, an Int, an Int64, an enum's value or a Text; a value any type but a map or a set.
       const bool map = is("Map");
       const std::size_t at = p;
       p += 2;
       TypeRef key, value;
-      if (!type_here(key) || !key_type_ok(key.type) || key.count) return fail(at + 2, "the keys of a map or a set are Bool, Int, Text or an enum");
+      if (!type_here(key) || !key_type_ok(key.type) || key.count) return fail(at + 2, "the keys of a map or a set are Bool, Int, Int64, Text or an enum");
       if (map) {
         if (!expect(",")) return false;
         if (!type_here(value) || is_keyed(value.type) || value.count) return fail(p, "the values of a map are a type a variable can be, but no map, set or list of a fixed length");
