@@ -488,17 +488,33 @@ Eine Form, die Gestalt oder Kosten ändert, ist keine von beiden.
     Klasse zwischen den zwei Meldungen ihres Aufrufcodes (`logic::native_probe`, eine allgemeine
     Messstelle der Engine: Argumente bauen und Ergebnisse zurückgeben liegt außerhalb). Der
     Vergleichstest prüft dabei auch, dass wirklich die Klasse läuft.
-  - **Der Stand:** Von 600 verglichenen Funktionen fordert die Klasse bei 470 nicht öfter an als
-    ihr Quelltext. Bei 130 tut sie es; der Test nennt jede (`cost:` in seiner Ausgabe) und ist
-    noch kein Fehler – er wird es, sobald die Liste leer ist. Woran es liegt, nach Häufigkeit:
-    1. Listen fester Länge (`f32 m[16]`, `std::array`) sind in der Sprache Listen und liegen im
-       Speicher, im C++ nicht (jede `Mat4`: 3 statt 0; die 256-Bit-Zahlen in `nostr`).
+  - **Übergeben statt kopieren (seit 14.11.2026, 09:15).** Die Klasse reicht einen Wert weiter,
+    wo ihn danach nichts mehr braucht – `std::move` im Text, vom Graphen aus entschieden
+    (`kern/docs/blueprint_cpp.md`, „Übergeben statt kopieren“): eine lokale Variable oder ein
+    Eingang als Wert dort, wo sie zum letzten Mal gelesen wird (auch in Schleifen: `All =
+    Make(All)` kopiert nichts), und was der Schritt direkt davor gab. Der Leser nimmt `std::move`
+    nur an diesen Stellen an. Dazu der Baustein **Take** (`var_take`): Er gibt, was an einem Platz
+    steht, und lässt ihn leer – der Konverter schreibt damit `std::move` aus einem Feld
+    (`take_points_log`), wo vorher „kopieren, dann leeren“ stand. Und Make (Struktur, Liste)
+    reicht durch, was es bekommt. Im Klassentext des Levels steht `std::move` an 683 Stellen.
+  - **Der Stand:** Von 600 verglichenen Funktionen fordert die Klasse bei 478 nicht öfter an als
+    ihr Quelltext (vorher 470). Bei 122 tut sie es; der Test nennt jede (`cost:` in seiner
+    Ausgabe) und ist noch kein Fehler – er wird es, sobald die Liste leer ist. Die Messung hat
+    die Ursachen genauer gezeigt, als sie am Morgen dastanden. Nach Häufigkeit:
+    1. **Listen fester Länge** (`f32 m[16]`, `std::array`) sind in der Sprache Listen und liegen
+       im Speicher, im C++ nicht – etwa 45 Funktionen: jede `Mat4` und alles, was Matrizen baut
+       (`*Art_put`: 9 statt 2), die 256-Bit-Zahlen in `nostr` (`powm`: 197.802 statt 0).
        → Die Sprache bekommt Listen fester Länge.
-    2. Eine Struktur aus Werten bauen kopiert die Werte (`struct_make`, `list_make`), und ein
-       `return {x}` kopiert die lokale Variable. → Die Klasse reicht sie durch, wie C++ es tut.
-    3. `std::move` aus einem Feld (`take_…`) ist heute „kopieren, dann leeren“. → Ein Baustein,
-       der nimmt und leer zurücklässt.
-    4. Ein Text aus einem festen Wortlaut (`const char*`) ist in der Klasse ein `std::string`.
+    2. **Listen in einem Zug** – etwa 28 Funktionen. `std::vector<T>(n)`, `resize`, `insert` eines
+       Bereichs, `reserve` sind in C++ eine Anforderung; im Blueprint sind sie heute Schleifen
+       aus einzelnen Add und Insert, deren Liste mehrmals wächst (`SmokeField_new`: 7 statt 1,
+       `People::take_deaths`: 4 statt 1). → Bausteine, die es in einem Zug tun: Länge setzen,
+       eine Liste anhängen, Platz vorhalten.
+    3. **Ein Text aus einem festen Wortlaut** (`const char*`) ist in der Klasse ein `std::string`
+       – 10 Funktionen (die Shader-Texte: 1 statt 0).
+    4. **Rund 30 einzelne**, viele nur in einem von 300 Aufrufen teurer (`Field_near`,
+       `clock_ms` …): jede wird angesehen, sobald 1 bis 3 erledigt sind – ein Teil fällt mit
+       ihnen weg.
 - **Gestalt:** Nach 1 bis 3 steht im Level keine Methode mehr, die ihr Objekt hinein- und
   herausbekommt; nach 5 und 6 keine Map als Liste und kein `Whole64`.
 

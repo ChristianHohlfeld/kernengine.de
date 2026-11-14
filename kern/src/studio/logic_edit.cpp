@@ -897,6 +897,7 @@ json::Value Studio::logic_palette(const json::Value& c) const {
     consider({"Get " + v.name, category, "Reads " + what, "var.get", with({{"variable", v.name}})});
     if (v.constant) return;  // (a constant is read: nothing changes it)
     consider({"Set " + v.name, category, "Writes " + what, "var.set", with({{"variable", v.name}})});
+    consider({"Take " + v.name, category, "Takes what " + what + " holds and leaves it empty", "var.take", with({{"variable", v.name}})});
     if (v.type == logic::PinType::number || v.type == logic::PinType::integer)
       consider({"Add to " + v.name, category, "Adds to " + what, "var.add", with({{"variable", v.name}})});
     // a struct variable: the Set of each of its fields - a Set at that place (Held.Damage)
@@ -1411,7 +1412,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         n.set_param("function", g.functions.front().name);
       }
       // New variables nodes on a graph without variables: offer one (Get / Set need a name).
-      if ((type == "var.get" || type == "var.set" || type == "var.add") && n.param("variable").empty()) {
+      if ((type == "var.get" || type == "var.set" || type == "var.add" || type == "var.take") && n.param("variable").empty()) {
         if (g.variables.empty()) g.variables.push_back({"Count", logic::PinType::number, json::Value(0.0), {}});
         n.set_param("variable", g.variables.front().name);
       }

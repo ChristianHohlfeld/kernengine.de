@@ -714,7 +714,7 @@ struct Shape {
     };
     std::vector<std::vector<Write>> writes(count);
     std::vector<int> raises(count, -1);      // a step of the function that may run handlers (NodeDef::raises): anything the Blueprint holds may change
-    auto writes_place = [](const std::string& t) { return t == "var.set" || t == "list.add" || t == "list.insert" || t == "list.remove_at" || t == "list.remove" || t == "list.clear"; };
+    auto writes_place = [](const std::string& t) { return t == "var.set" || t == "var.take" || t == "list.add" || t == "list.insert" || t == "list.remove_at" || t == "list.remove" || t == "list.clear"; };
     // what a call's function does, as the caller sees it: a write through one of its reference
     // inputs is a write at the place the call gave that input
     auto through = [&](std::size_t callee, int call) {
@@ -770,7 +770,7 @@ struct Shape {
         w.kind = g.root_of(*at(x).node, named);
         w.root = at(x).node->param("variable");
         if (w.kind == Graph::Root::none || !path_steps(at(x).node->param("path"), w.path)) continue;
-        w.resizes = t != "var.set";
+        w.resizes = t != "var.set" && t != "var.take";  // (a Take puts the zero where something stood, like a Set)
         w.node = x;
         writes[f].push_back(std::move(w));
       }
@@ -1111,6 +1111,211 @@ struct Writer {
   }
   /// What a call gives its function's inputs, in their order: a value for an input by value,
   /// the place for a reference - Car_step(Cars[n4.index], 0.5).
+  /// Does a value of this type hold memory of its own - a text, a list, a struct with one of
+  /// them? (Handing such a value over instead of copying it is what std::move says.)
+  bool holds_memory(PinType type, const std::string& of, int depth = 0) const {
+    if (type == PinType::text || is_list(type)) return true;
+    if (type != PinType::structure || depth > 16) return false;
+    const StructType* st = s.g.structure(of);
+    if (!st) return false;
+    for (const StructField& f : st->fields)
+      if (holds_memory(f.type.type, f.type.of, depth + 1)) return true;
+    return false;
+  }
+
+  /// What the step right before `x` gave, read by the input `k` of `x` alone. "Right before": a
+  /// plain step whose one path leads to `x`, and no other path does - `x` runs once after each
+  /// of its runs and never without one.
+  bool from_step_before(int x, int k) {
+    const std::pair<int, int> read = at(x).src[static_cast<std::size_t>(k)];
+    if (read.first < 0 || at(read.first).form != Form::plain || at(x).entered != 1) return false;
+    const Info& F = at(read.first);
+    const PinDef pin = F.out[static_cast<std::size_t>(read.second)];
+    if (!holds_memory(pin.type, pin.of) || pin.type != at(x).in[static_cast<std::size_t>(k)].type) return false;
+    if (F.dst.size() != 1 || F.dst[0].first != x) return false;
+    int reads = 0;
+    for (const auto& [reader, input] : F.readers) reads += at(reader).src[static_cast<std::size_t>(input)] == read ? 1 : 0;
+    return reads == 1;
+  }
+  // ---- what is needed again: the local variables and the inputs by value of a function ----
+  // A call of a function has them for itself (in the class they are C++'s own local variables).
+  // So whether one is needed again is a question about the steps of that call alone: is it read
+  // on a way from here before it is set anew?
+  struct CallFlow {
+    std::vector<int> steps;                                  // the steps a call of the function may run
+    std::map<int, std::vector<std::string>> reads;           // per step: the names it reads - in its values, at its place
+    std::map<int, std::string> sets;                         // per step: the local variable it sets as a whole
+    std::map<std::string, std::vector<u8>> needed;           // per name, per node: read after that step, before it is set anew
+  };
+  std::vector<std::vector<int>> next_;  // per node: the steps that may run after it
+  std::map<int, CallFlow> flows_;       // per Function Entry
+
+  static bool names_variable(const std::string& key) { return key == "variable" || (key.size() > 9 && key.compare(key.size() - 9, 9, ".variable") == 0); }
+  /// The steps reached from `from` along the exec wires.
+  std::vector<int> reached(int from) {
+    std::vector<int> seen;
+    if (from >= 0) seen.push_back(from);
+    for (std::size_t next = 0; next < seen.size(); ++next)
+      for (const auto& d : at(seen[next]).dst)
+        if (d.first >= 0 && std::find(seen.begin(), seen.end(), d.first) == seen.end()) seen.push_back(d.first);
+    return seen;
+  }
+  /// Can the path end at this step? A plain step and a Branch go on where every exec output is
+  /// wired; a Return ends the call, not the path. Anything else may end it: an output nothing is
+  /// wired to, a step that decides whether it goes on (Do Once, a Switch without that case), a
+  /// loop that has completed, the last block of a Sequence, a wait.
+  bool may_end(int y) {
+    const Info& Y = at(y);
+    if (Y.form == Form::give) return false;
+    if ((Y.form != Form::plain && Y.form != Form::branch) || Y.dst.empty()) return true;
+    for (const auto& d : Y.dst)
+      if (d.first < 0) return true;
+    return false;
+  }
+  /// What may run after a step: where its exec outputs lead - and, where the path ends inside the
+  /// body of a loop, the loop again; inside a block of a Sequence, the blocks after it.
+  void flow() {
+    if (!next_.empty()) return;
+    next_.assign(s.n.size(), {});
+    for (std::size_t i = 0; i < s.n.size(); ++i)
+      for (const auto& d : s.n[i].dst)
+        if (d.first >= 0) next_[i].push_back(d.first);
+    for (std::size_t i = 0; i < s.n.size(); ++i) {
+      const Info& C = s.n[i];
+      const bool loop = C.form == Form::loop || C.form == Form::loop_while;
+      if (!loop && C.form != Form::sequence) continue;
+      for (std::size_t k = 0; k < C.dst.size() && (!loop || k == 0); ++k)  // (a loop's body is its first output)
+        for (int y : reached(C.dst[k].first)) {
+          if (!may_end(y)) continue;
+          if (loop) next_[static_cast<std::size_t>(y)].push_back(static_cast<int>(i));
+          else
+            for (std::size_t later = k + 1; later < C.dst.size(); ++later)
+              if (C.dst[later].first >= 0) next_[static_cast<std::size_t>(y)].push_back(C.dst[later].first);
+        }
+    }
+  }
+  CallFlow& flow_of(int entry) {
+    auto found = flows_.find(entry);
+    if (found != flows_.end()) return found->second;
+    flow();
+    CallFlow& f = flows_[entry];
+    f.steps.push_back(entry);
+    for (std::size_t next = 0; next < f.steps.size(); ++next)
+      for (int to : next_[static_cast<std::size_t>(f.steps[next])])
+        if (std::find(f.steps.begin(), f.steps.end(), to) == f.steps.end()) f.steps.push_back(to);
+    for (int y : f.steps) {
+      const Info& Y = at(y);
+      std::vector<std::string>& reads = f.reads[y];
+      // (its values: what it reads through values, and the function's inputs it reads from the entry)
+      std::vector<int> seen{y};
+      for (std::size_t next = 0; next < seen.size(); ++next) {
+        const Info& Q = at(seen[next]);
+        for (const auto& from : Q.src) {
+          if (from.first == entry) reads.push_back(at(entry).out[static_cast<std::size_t>(from.second)].id);
+          if (from.first >= 0 && at(from.first).pure && std::find(seen.begin(), seen.end(), from.first) == seen.end()) seen.push_back(from.first);
+        }
+        if (seen[next] == y) continue;
+        for (const auto& [key, named] : Q.node->params)
+          if (names_variable(key)) reads.push_back(named);
+      }
+      // (its place: a Set of a whole local variable sets it - anything else at a place reads what is there)
+      Variable named;
+      const bool sets = Y.def->type == "var.set" && Y.node->param("path").empty() && s.g.root_of(*Y.node, named) == Graph::Root::local;
+      if (sets) f.sets[y] = Y.node->param("variable");
+      for (const auto& [key, value] : Y.node->params)
+        if (names_variable(key) && !(sets && key == "variable")) reads.push_back(value);
+    }
+    return f;
+  }
+  /// Per node: is `name` - a local variable or an input by value of the function at `entry` -
+  /// read after that step, before it is set anew?
+  const std::vector<u8>& needed_after(int entry, const std::string& name) {
+    CallFlow& f = flow_of(entry);
+    auto found = f.needed.find(name);
+    if (found != f.needed.end()) return found->second;
+    std::vector<u8> before(s.n.size(), 0);
+    std::vector<u8>& after = f.needed[name];
+    after.assign(s.n.size(), 0);
+    for (bool changed = true; changed;) {
+      changed = false;
+      for (int y : f.steps) {
+        const std::size_t at_y = static_cast<std::size_t>(y);
+        u8 out = 0;
+        for (int to : next_[at_y]) out |= before[static_cast<std::size_t>(to)];
+        const std::vector<std::string>& reads = f.reads[y];
+        const auto set = f.sets.find(y);
+        const u8 in = std::find(reads.begin(), reads.end(), name) != reads.end() || (out && !(set != f.sets.end() && set->second == name)) ? 1 : 0;
+        if (out != after[at_y] || in != before[at_y]) changed = true;
+        after[at_y] = out;
+        before[at_y] = in;
+      }
+    }
+    return after;
+  }
+  /// Does the input `k` of the step `x` read a local variable of its function, or one of its
+  /// inputs by value, as a whole and for the last time - nothing else `x` reads names it, and
+  /// nothing that may run after `x` reads it before it is set anew?
+  bool last_use(int x, int k) {
+    const std::pair<int, int> read = at(x).src[static_cast<std::size_t>(k)];
+    if (read.first < 0 || at(x).place < 0) return false;
+    const Info& F = at(read.first);
+    const PinDef pin = F.out[static_cast<std::size_t>(read.second)];
+    if (!holds_memory(pin.type, pin.of) || pin.type != at(x).in[static_cast<std::size_t>(k)].type) return false;
+    std::string name;
+    int entry = -1;
+    if (F.def->type == "var.get") {
+      Variable named;
+      if (F.named || !F.node->param("path").empty() || s.g.root_of(*F.node, named) != Graph::Root::local) return false;
+      name = F.node->param("variable");
+      // (the function whose call has it: `x` stands in that function's own body - Shape::rules)
+      if (s.ctx[static_cast<std::size_t>(at(x).place)].first == kCallable) entry = s.ctx[static_cast<std::size_t>(at(x).place)].second;
+      if (entry < 0 || at(entry).def->type != "func.entry" || at(entry).node->param("function") != F.node->param("scope")) return false;
+    } else if (F.def->type == "func.entry" && F.place == at(x).place) {
+      const Function* f = s.g.function(F.node->param("function"));
+      const FunctionPin* input = nullptr;
+      if (f)
+        for (const FunctionPin& in : f->inputs)
+          if (in.name == pin.id) input = &in;
+      if (!input || input->ref) return false;
+      name = pin.id;
+      entry = read.first;
+    } else {
+      return false;
+    }
+    // what `x` itself reads: its own inputs and, through them, the values they are made of - and its place
+    std::vector<int> seen{x};
+    for (std::size_t next = 0; next < seen.size(); ++next)
+      for (const auto& from : at(seen[next]).src)
+        if (from.first >= 0 && at(from.first).pure && std::find(seen.begin(), seen.end(), from.first) == seen.end()) seen.push_back(from.first);
+    int reads = 0;
+    for (int q : seen) {
+      for (const auto& from : at(q).src) reads += from == read ? 1 : 0;
+      if (q == read.first) continue;
+      for (const auto& [key, named] : at(q).node->params)
+        if (named == name && names_variable(key)) return false;
+    }
+    return reads == 1 && !needed_after(entry, name)[static_cast<std::size_t>(x)];
+  }
+  /// Is what the input `k` of the step `x` reads needed by nothing once `x` has it? Then the text
+  /// hands it over - std::move(Points), as C++ writes it (the graph has nothing to say for it:
+  /// the wire is the same wire):
+  /// - a local variable of the function or one of its inputs by value, read here for the last
+  ///   time: in a Return always (the call is over - C++ does the same for a plain `return
+  ///   Points;`), in any other step when no way from it reads the variable before it is set anew
+  /// - what the step right before gave, read by this input alone
+  /// A While reads its condition before every round, a value whenever it is read: they hand
+  /// nothing over.
+  bool hands_over(int x, int k) {
+    const Info& X = at(x);
+    if (X.pure || X.event || X.form == Form::loop_while) return false;
+    return last_use(x, k) || from_step_before(x, k);
+  }
+  /// What input `k` of the step `x` is given: its value, handed over where `hands_over` says so.
+  std::string given(int x, int k, int c) {
+    const std::string e = value(x, k, c);
+    return hands_over(x, k) ? "std::move(" + e + ")" : e;
+  }
+
   std::string call_args(int x, int c) {
     const Function* f = s.g.function(at(x).node->param("function"));
     if (!f) return inputs(x, c);
@@ -1124,7 +1329,7 @@ struct Writer {
         const std::vector<int> pins = at(x).data_in;
         for (int k : pins)
           if (at(x).in[static_cast<std::size_t>(k)].id == in.name) pin = k;
-        if (pin >= 0) a = value(x, pin, c);
+        if (pin >= 0) a = given(x, pin, c);
       }
       r += (r.empty() ? "" : ", ") + a;
     }
@@ -1139,7 +1344,7 @@ struct Writer {
     const std::vector<int> pins = at(x).data_in;
     for (int k : pins) {
       if (in_place(x, k)) continue;
-      const std::string v = value(x, k, c);
+      const std::string v = given(x, k, c);
       r += (r.empty() ? "" : ", ") + v;
     }
     return r;
@@ -1371,7 +1576,7 @@ struct Writer {
       // Heat = value;   Cars[n4.index].Wheels[0].Slip = value;   Heat += value;
       // or, when what the node gives is read: n5.value = (Heat = value);
       const std::string where = place_text(x, c);
-      const std::string set = where + (t == "var.set" ? " = " : " += ") + value(x, X.data_in.front(), c);
+      const std::string set = where + (t == "var.set" ? " = " + given(x, X.data_in.front(), c) : " += " + value(x, X.data_in.front(), c));
       line(ind, X.member ? "n" + id(x) + "." + X.out[static_cast<std::size_t>(X.data_out.front())].id + " = (" + set + ");" : set + ";");
       return 0;
     }
@@ -1687,6 +1892,7 @@ struct Reader {
     std::string of;     // a value written out: of which enum (when it is an enum's)
     std::size_t tok = 0;
     bool root = false;  // the expression is one new value node (what a name can be given to)
+    std::size_t moved = 0;  // std::move(value): the token it stands at, plus one
   };
   struct DataWire { int to; std::string in; Src from; };
   struct ExecWire { int from; std::string out; int to; u32 to_id; std::string in; std::size_t tok; };
@@ -1697,6 +1903,7 @@ struct Reader {
   static constexpr int kGone = -2;
   static Ends gone() { return {{kGone, std::string()}}; }
   std::vector<DataWire> data_wires;
+  std::vector<std::size_t> moves;  // every std::move( of the text (its token)
   std::vector<ExecWire> exec_wires;
   std::set<int> published;  // events / entries (made index) whose method begins with "n<id> = {...};"
 
@@ -2807,6 +3014,19 @@ struct Reader {
     }
     const Tok t = peek();
     if (t.kind != Tok::id) { fail(p, "a value expected, not " + shown(t)); return s; }
+    if (t.s == "std") {
+      // std::move(value): the value, handed over - what the wire carries is the same (the text
+      // says it where a value is not needed again; the graph has nothing to say for it)
+      const std::size_t at = p;
+      p += 1;
+      if (!expect("::") || !expect("move") || !expect("(")) return s;
+      Src handed = value();
+      if (!failed()) expect(")");
+      handed.moved = at + 1;
+      handed.root = false;
+      moves.push_back(at);
+      return handed;
+    }
     if (t.s == "kern") {
       p += 1;
       if (!expect("::")) return s;
@@ -3961,6 +4181,28 @@ struct Reader {
       std::size_t tok = toks.size() - 1;
       for (const Made& m : made) if (m.node.id == shape.error_node) tok = m.tok;
       return fail(tok, shape.error);
+    }
+    {
+      // std::move(value) stands where the value is needed by nothing again - where the text of
+      // this graph has it (Writer::hands_over). Anywhere else C++ would leave a place empty
+      // that the Blueprint still reads.
+      const char* const why = "std::move hands over a value nothing needs again: a local variable or an input by value of the function where it is read for the last time; "
+                              "or what the step right before gave, read here alone. This value is needed again (or is none of them): write it without std::move";
+      Writer w(shape);
+      std::vector<std::size_t> bound;
+      for (const DataWire& wire : data_wires) {
+        if (!wire.from.moved) continue;
+        bound.push_back(wire.from.moved - 1);
+        const u32 id = made[static_cast<std::size_t>(wire.to)].node.id;
+        int x = -1, k = -1;
+        for (std::size_t i = 0; i < shape.n.size(); ++i)
+          if (shape.n[i].node->id == id) x = static_cast<int>(i);
+        for (std::size_t i = 0; x >= 0 && i < shape.at(x).in.size(); ++i)
+          if (shape.at(x).in[i].id == wire.in) k = static_cast<int>(i);
+        if (x < 0 || k < 0 || !w.hands_over(x, k)) return fail(wire.from.moved - 1, why);
+      }
+      for (std::size_t tok : moves)
+        if (std::find(bound.begin(), bound.end(), tok) == bound.end()) return fail(tok, why);
     }
     for (const Info& x : shape.n) {
       const u32 id = x.node->id;

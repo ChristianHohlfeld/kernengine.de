@@ -3077,6 +3077,21 @@ class Emit:
         name = self.names[n["referencedDecl"]["id"]]
         return not any(name == p and kind for (p, _), kind in zip(self.f.params, self.f.kinds))
 
+    def taken_out(self, n, lt):
+        """What stood where a list is moved out of, the place left empty: a Take (var_take - the list is
+        handed on, not copied) where the place is one of the notation - a variable, a field, a list entry.
+        Anywhere else (a map's row ...) its value is held and the place is set to the empty list."""
+        got = self.spot(n)
+        if got is not None and got[1] == lt and self.writable(got[0]):
+            node = self.u.next_node
+            self.u.next_node += 1
+            self.u.members.append(f"  struct {{ {lt} value = {self.u.zero(lt)}; }} n{node};")
+            self.hoist([f"var_take(n{node}, {got[0]});"])
+            return f"n{node}.value"
+        tmp = self.temp("moved", lt)
+        self.hoist([f"{tmp} = {self.ex(n, lt)};"] + self.store(n, lambda t: t + "{}"))
+        return tmp
+
     def moved_into(self, n, by):
         """A value that is moved (std::move(x)) and what takes it: a constructor or an assignment that takes
         its argument as T&& - then the value is gone where it was (see `call`)."""
@@ -4227,9 +4242,7 @@ class Emit:
             if name == "move" and len(a) == 1 and self.is_box(a[0]):
                 # what is moved out of an owned value is gone there
                 lt = self.tp(a[0])
-                tmp = self.temp("moved", lt)
-                self.hoist([f"{tmp} = {self.ex(a[0], lt)};"] + self.store(a[0], lambda t: t + "{}"))
-                return tmp, lt
+                return self.taken_out(a[0], lt), lt
             if name == "move" and len(a) == 1 and b.get("_taken") and not self.own_value(a[0]):
                 # A value a constructor or an assignment takes out of a place that stays - a field of the
                 # object, what a reference names: a list (std::vector) is empty there afterwards. Of anything
@@ -4237,9 +4250,7 @@ class Emit:
                 lt = self.tp(a[0])
                 if not (lt.startswith("List<") and self.ctype(a[0]).startswith("std::vector<")):
                     raise Wait("what stays where a value was moved out of (std::move): C++ leaves it open, but for a list")
-                tmp = self.temp("moved", lt)
-                self.hoist([f"{tmp} = {self.ex(a[0], lt)};"] + self.store(a[0], lambda t: t + "{}"))
-                return tmp, lt
+                return self.taken_out(a[0], lt), lt
             if name in ("move", "forward") and len(a) == 1:
                 return self.value(a[0])
             if name == "make_unique" and self.is_box(b):

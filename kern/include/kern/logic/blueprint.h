@@ -19,6 +19,7 @@
 #include <string_view>
 #include <tuple>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "kern/logic/engine_nodes.gen.h"
@@ -257,7 +258,13 @@ struct BlueprintCore : logic::PureNodes {
   // What they do is logic::list (nodes.h): the functions the interpreter's nodes call. The values
   // take any list - the type of its items is their setting, list_get<Float>(Scores, 0); the steps
   // change a list variable - the member itself is their first value.
-  template <class T, Setting Count, class... V> static List<T> list_make(const V&... items) { return List<T>{T(items)...}; }
+  /// (each item is made once, where it stands in the list - what is handed over is not copied)
+  template <class T, Setting Count, class... V> static List<T> list_make(V&&... items) {
+    List<T> made;
+    made.reserve(sizeof...(V));
+    (made.emplace_back(T(std::forward<V>(items))), ...);
+    return made;
+  }
   template <class T> static Int list_length(const std::type_identity_t<List<T>>& list) { return logic::list::length(list); }
   template <class T> static const T& list_get(const std::type_identity_t<List<T>>& list, Int index) { return list[index]; }
   template <class T> static Bool list_contains(const std::type_identity_t<List<T>>& list, const std::type_identity_t<T>& item) { return logic::list::contains(list, item); }
@@ -269,6 +276,13 @@ struct BlueprintCore : logic::PureNodes {
   template <class T> static void list_remove(List<T>& list, const std::type_identity_t<T>& item) { logic::list::remove(list, item); }
   template <class N, class T> static void list_remove(N& n, List<T>& list, const std::type_identity_t<T>& item) { n.removed = logic::list::remove(list, item); }
   template <class T> static void list_clear(List<T>& list) { logic::list::clear(list); }
+
+  // ---- variables ----
+  // Get, Set and Add are C++'s own (Heat, Heat = value, Heat += value). A Take gives what
+  // stands at a place and leaves the zero of its type there - std::exchange(place, {}): a list,
+  // a text is handed on, not copied.
+  template <class T> static void var_take(T& place) { place = T{}; }
+  template <class N, class T> static void var_take(N& n, T& place) { n.value = std::exchange(place, T{}); }
 
   // ---- enums ----
   // An enum the Blueprint declares with KERN_ENUM; the nodes' setting "Enum" is the type:
@@ -310,7 +324,7 @@ struct BlueprintCore : logic::PureNodes {
   // Make is the struct from a value for each field, in their order; Break is the struct, read
   // field by field: struct_break<Weapon>(Held).Damage. (A field of a variable is set where it
   // is: Held.Damage = 2.0; - the Set at that place, no function.)
-  template <class S, class... V> static S struct_make(const V&... fields) { return S{fields...}; }
+  template <class S, class... V> static S struct_make(V&&... fields) { return S{std::forward<V>(fields)...}; }
   /// list_find_row<&Weapon::Name>(Rack, "Bow"): the first item of a list of structs whose field
   /// is the value - a table's row by its key. Not found: the struct's defaults, index -1.
   template <class S> struct FoundRow {

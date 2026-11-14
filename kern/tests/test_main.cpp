@@ -3912,6 +3912,100 @@ TEST(game_blueprints_as_classes) {
   }
 }
 
+TEST(logic_notation_hands_over) {
+  // std::move stands in a Blueprint's C++ exactly where a value is needed by nothing again - a
+  // local variable or an input by value of a function where it is read for the last time, what
+  // the step right before gave when this input alone reads it. The text of a graph has it there;
+  // a text is read with it there, without it there (the graph is the same), and with it nowhere
+  // else.
+  const std::string head = "struct B : kern::Blueprint {\n  List<Float> Log = List<Float>{};\n  List<Float> Kept = List<Float>{};\n  Text Name = \"\";\n  Int Count = 0;\n";
+  const std::string make = "  struct MakeResult { List<Float> list = List<Float>{}; Text name = \"\"; };\n"
+                           "  MakeResult Make(List<Float> given = List<Float>{}, Text name = \"\") {\n"
+                           "    List<Float> Made = List<Float>{};\n"
+                           "    Made = given;\n";
+  auto text_of = [&](const std::string& returned, const std::string& event, const std::string& round = {}) {
+    // (the members of the steps the text names: n5, n7 and n23 are calls of Make, n9 is a Take, n20 a For Loop)
+    const auto names = [&](const char* member) { return event.find(member) != std::string::npos || round.find(member) != std::string::npos; };
+    const std::string grow = round.empty() ? std::string()
+                                           : "  struct GrowResult { List<Float> list = List<Float>{}; };\n"
+                                             "  GrowResult Grow(List<Float> from = List<Float>{}, Int n = 2) {\n"
+                                             "    List<Float> Item = List<Float>{};\n"
+                                             "    List<Float> All = List<Float>{};\n"
+                                             "    for (auto it20 = flow_for(n20, 1, n); it20.next();) {\n" +
+                                                 round + "    }\n    return {All};\n  }\n";
+    return head + make + "    return {" + returned + "};\n  }\n" + grow + "  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, Float value, Text text) {\n" + event + "  }\n" +
+           (names("n5") ? "  MakeResult n5;\n" : "") + (names("n7") ? "  MakeResult n7;\n" : "") + (names("n9") ? "  struct { List<Float> value = List<Float>{}; } n9;\n" : "") +
+           (round.empty() ? "" : "  struct : kern::Node<20> { Int index = 0; } n20;\n") + (names("n23") ? "  MakeResult n23;\n" : "") + "};\n";
+  };
+  auto written = [&](const std::string& returned, const std::string& event, const std::string& round = {}) {
+    logic::Graph g;
+    std::string error, back;
+    if (!logic::from_cpp(text_of(returned, event, round), g, nullptr, &error) || !logic::to_cpp(g, "B", back, &error, logic::library(), false)) {
+      std::printf("not read: %s\n", error.c_str());
+      return std::string();
+    }
+    return back;
+  };
+  auto has = [](const std::string& text, const char* part) {
+    const bool there = text.find(part) != std::string::npos;
+    if (!there) std::printf("\"%s\" is missing in:\n%s\n", part, text.c_str());
+    return there;
+  };
+  const std::string plain = "    n5 = Make(Log, \"a\");\n    Kept = n5.list;\n";
+  {
+    // written without it: the same graph, and its text has it
+    const std::string t = written("Made, name", plain);
+    CHECK(has(t, "    Made = std::move(given);\n    return {std::move(Made), std::move(name)};\n"));
+    CHECK(has(t, "    Kept = std::move(n5.list);\n"));
+    CHECK(t == written("std::move(Made), std::move(name)", "    n5 = Make(Log, \"a\");\n    Kept = std::move(n5.list);\n"));
+    logic::Graph with, without;
+    CHECK(logic::from_cpp(text_of("std::move(Made), std::move(name)", "    n5 = Make(Log, \"a\");\n    Kept = std::move(n5.list);\n"), with));
+    CHECK(logic::from_cpp(text_of("Made, name", plain), without));
+    std::string difference;
+    CHECK(logic::same_blueprint(with, without, &difference));
+  }
+  // what a call is given: the step right before - a call, a Take
+  CHECK(has(written("Made, name", "    n5 = Make(Log, \"a\");\n    n7 = Make(n5.list, n5.name);\n    Kept = n7.list;\n"), "    n7 = Make(std::move(n5.list), std::move(n5.name));\n    Kept = std::move(n7.list);\n"));
+  CHECK(has(written("Made, name", "    var_take(n9, Log);\n    Kept = n9.value;\n"), "    var_take(n9, Log);\n    Kept = std::move(n9.value);\n"));
+  CHECK(has(written("Made, name", "    n5 = Make(Log, \"a\");\n    list_add(Kept, kern::to<Float>(list_length<Float>(n5.list)));\n"), "list_length<Float>(n5.list)"));  // (a value reads it: whenever it is read)
+  // a value that is needed again is copied
+  CHECK(has(written("Made, text_append(name, \"!\", \"\")", plain), "    return {std::move(Made), text_append(name, \"!\", \"\")};\n"));  // (name inside a value: the value reads it)
+  CHECK(has(written("Made, text_append(kern::to<Text>(Made), name, \"\")", plain), "    return {Made, text_append(kern::to<Text>(Made), name, \"\")};\n"));
+  CHECK(has(written("given, name", plain), "    Made = given;\n    return {std::move(given), std::move(name)};\n"));  // (the Set is not the last to read it, the Return is)
+  CHECK(has(written("Made, name", "    n5 = Make(Log, \"a\");\n    Kept = n5.list;\n    Log = n5.list;\n"), "    Kept = n5.list;\n    Log = n5.list;\n"));
+  CHECK(has(written("Made, name", "    n5 = Make(Log, \"a\");\n    Count += 1;\n    Kept = n5.list;\n"), "    Count += 1;\n    Kept = n5.list;\n"));  // (not the step right before)
+  CHECK(has(written("Made, name", "    n5 = Make(Log, \"a\");\n    if (math_compare<\">\">(value, 1.0)) {\n      Count += 1;\n    }\n    Kept = n5.list;\n"), "    Kept = n5.list;\n"));
+  CHECK(has(written("Log, name", plain), "    return {Log, std::move(name)};\n"));  // (a variable of the Blueprint stays)
+  // a local variable in a loop: handed over when the next round sets it anew before reading it - and the input
+  // that every round reads is copied
+  CHECK(has(written("Made, name", plain, "      Item = from;\n      list_add(Item, 1.0);\n      n23 = Make(Item, \"x\");\n      All = n23.list;\n"),
+            "      Item = from;\n      list_add(Item, 1.0);\n      n23 = Make(std::move(Item), \"x\");\n      All = std::move(n23.list);\n    }\n    return {std::move(All)};\n"));
+  CHECK(has(written("Made, name", plain, "      list_add(Item, 1.0);\n      n23 = Make(Item, \"x\");\n      All = n23.list;\n"), "      n23 = Make(Item, \"x\");\n      All = std::move(n23.list);\n"));
+  CHECK(has(written("Made, name", plain, "      n23 = Make(Item, \"x\");\n      list_add(Item, 1.0);\n      Item = from;\n      All = n23.list;\n"), "      n23 = Make(Item, \"x\");\n      list_add(Item, 1.0);\n"));
+  CHECK(has(written("Made, name", plain, "      n23 = Make(All, \"x\");\n      All = n23.list;\n"), "      n23 = Make(std::move(All), \"x\");\n      All = std::move(n23.list);\n"));  // (All = Make(All): nothing is copied)
+  CHECK(has(written("Made, name", plain, "      if (math_compare<\">\">(kern::to<Float>(n20.index), 1.0)) {\n        Item = from;\n      }\n      n23 = Make(Item, \"x\");\n      All = n23.list;\n"),
+            "      n23 = Make(Item, \"x\");\n"));  // (a round that does not set it reads what the round before left)
+  // and where C++ would leave a place empty that the Blueprint still reads, the text is refused
+  auto refused = [&](const std::string& returned, const std::string& event, const char* where, const std::string& round = {}) {
+    logic::Graph g;
+    std::string error;
+    const bool read = logic::from_cpp(text_of(returned, event, round), g, nullptr, &error);
+    const bool right = !read && error.find("std::move hands over a value nothing needs again") != std::string::npos && error.rfind(where, 0) == 0;
+    if (!right) std::printf("expected the std::move at %s to be refused, got: %s\n", where, read ? "(it was read)" : error.c_str());
+    CHECK(right);
+  };
+  refused("std::move(Made), text_append(kern::to<Text>(Made), name, \"\")", plain, "line 10, column 13:");
+  refused("std::move(Log), name", plain, "line 10, column 13:");
+  refused("Made, text_append(std::move(name), \"!\", \"\")", plain, "line 10, column 31:");
+  refused("Made, name", "    n5 = Make(Log, \"a\");\n    Kept = std::move(n5.list);\n    Log = n5.list;\n", "line 15, column 12:");
+  refused("Made, name", "    n5 = Make(std::move(Log), \"a\");\n    Kept = n5.list;\n", "line 14, column 15:");
+  refused("Made, name", "    n5 = Make(Log, \"a\");\n    Count += 1;\n    Kept = std::move(n5.list);\n", "line 16, column 12:");
+  refused("Made, name", "    n5 = Make(Log, \"a\");\n    Kept = std::move(list_make<Float, \"1\">(1.0));\n", "line 15, column 12:");
+  refused("Made, name", "    n5 = Make(Log, \"a\");\n    Count = std::move(Count);\n", "line 15, column 13:");
+  refused("Made, name", plain, "line 18, column 18:", "      list_add(Item, 1.0);\n      n23 = Make(std::move(Item), \"x\");\n      All = n23.list;\n");  // (the next round reads it)
+  refused("Made, name", plain, "line 17, column 14:", "      Item = std::move(from);\n      n23 = Make(Item, \"x\");\n      All = n23.list;\n");                      // (every round reads it)
+}
+
 TEST(logic_notation_refuses_with_place_and_reason) {
   // What is not in the subset is refused: where, and why.
   auto refused = [](const std::string& body, const char* why, const char* where = nullptr) {
@@ -10483,6 +10577,7 @@ TEST(studio_logic_structs) {
   CHECK(offered(pal, "struct.make", "struct", "Weapon", "Make Weapon") && offered(pal, "struct.break", "struct", "Weapon", "Break Weapon") && !offered(pal, "struct.make", "struct", "Aim"));
   pal = cmd({{"cmd", "logicPalette"}, {"query", "held"}});
   CHECK(offered(pal, "var.set", "path", ".Damage", "Set Held.Damage") && offered(pal, "var.set", "path", ".Sight", "Set Held.Sight") && offered(pal, "var.set", "variable", "Held"));
+  CHECK(offered(pal, "var.take", "variable", "Held", "Take Held"));
   pal = cmd({{"cmd", "logicPalette"}, {"query", "struct"}});
   bool bare = false;
   std::size_t per_struct = 0;

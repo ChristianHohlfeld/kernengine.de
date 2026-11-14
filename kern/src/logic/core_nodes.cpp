@@ -479,6 +479,27 @@ void add_variables(Library& lib) {
     lib.add(std::move(d));
   }
   {
+    NodeDef d = make("var.take", "Take Variable", "Variables", NodeKind::action,
+                     "Takes what a variable holds - or a place in it, one field of a struct, one entry of a list - and leaves the zero of its type there: a list without items, "
+                     "an empty text, 0, a struct with its defaults. Value: what was there (a list, a text is handed on, not copied).",
+                     "move hand over empty clear exchange take out");
+    d.params = {param("variable", "Variable", ParamDef::Kind::variable), local_of(), path_of()};
+    d.inputs = {exec_in()};
+    d.outputs = {exec_out(), data("value", "Value", PinType::number)};
+    d.shape = var_shape(false, true);
+    d.title = [](const NodeDef&, const Node& n) { return "Take " + place_title(n); };
+    d.run = [](Context& c) {
+      const std::vector<i64> at = c.path();
+      const Graph& g = c.instance().graph();
+      Variable named;
+      Value taken = g.place_of(c.node(), named) ? zero_of(TypeRef{named.type, named.of}, g) : Value();
+      c.instance().change(c.node(), at, [&](Value& v) { std::swap(taken, v); });
+      c.out("value", taken);
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
+  {
     NodeDef d = make("var.add", "Add to Variable", "Variables", NodeKind::action, "Adds Amount to a number variable, Integer or Float (use -1 to count down).");
     d.params = {param("variable", "Variable", ParamDef::Kind::variable), local_of(), path_of()};
     d.inputs = {exec_in(), data("amount", "Amount", PinType::number, 1.0)};

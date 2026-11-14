@@ -110598,6 +110598,17 @@
      ],
      "nodes": [
       {
+       "id": 10,
+       "type": "var.take",
+       "x": 288,
+       "y": 544,
+       "params": {
+        "variable": "self",
+        "scope": "Destruction_take_points_log",
+        "path": ".points_log_"
+       }
+      },
+      {
        "id": 17,
        "type": "func.entry",
        "x": 0,
@@ -110663,54 +110674,21 @@
        "params": {
         "function": "Destruction_take_points_log"
        }
-      },
-      {
-       "id": 24,
-       "type": "var.get",
-       "x": 160,
-       "y": 640,
-       "params": {
-        "variable": "moved",
-        "scope": "Destruction_take_points_log"
-       }
-      },
-      {
-       "id": 77,
-       "type": "var.set",
-       "x": 288,
-       "y": 544,
-       "params": {
-        "variable": "moved",
-        "scope": "Destruction_take_points_log"
-       }
-      },
-      {
-       "id": 78,
-       "type": "var.get",
-       "x": 240,
-       "y": 696,
-       "params": {
-        "variable": "self",
-        "scope": "Destruction_take_points_log",
-        "path": ".points_log_"
-       }
-      },
-      {
-       "id": 79,
-       "type": "var.set",
-       "x": 576,
-       "y": 600,
-       "params": {
-        "variable": "self",
-        "scope": "Destruction_take_points_log",
-        "path": ".points_log_"
-       },
-       "values": {
-        "value": []
-       }
       }
      ],
      "links": [
+      [
+       10,
+       "then",
+       23,
+       "exec"
+      ],
+      [
+       10,
+       "value",
+       23,
+       "Result"
+      ],
       [
        17,
        "r",
@@ -110738,31 +110716,7 @@
       [
        22,
        "then",
-       77,
-       "exec"
-      ],
-      [
-       24,
-       "value",
-       23,
-       "Result"
-      ],
-      [
-       77,
-       "then",
-       79,
-       "exec"
-      ],
-      [
-       78,
-       "value",
-       77,
-       "value"
-      ],
-      [
-       79,
-       "then",
-       23,
+       10,
        "exec"
       ]
      ],
@@ -110863,14 +110817,6 @@
        "outputs": [
         {
          "name": "Result",
-         "type": "struct_list",
-         "of": "Int_Float_pair",
-         "value": []
-        }
-       ],
-       "locals": [
-        {
-         "name": "moved",
          "type": "struct_list",
          "of": "Int_Float_pair",
          "value": []
@@ -335771,7 +335717,7 @@
     "logic": {
      "kind": "kern-logic",
      "version": 1,
-     "nextId": 855,
+     "nextId": 856,
      "variables": [
       {
        "name": "kTeleportM",
@@ -336179,14 +336125,16 @@
       },
       {
        "id": 22,
-       "type": "func.call",
-       "x": 1400,
-       "y": 11980,
+       "type": "var.take",
+       "x": 848,
+       "y": 7744,
        "params": {
-        "function": "project_on",
-        "pts.variable": "pts",
-        "cum.variable": "cum",
-        "scope": "sample_breadcrumbs"
+        "variable": "self",
+        "scope": "VoiceCapture_take",
+        "path": ".frames_[].items"
+       },
+       "values": {
+        "path0": 0
        }
       },
       {
@@ -336198,7 +336146,7 @@
         "function": "project_on",
         "pts.variable": "pts",
         "cum.variable": "cum",
-        "scope": "upcoming_turn"
+        "scope": "sample_breadcrumbs"
        }
       },
       {
@@ -336210,25 +336158,28 @@
         "function": "project_on",
         "pts.variable": "pts",
         "cum.variable": "cum",
+        "scope": "upcoming_turn"
+       }
+      },
+      {
+       "id": 25,
+       "type": "func.call",
+       "x": 1128,
+       "y": 15584,
+       "params": {
+        "function": "project_on",
+        "pts.variable": "pts",
+        "cum.variable": "cum",
         "scope": "route_left"
        }
       },
       {
-       "id": 26,
+       "id": 27,
        "type": "flow.for",
-       "x": 280,
-       "y": 16630,
+       "x": 288,
+       "y": 16688,
        "values": {
         "first": 0
-       }
-      },
-      {
-       "id": 27,
-       "type": "func.entry",
-       "x": 0,
-       "y": 0,
-       "params": {
-        "function": "fmin2"
        }
       },
       {
@@ -339341,30 +339292,6 @@
        },
        "values": {
         "Result": false
-       }
-      },
-      {
-       "id": 349,
-       "type": "var.set",
-       "x": 840,
-       "y": 7690,
-       "params": {
-        "variable": "moved",
-        "scope": "VoiceCapture_take"
-       }
-      },
-      {
-       "id": 350,
-       "type": "var.get",
-       "x": 720,
-       "y": 7840,
-       "params": {
-        "variable": "self",
-        "scope": "VoiceCapture_take",
-        "path": ".frames_[].items"
-       },
-       "values": {
-        "path0": 0
        }
       },
       {
@@ -344119,21 +344046,6 @@
        }
       },
       {
-       "id": 852,
-       "type": "var.set",
-       "x": 1128,
-       "y": 7744,
-       "params": {
-        "variable": "self",
-        "scope": "VoiceCapture_take",
-        "path": ".frames_[].items"
-       },
-       "values": {
-        "path0": 0,
-        "value": []
-       }
-      },
-      {
        "id": 853,
        "type": "var.set",
        "x": 1416,
@@ -344144,13 +344056,12 @@
        }
       },
       {
-       "id": 854,
-       "type": "var.get",
-       "x": 1368,
-       "y": 7952,
+       "id": 855,
+       "type": "func.entry",
+       "x": 0,
+       "y": 17240,
        "params": {
-        "variable": "moved",
-        "scope": "VoiceCapture_take"
+        "function": "fmin2"
        }
       }
      ],
@@ -344361,93 +344272,87 @@
       ],
       [
        22,
-       "Result",
-       539,
-       "value"
+       "then",
+       853,
+       "exec"
       ],
       [
        22,
+       "value",
+       853,
+       "value"
+      ],
+      [
+       23,
+       "Result",
+       539,
+       "value"
+      ],
+      [
+       23,
        "then",
        539,
        "exec"
       ],
       [
-       23,
+       24,
        "Result",
        682,
        "value"
       ],
       [
-       23,
+       24,
        "then",
        682,
        "exec"
       ],
       [
-       24,
+       25,
        "Result",
        830,
        "value"
       ],
       [
-       24,
+       25,
        "then",
        830,
        "exec"
       ],
       [
-       26,
+       27,
        "body",
        843,
        "exec"
       ],
       [
-       26,
+       27,
        "completed",
        850,
        "exec"
       ],
       [
-       26,
+       27,
        "index",
        845,
        "path0"
       ],
       [
-       26,
+       27,
        "index",
        846,
        "path0"
       ],
       [
-       26,
+       27,
        "index",
        847,
        "path0"
       ],
       [
-       26,
+       27,
        "index",
        848,
        "path0"
-      ],
-      [
-       27,
-       "a",
-       29,
-       "a"
-      ],
-      [
-       27,
-       "b",
-       29,
-       "b"
-      ],
-      [
-       27,
-       "then",
-       28,
-       "exec"
       ],
       [
        29,
@@ -346456,7 +346361,7 @@
       [
        344,
        "false",
-       349,
+       22,
        "exec"
       ],
       [
@@ -346482,18 +346387,6 @@
        "value",
        346,
        "list"
-      ],
-      [
-       349,
-       "then",
-       852,
-       "exec"
-      ],
-      [
-       350,
-       "value",
-       349,
-       "value"
       ],
       [
        351,
@@ -347608,7 +347501,7 @@
       [
        530,
        "pos",
-       22,
+       23,
        "pos"
       ],
       [
@@ -347674,7 +347567,7 @@
       [
        538,
        "then",
-       22,
+       23,
        "exec"
       ],
       [
@@ -348490,7 +348383,7 @@
       [
        670,
        "pos",
-       23,
+       24,
        "pos"
       ],
       [
@@ -348574,7 +348467,7 @@
       [
        681,
        "then",
-       23,
+       24,
        "exec"
       ],
       [
@@ -349390,7 +349283,7 @@
       [
        813,
        "pos",
-       24,
+       25,
        "pos"
       ],
       [
@@ -349504,7 +349397,7 @@
       [
        829,
        "then",
-       24,
+       25,
        "exec"
       ],
       [
@@ -349606,13 +349499,13 @@
       [
        839,
        "then",
-       26,
+       27,
        "exec"
       ],
       [
        840,
        "result",
-       26,
+       27,
        "last"
       ],
       [
@@ -349670,22 +349563,28 @@
        "item"
       ],
       [
-       852,
-       "then",
-       853,
-       "exec"
-      ],
-      [
        853,
        "then",
        351,
        "exec"
       ],
       [
-       854,
-       "value",
-       853,
-       "value"
+       855,
+       "a",
+       29,
+       "a"
+      ],
+      [
+       855,
+       "b",
+       29,
+       "b"
+      ],
+      [
+       855,
+       "then",
+       28,
+       "exec"
       ]
      ],
      "machines": [],
@@ -350238,13 +350137,6 @@
          "name": "Result",
          "type": "bool",
          "value": false
-        }
-       ],
-       "locals": [
-        {
-         "name": "moved",
-         "type": "int_list",
-         "value": []
         }
        ]
       },

@@ -7,6 +7,12 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-14",time:"09:15",title:"Blueprints: übergeben statt kopieren",items:[
+    "Die Klasse eines Blueprints reicht einen Wert weiter, wo ihn danach nichts mehr braucht (std::move): eine lokale Variable an ihrer letzten Lesestelle, auch in Schleifen, und was der Schritt direkt davor gab.",
+    "Der Text wird streng gelesen: std::move wird nur dort angenommen, wo der Wert wirklich nicht mehr gebraucht wird. Sonst wird er mit Zeile und Grund abgelehnt.",
+    "Neuer Baustein „Take“: gibt, was an einem Platz steht, und lässt ihn leer. Der Konverter schreibt damit std::move aus einem Feld.",
+    "Kosten gemessen: Bei 478 von 600 verglichenen Funktionen fordert die Klasse nicht öfter Speicher an als der Quelltext (vorher 470). Die übrigen 122 sind nach Ursache sortiert; die größte sind Listen fester Länge.",
+  ]},
   {date:"2026-11-14",time:"07:25",title:"Blueprints: der Test zählt die Kosten",items:[
     "Unter der Haube: Der Vergleichstest zählt jetzt für jede Funktion, wie oft der Export Speicher anfordert und wie oft der Quelltext. Bei 470 von 600 Funktionen ist der Export schon gleichauf oder sparsamer; die übrigen 130 nennt der Test, sie sind die nächste Arbeit. Am Spiel selbst ändert sich nichts.",
   ]},

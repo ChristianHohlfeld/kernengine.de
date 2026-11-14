@@ -205,6 +205,7 @@ KERN_LAYOUT(Demo) {
 | Wert-Knoten (pure) | ein Ausdruck: `math_add(a, b)` |
 | Get Variable | der Name der Variablen – oder der Platz, den der Knoten nennt: `Held.Damage`, `Cars[i].Wheels[j].Slip` |
 | Set / Add to Variable | `Heat = wert;` / `Heat += wert;` – an einem Platz genauso: `Held.Damage = wert;`, `Scores[i] = wert;`, `Cars[i].Speed += wert;`; wird ihr Ergebnis gelesen: `n5.value = (Heat += wert);` |
+| Take Variable | `var_take(Punkte);` – der Platz ist das Argument, eine Variable oder ein Platz in ihr (`var_take(Cars[i].Wheels);`); wird sein Ergebnis gelesen: `var_take(n7, Punkte);` und `n7.value`. Gibt, was am Platz steht, und lässt dort den leeren Wert des Typs (siehe „Übergeben statt kopieren“) |
 | Schritt, der eine Liste ändert (Add to List, Insert, Remove, Clear) | `list_add(Scores, wert);` – der Platz der Liste ist das erste Argument, eine Variable oder eine Liste darin (`list_add(Cars[i].Wheels, rad);`); wird sein Ergebnis gelesen: `list_add(n7, Scores, wert);` und `n7.index` |
 | Wert-Knoten auf einer Liste (Length, Get Item, Contains, Find, Make List) | `list_get<Float>(Scores, 0)`, `list_make<Text, "2">("a", "b")` – die Einstellung „Type“ ist der Typ der Einträge |
 | For Each | `for (auto it9 = flow_for_each<Float>(n9, Scores); it9.next();) { ... }` – im Rumpf `n9.item` und `n9.index` |
@@ -214,6 +215,7 @@ KERN_LAYOUT(Demo) {
 | Function Value | `Fn(args).y` |
 | Formel-Knoten | `kern::formula([](Float a, Float b) -> Float { return a * b; }, wertA, wertB)` |
 | Umwandlung an einem Draht (Int → Float …) | `kern::to<Float>(wert)` |
+| ein Wert, den nach diesem Eingang nichts mehr braucht | `std::move(wert)` – der Draht ist derselbe, der Text reicht den Wert weiter, statt ihn zu kopieren (siehe „Übergeben statt kopieren“) |
 | Branch | `if (wert) { ... } else { ... }` |
 | Sequence | `{ ... } { ... }` – ein Block je Ausgang |
 | For Loop (jeder Schleifen-Knoten) | `for (auto it12 = flow_for(n12, 0, 9); it12.next();) { ... }` – danach folgt „Completed“ |
@@ -493,9 +495,9 @@ void Skid(Int car = 0, Int wheel = 0, Float by = 0.1) {
 }
 ```
 
-- **Jeder Knoten, der eine Variable nennt, kann einen Platz in ihr nennen:** Get, Set und Add to
-  Variable und die Schritte, die eine Liste ändern (Add, Insert, Remove Index, Remove Item,
-  Clear). Es gibt keinen Unterschied zwischen einer Variablen und einem Platz in ihr: Was an
+- **Jeder Knoten, der eine Variable nennt, kann einen Platz in ihr nennen:** Get, Set, Add to
+  Variable und Take und die Schritte, die eine Liste ändern (Add, Insert, Remove Index, Remove
+  Item, Clear). Es gibt keinen Unterschied zwischen einer Variablen und einem Platz in ihr: Was an
   dem einen geht, geht an dem anderen.
 - **Geändert wird am Platz.** Nichts wird herausgelesen und zurückgeschrieben: In der Klasse ist
   `Cars[car].Wheels[wheel].Slip += by;` genau diese Zeile C++ auf den Membern; der Interpreter
@@ -521,6 +523,70 @@ void Skid(Int car = 0, Int wheel = 0, Float by = 0.1) {
   mit der Stelle (`Held.Damage is float: it has no entries`).
 - **Dokumente von früher:** Set Field und Set List Item waren eigene Knoten. Beim Laden wird
   jeder zu dem Set an seinem Platz, das er ist (`Held.Damage = wert;`, `Scores[index] = wert;`).
+
+### Übergeben statt kopieren
+
+Eine Liste, ein Text, eine Struktur mit einem von beiden hält eigenen Speicher. Wo C++ so einen
+Wert weiterreicht, statt ihn zu kopieren, tut es die Klasse eines Blueprints auch – sonst kostete
+sie mehr als der Quelltext, aus dem sie kommt. Dafür gibt es zwei Dinge: `std::move` im Text,
+und den Baustein **Take**.
+
+```cpp
+struct PfadResult { List<Vector> punkte = List<Vector>{}; };
+PfadResult Pfad(List<Vector> start = List<Vector>{}, Int n = 3) {
+  List<Vector> Punkte = List<Vector>{};
+  Punkte = std::move(start);           // der Eingang wird hier zum letzten Mal gelesen
+  for (auto it3 = flow_for(n3, 1, n); it3.next();) {
+    n4 = Glatt(std::move(Punkte));     // Punkte wird gesetzt, bevor es wieder gelesen wird:
+    Punkte = std::move(n4.punkte);     // Punkte = Glatt(Punkte) kopiert nichts
+  }
+  return {std::move(Punkte)};          // der Aufruf ist vorbei
+}
+
+struct LeerenResult { List<Float> log = List<Float>{}; };
+LeerenResult Leeren() {
+  var_take(n6, Log);                   // Take: gibt die Liste, Log ist danach leer
+  return {std::move(n6.value)};        // was der Schritt direkt davor gab
+}
+```
+
+- **`std::move(wert)` steht genau dort, wo den Wert danach nichts mehr braucht.** Das sind zwei
+  Fälle, und der Text eines Graphen hat es in genau diesen:
+  - **eine lokale Variable der Funktion oder einer ihrer Eingänge als Wert, als Ganzes, wo sie zum
+    letzten Mal gelesen wird:** Nichts sonst, was der Schritt liest, nennt sie (`return {Punkte,
+    list_length<Vector>(Punkte)};` kopiert), und auf keinem Weg von dem Schritt aus wird sie
+    gelesen, bevor ein Set sie als Ganzes neu setzt. In einem Return ist das immer so – C++ tut
+    dort dasselbe bei `return Punkte;`. In einer Schleife zählt die nächste Runde mit: Was jede
+    Runde liest, wird kopiert; was jede Runde erst neu setzt, wird übergeben. Jeder Aufruf hat
+    seine lokalen Variablen für sich (in der Klasse sind es die von C++), darum ist das allein
+    eine Frage der Schritte dieses Aufrufs.
+  - **was der Schritt direkt davor gab** (`n4.punkte`), wenn dieser Eingang es als einziger liest.
+    „Direkt davor“: ein einfacher Schritt, dessen einer Weg zu diesem Schritt führt, und kein
+    anderer Weg führt hierher – der Schritt läuft genau einmal nach jedem seiner Läufe, und
+    dazwischen läuft nichts. (Was ein Schritt gibt, steht in einem Member der Klasse, den alle
+    Läufe teilen: Läge ein Schritt dazwischen, der einen Handler auslösen kann, könnte ein zweiter
+    Lauf den Wert nehmen, den der erste noch liest.)
+
+  Das gilt für jeden Schritt (ein Set, ein Aufruf, ein Return, ein Knoten der Engine); ein While
+  liest seine Bedingung vor jeder Runde, ein Wert-Knoten, wann immer er gelesen wird – sie
+  übergeben nichts. Variablen des Blueprints bleiben, wo sie sind: Die nimmt nur ein Take.
+- **Der Graph sagt dazu nichts.** Der Draht ist derselbe Draht; übergeben oder kopiert, der Wert,
+  der ankommt, ist derselbe, in jeder Stufe. `std::move` ist allein Sache des Textes:
+  `Writer::hands_over` (notation.cpp) entscheidet es aus dem Graphen – „wird noch gebraucht“ ist
+  dort eine Rechnung über die Schritte eines Aufrufs (`Writer::needed_after`: wohin die Wege
+  führen, was jeder Schritt liest und setzt; wo ein Weg im Rumpf einer Schleife endet, folgt die
+  Schleife wieder, in einem Block einer Sequence die Blöcke danach).
+- **Der Leser nimmt `std::move` nur dort an.** Fehlt es, wo der Text es hätte, ist es derselbe
+  Graph (und `to_cpp` schreibt es hin). Steht es woanders – an einem Wert, der noch gebraucht
+  wird, an einer Variablen des Blueprints, an einem Wert-Knoten, an einer Zahl –, wird der Text
+  mit der Stelle abgelehnt: C++ ließe dort einen Platz leer, den der Blueprint noch liest.
+- **Take** (`var.take`, „Take Variable“) ist ein Schritt an einem Platz, wie Set: Er gibt, was dort
+  steht, und lässt den leeren Wert des Typs zurück – eine Liste ohne Einträge, einen leeren Text,
+  0, eine Struktur mit ihren Defaults. In der Klasse ist das `std::exchange(platz, {})`: Die Liste
+  wird weitergereicht, nicht kopiert. Im Interpreter tauscht der Knoten den Wert am Platz gegen
+  den leeren (`Instance::change`). Neben einer Liste gibt er den Default, wie jedes Lesen dort.
+  Für die Regel der gehaltenen Listeneinträge (Referenz-Eingänge) ist ein Take ein Set: Er setzt
+  etwas an die Stelle dessen, was dort stand.
 
 ### Referenz-Eingänge
 
@@ -845,6 +911,7 @@ Form:
 - Fehlt bei einem Feld einer Struktur oder bei einer Variablen `= Wert`, ist ihr Default der leere
   Wert des Typs (bei einer Struktur: jedes Feld mit seinem Default).
 - Ohne `KERN_LAYOUT`-Block bekommen neue Knoten Ids und Plätze automatisch.
+- Ein Wert ohne `std::move`, wo der Text des Graphen es hat (derselbe Graph).
 
 Abgelehnt wird – immer mit Zeile, Spalte und dem Grund, oft mit der richtigen Schreibweise:
 
@@ -859,6 +926,8 @@ Abgelehnt wird – immer mit Zeile, Spalte und dem Grund, oft mit der richtigen 
   Damage): Weapon{...} gives a value for each, in that order`), ein Feld vom falschen Typ, ein
   Feld, das die Struktur nicht hat (`Held.Range = 1.0;`), eine Struktur, die über ihrer
   Deklaration benutzt wird oder sich selbst enthält,
+- `std::move` an einem Wert, der noch gebraucht wird (`std::move hands over a value nothing needs
+  again …`),
 - ein Parameter in einem Lambda nach einem Warten,
 - fehlende oder falsche Deklarationen (`n12 is not declared: struct { Float value = 0.0; } n12;`),
 - ein Layout, das nicht zu den Knoten des Textes passt.
@@ -1036,10 +1105,13 @@ Aufruf Zeichen für Zeichen mit dem Interpreter** – Ergebnisse und alle Variab
 und beim Namen durch eine `logic::Instance`, die den Graphen als diese Klasse ausführt. Dazu
 spielen die Tier-Fälle (`logic_cases.h`), die ein Compiler schon ausführt, als Klassen dasselbe
 Szenario wie Interpreter und JIT – Begin Play, Events, Ticks, Wartezeiten, State Machines – mit
-demselben Ergebnis: alle 21, auch Aufrufe auf einem Blueprint (`call_on`: eine Funktion, die sich
+demselben Ergebnis: alle 22, auch Aufrufe auf einem Blueprint (`call_on`: eine Funktion, die sich
 so selbst aufruft, eine erklärte Funktion, die niemand hat, und Aufrufe ohne Ende), lokale Variablen (`locals`: Zahlen und ein Text, zwei
 Funktionen mit einer gleichnamigen, eine Pure-Funktion, die ihre eigene setzt, und ein Aufruf, den
-ein zweiter Aufruf derselben Funktion unterbricht), Listen (`lists`: jeder Schritt, For Each über eine Liste, die
+ein zweiter Aufruf derselben Funktion unterbricht), Übergeben (`handing_over`: ein Return, das eine
+lokale Variable und Eingänge weiterreicht, ein Set und ein Aufruf, die nehmen, was der Schritt davor
+gab – und daneben dieselben Werte dort, wo sie noch gebraucht und also kopiert werden; Take an einer
+Variablen, einem Feld, einem Listeneintrag, neben einer Liste und in einer lokalen Variablen), Listen (`lists`: jeder Schritt, For Each über eine Liste, die
 ihr Rumpf ändert, und eine Schleife, deren Rumpf sie selbst wieder startet), Aufzählungen
 (`enums`: eine Variable und eine Liste vom Typ einer Aufzählung, Switch on Enum, der Weg zu Index
 und Name und zurück, alle Werte in einem For Each), Strukturen (`structs`: eine Variable und eine
