@@ -21,11 +21,13 @@
 #include <limits>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <deque>
 #include <initializer_list>
 #include <list>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <type_traits>
@@ -124,6 +126,9 @@ constexpr Vec3 lerp(Vec3 a, Vec3 b, double t) { return kern::lerp(kern::Vec3(a),
 constexpr Vec3 vmin(Vec3 a, Vec3 b) { return kern::vmin(kern::Vec3(a), kern::Vec3(b)); }
 constexpr Vec3 vmax(Vec3 a, Vec3 b) { return kern::vmax(kern::Vec3(a), kern::Vec3(b)); }
 inline Vec3 normalize(Vec3 a, Vec3 fallback = {0, 0, 1}) { return kern::normalize(kern::Vec3(a), kern::Vec3(fallback)); }
+constexpr Vec3 hex_color(kern::u32 h) { return kern::hex_color(h); }   // (a colour's components are 32-bit, as a vector's)
+/// A view of a list (kern::Span): the engine's own - of the test's values.
+template <class T> using Span = kern::Span<T>;
 
 // the functions of numbers a formula does not have itself, as the converter writes them
 inline double hypot_bp(double a, double b) { return kern::math::sqrt((a * a) + (b * b)); }
@@ -401,6 +406,62 @@ template <class Make> auto draw_list(Draw& draw, Make make) {
   return out;
 }
 
+/// What may be there or not (a std::unique_ptr or std::optional of a value - in the Blueprint a list of no
+/// entry or one): there one time in two.
+template <class P, class Make> P draw_maybe(Draw& draw, Make make) {
+  if (!draw.flag()) return P{};
+  if constexpr (requires { typename P::element_type; }) {
+    return std::make_unique<typename P::element_type>(make());
+  } else {
+    return P(make());
+  }
+}
+/// A list the source writes in braces (std::initializer_list): up to four entries, as such a list is
+/// written - handed to the source by `listed`.
+template <class Make> auto draw_few(Draw& draw, Make make) {
+  std::vector<decltype(make())> out;
+  for (u32 n = draw.below(5); n > 0; --n) out.push_back(make());
+  return out;
+}
+/// `f` called with the drawn list as a list in braces (it lives for the call, as one written there does).
+template <class T, class F> decltype(auto) listed(const std::vector<T>& v, F f) {
+  switch (v.size()) {
+    case 0: return f(std::initializer_list<T>{});
+    case 1: return f({v[0]});
+    case 2: return f({v[0], v[1]});
+    case 3: return f({v[0], v[1], v[2]});
+    case 4: return f({v[0], v[1], v[2], v[3]});
+    default: break;
+  }
+  std::abort();   // (draw_few draws no more)
+}
+
+/// A C array of any rank (T[3][2]: 3 entries of T[2]) as the Blueprint has it - a list, of lists - and
+/// back (as far as both go); `fill_array` draws every entry.
+template <class T> auto array_list(const T& a) {
+  if constexpr (std::is_array_v<T>) {
+    std::vector<decltype(array_list(a[0]))> out;
+    for (const auto& e : a) out.push_back(array_list(e));
+    return out;
+  } else {
+    return a;
+  }
+}
+template <class T, class L> void array_from(T& a, const L& items) {
+  if constexpr (std::is_array_v<T>) {
+    for (std::size_t k = 0; k < items.size() && k < std::size(a); ++k) array_from(a[k], items[k]);
+  } else {
+    a = items;
+  }
+}
+template <class T, class Make> void fill_array(T& a, Make make) {
+  if constexpr (std::is_array_v<T>) {
+    for (auto& e : a) fill_array(e, make);
+  } else {
+    a = make();
+  }
+}
+
 /// A map of up to four drawn rows, a set of up to four drawn keys.
 template <class M, class Key, class Held> M draw_map(Draw& draw, Key key, Held held) {
   M out;
@@ -631,9 +692,37 @@ std::string text(E e) { return "#" + std::to_string(static_cast<long long>(e)); 
 template <class A, class B> std::string text(const std::pair<A, B>& p) { return "{" + text(p.first) + ", " + text(p.second) + "}"; }
 template <class T> std::string text(const std::vector<T>& v) {
   std::string out = "[";
-  for (std::size_t i = 0; i < v.size(); ++i) out += (i ? ", " : "") + text(static_cast<T>(v[i]));
+  for (std::size_t i = 0; i < v.size(); ++i) out += (i ? ", " : "") + text(static_cast<const T&>(v[i]));
   return out + "]";
 }
+
+// ---- a view of a list (kern::Span): the list it shows ----
+template <class T> std::vector<std::remove_const_t<T>> as_list(kern::Span<T> s) { return std::vector<std::remove_const_t<T>>(s.begin(), s.end()); }
+template <class T> Value arg(kern::Span<T> s) { return arg(as_list(s)); }
+template <class T> bool same(kern::Span<T> want, const Value& got) { return same(as_list(want), got); }
+template <class T> bool defined(kern::Span<T> s) { return defined(as_list(s)); }
+template <class T> std::string text(kern::Span<T> s) { return text(as_list(s)); }
+
+// ---- what may be there or not (std::unique_ptr, std::optional of a value): as the Blueprint has it, a
+// list of no entry or one ----
+template <class T> std::vector<T> as_list(const std::unique_ptr<T>& p) { return p ? std::vector<T>{*p} : std::vector<T>{}; }
+template <class T> std::vector<T> as_list(const std::optional<T>& p) { return p ? std::vector<T>{*p} : std::vector<T>{}; }
+template <class T>
+  requires(!std::is_base_of_v<EngineObject, T>)
+Value arg(const std::unique_ptr<T>& p) { return arg(as_list(p)); }
+template <class T> Value arg(const std::optional<T>& p) { return arg(as_list(p)); }
+template <class T>
+  requires(!std::is_base_of_v<EngineObject, T>)
+bool same(const std::unique_ptr<T>& want, const Value& got) { return same(as_list(want), got); }
+template <class T> bool same(const std::optional<T>& want, const Value& got) { return same(as_list(want), got); }
+template <class T>
+  requires(!std::is_base_of_v<EngineObject, T>)
+bool defined(const std::unique_ptr<T>& p) { return !p || defined(*p); }
+template <class T> bool defined(const std::optional<T>& p) { return !p || defined(*p); }
+template <class T>
+  requires(!std::is_base_of_v<EngineObject, T>)
+std::string text(const std::unique_ptr<T>& p) { return text(as_list(p)); }
+template <class T> std::string text(const std::optional<T>& p) { return text(as_list(p)); }
 
 // ---- a value the engine's stand-in answered, as the source gets it ----
 inline void take(f64& to, const Value& v) { to = v.as_number(); }
@@ -673,9 +762,44 @@ template <class S> struct Take<std::vector<S>> {
     target.clear();
     for (std::size_t k = 0; k < v.size(); ++k) {
       T item{};
-      Take<S>::to(item, v.item(k));
+      if constexpr (is_list<S>) {   // (a list inside a list: a struct that holds it, as the Blueprint has it)
+        const Value row = v.item(k);
+        if (row.rows && row.rows->size() == 1) Take<S>::to(item, (*row.rows)[0]);
+      } else {
+        Take<S>::to(item, v.item(k));
+      }
       target.push_back(std::move(item));
     }
+  }
+};
+/// What may be there or not, from the list of no entry or one. (An object of the engine: by its handle. A
+/// value whose class cannot be made without one it refers to - it holds a reference - stays as it is
+/// where there is none: the Blueprint's list holds no such object.)
+template <class S> struct Take<std::unique_ptr<S>> {
+  template <class T> static void to(std::unique_ptr<T>& target, const Value& v) {
+    if constexpr (std::is_base_of_v<EngineObject, T>) {
+      const long long handle = v.as_int();
+      target = handle ? std::make_unique<T>(*engine_object<T>(handle)) : nullptr;
+    } else {
+      if (v.size() == 0) {
+        target.reset();
+        return;
+      }
+      if constexpr (std::is_default_constructible_v<T>) {
+        if (!target) target = std::make_unique<T>();
+      }
+      if (target) Take<S>::to(*target, v.item(0));
+    }
+  }
+};
+template <class S> struct Take<std::optional<S>> {
+  template <class T> static void to(std::optional<T>& target, const Value& v) {
+    if (v.size() == 0) {
+      target.reset();
+      return;
+    }
+    if (!target) target.emplace();
+    Take<S>::to(*target, v.item(0));
   }
 };
 template <class A, class B> struct Take<std::pair<A, B>> {
@@ -741,6 +865,12 @@ inline std::string shown(const Value& v) {
     }
     default: return v.as_text();
   }
+}
+/// The arguments of a call as the Blueprint is given them, for a failure's line.
+inline std::string shown_all(const std::vector<Value>& given) {
+  std::string out;
+  for (std::size_t i = 0; i < given.size(); ++i) out += (i ? ", " : "") + shown(given[i]);
+  return out;
 }
 
 inline constexpr int kCalls = 300;
@@ -918,14 +1048,22 @@ inline void open_read() {
 }
 inline void wide::mark_open() { g_open = true; }
 
+/// How many entries a list has: a container, an array - or a view (kern::Span says its length as a field).
+template <class C> constexpr std::size_t entries(const C& c) {
+  if constexpr (requires { std::size(c); }) {
+    return std::size(c);
+  } else {
+    return c.size;
+  }
+}
 template <class C, class I> auto at(C&& c, I i) -> decltype(c[0]) {
   using R = decltype(c[0]);
-  const long long n = static_cast<long long>(std::size(c)), k = static_cast<long long>(i);
+  const long long n = static_cast<long long>(entries(c)), k = static_cast<long long>(i);
   if (k >= 0 && k < n) return c[static_cast<std::size_t>(k)];
   open_read();
   if constexpr (std::is_reference_v<R>) {
-    static std::remove_cvref_t<R> none;
-    none = std::remove_cvref_t<R>{};
+    static std::remove_cvref_t<R> none;   // (an entry that is an array - T[3][2] - too: every entry of it zero)
+    fill_array(none, [] { return std::remove_all_extents_t<std::remove_cvref_t<R>>{}; });
     return none;
   } else {
     static std::vector<bool> none(1);
@@ -998,7 +1136,7 @@ template <class C, class A, class B> auto erase(C& c, A first, B last) -> declty
   return c.erase(first, last);
 }
 template <class C> auto front(C&& c) -> decltype(c[0]) { return at(c, 0); }
-template <class C> auto back(C&& c) -> decltype(c[0]) { return at(c, static_cast<long long>(std::size(c)) - 1); }
+template <class C> auto back(C&& c) -> decltype(c[0]) { return at(c, static_cast<long long>(entries(c)) - 1); }
 
 // A 64-bit whole number is, in a Blueprint, the number its bits are read with a sign - exact while it is
 // within 2^53 of zero (unsigned C++ arithmetic around 2^64 comes out the same there). What the source
