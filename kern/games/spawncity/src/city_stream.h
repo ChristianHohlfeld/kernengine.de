@@ -159,7 +159,6 @@ class CityStream {
   u32 furniture_serial_ = 0;
   std::vector<kern::Vec4> ground_changes_;
   struct Tile;
-  Tile* tile(const TileKey& k);
   void request_around(Vec3 focus, i32 ring_of);
   void unload_far(Vec3 focus);
   kern::Vec4 ring_bounds(Vec3 focus, i32 r) const;

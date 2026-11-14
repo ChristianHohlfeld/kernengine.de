@@ -36,7 +36,7 @@ std::vector<f32> layered(std::initializer_list<std::pair<SynthPatch, f32>> layer
 
 // The voices of street life as synth patches (animal_audio.mjs, cows.mjs moo, pigeons.mjs coo and
 // wing clatter, jogger_chain.mjs stomp and jingle, street_voices.mjs horn and scream).
-void make_sounds(kern::audio::Mixer& mixer, kern::audio::ClipId* clips) {
+void make_sounds(kern::audio::Mixer& mixer, std::array<kern::audio::ClipId, static_cast<u32>(LifeOut::Sound::kCount)>& clips) {
   const u32 rate = mixer.sample_rate();
   auto clip = [&](Sound s, std::vector<f32> v, const char* name) { clips[static_cast<u32>(s)] = mixer.adopt_clip(std::move(v), 1, name); };
   {  // moo: two detuned saws 105..135 Hz through a band-pass that opens (cows.mjs)
@@ -391,12 +391,12 @@ void Game::life_draw() {
 void Game::life_draw_people() {
   // The running club in the town's people drawing (people_art.h): neon shirts, dark shorts.
   if (!glife_) return;
-  const Life::Chain* c = glife_->life.chain();
-  if (!c) return;
+  if (!glife_->life.has_chain()) return;
+  const Life::Chain& c = glife_->life.chain();
   const f32 now = world_->sim_time();
   const u32 skins[5] = {0xe0b08c, 0xc48e6c, 0xa87052, 0x7b4a33, 0xd2a27e};
   for (u32 i = 0; i < 10; ++i) {
-    const Life::Runner& r = c->runners[i];
+    const Life::Runner& r = c.runners[i];
     if (!r.alive || kern::length(r.pos - view_.cam.eye) > 220) continue;
     People::Person p;
     p.pos = r.pos;
@@ -468,8 +468,8 @@ void Game::life_hud(std::string& s) {
   for (const Life::Flock& f : L.flocks()) pigeons += static_cast<u32>(f.birds.size());
   for (const Life::Bird& b : L.birds()) birds += now >= b.dead_until ? 1 : 0;
   u32 joggers = 0;
-  if (const Life::Chain* c = L.chain())
-    for (const Life::Runner& r : c->runners) joggers += r.alive ? 1 : 0;
+  if (L.has_chain())
+    for (const Life::Runner& r : L.chain().runners) joggers += r.alive ? 1 : 0;
   char b[640];
   std::snprintf(b, sizeof b,
                 ",\"life\":{\"cows\":%u,\"cowsDead\":%u,\"cowHits\":%u,\"flocks\":%u,\"flocksAir\":%u,\"pigeons\":%u,\"birds\":%u,\"birdHits\":%u,\"trees\":%u,"

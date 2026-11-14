@@ -1,7 +1,7 @@
 // MVT decoder / minimal writer (see mvt.h). Spec: github.com/mapbox/vector-tile-spec (2.1).
 #include "mvt.h"
 
-#include <cstring>
+#include <bit>
 
 #include "kern/core/base.h"
 
@@ -53,17 +53,17 @@ struct Reader {
     }
     if (p > end) ok = false;
   }
+  // (little-endian, as protobuf writes them: the low byte first)
+  u32 le32(kern::Span<const u8> bytes, std::size_t at) const { return u32{bytes[at]} | u32{bytes[at + 1]} << 8 | u32{bytes[at + 2]} << 16 | u32{bytes[at + 3]} << 24; }
   f64 fixed64(kern::Span<const u8> bytes) {
     if (end < p + 8) { ok = false; return 0; }
-    f64 d;
-    std::memcpy(&d, bytes.data + p, 8);
+    const f64 d = std::bit_cast<f64>(u64{le32(bytes, p + 4)} << 32 | le32(bytes, p));
     p += 8;
     return d;
   }
   f32 fixed32(kern::Span<const u8> bytes) {
     if (end < p + 4) { ok = false; return 0; }
-    f32 f;
-    std::memcpy(&f, bytes.data + p, 4);
+    const f32 f = std::bit_cast<f32>(le32(bytes, p));
     p += 4;
     return f;
   }
@@ -267,11 +267,16 @@ void put_varint(std::vector<u8>& o, u64 v) {
   o.push_back(static_cast<u8>(v));
 }
 void put_key(std::vector<u8>& o, u32 field, u32 wire) { put_varint(o, (static_cast<u64>(field) << 3) | wire); }
-void put_bytes(std::vector<u8>& o, u32 field, const void* data, std::size_t n) {
+// a length-delimited field: bytes (a packed field, a message) or a text (a name, a key, a value)
+void put_bytes(std::vector<u8>& o, u32 field, const std::vector<u8>& data) {
   put_key(o, field, 2);
-  put_varint(o, n);
-  const u8* p = static_cast<const u8*>(data);
-  o.insert(o.end(), p, p + n);
+  put_varint(o, data.size());
+  o.insert(o.end(), data.begin(), data.end());
+}
+void put_bytes(std::vector<u8>& o, u32 field, std::string_view text) {
+  put_key(o, field, 2);
+  put_varint(o, text.size());
+  o.insert(o.end(), text.begin(), text.end());
 }
 u64 zz(i64 v) { return (static_cast<u64>(v) << 1) ^ static_cast<u64>(v >> 63); }
 }  // namespace
@@ -298,7 +303,7 @@ void Writer::feature(GeomType type, const std::vector<std::vector<Vec2>>& parts,
     put_varint(t, ki);
     put_varint(t, vi);
   }
-  put_bytes(f, 2, t.data(), t.size());
+  put_bytes(f, 2, t);
   put_key(f, 3, 0);
   put_varint(f, static_cast<u64>(type));
   std::vector<u8> g;
@@ -321,7 +326,7 @@ void Writer::feature(GeomType type, const std::vector<std::vector<Vec2>>& parts,
     }
     if (type == GeomType::polygon) put_varint(g, (1u << 3) | 7);
   }
-  put_bytes(f, 4, g.data(), g.size());
+  put_bytes(f, 4, g);
   layer_.features.push_back(std::move(f));
 }
 
@@ -329,22 +334,22 @@ void Writer::end_layer() {
   std::vector<u8> l;
   put_key(l, 15, 0);
   put_varint(l, 2);
-  put_bytes(l, 1, layer_.name.data(), layer_.name.size());
-  for (const auto& f : layer_.features) put_bytes(l, 2, f.data(), f.size());
-  for (const auto& k : layer_.keys) put_bytes(l, 3, k.data(), k.size());
+  put_bytes(l, 1, layer_.name);
+  for (const auto& f : layer_.features) put_bytes(l, 2, f);
+  for (const auto& k : layer_.keys) put_bytes(l, 3, k);
   for (const Value& v : layer_.values) {
     std::vector<u8> e;
     switch (v.kind) {
-      case Value::Kind::string: put_bytes(e, 1, v.s.data(), v.s.size()); break;
+      case Value::Kind::string: put_bytes(e, 1, v.s); break;
       case Value::Kind::number: { put_key(e, 3, 1); const u8* p = reinterpret_cast<const u8*>(&v.n); e.insert(e.end(), p, p + 8); break; }
       case Value::Kind::boolean: put_key(e, 7, 0); put_varint(e, v.b ? 1 : 0); break;
       default: break;
     }
-    put_bytes(l, 4, e.data(), e.size());
+    put_bytes(l, 4, e);
   }
   put_key(l, 5, 0);
   put_varint(l, layer_.extent);
-  put_bytes(out_, 3, l.data(), l.size());
+  put_bytes(out_, 3, l);
 }
 
 }  // namespace sc::mvt

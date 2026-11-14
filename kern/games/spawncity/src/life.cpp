@@ -26,7 +26,7 @@ const char* kCalls[6][2] = {{"Wer l\xc3\xa4uft mit?", "Wir laufen mit!"}, {"Link
                             {"Was wollen wir?", "Kilometer!"}, {"Schneller?", "Immer schneller!"}};
 // street_voices.mjs
 constexpr f32 kMaxHear = 38, kShoutGap = 1.4f, kSourceGap = 6, kHonkGap = 1.2f, kBubble = 2.1f;
-struct Lines { const char* mood; const char* lines[6]; u32 n; };
+struct Lines { std::string_view mood; std::string_view lines[6]; u32 n; };
 const Lines kLines[] = {
     {"bump", {"Hey, pass doch auf!", "Geht's noch?", "Augen auf, Mann!", "Was soll das denn?", "Mann, ey!", "Hast du keine Augen im Kopf?"}, 6},
     {"angry", {"Na warte!", "Jetzt reicht's mir!", "Willst du \xc3\x84rger?", "Komm her, du Idiot!", "Dir zeig ich's!", "Du hast sie doch nicht alle!"}, 6},
@@ -251,12 +251,12 @@ bool Life::spawn_herd(Vec2 center, f32 radius, u32 n, f32 now) {
 
 Vec2 Life::graze_spot(const Cow& c, i64 k) const {
   // A cow grazes around its own patch (GRAZE_R around its home spot): short legs at a cow's pace.
-  const Meadow* m = c.meadow >= 0 && c.meadow < static_cast<i32>(meadows_.size()) ? &meadows_[c.meadow] : nullptr;
+  const bool fenced = c.meadow >= 0 && c.meadow < static_cast<i32>(meadows_.size());  // (it has a meadow: it stays inside)
   for (int j = 0; j < 6; ++j) {
     const u64 h = mix(c.key, static_cast<u64>(k) * 16 + j);
     const f32 a = hash01(h) * 2 * kPi, r = std::sqrt(hash01(h + 1)) * kGrazeR;
     const Vec2 p{c.home.x + std::cos(a) * r, c.home.y + std::sin(a) * r};
-    if (!m || in_rings(m->rings, p)) return p;
+    if (!fenced || in_rings(meadows_[static_cast<std::size_t>(c.meadow)].rings, p)) return p;
   }
   return c.home;
 }
@@ -300,26 +300,26 @@ void Life::kill_cow(Cow& c, Vec3 impulse, f32 now, LifeOut& out) {
 kern::physics::Body Life::grab_animal(Vec3 at, f32 reach) {
   if (!world_) return {};
   f32 best = reach;
-  Cow* cow = nullptr;
-  i32 pet = -1;
-  for (Cow& c : cows_) {
+  i32 cow = -1, pet = -1;  // (the nearest: its place among the cows or among the pets)
+  for (std::size_t i = 0; i < cows_.size(); ++i) {
+    const Cow& c = cows_[i];
     if (c.dead) continue;
     if (c.carried && c.body.valid() && world_->body_valid(c.body)) {
       const f32 d = kern::length(world_->pose(c.body).position - at);
-      if (d < best + 0.6f) { best = d; cow = &c; pet = -1; }
+      if (d < best + 0.6f) { best = d; cow = static_cast<i32>(i); pet = -1; }
       continue;
     }
     // the hand on its back, its neck or its flank (the body 1.6 m long, 1.45 m high)
     const Vec3 to_local = at - (c.pos + Vec3{0, 0, 1.1f});
     const f32 d = std::fmax(0.0f, kern::length(to_local) - 0.75f);
-    if (d < best) { best = d; cow = &c; pet = -1; }
+    if (d < best) { best = d; cow = static_cast<i32>(i); pet = -1; }
   }
   for (std::size_t i = 0; i < pets_.size(); ++i) {
     Pet& p = pets_[i];
     if (!p.shown || p.dead_at >= 0) continue;
     const Vec3 c = p.carried && p.body.valid() && world_->body_valid(p.body) ? world_->pose(p.body).position : p.pos + Vec3{0, 0, 0.3f * p.scale};
     const f32 d = std::fmax(0.0f, kern::length(at - c) - 0.25f * p.scale);
-    if (d < best) { best = d; pet = static_cast<i32>(i); cow = nullptr; }
+    if (d < best) { best = d; pet = static_cast<i32>(i); cow = -1; }
   }
   if (pet >= 0) {
     Pet& p = pets_[static_cast<std::size_t>(pet)];
@@ -347,8 +347,8 @@ kern::physics::Body Life::grab_animal(Vec3 at, f32 reach) {
     p.carried_still = 0;
     return p.body;
   }
-  if (cow) {
-    Cow& c = *cow;
+  if (cow >= 0) {
+    Cow& c = cows_[static_cast<std::size_t>(cow)];
     if (c.carried && c.body.valid() && world_->body_valid(c.body)) { c.carried_still = 0; return c.body; }
     ph::BodySettings bs;
     bs.type = ph::BodyType::dynamic;
@@ -1168,7 +1168,7 @@ void Life::kill_runner(i32 i, Vec3 velocity, f32 now, LifeOut& out) {
   }
 }
 
-void Life::apply_joggers(u32 id, const Vec3* pos, const f32* yaw, const bool* alive, u32 n, f32 now, f32 at) {
+void Life::apply_joggers(u32 id, const std::array<Vec3, 10>& pos, const std::array<f32, 10>& yaw, const std::array<bool, 10>& alive, u32 n, f32 now, f32 at) {
   Chain& c = chain_;
   if (!chain_alive_ || c.id != id) {
     c = Chain{};
@@ -1563,12 +1563,12 @@ bool Life::shot(Vec3 from, Vec3& to, f32 damage, f32 now, LifeOut& out, bool mel
 }
 
 void Life::remote_cow_death(Vec3 at, Vec3 impulse, f32 now, LifeOut& out) {
-  Cow* best = nullptr;
+  i32 best = -1;
   f32 bd = 4;
-  for (Cow& c : cows_)
-    if (!c.dead && dist2d(c.pos, at) < bd) { bd = dist2d(c.pos, at); best = &c; }
-  if (!best) return;
-  kill_cow(*best, impulse, now, out);
+  for (std::size_t i = 0; i < cows_.size(); ++i)
+    if (!cows_[i].dead && dist2d(cows_[i].pos, at) < bd) { bd = dist2d(cows_[i].pos, at); best = static_cast<i32>(i); }
+  if (best < 0) return;
+  kill_cow(cows_[static_cast<std::size_t>(best)], impulse, now, out);
   out.cow_deaths.pop_back();  // not sent back
 }
 
@@ -1646,19 +1646,22 @@ bool Life::shout(Vec3 at, const char* mood, u32 seed, f32 now, f32 d, LifeOut& o
   if (now - last_shout_ < kShoutGap || d > kMaxHear) return false;
   for (auto& [s, t] : source_gap_)
     if (s == seed && now - t < kSourceGap) return false;
-  const Lines* lines = &kLines[0];
-  for (const Lines& l : kLines)
-    if (std::string(l.mood) == mood) lines = &l;
+  std::size_t pick = 0, i = 0;  // (the lines of this mood: the first ones when there are none for it)
+  for (const Lines& l : kLines) {
+    if (l.mood == mood) pick = i;
+    ++i;
+  }
+  const Lines& lines = kLines[pick];
   const f32 r = hash01(mix(seed, static_cast<u64>(now / 0.997f)));
-  const char* line = lines->lines[static_cast<u32>(r * static_cast<f32>(lines->n)) % lines->n];
+  const std::string_view line = lines.lines[static_cast<u32>(r * static_cast<f32>(lines.n)) % lines.n];
   last_shout_ = now;
   source_gap_.push_back({seed, now});
   if (source_gap_.size() > 32) source_gap_.erase(source_gap_.begin());
   while (voices_.size() >= 3) voices_.erase(voices_.begin());
-  voices_.push_back({at + Vec3{0, 0, 2.05f}, line, mood, now + kBubble});
+  voices_.push_back({at + Vec3{0, 0, 2.05f}, std::string(line), mood, now + kBubble});
   const f32 vol = std::fmax(0.0f, 1 - d / kMaxHear);
   const f32 k = hash01(seed);
-  if (vol > 0.03f) out.speech.push_back({line, 0.65f + k * 0.8f, std::string(mood) == "scared" ? 1.35f : 1.12f + hash01(mix(seed, 5)) * 0.2f, std::fmin(1.0f, 0.25f + vol * 0.9f)});
+  if (vol > 0.03f) out.speech.push_back({std::string(line), 0.65f + k * 0.8f, std::string(mood) == "scared" ? 1.35f : 1.12f + hash01(mix(seed, 5)) * 0.2f, std::fmin(1.0f, 0.25f + vol * 0.9f)});
   ++shouts_;
   return true;
 }

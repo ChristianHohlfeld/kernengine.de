@@ -65,11 +65,12 @@ bool sane(Vec3 v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfi
 // One part of a player's swarm snapshot: owner, the snapshot's serial, the part's number (bit 7: the
 // last one), its units - 18 bytes a unit (64 fit in one unreliable message of 1200): z in dm, yaw
 // and aux in 1/100.
-std::vector<u8> pack_swarm(u8 owner, u8 serial, u8 part, bool last, const SwarmUnit* units, std::size_t n) {
+// (`n` units of the list, from `from` on)
+std::vector<u8> pack_swarm(u8 owner, u8 serial, u8 part, bool last, const std::vector<SwarmUnit>& units, std::size_t from, std::size_t n) {
   W w;
   w.put(owner).put(serial).put(static_cast<u8>(part | (last ? 0x80 : 0))).put(static_cast<u8>(n));
   for (std::size_t i = 0; i < n; ++i) {
-    const SwarmUnit& u = units[i];
+    const SwarmUnit& u = units[from + i];
     const auto q16 = [](f32 v, f32 k) { return static_cast<std::int16_t>(std::clamp(std::lround(v * k), -32767L, 32767L)); };
     w.put(u.id).put(static_cast<u8>(u.kind)).put(u.flags).put(u.p.x).put(u.p.y).put(q16(u.p.z, 10)).put(q16(u.yaw, 100)).put(q16(u.aux, 100));
   }
@@ -209,7 +210,7 @@ bool Session::connected() const {
 bool Session::host_lost() const {
   if (role_ != Role::client || !ever_in_) return false;
   if (!client_ || !client_->connected()) return true;
-  return now_ms() - in_since_ > kQuietS * 1000 + 2000 && !remote(kHost);
+  return now_ms() - in_since_ > kQuietS * 1000 + 2000 && remote_index(kHost) < 0;
 }
 
 u8 Session::successor() const {
@@ -235,9 +236,9 @@ bool Session::origin(f64& lon, f64& lat) const {
   return true;
 }
 
-const Remote* Session::remote(u8 slot) const {
-  for (const Remote& r : remotes_) if (r.state.slot == slot) return &r;
-  return nullptr;
+i32 Session::remote_index(u8 slot) const {
+  for (std::size_t i = 0; i < remotes_.size(); ++i) if (remotes_[i].state.slot == slot) return static_cast<i32>(i);
+  return -1;
 }
 
 std::vector<u8> Session::roster() const {
@@ -272,15 +273,18 @@ bool Session::protected_now(u8 slot, f64 now) const {
 
 Vec3 Session::focus_of(u8 slot) const {
   if (slot == self_slot_) return me_.mode == PlayerMode::foot || me_.mode == PlayerMode::drone ? me_.avatar : me_.position;
-  const Remote* r = remote(slot);
-  if (!r) return {};
-  return r->state.mode == PlayerMode::foot || r->state.mode == PlayerMode::drone ? r->person_shown : r->shown;
+  const i32 at = remote_index(slot);
+  if (at < 0) return {};
+  const Remote& r = remotes_[static_cast<std::size_t>(at)];
+  return r.state.mode == PlayerMode::foot || r.state.mode == PlayerMode::drone ? r.person_shown : r.shown;
 }
 
 f32 Session::hp_of(u8 slot) const {
   if (slot == self_slot_) return me_.flags & kDead ? 0 : me_.health;
-  const Remote* r = remote(slot);
-  return r ? (r->state.flags & kDead ? 0 : r->state.health) : 0;
+  const i32 at = remote_index(slot);
+  if (at < 0) return 0;
+  const Remote& r = remotes_[static_cast<std::size_t>(at)];
+  return r.state.flags & kDead ? 0 : r.state.health;
 }
 
 // ---- routing ------------------------------------------------------------------------------------
@@ -320,7 +324,7 @@ bool Session::send_swarm(const std::vector<SwarmUnit>& units) {
   const std::size_t parts = std::max<std::size_t>(1, (units.size() + kSwarmPerMessage - 1) / kSwarmPerMessage);
   for (std::size_t k = 0; k < parts; ++k) {
     const std::size_t from = k * kSwarmPerMessage, n = std::min(kSwarmPerMessage, units.size() - from);
-    to_host(kUnreliable, kSwarmMsg, pack_swarm(self_slot_, swarm_serial_, static_cast<u8>(k), k + 1 == parts, units.data() + from, n));
+    to_host(kUnreliable, kSwarmMsg, pack_swarm(self_slot_, swarm_serial_, static_cast<u8>(k), k + 1 == parts, units, from, n));
   }
   return true;
 }
@@ -328,25 +332,31 @@ bool Session::send_swarm(const std::vector<SwarmUnit>& units) {
 // it is here - a snapshot with a part lost on the way is dropped whole (the next one comes 120 ms
 // later), never shown with units missing.
 void Session::swarm_part(u8 owner, u8 serial, u8 part, bool last, std::vector<SwarmUnit>& units) {
-  SwarmParts* p = nullptr;
-  for (SwarmParts& x : swarm_parts_) if (x.owner == owner) p = &x;
-  if (!p) { swarm_parts_.push_back({}); p = &swarm_parts_.back(); p->owner = owner; p->serial = static_cast<u8>(serial - 1); }
-  if (p->serial != serial) {
-    if (static_cast<kern::i8>(serial - p->serial) < 0) return;  // a part of an older snapshot, late
-    *p = SwarmParts{};
-    p->owner = owner;
-    p->serial = serial;
+  i32 at = -1;
+  for (std::size_t i = 0; i < swarm_parts_.size(); ++i) if (swarm_parts_[i].owner == owner) at = static_cast<i32>(i);
+  if (at < 0) {
+    swarm_parts_.push_back({});
+    at = static_cast<i32>(swarm_parts_.size()) - 1;
+    swarm_parts_[static_cast<std::size_t>(at)].owner = owner;
+    swarm_parts_[static_cast<std::size_t>(at)].serial = static_cast<u8>(serial - 1);
+  }
+  SwarmParts& p = swarm_parts_[static_cast<std::size_t>(at)];
+  if (p.serial != serial) {
+    if (static_cast<kern::i8>(serial - p.serial) < 0) return;  // a part of an older snapshot, late
+    p = SwarmParts{};
+    p.owner = owner;
+    p.serial = serial;
   }
   const u64 mark = 1ull << (part & 63);
-  if (p->have[part >> 6] & mark) return;  // (twice)
-  p->have[part >> 6] |= mark;
-  p->units.insert(p->units.end(), units.begin(), units.end());
-  if (last) p->last = part;
-  if (p->last < 0) return;
-  for (int k = 0; k <= p->last; ++k) if (!(p->have[k >> 6] & (1ull << (k & 63)))) return;
-  swarms_.push_back({owner, std::move(p->units)});
-  p->units.clear();
-  p->last = -1;  // (handed on: its parts stay marked, so a duplicate does not start it again)
+  if (p.have[part >> 6] & mark) return;  // (twice)
+  p.have[part >> 6] |= mark;
+  p.units.insert(p.units.end(), units.begin(), units.end());
+  if (last) p.last = part;
+  if (p.last < 0) return;
+  for (int k = 0; k <= p.last; ++k) if (!(p.have[k >> 6] & (1ull << (k & 63)))) return;
+  swarms_.push_back({owner, std::move(p.units)});
+  p.units.clear();
+  p.last = -1;  // (handed on: its parts stay marked, so a duplicate does not start it again)
 }
 void Session::town_to_host(const std::vector<u8>& blob) {
   if (role_ == Role::client && client_ && client_->connected() && !client_->send(kReliable, kTownMsg, blob)) refused(kTownMsg, blob.size());
@@ -539,7 +549,7 @@ void Session::dispatch(u8 from, u16 type, const std::vector<u8>& d) {
       bool last;
       std::vector<SwarmUnit> units;
       if (!unpack_swarm(d, owner, serial, part, last, units)) return;
-      to_all(kUnreliable, kSwarmMsg, pack_swarm(from, serial, part, last, units.data(), units.size()), from);
+      to_all(kUnreliable, kSwarmMsg, pack_swarm(from, serial, part, last, units, 0, units.size()), from);
       if (from != self_slot_) swarm_part(from, serial, part, last, units);
       return;
     }
@@ -827,7 +837,7 @@ void Session::update(f64 time, f32 dt, const PlayerState& me, bool send_pose) {
     }
     // A joining player gets his anchor once his first pose is in (the group is known then).
     for (std::size_t i = 0; i < pending_anchor_.size();)
-      if (remote(pending_anchor_[i])) { send_anchor(pending_anchor_[i]); pending_anchor_.erase(pending_anchor_.begin() + static_cast<std::ptrdiff_t>(i)); }
+      if (remote_index(pending_anchor_[i]) >= 0) { send_anchor(pending_anchor_[i]); pending_anchor_.erase(pending_anchor_.begin() + static_cast<std::ptrdiff_t>(i)); }
       else ++i;
     if (tick && send_pose) { to_all(kUnreliable, kPoseRelay, pack(me_), kNobody); ++sent_poses_; }
     if (time - scores_clock_ > kScoresEvery) { scores_clock_ = time; send_scores(); }
@@ -846,7 +856,7 @@ void Session::update(f64 time, f32 dt, const PlayerState& me, bool send_pose) {
     for (int ch : {kReliable, kUnreliable})
       while (auto m = client_->receive(ch)) deliver(m->type, m->data);
     if (client_->connected() && have_origin_ && !ever_in_) { ever_in_ = true; in_since_ = now_ms(); }
-    if (client_->connected() && remote(kHost)) {
+    if (client_->connected() && remote_index(kHost) >= 0) {
       mates_.clear();
       for (const Remote& r : remotes_) if (r.state.slot != kHost) mates_.push_back(r.state.slot);
     }

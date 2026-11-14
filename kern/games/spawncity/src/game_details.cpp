@@ -128,7 +128,7 @@ bool Game::details_command(const std::string& cmd, std::string& out) {
       in >> peer >> yes;
       while (in >> m) members.push_back(static_cast<u8>(m));
       mp::Ballot::Status did = details_.ballot.status;
-      mp::cast_vote(details_.ballot, static_cast<u8>(peer), yes != 0, members, now_ms, &did);
+      mp::cast_vote(details_.ballot, static_cast<u8>(peer), yes != 0, members, now_ms, did);
       out = mp::ballot_name(did);
       return true;
     }

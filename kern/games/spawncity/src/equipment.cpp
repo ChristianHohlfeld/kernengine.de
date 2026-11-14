@@ -179,7 +179,6 @@ void MusicSynth::step() {
   const u32 pos = step_ % 16, bar = step_ / 16;
   auto rnd = [&]() { rng_ = rng_ * 1664525u + 1013904223u; return static_cast<f32>(rng_ >> 8) / 16777216.0f; };
   const i32 chord = (p.minor ? kMinorProg : kMajorProg)[bar % 4];
-  const i32* scale = p.minor ? kMinorScale : kMajorScale;
   const f32 rate = static_cast<f32>(rate_);
   auto decay = [&](f32 tau) { return std::exp(-1.0f / (tau * rate)); };
   // drums
@@ -201,7 +200,7 @@ void MusicSynth::step() {
   const f32 lead_prob = p.genre == chip ? 0.85f : p.genre == synthwave ? 0.55f : p.genre == lofi ? 0.3f : 0.25f;
   if ((pos % 2 == 0 || p.genre == chip) && rnd() < lead_prob) {
     const i32 deg = static_cast<i32>(rnd() * 7) % 7, oct = rnd() < 0.3f ? 12 : 0;
-    lead_.freq = midi(static_cast<f32>(p.root + 12 + chord + scale[deg] + oct));
+    lead_.freq = midi(static_cast<f32>(p.root + 12 + chord + (p.minor ? kMinorScale[deg] : kMajorScale[deg]) + oct));
     lead_.env = 1;
     lead_.decay = decay(p.genre == chip ? 0.09f : 0.22f);
   }
@@ -277,7 +276,7 @@ f32 MusicSynth::next_sample(f32& right) {
   return mono + lead + echo * 0.3f;
 }
 
-void MusicSynth::render_add(f32* out, u32 frames) {
+void MusicSynth::render_add(std::vector<f32>& out, u32 frames) {
   peak = 0;
   if (!rate_) return;
   for (u32 i = 0; i < frames; ++i) {

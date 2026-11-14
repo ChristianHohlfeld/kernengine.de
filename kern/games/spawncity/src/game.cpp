@@ -217,7 +217,7 @@ kern::game::Level Game::build_level() const {
     cap.length = 1.1f;
     rs.colliders.push_back(cap);
     rs.mass.mass = 90;
-    box_inertia(90, {0.6f, 0.6f, 1.7f}, rs.mass.inertia);
+    box_inertia(90, {0.6f, 0.6f, 1.7f}, rs.mass);
     Actor a = vehicle_actor("Parachute", rs, {0, 0, -500}, 0);
     a.body->lock_angular[0] = a.body->lock_angular[1] = a.body->lock_angular[2] = true;
     l.add(a);
@@ -1255,8 +1255,8 @@ void Game::draw_vehicles() {
       art_.jet(matrix_of(jet_actor_), jet_.gear_down(), jet_.nozzle(), jet_.thrust() / jet_.spec().thrust_max, mode_ == Mode::jet && view_.jet_cockpit);
     }
     if (vehicle_.drone_out) {
-      Vec3 motors[4];
-      f32 angles[4];
+      std::array<Vec3, 4> motors;
+      std::array<f32, 4> angles;
       for (int i = 0; i < 4; ++i) { motors[i] = drone_.motor_position(i); angles[i] = drone_.rotor_angle(i); }
       art_.drone(gaps_drone_matrix(), motors,  // visual_pose_stabilization.mjs (game_gaps.cpp)
                  angles, drone_.params().prop_d, drone_.telemetry().armed, mode_ == Mode::drone && view_.drone_cam == 0);
@@ -1284,18 +1284,18 @@ bool Game::audio_init(u32 rate) {
   return true;
 }
 
-const f32* Game::audio_render(u32 frames) {
+const std::vector<f32>& Game::audio_render(u32 frames) {
   audio_.out.resize(static_cast<std::size_t>(frames) * 2);
   if (audio_.mixer.ready()) {
     audio_.mixer.render(audio_.out.data(), frames);
     // the page plays the original's own sound (game_audio_web.cpp): Kern's mix is not heard and
     // its music not made
     if (audio_.web_audio) std::fill(audio_.out.begin(), audio_.out.end(), 0.0f);
-    else ui_render_music(audio_.out.data(), frames);  // title music and car radio (game_equipment.cpp)
+    else ui_render_music(audio_.out, frames);  // title music and car radio (game_equipment.cpp)
   }
   else std::fill(audio_.out.begin(), audio_.out.end(), 0.0f);
-  mix_voice(audio_.out.data(), frames);  // proximity voice of the other players (game_net.cpp)
-  return audio_.out.data();
+  mix_voice(audio_.out, frames);  // proximity voice of the other players (game_net.cpp)
+  return audio_.out;
 }
 
 void Game::update_sound(f32 dt) {

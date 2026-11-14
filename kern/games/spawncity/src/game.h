@@ -151,13 +151,13 @@ class Game {
   std::string hud_json();
   std::string command(const std::string& cmd);
   bool audio_init(u32 rate);
-  const f32* audio_render(u32 frames);
+  const std::vector<f32>& audio_render(u32 frames);
   void key_down_event() { ctl_.dev.key(); }
   /// Mouse movement under the pointer lock (CSS px, clamped per event) and the lock state (game_controls.cpp).
   void mouse_move(f32 dx, f32 dy) { ctl_.mouse.x += dx; ctl_.mouse.y += dy; }
   void pointer_locked(bool locked) { ctl_.locked = locked; }
   /// Microphone samples from the page (only while the mic is on; game_net.cpp).
-  void voice_capture(const f32* samples, u32 count, u32 rate);
+  void voice_capture(kern::Span<const f32> samples, u32 rate);
   /// The lit-windows shader extension (registered with the renderer, driven by GameWorld).
   Facades& windows() { return windows_; }  // the original's facades and lit windows (facades.h)
   WaterLook& water_look() { return water_look_; }  // the original's water shader (water_look.h)
@@ -361,7 +361,7 @@ class Game {
   std::string bigmap_json(f32 cx, f32 cy, f32 range);
   void update_nav();
   bool project_screen(Vec3 p, f32& x, f32& y, f32& depth) const;
-  void mix_voice(f32* out, u32 frames);
+  void mix_voice(std::vector<f32>& out, u32 frames);
   void update_net(f32 dt);
   net::PlayerState my_state() const;
   void rebase_origin(f64 lon, f64 lat);
@@ -484,7 +484,7 @@ class Game {
   void ui_equipment(f32 dt);
   void ui_radio(i32 dir);
   void ui_mix_equipment(f32 dt);
-  void ui_render_music(f32* out, u32 frames);
+  void ui_render_music(std::vector<f32>& out, u32 frames);
   bool ui_equipment_command(const std::string& cmd, std::string& out);
   std::string ui_equipment_json();
 

@@ -157,12 +157,31 @@ bool VehicleArt::init(kern::Renderer& r) {
   return true;
 }
 
+void VehicleArt::clear(Part& p) {
+  p.transforms.clear();
+  p.tints.clear();
+}
+
 void VehicleArt::begin() {
-  for (Part* p : {&car_body_, &car_glass_, &car_lights_, &car_tail_, &wheel_, &bus_body_, &bus_glass_, &jet_body_, &jet_glass_, &jet_gear_, &jet_flame_,
-                  &drone_frame_, &drone_motor_, &drone_prop_a_, &drone_prop_b_, &drone_led_, &chute_, &chute_lines_, &pilot_}) {
-    p->transforms.clear();
-    p->tints.clear();
-  }
+  clear(car_body_);
+  clear(car_glass_);
+  clear(car_lights_);
+  clear(car_tail_);
+  clear(wheel_);
+  clear(bus_body_);
+  clear(bus_glass_);
+  clear(jet_body_);
+  clear(jet_glass_);
+  clear(jet_gear_);
+  clear(jet_flame_);
+  clear(drone_frame_);
+  clear(drone_motor_);
+  clear(drone_prop_a_);
+  clear(drone_prop_b_);
+  clear(drone_led_);
+  clear(chute_);
+  clear(chute_lines_);
+  clear(pilot_);
 }
 
 void VehicleArt::put(Part& p, const Mat4& m, Vec3 tint) {
@@ -213,13 +232,14 @@ void VehicleArt::jet(const Mat4& body, bool gear_down, f32 nozzle, f32 thrust01,
   }
 }
 
-void VehicleArt::drone(const Mat4& body, const Vec3* motors, const f32* rotor_angles, f32 prop_d, bool armed, bool fpv_view) {
+void VehicleArt::drone(const Mat4& body, const std::array<Vec3, 4>& motors, const std::array<f32, 4>& rotor_angles, f32 prop_d, bool armed, bool fpv_view) {
   if (fpv_view) return;
   put(drone_frame_, body);
   for (int i = 0; i < 4; ++i) {
     put(drone_motor_, body * at(motors[i] + Vec3{0, 0, -0.004f}));
     const Mat4 p = body * at(motors[i] + Vec3{0, 0, 0.018f}) * rot({0, 0, 1}, rotor_angles[i]) * Mat4::scale({prop_d, 1, 1});
-    put(i % 2 ? drone_prop_b_ : drone_prop_a_, p);
+    if (i % 2) put(drone_prop_b_, p);
+    else put(drone_prop_a_, p);
   }
   put(drone_led_, body * at({0.06f, 0, 0.018f}), armed ? Vec3{4, 0.2f, 0.1f} : Vec3{0.3f, 0.3f, 0.3f});
 }
@@ -242,15 +262,33 @@ void VehicleArt::parachute(Vec3 pilot, f32 heading, bool open) {
   }
 }
 
+void VehicleArt::upload(Part& p) {
+  if (!p.id) return;
+  if (p.transforms.empty()) { r_->set_visible(p.id, false); return; }
+  r_->update_instances(p.id, kern::Span<const f32>(p.transforms), kern::Span<const f32>(p.tints));
+  r_->set_visible(p.id, true);
+}
+
 void VehicleArt::end() {
-  for (Part* p : {&car_body_, &car_glass_, &car_lights_, &car_tail_, &wheel_, &bus_body_, &bus_glass_, &jet_body_, &jet_glass_, &jet_gear_, &jet_flame_,
-                  &drone_frame_, &drone_motor_, &drone_prop_a_, &drone_prop_b_, &drone_led_, &chute_, &chute_lines_, &pilot_}) {
-    if (!p->id) continue;
-    if (p->transforms.empty()) { r_->set_visible(p->id, false); continue; }
-    r_->update_instances(p->id, kern::Span<const f32>(p->transforms.data(), p->transforms.size()),
-                         kern::Span<const f32>(p->tints.data(), p->tints.size()));
-    r_->set_visible(p->id, true);
-  }
+  upload(car_body_);
+  upload(car_glass_);
+  upload(car_lights_);
+  upload(car_tail_);
+  upload(wheel_);
+  upload(bus_body_);
+  upload(bus_glass_);
+  upload(jet_body_);
+  upload(jet_glass_);
+  upload(jet_gear_);
+  upload(jet_flame_);
+  upload(drone_frame_);
+  upload(drone_motor_);
+  upload(drone_prop_a_);
+  upload(drone_prop_b_);
+  upload(drone_led_);
+  upload(chute_);
+  upload(chute_lines_);
+  upload(pilot_);
 }
 
 }  // namespace sc

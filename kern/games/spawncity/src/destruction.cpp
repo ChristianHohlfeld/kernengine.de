@@ -90,22 +90,24 @@ void Destruction::collapse(const Broken& b, Vec3 center, CityStream& city, Rng& 
 bool Destruction::tear(const Broken& b, Vec3 center, Rng& rng) {
   if (!r_) return false;
   // the largest ring is the piece's outline
-  const std::vector<Vec2>* ring = nullptr;
+  i32 largest = -1;  // (its place in b.rings)
   f32 best = -1;
-  for (const auto& rr : b.rings) {
+  for (std::size_t k = 0; k < b.rings.size(); ++k) {
+    const std::vector<Vec2>& rr = b.rings[k];
     f32 a = 0;
     for (std::size_t i = 0; i < rr.size(); ++i) { const Vec2 p = rr[i], q = rr[(i + 1) % rr.size()]; a += p.x * q.y - q.x * p.y; }
-    if (std::fabs(a) > best) { best = std::fabs(a); ring = &rr; }
+    if (std::fabs(a) > best) { best = std::fabs(a); largest = static_cast<i32>(k); }
   }
-  if (!ring || ring->size() < 3) return false;
+  if (largest < 0 || b.rings[static_cast<std::size_t>(largest)].size() < 3) return false;
+  const std::vector<Vec2>& ring = b.rings[static_cast<std::size_t>(largest)];
   const Vec2 dir = norm2(b.c - Vec2{center.x, center.y}, {1, 0});
   // it pivots on its leeward edge: the outline's farthest point along the blast direction
   f32 reach = -1e30f;
-  for (Vec2 p : *ring) reach = std::fmax(reach, (p.x - b.c.x) * dir.x + (p.y - b.c.y) * dir.y);
+  for (Vec2 p : ring) reach = std::fmax(reach, (p.x - b.c.x) * dir.x + (p.y - b.c.y) * dir.y);
   const Vec3 pivot{b.c.x + dir.x * reach, b.c.y + dir.y * reach, b.new_top};
   const f32 h = b.top - b.new_top;
   std::vector<Vec2> pts;
-  for (Vec2 p : *ring) pts.push_back({p.x - pivot.x, p.y - pivot.y});
+  for (Vec2 p : ring) pts.push_back({p.x - pivot.x, p.y - pivot.y});
   if (pts.size() > 3 && std::hypot(pts.front().x - pts.back().x, pts.front().y - pts.back().y) < 1e-4f) pts.pop_back();
   if (pts.size() < 3) return false;
   f32 area = 0;

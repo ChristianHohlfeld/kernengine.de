@@ -187,11 +187,6 @@ void CityStream::remove(Tile& t) {
     if (l.tile == t.key.hash()) l.alive = false;
 }
 
-CityStream::Tile* CityStream::tile(const TileKey& k) {
-  auto it = tiles_.find(k.hash());
-  return it == tiles_.end() ? nullptr : it->second.get();
-}
-
 void CityStream::request_around(Vec3 focus, i32 ring) {
   if (offline_) return;
   f64 lon, lat;
@@ -203,7 +198,7 @@ void CityStream::request_around(Vec3 focus, i32 ring) {
     for (i32 dx = -ring; dx <= ring; ++dx) want.push_back({dx * dx + dy * dy, TileKey{c.z, c.x + dx, c.y + dy}});
   std::sort(want.begin(), want.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
   for (const auto& [d, k] : want) {
-    if (tile(k)) continue;
+    if (tiles_.find(k.hash()) != tiles_.end()) continue;
     auto t = std::make_unique<Tile>();
     t->key = k;
     f64 lo, la, x, y;
@@ -264,23 +259,25 @@ std::string CityStream::take_requests() {
 }
 
 void CityStream::provide(const TileKey& key, kern::Span<const u8> bytes) {
-  Tile* t = tile(key);
-  if (!t || t->state != Tile::State::requested) return;
+  auto it = tiles_.find(key.hash());
+  if (it == tiles_.end() || it->second->state != Tile::State::requested) return;
+  Tile& t = *it->second;
   if (key == origin_tile_ && ms_.t_data < 0) ms_.t_data = kern::now_ms() - start_ms_;
   // decoded off the frame (a Web Worker / thread): the frame only takes the finished features
-  t->tile_job = kern::jobs::submit(cityjobs::kTile, cityjobs::tile_input(key, proj_.lon0, proj_.lat0, bytes));
-  t->state = Tile::State::decoding;
+  t.tile_job = kern::jobs::submit(cityjobs::kTile, cityjobs::tile_input(key, proj_.lon0, proj_.lat0, bytes));
+  t.state = Tile::State::decoding;
 }
 
 void CityStream::fail(const TileKey& key) {
-  Tile* t = tile(key);
-  if (!t) return;
+  auto it = tiles_.find(key.hash());
+  if (it == tiles_.end()) return;
+  Tile& t = *it->second;
   // asked again (a lost request is no hole in the city): after 2 s, 4 s, ... 20 s
-  t->state = Tile::State::failed;
-  ++t->tries;
-  t->retry_ms = kern::now_ms() + std::min(20000.0, 2000.0 * t->tries);
+  t.state = Tile::State::failed;
+  ++t.tries;
+  t.retry_ms = kern::now_ms() + std::min(20000.0, 2000.0 * t.tries);
   // Nothing came for the player's own start tile, three times: build the stand-in town instead.
-  if (key == origin_tile_ && real_tiles_ == 0 && t->tries >= 3) go_offline();
+  if (key == origin_tile_ && real_tiles_ == 0 && t.tries >= 3) go_offline();
 }
 
 void CityStream::go_offline() {

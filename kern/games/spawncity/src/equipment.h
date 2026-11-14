@@ -97,7 +97,7 @@ class MusicSynth {
   /// The programme to play (kMenu, a station index, or -2 = silence) and its level 0..1.
   void select(i32 programme, f32 level);
   /// Adds `frames` stereo frames into `out` (interleaved).
-  void render_add(f32* out, u32 frames);
+  void render_add(std::vector<f32>& out, u32 frames);
   i32 programme() const { return programme_; }
   f32 level() const { return gain_; }
   f32 peak = 0;  // of the last block (tests)

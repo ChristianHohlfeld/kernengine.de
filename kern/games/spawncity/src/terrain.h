@@ -71,9 +71,9 @@ class Terrain {
   static constexpr i32 kImageZoom = 15, kImagePixels = 64;
   std::string take_image_requests();
   /// RGBA of a requested imagery tile (any size; averaged down to 64 x 64 as the original's mosaic).
-  void provide_image(const TileKey& key, const u8* rgba, u32 width, u32 height);
+  void provide_image(const TileKey& key, kern::Span<const u8> rgba, u32 width, u32 height);
   void fail_image(const TileKey& key);
-  void provide(const TileKey& key, const u8* rgba, u32 width, u32 height);
+  void provide(const TileKey& key, kern::Span<const u8> rgba, u32 width, u32 height);
   void fail(const TileKey& key);
 
   /// The ground's shape is decided (elevation loaded, or flat because there is none).
@@ -252,7 +252,7 @@ class Terrain {
 f32 crater_profile(f32 r, f32 radius, f32 depth, f32 rim);
 
 /// Terrarium RGB -> metres.
-inline f32 terrarium_height(const u8* px) { return static_cast<f32>(px[0]) * 256.0f + static_cast<f32>(px[1]) + static_cast<f32>(px[2]) / 256.0f - 32768.0f; }
+inline f32 terrarium_height(u8 r, u8 g, u8 b) { return static_cast<f32>(r) * 256.0f + static_cast<f32>(g) + static_cast<f32>(b) / 256.0f - 32768.0f; }
 
 /// Morphological opening + two box blurs over an n x n grid (terrain_elevation.mjs bareEarth).
 void bare_earth(std::vector<f32>& h, u32 n, f32 step, f32 open_m, f32 blur_m);

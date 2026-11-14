@@ -54,8 +54,20 @@ bool MpArt::init(kern::Renderer& r) {
   return true;
 }
 
+void MpArt::clear(Part& p) {
+  p.transforms.clear();
+  p.tints.clear();
+}
+
 void MpArt::begin() {
-  for (Part* p : {&post_, &gem_, &ring_, &tracer_, &flash_, &canopy_, &led_, &shield_}) { p->transforms.clear(); p->tints.clear(); }
+  clear(post_);
+  clear(gem_);
+  clear(ring_);
+  clear(tracer_);
+  clear(flash_);
+  clear(canopy_);
+  clear(led_);
+  clear(shield_);
 }
 
 void MpArt::put(Part& p, const Mat4& m, Vec3 t) {
@@ -98,13 +110,22 @@ void MpArt::shield(Vec3 center, f32 radius, f32 now) {
   put(shield_, Mat4::trs(center, Quat{}, {r, r, r * 1.3f}), {0.6f, 0.85f, 1});
 }
 
+void MpArt::upload(Part& p) {
+  if (!p.id) return;
+  if (p.transforms.empty()) { r_->set_visible(p.id, false); return; }
+  r_->update_instances(p.id, kern::Span<const f32>(p.transforms), kern::Span<const f32>(p.tints));
+  r_->set_visible(p.id, true);
+}
+
 void MpArt::end() {
-  for (Part* p : {&post_, &gem_, &ring_, &tracer_, &flash_, &canopy_, &led_, &shield_}) {
-    if (!p->id) continue;
-    if (p->transforms.empty()) { r_->set_visible(p->id, false); continue; }
-    r_->update_instances(p->id, kern::Span<const f32>(p->transforms.data(), p->transforms.size()), kern::Span<const f32>(p->tints.data(), p->tints.size()));
-    r_->set_visible(p->id, true);
-  }
+  upload(post_);
+  upload(gem_);
+  upload(ring_);
+  upload(tracer_);
+  upload(flash_);
+  upload(canopy_);
+  upload(led_);
+  upload(shield_);
 }
 
 }  // namespace sc

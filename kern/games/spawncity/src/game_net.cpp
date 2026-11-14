@@ -465,12 +465,12 @@ void Game::mp_input(kern::Engine& e, f32 dt) {
   }
 }
 
-void Game::voice_capture(const f32* samples, u32 count, u32 rate) {
+void Game::voice_capture(kern::Span<const f32> samples, u32 rate) {
   MpLocal& m = mp_local();
-  if (m.mic && !m.muted) m.capture.push(samples, count, rate);
+  if (m.mic && !m.muted) m.capture.push(samples, rate);
 }
 
-void Game::mix_voice(f32* out, u32 frames) {
+void Game::mix_voice(std::vector<f32>& out, u32 frames) {
   if (!net_.active() || !mp_ || !audio_.mixer.ready()) return;
   for (net::Remote& r : net_.remotes()) r.voice.render(out, frames, audio_.mixer.sample_rate());
 }
@@ -706,8 +706,8 @@ void Game::draw_remote_vehicles() {
   if (net_.active()) {
     if (!remote_car_) remote_car_ = std::make_unique<Car>(CarSpec::car());
     if (!remote_bus_) remote_bus_ = std::make_unique<Car>(CarSpec::bus());
-    Vec3 motors[4];
-    f32 angles[4];
+    std::array<Vec3, 4> motors;
+    std::array<f32, 4> angles;
     for (const net::Remote& r : net_.remotes()) {
       const Vec3 color = mp::rgb(net_.color_of(r.state.slot));
       auto drone_at = [&](const kern::Mat4& mtx, bool armed) {
@@ -1122,7 +1122,7 @@ std::string Game::net_command(const std::string& cmd) {
       // Tests (no microphone in a headless browser): 100 ms of a 440 Hz tone as if spoken.
       std::vector<f32> tone(4800);
       for (std::size_t i = 0; i < tone.size(); ++i) tone[i] = 0.4f * std::sin(static_cast<f32>(i) * 2 * kPi * 440 / 48000);
-      for (int k = 0; k < std::max(1, std::atoi(cmd.c_str() + 11)); ++k) voice_capture(tone.data(), 4800, 48000);
+      for (int k = 0; k < std::max(1, std::atoi(cmd.c_str() + 11)); ++k) voice_capture(tone, 48000);
       return std::to_string(m.seq);
     }
     if (rest == "state") {
