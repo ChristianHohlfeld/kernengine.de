@@ -942,7 +942,10 @@ void on1(Float delta) {
   Funktion aus ihr gemacht hat, steht hinter den Ausgängen in `results` – für jeden
   Referenz-Eingang, der nicht const ist, in der Reihenfolge der Eingänge.
 - **Call on Actor gibt Werte:** Eine Funktion eines anderen Blueprints (`KERN_EXTERN`) hat keine
-  Referenz-Eingänge.
+  Referenz-Eingänge. Hat der andere Blueprint sie unter einem anderen Namen, sagt ihn
+  `KERN_EXTERN_AS("Update") ZombiesUpdateResult Zombies_Update(...);` (JSON: `"remote"`) – so ruft ein
+  Blueprint die Funktionen „Update“ zweier Actors, die verschieden aussehen; Call on Actor ruft sie in
+  jeder Stufe beim Namen des anderen Blueprints.
 
 ### Bibliotheken
 

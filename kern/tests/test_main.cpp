@@ -2227,6 +2227,64 @@ TEST(logic_local_variables) {
   CHECK(error.find("local variable L") != std::string::npos);
 }
 
+TEST(logic_call_on_actor_by_its_name) {
+  // A function of another Blueprint named here otherwise (KERN_EXTERN_AS): Call on Actor calls it by the
+  // name that Blueprint has it under - two actors' "Stars" that look different, each named by its actor.
+  const char* level_text = R"kn(
+struct Level : kern::Blueprint {
+  struct StarsResult { Int stars = -1; };
+  StarsResult Stars(Int base = 1) {
+    return {kern::to<Int>(math_add(kern::to<Float>(base), 10.0))};
+  }
+};
+)kn";
+  const char* caller_text = R"kn(
+struct Caller : kern::Blueprint {
+  Int Got = 0;
+
+  struct Level_StarsResult { Int stars = 3; };
+  /// (of the Level, called on it)
+  KERN_EXTERN_AS("Stars") Level_StarsResult Level_Stars(Int base = 1);
+
+  KERN_EVENT(on1, event_custom<"Ask">)
+  void on1(Actor actor, Float value, Text text) {
+    func_call_on<"Level_Stars">(Actor{0}, kern::out(n2.stars), kern::to<Int>(value));
+    Got = n2.stars;
+  }
+
+  struct { Int stars = 0; } n2;
+};
+)kn";
+  logic::Graph level, caller;
+  std::string error;
+  CHECK(logic::from_cpp(level_text, level, nullptr, &error) && logic::from_cpp(caller_text, caller, nullptr, &error));
+  if (!error.empty()) std::printf("%s\n", error.c_str());
+  CHECK(caller.function("Level_Stars") && caller.function("Level_Stars")->external && caller.function("Level_Stars")->remote == "Stars");
+  CHECK(no_errors(logic::check(caller)));
+  logic::Graph back;
+  CHECK(logic::graph_from_json(logic::graph_to_json(caller), back) && back == caller);
+  std::string text;
+  CHECK(logic::to_cpp(caller, "Caller", text, &error) && text.find("  KERN_EXTERN_AS(\"Stars\") Level_StarsResult Level_Stars(Int base = 1);\n") != std::string::npos);
+  logic::Graph read;
+  CHECK(logic::from_cpp(text, read, nullptr, &error) && read == caller);
+  for (bool jit : {false, true}) {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.jit = jit;
+    logic::Instance* lv = rt.add(level, 0, "Level");
+    logic::Instance* c = rt.add(caller, 7, "Caller");
+    CHECK(lv && c);
+    if (!lv || !c) continue;
+    rt.begin();
+    rt.call("Ask", 7, {{"actor", logic::Value::actor(0)}, {"value", logic::Value::number(4)}, {"text", logic::Value::text("")}});
+    CHECK(c->get("Got").i == 14);
+  }
+  // (a name of another Blueprint's function is only for a function of another Blueprint)
+  logic::Graph bad = level;
+  bad.functions[0].remote = "Other";
+  CHECK(!logic::graph_from_json(logic::graph_to_json(bad), back));
+}
+
 TEST(logic_call_on_actor) {
   // A Blueprint calls a function of another one: it declares what the function looks like
   // (KERN_EXTERN) and calls it on an actor - or on the Level (no target).
@@ -3297,11 +3355,13 @@ static logic::Graph every_node_graph(bool wired) {
                       {"VE", PinType::enumeration, "EM"},  {"LE", PinType::enumeration_list, "EM"}, {"VS", PinType::structure, "SM"},  {"LS", PinType::structure_list, "SM"},
                       {"VN", PinType::structure, "SI"},    {"LN", PinType::structure_list, "SI"}, {"VX", PinType::int64, ""},        {"LX", PinType::int64_list, ""},
                       // (a map and a set as the nodes of maps and sets are typed by default: Int keys, Float values)
-                      {"VM", PinType::map, "int>float"},  {"VQ", PinType::set, "int"}};
+                      {"VM", PinType::map, "int>float"},  {"VQ", PinType::set, "int"},   {"VSB", PinType::structure, "SB"}};
   g.enums.push_back({"EM", {"One", "Two", "Three"}, "An enum.\n\nWith three values."});
   // (a struct with a field of every kind - a value, an enum's, another struct's, lists of them - and the struct it holds)
   g.structs.push_back({"SI", {{"N", {PinType::integer, ""}, json::Value(3)}, {"Tag", {PinType::text, ""}, json::Value("t \"q\"")}}, "A struct."});
   g.structs.push_back({"SM", {}, "A struct that holds one.\n\nIts second paragraph."});
+  // (a struct of numbers: what the bytes of a value are of - in the layout the nodes say by default, "4: i32@0")
+  g.structs.push_back({"SB", {{"Bits", {PinType::integer, ""}, json::Value(7)}}, "A struct of one number."});
   {
     json::Value in = json::Value::object(), numbers = json::Value::array(), places = json::Value::array(), at = json::Value::array();
     in.set("N", 5);
@@ -3325,6 +3385,7 @@ static logic::Graph every_node_graph(bool wired) {
     const logic::Value inner = logic::Value::structure({logic::Value::integer(-7), logic::Value::text("x \"y\"\n")});
     if (logic::element_of(t) == PinType::structure) {
       const logic::Value one = of == "SI" ? inner
+                               : of == "SB" ? logic::Value::structure({logic::Value::integer(-123456)})
                                           : logic::Value::structure({logic::Value::number(2.625), logic::Value::enumeration(2), inner, logic::Value::of(std::vector<f64>{0.25}),
                                                                      logic::Value::structures({inner, logic::zero_of({PinType::structure, "SI"}, g)}), logic::Value::boolean(false),
                                                                      logic::Value::vector({1, -2, 3.5f}), logic::Value::actor(3), logic::Value::enumerations({2, 0})});
@@ -3437,7 +3498,7 @@ static logic::Graph every_node_graph(bool wired) {
     std::vector<std::pair<std::string, std::string>> params;
     for (const logic::ParamDef& pd : def->params) {
       using K = logic::ParamDef::Kind;
-      params.push_back({pd.key, pd.kind == K::type && pd.enums_only ? "EM" : pd.kind == K::type && pd.structs_only ? "SM" : pd.kind == K::variable ? (type.rfind("list.", 0) == 0 ? "LT" : type.rfind("map.", 0) == 0 ? "VM" : type.rfind("set.", 0) == 0 ? "VQ" : "VF") :
+      params.push_back({pd.key, pd.kind == K::type && pd.enums_only ? "EM" : pd.kind == K::type && pd.structs_only ? (type.rfind("struct.bytes", 0) == 0 || type.rfind("struct.of_bytes", 0) == 0 ? "SB" : "SM") : pd.kind == K::variable ? (type.rfind("list.", 0) == 0 ? "LT" : type.rfind("map.", 0) == 0 ? "VM" : type.rfind("set.", 0) == 0 ? "VQ" : "VF") :
                                     pd.kind == K::field ? "In" : pd.kind == K::function ? (pd.optional ? pd.def : def->kind == logic::NodeKind::pure ? "Calc" : "Fn") : pd.kind == K::machine ? "State Machine" :
                                     pd.kind == K::state ? "Idle" : pd.def});
     }

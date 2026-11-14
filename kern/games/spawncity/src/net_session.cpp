@@ -866,7 +866,7 @@ void Session::update(f64 time, f32 dt, const PlayerState& me, bool send_pose) {
     if (remote_ballot_.id && now_ms() >= remote_ballot_.expires_ms) { remote_ballot_ = mp::Ballot{}; vote_text_ = "Abstimmung abgelaufen"; }
     client_->send_packets();
   }
-  protected_.erase(std::remove_if(protected_.begin(), protected_.end(), [&](const auto& p) { return now_ms() > p.second; }), protected_.end());
+  protected_.erase(std::remove_if(protected_.begin(), protected_.end(), [&](const std::pair<u8, f64>& p) { return now_ms() > p.second; }), protected_.end());
   // Players who went quiet are gone.
   remotes_.erase(std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& r) { return now_ms() - r.received_ms > kQuietS * 1000; }), remotes_.end());
 }

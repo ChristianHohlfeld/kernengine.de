@@ -517,6 +517,10 @@ struct Function {
   /// and calls it on an actor (Call on Actor) - it has no body here. In the Blueprint's C++:
   /// KERN_EXTERN FnResult Fn(Float x = 0.0);
   bool external = false;
+  /// Of a function of another Blueprint: the name that Blueprint has it under, where this one calls it
+  /// by another (empty: the same) - two actors' Blueprints with a function of one name that looks
+  /// different in each: KERN_EXTERN_AS("Update") ZombiesUpdateResult Zombies_Update(...);
+  std::string remote{};
   /// A function of a library the Blueprint uses (Graph::uses): the library's name. This one says
   /// what the function looks like - its name here is "Library::function", as the call writes it
   /// (Random::range(rng, 0.0, 1.0)) - and has no body: the library has it, once. Called
