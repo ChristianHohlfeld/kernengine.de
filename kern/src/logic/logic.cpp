@@ -1700,7 +1700,7 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
         if (m && !v.empty() && v != "any" && !m->find(v)) err(n.id, lib.title(n) + ": \"" + m->name + "\" has no state \"" + v + "\"");
       }
       if (pd.kind == ParamDef::Kind::event && v.empty()) err(n.id, lib.title(n) + ": the event needs a name");
-      if (pd.kind == ParamDef::Kind::function && !g.function(v)) err(n.id, d->label + ": no function \"" + v + "\"");
+      if (pd.kind == ParamDef::Kind::function && !g.function(v) && !(pd.optional && v.empty())) err(n.id, d->label + ": no function \"" + v + "\"");
       if (pd.kind == ParamDef::Kind::type) {
         // (the setting holds a type's own name: what it means does not depend on a reader's goodwill)
         bool known = false;

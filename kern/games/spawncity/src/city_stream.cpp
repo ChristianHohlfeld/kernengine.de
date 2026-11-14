@@ -14,6 +14,9 @@ namespace sc {
 
 namespace {
 
+/// The map features of a tile that is not loaded: none.
+const MapFeatures kNoFeatures{};
+
 kern::BuildingStyle konstanz_style() {
   // world_city_buildings.mjs WALLS / ROOFS (sRGB) and the cornice mix with #f4efe4 (0.45)
   auto hex = [](u32 h) { return kern::Rgb{((h >> 16) & 255) / 255.0, ((h >> 8) & 255) / 255.0, (h & 255) / 255.0}; };
@@ -86,8 +89,6 @@ struct CityStream::Tile {
   u32 tries = 0;       // failed requests so far
   f64 retry_ms = 0;    // when a failed tile is asked for again
   bool procedural = false;
-  std::vector<u8> bytes;
-  mvt::Decoder decoder;
   MapFeatures features;
   kern::FootprintStream footprints;
   kern::RoadStream roads;
@@ -99,7 +100,7 @@ struct CityStream::Tile {
   u32 colliders = 0, triangles = 0;
   Vec2 center;
   // terrain: road and area meshes are re-laid when the ground under them changes (craters, water)
-  kern::Vec4 bounds{-1e9f, -1e9f, 1e9f, 1e9f};
+  kern::Vec4 bounds;  // the tile's square (x0, y0, x1, y1), set where the tile is made
   std::vector<u32> lay_meshes, old_lay;
   bool relay = false, relay_again = false;
   Vec2 roads_at{1e9f, 1e9f};  // where the streets were last laid around (REBUILD_MOVE_M 260)
@@ -186,11 +187,6 @@ void CityStream::remove(Tile& t) {
     if (l.tile == t.key.hash()) l.alive = false;
 }
 
-CityStream::Tile* CityStream::tile(const TileKey& k) {
-  auto it = tiles_.find(k.hash());
-  return it == tiles_.end() ? nullptr : it->second.get();
-}
-
 void CityStream::request_around(Vec3 focus, i32 ring) {
   if (offline_) return;
   f64 lon, lat;
@@ -202,7 +198,7 @@ void CityStream::request_around(Vec3 focus, i32 ring) {
     for (i32 dx = -ring; dx <= ring; ++dx) want.push_back({dx * dx + dy * dy, TileKey{c.z, c.x + dx, c.y + dy}});
   std::sort(want.begin(), want.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
   for (const auto& [d, k] : want) {
-    if (tile(k)) continue;
+    if (tiles_.find(k.hash()) != tiles_.end()) continue;
     auto t = std::make_unique<Tile>();
     t->key = k;
     f64 lo, la, x, y;
@@ -262,24 +258,26 @@ std::string CityStream::take_requests() {
   return s + "]";
 }
 
-void CityStream::provide(const TileKey& key, const u8* bytes, std::size_t length) {
-  Tile* t = tile(key);
-  if (!t || t->state != Tile::State::requested) return;
+void CityStream::provide(const TileKey& key, kern::Span<const u8> bytes) {
+  auto it = tiles_.find(key.hash());
+  if (it == tiles_.end() || it->second->state != Tile::State::requested) return;
+  Tile& t = *it->second;
   if (key == origin_tile_ && ms_.t_data < 0) ms_.t_data = kern::now_ms() - start_ms_;
   // decoded off the frame (a Web Worker / thread): the frame only takes the finished features
-  t->tile_job = kern::jobs::submit(cityjobs::kTile, cityjobs::tile_input(key, proj_.lon0, proj_.lat0, bytes, length));
-  t->state = Tile::State::decoding;
+  t.tile_job = kern::jobs::submit(cityjobs::kTile, cityjobs::tile_input(key, proj_.lon0, proj_.lat0, bytes));
+  t.state = Tile::State::decoding;
 }
 
 void CityStream::fail(const TileKey& key) {
-  Tile* t = tile(key);
-  if (!t) return;
+  auto it = tiles_.find(key.hash());
+  if (it == tiles_.end()) return;
+  Tile& t = *it->second;
   // asked again (a lost request is no hole in the city): after 2 s, 4 s, ... 20 s
-  t->state = Tile::State::failed;
-  ++t->tries;
-  t->retry_ms = kern::now_ms() + std::min(20000.0, 2000.0 * t->tries);
+  t.state = Tile::State::failed;
+  ++t.tries;
+  t.retry_ms = kern::now_ms() + std::min(20000.0, 2000.0 * t.tries);
   // Nothing came for the player's own start tile, three times: build the stand-in town instead.
-  if (key == origin_tile_ && real_tiles_ == 0 && t->tries >= 3) go_offline();
+  if (key == origin_tile_ && real_tiles_ == 0 && t.tries >= 3) go_offline();
 }
 
 void CityStream::go_offline() {
@@ -295,6 +293,7 @@ void CityStream::go_offline() {
   auto t = std::make_unique<Tile>();
   t->procedural = true;
   t->key = TileKey{0, -1, -1};
+  t->bounds = {-1e9f, -1e9f, 1e9f, 1e9f};  // the stand-in town has no square: it is everywhere
   if (training_offline) training_level(t->features);  // training_test_level_v2.mjs
   else procedural_city(0, 0, 760, 20261029, t->features);
   furnish(t->features, t->bounds, {});
@@ -304,11 +303,16 @@ void CityStream::go_offline() {
   tiles_[t->key.hash()] = std::move(t);
 }
 
-void CityStream::furniture(std::vector<Furniture>& out) const {
+void CityStream::furniture(std::vector<u64>& out) const {
   out.clear();
   for (const auto& [k, t] : tiles_)
-    if (t->prepared) out.push_back({k, &t->features.trees, &t->features.lamps});
-  std::sort(out.begin(), out.end(), [](const Furniture& a, const Furniture& b) { return a.tile < b.tile; });
+    if (t->prepared) out.push_back(k);
+  std::sort(out.begin(), out.end());
+}
+
+const MapFeatures& CityStream::features(u64 tile) const {
+  const auto it = tiles_.find(tile);
+  return it != tiles_.end() ? it->second->features : kNoFeatures;
 }
 
 bool CityStream::ready_at(Vec3 p) const {
@@ -1112,16 +1116,16 @@ void CityStream::buildings_near(Vec2 p, f32 radius, std::vector<BuildingRef>& ou
       f32 x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
       for (Vec2 q : b.rings[0]) { x0 = std::fmin(x0, q.x); y0 = std::fmin(y0, q.y); x1 = std::fmax(x1, q.x); y1 = std::fmax(y1, q.y); }
       if (p.x < x0 - radius || p.x > x1 + radius || p.y < y0 - radius || p.y > y1 + radius) continue;
-      out.push_back({k, static_cast<u32>(i), &b});
+      out.push_back({k, static_cast<u32>(i)});
     }
   }
 }
 
-void CityStream::ready_features(std::vector<const MapFeatures*>& out) const {
+void CityStream::ready_tiles(std::vector<u64>& out) const {
   for (const auto& [k, t] : tiles_)
     // a tile being re-synced keeps its features (the map and the town must not lose its houses
     // while the meshes are rebuilt: they flickered on the minimap)
-    if (t->prepared) out.push_back(&t->features);
+    if (t->prepared) out.push_back(k);
 }
 
 void CityStream::areas_near(Vec2 p, f32 radius, AreaKind kind, std::vector<AreaRef>& out) const {
@@ -1133,7 +1137,7 @@ void CityStream::areas_near(Vec2 p, f32 radius, AreaKind kind, std::vector<AreaR
       f32 x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
       for (Vec2 q : a.rings[0]) { x0 = std::fmin(x0, q.x); y0 = std::fmin(y0, q.y); x1 = std::fmax(x1, q.x); y1 = std::fmax(y1, q.y); }
       if (p.x < x0 - radius || p.x > x1 + radius || p.y < y0 - radius || p.y > y1 + radius) continue;
-      out.push_back({k * 65536 + i, &a});
+      out.push_back({k * 65536 + i, k, static_cast<u32>(i)});
     }
   }
 }

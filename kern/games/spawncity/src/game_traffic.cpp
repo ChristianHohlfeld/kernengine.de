@@ -96,7 +96,7 @@ f32 Game::traffic_gap(i32 car, Vec3 pos, Vec3 fwd, i32* limiter) {
   const f32 fl = std::hypot(fwd.x, fwd.y);
   const Vec2 f2 = fl > 1e-4f ? Vec2{fwd.x / fl, fwd.y / fl} : Vec2{1, 0};
   i32 who = -1;
-  const f32 v = TrafficRules::gap_speed(car, {pos.x, pos.y}, f2, cars_[static_cast<std::size_t>(car)].car->spec().radius > 0.4f, L.vehicles, &who);
+  const f32 v = TrafficRules::gap_speed(car, {pos.x, pos.y}, f2, cars_[static_cast<std::size_t>(car)].car->spec().radius > 0.4f, L.vehicles, who);
   if (limiter) *limiter = who >= 0 && who < static_cast<i32>(cars_.size()) ? who : -1;
   return v;
 }
@@ -161,7 +161,7 @@ void Game::update_traffic_world(f32 dt) {
       pp.max_distance = 120;
       pp.min_distance = 3;
       pp.volume = 0.7f;
-      audio_.mixer.play(L.sounds.horn, pp);
+      mixer_.play(L.sounds.horn, pp);
       ++L.honk_count;
     }
   L.honks.clear();
@@ -174,7 +174,7 @@ void Game::update_traffic_world(f32 dt) {
       explosion(world_->physics().pose(t.body).position + Vec3{0, 0, 0.3f}, 7, 110, false);
     }
   // ---- tow service: who needs help (every 0.5 s) ----
-  if (worldsync_.puppet_world) return;  // MP client in the host's town: his cars, his tow trucks
+  if (puppet_world_) return;  // MP client in the host's town: his cars, his tow trucks
   if (now - L.tow_scan_at < 0.5f) return;
   L.tow_scan_at = now;
   if (L.watch.size() < cars_.size()) L.watch.resize(cars_.size());
@@ -409,7 +409,7 @@ void Game::draw_traffic_lights() {
     }
   }
   std::vector<i32> near;
-  L.rules.near({view_.cam.eye.x, view_.cam.eye.y}, 160, near);
+  L.rules.near({cam_.eye.x, cam_.eye.y}, 160, near);
   for (i32 ji : near) {
     const TrafficRules::Junction& j = L.rules.junctions()[ji];
     if (!j.lights) continue;

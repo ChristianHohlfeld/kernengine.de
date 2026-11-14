@@ -12,7 +12,7 @@ namespace {
 constexpr f32 kCell = 40;       // junction lookup grid
 constexpr f32 kMerge = 3;       // street vertices closer than this are one node
 using kern::logic::Value;
-rules::Blueprint g_rules;  // the Blueprint of the level's actor "Traffic": the laws (see world_traffic.h)
+rules::Blueprint g_rules{"Traffic"};  // the laws (see world_traffic.h)
 /// The Blueprint's distances and times the loops below compare with (read when it is bound).
 struct Laws { f32 ahead_min = 0, ahead_max = 0, stop_line = 0, first_come = 0, claim_s = 0, patience_s = 0; } g_laws;
 f32 num(const char* function, const std::vector<Value>& args) { return static_cast<f32>(g_rules.number(function, args)); }
@@ -223,7 +223,7 @@ TrafficRules::Pursuit TrafficRules::pursuit(const Lane& lane, i32 index, i32 dir
   return out;
 }
 
-f32 TrafficRules::gap_speed(i32 self, Vec2 pos, Vec2 fwd, bool bus, const std::vector<Vehicle>& all, i32* limiter) {
+f32 TrafficRules::gap_speed(i32 self, Vec2 pos, Vec2 fwd, bool bus, const std::vector<Vehicle>& all, i32& limiter) {
   const f32 side = num("SideReach", {Value::boolean(bus)}), far = g_laws.ahead_max;
   const f32 bodies[2] = {num("Bodies", {Value::boolean(bus), Value::boolean(false)}), num("Bodies", {Value::boolean(bus), Value::boolean(true)})};
   f32 gap = 1e9f;
@@ -239,7 +239,7 @@ f32 TrafficRules::gap_speed(i32 self, Vec2 pos, Vec2 fwd, bool bus, const std::v
     const f32 g = along - bodies[o.bus ? 1 : 0];
     if (g < gap) { gap = g; who = static_cast<i32>(i); }
   }
-  if (limiter) *limiter = who;
+  limiter = who;
   if (who < 0) return 1e9f;
   return num("GapSpeed", {rules::number(gap)});
 }

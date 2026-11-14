@@ -191,14 +191,14 @@ SC_TEST(gaps_street_lamps) {
   SC_CHECK(bp.inst && std::string(bp.inst->tier()) == "native C++", "it runs as its C++ class");
   lamps::Field f;
   // a straight 200 m street, 8 m wide: lamps from 17 m on every 34 m, alternating kerbs, 1.15 m out
-  f.place_road({{0, 0}, {200, 0}}, 8, 0, [](f32, f32) { return 2.0f; });
+  f.place_road({{0, 0}, {200, 0}}, 8, 0, 2.0f);
   SC_CHECK(f.all().size() == 6, "lamps %zu", f.all().size());
   const lamps::Lamp& a = f.all()[0];
   SC_CHECK(std::fabs(a.foot.x - 17) < 1e-3f && std::fabs(std::fabs(a.foot.y) - 5.15f) < 1e-3f && a.foot.z == 2, "first lamp %f %f", a.foot.x, a.foot.y);
   SC_CHECK(f.all()[0].foot.y * f.all()[1].foot.y < 0, "alternating sides");
   SC_CHECK(std::fabs(std::fabs(a.head.y) - (5.15f - 1.42f)) < 1e-3f, "the arm reaches over the road");
   // placing the same street again adds nothing (one lamp per 8 m cell)
-  f.place_road({{0, 0}, {200, 0}}, 8, 1, nullptr);
+  f.place_road({{0, 0}, {200, 0}}, 8, 1, 0);
   SC_CHECK(f.all().size() == 6, "dedup");
   // a round through the head
   const Vec3 h{a.head.x, a.head.y, a.foot.z + lamps::kHeadZ};
@@ -215,7 +215,7 @@ SC_TEST(gaps_street_lamps) {
   SC_CHECK(slow.size() == 1 && !slow[0].topple && std::fabs(slow[0].impulse.x + 1350 * 2 * 1.05f) < 1, "stopped %f", slow.empty() ? 0.0f : slow[0].impulse.x);
   // broken lamps stay broken when the street is placed again; RESET puts them back
   f.clear();
-  f.place_road({{0, 0}, {200, 0}}, 8, 0, nullptr);
+  f.place_road({{0, 0}, {200, 0}}, 8, 0, 0);
   SC_CHECK(f.all()[0].state == 1, "remembered");
   f.reset_broken();
   SC_CHECK(f.all()[0].state == 0 && f.broken() == 0, "reset");

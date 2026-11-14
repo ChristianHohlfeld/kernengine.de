@@ -8,7 +8,7 @@ namespace sc::seats {
 namespace {
 using kern::logic::Value;
 using rules::of_enum;
-rules::Blueprint g_rules;
+rules::Blueprint g_rules{"JetSeats"};
 
 // The Blueprint's struct Row, field by field in its order - and a table of them.
 Value to_value(const Row& r) { return Value::structure({Value::integer(r.owner), Value::integer(r.pilot), Value::integer(r.passenger)}); }
@@ -37,8 +37,9 @@ void bind(kern::logic::Instance* blueprint) { g_rules.running = blueprint; }
 kern::logic::Instance* blueprint() { return g_rules.running; }
 
 std::string result_name(Result r) {
-  std::vector<Value> out;
-  return g_rules.call("ResultName", {of_enum(r)}, out) && !out.empty() ? out[0].as_text() : std::string();
+  std::string name;
+  g_rules.call("ResultName", std::tie(name), r);
+  return name;
 }
 
 Row Table::get(u8 owner) const {

@@ -97,13 +97,13 @@ void Game::gaps_lamps_init(kern::Renderer& r) {
 }
 
 void Game::gaps_lamps_sounds() {
-  if (!gaps_ || gaps_->lamp_sounds || !audio_.bank) return;
+  if (!gaps_ || gaps_->lamp_sounds || !bank_) return;
   const u32 rate = 44100;
   const std::vector<f32> glass = glass_pcm(rate), clang = clang_pcm(rate);
-  audio_.bank->request("sc:lampglass");
-  audio_.bank->set_pcm("sc:lampglass", glass.data(), static_cast<u32>(glass.size()), 1, rate);
-  audio_.bank->request("sc:lampclang");
-  audio_.bank->set_pcm("sc:lampclang", clang.data(), static_cast<u32>(clang.size()), 1, rate);
+  bank_->request("sc:lampglass");
+  bank_->set_pcm("sc:lampglass", glass.data(), static_cast<u32>(glass.size()), 1, rate);
+  bank_->request("sc:lampclang");
+  bank_->set_pcm("sc:lampclang", clang.data(), static_cast<u32>(clang.size()), 1, rate);
   gaps_->lamp_sounds = true;
 }
 
@@ -112,19 +112,18 @@ void Game::gaps_lamps_place() {
   // with every road set): taken whenever the set of tiles changes - a tile that goes takes its
   // lamps along, what was broken stays broken (by cell). Not in open water.
   GapsState& g = *gaps_;
-  auto ground = [this](f32 x, f32 y) { return city_.ground_height(x, y); };
   if (g.lamp_serial != city_.furniture_serial()) {
     g.lamp_serial = city_.furniture_serial();
-    std::vector<CityStream::Furniture> tiles;
+    std::vector<u64> tiles;
     city_.furniture(tiles);
     std::vector<lamps::Field::Spot> spots;
-    for (const CityStream::Furniture& f : tiles)
-      for (const MapFeatures::Spot& sp : *f.lamps)
-        if (!city_.terrain().water_at(sp.p.x, sp.p.y)) spots.push_back({sp.p.x, sp.p.y, sp.a});
-    g.lamps.rebuild(spots, ground);
+    for (u64 tile : tiles)
+      for (const MapFeatures::Spot& sp : city_.features(tile).lamps)
+        if (!city_.terrain().water_at(sp.p.x, sp.p.y)) spots.push_back({sp.p.x, sp.p.y, sp.a, city_.ground_height(sp.p.x, sp.p.y)});
+    g.lamps.rebuild(spots);
     g.lamps_dirty = true;
   }
-  for (const kern::Vec4& r : ground_changes_) { g.lamps.reground(r.x, r.y, r.z, r.w, ground); g.lamps_dirty = true; }
+  for (const kern::Vec4& r : ground_changes_) { g.lamps.reground(r.x, r.y, r.z, r.w, city_); g.lamps_dirty = true; }
   if (g.lamps_dirty) gaps_lamps_mirror();
 }
 
@@ -145,11 +144,11 @@ void Game::gaps_lamp_break(i32 i, u8 state, Vec2 dir, f32 speed, bool net) {
   ++g.lamps_broken_events;
   townsync_lamp(l.key, state);  // in a session: the host keeps which lamps are broken (game_townsync.cpp)
   gaps_lamps_sounds();
-  const f32 fx_d = kern::length(l.foot - view_.cam.eye), vol = std::fmax(0.0f, 1 - fx_d / 90) * 0.5f;
-  if (was < 1 && vol > 0) world_->play_sound("sc:lampglass", view_.cam.eye, vol, 1, false);
+  const f32 fx_d = kern::length(l.foot - cam_.eye), vol = std::fmax(0.0f, 1 - fx_d / 90) * 0.5f;
+  if (was < 1 && vol > 0) world_->play_sound("sc:lampglass", cam_.eye, vol, 1, false);
   if (was < 1) osfx("street_lamps.glass", {l.head.x, l.head.y, l.foot.z + lamps::kPoleH - 0.2f});
   if (state == 2) {
-    if (vol > 0) world_->play_sound("sc:lampclang", view_.cam.eye, vol, 1, false);
+    if (vol > 0) world_->play_sound("sc:lampclang", cam_.eye, vol, 1, false);
     osfx("street_lamps.clang", l.foot + Vec3{0, 0, 0.4f}, 1);
     // topple(): the post becomes a 140 kg box (0.22 x 0.22 x 6.2 m) and gets a push at 80 % height
     kern::physics::World& w = world_->physics();
@@ -227,8 +226,8 @@ void Game::gaps_lamps_update(f32 dt) {
         if (h.topple) gaps_lamp_break(h.lamp, 2, {s.velocity.x, s.velocity.y}, std::hypot(s.velocity.x, s.velocity.y), true);
         else if (h.clang) {
           gaps_lamps_sounds();
-          const f32 vol = std::fmax(0.0f, 1 - kern::length(s.position - view_.cam.eye) / 90) * 0.5f * 0.5f;
-          if (vol > 0) world_->play_sound("sc:lampclang", view_.cam.eye, vol, 1, false);
+          const f32 vol = std::fmax(0.0f, 1 - kern::length(s.position - cam_.eye) / 90) * 0.5f * 0.5f;
+          if (vol > 0) world_->play_sound("sc:lampclang", cam_.eye, vol, 1, false);
           osfx("street_lamps.clang", g.lamps.all()[static_cast<std::size_t>(h.lamp)].foot + Vec3{0, 0, 0.5f}, 0.5f);
         }
       }
@@ -260,7 +259,7 @@ void Game::gaps_lamps_draw() {
     const f32 glow = look::lamp_glow(night_);
     for (const lamps::Lamp& l : g.lamps.all()) {
       if (l.state == 2) continue;
-      if (std::fabs(l.foot.x - view_.cam.eye.x) > look_.lamp_m * std::fmin(view_zoom(), 3.0f) || std::fabs(l.foot.y - view_.cam.eye.y) > look_.lamp_m * std::fmin(view_zoom(), 3.0f)) continue;
+      if (std::fabs(l.foot.x - cam_.eye.x) > look_.lamp_m * std::fmin(view_zoom(), 3.0f) || std::fabs(l.foot.y - cam_.eye.y) > look_.lamp_m * std::fmin(view_zoom(), 3.0f)) continue;
       const Mat4 m = yaw_at(l.foot, l.yaw);
       put(g.lamp_pole, m, {1, 1, 1, 1});
       if (l.state == 0 && glow > 0.01f) {

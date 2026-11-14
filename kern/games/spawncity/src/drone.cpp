@@ -1,10 +1,6 @@
 // SpawnCity drone plant + the Arondight45 firmware (see drone.h).
 #include "drone.h"
 
-#include <cstring>
-
-#include "../firmware/Arondight45_FirmwareRuntime.hpp"
-
 namespace sc {
 
 namespace {
@@ -22,8 +18,8 @@ f32 battery_under_load(f32 ocv, f32 amps, f32 r, f32 cells) {
   return clampf(ocv - std::fmax(0.0f, amps) * r, 3 * cells, 4.2f * cells);
 }
 
-void encode_sbus(const u16 ch[16], u8* p) {
-  std::memset(p, 0, 25);
+void encode_sbus(const std::array<u16, 16>& ch, std::array<u8, 25>& p) {
+  p.fill(0);
   p[0] = 0x0F;
   for (int c = 0; c < 16; ++c)
     for (int bit = 0; bit < 11; ++bit)
@@ -33,23 +29,23 @@ void encode_sbus(const u16 ch[16], u8* p) {
       }
 }
 
-void put_be16(u8* p, f32 v) {
+// a big-endian 16-bit register pair at `at`
+void put_be16(std::array<u8, 14>& out, u32 at, f32 v) {
   const long r = std::lround(clampf(v, -32767, 32767));
   const u16 u = static_cast<u16>(static_cast<int16_t>(r));
-  p[0] = static_cast<u8>(u >> 8);
-  p[1] = static_cast<u8>(u & 0xff);
+  out[at] = static_cast<u8>(u >> 8);
+  out[at + 1] = static_cast<u8>(u & 0xff);
 }
 
 f32 quat_yaw_deg(Quat q) {
   return std::atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z)) / kDeg;
 }
 
-}  // namespace
+/// A component of the airframe for its mass properties (component_mass_model.mjs): mass, centre,
+/// size (a disc: radius, thickness).
+struct MassPart { f32 m; Vec3 pos, size; bool disk; };
 
-class DroneFirmware {
- public:
-  fc::FirmwareRuntime runtime;
-};
+}  // namespace
 
 f32 clearance_rate(f32 axis) {
   const f32 x = clampf(axis, -1, 1), m = std::fabs(x);
@@ -65,7 +61,7 @@ f32 clearance_lead(f32 v) {
   return up ? e : -e;
 }
 
-Drone::Drone(const DroneParams& p) : p_(p), fw_(new DroneFirmware()) {
+Drone::Drone(const DroneParams& p) : p_(p) {
   const f32 a = p_.span / (2 * std::sqrt(2.0f));
   motor_pos_[0] = {-a, -a, 0};
   motor_pos_[1] = {-a, a, 0};
@@ -77,8 +73,6 @@ Drone::Drone(const DroneParams& p) : p_(p), fw_(new DroneFirmware()) {
   cdA_ = Vec3{0.035f, 0.035f, 0.07f} * p_.drag_scale;
   reset();
 }
-
-Drone::~Drone() { delete fw_; }
 
 RigidSpec Drone::rigid_spec(const DroneParams& p) {
   RigidSpec r;
@@ -112,8 +106,7 @@ RigidSpec Drone::rigid_spec(const DroneParams& p) {
     r.colliders.push_back(sweep);
   }
   // Mass properties from the components (component_mass_model.mjs buildQuadComponents).
-  struct Part { f32 m; Vec3 pos, size; bool disk; };
-  std::vector<Part> parts;
+  std::vector<MassPart> parts;
   parts.push_back({p.m_frame, {0, 0, 0}, {p.span * 0.62f, p.span * 0.48f, 0.018f}, false});
   for (const Vec3& m : motors) {
     parts.push_back({p.m_motor, m, {0.036f, 0.036f, 0.025f}, false});
@@ -126,10 +119,10 @@ RigidSpec Drone::rigid_spec(const DroneParams& p) {
   parts.push_back({p.m_cam_vtx, {p.camera_x, 0, p.camera_z}, {0.04f, 0.03f, 0.025f}, false});
   f32 mass = 0;
   Vec3 c;
-  for (const Part& q : parts) { mass += q.m; c += q.pos * q.m; }
+  for (const MassPart& q : parts) { mass += q.m; c += q.pos * q.m; }
   c = c * (1.0f / mass);
   f32 I[6] = {};
-  for (const Part& q : parts) {
+  for (const MassPart& q : parts) {
     f32 l[3];
     if (q.disk) {
       const f32 rr = q.size.x, t = q.size.y;
@@ -158,7 +151,7 @@ RigidSpec Drone::rigid_spec(const DroneParams& p) {
 }
 
 void Drone::reset() {
-  fw_->runtime.reset();
+  fw_.reset();
   for (int i = 0; i < 4; ++i) { omega_[i] = current_[i] = motor_torque_[i] = prop_torque_[i] = 0; pulses_[i] = 1000; }
   soc_ = 1;
   vbatt_ = battery_ocv(1, p_.cells);
@@ -180,7 +173,7 @@ void Drone::reset() {
   tele_ = {};
 }
 
-void Drone::imu_bytes(f32 dt, const BodyState& s, u8 out[14]) {
+void Drone::imu_bytes(f32 dt, const BodyState& s, std::array<u8, 14>& out) {
   for (int i = 0; i < 3; ++i) {
     gyro_bias_[i] += noise_.gaussian() * 0.002f * std::sqrt(dt);
     acc_bias_[i] += noise_.gaussian() * 0.00002f * std::sqrt(dt);
@@ -196,16 +189,17 @@ void Drone::imu_bytes(f32 dt, const BodyState& s, u8 out[14]) {
     accel[i] += acc_bias_[i] * kG + noise_.gaussian() * 0.0025f * kG;
     gyro[i] += gyro_bias_[i] + noise_.gaussian() * 0.035f;
   }
-  out[0] = out[1] = 0;
-  put_be16(out + 2, accel.x / kG * 2048);
-  put_be16(out + 4, accel.y / kG * 2048);
-  put_be16(out + 6, accel.z / kG * 2048);
-  put_be16(out + 8, gyro.x * 16.4f);
-  put_be16(out + 10, gyro.y * 16.4f);
-  put_be16(out + 12, gyro.z * 16.4f);
+  out[0] = 0;
+  out[1] = 0;
+  put_be16(out, 2, accel.x / kG * 2048);
+  put_be16(out, 4, accel.y / kG * 2048);
+  put_be16(out, 6, accel.z / kG * 2048);
+  put_be16(out, 8, gyro.x * 16.4f);
+  put_be16(out, 10, gyro.y * 16.4f);
+  put_be16(out, 12, gyro.z * 16.4f);
 }
 
-void Drone::motor_tick(f32 dt, const BodyState& s, f32 altitude, f32 thrust_out[4], f32 torque_out[4]) {
+void Drone::motor_tick(f32 dt, const BodyState& s, f32 altitude, std::array<f32, 4>& thrust_out, std::array<f32, 4>& torque_out) {
   const f32 ocv = battery_ocv(soc_, p_.cells);
   const f32 limit = std::fmin(p_.motor_limit_a, p_.esc_limit_a);
   f32 total = 0;
@@ -281,7 +275,7 @@ void Drone::step(kern::physics::World& world, kern::physics::Body body, f32 h, c
   const f32 altitude = std::fmax(0.001f, below.hit ? below.distance : 50.0f);
 
   // SBUS channels (simulator.mjs controls()).
-  u16 ch[16];
+  std::array<u16, 16> ch;
   for (u16& c : ch) c = 992;
   auto centered = [](f32 v) { return static_cast<u16>(std::lround(992 + 820 * clampf(v, -1, 1))); };
   ch[0] = centered(sticks.roll);
@@ -300,21 +294,19 @@ void Drone::step(kern::physics::World& world, kern::physics::Body body, f32 h, c
 
   const int ticks = std::max(1, static_cast<int>(std::lround(h * 1000.0f)));
   const f32 dt = h / static_cast<f32>(ticks);
-  f32 thrust[4] = {}, yaw_torque[4] = {};
+  std::array<f32, 4> thrust = {}, yaw_torque = {};
   fc::RuntimeOutput out{};
   for (int t = 0; t < ticks; ++t) {
     fc::HardwareFrame hw{};
     now_us_ += static_cast<f64>(dt) * 1e6;
     hw.now_us = static_cast<uint64_t>(now_us_);
     hw.dt_us = static_cast<uint32_t>(std::lround(dt * 1e6f));
-    u8 imu[14];
-    imu_bytes(dt, s, imu);
-    std::memcpy(hw.imu_registers.data(), imu, 14);
+    imu_bytes(dt, s, hw.imu_registers);
     hw.imu_present = true;
     sbus_elapsed_ += dt;
     if (sbus_elapsed_ >= 0.01f) {
       sbus_elapsed_ -= 0.01f;
-      encode_sbus(ch, hw.sbus_frame.data());
+      encode_sbus(ch, hw.sbus_frame);
       hw.sbus_present = true;
     }
     nav_elapsed_ += dt;
@@ -331,8 +323,8 @@ void Drone::step(kern::physics::World& world, kern::physics::Body body, f32 h, c
                                                                heading, true);
       hw.navigation_present = true;
     }
-    if (reset_flag_) { fw_->runtime.reset(); reset_flag_ = false; }
-    out = fw_->runtime.step(hw);
+    if (reset_flag_) { fw_.reset(); reset_flag_ = false; }
+    out = fw_.step(hw);
     for (int i = 0; i < 4; ++i) pulses_[i] = sticks.kill ? 1000 : out.motor_us[i];
     motor_tick(dt, s, altitude, thrust, yaw_torque);
   }

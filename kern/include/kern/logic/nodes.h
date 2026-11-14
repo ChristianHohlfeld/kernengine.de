@@ -5,6 +5,7 @@
 // Nothing here knows about graphs.
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <charconv>
 #include <cmath>
@@ -552,6 +553,11 @@ template <class T> bool remove(std::vector<T>& items, const std::type_identity_t
   return removed;
 }
 template <class T> void clear(std::vector<T>& items) { items.clear(); }
+/// Sort List: the items in order - `less(a, b)`: a goes before b; without it, by their `<` -, items
+/// that are equal in that order as they stood (a stable sort: the order it gives is the one order there
+/// is, on every machine and in every tier).
+template <class T, class Less> void sort(std::vector<T>& items, Less less) { std::stable_sort(items.begin(), items.end(), less); }
+template <class T> void sort(std::vector<T>& items) { std::stable_sort(items.begin(), items.end()); }
 /// The longest list Set Length makes and Reserve makes room for: a length beyond it is this
 /// one (a length is defined for every number, like an index).
 inline constexpr i64 kLongest = i64{1} << 24;
@@ -1195,6 +1201,10 @@ struct PureNodes {
   static Bool text_equal(Text a, Text b) { return a == b; }
   static Bool text_contains(Text a, Text b) { return a.find(b) != std::string::npos; }
   static Int text_length(Text a) { return static_cast<i64>(a.size()); }
+  /// The byte at `index` as a number 0..255 (beyond the text: 0 - as std::string has a 0 after its last).
+  static Int text_code_at(Text a, Int index) { return index >= 0 && static_cast<u64>(index) < a.size() ? static_cast<i64>(static_cast<u8>(a[static_cast<std::size_t>(index)])) : 0; }
+  /// A text of one byte: the code cut to 8 bits, as a char holds it.
+  static Text text_of_code(Int code) { return Text(1, static_cast<char>(static_cast<u8>(code))); }
 };
 
 /// The flow nodes that keep something between runs. `m`: the node's memory, four numbers (the

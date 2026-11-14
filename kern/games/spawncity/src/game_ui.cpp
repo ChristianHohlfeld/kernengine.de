@@ -298,19 +298,19 @@ void Game::ui_camera(f32 dt) {
   if (!ui_.gps_cam_init) { ui_.gps_cam_eye = eye; ui_.gps_cam_look = look; ui_.gps_cam_init = true; }
   ui_.gps_cam_eye = ui_.gps_cam_eye + (eye - ui_.gps_cam_eye) * 0.18f;
   ui_.gps_cam_look = ui_.gps_cam_look + (look - ui_.gps_cam_look) * 0.25f;
-  view_.cam.eye = ui_.gps_cam_eye;
-  view_.cam.target = ui_.gps_cam_look;
-  view_.cam.up = up;
-  view_.cam.fov = fov * kDeg;
-  view_.cam.near = 0.25f;
+  cam_.eye = ui_.gps_cam_eye;
+  cam_.target = ui_.gps_cam_look;
+  cam_.up = up;
+  cam_.fov = fov * kDeg;
+  cam_.near = 0.25f;
 }
 
 // ---------------------------------------------------------------------------------------------
 // input: the settings on top of what read_input decided
 
 void Game::ui_before_input(kern::Engine& e) {
-  ui_.head_yaw_before = view_.head_yaw;
-  ui_.head_pitch_before = view_.head_pitch;
+  ui_.head_yaw_before = head_yaw_;
+  ui_.head_pitch_before = head_pitch_;
   // mouse_settings.mjs scaleMouseDelta (invert Y) is applied to the mouse stream in game_controls.cpp.
 }
 
@@ -330,7 +330,7 @@ void Game::ui_after_input(f32 dt) {
       // Stick curves, inversions and the GAME top speed: applyGameStick in game_controls.cpp (control_semantics.mjs).
       if (!ui_.drone_seen) {
         // A freshly launched drone holds the chosen hover height (defaultHoverAgl).
-        vehicle_.sticks.clearance = st.get(Opt::drone_hover_agl);
+        sticks_.clearance = st.get(Opt::drone_hover_agl);
         ui_.drone_seen = true;
       }
       break;
@@ -364,8 +364,8 @@ void Game::ui_apply_settings() {
   if (ui_.applied == st.version()) return;
   ui_.applied = st.version();
   sensitivity_ = st.get(Opt::mouse_sensitivity) / 100;
-  view_.fpv_tilt_deg = st.get(Opt::cam_fpv_tilt);
-  view_.fpv_fov_deg = st.get(Opt::cam_fov);
+  fpv_tilt_deg_ = st.get(Opt::cam_fpv_tilt);
+  fpv_fov_deg_ = st.get(Opt::cam_fov);
   // WORLD: switched-off kinds do not exist (world_options.mjs: no bodies, no AI, no draw).
   people_.set_budget(look_people_budget());  // the quality level's budget (game_look.cpp)
   if (!st.on(Opt::world_people)) people_.clear();
@@ -391,32 +391,32 @@ void Game::ui_update(f32 dt) {
       c.placed = false;
     }
   }
-  if (!st.on(Opt::world_police) && (wanted::stars() > 0 || !police_.units.empty())) {
+  if (!st.on(Opt::world_police) && (wanted::stars() > 0 || !units_.empty())) {
     wanted::clear();
     ui_clear_police();
   }
 }
 
 void Game::ui_clear_police() {
-  for (PoliceUnit& u : police_.units) {
+  for (PoliceUnit& u : units_) {
     if (u.car >= 0 && u.car != car_index_) {
       world_->set_alive(cars_[u.car].actor, false);
       cars_[u.car].placed = false;
     }
     if (u.car >= 0) cars_[u.car].unit = -1;
   }
-  police_.units.clear();
-  for (PoliceDrone& d : police_.pdrones) d.active = false;
-  police_.drone_wave_live = false;
-  police_.next_drone_wave = -1;
-  police_.star_since = -1;
+  units_.clear();
+  for (PoliceDrone& d : pdrones_) d.active = false;
+  drone_wave_live_ = false;
+  next_drone_wave_ = -1;
+  star_since_ = -1;
 }
 
 void Game::ui_mix_audio(SoundState& s) {
   // audio_settings.mjs: the sound switch, the effects / shots / footsteps / ambient / drone / vehicle
   // sliders (SpawnCity's defaults are this game's mix, so each slider scales relative to its default).
   const Settings& st = ui_.settings;
-  kern::audio::Mixer& m = audio_.mixer;
+  kern::audio::Mixer& m = mixer_;
   m.bus(kern::audio::Bus::master).muted = !st.on(Opt::audio_on);
   m.bus(kern::audio::Bus::sfx).volume = st.get(Opt::audio_fx) / 72;
   m.bus(kern::audio::Bus::ambience).volume = st.get(Opt::audio_ambient) / 46;
@@ -437,7 +437,7 @@ void Game::ui_mix_cues() {
   for (kern::game::SoundCue& c : world_->sound_cues()) {
     const std::string& n = c.sound;
     // the soldier's own rounds (the weapon's fireSound, game_weapons.cpp): the original's foot weapon sound
-    if (c.actor == soldier_ && (n == "sc:shot0" || n == "sc:pistol0" || n == "builtin:sniper")) osfx("foot.shot", c.position, static_cast<f32>(static_cast<i32>(weapons_.foot_weapon)));
+    if (c.actor == soldier_ && (n == "sc:shot0" || n == "sc:pistol0" || n == "builtin:sniper")) osfx("foot.shot", c.position, static_cast<f32>(static_cast<i32>(foot_weapon_)));
     if (n == "builtin:step" || n == "builtin:land") c.volume *= st.get(Opt::audio_steps) / 30 / fx;
     else if (n == "builtin:pistol" || n == "builtin:smg" || n == "builtin:sniper" || n == "builtin:rifle" || n == "builtin:shotgun")
       c.volume *= st.get(Opt::audio_shots) / 82 / fx;
@@ -465,7 +465,7 @@ void Game::ui_reset() {
   if (mode_ != Mode::foot) command("mode foot");
   wanted::clear();
   ui_clear_police();
-  weapons_.projectiles.clear();
+  projectiles_.clear();
   people_.clear();
   for (TrafficCar& c : cars_) {
     if (c.police) continue;
@@ -473,8 +473,8 @@ void Game::ui_reset() {
     c.wreck = false;
     c.burn_until = -1;
   }
-  vehicle_.drone_hp = 100;
-  vehicle_.jet_hp = 400;  // jet_mode.mjs HP_MAX
+  drone_hp_ = 100;
+  jet_hp_ = 400;  // jet_mode.mjs HP_MAX
   jet_.fuel = 1;
   player_dead_ = false;
   // Fresh weapons, the pistol in hand (Kern's weapon component follows select_foot_weapon).
@@ -482,7 +482,7 @@ void Game::ui_reset() {
   destruction_.reset(city_);  // every building whole again (world_destruction_state clearDestruction)
   dsync_reset_epoch();  // in a session: every machine's city whole again with the host's (game_destruction_sync.cpp)
   townsync_reset();     // ... and its lamps: the host's RESET is everybody's, a client's takes the host's state again (game_townsync.cpp)
-  weapons_.foot_weapon = weapons::Id::knife;
+  foot_weapon_ = weapons::Id::knife;
   select_foot_weapon(weapons::Id::glock);
   // down at RESET: Kern's soldier comes back at its next step (at its spawn), the start point follows
   // then (update_town) - heal alone does not raise the dead (the player stayed lying)

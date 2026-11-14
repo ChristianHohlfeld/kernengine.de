@@ -40,14 +40,16 @@ bool Game::line_of_sight(Vec3 a, Vec3 b) const {
 PeopleView Game::people_view() const {
   PeopleView v;
   v.physics = &world_->physics();
-  v.city = &city_;
   v.focus = focus_position();
   if (net_.hosting()) v.foci = mate_foci();  // MP: the citizens live around every player (game_worldsync.cpp)
   v.player = player_position();
   if (mode_ == Mode::foot) v.player.z -= 0.73f;
   v.player_on_foot = mode_ == Mode::foot;
   v.player_alive = !player_dead_;
-  v.can_spawn = [this](Vec3 p) { return gaps_can_spawn(p, 1.9f, mobile_ ? 125.0f : 150.0f); };  // spawn_visibility_guard.mjs (game_gaps.cpp)
+  // spawn_visibility_guard.mjs (game_gaps.cpp): who may not see a person appear
+  v.spawn_watched = gaps_spawn_viewers(v.spawn_viewers);
+  v.spawn_far_entry = mobile_ ? 125.0f : 150.0f;
+  v.spawn_height = 1.9f;
   for (std::size_t i = 0; i < cars_.size(); ++i) {
     const TrafficCar& c = cars_[i];
     if (!c.placed || !world_->actor_alive(c.actor)) continue;
@@ -60,11 +62,11 @@ PeopleView Game::people_view() const {
     vv.player = mode_ == Mode::car && static_cast<i32>(i) == car_index_;
     v.vehicles.push_back(vv);
   }
-  if (vehicle_.drone_out) {
+  if (drone_out_) {
     const BodyState s = state_of(drone_actor_);
     v.vehicles.push_back({s.position - Vec3{0, 0, city_.ground_height(s.position.x, s.position.y)}, s.velocity, s.rotation, {0.3f, 0.3f}, true, true});
   }
-  if (vehicle_.jet_placed) {
+  if (jet_placed_) {
     const BodyState s = state_of(jet_actor_);
     const bool flying = jet_.telemetry().contacts == 0;
     // Body frame of the jet: +Y nose; footprint across X (wings) and Y (length).
@@ -85,7 +87,7 @@ void Game::handle_shots() {
   std::vector<kern::game::ShotEvent> arrived;
   gaps_sniper_rounds(shots, arrived, now);
   for (kern::game::ShotEvent& s : shots)
-    if (s.shooter == soldier_ && !(mode_ == Mode::foot && weapons_.foot_weapon == weapons::Id::sniper)) work.push_back(&s);
+    if (s.shooter == soldier_ && !(mode_ == Mode::foot && foot_weapon_ == weapons::Id::sniper)) work.push_back(&s);
   for (kern::game::ShotEvent& s : arrived) work.push_back(&s);
   for (kern::game::ShotEvent* sp : work) {
     kern::game::ShotEvent& s = *sp;
@@ -94,7 +96,7 @@ void Game::handle_shots() {
     Vec3 to = s.to;
     // Police drones: a sphere of 0.55 m around each.
     bool drone_hit = false;
-    for (PoliceDrone& d : police_.pdrones) {
+    for (PoliceDrone& d : pdrones_) {
       if (!d.active) continue;
       const Vec3 seg = s.to - s.from;
       const f32 l2 = kern::dot(seg, seg);
@@ -196,8 +198,8 @@ void Game::wreck_car(i32 i) {
   c.wreck_at = world_->sim_time();
   const Vec3 at = matrix_of(c.actor).translation() + Vec3{0, 0, 0.6f};
   // Whoever sits inside does not survive it.
-  if (c.unit >= 0 && c.unit < static_cast<i32>(police_.units.size())) {
-    PoliceUnit& u = police_.units[c.unit];
+  if (c.unit >= 0 && c.unit < static_cast<i32>(units_.size())) {
+    PoliceUnit& u = units_[c.unit];
     for (PoliceUnit::Cop& cop : u.cops)
       if (cop.inside) { cop.inside = false; cop.seed = 0; }
     u.state = PoliceUnit::State::wreck;
@@ -223,16 +225,16 @@ void Game::damage_player_vehicle(f32 amount) {
   const f32 now = world_->sim_time();
   (void)now;
   if (mode_ == Mode::car && car_index_ >= 0) damage_car(car_index_, amount, false);
-  else if (mode_ == Mode::drone && vehicle_.drone_out) {
-    vehicle_.drone_hp -= amount;
-    if (vehicle_.drone_hp <= 0) {
+  else if (mode_ == Mode::drone && drone_out_) {
+    drone_hp_ -= amount;
+    if (drone_hp_ <= 0) {
       const Vec3 at = matrix_of(drone_actor_).translation();
       world_->particle_burst(at, {2.0f, 0.8f, 0.2f});
       world_->play_sound("builtin:break", at, 1, 1.2f, true);
       toast_ = "Drohne abgeschossen!";
       toast_age_ = 0;
       toggle_drone();
-      vehicle_.drone_hp = kDroneHp;
+      drone_hp_ = kDroneHp;
       combat_.drone_ready_at = world_->sim_time() + 8;  // player_vitals_logic.mjs DRONE_REPLACEMENT_COOLDOWN_MS
       combat_.pop = combat_.fun.apply(combat::FunEvent::drone_destroyed, world_->sim_time(), wanted::stars());  // gameplay_fun_logic.mjs
       combat_.pop_at = world_->sim_time();
@@ -244,17 +246,17 @@ void Game::damage_player_vehicle(f32 amount) {
 
 void Game::explosion(Vec3 at, f32 radius, f32 damage, bool by_player, BlastBy kind) {
   const f32 now = world_->sim_time();
-  ++weapons_.explosions;
+  ++explosions_;
   look_blast(at, radius);  // light, camera shake (game_look.cpp)
   // dispatchExplosion -> visualBlast(position, 1): a pool of 8 in the original
-  if (rounds_.visual_blasts.size() >= 8) rounds_.visual_blasts.erase(rounds_.visual_blasts.begin());
-  rounds_.visual_blasts.push_back({at, now, 1});
+  if (visual_blasts_.size() >= 8) visual_blasts_.erase(visual_blasts_.begin());
+  visual_blasts_.push_back({at, now, 1});
   world_->physics().explode(at, radius, radius * 0.5f, 6.0f);
   world_->particle_burst(at, {3.0f, 1.2f, 0.3f});
   world_->particle_burst(at + Vec3{0, 0, 0.8f}, {1.1f, 1.1f, 1.1f});
   world_->play_sound(combat_sfx(combat_audio::Kind::explosion), at, 1, 1, true);
   osfx("player_vehicle_runtime_v2.playExplosion", at);  // "arondight:world-explosion"
-  const f32 cam_d = kern::length(view_.cam.eye - at);
+  const f32 cam_d = kern::length(cam_.eye - at);
   world_->shake_camera(clampf(1.4f - cam_d / (radius * 3), 0, 1.2f));
   people_.blast(at, radius, damage, by_player, now);
   combat_blast(at, radius, damage, by_player);  // army, flak, rockets (game_military.cpp)
@@ -277,7 +279,7 @@ void Game::explosion(Vec3 at, f32 radius, f32 damage, bool by_player, BlastBy ki
   blast_cars(at, radius, damage, by_player);  // hits per car / bus, cruisers linear (game_vehicle_damage.cpp)
   // the parked jet (player_vehicle_runtime_v2 airframes): grenades and rockets wreck it too, linear
   // over the radius + 5 m (its size); in the cockpit the flight's own damage applies
-  if (vehicle_.jet_placed && mode_ != Mode::jet && gaps_) {
+  if (jet_placed_ && mode_ != Mode::jet && gaps_) {
     const f32 dj = kern::length(matrix_of(jet_actor_).translation() - at), rj = radius + 5;
     if (dj < rj) gaps_jet_damage(std::fmax(20.0f, damage) * 2.5f * (1 - dj / rj));
   }
@@ -338,12 +340,12 @@ void Game::spawn_police_unit() {
   u.progress_t = world_->sim_time();
   // Reuse a finished unit's slot so car.unit indices stay valid.
   i32 slot = -1;
-  for (std::size_t i = 0; i < police_.units.size(); ++i)
-    if (police_.units[i].car < 0) { slot = static_cast<i32>(i); break; }
-  if (slot < 0) { police_.units.push_back(u); slot = static_cast<i32>(police_.units.size() - 1); }
-  else police_.units[slot] = u;
+  for (std::size_t i = 0; i < units_.size(); ++i)
+    if (units_[i].car < 0) { slot = static_cast<i32>(i); break; }
+  if (slot < 0) { units_.push_back(u); slot = static_cast<i32>(units_.size() - 1); }
+  else units_[slot] = u;
   c.unit = slot;
-  police_.last_wave = world_->sim_time();
+  last_wave_ = world_->sim_time();
 }
 
 void Game::step_cop(PoliceUnit& u, PoliceUnit::Cop& c, f32 dt) {
@@ -392,10 +394,10 @@ void Game::step_cop(PoliceUnit& u, PoliceUnit::Cop& c, f32 dt) {
   p.aiming = !back && c.los && d < kEngageMax + 12;
   // Shooting: in range and in sight; officers keep a gap between their shots (a volley gap).
   if (back || !c.los || d >= kEngageMax + 12 || player_dead_) return;
-  if (now >= c.next_shot && now - police_.last_cop_shot < kVolleyGap) c.next_shot = police_.last_cop_shot + kVolleyGap + rng_.unit() * 0.26f;
+  if (now >= c.next_shot && now - last_cop_shot_ < kVolleyGap) c.next_shot = last_cop_shot_ + kVolleyGap + rng_.unit() * 0.26f;
   if (now < c.next_shot || std::fabs(wrap_pi(p.yaw - std::atan2(dy, dx))) > 0.35f) return;
   c.next_shot = now + std::fmax(2.3f, 3.5f - static_cast<f32>(stars) * 0.16f) + rng_.unit() * 1.5f;
-  police_.last_cop_shot = now;
+  last_cop_shot_ = now;
   const f32 cy = std::cos(p.yaw), sy = std::sin(p.yaw);
   const Vec3 from{p.pos.x + cy * 0.45f + sy * 0.12f, p.pos.y + sy * 0.45f - cy * 0.12f, p.pos.z + 1.38f};
   const f32 player_speed = kern::length(world_->actor_velocity(mode_ == Mode::foot ? soldier_ : mode_ == Mode::car && car_index_ >= 0 ? cars_[car_index_].actor
@@ -454,7 +456,7 @@ void Game::drive_police(PoliceUnit& u, f32 dt) {
       at.z = city_.ground_height(at.x, at.y);
       if (!line_of_sight(pos + Vec3{0, 0, 1.0f}, at + Vec3{0, 0, 1.0f})) at = pos - fwd * 2.6f;
       at.z = city_.ground_height(at.x, at.y);
-      cop.person = people_.add_officer(at, yaw + static_cast<f32>(cop.seat) * kPi / 2, static_cast<i32>(&u - police_.units.data()), cop.seed);
+      cop.person = people_.add_officer(at, yaw + static_cast<f32>(cop.seat) * kPi / 2, static_cast<i32>(&u - units_.data()), cop.seed);
       cop.inside = false;
       cop.next_shot = now + 0.7f + rng_.unit() * 0.5f;
       cop.los = false;
@@ -553,7 +555,7 @@ void Game::police_drone_mate_hit(u16 id, f32 damage) {
   // a mate's round on our drone (game_swarm.cpp): what our own round does (handle_shots) - but it
   // is not our crime
   const f32 now = world_->sim_time();
-  for (PoliceDrone& d : police_.pdrones) {
+  for (PoliceDrone& d : pdrones_) {
     if (!d.active || static_cast<u16>(d.serial % 65535 + 1) != id) continue;
     d.hp -= damage;
     if (d.hp <= 0) {
@@ -571,16 +573,16 @@ void Game::spawn_police_drones() {
   const i32 stars = wanted::stars();
   const i32 desired = wanted::police_count(stars);
   i32 active = 0;
-  for (const PoliceDrone& d : police_.pdrones) active += d.active ? 1 : 0;
+  for (const PoliceDrone& d : pdrones_) active += d.active ? 1 : 0;
   // A wave at once; when a wave is down, the next after a break (syncPoliceWaves).
-  if (active > 0) { police_.drone_wave_live = true; if (active >= desired) return; }
-  else if (police_.drone_wave_live) { police_.drone_wave_live = false; police_.next_drone_wave = now + wanted::wave_break_ms(stars) / 1000; }
-  if (police_.next_drone_wave >= 0 && now < police_.next_drone_wave) return;
+  if (active > 0) { drone_wave_live_ = true; if (active >= desired) return; }
+  else if (drone_wave_live_) { drone_wave_live_ = false; next_drone_wave_ = now + wanted::wave_break_ms(stars) / 1000; }
+  if (next_drone_wave_ >= 0 && now < next_drone_wave_) return;
   // They come in from behind the player's view, at his height (policeSpawnSpot).
-  const Vec3 anchor = police_.last_contact > now - wanted::escape_ms(stars) / 1000 ? police_.last_known : player_position();
-  const f32 forward = std::atan2(view_.cam.target.y - view_.cam.eye.y, view_.cam.target.x - view_.cam.eye.x);
+  const Vec3 anchor = last_contact_ > now - wanted::escape_ms(stars) / 1000 ? last_known_ : player_position();
+  const f32 forward = std::atan2(cam_.target.y - cam_.eye.y, cam_.target.x - cam_.eye.x);
   for (u32 i = 0; i < 5 && active < desired; ++i) {
-    PoliceDrone& d = police_.pdrones[i];
+    PoliceDrone& d = pdrones_[i];
     if (d.active || now < d.destroyed_until) continue;
     if (!gaps_drone_due(i, stars)) { ++active; continue; }  // wanted_dispatch_guard.mjs: on its way (game_gaps.cpp)
     const f32 base = forward + kPi + (static_cast<f32>(i) - 2) * 0.34f;
@@ -599,7 +601,7 @@ void Game::spawn_police_drones() {
       d.vel = {-std::sin(a) * 1.2f, std::cos(a) * 1.2f, 0};
       d.hp = kPdHp;
       d.next_shot = now + wanted::engage_delay_ms(stars) / 1000;
-      d.serial = ++police_.drone_serial;
+      d.serial = ++drone_serial_;
       gaps_drone_revealed(i, stars);  // arrived: the grace before the first shot (game_gaps.cpp)
       placed = true;
       ++active;
@@ -610,18 +612,18 @@ void Game::spawn_police_drones() {
 void Game::emp_pulse() {
   // EMP (wanted_police_drones.mjs): 30 m, 18 s cooldown; drones in range drop out of the sky.
   const f32 now = world_->sim_time();
-  if (now < police_.emp_ready_at || wanted::stars() <= 0) { toast_ = now < police_.emp_ready_at ? "EMP laedt ..." : "EMP: keine Ziele"; toast_age_ = 0; return; }
+  if (now < emp_ready_at_ || wanted::stars() <= 0) { toast_ = now < emp_ready_at_ ? "EMP laedt ..." : "EMP: keine Ziele"; toast_age_ = 0; return; }
   const Vec3 me = player_position();
   {
     // wanted_police_drones.mjs triggerEmp: nothing in range = "NO TARGET IN RANGE" for 1.1 s, no cooldown
     i32 targets = 0;
     const f32 emp_range = wanted::emp_range();
-    for (const PoliceDrone& d : police_.pdrones) targets += d.active && !d.emp && kern::length(d.pos - me) <= emp_range ? 1 : 0;
+    for (const PoliceDrone& d : pdrones_) targets += d.active && !d.emp && kern::length(d.pos - me) <= emp_range ? 1 : 0;
     if (targets == 0) { ctl_.emp_miss_until = now + 1.1f; return; }
   }
-  police_.emp_ready_at = now + wanted::emp_cooldown_ms() / 1000;
+  emp_ready_at_ = now + wanted::emp_cooldown_ms() / 1000;
   u32 hit = 0;
-  for (PoliceDrone& d : police_.pdrones) {
+  for (PoliceDrone& d : pdrones_) {
     if (!d.active || d.emp) continue;
     const f32 dist = kern::length(d.pos - me);
     const f32 impulse = wanted::emp_impulse(dist);
@@ -632,7 +634,7 @@ void Game::emp_pulse() {
     // the 18 kg body (massKg 18); its HP drop to 34 % at most
     Vec3 away{d.pos.x - me.x, d.pos.y - me.y, 0};
     const f32 al = std::hypot(away.x, away.y);
-    if (al < 1e-2f) { const f32 a = static_cast<f32>(&d - police_.pdrones) / 5 * 2 * kPi; away = {std::cos(a), std::sin(a), 0}; }
+    if (al < 1e-2f) { const f32 a = static_cast<f32>(&d - pdrones_) / 5 * 2 * kPi; away = {std::cos(a), std::sin(a), 0}; }
     else away = away * (1.0f / al);
     d.vel += (away * impulse + Vec3{0, 0, -std::fmax(16.0f, impulse * 0.16f)}) * (1.0f / 18.0f);
     d.hp = std::fmin(d.hp, std::ceil(kPdHp * 0.34f));
@@ -654,9 +656,9 @@ bool Game::update_police_drones(f32 dt) {
   const Vec3 me_center = me + Vec3{0, 0, mode_ == Mode::foot ? 1.2f : 0.5f};
   const f32 radius = wanted::detection_radius(std::max(1, stars));
   bool sees = false;
-  const bool searching = police_.last_contact < now - 0.5f;
+  const bool searching = last_contact_ < now - 0.5f;
   for (u32 i = 0; i < 5; ++i) {
-    PoliceDrone& d = police_.pdrones[i];
+    PoliceDrone& d = pdrones_[i];
     if (!d.active) continue;
     if (d.emp) {
       // Knocked out: falls under 1.35 g (EMP_GRAVITY_SCALE), and breaks on the ground.
@@ -688,13 +690,13 @@ bool Game::update_police_drones(f32 dt) {
       d.sees = !player_dead_ && d.distance <= radius && d.distance <= wanted::fire_range(stars) && line_of_sight(d.pos, me_center);
       if (d.sees && !had) d.sight_since = now;
     }
-    if (d.sees) { sees = true; police_.last_known = me; police_.last_contact = now; }
+    if (d.sees) { sees = true; last_known_ = me; last_contact_ = now; }
     // Motion: a ring around the player (or the last known position), at his height.
     Vec3 goal = d.retreating ? d.retreat_goal : Vec3{};
     if (!d.retreating) {
       const f32 ang = static_cast<f32>(i) / 5 * 2 * kPi + now * (searching ? 0.35f : 0.16f);
       const f32 r = searching ? 11 + static_cast<f32>(i % 3) * 5 : 8 + static_cast<f32>(i % 2) * 4;
-      const Vec3 c = searching ? police_.last_known : me;
+      const Vec3 c = searching ? last_known_ : me;
       goal = {c.x + std::cos(ang) * r, c.y + std::sin(ang) * r, c.z + (searching ? 0.53f : 0.18f) + kPdFormation[i] + 1.2f};
       if (now >= d.roof_at) {
         d.roof_at = now + 0.125f + static_cast<f32>(i) * 0.009f;
@@ -721,10 +723,10 @@ bool Game::update_police_drones(f32 dt) {
     if (kern::length(Vec3{d.vel.x, d.vel.y, 0}) > 0.3f || d.sees) d.yaw = approach_angle(d.yaw, face, dt * 4);
     // Attack (updateDroneAttack).
     if (d.retreating || searching || !d.sees || d.distance < 4.5f || d.distance > 34 + static_cast<f32>(stars) * 2 || now < d.next_shot) continue;
-    if (now - d.sight_since < kPdReaction + static_cast<f32>(i) * 0.09f || now - police_.last_drone_shot < kPdVolley) continue;
+    if (now - d.sight_since < kPdReaction + static_cast<f32>(i) * 0.09f || now - last_drone_shot_ < kPdVolley) continue;
     if (!line_of_sight(d.pos, me_center)) { d.sees = false; d.next_shot = now + 0.19f; continue; }
     d.next_shot = now + std::max(3.9f, 5.1f - static_cast<f32>(stars) * 0.23f) + static_cast<f32>(i) * 0.073f;
-    police_.last_drone_shot = now;
+    last_drone_shot_ = now;
     ++d.shots;
     const f32 player_speed = kern::length(world_->actor_velocity(mode_ == Mode::foot ? soldier_ : mode_ == Mode::car && car_index_ >= 0 ? cars_[car_index_].actor : mode_ == Mode::jet ? jet_actor_ : drone_actor_));
     const f32 chance = wanted::hit_chance(stars, d.distance, player_speed);
@@ -748,8 +750,8 @@ bool Game::update_police_drones(f32 dt) {
     world_->shots().push_back(s);
     world_->play_sound(combat_sfx(combat_audio::Kind::shot), d.pos, 0.6f, 1.25f, true);
     osfx("wanted_police_drones.shot", d.pos);
-    if (accurate && now - police_.last_player_hit >= kPdDamageCooldown) {
-      police_.last_player_hit = now;
+    if (accurate && now - last_player_hit_ >= kPdDamageCooldown) {
+      last_player_hit_ = now;
       if (mode_ == Mode::foot) world_->damage(soldier_, std::max(2.0f, std::round(wanted::police_damage(stars))), 0, false, d.pos);
       else damage_player_vehicle(mode_ == Mode::drone ? kDroneHit : mode_ == Mode::jet ? kJetHit : kCarHit);
     }
@@ -760,18 +762,18 @@ bool Game::update_police_drones(f32 dt) {
 void Game::update_police(f32 dt) {
   const f32 now = world_->sim_time();
   const i32 stars = wanted::stars();
-  if (stars > 0 && police_.star_since < 0) police_.star_since = now;
-  if (stars == 0) { police_.star_since = -1; police_.next_drone_wave = -1; police_.drone_wave_live = false; }
+  if (stars > 0 && star_since_ < 0) star_since_ = now;
+  if (stars == 0) { star_since_ = -1; next_drone_wave_ = -1; drone_wave_live_ = false; }
   // Units that are due (wantedPoliceCount, arrival delay, a break between waves).
   i32 active = 0;
-  for (const PoliceUnit& u : police_.units)
+  for (const PoliceUnit& u : units_)
     if (u.car >= 0 && u.state != PoliceUnit::State::leave && u.state != PoliceUnit::State::abandoned && u.state != PoliceUnit::State::wreck) ++active;
-  if (stars > 0 && !player_dead_ && active < wanted::police_count(stars) && now - police_.star_since > wanted::arrival_delay_ms(stars) / 1000 &&
-      now - police_.last_wave > wanted::wave_break_ms(stars) / 1000)
+  if (stars > 0 && !player_dead_ && active < wanted::police_count(stars) && now - star_since_ > wanted::arrival_delay_ms(stars) / 1000 &&
+      now - last_wave_ > wanted::wave_break_ms(stars) / 1000)
     spawn_police_unit();
   const Vec3 me = player_position();
-  for (std::size_t ui = 0; ui < police_.units.size(); ++ui) {
-    PoliceUnit& u = police_.units[ui];
+  for (std::size_t ui = 0; ui < units_.size(); ++ui) {
+    PoliceUnit& u = units_[ui];
     if (u.car < 0) continue;
     TrafficCar& c = cars_[u.car];
     // The player took the cruiser: the crew is out and stays on foot.
@@ -872,7 +874,8 @@ void Game::update_town(f32 dt) {
   player_dead_ = dead;
   handle_shots();
   const PeopleView view = people_view();
-  people_.update(dt, now, view, rng_);
+  people_.update(dt, now, view, city_, rng_);
+  if (view.spawn_watched) { gaps_->spawn_allowed += people_.spawns_allowed(); gaps_->spawn_denied += people_.spawns_denied(); }
   // Burning and crashing cars (critical_damage_logic.mjs).
   for (std::size_t i = 0; i < cars_.size(); ++i) {
     TrafficCar& c = cars_[i];
@@ -891,7 +894,7 @@ void Game::update_town(f32 dt) {
   people_.take_reports(reports);
   bool police_sees = false;
   const Vec3 me = player_position();
-  for (const PoliceUnit& u : police_.units) {
+  for (const PoliceUnit& u : units_) {
     if (u.car < 0) continue;
     for (const PoliceUnit::Cop& cop : u.cops)
       if (cop.person >= 0 && cop.los) police_sees = true;
@@ -900,23 +903,23 @@ void Game::update_town(f32 dt) {
   }
   for (const CrimeReport& r : reports) wanted::report(r.crime, r.witnessed || police_sees);
   if (update_police_drones(dt)) police_sees = true;
-  if (police_sees) { police_.last_known = me; police_.last_contact = now; }
+  if (police_sees) { last_known_ = me; last_contact_ = now; }
   // The police must arrive before you can shake them: while they are on their way the escape
   // clock does not run (wanted_police_drones.mjs).
   const i32 st = wanted::stars();
-  const bool en_route = st > 0 && police_.star_since >= 0 && now < police_.star_since + wanted::arrival_delay_ms(st) / 1000 + 6;
+  const bool en_route = st > 0 && star_since_ >= 0 && now < star_since_ + wanted::arrival_delay_ms(st) / 1000 + 6;
   const bool had = wanted::stars() > 0;
   wanted::update(dt, police_sees || en_route);
   const i32 stars = wanted::stars();
   if (had && stars == 0) osfx("wanted_police_drones.escaped", me);  // clearWanted("escaped"): playTone 660 -> 1040
-  if (stars > police_.last_stars) {
+  if (stars > last_stars_) {
     toast_ = "Fahndung: " + std::string(static_cast<std::size_t>(stars), '*');
     toast_age_ = 0;
-  } else if (stars == 0 && police_.last_stars > 0 && !player_dead_) {
+  } else if (stars == 0 && last_stars_ > 0 && !player_dead_) {
     toast_ = "Abgehaengt.";
     toast_age_ = 0;
   }
-  police_.last_stars = stars;
+  last_stars_ = stars;
   update_police(dt);
 }
 
@@ -932,7 +935,7 @@ std::string Game::map_json() {
   const f32 range = 180;
   std::string o;
   char b[96];
-  const Vec3 look = view_.cam.target - view_.cam.eye;
+  const Vec3 look = cam_.target - cam_.eye;
   std::snprintf(b, sizeof b, "{\"me\":[%.1f,%.1f,%.3f],\"lanes\":[", me.x, me.y, std::atan2(look.y, look.x));
   o += b;
   bool first = true;
@@ -957,14 +960,14 @@ std::string Game::map_json() {
   }
   o += "],\"police\":[";
   first = true;
-  for (const PoliceUnit& u : police_.units) {
+  for (const PoliceUnit& u : units_) {
     if (u.car < 0) continue;
     const Vec3 p = matrix_of(cars_[u.car].actor).translation();
     std::snprintf(b, sizeof b, "%s[%.0f,%.0f]", first ? "" : ",", p.x - me.x, p.y - me.y);
     o += b;
     first = false;
   }
-  for (const PoliceDrone& d : police_.pdrones) {
+  for (const PoliceDrone& d : pdrones_) {
     if (!d.active) continue;
     std::snprintf(b, sizeof b, "%s[%.0f,%.0f]", first ? "" : ",", d.pos.x - me.x, d.pos.y - me.y);
     o += b;
@@ -978,7 +981,7 @@ std::string Game::map_json() {
     first = false;
   }
   o += "]";
-  if (vehicle_.jet_placed && mode_ != Mode::jet) {
+  if (jet_placed_ && mode_ != Mode::jet) {
     const Vec3 j = matrix_of(jet_actor_).translation();
     std::snprintf(b, sizeof b, ",\"jet\":[%.0f,%.0f]", j.x - me.x, j.y - me.y);
     o += b;
@@ -995,21 +998,21 @@ void Game::draw_town() {
     gaps_lamps_draw();  // street_lamps.mjs (game_lamps.cpp)
     const f32 now = world_->sim_time();
     for (const People::Person& p : people_.all())
-      if (p.state != People::State::gone && kern::length(p.pos - view_.cam.eye) < look_.people_m * std::fmin(view_zoom(), 4.0f) && !life_hides_person(static_cast<i32>(&p - people_.all().data()))) people_art_.person(p, now);
+      if (p.state != People::State::gone && kern::length(p.pos - cam_.eye) < look_.people_m * std::fmin(view_zoom(), 4.0f) && !life_hides_person(static_cast<i32>(&p - people_.all().data()))) people_art_.person(p, now);
     life_draw_ragdolls();  // game_life.cpp
     draw_projectiles();
     draw_guided();  // game_guided.cpp
     for (u32 i = 0; i < 5; ++i) {
-      const PoliceDrone& d = police_.pdrones[i];
+      const PoliceDrone& d = pdrones_[i];
       if (d.active) people_art_.police_drone(d.pos, d.yaw, clampf(-d.vel.y * 0.04f, -0.3f, 0.3f), clampf(d.vel.x * 0.04f, -0.3f, 0.3f), !d.emp, now, i);
     }
     for (std::size_t i = 0; i < cars_.size(); ++i) {
       const TrafficCar& c = cars_[i];
       if (!c.placed || !world_->actor_alive(c.actor)) continue;
       if (c.police) {
-        const bool on = c.unit >= 0 && c.unit < static_cast<i32>(police_.units.size()) && police_.units[c.unit].state != PoliceUnit::State::abandoned &&
-                        police_.units[c.unit].state != PoliceUnit::State::wreck && police_.units[c.unit].state != PoliceUnit::State::leave;
-        if (!(mode_ == Mode::car && car_index_ == static_cast<i32>(i) && view_.car_cockpit)) people_art_.light_bar(matrix_of(c.actor), on, now);
+        const bool on = c.unit >= 0 && c.unit < static_cast<i32>(units_.size()) && units_[c.unit].state != PoliceUnit::State::abandoned &&
+                        units_[c.unit].state != PoliceUnit::State::wreck && units_[c.unit].state != PoliceUnit::State::leave;
+        if (!(mode_ == Mode::car && car_index_ == static_cast<i32>(i) && car_cockpit_)) people_art_.light_bar(matrix_of(c.actor), on, now);
       }
       if (c.burn_until >= 0 || c.wreck) {
         const Vec3 at = matrix_of(c.actor).translation();
@@ -1039,8 +1042,8 @@ std::string Game::minimap_json() {
   const f32 range = 420;  // the expanded map shows up to 380 m from the subject
   struct Feat { char kind; bool poly; const std::vector<Vec2>* pts; f32 d; };
   std::vector<Feat> feats;
-  std::vector<const MapFeatures*> tiles;
-  city_.ready_features(tiles);
+  std::vector<u64> tiles;
+  city_.ready_tiles(tiles);
   auto dist = [&](const std::vector<Vec2>& pts) {
     f32 best = 1e9f;
     for (std::size_t k = 0; k + 1 < pts.size(); ++k) {
@@ -1051,16 +1054,17 @@ std::string Game::minimap_json() {
     }
     return best;
   };
-  for (const MapFeatures* f : tiles) {
-    for (const auto& r : f->roads)
+  for (u64 tile : tiles) {
+    const MapFeatures& f = city_.features(tile);
+    for (const auto& r : f.roads)
       if (r.points.size() >= 2) feats.push_back({road_is_water(r.cls) ? 'w' : 'r', false, &r.points, dist(r.points)});
-    for (const auto& a : f->areas) {
+    for (const auto& a : f.areas) {
       if (a.rings.empty() || a.rings[0].size() < 3) continue;
       const char k = a.kind == AreaKind::water ? 'w' : (a.kind == AreaKind::sand ? 0 : 'g');
       if (k) feats.push_back({k, true, &a.rings[0], dist(a.rings[0])});
     }
     // buildings: a house is under 300 m across - one far corner rules it out before the outline
-    for (const auto& b : f->buildings) {
+    for (const auto& b : f.buildings) {
       if (b.rings.empty() || b.rings[0].size() < 3) continue;
       const Vec2 q = b.rings[0][0];
       if (std::fabs(q.x - me.x) > range + 300 || std::fabs(q.y - me.y) > range + 300) continue;
@@ -1074,13 +1078,13 @@ std::string Game::minimap_json() {
   auto order = [](char k) { return k == 'w' ? 0 : k == 'g' ? 1 : k == 'r' ? 2 : 3; };
   std::stable_sort(feats.begin(), feats.end(), [&](const Feat& a, const Feat& b) { return order(a.kind) < order(b.kind); });
   // the subject's heading (compass degrees) and the view's (the minimap turns with the look)
-  const Vec3 look = view_.cam.target - view_.cam.eye;
+  const Vec3 look = cam_.target - cam_.eye;
   auto compass = [](f32 x, f32 y) { return 90.0f - std::atan2(y, x) * 180.0f / kPi; };
   Vec3 fwd = look;
   kern::game::ActorId a = soldier_;
   if (mode_ == Mode::car && car_index_ >= 0) a = cars_[car_index_].actor;
   else if (mode_ == Mode::jet) a = jet_actor_;
-  else if (mode_ == Mode::drone && vehicle_.drone_out) a = drone_actor_;
+  else if (mode_ == Mode::drone && drone_out_) a = drone_actor_;
   if (a != soldier_) { const kern::Mat4 m = matrix_of(a); fwd = {m.m[0], m.m[1], 0}; }
   std::string o;
   char b[160];

@@ -8,11 +8,11 @@
 // vehicles knock people down by their footprint and speed.
 #pragma once
 
-#include <functional>
 #include <vector>
 
 #include "city_stream.h"
 #include "common.h"
+#include "spawn_guard.h"
 #include "wanted.h"
 
 namespace sc {
@@ -26,14 +26,20 @@ struct VehicleView {
   bool airborne = false;  // drone / jet: frightens from above, does not run people over
 };
 
+/// The world as the people see it this frame: values. The streamed city they walk in the
+/// functions are given by reference.
 struct PeopleView {
   const kern::physics::World* physics = nullptr;
-  const CityStream* city = nullptr;
   Vec3 focus;             // where the player is (spawn ring around it)
   Vec3 player;            // the player's feet (or vehicle)
   f32 player_speed = 0;
   bool player_on_foot = true, player_alive = true;
-  std::function<bool(Vec3)> can_spawn;  // spawn_visibility_guard.mjs: may someone appear here unseen?
+  // spawn_visibility_guard.mjs: may someone appear here unseen? When `spawn_watched`, nobody of
+  // `spawn_viewers` may see a person `spawn_height` tall appear (spawn::can_spawn; beyond
+  // `spawn_far_entry` an arrival in view is allowed); otherwise anybody may appear anywhere.
+  bool spawn_watched = false;
+  std::vector<spawn::Viewer> spawn_viewers;
+  f32 spawn_far_entry = 0, spawn_height = 0;
   std::vector<VehicleView> vehicles;
   std::vector<Vec3> foci;  // the other players (MP host): people live around everybody
 };
@@ -98,7 +104,11 @@ class People {
   void set_ranges(f32 show, f32 hide) { show_ = show; hide_ = hide; }
   void clear() { people_.clear(); }
   /// Walks, flees, spawns and retires people around the focus; knocks people down under vehicles.
-  void update(f32 dt, f32 now, const PeopleView& view, Rng& rng);
+  void update(f32 dt, f32 now, const PeopleView& view, const CityStream& city, Rng& rng);
+  /// What the spawn gate (PeopleView::spawn_viewers) said in the last update: arrivals it
+  /// allowed, arrivals it denied.
+  u32 spawns_allowed() const { return spawns_allowed_; }
+  u32 spawns_denied() const { return spawns_denied_; }
   /// A bullet from `from` to `to`: the first person on that line takes `damage` (x3 on the head).
   /// Returns the index hit (-1: nobody) and shortens `to` to the hit point.
   /// Passers-by take hits as world_procedural_population.mjs handleProceduralHit: a round does 55
@@ -135,7 +145,7 @@ class People {
     if (p.state == State::down || p.state == State::gone) return;
     p.hp -= damage;
     p.hurt_at = now;
-    if (p.hp <= 0) kill(p, from_dir, by_player, now, false);
+    if (p.hp <= 0) kill(i, from_dir, by_player, now, false);
   }
   void take_deaths(std::vector<Death>& out) { out.insert(out.end(), deaths_.begin(), deaths_.end()); deaths_.clear(); }
   /// MP: what our rounds and blows did to a mate's unit (Person::remote) since the last call: the
@@ -172,15 +182,17 @@ class People {
 
  public:
   /// VR grab: the person goes down as a ragdoll (gets up again later), pushed by `push`.
-  void grab_knock(i32 index, Vec3 push, f32 now) { if (index >= 0 && index < static_cast<i32>(people_.size())) knock(people_[static_cast<std::size_t>(index)], push, now); }
+  void grab_knock(i32 index, Vec3 push, f32 now) { if (index >= 0 && index < static_cast<i32>(people_.size())) knock(index, push, now); }
 
  private:
-  void spawn(const PeopleView& view, Rng& rng, f32 now);
-  void walk(Person& p, f32 dt, f32 now, const PeopleView& view, Rng& rng);
-  void kill(Person& p, Vec3 from_dir, bool by_player, f32 now, bool hit_by_car);
+  void spawn(const PeopleView& view, const CityStream& city, Rng& rng, f32 now);
+  void walk(Person& p, f32 dt, f32 now, const PeopleView& view, const CityStream& city, Rng& rng);
+  /// Person `i` (its place in people_) down for good.
+  void kill(i32 i, Vec3 from_dir, bool by_player, f32 now, bool hit_by_car);
   /// Down as a ragdoll that gets up again (world_procedural_population.mjs knockPerson).
-  void knock(Person& p, Vec3 push, f32 now) {
-    falls_.push_back({static_cast<i32>(&p - people_.data()), push, false, true});
+  void knock(i32 i, Vec3 push, f32 now) {
+    Person& p = people_[static_cast<std::size_t>(i)];
+    falls_.push_back({i, push, false, true});
     p.knocked_until = now + 6;
     p.v = 0;
   }
@@ -193,6 +205,7 @@ class People {
   std::vector<Hurt> hurts_;
   bool last_head_ = false, puppets_ = false;
   u32 budget_ = 60, serial_ = 1;
+  u32 spawns_allowed_ = 0, spawns_denied_ = 0;
   f32 show_ = 170, hide_ = 190;
 };
 

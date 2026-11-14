@@ -6,7 +6,7 @@
 namespace sc::controls {
 namespace {
 using kern::logic::Value;
-rules::Blueprint g_rules;
+rules::Blueprint g_rules{"Controls"};
 Value N(f32 x) { return rules::number(x); }
 Value B(bool x) { return Value::boolean(x); }
 f32 num(const char* function, const std::vector<Value>& args) { return static_cast<f32>(g_rules.number(function, args)); }
@@ -135,8 +135,8 @@ VoiceChord::Out VoiceChord::step(bool r3_now, bool y_now, bool allowed) {
   return o;
 }
 
-bool ReleaseLatch::step(const f32* values, int n) {
-  std::vector<f64> list(values, values + n);
+bool ReleaseLatch::step(const std::array<f32, 9>& values) {
+  std::vector<f64> list(values.begin(), values.end());
   std::vector<Value> r;
   if (!g_rules.call("ReleaseLatchStep", {B(armed), Value::of(std::move(list))}, r) || r.size() < 2) return false;
   armed = r[1].b;

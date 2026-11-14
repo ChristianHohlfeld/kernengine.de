@@ -154,14 +154,14 @@ net::PlayerState Game::my_state() const {
   const kern::game::Hud& h = world_->hud();
   s.health = h.health >= 0 ? clampf(h.health / std::fmax(1.0f, h.max_health) * 100, 0, 100) : 100;
   s.stars = static_cast<u8>(wanted::stars());
-  s.weapon = static_cast<u8>(weapons_.foot_weapon);
+  s.weapon = static_cast<u8>(foot_weapon_);
   // the hands and the blows (the others draw his arms there: game_net.cpp draw)
   s.hands = 0;
   for (kern::i8& v : s.hand) v = 0;
   if (mode_ == Mode::foot && !player_dead_) {
     const f32 tnow = world_->sim_time();
     const Vec3 feet = matrix_of(soldier_).translation() - Vec3{0, 0, 0.73f};
-    if (engine_ && engine_->xr && vr_.on) {
+    if (engine_ && engine_->xr && vr_) {
       kern::Mat4 hm;
       bool any = false;
       for (i32 side = 0; side < 2; ++side)
@@ -177,7 +177,7 @@ net::PlayerState Game::my_state() const {
     } else if (gaps_) {
       if (tnow - gaps_->fist_last[0] < 0.22f) s.hands |= 2;
       if (tnow - gaps_->fist_last[1] < 0.22f) s.hands |= 4;
-      if (weapons_.foot_weapon == weapons::Id::knife && tnow - look_.vm_fire_at < 0.3f) s.hands |= 8;
+      if (foot_weapon_ == weapons::Id::knife && tnow - look_.vm_fire_at < 0.3f) s.hands |= 8;
     }
   }
   // the traffic car we drive, by the host's index (his town's: game_worldsync.cpp); a car of our
@@ -185,7 +185,7 @@ net::PlayerState Game::my_state() const {
   s.car = 255;
   if (mode_ == Mode::car && car_index_ >= 0) {
     if (net_.hosting()) s.car = static_cast<u8>(std::min(car_index_, 254));
-    else if (worldsync_.puppet_world && static_cast<std::size_t>(car_index_) < worldsync_.car_net.size() && worldsync_.car_net[static_cast<std::size_t>(car_index_)] >= 0) s.car = static_cast<u8>(worldsync_.car_net[static_cast<std::size_t>(car_index_)]);
+    else if (puppet_world_ && static_cast<std::size_t>(car_index_) < car_net_.size() && car_net_[static_cast<std::size_t>(car_index_)] >= 0) s.car = static_cast<u8>(car_net_[static_cast<std::size_t>(car_index_)]);
   }
   s.day = look_.tod;  // the host's phase is the session's (game_look.cpp)
   s.thrust = jet_.thrust() / std::fmax(1.0f, jet_.spec().thrust_max);
@@ -198,13 +198,13 @@ net::PlayerState Game::my_state() const {
     s.color = static_cast<u8>(car_index_ % 8);
   }
   if (jet_.gear_down()) f |= net::kGearDown;
-  if (vehicle_.drone_out && mode_ != Mode::drone) {
+  if (drone_out_ && mode_ != Mode::drone) {
     f |= net::kDroneOut;
     const BodyState d = state_of(drone_actor_);
     s.drone_pos = d.position;
     s.drone_rot = d.rotation;
   }
-  if (vehicle_.jet_placed && mode_ != Mode::jet) {
+  if (jet_placed_ && mode_ != Mode::jet) {
     f |= net::kJetOut;
     const BodyState j = state_of(jet_actor_);
     s.jet_pos = j.position;
@@ -237,10 +237,10 @@ void Game::rebase_origin(f64 lon, f64 lat) {
     c.unit = -1;
     c.wreck = false;
   }
-  police_.units.clear();
-  for (PoliceDrone& d : police_.pdrones) d.active = false;
+  units_.clear();
+  for (PoliceDrone& d : pdrones_) d.active = false;
   people_.clear();
-  weapons_.projectiles.clear();
+  projectiles_.clear();
   wanted::clear();
   if (mode_ != Mode::foot) command("mode foot");
   world_placed_ = false;
@@ -354,8 +354,8 @@ void Game::update_net(f32 dt) {
         world_->particle_burst(f.p + Vec3{0, 0, 0.8f}, {1.1f, 1.1f, 1.1f});
         world_->play_sound("builtin:explosion", f.p, 1, 1, true);
         osfx("player_vehicle_runtime_v2.playExplosion", f.p);
-        world_->shake_camera(clampf(1.4f - kern::length(view_.cam.eye - f.p) / (std::fmax(2.0f, f.a) * 3), 0, 1.2f));
-        ++weapons_.explosions;
+        world_->shake_camera(clampf(1.4f - kern::length(cam_.eye - f.p) / (std::fmax(2.0f, f.a) * 3), 0, 1.2f));
+        ++explosions_;
         gaps_lamps_blast(f.p, f.a);  // street lamps break on every machine (game_lamps.cpp)
         if (f.dir.y > 0.5f) destruction_.blast(f.p, f.a, f.dir.x, f.dir.y > 1.5f, city_, rng_);  // and buildings
         // the scorch and the wall marks too (the crater, if any, comes with the host's state:
@@ -465,14 +465,14 @@ void Game::mp_input(kern::Engine& e, f32 dt) {
   }
 }
 
-void Game::voice_capture(const f32* samples, u32 count, u32 rate) {
+void Game::voice_capture(kern::Span<const f32> samples, u32 rate) {
   MpLocal& m = mp_local();
-  if (m.mic && !m.muted) m.capture.push(samples, count, rate);
+  if (m.mic && !m.muted) m.capture.push(samples, rate);
 }
 
-void Game::mix_voice(f32* out, u32 frames) {
-  if (!net_.active() || !mp_ || !audio_.mixer.ready()) return;
-  for (net::Remote& r : net_.remotes()) r.voice.render(out, frames, audio_.mixer.sample_rate());
+void Game::mix_voice(std::vector<f32>& out, u32 frames) {
+  if (!net_.active() || !mp_ || !mixer_.ready()) return;
+  for (net::Remote& r : net_.remotes()) r.voice.render(out, frames, mixer_.sample_rate());
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -550,9 +550,9 @@ i32 Game::remote_on_segment(Vec3 from, Vec3 to, f32& t_out, mp::Zone& zone_out) 
 bool Game::hit_remotes(Vec3 from, Vec3& to, f32 damage, bool melee) {
   (void)damage;
   if (!net_.active()) return false;
-  const weapons::Id wid = mode_ == Mode::drone ? (weapons_.drone_weapon == 0 ? weapons::Id::drone_gun : weapons::Id::drone_rockets)
+  const weapons::Id wid = mode_ == Mode::drone ? (drone_weapon_ == 0 ? weapons::Id::drone_gun : weapons::Id::drone_rockets)
                           : mode_ == Mode::jet ? weapons::Id::jet_cannon
-                                               : weapons_.foot_weapon;
+                                               : foot_weapon_;
   const Vec3 seg = to - from;
   const f32 l2 = std::fmax(1e-6f, kern::dot(seg, seg));
   std::vector<net::Remote>& rs = net_.remotes();
@@ -646,7 +646,7 @@ void Game::draw_remote_people() {
   for (const net::Remote& r : net_.remotes()) {
     if (r.state.flags & (net::kDead | net::kPassenger)) continue;
     const Vec3 at = r.state.mode == net::PlayerMode::foot || r.state.mode == net::PlayerMode::drone ? r.person_shown : r.shown;
-    const f32 d = kern::length(at - view_.cam.eye);
+    const f32 d = kern::length(at - cam_.eye);
     if (d > 40) people_art_.beacon(at, mp::rgb(net_.color_of(r.state.slot)), clampf((d - 40) / 200, 0, 1));
   }
   for (const net::Remote& r : net_.remotes()) {
@@ -706,8 +706,8 @@ void Game::draw_remote_vehicles() {
   if (net_.active()) {
     if (!remote_car_) remote_car_ = std::make_unique<Car>(CarSpec::car());
     if (!remote_bus_) remote_bus_ = std::make_unique<Car>(CarSpec::bus());
-    Vec3 motors[4];
-    f32 angles[4];
+    std::array<Vec3, 4> motors;
+    std::array<f32, 4> angles;
     for (const net::Remote& r : net_.remotes()) {
       const Vec3 color = mp::rgb(net_.color_of(r.state.slot));
       auto drone_at = [&](const kern::Mat4& mtx, bool armed) {
@@ -746,7 +746,7 @@ void Game::draw_remote_vehicles() {
     for (const MpLocal::Tracer& t : m.tracers) m.art.tracer(t.p, t.v, 2.2f, mp::rgb(t.color) * 2.0f + Vec3{0.6f, 0.5f, 0.2f});
     for (const MpLocal::Flash& f : m.flashes) m.art.flash(f.p, f.r, static_cast<f32>((now_ms - f.born) / f.life));
     for (const mp::Ping& p : m.pings.all()) {
-      const f32 d = kern::length(view_.cam.eye - p.p);
+      const f32 d = kern::length(cam_.eye - p.p);
       m.art.ping(p.p, clampf(d / 22, 1, 40), mp::rgb(p.color), mp::PingBoard::fade(p, now_ms), now);
     }
     m.art.end();
@@ -796,13 +796,13 @@ void Game::update_nav() {
 // HUD data (the page draws it: web/mp_host.mjs)
 
 bool Game::project_screen(Vec3 p, f32& x, f32& y, f32& depth) const {
-  const Vec3 f = kern::normalize(view_.cam.target - view_.cam.eye);
-  Vec3 r{f.y * view_.cam.up.z - f.z * view_.cam.up.y, f.z * view_.cam.up.x - f.x * view_.cam.up.z, f.x * view_.cam.up.y - f.y * view_.cam.up.x};
+  const Vec3 f = kern::normalize(cam_.target - cam_.eye);
+  Vec3 r{f.y * cam_.up.z - f.z * cam_.up.y, f.z * cam_.up.x - f.x * cam_.up.z, f.x * cam_.up.y - f.y * cam_.up.x};
   r = kern::normalize(r);
   const Vec3 u{r.y * f.z - r.z * f.y, r.z * f.x - r.x * f.z, r.x * f.y - r.y * f.x};
-  const Vec3 d = p - view_.cam.eye;
+  const Vec3 d = p - cam_.eye;
   depth = kern::dot(d, f);
-  const f32 t = std::tan(view_.cam.fov / 2), aspect = frame_w_ / std::fmax(1.0f, frame_h_);
+  const f32 t = std::tan(cam_.fov / 2), aspect = frame_w_ / std::fmax(1.0f, frame_h_);
   const f32 z = std::fabs(depth) < 1e-3f ? 1e-3f : std::fabs(depth);
   f32 nx = kern::dot(d, r) / (z * t * aspect), ny = kern::dot(d, u) / (z * t);
   if (depth < 0.05f) {
@@ -847,7 +847,7 @@ std::string Game::mp_hud_json() {
   s += ",\"pings\":[";
   bool first = true;
   for (const mp::Ping& p : m.pings.all()) {
-    const f32 d = kern::length(view_.cam.eye - p.p), sc = clampf(d / 22, 1, 40);
+    const f32 d = kern::length(cam_.eye - p.p), sc = clampf(d / 22, 1, 40);
     f32 nx, ny, depth;
     const bool on = project_screen(p.p + Vec3{0, 0, 3.4f * sc}, nx, ny, depth);
     add("%s{\"on\":%s,\"x\":%.0f,\"y\":%.0f,\"d\":%.0f,\"color\":\"%s\",\"fade\":%.2f,\"mine\":%s}", first ? "" : ",", on ? "true" : "false", (nx + 1) / 2 * w,
@@ -864,7 +864,7 @@ std::string Game::mp_hud_json() {
     const Vec2 ahead = crumbs.empty() ? m.dest : crumbs.back().p;
     const f32 bearing = std::atan2(ahead.x - me.x, ahead.y - me.y);
     // Relative to where the camera looks (clockwise from north both).
-    const Vec3 look = view_.cam.target - view_.cam.eye;
+    const Vec3 look = cam_.target - cam_.eye;
     const f32 rel = wrap_pi(bearing - std::atan2(look.x, look.y));
     f32 cx, cy, ca;
     bool on;
@@ -887,8 +887,8 @@ std::string Game::mp_hud_json() {
         now - m.hit_at < (m.hit_kill ? kKillMarkerMs : kHitMarkerMs) ? "true" : "false");
     {
       // Damage direction: where the hit came from relative to the view (mp_fun_hud.mjs onHurt).
-      const Vec3 look = view_.cam.target - view_.cam.eye;
-      const f32 ang = (std::atan2(look.y, look.x) - std::atan2(m.hurt_from.y - view_.cam.eye.y, m.hurt_from.x - view_.cam.eye.x)) / kDeg;
+      const Vec3 look = cam_.target - cam_.eye;
+      const f32 ang = (std::atan2(look.y, look.x) - std::atan2(m.hurt_from.y - cam_.eye.y, m.hurt_from.x - cam_.eye.x)) / kDeg;
       add(",\"hurt\":%s,\"hurtAngle\":%.0f", now - m.hurt_at < kHurtMs ? "true" : "false", ang);
     }
     add(",\"shield\":%s", net_.protected_now(self, now) ? "true" : "false");
@@ -903,13 +903,13 @@ std::string Game::mp_hud_json() {
       f32 x, y, ang;
       bool on;
       marker(anchor, x, y, on, ang);
-      const f32 d = kern::length(anchor - view_.cam.eye);
+      const f32 d = kern::length(anchor - cam_.eye);
       // where he is from us: higher or lower (his feet / craft against ours), and his bearing
       // against the view (0 ahead, + to the right, +-180 behind) - the HUD says it in words
       const Vec3 his = r.state.mode == net::PlayerMode::foot ? r.person_shown : r.shown;
       const f32 dz = his.z - mine.z;
-      const Vec3 look = view_.cam.target - view_.cam.eye;
-      const f32 rel = wrap_pi(std::atan2(his.x - view_.cam.eye.x, his.y - view_.cam.eye.y) - std::atan2(look.x, look.y)) / kDeg;
+      const Vec3 look = cam_.target - cam_.eye;
+      const f32 rel = wrap_pi(std::atan2(his.x - cam_.eye.x, his.y - cam_.eye.y) - std::atan2(look.x, look.y)) / kDeg;
       // (stars: his wanted level - his own, as in the original; the plate shows it)
       add("%s{\"slot\":%u,\"index\":%u,\"color\":\"%s\",\"hp\":%.0f,\"dead\":%s,\"mode\":\"%s\",\"x\":%.0f,\"y\":%.0f,\"on\":%s,\"angle\":%.0f,\"d\":%.1f,"
           "\"dz\":%.1f,\"rel\":%.0f,"
@@ -950,7 +950,7 @@ std::string Game::bigmap_json(f32 cx, f32 cy, f32 range) {
   std::string o;
   char b[256];
   const Vec3 me = focus_position();
-  const Vec3 look = view_.cam.target - view_.cam.eye;
+  const Vec3 look = cam_.target - cam_.eye;
   f64 lon = 0, lat = 0;
   unproject(city_.projector(), me.x, me.y, lon, lat);
   static const char* kModes[] = {"foot", "drone", "car", "jet", "parachute"};
@@ -1004,7 +1004,7 @@ std::string Game::bigmap_json(f32 cx, f32 cy, f32 range) {
     }
     o += "]";
   }
-  if (vehicle_.jet_placed && mode_ != Mode::jet) {
+  if (jet_placed_ && mode_ != Mode::jet) {
     const Vec3 j = matrix_of(jet_actor_).translation();
     std::snprintf(b, sizeof b, ",\"jet\":[%.0f,%.0f]", j.x, j.y);
     o += b;
@@ -1045,7 +1045,7 @@ std::string Game::net_command(const std::string& cmd) {
     if (rest == "swarm") {
       // Tests: the mates' units as they are shown here (game_swarm.cpp): [owner, kind, id, flags, x, y] each
       std::string o = "[";
-      for (const auto& [owner, sw] : swarm_.mates)
+      for (const auto& [owner, sw] : swarms_)
         for (const RemoteUnit& u : sw.units) {
           char b[96];
           std::snprintf(b, sizeof b, "%s[%u,%u,%u,%u,%.1f,%.1f]", o.size() > 1 ? "," : "", static_cast<unsigned>(owner), static_cast<unsigned>(u.kind), static_cast<unsigned>(u.id),
@@ -1122,7 +1122,7 @@ std::string Game::net_command(const std::string& cmd) {
       // Tests (no microphone in a headless browser): 100 ms of a 440 Hz tone as if spoken.
       std::vector<f32> tone(4800);
       for (std::size_t i = 0; i < tone.size(); ++i) tone[i] = 0.4f * std::sin(static_cast<f32>(i) * 2 * kPi * 440 / 48000);
-      for (int k = 0; k < std::max(1, std::atoi(cmd.c_str() + 11)); ++k) voice_capture(tone.data(), 4800, 48000);
+      for (int k = 0; k < std::max(1, std::atoi(cmd.c_str() + 11)); ++k) voice_capture(tone, 48000);
       return std::to_string(m.seq);
     }
     if (rest == "state") {
@@ -1137,20 +1137,20 @@ std::string Game::net_command(const std::string& cmd) {
   if (starts("ping")) {
     // At the crosshair (or at a screen point "ping X Y" in CSS px: the touch long press).
     if (!world_placed_) return "no world";
-    Vec3 dir = kern::normalize(view_.cam.target - view_.cam.eye);
+    Vec3 dir = kern::normalize(cam_.target - cam_.eye);
     f32 sx = 0, sy = 0;
     if (std::sscanf(cmd.c_str(), "ping %f %f", &sx, &sy) == 2) {
       const Vec3 f = dir;
-      Vec3 r = kern::normalize(Vec3{f.y * view_.cam.up.z - f.z * view_.cam.up.y, f.z * view_.cam.up.x - f.x * view_.cam.up.z, f.x * view_.cam.up.y - f.y * view_.cam.up.x});
+      Vec3 r = kern::normalize(Vec3{f.y * cam_.up.z - f.z * cam_.up.y, f.z * cam_.up.x - f.x * cam_.up.z, f.x * cam_.up.y - f.y * cam_.up.x});
       const Vec3 u{r.y * f.z - r.z * f.y, r.z * f.x - r.x * f.z, r.x * f.y - r.y * f.x};
-      const f32 t = std::tan(view_.cam.fov / 2), aspect = frame_w_ / std::fmax(1.0f, frame_h_);
+      const f32 t = std::tan(cam_.fov / 2), aspect = frame_w_ / std::fmax(1.0f, frame_h_);
       const f32 nx = sx / std::fmax(1.0f, frame_w_) * 2 - 1, ny = 1 - sy / std::fmax(1.0f, frame_h_) * 2;
       dir = kern::normalize(f + r * (nx * t * aspect) + u * (ny * t));
     }
-    const RayResult hit = cast(world_->physics(), view_.cam.eye, dir, 1500, body(soldier_));
+    const RayResult hit = cast(world_->physics(), cam_.eye, dir, 1500, body(soldier_));
     Vec3 at;
     if (hit.hit) at = hit.point;
-    else if (dir.z < -0.01f) at = view_.cam.eye + dir * (-view_.cam.eye.z / dir.z);  // to the ground plane
+    else if (dir.z < -0.01f) at = cam_.eye + dir * (-cam_.eye.z / dir.z);  // to the ground plane
     else return "nothing";
     const u8 owner = net_.active() ? net_.self_slot() : net::kHost;
     const u32 color = net_.active() ? net_.color_of(owner) : 0xe8f4ff;

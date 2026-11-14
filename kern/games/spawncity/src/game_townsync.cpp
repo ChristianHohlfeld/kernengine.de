@@ -38,12 +38,12 @@ TownSync& Game::townsync() {
 }
 
 bool Game::town_car_remote(i32 car) const {
-  return worldsync_.puppet_world && car >= 0 && static_cast<std::size_t>(car) < worldsync_.car_net.size() && worldsync_.car_net[static_cast<std::size_t>(car)] >= 0 &&
+  return puppet_world_ && car >= 0 && static_cast<std::size_t>(car) < car_net_.size() && car_net_[static_cast<std::size_t>(car)] >= 0 &&
          !(mode_ == Mode::car && car == car_index_);
 }
 
 void Game::townsync_car_hit(i32 car, f32 amount, town::Cause cause) {
-  net_.town_to_host(town::pack(town::CarHit{static_cast<u8>(worldsync_.car_net[static_cast<std::size_t>(car)]), amount, cause}));
+  net_.town_to_host(town::pack(town::CarHit{static_cast<u8>(car_net_[static_cast<std::size_t>(car)]), amount, cause}));
   ++townsync().car_hits[static_cast<std::size_t>(cause)];
 }
 
@@ -130,7 +130,7 @@ void Game::townsync_update(f32 dt) {
         const TrafficCar& c = cars_[h.car];
         // his hit on our car, as if it had happened here (a cruiser is its owner's, a car a mate
         // drives is that mate's)
-        if (c.police || !c.placed || (h.car < worldsync_.car_lent.size() && worldsync_.car_lent[h.car])) continue;
+        if (c.police || !c.placed || (h.car < car_lent_.size() && car_lent_[h.car])) continue;
         damage_car(h.car, h.damage, false, h.cause);
         ++t.car_hits[static_cast<std::size_t>(h.cause)];
       } else if (kind == town::Kind::person_hit) {
@@ -198,7 +198,7 @@ void Game::townsync_update(f32 dt) {
     // a mate who joined gets the whole state once
     for (const net::Remote& r : net_.remotes())
       if (std::find(t.known.begin(), t.known.end(), r.state.slot) == t.known.end()) { townsync_send_full(r.state.slot); t.known.push_back(r.state.slot); }
-    t.known.erase(std::remove_if(t.known.begin(), t.known.end(), [&](u8 s) { return !net_.remote(s); }), t.known.end());
+    t.known.erase(std::remove_if(t.known.begin(), t.known.end(), [&](u8 s) { return net_.remote_index(s) < 0; }), t.known.end());
     for (const std::vector<u8>& part : town::pack_lamps(t.lamps_out)) net_.town_to_all(part);
     t.lamps_out.clear();
     return;

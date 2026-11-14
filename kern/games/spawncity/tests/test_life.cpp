@@ -115,15 +115,15 @@ SC_TEST(life_cows_birds_shots) {
   CityStream city;  // no tiles: flat ground, no meadows, no streets
   Life life;
   life.init(w, false);
+  const std::vector<kern::Vec4> no_ground_changes;  // (nowhere did the ground change)
   LifeView v;
   v.physics = &w;
-  v.city = &city;
   v.focus = v.player = v.eye = {0, -20, 0};
   Rng rng{5};
   LifeOut out;
   f32 now = 10;
   SC_CHECK(life.spawn_herd({0, 0}, 14, 5, now), "a herd");
-  life.update(1.0f / 60, now, v, rng, out);
+  life.update(1.0f / 60, now, v, city, no_ground_changes, rng, out);
   SC_CHECK(life.cows().size() == 5, "five cows (%zu)", life.cows().size());
   // a round into the first cow
   const Vec3 cow = life.cows()[0].pos;
@@ -136,10 +136,10 @@ SC_TEST(life_cows_birds_shots) {
   const f32 m = w.mass(life.cows()[0].body);
   SC_CHECK(std::fabs(m - 600) < 5, "600 kg (%.0f)", m);
   for (int i = 0; i < 240; ++i) w.step(1.0f / 240, 1);
-  life.update(1.0f / 60, now + 1, v, rng, out);
+  life.update(1.0f / 60, now + 1, v, city, no_ground_changes, rng, out);
   SC_CHECK(kern::length(life.cows()[0].pos - (cow + Vec3{0, 0, 1.12f})) > 0.3f, "the body was thrown");
   // birds circle over the roofs and fall when hit
-  for (int i = 0; i < 30; ++i) life.update(1.0f / 30, now + 1 + i / 30.0f, v, rng, out);
+  for (int i = 0; i < 30; ++i) life.update(1.0f / 30, now + 1 + i / 30.0f, v, city, no_ground_changes, rng, out);
   const Life::Bird& b = life.birds()[0];
   SC_CHECK(b.pos.z > 7 && b.pos.z < 25, "bird at %.1f m", b.pos.z);
   Vec3 bt = b.pos + Vec3{0, 0, 20};
@@ -156,9 +156,9 @@ SC_TEST(life_dogs_cats_black_cat) {
   CityStream city;
   Life life;
   life.init(w, false);
+  const std::vector<kern::Vec4> no_ground_changes;  // (nowhere did the ground change)
   LifeView v;
   v.physics = &w;
-  v.city = &city;
   v.focus = v.player = v.eye = {0, 0, 0};
   v.head = {0, 0, 1.68f};
   v.epoch = 1000;  // floor(1000 / 120) = 8: the black cat is out (every other two minutes)
@@ -168,7 +168,7 @@ SC_TEST(life_dogs_cats_black_cat) {
   for (int i = 0; i < 10; ++i) {
     now += 1.0f / 30;
     v.epoch += 1.0 / 30;
-    life.update(1.0f / 30, now, v, rng, out);
+    life.update(1.0f / 30, now, v, city, no_ground_changes, rng, out);
   }
   SC_CHECK(life.pets().size() == 20, "20 dogs and cats (%zu)", life.pets().size());
   SC_CHECK(life.species(2, v.epoch) == Life::Species::cat && life.species(0, v.epoch) == Life::Species::dog, "every third a cat");
@@ -186,7 +186,7 @@ SC_TEST(life_dogs_cats_black_cat) {
     out.clear();
     now += 1.0f / 30;
     v.epoch += 1.0 / 30;
-    life.update(1.0f / 30, now, v, rng, out);
+    life.update(1.0f / 30, now, v, city, no_ground_changes, rng, out);
     killed = out.kill_player;
   }
   SC_CHECK(killed, "and that is the end of you");

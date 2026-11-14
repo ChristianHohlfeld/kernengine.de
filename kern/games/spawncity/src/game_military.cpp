@@ -24,7 +24,7 @@ const Vec3 kSoldierSkins[4] = {{0.78f, 0.58f, 0.44f}, {0.66f, 0.44f, 0.32f}, {0.
 // shared helpers
 
 bool Game::combat_target(Vec3& at, Vec3& vel, bool& drone, bool& air) const {
-  drone = mode_ == Mode::drone && vehicle_.drone_out;
+  drone = mode_ == Mode::drone && drone_out_;
   air = drone || mode_ == Mode::jet;
   if (player_dead_) return false;
   const ActorId a = drone ? drone_actor_ : mode_ == Mode::car && car_index_ >= 0 ? cars_[car_index_].actor : mode_ == Mode::jet ? jet_actor_
@@ -54,11 +54,11 @@ bool Game::spawn_unseen(Vec3 p, f32 height) const {
   // outside every player's view cone unless a building hides it.
   if (gaps_) return gaps_can_spawn(p, height, 0);
   const Vec3 top = p + Vec3{0, 0, height};
-  const Vec3 fwd = kern::normalize(view_.cam.target - view_.cam.eye, {1, 0, 0}), to = top - view_.cam.eye;
+  const Vec3 fwd = kern::normalize(cam_.target - cam_.eye, {1, 0, 0}), to = top - cam_.eye;
   const f32 d = kern::length(to);
   if (d < 1) return false;
-  if (kern::dot(fwd, to * (1.0f / d)) < std::cos(std::fmin(1.4f, view_.cam.fov * 0.5f * 1.9f + 0.15f))) return true;
-  return cast(world_->physics(), view_.cam.eye, to * (1.0f / d), d - 1, {}, kCatWorld).hit;
+  if (kern::dot(fwd, to * (1.0f / d)) < std::cos(std::fmin(1.4f, cam_.fov * 0.5f * 1.9f + 0.15f))) return true;
+  return cast(world_->physics(), cam_.eye, to * (1.0f / d), d - 1, {}, kCatWorld).hit;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -94,7 +94,7 @@ bool Game::combat_shot(kern::game::ShotEvent& s) {
       s.to = s.from + seg * t;
       s.surface = 2;
       // flak_battery.mjs onTracer: a sniper round 35, anything else 4
-      g.hp -= weapons_.foot_weapon == weapons::Id::sniper && mode_ == Mode::foot ? 35 : 4;
+      g.hp -= foot_weapon_ == weapons::Id::sniper && mode_ == Mode::foot ? 35 : 4;
       if (g.hp <= 0) { g.dead = true; ++combat_.flak_destroyed; }
       return true;
     }
@@ -279,7 +279,7 @@ void Game::step_heli(Heli& h, f32 dt) {
   const f32 face = leaving || h.state == Heli::State::inbound ? std::atan2(h.v.y, h.v.x) : std::atan2(tp.y - h.p.y, tp.x - h.p.x);
   h.yaw += wrap_pi(face - kPi / 2 - h.yaw) * std::fmin(1.0f, dt * 1.6f);
   if (leaving) {
-    if (dist2d(h.p, view_.cam.eye) > 650) h.dead = true;
+    if (dist2d(h.p, cam_.eye) > 650) h.dead = true;
     return;
   }
   // heavy machine gun: bursts of 7 every 3.5..5.15 s
@@ -552,7 +552,7 @@ void Game::update_flak(f32 dt) {
   // scan: the 3x3 cells of 700 m around the listener, a hash decides gun and spot
   if (now - C.flak_scan > 1.5f) {
     C.flak_scan = now;
-    const i64 cx = static_cast<i64>(std::floor(view_.cam.eye.x / kFlakCell)), cy = static_cast<i64>(std::floor(view_.cam.eye.y / kFlakCell));
+    const i64 cx = static_cast<i64>(std::floor(cam_.eye.x / kFlakCell)), cy = static_cast<i64>(std::floor(cam_.eye.y / kFlakCell));
     std::vector<FlakGun> keep;
     for (i64 dx = -1; dx <= 1; ++dx)
       for (i64 dy = -1; dy <= 1; ++dy) {
@@ -618,7 +618,7 @@ void Game::update_flak(f32 dt) {
             if (C.flak_rounds.size() < 180) C.flak_rounds.push_back({mz, dir * kFlakMuzzle, now + fuse});
             g.flash_at = now;
             ++g.barrel;
-            if (g.barrel % 3 == 0) world_->play_sound("builtin:launcher", mz, clampf(1.4f / (1 + kern::length(mz - view_.cam.eye) / 90), 0, 1.2f) * 0.55f, 1.6f, true);
+            if (g.barrel % 3 == 0) world_->play_sound("builtin:launcher", mz, clampf(1.4f / (1 + kern::length(mz - cam_.eye) / 90), 0, 1.2f) * 0.55f, 1.6f, true);
             osfx("flak_battery.audioShot", g.p);
             g.next_shot = std::fmax(g.next_shot + 1.0f / kFlakRps, now - 0.05f);
           }
@@ -685,16 +685,16 @@ void Game::update_jets(f32 dt) {
   if (now > C.next_ambient) {
     C.next_ambient = now + kAmbientMinS + rng_.unit() * (kAmbientMaxS - kAmbientMinS);
     const f32 alt = kJetAltMin + rng_.unit() * (kJetAltMax - kJetAltMin), off = (rng_.unit() - 0.5f) * 160;
-    launch_jets(view_.cam.eye.x, view_.cam.eye.y, false, now, alt, off);
-    gaps_send_jets(false, view_.cam.eye, off, alt);  // fighter_jets.mjs sendFx flyover (game_gaps.cpp)
+    launch_jets(cam_.eye.x, cam_.eye.y, false, now, alt, off);
+    gaps_send_jets(false, cam_.eye, off, alt);  // fighter_jets.mjs sendFx flyover (game_gaps.cpp)
   }
   for (FighterJet& j : C.jets) {
     const f32 y = j.y0 + kJetSpeed * (now - j.t0);
     const Vec3 p{j.x, y, j.z};
     // the roar arrives late (retarded position, 343 m/s): heard when the sound from the closest
     // point reaches the listener; a close pass shakes the camera
-    const f32 d = kern::length(p - view_.cam.eye);
-    const f32 closest_y = view_.cam.eye.y, closest = std::hypot(j.x - view_.cam.eye.x, j.z - view_.cam.eye.z);
+    const f32 d = kern::length(p - cam_.eye);
+    const f32 closest_y = cam_.eye.y, closest = std::hypot(j.x - cam_.eye.x, j.z - cam_.eye.z);
     if (!j.heard && now >= j.t0 && y > closest_y && (y - closest_y) / kJetSpeed >= closest / kSoundMps) {
       j.heard = true;
       // the roar itself is a looping voice per jet with retarded time and Doppler (game_gaps.cpp gaps_jet_audio)
@@ -748,7 +748,7 @@ void Game::draw_military() {
   for (const Tank& k : combat_.tanks)
     if (k.wreck && now - k.wreck_at < 40) people_art_.fire(k.p + Vec3{0, 0, 1.6f}, 0.9f, now);
   for (const FlakGun& g : combat_.flak)
-    if (kern::length(g.p - view_.cam.eye) < 900) A.flak(g.p, g.base_yaw, g.yaw, g.pitch, g.dead, now - g.flash_at < 0.045f);
+    if (kern::length(g.p - cam_.eye) < 900) A.flak(g.p, g.base_yaw, g.yaw, g.pitch, g.dead, now - g.flash_at < 0.045f);
   for (const FlakRound& r : combat_.flak_rounds) A.beam(r.p, r.p - kern::normalize(r.v) * std::fmin(14.0f, kern::length(r.v) * 0.016f), 0.12f, {3.2f, 1.8f, 0.6f});
   for (const Puff& p : combat_.puffs) {
     const f32 a = now - p.born, s = (1.2f + a * 2.2f) * 2;
@@ -756,7 +756,7 @@ void Game::draw_military() {
   }
   for (const FighterJet& j : combat_.jets) {
     const Vec3 p{j.x, j.y0 + kJetSpeed * (now - j.t0), j.z};
-    if (kern::length(p - view_.cam.eye) < 2400) A.fighter(p, 0.8f + 0.5f * std::fabs(std::sin(now * 37 + j.x)));
+    if (kern::length(p - cam_.eye) < 2400) A.fighter(p, 0.8f + 0.5f * std::fabs(std::sin(now * 37 + j.x)));
   }
   for (const Bomb& b : combat_.bombs) {
     const f32 u = clampf((now - b.t0) / b.dur, 0, 1);
@@ -797,15 +797,15 @@ void Game::draw_military() {
   }
   // updateBlasts: hot core (sphere r .45, x .5 .. 5, opacity .9 (1-t)) and flat ring (inner .6 outer 1,
   // x .7 .. 7.7, opacity .78 (1-t)^1.6), e = 1 - (1-t)^3 over 540 ms, additive orange / gold
-  std::erase_if(rounds_.visual_blasts, [&](const VisualBlast& b) { return now - b.born >= 0.54f || now < b.born; });
-  for (const VisualBlast& b : rounds_.visual_blasts) {
+  std::erase_if(visual_blasts_, [&](const VisualBlast& b) { return now - b.born >= 0.54f || now < b.born; });
+  for (const VisualBlast& b : visual_blasts_) {
     const f32 t = clampf((now - b.born) / 0.54f, 0, 1), e = 1 - (1 - t) * (1 - t) * (1 - t);
     const f32 hot = b.scale * (0.5f + 4.5f * e) * 0.9f, ring = b.scale * (0.7f + 7.0f * e);
     A.put(CombatArt::fade_sphere, Mat4::translate(b.p) * Mat4::scale({hot, hot, hot}), Vec3{1.0f, 0.33f, 0.056f} * 3.0f, 0.9f * (1 - t));
     A.put(CombatArt::fade_ring, Mat4::translate(b.p) * Mat4::scale({ring, ring, ring}), Vec3{1.0f, 0.64f, 0.19f} * 3.0f, 0.78f * std::pow(1 - t, 1.6f));
   }
   // makeGrenade: the 40 mm round - dark shell, two glowing orange bands, a green phosphor halo (x1.35)
-  for (const Projectile& p : weapons_.projectiles) {
+  for (const Projectile& p : projectiles_) {
     if (p.id != weapons::Id::grenade_launcher) continue;
     constexpr f32 r = 0.039f * 1.35f;
     const Mat4 m = Mat4::translate(p.pos) * Mat4::trs({}, Quat::axis_angle(kern::normalize(kern::cross({0, 0, 1}, kern::normalize(p.vel, {1, 0, 0})), {1, 0, 0}),
@@ -818,7 +818,7 @@ void Game::draw_military() {
   }
   // updateGrenadeBounceFx: e = 1 - (1-t)^3; the ring (r .040 .. .058, 0xffb347) x strength (.75 + 3.1 e),
   // opacity .72 (1-t)^1.35; the flash (r .020, 0xf4fff8) x strength (1 + .7 e), opacity .95 (1-t)^2.2
-  for (const BounceFx& b : rounds_.bounce_fx) {
+  for (const BounceFx& b : bounce_fx_) {
     const f32 t = (now - b.born) / 0.18f;
     if (t < 0 || t >= 1) continue;
     const f32 e = 1 - (1 - t) * (1 - t) * (1 - t);
@@ -832,10 +832,10 @@ void Game::draw_military() {
   }
   // updateRocketLaser / placeDot: the launcher's red dot while it is in hand on foot - big, pulsing a
   // little, pulled a hair toward the viewer so it never sinks into the wall
-  if (world_placed_ && mode_ == Mode::foot && weapons_.foot_weapon == weapons::Id::rocket && !player_dead_) {
+  if (world_placed_ && mode_ == Mode::foot && foot_weapon_ == weapons::Id::rocket && !player_dead_) {
     const Vec3 dot = rocket_laser_dot();
-    if (rounds_.laser_valid) {
-      const Vec3 to_eye = view_.cam.eye - dot;
+    if (laser_valid_) {
+      const Vec3 to_eye = cam_.eye - dot;
       const f32 dist = std::fmax(1e-3f, kern::length(to_eye));
       // the sprite's width (placeDot: max(.14, d * .016), flicker .9 .. 1): a red core that full
       // width, a soft halo round it - drawn flat towards the eye and pulled out of the wall by its

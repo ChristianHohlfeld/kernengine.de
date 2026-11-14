@@ -15,6 +15,7 @@
 
 #include <array>
 
+#include "../firmware/Arondight45_FirmwareRuntime.hpp"
 #include "common.h"
 #include "rigid_spec.h"
 
@@ -59,14 +60,9 @@ struct DroneTelemetry {
   f32 attitude_deg[3] = {};           // FC estimate: roll, pitch, yaw (deg)
 };
 
-class DroneFirmware;  // the vendored FC stack (drone.cpp)
-
 class Drone {
  public:
   explicit Drone(const DroneParams& p = {});
-  ~Drone();
-  Drone(const Drone&) = delete;
-  Drone& operator=(const Drone&) = delete;
 
   /// Colliders and mass properties of the airframe (airframe_collision_envelope.mjs, component masses).
   static RigidSpec rigid_spec(const DroneParams& p = {});
@@ -85,11 +81,11 @@ class Drone {
   bool parked() const { return parked_; }
 
  private:
-  void motor_tick(f32 dt, const BodyState& s, f32 altitude, f32 thrust_out[4], f32 torque_out[4]);
-  void imu_bytes(f32 dt, const BodyState& s, u8 out[14]);
+  void motor_tick(f32 dt, const BodyState& s, f32 altitude, std::array<f32, 4>& thrust_out, std::array<f32, 4>& torque_out);
+  void imu_bytes(f32 dt, const BodyState& s, std::array<u8, 14>& out);
 
   DroneParams p_;
-  DroneFirmware* fw_ = nullptr;
+  fc::FirmwareRuntime fw_;  // the vendored FC stack: it reads the sensor bytes and gives the ESC pulses
   Vec3 motor_pos_[4];
   f32 omega_[4] = {}, current_[4] = {}, rotor_angle_[4] = {}, motor_torque_[4] = {}, prop_torque_[4] = {};
   f32 soc_ = 1, vbatt_ = 16.8f, ibatt_ = 0;

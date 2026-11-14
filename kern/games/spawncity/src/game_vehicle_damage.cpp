@@ -23,7 +23,7 @@ void Game::car_bullet(i32 i, bool by_player) {
   // SNIPER_CAR_FRACTION .34 of a civilian's HP, a cruiser takes it as four hits (sniperShotAt)
   if (i < 0 || i >= static_cast<i32>(cars_.size())) return;
   const TrafficCar& c = cars_[i];
-  const bool sniper = mode_ == Mode::foot && weapons_.foot_weapon == weapons::Id::sniper;
+  const bool sniper = mode_ == Mode::foot && foot_weapon_ == weapons::Id::sniper;
   f32 dmg = c.police ? 22.0f : is_bus(c) ? 26.0f : 30.0f;
   if (sniper) dmg = c.police ? 4 * 22.0f : std::fmax(1.0f, std::round(car_max_hp(c) * 0.34f));
   damage_car(i, dmg, by_player, town::Cause::round);

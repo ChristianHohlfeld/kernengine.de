@@ -10,9 +10,8 @@ namespace sc::gaps {
 
 // ---- police_sirens.mjs, the dispatch grace, the organic crack: the Blueprint of the actor "Sirens"
 namespace {
-using kern::logic::Value;
-rules::Blueprint g_sirens;
-f32 num(const char* function, const std::vector<Value>& args) { return static_cast<f32>(g_sirens.number(function, args)); }
+using rules::decimal;
+rules::Blueprint g_sirens{"Sirens"};
 }  // namespace
 void bind_sirens(kern::logic::Instance* blueprint) { g_sirens.running = blueprint; }
 f32 horn_low() { return static_cast<f32>(g_sirens.variable("HornLow")); }
@@ -23,24 +22,45 @@ f32 whoop_base() { return static_cast<f32>(g_sirens.variable("WhoopBase")); }
 f32 organic_gain() { return static_cast<f32>(g_sirens.variable("OrganicGain")); }
 f32 organic_min_gap_s() { return static_cast<f32>(g_sirens.variable("OrganicMinGapS")); }
 
-f32 horn_hz(f32 t) { return num("HornHz", {rules::number(t)}); }
-f32 whoop_hz(f32 t) { return num("WhoopHz", {rules::number(t)}); }
-f32 siren_gain(f32 base, f32 d, f32 level) { return num("SirenGain", {rules::number(base), rules::number(d), rules::number(level)}); }
-f32 siren_cutoff(f32 d) { return num("SirenCutoff", {rules::number(d)}); }
-
-f32 SirenVoice::update(f32 d, f32 dt, f32 base, f32 level) {
-  std::vector<Value> r;
-  if (!g_sirens.call("VoiceUpdate", {rules::number(d), rules::number(dt), rules::number(base), rules::number(level), Value::boolean(have_d), rules::number(last_d), rules::number(doppler)}, r) ||
-      r.size() < 4)
-    return 0;
-  have_d = r[1].b;
-  last_d = static_cast<f32>(r[2].as_number());
-  doppler = static_cast<f32>(r[3].as_number());
-  return static_cast<f32>(r[0].as_number());
+f32 horn_hz(f32 t) {
+  f64 hz = 0;
+  g_sirens.call("HornHz", std::tie(hz), decimal(t));
+  return static_cast<f32>(hz);
+}
+f32 whoop_hz(f32 t) {
+  f64 hz = 0;
+  g_sirens.call("WhoopHz", std::tie(hz), decimal(t));
+  return static_cast<f32>(hz);
+}
+f32 siren_gain(f32 base, f32 d, f32 level) {
+  f64 gain = 0;
+  g_sirens.call("SirenGain", std::tie(gain), decimal(base), decimal(d), decimal(level));
+  return static_cast<f32>(gain);
+}
+f32 siren_cutoff(f32 d) {
+  f64 hz = 0;
+  g_sirens.call("SirenCutoff", std::tie(hz), decimal(d));
+  return static_cast<f32>(hz);
 }
 
-f32 post_arrival_grace_ms(i32 stars) { return num("PostArrivalGraceMs", {Value::integer(stars)}); }
-f32 organic_rate(Organic k) { return num("OrganicRate", {rules::of_enum(k)}); }
+f32 SirenVoice::update(f32 d, f32 dt, f32 base, f32 level) {
+  f64 gain = 0, next_last_d = 0, next_doppler = 0;
+  g_sirens.call("VoiceUpdate", std::tie(gain, have_d, next_last_d, next_doppler), decimal(d), decimal(dt), decimal(base), decimal(level), have_d, decimal(last_d), decimal(doppler));
+  last_d = static_cast<f32>(next_last_d);
+  doppler = static_cast<f32>(next_doppler);
+  return static_cast<f32>(gain);
+}
+
+f32 post_arrival_grace_ms(i32 stars) {
+  f64 ms = 0;
+  g_sirens.call("PostArrivalGraceMs", std::tie(ms), stars);
+  return static_cast<f32>(ms);
+}
+f32 organic_rate(Organic k) {
+  f64 rate = 0;
+  g_sirens.call("OrganicRate", std::tie(rate), k);
+  return static_cast<f32>(rate);
+}
 
 // ---- world_critical_damage_fx.mjs
 u32 hash_text(const std::string& s) {
@@ -102,31 +122,33 @@ bool SmokeField::active(const std::string& id) const {
 void SmokeField::emit(SmokeEffect& e, f32 now) {
   if (puffs_.empty()) return;
   // choosePuff: a free one, else the oldest
-  Puff* p = nullptr;
-  for (Puff& q : puffs_)
-    if (!q.alive) { p = &q; break; }
-  if (!p) {
-    p = &puffs_[0];
-    for (Puff& q : puffs_)
-      if (q.born < p->born) p = &q;
+  i32 at = -1;  // (its place in puffs_)
+  for (std::size_t i = 0; i < puffs_.size(); ++i)
+    if (!puffs_[i].alive) { at = static_cast<i32>(i); break; }
+  if (at < 0) {
+    at = 0;
+    for (std::size_t i = 0; i < puffs_.size(); ++i)
+      if (puffs_[i].born < puffs_[static_cast<std::size_t>(at)].born) at = static_cast<i32>(i);
   }
   const f32 progress = clampf((now - e.started) / std::fmax(1e-3f, e.expires - e.started), 0, 1);
-  const u32 serial = e.serial++;
+  const u32 serial = e.serial;
+  e.serial += 1;
   const u32 seed = hash_text(e.id + ":" + std::to_string(serial));
   const f32 a = unit_hash(seed) * 2 * kPi, side = (unit_hash(seed + 17) - 0.5f) * (0.22f + e.scale * 0.18f);
   const bool ember = progress > 0.67f && serial % 5 == 0;
-  p->alive = true;
-  p->ember = ember;
-  p->pos = e.at + Vec3{std::cos(a) * side, std::sin(a) * side, 0};
-  p->vel = {std::cos(a) * (0.07f + unit_hash(seed + 31) * 0.19f), std::sin(a) * (0.07f + unit_hash(seed + 47) * 0.19f), 0.46f + unit_hash(seed + 61) * 0.40f + progress * 0.30f};
-  p->born = now;
-  p->expires = now + (ember ? 0.42f : 1.25f + unit_hash(seed + 79) * 0.52f);
-  p->s0 = e.scale * (ember ? 0.10f : 0.38f + unit_hash(seed + 97) * 0.19f);
-  p->s1 = e.scale * (ember ? 0.035f : 1.32f + unit_hash(seed + 113) * 0.42f);
-  p->serial = serial;
-  p->rotation = 0;
-  p->color = ember ? rgb(0xff8a3d) : progress > 0.55f ? rgb(0xb9bec6) : rgb(0x8f949c);
-  p->opacity = ember ? 0.94f : 0.54f + progress * 0.18f;
+  Puff& p = puffs_[static_cast<std::size_t>(at)];
+  p.alive = true;
+  p.ember = ember;
+  p.pos = e.at + Vec3{std::cos(a) * side, std::sin(a) * side, 0};
+  p.vel = {std::cos(a) * (0.07f + unit_hash(seed + 31) * 0.19f), std::sin(a) * (0.07f + unit_hash(seed + 47) * 0.19f), 0.46f + unit_hash(seed + 61) * 0.40f + progress * 0.30f};
+  p.born = now;
+  p.expires = now + (ember ? 0.42f : 1.25f + unit_hash(seed + 79) * 0.52f);
+  p.s0 = e.scale * (ember ? 0.10f : 0.38f + unit_hash(seed + 97) * 0.19f);
+  p.s1 = e.scale * (ember ? 0.035f : 1.32f + unit_hash(seed + 113) * 0.42f);
+  p.serial = serial;
+  p.rotation = 0;
+  p.color = ember ? rgb(0xff8a3d) : progress > 0.55f ? rgb(0xb9bec6) : rgb(0x8f949c);
+  p.opacity = ember ? 0.94f : 0.54f + progress * 0.18f;
 }
 
 void SmokeField::update(f32 now, f32 dt) {

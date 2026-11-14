@@ -7,7 +7,7 @@ namespace sc::guided {
 
 namespace {
 using kern::logic::Value;
-rules::Blueprint g_rules;
+rules::Blueprint g_rules{"Guided"};
 
 // The Blueprint's struct Missile, field by field in its order.
 Value to_value(const Missile& m) {

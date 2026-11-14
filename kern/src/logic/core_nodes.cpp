@@ -1,6 +1,7 @@
 // Kern Logic: the built-in nodes (events, flow control, variables, state
 // machines, functions, math, logic, vectors, text, debugging). Gameplay nodes live in
 // the game module (src/game/logic_nodes.cpp).
+#include <algorithm>
 #include <cmath>
 #include <type_traits>
 #include <utility>
@@ -816,6 +817,72 @@ void add_lists(Library& lib) {
     lib.add(std::move(d));
   }
   {
+    // Sort List: in the order a pure function of the Blueprint says (two items -> does the first go
+    // before the second?), or by the items' own order; stable (nodes.h, list::sort)
+    NodeDef d = step("list.sort", "Sort List",
+                     "Puts the items of a list variable in order: by Order, a pure function that takes two items and gives whether the first goes before the second - "
+                     "or, without one, by their own order (numbers, whole numbers, booleans, texts, enum values). Items that are equal in that order keep theirs.",
+                     "sort order arrange rank array", {}, {});
+    d.params.push_back(param("function", "Order", ParamDef::Kind::function, ""));
+    d.params.back().optional = true;
+    d.title = [](const NodeDef&, const Node& n) { return "Sort " + place_title(n); };
+    d.problem = [needs_list = d.problem](const Node& n, const Graph& g) -> std::string {
+      std::string why = needs_list ? needs_list(n, g) : std::string();
+      if (!why.empty()) return why;
+      Variable named;
+      if (!g.place_of(n, named) || !is_list(named.type)) return {};
+      const PinType e = element_of(named.type);
+      const std::string fn = n.param("function", "");
+      if (fn.empty()) {
+        if (e == PinType::vector || e == PinType::actor || e == PinType::structure) return "a list of " + std::string(pin_type_name(e)) + " has no order of its own: Order names a function that says it";
+        return {};
+      }
+      const Function* f = g.function(fn);
+      if (!f) return "Order: there is no function \"" + fn + "\"";
+      if (!f->pure) return "Order: " + fn + " is to be pure (it is asked again and again while the list is put in order)";
+      const bool takes = f->inputs.size() == 2 && f->inputs[0].type == e && f->inputs[1].type == e && f->inputs[0].of == named.of && f->inputs[1].of == named.of && !f->inputs[0].ref && !f->inputs[1].ref;
+      if (!takes || f->outputs.size() != 1 || f->outputs[0].type != PinType::boolean)
+        return "Order: " + fn + " takes two items of the list (by value) and gives one Bool";
+      return {};
+    };
+    d.run = [](Context& c) {
+      const std::vector<i64> at = c.path();  // (its indices, read once)
+      Value list;
+      c.instance().change(c.node(), at, [&](Value& v) { list = v; });  // (taken out: the order is worked out apart from the place)
+      Variable named;
+      if (!is_list(list.type) || (c.instance().graph().place_of(c.node(), named) && named.count)) return 0;
+      const std::string fn = c.param("function", "");
+      auto before = [&](const Value& a, const Value& b) -> bool {
+        if (!fn.empty()) {
+          std::vector<Value> r;
+          c.instance().call_inside(fn, {a, b}, r);
+          return !r.empty() && r[0].as_bool();
+        }
+        switch (a.type) {
+          case PinType::integer:
+          case PinType::enumeration: return a.i < b.i;
+          case PinType::number: return a.n < b.n;
+          case PinType::boolean: return a.b < b.b;
+          case PinType::text: return a.s < b.s;
+          default: return false;
+        }
+      };
+      std::vector<std::size_t> order(list.size());
+      for (std::size_t k = 0; k < order.size(); ++k) order[k] = k;
+      std::stable_sort(order.begin(), order.end(), [&](std::size_t i, std::size_t j) { return before(list.item(i), list.item(j)); });
+      Value sorted = list;
+      with_items(element_of(list.type), [&](auto type) {
+        using T = typename decltype(type)::type;
+        const std::vector<T>& from = list.items<T>();
+        std::vector<T>& to = sorted.template edit<T>();
+        for (std::size_t k = 0; k < order.size(); ++k) to[k] = from[order[k]];
+      });
+      c.instance().change(c.node(), at, [&](Value& v) { v = std::move(sorted); });
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
+  {
     NodeDef d = step("list.append", "Append List", "Adds the items of another list at the end of a list variable, in their order and in one go.", "add all extend concat join array",
                      {data("items", "Items", PinType::number_list)}, {});
     d.title = [](const NodeDef&, const Node& n) { return "Append to " + place_title(n); };
@@ -1239,6 +1306,10 @@ void add_math(Library& lib) {
   lib.add(pure("text.equal", "Text Equals", "Text", {data("a", "A", K::text, ""), data("b", "B", K::text, "")}, boolean, of(&P::text_equal)));
   lib.add(pure("text.contains", "Contains", "Text", {data("a", "Text", K::text, ""), data("b", "Search", K::text, "")}, boolean, of(&P::text_contains)));
   lib.add(pure("text.length", "Text Length", "Text", {data("a", "Text", K::text, "")}, integer, of(&P::text_length)));
+  lib.add(pure("text.code_at", "Code At", "Text", {data("a", "Text", K::text, ""), data("index", "Index", K::integer, 0)}, integer, of(&P::text_code_at),
+               "The byte at Index as a number 0 to 255 (beyond the text: 0)", "char character byte ascii index"));
+  lib.add(pure("text.of_code", "Text of Code", "Text", {data("code", "Code", K::integer, 65)}, data("result", "", K::text), of(&P::text_of_code),
+               "A text of one byte: Code cut to 8 bits", "char character byte ascii"));
   {
     // Format Text: a format as printf has it, and a value for each of its conversions (nodes.h, format)
     NodeDef d = make("text.format", "Format Text", "Text", NodeKind::pure,

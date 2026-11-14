@@ -92,23 +92,23 @@ SC_TEST(traffic_keeps_its_distance) {
   i32 who = -2;
   // car 0 heading +x: car 1 is 20 m ahead (gap 20 - 3.8 = 16.2, free 13.7 -> 8.56 m/s); the car
   // beside (4 m to the left), the one behind and the one that is not there do not count
-  f32 v = TrafficRules::gap_speed(0, {0, 0}, {1, 0}, false, all, &who);
+  f32 v = TrafficRules::gap_speed(0, {0, 0}, {1, 0}, false, all, who);
   SC_CHECK(std::fabs(v - (20 - 3.8f - 2.5f) / 1.6f) < 1e-3f && who == 1, "behind a car 20 m ahead (%.2f m/s, limiter %d)", v, who);
   // the bus one further: behind it car 1 has 10 - (1.9 + 4) = 4.1 m -> 1 m/s
-  v = TrafficRules::gap_speed(1, {20, 0.5f}, {1, 0}, false, all, &who);
+  v = TrafficRules::gap_speed(1, {20, 0.5f}, {1, 0}, false, all, who);
   SC_CHECK(std::fabs(v - (10 - 5.9f - 2.5f) / 1.6f) < 1e-3f && who == 2, "behind the bus (%.2f m/s, limiter %d)", v, who);
   // closer than 2.5 m bumper to bumper: stop
   all[1].p = {6, 0};
-  v = TrafficRules::gap_speed(0, {0, 0}, {1, 0}, false, all, &who);
+  v = TrafficRules::gap_speed(0, {0, 0}, {1, 0}, false, all, who);
   SC_CHECK(v == 0 && who == 1, "bumper to bumper: stop (%.2f)", v);
   // nobody ahead: free
-  v = TrafficRules::gap_speed(2, {30, 0}, {1, 0}, true, all, &who);
+  v = TrafficRules::gap_speed(2, {30, 0}, {1, 0}, true, all, who);
   SC_CHECK(v > 1e8f && who == -1, "nobody ahead: free (%.0f, %d)", v, who);
   // a car looks 1.25 + 0.6 m to each side, a bus 1.6 + 0.6 m
   all[1].p = {20, 2.0f};
   all[2].there = false;
-  SC_CHECK(TrafficRules::gap_speed(0, {0, 0}, {1, 0}, false, all) > 1e8f, "2 m to the side: not in a car's way");
-  SC_CHECK(TrafficRules::gap_speed(0, {0, 0}, {1, 0}, true, all) < 10, "2 m to the side: in a bus' way");
+  SC_CHECK(TrafficRules::gap_speed(0, {0, 0}, {1, 0}, false, all, who) > 1e8f, "2 m to the side: not in a car's way");
+  SC_CHECK(TrafficRules::gap_speed(0, {0, 0}, {1, 0}, true, all, who) < 10, "2 m to the side: in a bus' way");
 }
 
 SC_TEST(traffic_pursuit_point) {

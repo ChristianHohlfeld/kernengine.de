@@ -174,7 +174,7 @@ void Game::gaps_init(kern::Engine& e) {
 void Game::gaps_guided_sounds() {
   // guided_missile.mjs lockTone (two square beeps 1760 Hz, 50 ms, 90 ms apart, .05) and the
   // ignition bang (sine 110 -> 40 Hz over .3 s, .6 -> .001 over .35 s), into Kern's SoundBank
-  if (!gaps_ || gaps_->guided_sounds || !audio_.bank) return;
+  if (!gaps_ || gaps_->guided_sounds || !bank_) return;
   const u32 rate = 44100;
   std::vector<f32> lock(static_cast<std::size_t>(rate * 0.15f), 0.0f), bang(static_cast<std::size_t>(rate * 0.4f), 0.0f);
   for (int k = 0; k < 2; ++k)
@@ -188,10 +188,10 @@ void Game::gaps_guided_sounds() {
     ph += 110 * std::pow(40.0 / 110.0, std::fmin(1.0, t / 0.3)) / rate;
     bang[i] = static_cast<f32>(std::sin(2 * 3.14159265358979 * ph)) * 0.6f * std::pow(0.001f / 0.6f, std::fmin(1.0f, t / 0.35f));
   }
-  audio_.bank->request("sc:locktone");
-  audio_.bank->set_pcm("sc:locktone", lock.data(), static_cast<u32>(lock.size()), 1, rate);
-  audio_.bank->request("sc:guidedbang");
-  audio_.bank->set_pcm("sc:guidedbang", bang.data(), static_cast<u32>(bang.size()), 1, rate);
+  bank_->request("sc:locktone");
+  bank_->set_pcm("sc:locktone", lock.data(), static_cast<u32>(lock.size()), 1, rate);
+  bank_->request("sc:guidedbang");
+  bank_->set_pcm("sc:guidedbang", bang.data(), static_cast<u32>(bang.size()), 1, rate);
   gaps_->guided_sounds = true;
 }
 
@@ -199,9 +199,9 @@ void Game::gaps_guided(f32 dt) {
   (void)dt;
   GapsState& g = *gaps_;
   const f32 now = world_->sim_time();
-  if (audio_.mixer.ready() && !g.motor_clip) {
+  if (mixer_.ready() && !g.motor_clip) {
     // motorVoice: brown-ish noise through a 700 Hz band-pass (Q .7) plus a 1300 Hz sawtooth whine (.05)
-    const u32 rate = audio_.mixer.sample_rate();
+    const u32 rate = mixer_.sample_rate();
     std::vector<f32> d(static_cast<std::size_t>(rate) * 2);
     u32 s = 0x51ed27u;
     f32 b = 0;
@@ -219,10 +219,10 @@ void Game::gaps_guided(f32 dt) {
     }
     kern::audio::make_seamless(d, rate, 0.05f);
     kern::audio::normalize(d, 0.8f);
-    g.motor_clip = audio_.mixer.adopt_clip(std::move(d), 1, "spawncity:guided-motor", true);
+    g.motor_clip = mixer_.adopt_clip(std::move(d), 1, "spawncity:guided-motor", true);
   }
   for (GapsState::MotorVoice& v : g.motors) v.alive = false;
-  for (const guided::Flight& f : guided_.flights) {
+  for (const guided::Flight& f : guided_) {
     GapsState::MotorVoice* v = nullptr;
     for (GapsState::MotorVoice& q : g.motors)
       if (q.born == f.m.born) { v = &q; break; }
@@ -232,7 +232,7 @@ void Game::gaps_guided(f32 dt) {
     if (v->lit < 0) {
       v->lit = now;
       gaps_guided_sounds();
-      world_->play_sound("sc:guidedbang", view_.cam.eye, 1, 1, false);
+      world_->play_sound("sc:guidedbang", cam_.eye, 1, 1, false);
       if (g.motor_clip) {
         kern::audio::PlayParams p;
         p.loop = true;
@@ -244,15 +244,15 @@ void Game::gaps_guided(f32 dt) {
         p.volume = 0.5f;
         p.bus = kern::audio::Bus::sfx;
         p.fade_in = 0.06f;
-        v->v = audio_.mixer.play(g.motor_clip, p);
+        v->v = mixer_.play(g.motor_clip, p);
       }
     }
     if (v->v) {
       // .5 at 60 ms, exponentially to .28 at .6 s
       const f32 t = now - v->lit;
       const f32 vol = t < 0.06f ? 0.5f * t / 0.06f : 0.5f * std::pow(0.28f / 0.5f, std::fmin(1.0f, (t - 0.06f) / 0.54f));
-      audio_.mixer.set_volume(v->v, vol);
-      audio_.mixer.set_position(v->v, f.m.p, f.m.v);
+      mixer_.set_volume(v->v, vol);
+      mixer_.set_position(v->v, f.m.p, f.m.v);
     }
     // a puff 0.9 m behind the missile every frame
     const f32 sp = kern::length(f.m.v);
@@ -261,7 +261,7 @@ void Game::gaps_guided(f32 dt) {
     pf.born = now;
   }
   for (GapsState::MotorVoice& v : g.motors)
-    if (!v.alive && v.v) audio_.mixer.stop(v.v, 0.05f);
+    if (!v.alive && v.v) mixer_.stop(v.v, 0.05f);
   std::erase_if(g.motors, [](const GapsState::MotorVoice& v) { return !v.alive; });
   for (GapsState::TrailPuff& p : g.trail) {
     if (p.born < 0) continue;
@@ -326,18 +326,17 @@ void Game::gaps_send_jets(bool strike, Vec3 p, f32 offset, f32 alt) {
 // ---------------------------------------------------------------------------------------------
 // spawn gates
 
-bool Game::gaps_can_spawn(Vec3 p, f32 height, f32 far_entry) const {
-  if (!gaps_ || !world_) return true;
-  if (gaps_->world_shown >= 0 && world_->sim_time() - gaps_->world_shown < kSpawnGraceS) return true;
-  std::vector<spawn::Viewer> vs;
+bool Game::gaps_spawn_viewers(std::vector<spawn::Viewer>& vs) const {
+  if (!gaps_ || !world_) return false;
+  if (gaps_->world_shown >= 0 && world_->sim_time() - gaps_->world_shown < kSpawnGraceS) return false;
   // the presented camera, judged with the unscoped field of view (spawnViewFovDeg)
   spawn::Viewer me;
-  me.eye = view_.cam.eye;
-  me.forward = kern::normalize(view_.cam.target - view_.cam.eye, {1, 0, 0});
+  me.eye = cam_.eye;
+  me.forward = kern::normalize(cam_.target - cam_.eye, {1, 0, 0});
   const f32 aspect = frame_w_ / std::fmax(1.0f, frame_h_);
   const f32 foot_fov = 2 * std::atan(std::tan(45 * kDeg) / std::fmax(0.2f, aspect));  // Kern's soldier: 90 deg horizontal
-  me.half_angle = spawn::cone_half_angle(mode_ == Mode::foot ? std::fmax(view_.cam.fov, foot_fov) : view_.cam.fov, aspect);
-  me.far = std::fmax(200.0f, view_.cam.far > 0 ? view_.cam.far : spawn::default_far());
+  me.half_angle = spawn::cone_half_angle(mode_ == Mode::foot ? std::fmax(cam_.fov, foot_fov) : cam_.fov, aspect);
+  me.far = std::fmax(200.0f, cam_.far > 0 ? cam_.far : spawn::default_far());
   me.local = true;
   vs.push_back(me);
   // the other players' views (collectPeerViewers: a drone looks along its nose, a person ahead)
@@ -356,6 +355,12 @@ bool Game::gaps_can_spawn(Vec3 p, f32 height, f32 far_entry) const {
     v.forward = kern::normalize(v.forward, {1, 0, 0});
     vs.push_back(v);
   }
+  return true;
+}
+
+bool Game::gaps_can_spawn(Vec3 p, f32 height, f32 far_entry) const {
+  std::vector<spawn::Viewer> vs;
+  if (!gaps_spawn_viewers(vs)) return true;
   // (whether buildings hide the point is the Blueprint's own question to the world: a ray against the channel "World")
   const bool ok = spawn::can_spawn(vs, p, far_entry, height);
   ++(ok ? gaps_->spawn_allowed : gaps_->spawn_denied);
@@ -393,7 +398,7 @@ void Game::gaps_drone_revealed(u32 slot, i32 stars) {
   if (!gaps_ || slot >= 5) return;
   const f32 now = world_->sim_time();
   // engageAt = reveal + grace; the reveal sets the next shot to max(engageAt, now + 260 + 90 * index ms)
-  police_.pdrones[slot].next_shot = std::fmax(now + gaps::post_arrival_grace_ms(stars) / 1000, now + 0.26f + static_cast<f32>(slot) * 0.09f);
+  pdrones_[slot].next_shot = std::fmax(now + gaps::post_arrival_grace_ms(stars) / 1000, now + 0.26f + static_cast<f32>(slot) * 0.09f);
   gaps_->pd_due[slot] = -1;
 }
 
@@ -415,12 +420,12 @@ void Game::gaps_update(f32 dt) {
     const f32 heat = wanted::heat();
     const i32 stars = wanted::stars();
     if (heat > g.last_heat + 1e-3f && stars > 0) {
-      police_.last_contact = now;
-      police_.last_known = player_position();
-      if (mode_ == Mode::foot) police_.last_known.z -= 0.73f;
+      last_contact_ = now;
+      last_known_ = player_position();
+      if (mode_ == Mode::foot) last_known_.z -= 0.73f;
     }
     if (stars > g.last_stars && stars > 0) {
-      if (audio_.bank && !g.star_tones) {
+      if (bank_ && !g.star_tones) {
         const u32 rate = 44100;
         for (i32 s = 1; s <= 5; ++s) {
           std::vector<f32> pcm(static_cast<std::size_t>(rate * 0.16f));
@@ -433,13 +438,13 @@ void Game::gaps_update(f32 dt) {
             pcm[i] = (std::fmod(ph, 1.0) < 0.5 ? 0.022f : -0.022f) * env;
           }
           const std::string id = "sc:star" + std::to_string(s);
-          audio_.bank->request(id);
-          audio_.bank->set_pcm(id, pcm.data(), static_cast<u32>(pcm.size()), 1, rate);
+          bank_->request(id);
+          bank_->set_pcm(id, pcm.data(), static_cast<u32>(pcm.size()), 1, rate);
         }
         g.star_tones = true;
       }
-      if (g.star_tones) world_->play_sound("sc:star" + std::to_string(std::min(5, stars)), view_.cam.eye, 1, 1, false);
-      osfx("wanted_police_drones.star", view_.cam.eye, static_cast<f32>(stars));
+      if (g.star_tones) world_->play_sound("sc:star" + std::to_string(std::min(5, stars)), cam_.eye, 1, 1, false);
+      osfx("wanted_police_drones.star", cam_.eye, static_cast<f32>(stars));
     }
     g.last_heat = heat;
     g.last_stars = stars;
@@ -460,19 +465,19 @@ void Game::gaps_update(f32 dt) {
   }
   for (u32 i = 0; i < 5; ++i) {
     const std::string id = "pd-" + std::to_string(i);
-    const PoliceDrone& d = police_.pdrones[i];
-    if (d.active && details_.pd_crit[i].armed()) {
+    const PoliceDrone& d = pdrones_[i];
+    if (d.active && pd_crit_[i].armed()) {
       const Vec3 at = d.pos + Vec3{-0.12f * std::cos(d.yaw), -0.12f * std::sin(d.yaw), 0.18f};  // offset (-.12, 0, .18), scale .68
       if (!g.smoke.active(id)) g.smoke.start(id, at, 0.68f, 30, now);
       else g.smoke.move(id, at);
     } else g.smoke.stop(id);
   }
-  if (vehicle_.drone_out && details_.drone_crit.armed()) {
+  if (drone_out_ && drone_crit_.armed()) {
     const Vec3 at = matrix_of(drone_actor_).translation() + Vec3{0, 0, 0.4f};  // the generic profile (0, 0, .4) scale .7
     if (!g.smoke.active("drone")) g.smoke.start("drone", at, 0.7f, 30, now);
     else g.smoke.move("drone", at);
   } else g.smoke.stop("drone");
-  if (g.jet_burning && vehicle_.jet_placed) {
+  if (g.jet_burning && jet_placed_) {
     const Mat4 m = matrix_of(jet_actor_);
     g.smoke.move("jet", (m * Mat4::translate({0, -6, 0.4f})).translation());  // offset (0, -6, .4) scale 2.2
     if (!g.smoke.active("jet")) {
@@ -481,7 +486,7 @@ void Game::gaps_update(f32 dt) {
       const Vec3 at = m.translation();
       osfx("jet_mode.boom", at);  // destroyAirframe -> boom()
       explosion(at, 14, 180, false);  // blast radius 14 m, 180 (also the army's and the look's)
-      vehicle_.jet_hp = kJetHpMax;
+      jet_hp_ = kJetHpMax;
       jet_.thrust_scale = 1;
       if (mode_ == Mode::jet) {
         // finish() 6 m ahead on foot, then __arondightPlayerDamageModel.damage(1000, "jet-destroyed")
@@ -496,7 +501,7 @@ void Game::gaps_update(f32 dt) {
         mode_ = Mode::foot;
         world_->damage(soldier_, 1000, 0, false, at);
       }
-      vehicle_.jet_placed = false;
+      jet_placed_ = false;
       world_->set_alive(jet_actor_, false);
     }
   }
@@ -508,7 +513,7 @@ void Game::gaps_update(f32 dt) {
   if (life_) {
     for (const kern::game::ShotEvent& s : world_->shots()) {
       if (s.shooter != soldier_) continue;
-      const f32 dmg = weapons_.foot_weapon == weapons::Id::smg ? 5.0f : weapons_.foot_weapon == weapons::Id::glock ? 9.0f : weapons_.foot_weapon == weapons::Id::sniper ? 70.0f : 8.0f;
+      const f32 dmg = foot_weapon_ == weapons::Id::smg ? 5.0f : foot_weapon_ == weapons::Id::glock ? 9.0f : foot_weapon_ == weapons::Id::sniper ? 70.0f : 8.0f;
       for (WorldLife::TowTruck& tt : life_->trucks) {
         if (!tt.body.valid() || !world_->physics().body_valid(tt.body)) continue;
         if (kern::length(world_->physics().pose(tt.body).position - s.to) < 2.3f) { tt.hp -= dmg; break; }
@@ -525,7 +530,7 @@ void Game::gaps_update(f32 dt) {
     if (now - g.last_organic < gaps::organic_min_gap_s()) continue;
     g.last_organic = now;
     ++g.organic_plays;
-    world_->play_sound(combat_sfx(combat_audio::Kind::crack), view_.cam.eye, gaps::organic_gain() * clampf(ui_.settings.get(Opt::audio_fx) / 100, 0, 1), gaps::organic_rate(gaps::Organic::person), false);
+    world_->play_sound(combat_sfx(combat_audio::Kind::crack), cam_.eye, gaps::organic_gain() * clampf(ui_.settings.get(Opt::audio_fx) / 100, 0, 1), gaps::organic_rate(gaps::Organic::person), false);
     osfx("world-kill", p.pos, 0);  // kind person
     // and the voice: a dying cry at the body, its pitch the person's (low, middle, high voices by
     // the seed, a little random on top), now and then a long one
@@ -545,7 +550,7 @@ void Game::gaps_update(f32 dt) {
   }
   g.death_scan = now;
   // ---- flight-fire impacts (impact_explosion_overlay.mjs): the drone MG's rounds that hit something
-  if (mode_ == Mode::drone && vehicle_.drone_out) {
+  if (mode_ == Mode::drone && drone_out_) {
     const Vec3 nose = matrix_of(drone_actor_).translation();
     for (const kern::game::ShotEvent& s : world_->shots()) {
       if (!s.impact || kern::length(s.from - nose) > 1.5f) continue;
@@ -559,20 +564,20 @@ void Game::gaps_update(f32 dt) {
 void Game::gaps_jet_damage(f32 amount) {
   // jet_mode.mjs damageAirframe: HP 400; thrust .35 + hp / 200 * .65 (.35 .. 1); at 15 % it burns
   // for 12 s, at 0 it breaks up at once.
-  if (!(amount > 0) || !vehicle_.jet_placed) return;
+  if (!(amount > 0) || !jet_placed_) return;
   if (amount > 8 && mode_ == Mode::jet) osfx("jet_mode.knock", matrix_of(jet_actor_).translation());  // damageAirframe: sfx("bounce", .3, .6)
   GapsState& g = *gaps_;
   const f32 now = world_->sim_time();
-  vehicle_.jet_hp = std::fmax(0.0f, std::fmin(vehicle_.jet_hp, kJetHpMax) - amount);
-  jet_.thrust_scale = clampf(0.35f + vehicle_.jet_hp / (kJetHpMax * 0.5f) * 0.65f, 0.35f, 1);
+  jet_hp_ = std::fmax(0.0f, std::fmin(jet_hp_, kJetHpMax) - amount);
+  jet_.thrust_scale = clampf(0.35f + jet_hp_ / (kJetHpMax * 0.5f) * 0.65f, 0.35f, 1);
   look_.shake.trauma = std::fmin(1.0f, look_.shake.trauma + std::fmin(0.6f, amount / 120));  // addTrauma
-  if (vehicle_.jet_hp <= kJetHpMax * 0.15f && vehicle_.jet_hp > 0 && !g.jet_burning) {
+  if (jet_hp_ <= kJetHpMax * 0.15f && jet_hp_ > 0 && !g.jet_burning) {
     g.jet_burning = true;
     g.smoke.start("jet", matrix_of(jet_actor_).translation(), 2.2f, kJetBurnS, now);
     toast_ = "JET BRENNT";
     toast_age_ = 0;
   }
-  if (vehicle_.jet_hp <= 0) {
+  if (jet_hp_ <= 0) {
     g.jet_burning = true;
     g.smoke.accelerate("jet", now, now);  // goes off on the next frame (at least 0.18 s)
     g.smoke.stop("jet");
@@ -583,22 +588,22 @@ void Game::gaps_jet_damage(f32 amount) {
 // sound
 
 void Game::gaps_sirens(f32 dt) {
-  if (!gaps_ || !audio_.mixer.ready()) return;
+  if (!gaps_ || !mixer_.ready()) return;
   GapsState& g = *gaps_;
-  const u32 rate = audio_.mixer.sample_rate();
+  const u32 rate = mixer_.sample_rate();
   if (!g.horn) {
     // voice(ctx, "car"): sawtooth 0 ct .5, square +7 ct .22, triangle -5 ct .45 -> peaking 1650 Hz Q .9 +7 dB -> low-pass 4200
-    g.horn = audio_.mixer.adopt_clip(siren_loop(rate, gaps::horn_low(), {{Osc::saw, 0, 0.5f}, {Osc::square, 7, 0.22f}, {Osc::triangle, -5, 0.45f}}, true, 5200), 1, "spawncity:horn", true);
-    g.horn_dull = audio_.mixer.adopt_clip(siren_loop(rate, gaps::horn_low(), {{Osc::saw, 0, 0.5f}, {Osc::square, 7, 0.22f}, {Osc::triangle, -5, 0.45f}}, true, 900), 1, "spawncity:horn-far", true);
+    g.horn = mixer_.adopt_clip(siren_loop(rate, gaps::horn_low(), {{Osc::saw, 0, 0.5f}, {Osc::square, 7, 0.22f}, {Osc::triangle, -5, 0.45f}}, true, 5200), 1, "spawncity:horn", true);
+    g.horn_dull = mixer_.adopt_clip(siren_loop(rate, gaps::horn_low(), {{Osc::saw, 0, 0.5f}, {Osc::square, 7, 0.22f}, {Osc::triangle, -5, 0.45f}}, true, 900), 1, "spawncity:horn-far", true);
     // voice(ctx, "drone"): sine .8 + triangle +4 ct .35 -> low-pass 4200
-    g.whoop = audio_.mixer.adopt_clip(siren_loop(rate, gaps::whoop_base(), {{Osc::sine, 0, 0.8f}, {Osc::triangle, 4, 0.35f}}, false, 5200), 1, "spawncity:whoop", true);
-    g.whoop_dull = audio_.mixer.adopt_clip(siren_loop(rate, gaps::whoop_base(), {{Osc::sine, 0, 0.8f}, {Osc::triangle, 4, 0.35f}}, false, 900), 1, "spawncity:whoop-far", true);
+    g.whoop = mixer_.adopt_clip(siren_loop(rate, gaps::whoop_base(), {{Osc::sine, 0, 0.8f}, {Osc::triangle, 4, 0.35f}}, false, 5200), 1, "spawncity:whoop", true);
+    g.whoop_dull = mixer_.adopt_clip(siren_loop(rate, gaps::whoop_base(), {{Osc::sine, 0, 0.8f}, {Osc::triangle, 4, 0.35f}}, false, 900), 1, "spawncity:whoop-far", true);
   }
   g.clock += dt;
-  const Vec3 ear = view_.cam.eye;
+  const Vec3 ear = cam_.eye;
   // the nearest cruiser on a call (lights on: not wrecked, abandoned, leaving or driven by the player)
   f32 dc = -1;
-  for (const PoliceUnit& u : police_.units) {
+  for (const PoliceUnit& u : units_) {
     if (u.car < 0 || u.state == PoliceUnit::State::abandoned || u.state == PoliceUnit::State::wreck || u.state == PoliceUnit::State::leave) continue;
     if (mode_ == Mode::car && car_index_ == u.car) continue;
     const f32 d = kern::length(matrix_of(cars_[u.car].actor).translation() + Vec3{0, 0, 0.9f} - ear);
@@ -606,7 +611,7 @@ void Game::gaps_sirens(f32 dt) {
   }
   // the nearest police drone (active, not retreating, not knocked out by the EMP)
   f32 dd = -1;
-  for (const PoliceDrone& d : police_.pdrones) {
+  for (const PoliceDrone& d : pdrones_) {
     if (!d.active || d.retreating || d.emp) continue;
     const f32 l = kern::length(d.pos - ear);
     if (dd < 0 || l < dd) dd = l;
@@ -623,17 +628,17 @@ void Game::gaps_sirens(f32 dt) {
     const f32 pitch = pitch_hz / f0 * v.doppler;
     (void)pitch_tau;
     for (auto [clip, voice, vol] : {std::tuple<kern::audio::ClipId, kern::audio::VoiceId*, f32>{bright, &vb, level * w}, {dull, &vd, level * (1 - w)}}) {
-      if (!on) { if (*voice) { audio_.mixer.stop(*voice, 0.1f); *voice = 0; } continue; }
-      if (!*voice || !audio_.mixer.playing(*voice)) {
+      if (!on) { if (*voice) { mixer_.stop(*voice, 0.1f); *voice = 0; } continue; }
+      if (!*voice || !mixer_.playing(*voice)) {
         kern::audio::PlayParams p;
         p.loop = true;
         p.volume = vol;
         p.pitch = pitch;
         p.bus = kern::audio::Bus::sfx;
-        *voice = audio_.mixer.play(clip, p);
+        *voice = mixer_.play(clip, p);
       } else {
-        audio_.mixer.set_volume(*voice, vol);
-        audio_.mixer.set_pitch(*voice, clampf(pitch, 0.05f, 8));
+        mixer_.set_volume(*voice, vol);
+        mixer_.set_pitch(*voice, clampf(pitch, 0.05f, 8));
       }
     }
   };
@@ -670,16 +675,16 @@ std::vector<f32> jet_roar_pcm(u32 rate, f32 cutoff) {
 
 void Game::gaps_jet_audio(f32 dt) {
   (void)dt;
-  if (!gaps_ || !audio_.mixer.ready() || !world_) return;
+  if (!gaps_ || !mixer_.ready() || !world_) return;
   GapsState& g = *gaps_;
   if (!g.jet_roar) {
-    const u32 rate = audio_.mixer.sample_rate();
-    g.jet_roar = audio_.mixer.adopt_clip(jet_roar_pcm(rate, 9000), 1, "spawncity:jetroar", true);
-    g.jet_roar_dull = audio_.mixer.adopt_clip(jet_roar_pcm(rate, 900), 1, "spawncity:jetroar-far", true);
+    const u32 rate = mixer_.sample_rate();
+    g.jet_roar = mixer_.adopt_clip(jet_roar_pcm(rate, 9000), 1, "spawncity:jetroar", true);
+    g.jet_roar_dull = mixer_.adopt_clip(jet_roar_pcm(rate, 900), 1, "spawncity:jetroar-far", true);
   }
   const f32 now = world_->sim_time();
   for (GapsState::JetVoice& v : g.jet_voices) v.alive = false;
-  const Vec3 L = mode_ == Mode::foot ? player_position() : view_.cam.eye;  // listenerPos
+  const Vec3 L = mode_ == Mode::foot ? player_position() : cam_.eye;  // listenerPos
   const bool silent = ui_.paused || !ui_.settings.on(Opt::audio_on);
   for (const FighterJet& j : combat_.jets) {
     GapsState::JetVoice* v = nullptr;
@@ -703,25 +708,25 @@ void Game::gaps_jet_audio(f32 dt) {
     const f32 cutoff = std::fmin(9000.0f, 900 + 60000 / d), w = clampf((cutoff - 900) / (9000 - 900), 0, 1);
     const f32 rate_k = doppler * (0.92f + v->pitch * 0.16f);
     for (auto [clip, voice, vol] : {std::tuple<kern::audio::ClipId, kern::audio::VoiceId*, f32>{g.jet_roar, &v->bright, gain * w}, {g.jet_roar_dull, &v->dull, gain * (1 - w)}}) {
-      if (!*voice || !audio_.mixer.playing(*voice)) {
+      if (!*voice || !mixer_.playing(*voice)) {
         kern::audio::PlayParams pp;
         pp.loop = true;
         pp.volume = vol;
         pp.pitch = rate_k;
         pp.bus = kern::audio::Bus::sfx;
         pp.start = v->pitch * 3;  // src.start(0, random * 3)
-        *voice = audio_.mixer.play(clip, pp);
+        *voice = mixer_.play(clip, pp);
       } else {
-        audio_.mixer.set_volume(*voice, vol, 0.05f);
-        audio_.mixer.set_pitch(*voice, clampf(rate_k, 0.05f, 8));
+        mixer_.set_volume(*voice, vol, 0.05f);
+        mixer_.set_pitch(*voice, clampf(rate_k, 0.05f, 8));
       }
     }
   }
   // stopJetVoice: fade 0.3 s when the jet is gone
   for (GapsState::JetVoice& v : g.jet_voices)
     if (!v.alive) {
-      if (v.bright) audio_.mixer.stop(v.bright, 0.3f);
-      if (v.dull) audio_.mixer.stop(v.dull, 0.3f);
+      if (v.bright) mixer_.stop(v.bright, 0.3f);
+      if (v.dull) mixer_.stop(v.dull, 0.3f);
     }
   std::erase_if(g.jet_voices, [](const GapsState::JetVoice& v) { return !v.alive; });
 }
@@ -736,7 +741,7 @@ void Game::gaps_camera(kern::Camera& c) {
   const f32 floor = city_.ground_height(c.eye.x, c.eye.y) + 0.12f;
   if (c.eye.z < floor) { c.target.z += floor - c.eye.z; c.eye.z = floor; collided = true; }
   gaps_->camera_lifted = false;
-  if (mode_ == Mode::car && car_index_ >= 0 && !view_.car_cockpit) {
+  if (mode_ == Mode::car && car_index_ >= 0 && !car_cockpit_) {
     // a wall right behind the car pulled the camera in: rise over the roof and look down at the car
     const Vec3 a = matrix_of(cars_[car_index_].actor).translation();
     const f32 h = std::hypot(c.eye.x - a.x, c.eye.y - a.y), min_h = 3.2f;
@@ -757,11 +762,11 @@ void Game::gaps_camera(kern::Camera& c) {
 
 kern::Mat4 Game::gaps_drone_matrix() {
   const Mat4 raw = matrix_of(drone_actor_);
-  if (!gaps_ || mode_ != Mode::drone || view_.drone_cam == 0) { if (gaps_) gaps_->drone_visual.invalidate(); return raw; }
+  if (!gaps_ || mode_ != Mode::drone || drone_cam_ == 0) { if (gaps_) gaps_->drone_visual.invalidate(); return raw; }
   // the external cameras draw the airframe on the camera anchor with a damped offset and rotation
   Vec3 p;
   Quat q;
-  gaps_->drone_visual.update(raw.translation(), state_of(drone_actor_).rotation, view_.cam_anchor, view_.drone_cam == 2 ? 2 : 1, gaps_->frame_dt, p, q);
+  gaps_->drone_visual.update(raw.translation(), state_of(drone_actor_).rotation, cam_anchor_, drone_cam_ == 2 ? 2 : 1, gaps_->frame_dt, p, q);
   return Mat4::trs(p, q, {1, 1, 1});
 }
 
@@ -770,7 +775,7 @@ void Game::gaps_draw() {
   gaps_barricades_draw();  // zombie barricades (game_barricades.cpp)
   GapsState& g = *gaps_;
   const f32 now = world_ ? world_->sim_time() : 0;
-  const Vec3 f = kern::normalize(view_.cam.target - view_.cam.eye, {1, 0, 0});
+  const Vec3 f = kern::normalize(cam_.target - cam_.eye, {1, 0, 0});
   Vec3 right = kern::normalize(kern::cross(f, Vec3{0, 0, 1}), {1, 0, 0});
   const Vec3 up = kern::cross(right, f);
   for (GapsState::Part* p : {&g.disc, &g.ember}) { p->transforms.clear(); p->tints.clear(); }
@@ -817,7 +822,7 @@ void Game::gaps_hud(std::string& s) {
   f32 next = 1e9f;
   if (wanted::stars() > 0)
     for (u32 i = 0; i < 5; ++i)
-      if (g.pd_due[i] > now && !police_.pdrones[i].active) { ++inbound; next = std::fmin(next, g.pd_due[i] - now); }
+      if (g.pd_due[i] > now && !pdrones_[i].active) { ++inbound; next = std::fmin(next, g.pd_due[i] - now); }
   std::snprintf(b, sizeof b, ",\"gaps\":{\"inbound\":%u,\"inboundS\":%.1f,\"sirenCar\":%.4f,\"sirenDrone\":%.4f,\"smoke\":%zu,\"puffs\":%u,\"organic\":%u,"
                 "\"repair\":%s,\"spawnAllowed\":%u,\"spawnDenied\":%u,\"overlapDenied\":%u,\"camLifted\":%s,\"jetBurning\":%s,\"lamps\":%zu,\"lampsBroken\":%zu,\"lampsFallen\":%zu,\"bursts\":[",
                 inbound, inbound ? next : 0.0f, g.car_level, g.drone_level, g.smoke.effects(), g.smoke.live_puffs(), g.organic_plays, gaps_repair_offer() ? "true" : "false", g.spawn_allowed, g.spawn_denied,
@@ -918,7 +923,7 @@ bool Game::gaps_command(const std::string& cmd, std::string& out) {
   }
   if (cmd == "jet dive") {
     // Tests: the flown jet 40 m up, nose and speed straight down into the ground (crash damage)
-    if (!vehicle_.jet_placed || mode_ != Mode::jet) { out = "not in the jet"; return true; }
+    if (!jet_placed_ || mode_ != Mode::jet) { out = "not in the jet"; return true; }
     const Vec3 p = matrix_of(jet_actor_).translation();
     const Vec3 rot{-80, 0, 0};
     world_->teleport(jet_actor_, {p.x, p.y, city_.ground_height(p.x, p.y) + 40}, &rot);
@@ -928,14 +933,14 @@ bool Game::gaps_command(const std::string& cmd, std::string& out) {
   }
   if (cmd == "jet hp") {
     char b[64];
-    std::snprintf(b, sizeof b, "jet %.0f placed %d mode %s", vehicle_.jet_hp, vehicle_.jet_placed ? 1 : 0, mode_name(mode_));
+    std::snprintf(b, sizeof b, "jet %.0f placed %d mode %s", jet_hp_, jet_placed_ ? 1 : 0, mode_name(mode_));
     out = b;
     return true;
   }
   if (cmd == "jetdamage" || starts("jetdamage ")) {
     gaps_jet_damage(cmd.size() > 10 ? static_cast<f32>(std::atof(cmd.c_str() + 10)) : 50);
     char b[64];
-    std::snprintf(b, sizeof b, "jet %.0f thrust %.2f", vehicle_.jet_hp, jet_.thrust_scale);
+    std::snprintf(b, sizeof b, "jet %.0f thrust %.2f", jet_hp_, jet_.thrust_scale);
     out = b;
     return true;
   }

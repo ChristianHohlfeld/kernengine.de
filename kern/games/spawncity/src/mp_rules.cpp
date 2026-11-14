@@ -14,7 +14,7 @@ f64 kSpawnProtectMs = 0, kRegenDelayMs = 0, kRegenTickMs = 0, kRespawnCooldownMs
 f32 kRegenHpPerS = 0, kRespawnRadiusMin = 0, kRespawnRadiusMax = 0, kVoiceRadius = 0, kPingRemoveM = 0;
 namespace {
 using kern::logic::Value;
-rules::Blueprint g_rules;
+rules::Blueprint g_rules{"Multiplayer"};
 std::vector<u32> g_palette;
 f32 num(const char* function, const std::vector<Value>& args) { return static_cast<f32>(g_rules.number(function, args)); }
 Vec2 pair(const char* function, const std::vector<Value>& args) {
@@ -97,28 +97,31 @@ PoseSample PoseTimeline::sample(f64 now) const {
   out.age_ms = now > latest.received ? now - latest.received : 0;
   out.stale = out.age_ms > kStaleHoldMs;
   const f64 target = now - offset_ - delay_;
-  const Snap* left = &snaps_[0];
-  const Snap* right = nullptr;
+  // the snapshots on both sides of the target time (their places in snaps_; no_right: none after it)
+  constexpr std::size_t no_right = static_cast<std::size_t>(-1);
+  std::size_t left_at = 0, right_at = no_right;
   for (std::size_t i = 1; i < snaps_.size(); ++i) {
-    if (snaps_[i].source >= target) { right = &snaps_[i]; break; }
-    left = &snaps_[i];
+    if (snaps_[i].source >= target) { right_at = i; break; }
+    left_at = i;
   }
-  if (right) {
-    const f64 span = std::max(0.001, right->source - left->source);
-    const f32 a = static_cast<f32>(clampd((target - left->source) / span, 0, 1));
+  if (right_at != no_right) {
+    const Snap& left = snaps_[left_at];
+    const Snap& right = snaps_[right_at];
+    const f64 span = std::max(0.001, right.source - left.source);
+    const f32 a = static_cast<f32>(clampd((target - left.source) / span, 0, 1));
     // Hermite through both snapshots with their velocities (Glenn Fiedler, "Snapshot
     // Interpolation": the curve passes through both points and matches their velocities - no
     // kink at the samples); a jump between them (a teleport) is not a flight: straight then
     const f32 T = static_cast<f32>(span / 1000);
-    const Vec3 d = right->p - left->p;
-    const f32 flown = (kern::length(left->v) + kern::length(right->v)) * 0.5f * T;
+    const Vec3 d = right.p - left.p;
+    const f32 flown = (kern::length(left.v) + kern::length(right.v)) * 0.5f * T;
     if (T < 0.6f && kern::length(d) <= flown * 2.5f + 0.5f) {
       const f32 a2 = a * a, a3 = a2 * a;
-      out.p = left->p * (2 * a3 - 3 * a2 + 1) + left->v * ((a3 - 2 * a2 + a) * T) + right->p * (-2 * a3 + 3 * a2) + right->v * ((a3 - a2) * T);
+      out.p = left.p * (2 * a3 - 3 * a2 + 1) + left.v * ((a3 - 2 * a2 + a) * T) + right.p * (-2 * a3 + 3 * a2) + right.v * ((a3 - a2) * T);
     } else {
-      out.p = left->p + d * a;
+      out.p = left.p + d * a;
     }
-    out.q = nlerp_slerp(left->q, right->q, a);
+    out.q = nlerp_slerp(left.q, right.q, a);
     return out;
   }
   const f64 ex = clampd(target - latest.source, 0, kMaxExtrapolationMs);
@@ -179,15 +182,25 @@ u32 color_of(const std::string& id) {
 // ---- combat -------------------------------------------------------------------------------------
 
 std::string weapon_label(Weapon w) {
-  std::vector<Value> r;
-  return g_rules.call("WeaponLabel", {rules::of_enum(w)}, r) && !r.empty() ? r[0].as_text() : std::string();
+  std::string out;
+  g_rules.call("WeaponLabel", std::tie(out), w);
+  return out;
 }
 std::string zone_name(Zone z) {
-  std::vector<Value> r;
-  return g_rules.call("ZoneName", {rules::of_enum(z)}, r) && !r.empty() ? r[0].as_text() : std::string();
+  std::string out;
+  g_rules.call("ZoneName", std::tie(out), z);
+  return out;
 }
-f32 round_damage(Weapon w, Zone z) { return num("RoundDamage", {rules::of_enum(w), rules::of_enum(z)}); }
-f32 blast_damage(f32 damage) { return num("BlastDamage", {rules::number(damage)}); }
+f32 round_damage(Weapon w, Zone z) {
+  f64 damage = 0;
+  g_rules.call("RoundDamage", std::tie(damage), w, z);
+  return static_cast<f32>(damage);
+}
+f32 blast_damage(f32 damage) {
+  f64 dealt = 0;
+  g_rules.call("BlastDamage", std::tie(dealt), rules::decimal(damage));
+  return static_cast<f32>(dealt);
+}
 
 HitVerdict judge_hit(bool target_known, bool shooter_known, bool self_damage, bool friendly_fire, f64 now, f64 protected_until, f32 hp) {
   std::vector<Value> r;
@@ -199,7 +212,11 @@ HitVerdict judge_hit(bool target_known, bool shooter_known, bool self_damage, bo
   return static_cast<HitVerdict>(r[0].i);
 }
 
-f32 regen(f32 hp, f64 now, f64 last_hurt, f32 dt) { return num("Regen", {rules::number(hp), rules::number(now), rules::number(last_hurt), rules::number(dt)}); }
+f32 regen(f32 hp, f64 now, f64 last_hurt, f32 dt) {
+  f64 healed = 0;
+  g_rules.call("Regen", std::tie(healed), rules::decimal(hp), now, last_hurt, rules::decimal(dt));
+  return static_cast<f32>(healed);
+}
 
 Vec2 respawn_offset(Rng& rng) {
   const f32 r1 = rng.unit(), r2 = rng.unit();  // (how far out, then which way)
@@ -299,22 +316,27 @@ bool create_ballot(Ballot& b, u32 id, u8 key, bool value, u8 host, std::vector<u
   return r[0].b;
 }
 
-Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now, Ballot::Status* did) {
+Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now, Ballot::Status& did) {
   roster(current);
   std::vector<Value> r;
-  if (did) *did = b.status;
+  did = b.status;
   if (g_rules.call("CastVote", {to_value(b), Value::integer(voter), Value::boolean(approve), ints(current), rules::number(now)}, r) && r.size() >= 2) {
     take(r[0], b);
-    if (did) *did = static_cast<Ballot::Status>(r[1].i);
+    did = static_cast<Ballot::Status>(r[1].i);
   }
   return b.status;
+}
+Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now) {
+  Ballot::Status did = b.status;
+  return cast_vote(b, voter, approve, std::move(current), now, did);
 }
 
 bool ballot_stale(const Ballot& b, const std::vector<u8>& current, f64 now) { return g_rules.flag("Stale", {to_value(b), ints(current), rules::number(now)}); }
 
 std::string ballot_name(Ballot::Status s) {
-  std::vector<Value> r;
-  return g_rules.call("BallotName", {rules::of_enum(s)}, r) && !r.empty() ? r[0].as_text() : std::string();
+  std::string out;
+  g_rules.call("BallotName", std::tie(out), s);
+  return out;
 }
 
 // ---- voice ----------------------------------------------------------------------------------------
@@ -361,7 +383,7 @@ bool VoiceStream::push(u32 seq, const std::vector<u8>& mulaw, f32 gain) {
   return true;
 }
 
-bool VoiceStream::render(f32* out, u32 frames, u32 rate) {
+bool VoiceStream::render(std::vector<f32>& out, u32 frames, u32 rate) {
   if (queue_.empty() || rate == 0) return false;
   const f64 step = static_cast<f64>(kVoiceRate) / rate;
   for (u32 i = 0; i < frames && !queue_.empty(); ++i) {
@@ -379,8 +401,9 @@ bool VoiceStream::render(f32* out, u32 frames, u32 rate) {
   return !queue_.empty();
 }
 
-void VoiceCapture::push(const f32* samples, u32 count, u32 rate) {
+void VoiceCapture::push(kern::Span<const f32> samples, u32 rate) {
   if (!rate) return;
+  const u32 count = static_cast<u32>(samples.size);
   const f64 stride = static_cast<f64>(rate) / kVoiceRate;
   f64 i = phase_;
   for (; i < count; i += stride) {
@@ -488,21 +511,18 @@ f32 route_left(const std::vector<Vec2>& pts, Vec2 pos) {
 }
 
 std::string bearing_arrow(f32 b) {
-  std::vector<Value> r;
-  return g_rules.call("BearingArrow", {rules::number(b)}, r) && !r.empty() ? r[0].as_text() : std::string();
+  std::string out;
+  g_rules.call("BearingArrow", std::tie(out), rules::decimal(b));
+  return out;
 }
 
 MapEdge locate_map_peer(Vec2 p, f32 w, f32 h, f32 ix, f32 it, f32 ib) {
   MapEdge out;
   if (!(std::isfinite(p.x) && std::isfinite(p.y))) return out;
-  std::vector<Value> r;
-  if (!g_rules.call("LocateMapPeer", {rules::number(p.x), rules::number(p.y), rules::number(w), rules::number(h), rules::number(ix), rules::number(it), rules::number(ib)}, r) || r.size() < 6)
-    return out;
-  out.valid = r[0].b;
-  out.p = {static_cast<f32>(r[1].as_number()), static_cast<f32>(r[2].as_number())};
-  out.offmap = r[3].b;
-  out.rotation_deg = static_cast<f32>(r[4].as_number());
-  out.arrow = r[5].as_text();
+  f64 x = 0, y = 0;
+  g_rules.call("LocateMapPeer", std::tie(out.valid, x, y, out.offmap, out.rotation_deg, out.arrow), rules::decimal(p.x), rules::decimal(p.y), rules::decimal(w), rules::decimal(h), rules::decimal(ix),
+               rules::decimal(it), rules::decimal(ib));
+  out.p = {static_cast<f32>(x), static_cast<f32>(y)};
   return out;
 }
 

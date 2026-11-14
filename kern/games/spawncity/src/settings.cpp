@@ -13,7 +13,7 @@ namespace sc {
 
 namespace {
 using kern::logic::Value;
-rules::Blueprint g_rules;
+rules::Blueprint g_rules{"Settings"};
 /// The table as the Blueprint has it: a row's texts (the specs point into them), the specs, and
 /// each row as the Blueprint's value (what Snap and InSection take).
 struct Row { std::string key, section, label, help; };
@@ -23,11 +23,11 @@ std::vector<Value> g_rows;
 const OptSpec kNone = {"", "", "", "", 0, 0, 0, 0, false, false};
 constexpr u32 kCount = static_cast<u32>(Opt::count);
 
-void escape_into(std::string& out, const char* s) {
-  for (; *s; ++s) {
-    if (*s == '"' || *s == '\\') { out += '\\'; out += *s; }
-    else if (static_cast<unsigned char>(*s) < 0x20) out += ' ';
-    else out += *s;
+void escape_into(std::string& out, std::string_view s) {
+  for (char c : s) {
+    if (c == '"' || c == '\\') { out += '\\'; out += c; }
+    else if (static_cast<unsigned char>(c) < 0x20) out += ' ';
+    else out += c;
   }
 }
 std::string num(f32 v) {

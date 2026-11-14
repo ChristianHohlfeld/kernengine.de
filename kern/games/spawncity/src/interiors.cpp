@@ -82,66 +82,62 @@ u32 hash_key(u32 seed, u32 salt) {
 }
 f32 h01(u32 seed, u32 salt) { return static_cast<f32>(hash_key(seed, salt) >> 8) / 16777216.0f; }
 
-// ---- geometry sinks
-struct Sink {
-  kern::MeshData* mesh;
-  std::vector<Vec3>* pts;
-  std::vector<u32>* idx;
-  void vtri(Vec3 a, Vec3 b, Vec3 c, Vec3 col) {
-    const Vec3 n = kern::normalize(kern::cross(b - a, c - a), {0, 0, 1});
-    for (Vec3 p : {a, b, c}) mesh->push(p, n, col, {p.x * 0.5f + p.z * 0.3f, p.y * 0.5f});
+// ---- geometry sinks: the triangles of a plan - drawn (its mesh) and for collision (its points
+// and indices)
+void vtri(Interiors::Plan& P, Vec3 a, Vec3 b, Vec3 c, Vec3 col) {
+  const Vec3 n = kern::normalize(kern::cross(b - a, c - a), {0, 0, 1});
+  for (Vec3 p : {a, b, c}) P.mesh.push(p, n, col, {p.x * 0.5f + p.z * 0.3f, p.y * 0.5f});
+}
+void vquad(Interiors::Plan& P, Vec3 a, Vec3 b, Vec3 c, Vec3 d, Vec3 col) { vtri(P, a, b, c, col); vtri(P, a, c, d, col); }
+void ctri(Interiors::Plan& P, Vec3 a, Vec3 b, Vec3 c) {
+  if (kern::length(kern::cross(b - a, c - a)) < 1e-4f) return;  // Box3D rejects degenerate triangles
+  const u32 base = static_cast<u32>(P.points.size());
+  P.points.insert(P.points.end(), {a, b, c});
+  P.indices.insert(P.indices.end(), {base, base + 1, base + 2});
+}
+void cquad(Interiors::Plan& P, Vec3 a, Vec3 b, Vec3 c, Vec3 d, bool two_sided) {
+  ctri(P, a, b, c); ctri(P, a, c, d);
+  if (two_sided) { ctri(P, a, c, b); ctri(P, a, d, c); }
+}
+// a vertical wall piece between two ground points
+void wall(Interiors::Plan& P, Vec2 p0, Vec2 p1, f32 z0, f32 z1, Vec3 col, bool visual, bool collide) {
+  if (z1 - z0 < 0.01f || std::hypot(p1.x - p0.x, p1.y - p0.y) < 0.01f) return;
+  const Vec3 a{p0.x, p0.y, z0}, b{p1.x, p1.y, z0}, c{p1.x, p1.y, z1}, d{p0.x, p0.y, z1};
+  if (visual) vquad(P, a, b, c, d, col);
+  if (collide) cquad(P, a, b, c, d, true);
+}
+// a horizontal polygon with holes
+void slab(Interiors::Plan& P, const std::vector<Vec2>& outer, const std::vector<std::vector<Vec2>>& holes, f32 z, Vec3 col, bool up, bool visual, bool collide) {
+  std::vector<f64> xy;
+  std::vector<u32> hs, tris;
+  for (Vec2 p : outer) xy.insert(xy.end(), {p.x, p.y});
+  for (const auto& h : holes) {
+    if (h.size() < 3) continue;
+    hs.push_back(static_cast<u32>(xy.size() / 2));
+    for (Vec2 p : h) xy.insert(xy.end(), {p.x, p.y});
   }
-  void vquad(Vec3 a, Vec3 b, Vec3 c, Vec3 d, Vec3 col) { vtri(a, b, c, col); vtri(a, c, d, col); }
-  void ctri(Vec3 a, Vec3 b, Vec3 c) {
-    if (kern::length(kern::cross(b - a, c - a)) < 1e-4f) return;  // Box3D rejects degenerate triangles
-    const u32 base = static_cast<u32>(pts->size());
-    pts->insert(pts->end(), {a, b, c});
-    idx->insert(idx->end(), {base, base + 1, base + 2});
+  if (xy.size() < 6) return;
+  kern::Earcut ec;
+  ec.triangulate(xy.data(), static_cast<u32>(xy.size() / 2), hs.data(), static_cast<u32>(hs.size()), tris);
+  for (std::size_t i = 0; i + 2 < tris.size(); i += 3) {
+    Vec3 p[3];
+    for (int k = 0; k < 3; ++k) p[k] = {static_cast<f32>(xy[tris[i + k] * 2]), static_cast<f32>(xy[tris[i + k] * 2 + 1]), z};
+    if ((kern::cross(p[1] - p[0], p[2] - p[0]).z < 0) == up) std::swap(p[1], p[2]);
+    if (visual) vtri(P, p[0], p[1], p[2], col);
+    if (collide) ctri(P, p[0], p[1], p[2]);
   }
-  void cquad(Vec3 a, Vec3 b, Vec3 c, Vec3 d, bool two_sided) {
-    ctri(a, b, c); ctri(a, c, d);
-    if (two_sided) { ctri(a, c, b); ctri(a, d, c); }
+}
+void box(Interiors::Plan& P, Vec3 c, Vec3 size, f32 yaw, Vec3 col, bool collide) {
+  const Vec3 h = size * 0.5f;
+  const Quat q = yaw_quat(yaw);
+  Vec3 v[8];
+  for (int i = 0; i < 8; ++i) v[i] = c + q.rotate({i & 1 ? h.x : -h.x, i & 2 ? h.y : -h.y, i & 4 ? h.z : -h.z});
+  const int f[6][4] = {{4, 5, 7, 6}, {0, 2, 3, 1}, {0, 1, 5, 4}, {2, 6, 7, 3}, {1, 3, 7, 5}, {0, 4, 6, 2}};
+  for (const auto& q4 : f) {
+    vquad(P, v[q4[0]], v[q4[1]], v[q4[2]], v[q4[3]], col);
+    if (collide && q4[0] != 0) cquad(P, v[q4[0]], v[q4[1]], v[q4[2]], v[q4[3]], false);
   }
-  // a vertical wall piece between two ground points
-  void wall(Vec2 p0, Vec2 p1, f32 z0, f32 z1, Vec3 col, bool visual, bool collide) {
-    if (z1 - z0 < 0.01f || std::hypot(p1.x - p0.x, p1.y - p0.y) < 0.01f) return;
-    const Vec3 a{p0.x, p0.y, z0}, b{p1.x, p1.y, z0}, c{p1.x, p1.y, z1}, d{p0.x, p0.y, z1};
-    if (visual) vquad(a, b, c, d, col);
-    if (collide) cquad(a, b, c, d, true);
-  }
-  // a horizontal polygon with holes
-  void slab(const std::vector<Vec2>& outer, const std::vector<std::vector<Vec2>>& holes, f32 z, Vec3 col, bool up, bool visual, bool collide) {
-    std::vector<f64> xy;
-    std::vector<u32> hs, tris;
-    for (Vec2 p : outer) xy.insert(xy.end(), {p.x, p.y});
-    for (const auto& h : holes) {
-      if (h.size() < 3) continue;
-      hs.push_back(static_cast<u32>(xy.size() / 2));
-      for (Vec2 p : h) xy.insert(xy.end(), {p.x, p.y});
-    }
-    if (xy.size() < 6) return;
-    kern::Earcut ec;
-    ec.triangulate(xy.data(), static_cast<u32>(xy.size() / 2), hs.data(), static_cast<u32>(hs.size()), tris);
-    for (std::size_t i = 0; i + 2 < tris.size(); i += 3) {
-      Vec3 p[3];
-      for (int k = 0; k < 3; ++k) p[k] = {static_cast<f32>(xy[tris[i + k] * 2]), static_cast<f32>(xy[tris[i + k] * 2 + 1]), z};
-      if ((kern::cross(p[1] - p[0], p[2] - p[0]).z < 0) == up) std::swap(p[1], p[2]);
-      if (visual) vtri(p[0], p[1], p[2], col);
-      if (collide) ctri(p[0], p[1], p[2]);
-    }
-  }
-  void box(Vec3 c, Vec3 size, f32 yaw, Vec3 col, bool collide) {
-    const Vec3 h = size * 0.5f;
-    const Quat q = yaw_quat(yaw);
-    Vec3 v[8];
-    for (int i = 0; i < 8; ++i) v[i] = c + q.rotate({i & 1 ? h.x : -h.x, i & 2 ? h.y : -h.y, i & 4 ? h.z : -h.z});
-    const int f[6][4] = {{4, 5, 7, 6}, {0, 2, 3, 1}, {0, 1, 5, 4}, {2, 6, 7, 3}, {1, 3, 7, 5}, {0, 4, 6, 2}};
-    for (const auto& q4 : f) {
-      vquad(v[q4[0]], v[q4[1]], v[q4[2]], v[q4[3]], col);
-      if (collide && q4[0] != 0) cquad(v[q4[0]], v[q4[1]], v[q4[2]], v[q4[3]], false);
-    }
-  }
-};
+}
 
 struct CoreFit { bool ok = false; Interiors::Core core; };
 
@@ -281,7 +277,6 @@ bool Interiors::build(const MapFeatures::Building& b, f32 door_ground, Plan& P) 
   P.roof_access = P.has_core && !capped && P.top - P.levels[F - 1] <= P.floor_h + 1.8f && P.area < 12000;
   const f32 ceil_top = capped ? P.levels[F - 1] + P.floor_h - kSlab : F == 1 && P.top - base0 > ground_storey + 0.5f ? P.base + ground_storey - kSlab : P.top - 0.3f;
   auto ceil_of = [&](u32 k) { return k + 1 < F ? P.levels[k + 1] - kSlab : ceil_top; };
-  Sink S{&P.mesh, &P.points, &P.indices};
   const Core& C = P.core;
   auto CP = [&](f32 u, f32 v) { return C.o + C.u * u + C.v * v; };
   auto rect = [&](f32 u0, f32 v0, f32 u1, f32 v1) {
@@ -307,8 +302,8 @@ bool Interiors::build(const MapFeatures::Building& b, f32 door_ground, Plan& P) 
       if (gap) { solid.push_back({0, std::fmax(0.0f, g0)}); solid.push_back({std::fmin(len, g1), len}); }
       else solid.push_back({0, len});
       // collision: from the footprint base to the roof
-      for (auto [s0, s1] : solid) S.wall(a + u * s0, a + u * s1, P.base - 0.5f, P.top, kWall, false, true);
-      if (gap) S.wall(a + u * g0, a + u * g1, base0 + kDoorH, P.top, kWall, false, true);
+      for (auto [s0, s1] : solid) wall(P, a + u * s0, a + u * s1, P.base - 0.5f, P.top, kWall, false, true);
+      if (gap) wall(P, a + u * g0, a + u * g1, base0 + kDoorH, P.top, kWall, false, true);
       if (ring == 0) continue;
       // inside: per storey, window openings exactly where the facade draws its windows (Kern's
       // facade: a column every 3 m from the ring's edge start, the pane over 22-78 % of it and 28-78 %
@@ -330,9 +325,9 @@ bool Interiors::build(const MapFeatures::Building& b, f32 door_ground, Plan& P) 
         // the full band below the sill and above the head, solid pieces between the windows
         f32 t = 0;
         for (auto [w0, w1] : wins) {
-          S.wall(a + u * t, a + u * w0, z0, z1, kWall, true, false);
-          S.wall(a + u * w0, a + u * w1, z0, sill, kWall, true, false);
-          S.wall(a + u * w0, a + u * w1, head, z1, kWall, true, false);
+          wall(P, a + u * t, a + u * w0, z0, z1, kWall, true, false);
+          wall(P, a + u * w0, a + u * w1, z0, sill, kWall, true, false);
+          wall(P, a + u * w0, a + u * w1, head, z1, kWall, true, false);
           // the pane (building_interiors.mjs glass: clear, slightly tinted, one transparent mesh),
           // halfway between the inner face and the facade
           const Vec2 g0 = a + u * w0 + Vec2{u.y, -u.x} * (kWallIn * 0.5f), g1 = a + u * w1 + Vec2{u.y, -u.x} * (kWallIn * 0.5f);
@@ -343,13 +338,13 @@ bool Interiors::build(const MapFeatures::Building& b, f32 door_ground, Plan& P) 
         }
         if (k == 0 && gap) {
           // the door opening in the lobby wall
-          if (t < g0) S.wall(a + u * t, a + u * g0, z0, z1, kWall, true, false);
-          S.wall(a + u * g0, a + u * g1, z0 + kDoorH, z1, kWall, true, false);
+          if (t < g0) wall(P, a + u * t, a + u * g0, z0, z1, kWall, true, false);
+          wall(P, a + u * g0, a + u * g1, z0 + kDoorH, z1, kWall, true, false);
           t = std::fmax(t, g1);
         }
-        S.wall(a + u * t, a + u * len, z0, z1, kWall, true, false);
-        S.wall(a, bb, z1, zn, kWall, true, false);  // slab edge band
-        S.wall(a, bb, z0, z0 + 0.1f, kTrim, true, false);  // skirting
+        wall(P, a + u * t, a + u * len, z0, z1, kWall, true, false);
+        wall(P, a, bb, z1, zn, kWall, true, false);  // slab edge band
+        wall(P, a, bb, z0, z0 + 0.1f, kTrim, true, false);  // skirting
       }
     }
   }
@@ -357,17 +352,17 @@ bool Interiors::build(const MapFeatures::Building& b, f32 door_ground, Plan& P) 
   for (std::size_t h = 0; h < P.holes.size(); ++h)
     for (int ring = 0; ring < 2; ++ring) {
       const std::vector<Vec2>& R = ring == 0 ? P.holes[h] : P.inner_holes[h];
-      for (std::size_t i = 0; i < R.size(); ++i) S.wall(R[i], R[(i + 1) % R.size()], ring ? base0 : P.base - 0.5f, ring ? ceil_top : P.top, kWall, ring == 1, true);
+      for (std::size_t i = 0; i < R.size(); ++i) wall(P, R[i], R[(i + 1) % R.size()], ring ? base0 : P.base - 0.5f, ring ? ceil_top : P.top, kWall, ring == 1, true);
     }
   // door reveals (walls of the opening between the two rings), lintel, threshold
   for (const Door& d : P.doors) {
     const Vec2 o0 = d.c - d.d * (kDoorW / 2), o1 = d.c + d.d * (kDoorW / 2), i0 = o0 - d.n * kWallIn, i1 = o1 - d.n * kWallIn;
-    S.wall(o0, i0, base0, base0 + kDoorH, kStone, true, true);
-    S.wall(i1, o1, base0, base0 + kDoorH, kStone, true, true);
-    S.vquad({o0.x, o0.y, base0 + kDoorH}, {o1.x, o1.y, base0 + kDoorH}, {i1.x, i1.y, base0 + kDoorH}, {i0.x, i0.y, base0 + kDoorH}, kStone);
+    wall(P, o0, i0, base0, base0 + kDoorH, kStone, true, true);
+    wall(P, i1, o1, base0, base0 + kDoorH, kStone, true, true);
+    vquad(P, {o0.x, o0.y, base0 + kDoorH}, {o1.x, o1.y, base0 + kDoorH}, {i1.x, i1.y, base0 + kDoorH}, {i0.x, i0.y, base0 + kDoorH}, kStone);
     const Vec2 f0 = o0 + d.n * 0.6f, f1 = o1 + d.n * 0.6f;
-    S.vquad({f0.x, f0.y, base0 - 0.01f}, {f1.x, f1.y, base0 - 0.01f}, {i1.x, i1.y, base0}, {i0.x, i0.y, base0}, kStone);
-    S.cquad({f0.x, f0.y, base0}, {f1.x, f1.y, base0}, {i1.x, i1.y, base0}, {i0.x, i0.y, base0}, false);
+    vquad(P, {f0.x, f0.y, base0 - 0.01f}, {f1.x, f1.y, base0 - 0.01f}, {i1.x, i1.y, base0}, {i0.x, i0.y, base0}, kStone);
+    cquad(P, {f0.x, f0.y, base0}, {f1.x, f1.y, base0}, {i1.x, i1.y, base0}, {i0.x, i0.y, base0}, false);
   }
   // ---- floors, ceilings, the roof
   std::vector<std::vector<Vec2>> floor_holes;
@@ -376,24 +371,24 @@ bool Interiors::build(const MapFeatures::Building& b, f32 door_ground, Plan& P) 
   if (P.has_core) core_holes.push_back(cw(rect(0, 0, kCoreW, kCoreL)));
   for (u32 k = 0; k < F; ++k) {
     const f32 z = P.levels[k];
-    S.slab(P.inner, k == 0 ? floor_holes : core_holes, z, k == 0 ? kStone : kOak, true, true, true);
+    slab(P, P.inner, k == 0 ? floor_holes : core_holes, z, k == 0 ? kStone : kOak, true, true, true);
     if (k > 0) {
-      S.slab(P.inner, core_holes, z - kSlab, kCeil, false, true, false);  // the ceiling of the storey below
+      slab(P, P.inner, core_holes, z - kSlab, kCeil, false, true, false);  // the ceiling of the storey below
       // the near landing in the core at this floor
-      S.slab(rect(0, 0, kCoreW, kLand), {}, z, kConcrete, true, true, true);
-      S.slab(rect(0, 0, kCoreW, kLand), {}, z - kSlab, kCeil, false, true, false);
+      slab(P, rect(0, 0, kCoreW, kLand), {}, z, kConcrete, true, true, true);
+      slab(P, rect(0, 0, kCoreW, kLand), {}, z - kSlab, kCeil, false, true, false);
     }
   }
   std::vector<std::vector<Vec2>> roof_holes;
   for (const auto& h : P.holes) roof_holes.push_back(h);
   if (P.roof_access) roof_holes.push_back(cw(rect(0, kLand, kCoreW, kCoreL)));
-  S.slab(P.inner, P.roof_access ? std::vector<std::vector<Vec2>>{floor_holes.begin(), floor_holes.end()} : floor_holes, ceil_top, kCeil, false, true, false);
-  if (P.roof_access) S.slab(rect(0, 0, kCoreW, kLand), {}, P.top, kConcrete, true, true, false);
-  S.slab(P.outer, roof_holes, P.top, kConcrete, true, false, true);
+  slab(P, P.inner, P.roof_access ? std::vector<std::vector<Vec2>>{floor_holes.begin(), floor_holes.end()} : floor_holes, ceil_top, kCeil, false, true, false);
+  if (P.roof_access) slab(P, rect(0, 0, kCoreW, kLand), {}, P.top, kConcrete, true, true, false);
+  slab(P, P.outer, roof_holes, P.top, kConcrete, true, false, true);
   // ---- the stair core: walls, divider, flights, landings
   if (P.has_core) {
     const f32 z0 = base0;
-    auto cwall = [&](f32 u0, f32 v0, f32 u1, f32 v1, f32 za, f32 zb, Vec3 col) { S.wall(CP(u0, v0), CP(u1, v1), za, zb, col, true, true); };
+    auto cwall = [&](f32 u0, f32 v0, f32 u1, f32 v1, f32 za, f32 zb, Vec3 col) { wall(P, CP(u0, v0), CP(u1, v1), za, zb, col, true, true); };
     cwall(0, 0, 0, kCoreL, z0, wall_top, kStairWall);
     cwall(kCoreW, 0, kCoreW, kCoreL, z0, wall_top, kStairWall);
     cwall(0, kCoreL, kCoreW, kCoreL, z0, wall_top, kStairWall);
@@ -405,25 +400,25 @@ bool Interiors::build(const MapFeatures::Building& b, f32 door_ground, Plan& P) 
       const f32 half = R / 2;
       auto P3 = [&](f32 u, f32 v, f32 h) { const Vec2 q = CP(u, v); return Vec3{q.x, q.y, h}; };
       // ramps for walking (collision), steps for the eye
-      S.cquad(P3(0, kLand, z), P3(kLane, kLand, z), P3(kLane, kLand + kRun, z + half), P3(0, kLand + kRun, z + half), true);
-      S.cquad(P3(kCoreW - kLane, kLand + kRun, z + half), P3(kCoreW, kLand + kRun, z + half), P3(kCoreW, kLand, z + R), P3(kCoreW - kLane, kLand, z + R), true);
-      S.slab(rect(0, kLand + kRun, kCoreW, kCoreL), {}, z + half, kConcrete, true, true, true);
-      S.slab(rect(0, kLand + kRun, kCoreW, kCoreL), {}, z + half - 0.2f, kCeil, false, true, false);
+      cquad(P, P3(0, kLand, z), P3(kLane, kLand, z), P3(kLane, kLand + kRun, z + half), P3(0, kLand + kRun, z + half), true);
+      cquad(P, P3(kCoreW - kLane, kLand + kRun, z + half), P3(kCoreW, kLand + kRun, z + half), P3(kCoreW, kLand, z + R), P3(kCoreW - kLane, kLand, z + R), true);
+      slab(P, rect(0, kLand + kRun, kCoreW, kCoreL), {}, z + half, kConcrete, true, true, true);
+      slab(P, rect(0, kLand + kRun, kCoreW, kCoreL), {}, z + half - 0.2f, kCeil, false, true, false);
       const u32 n = std::max<u32>(6, static_cast<u32>(std::lround(half / 0.18f)));
       const f32 rise = half / static_cast<f32>(n), tread = kRun / static_cast<f32>(n);
       const f32 yaw = std::atan2(C.v.y, C.v.x);
       for (u32 s = 0; s < n; ++s) {
         const f32 top_a = z + rise * static_cast<f32>(s + 1), top_b = z + half + rise * static_cast<f32>(s + 1);
         const Vec2 ca = CP(kLane / 2, kLand + tread * (static_cast<f32>(s) + 0.5f)), cb = CP(kCoreW - kLane / 2, kLand + kRun - tread * (static_cast<f32>(s) + 0.5f));
-        S.box({ca.x, ca.y, top_a - rise * 0.5f}, {tread, kLane, rise}, yaw, s % 2 ? kRiser : kConcrete, false);
-        S.box({cb.x, cb.y, top_b - rise * 0.5f}, {tread, kLane, rise}, yaw, s % 2 ? kRiser : kConcrete, false);
+        box(P, {ca.x, ca.y, top_a - rise * 0.5f}, {tread, kLane, rise}, yaw, s % 2 ? kRiser : kConcrete, false);
+        box(P, {cb.x, cb.y, top_b - rise * 0.5f}, {tread, kLane, rise}, yaw, s % 2 ? kRiser : kConcrete, false);
       }
     }
     if (!P.roof_access) cwall(0, kLand, kLane, kLand, P.levels[F - 1], P.levels[F - 1] + 1.1f, kDark);  // the railing at the top
     else {
       // the stair house on the roof: a lid over the core
-      S.slab(rect(0, 0, kCoreW, kCoreL), {}, P.top + kRoofHouse, kConcrete, false, true, true);
-      S.slab(rect(0, 0, kCoreW, kCoreL), {}, P.top + kRoofHouse + 0.01f, kConcrete, true, true, true);
+      slab(P, rect(0, 0, kCoreW, kCoreL), {}, P.top + kRoofHouse, kConcrete, false, true, true);
+      slab(P, rect(0, 0, kCoreW, kCoreL), {}, P.top + kRoofHouse + 0.01f, kConcrete, true, true, true);
     }
   }
   // ---- furniture and ceiling lights (building_interiors.mjs placeProps: desks, sofas, shelves,
@@ -457,54 +452,54 @@ bool Interiors::build(const MapFeatures::Building& b, f32 door_ground, Plan& P) 
         const u32 kind = k == 0 ? (placed == 0 ? 9u : 3u + (h >> 12) % 3 + ((h >> 14) & 1) * 3u) : (h >> 12) % 9;
         switch (kind) {
           case 0:  // desk with a screen and a chair
-            S.box({p.x, p.y, z + 0.37f}, {1.6f, 0.8f, 0.74f}, yaw, kOak, true);
-            S.box(Vec3{p.x, p.y, z + 1.0f} + yaw_quat(yaw).rotate({0, 0.22f, 0}), {0.62f, 0.035f, 0.38f}, yaw, rgb(0x111214), false);
-            S.box(Vec3{p.x, p.y, z + 0.25f} + yaw_quat(yaw).rotate({0, -0.7f, 0}), {0.5f, 0.5f, 0.5f}, yaw, rgb(0x3a3f47), false);
+            box(P, {p.x, p.y, z + 0.37f}, {1.6f, 0.8f, 0.74f}, yaw, kOak, true);
+            box(P, Vec3{p.x, p.y, z + 1.0f} + yaw_quat(yaw).rotate({0, 0.22f, 0}), {0.62f, 0.035f, 0.38f}, yaw, rgb(0x111214), false);
+            box(P, Vec3{p.x, p.y, z + 0.25f} + yaw_quat(yaw).rotate({0, -0.7f, 0}), {0.5f, 0.5f, 0.5f}, yaw, rgb(0x3a3f47), false);
             break;
           case 1:  // bed
-            S.box({p.x, p.y, z + 0.27f}, {1.72f, 2.18f, 0.54f}, yaw, rgb(0xeeece6), true);
-            S.box(Vec3{p.x, p.y, z + 0.55f} + yaw_quat(yaw).rotate({0, 1.05f, 0}), {1.74f, 0.08f, 1.1f}, yaw, rgb(0x5e3f2a), false);
+            box(P, {p.x, p.y, z + 0.27f}, {1.72f, 2.18f, 0.54f}, yaw, rgb(0xeeece6), true);
+            box(P, Vec3{p.x, p.y, z + 0.55f} + yaw_quat(yaw).rotate({0, 1.05f, 0}), {1.74f, 0.08f, 1.1f}, yaw, rgb(0x5e3f2a), false);
             break;
           case 2:  // shelf
-            S.box({p.x, p.y, z + 0.95f}, {1.2f, 0.36f, 1.9f}, yaw, rgb(0xeeece6), true);
+            box(P, {p.x, p.y, z + 0.95f}, {1.2f, 0.36f, 1.9f}, yaw, rgb(0xeeece6), true);
             break;
           case 3:  // sofa
-            S.box({p.x, p.y, z + 0.3f}, {2.1f, 0.92f, 0.6f}, yaw, rgb(0x4f6d7a + (h & 0x0f0f0f)), true);
-            S.box(Vec3{p.x, p.y, z + 0.66f} + yaw_quat(yaw).rotate({0, 0.36f, 0}), {2.1f, 0.2f, 0.5f}, yaw, rgb(0x4f6d7a + (h & 0x0f0f0f)), false);
+            box(P, {p.x, p.y, z + 0.3f}, {2.1f, 0.92f, 0.6f}, yaw, rgb(0x4f6d7a + (h & 0x0f0f0f)), true);
+            box(P, Vec3{p.x, p.y, z + 0.66f} + yaw_quat(yaw).rotate({0, 0.36f, 0}), {2.1f, 0.2f, 0.5f}, yaw, rgb(0x4f6d7a + (h & 0x0f0f0f)), false);
             break;
           case 4:  // table
-            S.box({p.x, p.y, z + 0.37f}, {0.9f, 0.9f, 0.74f}, yaw, rgb(0xefe9df), true);
+            box(P, {p.x, p.y, z + 0.37f}, {0.9f, 0.9f, 0.74f}, yaw, rgb(0xefe9df), true);
             break;
           case 6: {  // armchair and a floor lamp
             const Quat q = yaw_quat(yaw);
-            S.box({p.x, p.y, z + 0.22f}, {0.86f, 0.84f, 0.44f}, yaw, rgb(0x8a4f3c + (h & 0x070707)), true);
-            S.box(Vec3{p.x, p.y, z + 0.66f} + q.rotate({0, 0.34f, 0}), {0.86f, 0.18f, 0.56f}, yaw, rgb(0x8a4f3c + (h & 0x070707)), false);
-            S.box(Vec3{p.x, p.y, z + 0.75f} + q.rotate({0.75f, 0.2f, 0}), {0.04f, 0.04f, 1.45f}, yaw, kDark, false);
-            S.box(Vec3{p.x, p.y, z + 1.55f} + q.rotate({0.75f, 0.2f, 0}), {0.36f, 0.36f, 0.26f}, yaw, rgb(0xf4e4c2), false);
+            box(P, {p.x, p.y, z + 0.22f}, {0.86f, 0.84f, 0.44f}, yaw, rgb(0x8a4f3c + (h & 0x070707)), true);
+            box(P, Vec3{p.x, p.y, z + 0.66f} + q.rotate({0, 0.34f, 0}), {0.86f, 0.18f, 0.56f}, yaw, rgb(0x8a4f3c + (h & 0x070707)), false);
+            box(P, Vec3{p.x, p.y, z + 0.75f} + q.rotate({0.75f, 0.2f, 0}), {0.04f, 0.04f, 1.45f}, yaw, kDark, false);
+            box(P, Vec3{p.x, p.y, z + 1.55f} + q.rotate({0.75f, 0.2f, 0}), {0.36f, 0.36f, 0.26f}, yaw, rgb(0xf4e4c2), false);
             break;
           }
           case 7: {  // dining table with four chairs
             const Quat q = yaw_quat(yaw);
-            S.box({p.x, p.y, z + 0.38f}, {1.8f, 0.9f, 0.76f}, yaw, rgb(0x5e3f2a), true);
+            box(P, {p.x, p.y, z + 0.38f}, {1.8f, 0.9f, 0.76f}, yaw, rgb(0x5e3f2a), true);
             for (f32 cx : {-0.45f, 0.45f})
-              for (f32 cy : {-0.68f, 0.68f}) S.box(Vec3{p.x, p.y, z + 0.45f} + q.rotate({cx, cy, 0}), {0.44f, 0.42f, 0.9f}, yaw, rgb(0xb98b5c), false);
+              for (f32 cy : {-0.68f, 0.68f}) box(P, Vec3{p.x, p.y, z + 0.45f} + q.rotate({cx, cy, 0}), {0.44f, 0.42f, 0.9f}, yaw, rgb(0xb98b5c), false);
             break;
           }
           case 8: {  // kitchen counter
-            S.box({p.x, p.y, z + 0.45f}, {2.4f, 0.6f, 0.9f}, yaw, rgb(0xeeece6), true);
-            S.box({p.x, p.y, z + 0.915f}, {2.44f, 0.64f, 0.04f}, yaw, rgb(0x3d3f42), false);
+            box(P, {p.x, p.y, z + 0.45f}, {2.4f, 0.6f, 0.9f}, yaw, rgb(0xeeece6), true);
+            box(P, {p.x, p.y, z + 0.915f}, {2.44f, 0.64f, 0.04f}, yaw, rgb(0x3d3f42), false);
             break;
           }
           case 9: {  // reception desk with a brass band
             const Quat q = yaw_quat(yaw);
-            S.box({p.x, p.y, z + 0.55f}, {2.8f, 0.75f, 1.1f}, yaw, rgb(0x5e3f2a), true);
-            S.box({p.x, p.y, z + 1.12f}, {2.9f, 0.85f, 0.05f}, yaw, rgb(0xd9d6cf), false);
-            S.box(Vec3{p.x, p.y, z + 0.55f} + q.rotate({0, -0.39f, 0}), {2.6f, 0.01f, 0.5f}, yaw, rgb(0xc7a35a), false);
+            box(P, {p.x, p.y, z + 0.55f}, {2.8f, 0.75f, 1.1f}, yaw, rgb(0x5e3f2a), true);
+            box(P, {p.x, p.y, z + 1.12f}, {2.9f, 0.85f, 0.05f}, yaw, rgb(0xd9d6cf), false);
+            box(P, Vec3{p.x, p.y, z + 0.55f} + q.rotate({0, -0.39f, 0}), {2.6f, 0.01f, 0.5f}, yaw, rgb(0xc7a35a), false);
             break;
           }
           default:  // plant
-            S.box({p.x, p.y, z + 0.21f}, {0.4f, 0.4f, 0.42f}, yaw, rgb(0xd9d4ca), true);
-            S.box({p.x, p.y, z + 0.9f}, {0.6f, 0.6f, 0.9f}, yaw + 0.4f, rgb(0x3d6b33), false);
+            box(P, {p.x, p.y, z + 0.21f}, {0.4f, 0.4f, 0.42f}, yaw, rgb(0xd9d4ca), true);
+            box(P, {p.x, p.y, z + 0.9f}, {0.6f, 0.6f, 0.9f}, yaw + 0.4f, rgb(0x3d6b33), false);
             break;
         }
         ++placed;
@@ -525,8 +520,8 @@ bool Interiors::build(const MapFeatures::Building& b, f32 door_ground, Plan& P) 
         const f32 cu = c.x * C.u.x + c.y * C.u.y, cv = c.x * C.v.x + c.y * C.v.y;
         if (cu > -2.5f && cu < kCoreW + 2.5f && cv > -3.5f && cv < kCoreL + 2.5f) continue;
         if (h01(seed, 900 + ac * 7 + static_cast<u32>(x * 3 + y)) > 0.5f) continue;
-        S.box({q.x, q.y, P.top + 0.55f}, {1.5f, 1.1f, 1.1f}, yaw0, rgb(0xa9adb1), true);
-        S.box({q.x, q.y, P.top + 1.12f}, {0.8f, 0.8f, 0.05f}, yaw0, rgb(0x2c2f33), false);
+        box(P, {q.x, q.y, P.top + 0.55f}, {1.5f, 1.1f, 1.1f}, yaw0, rgb(0xa9adb1), true);
+        box(P, {q.x, q.y, P.top + 1.12f}, {0.8f, 0.8f, 0.05f}, yaw0, rgb(0x2c2f33), false);
         ++ac;
       }
   }
@@ -552,7 +547,7 @@ void Interiors::release(CityStream& city) {
 
 void Interiors::activate(const CityStream::BuildingRef& ref, CityStream& city, f32 ground) {
   Plan plan;
-  if (!build(*ref.building, ground, plan)) return;
+  if (!build(city.building(ref), ground, plan)) return;
   clear();
   plan_ = std::move(plan);
   ph::BodySettings bs;
@@ -631,36 +626,37 @@ void Interiors::update(f32 dt, f32 now, Vec3 feet, bool on_foot, CityStream& cit
   std::vector<CityStream::BuildingRef> near;
   city.buildings_near(f, kDoorsRadius, near);
   // which building is the player at? (inside it, or the nearest outline within ACTIVATE)
-  const CityStream::BuildingRef* best = nullptr;
+  i32 best = -1;  // (its place in `near`)
   f32 best_d = kActivate;
-  for (const CityStream::BuildingRef& r : near) {
-    const std::vector<Vec2>& o = r.building->rings[0];
+  for (std::size_t i = 0; i < near.size(); ++i) {
+    const std::vector<Vec2>& o = city.building(near[i]).rings[0];
     const f32 d = pip(f, o) ? 0 : ring_dist(f, o);
-    if (d < best_d) { best_d = d; best = &r; }
+    if (d < best_d) { best_d = d; best = static_cast<i32>(i); }
   }
   if (active_) {
     const f32 d = pip(f, plan_.outer) ? 0 : ring_dist(f, plan_.outer);
     const bool keep = inside(feet) || d < kRelease;
-    const bool other = best && !(best->tile == tile_ && best->index == index_) && best_d < 0.5f * d && !inside(feet);
+    const bool other = best >= 0 && !(near[static_cast<std::size_t>(best)].tile == tile_ && near[static_cast<std::size_t>(best)].index == index_) && best_d < 0.5f * d && !inside(feet);
     if (!keep || other || (!on_foot && d > kActivate)) release(city);
   }
-  if (!active_ && on_foot && best) {
+  if (!active_ && on_foot && best >= 0) {
     const f32 ground = city.ground_height(f.x, f.y);
-    activate(*best, city, ground);
+    activate(near[static_cast<std::size_t>(best)], city, ground);
   }
   // closed doors of the buildings around (the nearest MAX_CLOSED_DOORS)
   std::vector<std::pair<f32, Closed>> doors;
   for (const CityStream::BuildingRef& r : near) {
     if (active_ && r.tile == tile_ && r.index == index_) continue;
-    std::vector<Vec2> o = clean(r.building->rings[0]);
+    const MapFeatures::Building& b = city.building(r);
+    std::vector<Vec2> o = clean(b.rings[0]);
     if (o.size() < 3) continue;
     if (signed_area(o) < 0) std::reverse(o.begin(), o.end());
     const f32 area = signed_area(o);
-    if (area < 24 || area > 40000 || r.building->top - r.building->base < 2.8f) continue;
+    if (area < 24 || area > 40000 || b.top - b.base < 2.8f) continue;
     for (const Door& d : doors_of(o, area)) {
       const f32 dist = std::hypot(d.c.x - f.x, d.c.y - f.y);
       if (dist > kDoorsRadius) continue;
-      doors.push_back({dist, {{d.c.x, d.c.y, std::fmax(r.building->base, city.ground_height(d.c.x + d.n.x, d.c.y + d.n.y))}, std::atan2(d.d.y, d.d.x)}});
+      doors.push_back({dist, {{d.c.x, d.c.y, std::fmax(b.base, city.ground_height(d.c.x + d.n.x, d.c.y + d.n.y))}, std::atan2(d.d.y, d.d.x)}});
     }
   }
   std::sort(doors.begin(), doors.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
@@ -711,7 +707,7 @@ void Interiors::hud(std::string& s) const {
   s += b;
 }
 
-bool Interiors::command(const std::string& cmd, Vec3 me, std::string& out, const std::function<bool(Vec3, f32)>& teleport) {
+bool Interiors::command(const std::string& cmd, Vec3 me, std::string& out, std::optional<Vec3>& go) {
   char b[256];
   if (cmd == "interior") {
     std::snprintf(b, sizeof b, "{\"active\":%s,\"inside\":%s,\"level\":%d,\"levels\":%u,\"roof\":%s,\"z\":%.2f,\"floor0\":%.2f,\"top\":%.2f}", active_ ? "true" : "false",
@@ -733,7 +729,7 @@ bool Interiors::command(const std::string& cmd, Vec3 me, std::string& out, const
     const Vec2 q = c.o + c.u * (kCoreW / 2) + c.v * (kLand / 2);
     to = {q.x, q.y, (roof ? plan_.top : plan_.levels[1]) + 0.05f};
   } else { out = "?"; return true; }
-  out = teleport(to, 0) ? "ok" : "not on foot";
+  go = to;
   return true;
 }
 
