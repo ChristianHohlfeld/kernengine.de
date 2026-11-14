@@ -972,6 +972,8 @@ Form:
   Wert des Typs (bei einer Struktur: jedes Feld mit seinem Default).
 - Ohne `KERN_LAYOUT`-Block bekommen neue Knoten Ids und Plätze automatisch.
 - Ein Wert ohne `std::move`, wo der Text des Graphen es hat (derselbe Graph).
+- Eine ausgeschriebene Liste (`List<Float>{1.0, 2.0}`) als Default eines Platzes fester Länge: Es
+  sind seine Einträge, wie C++ sie nähme (nicht mehr, als er hat).
 
 Abgelehnt wird – immer mit Zeile, Spalte und dem Grund, oft mit der richtigen Schreibweise:
 

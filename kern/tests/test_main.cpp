@@ -3976,7 +3976,14 @@ TEST(logic_fixed_lists) {
   CHECK(says(in_event("    list_resize(Axis, 5, 0.0);"), "is a list of a fixed length (3)"));
   CHECK(says("  Fixed<Float, 2> Two = Fixed<Float, 2>{1.0, 2.0, 3.0};\n", "Fixed<Float, 2> has 2 entries: this says 3"));
   CHECK(says("  Fixed<Float, 0> None = Fixed<Float, 0>{};\n", "a list of a fixed length has 1 to 4096 entries"));
-  CHECK(says("  Fixed<Float, 2> Two = List<Float>{1.0, 2.0};\n", "this is List<Float>, but Fixed<Float, 2> is needed"));
+  CHECK(says("  Fixed<Float, 2> Two = List<Float>{1.0, 2.0, 3.0};\n", "Fixed<Float, 2> has 2 entries: this says 3"));
+  {
+    // (a list written out for a place of a fixed length is that place's entries - as C++ takes it; the text of the graph says Fixed)
+    logic::Graph g;
+    std::string error, text;
+    CHECK(read("  Fixed<Float, 2> Two = List<Float>{1.5};\n  Mat Other = Mat{List<Float>{2.0, 3.0}};\n", g, error) && logic::to_cpp(g, "B", text, &error, logic::library(), false));
+    CHECK(text.find("  Fixed<Float, 2> Two = Fixed<Float, 2>{1.5, 0.0};\n  Mat Other = Mat{Fixed<Float, 4>{2.0, 3.0, 0.0, 0.0}};\n") != std::string::npos);
+  }
   CHECK(says("  List<Float> Two = Fixed<Float, 2>{1.0, 2.0};\n", "this is Fixed<Float, 2>, but List<Float> is needed"));
   CHECK(says(in_event("    Any = Fixed<Float, 2>{1.0, 2.0};"), "a list of a fixed length is what a place is declared as"));
   CHECK(says("  void Fill(List<Float>& list) {\n    list[0] = 1.0;\n  }\n" + in_event("    Fill(Axis);"), "is float_list, but Axis is float_list[3] - a reference is the place itself, nothing converts"));

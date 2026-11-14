@@ -2258,6 +2258,13 @@ struct Reader {
     if (!literal_here(v, &of, &count)) return fail(p, what + ": a value of type " + cpp_type(want) + " expected, not " + shown(peek()));
     if (failed()) return false;
     if (v.type == PinType::integer && want.type == PinType::number) v = Value::number(static_cast<f64>(v.i));
+    if (want.count && !count && v.type == want.type && of == want.of) {
+      // A list written out, for a place of a fixed length: the place's entries (C++ takes it the same
+      // way; the text of the graph says Fixed<Float, 3>{...}). It says no more than the place has.
+      if (v.size() > want.count) return fail(at, what + ": " + cpp_type(want) + " has " + std::to_string(want.count) + " entries: this says " + std::to_string(v.size()));
+      v = fitted(std::move(v), want, g);
+      count = want.count;
+    }
     if (v.type != want.type || of != want.of || count != want.count)
       return fail(at, what + ": this is " + cpp_type(TypeRef{v.type, of, count}) + ", but " + cpp_type(want) + " is needed (like " + literal(zero_of(want, g), want, g) + ")");
     out = v;

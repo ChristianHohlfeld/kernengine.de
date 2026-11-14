@@ -636,6 +636,8 @@ class Function:
         self.pure = True
         self.params = []      # (name, type)
         self.kinds = []       # per parameter: "" an input by value, "ref" a reference the function changes (T& x), "const" one it reads (const T& x)
+        self.fixed = {}       # per parameter (by place) that is a list of a fixed length (std::array, T[N]): its length - it is declared Fixed<T, N>
+        self.result_fixed = None   # the same for what it gives
         self.result = None    # type, None: no result
         self.text = None
         self.wait = None
@@ -769,21 +771,43 @@ class Unit:
             raise Wait(f"the name {t} means several types")
         return None
 
-    def element(self, it):
-        """The type of a list's entries: a list inside a list is a struct that holds it."""
+    def element(self, it, n=None):
+        """The type of a list's entries: a list inside a list is a struct that holds it (`n`: the inner
+        list has a fixed length - its struct declares it so)."""
         if not it.startswith("List<"):
             return it
-        for name, inner in self.rows.items():
-            if inner == it:
-                return name
         # (a shape: its name says what it is made of - the same in every Blueprint; main says where it stands)
-        name = re.sub(r"\W+", "_", it[5:-1]).strip("_") + "_row"
+        name = re.sub(r"\W+", "_", it[5:-1]).strip("_") + (f"_{n}" if n else "") + "_row"
+        if self.rows.get(name) == it:
+            return name
         if name in self.type_line:
             raise Wait(f"two types would be called {name}")
         self.rows[name] = it
         self.struct_fields[name] = [("items", it, it + "{}", "items")]
-        self.declare(name, f"  KERN_STRUCT({name}) {{ {it} items = {it}{{}}; }};", None, [self.part(it)])
+        self.declare(name, f"  KERN_STRUCT({name}) {{ {self.fixed_type(it, n)} items = {it}{{}}; }};", None, [self.part(it)])
         return name
+
+    def entry(self, raw):
+        """The type of the entries of a list whose C++ entries are `raw` (see `element`)."""
+        return self.element(self.btype(raw), self.entries(raw))
+
+    @staticmethod
+    def fixed_type(t, n):
+        """What a place is declared as: a list of a fixed length (`n` entries) is Fixed<T, n>."""
+        return f"Fixed<{t[5:-1]}, {n}>" if n and t.startswith("List<") else t
+
+    def dtype(self, raw, t=None):
+        """What a place of the C++ type `raw` is declared as in the Blueprint: its type - and a list of a
+        fixed length (std::array<T, N>, T[N]) with its length: Fixed<T, N>, which lies where it stands
+        as the C++ array does. (What flows through a pin and what an expression is, is the list: `btype`.)"""
+        return self.fixed_type(t if t is not None else self.btype(raw), self.fixed(raw))
+
+    def fixed(self, raw):
+        """The length a place of the C++ type `raw` is declared with (None: none - not a list of a fixed length)."""
+        n = self.entries(raw)
+        if n is not None and n > 4096:
+            raise Wait("a list of more than 4096 entries of fixed length")
+        return n if n else None
 
     def pair(self, a, b):
         """std::pair<A, B>: a struct of its two parts."""
@@ -870,7 +894,7 @@ class Unit:
             raise Wait("a pointer")
         m = re.match(r"(?:kern::)?Span<\s*(.+)>$", t)
         if m and ENGINE_NODES:   # (a view of a list: the list)
-            return f"List<{self.element(self.btype(m.group(1)))}>"
+            return f"List<{self.entry(m.group(1))}>"
         m = KEYED.match(t)
         if m:
             a = template_args(t)
@@ -884,15 +908,15 @@ class Unit:
             return f"List<{self.pair(self.btype(a[0]), self.btype(a[1]))}>"
         m = re.match(r"std::vector<(.+)>$", t)
         if m:
-            return f"List<{self.element(self.btype(template_args(t)[0]))}>"
+            return f"List<{self.entry(template_args(t)[0])}>"
         m = re.match(r"std::array<(.+), (\d+)>$", t) or re.match(r"(.+?)\s*\[(\d*)\]$", t)
         if m:
-            return f"List<{self.element(self.btype(m.group(1)))}>"
+            return f"List<{self.entry(m.group(1))}>"
         if t.startswith("std::unique_ptr<") or t.startswith("std::optional<"):
             # what may be there or not: a list of no entry or one
-            return f"List<{self.element(self.btype(template_args(t)[0]))}>"
+            return f"List<{self.entry(template_args(t)[0])}>"
         if t.startswith("std::initializer_list<"):
-            return f"List<{self.element(self.btype(template_args(t)[0]))}>"
+            return f"List<{self.entry(template_args(t)[0])}>"
         if t.startswith("std::shared_ptr"):
             raise Wait("a shared pointer (shared_ptr)")
         if t.startswith("std::function") or "(lambda" in t:
@@ -954,7 +978,7 @@ class Unit:
             raise Wait(f"the class {q.split('::')[-1]} (a base class)")
         self.structs[q] = None
         try:
-            fields, taken = [], set()
+            fields, taken, declared = [], set(), {}
             for c in kids(o):
                 if c.get("kind") in ("CXXMethodDecl", "CXXDestructorDecl") and c.get("virtual"):
                     raise Wait(f"the class {q.split('::')[-1]} (virtual functions)")
@@ -976,6 +1000,7 @@ class Unit:
                     except Wait as w:
                         raise Wait(f"the struct {q.split('::')[-1]} (the default of its field {c.get('name')}: {w})")
                 fields.append((fname, ft, default, c.get("name")))
+                declared[fname] = self.dtype(qtype(c), ft)
             if not fields:
                 raise Wait(f"the struct {q.split('::')[-1]} has no fields")
             if len(fields) > 96:
@@ -989,7 +1014,8 @@ class Unit:
             raise Wait(f"two types would be called {name}")
         self.structs[q] = name
         self.struct_fields[name] = fields
-        self.declare(name, f"  KERN_STRUCT({name}) {{ " + " ".join(f"{t} {f} = {d};" for f, t, d, _ in fields) + " };", self.world.unit_of(o.get("_file", "")),
+        # (a field that is an array of C++ is declared with its length: Fixed<Float, 16> - its default is the list of its entries)
+        self.declare(name, f"  KERN_STRUCT({name}) {{ " + " ".join(f"{declared[f]} {f} = {d};" for f, t, d, _ in fields) + " };", self.world.unit_of(o.get("_file", "")),
                      [self.part(t) for _, t, _, _ in fields])
         return name
 
@@ -1011,6 +1037,9 @@ class Unit:
     def zero(self, t):
         if t in ZERO:
             return ZERO[t]
+        m = re.match(r"Fixed<(.+), (\d+)>$", t)
+        if m:   # (a list of a fixed length: every entry)
+            return t + "{" + ", ".join([self.zero(m.group(1))] * int(m.group(2))) + "}"
         if t.startswith("List<"):
             return t + "{}"
         if t in self.enum_values:
@@ -1045,7 +1074,7 @@ class Unit:
         doc = self.comment_of(d)
         if doc:
             self.variable_lines.append(f"  /// {doc}")
-        self.variable_lines.append(f"  KERN_CONST {t} {name} = {lit};")
+        self.variable_lines.append(f"  KERN_CONST {self.dtype(raw, t)} {name} = {lit};")   # (an array of C++: a list of that length)
         self.variable_values[name] = (t, lit, d)
         self.variables[d["id"]] = self.variables[decl["id"]] = (name, t)
         return name, t
@@ -1165,6 +1194,7 @@ class Unit:
             f.wait = e["wait"]
             f.text = "" if e["wait"] else "(of another Blueprint)"
             f.pure, f.params, f.kinds, f.result, f.indexes = e["pure"], [tuple(x) for x in e["params"]], list(e["kinds"]), e["result"], e["indexes"]
+            f.fixed, f.result_fixed = {int(k): v for k, v in e["fixed"].items()}, e["result_fixed"]
             f.self_type, f.mutates, f.refs, f.value, f.ctor = e["self_type"], e["mutates"], list(e["refs"]), e["value"], e["ctor"]
             f.out_fields = [(n, t, tuple(src) if isinstance(src, list) else src) for n, t, src in e["out_fields"]]
             f.open = e["open"]
@@ -1194,6 +1224,7 @@ class Unit:
     def entry_of(self, f):
         """What a call of a function of this Blueprint needs to know, for the table of the whole program."""
         return {"unit": self.name, "name": f.name, "cpp": f.cpp, "wait": f.wait if not f.text else None, "pure": f.pure, "params": f.params, "kinds": f.kinds, "result": f.result,
+                "fixed": dict(f.fixed), "result_fixed": f.result_fixed,
                 "indexes": f.indexes, "self_type": f.self_type, "mutates": f.mutates, "refs": f.refs, "value": f.value, "ctor": f.ctor, "out_fields": f.out_fields,
                 "open": self.name in self.world.source_units}
 
@@ -1505,6 +1536,7 @@ class Emit:
         self.names = {}       # decl id -> the Blueprint name of a parameter or local
         self.types = {}       # decl id -> its Blueprint type
         self.locals = []      # (name, type): declared at the top of the body
+        self.lengths = {}     # the local variables that are lists of a fixed length (name -> length)
         self.taken = set()
         self.index = {}       # decl id of a loop's counter -> "n12.index"
         self.pre = []         # steps to run before the statement being written
@@ -1569,13 +1601,23 @@ class Emit:
         self.names[decl["id"]] = name
         self.types[decl["id"]] = t
         self.locals.append((name, t))
+        if t.startswith("List<") and self.u.fixed(qtype(decl)):   # (an array of C++: declared with its length)
+            self.lengths[name] = self.u.fixed(qtype(decl))
         return name
 
-    def temp(self, want, t):
+    def temp(self, want, t, fixed=None):
+        """A local variable of the function's own making (`fixed`: a list of that fixed length - what holds
+        a value for a reference of that type)."""
         name = self.u.fresh(want, self.taken)
         self.taken.add(name)
         self.locals.append((name, t))
+        if fixed:
+            self.lengths[name] = fixed
         return name
+
+    def declared(self, name, t):
+        """What a local variable is declared as: its type, a list of a fixed length with its length."""
+        return self.u.fixed_type(t, self.lengths.get(name))
 
     # ---- the function ----
     def run(self):
@@ -1631,6 +1673,8 @@ class Emit:
             self.taken.add(name)
             if kind == "ref":
                 f.refs.append(len(f.params))
+            if u.fixed(raw) and t.startswith("List<"):   # (an array of C++: the input is declared with its length)
+                f.fixed[len(f.params)] = u.fixed(raw)
             f.params.append((name, t))
             f.kinds.append(kind)
             self.names[p["id"]] = name
@@ -1673,7 +1717,7 @@ class Emit:
                 lines += self.pre + [f"{self.self_name}.{fname} = {text};"]
                 self.pre = saved
         for p, name, t in copies:
-            c = self.temp(name + "_", t)
+            c = self.temp(name + "_", t, self.u.fixed(qtype(p)) if t.startswith("List<") else None)
             self.names[p["id"]] = c
             lines.append(f"{c} = {name};")
         lines += self.block(kids(body))
@@ -1682,13 +1726,17 @@ class Emit:
         head = []
         doc = u.comment_of(d)
         if f.result is not None:
-            head.append(f"  struct {f.name}Result {{ {f.result} Result = {u.zero(f.result)}; }};")
+            if f.value is not None and not f.ctor and f.value.startswith("List<"):
+                f.result_fixed = u.fixed(ret)   # (it returns an array of C++: its output is declared with its length)
+            given = u.fixed_type(f.result, f.result_fixed)
+            head.append(f"  struct {f.name}Result {{ {given} Result = {u.zero(given)}; }};")
         if doc:
             head.append(f"  /// {doc}")
-        params = ", ".join(f"{t}& {n}" if kind == "ref" else f"const {t}& {n}" if kind == "const" else f"{t} {n} = {u.zero(t)}"
-                           for (n, t), kind in ((f.params[i], f.kinds[i]) for i in f.order()))
+        takes = [u.fixed_type(f.params[i][1], f.fixed.get(i)) for i in range(len(f.params))]
+        params = ", ".join(f"{takes[i]}& {f.params[i][0]}" if f.kinds[i] == "ref" else f"const {takes[i]}& {f.params[i][0]}" if f.kinds[i] == "const"
+                           else f"{takes[i]} {f.params[i][0]} = {u.zero(takes[i])}" for i in f.order())
         head.append(f"  {'KERN_PURE ' if f.pure else ''}{f.name + 'Result' if f.result is not None else 'void'} {f.name}({params}) {{")
-        out = head + [f"    {t} {n} = {u.zero(t)};" for n, t in self.locals] + ["    " + ln for ln in lines] + ["  }"]
+        out = head + [f"    {self.declared(n, t)} {n} = {u.zero(self.declared(n, t))};" for n, t in self.locals] + ["    " + ln for ln in lines] + ["  }"]
         f.local_names = set(self.taken)   # (its inputs and local variables: see convert_unit)
         f.text = "\n".join(out)
 
@@ -3144,14 +3192,15 @@ class Emit:
         root = re.match(r"\w+", place).group(0)
         return any(root == n for n, _ in self.locals) or any(root == n and kind == "ref" for (n, _), kind in zip(self.f.params, self.f.kinds))
 
-    def place_arg(self, n, t, kind, after):
+    def place_arg(self, n, t, kind, after, fixed=None):
         """What a call gives a reference input: the place the argument is. Where the argument is none of the
         notation's places (a value, a map's row by its key ...), a variable holds it for the call - and is
-        stored back after it, when the function changes it (`after`: the lines for that)."""
+        stored back after it, when the function changes it (`after`: the lines for that). `fixed`: the input
+        is a list of that fixed length - so is the variable (a reference is the place itself)."""
         got = self.spot(n)
         if got is not None and got[1] == t and (kind != "ref" or self.writable(got[0])):
             return got[0]
-        held = self.temp("a", t)
+        held = self.temp("a", t, fixed)
         self.hoist([f"{held} = {self.ex(n, t)};"])
         if kind == "ref":
             after.append(lambda: self.store(n, self.typed(held, t)))
@@ -3429,8 +3478,9 @@ class Emit:
             kinds = kinds[1:]
         if len(args) != len(params):
             raise Wait("a call with default arguments")
-        for a, (_, pt), kind in zip(args, params, kinds):
-            texts.append(self.place_arg(a, pt, kind, after) if kind else self.ex(a, pt))
+        first = len(g.params) - len(params)   # (a method: its object is the first input)
+        for i, (a, (_, pt), kind) in enumerate(zip(args, params, kinds)):
+            texts.append(self.place_arg(a, pt, kind, after, g.fixed.get(first + i)) if kind else self.ex(a, pt))
         gives = g.self_type if g.ctor else g.value
         texts = [texts[i] for i in g.order()]   # (as the Blueprint function has its inputs: those by reference first)
         call = f"{g.name}({', '.join(texts)}).Result"
