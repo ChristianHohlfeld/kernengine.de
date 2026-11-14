@@ -1625,6 +1625,12 @@ inline const char* builtin_cpp_type(PinType t) {
 }
 /// A pin's type in C++, outside the class `owner` (an enum and a struct are the class's own: Owner::Mode).
 inline std::string cpp_type(PinType t, const std::string& of = {}, const std::string& owner = {}) {
+  if (logic::is_keyed(t)) {
+    // a map or a set as the class holds it: Map<Int, Float> - its keys and values of the class's types (an Int: Whole)
+    const logic::TypeRef k = logic::key_type({t, of});
+    auto part = [&](const logic::TypeRef& p) { return p.type == PinType::integer ? std::string("kern::logic::Whole") : cpp_type(p.type, p.of, owner); };
+    return t == PinType::map ? "kern::logic::Map<" + part(k) + ", " + part(logic::value_type({t, of})) + ">" : "kern::logic::Set<" + part(k) + ">";
+  }
   if (logic::element_of(t) != PinType::enumeration && logic::element_of(t) != PinType::structure) return builtin_cpp_type(t);
   return logic::is_list(t) ? "kern::List<" + owner + "::" + of + ">" : owner + "::" + of;
 }
@@ -1655,6 +1661,16 @@ inline std::string cpp_value(const Value& v, const std::string& of = {}, const s
       return r + "}";
     }
     default: break;
+  }
+  if (logic::is_keyed(v.type)) {
+    // a map: Map<K, V>{{key, value}, ...}, a set: Set<K>{key, ...} - in the order the keys came
+    const logic::TypeRef k = logic::key_type({v.type, of}), val = v.type == PinType::map ? logic::value_type({v.type, of}) : logic::TypeRef{};
+    std::string r = cpp_type(v.type, of, owner) + "{";
+    for (std::size_t n = 0; n < v.size(); ++n) {
+      const std::string key = cpp_value(logic::key_value(v.keyed().key_at(n), k.type), k.of, owner, g);
+      r += (n ? ", " : "") + (v.type == PinType::map ? "{" + key + ", " + cpp_value(v.keyed().value_at(n), val.of, owner, g) + "}" : key);
+    }
+    return r + "}";
   }
   if (!logic::is_list(v.type)) return "0";
   std::string r = cpp_type(v.type, of, owner) + "{";

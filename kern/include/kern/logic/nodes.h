@@ -1376,6 +1376,9 @@ void native_set(E& variable, const Value& v) {
   variable = from_value<E>(v.converted(PinType::enumeration));
 }
 template <detail::NativeStruct S> void native_set(S& variable, const Value& v) { variable = from_value<S>(v); }
+inline void native_set(Int64& variable, const Value& v) { variable = from_value<Int64>(v.converted(PinType::int64)); }
+template <class K, class V> void native_set(Map<K, V>& variable, const Value& v) { variable = from_value<Map<K, V>>(v.converted(pin_type_of<Map<K, V>>())); }
+template <class K> void native_set(Set<K>& variable, const Value& v) { variable = from_value<Set<K>>(v.converted(pin_type_of<Set<K>>())); }
 
 /// A Random node's own sequence. `m` is the node's memory ([0] where the sequence is, [1] it has
 /// begun); it starts from the Blueprint's seed and the node's id. Two Random nodes never share a
