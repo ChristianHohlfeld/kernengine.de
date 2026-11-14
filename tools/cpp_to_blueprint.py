@@ -1347,7 +1347,7 @@ class Unit:
             f.self_type, f.mutates, f.refs, f.value, f.ctor = e["self_type"], e["mutates"], list(e["refs"]), e["value"], e["ctor"]
             f.out_fields = [(n, t, tuple(src) if isinstance(src, list) else src) for n, t, src in e["out_fields"]]
             f.open = e["open"]
-            if not f.wait and f.open and d["id"] not in self.tree.body and self.world.closures is not None and key not in self.world.closures:
+            if not f.wait and f.open and d["id"] not in self.tree.body and key not in (self.world.closures or {}):
                 # A function is written when its test compares it, and the test holds the source of all it
                 # calls once more: what stands in another source file, as the test of that file hands it on.
                 f.wait = "what it calls stands in another source file, whose test does not hand its source on"
@@ -7130,21 +7130,22 @@ class TestWriter:
             try:
                 params = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
                 decl_lines, names, types = [], [], []
-                kept = set()   # (the arguments kept as drawn: handed to the call as converted::Passed)
+                # (what the Blueprint is given is said before the call: the drawn values are then handed over to
+                # it - moved, as a value that may only be moved (std::unique_ptr) must be - and what the call
+                # made of them is compared)
+                moved = set()
                 static = d.get("storageClass") == "static" or tree.decl.get(d.get("previousDecl"), {}).get("storageClass") == "static"
                 if owner and f.self_type is not None and not f.ctor and not static:
                     types.append(self.names[owner])
-                    decl_lines.append(f"converted::Kept<{types[-1]}> a0 = {self.helpers(owner)}(draw);")
-                    kept.add("a0")
+                    decl_lines.append(f"{types[-1]} a0 = {self.helpers(owner)}(draw);")
+                    moved.add("a0")
                     names.append("a0")
                 first = len(names)
                 for p in params:
                     types.append(self.spell(qtype(p)))
-                    if types[-1].startswith("const ") or self.u.object_of(qtype(p)):
-                        decl_lines.append(f"{types[-1]} a{len(names)} = {self.draw(qtype(p))};")
-                    else:   # (kept as drawn; see converted::Kept)
-                        decl_lines.append(f"converted::Kept<{types[-1]}> a{len(names)} = {self.draw(qtype(p))};")
-                        kept.add(f"a{len(names)}")
+                    decl_lines.append(f"{types[-1]} a{len(names)} = {self.draw(qtype(p))};")
+                    if not types[-1].startswith("const ") and not types[-1].endswith("&"):
+                        moved.add(f"a{len(names)}")
                     names.append(f"a{len(names)}")
                 ret = qtype(d).split("(")[0].strip()
                 if f.value is not None:
@@ -7162,9 +7163,9 @@ class TestWriter:
                 here = f"{ns}::"   # (by its full name: the test's own function, whatever its arguments are)
                 target = (f"{self.names[owner]}({args})" if f.ctor else f"{self.names[owner]}::{d['name']}({args})" if owner and static
                           else f"a0.{d['name']}({args})" if owner and f.self_type is not None else f"{self.names[owner]}{{}}.{d['name']}({args})" if owner else f"{here}{free or d['name']}({args})")
-                parts = {"self": "std::move(a0)", "result": "r"}   # (what the call changed: its own - see converted::Passed)
+                parts = {"self": "a0", "result": "r"}   # (what the call changed: run's own values, handed back as they are)
                 for place_ in f.refs:
-                    parts[("ref", place_)] = f"std::move(a{place_})"
+                    parts[("ref", place_)] = f"a{place_}"
                 out_lines = []
                 want_type = ""   # (how the test spells what the call gives, see `wrap`)
                 # the function's own call is counted: how often it asks for memory (converted::counted)
@@ -7176,7 +7177,7 @@ class TestWriter:
                 elif len(f.out_fields) > 1:
                     fields = [(n, types[0] if src_ == "self" else self.spell(ret) if src_ == "result" else types[src_[1]]) for n, _, src_ in f.out_fields]
                     out_lines = self.plain_struct(f"Out_{f.name}", fields)
-                    give = f"{'const auto r = ' if f.value is not None else ''}{counted}; return Out_{f.name}{{{', '.join(parts[src_] for _, _, src_ in f.out_fields)}}};"
+                    give = f"{'auto r = ' if f.value is not None else ''}{counted}; return Out_{f.name}{{{', '.join(f'std::move({parts[src_]})' for _, _, src_ in f.out_fields)}}};"
                 else:
                     src_ = f.out_fields[0][2]
                     give = f"return {counted};" if src_ == "result" else f"{counted}; return {parts[src_]};"
@@ -7197,7 +7198,7 @@ class TestWriter:
                 f"  {{  // {f.cpp}",
                 f'    converted::Tally tally("{f.name}");',
                 "    converted::Draw draw;   // (every function its own arguments, the same in every run)",
-                f"    const auto run = [&]({', '.join(f'[[maybe_unused]] converted::Passed<{t}> {n}' if n in kept else f'[[maybe_unused]] {t} {n}' for t, n in zip(types, names))}) {{ {give} }};",
+                f"    const auto run = [&]({', '.join(f'[[maybe_unused]] {t} {n}' for t, n in zip(types, names))}) {{ {give} }};",
                 "    for (int i = 0; tally.more(i); ++i) {",
                 *[f"      {x}" for x in decl_lines],
                 f"      const std::vector<converted::Value> given = {{{given_args}}};   // (what the Blueprint is given: before the call)",
@@ -7205,7 +7206,7 @@ class TestWriter:
                 "      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)",
                 "      converted::g_can_bail = true;",
                 "      converted::may_bail(true);",
-                f"      const auto want = {self.wrap('run(' + ', '.join(names) + ')', want_type)};",
+                f"      const auto want = {self.wrap('run(' + ', '.join(f'std::move({n})' if n in moved else n for n in names) + ')', want_type)};",
                 "      converted::g_can_bail = false;",
                 "      converted::may_bail(false);",
                 f"      tally.take(bp, given, want, watch.left(), [&] {{ return converted::shown_all(given); }}, {{{', '.join(str(k) for k in order)}}});",

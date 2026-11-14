@@ -866,6 +866,12 @@ inline std::string shown(const Value& v) {
     default: return v.as_text();
   }
 }
+/// The arguments of a call as the Blueprint is given them, for a failure's line.
+inline std::string shown_all(const std::vector<Value>& given) {
+  std::string out;
+  for (std::size_t i = 0; i < given.size(); ++i) out += (i ? ", " : "") + shown(given[i]);
+  return out;
+}
 
 inline constexpr int kCalls = 300;
 
@@ -1042,9 +1048,17 @@ inline void open_read() {
 }
 inline void wide::mark_open() { g_open = true; }
 
+/// How many entries a list has: a container, an array - or a view (kern::Span says its length as a field).
+template <class C> constexpr std::size_t entries(const C& c) {
+  if constexpr (requires { std::size(c); }) {
+    return std::size(c);
+  } else {
+    return c.size;
+  }
+}
 template <class C, class I> auto at(C&& c, I i) -> decltype(c[0]) {
   using R = decltype(c[0]);
-  const long long n = static_cast<long long>(std::size(c)), k = static_cast<long long>(i);
+  const long long n = static_cast<long long>(entries(c)), k = static_cast<long long>(i);
   if (k >= 0 && k < n) return c[static_cast<std::size_t>(k)];
   open_read();
   if constexpr (std::is_reference_v<R>) {
@@ -1122,7 +1136,7 @@ template <class C, class A, class B> auto erase(C& c, A first, B last) -> declty
   return c.erase(first, last);
 }
 template <class C> auto front(C&& c) -> decltype(c[0]) { return at(c, 0); }
-template <class C> auto back(C&& c) -> decltype(c[0]) { return at(c, static_cast<long long>(std::size(c)) - 1); }
+template <class C> auto back(C&& c) -> decltype(c[0]) { return at(c, static_cast<long long>(entries(c)) - 1); }
 
 // A 64-bit whole number is, in a Blueprint, the number its bits are read with a sign - exact while it is
 // within 2^53 of zero (unsigned C++ arithmetic around 2^64 comes out the same there). What the source
