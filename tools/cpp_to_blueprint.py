@@ -3169,6 +3169,8 @@ class Emit:
                     raise Wait(f"list: every {it} that equals a value is removed")
                 x = self.temp("gone", it)
                 return [f"{x} = {self.ex(kids(inner)[3], it)};", f"while (loop(list_contains<{it}>({lv}, {x}))) {{", f"  list_remove({lv}, {x});", "}"]
+            if inner.get("kind") == "CallExpr" and callee_name(inner) == "remove_if" and len(kids(inner)) == 4:
+                return self.removed_where(base, lv, it, kids(inner)[1:], args[1])
             if inner.get("kind") == "CallExpr" and callee_name(inner) in ("remove_if", "unique", "partition", "stable_partition"):
                 raise Wait("a function value (lambda / std::function)")
             (l0, first), (l1, last) = self.place(args[0]), self.place(args[1])
@@ -3365,6 +3367,28 @@ class Emit:
         self.hoist(lines + [f"{best} = {first};", f"{end} = {last};", f"{at} = {self.whole_math('+', best, '1')};", f"while (loop({more})) {{", *["  " + ln for ln in pre],
                             f"  if ({better}) {{", f"    {best} = {at};", "  }", f"  {at} += 1;", "}"])
         return best
+
+    def removed_where(self, base, lv, it, a, last):
+        """v.erase(std::remove_if(first, v.end(), f), v.end()): every entry from first on that f holds for
+        goes, the others stay in their order. As std::remove_if goes: f runs once for every entry, in their
+        order; an entry that stays is handed on to the next free place (a Take - nothing is copied), and the
+        list is cut after the last that stays (Set Length: no memory is asked for)."""
+        l0, lt, first, end = self.range_of("remove_if", a[0], a[1])
+        _, at_end = self.place(last)
+        here = self.spot(base)
+        if not self.same_list(l0, base) or here is None or here[0] != lv or end != at_end or at_end != f"list_length<{it}>({self.ex(base, lt)})":
+            raise Wait("algorithm: std::remove_if of a range that does not reach the end of its list")
+        g, given, lines = self.function_value("remove_if", a[2])
+        read, kept, stop = self.temp("at", "Int"), self.temp("kept", "Int"), self.temp("end", "Int")
+        pre, gone = self.lazily(lambda: self.invoke(g, given + [self.at_place(l0, read, it)])[0])
+        node = self.u.next_node
+        self.u.next_node += 1
+        self.u.members.append(f"  struct {{ {it} value = {self.u.zero(it)}; }} n{node};")
+        later = f'math_compare<"<">(kern::to<Float>({kept}), kern::to<Float>({read}))'
+        return lines + [f"{read} = {first};", f"{kept} = {read};", f"{stop} = {end};",
+                        f'while (loop(math_compare<"<">(kern::to<Float>({read}), kern::to<Float>({stop})))) {{', *["  " + ln for ln in pre],
+                        f"  if (logic_not({gone})) {{", f"    if ({later}) {{", f"      var_take(n{node}, {lv}[{read}]);", f"      {lv}[{kept}] = n{node}.value;", "    }",
+                        f"    {kept} += 1;", "  }", f"  {read} += 1;", "}", f"list_resize({lv}, {kept}, {self.u.zero(it)});"]
 
     def whole_list(self, first, last):
         """Are these two places the begin and the end of one list - begin()/end(), cbegin()/cend(),
