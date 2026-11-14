@@ -80,8 +80,7 @@ f32 kCourseScale = 0;
 namespace {
 rules::Blueprint g_military{"Military"}, g_zombies{"Zombies"}, g_sandbox{"Sandbox"}, g_fun{"Fun"}, g_race{"Race"};
 
-// The tables as the Blueprints have them - their rows, which keep the texts the game's rows point
-// into - and the game's rows.
+// The tables as the Blueprints have them - their rows - and the game's rows.
 /// The struct EnemySpec of the Blueprint "Sandbox".
 struct EnemyRow {
   std::string name;
@@ -332,13 +331,13 @@ bool bind_sandbox(kern::logic::Instance* blueprint) {
   g_enemies.clear();
   kEnemySpawnS = static_cast<f32>(g_sandbox.get<f64>("EnemySpawnS"));
   kComboS = static_cast<f32>(g_sandbox.get<f64>("ComboS"));
-  g_enemy_rows = g_sandbox.get<std::vector<EnemyRow>>("Enemies");  // (the rows stay as they are now: the specs point into their texts)
+  g_enemy_rows = g_sandbox.get<std::vector<EnemyRow>>("Enemies");
   if (g_enemy_rows.size() < 3) {  // (a row for each EnemyType)
     g_enemy_rows.clear();
     return false;
   }
   for (const EnemyRow& e : g_enemy_rows)
-    g_enemies.push_back({e.name.c_str(), static_cast<f32>(e.hp), static_cast<f32>(e.speed), static_cast<f32>(e.range), static_cast<f32>(e.shot_s), e.burst, static_cast<f32>(e.dmg),
+    g_enemies.push_back({e.name, static_cast<f32>(e.hp), static_cast<f32>(e.speed), static_cast<f32>(e.range), static_cast<f32>(e.shot_s), e.burst, static_cast<f32>(e.dmg),
                          static_cast<f32>(e.acc), e.score, static_cast<f32>(e.scale), e.color, e.stripe});
   return true;
 }
@@ -397,9 +396,9 @@ bool bind_fun(kern::logic::Instance* blueprint) {
   kFunComboS = static_cast<f32>(g_fun.get<f64>("FunComboS"));
   kOverdriveS = static_cast<f32>(g_fun.get<f64>("OverdriveS"));
   kMomentumTarget = static_cast<i32>(g_fun.get<f64>("MomentumTarget"));
-  g_contract_rows = g_fun.get<std::vector<ContractRow>>("Contracts");  // (the rows stay as they are now: the game's rows point into their texts)
+  g_contract_rows = g_fun.get<std::vector<ContractRow>>("Contracts");
   if (g_contract_rows.empty()) return false;
-  for (const ContractRow& c : g_contract_rows) g_contracts.push_back({c.id.c_str(), c.name.c_str(), c.hint.c_str(), c.target, c.reward});
+  for (const ContractRow& c : g_contract_rows) g_contracts.push_back({c.id, c.name, c.hint, c.target, c.reward});
   kContracts = static_cast<i32>(g_contracts.size());
   return true;
 }
@@ -471,8 +470,7 @@ bool bind_race(kern::logic::Instance* blueprint) {
     g_race.call("GateAt", std::tie(g), i);
     g_gate_rows.push_back(g);
   }
-  // (the rows stay as they are now: the game's gates point into their names)
-  for (const GateRow& g : g_gate_rows) g_gates.push_back({g.name.c_str(), g.center, static_cast<f32>(g.width), static_cast<f32>(g.height), g.start});
+  for (const GateRow& g : g_gate_rows) g_gates.push_back({g.name, g.center, static_cast<f32>(g.width), static_cast<f32>(g.height), g.start});
   kGates = static_cast<i32>(g_gates.size());
   return true;
 }
