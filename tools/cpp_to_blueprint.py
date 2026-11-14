@@ -7471,6 +7471,20 @@ class TestWriter:
             return self.names[q]
         raise Wait(f"the test has no values of {c}")
 
+    def in_scope(self, t, scope):
+        """A type as the compiler spells it where it is declared (in the class `scope`): a name it gives
+        without its classes (`std::vector<Part>` in VehicleArt) is the one C++ finds there - that class's,
+        or an outer one's - by its full name."""
+        parts = scope.split("::") if scope else []
+        def full(m):
+            word = m.group(0)
+            for i in range(len(parts), 0, -1):
+                q = "::".join(parts[:i]) + "::" + word
+                if q in self.tree.records or q in self.tree.enums:
+                    return q
+            return word
+        return re.sub(r"(?<![\w:])[A-Za-z_]\w*(?![\w:])", full, t)
+
     @staticmethod
     def span_of(raw, cleaned):
         """Of a view (kern::Span<const T>): ("const " or "", T) - as the source spells it."""
@@ -7600,7 +7614,7 @@ class TestWriter:
         ctors = [c for c in kids(o) if c.get("kind") == "CXXConstructorDecl" and not c.get("isImplicit")]
         # (the constructors the test's class has: those whose source it holds - the others are not part of it)
         held_ctors = [c for c in ctors if c.get("explicitlyDefaulted") or c["id"] in self.whole.kept or self.tree.body.get(c["id"], c)["id"] in self.whole.functions]
-        fields = [(c["name"], qtype(c)) for c in kids(o) if c.get("kind") == "FieldDecl"]
+        fields = [(c["name"], self.in_scope(qtype(c), q)) for c in kids(o) if c.get("kind") == "FieldDecl"]
         self.helped[q] = None
         try:
             make, built = f"  {t} s{{}};", None
@@ -7716,7 +7730,7 @@ class TestWriter:
                         variable, _ = self.u.state_variable(c["name"])
                     except Wait:
                         continue   # (no variable: what touches it waits)
-                    ft = qtype(c)
+                    ft = self.in_scope(qtype(c), q)
                     try:
                         if "&" in ft or re.match(r"(?:kern::)?Span<", self.u.clean(ft)):
                             raise Wait("a reference, a view")
@@ -8119,11 +8133,17 @@ class TestWriter:
                 return self.home_of(p)
         return q
 
-    def wrapped(self, q, text, local=None):
+    def outside_its_class(self, q, records):
+        """Is this a class defined outside the class it is declared in (`struct CityStream::Tile { ... };`),
+        which the test compiles along? Its text names that class itself."""
+        outer = q.rsplit("::", 1)[0] if "::" in q else ""
+        return bool(outer) and (self.top_of(q) != q or outer in records) and outer in self.tree.records and self.inside(self.tree.records[q], [self.tree.records[outer]]) is None
+
+    def wrapped(self, q, text, local=None, records=()):
         """A class's text where it stands in the test: in its namespaces - one defined outside its class
         (`struct CityStream::Tile { ... };`) names that class itself."""
         scope = q.rsplit("::", 1)[0] + "::" if "::" in q else ""
-        if self.top_of(q) != q:
+        if self.outside_its_class(q, records):
             names = self.spaces_of(scope) + ([local] if local else [])
             return "".join(f"namespace {c} {{ " for c in names) + text + " }" * len(names)
         return self.in_classes(scope, text, local)
@@ -8686,7 +8706,7 @@ class TestWriter:
                 segments.append((text, None if m.get("explicitlyDefaulted") else self.ident(m), raw[ma:mb].count("\n")))
                 at = end
             segments.append((tree.said(self.cut(d["_file"], at, b0, [])), None, 0))
-            inside_of = self.local_path(outer(q), local_of(d)) if self.top_of(q) == q else self.spaces_of(outer(q)) + ([local_of(d)] if local_of(d) else [])
+            inside_of = self.local_path(outer(q), local_of(d)) if not self.outside_its_class(q, G.records) else self.spaces_of(outer(q)) + ([local_of(d)] if local_of(d) else [])
             put(d, {"kind": "record", "segments": segments, "head": "".join(f"namespace {c} {{ " for c in inside_of), "tail": " }" * len(inside_of),
                     "pairs": [(self.absolute(x), names[x]) for x in names if self.compiled_top(x, G.records) == q] + [(self.absolute(x), enum_names[x]) for x in enum_names if self.compiled_top(x, G.records) == q and x not in G.enums]})
         for q in sorted(G.enums):
@@ -9115,7 +9135,7 @@ class TestWriter:
                     else:
                         inner.append((raw[a0:ma].count("\n"), raw[a0:mb].count("\n"), ("member", m["id"])))
                 text += self.cut(d["_file"], at, b0)
-                first = add(("record", q), self.wrapped(q, re.sub(r"^\s*class\b", "struct", wide(tree.said(text))) + ";"))
+                first = add(("record", q), self.wrapped(q, re.sub(r"^\s*class\b", "struct", wide(tree.said(text))) + ";", records=records))
                 where.extend((first + x, first + y, key) for x, y, key in inner)
             add(None, "\n".join(["#undef private", "#undef protected", '#pragma GCC diagnostic pop', ""]))
             for q, hl in self.helped.items():
@@ -9128,7 +9148,7 @@ class TestWriter:
                     home = self.compiled_top(q, records) or top_of(q)
                     outer_scope = home.rsplit("::", 1)[0] + "::" if "::" in home else ""
                     # (of a class defined outside its class - struct CityStream::Tile: the namespaces that class stands in)
-                    spaces = self.spaces_of(outer_scope) if top_of(home) != home else classes_of(outer_scope)
+                    spaces = self.spaces_of(outer_scope) if self.outside_its_class(home, records) else classes_of(outer_scope)
                     if spaces:   # (of a class in a namespace: there, where a call from converted.h looks for them)
                         hl = [*hl[:-5], "".join(f"namespace {c} {{ " for c in spaces) + "using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;",
                               *hl[-5:], "}" * len(spaces)]
