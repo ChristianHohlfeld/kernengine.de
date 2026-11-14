@@ -5,28 +5,12 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstring>
+
+#include "wire.h"
 
 namespace sc::town {
 
 namespace {
-struct Out {
-  std::vector<u8> b;
-  template <class T> Out& put(T v) { const auto* p = reinterpret_cast<const u8*>(&v); b.insert(b.end(), p, p + sizeof(T)); return *this; }
-};
-struct In {
-  const std::vector<u8>& b;
-  std::size_t at = 0;
-  bool ok = true;
-  template <class T> T get() {
-    T v{};
-    if (at + sizeof(T) > b.size()) { ok = false; return v; }
-    std::memcpy(&v, b.data() + at, sizeof(T));
-    at += sizeof(T);
-    return v;
-  }
-  bool done() const { return ok && at == b.size(); }
-};
 bool vec_finite(Vec3 v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z); }
 bool lamp_ok(const LampRec& r) { return r.state == 1 || r.state == 2; }
 bool plank_ok(const PlankRec& r) { return r.doors >= 1 && r.doors <= kDoorsMax && r.door < r.doors && r.planks <= kPlanksMax; }
@@ -39,76 +23,109 @@ Kind kind_of(const std::vector<u8>& blob) {
   return static_cast<Kind>(blob[0]);
 }
 
-std::vector<u8> pack(const CarHit& h) { return Out().put(static_cast<u8>(Kind::car_hit)).put(h.car).put(h.damage).put(static_cast<u8>(h.cause)).b; }
+std::vector<u8> pack(const CarHit& h) {
+  std::vector<u8> o;
+  wire::put_u8(o, static_cast<u8>(Kind::car_hit));
+  wire::put_u8(o, h.car);
+  wire::put_f32(o, h.damage);
+  wire::put_u8(o, static_cast<u8>(h.cause));
+  return o;
+}
 bool unpack(const std::vector<u8>& blob, CarHit& h) {
-  In in{blob};
-  if (in.get<u8>() != static_cast<u8>(Kind::car_hit)) return false;
-  h.car = in.get<u8>();
-  h.damage = in.get<f32>();
-  const u8 cause = in.get<u8>();
-  if (!in.done() || cause > static_cast<u8>(Cause::kLast) || !std::isfinite(h.damage) || !(h.damage > 0) || h.damage > 1e4f) return false;
+  wire::Reader in;
+  if (in.get_u8(blob) != static_cast<u8>(Kind::car_hit)) return false;
+  h.car = in.get_u8(blob);
+  h.damage = in.get_f32(blob);
+  const u8 cause = in.get_u8(blob);
+  if (!in.done(blob) || cause > static_cast<u8>(Cause::kLast) || !std::isfinite(h.damage) || !(h.damage > 0) || h.damage > 1e4f) return false;
   h.cause = static_cast<Cause>(cause);
   return true;
 }
 
-std::vector<u8> pack(const PersonHit& h) { return Out().put(static_cast<u8>(Kind::person_hit)).put(h.person).put(h.seed).put(h.damage).put(h.by).put(h.push).b; }
+std::vector<u8> pack(const PersonHit& h) {
+  std::vector<u8> o;
+  wire::put_u8(o, static_cast<u8>(Kind::person_hit));
+  wire::put_u8(o, h.person);
+  wire::put_u32(o, h.seed);
+  wire::put_f32(o, h.damage);
+  wire::put_u8(o, h.by);
+  wire::put_vec3(o, h.push);
+  return o;
+}
 bool unpack(const std::vector<u8>& blob, PersonHit& h) {
-  In in{blob};
-  if (in.get<u8>() != static_cast<u8>(Kind::person_hit)) return false;
-  h.person = in.get<u8>();
-  h.seed = in.get<u32>();
-  h.damage = in.get<f32>();
-  h.by = in.get<u8>();
-  h.push = in.get<Vec3>();
-  return in.done() && h.by <= 2 && std::isfinite(h.damage) && h.damage > 0 && h.damage <= 1e4f && vec_finite(h.push) && kern::length(h.push) <= 40;
+  wire::Reader in;
+  if (in.get_u8(blob) != static_cast<u8>(Kind::person_hit)) return false;
+  h.person = in.get_u8(blob);
+  h.seed = in.get_u32(blob);
+  h.damage = in.get_f32(blob);
+  h.by = in.get_u8(blob);
+  h.push = in.get_vec3(blob);
+  return in.done(blob) && h.by <= 2 && std::isfinite(h.damage) && h.damage > 0 && h.damage <= 1e4f && vec_finite(h.push) && kern::length(h.push) <= 40;
 }
 
 std::vector<std::vector<u8>> pack_lamps(const std::vector<LampRec>& lamps) {
   std::vector<std::vector<u8>> out;
   for (std::size_t from = 0; from < lamps.size(); from += 255) {
     const std::size_t n = std::min<std::size_t>(255, lamps.size() - from);
-    Out o;
-    o.put(static_cast<u8>(Kind::lamps)).put(static_cast<u8>(n));
-    for (std::size_t i = from; i < from + n; ++i) o.put(lamps[i].key).put(lamps[i].state);
-    out.push_back(std::move(o.b));
+    std::vector<u8> o;
+    wire::put_u8(o, static_cast<u8>(Kind::lamps));
+    wire::put_u8(o, static_cast<u8>(n));
+    for (std::size_t i = from; i < from + n; ++i) { wire::put_i64(o, lamps[i].key); wire::put_u8(o, lamps[i].state); }
+    out.push_back(std::move(o));
   }
   return out;
 }
 bool unpack_lamps(const std::vector<u8>& blob, std::vector<LampRec>& lamps) {
-  In in{blob};
+  wire::Reader in;
   lamps.clear();
-  if (in.get<u8>() != static_cast<u8>(Kind::lamps)) return false;
-  const u8 n = in.get<u8>();
+  if (in.get_u8(blob) != static_cast<u8>(Kind::lamps)) return false;
+  const u8 n = in.get_u8(blob);
   for (u8 i = 0; i < n && in.ok; ++i) {
     LampRec r;
-    r.key = in.get<i64>();
-    r.state = in.get<u8>();
+    r.key = in.get_i64(blob);
+    r.state = in.get_u8(blob);
     if (!in.ok || !lamp_ok(r)) return false;
     lamps.push_back(r);
   }
-  return in.done();
+  return in.done(blob);
 }
 
-std::vector<u8> pack(const PlankStep& s) { return Out().put(static_cast<u8>(Kind::plank_step)).put(s.key).put(s.door).put(s.doors).put(s.step).b; }
+std::vector<u8> pack(const PlankStep& s) {
+  std::vector<u8> o;
+  wire::put_u8(o, static_cast<u8>(Kind::plank_step));
+  wire::put_i64(o, s.key);
+  wire::put_u8(o, s.door);
+  wire::put_u8(o, s.doors);
+  wire::put_i8(o, s.step);
+  return o;
+}
 bool unpack(const std::vector<u8>& blob, PlankStep& s) {
-  In in{blob};
-  if (in.get<u8>() != static_cast<u8>(Kind::plank_step)) return false;
-  s.key = in.get<i64>();
-  s.door = in.get<u8>();
-  s.doors = in.get<u8>();
-  s.step = in.get<kern::i8>();
-  return in.done() && s.doors >= 1 && s.doors <= kDoorsMax && s.door < s.doors && (s.step == 1 || s.step == -1);
+  wire::Reader in;
+  if (in.get_u8(blob) != static_cast<u8>(Kind::plank_step)) return false;
+  s.key = in.get_i64(blob);
+  s.door = in.get_u8(blob);
+  s.doors = in.get_u8(blob);
+  s.step = in.get_i8(blob);
+  return in.done(blob) && s.doors >= 1 && s.doors <= kDoorsMax && s.door < s.doors && (s.step == 1 || s.step == -1);
 }
 
-std::vector<u8> pack(const PlankRec& r) { return Out().put(static_cast<u8>(Kind::planks)).put(r.key).put(r.door).put(r.doors).put(r.planks).b; }
+std::vector<u8> pack(const PlankRec& r) {
+  std::vector<u8> o;
+  wire::put_u8(o, static_cast<u8>(Kind::planks));
+  wire::put_i64(o, r.key);
+  wire::put_u8(o, r.door);
+  wire::put_u8(o, r.doors);
+  wire::put_u8(o, r.planks);
+  return o;
+}
 bool unpack(const std::vector<u8>& blob, PlankRec& r) {
-  In in{blob};
-  if (in.get<u8>() != static_cast<u8>(Kind::planks)) return false;
-  r.key = in.get<i64>();
-  r.door = in.get<u8>();
-  r.doors = in.get<u8>();
-  r.planks = in.get<u8>();
-  return in.done() && plank_ok(r);
+  wire::Reader in;
+  if (in.get_u8(blob) != static_cast<u8>(Kind::planks)) return false;
+  r.key = in.get_i64(blob);
+  r.door = in.get_u8(blob);
+  r.doors = in.get_u8(blob);
+  r.planks = in.get_u8(blob);
+  return in.done(blob) && plank_ok(r);
 }
 
 std::vector<u8> pack_ask() { return {static_cast<u8>(Kind::ask)}; }
@@ -126,15 +143,17 @@ std::vector<std::vector<u8>> pack_state(u32 epoch, const std::vector<LampRec>& l
     room -= np * kPlankBytes;
     const std::size_t nm = li + nl == lamps.size() && pi + np == planks.size() ? std::min(marks.size() - mi, room / kMarkBytes) : 0;
     const bool last = li + nl == lamps.size() && pi + np == planks.size() && mi + nm == marks.size();
-    Out o;
-    o.put(static_cast<u8>(Kind::state)).put(epoch).put(static_cast<u8>((out.empty() ? 1 : 0) | (last ? 2 : 0)));
-    o.put(static_cast<u16>(nl));
-    for (std::size_t i = li; i < li + nl; ++i) o.put(lamps[i].key).put(lamps[i].state);
-    o.put(static_cast<u16>(np));
-    for (std::size_t i = pi; i < pi + np; ++i) o.put(planks[i].key).put(planks[i].door).put(planks[i].doors).put(planks[i].planks);
-    o.put(static_cast<u16>(nm));
-    for (std::size_t i = mi; i < mi + nm; ++i) o.put(marks[i].at).put(marks[i].radius).put(marks[i].strength);
-    out.push_back(std::move(o.b));
+    std::vector<u8> o;
+    wire::put_u8(o, static_cast<u8>(Kind::state));
+    wire::put_u32(o, epoch);
+    wire::put_u8(o, static_cast<u8>((out.empty() ? 1 : 0) | (last ? 2 : 0)));
+    wire::put_u16(o, static_cast<u16>(nl));
+    for (std::size_t i = li; i < li + nl; ++i) { wire::put_i64(o, lamps[i].key); wire::put_u8(o, lamps[i].state); }
+    wire::put_u16(o, static_cast<u16>(np));
+    for (std::size_t i = pi; i < pi + np; ++i) { wire::put_i64(o, planks[i].key); wire::put_u8(o, planks[i].door); wire::put_u8(o, planks[i].doors); wire::put_u8(o, planks[i].planks); }
+    wire::put_u16(o, static_cast<u16>(nm));
+    for (std::size_t i = mi; i < mi + nm; ++i) { wire::put_vec3(o, marks[i].at); wire::put_f32(o, marks[i].radius); wire::put_f32(o, marks[i].strength); }
+    out.push_back(std::move(o));
     li += nl;
     pi += np;
     mi += nm;
@@ -143,41 +162,41 @@ std::vector<std::vector<u8>> pack_state(u32 epoch, const std::vector<LampRec>& l
 }
 
 bool unpack_state(const std::vector<u8>& blob, State& s) {
-  In in{blob};
+  wire::Reader in;
   s = State{};
-  if (in.get<u8>() != static_cast<u8>(Kind::state)) return false;
-  s.epoch = in.get<u32>();
-  const u8 flags = in.get<u8>();
+  if (in.get_u8(blob) != static_cast<u8>(Kind::state)) return false;
+  s.epoch = in.get_u32(blob);
+  const u8 flags = in.get_u8(blob);
   s.first = flags & 1;
   s.last = flags & 2;
-  const u16 nl = in.get<u16>();
+  const u16 nl = in.get_u16(blob);
   for (u16 i = 0; i < nl && in.ok; ++i) {
     LampRec r;
-    r.key = in.get<i64>();
-    r.state = in.get<u8>();
+    r.key = in.get_i64(blob);
+    r.state = in.get_u8(blob);
     if (!in.ok || !lamp_ok(r)) return false;
     s.lamps.push_back(r);
   }
-  const u16 np = in.get<u16>();
+  const u16 np = in.get_u16(blob);
   for (u16 i = 0; i < np && in.ok; ++i) {
     PlankRec r;
-    r.key = in.get<i64>();
-    r.door = in.get<u8>();
-    r.doors = in.get<u8>();
-    r.planks = in.get<u8>();
+    r.key = in.get_i64(blob);
+    r.door = in.get_u8(blob);
+    r.doors = in.get_u8(blob);
+    r.planks = in.get_u8(blob);
     if (!in.ok || !plank_ok(r)) return false;
     s.planks.push_back(r);
   }
-  const u16 nm = in.get<u16>();
+  const u16 nm = in.get_u16(blob);
   for (u16 i = 0; i < nm && in.ok; ++i) {
     MarkRec m;
-    m.at = in.get<Vec3>();
-    m.radius = in.get<f32>();
-    m.strength = in.get<f32>();
+    m.at = in.get_vec3(blob);
+    m.radius = in.get_f32(blob);
+    m.strength = in.get_f32(blob);
     if (!in.ok || !mark_ok(m)) return false;
     s.marks.push_back(m);
   }
-  return in.done();
+  return in.done(blob);
 }
 
 }  // namespace sc::town

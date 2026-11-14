@@ -367,17 +367,18 @@ SKIP = ("ParenExpr", "ExprWithCleanups", "MaterializeTemporaryExpr", "CXXBindTem
 
 # ---- the bytes of a value (Bytes of Struct, Struct of Bytes - kern/docs/blueprint_cpp.md) ----------------
 # The number a field is in a layout, by the type C++ gives it - its spelling first (uint32_t is 32 bits on every
-# platform), then what that is. What the platform decides (the width of a long, the sign of a char), a float (the
-# language holds it in 64 bits) and anything that is no number have no place in a layout yet.
+# platform), then what that is. A float is f32: the field is a Float, its bytes those of the number as a float
+# (rounded as C++ rounds it to one). What the platform decides (the width of a long, the sign of a char) and
+# anything that is no number have no place in a layout yet.
 BYTE_CODES = {"bool": "bool", "uint8_t": "u8", "std::uint8_t": "u8", "u8": "u8", "int8_t": "i8", "std::int8_t": "i8", "i8": "i8",
               "uint16_t": "u16", "std::uint16_t": "u16", "u16": "u16", "int16_t": "i16", "std::int16_t": "i16", "i16": "i16",
               "uint32_t": "u32", "std::uint32_t": "u32", "u32": "u32", "int32_t": "i32", "std::int32_t": "i32", "i32": "i32",
               "uint64_t": "u64", "std::uint64_t": "u64", "u64": "u64", "int64_t": "i64", "std::int64_t": "i64", "i64": "i64",
-              "double": "f64", "f64": "f64", "unsigned char": "u8", "signed char": "i8", "short": "i16", "unsigned short": "u16", "int": "i32",
+              "float": "f32", "f32": "f32", "double": "f64", "f64": "f64", "unsigned char": "u8", "signed char": "i8", "short": "i16", "unsigned short": "u16", "int": "i32",
               "unsigned int": "u32", "long long": "i64", "unsigned long long": "u64"}
-BYTE_WIDTH = {"bool": 1, "u8": 1, "i8": 1, "u16": 2, "i16": 2, "u32": 4, "i32": 4, "u64": 8, "i64": 8, "f64": 8}
+BYTE_WIDTH = {"bool": 1, "u8": 1, "i8": 1, "u16": 2, "i16": 2, "u32": 4, "i32": 4, "u64": 8, "i64": 8, "f32": 4, "f64": 8}
 # (the Blueprint type of a field of each such number)
-BYTE_FIELD = {"bool": "Bool", "u8": "Int", "i8": "Int", "u16": "Int", "i16": "Int", "u32": "Int", "i32": "Int", "u64": "Int64", "i64": "Int64", "f64": "Float"}
+BYTE_FIELD = {"bool": "Bool", "u8": "Int", "i8": "Int", "u16": "Int", "i16": "Int", "u32": "Int", "i32": "Int", "u64": "Int64", "i64": "Int64", "f32": "Float", "f64": "Float"}
 # A pointer to bytes: what C++ reads any object's bytes through (and a void*, which is read as one of these)
 BYTE_POINTER = re.compile(r"const\s+(?:void|unsigned\s+char|uint8_t|std::uint8_t|u8|std::byte)\s*\*$")
 
@@ -390,8 +391,6 @@ def byte_code(raw):
     plain = re.sub(r"^(?:const\s+|volatile\s+)+", "", (raw.get("desugaredQualType") or spelled).strip())
     if plain in BYTE_CODES:
         return BYTE_CODES[plain]
-    if plain in ("float",) or spelled in ("float", "f32"):
-        raise Wait("the bytes of a float (the language holds it in 64 bits)")
     if plain in ("char", "long", "unsigned long", "wchar_t") or spelled in ("size_t", "std::size_t", "usize"):
         raise Wait(f"the bytes of a {spelled} (its width or its sign is the platform's)")
     raise Wait(f"the bytes of a {spelled} (no number)")
@@ -428,6 +427,19 @@ def record_bytes(tree, q):
     return text, size, [(c.get("name"), code) for c, code in zip(fields, codes)]
 
 
+def record_of(tree, v):
+    """The qualified name of the record the expression v is a value of - None: it is none (or one of several of
+    that name)."""
+    raw = re.sub(r"^(?:const\s+|volatile\s+)+", "", (v.get("type") or {}).get("desugaredQualType") or qtype(v)).strip()
+    raw = re.sub(r"^(?:struct|class)\s+", "", raw)
+    if raw in tree.records:
+        return raw
+    # (the tree names a record without the namespace that is converted - `sc::wire::F32` is `wire::F32`)
+    found = [r for r in tree.records if raw.endswith("::" + r) or r.endswith("::" + raw)]
+    longest = [r for r in found if len(r) == max(map(len, found))]
+    return longest[0] if len(longest) == 1 else None
+
+
 def addressed_record(tree, a):
     """`&x` (also cast to a pointer to bytes) where x is a value of a record: (x, the record's qualified name) - else None."""
     x = bare(a)
@@ -441,10 +453,8 @@ def addressed_record(tree, a):
     if x.get("kind") != "UnaryOperator" or x.get("opcode") != "&" or not kids(x):
         return None
     v = bare(kids(x)[0])
-    raw = re.sub(r"^(?:const\s+|volatile\s+)+", "", (v.get("type") or {}).get("desugaredQualType") or qtype(v)).strip()
-    raw = re.sub(r"^(?:struct|class)\s+", "", raw)
-    found = [raw] if raw in tree.records else [r for r in tree.records if r.endswith("::" + raw)]
-    return (v, found[0]) if len(found) == 1 else None
+    q = record_of(tree, v)
+    return (v, q) if q is not None else None
 
 
 def bare(n):
@@ -508,9 +518,11 @@ class Tree:
                 if z and name:
                     self.layouts.setdefault(name, (int(z.group(1)), fields))
                     name = ""
-        if q not in self.layouts:
-            raise Wait(f"the bytes of a {q.split('::')[-1]} (the compiler gives no layout of it here)")
-        return self.layouts[q]
+        # (the compiler names a record with all its namespaces; the tree without the one that is converted)
+        for name in (q, f"{self.namespace}::{q}"):
+            if name in self.layouts:
+                return self.layouts[name]
+        raise Wait(f"the bytes of a {q.split('::')[-1]} (the compiler gives no layout of it here)")
 
     def __init__(self, path, namespace, flags, spaces=()):
         self.path = os.path.abspath(path)
@@ -3892,6 +3904,7 @@ class Emit:
             b = bare(kids(b)[-1])
         if b.get("kind") == "IntegerLiteral":
             return str(int(b["value"]) - 1)
+        # (a bound that is itself a conversion - `i < from + n` - is a value of its own first: conv)
         return f"kern::to<Int>(kern::formula([](Float n) -> Float {{ return n - 1.0; }}, {self.conv(text, 'Int', 'Float')}))"
 
     def refers(self, n, decl_id):
@@ -6454,6 +6467,25 @@ class Emit:
             return str(self.offset_of(b)), "Int"
         raise Wait(f"an expression: {k}")
 
+    def bit_cast(self, b, x):
+        """std::bit_cast<std::array<u8, N>>(value), the value one of a struct of numbers: its bytes (Bytes of Struct,
+        in the layout C++ gives the struct) - a list of that fixed length, made where the cast is; nothing is asked
+        for, as for the std::array. A cast to anything else waits."""
+        c = self.ctype(b)
+        if not c.startswith("std::array<"):
+            return self.number_bits(b, x)   # (between a float and a whole number of its width)
+        entry = template_args(c)[0] if c.startswith("std::array<") else None
+        q = record_of(self.tree, bare(x))
+        if entry is None or self.u.clean(entry) != "unsigned char" or q is None:
+            raise Wait("std::bit_cast to anything but the bytes of a struct")
+        st, text, size = self.u.byte_layout(q)
+        if self.u.fixed(qtype(b)) != size:
+            raise Wait("std::bit_cast to bytes of another size")   # (C++ does not take that either)
+        lt = "List<Int>"
+        tmp = self.temp("bytes", lt, size)
+        self.hoist([f"{tmp} = struct_bytes<{st}, {text_literal(text)}>({self.ex(x, st)});"])
+        return tmp, lt
+
     def offset_of(self, n):
         """offsetof(S, field): where the field begins in a value of S, as the compiler lays S out (Tree.layout). The
         compiler's tree does not say which field it is: the source does, where the macro is written."""
@@ -6786,7 +6818,7 @@ class Emit:
         text, have = self.value(n)
         return text if have == self.whole64() else self.to64(text, have)
 
-    def bit_cast(self, n, x):
+    def number_bits(self, n, x):
         """std::bit_cast between a float and a whole number of its width: the same bits read as the other type -
         32 bits (Bits of Float 32, Float 32 of Bits: a u32 is 0 .. 2^32 - 1, an i32 its two's complement) and
         64 bits (Bits of Float, Float of Bits: the Int64 the 64-bit number is)."""
@@ -7289,8 +7321,9 @@ class Emit:
                     if n in (f"list_length<{it}>({self.ex(lst, t)})", str(u.fixed(qtype(lst)))):
                         return self.ex(lst, t), t
                 raise Wait("a view (Span) of a part of a list")
-            if len(a) in (1, 2) and self.tp_or_none(a[0]) in ("Int", "Float") and (len(a) == 1 or self.tp_or_none(a[1]) is not None):
-                # std::vector<T>(n) and (n, x): n entries, each T's zero or x
+            if len(a) in (1, 2) and self.tp_or_none(a[0]) in ("Int", "Float") and (len(a) == 1 or self.tp_or_none(a[1]) is not None) and not (len(a) == 2 and self.is_iter(a[0])):
+                # std::vector<T>(n) and (n, x): n entries, each T's zero or x (a place in a list is an Int as well:
+                # two of them are the range below)
                 made = self.temp("made", t)
                 self.hoist([f"{made} = {t}{{}};", f"list_resize({made}, {self.ex(a[0], 'Int')}, {self.ex(a[1], it) if len(a) == 2 else u.zero(it)});"])
                 return made, t
@@ -7302,8 +7335,10 @@ class Emit:
                     raise Wait("a list made of a range of another type")
                 if self.whole_list(a[0], a[1]):
                     return self.ex(s0, st), t   # (the whole list: a copy of it)
-                made, src, i0, i1 = self.temp("made", t), self.temp("from", st), self.temp("first", "Int"), self.temp("last", "Int")
-                self.hoist([f"{made} = {t}{{}};", f"{src} = {self.ex(s0, st)};", f"{i0} = {first};", f"{i1} = {self.whole_math('-', last, '1')};",
+                # (the entries read where the list stands - nothing is copied but them, as in C++)
+                src = self.place_arg(s0, st, "const", [])
+                made, i0, i1 = self.temp("made", t), self.temp("first", "Int"), self.temp("last", "Int")
+                self.hoist([f"{made} = {t}{{}};", f"{i0} = {first};", f"{i1} = {self.whole_math('-', last, '1')};",
                             f"list_reserve({made}, {self.whole_math('+', self.whole_math('-', i1, i0), '1')});"]
                            + self.count_loop(i0, i1, lambda i: [f"list_add({made}, list_get<{it}>({src}, {i}));"]))
                 return made, t
@@ -7895,11 +7930,72 @@ class TestWriter:
                 return self.u.pointed(qtype(r)) is not None
             except Wait:
                 return False
+        def wide_layout(q):
+            """The fields of the record q where the test holds them otherwise than the program (a float of the
+            program is a 64-bit number there): ([(field, its number, its place)], the size) - None where the test
+            holds every field as the program does (record_bytes)."""
+            try:
+                text, size, fields = record_bytes(self.tree, q) if q is not None else (None, None, ())
+            except Wait:
+                return None
+            if not any(code == "f32" for _, code in fields):
+                return None
+            places = [int(f.split("@")[1]) for f in text.split(":", 1)[1].split()]
+            return [(name, code, at) for (name, code), at in zip(fields, places)], size
+        def bytes_text(value, layout):
+            """The bytes of a value as the program lays it out (converted::layout)."""
+            fields, size = layout
+            steps = " ".join("converted::layout::%s(o_ + %d, v_.%s);" % ("single_to" if code == "f32" else "raw_to", at, name) for name, code, at in fields)
+            return "converted::layout::bytes_of<%d>(%s, [](const auto& v_, kern::u8* o_) { %s })" % (size, value, steps)
+        def text_of(x):
+            xa, xb = span(x)
+            return raw[xa:xb]
         visited = set()
         def visit(n, depth):
             if n.get("_call") is not None:   # (a place written out for a call: the source has the call)
                 return visit(n["_call"], depth)
             k, ks = n.get("kind"), kids(n)
+            # the bytes of a value of a struct with a float, as the program lays them out (Bytes of Struct,
+            # Struct of Bytes): the test holds the float as a 64-bit number
+            if k == "CallExpr" and callee_name(n) == "bit_cast" and len(ks) == 2:
+                # the bits of a float of the program (the test holds it as a 64-bit number): of the float it is
+                plain = lambda x: re.sub(r"\bconst\b", "", qtype(x)).strip()
+                to, frm = plain(n), plain(ks[1])
+                if frm == "float" and to in ("unsigned int", "int"):
+                    a, b = span(n)
+                    edits.append((a, 1, 0, b, "static_cast<%s>(converted::layout::float_bits(%s))" % (to, text_of(ks[1]))))
+                    return
+                if to == "float" and frm in ("unsigned int", "int"):
+                    a, b = span(n)
+                    edits.append((a, 1, 0, b, "converted::layout::float_of_bits(static_cast<kern::u32>(%s))" % text_of(ks[1])))
+                    return
+                lay = wide_layout(record_of(self.tree, bare(ks[1])))
+                if lay is not None:
+                    a, b = span(n)
+                    edits.append((a, 1, 0, b, bytes_text(text_of(ks[1]), lay)))
+                    return
+            if k == "CallExpr" and callee_name(n) in ("memcpy", "memmove") and len(ks) == 4:
+                held = addressed_record(self.tree, ks[1])
+                lay = wide_layout(held[1]) if held is not None else None
+                if lay is not None:
+                    a, b = span(n)
+                    steps = " ".join("converted::layout::%s(v_.%s, p_ + %d);" % ("single_from" if code == "f32" else "raw_from", name, at) for name, code, at in lay[0])
+                    edits.append((a, 1, 0, b, "converted::layout::of_bytes(%s, %s, [](auto& v_, const kern::u8* p_) { %s })" % (text_of(held[0]), text_of(ks[2]), steps)))
+                    return
+            if k in ("CallExpr", "CXXMemberCallExpr"):
+                # the address of such a value handed to a pointer to bytes: its bytes, for the call
+                member = k == "CXXMemberCallExpr" and bool(ks) and ks[0].get("kind") == "MemberExpr"
+                fn = bare(ks[0]) if ks else {}
+                while fn.get("kind") in ("ImplicitCastExpr", "ParenExpr") and kids(fn):
+                    fn = bare(kids(fn)[0])
+                target = ks[0].get("referencedMemberDecl") if member else (fn.get("referencedDecl") or {}).get("id")
+                params = [p for p in kids(self.tree.decl.get(target) or {}) if p.get("kind") == "ParmVarDecl"]
+                for x, p in zip(ks[1:], params):
+                    held = addressed_record(self.tree, x) if BYTE_POINTER.match(qtype(p).strip()) else None
+                    lay = wide_layout(held[1]) if held is not None else None
+                    if lay is not None:
+                        xa, xb = span(x)
+                        edits.append((xa, 1, 0, xb, bytes_text(text_of(held[0]), lay) + ".data()"))
             if k == "VarDecl" and re.match(r"const\s+[^*&]+\*$", qtype(n).strip()) and n.get("init") and ks and into_list(ks[-1]):
                 aliases.add(n.get("id"))
             if n.get("id") is not None:
