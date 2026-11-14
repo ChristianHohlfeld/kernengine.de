@@ -114,7 +114,7 @@ The result `PickHit` contains the mesh id, instance, triangle, distance, hit poi
 
 ```cpp
 PickHit hit;
-if (engine.renderer.pick(in.pointer().x, in.pointer().y, {}, hit) && hit.mesh == boxes_) {
+if (engine.renderer().pick(in.pointer().x, in.pointer().y, {}, hit) && hit.mesh == boxes_) {
   // examples/hello: color the clicked crate red
   tints_[hit.instance * 4 + 0] = 1.0f; tints_[hit.instance * 4 + 1] = 0.25f; tints_[hit.instance * 4 + 2] = 0.2f;
 }

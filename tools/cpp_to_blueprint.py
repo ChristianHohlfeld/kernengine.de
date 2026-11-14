@@ -2115,6 +2115,10 @@ class Emit:
                     # name stands: a field made as its class makes it. The struct has that as its default.)
                     continue
                 fname, ft = u.field(f.self_type, init["anyInit"]["name"])
+                if u.object_of(qtype(init["anyInit"])) and (self.maker_of(e) is not None or any(callee_name(x) == "make_unique" for x in walk(e) if x.get("kind") == "CallExpr")):
+                    # (an object of the engine its owner makes: it ends with its owner - which a value of the
+                    # Blueprint has not; see the plan for the fields of objects of the engine)
+                    raise Wait("an object of the engine as a field, made with its owner")
                 saved, self.pre = self.pre, []
                 text = self.ex(e, ft)
                 lines += self.pre + [f"{self.self_name}.{fname} = {text};"]

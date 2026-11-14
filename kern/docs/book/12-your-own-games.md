@@ -241,7 +241,7 @@ fills in width and height itself.
 
 ```cpp
   bool start(Engine& engine) override {
-    Renderer& r = engine.renderer;
+    Renderer& r = engine.renderer();
     ground_ = r.allocate_id();
     MeshInput g = ground_mesh_.as_input();
     g.material.color = {0.42f, 0.47f, 0.40f, 1};
@@ -270,7 +270,7 @@ matrices beforehand.
 
 ```cpp
   void update(Engine& engine, const Frame& frame) override {
-    Input& in = engine.input;
+    Input& in = engine.input();
     if (in.button(0)) yaw_ -= in.pointer_delta().x * 0.005f;
     if (in.down(Key::left)) yaw_ += frame.dt * 1.5f;
     if (in.down(Key::right)) yaw_ -= frame.dt * 1.5f;
@@ -282,16 +282,17 @@ Holding the left mouse button rotates by the pointer's movement, the arrow keys 
 8 and 80 m.
 
 ```cpp
-    Camera& c = engine.renderer.camera;
+    Camera c = engine.renderer().camera();
     c.target = {0, 0, 1};
     c.eye = {std::cos(yaw_) * distance_, std::sin(yaw_) * distance_, distance_ * 0.6f};
+    engine.renderer().set_camera(c);
 ```
 
-The camera is a field of the renderer: eye point, target (and field of view, near, far). Z points up.
+The camera belongs to the renderer (`camera()`, `set_camera()`): eye point, target (and field of view, near, far). Z points up.
 
 ```cpp
     layout(static_cast<f32>(frame.time));
-    engine.renderer.update_instances(boxes_, Span<const f32>(transforms_.data(), transforms_.size()),
+    engine.renderer().update_instances(boxes_, Span<const f32>(transforms_.data(), transforms_.size()),
                                      Span<const f32>(tints_.data(), tints_.size()));
 ```
 
@@ -301,7 +302,7 @@ detects unchanged instances and does not upload them again.
 ```cpp
     if (in.button_pressed(0)) {
       PickHit hit;
-      if (engine.renderer.pick(in.pointer().x, in.pointer().y, {}, hit) && hit.mesh == boxes_) {
+      if (engine.renderer().pick(in.pointer().x, in.pointer().y, {}, hit) && hit.mesh == boxes_) {
         tints_[hit.instance * 4 + 0] = 1.0f; tints_[hit.instance * 4 + 1] = 0.25f; tints_[hit.instance * 4 + 2] = 0.2f;
       }
     }
@@ -428,8 +429,8 @@ half of the screen steers and accelerates (deflection from the touch-down point)
 
 ```cpp
   void update(Engine& engine, const Frame& frame) override {
-    Renderer& r = engine.renderer;
-    Input& in = engine.input;
+    Renderer& r = engine.renderer();
+    Input& in = engine.input();
     const f32 dt = frame.dt;
     if (in.pressed(Key::enter)) new_run(engine, rng_.next());
     if (in.pressed(Key::n)) fast_time_ = !fast_time_;
@@ -504,9 +505,12 @@ and moonlight, as well as sky, ground and fog color, ambient light and exposure:
     l.sun_direction = sun.z > -0.04f ? sun : moon;
     l.sun_color = mix3(mix3(day_sun, dusk_sun, dusk), moon_light, night);
     ...
-    r.sky.sun = sun;
-    r.sky.moon = moon;
-    r.sky.night = night;
+    r.set_lighting(l);
+    SkyState sky = r.sky();
+    sky.sun = sun;
+    sky.moon = moon;
+    sky.night = night;
+    r.set_sky(sky);
     windows_.night = night;
 ```
 

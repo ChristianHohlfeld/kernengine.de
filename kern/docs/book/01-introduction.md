@@ -201,7 +201,7 @@ class Hello final : public App {
   }
 
   bool start(Engine& engine) override {
-    Renderer& r = engine.renderer;
+    Renderer& r = engine.renderer();
     ground_ = r.allocate_id();
     MeshInput g = ground_mesh_.as_input();
     g.material.color = {0.42f, 0.47f, 0.40f, 1};
