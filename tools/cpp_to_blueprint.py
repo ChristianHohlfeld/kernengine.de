@@ -3141,6 +3141,18 @@ class Emit:
         is written out (the first field of the value, the second ...)."""
         fields = self.u.struct_fields.get(bt)
         binds = [c for c in kids(d) if c.get("kind") == "BindingDecl"]
+        lt = self.u.rows.get(bt, bt)
+        if lt.startswith("List<") and self.u.fixed(re.sub(r"&", "", qtype(d))) == len(binds):
+            # `auto& [x, y, w] = an_array;` - the names are its entries: x is the entry 0, where it stands
+            ids = {c["id"]: i for i, c in enumerate(binds)}
+            for n in walk(self.f.decl):
+                if n.get("kind") == "DeclRefExpr" and n.get("referencedDecl", {}).get("id") in ids:
+                    whole = {"kind": "DeclRefExpr", "referencedDecl": {"id": d["id"], "kind": "VarDecl", "name": d.get("name", "")}, "type": d.get("type", {}), "_bt": bt}
+                    at = {"kind": "IntegerLiteral", "value": str(ids[n["referencedDecl"]["id"]]), "type": {"qualType": "int"}}
+                    was = n.get("type", {})
+                    n.clear()
+                    n.update({"kind": "ArraySubscriptExpr", "type": was, "_bt": lt[5:-1], "inner": [whole, at]})
+            return
         if fields is None or len(fields) != len(binds) or any(f[3] is None for f in fields):
             raise Wait("names for the parts of something that is not a struct")
         ids = {c["id"]: i for i, c in enumerate(binds)}
