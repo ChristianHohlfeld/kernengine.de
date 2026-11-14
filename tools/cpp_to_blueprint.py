@@ -131,7 +131,8 @@ TEXT = {"const char *", "std::basic_string<char>", "std::string", "std::basic_st
         "std::basic_string_view<char, std::char_traits<char>>"}
 # (the names the engine writes these types with, where clang gives the name as written)
 ALIAS = {"f32": "float", "f64": "double", "i8": "signed char", "i16": "short", "i32": "int", "i64": "whole64s", "u8": "unsigned char", "u16": "unsigned short", "u32": "unsigned int",
-         "u64": "whole64u", "uint64_t": "whole64u", "int64_t": "whole64s", "usize": "unsigned long", "size_t": "unsigned long", "Vec2": "kern::Vec2", "Vec3": "kern::Vec3", "Vec4": "kern::Vec4", "Quat": "kern::Quat",
+         "u64": "whole64u", "uint64_t": "whole64u", "int64_t": "whole64s", "uint8_t": "unsigned char", "uint16_t": "unsigned short",
+         "uint32_t": "unsigned int", "int8_t": "signed char", "int16_t": "short", "int32_t": "int", "usize": "unsigned long", "size_t": "unsigned long", "Vec2": "kern::Vec2", "Vec3": "kern::Vec3", "Vec4": "kern::Vec4", "Quat": "kern::Quat",
          "Mat4": "kern::Mat4"}
 ZERO = {"Float": "0.0", "Int": "0", "Bool": "false", "Vector": "Vector{0.0, 0.0, 0.0}", "Text": '""'}
 # (functions of numbers a formula has, by the names C++ calls them)
@@ -874,7 +875,7 @@ class Unit:
         if "enum at " in t:   # (a place of an enum without a name holds a number of its underlying type)
             t = re.sub(r"(?:[A-Za-z_]\w*::)*(\((?:unnamed|anonymous) enum at [^)]*\))", lambda m: self.tree.unnamed.get(m.group(1), m.group(0)), t)
         t = re.sub(r"\b(const|volatile|struct|class|enum)\b", " ", t).replace("&&", " ").replace("&", " ")
-        t = re.sub(r"(?<![\w:])(?:kern::|std::)?(f32|f64|i8|i16|i32|i64|u8|u16|u32|u64|uint64_t|int64_t|usize|Vec2|Vec3|Vec4|Quat|Mat4|size_t)\b", lambda m: ALIAS[m.group(1)], t)
+        t = re.sub(r"(?<![\w:])(?:kern::|std::)?(f32|f64|i8|i16|i32|i64|u8|u16|u32|u64|uint64_t|int64_t|uint8_t|uint16_t|uint32_t|int8_t|int16_t|int32_t|usize|Vec2|Vec3|Vec4|Quat|Mat4|size_t)\b", lambda m: ALIAS[m.group(1)], t)
         t = t.replace("std::size_t", "unsigned long").replace("(anonymous namespace)::", "")
         for _ in range(4):   # (the names the program itself gives types)
             before = t
@@ -887,7 +888,7 @@ class Unit:
 
     def clean0(self, t):
         t = re.sub(r"\b(const|volatile|struct|class|enum)\b", " ", t).replace("&&", " ").replace("&", " ").replace("(anonymous namespace)::", "")
-        return re.sub(r"(?<![\w:])(?:kern::|std::)?(f32|f64|i8|i16|i32|i64|u8|u16|u32|u64|uint64_t|int64_t|usize|Vec2|Vec3|Vec4|Quat|Mat4|size_t)\b", lambda m: ALIAS[m.group(1)], t)
+        return re.sub(r"(?<![\w:])(?:kern::|std::)?(f32|f64|i8|i16|i32|i64|u8|u16|u32|u64|uint64_t|int64_t|uint8_t|uint16_t|uint32_t|int8_t|int16_t|int32_t|usize|Vec2|Vec3|Vec4|Quat|Mat4|size_t)\b", lambda m: ALIAS[m.group(1)], t)
 
     def find_type(self, t):
         """The program's record or enum a type name means (its qualified name), or None."""
@@ -3908,6 +3909,11 @@ class Emit:
             # (assign: what it is given is worked out before the list is emptied)
             n, fill = self.temp("count", "Int"), self.temp("fill", it)
             return [f"{n} = {self.ex(args[0], 'Int')};", f"{fill} = {self.ex(args[1], it)};", f"list_clear({lv});", f"list_resize({lv}, {n}, {fill});"]
+        if name == "fill" and len(args) == 1:
+            # every entry this value (std::array::fill): worked out once, then set where each entry stands -
+            # the loop C++ runs, nothing asked for
+            fill, last = self.temp("fill", it), self.temp("last", "Int")
+            return [f"{fill} = {self.ex(args[0], it)};", f"{last} = {self.whole_math('-', f'list_length<{it}>({lv})', '1')};"] + self.count_loop("0", last, lambda i: [f"{lv}[{i}] = {fill};"])
         raise Wait(f"list: {name}()")
 
     # ---- algorithms over a range of a list (<algorithm>): a loop over its places ----
@@ -6134,6 +6140,10 @@ class TestWriter:
         """A value of the test as the Blueprint has it where the two differ by more than their numbers: a
         64-bit bit pattern (the program's u64) is the Blueprint's Whole64, a map the list of its rows, a
         set the list of its keys - converted::shaped makes it that, by the type as the program spells it."""
+        if spelled.startswith("std::array<"):
+            # (a std::array: the list of its entries, as a C++ array of a struct's is - see helpers)
+            inner = template_args(spelled)[0]
+            expr, spelled = f"[](const auto& a) {{ return std::vector<{inner}>(std::begin(a), std::end(a)); }}({expr})", f"std::vector<{inner}>"
         if not re.search(r"\b[ui]64\b|converted::wide::(?:Sorted)?(?:Map|Set)<", spelled):
             return expr
         return f"converted::shaped<{re.sub(r'\b[ui]64\b', 'converted::Whole', spelled)}>({expr})"
@@ -6177,6 +6187,11 @@ class TestWriter:
             if inner.startswith("std::array<") or "[" in inner:
                 raise Wait("the test has no values of a list inside a list")
             return f"std::vector<{self.spell(inner)}>"
+        if c.startswith("std::array<"):
+            inner = template_args(c)[0]
+            if inner.startswith("std::array<") or "[" in inner:
+                raise Wait("the test has no values of a list inside a list")
+            return f"std::array<{self.spell(inner)}, {self.u.entries(c)}>"
         m = KEYED.match(c)
         if m and not m.group(2):
             a = template_args(c)
@@ -6223,6 +6238,8 @@ class TestWriter:
         if m:
             inner = template_args(c)[0]
             return f"draw_list(draw, [&]() -> {self.spell(inner)} {{ return {self.draw(inner)}; }})" if self.u.clean(inner) != "bool" else "draw_list(draw, [&] { return draw.flag(); })"
+        if c.startswith("std::array<"):   # (every entry drawn on its own)
+            return f"[&] {{ {self.spell(raw)} a{{}}; for (auto& e : a) e = {self.draw(template_args(c)[0])}; return a; }}()"
         m = KEYED.match(c)
         if m and not m.group(2):
             a = template_args(c)
@@ -6248,7 +6265,7 @@ class TestWriter:
         self.spell(raw)
         def parts(c):
             """The classes a type is made of, through lists, maps, sets and pairs."""
-            if re.match(r"std::vector<", c):
+            if re.match(r"std::(vector|array)<", c):
                 return parts(template_args(c)[0])
             m = KEYED.match(c)
             if m or c.startswith("std::pair<"):
@@ -6310,9 +6327,12 @@ class TestWriter:
                 m = re.match(r"(.+?)\s*\[(\d+)\]((?:\s*\[\d+\])*)$", self.u.clean(ft))   # (T[3][2]: 3 entries of T[2])
                 if m and m.group(3):
                     raise Wait("the test has no values of an array of arrays")
-                if m:
-                    arrays[f] = self.spell(m.group(1))
-                    lines.append(f"  for (auto& e : s.{f}) e = {self.draw(m.group(1))};")
+                entry = m.group(1) if m else template_args(self.u.clean(ft))[0] if self.u.clean(ft).startswith("std::array<") else None
+                if entry is not None and (entry.startswith("std::array<") or "[" in entry):
+                    raise Wait("the test has no values of an array of arrays")
+                if entry is not None:   # (an array of C++ or a std::array: the list of its entries, each drawn on its own)
+                    arrays[f] = self.spell(entry)
+                    lines.append(f"  for (auto& e : s.{f}) e = {self.draw(entry)};")
                 else:
                     lines.append(f"  s.{f} = {self.draw(ft)};")
         except Wait:
@@ -6335,7 +6355,8 @@ class TestWriter:
             if f in held:
                 continue
             if f in arrays:
-                takes.append(f"{{ {spelled[f]} items; converted::take_as<{shape(spelled[f])}>(items, (*v.rows)[{i}]); for (std::size_t k = 0; k < items.size() && k < std::size(s.{f}); ++k) s.{f}[k] = items[k]; }}")
+                # (entry by entry where it stands: an entry need not be made of nothing - a class without a default constructor)
+                takes.append(f"{{ const converted::Value& items = (*v.rows)[{i}]; for (std::size_t k = 0; k < items.size() && k < std::size(s.{f}); ++k) converted::take_as<{shape(arrays[f])}>(s.{f}[k], items.item(k)); }}")
             else:
                 takes.append(f"converted::take_as<{shape(spelled[f])}>(s.{f}, (*v.rows)[{i}]);")
         lines.append(f"[[maybe_unused]] static void take({t}& s, const converted::Value& v) {{ if (!v.rows || v.rows->size() != {len(fields)}) return; {' '.join(takes)} }}")
@@ -6348,8 +6369,8 @@ class TestWriter:
         lines = [f"struct {name} {{ " + " ".join(f"{t} {f};" for f, t in fields) + " };"]
         lines.append(f"[[maybe_unused]] static bool same(const {name}& want, const converted::Value& got) {{ return got.rows && got.rows->size() == {len(fields)}"
                      + "".join(f" && same({self.wrap(f'want.{f}', t)}, (*got.rows)[{i}])" for i, (f, t) in enumerate(fields)) + "; }")
-        lines.append(f"[[maybe_unused]] static bool defined(const {name}& s) {{ return " + " && ".join(f"defined(s.{f})" for f, _ in fields) + "; }")
-        lines.append(f"[[maybe_unused]] static std::string text(const {name}& s) {{ return std::string(\"{{\") + " + ' + ", " + '.join(f"text(s.{f})" for f, _ in fields) + ' + "}"; }')
+        lines.append(f"[[maybe_unused]] static bool defined(const {name}& s) {{ return " + " && ".join(f"defined({self.wrap(f's.{f}', t)})" if t.startswith("std::array<") else f"defined(s.{f})" for f, t in fields) + "; }")
+        lines.append(f"[[maybe_unused]] static std::string text(const {name}& s) {{ return std::string(\"{{\") + " + ' + ", " + '.join(f"text({self.wrap(f's.{f}', t)})" if t.startswith("std::array<") else f"text(s.{f})" for f, t in fields) + ' + "}"; }')
         return lines
 
     # ---- the engine in the test: stand-ins that keep every call ----
@@ -6828,7 +6849,7 @@ class TestWriter:
             order = [layout.index(src_) for _, _, src_ in f.out_fields] if len(f.out_fields) > 1 else []
             # the arguments as the Blueprint function has its inputs (those by reference first)
             given = f.order() if len(names) == len(f.params) else list(range(len(names)))
-            shown = ' + ", " + '.join(f"text({n})" for n in names) if names else 'std::string()'
+            shown = ' + ", " + '.join(f"text({self.wrap(n, t) if t.startswith('std::array<') else n})" for n, t in zip(names, types)) if names else 'std::string()'
             case_of[d["id"]] = f
             outs.append((("case", d["id"]), "\n".join(out_lines)))
             cases.append((("case", d["id"]), "\n".join([
