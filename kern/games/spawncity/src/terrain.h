@@ -181,7 +181,6 @@ class Terrain {
   struct CorridorSeg { f32 ax, ay, dx, dy, l2, ha, hb, half; };
   struct CorridorSet { u64 owner = 0; kern::Vec4 bounds, box; kern::Map<u64, std::vector<CorridorSeg>> grid; };
   std::vector<std::unique_ptr<CorridorSet>> corridors_;
-  mutable i32 corridor_hit_ = -1;  // the set of the last query, its place in corridors_ (queries come in runs); -1: none
   /// The place in corridors_ of the map tile's set whose square holds the point, or -1.
   i32 corridor_set(f32 x, f32 y) const;
   f32 road_field(f32 x, f32 y) const;
@@ -202,9 +201,6 @@ class Terrain {
   f32 sample_dem(f64 lon, f64 lat, bool& ok) const;
   f32 grid_at(const Grid& g, f32 x, f32 y) const;
   bool water_cell(i32 cx, i32 cy) const;
-  mutable u64 wc_key_ = ~0ull;            // water_cell's last block: its key, whether there is one, its bits
-  mutable bool wc_has_ = false;
-  mutable u64 wc_bits_[4] = {};
   void set_water_cell(i32 cx, i32 cy);
   bool on_bridge(f32 x, f32 y) const;
   void dirty(f32 x0, f32 y0, f32 x1, f32 y1, bool notify = true);

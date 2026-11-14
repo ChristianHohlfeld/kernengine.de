@@ -202,7 +202,6 @@ void Terrain::clear() {
   want_collision_.clear();
   want_water_.clear();
   water_.clear();
-  wc_key_ = ~0ull;
   bridges_.clear();
   craters_.clear();
   tints_.clear();
@@ -216,7 +215,6 @@ void Terrain::clear() {
   grid_ = Grid{};
   side_.clear();
   corridors_.clear();
-  corridor_hit_ = -1;
   grid_ready_ = false;
   ref_ready_ = false;
   ref_height_ = 0;
@@ -558,7 +556,6 @@ void Terrain::set_corridors(u64 owner, const kern::Vec4& bounds, const std::vect
     }
   }
   const kern::Vec4 box = set->box;
-  corridor_hit_ = -1;
   corridors_.push_back(std::move(set));
   // the ground of the tile's square changed where its streets run (nobody else's ground did)
   if (box.z > box.x) {
@@ -571,8 +568,7 @@ void Terrain::remove_corridors(u64 owner) {
   for (auto it = corridors_.begin(); it != corridors_.end(); ++it) {
     if ((*it)->owner != owner) continue;
     const kern::Vec4 box = (*it)->box, bounds = (*it)->bounds;
-    corridor_hit_ = -1;
-    corridors_.erase(it);
+      corridors_.erase(it);
     if (box.z > box.x) {
       const kern::Vec4 c{std::fmax(box.x, bounds.x), std::fmax(box.y, bounds.y), std::fmin(box.z, bounds.z), std::fmin(box.w, bounds.w)};
       if (c.z > c.x && c.w > c.y) dirty(c.x, c.y, c.z, c.w, false);
@@ -582,14 +578,11 @@ void Terrain::remove_corridors(u64 owner) {
 }
 
 i32 Terrain::corridor_set(f32 x, f32 y) const {
-  // the map tile whose square holds the point (the squares tile the plane: west / south edge in)
-  auto in = [&](const CorridorSet& s) { return x >= s.bounds.x && x < s.bounds.z && y >= s.bounds.y && y < s.bounds.w; };
-  if (corridor_hit_ >= 0 && in(*corridors_[static_cast<std::size_t>(corridor_hit_)])) return corridor_hit_;
-  for (std::size_t i = 0; i < corridors_.size(); ++i)
-    if (in(*corridors_[i])) {
-      corridor_hit_ = static_cast<i32>(i);
-      return corridor_hit_;
-    }
+  // the map tile whose square holds the point (the squares tile the plane: west / south edge in - one at most)
+  for (std::size_t i = 0; i < corridors_.size(); ++i) {
+    const CorridorSet& s = *corridors_[i];
+    if (x >= s.bounds.x && x < s.bounds.z && y >= s.bounds.y && y < s.bounds.w) return static_cast<i32>(i);
+  }
   return -1;
 }
 
@@ -669,24 +662,14 @@ kern::HeightSampler Terrain::sampler(f32 offset) const {
 // water
 
 bool Terrain::water_cell(i32 cx, i32 cy) const {
-  // The hottest lookup of the city's streets (every draped road point asks it, ?perf=1 / the CPU
-  // profile): consecutive points almost always fall in the same 64 m block, so the last block is
-  // remembered - its 256 bits (set_water_cell / clear forget it).
-  const u64 k = key2(cx >> 4, cy >> 4);
-  if (k != wc_key_) {
-    auto it = water_.find(k);
-    wc_key_ = k;
-    wc_has_ = it != water_.end();
-    if (wc_has_)
-      for (std::size_t w = 0; w < 4; ++w) wc_bits_[w] = it->second.bits[w];
-  }
-  if (!wc_has_) return false;
+  // the 256 bits of the cell's 64 m block
+  auto it = water_.find(key2(cx >> 4, cy >> 4));
+  if (it == water_.end()) return false;
   const u32 idx = static_cast<u32>((cy & 15) * 16 + (cx & 15));
-  return (wc_bits_[idx >> 6] >> (idx & 63)) & 1u;
+  return (it->second.bits[idx >> 6] >> (idx & 63)) & 1u;
 }
 
 void Terrain::set_water_cell(i32 cx, i32 cy) {
-  wc_key_ = ~0ull;  // the remembered block (water_cell) may be new now
   WaterBlock& b = water_[key2(cx >> 4, cy >> 4)];
   const u32 idx = static_cast<u32>((cy & 15) * 16 + (cx & 15));
   if (!((b.bits[idx >> 6] >> (idx & 63)) & 1u)) ++stats_.water_cells;
