@@ -2992,8 +2992,8 @@ struct Reader {
     std::size_t where = tok + 1;  // (the token of the step)
     for (const std::string& step : steps) {
       if (step.empty()) {
-        if (!is_list(at.type)) return fail(where, name + " is " + cpp_type(at) + ": it has no entries");
-        at.type = element_of(at.type);
+        if (!is_list(at.type) && at.type != PinType::map) return fail(where, name + " is " + cpp_type(at) + ": it has no entries");
+        at = at.type == PinType::map ? value_type(at) : TypeRef{element_of(at.type), at.of};  // (of a map: the value at its place)
         name += "[]";
         int depth = 0;
         for (;; ++where) {

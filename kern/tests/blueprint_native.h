@@ -1086,6 +1086,11 @@ inline std::vector<Value> samples(PinType t, std::size_t count = 0) {
     case PinType::enumeration:
       for (std::size_t k = 0; k < count; ++k) r.push_back(Value::enumeration(static_cast<i64>(k)));
       break;
+    case PinType::int64:
+      // (64 bits at their ends: the sign bit, beyond 2^53, all ones - and divisors that are 0 and -1)
+      for (u64 v : {u64{0}, u64{1}, ~u64{0}, u64{2}, u64{7}, u64{0} - 13, u64{1} << 63, (u64{1} << 63) - 1, (u64{1} << 53) + 1, u64{0x123456789abcdef0}, u64{0xfedcba9876543210}, u64{64}})
+        r.push_back(Value::int64(v));
+      break;
     default: break;
   }
   if (logic::is_list(t)) {
@@ -1106,6 +1111,25 @@ inline std::vector<Value> samples(PinType t, std::size_t count = 0) {
 /// The values a pin of a type of the Blueprint `g` is tried with. A struct: its default, and for
 /// each field two more with that field at other values.
 inline std::vector<Value> samples(const logic::TypeRef& t, const logic::Graph& g) {
+  if (logic::is_keyed(t.type)) {
+    // a map or a set of the keys' samples: none, one, all of them in the order they came and the other way round (a map:
+    // with the values' samples, one after the other)
+    const std::vector<Value> keys = samples(logic::key_type(t), g);
+    const std::vector<Value> values = t.type == PinType::map ? samples(logic::value_type(t), g) : std::vector<Value>{Value{}};
+    auto keyed = [&](std::vector<std::size_t> picks) {
+      Value v = Value::zero(t.type);
+      std::size_t n = 0;
+      for (std::size_t k : picks) {
+        if (keys.empty()) break;
+        v.own_entries().try_emplace(logic::key_of(keys[k % keys.size()]), t.type == PinType::map ? values[n++ % values.size()] : Value{});
+      }
+      return v;
+    };
+    std::vector<std::size_t> all, back;
+    for (std::size_t k = 0; k < keys.size(); ++k) all.push_back(k);
+    back.assign(all.rbegin(), all.rend());
+    return {keyed({}), keyed({1}), keyed(all), keyed(back), keyed({2, 0, 2, 1})};
+  }
   if (logic::element_of(t.type) != PinType::structure) {
     const logic::EnumType* e = g.enumeration(t.of);
     return samples(t.type, e ? e->values.size() : 0);

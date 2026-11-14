@@ -2968,7 +2968,7 @@ TEST(logic_structs) {
   PinType named = PinType::exec;
   CHECK(logic::pin_type_from_name("struct", named) && named == PinType::structure && logic::pin_type_from_name("struct_list", named) && named == PinType::structure_list);
   CHECK(logic::is_list(PinType::structure_list) && logic::element_of(PinType::structure_list) == PinType::structure && logic::list_of(PinType::structure) == PinType::structure_list);
-  CHECK(logic::kValueTypes == 8 && !logic::is_list(PinType::structure) && logic::element_of(PinType::enumeration_list) == PinType::enumeration && logic::list_of(PinType::boolean) == PinType::boolean_list);
+  CHECK(logic::kValueTypes == 9 && !logic::is_list(PinType::structure) && logic::element_of(PinType::enumeration_list) == PinType::enumeration && logic::list_of(PinType::boolean) == PinType::boolean_list);
   // It becomes nothing but itself - no number, no text - and nothing becomes it: Break gives its fields ...
   for (PinType other : {PinType::boolean, PinType::integer, PinType::number, PinType::vector, PinType::text, PinType::actor, PinType::enumeration, PinType::number_list, PinType::enumeration_list}) {
     CHECK(!logic::convertible(PinType::structure, other) && !logic::convertible(other, PinType::structure));
@@ -3234,7 +3234,9 @@ static logic::Graph every_node_graph(bool wired) {
                       {"VT", PinType::text, ""},           {"VA", PinType::actor, ""},            {"LB", PinType::boolean_list, ""},   {"LI", PinType::integer_list, ""},
                       {"LF", PinType::number_list, ""},    {"LV", PinType::vector_list, ""},      {"LT", PinType::text_list, ""},      {"LA", PinType::actor_list, ""},
                       {"VE", PinType::enumeration, "EM"},  {"LE", PinType::enumeration_list, "EM"}, {"VS", PinType::structure, "SM"},  {"LS", PinType::structure_list, "SM"},
-                      {"VN", PinType::structure, "SI"},    {"LN", PinType::structure_list, "SI"}};
+                      {"VN", PinType::structure, "SI"},    {"LN", PinType::structure_list, "SI"}, {"VX", PinType::int64, ""},        {"LX", PinType::int64_list, ""},
+                      // (a map and a set as the nodes of maps and sets are typed by default: Int keys, Float values)
+                      {"VM", PinType::map, "int>float"},  {"VQ", PinType::set, "int"}};
   g.enums.push_back({"EM", {"One", "Two", "Three"}, "An enum.\n\nWith three values."});
   // (a struct with a field of every kind - a value, an enum's, another struct's, lists of them - and the struct it holds)
   g.structs.push_back({"SI", {{"N", {PinType::integer, ""}, json::Value(3)}, {"Tag", {PinType::text, ""}, json::Value("t \"q\"")}}, "A struct."});
@@ -3267,8 +3269,17 @@ static logic::Graph every_node_graph(bool wired) {
                                                                      logic::Value::vector({1, -2, 3.5f}), logic::Value::actor(3), logic::Value::enumerations({2, 0})});
       return t == PinType::structure ? one : logic::Value::structures({one, logic::zero_of({PinType::structure, of}, g)});
     }
+    if (t == PinType::map || t == PinType::set) {
+      // (entries whose keys are not in their own order: the order they came in is kept)
+      logic::Value keyed = logic::Value::zero(t);
+      const logic::TypeRef key = logic::key_type({t, of});
+      for (i64 k : {9, -7, 0}) keyed.own_entries().try_emplace(logic::key_of(logic::key_value({k, ""}, key.type)), t == PinType::map ? logic::Value::number(2.625 * static_cast<f64>(k)) : logic::Value{});
+      return keyed;
+    }
     switch (t) {
       case PinType::boolean: return logic::Value::boolean(true);
+      case PinType::int64: return logic::Value::int64(0xfffffffffffffff9ull);
+      case PinType::int64_list: return logic::Value::of(std::vector<logic::Int64>{logic::Int64{0x8000000000000001ull}, logic::Int64{0}, logic::Int64{9007199254740993ull}});
       case PinType::integer: return logic::Value::integer(-7);
       case PinType::number: return logic::Value::number(2.625);
       case PinType::vector: return logic::Value::vector({1, -2, 3.5f});
@@ -3287,7 +3298,7 @@ static logic::Graph every_node_graph(bool wired) {
   // (list variables that start with items, a list a function takes and one it gives)
   for (logic::Variable& v : g.variables)
     if (v.type == PinType::integer_list || v.type == PinType::text_list || v.type == PinType::vector_list || logic::element_of(v.type) == PinType::enumeration ||
-        logic::element_of(v.type) == PinType::structure)
+        logic::element_of(v.type) == PinType::structure || v.type == PinType::int64_list || logic::is_keyed(v.type))
       v.value = other_than_default(v.type, v.of).to_json(g, v.of);
   logic::Function fn;
   fn.name = "Fn";
@@ -3365,8 +3376,8 @@ static logic::Graph every_node_graph(bool wired) {
     std::vector<std::pair<std::string, std::string>> params;
     for (const logic::ParamDef& pd : def->params) {
       using K = logic::ParamDef::Kind;
-      params.push_back({pd.key, pd.kind == K::type && pd.enums_only ? "EM" : pd.kind == K::type && pd.structs_only ? "SM" : pd.kind == K::variable ? (type.rfind("list.", 0) == 0 ? "LT" : "VF") :
-                                    pd.kind == K::field ? "In" : pd.kind == K::function ? (def->kind == logic::NodeKind::pure ? "Calc" : "Fn") : pd.kind == K::machine ? "State Machine" :
+      params.push_back({pd.key, pd.kind == K::type && pd.enums_only ? "EM" : pd.kind == K::type && pd.structs_only ? "SM" : pd.kind == K::variable ? (type.rfind("list.", 0) == 0 ? "LT" : type.rfind("map.", 0) == 0 ? "VM" : type.rfind("set.", 0) == 0 ? "VQ" : "VF") :
+                                    pd.kind == K::field ? "In" : pd.kind == K::function ? (pd.optional ? pd.def : def->kind == logic::NodeKind::pure ? "Calc" : "Fn") : pd.kind == K::machine ? "State Machine" :
                                     pd.kind == K::state ? "Idle" : pd.def});
     }
     const u32 id = add(type, params);
