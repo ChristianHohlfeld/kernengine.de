@@ -2503,6 +2503,7 @@ class Emit:
         self.assigned_ids = set()   # (the variables the body changes - see assigned)
         self.keyed_vars = {}  # decl id of a name for an entry of a map or a set (a loop's variable, `auto& [k, v]`) -> (the map or set, its place)
         self.serial = 0       # the number of the statement being written (see `slot`)
+        self.writing = object()   # (this writing of the function: the tree is shared - another writing of it, a later conversion of its file, has nodes of its own)
 
     # ---- types ----
     def tp(self, n):
@@ -3234,7 +3235,7 @@ class Emit:
             raise Wait(f"the release of a {q.split('::')[-1]} (its node is another one in the engine)")
         u.engine_calls[f["decl"]["id"] + ":release"] = f
         self.f.pure = False
-        return [f'if (math_compare<"!=">(kern::to<Float>({handle}), 0.0)) {{', f'  {f["type"].replace(".", "_")}({handle});', "}"]
+        return [f'if (math_compare<"!=">({self.cast("Float", handle)}, 0.0)) {{', f'  {f["type"].replace(".", "_")}({handle});', "}"]
 
     # ---- the objects of the engine a value holds: made with it, ended with it (Unit.held_life) ----
     def made_parts(self, q, place, inits=None, own=False):
@@ -3845,13 +3846,28 @@ class Emit:
         finally:
             self.pre = saved
 
+    @staticmethod
+    def cast(t, text):
+        """`kern::to<T>(text)`: a conversion - of a conversion with the value in between (Value Int, Value
+        Float: one conversion is one pin's)."""
+        m = re.match(r"kern::to<(Float|Int|Bool)>\(", text)
+        if m:
+            depth = 0
+            for k in range(len(m.group(0)) - 1, len(text)):
+                depth += {"(": 1, ")": -1}.get(text[k], 0)
+                if depth == 0:
+                    break
+            if k == len(text) - 1:   # (the whole text is that conversion)
+                text = f"value_{m.group(1).lower()}({text})"
+        return f"kern::to<{t}>({text})"
+
     def minus_one(self, n, text):
         b = bare(n)
         while b.get("kind") in CAST and kids(b):
             b = bare(kids(b)[-1])
         if b.get("kind") == "IntegerLiteral":
             return str(int(b["value"]) - 1)
-        return f"kern::to<Int>(kern::formula([](Float n) -> Float {{ return n - 1.0; }}, kern::to<Float>({text})))"
+        return f"kern::to<Int>(kern::formula([](Float n) -> Float {{ return n - 1.0; }}, {self.conv(text, 'Int', 'Float')}))"
 
     def refers(self, n, decl_id):
         n = bare(n)
@@ -3868,7 +3884,7 @@ class Emit:
         code = f"text_code_at({text}, {index})"
         c = self.u.clean(re.sub(r"\bconst\b|&", "", raw)).strip()
         if c in ("char", "signed char"):
-            return f"kern::to<Int>(kern::formula([](Float a) -> Float {{ return a >= 128.0 ? a - 256.0 : a; }}, kern::to<Float>({code})))"
+            return f"kern::to<Int>(kern::formula([](Float a) -> Float {{ return a >= 128.0 ? a - 256.0 : a; }}, {self.cast('Float', code)}))"
         if c in ("unsigned char", "u8", "uint8_t", "int", "unsigned int", "u32"):
             return code
         raise Wait(f"a character of a text as a {c}")
@@ -3896,7 +3912,7 @@ class Emit:
             at, count = self.temp("at", "Int"), self.temp("count", "Int")
             first = [f"{self.local(v, 'Int')} = {self.char_of(text, at, raw)};"]
             lines = first + self.loop_body(loop, [body], [f"{at} += 1;"])
-            cond = f'math_compare<"<">(kern::to<Float>({at}), kern::to<Float>({count}))'
+            cond = f'math_compare<"<">({self.cast("Float", at)}, {self.cast("Float", count)})'
             return before + [f"{count} = text_length({text});", f"{at} = 0;"] + self.loop_lines(cond, [], lines, loop)
         node = self.u.next_node
         self.u.next_node += 1
@@ -3978,7 +3994,7 @@ class Emit:
         length = count_text if keyed else f"list_length<{it}>({place})"
         if has_break:
             lines = first + self.loop_body(loop, [body], [f"{index} += 1;"])
-            cond = f'math_compare<"<">(kern::to<Float>({index}), kern::to<Float>({count}))'
+            cond = f'math_compare<"<">({self.cast("Float", index)}, {self.cast("Float", count)})'
             return before + [f"{count} = {length};", f"{index} = 0;"] + self.loop_lines(cond, [], lines, loop)
         lines = first + self.loop_body(loop, [body])
         last = self.whole_math("-", length, "1")
@@ -4074,7 +4090,7 @@ class Emit:
             vals = [lab for lab in labels if lab is not None]
             if not vals:
                 continue
-            conds = [f'math_compare<"==">(kern::to<Float>({sel_name}), {flit(Const(self.u).number(lab))})' for lab in vals]
+            conds = [f'math_compare<"==">({self.cast("Float", sel_name)}, {flit(Const(self.u).number(lab))})' for lab in vals]
             cond = conds[0]
             for x in conds[1:]:
                 cond = f"logic_or({cond}, {x})"
@@ -4238,7 +4254,7 @@ class Emit:
                 before, lv, after = self.variable_of(l0, lt)
                 a, b, held = self.temp("first", "Int"), self.temp("last", "Int"), self.temp("held", it)
                 lines = [f"{a} = {first};", f"{b} = {self.whole_math('-', last, '1')};",
-                         f'while (loop(math_compare<"<">(kern::to<Float>({a}), kern::to<Float>({b})))) {{',
+                         f'while (loop(math_compare<"<">({self.cast("Float", a)}, {self.cast("Float", b)}))) {{',
                          f"  {held} = list_get<{it}>({lv}, {a});", f"  {lv}[{a}] = list_get<{it}>({lv}, {b});", f"  {lv}[{b}] = {held};",
                          f"  {a} += 1;", f"  {b} = {self.whole_math('-', b, '1')};", "}"]
                 return before + lines + after
@@ -4366,9 +4382,9 @@ class Emit:
         if name == "memcpy" or not self.same_list(dst, src):
             return before + lines + up + after
         k = self.temp("k", "Int")
-        down = [f"{k} = {last};", f'while (loop(math_compare<">=">(kern::to<Float>({k}), 0.0))) {{',
+        down = [f"{k} = {last};", f'while (loop(math_compare<">=">({self.cast("Float", k)}, 0.0))) {{',
                 f"  {lv}[{self.whole_math('+', to, k)}] = list_get<Int>({sv}, {self.whole_math('+', fro, k)});", f"  {k} = {self.whole_math('-', k, '1')};", "}"]
-        return before + lines + [f'if (math_compare<"<=">(kern::to<Float>({to}), kern::to<Float>({fro}))) {{', *["  " + x for x in up], "} else {", *["  " + x for x in down], "}"] + after
+        return before + lines + [f'if (math_compare<"<=">({self.cast("Float", to)}, {self.cast("Float", fro)})) {{', *["  " + x for x in up], "} else {", *["  " + x for x in down], "}"] + after
 
     def addressed(self, n):
         """What a pointer handed to memset / memcpy points at, when it is the address of a place: `&n`, an
@@ -4869,15 +4885,15 @@ class Emit:
         """m[key]: the place of the key's row. Steps before the statement find it - and add the row when the
         key is new, as C++ does."""
         cached = n.get("_slot")
-        if cached is not None and cached[0] == self.serial:
-            return cached[1]
+        if cached is not None and cached[0] is self.writing and cached[1] == self.serial:
+            return cached[2]
         base, key = kids(n)[1], kids(n)[2]
         kt = self.rows(base)[2]
         held = self.temp("key", kt)
         self.hoist([f"{held} = {self.ex(key, kt)};"])
         lines, at, _ = self.put_row(base, held)
         self.hoist(lines)
-        n["_slot"] = (self.serial, at)
+        n["_slot"] = (self.writing, self.serial, at)
         return at
 
     def is_slot(self, n):
@@ -5072,18 +5088,18 @@ class Emit:
             if name == "contains":
                 return self.found(kind, row, lst, key), "Bool"
             if name == "count":
-                return f"kern::to<Int>({self.found(kind, row, lst, key)})", "Int"
+                return f"{self.cast('Int', self.found(kind, row, lst, key))}", "Int"
             if name == "at":
                 if kind != "map":
                     raise Wait("at() of a set")
                 return f"map_find<{row}>({lst}, {key}).value", vt
             return (f"kern::to<Int>(kern::formula([](Float at, Float count) -> Float {{ return at < 0.0 ? count : at; }}, "
-                    f"kern::to<Float>({self.found_at(kind, row, lst, key)}), kern::to<Float>({kind}_length<{row}>({lst}))))"), "Int"
+                    f"{self.cast('Float', self.found_at(kind, row, lst, key))}, kern::to<Float>({kind}_length<{row}>({lst}))))"), "Int"
         if name in ("insert", "emplace", "try_emplace", "insert_or_assign", "erase") and not (name == "erase" and len(a) != 1):
             lines, at, flag = self.keyed_change(base, name, a)
             self.hoist(lines)
             if name == "erase":
-                return (at, "Int") if self.is_iter(a[0]) else (f"kern::to<Int>({flag})", "Int")
+                return (at, "Int") if self.is_iter(a[0]) else (f"{self.cast('Int', flag)}", "Int")
             pt = self.u.btype(qtype(b))
             if pt not in self.u.struct_fields:
                 raise Wait(f"what {name}() of a map or set gives")
@@ -5283,7 +5299,7 @@ class Emit:
             return [f"if (logic_not({same})) {{", f"  {kept} += 1;", f"  {lv}[{kept}] = {lv}[{r}];", "}"]
         first, last = "1", self.whole_math("-", n, "1")
         return [f"{n} = list_length<{it}>({lv});",
-                f'if (math_compare<">">(kern::to<Float>({n}), 0.0)) {{',
+                f'if (math_compare<">">({self.cast("Float", n)}, 0.0)) {{',
                 f"  {kept} = 0;",
                 *["  " + ln for ln in self.count_loop(first, last, body)],
                 f"  list_resize({lv}, {self.whole_math('+', kept, '1')}, {self.u.zero(it)});",
@@ -5538,7 +5554,7 @@ class Emit:
                 raise Wait(f"algorithm: std::{name} with a function that gives no Bool")
             return got[0] if name == "find_if" else f"logic_not({got[0]})"
         pre, hit = self.lazily(test)
-        more = f'math_compare<"<">(kern::to<Float>({at}), kern::to<Float>({end}))'
+        more = f'math_compare<"<">({self.cast("Float", at)}, {self.cast("Float", end)})'
         self.hoist(lines + [f"{at} = {first};", f"{end} = {last};", f"{go} = {more};", f"while (loop({go})) {{", *["  " + ln for ln in pre],
                             f"  if ({hit}) {{", f"    {go} = false;", "  } else {", f"    {at} += 1;", f"    {go} = {more};", "  }", "}"])
         return at
@@ -5557,7 +5573,7 @@ class Emit:
         best, at, end = self.temp("best", "Int"), self.temp("at", "Int"), self.temp("end", "Int")
         x, y = self.at_place(l0, at, it), self.at_place(l0, best, it)
         pre, better = self.lazily(lambda: self.is_less(x, y, cpp, cmp) if name == "min_element" else self.is_less(y, x, cpp, cmp))
-        more = f'math_compare<"<">(kern::to<Float>({at}), kern::to<Float>({end}))'
+        more = f'math_compare<"<">({self.cast("Float", at)}, {self.cast("Float", end)})'
         self.hoist(lines + [f"{best} = {first};", f"{end} = {last};", f"{at} = {self.whole_math('+', best, '1')};", f"while (loop({more})) {{", *["  " + ln for ln in pre],
                             f"  if ({better}) {{", f"    {best} = {at};", "  }", f"  {at} += 1;", "}"])
         return best
@@ -5578,9 +5594,9 @@ class Emit:
         node = self.u.next_node
         self.u.next_node += 1
         self.u.members.append(f"  struct {{ {it} value = {self.u.zero(it)}; }} n{node};")
-        later = f'math_compare<"<">(kern::to<Float>({kept}), kern::to<Float>({read}))'
+        later = f'math_compare<"<">({self.cast("Float", kept)}, {self.cast("Float", read)})'
         return lines + [f"{read} = {first};", f"{kept} = {read};", f"{stop} = {end};",
-                        f'while (loop(math_compare<"<">(kern::to<Float>({read}), kern::to<Float>({stop})))) {{', *["  " + ln for ln in pre],
+                        f'while (loop(math_compare<"<">({self.cast("Float", read)}, {self.cast("Float", stop)}))) {{', *["  " + ln for ln in pre],
                         f"  if (logic_not({gone})) {{", f"    if ({later}) {{", f"      var_take(n{node}, {lv}[{read}]);", f"      {lv}[{kept}] = n{node}.value;", "    }",
                         f"    {kept} += 1;", "  }", f"  {read} += 1;", "}", f"list_resize({lv}, {kept}, {self.u.zero(it)});"]
 
@@ -6063,20 +6079,20 @@ class Emit:
             # (a conversion of a conversion - (int)(float)i: the value in between is a value of its own)
             text = f"value_{have.lower()}({text})"
         if want == "Float" and have in ("Int", "Bool"):
-            return f"kern::to<Float>({text})"
+            return f"{self.cast('Float', text)}"
         if want == "Int" and have in ("Float", "Bool"):
-            return f"kern::to<Int>({text})"
+            return f"{self.cast('Int', text)}"
         if want == "Bool" and have == "Float":   # (exactly not 0, as C++ asks)
             return f'math_compare<">">(kern::formula([](Float x) -> Float {{ return x != 0.0; }}, {text}), 0.5)'
         if want == "Bool" and have in ("Float", "Int"):
-            return f'math_compare<"!=">({text if have == "Float" else f"kern::to<Float>({text})"}, 0.0)'
+            return f'math_compare<"!=">({text if have == "Float" else self.cast("Float", text)}, 0.0)'
         if want in ("Int", "Float") and have in self.u.enum_values:
             index = f"enum_index<{have}>({text})"
             if have in self.u.enum_numbers:   # (the number C++ gives the value, not its place)
                 index = f"list_get<Int>({self.u.enum_numbers[have]}, {index})"
-            return index if want == "Int" else f"kern::to<Float>({index})"
+            return index if want == "Int" else f"{self.cast('Float', index)}"
         if want in self.u.enum_values and have in ("Int", "Float"):
-            index = text if have == "Int" else f"kern::to<Int>({text})"
+            index = text if have == "Int" else f"{self.cast('Int', text)}"
             if want in self.u.enum_numbers:
                 index = f"list_find<Int>({self.u.enum_numbers[want]}, {index})"
             return f"enum_from_index<{want}>({index}).value"
@@ -6217,7 +6233,7 @@ class Emit:
             inner = kids(b)[-1]
             ck = b.get("castKind", "")
             if ck == "PointerToBoolean" and self.pointer_of(inner) is not None:   # (a pointer into a list: not null - it has a place)
-                return f'math_compare<">=">(kern::to<Float>({self.pointer_of(inner)[1]}), 0.0)', "Bool"
+                return f'math_compare<">=">({self.cast("Float", self.pointer_of(inner)[1])}, 0.0)', "Bool"
             if ck == "NullToPointer" and self.u.object_of(qtype(b)):
                 return "0", "Int"   # (no object of the engine: the handle 0)
             if ck in ("FunctionToPointerDecay", "BuiltinFnToFnPtr"):
@@ -6334,7 +6350,7 @@ class Emit:
                     return self.either(op, left, y)
             if op in ("==", "!=") and (self.pointer_of(x) is not None and self.nothing(y) or self.pointer_of(y) is not None and self.nothing(x)):
                 at = (self.pointer_of(x) or self.pointer_of(y))[1]   # (a pointer into a list and null: has it no place)
-                return f'math_compare<"{"<" if op == "==" else ">="}">(kern::to<Float>({at}), 0.0)', "Bool"
+                return f'math_compare<"{"<" if op == "==" else ">="}">({self.cast("Float", at)}, 0.0)', "Bool"
             if op in COMPARE:
                 tx, ty = self.tp(x), self.tp(y)
                 if op in ("==", "!=") and "Float" in (tx, ty) and tx in ("Float", "Int") and ty in ("Float", "Int"):
@@ -6455,7 +6471,7 @@ class Emit:
         params = ", ".join(f"Float {p}" for p in leaves.values())
         text = f"kern::formula([]({params}) -> Float {{ return {body}; }}, {', '.join(leaves)})"
         if t == "Int":
-            return f"kern::to<Int>({text})", "Int"
+            return f"{self.cast('Int', text)}", "Int"
         if t == "Bool":
             return f'math_compare<">">({text}, 0.5)', "Bool"
         return text, "Float"
@@ -6755,7 +6771,7 @@ class Emit:
         if frm == "float" and to in w32:
             bits = f"math_bits_of_float32({self.ex(x, 'Float')})"
             if to == "int":
-                bits = f"kern::to<Int>(kern::formula([](Float b) -> Float {{ return b >= 2147483648.0 ? b - 4294967296.0 : b; }}, kern::to<Float>({bits})))"
+                bits = f"kern::to<Int>(kern::formula([](Float b) -> Float {{ return b >= 2147483648.0 ? b - 4294967296.0 : b; }}, {self.cast('Float', bits)}))"
             return bits, "Int"
         if frm in w32 and to == "float":
             return f"math_float32_of_bits({self.ex(x, 'Int')})", "Float"
@@ -6928,7 +6944,7 @@ class Emit:
                 # vector's 32-bit part rounds as the 32-bit division does
                 h = self.held_once(a[0], "Int")
                 hv = self.ex(h, "Int")
-                parts = [f"kern::formula([](Float h) -> Float {{ return kern::math::div({'kern::math::band(kern::math::shr(h, ' + str(sh) + '.0), 255.0)' if sh else 'kern::math::band(h, 255.0)'}, 255.0); }}, kern::to<Float>({hv}))" for sh in (16, 8, 0)]
+                parts = [f"kern::formula([](Float h) -> Float {{ return kern::math::div({'kern::math::band(kern::math::shr(h, ' + str(sh) + '.0), 255.0)' if sh else 'kern::math::band(h, 255.0)'}, 255.0); }}, {self.cast('Float', hv)})" for sh in (16, 8, 0)]
                 return f"vector_make({', '.join(parts)})", "Vector"
             if name == "finite" and vec == [True]:
                 v = self.ex(a[0], "Vector")
@@ -7023,10 +7039,10 @@ class Emit:
                         lt, row, kt, _ = self.rows(fb)
                         there = self.found(self.keyed(fb)[0], row, self.ex(fb, lt), self.ex(kids(f_)[1], kt))
                         return (there if name == "operator!=" else f"logic_not({there})"), "Bool"
-                same = f'math_compare<"==">(kern::to<Float>({self.ex(ops[0], "Int")}), kern::to<Float>({self.ex(ops[1], "Int")}))'
+                same = f'math_compare<"==">({self.cast("Float", self.ex(ops[0], "Int"))}, {self.cast("Float", self.ex(ops[1], "Int"))})'
                 return (same if name == "operator==" else f"logic_not({same})"), "Bool"
             if name in ("operator<", "operator>", "operator<=", "operator>=") and len(ops) == 2:
-                return f'math_compare<"{name[8:]}">(kern::to<Float>({self.ex(ops[0], "Int")}), kern::to<Float>({self.ex(ops[1], "Int")}))', "Bool"
+                return f'math_compare<"{name[8:]}">({self.cast("Float", self.ex(ops[0], "Int"))}, {self.cast("Float", self.ex(ops[1], "Int"))})', "Bool"
             if name in ("operator+", "operator-") and len(ops) == 2:
                 return self.whole_math(name[-1], self.ex(ops[0], "Int"), self.ex(ops[1], "Int")), "Int"
             if name in ("operator++", "operator--"):
@@ -7306,7 +7322,7 @@ class Emit:
             return self.value(base)   # (an entry of a std::vector<bool>, read)
         if name == "operator bool" and not a and self.u.object_of(qtype(base)):
             # (what holds an object of the engine - std::unique_ptr - as a Bool: is there one; none is the handle 0)
-            return f'math_compare<"!=">(kern::to<Float>({self.ex(base, "Int")}), 0.0)', "Bool"
+            return f'math_compare<"!=">({self.cast("Float", self.ex(base, "Int"))}, 0.0)', "Bool"
         if bt.startswith("List<") and name in ("begin", "cbegin", "end", "cend") and not a and self.is_iter(b):
             # an iterator is the place it stands at: the first entry's is 0, the end the list's length
             return ("0" if "begin" in name else f"list_length<{bt[5:-1]}>({self.ex(base, bt)})"), "Int"
