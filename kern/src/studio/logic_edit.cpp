@@ -979,9 +979,13 @@ json::Value Studio::logic_palette(const json::Value& c) const {
       named.set_param("path", "[]");
       consider({lib.title(named), scope.empty() ? std::string("Lists") : category, "Replaces one entry of " + what + " (beside the list: nothing)", named.type, with({{"variable", v.name}, {"path", "[]"}})});
     }
-    if (v.count) return;  // (a list of a fixed length: its entries are set - no step changes its length)
+    // (a list of a fixed length: its entries are set - no step changes its length; Copy Bytes writes the
+    // bytes of its numbers where they stand, and only a list of numbers has those)
+    const logic::PinType item = logic::element_of(v.type);
+    const bool numbers = item == logic::PinType::integer || item == logic::PinType::int64 || item == logic::PinType::number;
     for (const auto& d : lib.all()) {
       if (!variable_step(*d) || d->type.rfind("list.", 0) != 0) continue;
+      if (d->type == "list.copy_bytes" ? !numbers : v.count != 0) continue;
       logic::Node named;
       named.type = d->type;
       named.set_param("variable", v.name);

@@ -11174,24 +11174,26 @@ TEST(studio_logic_lists) {
     ++steps;
     bare |= it["params"]["variable"].as_string().empty();
   }
-  CHECK(add_to && !bare && steps == 20 && entries == 2);  // (ten steps and the Set of an entry for each of the two list variables)
+  CHECK(add_to && !bare && steps == 21 && entries == 2);  // (ten steps and the Set of an entry for each of the two list variables; Copy Bytes for the list of numbers)
   {
     // A list of a fixed length: the command says its length ("count"); its default has that many entries,
-    // the palette offers its Get and the Set of an entry - no step that would change its length.
+    // the palette offers its Get and the Set of an entry - no step that would change its length (Copy Bytes
+    // writes its numbers where they stand).
     CHECK(f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Axis","type":"float_list","count":3})")["ok"].as_bool());
     CHECK(variable("Axis")["count"].as_number() == 3 && variable("Axis")["value"].size() == 3);
     CHECK(f.cmd(R"({"cmd":"logicVariable","op":"value","name":"Axis","value":[1,2,3,4,5]})")["ok"].as_bool() && variable("Axis")["value"].size() == 3 && variable("Axis")["value"][2].as_number() == 3);
     CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Bad","type":"float","count":3})")["ok"].as_bool());
     CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Bad","type":"float_list","count":70000})")["ok"].as_bool());
     pal = f.cmd(R"({"cmd":"logicPalette","query":"axis"})");
-    bool get = false, set_entry = false, step = false;
+    bool get = false, set_entry = false, step = false, copy = false;
     for (const json::Value& it : pal["items"].items()) {
       if (it["params"]["variable"].as_string() != "Axis") continue;
       get |= it["type"].as_string() == "var.get";
       set_entry |= it["type"].as_string() == "var.set" && it["params"]["path"].as_string() == "[]";
-      step |= it["type"].as_string().rfind("list.", 0) == 0;
+      step |= it["type"].as_string().rfind("list.", 0) == 0 && it["type"].as_string() != "list.copy_bytes";
+      copy |= it["type"].as_string() == "list.copy_bytes";
     }
-    CHECK(get && set_entry && !step);
+    CHECK(get && set_entry && !step && copy);
     // (another length keeps what fits; the same type without a length is a list of any length again)
     CHECK(f.cmd(R"({"cmd":"logicVariable","op":"type","name":"Axis","type":"float_list","count":2})")["ok"].as_bool() && variable("Axis")["value"].size() == 2 && variable("Axis")["value"][1].as_number() == 2);
     CHECK(f.cmd(R"({"cmd":"logicVariable","op":"type","name":"Axis","type":"float_list"})")["ok"].as_bool() && !variable("Axis").has("count") && variable("Axis")["value"].size() == 2);
