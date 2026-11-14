@@ -518,8 +518,8 @@ void PingBoard::set(u8 owner, Vec3 p, u32 color, f64 now) {
   pings_.push_back({owner, p, color, now});
 }
 void PingBoard::clear(u8 owner) { pings_.erase(std::remove_if(pings_.begin(), pings_.end(), [&](const Ping& q) { return q.owner == owner; }), pings_.end()); }
-void PingBoard::expire(f64 now) { pings_.erase(std::remove_if(pings_.begin(), pings_.end(), [&](const Ping& q) { return g_rules.flag("PingExpired", rules::decimal(now - q.at_ms)); }), pings_.end()); }
+void PingBoard::expire(f64 now) { pings_.erase(std::remove_if(pings_.begin(), pings_.end(), [&](const Ping& q) { return g_rules.flag("PingExpired", now - q.at_ms); }), pings_.end()); }
 
-f32 PingBoard::fade(const Ping& p, f64 now_ms) { return static_cast<f32>(g_rules.number("PingFade", rules::decimal(now_ms - p.at_ms))); }
+f32 PingBoard::fade(const Ping& p, f64 now_ms) { return static_cast<f32>(g_rules.number("PingFade", now_ms - p.at_ms)); }
 
 }  // namespace sc::mp
