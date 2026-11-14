@@ -174,12 +174,15 @@ std::string literal(const Value& v) {
 /// every field, in their order: Weapon{"Knife", Kind::Melee, 25.0}.
 std::string literal(const Value& v, const std::string& of, const Graph& g, std::size_t depth = 0);
 /// The same for what a place is declared as: a list of a fixed length is written with its type,
-/// Fixed<Float, 3>{0.0, 0.0, 0.0} - every entry, as the place holds them.
+/// Fixed<Float, 3>{0.0, 0.0, 1.0} - its entries up to the last that is not the zero of their type
+/// (logic::said): what it does not say is zero, as in C++ - a buffer of 24000 zeros is
+/// Fixed<Float, 24000>{}.
 std::string literal(const Value& v, const TypeRef& declared, const Graph& g, std::size_t depth = 0) {
-  const std::string text = literal(v, declared.of, g, depth);
-  if (!declared.count || !is_list(declared.type) || v.type != declared.type) return text;
-  const std::size_t list = cpp_type(TypeRef{declared.type, declared.of}).size();  // ("List<Float>": what the list's own text begins with)
-  return text.size() >= list ? cpp_type(declared) + text.substr(list) : text;
+  if (!declared.count || !is_list(declared.type) || v.type != declared.type) return literal(v, declared.of, g, depth);
+  const TypeRef item{element_of(declared.type), declared.of};
+  std::string r = cpp_type(declared) + "{";
+  for (std::size_t k = 0, entries = said(v, declared, g); k < entries; ++k) r += (k ? ", " : "") + literal(v.item(k), item, g, depth);
+  return r + "}";
 }
 std::string literal(const Value& v, const std::string& of, const Graph& g, std::size_t depth) {
   if (element_of(v.type) == PinType::structure) {
@@ -2495,7 +2498,7 @@ struct Reader {
           Value init = zero_of(f.type, g);
           if (accept("=") && !typed_literal(f.type, init, s.name + "." + f.name)) return false;
           if (!expect(";")) return false;
-          f.value = init.to_json(g, f.type.of);
+          f.value = init.to_json(g, f.type);
           s.fields.push_back(std::move(f));
         }
         if (s.fields.empty()) return fail(p, "a struct has fields: KERN_STRUCT(" + s.name + ") { Float Field = 0.0; };");
@@ -2521,7 +2524,7 @@ struct Reader {
         if (accept("=") && !typed_literal(type, init, v.name)) return false;
         if (!expect(";")) return false;
         if (g.variable(v.name)) return fail(at + 1, "the variable " + v.name + " is declared twice");
-        v.value = init.to_json(g, type.of);
+        v.value = init.to_json(g, type);
         v.help = take_docs();
         g.variables.push_back(std::move(v));
         continue;
@@ -2650,7 +2653,7 @@ struct Reader {
           auto r = results.find(fn);
           if (r == results.end()) return fail(at, "struct " + ret + " { ... }; must be declared above the function");
           for (std::size_t k = 0; k < r->second.first.size(); ++k)
-            f.outputs.push_back({r->second.first[k].first, r->second.first[k].second.type, r->second.second[k].to_json(g, r->second.first[k].second.of), r->second.first[k].second.of,
+            f.outputs.push_back({r->second.first[k].first, r->second.first[k].second.type, r->second.second[k].to_json(g, r->second.first[k].second), r->second.first[k].second.of,
                                  r->second.first[k].second.count});
         }
         while (!is(")")) {
@@ -2667,7 +2670,7 @@ struct Reader {
           Value v = zero_of(in_type, g);
           if (in.ref && is("=")) return fail(p, in.name + " is a reference: the call names its place, it has no default");
           if (accept("=") && !typed_literal(in_type, v, in.name)) return false;
-          in.value = v.to_json(g, in.of);
+          in.value = v.to_json(g, in_type);
           f.inputs.push_back(std::move(in));
           if (!accept(",")) break;
         }
@@ -2703,7 +2706,7 @@ struct Reader {
           Value init = zero_of(type, g);
           if (accept("=") && !typed_literal(type, init, l.name)) return false;
           if (!expect(";")) return false;
-          l.value = init.to_json(g, type.of);
+          l.value = init.to_json(g, type);
           f.locals.push_back(std::move(l));
         }
         if (failed()) return false;

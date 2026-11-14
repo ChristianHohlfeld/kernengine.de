@@ -106,7 +106,7 @@ PinDef typed_pin(std::string id, std::string label, const TypeRef& t, json::Valu
   return p;
 }
 /// What a pin of type `t` holds when nothing is typed in (a struct: its fields' defaults).
-json::Value zero_json(const TypeRef& t, const Graph& g) { return zero_of(t, g).to_json(g, t.of); }
+json::Value zero_json(const TypeRef& t, const Graph& g) { return zero_of(t, g).to_json(g, t); }
 void retype(PinDef& p, const TypeRef& t, const Graph& g) {
   p.type = t.type;
   p.of = t.of;

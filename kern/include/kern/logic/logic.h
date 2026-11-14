@@ -280,8 +280,11 @@ struct Value {
   /// "Damage": 25} -, written with every field; read, a field that is missing has its default.
   json::Value to_json(const struct Graph& g, std::string_view of) const;
   static Value from_json(const json::Value& j, PinType type, const struct Graph& g, std::string_view of);
-  /// The same for what a place is declared as (TypeRef: a list of a fixed length has that length).
+  /// The same for what a place is declared as (TypeRef). A list of a fixed length has that length:
+  /// read, what JSON does not say is the zero of its entries; written, it is said up to its last
+  /// entry that is not that zero (logic::said) - a buffer of 24000 zeros is [].
   static Value from_json(const json::Value& j, const struct TypeRef& declared, const struct Graph& g);
+  json::Value to_json(const struct Graph& g, const struct TypeRef& declared) const;
   bool operator==(const Value& o) const;
 };
 
@@ -359,7 +362,7 @@ struct TypeRef {
   bool operator==(const TypeRef&) const = default;
 };
 /// The longest list of a fixed length a place can be declared as.
-inline constexpr u32 kLongestFixed = 4096;
+inline constexpr u32 kLongestFixed = 65536;
 /// Can what comes out of a pin of type `from` go into one of type `to`? (convertible, and two
 /// enums are the same enum, two structs the same struct.)
 bool fits(const TypeRef& from, const TypeRef& to);
@@ -577,6 +580,10 @@ Value from_outside(const Value& v, const TypeRef& t, const Graph& g);
 /// every list of a fixed length in it (the place itself, the fields of its structs) at its
 /// length, cut or filled up with zeros. (A Set, a Make, a call's input, a function's output.)
 Value fitted(Value v, const TypeRef& t, const Graph& g);
+/// How many entries of a list of a fixed length are said - in JSON and in the text of a graph:
+/// up to its last entry that is not exactly the zero of its entries, bit for bit (-0.0 is said).
+/// What is not said is that zero, as in C++. (No list of a fixed length: all it has.)
+std::size_t said(const Value& list, const TypeRef& declared, const Graph& g);
 /// Is there a list of a fixed length in what `t` declares (itself, or in a field of its struct)?
 bool has_fixed(const TypeRef& t, const Graph& g);
 /// The type a variable, an input, an output or a local variable is declared as.

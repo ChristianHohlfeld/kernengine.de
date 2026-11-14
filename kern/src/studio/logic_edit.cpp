@@ -1019,10 +1019,11 @@ json::Value Studio::logic_palette(const json::Value& c) const {
 static json::Value retyped_default(const logic::Graph& g, const json::Value& value, const logic::TypeRef& from, const logic::TypeRef& to) {
   const bool declared = logic::element_of(to.type) == logic::PinType::enumeration || logic::element_of(to.type) == logic::PinType::structure;
   const bool same = from.type == to.type && from.of == to.of;  // (the same type - a list of another length is one)
-  if (declared && !same) return logic::zero_of(to, g).to_json(g, to.of);
-  // (as the new type holds it: a list of a fixed length at its length)
-  if (same) return logic::Value::from_json(value, to, g).to_json(g, to.of);
-  return logic::Value::from_json(logic::Value::from_json(value, from.type).converted(to.type).to_json(), to, g).to_json(g, to.of);
+  if (declared && !same) return logic::zero_of(to, g).to_json(g, to);
+  // (what the place held - a list of a fixed length with all its entries, also those its default
+  // does not say - as the new type holds it: a list of a fixed length at its length)
+  if (same) return logic::fitted(logic::Value::from_json(value, from, g), to, g).to_json(g, to);
+  return logic::Value::from_json(logic::Value::from_json(value, from, g).converted(to.type).to_json(), to, g).to_json(g, to);
 }
 
 /// Everything in the Blueprint that holds a value: the defaults of variables, of functions' pins
@@ -1036,10 +1037,10 @@ static void each_held_value(logic::Graph& g, const std::function<void(json::Valu
       for (const logic::PinDef& pd : in)
         if (pd.id == pin && pd.type != logic::PinType::exec) fn(value, {pd.type, pd.of});
   }
-  for (logic::Variable& v : g.variables) fn(v.value, {v.type, v.of});
+  for (logic::Variable& v : g.variables) fn(v.value, logic::declared(v));
   for (logic::Function& f : g.functions)
     for (auto* pins : {&f.inputs, &f.outputs, &f.locals})
-      for (logic::FunctionPin& fp : *pins) fn(fp.value, {fp.type, fp.of});
+      for (logic::FunctionPin& fp : *pins) fn(fp.value, logic::declared(fp));
   for (logic::StructType& s : g.structs)
     for (logic::StructField& f : s.fields) fn(f.value, f.type);
 }
@@ -1067,9 +1068,9 @@ static void settle_struct_values(logic::Graph& g) {
   // (first the fields' defaults, in the order of the declarations: a struct's default holds those of the structs above it)
   for (logic::StructType& s : g.structs)
     for (logic::StructField& f : s.fields)
-      if (logic::element_of(f.type.type) == logic::PinType::structure) f.value = logic::Value::from_json(f.value, f.type.type, g, f.type.of).to_json(g, f.type.of);
+      if (logic::element_of(f.type.type) == logic::PinType::structure) f.value = logic::Value::from_json(f.value, f.type, g).to_json(g, f.type);
   each_held_value(g, [&](json::Value& value, const logic::TypeRef& t) {
-    if (logic::element_of(t.type) == logic::PinType::structure) value = logic::Value::from_json(value, t.type, g, t.of).to_json(g, t.of);
+    if (logic::element_of(t.type) == logic::PinType::structure) value = logic::Value::from_json(value, t, g).to_json(g, t);
   });
 }
 
@@ -1827,7 +1828,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         logic::TypeRef t;
         if (!logic::type_from_text(str("type").empty() ? "float" : str("type"), g, t)) { error = "unknown type"; return false; }
         if (!with_count(t, error)) return false;
-        pins.push_back({pname, t.type, logic::zero_of(t, g).to_json(g, t.of), t.of, t.count});
+        pins.push_back({pname, t.type, logic::zero_of(t, g).to_json(g, t), t.of, t.count});
         result.set("pin", pname);
         return true;
       }
@@ -1917,7 +1918,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
             n.values.erase(std::remove_if(n.values.begin(), n.values.end(), [&](const auto& v) { return v.first == pin; }), n.values.end());
         return true;
       }
-      if (op == "pinValue") { it->value = logic::Value::from_json(c["value"], logic::declared(*it), g).to_json(g, it->of); return true; }
+      if (op == "pinValue") { it->value = logic::Value::from_json(c["value"], logic::declared(*it), g).to_json(g, logic::declared(*it)); return true; }
       if (op == "pinMove") {
         const std::ptrdiff_t at = it - pins.begin(), to = at + (num("by") < 0 ? -1 : 1);
         if (to < 0 || to >= static_cast<std::ptrdiff_t>(pins.size())) return false;
@@ -1944,7 +1945,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         logic::TypeRef t;
         if (!logic::type_from_text(str("type").empty() ? "float" : str("type"), g, t)) { error = "unknown type"; return false; }
         if (!with_count(t, error)) return false;
-        g.variables.push_back({n, t.type, logic::zero_of(t, g).to_json(g, t.of), {}, t.of, t.count});
+        g.variables.push_back({n, t.type, logic::zero_of(t, g).to_json(g, t), {}, t.of, t.count});
         result.set("name", n);
         return true;
       }
@@ -1978,7 +1979,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         return true;
       }
       if (op == "value") {
-        v->value = logic::Value::from_json(c["value"], logic::declared(*v), g).to_json(g, v->of);
+        v->value = logic::Value::from_json(c["value"], logic::declared(*v), g).to_json(g, logic::declared(*v));
         return true;
       }
       if (op == "constant") {
@@ -2213,7 +2214,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         for (int i = 2; s->field(n) >= 0 || g.enumeration(n) || g.structure(n); ++i) n = base + std::to_string(i);
         logic::TypeRef t;
         if (!field_type(str("type"), t)) return false;
-        s->fields.push_back({n, t, logic::zero_of(t, g).to_json(g, t.of)});
+        s->fields.push_back({n, t, logic::zero_of(t, g).to_json(g, t)});
         result.set("field", n);
         order_structs();
         settle_struct_values(g);
@@ -2316,7 +2317,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       }
       if (op == "fieldValue") {
         const logic::TypeRef t = s->fields[at].type;
-        s->fields[at].value = logic::Value::from_json(c["value"], t, g).to_json(g, t.of);
+        s->fields[at].value = logic::Value::from_json(c["value"], t, g).to_json(g, t);
         settle_struct_values(g);
         return true;
       }

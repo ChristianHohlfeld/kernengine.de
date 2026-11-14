@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <map>
 #include <set>
 
@@ -306,21 +307,88 @@ Value read_value(const json::Value& j, const TypeRef& t, const Graph& g, int dep
   at_length(v, t, g);
   return v;
 }
-json::Value written(const Value& v, std::string_view of, const Graph& g, int depth) {
-  const StructType* s = element_of(v.type) == PinType::structure && depth > 0 ? g.structure(of) : nullptr;
-  if (!s) return v.to_json();
+/// Bit for bit the same value of type `t`? (-0.0 is not 0.0; a field a struct's value does not
+/// hold is at its declared default.)
+bool identical(const Value& a, const Value& b, const TypeRef& t, const Graph& g, int depth) {
+  if (a.type != b.type) return false;
+  auto bits = [](f64 x, f64 y) { return std::memcmp(&x, &y, sizeof x) == 0; };
+  auto bits32 = [](f32 x, f32 y) { return std::memcmp(&x, &y, sizeof x) == 0; };
+  switch (a.type) {
+    case PinType::boolean: return a.b == b.b;
+    case PinType::integer:
+    case PinType::enumeration: return a.i == b.i;
+    case PinType::number: return bits(a.n, b.n);
+    case PinType::vector: return bits32(a.v.x, b.v.x) && bits32(a.v.y, b.v.y) && bits32(a.v.z, b.v.z);
+    case PinType::text: return a.s == b.s;
+    case PinType::actor: return a.a == b.a;
+    default: break;
+  }
+  if (a.type == PinType::structure) {
+    const StructType* s = depth > 0 ? g.structure(t.of) : nullptr;
+    if (!s) return a == b;
+    for (std::size_t k = 0; k < s->fields.size(); ++k) {
+      const Value* x = a.field(k);
+      const Value* y = b.field(k);
+      if (!x && !y) continue;  // (both at the field's default)
+      const StructField& f = s->fields[k];
+      if (!identical(x ? *x : read_value(f.value, f.type, g, depth - 1), y ? *y : read_value(f.value, f.type, g, depth - 1), f.type, g, depth - 1)) return false;
+    }
+    return true;
+  }
+  if (!is_list(a.type) || a.size() != b.size()) return !is_list(a.type);
+  const TypeRef item{element_of(t.type), t.of};
+  for (std::size_t k = 0, n = a.size(); k < n; ++k)
+    if (!identical(a.item(k), b.item(k), item, g, depth)) return false;
+  return true;
+}
+std::size_t said_of(const Value& v, const TypeRef& t, const Graph& g, int depth) {
+  std::size_t n = v.size();
+  if (!t.count || !is_list(t.type) || v.type != t.type) return n;
+  if (n > t.count) n = t.count;
+  auto zero = [](f64 x) { return x == 0 && !std::signbit(x); };
+  switch (element_of(t.type)) {
+    case PinType::boolean: for (const auto& x = v.items<bool>(); n && !x[n - 1];) --n; break;
+    case PinType::integer:
+    case PinType::enumeration: for (const auto& x = v.items<i64>(); n && x[n - 1] == 0;) --n; break;
+    case PinType::number: for (const auto& x = v.items<f64>(); n && zero(x[n - 1]);) --n; break;
+    case PinType::vector: for (const auto& x = v.items<Vec3>(); n && zero(x[n - 1].x) && zero(x[n - 1].y) && zero(x[n - 1].z);) --n; break;
+    case PinType::text: for (const auto& x = v.items<std::string>(); n && x[n - 1].empty();) --n; break;
+    case PinType::actor: for (const auto& x = v.items<ActorHandle>(); n && x[n - 1] == ActorHandle{};) --n; break;
+    case PinType::structure: {
+      // (the zero of a struct is the struct at its declared defaults: at_length fills up with it)
+      const TypeRef item{PinType::structure, t.of};
+      const Value none = zero_of(item, g);
+      for (const auto& x = v.items<Value>(); n && identical(x[n - 1], none, item, g, depth);) --n;
+      break;
+    }
+    default: break;
+  }
+  return n;
+}
+/// A value as JSON, by what its place is declared as: a struct is an object of its fields by
+/// their names, a list of a fixed length is said up to its last entry that is not zero.
+json::Value written(const Value& v, const TypeRef& t, const Graph& g, int depth) {
+  const StructType* s = element_of(v.type) == PinType::structure && depth > 0 ? g.structure(t.of) : nullptr;
+  const std::size_t entries = is_list(v.type) ? said_of(v, t, g, depth) : 0;
+  if (!s) {
+    if (!is_list(v.type) || entries == v.size()) return v.to_json();
+    json::Value arr = json::Value::array();
+    for (std::size_t k = 0; k < entries; ++k) arr.push(v.item(k).to_json());
+    return arr;
+  }
   auto one = [&](const Value& x) {
     json::Value o = json::Value::object();
     for (std::size_t k = 0; k < s->fields.size(); ++k) {
       const StructField& f = s->fields[k];
       const Value* held = x.field(k);
-      o.set(f.name, written(held ? *held : read_value(f.value, f.type, g, depth - 1), f.type.of, g, depth - 1));
+      o.set(f.name, written(held ? *held : read_value(f.value, f.type, g, depth - 1), f.type, g, depth - 1));
     }
     return o;
   };
   if (v.type == PinType::structure) return one(v);
   json::Value arr = json::Value::array();
-  for (const Value& x : v.items<Value>()) arr.push(one(x));
+  const auto& rows = v.items<Value>();
+  for (std::size_t k = 0; k < entries; ++k) arr.push(one(rows[k]));
   return arr;
 }
 bool value_of(const Value& v, const TypeRef& t, const Graph& g, int depth) {
@@ -349,7 +417,8 @@ bool value_of(const Value& v, const TypeRef& t, const Graph& g, int depth) {
 }
 }  // namespace
 
-json::Value Value::to_json(const Graph& g, std::string_view of) const { return written(*this, of, g, struct_depth(g)); }
+json::Value Value::to_json(const Graph& g, std::string_view of) const { return written(*this, TypeRef{type, std::string(of)}, g, struct_depth(g)); }
+json::Value Value::to_json(const Graph& g, const TypeRef& declared) const { return written(*this, declared, g, struct_depth(g)); }
 Value Value::from_json(const json::Value& j, PinType t, const Graph& g, std::string_view of) { return read_value(j, {t, std::string(of)}, g, struct_depth(g)); }
 
 Value zero_of(const TypeRef& t, const Graph& g) {
@@ -399,6 +468,7 @@ void fit(Value& v, const TypeRef& t, const Graph& g, int depth) {
     for (Value& x : v.edit<Value>()) one(x);
 }
 }  // namespace
+std::size_t said(const Value& list, const TypeRef& declared, const Graph& g) { return said_of(list, declared, g, struct_depth(g)); }
 Value fitted(Value v, const TypeRef& t, const Graph& g) {
   if (has_fixed(t, g)) fit(v, t, g, struct_depth(g));
   return v;
@@ -736,7 +806,7 @@ bool Graph::place_of(const Node& n, Variable& out, std::string* why, std::string
     name += "." + step;
   }
   // what stands there when nothing else is said: a field's declared default, an entry's zero
-  out.value = declared ? *declared : zero_of(at, *this).to_json(*this, at.of);
+  out.value = declared ? *declared : zero_of(at, *this).to_json(*this, at);
   out.name = name;
   out.type = at.type;
   out.of = at.of;
@@ -1377,7 +1447,7 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
       if (s.field(f.name) >= 0) return bad("struct \"" + s.name + "\": the field \"" + f.name + "\" exists twice");
       if (!type_of(x, f.type.type, f.type.of)) return bad("struct \"" + s.name + "\": the field \"" + f.name + "\" has an unknown type (a struct holds structs declared above it)");
       f.type.count = count_of(x);
-      f.value = Value::from_json(x["value"], f.type, g).to_json(g, f.type.of);
+      f.value = Value::from_json(x["value"], f.type, g).to_json(g, f.type);
       s.fields.push_back(std::move(f));
     }
     s.help = v["help"].as_string();
@@ -1392,7 +1462,7 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
     if (g.variable(var.name)) return bad("variable \"" + var.name + "\" is declared twice");
     if (!type_of(v, var.type, var.of)) return bad("variable \"" + var.name + "\" has an unknown type");
     var.count = count_of(v);
-    var.value = Value::from_json(v["value"], declared(var), g).to_json(g, var.of);
+    var.value = Value::from_json(v["value"], declared(var), g).to_json(g, declared(var));
     var.help = v["help"].as_string();
     var.constant = v["const"].as_bool();
     var.from = v["from"].as_string();
@@ -1496,7 +1566,7 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
         for (const FunctionPin& q : out) if (q.name == p.name) return bad("function \"" + f.name + "\": " + what + " \"" + p.name + "\" exists twice");
         if (!type_of(x, p.type, p.of)) return bad("function \"" + f.name + "\": \"" + p.name + "\" has an unknown type");
         p.count = count_of(x);
-        p.value = Value::from_json(x["value"], declared(p), g).to_json(g, p.of);
+        p.value = Value::from_json(x["value"], declared(p), g).to_json(g, declared(p));
         p.constant = x["ref"].is_string() && x["ref"].as_string() == "const";
         p.ref = p.constant || x["ref"].as_bool();
         out.push_back(std::move(p));
@@ -1712,7 +1782,7 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
     if (!t.count) return;
     if (!is_list(t.type)) { err(0, what + " has a fixed length (" + std::to_string(t.count) + "), but is " + type_text({t.type, t.of}) + ": a length is a list's"); return; }
     if (t.count > kLongestFixed) { err(0, what + " is a list of " + std::to_string(t.count) + " entries: a list of a fixed length has " + std::to_string(kLongestFixed) + " at most"); return; }
-    if (value.is_array() && value.size() != t.count)
+    if (value.is_array() && value.size() > t.count)
       err(0, what + " is a list of " + std::to_string(t.count) + " entries, its default has " + std::to_string(value.size()));
   };
   for (const StructType& st : g.structs)

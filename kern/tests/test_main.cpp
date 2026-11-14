@@ -3932,20 +3932,35 @@ TEST(logic_fixed_lists) {
     return right;
   };
   {
-    // the text and the graph: the declaration with its length, the default with every entry
+    // the text and the graph: the declaration with its length, the default up to its last entry
+    // that is not zero - in the text and in JSON (a buffer of 24000 zeros says nothing)
     logic::Graph g, back;
     std::string error, text, twice;
-    CHECK(read("  struct GiveResult { Fixed<Float, 3> v = Fixed<Float, 3>{0.0, 0.0, 0.0}; };\n  GiveResult Give(const Fixed<Float, 3>& seen, Fixed<Float, 3>& into, Fixed<Float, 3> v = Fixed<Float, 3>{1.0}) {\n"
-               "    Fixed<Float, 2> Pair = Fixed<Float, 2>{};\n    Pair[0] = v[0];\n    into[1] = seen[2];\n    return {v};\n  }\n" + in_event("    Axis[1] = value;\n    Any = Axis;\n    Axis = Any;\n    Now.m[3] = Axis[0];"),
+    CHECK(read("  Fixed<Float, 24000> Echo = Fixed<Float, 24000>{};\n  struct GiveResult { Fixed<Float, 3> v = Fixed<Float, 3>{0.0, 0.0, 0.0}; };\n  GiveResult Give(const Fixed<Float, 3>& seen, Fixed<Float, 3>& into, Fixed<Float, 3> v = Fixed<Float, 3>{1.0}) {\n"
+               "    Fixed<Float, 2> Pair = Fixed<Float, 2>{};\n    Pair[0] = v[0];\n    into[1] = seen[2];\n    return {v};\n  }\n" + in_event("    Axis[1] = value;\n    Any = Axis;\n    Axis = Any;\n    Now.m[3] = Axis[0];\n    Echo[23999] = value;"),
                g, error));
     if (!error.empty()) std::printf("%s\n", error.c_str());
     CHECK(g.variable("Axis") && g.variable("Axis")->count == 3 && g.variable("Axis")->type == logic::PinType::number_list && g.variable("Any")->count == 0);
     CHECK(g.structure("Mat") && g.structure("Mat")->fields[0].type.count == 4);
     const logic::Function* give = g.function("Give");
     CHECK(give && give->input("v")->count == 3 && give->input("seen")->count == 3 && give->input("into")->ref && give->outputs[0].count == 3 && give->locals[0].count == 2);
-    CHECK(json::stringify(give->input("v")->value) == "[1,0,0]" && json::stringify(give->locals[0].value) == "[0,0]");  // (what a default does not say is zero)
+    CHECK(json::stringify(give->input("v")->value) == "[1]" && json::stringify(give->locals[0].value) == "[]" && json::stringify(give->outputs[0].value) == "[]");  // (what a default does not say is zero)
+    CHECK(g.variable("Echo") && g.variable("Echo")->count == 24000 && json::stringify(g.variable("Echo")->value) == "[]" && json::stringify(g.structure("Mat")->fields[0].value) == "[1,0,0,1]");
+    {
+      // (said: up to the last entry that is not exactly zero - -0.0 is said, a struct at its defaults is not)
+      const logic::TypeRef three{logic::PinType::number_list, {}, 3};
+      CHECK(logic::said(logic::Value::of(std::vector<f64>{0, 2, 0}), three, g) == 2 && logic::said(logic::Value::of(std::vector<f64>{0, 0, -0.0}), three, g) == 3);
+      CHECK(logic::said(logic::Value::of(std::vector<f64>{0, 2, 0}), {logic::PinType::number_list, {}, 0}, g) == 3 && logic::said(logic::Value::of(std::vector<f64>{}), three, g) == 0);
+      const logic::TypeRef mats{logic::PinType::structure_list, "Mat", 2};
+      const logic::Value plain = logic::zero_of({logic::PinType::structure, "Mat"}, g);
+      CHECK(logic::said(logic::fitted(logic::Value::structures({}), mats, g), mats, g) == 0 && logic::said(logic::Value::structures({plain, plain}), mats, g) == 0);
+      CHECK(json::stringify(logic::zero_of(mats, g).to_json(g, mats)) == "[]" && logic::Value::from_json(json::Value::array(), mats, g).size() == 2);
+    }
     CHECK(logic::to_cpp(g, "B", text, &error, logic::library(), false));
-    CHECK(text.find("  GiveResult Give(const Fixed<Float, 3>& seen, Fixed<Float, 3>& into, Fixed<Float, 3> v = Fixed<Float, 3>{1.0, 0.0, 0.0}) {\n    Fixed<Float, 2> Pair = Fixed<Float, 2>{0.0, 0.0};\n") != std::string::npos);
+    // (the text says an entry up to the last that is not zero - what it does not say is zero, as in C++)
+    CHECK(text.find("  GiveResult Give(const Fixed<Float, 3>& seen, Fixed<Float, 3>& into, Fixed<Float, 3> v = Fixed<Float, 3>{1.0}) {\n    Fixed<Float, 2> Pair = Fixed<Float, 2>{};\n") != std::string::npos);
+    CHECK(text.find("  Fixed<Float, 3> Axis = Fixed<Float, 3>{1.0, 2.0, 3.0};\n") != std::string::npos && text.find("    Fixed<Float, 4> m = Fixed<Float, 4>{1.0, 0.0, 0.0, 1.0};\n") != std::string::npos);
+    CHECK(text.find("  Fixed<Float, 24000> Echo = Fixed<Float, 24000>{};\n") != std::string::npos && text.find("  struct GiveResult { Fixed<Float, 3> v = Fixed<Float, 3>{}; };\n") != std::string::npos);
     CHECK(logic::from_cpp(text, back, nullptr, &error) && logic::to_cpp(back, "B", twice, &error, logic::library(), false) && twice == text);
     CHECK(logic::graph_from_json(logic::graph_to_json(g), back) && back == g);
     std::string difference;
@@ -3963,6 +3978,7 @@ TEST(logic_fixed_lists) {
       rt.begin();
       rt.call("Go", 0, {{"value", logic::Value::number(7)}});
       CHECK(inst->get("Axis").as_text() == "[1, 7, 3]" && inst->get("Any").as_text() == "[1, 7, 3]" && inst->get("Now").field(0)->size() == 4 && host.errors.empty());
+      CHECK(inst->get("Echo").size() == 24000 && inst->get("Echo").item(23999).as_number() == 7 && inst->get("Echo").item(0).as_number() == 0);
       CHECK(inst->set("Axis", logic::Value::of(std::vector<f64>{5, 6})) && inst->get("Axis").as_text() == "[5, 6, 0]");
       CHECK(inst->set("Axis", logic::Value::of(std::vector<f64>{1, 2, 3, 4, 5})) && inst->get("Axis").as_text() == "[1, 2, 3]");
       std::vector<logic::Value> results;
@@ -3975,14 +3991,14 @@ TEST(logic_fixed_lists) {
   CHECK(says(in_event("    list_clear(Now.m);"), "is a list of a fixed length (4)"));
   CHECK(says(in_event("    list_resize(Axis, 5, 0.0);"), "is a list of a fixed length (3)"));
   CHECK(says("  Fixed<Float, 2> Two = Fixed<Float, 2>{1.0, 2.0, 3.0};\n", "Fixed<Float, 2> has 2 entries: this says 3"));
-  CHECK(says("  Fixed<Float, 0> None = Fixed<Float, 0>{};\n", "a list of a fixed length has 1 to 4096 entries"));
+  CHECK(says("  Fixed<Float, 0> None = Fixed<Float, 0>{};\n", "a list of a fixed length has 1 to 65536 entries"));
   CHECK(says("  Fixed<Float, 2> Two = List<Float>{1.0, 2.0, 3.0};\n", "Fixed<Float, 2> has 2 entries: this says 3"));
   {
     // (a list written out for a place of a fixed length is that place's entries - as C++ takes it; the text of the graph says Fixed)
     logic::Graph g;
     std::string error, text;
     CHECK(read("  Fixed<Float, 2> Two = List<Float>{1.5};\n  Mat Other = Mat{List<Float>{2.0, 3.0}};\n", g, error) && logic::to_cpp(g, "B", text, &error, logic::library(), false));
-    CHECK(text.find("  Fixed<Float, 2> Two = Fixed<Float, 2>{1.5, 0.0};\n  Mat Other = Mat{Fixed<Float, 4>{2.0, 3.0, 0.0, 0.0}};\n") != std::string::npos);
+    CHECK(text.find("  Fixed<Float, 2> Two = Fixed<Float, 2>{1.5};\n  Mat Other = Mat{Fixed<Float, 4>{2.0, 3.0}};\n") != std::string::npos);
   }
   CHECK(says("  List<Float> Two = Fixed<Float, 2>{1.0, 2.0};\n", "this is Fixed<Float, 2>, but List<Float> is needed"));
   CHECK(says(in_event("    Any = Fixed<Float, 2>{1.0, 2.0};"), "a list of a fixed length is what a place is declared as"));
@@ -4001,8 +4017,15 @@ TEST(logic_fixed_lists) {
     std::string all;
     for (const logic::Issue& i : logic::check(g)) all += i.text + "\n";
     CHECK(all.find("variable \"N\" has a fixed length (3), but is float: a length is a list's") != std::string::npos);
-    CHECK(all.find("variable \"L\" is a list of 3 entries, its default has 2") != std::string::npos);
-    CHECK(all.find("variable \"Big\" is a list of 4097 entries") != std::string::npos);
+    CHECK(all.find("variable \"L\"") == std::string::npos);  // (a default says no more than the list has: what it does not say is zero)
+    CHECK(all.find("variable \"Big\" is a list of " + std::to_string(logic::kLongestFixed + 1) + " entries") != std::string::npos);
+    json::Value four = two;
+    four.push(3.0);
+    four.push(4.0);
+    g.variables[1].value = four;
+    all.clear();
+    for (const logic::Issue& i : logic::check(g)) all += i.text + "\n";
+    CHECK(all.find("variable \"L\" is a list of 3 entries, its default has 4") != std::string::npos);
   }
 }
 
@@ -10243,7 +10266,7 @@ TEST(studio_logic_lists) {
     CHECK(variable("Axis")["count"].as_number() == 3 && variable("Axis")["value"].size() == 3);
     CHECK(f.cmd(R"({"cmd":"logicVariable","op":"value","name":"Axis","value":[1,2,3,4,5]})")["ok"].as_bool() && variable("Axis")["value"].size() == 3 && variable("Axis")["value"][2].as_number() == 3);
     CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Bad","type":"float","count":3})")["ok"].as_bool());
-    CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Bad","type":"float_list","count":5000})")["ok"].as_bool());
+    CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Bad","type":"float_list","count":70000})")["ok"].as_bool());
     pal = f.cmd(R"({"cmd":"logicPalette","query":"axis"})");
     bool get = false, set_entry = false, step = false;
     for (const json::Value& it : pal["items"].items()) {
@@ -10257,6 +10280,11 @@ TEST(studio_logic_lists) {
     CHECK(f.cmd(R"({"cmd":"logicVariable","op":"type","name":"Axis","type":"float_list","count":2})")["ok"].as_bool() && variable("Axis")["value"].size() == 2 && variable("Axis")["value"][1].as_number() == 2);
     CHECK(f.cmd(R"({"cmd":"logicVariable","op":"type","name":"Axis","type":"float_list"})")["ok"].as_bool() && !variable("Axis").has("count") && variable("Axis")["value"].size() == 2);
     CHECK(f.cmd(R"({"cmd":"logicVariable","op":"remove","name":"Axis"})")["ok"].as_bool());
+    // (a default says its entries up to the last that is not zero; the place has them all - also as a list of any length, or of numbers of another kind)
+    CHECK(f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Pad","type":"float_list","count":3})")["ok"].as_bool() && f.cmd(R"({"cmd":"logicVariable","op":"value","name":"Pad","value":[4]})")["ok"].as_bool());
+    CHECK(variable("Pad")["value"].size() == 3 && variable("Pad")["value"][0].as_number() == 4 && json::stringify(f.s->level().logic.variable("Pad")->value) == "[4]");
+    CHECK(f.cmd(R"({"cmd":"logicVariable","op":"type","name":"Pad","type":"int_list"})")["ok"].as_bool() && variable("Pad")["value"].size() == 3 && variable("Pad")["value"][0].as_number() == 4);
+    CHECK(f.cmd(R"({"cmd":"logicVariable","op":"remove","name":"Pad"})")["ok"].as_bool());
   }
   // From the pin of Get Names: the nodes for a list, in its type; nothing a list does not go into.
   auto added = [&](const char* type, const char* params = "{}") {

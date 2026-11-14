@@ -461,8 +461,8 @@ inline const std::vector<Case>& cases() {
           [123,"value",34,"list"],[125,"result",124,"value"],[126,"value",125,"a"],[127,"then",129,"exec"],[128,"value",127,"value"],[130,"result",129,"value"],
           [131,"value",130,"a"],[132,"value",130,"b"],[133,"value",130,"c"]],"functions":[
           {"name":"Mul","pure":true,"inputs":[{"name":"a","type":"struct","of":"Mat","ref":"const","value":{"m":[1,0,0,1],"Name":"m"}},{"name":"b","type":"struct","of":"Mat","ref":"const","value":{"m":[1,0,0,1],"Name":"m"}}],"outputs":[{"name":"out","type":"struct","of":"Mat","value":{"m":[1,0,0,1],"Name":"m"}}],"locals":[{"name":"R","type":"struct","of":"Mat","value":{"m":[1,0,0,1],"Name":"m"}}]},
-          {"name":"Scaled","inputs":[{"name":"v","type":"float_list","count":3,"value":[1,1,1]},{"name":"by","type":"float","value":2}],"outputs":[{"name":"v","type":"float_list","count":3,"value":[0,0,0]}],"locals":[{"name":"Made","type":"float_list","count":3,"value":[0,0,0]}]},
-          {"name":"Bump","inputs":[{"name":"axis","type":"float_list","count":3,"ref":true,"value":[0,0,0]},{"name":"by","type":"float","value":1}],"outputs":[]}]})"},
+          {"name":"Scaled","inputs":[{"name":"v","type":"float_list","count":3,"value":[1,1,1]},{"name":"by","type":"float","value":2}],"outputs":[{"name":"v","type":"float_list","count":3,"value":[]}],"locals":[{"name":"Made","type":"float_list","count":3,"value":[]}]},
+          {"name":"Bump","inputs":[{"name":"axis","type":"float_list","count":3,"ref":true,"value":[]},{"name":"by","type":"float","value":1}],"outputs":[]}]})"},
       // Lists in one go: Set Length cuts and fills (a list of numbers, of booleans, of structs;
       // less than 0), Append and Insert List put a whole list in - at the start, in the middle,
       // past the end, a list into itself -, Reserve changes nothing one can read.

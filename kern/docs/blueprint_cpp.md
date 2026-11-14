@@ -247,7 +247,7 @@ Der Name einer Knotenfunktion ist der Knotentyp mit `_` statt `.` (`math.add` �
 | Liste eines dieser Typen | `List<Bool>`, `List<Int>`, `List<Float>`, `List<Vector>`, `List<Text>`, `List<Actor>` | `List<Float>{1.0, 2.5}`, leer: `List<Float>{}` |
 | Aufzählung des Blueprints, Liste ihrer Werte | ihr Name: `Mode`, `List<Mode>` | `Mode::Open`, `List<Mode>{Mode::Closed, Mode::Open}`, leer: `List<Mode>{}` |
 | Struktur des Blueprints, Liste davon | ihr Name: `Weapon`, `List<Weapon>` | `Weapon{"Knife", Kind::Melee, 25.0}` – ein Wert für jedes Feld, in der Reihenfolge der Deklaration; `List<Weapon>{Weapon{...}, Weapon{...}}`, leer: `List<Weapon>{}` |
-| Liste fester Länge – der Typ eines **Platzes**: einer Variablen, eines Felds, eines Ein- oder Ausgangs, einer lokalen Variablen (siehe „Listen fester Länge“) | `Fixed<Float, 16>`, `Fixed<Weapon, 4>` | `Fixed<Float, 3>{1.0, 2.5, 0.0}` – jeder Eintrag; was nicht dasteht, ist null (`Fixed<Float, 3>{1.0}`), mehr als die Länge ist ein Fehler |
+| Liste fester Länge – der Typ eines **Platzes**: einer Variablen, eines Felds, eines Ein- oder Ausgangs, einer lokalen Variablen (siehe „Listen fester Länge“) | `Fixed<Float, 16>`, `Fixed<Weapon, 4>` | `Fixed<Float, 3>{1.0, 2.5}` – die Einträge bis zum letzten, der nicht null ist: Was nicht dasteht, ist null, wie in C++ (lauter Nullen: `Fixed<Float, 3>{}`); mehr als die Länge ist ein Fehler |
 
 Zahlen stehen in der kürzesten Form, die genau denselben Wert wieder ergibt. Jeder Draht, dessen
 Enden verschiedene Typen haben, ist ein `kern::to<Typ>(...)` – keine stille Umwandlung. Der Wert
@@ -325,9 +325,9 @@ KERN_STRUCT(Mat4) {
 };
 Fixed<Float, 3> Axis = Fixed<Float, 3>{0.0, 0.0, 1.0};
 
-struct ScaledResult { Fixed<Float, 3> v = Fixed<Float, 3>{0.0, 0.0, 0.0}; };
+struct ScaledResult { Fixed<Float, 3> v = Fixed<Float, 3>{}; };
 ScaledResult Scaled(const Fixed<Float, 3>& v, Float by = 2.0) {
-  Fixed<Float, 3> Made = Fixed<Float, 3>{0.0, 0.0, 0.0};
+  Fixed<Float, 3> Made = Fixed<Float, 3>{};
   for (auto it3 = flow_for(n3, 0, 2); it3.next();) {
     Made[n3.index] = math_mul(v[n3.index], by);
   }
@@ -337,7 +337,7 @@ ScaledResult Scaled(const Fixed<Float, 3>& v, Float by = 2.0) {
 
 - **Die Länge gehört zur Deklaration des Platzes**, nicht zum Wert: Eine Variable, ein Feld einer
   Struktur, ein Eingang (als Wert oder als Referenz), ein Ausgang und eine lokale Variable einer
-  Funktion können sie haben – 1 bis 4.096 Einträge. Was durch einen Pin fließt, ist eine Liste:
+  Funktion können sie haben – 1 bis 65.536 Einträge. Was durch einen Pin fließt, ist eine Liste:
   Ein Pin hat keine Länge, und die Knoten, die Listen lesen (Length, Get Item, Contains, Find, For
   Each), lesen eine Liste fester Länge wie jede andere – in der Klasse dort, wo sie steht
   (`kern::logic::Items`, ohne Kopie).

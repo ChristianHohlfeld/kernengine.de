@@ -805,8 +805,8 @@ class Unit:
     def fixed(self, raw):
         """The length a place of the C++ type `raw` is declared with (None: none - not a list of a fixed length)."""
         n = self.entries(raw)
-        if n is not None and n > 4096:
-            raise Wait("a list of more than 4096 entries of fixed length")
+        if n is not None and n > 65536:
+            raise Wait("a list of more than 65536 entries of fixed length")
         return n if n else None
 
     def pair(self, a, b):
@@ -993,7 +993,9 @@ class Unit:
                 fname = self.fresh(c.get("name", "field"), taken, among=self.world.taken)
                 taken.add(fname)
                 init = kids(c)[-1] if kids(c) and c.get("hasInClassInitializer") else None
-                default = self.zeros(qtype(c), ft)
+                # (an array of C++ is declared with its length - `dtype`, below -: its default says what is
+                # not zero - nothing)
+                default = self.zero(ft)
                 if init is not None:
                     try:
                         default = Const(self).literal(init, ft)
@@ -1025,21 +1027,11 @@ class Unit:
         m = re.search(r"\[(\d+)\]$", c) or re.match(r"std::array<.*,\s*(\d+)U?L?L?>$", c)
         return int(m.group(1)) if m else None
 
-    def zeros(self, raw, t):
-        """The zero of a C++ type: of a list of fixed length, that many zeros."""
-        n = self.entries(raw)
-        if n is None or not t.startswith("List<"):
-            return self.zero(t)
-        if n > 256:
-            raise Wait("a list of more than 256 entries of fixed length")
-        return t + "{" + ", ".join([self.zero(t[5:-1])] * n) + "}"
-
     def zero(self, t):
         if t in ZERO:
             return ZERO[t]
-        m = re.match(r"Fixed<(.+), (\d+)>$", t)
-        if m:   # (a list of a fixed length: every entry)
-            return t + "{" + ", ".join([self.zero(m.group(1))] * int(m.group(2))) + "}"
+        if re.match(r"Fixed<(.+), (\d+)>$", t):   # (a list of a fixed length: what its text does not say is zero)
+            return t + "{}"
         if t.startswith("List<"):
             return t + "{}"
         if t in self.enum_values:
@@ -1492,13 +1484,9 @@ class Const:
                         return self.literal(args[0], t)
                     if args:
                         raise Wait("a list constant made by a constructor")
-                vals = [self.literal(c, it) for c in args]
-                fixed = u.entries(qtype(n)) if k == "InitListExpr" else None
-                if fixed is not None and fixed > len(vals):   # (a list of fixed length: what is not written is zero)
-                    if fixed > 256:
-                        raise Wait("a list of more than 256 entries of fixed length")
-                    vals += [u.zero(it)] * (fixed - len(vals))
-                return t + "{" + ", ".join(vals) + "}"
+                # (an array of C++ - a constant, the default of a field - is declared with its length: what
+                # is not written is zero there, in the Blueprint as in C++)
+                return t + "{" + ", ".join(self.literal(c, it) for c in args) + "}"
             if k == "CXXStdInitializerListExpr":
                 return self.literal(kids(n)[0], t)
             raise Wait(f"a list constant written as {k}")
@@ -2029,7 +2017,9 @@ class Emit:
                     kept = self.copied_type(init)
                 name = self.local(v, self.whole64() if wide_init else kept)
                 if init is not None:
-                    text = self.ex(init, self.types[v['id']])
+                    # (an array written out: its place - declared with its length - is set to what is written)
+                    said = self.written_array(init, self.types[v['id']]) if name in self.lengths else None
+                    text = self.made_list(said[0], self.types[v['id']]) if said else self.ex(init, self.types[v['id']])
                     out += self.take_pre() + [f"{name} = {text};"]
                     c = self.ctype(v)
                     if ITERATOR.match(c):
@@ -2037,8 +2027,9 @@ class Emit:
                     elif c.startswith("std::pair<") and ITERATOR.match(template_args(c)[0]):
                         self.note_home(v["id"], init, of_pair=True)
                 else:
-                    value = self.zero_value(raw, self.types[v["id"]])
-                    out += self.take_pre() + [f"{name} = {value};"]
+                    # (the zero of its type; an array of C++ is declared with its length - set to the
+                    # empty list, each of its entries is zero)
+                    out += [f"{name} = {self.u.zero(self.types[v['id']])};"]
             return out, False
         if k == "ReturnStmt":
             c = kids(s)
@@ -2502,17 +2493,30 @@ class Emit:
             raise Wait(f"call: {name}() of an object")
         raise Wait(f"a statement: {k}")
 
-    def zero_value(self, raw, t):
-        """The zero of a C++ type as a value: of a list of fixed length, that many zeros."""
-        n = self.u.entries(raw)
-        if n is None or not t.startswith("List<"):
-            return self.u.zero(t)
-        it = t[5:-1]
-        if n <= 16:
-            return f'list_make<{it}, "{n}">({", ".join([self.u.zero(it)] * n)})'
-        made = self.temp("made", t)
-        self.hoist([f"list_clear({made});", f'while (loop(math_compare<"<">(kern::to<Float>(list_length<{it}>({made})), {flit(float(n))}))) {{', f"  list_add({made}, {self.u.zero(it)});", "}"])
-        return made
+    def written_array(self, n, t):
+        """An array of C++ written out - `{}`, `{1, 2}` for a T[N] or a std::array<T, N>: (the values it
+        says, N). A place of that length set to the list of these values has them, and zeros after them
+        - as the array has in C++. None: `n` is no array written out."""
+        b = self.unwrap(n)
+        while b.get("kind") in ("CXXBindTemporaryExpr", "MaterializeTemporaryExpr", "ExprWithCleanups", "CXXFunctionalCastExpr") and len(kids(b)) == 1:
+            b = self.unwrap(kids(b)[0])
+        if b.get("kind") != "InitListExpr" or not t.startswith("List<"):
+            return None
+        fixed = self.u.fixed(qtype(b))
+        if not fixed:
+            return None
+        said = [x for x in kids(b) if x.get("kind") not in ("CXXDefaultArgExpr", "ImplicitValueInitExpr")]
+        if len(said) == 1 and bare(said[0]).get("kind") == "InitListExpr" and self.u.clean(qtype(b)).startswith("std::array<") and self.u.entries(qtype(bare(said[0]))) == fixed:
+            # (std::array<T, N>{...}: the array it holds, written out)
+            said = [x for x in kids(bare(said[0])) if x.get("kind") not in ("CXXDefaultArgExpr", "ImplicitValueInitExpr")]
+        return [self.ex(x, t[5:-1]) for x in said], fixed
+
+    @staticmethod
+    def made_list(vals, t):
+        """The list of these values, as a value: one Make List (of up to 16)."""
+        if len(vals) > 16:
+            raise Wait("a list made of more than 16 values")
+        return f'list_make<{t[5:-1]}, "{len(vals)}">({", ".join(vals)})' if vals else t + "{}"
 
     # ---- a function a function declares in itself (a lambda) ----
     def lambda_of(self, n):
@@ -4509,14 +4513,22 @@ class Emit:
             return u.zero(t), t
         if t.startswith("List<"):
             it = t[5:-1]
+            said = self.written_array(b, t) if b.get("kind") == "InitListExpr" else None
+            if said is not None:
+                # An array of C++ written out, as a value: every entry of it - what is not written is zero.
+                # Up to 16 entries it is one Make List; a longer one is a place of that length, set to
+                # what is written.
+                vals, fixed = said
+                if fixed <= 16:
+                    return self.made_list(vals + [u.zero(it)] * (fixed - len(vals)), t), t
+                made = self.temp("made", t, fixed)
+                self.hoist([f"{made} = {self.made_list(vals, t)};"])
+                return made, t
             if not a:
                 return t + "{}", t
             if b.get("kind") == "InitListExpr" or (len(a) == 1 and bare(a[0]).get("kind") in ("CXXStdInitializerListExpr", "InitListExpr")):
                 items = a if b.get("kind") == "InitListExpr" else kids(bare(a[0]) if bare(a[0]).get("kind") == "InitListExpr" else bare(kids(bare(a[0]))[0]))
                 vals = [self.ex(x, it) for x in items]
-                fixed = u.entries(qtype(b)) if b.get("kind") == "InitListExpr" else None
-                if fixed is not None and fixed > len(vals):   # (a list of fixed length: what is not written is zero)
-                    vals += [u.zero(it)] * (fixed - len(vals))
                 if len(vals) > 16:
                     raise Wait("a list made of more than 16 values")
                 return f'list_make<{it}, "{len(vals)}">({", ".join(vals)})', t
