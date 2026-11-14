@@ -123,8 +123,8 @@ SC_TEST(controls_pad_buttons) {
   SC_CHECK(!c.step(false, false, true).mic, "and the release is not a mic toggle");
   ReleaseLatch l;
   l.armed = true;
-  const f32 held[9] = {1, 0, 0, 0, 0, 0, 0, 0, 0}, free[9] = {0, 0, 0, 0, 0, 0.1f, 0, 0, 0};
-  SC_CHECK(l.step(held, 9) && !l.step(free, 9) && !l.armed, "latch until below .18");
+  const std::array<f32, 9> held{1, 0, 0, 0, 0, 0, 0, 0, 0}, free{0, 0, 0, 0, 0, 0.1f, 0, 0, 0};
+  SC_CHECK(l.step(held) && !l.step(free) && !l.armed, "latch until below .18");
 }
 
 SC_TEST(controls_grenade_cook) {
