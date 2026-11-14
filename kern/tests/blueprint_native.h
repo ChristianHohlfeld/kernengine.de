@@ -244,6 +244,37 @@ struct Garage : virtual kern::Blueprint, virtual Workshop, virtual Parts {
 };
 )kn";
 
+// A library's name is a name of C++ like any other: an input, a variable may have it too - where
+// the library is meant, it is written rng::next.
+inline const char* kRng = R"kn(
+struct rng : virtual kern::Library {
+  KERN_STRUCT(Rng) {
+    Int State = 1;
+  };
+
+  struct nextResult { Int value = 0; };
+  nextResult next(Rng& rng, Int step = 3) {
+    rng.State += step;
+    return {rng.State};
+  }
+};
+)kn";
+inline const char* kDice = R"kn(
+struct dice : virtual kern::Blueprint, virtual rng {
+  Rng rng = Rng{7};
+  Int Last = 0;
+
+  struct rollResult { Int value = 0; Int state = 0; };
+  rollResult roll(Int step = 1) {
+    n5 = rng::next(rng, step);
+    Last = n5.value;
+    return {Last, rng.State};
+  }
+
+  rng::nextResult n5;
+};
+)kn";
+
 // References: an input of a function that is a place of the caller - changed where it stands
 // (Car& car) or read there (const Car& car), nothing copied. A number, a Bool, a struct, a list;
 // a field and a list entry of what the function was given, handed on to other functions; a local
@@ -1401,6 +1432,10 @@ inline std::vector<Case> cases() {
       w.calls.push_back({"twice", {wheel, I(3)}});
     }
     w.calls.push_back({"fit", {Value::structures({}), samples({PinType::structure, "Wheel"}, w.graph).front(), I(2)}});
+    Case& r = read("rng", kRng);
+    r.calls.push_back({"next", {samples({PinType::structure, "Rng"}, r.graph).front(), I(5)}});
+    Case& d = read("dice", kDice);
+    for (i64 step : {i64{1}, i64{4}, i64{-2}}) d.calls.push_back({"roll", {I(step)}});
     Case& c = read("Garage", kGarage);
     const i64 most = std::numeric_limits<i64>::max();
     for (i64 car : {i64{0}, i64{1}, i64{-1}, most})

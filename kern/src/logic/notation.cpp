@@ -888,9 +888,12 @@ struct Shape {
       if (!names.insert(v.name).second) return fail("the name \"" + v.name + "\" is used twice");
       if (!typed_ok("the variable " + v.name, v.type, v.of, v.value)) return false;
     }
+    // A library's name is the name of a base class in the Blueprint's C++. A variable, a function
+    // or an input may have that name too - where the library is meant it is written Library::name,
+    // and C++ looks only for a type there. A type of the Blueprint with that name would be found.
     for (const std::string& used : g.uses) {
       if (!name_ok(used, "the library")) return false;
-      if (!names.insert(used).second) return fail("the name \"" + used + "\" is used twice (a library and a variable, or two libraries)");
+      if (g.enumeration(used) || g.structure(used)) return fail("the library \"" + used + "\" has the name of a type the Blueprint has: where " + used + "::function is written, C++ would find the type");
     }
     for (const Function& f : g.functions) {
       if (!f.from.empty()) {
@@ -909,7 +912,9 @@ struct Shape {
         for (const FunctionPin& p : *pins) {
           if (!name_ok(p.name, "the pin")) return false;
           if (!seen.insert(p.name).second) return fail("function \"" + f.name + "\" has two pins called \"" + p.name + "\"");
-          if (pins == &f.inputs && names.count(p.name)) return fail("the input \"" + p.name + "\" of " + f.name + " has the name of a variable or a function");
+          // (a function of a library is a function of the library's class in C++: its inputs and local
+          // variables hide nothing of this Blueprint - the library has no variables, and its names are its own)
+          if (pins == &f.inputs && f.from.empty() && names.count(p.name)) return fail("the input \"" + p.name + "\" of " + f.name + " has the name of a variable or a function");
           if (!typed_ok("\"" + p.name + "\" of " + f.name, p.type, p.of, p.value)) return false;
         }
       }
@@ -919,7 +924,7 @@ struct Shape {
       for (const FunctionPin& l : f.locals) {
         if (!name_ok(l.name, "the local variable")) return false;
         if (!locals.insert(l.name).second) return fail("function \"" + f.name + "\" has two local variables called \"" + l.name + "\"");
-        if (names.count(l.name)) return fail("the local variable \"" + l.name + "\" of " + f.name + " has the name of a variable, a function or a type");
+        if (f.from.empty() && names.count(l.name)) return fail("the local variable \"" + l.name + "\" of " + f.name + " has the name of a variable, a function or a type");
         if (f.input(l.name) || f.output(l.name)) return fail("the local variable \"" + l.name + "\" of " + f.name + " has the name of one of its pins");
         if (l.type == PinType::exec || l.type >= PinType::count) return fail("the local variable " + l.name + " of " + f.name + " has no type");
         if (!typed_ok("the local variable " + l.name + " of " + f.name, l.type, l.of, l.value)) return false;
@@ -1428,7 +1433,7 @@ struct Writer {
     std::string type;
     for (char ch : name) type += is_part(ch) ? ch : '_';
     if (type.empty() || is_digit(type[0])) type = "Blueprint_" + type;
-    bool taken = !cpp_name_ok(type) || g.variable(type) || g.function(type) || g.enumeration(type) || g.structure(type);
+    bool taken = !cpp_name_ok(type) || g.variable(type) || g.function(type) || g.enumeration(type) || g.structure(type) || g.uses_library(type);
     for (const Function& f : g.functions) taken = taken || f.name + "Result" == type;
     return taken ? type + "_Blueprint" : type;
   }

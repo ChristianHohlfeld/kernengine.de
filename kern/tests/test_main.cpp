@@ -4287,6 +4287,9 @@ TEST(logic_libraries) {
   CHECK(says(read("A", "struct A : virtual kern::Blueprint, virtual Nothing {\n};\n"), "the library \"Nothing\" is not there"));
   CHECK(says(read("A", "struct A : virtual kern::Blueprint, virtual Garage {\n};\n"), "\"Garage\" is no library"));
   CHECK(says(read("A", "struct A : virtual kern::Blueprint, virtual Wheels, virtual Wheels {\n};\n"), "the library Wheels is used twice"));
+  // a library's name is a name of C++ like any other: a variable or an input may have it - a type of the Blueprint may not
+  CHECK(read("A", "struct A : virtual kern::Blueprint, virtual Wheels {\n  Float Wheels = 0.0;\n\n  void f(Wheel& Types) {\n    Wheels::skid(Types, Wheels);\n  }\n};\n").empty());
+  CHECK(says(read("A", "struct A : virtual kern::Blueprint, virtual Wheels {\n  KERN_ENUM(Wheels, One, Two);\n};\n"), "the library \"Wheels\" has the name of a type the Blueprint has"));
   CHECK(says(read("A", "struct A : virtual kern::Blueprint, virtual Wheels {\n  KERN_STRUCT(Wheel) {\n    Float Slip = 0.0;\n  };\n};\n"), "the name Wheel is declared twice"));
   CHECK(says(read("A", "struct A : virtual kern::Blueprint, virtual Types {\n  Wheel Mine = Wheel{0.5, Side::Front, List<Float>{}};\n\n  void f() {\n    Wheels::skid(Mine, 1.0);\n  }\n};\n"), "starts no statement"));
   CHECK(says(read("A", "struct A : virtual kern::Blueprint, virtual Wheels {\n  void f() {\n    Wheels::nothing();\n  }\n};\n"), "starts no statement"));

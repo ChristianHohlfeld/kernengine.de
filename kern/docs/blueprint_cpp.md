@@ -632,6 +632,12 @@ struct Garage : virtual kern::Blueprint, virtual Workshop {     // ein Blueprint
 - **Der Aufruf nennt die Bibliothek:** `Workshop::skid(Spare[at], 1.0);`, was ein Aufruf gab, ist
   `Workshop::twiceResult n5;`. In C++ ist das der Aufruf einer Funktion einer Basisklasse: einmal
   übersetzt, direkt. Eine Referenz ist ein Platz des Aufrufers, wie bei einer eigenen Funktion.
+- **Der Name einer Bibliothek ist ein Name von C++ wie jeder andere:** Eine Variable, eine
+  Funktion, ein Eingang darf so heißen wie eine Bibliothek, die der Blueprint benutzt (`Rng rng`
+  neben `rng::next(rng)`) – wo die Bibliothek gemeint ist, steht `Bibliothek::name`, und C++ sucht
+  dort nur nach einem Typ. Darum heißt kein Typ des Blueprints wie eine seiner Bibliotheken. Die
+  Eingänge und lokalen Variablen einer Bibliotheksfunktion sind Namen der Bibliothek: Sie stoßen
+  an keinen Namen dessen, der sie benutzt.
 - **Die Typen der Bibliothek hat, wer sie benutzt** – auch die der Bibliotheken, die sie selbst
   benutzt –, ohne sie noch einmal zu deklarieren: In C++ ist `Wheel` *ein* Typ, darum bindet eine
   Referenz. Zwei Bibliotheken deklarieren nicht denselben Namen; ein Blueprint deklariert keinen
