@@ -484,8 +484,8 @@ KERN_PURE Int64 Next(Int64 s) {
 - **Was sie tun, steht einmal:** `PureNodes::int64_*` in `kern/logic/nodes.h` – der Knoten und die
   Klasse rufen dieselbe Funktion; in der Klasse ist ein Int64 ein `kern::logic::Int64` (ein `u64`),
   ein Knoten ein Ausdruck auf ihm, ohne Speicher anzufordern.
-- Der Konverter schreibt `u64` und `i64` eines Programms, die Bitmuster sind, als `Int64`; die Engine
-  nimmt und gibt ihre 64-Bit-Zahlen als Int64-Pins (`tools/engine_api.py`).
+- Ein `u64` oder `i64` eines Programms, das ein Bitmuster ist, ist im Blueprint ein `Int64`; die
+  Knoten der Engine nehmen und geben ihre 64-Bit-Zahlen als Int64-Pins (`tools/engine_api.py`).
 
 ### Aufzählungen
 

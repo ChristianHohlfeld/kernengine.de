@@ -420,6 +420,11 @@ TypeRef key_type(const TypeRef& keyed);
 TypeRef value_type(const TypeRef& map);
 /// What TypeRef::of says of a map with these keys and values (`value` null: of a set).
 std::string keyed_of(const TypeRef& key, const TypeRef* value);
+/// The types of the Blueprint (enums and structs) a type names: itself or its items - of a map its
+/// keys and its values, of a set its keys. (Each with the type it has there: Mode, Weapon_list.)
+std::vector<TypeRef> types_named(const TypeRef& t);
+/// The type with the enum or struct `from` called `to` wherever it names it (a map's keys, values).
+TypeRef type_renamed(const TypeRef& t, const std::string& from, const std::string& to);
 /// Can a map's or a set's keys be of this type?
 constexpr bool key_type_ok(PinType t) { return t == PinType::boolean || t == PinType::integer || t == PinType::int64 || t == PinType::enumeration || t == PinType::text; }
 /// The key of an entry as the interpreter holds it, and back (`key`: the keys' type).
