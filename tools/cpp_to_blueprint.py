@@ -1531,6 +1531,8 @@ class Const:
             raise Wait(f"the constant {ref.get('name')} is defined elsewhere")
         if k == "CallExpr" and self.limit(n) is not None:
             return self.limit(n)
+        if self.inlined(n) is not None:
+            return self.number(self.inlined(n))
         if k == "CallExpr":
             name = callee_name(n)
             args = [self.number(c) for c in kids(n)[1:]]
@@ -1547,6 +1549,35 @@ class Const:
         if k in ("CXXNullPtrLiteralExpr", "GNUNullExpr") and ENGINE_NODES:   # (no object of the engine: the handle 0)
             return 0
         raise Wait(f"a constant written as {k}")
+
+    def inlined(self, n):
+        """A call of a constexpr function that returns one expression of its parameters
+        (`constexpr Vec3 hex_color(u32 h) { return {...}; }`), with constants for them: that expression,
+        the parameters standing for what the call gives - worked out as the compiler works it out at
+        compile time. None: the call is none such."""
+        n = bare(n)
+        if n.get("kind") != "CallExpr":
+            return None
+        c = callee(n)
+        d = self.unit.tree.body.get(c.get("referencedDecl", {}).get("id")) if c.get("kind") == "DeclRefExpr" else None
+        if d is None or not d.get("constexpr") or d.get("kind") != "FunctionDecl":
+            return None
+        body = next((x for x in kids(d) if x.get("kind") == "CompoundStmt"), None)
+        stmts = kids(body) if body is not None else []
+        if len(stmts) != 1 or stmts[0].get("kind") != "ReturnStmt" or not kids(stmts[0]):
+            return None
+        params = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
+        args = kids(n)[1:]
+        if len(args) != len(params) or any(a.get("kind") == "CXXDefaultArgExpr" for a in args):
+            return None
+        by = {p["id"]: a for p, a in zip(params, args)}
+        out = copy.deepcopy(kids(stmts[0])[0])
+        for x in walk(out):
+            if x.get("kind") == "DeclRefExpr" and x.get("referencedDecl", {}).get("id") in by:
+                arg = copy.deepcopy(by[x["referencedDecl"]["id"]])
+                x.clear()
+                x.update(arg)
+        return out
 
     FLOAT_LIMITS = {"float": {"max": 3.4028234663852886e+38, "min": 1.1754943508222875e-38, "epsilon": 1.1920928955078125e-07},
                     "double": {"max": 1.7976931348623157e+308, "min": 2.2250738585072014e-308, "epsilon": 2.220446049250313e-16}}
@@ -1593,6 +1624,9 @@ class Const:
         while k in ("ImplicitCastExpr", "CXXFunctionalCastExpr", "CXXStaticCastExpr") and t not in ("Float", "Int", "Bool") and kids(n):
             n = bare(kids(n)[-1])
             k = n.get("kind")
+        inlined = self.inlined(n)
+        if inlined is not None:
+            return self.literal(inlined, t)
         if t == u.structs.get("w64::Whole64") and t is not None and k not in ("InitListExpr", "CXXConstructExpr"):
             v = int(self.number(n)) % (1 << 64)   # (a 64-bit number written out: its two halves)
             return f"{t}{{{v >> 32}, {v & 0xFFFFFFFF}}}"
