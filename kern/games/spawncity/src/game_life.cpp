@@ -660,9 +660,10 @@ bool Game::life_command(const std::string& cmd, std::string& out) {
     f32 bd = 1e9f;
     Vec3 to;
     for (const CityStream::BuildingRef& r : near) {
+      const MapFeatures::Building& b = city_.building(r);
       Interiors::Plan plan;
-      if (std::fabs(r.building->rings[0][0].x - me.x) + std::fabs(r.building->rings[0][0].y - me.y) > bd + 60) continue;
-      if (!Interiors::build(*r.building, r.building->base, plan) || !plan.has_core) continue;
+      if (std::fabs(b.rings[0][0].x - me.x) + std::fabs(b.rings[0][0].y - me.y) > bd + 60) continue;
+      if (!Interiors::build(b, b.base, plan) || !plan.has_core) continue;
       const Interiors::Door& d = plan.doors[0];
       const f32 dd = std::hypot(d.c.x - me.x, d.c.y - me.y);
       if (dd < bd) { bd = dd; to = {d.c.x + d.n.x * 1.5f, d.c.y + d.n.y * 1.5f, city_.ground_height(d.c.x + d.n.x * 1.5f, d.c.y + d.n.y * 1.5f)}; }

@@ -1039,8 +1039,8 @@ std::string Game::minimap_json() {
   const f32 range = 420;  // the expanded map shows up to 380 m from the subject
   struct Feat { char kind; bool poly; const std::vector<Vec2>* pts; f32 d; };
   std::vector<Feat> feats;
-  std::vector<const MapFeatures*> tiles;
-  city_.ready_features(tiles);
+  std::vector<u64> tiles;
+  city_.ready_tiles(tiles);
   auto dist = [&](const std::vector<Vec2>& pts) {
     f32 best = 1e9f;
     for (std::size_t k = 0; k + 1 < pts.size(); ++k) {
@@ -1051,16 +1051,17 @@ std::string Game::minimap_json() {
     }
     return best;
   };
-  for (const MapFeatures* f : tiles) {
-    for (const auto& r : f->roads)
+  for (u64 tile : tiles) {
+    const MapFeatures& f = city_.features(tile);
+    for (const auto& r : f.roads)
       if (r.points.size() >= 2) feats.push_back({road_is_water(r.cls) ? 'w' : 'r', false, &r.points, dist(r.points)});
-    for (const auto& a : f->areas) {
+    for (const auto& a : f.areas) {
       if (a.rings.empty() || a.rings[0].size() < 3) continue;
       const char k = a.kind == AreaKind::water ? 'w' : (a.kind == AreaKind::sand ? 0 : 'g');
       if (k) feats.push_back({k, true, &a.rings[0], dist(a.rings[0])});
     }
     // buildings: a house is under 300 m across - one far corner rules it out before the outline
-    for (const auto& b : f->buildings) {
+    for (const auto& b : f.buildings) {
       if (b.rings.empty() || b.rings[0].size() < 3) continue;
       const Vec2 q = b.rings[0][0];
       if (std::fabs(q.x - me.x) > range + 300 || std::fabs(q.y - me.y) > range + 300) continue;

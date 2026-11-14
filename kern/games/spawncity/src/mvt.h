@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "common.h"
+#include "kern/core/base.h"
 
 namespace sc::mvt {
 
@@ -35,35 +36,41 @@ struct Layer {
   std::vector<std::string> keys;
   std::vector<Value> values;
   std::vector<Feature> features;
-  /// The value of a tag on a feature (nullptr when absent).
-  const Value* tag(const Feature& f, std::string_view key) const;
+  /// The value of a tag on a feature: its index in `values` (-1 when absent).
+  i32 tag(const Feature& f, std::string_view key) const;
   std::string_view text(const Feature& f, std::string_view key) const;
   f64 number(const Feature& f, std::string_view key, f64 fallback) const;
 };
 
 struct Tile {
   std::vector<Layer> layers;
-  const Layer* layer(std::string_view name) const;
+  /// The layer of that name: its index in `layers` (-1 when the tile has none).
+  i32 layer(std::string_view name) const;
+};
+
+/// A piece of a buffer of bytes: from the offset `at` up to (not including) `end`.
+struct Piece {
+  std::size_t at = 0, end = 0;
 };
 
 /// Decodes `bytes` (uncompressed protobuf). Layers not in `wanted` (when non-empty) are skipped.
-bool decode(const u8* bytes, std::size_t length, Tile& out, const std::vector<std::string>& wanted = {});
+bool decode(kern::Span<const u8> bytes, Tile& out, const std::vector<std::string>& wanted = {});
 
-/// The same decoding in time slices (a dense city tile takes tens of milliseconds): the bytes
-/// must stay alive until done() / failed().
+/// The same decoding in time slices (a dense city tile takes tens of milliseconds). The tile
+/// lies in `bytes` from the offset `at` to their end. The decoder keeps where the layers and
+/// features lie in the bytes, not the bytes: every step() is given the same ones.
 class Decoder {
  public:
-  void begin(const u8* bytes, std::size_t length, const std::vector<std::string>& wanted = {});
+  void begin(kern::Span<const u8> bytes, std::size_t at, const std::vector<std::string>& wanted = {});
   /// Decodes for about `budget_ms` (0 = to the end). True when finished (check failed()).
-  bool step(f64 budget_ms);
+  bool step(kern::Span<const u8> bytes, f64 budget_ms);
   bool done() const { return done_; }
   bool failed() const { return failed_; }
   Tile& tile() { return tile_; }
 
  private:
-  struct Span { const u8* p; const u8* end; };
-  std::vector<Span> layers_;
-  std::vector<Span> features_;
+  std::vector<Piece> layers_;
+  std::vector<Piece> features_;
   std::size_t layer_ = 0, feature_ = 0;
   bool layer_open_ = false, done_ = true, failed_ = false;
   Tile tile_;

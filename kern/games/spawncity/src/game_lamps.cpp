@@ -115,11 +115,11 @@ void Game::gaps_lamps_place() {
   auto ground = [this](f32 x, f32 y) { return city_.ground_height(x, y); };
   if (g.lamp_serial != city_.furniture_serial()) {
     g.lamp_serial = city_.furniture_serial();
-    std::vector<CityStream::Furniture> tiles;
+    std::vector<u64> tiles;
     city_.furniture(tiles);
     std::vector<lamps::Field::Spot> spots;
-    for (const CityStream::Furniture& f : tiles)
-      for (const MapFeatures::Spot& sp : *f.lamps)
+    for (u64 tile : tiles)
+      for (const MapFeatures::Spot& sp : city_.features(tile).lamps)
         if (!city_.terrain().water_at(sp.p.x, sp.p.y)) spots.push_back({sp.p.x, sp.p.y, sp.a});
     g.lamps.rebuild(spots, ground);
     g.lamps_dirty = true;

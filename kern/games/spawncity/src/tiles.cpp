@@ -139,15 +139,16 @@ u32 hash_u32(u64 v) {
 void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector& proj, MapFeatures& out) {
   std::vector<std::vector<std::vector<Vec2>>> polys;
   std::vector<std::vector<Vec2>> apron;
-  if (const mvt::Layer* l = tile.layer("building")) {
-    const Projector P(key, proj, static_cast<f64>(l->extent));
-    for (const mvt::Feature& f : l->features) {
+  if (const i32 at = tile.layer("building"); at >= 0) {
+    const mvt::Layer& l = tile.layers[static_cast<std::size_t>(at)];
+    const Projector P(key, proj, static_cast<f64>(l.extent));
+    for (const mvt::Feature& f : l.features) {
       if (f.type != mvt::GeomType::polygon) continue;
-      const mvt::Value* hide = l->tag(f, "hide_3d");
-      if (hide && hide->kind == mvt::Value::Kind::boolean && hide->b) continue;
-      f32 top = static_cast<f32>(l->number(f, "render_height", -1));
+      const i32 hide = l.tag(f, "hide_3d");
+      if (hide >= 0 && l.values[static_cast<std::size_t>(hide)].kind == mvt::Value::Kind::boolean && l.values[static_cast<std::size_t>(hide)].b) continue;
+      f32 top = static_cast<f32>(l.number(f, "render_height", -1));
       if (!(top > 0)) top = 8;  // SpawnCity's default (real_world_bootstrap.mjs:443)
-      const f32 base = static_cast<f32>(std::fmax(0.0, l->number(f, "render_min_height", 0)));
+      const f32 base = static_cast<f32>(std::fmax(0.0, l.number(f, "render_min_height", 0)));
       polygons(f, polys);
       u32 n = 0;
       for (auto& poly : polys) {
@@ -155,7 +156,7 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
         b.base = base;
         b.top = std::fmax(top, base + 1.0f);
         b.seed = hash_u32(f.id * 31 + (n++) + static_cast<u64>(key.x) * 7919 + static_cast<u64>(key.y) * 104729);
-        const f32 ext = static_cast<f32>(l->extent);
+        const f32 ext = static_cast<f32>(l.extent);
         if (!poly.empty()) {
           // an outline that reaches over the tile's edge: kept whole for the furniture's clearance
           bool over = false;
@@ -174,13 +175,14 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
       }
     }
   }
-  if (const mvt::Layer* l = tile.layer("transportation")) {
-    const Projector P(key, proj, static_cast<f64>(l->extent));
-    for (const mvt::Feature& f : l->features) {
+  if (const i32 at = tile.layer("transportation"); at >= 0) {
+    const mvt::Layer& l = tile.layers[static_cast<std::size_t>(at)];
+    const Projector P(key, proj, static_cast<f64>(l.extent));
+    for (const mvt::Feature& f : l.features) {
       if (f.type != mvt::GeomType::line) continue;
       RoadClass c;
-      if (!parse_road(l->text(f, "class"), c)) continue;
-      const std::string_view brunnel = l->text(f, "brunnel");
+      if (!parse_road(l.text(f, "class"), c)) continue;
+      const std::string_view brunnel = l.text(f, "brunnel");
       if (brunnel == "tunnel") continue;
       for (const auto& part : f.parts) {
         if (part.size() < 2) continue;
@@ -192,13 +194,14 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
       }
     }
   }
-  if (const mvt::Layer* l = tile.layer("waterway")) {
-    const Projector P(key, proj, static_cast<f64>(l->extent));
-    for (const mvt::Feature& f : l->features) {
+  if (const i32 at = tile.layer("waterway"); at >= 0) {
+    const mvt::Layer& l = tile.layers[static_cast<std::size_t>(at)];
+    const Projector P(key, proj, static_cast<f64>(l.extent));
+    for (const mvt::Feature& f : l.features) {
       if (f.type != mvt::GeomType::line) continue;
-      const std::string_view cls = l->text(f, "class");
+      const std::string_view cls = l.text(f, "class");
       const RoadClass c = cls == "river" ? RoadClass::river : cls == "canal" ? RoadClass::canal : RoadClass::stream;
-      if (l->text(f, "brunnel") == "tunnel") continue;
+      if (l.text(f, "brunnel") == "tunnel") continue;
       for (const auto& part : f.parts) {
         if (part.size() < 2) continue;
         MapFeatures::Road r;
@@ -209,13 +212,14 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
     }
   }
   auto areas = [&](const char* layer, auto kind_of) {
-    const mvt::Layer* l = tile.layer(layer);
-    if (!l) return;
-    const Projector P(key, proj, static_cast<f64>(l->extent));
-    for (const mvt::Feature& f : l->features) {
+    const i32 at = tile.layer(layer);
+    if (at < 0) return;
+    const mvt::Layer& l = tile.layers[static_cast<std::size_t>(at)];
+    const Projector P(key, proj, static_cast<f64>(l.extent));
+    for (const mvt::Feature& f : l.features) {
       if (f.type != mvt::GeomType::polygon) continue;
       AreaKind kind;
-      if (!kind_of(*l, f, kind)) continue;
+      if (!kind_of(l, f, kind)) continue;
       polygons(f, polys);
       for (auto& poly : polys) {
         MapFeatures::Area a;
@@ -260,7 +264,9 @@ namespace {
 struct FurnishIndex {
   static constexpr f32 kCell = 20;
   struct Seg { Vec2 a, b; f32 half; u32 road; bool paved; };
-  struct Ring { const std::vector<Vec2>* r; kern::Vec4 box; };
+  /// A house's outline: the outer ring of the tile's building `index`, or the apron's ring `index`
+  /// (the outlines that reach over the tile's edge), with its bounding box.
+  struct Ring { bool apron; u32 index; kern::Vec4 box; };
   std::vector<Seg> segs;
   std::vector<Ring> rings;
   std::unordered_map<u64, std::vector<u32>> seg_cells, ring_cells;
@@ -273,24 +279,24 @@ struct FurnishIndex {
     for (i32 x = cell(std::fmin(a.x, b.x) - m); x <= cell(std::fmax(a.x, b.x) + m); ++x)
       for (i32 y = cell(std::fmin(a.y, b.y) - m); y <= cell(std::fmax(a.y, b.y) + m); ++y) seg_cells[key(x, y)].push_back(id);
   }
-  void add_ring(const std::vector<Vec2>& r) {
+  void add_ring(const std::vector<Vec2>& r, bool apron, u32 index) {
     if (r.size() < 3) return;
     kern::Vec4 box{1e30f, 1e30f, -1e30f, -1e30f};
     for (Vec2 p : r) box = {std::fmin(box.x, p.x), std::fmin(box.y, p.y), std::fmax(box.z, p.x), std::fmax(box.w, p.y)};
     if (box.z - box.x > 4000 || box.w - box.y > 4000) return;
     const u32 id = static_cast<u32>(rings.size());
-    rings.push_back({&r, box});
+    rings.push_back({apron, index, box});
     for (i32 x = cell(box.x); x <= cell(box.z); ++x)
       for (i32 y = cell(box.y); y <= cell(box.w); ++y) ring_cells[key(x, y)].push_back(id);
   }
-  /// Inside a house.
-  bool built(Vec2 p) const {
+  /// Inside a house (of the tile's `buildings` or the `apron` the rings were added from).
+  bool built(Vec2 p, const std::vector<MapFeatures::Building>& buildings, const std::vector<std::vector<Vec2>>& apron) const {
     const auto it = ring_cells.find(key(cell(p.x), cell(p.y)));
     if (it == ring_cells.end()) return false;
     for (u32 id : it->second) {
       const Ring& g = rings[id];
       if (p.x < g.box.x || p.x > g.box.z || p.y < g.box.y || p.y > g.box.w) continue;
-      const std::vector<Vec2>& r = *g.r;
+      const std::vector<Vec2>& r = g.apron ? apron[g.index] : buildings[g.index].rings[0];
       bool c = false;
       for (std::size_t i = 0, j = r.size() - 1; i < r.size(); j = i++)
         if ((r[i].y > p.y) != (r[j].y > p.y) && p.x < (r[j].x - r[i].x) * (p.y - r[i].y) / (r[j].y - r[i].y + 1e-12f) + r[i].x) c = !c;
@@ -324,9 +330,9 @@ void furnish(MapFeatures& out, const kern::Vec4& sq, const std::vector<std::vect
     const bool paved = r.cls != RoadClass::path && r.cls != RoadClass::track;
     for (std::size_t k = 0; k + 1 < r.points.size(); ++k) ix.add_seg(r.points[k], r.points[k + 1], road_width(r.cls) / 2, ri, paved);
   }
-  for (const MapFeatures::Building& b : out.buildings)
-    if (!b.rings.empty()) ix.add_ring(b.rings[0]);
-  for (const std::vector<Vec2>& r : apron) ix.add_ring(r);
+  for (u32 bi = 0; bi < out.buildings.size(); ++bi)
+    if (!out.buildings[bi].rings.empty()) ix.add_ring(out.buildings[bi].rings[0], false, bi);
+  for (u32 ai = 0; ai < apron.size(); ++ai) ix.add_ring(apron[ai], true, ai);
   auto inside = [&](Vec2 p) { return p.x >= sq.x && p.x < sq.z && p.y >= sq.y && p.y < sq.w; };
   constexpr f32 kPi2 = 6.2831853f;
   std::unordered_set<u64> lamp_cells;
@@ -347,9 +353,9 @@ void furnish(MapFeatures& out, const kern::Vec4& sq, const std::vector<std::vect
         for (f32 t = carry; t < len; t += 37, ++i) {
           const f32 side = (i & 1) ? 1.0f : -1.0f, off = w * 0.5f + 2.2f + static_cast<f32>(i % 4) * 0.4f;
           const Vec2 c = a + u * t + right * (side * off);
-          if (!inside(c) || !ix.off_roads(c, 1.9f, 0.6f) || ix.built(c)) continue;
+          if (!inside(c) || !ix.off_roads(c, 1.9f, 0.6f) || ix.built(c, out.buildings, apron)) continue;
           bool free = true;
-          for (int j = 0; j < 6 && free; ++j) free = !ix.built(c + Vec2{std::cos(static_cast<f32>(j) * kPi2 / 6), std::sin(static_cast<f32>(j) * kPi2 / 6)} * 2.4f);
+          for (int j = 0; j < 6 && free; ++j) free = !ix.built(c + Vec2{std::cos(static_cast<f32>(j) * kPi2 / 6), std::sin(static_cast<f32>(j) * kPi2 / 6)} * 2.4f, out.buildings, apron);
           if (free) out.trees.push_back({c, 0.82f + static_cast<f32>(i % 5) * 0.045f});
         }
         carry = std::fmod(carry + 37 - std::fmod(len, 37.0f), 37.0f);
@@ -369,7 +375,7 @@ void furnish(MapFeatures& out, const kern::Vec4& sq, const std::vector<std::vect
           if (!inside(c)) continue;
           const u64 cell = (static_cast<u64>(static_cast<u32>(std::lround(c.x / 8))) << 32) | static_cast<u32>(std::lround(c.y / 8));
           // on its kerb: off every other street's carriageway, not in a house (nor its arm's foot)
-          if (!ix.off_roads(c, 0.35f, 0.3f) || ix.built(c)) continue;
+          if (!ix.off_roads(c, 0.35f, 0.3f) || ix.built(c, out.buildings, apron)) continue;
           if (!lamp_cells.insert(cell).second) continue;
           out.lamps.push_back({c, std::atan2(-n.y * side, -n.x * side)});
         }

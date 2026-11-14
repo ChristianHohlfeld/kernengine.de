@@ -14,7 +14,7 @@ namespace sc::cityjobs {
 constexpr u32 kTile = 1, kBuildings = 2;
 
 /// kTile input: the tile, the projection origin and the uncompressed MVT bytes.
-std::vector<u8> tile_input(const TileKey& key, f64 lon0, f64 lat0, const u8* mvt, std::size_t length);
+std::vector<u8> tile_input(const TileKey& key, f64 lon0, f64 lat0, kern::Span<const u8> mvt);
 /// kTile output -> features (false: the tile could not be decoded).
 bool read_features(const std::vector<u8>& output, MapFeatures& out);
 
