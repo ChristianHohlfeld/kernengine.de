@@ -4,10 +4,10 @@
 #include <algorithm>
 #include <cstdio>
 
+#include "kern/core/map.h"
 #include "kern/core/base.h"
 #include "kern/core/jobs.h"
 #include <cstring>
-#include <unordered_map>
 
 namespace sc {
 
@@ -120,7 +120,7 @@ void dem_grid_job(kern::Span<const u8> in, std::vector<u8>& out) {
   u32 n = 0, count = 0;
   get(&lon0, 8); get(&lat0, 8); get(&x0, 4); get(&y0, 4); get(&step, 4); get(&n, 4); get(&open, 4); get(&blur, 4); get(&count, 4);
   if (!ok || n < 2 || n > 4096) return;
-  std::unordered_map<u64, DemBytes> tiles;
+  kern::Map<u64, DemBytes> tiles;
   for (u32 k = 0; k < count && ok; ++k) {
     u32 x = 0, y = 0, w = 0, h = 0;
     get(&x, 4); get(&y, 4); get(&w, 4); get(&h, 4);
@@ -1042,7 +1042,7 @@ void Terrain::want_tiles(Vec3 focus, Vec3 anchor) {
       }
   }
   // Water: 320 m chunks holding water within 2.4 km.
-  std::unordered_set<u64> chunks;
+  kern::Set<u64> chunks;
   for (const auto& [k, b] : water_) {
     (void)b;
     const i32 bx = static_cast<i32>(k >> 32), by = static_cast<i32>(k & 0xffffffffu);
@@ -1382,12 +1382,12 @@ void Terrain::update(Vec3 focus, Vec3 anchor, f64 budget_ms) {
   }
   if (!missing) {
     // Everything wanted is there: drop what is no longer wanted (never before - no holes).
-    std::unordered_set<u64> keep(want_render_.begin(), want_render_.end());
+    kern::Set<u64> keep(want_render_.begin(), want_render_.end());
     for (auto it = render_.begin(); it != render_.end();) {
       if (!keep.count(it->first)) { if (it->second.mesh) r_->remove(it->second.mesh); dirty_render_.erase(it->first); it = render_.erase(it); }
       else ++it;
     }
-    keep = std::unordered_set<u64>(want_collision_.begin(), want_collision_.end());
+    keep = kern::Set<u64>(want_collision_.begin(), want_collision_.end());
     for (auto it = collision_.begin(); it != collision_.end();) {
       if (!keep.count(it->first)) {
         if (it->second.body.valid() && world_->body_valid(it->second.body)) world_->destroy_body(it->second.body);
@@ -1395,7 +1395,7 @@ void Terrain::update(Vec3 focus, Vec3 anchor, f64 budget_ms) {
         it = collision_.erase(it);
       } else ++it;
     }
-    keep = std::unordered_set<u64>(want_water_.begin(), want_water_.end());
+    keep = kern::Set<u64>(want_water_.begin(), want_water_.end());
     for (auto it = water_meshes_.begin(); it != water_meshes_.end();) {
       if (!keep.count(it->first)) { if (it->second) r_->remove(it->second); dirty_water_.erase(it->first); water_detail_.erase(it->first); it = water_meshes_.erase(it); }
       else ++it;

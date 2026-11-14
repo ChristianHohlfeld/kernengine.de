@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <cmath>
 
+#include "kern/core/map.h"
+
 namespace sc {
 
 namespace {
@@ -25,7 +27,7 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
   blocked_.clear();
   struct Node { Vec2 p; std::vector<Arm> arms; };
   std::vector<Node> nodes;
-  std::unordered_map<u64, std::vector<i32>> cells;
+  kern::Map<u64, std::vector<i32>> cells;
   auto node_at = [&](Vec2 p) -> i32 {
     const i32 cx = static_cast<i32>(std::floor(p.x / kMerge)), cy = static_cast<i32>(std::floor(p.y / kMerge));
     for (i32 dy = -1; dy <= 1; ++dy)
@@ -62,7 +64,7 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
   {
     struct Seg { Vec2 a, b; f32 width; u32 lane; };
     std::vector<Seg> segs;
-    std::unordered_map<u64, std::vector<u32>> buckets;
+    kern::Map<u64, std::vector<u32>> buckets;
     for (u32 li = 0; li < lanes.size(); ++li) {
       const Lane& l = lanes[li];
       if (!l.alive || l.points.size() < 2) continue;

@@ -27,12 +27,13 @@
 #pragma once
 
 #include <algorithm>
-#include <unordered_map>
 #include <vector>
 
 #include "city_stream.h"
 #include "combat_art.h"
 #include "common.h"
+
+#include "kern/core/map.h"
 
 namespace sc {
 
@@ -79,7 +80,7 @@ class Destruction {
   void free_torn(Torn& t);
 
   kern::Renderer* r_ = nullptr;
-  std::unordered_map<u32, f32> points_;  // structural points left, by building seed
+  kern::Map<u32, f32> points_;  // structural points left, by building seed
   std::vector<std::pair<u32, f32>> points_log_;
   std::vector<Piece> pieces_;
   std::vector<Torn> torn_;

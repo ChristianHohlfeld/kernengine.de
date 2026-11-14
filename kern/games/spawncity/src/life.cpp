@@ -2,9 +2,10 @@
 #include "life.h"
 
 #include <algorithm>
-#include <unordered_map>
 #include <cmath>
 #include <cstdio>
+
+#include "kern/core/map.h"
 
 namespace sc {
 
@@ -792,9 +793,9 @@ void Life::update_trees(const LifeView& view, const CityStream& city, const std:
     tree_serial_ = city.furniture_serial();
     std::vector<u64> tiles;
     city.furniture(tiles);
-    std::unordered_map<u64, Tree> fallen;
+    kern::Map<u64, Tree> fallen;
     for (const Tree& t : trees_) if (t.fell_at >= 0) fallen[key_of(t.tile, t.index)] = t;
-    std::unordered_set<u64> gone;
+    kern::Set<u64> gone;
     trees_.clear();
     for (u64 tile : tiles) {
       const std::vector<MapFeatures::Spot>& spots = city.features(tile).trees;

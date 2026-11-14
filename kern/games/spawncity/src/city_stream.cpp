@@ -5,10 +5,10 @@
 #include <cstdio>
 
 #include "city_jobs.h"
+#include "kern/core/map.h"
 #include "kern/core/base.h"
 #include "kern/core/jobs.h"
 #include "kern/geo/earcut.h"
-#include <unordered_set>
 
 namespace sc {
 
@@ -107,15 +107,15 @@ struct CityStream::Tile {
   // the buildings' centres, and the buildings by chunk cell (160 m): the drawn city is made of
   // cells - each wanted cell is extruded once, off the frame, and stays until it is far behind
   std::vector<Vec2> cent;
-  std::unordered_map<u64, std::vector<u32>> cell_items;
-  std::unordered_set<u64> want_cells;                     // the cells to be drawn now (select_cells)
-  std::unordered_map<u64, std::vector<u32>> cell_old;     // meshes a finished job replaces (go when its uploads are done)
+  kern::Map<u64, std::vector<u32>> cell_items;
+  kern::Set<u64> want_cells;                     // the cells to be drawn now (select_cells)
+  kern::Map<u64, std::vector<u32>> cell_old;     // meshes a finished job replaces (go when its uploads are done)
   bool cell_uploading = false;
   // jobs off the frame thread (city_jobs.h): the tile's decoding, the drawn buildings' extrusion
   u32 tile_job = 0, build_job = 0;
   // destruction: the building chunk meshes by chunk cell; damaged cells are rebuilt alone
-  std::unordered_map<u64, std::vector<u32>> cell_ids;
-  std::unordered_set<u64> dirty_cells;
+  kern::Map<u64, std::vector<u32>> cell_ids;
+  kern::Set<u64> dirty_cells;
   std::vector<u64> job_cells;
   u32 cell_job = 0;
   std::vector<u8> built_bytes;        // the kBuildings job's output, read one chunk per step
@@ -701,7 +701,7 @@ bool CityStream::damage_of(u32 seed, DamageRec& out) const {
 
 bool CityStream::merge_damage(const std::vector<DamageRec>& list, bool log) {
   if (list.empty()) return false;
-  std::unordered_map<u32, const DamageRec*> want;
+  kern::Map<u32, const DamageRec*> want;
   bool changed = false;
   for (const DamageRec& r : list) {
     if (!(r.height >= 0) || !std::isfinite(r.height)) continue;

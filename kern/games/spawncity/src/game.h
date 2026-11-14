@@ -11,7 +11,6 @@
 #include <map>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "car.h"
@@ -36,6 +35,7 @@
 #include "game_townsync.h"
 #include "game_world.h"  // WorldLife (M3 world, game_world.cpp)
 #include "jet.h"
+#include "kern/core/map.h"
 #include "kern/app/app.h"
 #include "kern/audio/audio.h"
 #include "kern/game/runtime.h"
@@ -327,7 +327,7 @@ class Game {
     bool fallen = false;  // an officer / enemy who went down: his body lies here, the unit only waits to be dropped
   };
   struct RemoteSwarm { f64 seen = 0; std::vector<RemoteUnit> units; };
-  std::unordered_map<u8, RemoteSwarm> swarms_;
+  kern::Map<u8, RemoteSwarm> swarms_;
   f64 swarm_clock_ = 0;
   u16 swarm_serial_ = 0;
   // ours as last sent: an officer or enemy missing from the next list who lies dead is sent on for

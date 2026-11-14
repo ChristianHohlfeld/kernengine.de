@@ -7,12 +7,13 @@
 
 #include <array>
 #include <string>
-#include <unordered_set>
 #include <vector>
 
 #include "city_stream.h"
 #include "common.h"
 #include "ragdoll.h"
+
+#include "kern/core/map.h"
 
 namespace sc {
 
@@ -274,7 +275,7 @@ class Life {
   Vec2 pet_anchor_{1e9f, 1e9f};
   f64 epoch_ = 0;
   u32 tree_serial_ = ~0u;                       // the city's furniture set the trees were taken from
-  std::unordered_set<u64> trees_gone_;          // blown over and cleared away (stays so while its tile is loaded)
+  kern::Set<u64> trees_gone_;          // blown over and cleared away (stays so while its tile is loaded)
   Chain chain_;
   bool chain_alive_ = false;
   f32 next_chain_ = -1, streak_at_ = -99;

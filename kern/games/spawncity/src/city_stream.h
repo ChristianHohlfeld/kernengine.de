@@ -7,9 +7,9 @@
 
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
+#include "kern/core/map.h"
 #include "kern/geo/buildings.h"
 #include "kern/geo/roads.h"
 #include "kern/gfx/renderer.h"
@@ -203,7 +203,7 @@ class CityStream {
   kern::physics::Shape building_shape(kern::physics::Body body, const MapFeatures::Building& b);
   // damage by building seed: the height above its base that is left, and whether it collapsed
   struct Damage { f32 height = 0; bool leveled = false; };
-  std::unordered_map<u32, Damage> damage_;
+  kern::Map<u32, Damage> damage_;
   std::vector<u32> damage_log_;
   bool damage_quiet_ = false;  // merge_damage(.., false): not logged
   void begin_cells(Tile& t);
@@ -213,7 +213,7 @@ class CityStream {
   kern::physics::World* world_ = nullptr;
   kern::GeoProjector proj_;
   TileKey origin_tile_;
-  std::unordered_map<u64, std::unique_ptr<Tile>> tiles_;
+  kern::Map<u64, std::unique_ptr<Tile>> tiles_;
   std::vector<TileKey> requests_;
   std::vector<Lane> lanes_;
   bool offline_ = false;
