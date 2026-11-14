@@ -1574,6 +1574,7 @@ class Unit:
             q = self.tree.scope_of[d["id"]] + (d.get("name") or "")
             inner = q[len(self.tree.namespace) + 2:] if q.startswith(self.tree.namespace + "::") else q
             owner = "_".join(inner.split("::")[:-1]) or "program"
+        want = f"{owner}_{d.get('name') or 'kept'}"
         name = sane_name(want)
         if name in self.names:
             raise Wait(f"the variable {d.get('name')} kept by {owner}: the Blueprint {self.name} has something called {name}")
