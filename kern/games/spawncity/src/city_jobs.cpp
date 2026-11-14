@@ -27,6 +27,10 @@ void put_points(std::vector<u8>& b, const std::vector<Vec2>& v) {
   put<u32>(b, static_cast<u32>(v.size()));
   for (Vec2 p : v) { put<f32>(b, p.x); put<f32>(b, p.y); }
 }
+void put_spots(std::vector<u8>& b, const std::vector<MapFeatures::Spot>& v) {
+  put<u32>(b, static_cast<u32>(v.size()));
+  for (const auto& sp : v) { put<f32>(b, sp.p.x); put<f32>(b, sp.p.y); put<f32>(b, sp.a); }
+}
 
 /// Reading them back: a cursor in the bytes - where it reads next, as an offset into the bytes
 /// its functions are given (the same ones every time).
@@ -52,6 +56,14 @@ struct Reader {
     if (!ok || b.size - p < static_cast<std::size_t>(n) * 8) { ok = false; return; }
     v.resize(n);
     for (u32 i = 0; i < n; ++i) { v[i].x = get<f32>(b); v[i].y = get<f32>(b); }
+  }
+  /// False: a broken count (the reader may still be ok).
+  bool spots(kern::Span<const u8> b, std::vector<MapFeatures::Spot>& v) {
+    const u32 n = get<u32>(b);
+    if (!ok || n > 200000) return false;
+    v.resize(n);
+    for (auto& sp : v) { sp.p.x = get<f32>(b); sp.p.y = get<f32>(b); sp.a = get<f32>(b); }
+    return true;
   }
 };
 
@@ -97,10 +109,8 @@ void run_tile(kern::Span<const u8> in, std::vector<u8>& out) {
     put<u32>(out, static_cast<u32>(a.rings.size()));
     for (const auto& ring : a.rings) put_points(out, ring);
   }
-  for (const auto* list : {&f.trees, &f.lamps}) {
-    put<u32>(out, static_cast<u32>(list->size()));
-    for (const auto& sp : *list) { put<f32>(out, sp.p.x); put<f32>(out, sp.p.y); put<f32>(out, sp.a); }
-  }
+  put_spots(out, f.trees);
+  put_spots(out, f.lamps);
 }
 
 // ---- kBuildings: footprints -> welded chunk meshes (kern::BuildingBuilder + kern::weld) ----
@@ -169,12 +179,7 @@ bool read_features(const std::vector<u8>& output, MapFeatures& f) {
     for (auto& ring : a.rings) r.points(in, ring);
     if (!r.ok) return false;
   }
-  for (auto* list : {&f.trees, &f.lamps}) {
-    const u32 n = r.get<u32>(in);
-    if (!r.ok || n > 200000) return false;
-    list->resize(n);
-    for (auto& sp : *list) { sp.p.x = r.get<f32>(in); sp.p.y = r.get<f32>(in); sp.a = r.get<f32>(in); }
-  }
+  if (!r.spots(in, f.trees) || !r.spots(in, f.lamps)) return false;
   return r.ok;
 }
 
