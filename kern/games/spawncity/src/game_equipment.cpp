@@ -308,7 +308,7 @@ void Game::ui_mix_equipment(f32 dt) {
   else ui_.music.select(-2, 0);
 }
 
-void Game::ui_render_music(f32* out, u32 frames) { ui_.music.render_add(out, frames); }
+void Game::ui_render_music(std::vector<f32>& out, u32 frames) { ui_.music.render_add(out, frames); }
 
 // ---------------------------------------------------------------------------------------------
 // commands and HUD

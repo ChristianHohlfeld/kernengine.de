@@ -63,11 +63,11 @@ SC_TEST(mp_rules_damage_regen_spawn_vote) {
   SC_CHECK(mp::ballot_name(mp::Ballot::Status::pending) == "pending" && mp::ballot_name(b.status) == "invalid", "a ballot's status by its name");
   SC_CHECK(mp::create_ballot(b, 7, 0, true, 2, {3, 1, 2, 2}, 0) && b.members.size() == 3 && b.expires_ms == 30000 && b.yes.size() == 1, "pending, each player once, the host has said yes");
   mp::Ballot::Status did = mp::Ballot::Status::pending;
-  SC_CHECK(mp::cast_vote(b, 2, true, {1, 2, 3}, 1000, &did) == mp::Ballot::Status::pending && did == mp::Ballot::Status::ignored, "the host has voted: ignored");
-  SC_CHECK(mp::cast_vote(b, 7, true, {1, 2, 3}, 1000, &did) == mp::Ballot::Status::pending && did == mp::Ballot::Status::ignored, "a stranger: ignored");
+  SC_CHECK(mp::cast_vote(b, 2, true, {1, 2, 3}, 1000, did) == mp::Ballot::Status::pending && did == mp::Ballot::Status::ignored, "the host has voted: ignored");
+  SC_CHECK(mp::cast_vote(b, 7, true, {1, 2, 3}, 1000, did) == mp::Ballot::Status::pending && did == mp::Ballot::Status::ignored, "a stranger: ignored");
   SC_CHECK(!mp::ballot_stale(b, {3, 2, 1}, 1000) && mp::ballot_stale(b, {1, 2}, 1000) && mp::ballot_stale(b, {1, 2, 3}, 30000), "stale: the roster changed or the time is up");
-  SC_CHECK(mp::cast_vote(b, 1, true, {3, 2, 1}, 2000, &did) == mp::Ballot::Status::pending && did == mp::Ballot::Status::pending, "one more yes");
-  SC_CHECK(mp::cast_vote(b, 3, true, {1, 2, 3}, 3000, &did) == mp::Ballot::Status::approved && did == mp::Ballot::Status::approved, "unanimous: approved");
+  SC_CHECK(mp::cast_vote(b, 1, true, {3, 2, 1}, 2000, did) == mp::Ballot::Status::pending && did == mp::Ballot::Status::pending, "one more yes");
+  SC_CHECK(mp::cast_vote(b, 3, true, {1, 2, 3}, 3000, did) == mp::Ballot::Status::approved && did == mp::Ballot::Status::approved, "unanimous: approved");
   SC_CHECK(mp::create_ballot(b, 8, 0, false, 1, {1, 2}, 0) && mp::cast_vote(b, 2, true, {1, 2, 4}, 1000) == mp::Ballot::Status::cancelled, "roster changed: cancelled");
   SC_CHECK(mp::create_ballot(b, 9, 0, false, 1, {1, 2}, 0) && mp::cast_vote(b, 2, true, {1, 2}, 30000) == mp::Ballot::Status::cancelled, "expired after 30 s");
   SC_CHECK(mp::create_ballot(b, 1, 0, true, 255, {3, 255, 1}, 0), "ballot");
@@ -87,13 +87,13 @@ SC_TEST(mp_voice_codec_and_stream) {
   mp::VoiceCapture cap;
   std::vector<f32> tone(48000);
   for (std::size_t i = 0; i < tone.size(); ++i) tone[i] = 0.5f * std::sin(static_cast<f32>(i) * 2 * kPi * 440 / 48000);
-  cap.push(tone.data(), 4800, 48000);  // 100 ms -> one 80 ms frame
+  cap.push({tone.data(), 4800}, 48000);  // 100 ms -> one 80 ms frame
   std::vector<u8> frame;
   SC_CHECK(cap.take(frame) && frame.size() == mp::kVoiceFrame && !cap.take(frame), "one frame");
   mp::VoiceStream vs;
   SC_CHECK(vs.push(1, frame, 1) && !vs.push(1, frame, 1), "sequence");
   std::vector<f32> out(48000 * 2, 0.0f);
-  vs.render(out.data(), 48000, 48000);
+  vs.render(out, 48000, 48000);
   f32 peak = 0;
   for (f32 s : out) peak = std::fmax(peak, std::fabs(s));
   SC_CHECK(peak > 0.4f && peak < 0.6f, "played back %.2f", peak);
