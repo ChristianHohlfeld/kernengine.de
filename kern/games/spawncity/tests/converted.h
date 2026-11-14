@@ -23,11 +23,13 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <deque>
 #include <initializer_list>
 #include <list>
 #include <map>
 #include <memory>
+#include <new>
 #include <optional>
 #include <set>
 #include <string>
@@ -499,21 +501,67 @@ template <class S, class Key> S draw_set(Draw& draw, Key key) {
 // an object of the engine is a handle in the Blueprint), the Blueprint through its host. The two must
 // have asked the same, call for call (Tally::take).
 // An object the source makes (a stand-in's constructor: the engine's <class>.make) is its own: its
-// destructor releases it (<class>.release) - and so is one the test puts where the source owns one (a
-// copy of one of the test's objects, as the Blueprint has a handle there: it is released as the
-// Blueprint releases it). The test's own objects (engine_object) are not made: quiet.
+// destructor releases it (<class>.release) - and so is one the test puts where the source holds one as a
+// value or owns one (`owned`: as the Blueprint has a handle there, it is released where the Blueprint
+// releases it). Ownership is the object's, as in C++: moved, it goes with it (what is moved from owns nothing
+// any more - the test handing a value to the source and back, the source moving what it made); a copy names
+// the same object and owns nothing (a handle handed on). The test's own objects (engine_object), and what
+// it makes quietly (what a stand-in gives back, a value it draws - `quiet`), are made by no one: no make, no
+// release.
 struct EngineObject {
   long long kern_handle = 0;
   bool kern_owned = false;
   EngineObject() = default;
-  EngineObject(const EngineObject& o) : kern_handle(o.kern_handle), kern_owned(true) {}
+  EngineObject(const EngineObject& o) : kern_handle(o.kern_handle) {}
+  EngineObject(EngineObject&& o) noexcept : kern_handle(o.kern_handle), kern_owned(o.kern_owned) { o.kern_owned = false; }
+  /// (set from a copy: the place stays as much the owner of what it holds as it was)
   EngineObject& operator=(const EngineObject& o) {
     kern_handle = o.kern_handle;
     return *this;
   }
+  EngineObject& operator=(EngineObject&& o) noexcept {
+    kern_handle = o.kern_handle;
+    kern_owned = o.kern_owned;
+    o.kern_owned = false;
+    return *this;
+  }
 };
-/// While the test makes its own objects of a class (engine_object): no make of the source.
+/// While the test makes its own objects of a class (engine_object, quiet): no make or release of the source.
 inline bool g_keeping = false;
+struct Quiet {
+  const bool was = g_keeping;
+  Quiet() { g_keeping = true; }
+  ~Quiet() { g_keeping = was; }
+  Quiet(const Quiet&) = delete;
+  Quiet& operator=(const Quiet&) = delete;
+};
+/// A value the test makes for itself (what a stand-in gives back, an entry it takes into a list): what it
+/// holds of the engine is made by no one.
+template <class T> T quiet() {
+  const Quiet q;
+  return T{};
+}
+/// An object of the engine the test puts where the source holds one as a value or owns one: the source's
+/// (see EngineObject).
+template <class T>
+  requires std::is_base_of_v<EngineObject, T>
+T owned(const T& object) {
+  T out(object);
+  out.kern_owned = true;
+  return out;
+}
+/// The one object of a state as the program makes it (static storage: all of it zero, then its constructor).
+template <class T> std::unique_ptr<T> made_static() {
+  void* at = ::operator new(sizeof(T));
+  std::memset(at, 0, sizeof(T));
+  return std::unique_ptr<T>(new (at) T());
+}
+/// That object as it is before its constructor makes anything of the engine: the variables of its Blueprint
+/// as they begin (their defaults, and what C++ makes of them that is not the engine's).
+template <class T> std::unique_ptr<T> quiet_static() {
+  const Quiet q;
+  return made_static<T>();
+}
 /// One of the few objects of an engine class a test keeps, by its handle.
 template <class T> T* engine_object(long long handle) {
   static T* const kept = [] {
@@ -853,11 +901,11 @@ void take(T& to, const Value& v) { to = *engine_object<T>(v.as_int()); }
 template <class T>
   requires std::is_base_of_v<EngineObject, T>
 void take(std::unique_ptr<T>& to, const Value& v) {
-  // (what this replaces is the test's handing over, not the source's: no release)
-  g_keeping = true;
+  // (what this replaces is the test's handing over, not the source's: no release - and what it holds then
+  // is the source's, as the Blueprint's handle there)
+  const Quiet q;
   if (v.as_int() == 0) to.reset();
-  else to = std::make_unique<T>(*engine_object<T>(v.as_int()));
-  g_keeping = false;
+  else to = std::make_unique<T>(owned(*engine_object<T>(v.as_int())));
 }
 template <class T> void take(std::vector<T>& to, const Value& v);
 /// By the type as the program spells it (S, with Whole where it says u64 or i64 - see shaped).
@@ -873,7 +921,7 @@ template <class S> struct Take<std::vector<S>> {
   template <class T> static void to(std::vector<T>& target, const Value& v) {
     target.clear();
     for (std::size_t k = 0; k < v.size(); ++k) {
-      T item{};
+      T item = quiet<T>();
       if constexpr (is_list<S>) {   // (a list inside a list: a struct that holds it, as the Blueprint has it)
         const Value row = v.item(k);
         if (row.rows && row.rows->size() == 1) Take<S>::to(item, (*row.rows)[0]);
@@ -906,14 +954,17 @@ template <class S> struct Take<std::unique_ptr<S>> {
   template <class T> static void to(std::unique_ptr<T>& target, const Value& v) {
     if constexpr (std::is_base_of_v<EngineObject, T>) {
       const long long handle = v.as_int();
-      target = handle ? std::make_unique<T>(*engine_object<T>(handle)) : nullptr;
+      target = handle ? std::make_unique<T>(owned(*engine_object<T>(handle))) : nullptr;
     } else {
       if (v.size() == 0) {
         target.reset();
         return;
       }
       if constexpr (std::is_default_constructible_v<T>) {
-        if (!target) target = std::make_unique<T>();
+        if (!target) {
+          const Quiet q;
+          target = std::make_unique<T>();
+        }
       }
       if (target) Take<S>::to(*target, v.item(0));
     }
@@ -925,7 +976,10 @@ template <class S> struct Take<std::optional<S>> {
       target.reset();
       return;
     }
-    if (!target) target.emplace();
+    if (!target) {
+      const Quiet q;
+      target.emplace();
+    }
     Take<S>::to(*target, v.item(0));
   }
 };

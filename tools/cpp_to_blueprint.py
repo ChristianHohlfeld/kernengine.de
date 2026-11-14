@@ -60,6 +60,16 @@ the keys). An iterator into a map, a set or a list is the place it stands at, a 
 end is the list's length. `auto [a, b] = value;` gives names to the parts of a value: where they
 stand, the part is written out.
 
+An object of the engine is a handle in a Blueprint (0: none). One a value holds as a field (a
+`kern::net::HostTransport transport_;`, a `kern::LightPool lights{16, 96};`) is made where C++ makes the
+value: by its constructor (X_new), in the order of the fields, before the constructor's body - what C++
+makes of a field itself too, and of the fields of a value inside it -, and it is released where C++ ends
+the value, in the reverse order: at the end of the block of a local variable, where what owns such a value
+(std::unique_ptr, std::optional) gets another one or is reset. The struct's default is the handle 0. The
+one object of a state is made when its Blueprint begins (Begin Play calls its constructor). What C++ does
+with such values that one handle cannot do the same way - a copy, a move or a temporary of one, one handed
+in or given back by value, a list or a map of them changed - waits (Emit.lifetimes).
+
 A parameter `const T*` a function reads entries through (`p[i]`, `*p`), hands on (`p + 2`) or asks
 whether it is null is a pointer into a list, like an iterator: the list, read where it stands (a const
 reference input), and the place in it (an Int; null is -1). Its list is of the type every call of the
@@ -710,6 +720,8 @@ class World:
         self.states = {}       # a class of the program there is one object of (see state_classes) -> the Blueprint it is the state of
         self.parts = {}        # a part of a Blueprint of several source files (a job: "Game/game_net_cpp") -> that Blueprint
         self.part_numbers = {} # such a part -> its number among the parts of its Blueprint (the block of its nodes' ids)
+        self.defaulted = set() # the program's classes whose constructor without arguments is defined `= default` outside the class (C++'s own)
+        self.ending = set()    # the program's classes whose destructor does something of its own (a body with statements)
         self.closures = None   # with tests: a function's key -> the places of the pieces its test holds, as its file's test hands them on (TestWriter.exports)
         self.pieces = None     # those pieces, by their places
 
@@ -771,6 +783,43 @@ def constructor_of(tree, n):
             if c.get("kind") == "CXXConstructorDecl" and not c.get("isImplicit") and c.get("type", {}).get("qualType") == want:
                 return c
     return None
+
+
+def copies_whole(n):
+    """Is this the making of a value out of another of its class (CXXConstructExpr of a copy or a move
+    constructor: `T x = y;`, an input by value, `std::move(a)` into a new place)?"""
+    if n.get("kind") not in ("CXXConstructExpr", "CXXTemporaryObjectExpr"):
+        return False
+    m = re.fullmatch(r"void \((?:const\s+)?(?:volatile\s+)?(.+?)\s*&{1,2}\)(?:\s*noexcept)?", (n.get("ctorType") or {}).get("qualType", "").strip())
+    if not m:
+        return False
+    own = lambda t: re.sub(r"<.*", "", re.sub(r"\b(const|volatile|struct|class)\b", "", t)).strip().split("::")[-1]
+    return own(m.group(1)) == own(qtype(n))
+
+
+def defaulted_maker(d):
+    """A constructor without arguments a class declares and defines `= default` outside itself, where its parts
+    are known (`Game::Game() = default;` in its source file): C++'s own constructor, written down there."""
+    return (d.get("kind") == "CXXConstructorDecl" and d.get("explicitlyDefaulted") == "default" and bool(d.get("previousDecl"))
+            and not any(p.get("kind") == "ParmVarDecl" for p in kids(d)))
+
+
+def ends_itself(d):
+    """Does this destructor do something of its own: a body with statements (not `= default`, not C++'s)?"""
+    if d.get("kind") != "CXXDestructorDecl" or d.get("isImplicit") or d.get("explicitlyDefaulted"):
+        return False
+    body = next((c for c in kids(d) if c.get("kind") == "CompoundStmt"), None)
+    return body is not None and bool(kids(body))
+
+
+def is_nothing(n):
+    """Is this an initializer that gives no value: nullptr, std::nullopt, {} or ()?"""
+    b = bare(n)
+    while b.get("kind") in ("ImplicitCastExpr", "CXXConstructExpr", "ExprWithCleanups", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr", "CXXFunctionalCastExpr") and len(kids(b)) == 1:
+        b = bare(kids(b)[0])
+    if b.get("kind") in ("CXXConstructExpr", "InitListExpr", "CXXScalarValueInitExpr") and not kids(b):
+        return True
+    return b.get("kind") in ("CXXNullPtrLiteralExpr", "GNUNullExpr") or re.sub(r"^const\s+", "", (b.get("type") or {}).get("qualType", "")) in ("std::nullopt_t", "std::nullptr_t", "nullptr_t")
 
 
 SHAPES = "shapes"   # the library of the types the converter makes of the notation's own (a row of a list of lists, a pair)
@@ -861,6 +910,8 @@ class Unit:
         self.engine_calls = {}      # the engine's functions this Blueprint calls: decl id -> its node (Api.function)
         self.objects_seen = set()   # the engine's classes it holds handles of
         self.deciding = set()       # (the engine's classes engine_object is deciding about: one that holds itself)
+        self.lives, self.deciding_life = {}, set()       # the program's classes -> what ends with a value of one (life)
+        self.makings, self.deciding_making = {}, set()   # the program's classes -> does C++ make more of one than its defaults (needs_making)
         self.externs = {}           # a function of an actor's Blueprint it calls on that actor -> (its inputs, its outputs: [(name, type)], its declaration)
         self.working = set()
         self.short = collections.defaultdict(list)
@@ -1240,7 +1291,7 @@ class Unit:
                 # (an array of C++ is declared with its length - `dtype`, below -: its default says what is
                 # not zero - nothing)
                 default = self.zero(ft)
-                if init is not None:
+                if init is not None and not self.made_by_cpp(qtype(c), init):
                     try:
                         default = Const(self).literal(init, ft)
                     except Wait as w:
@@ -1290,6 +1341,140 @@ class Unit:
             if c == cpp_field:
                 return f, t
         raise Wait(f"{struct_name} has no field {cpp_field}")
+
+    # ---- what a value makes and ends: the objects of the engine it holds ----
+    # An object of the engine a value holds as a field (Session::transport_, LookState::lights) is made where
+    # C++ makes the value - by its constructor, in the order of the fields, before the constructor's body; and
+    # C++ itself makes what no constructor says - and it ends where C++ ends the value: in the reverse order of
+    # the fields, the parts of the parts too. In the Blueprint the field is a handle (0: none, the struct's
+    # default); Emit.made_parts makes what C++ makes, Emit.ended_parts releases what C++ ends.
+    def held_life(self, raw):
+        """What ends with a value of the C++ type `raw` (a field's, a local variable's, an input's) when it ends,
+        as C++ ends it: ("object", class) - it is an object of the engine (<class>.release); ("owned", class) -
+        it owns one (std::unique_ptr: released if it holds one); ("value", class) - it is a value of a class of
+        the program that ends something itself (Unit.life); ("box", class) - it owns or may hold such a value
+        (std::unique_ptr, std::optional); ("many", type) - a list, a map, a set or an array of any of these.
+        None: nothing ends with it (a number, plain data, what a pointer, a reference or a view only names)."""
+        r = raw.strip()
+        if r.endswith("&") or re.search(r"\*\s*(const)?$", r):
+            return None
+        q = self.object_of(r)
+        c = self.clean(r)
+        if q is not None:
+            return ("owned", q) if c.startswith("std::unique_ptr<") else ("object", q)
+        if c.startswith(("std::unique_ptr<", "std::optional<")):
+            inner = self.held_life(template_args(c)[0])
+            return None if inner is None else ("box", inner[1]) if inner[0] == "value" else ("many", c)
+        if re.match(r"(?:kern::)?Span<|std::(?:basic_)?string_view\b|std::function<", c):
+            return None   # (a view: of what another holds)
+        arr = re.match(r"(.+?)\s*\[\d*\](?:\s*\[\d*\])*$", c)
+        # (a list, a map, a set, a pair - not a type inside one: an iterator into it only names an entry)
+        args = [arr.group(1)] if arr else template_args(c) if re.fullmatch(r"(?:std|kern)::[\w:]+<.*>", c) else None
+        if args is not None:
+            return ("many", c) if any(self.held_life(a) for a in args if not re.fullmatch(r"\s*\d+\w*\s*", a)) else None
+        try:
+            q = self.find_type(c)
+        except Wait:
+            return None
+        if q is not None and q in self.tree.records and self.life(q) != ([], False):
+            return ("value", q)
+        return None
+
+    def life(self, q):
+        """What ends with a value of the program's class `q` (its destructor, as C++ has it): its fields that end
+        something, in their order - [(field declaration, held_life of its type)] -, and whether the class has a
+        destructor of its own that does something (then the end of such a value runs that function, which is not
+        written yet). (parts, body)"""
+        if q in self.lives:
+            return self.lives[q]
+        rec = self.tree.records.get(q)
+        if rec is None or q.startswith(ENGINE + "::") or q in self.deciding_life:
+            return ([], False)   # (the engine's plain data ends nothing; a class that holds itself: judged by the rest)
+        self.deciding_life.add(q)
+        try:
+            parts = [(c, h) for c in kids(rec) if c.get("kind") == "FieldDecl" for h in [self.held_life(qtype(c))] if h is not None]
+            body = q in self.world.ending or any(ends_itself(self.tree.body.get(c["id"], c)) for c in kids(rec) if c.get("kind") == "CXXDestructorDecl")
+        finally:
+            self.deciding_life.discard(q)
+        self.lives[q] = (parts, body)
+        return self.lives[q]
+
+    def own_default_ctor(self, q):
+        """The constructor without arguments (or with defaults for all) the program's class `q` has of its own -
+        one with what it sets or a body. None: C++'s own (none declared, or `= default` - in the class or where
+        it is defined, as the plan of the whole program says: World.defaulted)."""
+        rec = self.tree.records.get(q)
+        if rec is None or q in self.world.defaulted:
+            return None
+        for c in kids(rec):
+            if c.get("kind") != "CXXConstructorDecl" or c.get("isImplicit") or c.get("explicitlyDefaulted") or c.get("explicitlyDeleted"):
+                continue
+            if self.tree.body.get(c["id"], c).get("explicitlyDefaulted") == "default":
+                continue
+            if all(kids(p) for p in kids(c) if p.get("kind") == "ParmVarDecl"):
+                return c
+        return None
+
+    def making(self, raw):
+        """What C++ makes of a field of the C++ type `raw` that nothing initializes (its class's own constructor),
+        beyond what the struct has as its default: ("object", class) - an object of the engine (<class>.make);
+        ("ctor", class) - a value of a class of the program with a constructor of its own (X_new); ("fields",
+        class) - one whose fields need making (needs_making); ("many", type) - an array of such values. None:
+        nothing - its default is what C++ makes (a list, a map, what may hold a value: made empty)."""
+        r = raw.strip()
+        if r.endswith("&") or re.search(r"\*\s*(const)?$", r):
+            return None
+        q = self.object_of(r)
+        c = self.clean(r)
+        if q is not None:
+            return None if c.startswith("std::unique_ptr<") else ("object", q)
+        arr = re.match(r"(.+?)\s*\[\d*\](?:\s*\[\d*\])*$", c) or re.match(r"std::array<(.+),\s*\d+\w*>$", c)
+        if arr:
+            inner = template_args(c)[0] if c.startswith("std::array<") else arr.group(1)
+            return ("many", c) if self.making(inner) is not None else None
+        if "<" in c:
+            return None
+        try:
+            q = self.find_type(c)
+        except Wait:
+            return None
+        if q is None or q not in self.tree.records or q.startswith(ENGINE + "::") or q in self.world.states:
+            return None
+        if self.own_default_ctor(q) is not None:
+            return ("ctor", q)
+        return ("fields", q) if self.needs_making(q) else None
+
+    def made_by_cpp(self, raw, init):
+        """Is a field's initializer what C++ makes when it makes the value (an object of the engine, a value of a
+        class with a constructor of its own, what it owns from the start) - so that the struct's default is the
+        zero of its type (a handle 0: none) and the making is a step where the value is made (Emit.made_parts)?"""
+        held = self.held_life(raw)
+        return self.making(raw) is not None or (held is not None and held[0] in ("owned", "box") and not is_nothing(init))
+
+    def needs_making(self, q):
+        """Does C++ make more of a value of the program's class `q` than the struct's defaults - when its
+        constructor is C++'s own: an object of the engine it holds, a value of a class with a constructor of its
+        own, what it owns from the start (a field `std::unique_ptr<T> p = std::make_unique<T>()`)?"""
+        if q in self.makings:
+            return self.makings[q]
+        rec = self.tree.records.get(q)
+        if rec is None or q in self.deciding_making:
+            return False
+        self.deciding_making.add(q)
+        try:
+            need = False
+            for c in kids(rec):
+                if c.get("kind") != "FieldDecl":
+                    continue
+                init = kids(c)[-1] if kids(c) and c.get("hasInClassInitializer") else None
+                held = self.held_life(qtype(c))
+                if self.making(qtype(c)) is not None or (init is not None and held is not None and held[0] in ("owned", "box") and not is_nothing(init)):
+                    need = True
+                    break
+        finally:
+            self.deciding_making.discard(q)
+        self.makings[q] = need
+        return need
 
     # ---- constants: the Blueprint's variables ----
     def constant(self, decl):
@@ -1413,7 +1598,7 @@ class Unit:
         try:
             t = self.btype(qtype(c))
             init = kids(c)[-1] if kids(c) and c.get("hasInClassInitializer") else None
-            default = Const(self).literal(init, t) if init is not None else self.zero(t)
+            default = Const(self).literal(init, t) if init is not None and not self.made_by_cpp(qtype(c), init) else self.zero(t)
         except Wait as w:
             raise Wait(f"the variable {name} of {self.name}: {w}")
         if c.get("mutable"):
@@ -2175,15 +2360,15 @@ class Emit:
         if u.state is not None and self.tree.owner.get(d["id"]) == u.state:
             # a method of the state the Blueprint is: its fields are the Blueprint's variables - no object is
             # handed in. It changes them unless it says it does not (const) and writes no mutable field.
-            if d.get("kind") == "CXXConstructorDecl":
-                raise Wait(f"the constructor of the state {u.name} (what it does would run when the Blueprint begins)")
+            # Its constructor makes what C++ makes of its fields when the one object is made (the variables begin
+            # with their defaults): the function that runs when the Blueprint begins - Begin Play calls it.
             f.state = True
             for x in walk(d):   # (what the file keeps for the state's methods alone: variables of its Blueprint - Unit.kept_by_state)
                 if x.get("kind") == "DeclRefExpr" and (x.get("referencedDecl") or {}).get("kind") == "VarDecl":
                     v = self.tree.decl.get(x["referencedDecl"]["id"])
                     if v is not None and v["id"] not in self.names and u.kept_by_state(v):
                         self.names[v["id"]], self.types[v["id"]] = u.state_static(v, os.path.splitext(os.path.basename(v.get("_file") or "file"))[0])
-            f.mutates = not qtype(d).rstrip().endswith("const") or any(
+            f.mutates = d.get("kind") == "CXXConstructorDecl" or not qtype(d).rstrip().endswith("const") or any(
                 x.get("kind") == "MemberExpr" and (u.state_fields.get(x.get("name")) or (None, None, {}))[2].get("mutable") and self.is_this(kids(x)[0] if kids(x) else {"kind": "CXXThisExpr"})
                 for x in walk(d))
             # (what it keeps from one call to the next, or of the file - changed or not: it may be)
@@ -2191,9 +2376,9 @@ class Emit:
                 or any(i in self.names and self.names[i] in {n for n, _ in u.state_statics.values()} for i in self.assigned(d))
             if f.mutates:
                 f.pure = False   # (it changes the Blueprint's variables: a step)
-        if d.get("kind") == "CXXConstructorDecl":
+        if d.get("kind") == "CXXConstructorDecl" and not f.state:
             # a constructor: a function that makes the object - it begins as the struct's default (the
-            # defaults of the class's data), then what the constructor sets
+            # defaults of the class's data), then what C++ makes of its fields (made_parts), then its body
             owner = self.tree.owner.get(d["id"])
             if owner is None:
                 raise Wait("a constructor of a class that is not known here")
@@ -2204,6 +2389,7 @@ class Emit:
             f.mutates = f.ctor = True
         if "&" in ret and not re.search(r"\bconst\b", ret):
             raise Wait("a function that gives a reference to something to change")
+        self.lifetimes(d)
         body = next(c for c in kids(d) if c.get("kind") == "CompoundStmt")
         self.dissolve(d)   # (a call of a function that names a place: the place)
         # a method: its object is the first parameter - a reference to a value of the struct its class's data is:
@@ -2285,30 +2471,24 @@ class Emit:
             f.out_fields.append((field, f.params[place][1], ("ref", place)))
         f.result = f.self_type if f.ctor else f.value
         lines = []
-        if f.ctor:
-            self.self_name = self.temp("self", f.self_type)
+        if d.get("kind") == "CXXConstructorDecl":
+            # what the constructor sets, and what C++ makes of the other fields: in the order of the fields, before
+            # its body (made_parts) - on the object it makes, or on the variables of the state
+            if f.ctor:
+                self.self_name = self.temp("self", f.self_type)
+            at = d.get("loc") or {}
+            here = at.get("expansionLoc", at).get("offset")
+            inits = {}
             for init in kids(d):
                 if init.get("kind") != "CXXCtorInitializer":
                     continue
                 if "anyInit" not in init:
                     raise Wait("a constructor that calls another constructor or a base class")
                 e = kids(init)[0] if kids(init) else None
-                if e is None or bare(e).get("kind") == "CXXDefaultInitExpr":
-                    continue   # (the data's own default: the struct has it)
-                at = d.get("loc") or {}
-                if e.get("_at", (None,))[0] is not None and e["_at"][0] == at.get("expansionLoc", at).get("offset"):
-                    # (what the constructor does not write, the compiler does - it stands where the constructor's
-                    # name stands: a field made as its class makes it. The struct has that as its default.)
-                    continue
-                fname, ft = u.field(f.self_type, init["anyInit"]["name"])
-                if u.object_of(qtype(init["anyInit"])) and (self.maker_of(e) is not None or any(callee_name(x) == "make_unique" for x in walk(e) if x.get("kind") == "CallExpr")):
-                    # (an object of the engine its owner makes: it ends with its owner - which a value of the
-                    # Blueprint has not; see the plan for the fields of objects of the engine)
-                    raise Wait("an object of the engine as a field, made with its owner")
-                saved, self.pre = self.pre, []
-                text = self.ex(e, ft)
-                lines += self.pre + [f"{self.self_name}.{fname} = {text};"]
-                self.pre = saved
+                # (what the constructor does not write, the compiler does - it stands where the constructor's name
+                # stands: a field made as its class makes it)
+                inits[init["anyInit"]["id"]] = (e, e is not None and not (e.get("_at", (None,))[0] is not None and e["_at"][0] == here))
+            lines += self.made_parts(self.tree.owner.get(d["id"]), self.self_name if f.ctor else None, inits, own=True)
         for p, name, t in copies:
             c = self.temp(name + "_", t, self.u.fixed(qtype(p)) if t.startswith("List<") else None)
             self.names[p["id"]] = c
@@ -2330,6 +2510,13 @@ class Emit:
                            else f"{takes[i]} {f.params[i][0]} = {u.zero(takes[i])}" for i in f.order())
         head.append(f"  {'KERN_PURE ' if f.pure else ''}{f.name + 'Result' if f.result is not None else 'void'} {f.name}({params}) {{")
         out = head + [f"    {self.declared(n, t)} {n} = {u.zero(self.declared(n, t))};" for n, t in self.locals] + ["    " + ln for ln in lines] + ["  }"]
+        if f.state and d.get("kind") == "CXXConstructorDecl":
+            # the one object of the state is made when the program begins: its Blueprint makes it when it begins
+            if f.params:
+                raise Wait(f"the constructor of the state {u.name} with arguments (the one object is made without)")
+            node = u.next_node
+            u.next_node += 1
+            out += ["", f"  KERN_EVENT(on{node}, event_begin)", f"  void on{node}() {{", f"    {f.name}();", "  }"]
         f.local_names = set(self.taken)   # (its inputs and local variables: see convert_unit)
         f.text = "\n".join(out)
 
@@ -2729,10 +2916,15 @@ class Emit:
 
     def releases(self, made):
         """What ends the objects of the engine a block made, where its way out is (in the reverse order of
-        their making, as C++ destroys them): each is released, if it was made - its handle is none after."""
+        their making, as C++ destroys them): each is released, if it was made - its handle is none after. A
+        local variable that is a value holding such objects ("value") or that owns one ("box") ends as its class
+        ends (ended_parts)."""
         out = []
         for name, q in reversed(made):
-            out += self.release(q, name) + [f"{name} = 0;"]
+            if isinstance(q, tuple):
+                out += self.ended_parts(q[1], name) if q[0] == "value" else self.ended_box(q[1], name)
+            else:
+                out += self.release(q, name) + [f"{name} = 0;"]
         return out
 
     def release(self, q, handle):
@@ -2744,6 +2936,266 @@ class Emit:
         u.engine_calls[f["decl"]["id"] + ":release"] = f
         self.f.pure = False
         return [f'if (math_compare<"!=">(kern::to<Float>({handle}), 0.0)) {{', f'  {f["type"].replace(".", "_")}({handle});', "}"]
+
+    # ---- the objects of the engine a value holds: made with it, ended with it (Unit.held_life) ----
+    def made_parts(self, q, place, inits=None, own=False):
+        """What C++ makes of the fields of a value of the program's class `q` beyond what the struct has as its
+        defaults, as steps on the value at `place` (None: the state the Blueprint is - each field a variable): in
+        the order of the fields - what the constructor being written sets (`inits`: {field id: (its initializer,
+        written by the constructor)}), and of the others what C++ makes itself: an object of the engine
+        (<class>.make, by the constructor the initializer of the field names or the one without arguments), a
+        value of a class with a constructor of its own (X_new), one whose fields need making (field by field).
+        `own`: the value is the object the function makes - an initializer of a field may read its other fields;
+        of a value inside it, that would be another object."""
+        u = self.u
+        rec = self.tree.records.get(q)
+        if rec is None:
+            raise Wait(f"the class {q.split('::')[-1]} is not known here")
+        sname = u.struct(q) if place is not None else None
+        lines = []
+        for c in kids(rec):
+            if c.get("kind") != "FieldDecl" or not c.get("name"):
+                continue
+            raw = qtype(c)
+            e, written = (inits or {}).get(c["id"], (None, False))
+            held, made = u.held_life(raw), u.making(raw)
+            node = None   # (the compiler's own making of the field, where the constructor's tree has it)
+            if e is not None and bare(e).get("kind") == "CXXDefaultInitExpr":
+                e, how = None, "default"
+            elif e is not None and written:
+                how = "written"
+            else:
+                node, e, how = e, None, "default"
+            if how == "default" and c.get("hasInClassInitializer") and kids(c):
+                e, how = kids(c)[-1], "in_class"
+                if made is None and not (held is not None and held[0] in ("owned", "box") and not is_nothing(e)):
+                    continue   # (the struct's default: what the initializer says)
+                if not own and any(x.get("kind") == "CXXThisExpr" for x in walk(e)):
+                    raise Wait(f"the field {c['name']} of a {q.split('::')[-1]} is made of its other fields, inside another value")
+            if how == "default" and made is None:
+                continue
+            if place is None:
+                p, ft = u.state_variable(c["name"])
+            else:
+                fname, ft = u.field(sname, c["name"])
+                p = f"{place}.{fname}"
+            if how == "default" and made[0] == "fields":
+                lines += self.made_parts(made[1], p)
+                continue
+            if how == "default" and made[0] == "many":
+                raise Wait(f"an array of values C++ makes one by one (the field {c['name']} of a {q.split('::')[-1]})")
+            saved, self.pre = self.pre, []
+            try:
+                want = "Int" if held is not None and held[0] in ("object", "owned") else ft
+                if e is not None:
+                    text = self.ex(e, want)
+                elif node is not None and bare(node).get("kind") in ("CXXConstructExpr", "CXXTemporaryObjectExpr", "ExprWithCleanups"):
+                    text = self.ex(node, want)
+                elif made[0] == "object":
+                    text = self.made(self.default_maker(made[1]), [])
+                else:
+                    text = self.made_by(made[1], u.own_default_ctor(made[1]))
+                lines += self.pre + [f"{p} = {text};"]
+            finally:
+                self.pre = saved
+        return lines
+
+    def default_maker(self, q):
+        """The constructor C++ makes an object of the engine's class `q` by when nothing is given: the one without
+        arguments, or whose arguments all have defaults - a node <class>.make."""
+        fit = [d for d in self.u.api().makers(q) if all(kids(p) for p in kids(d) if p.get("kind") == "ParmVarDecl")]
+        if len(fit) != 1:
+            raise Wait(f"a {q.split('::')[-1]} made without arguments: " + ("no constructor of it is a node" if not fit else "which of its constructors"))
+        return fit[0]
+
+    def made_by(self, q, c):
+        """A value of the program's class `q` made by its own constructor `c` without arguments (its defaults for all)."""
+        if c["id"] not in self.tree.body:
+            raise Wait(f"a {q.split('::')[-1]} made by a constructor that is defined in another file")
+        return self.invoke(self.u.function(c["id"]), [{"kind": "CXXDefaultArgExpr"} for p in kids(c) if p.get("kind") == "ParmVarDecl"])[0]
+
+    def finished(self, t, q, text, inits=None):
+        """A value of the struct `t` (the program's class `q`) as C++ makes it: `text` - its defaults -, then what C++
+        makes of its fields (made_parts; `inits`: what is given for them). Without anything to make: the text."""
+        if q is None or (not inits and not self.u.needs_making(q)):
+            return text
+        tmp = self.temp("made", t)
+        self.hoist([f"{tmp} = {text};"] + self.made_parts(q, tmp, inits))
+        return tmp
+
+    def ended_parts(self, q, place):
+        """What ends with a value of the program's class `q` at `place` when C++ ends it (its destructor): in the
+        reverse order of its fields, each object of the engine it holds or owns is released, each value inside it
+        that holds some ends the same way."""
+        parts, body = self.u.life(q)
+        short = q.split("::")[-1]
+        if body:
+            raise Wait(f"the end of a {short} runs its destructor ~{short}(), which is not written yet")
+        sname = self.u.struct(q)
+        out = []
+        for c, (kind, what) in reversed(parts):
+            fname, _ = self.u.field(sname, c["name"])
+            p = f"{place}.{fname}"
+            if kind in ("object", "owned"):
+                out += self.release(what, p)
+            elif kind == "value":
+                out += self.ended_parts(what, p)
+            elif kind == "box":
+                out += self.ended_box(what, p)
+            else:
+                raise Wait(f"the end of a {short}: its field {c['name']} is a list, a map or an array of what ends with it")
+        return out
+
+    def ended_box(self, q, place):
+        """The end of what an owned or optional value at `place` holds (a value of the program's class `q`), if it
+        holds one."""
+        inner = self.ended_parts(q, f"{place}[0]")
+        if not inner:
+            return []
+        t = self.u.struct(q)
+        return [f'if (math_compare<">">(kern::to<Float>(list_length<{t}>({place})), 0.0)) {{', *["  " + x for x in inner], "}"]
+
+    def made_default(self, init, t):
+        """The program's class a variable of the struct `t` is made of by C++'s own constructor without arguments
+        (`T x;`, `T x{};`) when C++ makes more of it than its defaults (Unit.needs_making) - else None."""
+        b = self.unwrap(init)
+        while b.get("kind") in ("ExprWithCleanups", "CXXBindTemporaryExpr") and len(kids(b)) == 1:
+            b = self.unwrap(kids(b)[0])
+        if b.get("kind") not in ("CXXConstructExpr", "CXXTemporaryObjectExpr") or [x for x in kids(b) if x.get("kind") != "CXXDefaultArgExpr"] or t not in self.u.struct_fields:
+            return None
+        q = next((x for x, n_ in self.u.structs.items() if n_ == t and isinstance(x, str)), None)
+        if q is None or self.u.own_default_ctor(q) is not None or not self.u.needs_making(q):
+            return None
+        return q
+
+    def made_anew(self, n):
+        """Is this `x = T(...)` - an object of the engine held as a value replaced by one its constructor makes for
+        it (move assignment from what the constructor made)? Then the new one is made, the old one ends (its
+        handle is released) and the place holds the new one - as an owned one gets another. The new one: its
+        maker (Emit.maker_of) - else None."""
+        if n.get("kind") != "CXXOperatorCallExpr" or callee_name(n) != "operator=" or len(kids(n)) != 3:
+            return None
+        h = self.u.held_life(qtype(kids(n)[1]))
+        if h is None or h[0] != "object":
+            return None
+        return self.maker_of(kids(n)[2])
+
+    def owner_box(self, n):
+        """The program's class of what an owned or optional value holds (n names it) when that ends something
+        (Unit.life) - else None."""
+        h = self.u.held_life(qtype(n))
+        return h[1] if h is not None and h[0] == "box" else None
+
+    MUTATING = frozenset("push_back emplace_back push_front emplace_front emplace emplace_hint insert insert_or_assign try_emplace erase erase_if clear pop_back pop_front "
+                         "resize assign swap reserve shrink_to_fit extract merge fill splice remove remove_if unique sort rehash".split())
+    ALGORITHMS = frozenset("swap iter_swap sort stable_sort partial_sort nth_element remove remove_if unique reverse rotate erase erase_if fill fill_n copy copy_n copy_if "
+                           "copy_backward move move_backward shuffle partition stable_partition exchange generate generate_n transform replace replace_if".split())
+
+    def lifetimes(self, d):
+        """What C++ does with something that ends (an object of the engine, a value that holds one - Unit.held_life)
+        that has no place in the Blueprint, where each such object is one handle, made once and released once:
+        copied or moved as a whole (C++ makes another object, or ends the one moved from empty), set as a whole,
+        made for a moment, handed in or given back by value, kept from one call to the next, a list, a map or an
+        array of them changed or ended. Such a function waits, with why."""
+        u = self.u
+        def what(h):
+            if h[0] in ("object", "owned"):
+                return f"an object of the engine ({h[1].split('::')[-1]})"
+            return f"a {h[1].split('::')[-1]}, which holds objects of the engine" if h[0] in ("value", "box") else "a list of what ends (objects of the engine, values that hold them)"
+        def mentions(raw):
+            """Does a type name a class that ends something (through templates: an iterator into a list of them)?"""
+            for name in re.findall(r"[A-Za-z_][\w:]*", re.sub(r"\b(const|volatile|struct|class)\b", " ", raw)):
+                try:
+                    if u.held_life(name) is not None:
+                        return True
+                except Wait:
+                    continue
+            return False
+        def entries_made(raw):
+            """Does C++ make the new entries of this list or map (its values) with a constructor of their own?"""
+            c = u.clean(re.sub(r"&", "", raw))
+            if not re.fullmatch(r"(?:std|kern)::[\w:]+<.*>", c):
+                return False
+            args = template_args(c)
+            entry = args[1] if re.match(r"(?:kern::Map|std::(?:unordered_)?map)<", c) and len(args) > 1 else args[0]
+            try:
+                return u.making(entry) is not None
+            except Wait:
+                return False
+        if d.get("kind") in ("FunctionDecl", "CXXMethodDecl", "CXXConversionDecl"):
+            h = u.held_life(qtype(d).split("(")[0].strip())
+            if h is not None:
+                raise Wait(f"{what(h)} given back by value (C++ moves it to the caller)")
+        for p in kids(d):
+            if p.get("kind") == "ParmVarDecl":
+                h = u.held_life(qtype(p))
+                if h is not None:
+                    raise Wait(f"{what(h)} as an input by value (a copy, or what the call takes over, ends with the call)")
+        stack = [(d, ())]
+        while stack:
+            n, up = stack.pop()
+            stack += [(c, up + (n,)) for c in kids(n)]
+            k = n.get("kind")
+            if k in ("CXXConstructExpr", "CXXTemporaryObjectExpr") and copies_whole(n):
+                h = u.held_life(qtype(n))
+                if h is not None and h[0] in ("object", "value", "many"):
+                    raise Wait(f"{what(h)} copied or moved as a whole")
+            elif k in ("MaterializeTemporaryExpr", "CXXBindTemporaryExpr"):
+                h = u.held_life(qtype(n))
+                if h is None:
+                    continue
+                outer = next((x for x in reversed(up) if x.get("kind") not in ("ImplicitCastExpr", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr", "ExprWithCleanups")), {})
+                if k == "CXXBindTemporaryExpr" and not any(x.get("kind") == "MaterializeTemporaryExpr" for x in up[-3:]) and not (
+                        outer.get("kind", "").endswith("Stmt") and outer.get("kind") not in ("ReturnStmt", "DeclStmt")):
+                    continue   # (what C++ makes right where it is kept - a variable, a field, what is returned: no temporary)
+                if h[0] in ("owned", "box"):
+                    # (what owns one, made for a moment, is moved from - into what is set, what is made of it: it ends empty)
+                    if (outer.get("kind") == "CXXOperatorCallExpr" and callee_name(outer) == "operator=") or copies_whole(outer):
+                        continue
+                if h[0] == "object" and self.made_anew(outer):
+                    continue   # (an object of the engine made to replace one: see made_anew)
+                raise Wait(f"{what(h)} made for a moment (C++ ends it with the statement)")
+            elif k in ("CXXOperatorCallExpr", "CXXMemberCallExpr") and callee_name(n) == "operator=":
+                left = kids(n)[1] if k == "CXXOperatorCallExpr" and len(kids(n)) > 1 else kids(callee(n))[0] if kids(callee(n)) else {}
+                h = u.held_life(re.sub(r"\*\s*$", "", qtype(left)))
+                if h is not None and h[0] in ("object", "value", "many") and not (h[0] == "object" and self.made_anew(n)):
+                    raise Wait(f"{what(h)} set as a whole (C++ copies or moves each object it holds)")
+            elif k == "CXXMemberCallExpr" and kids(callee(n)):
+                name = callee(n).get("name")
+                h = u.held_life(re.sub(r"\*\s*(const)?\s*$", "", qtype(kids(callee(n))[0])))
+                if h is not None and h[0] == "many" and name in self.MUTATING:
+                    raise Wait(f"{name}() of {what(h)}")
+                if h is not None and h[0] in ("box", "owned") and name in ("release", "swap", "emplace"):
+                    raise Wait(f"{name}() of what owns {what(h)}")
+            elif k == "CXXOperatorCallExpr" and callee_name(n) == "operator[]" and len(kids(n)) > 1:
+                h = u.held_life(qtype(kids(n)[1]))
+                keyed = re.match(r"(?:kern::Map|std::(?:unordered_)?map)<", u.clean(qtype(kids(n)[1])))
+                if h is not None and h[0] == "many" and keyed:
+                    raise Wait(f"a row of {what(h)} by its key (C++ makes it where there is none)")
+                if keyed and entries_made(qtype(kids(n)[1])):
+                    raise Wait("a row of a map by its key, whose value C++ makes with its constructor where there is none")
+            if k == "CXXMemberCallExpr" and kids(callee(n)) and callee(n).get("name") in ("resize", "emplace_back", "emplace", "try_emplace") and entries_made(re.sub(r"\*\s*(const)?\s*$", "", qtype(kids(callee(n))[0]))):
+                if callee(n)["name"] == "resize" or len(kids(n)) <= (2 if callee(n)["name"] == "try_emplace" else 1):
+                    raise Wait(f"{callee(n)['name']}() of a list or a map whose new entries C++ makes with their constructor")
+            if k == "CXXConstructExpr" and re.match(r"std::vector<", u.clean(qtype(n))) and entries_made(qtype(n)) and not copies_whole(n):
+                given = [x for x in kids(n) if x.get("kind") != "CXXDefaultArgExpr"]
+                if len(given) == 1 and NUMBER.get(u.clean(qtype(given[0]))) == "Int":
+                    raise Wait("a list whose entries C++ makes with their constructor")
+            elif k == "CallExpr" and callee_name(n) in self.ALGORITHMS and not (callee_name(n) == "move" and len(kids(n)) == 2):
+                if any(mentions(qtype(a)) for a in kids(n)[1:]):
+                    raise Wait(f"std::{callee_name(n)} over what ends (objects of the engine, values that hold them)")
+            elif k == "VarDecl" and up:
+                h = u.held_life(qtype(n))
+                if h is None:
+                    continue
+                if n.get("storageClass") == "static":
+                    raise Wait(f"{what(h)} kept from one call to the next (C++ ends it when the program ends)")
+                if h[0] == "many":
+                    raise Wait(f"{what(h)} as a local variable")
+                if h[0] == "owned":
+                    raise Wait("an owned object of the engine as a local variable")
+            elif k in ("CXXNewExpr", "CXXDeleteExpr") and mentions(qtype(n)):
+                raise Wait("an object that ends something made with new or ended with delete")
 
     def block_of(self, stmts):
         """The statements of a block, and whether it always returns (then its objects are released by the return)."""
@@ -2897,7 +3349,11 @@ class Emit:
                     out += self.take_pre() + [f"{name} = {self.ex(init, 'Int')};"]
                     self.scopes[-1].append((name, made))
                     continue
-                if init is not None:
+                made_here = self.made_default(init, self.types[v["id"]]) if init is not None else None
+                if made_here is not None:
+                    # (made as C++'s own constructor makes it: its defaults, then what C++ makes of its fields - there)
+                    out += [f"{name} = {self.u.zero(self.types[v['id']])};"] + self.made_parts(made_here, name)
+                elif init is not None:
                     # (an array written out: its place - declared with its length - is set to what is written)
                     said = self.written_array(init, self.types[v['id']]) if name in self.lengths else None
                     text = self.made_list(said[0], self.types[v['id']]) if said else self.ex(init, self.types[v['id']])
@@ -2911,6 +3367,11 @@ class Emit:
                     # (the zero of its type; an array of C++ is declared with its length - set to the
                     # empty list, each of its entries is zero)
                     out += [f"{name} = {self.u.zero(self.types[v['id']])};"]
+                held = self.u.held_life(raw)
+                if held is not None and held[0] in ("value", "box"):
+                    # (a value that holds objects of the engine, or owns such a value: made as its class makes it -
+                    # it ends where its block ends, as its class ends)
+                    self.scopes[-1].append((name, held))
             return out, False
         if k == "ReturnStmt":
             c = kids(s)
@@ -2921,7 +3382,7 @@ class Emit:
                 return [self.ret_line(self.ex(c[0], self.f.value))], True
             # the objects of the engine the function made are released on its way out - after what it
             # returns is computed (C++: the value first, then the destructors)
-            mine = {i for scope in self.scopes for i, _ in scope}
+            mine = {i for scope in self.scopes for i, q in scope if not isinstance(q, tuple)}   # (a value that holds some: none given back - lifetimes)
             if c and any(x.get("kind") == "DeclRefExpr" and self.names.get(x.get("referencedDecl", {}).get("id")) in mine for x in walk(c[0])):
                 raise Wait("a return of an object of the engine the function made")
             text = self.ex(c[0], self.f.value) if c else None
@@ -3376,6 +3837,15 @@ class Emit:
             if inner.get("kind") == "CXXOperatorCallExpr" and not inner.get("_op") and callee_name(inner) == "operator=" and len(kids(inner)) == 3:
                 # a = b = v of a class (a vector, a struct): first b, then a is what b is now
                 return self.effect(inner) + self.store(ops[0], lambda t: self.ex(kids(inner)[1], t))
+            if name == "operator=" and self.made_anew(n) is not None:
+                # an object of the engine held as a value gets one its constructor makes for it: the new one first,
+                # then the old one ends (move assignment: what the place held is replaced)
+                q = self.u.held_life(qtype(ops[0]))[1]
+                old = self.temp("old", "Int")
+                lines = [f"{old} = {self.ex(ops[0], 'Int')};"]
+                text = self.ex(ops[1], "Int")
+                lines += self.take_pre()
+                return lines + self.store(ops[0], lambda t: text) + self.release(q, old)
             if name == "operator=" and self.owned_object(ops[0]):
                 # an owned object of the engine (std::unique_ptr) gets another: the new one first, then the
                 # old one is released (unique_ptr::operator=: reset - the pointer stored, then the old deleted)
@@ -3385,6 +3855,22 @@ class Emit:
                 text = "0" if self.nothing(ops[1]) else self.ex(ops[1], "Int")
                 lines += self.take_pre()
                 return lines + self.store(ops[0], lambda t: text) + self.release(q, old)
+            if name == "operator=" and self.owner_box(ops[0]) is not None:
+                # what an owned or optional value holds that holds objects of the engine gets replaced: the new
+                # value first, then the old one ends (unique_ptr::operator=: the pointer stored, then the old deleted)
+                self.moved_into(ops[1], qtype(callee(n)))
+                got = self.spot(ops[0])
+                if got is None or not self.writable(got[0]):
+                    raise Wait("an owned value that holds objects of the engine, replaced where it is no place")
+                lt = got[1]
+                if self.nothing(ops[1]):
+                    text = lt + "{}"
+                elif self.is_box(ops[1]):
+                    text = self.ex(ops[1], lt)
+                else:
+                    text = f'list_make<{lt[5:-1]}, "1">({self.ex(ops[1], lt[5:-1])})'
+                put = self.temp("put", lt)
+                return self.take_pre() + [f"{put} = {text};"] + self.ended_box(self.owner_box(ops[0]), got[0]) + [f"{got[0]} = {put};"]
             if name == "operator=":
                 self.moved_into(ops[1], qtype(callee(n)))
                 if self.is_box(ops[0]) and self.nothing(ops[1]):
@@ -3454,7 +3940,13 @@ class Emit:
                 old = self.temp("old", "Int")
                 return [f"{old} = {self.ex(base, 'Int')};"] + self.store(base, lambda t: "0") + self.release(q, old)
             if base is not None and not self.is_this(base) and self.is_box(base):
-                if name == "reset" and len(kids(n)) == 1:
+                if name == "reset" and all(x.get("kind") == "CXXDefaultArgExpr" or self.nothing(x) for x in kids(n)[1:]):   # (reset(), reset(nullptr))
+                    if self.owner_box(base) is not None:
+                        # (what it holds ends - as its class ends -, then it holds nothing: unique_ptr::reset)
+                        got = self.spot(base)
+                        if got is None or not self.writable(got[0]):
+                            raise Wait("an owned value that holds objects of the engine, ended where it is no place")
+                        return self.ended_box(self.owner_box(base), got[0]) + [f"{got[0]} = {got[1]}{{}};"]
                     return self.store(base, lambda t: t + "{}")
                 raise Wait(f"{name}() of an owned or optional value")
             if base is not None and not self.is_this(base) and self.tp(base).startswith(("Map<", "Set<")):
@@ -4887,6 +5379,8 @@ class Emit:
         rec = self.tree.records.get(q, {})
         ctors = [c for c in kids(rec) if c.get("kind") == "CXXConstructorDecl" and not c.get("isImplicit")]
         fits = [c for c in ctors if (ctor_type and c.get("type", {}).get("qualType") == ctor_type) or (not ctor_type and len([p for p in kids(c) if p.get("kind") == "ParmVarDecl"]) == len(arg_nodes))]
+        if not arg_nodes and q is not None and u.own_default_ctor(q) is None:
+            return self.finished(t, q, u.zero(t))   # (C++'s own constructor: the defaults, and what C++ makes of the fields)
         if len(fits) == 1:
             if fits[0]["id"] not in self.tree.body:
                 raise Wait(f"a {t} made by a constructor that is defined in another file")
@@ -4894,10 +5388,14 @@ class Emit:
         if ctors and arg_nodes:
             raise Wait(f"a {t} made by a constructor")
         if not arg_nodes:
-            return u.zero(t)
+            return u.zero(t) if q is None else self.made_by(q, u.own_default_ctor(q))
         fields = u.struct_fields[t]
         if len(arg_nodes) > len(fields):
             raise Wait(f"a {t} made of too many values")
+        if q is not None and u.needs_making(q):
+            # (its fields given in their order, and what C++ makes of the others)
+            fds = [c for c in kids(rec) if c.get("kind") == "FieldDecl"]
+            return self.finished(t, q, u.zero(t), {fd["id"]: (a, True) for fd, a in zip(fds, arg_nodes)})
         return f"struct_make<{t}>({', '.join([self.ex(a, ft) for a, (_, ft, _, _) in zip(arg_nodes, fields)] + [d for _, _, d, _ in fields[len(arg_nodes):]])})"
 
     def store(self, target, value):
@@ -6148,12 +6646,22 @@ class Emit:
                 want = b.get("ctorType", {}).get("qualType")
                 for c in kids(rec):   # the constructor the class itself has for these arguments
                     if c.get("kind") == "CXXConstructorDecl" and not c.get("isImplicit") and qtype(c) == want or (c.get("kind") == "CXXConstructorDecl" and not c.get("isImplicit") and c.get("type", {}).get("qualType") == want):
+                        if not a and q is not None and u.own_default_ctor(q) is None:
+                            break   # (C++'s own - `= default`: what it makes is made here)
                         if c["id"] not in self.tree.body:
                             raise Wait(f"a {t} made by a constructor that is defined in another file")
                         return self.invoke(u.function(c["id"]), kids(b))
                 if a:
                     raise Wait(f"a {t} made by a constructor")
-                return u.zero(t), t
+                # (the defaults - and what C++ makes of the fields: objects of the engine, values of classes with a
+                # constructor of their own)
+                return self.finished(t, q, u.zero(t)), t
+            q = next((x for x, n_ in u.structs.items() if n_ == t), None)
+            if q is not None and q in self.tree.records and u.needs_making(q):
+                # (written out: the fields given in their order, and what C++ makes of the others - in their order)
+                fds = [c for c in kids(self.tree.records[q]) if c.get("kind") == "FieldDecl"]
+                given = {fd["id"]: (x, True) for fd, x in zip(fds, a) if x.get("kind") not in ("ImplicitValueInitExpr", "CXXDefaultInitExpr")}
+                return self.finished(t, q, u.zero(t), given), t
             vals = []
             for i, (f, ft, d, _) in enumerate(fields):
                 if i < len(a) and a[i].get("kind") not in ("ImplicitValueInitExpr", "CXXDefaultInitExpr"):
@@ -7117,9 +7625,11 @@ class TestWriter:
         if q:   # (an object of the engine: one of a few the test keeps, by its handle)
             one = f"converted::engine_object<{self.object_name(q)}>(1 + draw.below(6))"
             r = raw.strip()
+            # (where the source holds one as a value or owns one, it is the source's - released when the source ends
+            # it, as the Blueprint releases its handle: converted::owned; a pointer or a reference only names one)
             if re.match(r"(?:const\s+)?std::unique_ptr<", self.u.clean(r)):
-                return f"std::make_unique<{self.object_name(q)}>(*{one})"
-            return one if re.search(r"\*\s*(const)?$", r) else "*" + one
+                return f"std::make_unique<{self.object_name(q)}>(converted::owned(*{one}))"
+            return one if re.search(r"\*\s*(const)?$", r) else f"converted::owned(*{one})" if not r.endswith("&") else "*" + one
         m = re.match(r"(?:kern::)?Span<\s*(?:const\s+)?(.+)>$", c)
         if m:   # (a view: of entries the test keeps - converted::kept_span)
             inner = m.group(1)
@@ -7427,7 +7937,8 @@ class TestWriter:
         body = [f'const std::vector<converted::Value> kern_out = converted::engine_call("{f["type"]}", {{{", ".join(values)}}});']
         k = 0
         if ret != "void":
-            body.append(f"{ret} kern_result{{}}; converted::take_as<{shape(ret)}>(kern_result, kern_out[0]);")
+            # (what it gives is made by the test - quietly: an object of the engine in it is no make of the source)
+            body.append(f"{ret} kern_result = converted::quiet<{ret}>(); converted::take_as<{shape(ret)}>(kern_result, kern_out[0]);")
             k = 1
         for name, t, optional in takes:
             body.append(f"if ({name}) converted::take_as<{shape(t)}>(*{name}, kern_out[{k}]);" if optional else f"converted::take_as<{shape(t)}>({name}, kern_out[{k}]);")
@@ -7518,12 +8029,23 @@ class TestWriter:
                 except Wait as w:
                     self.no_stand_in(f, w)
                     continue   # (what it takes the test has no values of: a function that calls it is not compared)
-                made = made or (f.get("role") == "make" and not f["ins"])
+                # (a constructor that needs no arguments - none, or a default for each - is the one C++ makes it by)
+                made = made or (f.get("role") == "make" and all(kids(p) for p in kids(f["decl"]) if p.get("kind") == "ParmVarDecl"))
                 decls.append("  " + a)
                 defs.append((("object", q), b))
-            if any(f.get("role") == "make" for f in by_class.get(q, [])) and not made:
+            if any(f.get("role") in ("make", "release") for f in by_class.get(q, [])) and not made:
                 decls.insert(0, f"  {name}() = default;")   # (the test's own objects of it - see converted::engine_object)
             over = ", ".join(f"public {self.object_name(b)}" for b in self.engine_bases(q)) or "converted::EngineObject"
+            ends = next((f for f in by_class.get(q, []) if f.get("role") == "release"), None)
+            if ends is not None:
+                # (its own destructor would leave it without moves: moved, what it owns goes with it - EngineObject.
+                # Set to one made for it - `x = T(...)` -, what it held ends: released, if it owned it, as the
+                # Blueprint releases the handle it replaces)
+                decls += [f"  {name}(const {name}&) = default;", f"  {name}({name}&&) = default;",
+                          f"  {name}& operator=(const {name}&) = default;", f"  {name}& operator=({name}&& o) noexcept;"]
+                first = over.split(",")[0].replace("public ", "").strip()
+                defs.append((("object", q), f'inline {name}& {name}::operator=({name}&& o) noexcept {{ if (kern_owned && kern_handle && !converted::g_keeping) '
+                                            f'converted::engine_call("{ends["type"]}", {{arg(*this)}}); {first}::operator=(std::move(o)); return *this; }}'))
             chunks.append((tree.place(tree.records[q]), ("object", q), "\n".join([f"struct {name} : {over} {{", *self.object_enums.get(q, []), *decls, "};"])))
         for f in free:
             d = f["decl"]
@@ -7850,7 +8372,8 @@ class TestWriter:
                         want_const(m["id"])
                 elif k == "CXXConstructExpr":
                     c = constructor_of(tree, x)   # (the constructor a value is made by is part of the source too)
-                    if c is not None:
+                    held = tree.owner.get(c["id"]) or "" if c is not None else ""
+                    if c is not None and not (held.startswith(ENGINE + "::") and u.engine_object(held)):   # (an object of the engine: its stand-in makes it)
                         want_function(c["id"])
         def scan_record(d):
             for base in d.get("bases", []) or []:
@@ -8319,7 +8842,13 @@ class TestWriter:
                     # a function of the Blueprint of a state: called on an object of the class whose fields that are
                     # variables are drawn - the Blueprint's variables start from the same values (converted::Variables)
                     state = self.state_helpers()
-                    decl_lines.append(f"s = {state['draw']}(draw);")
+                    if d.get("kind") == "CXXConstructorDecl":
+                        # its constructor: the one object made as the program makes it (static storage: zero, then
+                        # the constructor - converted::made_static); the variables begin as the Blueprint's do, as
+                        # an object is before its constructor makes anything of the engine (quiet_static)
+                        decl_lines += ["made.reset();", f"s = converted::quiet_static<{self.names[u.state]}>();"]
+                    else:
+                        decl_lines.append(f"s = {state['draw']}(draw);")
                 if owner and f.self_type is not None and not f.ctor and not static:
                     types.append(self.names[owner])
                     decl_lines.append(f"{types[-1]} a0 = {self.helpers(owner)}(draw);")
@@ -8374,12 +8903,15 @@ class TestWriter:
                 if owner and f.self_type is None and not f.ctor and not static and not f.state:
                     self.helpers(owner)   # (a method that does not use its object: called on one as its class makes it)
                 here = f"{ns}::"   # (by its full name: the test's own function, whatever its arguments are)
-                target = (f"{self.names[owner]}({args})" if f.ctor else f"{self.names[owner]}::{d['name']}({args})" if owner and static
+                state_made = f.state and d.get("kind") == "CXXConstructorDecl"
+                target = (f"{self.names[owner]}({args})" if f.ctor else f"made = converted::made_static<{self.names[owner]}>()" if state_made
+                          else f"{self.names[owner]}::{d['name']}({args})" if owner and static
                           else f"s->{d['name']}({args})" if f.state
                           else f"a0.{d['name']}({args})" if owner and f.self_type is not None else f"{self.names[owner]}{{}}.{d['name']}({args})" if owner else f"{here}{free or self.function_name(d)}({args})")
                 parts = {"self": "a0", "result": "r"}   # (what the call changed: run's own values, handed back as they are)
                 if f.state:
-                    parts["state"] = f"{state['struct']}{{s.get()}}"   # (the object after the call: all its variables are compared)
+                    # (the object after the call: all its variables are compared - of the constructor, the one it made)
+                    parts["state"] = f"{state['struct']}{{{'made' if state_made else 's'}.get()}}"
                 for place_ in f.refs:
                     parts[("ref", place_)] = f"a{place_}"
                 out_lines = []
@@ -8417,6 +8949,7 @@ class TestWriter:
                 f'    converted::Tally tally("{f.name}");',
                 "    converted::Draw draw;   // (every function its own arguments, the same in every run)",
                 *([f"    std::unique_ptr<{self.names[u.state]}> s;   // (the object of the state: drawn for every call)"] if f.state else []),
+                *([f"    std::unique_ptr<{self.names[u.state]}> made;   // (the one its constructor makes: compared after the call)"] if state_made else []),
                 f"    const auto run = [&]({', '.join(f'[[maybe_unused]] const {t}& {n}' if n in held_lists else f'[[maybe_unused]] {t} {n}' for t, n in zip(types, names))}) {{ {give} }};",
                 "    for (int i = 0; tally.more(i); ++i) {",
                 *[f"      {x}" for x in decl_lines],
@@ -8744,8 +9277,19 @@ def survey_one(job):
     tree = Tree(path, namespace, flags, spaces)
     me = os.path.abspath(path)
     functions, pointer_args, params_of = [], [], {}
+    defaulted, ending = set(), set()   # (World.defaulted, World.ending)
+    kinds = None   # (what the engine's classes are - Unit.engine_object -, asked when a call needs it)
     for i, d in tree.body.items():
-        if i != d["id"] or not d.get("_file") or d.get("kind") == "VarDecl" or d.get("isImplicit") or d.get("explicitlyDefaulted") or d.get("kind") == "CXXDestructorDecl":
+        if i != d["id"] or not d.get("_file") or os.path.abspath(d["_file"]) != me and not is_header(d["_file"]):
+            continue
+        if defaulted_maker(d) and tree.owner.get(d["id"]):
+            defaulted.add(tree.owner[d["id"]])
+        if ends_itself(d) and tree.owner.get(d["id"]):
+            ending.add(tree.owner[d["id"]])
+    for i, d in tree.body.items():
+        # (a constructor defined `= default` outside its class is C++'s own: a function only of the state - see main)
+        if (i != d["id"] or not d.get("_file") or d.get("kind") == "VarDecl" or d.get("isImplicit") or (d.get("explicitlyDefaulted") and not defaulted_maker(d))
+                or d.get("kind") == "CXXDestructorDecl"):
             continue
         file = os.path.abspath(d["_file"])
         if file != me and not is_header(file):
@@ -8772,17 +9316,23 @@ def survey_one(job):
                 # functions of numbers - should one be called as a function after all, its file says so: main)
                 if not own_function(tree, t["id"]) or (tree.scope_of.get(t["id"], "").startswith(ENGINE + "::") and (t.get("name") in MATH or t.get("name") in MORE_MATH)):
                     continue
+                if t.get("kind") == "CXXConstructorDecl" and (tree.owner.get(t["id"]) or "").startswith(ENGINE + "::"):
+                    if kinds is None:
+                        kinds = Unit(tree, "survey")
+                    if kinds.engine_object(tree.owner[t["id"]]):
+                        continue   # (an object of the engine is made by its node <class>.make: no function of a Blueprint)
                 calls.add(function_key(tree, t))
         a, b = d.get("_at", (None, None))
         functions.append({"key": function_key(tree, d), "file": file, "at": a or 0, "calls": sorted(calls), "lines": tree.text(d["_file"]).count("\n", a, b) + 1 if a is not None else 0,
-                          "name": Unit.cpp_name_of(tree, d), "owner": tree.owner.get(d["id"])})
+                          "name": Unit.cpp_name_of(tree, d), "owner": tree.owner.get(d["id"]), "defaulted": defaulted_maker(d)})
     types = [(q, os.path.abspath(o.get("_file") or "?")) for q, o in [*tree.records.items(), *tree.enums.items()] if o.get("_file")]
     statics, made = objects_made(tree)
     records = {q: {"file": os.path.abspath(tree.records[q].get("_file") or "?"), "bases": bool(tree.records[q].get("bases")),
                    "virtual": any(c.get("virtual") for c in kids(tree.records[q]))} for q in statics if q in tree.records}
     # (what a caller's own parameter hands on: by the caller's key and the parameter's place)
     pointer_args = [(key, k, ("param", *params_of[src[1]]) if isinstance(src, tuple) and src[1] in params_of else "other" if isinstance(src, tuple) else src) for key, k, src in pointer_args]
-    return {"path": path, "functions": functions, "types": types, "statics": statics, "made": made, "records": records, "pointer_args": pointer_args}
+    return {"path": path, "functions": functions, "types": types, "statics": statics, "made": made, "records": records, "pointer_args": pointer_args,
+            "defaulted": sorted(defaulted), "ending": sorted(ending)}
 
 
 def objects_made(tree):
@@ -8872,8 +9422,10 @@ def convert_unit(job):
         main_file = os.path.abspath(source or files[0])
         # its functions, in the order they stand in: those of a header first (a source file's Blueprint has
         # the functions of its header that need the source file), then the source file's
+        # (a constructor `= default` is C++'s own - but the one of a state: what runs when its Blueprint begins)
         mine = [d for i, d in tree.body.items() if i == d["id"] and d.get("_file") and d.get("kind") != "VarDecl"
-                and not (d.get("isImplicit") or d.get("explicitlyDefaulted") or d.get("kind") == "CXXDestructorDecl") and world.part_of_function(tree, d) == part]
+                and not (d.get("isImplicit") or (d.get("explicitlyDefaulted") and not (defaulted_maker(d) and tree.owner.get(d["id"]) in world.states))
+                         or d.get("kind") == "CXXDestructorDecl") and world.part_of_function(tree, d) == part]
         mine.sort(key=lambda d: (not is_header(d["_file"]), os.path.abspath(d["_file"]), d.get("_at", (0, 0))[0] or 0))
         # A function is written only when its test compares it: what the test cannot compare yet waits,
         # and with it what calls it - the file is converted again without those. And no input or local
@@ -9081,6 +9633,11 @@ def main(argv):
     # The classes there is one object of: each is the state of a Blueprint - no type (state_classes)
     world.states = state_classes(world, surveys)
     types = {(q, file) for q, file in types if q not in world.states}
+    # A constructor defined `= default` outside its class is C++'s own: what it makes is made where a value of
+    # the class is made (Emit.made_parts). Of a state it is a function - what runs when its Blueprint begins.
+    functions = {k: f for k, f in functions.items() if not f.get("defaulted") or f.get("owner") in world.states}
+    world.defaulted = {q for r in surveys for q in r["defaulted"]}
+    world.ending = {q for r in surveys for q in r["ending"]}
     # A header's function stands in the header's Blueprint when all it calls stands in headers too
     # (whoever includes the header has all of it); one that needs a source file - it calls what stands in
     # one - stands with the source file of the header's name.
@@ -9152,7 +9709,7 @@ def main(argv):
         w = World(files, flags, more)
         w.units, w.type_names, w.taken, w.nodes, w.function_units, w.source_units = world.units, world.type_names, world.taken, world.nodes, world.function_units, world.source_units
         w.actors, w.states, w.parts, w.part_numbers = world.actors, world.states, world.parts, world.part_numbers
-        w.pointer_lists = world.pointer_lists
+        w.pointer_lists, w.defaulted, w.ending = world.pointer_lists, world.defaulted, world.ending
         w.table = {k: e for d in need for k, e in tables.get(d, {}).items()}
         if test:   # (the pieces of their source their tests hand on: what the test of this one holds of them)
             w.closures, w.pieces = {}, {}
