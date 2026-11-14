@@ -10,17 +10,19 @@
 
 namespace sc {
 
-class WaterLook final : public kern::ShaderExtension {
+// Plain state with the functions of a shader extension: the renderer gets it as
+// LookExtension<WaterLook> (shader_look.h).
+class WaterLook final {
  public:
   f32 time = 0;  // seconds (uTime)
-  const char* name() const override { return "spawncity-water"; }
-  kern::Span<const kern::ExtensionAttribute> attributes() const override;
-  const char* vertex_declarations() const override;
-  const char* vertex() const override;
-  const char* fragment_declarations() const override;
-  const char* fragment_surface() const override;
-  void bind(const kern::Program& p) override;
-  void frame_uniforms(kern::UniformCache& cache, const kern::Renderer&) override;
+  const char* name() const { return "spawncity-water"; }
+  kern::Span<const kern::ExtensionAttribute> attributes() const;
+  const char* vertex_declarations() const;
+  const char* vertex() const;
+  const char* fragment_declarations() const;
+  const char* fragment_surface() const;
+  void bind(const kern::Program& p);
+  void frame_uniforms(kern::UniformCache& cache, const kern::Renderer&);
 
  private:
   u32 u_time_ = 0;
