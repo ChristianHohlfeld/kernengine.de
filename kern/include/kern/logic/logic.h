@@ -280,9 +280,11 @@ struct Value {
   /// "Damage": 25} -, written with every field; read, a field that is missing has its default.
   json::Value to_json(const struct Graph& g, std::string_view of) const;
   static Value from_json(const json::Value& j, PinType type, const struct Graph& g, std::string_view of);
-  /// The same for what a place is declared as (TypeRef). A list of a fixed length has that length:
-  /// read, what JSON does not say is the zero of its entries; written, it is said up to its last
-  /// entry that is not that zero (logic::said) - a buffer of 24000 zeros is [].
+  /// The same for what a place is declared as (TypeRef) - how a graph holds a default and a value
+  /// typed into a pin. A list of a fixed length (the place, a field of a struct) has that length:
+  /// read, what JSON does not say is the zero of its entries; written here, it is said up to its
+  /// last entry that is not that zero (logic::said) - a buffer of 24000 zeros is []. (to_json(g, of),
+  /// above, writes a value in full: every entry - what an inspector shows.)
   static Value from_json(const json::Value& j, const struct TypeRef& declared, const struct Graph& g);
   json::Value to_json(const struct Graph& g, const struct TypeRef& declared) const;
   bool operator==(const Value& o) const;

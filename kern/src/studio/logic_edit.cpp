@@ -1605,7 +1605,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       logic::Node* n = g.find(static_cast<u32>(num("node")));
       logic::PinDef p;
       if (!n || !pin_of(g, n->id, str("pin"), false, p)) { error = "no such input"; return false; }
-      n->set_value(p.id, logic::Value::from_json(c["value"], p.type, g, p.of).to_json(g, p.of));
+      n->set_value(p.id, logic::Value::from_json(c["value"], p.type, g, p.of).to_json(g, logic::TypeRef{p.type, p.of}));
       return true;
     });
   }
@@ -2479,9 +2479,10 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       if (!name_problem(g, base).empty()) base += "Value";
       std::string vname = base;
       for (int i = 2; g.variable(vname) || g.function(vname) || g.enumeration(vname) || g.structure(vname); ++i) vname = base + std::to_string(i);
-      logic::Variable v{vname, p.type, logic::zero_of({p.type, p.of}, g).to_json(g, p.of), {}, p.of};
+      const logic::TypeRef held{p.type, p.of};
+      logic::Variable v{vname, p.type, logic::zero_of(held, g).to_json(g, held), {}, p.of};
       if (!output)
-        if (const json::Value* lit = n->value(p.id)) v.value = logic::Value::from_json(*lit, p.type, g, p.of).to_json(g, p.of);
+        if (const json::Value* lit = n->value(p.id)) v.value = logic::Value::from_json(*lit, held, g).to_json(g, held);
       g.variables.push_back(v);
       logic::Node vn;
       vn.id = g.next_id++;

@@ -2986,7 +2986,7 @@ struct Reader {
     if (v.type != pin.type || src.of != pin.of)
       return fail(src.tok, "\"" + pin.id + "\" of " + node_name(m.def->type) + " is " + cpp_type(want) + ", this is " + cpp_type(TypeRef{v.type, src.of}) + " (a " + cpp_type(want) + " looks like " +
                                literal(zero_of(want, g), pin.of, g) + ")");
-    m.node.set_value(pin.id, v.to_json(g, pin.of));
+    m.node.set_value(pin.id, v.to_json(g, TypeRef{pin.type, pin.of}));
     return true;
   }
   /// Wires the exec outputs `from` to the exec input `in` of `node` ("": its first), or of the step go<id>.

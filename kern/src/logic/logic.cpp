@@ -365,11 +365,12 @@ std::size_t said_of(const Value& v, const TypeRef& t, const Graph& g, int depth)
   }
   return n;
 }
-/// A value as JSON, by what its place is declared as: a struct is an object of its fields by
-/// their names, a list of a fixed length is said up to its last entry that is not zero.
-json::Value written(const Value& v, const TypeRef& t, const Graph& g, int depth) {
+/// A value as JSON: a struct is an object of its fields by their names. `said`: as a default says
+/// it - a list of a fixed length (the place itself: `t`; a field of a struct) up to its last
+/// entry that is not zero; else in full, every entry.
+json::Value written(const Value& v, const TypeRef& t, const Graph& g, int depth, bool said) {
   const StructType* s = element_of(v.type) == PinType::structure && depth > 0 ? g.structure(t.of) : nullptr;
-  const std::size_t entries = is_list(v.type) ? said_of(v, t, g, depth) : 0;
+  const std::size_t entries = !is_list(v.type) ? 0 : said ? said_of(v, t, g, depth) : v.size();
   if (!s) {
     if (!is_list(v.type) || entries == v.size()) return v.to_json();
     json::Value arr = json::Value::array();
@@ -381,7 +382,7 @@ json::Value written(const Value& v, const TypeRef& t, const Graph& g, int depth)
     for (std::size_t k = 0; k < s->fields.size(); ++k) {
       const StructField& f = s->fields[k];
       const Value* held = x.field(k);
-      o.set(f.name, written(held ? *held : read_value(f.value, f.type, g, depth - 1), f.type, g, depth - 1));
+      o.set(f.name, written(held ? *held : read_value(f.value, f.type, g, depth - 1), f.type, g, depth - 1, said));
     }
     return o;
   };
@@ -417,8 +418,8 @@ bool value_of(const Value& v, const TypeRef& t, const Graph& g, int depth) {
 }
 }  // namespace
 
-json::Value Value::to_json(const Graph& g, std::string_view of) const { return written(*this, TypeRef{type, std::string(of)}, g, struct_depth(g)); }
-json::Value Value::to_json(const Graph& g, const TypeRef& declared) const { return written(*this, declared, g, struct_depth(g)); }
+json::Value Value::to_json(const Graph& g, std::string_view of) const { return written(*this, TypeRef{type, std::string(of)}, g, struct_depth(g), false); }
+json::Value Value::to_json(const Graph& g, const TypeRef& declared) const { return written(*this, declared, g, struct_depth(g), true); }
 Value Value::from_json(const json::Value& j, PinType t, const Graph& g, std::string_view of) { return read_value(j, {t, std::string(of)}, g, struct_depth(g)); }
 
 Value zero_of(const TypeRef& t, const Graph& g) {
