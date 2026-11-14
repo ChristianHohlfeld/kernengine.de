@@ -6487,7 +6487,7 @@ class TestWriter:
                     raise Wait(f"the class {q.split('::')[-1]} of the state is not part of the test")
                 t, key = self.names[q], re.sub(r"\W", "_", q.strip(":"))
                 info = {"draw": f"draw_state_{key}", "variables": f"variables_{key}", "struct": f"State_{key}"}
-                draws, values, checks, texts, fine = [], [], [], [], []
+                draws, values, checks, texts, fine, missing = [], [], [], [], [], []
                 for c in kids(self.tree.records[q]):
                     if c.get("kind") != "FieldDecl" or not c.get("name"):
                         continue
@@ -6509,13 +6509,17 @@ class TestWriter:
                             spelled = self.spell(ft)
                             draws.append(f"  s->{c['name']} = {self.draw(ft)};")
                             of = lambda o, f=c["name"], sp=spelled: self.wrap(f"{o}{f}", sp)
-                        self.result_ok(re.sub(r"\s*\[\d+\]", "", ft) if m is None else m.group(1))
+                        if not self.u.object_of(ft):   # (an object of the engine: a stand-in, by its handle)
+                            self.result_ok(ft if m is None else m.group(1))
                     except Wait as w:
-                        raise Wait(f"the test has no values of the variable {variable} of {self.u.name}: {w}")
+                        missing.append(f"{variable} ({w})")
+                        continue
                     values.append(f'{{"{variable}", arg({of("s.")})}}')
                     checks.append(f"same({of('w.s->')}, (*got.rows)[{len(checks)}])")
                     fine.append(f"defined({of('w.s->')})")
                     texts.append(f'"{variable} = " + text({of("w.s->")})')
+                if missing:   # (every variable is set and compared: one the test has no values of, and it cannot compare any)
+                    raise Wait(f"the test has no values of the variables of {self.u.name}: {'; '.join(missing)}")
                 n = len(values)
                 self.helped[("state", q)] = [
                     f"[[maybe_unused]] static std::unique_ptr<{t}> {info['draw']}(converted::Draw& draw) {{",
@@ -7610,7 +7614,8 @@ class TestWriter:
                 elif hl and ("helper", q) not in dropped:
                     made = self.made.get(q)
                     hl = hl if not made or ("member", made[0]) not in dropped else [hl[0], made[1], *hl[2:]]
-                    spaces = self.names[q].split("::")[:-1] if top_of(q) == q else []
+                    # (where the class's compiled text stands: its helpers next to it, for a call from converted.h)
+                    spaces = classes_of(top_of(q).rsplit("::", 1)[0] + "::") if "::" in top_of(q) else []
                     if spaces:   # (of a class in a namespace: there, where a call from converted.h looks for them)
                         hl = [*hl[:-5], "".join(f"namespace {c} {{ " for c in spaces) + "using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;",
                               *hl[-5:], "}" * len(spaces)]
