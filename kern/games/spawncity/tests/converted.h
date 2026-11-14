@@ -80,7 +80,10 @@ using kern::u8;
 struct Num32 {
   float v = 0;
   constexpr Num32() = default;
-  constexpr Num32(double x) : v(static_cast<float>(x)) {}
+  // (explicit: read, a component is a number - `c ? p.x : 0.5` is a number, as in the Blueprint; what is
+  // written into one is brought to 32 bit)
+  constexpr explicit Num32(double x) : v(static_cast<float>(x)) {}
+  constexpr Num32& operator=(double x) { v = static_cast<float>(x); return *this; }
   constexpr operator double() const { return static_cast<double>(v); }
   constexpr Num32& operator+=(double x) { return *this = Num32(static_cast<double>(v) + x); }
   constexpr Num32& operator-=(double x) { return *this = Num32(static_cast<double>(v) - x); }
@@ -348,6 +351,12 @@ struct EngineObject {
   long long kern_handle = 0;
   bool kern_owned = false;
   EngineObject() = default;
+  /// One the source makes with what the engine's class is made with, where it has no constructor of its
+  /// own (`kern::LightPool lights{kMaxPointLights, 96}`, a field of a class compiled along): the stand-in
+  /// answers what the source asks it, whatever it was made with.
+  template <class A, class... B>
+    requires(!std::is_base_of_v<EngineObject, std::remove_cvref_t<A>>)
+  explicit EngineObject(const A&, const B&...) {}
   EngineObject(const EngineObject& o) : kern_handle(o.kern_handle), kern_owned(true) {}
   EngineObject& operator=(const EngineObject& o) {
     kern_handle = o.kern_handle;
@@ -442,6 +451,12 @@ template <class A, class B> bool defined(const std::pair<A, B>& p);
 template <class A, class B> std::string text(const std::pair<A, B>& p);
 /// Entries the test keeps for a view to see (a drawn view, one the engine's stand-in gave): kept to the end.
 template <class U> wide::Span<const U> kept_span(std::vector<U> entries) {
+  static std::deque<std::vector<U>> kept;
+  kept.push_back(std::move(entries));
+  return {kept.back().data(), kept.back().size()};
+}
+/// The same for a view through which the entries are changed.
+template <class U> wide::Span<U> kept_span_changed(std::vector<U> entries) {
   static std::deque<std::vector<U>> kept;
   kept.push_back(std::move(entries));
   return {kept.back().data(), kept.back().size()};
@@ -778,7 +793,7 @@ template <class E>
 void take(E& to, const Value& v) { to = static_cast<E>(v.i); }
 template <class T>
   requires std::is_base_of_v<EngineObject, T>
-void take(T*& to, const Value& v) { to = engine_object<T>(v.as_int()); }
+void take(T*& to, const Value& v) { to = engine_object<std::remove_const_t<T>>(v.as_int()); }   // (one the source may only read: the same object)
 template <class T>
   requires std::is_base_of_v<EngineObject, T>
 void take(T& to, const Value& v) { to = *engine_object<T>(v.as_int()); }
@@ -953,6 +968,11 @@ inline void class_runs(bool begins) {
   }
 }
 
+/// A value as the Blueprint gets it - where a stand-in of the engine passes it on, whose class may have a
+/// function of its own called `arg` (Engine::arg): found as everywhere else (and a struct of the test by its
+/// own helpers).
+template <class T> Value value_of(const T& x) { return arg(x); }
+
 /// Is what the Blueprint gives this very value, bit for bit? (Numbers by their bits; a struct, a list, a map
 /// entry for entry.)
 inline bool same_value(const Value& a, const Value& b) {
@@ -1115,6 +1135,9 @@ struct Blueprint {
 
 // ---- the Blueprint of a state (a class of the program there is one object of: its fields are the
 // Blueprint's variables, its methods the Blueprint's functions) ----
+/// Of a Blueprint of a state whose test holds none of its methods - only free functions that share the
+/// program's variables: no object (the variables are the program's own).
+struct NoObject {};
 /// The variables as the source's object has them before a call: by name, as the Blueprint holds them.
 using Variables = std::vector<std::pair<const char*, Value>>;
 /// Is this a variable of the Blueprint that a call may change? (A field whose variable no part of the
