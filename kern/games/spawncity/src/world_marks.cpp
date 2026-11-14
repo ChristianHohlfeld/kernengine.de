@@ -60,18 +60,19 @@ void Marks::blast(Vec3 at, f32 r, f32 strength, CityStream& city, kern::physics:
 }
 
 void Marks::add_soot(Vec3 at, f32 r, const std::vector<CityStream::Wall>& walls, const Terrain& t, Rng& rng) {
-  struct C { const CityStream::Wall* w; f32 u, d; };
+  struct C { std::size_t w; f32 u, d; };  // the wall (its index in `walls`), along it, off it
   std::vector<C> cand;
-  for (const CityStream::Wall& wl : walls) {
+  for (std::size_t i = 0; i < walls.size(); ++i) {
+    const CityStream::Wall& wl = walls[i];
     const f32 rx = at.x - wl.a.x, ry = at.y - wl.a.y, u = rx * wl.dir.x + ry * wl.dir.y, side = rx * wl.normal.x + ry * wl.normal.y;
     if (side <= 0.05f || u < 0 || u > wl.len) continue;
-    if (side < r * 0.55f) cand.push_back({&wl, u, side});
+    if (side < r * 0.55f) cand.push_back({i, u, side});
   }
   std::stable_sort(cand.begin(), cand.end(), [](const C& a, const C& b) { return a.d < b.d; });
   i32 placed = 0;
   for (const C& c : cand) {
     if (placed >= 2) break;
-    const CityStream::Wall& wl = *c.w;
+    const CityStream::Wall& wl = walls[c.w];
     const Vec2 p = wl.a + wl.dir * c.u;
     const f32 ground = t.height(p.x + wl.normal.x * 0.3f, p.y + wl.normal.y * 0.3f);
     // clipped to the wall: never wider than it, never above the roof edge
@@ -92,18 +93,19 @@ void Marks::add_soot(Vec3 at, f32 r, const std::vector<CityStream::Wall>& walls,
 }
 
 void Marks::add_breach(Vec3 at, f32 r, f32 strength, const std::vector<CityStream::Wall>& walls, const Terrain& t, kern::physics::World& w, Rng& rng, f32 now) {
-  struct C { const CityStream::Wall* w; f32 u, d; };
+  struct C { std::size_t w; f32 u, d; };  // the wall (its index in `walls`), along it, off it
   std::vector<C> cand;
-  for (const CityStream::Wall& wl : walls) {
+  for (std::size_t i = 0; i < walls.size(); ++i) {
+    const CityStream::Wall& wl = walls[i];
     const f32 rx = at.x - wl.a.x, ry = at.y - wl.a.y, u = rx * wl.dir.x + ry * wl.dir.y, side = rx * wl.normal.x + ry * wl.normal.y;
     if (side <= -0.3f || u < 0 || u > wl.len) continue;
-    if (side < r * 0.5f) cand.push_back({&wl, u, std::fmax(0.0f, side)});
+    if (side < r * 0.5f) cand.push_back({i, u, std::fmax(0.0f, side)});
   }
   std::stable_sort(cand.begin(), cand.end(), [](const C& a, const C& b) { return a.d < b.d; });
   i32 placed = 0;
   for (const C& c : cand) {
     if (placed >= 2) break;
-    const CityStream::Wall& wl = *c.w;
+    const CityStream::Wall& wl = walls[c.w];
     const Vec2 foot = wl.a + wl.dir * c.u;
     const f32 ground = t.height(foot.x + wl.normal.x * 0.3f, foot.y + wl.normal.y * 0.3f);
     const f32 zc = std::fmin(std::fmax(at.z, ground + 0.4f), wl.top - 0.3f);
@@ -112,10 +114,11 @@ void Marks::add_breach(Vec3 at, f32 r, f32 strength, const std::vector<CityStrea
     const u64 cell = (static_cast<u64>(wl.seed) << 32) ^ (static_cast<u64>(wl.edge) << 20) ^ (static_cast<u64>(static_cast<u32>(std::lround(c.u / 2))) << 10) ^
                      static_cast<u64>(static_cast<u32>(std::lround(zc / 2)));
     const f32 hit = std::fmax(0.15f, strength * (1 - c.d / (r * 0.5f)));
-    WallMark* m = nullptr;
-    for (WallMark& b : breaches_)
-      if (b.cell == cell) { m = &b; break; }
-    if (!m) {
+    // the patch's mark: the one it has, or a new one in the ring
+    i32 at_mark = -1;
+    for (std::size_t i = 0; i < breaches_.size(); ++i)
+      if (breaches_[i].cell == cell) { at_mark = static_cast<i32>(i); break; }
+    if (at_mark < 0) {
       WallMark nb;
       nb.cell = cell;
       nb.breach = true;
@@ -124,10 +127,11 @@ void Marks::add_breach(Vec3 at, f32 r, f32 strength, const std::vector<CityStrea
       nb.n = wl.normal;
       nb.d = wl.dir;
       ring_put(breaches_, breach_cursor_, kBreaches, nb);
-      m = &breaches_[(breach_cursor_ - 1) % kBreaches];
+      at_mark = static_cast<i32>((breach_cursor_ - 1) % kBreaches);
     }
-    m->level = std::fmin(1.0f, m->level + hit * 0.45f);
-    m->size = std::fmax(0.35f, std::fmin(std::fmin(r * (0.18f + 0.22f * m->level), c.u + 0.6f), std::fmin(wl.len - c.u + 0.6f, (wl.top - ground) * 0.6f)));
+    WallMark& m = breaches_[at_mark];
+    m.level = std::fmin(1.0f, m.level + hit * 0.45f);
+    m.size = std::fmax(0.35f, std::fmin(std::fmin(r * (0.18f + 0.22f * m.level), c.u + 0.6f), std::fmin(wl.len - c.u + 0.6f, (wl.top - ground) * 0.6f)));
     spawn_rubble({foot.x + wl.normal.x * 0.5f, foot.y + wl.normal.y * 0.5f, zc}, wl.normal, static_cast<i32>(std::lround(2 + 5 * hit)), w, rng, now);
     ++placed;
   }
@@ -158,10 +162,11 @@ void Marks::spawn_rubble(Vec3 at, Vec2 n, i32 count, kern::physics::World& w, Rn
     if (rubble_.size() < kRubble) rubble_.push_back(c);
     else {
       // full: the oldest chunk (the soonest to expire) makes room
-      Chunk* old = &rubble_[0];
-      for (Chunk& x : rubble_) if (x.until < old->until) old = &x;
-      if (old->body.valid() && w.body_valid(old->body)) w.destroy_body(old->body);
-      *old = c;
+      std::size_t oldest = 0;
+      for (std::size_t i = 0; i < rubble_.size(); ++i) if (rubble_[i].until < rubble_[oldest].until) oldest = i;
+      Chunk& old = rubble_[oldest];
+      if (old.body.valid() && w.body_valid(old.body)) w.destroy_body(old.body);
+      old = c;
     }
   }
 }

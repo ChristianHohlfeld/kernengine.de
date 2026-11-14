@@ -3244,7 +3244,7 @@ class Emit:
         s = stmts[i]
         if s.get("kind") != "DeclStmt":
             return
-        for v in kids(s):
+        for v in list(kids(s)):
             raw = qtype(v)
             if v.get("kind") not in ("VarDecl", "DecompositionDecl") or self.init_of(v) is None or "&" not in raw or "&&" in raw or v.get("id") in self.named_places or self.u.object_of(raw):
                 continue
@@ -3252,6 +3252,7 @@ class Emit:
             if self.lambda_of(init) is not None:
                 continue
             target, root, own = self.unwrap(init), None, False
+            picks = []   # (the index or key of each entry the place goes through: where it stands in its node)
             while target is not None:   # (the variable the place is a part of - or the object of the method itself)
                 target = bare(target)
                 if target.get("kind") == "DeclRefExpr":
@@ -3260,9 +3261,13 @@ class Emit:
                 if target.get("kind") == "CXXThisExpr":
                     own = True
                     break
+                if target.get("kind") == "ArraySubscriptExpr" and len(kids(target)) == 2:
+                    picks.append((target, 1))
                 if target.get("kind") in ("MemberExpr", "ArraySubscriptExpr", "ImplicitCastExpr") and kids(target):
                     target = kids(target)[0]
                 elif target.get("kind") == "CXXOperatorCallExpr" and callee_name(target) in ("operator[]", "operator*", "operator->") and len(kids(target)) >= 2:
+                    if callee_name(target) == "operator[]" and len(kids(target)) == 3:
+                        picks.append((target, 2))
                     target = kids(target)[1]   # (an entry of a list, a map's value - and what an owned value holds: *life_)
                 elif target.get("kind") == "UnaryOperator" and target.get("opcode") == "*" and kids(target):
                     target = kids(target)[0]
@@ -3274,8 +3279,30 @@ class Emit:
             changed = self.assigned(rest)
             if re.search(r"\bconst\b", raw) and not own and root not in changed:
                 continue
-            if (self.reads(init) - {root}) & self.changed_while_named(stmts[i + 1:], v["id"]):
-                raise Wait("a reference to an entry at a place that changes while the reference lives")
+            later = self.changed_while_named(stmts[i + 1:], v["id"])
+            if (self.reads(init) - {root}) & later or any(self.steps_in(kids(node)[at]) for node, at in picks):
+                # C++ finds the entry once, where the reference is bound: an index or key that may change while the
+                # reference lives - or that makes a step (rng.next() % n) - is worked out there, into a local variable
+                # of its own (a whole number, as the address C++ keeps); the place names the entry by it
+                for node, at in picks:
+                    pick = kids(node)[at]
+                    if not (self.reads(pick) & later or self.steps_in(pick)):
+                        continue
+                    self.picked = getattr(self, "picked", 0) + 1
+                    pid = f"{v['id']}_at{self.picked}"
+                    pt = {"qualType": qtype(pick) or "long"}
+                    decl = {"kind": "VarDecl", "id": pid, "name": f"{v.get('name', 'ref')}_at", "type": dict(pt), "init": "c",
+                            "_file": v.get("_file", ""), "_at": v.get("_at", (None, None)), "inner": [pick]}
+                    ref = {"kind": "ImplicitCastExpr", "castKind": "LValueToRValue", "type": dict(pt), "valueCategory": "prvalue",
+                           "inner": [{"kind": "DeclRefExpr", "type": dict(pt), "valueCategory": "lvalue",
+                                      "referencedDecl": {"id": pid, "kind": "VarDecl", "name": decl["name"], "type": dict(pt)}}]}
+                    inner = [c for c in node["inner"]]
+                    real = [c for c in inner if isinstance(c, dict) and c.get("kind") and not c["kind"].endswith("Comment") and not c["kind"].endswith("Attr")]
+                    node["inner"][inner.index(real[at])] = ref
+                    s["inner"].insert(s["inner"].index(v), decl)
+                    self.tree.decl[pid] = decl
+                if (self.reads(init) - {root}) & later:
+                    raise Wait("a reference to an entry at a place that changes while the reference lives")
             if v.get("kind") == "DecompositionDecl":   # (auto& [a, b] = place; - a and b are parts of the place)
                 self.bind(v, self.tp(init))
             for n in walk(rest):
@@ -3285,6 +3312,11 @@ class Emit:
             self.named_places.add(v["id"])
 
     named_places = frozenset()
+
+    def steps_in(self, n):
+        """Does working out this expression change something (a call that changes its object or what it is
+        handed, an assignment, ++)?"""
+        return bool(self.assigned(n))
 
     def changed_while_named(self, stmts, vid):
         """What the statements change while a name declared before them is still used: all they change up to
@@ -3729,8 +3761,8 @@ class Emit:
                     self.note_home(v["id"], init, of_pair=True)
                     out += self.take_pre() + [f"{name} = {text};"]
                     continue
-                if v.get("kind") in ("UsingDirectiveDecl", "UsingDecl", "TypeAliasDecl", "TypedefDecl", "StaticAssertDecl", "EnumDecl"):
-                    continue   # (a name for what the compiler has resolved; an enum: a type like any other, or - without a name - numbers)
+                if v.get("kind") in ("UsingDirectiveDecl", "UsingDecl", "TypeAliasDecl", "TypedefDecl", "StaticAssertDecl", "EnumDecl", "NamespaceAliasDecl"):
+                    continue   # (a name for what the compiler has resolved - a type, a namespace; an enum: a type like any other, or - without a name - numbers)
                 if v.get("kind") == "CXXRecordDecl" and v.get("_q") in self.tree.local_types:
                     continue   # (a type of the function's own: a struct of the program, declared where it is first used)
                 if v.get("kind") != "VarDecl":
@@ -5235,6 +5267,12 @@ class Emit:
             if b.get("kind") == "MemberExpr" and (self.is_this(kids(b)[0]) or not b.get("isArrow")):
                 b = self.unwrap(kids(b)[0])
                 continue
+            if b.get("kind") == "MemberExpr" and b.get("isArrow") and kids(b) and self.is_box(kids(b)[0]):
+                b = self.unwrap(kids(b)[0])   # (p->list: the list in what an owned value holds - its one entry)
+                continue
+            if self.box(b) is not None:   # (*p: what an owned value holds - named as p is)
+                b = self.unwrap(self.box(b))
+                continue
             raise Wait("an iterator kept into a list at a place that is computed")
 
     def note_home(self, decl_id, source, of_pair=False):
@@ -5966,6 +6004,66 @@ class Emit:
             after.append(lambda: self.store(n, self.typed(held, t)))
         return held
 
+    def chosen_place(self, g, args, obj):
+        """`f(c ? a : b)`, where f takes a reference: the argument is one of two places, which one the condition
+        says when the call is made. The call is made on that place - `if (c) f(a) else f(b)`, the condition
+        worked out first, as C++ does it before the call -: nothing is copied in or out. (A const reference to
+        a number reads its value: that is the value of the choice.) None: no argument of the call is such a choice."""
+        method = g.self_type is not None and not g.ctor
+        on_other = method and obj is not None and not self.is_this(obj)
+        given = ([obj] if on_other else []) + list(args)
+        for idx, a in enumerate(given):
+            b = self.unwrap(a)
+            if b.get("kind") != "ConditionalOperator" or b.get("valueCategory") != "lvalue":
+                continue
+            k = self.input_kind(g, len(args), idx - 1 if on_other else idx, on_other and idx == 0)
+            if k not in ("ref", "const"):
+                continue
+            t = self.tp(b)
+            if k == "const" and t in ("Int", "Float", "Bool", "Vector"):
+                continue
+            c, x, y = kids(b)
+            which = self.bx(c)
+            if not re.fullmatch(r"\w+", which):
+                held = self.temp("which", "Bool")
+                self.hoist([f"{held} = {which};"])
+                which = held
+            def one(branch):
+                rest = [branch if n is a else n for n in given]
+                o, r = (rest[0], rest[1:]) if on_other else (obj, rest)
+                return self.lazily(lambda: self.invoke(g, r, obj=o))
+            (px, (tx, gx)), (py, (ty, _)) = one(x), one(y)
+            if tx is None:
+                self.hoist([f"if ({which}) {{", *["  " + ln for ln in px], "} else {", *["  " + ln for ln in py], "}"])
+                return None, None
+            out = self.temp("chosen", gx)
+            self.hoist([f"if ({which}) {{", *["  " + ln for ln in px + [f"{out} = {tx};"]], "} else {", *["  " + ln for ln in py + [f"{out} = {ty};"]], "}"])
+            return out, gx
+        return None
+
+    @staticmethod
+    def input_kind(g, count, idx, is_object):
+        """What kind of input of g the idx-th of a call's `count` arguments is - its object, when `is_object` -:
+        "ref", "const" or None (a value, the logic, a pointer into a list) - as invoke matches them."""
+        if is_object:
+            return g.kinds[0]
+        first = 1 if g.self_type is not None and not g.ctor else 0
+        j = 0
+        for i in range(count):
+            if i in g.logic:
+                if i == idx:
+                    return None
+                continue
+            if first + j in g.pointers:
+                if i == idx:
+                    return None
+                j += 2
+                continue
+            if i == idx:
+                return g.kinds[first + j] if first + j < len(g.kinds) else None
+            j += 1
+        return None
+
     def may_raise(self, g, seen=None):
         """May the function run handlers while it runs - does it call on an actor's Blueprint, itself or
         through what it calls?"""
@@ -6240,6 +6338,16 @@ class Emit:
                 raise Wait("an entry of something that is not a list is set")
             before, var, after = self.variable_of(base, lt)
             return before + [f"{var}[{self.ex(idx, 'Int')}] = {value(lt[5:-1])};"] + after
+        if k == "ConditionalOperator" and t.get("valueCategory") == "lvalue":
+            # (c ? a : b) = v: the value first (C++ sequences the right of = before its left), then the condition
+            # picks the place that gets it
+            c, x, y = kids(t)
+            vt = self.tp(t)
+            put = self.temp("put", vt)
+            lines = [f"{put} = {value(vt)};"]
+            pc, which = self.lazily(lambda: self.bx(c))
+            (px, lx), (py, ly) = (self.lazily(lambda w=w: self.store(w, lambda _t: put)) for w in (x, y))
+            return lines + pc + [f"if ({which}) {{", *["  " + ln for ln in px + lx], "} else {", *["  " + ln for ln in py + ly], "}"]
         raise Wait(f"an assignment to {k}")
 
     def invoke(self, g, args, obj=None):
@@ -6247,6 +6355,9 @@ class Emit:
         (None, None). What it changes - its object, what it writes through its parameters - it changes
         where it stands: the call names those places (place_arg). A function that changes something is
         called by a step before the statement being written."""
+        chosen = self.chosen_place(g, args, obj)
+        if chosen is not None:
+            return chosen
         self.f.calls.append(g)
         self.f.indexes = self.f.indexes or g.indexes
         if g.state and g.mutates and self.f.state and not self.f.mutates:
@@ -6866,7 +6977,7 @@ class Emit:
             if op in COMPARE and self.numeric(x) and self.numeric(y):
                 return f"({self.fx(x, leaves)} {op} {self.fx(y, leaves)})"
             if op in ("&&", "||"):
-                return f"({self.fx(x, leaves)} {op} {self.sometimes(lambda: self.fx(y, leaves))})"
+                return self.guarded(b, leaves, lambda: f"({self.fx(x, leaves)} {op} {self.sometimes(lambda: self.fx(y, leaves))})")
             if op in ("&", "|", "^"):
                 return f"kern::math::{'band' if op == '&' else 'bor' if op == '|' else 'bxor'}({self.fx(x, leaves)}, {self.fx(y, leaves)})"
             if op in ("<<", ">>") and bare(y).get("kind") != "IntegerLiteral" and not (bare(y).get("kind") in CAST and kids(bare(y)) and bare(kids(bare(y))[-1]).get("kind") == "IntegerLiteral"):
@@ -6892,7 +7003,7 @@ class Emit:
                 return f"kern::math::wrap32({shifted})" if self.ctype(b) in UNSIGNED else f"kern::math::wrap32s({shifted})"
         if k == "ConditionalOperator":
             c, x, y = kids(b)
-            return f"({self.fb(c, leaves)} ? {self.sometimes(lambda: self.fx(x, leaves))} : {self.sometimes(lambda: self.fx(y, leaves))})"
+            return self.guarded(b, leaves, lambda: f"({self.fb(c, leaves)} ? {self.sometimes(lambda: self.fx(x, leaves))} : {self.sometimes(lambda: self.fx(y, leaves))})")
         if self.formula_function(b):
             name = callee_name(b)
             if name == "hash_u32" and len(kids(b)) == 2:   # kern::hash_u32 (lowbias32), step by step
@@ -6942,13 +7053,39 @@ class Emit:
                 return f"(kern::math::sign({args[0]}) * kern::math::pow(kern::math::abs({args[0]}), 0.3333333333333333))"
         return self.leaf(b, leaves)
 
+    def guarded(self, b, leaves, inline, flag=False):
+        """A part of a formula that C++ does not always evaluate (c ? x : y, a && b, a || b), written in the
+        formula - or, where a part of it that may not run makes a step of its own (a call that changes
+        something), worked out before the formula by an if (chosen, either) that makes the step only when
+        C++ evaluates that part; its value is then a leaf of the formula. (Inside a part that does not
+        always run itself, the outer part does this.)"""
+        mark, kept = len(self.pre), list(leaves.items())
+        try:
+            return inline()
+        except Hoists:
+            if not ENGINE_NODES or self.cond_depth:
+                raise
+            del self.pre[mark:]
+            leaves.clear()
+            leaves.update(kept)
+        if b.get("kind") == "ConditionalOperator":
+            c, x, y = kids(b)
+            t = self.tp(b)
+            text, t = self.chosen(self.bx(c), x, y, t)
+        else:
+            x, y = kids(b)
+            text, t = self.either(b["opcode"], self.bx(x), y)
+        if flag:
+            return f"({self.leaf(None, leaves, self.conv(text, t, 'Float'))} != 0.0)"
+        return self.leaf(None, leaves, text if t == "Float" else self.conv(text, t, "Float"))
+
     def fb(self, n, leaves):
         b = bare(n)
         k = b.get("kind")
         if k == "BinaryOperator" and b.get("opcode") in COMPARE + ("&&", "||") and all(self.numeric(c) for c in kids(b)):
             x, y = kids(b)
             if b["opcode"] in ("&&", "||"):
-                return f"({self.fb(x, leaves)} {b['opcode']} {self.sometimes(lambda: self.fb(y, leaves))})"
+                return self.guarded(b, leaves, lambda: f"({self.fb(x, leaves)} {b['opcode']} {self.sometimes(lambda: self.fb(y, leaves))})", flag=True)
             return f"({self.fx(x, leaves)} {b['opcode']} {self.fx(y, leaves)})"
         if k == "UnaryOperator" and b.get("opcode") == "!":
             return f"(!{self.fb(kids(b)[0], leaves)})"
