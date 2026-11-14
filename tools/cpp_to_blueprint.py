@@ -528,13 +528,13 @@ class Tree:
 
 
 def enum_underlying(values):
-    """The type an enum that names none is held as: the first of int, unsigned int, long, unsigned long
-    that has all its values (as the compilers the program is built with choose it)."""
+    """The type an enum that names none is held as, as the compilers the program is built with choose it:
+    without a negative value the first of unsigned int, unsigned long that has all its values; with one,
+    the first of int, long."""
     lo, hi = min(values, default=0), max(values, default=0)
-    for name, a, b in (("int", -2 ** 31, 2 ** 31 - 1), ("unsigned int", 0, 2 ** 32 - 1), ("long", -2 ** 63, 2 ** 63 - 1)):
-        if a <= lo and hi <= b:
-            return name
-    return "unsigned long"
+    if lo >= 0:
+        return "unsigned int" if hi < 2 ** 32 else "unsigned long"
+    return "int" if -2 ** 31 <= lo and hi < 2 ** 31 else "long"
 
 
 def enum_numbers(enum_decl):
