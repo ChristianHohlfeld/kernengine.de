@@ -47,12 +47,12 @@ bool CombatArt::init(kern::Renderer& r) {
     }
     Part& p = parts_[i];
     p.id = r.allocate_id();
-    kern::MeshInput in = meshes[i].as_input(kern::kMaxExtensionAttributes);
-    in.material = m;
-    in.visible = false;
+    kern::MeshLook look;
+    look.material = m;
+    look.extra_slot = kern::kMaxExtensionAttributes;
+    look.visible = false;
     static const Mat4 parked = Mat4::translate({0, 0, -1000});
-    in.transforms = kern::Span<const f32>(parked.m, 16);
-    if (!r.upsert(p.id, in)) { r.release_id(p.id); p.id = 0; return false; }
+    if (!kern::upsert(r, p.id, meshes[i], look, kern::Span<const f32>(parked.m, 16))) { r.release_id(p.id); p.id = 0; return false; }
   }
   return true;
 }

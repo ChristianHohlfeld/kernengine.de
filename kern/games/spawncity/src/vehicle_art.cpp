@@ -32,12 +32,12 @@ kern::Material mat(f32 roughness, f32 metalness = 0, Vec3 emissive = {}) {
 bool VehicleArt::make(kern::Renderer& r, Part& p, const MeshData& mesh, const kern::Material& m, bool tinted) {
   p.id = r.allocate_id();
   p.tinted = tinted;
-  kern::MeshInput in = mesh.as_input(kern::kMaxExtensionAttributes);
-  in.material = m;
-  in.visible = false;
+  kern::MeshLook look;
+  look.material = m;
+  look.extra_slot = kern::kMaxExtensionAttributes;
+  look.visible = false;
   static const Mat4 parked = Mat4::translate({0, 0, -1000});  // hidden until the first frame places it
-  in.transforms = kern::Span<const f32>(parked.m, 16);
-  if (!r.upsert(p.id, in)) { r.release_id(p.id); p.id = 0; return false; }
+  if (!kern::upsert(r, p.id, mesh, look, kern::Span<const f32>(parked.m, 16))) { r.release_id(p.id); p.id = 0; return false; }
   return true;
 }
 

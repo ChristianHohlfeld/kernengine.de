@@ -950,14 +950,25 @@ class Unit:
             q = self.find_type(self.clean(r).replace("const ", "").strip())
         except Wait:
             return None
-        if q is None or not q.startswith(ENGINE + "::") or q not in self.tree.records or q in (ENGINE + "::Vec3", ENGINE + "::Vec2"):
+        if q is None or not self.engine_object(q):
             return None
+        self.objects_seen.add(q)
+        return q
+
+    def engine_object(self, q):
+        """Is the class `q` of the engine an object with a life of its own (a handle in a Blueprint), not
+        plain data? A `class` is one (its state is its own: the engine's convention), and so is a struct
+        that cannot be a struct of the Blueprint (a pointer in it, a field without a Blueprint type).
+        Api.opaque asks the same."""
+        if not q.startswith(ENGINE + "::") or q not in self.tree.records or q in (ENGINE + "::Vec3", ENGINE + "::Vec2"):
+            return False
+        if self.tree.records[q].get("tagUsed") == "class":
+            return True
         try:
             self.struct(q)
-            return None   # (plain data: a struct of the Blueprint)
+            return False   # (plain data: a struct of the Blueprint)
         except Wait:
-            self.objects_seen.add(q)
-            return q
+            return True
 
     def engine_table(self):
         """The engine's nodes as the engine has them (kern/src/logic/engine_api.gen.cpp): type -> (is it a
@@ -5585,16 +5596,7 @@ class Api:
 
     def opaque(self, q):
         """Is this class an object of the engine with a life of its own (a handle in a Blueprint)?"""
-        d = self.tree.records.get(q)
-        if d is None or not q.startswith(ENGINE + "::") or q in (ENGINE + "::Vec3", ENGINE + "::Vec2"):
-            return False
-        if d.get("tagUsed") == "class":
-            return True
-        try:
-            self.u.struct(q)
-            return False
-        except Wait:
-            return True
+        return self.u.engine_object(q)
 
     def handed(self, raw):
         """How a parameter is handed over: (its Blueprint type, does the function write through it, the
@@ -5728,18 +5730,21 @@ class Api:
                 ins.append((name_of("self"), st, None))
                 if not const:
                     outs.append(("self", st, None))
+        changes = False   # (an object of the engine it is handed to change - Renderer&, physics::World*: a step)
         for i, p in enumerate(x for x in kids(d) if x.get("kind") == "ParmVarDecl"):
             bt, writes, handle = self.handed(qtype(p))
             name = name_of(p.get("name") or f"value{i + 1}")
             ins.append((name, bt, handle))
             if writes:
                 outs.append((name, bt, None))
+            if handle and re.search(r"(&|\*\s*(const)?)$", qtype(p).strip()) and not re.match(r"const\b", qtype(p).strip()):
+                changes = True
         ret = qtype(d).split("(")[0].strip()
         if ret != "void":
             bt, _, handle = self.handed(ret)
             outs.insert(0, ("result", bt, handle))
         qualified = self.home(d) + "::" + d["name"]
-        value = ret != "void" and len(outs) == 1 and (const or not method) and qualified not in ENGINE_STEPS
+        value = ret != "void" and len(outs) == 1 and (const or not method) and not changes and qualified not in ENGINE_STEPS
         for _, bt, _ in ins + outs:
             self.pin(bt)
             self.shape(bt)
