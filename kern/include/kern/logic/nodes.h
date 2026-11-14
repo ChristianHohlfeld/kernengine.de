@@ -1185,6 +1185,123 @@ template <class S> constexpr bool equal(const S& a, const S& b) {
 }
 }  // namespace structs
 
+/// The bytes of a value (Bytes of Struct, Struct of Bytes): the object representation of a struct
+/// of numbers in the layout C++ gives it - what std::bit_cast and std::memcpy between a struct and
+/// bytes see. The layout is the node's setting, "20: u32@0 u16@4 i16@6 ...": the size in bytes,
+/// then for each field of the struct, in their order, the number C++ holds it as and where it
+/// begins. The numbers: bool, u8, i8, u16, i16, u32, i32 (a Bool's or an Int's field; an Int is
+/// cut to that many bits, as C++ converts), u64, i64 (an Int64's field), f32, f64 (a Float's). The
+/// bytes are little-endian, on every platform the same; a byte no field covers is 0. A number of
+/// the bytes is taken as C++ takes it to an unsigned char (its last 8 bits); where there are no
+/// bytes - before the list, beyond it - they are 0. A NaN keeps its sign and the upper bits of its
+/// payload and is quiet (on every platform the same - what x86 does).
+namespace bytes {
+enum class Code : u8 { none, boolean, u8, i8, u16, i16, u32, i32, u64, i64, f32, f64 };
+struct Field {
+  Code code = Code::none;
+  u32 at = 0;
+};
+/// A layout read: the size, the fields - and, when it cannot be read, why (`error`, else nullptr).
+struct Layout {
+  std::array<Field, StructType::kMaxFields> fields{};
+  std::size_t count = 0;
+  u32 size = 0;
+  const char* error = nullptr;
+};
+inline constexpr u32 kMaxBytes = 65536;
+constexpr u32 width(Code c) {
+  switch (c) {
+    case Code::boolean: case Code::u8: case Code::i8: return 1;
+    case Code::u16: case Code::i16: return 2;
+    case Code::u32: case Code::i32: case Code::f32: return 4;
+    case Code::u64: case Code::i64: case Code::f64: return 8;
+    default: return 0;
+  }
+}
+constexpr bool whole(Code c) { return c >= Code::u8 && c <= Code::i32; }    // (an Int's field)
+constexpr bool wide(Code c) { return c == Code::u64 || c == Code::i64; }    // (an Int64's)
+constexpr bool floating(Code c) { return c == Code::f32 || c == Code::f64; }  // (a Float's)
+constexpr bool is_signed(Code c) { return c == Code::i8 || c == Code::i16 || c == Code::i32 || c == Code::i64; }
+constexpr Code code_of(std::string_view w) {
+  constexpr std::pair<std::string_view, Code> kCodes[] = {{"bool", Code::boolean}, {"u8", Code::u8},   {"i8", Code::i8},   {"u16", Code::u16},
+                                                          {"i16", Code::i16},      {"u32", Code::u32}, {"i32", Code::i32}, {"u64", Code::u64},
+                                                          {"i64", Code::i64},      {"f32", Code::f32}, {"f64", Code::f64}};
+  for (const auto& [name, code] : kCodes)
+    if (name == w) return code;
+  return Code::none;
+}
+/// The layout a setting says (constexpr: a Blueprint's class reads it when it is compiled).
+constexpr Layout layout(std::string_view s) {
+  Layout r;
+  std::size_t i = 0;
+  auto blank = [&] { while (i < s.size() && (s[i] == ' ' || s[i] == '\t' || s[i] == '\n' || s[i] == '\r')) ++i; };
+  auto number = [&](u32& out) {
+    const std::size_t from = i;
+    u64 v = 0;
+    while (i < s.size() && s[i] >= '0' && s[i] <= '9' && v <= kMaxBytes) v = v * 10 + static_cast<u64>(s[i++] - '0');
+    out = static_cast<u32>(v);
+    return i > from && v <= kMaxBytes;
+  };
+  blank();
+  if (!number(r.size) || r.size == 0) { r.error = "the layout begins with its size in bytes (1 to 65536) and a colon: \"20: u32@0 ...\""; return r; }
+  blank();
+  if (i >= s.size() || s[i] != ':') { r.error = "a colon after the size: \"20: u32@0 ...\""; return r; }
+  ++i;
+  for (blank(); i < s.size(); blank()) {
+    const std::size_t from = i;
+    while (i < s.size() && s[i] != '@' && s[i] != ' ' && s[i] != '\t' && s[i] != '\n' && s[i] != '\r') ++i;
+    const Code c = code_of(s.substr(from, i - from));
+    if (c == Code::none) { r.error = "a field is one of bool u8 i8 u16 i16 u32 i32 u64 i64 f32 f64"; return r; }
+    if (i >= s.size() || s[i] != '@') { r.error = "a field says where it begins: u16@4"; return r; }
+    ++i;
+    Field f{c, 0};
+    if (!number(f.at)) { r.error = "where a field begins is a number of bytes: u16@4"; return r; }
+    if (f.at + width(c) > r.size) { r.error = "a field reaches beyond the size"; return r; }
+    for (std::size_t k = 0; k < r.count; ++k)
+      if (f.at < r.fields[k].at + width(r.fields[k].code) && r.fields[k].at < f.at + width(c)) { r.error = "two fields share a byte"; return r; }
+    if (r.count == r.fields.size()) { r.error = "more fields than a struct has"; return r; }
+    r.fields[r.count++] = f;
+  }
+  if (r.count == 0) r.error = "a layout has a field at least";
+  return r;
+}
+/// The bits a Float is as a 32-bit float (a NaN: its sign, the upper bits of its payload, quiet).
+inline u32 single_bits(f64 x) {
+  if (x != x) {
+    const u64 b = std::bit_cast<u64>(x);
+    return (static_cast<u32>(b >> 32) & 0x80000000u) | 0x7fc00000u | static_cast<u32>((b >> 29) & 0x003fffffu);
+  }
+  return std::bit_cast<u32>(static_cast<f32>(x));
+}
+/// The Float 32 bits are as a float (a NaN: its sign, its payload in the upper bits, quiet).
+inline f64 single_value(u32 b) {
+  if ((b & 0x7f800000u) == 0x7f800000u && (b & 0x007fffffu) != 0)
+    return std::bit_cast<f64>((static_cast<u64>(b & 0x80000000u) << 32) | 0x7ff8000000000000ull | (static_cast<u64>(b & 0x003fffffu) << 29));
+  return static_cast<f64>(std::bit_cast<f32>(b));
+}
+/// The bits a field writes: of a whole number (cut by `put`), of a Float.
+inline u64 bits(Code c, f64 x) { return c == Code::f32 ? single_bits(x) : std::bit_cast<u64>(x); }
+/// The field's bits into the bytes, little-endian.
+template <class B> void put(B* out, const Field& f, u64 v) {
+  for (u32 k = 0; k < width(f.code); ++k) out[f.at + k] = B(static_cast<i64>((v >> (8 * k)) & 0xffu));
+}
+/// The field's bits from the bytes (`byte(i)`: the i-th byte, 0 .. 255), sign-extended where it is signed.
+template <class Byte> u64 take(const Field& f, Byte&& byte) {
+  u64 v = 0;
+  const u32 n = width(f.code);
+  for (u32 k = 0; k < n; ++k) v |= static_cast<u64>(byte(f.at + k)) << (8 * k);
+  if (is_signed(f.code) && n < 8 && (v >> (8 * n - 1)) & 1u) v |= ~u64{0} << (8 * n);
+  return v;
+}
+/// What a field of a struct is, for a layout: which numbers suit it (Bool: bool; Int: u8 .. i32;
+/// Int64: u64, i64; Float: f32, f64).
+constexpr bool suits(Code c, PinType t) {
+  return t == PinType::boolean ? c == Code::boolean : t == PinType::integer ? whole(c) : t == PinType::int64 ? wide(c) : t == PinType::number ? floating(c) : false;
+}
+/// The byte of a number of a list of bytes: its last 8 bits.
+inline u64 byte_of(i64 v) { return static_cast<u64>(v) & 0xffu; }
+}  // namespace bytes
+
 /// A whole number written as text, as settings hold them ("3", " 12"): leading blanks, a sign,
 /// digits; anything else ends it. Empty or no digits: `fallback`.
 constexpr int setting_int(std::string_view s, int fallback) {

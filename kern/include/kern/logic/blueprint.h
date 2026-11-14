@@ -467,6 +467,41 @@ struct BlueprintCore : logic::PureNodes {
     return r;
   }
   template <class S> static const S& struct_break(const std::type_identity_t<S>& value) { return value; }
+  /// The bytes of a struct of numbers in the layout of the setting (logic::bytes, nodes.h):
+  /// struct_bytes<Frame, "20: u32@0 u16@4 ...">(frame) - as many as the layout's size, a list of a
+  /// fixed length (where it lies, nothing is asked for); struct_of_bytes<Frame, "...">(bytes, at)
+  /// the struct whose bytes begin at `at` in the list.
+  template <class S, Setting Layout> static auto struct_bytes(const std::type_identity_t<S>& value) {
+    static constexpr logic::bytes::Layout kLayout = logic::bytes::layout(Layout.view());
+    static_assert(kLayout.error == nullptr, "the layout of Bytes of Struct cannot be read");
+    static_assert(kLayout.count == logic::structs::field_count<S>(), "the layout has a field for each field of the struct");
+    Fixed<Int, kLayout.size> out;
+    std::size_t k = 0;
+    logic::structs::fields(value, [&](const auto&... field) { (put_bytes(out.items.data(), kLayout.fields[k++], field), ...); });
+    return out;
+  }
+  template <class S, Setting Layout> static S struct_of_bytes(logic::Items<Int> bytes, Int at) {
+    static constexpr logic::bytes::Layout kLayout = logic::bytes::layout(Layout.view());
+    static_assert(kLayout.error == nullptr, "the layout of Struct of Bytes cannot be read");
+    static_assert(kLayout.count == logic::structs::field_count<S>(), "the layout has a field for each field of the struct");
+    S out{};
+    const i64 from = at;
+    auto byte = [&](u32 i) { return logic::bytes::byte_of(static_cast<i64>(bytes[from + static_cast<i64>(i)])); };
+    std::size_t k = 0;
+    logic::structs::fields(out, [&](auto&... field) { (take_bytes(field, kLayout.fields[k++], byte), ...); });
+    return out;
+  }
+  static void put_bytes(Int* out, const logic::bytes::Field& f, Bool v) { logic::bytes::put(out, f, v ? 1 : 0); }
+  static void put_bytes(Int* out, const logic::bytes::Field& f, Int v) { logic::bytes::put(out, f, static_cast<u64>(static_cast<i64>(v))); }
+  static void put_bytes(Int* out, const logic::bytes::Field& f, logic::Int64 v) { logic::bytes::put(out, f, v.bits); }
+  static void put_bytes(Int* out, const logic::bytes::Field& f, Float v) { logic::bytes::put(out, f, logic::bytes::bits(f.code, v)); }
+  template <class B> static void take_bytes(Bool& to, const logic::bytes::Field& f, B&& byte) { to = logic::bytes::take(f, byte) != 0; }
+  template <class B> static void take_bytes(Int& to, const logic::bytes::Field& f, B&& byte) { to = static_cast<i64>(logic::bytes::take(f, byte)); }
+  template <class B> static void take_bytes(logic::Int64& to, const logic::bytes::Field& f, B&& byte) { to = logic::Int64(logic::bytes::take(f, byte)); }
+  template <class B> static void take_bytes(Float& to, const logic::bytes::Field& f, B&& byte) {
+    const u64 b = logic::bytes::take(f, byte);
+    to = f.code == logic::bytes::Code::f32 ? logic::bytes::single_value(static_cast<u32>(b)) : std::bit_cast<f64>(b);
+  }
 
   // ---- steps ----
   void flow_reroute() {}

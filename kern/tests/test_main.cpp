@@ -2108,6 +2108,40 @@ TEST(logic_formulas) {
   CHECK(said);
 }
 
+TEST(logic_bytes_of_struct) {
+  // the layout: the size, then each field's number and where it begins
+  const logic::bytes::Layout l = logic::bytes::layout("20: u32@0 u16@4 u16@6 i16@8 i16@10 i16@12 u16@14 u16@16 u16@18");
+  CHECK(l.error == nullptr && l.size == 20 && l.count == 9 && l.fields[3].code == logic::bytes::Code::i16 && l.fields[3].at == 8);
+  for (const char* bad : {"", "20", "20 u32@0", "0: u8@0", "70000: u8@0", "4: u24@0", "4: u32", "4: u32@1", "4: u16@0 u16@1", "4:"})
+    CHECK(logic::bytes::layout(bad).error != nullptr);
+  // a frame of a wire protocol (NAV1): its bytes as C++ lays them out, and back
+  FakeLogicHost host;
+  logic::Runtime rt(host);
+  const logic::Graph g = logic_graph(R"({"structs":[{"name":"Frame","fields":[{"name":"Magic","type":"int","value":1447121230},{"name":"Seq","type":"int","value":513},
+      {"name":"Vx","type":"int","value":-3},{"name":"On","type":"bool","value":true},{"name":"Speed","type":"float","value":0.1},{"name":"Key","type":"int64","value":"18364758544493064720"}]}],
+    "variables":[{"name":"B","type":"int_list","value":[]},{"name":"Back","type":"struct","of":"Frame","value":{}}],
+    "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.set","params":{"variable":"B"}},
+      {"id":3,"type":"struct.bytes","params":{"struct":"Frame","layout":"24: u32@0 u16@4 i16@6 bool@8 f32@9 u64@16"}},{"id":4,"type":"struct.make","params":{"struct":"Frame"}},
+      {"id":5,"type":"var.set","params":{"variable":"Back"}},{"id":6,"type":"struct.of_bytes","params":{"struct":"Frame","layout":"24: u32@0 u16@4 i16@6 bool@8 f32@9 u64@16"}},
+      {"id":7,"type":"var.get","params":{"variable":"B"}}],
+    "links":[[1,"then",2,"exec"],[4,"value",3,"value"],[3,"bytes",2,"value"],[2,"then",5,"exec"],[7,"value",6,"bytes"],[6,"value",5,"value"]]})");
+  CHECK(no_errors(logic::check(g)));
+  logic::Instance* inst = rt.add(g, 0, "Level");
+  rt.begin();
+  rt.call("Go");
+  const std::vector<i64> want = {78, 81, 65, 86, 1, 2, 253, 255, 1, 205, 204, 204, 61, 0, 0, 0, 16, 50, 84, 118, 152, 186, 220, 254};
+  CHECK(inst->get("B").items<i64>() == want);
+  const logic::Value back = inst->get("Back");
+  CHECK(back.field(0) && back.field(0)->as_int() == 1447121230 && back.field(1)->as_int() == 513 && back.field(2)->as_int() == -3 && back.field(3)->as_bool());
+  CHECK(back.field(4) && back.field(4)->as_number() == static_cast<f64>(0.1f) && static_cast<u64>(back.field(5)->i) == 0xfedcba9876543210ull);
+  // what does not suit the struct is an error of the graph
+  const logic::Graph wrong = logic_graph(R"({"structs":[{"name":"P","fields":[{"name":"A","type":"float","value":0}]}],
+    "nodes":[{"id":1,"type":"struct.bytes","params":{"struct":"P","layout":"4: i32@0"}}]})");
+  bool said = false;
+  for (const logic::Issue& i : logic::check(wrong)) said |= i.error && i.node == 1 && i.text.find("does not suit") != std::string::npos;
+  CHECK(said);
+}
+
 TEST(logic_local_variables) {
   // A function's local variables: every call starts with their defaults; two functions have one
   // of the same name; a call another call of the same function interrupts has its own back.
