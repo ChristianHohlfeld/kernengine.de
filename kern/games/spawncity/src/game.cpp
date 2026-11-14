@@ -243,7 +243,7 @@ bool Game::start(kern::Engine& e) {
   city_.building_budget = mobile_ ? 2600 : 4000;  // world_city_buildings.mjs MAX_FOOTPRINTS 2600 (a desktop draws more of the city)
   lat_ = e.arg_number("lat", kKonstanzLat);
   lon_ = e.arg_number("lon", kKonstanzLon);
-  fpv_tilt_deg_ = static_cast<f32>(kern::clamp(e.arg_number("fpvtilt", -15), -15.0, 50.0));
+  view_.fpv_tilt_deg = static_cast<f32>(kern::clamp(e.arg_number("fpvtilt", -15), -15.0, 50.0));
   sensitivity_ = static_cast<f32>(kern::clamp(e.arg_number("mouse", 100), 20.0, 300.0)) / 100;  // mouse_settings.mjs 20..300 %
   if (const char* s = e.arg("start")) start_mode_ = s;
 
@@ -359,9 +359,9 @@ bool Game::start(kern::Engine& e) {
   if (mobile_) people_.set_ranges(140, 160);  // world_procedural_population.mjs PEOPLE_SHOW_M / HIDE_M (phone)
   init_weapons();
   e.set_status("SpawnCity: Karte wird geladen ...");
-  cam_.eye = {-30, -40, 60};
-  cam_.target = {0, 0, 0};
-  e.renderer.camera = cam_;
+  view_.cam.eye = {-30, -40, 60};
+  view_.cam.target = {0, 0, 0};
+  e.renderer.camera = view_.cam;
   return true;
 }
 
@@ -391,7 +391,7 @@ Vec3 Game::player_position() const {
 }
 
 Vec3 Game::focus_position() const {
-  if (mode_ == Mode::drone && drone_out_) return matrix_of(drone_actor_).translation();
+  if (mode_ == Mode::drone && vehicle_.drone_out) return matrix_of(drone_actor_).translation();
   return player_position();
 }
 
@@ -441,7 +441,7 @@ void Game::spawn_guard() {
   if (spawn_checked_ || mode_ != Mode::foot || city_.stats().t_collision < 0) return;
   spawn_checked_ = true;
   // the jet was placed before the streets were there: on a street now, it moves beside it
-  if (jet_placed_ && mode_ != Mode::jet && !jet_.pilot) {
+  if (vehicle_.jet_placed && mode_ != Mode::jet && !jet_.pilot) {
     const Vec3 jp = matrix_of(jet_actor_).translation();
     Spot here{}, there{};
     if (!clear_spot(jp, {16, 20}, 0, here, true) && clear_spot(jp, {16, 20}, 260, there, true)) {
@@ -490,10 +490,10 @@ void Game::place_world() {
     const Vec3 rot{0, 0, std::atan2(p.p.y - j.p.y, p.p.x - j.p.x) / kDeg - 90};  // nose (+Y) towards the player
     world_->teleport(jet_actor_, j.p + Vec3{0, 0, 2.1f}, &rot);
     jet_.reset();
-    jet_flown_ = false;
-    jet_v_valid_ = false;
+    vehicle_.jet_flown = false;
+    vehicle_.jet_v_valid = false;
     jet_.pilot = false;
-    jet_placed_ = true;
+    vehicle_.jet_placed = true;
   }
   world_placed_ = true;
   world_->set_paused(false);
@@ -585,7 +585,7 @@ void Game::toggle_drone() {
   if (mode_ == Mode::drone) {
     // Stow the drone (killDrone): back to the pilot.
     world_->set_alive(drone_actor_, false);
-    drone_out_ = false;
+    vehicle_.drone_out = false;
     world_->set_mode(kern::game::SimMode::play);
     mode_ = Mode::foot;
     return;
@@ -612,14 +612,14 @@ void Game::toggle_drone() {
   world_->teleport(drone_actor_, at, &rot);
   world_->set_actor_velocity(drone_actor_, {});
   drone_.reset();
-  sticks_ = DroneSticks{};
-  sticks_.clearance = 1.2f;  // control_semantics.mjs defaultHoverAgl
-  landing_ = false;
-  drone_out_ = true;
+  vehicle_.sticks = DroneSticks{};
+  vehicle_.sticks.clearance = 1.2f;  // control_semantics.mjs defaultHoverAgl
+  vehicle_.landing = false;
+  vehicle_.drone_out = true;
   // The pilot stays where he is (not possessed: the soldier stands while the drone flies).
   world_->set_mode(kern::game::SimMode::simulate);
   mode_ = Mode::drone;
-  rig_init_ = false;
+  view_.rig_init = false;
 }
 
 void Game::switch_mode(Mode m, i32 vehicle) {
@@ -642,7 +642,7 @@ void Game::switch_mode(Mode m, i32 vehicle) {
       // a parked car may be asleep in Box3D: the throttle must reach it at once
       if (world_->physics().body_valid(body(c.actor))) world_->physics().set_awake(body(c.actor), true);
       hide_soldier();
-      car_cockpit_ = vr_;  // VR: the driver's seat (a chase camera swinging round the car sickens)
+      view_.car_cockpit = vr_.on;  // VR: the driver's seat (a chase camera swinging round the car sickens)
       break;
     }
     case Mode::jet:
@@ -653,8 +653,8 @@ void Game::switch_mode(Mode m, i32 vehicle) {
     case Mode::parachute: break;
   }
   mode_ = m;
-  rig_init_ = false;
-  head_yaw_ = head_pitch_ = 0;
+  view_.rig_init = false;
+  view_.head_yaw = view_.head_pitch = 0;
 }
 
 void Game::try_enter() {
@@ -669,7 +669,7 @@ void Game::try_enter() {
     const f32 d = std::hypot(p.x - me.x, p.y - me.y) - (cars_[i].car->spec().half.x - 1.78f);
     if (d < best_d) { best_d = d; best = static_cast<i32>(i); }
   }
-  if (jet_placed_) {
+  if (vehicle_.jet_placed) {
     const Vec3 j = matrix_of(jet_actor_).translation();
     if (std::hypot(j.x - me.x, j.y - me.y) < kEnterJet && (best < 0 || std::hypot(j.x - me.x, j.y - me.y) < best_d)) { switch_mode(Mode::jet); return; }
   }
@@ -715,10 +715,10 @@ void Game::eject() {
   world_->set_alive(chute_actor_, true);
   world_->teleport(chute_actor_, s.position + s.rotation.rotate({0, 0, 2.8f}));
   world_->set_actor_velocity(chute_actor_, s.velocity + s.rotation.rotate({0, 0, kEjectUp}));
-  chute_time_ = 0;
-  chute_open_ = false;
+  vehicle_.chute_time = 0;
+  vehicle_.chute_open = false;
   mode_ = Mode::parachute;
-  rig_init_ = false;
+  view_.rig_init = false;
   toast_ = "Schleudersitz!";
   toast_age_ = 0;
 }
@@ -731,29 +731,29 @@ void Game::fixed_step(f32 h) {
   ++steps_;
   spawn_guard_step();  // a player put down stands on the final ground (game.cpp)
   kern::physics::World& w = world_->physics();
-  if (drone_out_) {
+  if (vehicle_.drone_out) {
     const kern::physics::Body b = body(drone_actor_);
-    if (b.valid()) drone_.step(w, b, h, sticks_);
+    if (b.valid()) drone_.step(w, b, h, vehicle_.sticks);
   }
-  if (jet_placed_) {
+  if (vehicle_.jet_placed) {
     const kern::physics::Body b = body(jet_actor_);
-    JetInput in = mode_ == Mode::jet ? jet_in_ : JetInput{};
+    JetInput in = mode_ == Mode::jet ? vehicle_.jet_in : JetInput{};
     if (mode_ != Mode::jet && jet_.telemetry().contacts > 0) in.brake = 1;  // parked: brakes on
     if (b.valid()) {
       // jet_mode.mjs onPhysicsImpact: what the step took off its speed beyond the flight forces
       // (a wall, a roof, the ground nose first) - over 5 m/s it hurts, (dv - 5)^1.7 * 4; a hard
       // landing (gear sink over 4 m/s) (gi - 4) * 80; a parked jet that never flew is spared
       const Vec3 v_now = w.linear_velocity(b);
-      if (mode_ == Mode::jet) jet_flown_ = true;
-      if (jet_flown_ && jet_v_valid_) {
-        const f32 dv = kern::length(v_now - jet_v_ctrl_);
+      if (mode_ == Mode::jet) vehicle_.jet_flown = true;
+      if (vehicle_.jet_flown && vehicle_.jet_v_valid) {
+        const f32 dv = kern::length(v_now - vehicle_.jet_v_ctrl);
         if (dv > 5) gaps_jet_damage(std::pow(dv - 5, 1.7f) * 4);
         if (mode_ == Mode::jet && dv > 2) look_.shake.trauma = std::fmin(1.0f, look_.shake.trauma + dv / 15);
       }
       jet_.step(w, b, h, in);
-      if (jet_flown_ && jet_.gear_impact() > 4) gaps_jet_damage((jet_.gear_impact() - 4) * 80);
-      jet_v_ctrl_ = w.linear_velocity(b);
-      jet_v_valid_ = true;
+      if (vehicle_.jet_flown && jet_.gear_impact() > 4) gaps_jet_damage((jet_.gear_impact() - 4) * 80);
+      vehicle_.jet_v_ctrl = w.linear_velocity(b);
+      vehicle_.jet_v_valid = true;
     }
   }
   drive_traffic(h);
@@ -772,7 +772,7 @@ void Game::drive_traffic(f32 h) {
     const kern::physics::Body b = body(c.actor);
     if (!b.valid() || !w.body_valid(b)) { c.car->detach(); continue; }
     c.car->hit_user = static_cast<u64>(c.actor);
-    if (i < car_lent_.size() && car_lent_[i]) { c.car->detach(); continue; }  // MP host: a mate drives it (game_worldsync.cpp)
+    if (i < worldsync_.car_lent.size() && worldsync_.car_lent[i]) { c.car->detach(); continue; }  // MP host: a mate drives it (game_worldsync.cpp)
     if (puppet_car_step(c, i, h)) { c.car->detach(); continue; }             // MP client: the host's car (game_worldsync.cpp)
     if (c.far) { c.car->detach(); traffic_far_step(c, i, h); continue; }  // no physics far away (game_traffic_far.cpp)
     if (life_) {
@@ -881,15 +881,15 @@ void Game::step_parachute(f32 h) {
   if (!b.valid()) return;
   const BodyState s = read_body(w, b);
   const f32 m = w.mass(b);
-  chute_time_ += h;
-  chute_open_ = chute_time_ >= kChuteOpen;
+  vehicle_.chute_time += h;
+  vehicle_.chute_open = vehicle_.chute_time >= kChuteOpen;
   // jet_mode.mjs stepPara: gravity, the horizontal speed damped .25 /s throughout; once the canopy is
   // open (1.1 s) v.z eases towards -6.5 at 1.6 /s (against gravity: a ~12.6 m/s sink) and v.x / v.y
-  // towards rollIn * 4 / -pitchIn * 4 at 0.8 /s (chute_steer_ = {rollIn, -pitchIn}, game_controls.cpp)
+  // towards rollIn * 4 / -pitchIn * 4 at 0.8 /s (vehicle_.chute_steer = {rollIn, -pitchIn}, game_controls.cpp)
   Vec3 f{-m * 0.25f * s.velocity.x, -m * 0.25f * s.velocity.y, 0};
-  if (chute_open_) {
+  if (vehicle_.chute_open) {
     f.z = m * 1.6f * (-kChuteSink - s.velocity.z);
-    const Vec2 want = chute_steer_ * kChuteSteer;
+    const Vec2 want = vehicle_.chute_steer * kChuteSteer;
     f.x += m * 0.8f * (want.x - s.velocity.x);
     f.y += m * 0.8f * (want.y - s.velocity.y);
   }
@@ -900,7 +900,7 @@ void Game::step_parachute(f32 h) {
 // traffic placement (every half second)
 
 void Game::manage_traffic() {
-  if (puppet_world_) return;  // MP client in the host's town: his traffic (game_worldsync.cpp)
+  if (worldsync_.puppet_world) return;  // MP client in the host's town: his traffic (game_worldsync.cpp)
   const std::vector<Lane>& lanes = city_.lanes();
   const Vec3 me = focus_position();
   // MP host: the traffic lives around every player - placed near one of them, taken away only
@@ -918,7 +918,7 @@ void Game::manage_traffic() {
   for (std::size_t i = 0; i < cars_.size(); ++i) {
     TrafficCar& c = cars_[i];
     if (static_cast<i32>(i) == car_index_) continue;
-    if (i < car_lent_.size() && car_lent_[i]) continue;  // a mate drives it
+    if (i < worldsync_.car_lent.size() && worldsync_.car_lent[i]) continue;  // a mate drives it
     if (c.police) {
       // An abandoned cruiser far away is put back into the pool.
       if (c.placed && c.unit < 0 && std::hypot(matrix_of(c.actor).translation().x - me.x, matrix_of(c.actor).translation().y - me.y) > 420) {
@@ -1026,7 +1026,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
   if (world_placed_ && !ui_.paused) {  // a menu is open: nothing moves (game_ui.cpp)
     mp_input(e, dt);  // multiplayer keys (voice, ping, big map, vote): game_net.cpp
     vr_menu_input(dt);  // the headset's wrist menu (game_vr.cpp): while open the pad is the menu's
-    if (vr_menu_open_) { pad.rt = pad.lt = 0; pad.pressed = 0; pad.buttons = 0; pad.rx = pad.ry = 0; }  // the menu's: no turn, no weapon step
+    if (vr_.menu_open) { pad.rt = pad.lt = 0; pad.pressed = 0; pad.buttons = 0; pad.rx = pad.ry = 0; }  // the menu's: no turn, no weapon step
     read_input(e, dt);
     update_touch_layout();
     look_lap(perf::Slot::logic);
@@ -1076,11 +1076,11 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
   update_camera(e, dt);
   ui_camera(dt);  // LIVE GPS views (game_ui.cpp)
   look_camera(dt);  // FPV stabilizer, camera shake, speed (game_look.cpp)
-  e.renderer.camera = cam_;
-  world_->set_view(cam_);
-  night_ = world_->apply_lighting(cam_.eye);
+  e.renderer.camera = view_.cam;
+  world_->set_view(view_.cam);
+  night_ = world_->apply_lighting(view_.cam.eye);
   look_lighting(dt);  // own day clock, point lights, quality (game_look.cpp)
-  world_->present(f.time * 1000.0, cam_.eye);
+  world_->present(f.time * 1000.0, view_.cam.eye);
   draw_vehicles();
   draw_town();
   draw_world();  // M3 world (game_world.cpp)
@@ -1092,7 +1092,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
 }
 
 void Game::update_camera(kern::Engine& e, f32 dt) {
-  kern::Camera c = cam_;
+  kern::Camera c = view_.cam;
   c.near = 0.05f;
   c.far = 2400;
   const f32 aspect = e.aspect();
@@ -1104,21 +1104,21 @@ void Game::update_camera(kern::Engine& e, f32 dt) {
     c.target = c.eye + Vec3{10, 0, 0};
     c.up = {0, 0, 1};
     c.fov = 50 * kDeg;
-    cam_ = c;
+    view_.cam = c;
     return;
   }
   auto rig = [&](Vec3 anchor, Vec3 vel, Vec2 heading, f32 pos_rate, f32 vel_rate, f32 head_rate, f32 max_lag) {
     // camera_stabilization.mjs: a damped inertial anchor and heading, lag capped.
-    if (!rig_init_) { cam_anchor_ = anchor; cam_vel_ = vel; cam_heading_ = heading; rig_init_ = true; }
-    cam_vel_ += (vel - cam_vel_) * damp_alpha(vel_rate, dt);
-    const Vec3 predicted = cam_anchor_ + cam_vel_ * dt;
-    cam_anchor_ = predicted + (anchor - predicted) * damp_alpha(pos_rate, dt);
-    const Vec3 lag = anchor - cam_anchor_;
+    if (!view_.rig_init) { view_.cam_anchor = anchor; view_.cam_vel = vel; view_.cam_heading = heading; view_.rig_init = true; }
+    view_.cam_vel += (vel - view_.cam_vel) * damp_alpha(vel_rate, dt);
+    const Vec3 predicted = view_.cam_anchor + view_.cam_vel * dt;
+    view_.cam_anchor = predicted + (anchor - predicted) * damp_alpha(pos_rate, dt);
+    const Vec3 lag = anchor - view_.cam_anchor;
     const f32 l = kern::length(lag);
-    if (l > max_lag) cam_anchor_ = anchor - lag * (max_lag / l);
-    const f32 ha = std::atan2(cam_heading_.y, cam_heading_.x), hb = std::atan2(heading.y, heading.x);
+    if (l > max_lag) view_.cam_anchor = anchor - lag * (max_lag / l);
+    const f32 ha = std::atan2(view_.cam_heading.y, view_.cam_heading.x), hb = std::atan2(heading.y, heading.x);
     const f32 h = ha + wrap_pi(hb - ha) * damp_alpha(head_rate, dt);
-    cam_heading_ = {std::cos(h), std::sin(h)};
+    view_.cam_heading = {std::cos(h), std::sin(h)};
   };
   auto collide = [&](Vec3 anchor, Vec3 want, kern::physics::Body ignore) {
     // Box3D sphere sweep from the anchor (camera_collision_guard / world_building_collision_physics).
@@ -1128,7 +1128,7 @@ void Game::update_camera(kern::Engine& e, f32 dt) {
   };
   switch (mode_) {
     case Mode::foot:
-      cam_valid_ = world_->update_camera(c, dt, play_in_);
+      view_.cam_valid = world_->update_camera(c, dt, play_in_);
       break;
     case Mode::drone: {
       const kern::Mat4 m = matrix_of(drone_actor_);
@@ -1136,30 +1136,30 @@ void Game::update_camera(kern::Engine& e, f32 dt) {
       const Quat q = state_of(drone_actor_).rotation;
       const Vec3 fwd = q.rotate({-1, 0, 0}), up = q.rotate({0, 0, 1});
       const Vec3 vel = world_->actor_velocity(drone_actor_);
-      if (drone_cam_ == 0) {
+      if (view_.drone_cam == 0) {
         // FPV: rigid on the frame, tilted (camera_settings.mjs -15 .. 50 deg), FOV 105.
-        const f32 t = fpv_tilt_deg_ * kDeg;
+        const f32 t = view_.fpv_tilt_deg * kDeg;
         const Vec3 f = fwd * std::cos(t) + up * std::sin(t), u = up * std::cos(t) - fwd * std::sin(t);
         c.eye = pos + fwd * 0.102f + up * (0.028f + 0.045f);  // + fpv_view_height.mjs FPV_VIEW_EXTRA_UP_M
         c.target = c.eye + f * 4.0f;
         c.up = u;
-        c.fov = fpv_fov_deg_ * kDeg;
+        c.fov = view_.fpv_fov_deg * kDeg;
         c.near = 0.02f;
       } else {
         Vec2 h{fwd.x, fwd.y};
         const f32 hl = std::sqrt(h.x * h.x + h.y * h.y);
-        h = hl > 0.2f ? h * (1.0f / hl) : cam_heading_;
-        const bool third = drone_cam_ == 2;
+        h = hl > 0.2f ? h * (1.0f / hl) : view_.cam_heading;
+        const bool third = view_.drone_cam == 2;
         rig(pos, vel, h, third ? 3.6f : 4.8f, third ? 5.2f : 7.0f, third ? 3.8f : 7.5f, third ? 0.36f : 0.18f);
         const f32 back = third ? 1.5f * 2.25f / 2.4847f : 1.65f, upm = third ? 1.5f * 1.05f / 2.4847f : 0.78f;
         const f32 ahead = third ? 0.55f : 0.38f, look_up = third ? 0.18f : 0.10f;
-        const Vec3 hd{cam_heading_.x, cam_heading_.y, 0};
-        const Vec3 want = cam_anchor_ - hd * back + Vec3{0, 0, upm};
-        c.eye = collide(cam_anchor_, want, body(drone_actor_));
-        c.target = cam_anchor_ + hd * ahead + Vec3{0, 0, look_up};
+        const Vec3 hd{view_.cam_heading.x, view_.cam_heading.y, 0};
+        const Vec3 want = view_.cam_anchor - hd * back + Vec3{0, 0, upm};
+        c.eye = collide(view_.cam_anchor, want, body(drone_actor_));
+        c.target = view_.cam_anchor + hd * ahead + Vec3{0, 0, look_up};
         c.up = {0, 0, 1};
         // simulator.mjs: third clamp(62 x fov / 105, 35, 100), follow clamp(52 x fov / 105, 30, 90)
-        c.fov = (third ? clampf(62 * fpv_fov_deg_ / 105, 35, 100) : clampf(52 * fpv_fov_deg_ / 105, 30, 90)) * kDeg;
+        c.fov = (third ? clampf(62 * view_.fpv_fov_deg / 105, 35, 100) : clampf(52 * view_.fpv_fov_deg / 105, 30, 90)) * kDeg;
         c.near = 0.06f;
       }
       break;
@@ -1172,10 +1172,10 @@ void Game::update_camera(kern::Engine& e, f32 dt) {
       const Vec3 pos = m.translation();
       const Vec3 fwd = s.rotation.rotate({1, 0, 0});
       const bool bus = tc.car->spec().radius > 0.4f;
-      if (car_cockpit_) {
+      if (view_.car_cockpit) {
         const kern::Mat4 seat = m * kern::Mat4::translate(bus ? Vec3{3.3f, 0.72f, 2.05f - 1.48f} : Vec3{0.04f, 0.36f, 1.24f - 0.54f});
         c.eye = seat.translation();
-        const Vec3 look = s.rotation.rotate({std::cos(head_yaw_) * std::cos(head_pitch_), std::sin(head_yaw_) * std::cos(head_pitch_), std::sin(head_pitch_)});
+        const Vec3 look = s.rotation.rotate({std::cos(view_.head_yaw) * std::cos(view_.head_pitch), std::sin(view_.head_yaw) * std::cos(view_.head_pitch), std::sin(view_.head_pitch)});
         c.target = c.eye + look * 5.0f;
         c.up = s.rotation.rotate({0, 0, 1});
         c.fov = 80 * kDeg;  // player_car_mode.mjs cockpit: camera.fov = 80 (vertical, as Kern's)
@@ -1184,13 +1184,13 @@ void Game::update_camera(kern::Engine& e, f32 dt) {
         // Chase (player_car_mode.mjs): 5.4 m back, 2.15 m up, heading smoothing 1 - exp(-6 dt); bus x 1.75.
         const f32 zoom = bus ? 1.75f : 1.0f;
         rig(pos, s.velocity, {fwd.x, fwd.y}, 9, 9, 6, 0.6f);
-        const Vec3 hd = kern::normalize(Vec3{cam_heading_.x, cam_heading_.y, 0});
-        const Vec3 look_dir = Quat::axis_angle({0, 0, 1}, head_yaw_).rotate(hd);
+        const Vec3 hd = kern::normalize(Vec3{view_.cam_heading.x, view_.cam_heading.y, 0});
+        const Vec3 look_dir = Quat::axis_angle({0, 0, 1}, view_.head_yaw).rotate(hd);
         // zoom (pinch / wheel / + -, player_car_mode.mjs): distance 5.4 z, height 2.15 (.55 + .45 z)
         const f32 cz = ctl_.car_zoom;
         // player_car_mode.mjs: the target 1.05 m ahead of the car and 1.2 m up, the eye d back and h above
         // the target; fov min(80, 70 + |v| x .25)
-        const Vec3 tgt = cam_anchor_ + look_dir * 1.05f + Vec3{0, 0, 1.2f};
+        const Vec3 tgt = view_.cam_anchor + look_dir * 1.05f + Vec3{0, 0, 1.2f};
         const Vec3 want = tgt - look_dir * (5.4f * zoom * cz) + Vec3{0, 0, 2.15f * zoom * (0.55f + 0.45f * cz)};
         c.eye = collide(tgt, want, body(tc.actor));
         c.target = tgt;
@@ -1204,7 +1204,7 @@ void Game::update_camera(kern::Engine& e, f32 dt) {
       const BodyState s = state_of(jet_actor_);
       const Vec3 pos = m.translation();
       const Vec3 nose = s.rotation.rotate({0, 1, 0}), up = s.rotation.rotate({0, 0, 1});
-      if (jet_cockpit_) {
+      if (view_.jet_cockpit) {
         // jet_mode.mjs applyCamera cockpit: cockpitEye (0, 3.5, 1.42), along the nose, near .5
         c.eye = (m * kern::Mat4::translate({0, 3.5f, 1.42f})).translation();
         c.target = c.eye + nose * 10.0f;
@@ -1215,9 +1215,9 @@ void Game::update_camera(kern::Engine& e, f32 dt) {
         // its own frame), eased with 1 - e^(-6 dt); up 35 % towards the world's; looking 30 m ahead
         const f32 sp = kern::length(s.velocity), dist = 22 + std::fmin(14.0f, sp / 40);
         const Vec3 want = nose * -dist + up * 6.5f;
-        if (!rig_init_) { jet_cam_off_ = want; rig_init_ = true; }
-        jet_cam_off_ = jet_cam_off_ + (want - jet_cam_off_) * (1 - std::exp(-std::fmin(dt, 0.1f) * 6));
-        c.eye = collide(pos + up * 2.0f, pos + jet_cam_off_, body(jet_actor_));
+        if (!view_.rig_init) { view_.jet_cam_off = want; view_.rig_init = true; }
+        view_.jet_cam_off = view_.jet_cam_off + (want - view_.jet_cam_off) * (1 - std::exp(-std::fmin(dt, 0.1f) * 6));
+        c.eye = collide(pos + up * 2.0f, pos + view_.jet_cam_off, body(jet_actor_));
         c.target = pos + nose * 30.0f;
         c.up = kern::normalize(up + (Vec3{0, 0, 1} - up) * 0.35f, {0, 0, 1});
         c.near = 1;
@@ -1238,7 +1238,7 @@ void Game::update_camera(kern::Engine& e, f32 dt) {
   }
   ctl_camera(c);  // the shared head look in the drone, jet and parachute (game_controls.cpp)
   gaps_camera(c);  // camera_collision_guard.mjs, riding in a mate's jet (game_gaps.cpp)
-  cam_ = c;
+  view_.cam = c;
 }
 
 void Game::draw_vehicles() {
@@ -1249,19 +1249,19 @@ void Game::draw_vehicles() {
       if (!c.placed || !world_->actor_alive(c.actor)) continue;
       const bool mine = static_cast<i32>(i) == car_index_ && mode_ == Mode::car;
       // a wreck is burnt out: charred, no lights - nobody takes it for a car still to be shot
-      art_.car(matrix_of(c.actor), *c.car, c.wreck ? Vec3{0.055f, 0.05f, 0.045f} : c.color, mine && car_cockpit_, !c.wreck && c.input.pedal < -0.05f);
+      art_.car(matrix_of(c.actor), *c.car, c.wreck ? Vec3{0.055f, 0.05f, 0.045f} : c.color, mine && view_.car_cockpit, !c.wreck && c.input.pedal < -0.05f);
     }
-    if (jet_placed_) {
-      art_.jet(matrix_of(jet_actor_), jet_.gear_down(), jet_.nozzle(), jet_.thrust() / jet_.spec().thrust_max, mode_ == Mode::jet && jet_cockpit_);
+    if (vehicle_.jet_placed) {
+      art_.jet(matrix_of(jet_actor_), jet_.gear_down(), jet_.nozzle(), jet_.thrust() / jet_.spec().thrust_max, mode_ == Mode::jet && view_.jet_cockpit);
     }
-    if (drone_out_) {
+    if (vehicle_.drone_out) {
       Vec3 motors[4];
       f32 angles[4];
       for (int i = 0; i < 4; ++i) { motors[i] = drone_.motor_position(i); angles[i] = drone_.rotor_angle(i); }
       art_.drone(gaps_drone_matrix(), motors,  // visual_pose_stabilization.mjs (game_gaps.cpp)
-                 angles, drone_.params().prop_d, drone_.telemetry().armed, mode_ == Mode::drone && drone_cam_ == 0);
+                 angles, drone_.params().prop_d, drone_.telemetry().armed, mode_ == Mode::drone && view_.drone_cam == 0);
     }
-    if (mode_ == Mode::parachute) art_.parachute(matrix_of(chute_actor_).translation() - Vec3{0, 0, 0.85f}, world_->camera_yaw() * kDeg, chute_open_);
+    if (mode_ == Mode::parachute) art_.parachute(matrix_of(chute_actor_).translation() - Vec3{0, 0, 0.85f}, world_->camera_yaw() * kDeg, vehicle_.chute_open);
     draw_remote_vehicles();
     swarm_draw_vehicles();  // the mates' cruisers (game_swarm.cpp)
     draw_world_vehicles();  // M3: tow trucks (game_traffic.cpp)
@@ -1273,38 +1273,38 @@ void Game::draw_vehicles() {
 // audio
 
 bool Game::audio_init(u32 rate) {
-  if (mixer_.ready()) return true;
-  if (!mixer_.init(rate, 64)) return false;
-  bank_ = std::make_unique<kern::game::SoundBank>(mixer_);
-  game_audio_ = std::make_unique<kern::game::GameAudio>(mixer_, *bank_);
-  if (world_) bank_->request_level(world_->level());
-  fx_.init(mixer_);
+  if (audio_.mixer.ready()) return true;
+  if (!audio_.mixer.init(rate, 64)) return false;
+  audio_.bank = std::make_unique<kern::game::SoundBank>(audio_.mixer);
+  audio_.game_audio = std::make_unique<kern::game::GameAudio>(audio_.mixer, *audio_.bank);
+  if (world_) audio_.bank->request_level(world_->level());
+  audio_.fx.init(audio_.mixer);
   ui_audio_init();  // jetpack, soundscape, music (game_equipment.cpp)
   combat_audio_init();  // combat_audio_bank.mjs sounds (game_details.cpp)
   return true;
 }
 
 const f32* Game::audio_render(u32 frames) {
-  audio_out_.resize(static_cast<std::size_t>(frames) * 2);
-  if (mixer_.ready()) {
-    mixer_.render(audio_out_.data(), frames);
+  audio_.out.resize(static_cast<std::size_t>(frames) * 2);
+  if (audio_.mixer.ready()) {
+    audio_.mixer.render(audio_.out.data(), frames);
     // the page plays the original's own sound (game_audio_web.cpp): Kern's mix is not heard and
     // its music not made
-    if (web_audio_) std::fill(audio_out_.begin(), audio_out_.end(), 0.0f);
-    else ui_render_music(audio_out_.data(), frames);  // title music and car radio (game_equipment.cpp)
+    if (audio_.web_audio) std::fill(audio_.out.begin(), audio_.out.end(), 0.0f);
+    else ui_render_music(audio_.out.data(), frames);  // title music and car radio (game_equipment.cpp)
   }
-  else std::fill(audio_out_.begin(), audio_out_.end(), 0.0f);
-  mix_voice(audio_out_.data(), frames);  // proximity voice of the other players (game_net.cpp)
-  return audio_out_.data();
+  else std::fill(audio_.out.begin(), audio_.out.end(), 0.0f);
+  mix_voice(audio_.out.data(), frames);  // proximity voice of the other players (game_net.cpp)
+  return audio_.out.data();
 }
 
 void Game::update_sound(f32 dt) {
-  if (!mixer_.ready() || !world_) return;
-  bank_->prepare(3);
+  if (!audio_.mixer.ready() || !world_) return;
+  audio_.bank->prepare(3);
   ui_mix_cues();  // settings: shots / steps before GameAudio plays the cues (game_ui.cpp)
-  game_audio_->update(*world_, cam_, dt);
+  audio_.game_audio->update(*world_, view_.cam, dt);
   SoundState s;
-  if (drone_out_) {
+  if (vehicle_.drone_out) {
     const DroneTelemetry& t = drone_.telemetry();
     f32 w = 0;
     for (f32 o : t.omega) w += o;
@@ -1323,7 +1323,7 @@ void Game::update_sound(f32 dt) {
     s.car.rate = clampf(std::fabs(c.car->forward_speed()) / 32, 0, 1);
     s.car.load = c.car->throttle();
   }
-  if (jet_placed_ && jet_.thrust() > 100) {
+  if (vehicle_.jet_placed && jet_.thrust() > 100) {
     s.jet.active = true;
     s.jet.position = matrix_of(jet_actor_).translation();
     s.jet.velocity = world_->actor_velocity(jet_actor_);
@@ -1334,7 +1334,7 @@ void Game::update_sound(f32 dt) {
   gaps_jet_audio(dt);  // fighter_jets.mjs: roar with retarded time and Doppler (game_gaps.cpp)
   s.wind = kern::length(world_->actor_velocity(mode_ == Mode::jet ? jet_actor_ : mode_ == Mode::parachute ? chute_actor_ : soldier_));
   ui_mix_audio(s);  // settings: audio sliders (game_ui.cpp)
-  fx_.update(s, dt);
+  audio_.fx.update(s, dt);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1351,28 +1351,28 @@ std::string Game::hud_json() {
       st.colliders);
   add(",\"t\":{\"request\":%.0f,\"data\":%.0f,\"decoded\":%.0f,\"terrain\":%.0f,\"built\":%.0f,\"collision\":%.0f,\"work\":%.0f,\"worst\":%.1f,\"worstStep\":\"%s\",\"worstStepMs\":%.1f,\"rebuilds\":%u,\"relays\":%u,\"uploads\":%u,\"uploadKVerts\":%u}}", st.t_request, st.t_data,
       st.t_decoded, st.t_terrain, st.t_built, st.t_collision, st.work_ms, st.worst_ms, st.worst_step, st.worst_step_ms, st.rebuilds, st.relays, st.uploads, st.upload_vertices);
-  if (vr_) s += vr_menu_json();  // the headset's wrist menu (game_vr.cpp)
+  if (vr_.on) s += vr_menu_json();  // the headset's wrist menu (game_vr.cpp)
   hud_world(s);  // terrain, water, animals, ... (game_world.cpp)
   life_hud(s);   // animals, street life, ragdolls, interiors (game_life.cpp)
   add(",\"fps\":%.0f,\"touch\":%s,\"stars\":%d,\"heat\":%.1f", fps_, touch_mode_ ? "true" : "false", wanted::stars(), wanted::heat());
   {
     u32 units = 0;
-    for (const PoliceUnit& u : units_) units += u.car >= 0 ? 1 : 0;
+    for (const PoliceUnit& u : police_.units) units += u.car >= 0 ? 1 : 0;
     add(",\"people\":%u,\"officers\":%u,\"police\":%u", people_.count(People::Kind::citizen), people_.count(People::Kind::officer), units);
     if (mode_ == Mode::car && car_index_ >= 0) add(",\"carHp\":%.0f", cars_[car_index_].hp);
     const f32 now = world_->sim_time();
-    add(",\"weapon\":\"%s\",\"grenades\":%d,\"emp\":%.1f,\"projectiles\":%u", mode_ == Mode::drone ? (drone_weapon_ == 0 ? "MG" : drone_weapon_ == 1 ? "Raketen" : "GUIDED")
-        : mode_ == Mode::jet ? "Bordkanone" : weapons::spec(foot_weapon_).name, grenades_, std::fmax(0.0f, emp_ready_at_ - now), static_cast<u32>(projectiles_.size()));
+    add(",\"weapon\":\"%s\",\"grenades\":%d,\"emp\":%.1f,\"projectiles\":%u", mode_ == Mode::drone ? (weapons_.drone_weapon == 0 ? "MG" : weapons_.drone_weapon == 1 ? "Raketen" : "GUIDED")
+        : mode_ == Mode::jet ? "Bordkanone" : weapons::spec(weapons_.foot_weapon).name, weapons_.grenades, std::fmax(0.0f, police_.emp_ready_at - now), static_cast<u32>(weapons_.projectiles.size()));
     u32 drones = 0;
-    for (const PoliceDrone& d : pdrones_) drones += d.active ? 1 : 0;
-    add(",\"policeDrones\":%u,\"explosions\":%u", drones, explosions_);
+    for (const PoliceDrone& d : police_.pdrones) drones += d.active ? 1 : 0;
+    add(",\"policeDrones\":%u,\"explosions\":%u", drones, weapons_.explosions);
     if (net_.active()) {
       add(",\"net\":{\"host\":%s,\"connected\":%s,\"slot\":%u,\"players\":%zu,\"status\":\"%s\"}", net_.hosting() ? "true" : "false", net_.connected() ? "true" : "false",
           net_.self_slot(), net_.remotes().size() + 1, json_escape(net_.status()).c_str());
     }
     s += mp_hud_json();  // multiplayer HUD data (game_net.cpp)
-    if (mode_ == Mode::drone) add(",\"droneHp\":%.0f", drone_hp_);
-    if (mode_ == Mode::jet) add(",\"jetHp\":%.0f", jet_hp_);
+    if (mode_ == Mode::drone) add(",\"droneHp\":%.0f", vehicle_.drone_hp);
+    if (mode_ == Mode::jet) add(",\"jetHp\":%.0f", vehicle_.jet_hp);
   }
   const kern::game::Hud& h = world_->hud();
   // Launchers and melee are the game's: their rounds (melee: none) instead of Kern's magazine.
@@ -1394,8 +1394,8 @@ std::string Game::hud_json() {
       agl = t.agl >= 0 ? t.agl : agl;
       add(",\"drone\":{\"armed\":%s,\"calibrating\":%s,\"fault\":%s,\"game\":%s,\"landing\":%s,\"battery\":%.2f,\"volts\":%.2f,\"amps\":%.1f,\"clearance\":%.1f,"
           "\"cam\":%d,\"pulses\":[%u,%u,%u,%u]}",
-          t.armed ? "true" : "false", t.calibrating ? "true" : "false", t.fault ? "true" : "false", sticks_.game_mode ? "true" : "false",
-          landing_ ? "true" : "false", t.battery_soc, t.battery_v, t.current_a, sticks_.clearance, drone_cam_, t.pulses[0], t.pulses[1], t.pulses[2],
+          t.armed ? "true" : "false", t.calibrating ? "true" : "false", t.fault ? "true" : "false", vehicle_.sticks.game_mode ? "true" : "false",
+          vehicle_.landing ? "true" : "false", t.battery_soc, t.battery_v, t.current_a, vehicle_.sticks.clearance, view_.drone_cam, t.pulses[0], t.pulses[1], t.pulses[2],
           t.pulses[3]);
       break;
     }
@@ -1409,7 +1409,7 @@ std::string Game::hud_json() {
         i32 contacts = 0;
         for (int w = 0; w < 4; ++w) contacts += cc.wheel(w).contact ? 1 : 0;
         add(",\"car\":{\"gear\":\"%s\",\"bus\":%s,\"throttle\":%.2f,\"vf\":%.2f,\"contacts\":%d,\"agl\":%.2f,\"jacked\":%.0f,\"awake\":%s}", cc.gear() < 0 ? "R" : "D",
-            cc.spec().radius > 0.4f ? "true" : "false", cc.throttle(), cc.forward_speed(), contacts, cp.z - city_.ground_height(cp.x, cp.y), jacked_at_,
+            cc.spec().radius > 0.4f ? "true" : "false", cc.throttle(), cc.forward_speed(), contacts, cp.z - city_.ground_height(cp.x, cp.y), vehicle_.jacked_at,
             world_->physics().body_valid(body(cars_[car_index_].actor)) && world_->physics().awake(body(cars_[car_index_].actor)) ? "true" : "false");
       }
       }
@@ -1424,7 +1424,7 @@ std::string Game::hud_json() {
           jet_.gear_down() ? "true" : "false", std::fmod(-t.heading / kDeg + 360, 360.0f), t.pitch / kDeg, t.roll / kDeg, jet_.fuel);
       break;
     }
-    case Mode::parachute: vel = world_->actor_velocity(chute_actor_); add(",\"chute\":%s", chute_open_ ? "true" : "false"); break;
+    case Mode::parachute: vel = world_->actor_velocity(chute_actor_); add(",\"chute\":%s", vehicle_.chute_open ? "true" : "false"); break;
   }
   add(",\"speed\":%.2f,\"vz\":%.2f,\"agl\":%.1f,\"alt\":%.1f,\"t\":%.3f", kern::length(vel), vel.z, agl, pos.z, world_->sim_time());
   f64 lon, lat;
@@ -1437,7 +1437,7 @@ std::string Game::hud_json() {
     // player_car_mode.mjs / jet_mode.mjs renderButtons: the key of the device in use (touch: the round buttons)
     const char* k = ctl_.dev.pad ? "\u24CD  " : "F · ";
     if (!touch_mode_) {
-      if (jet_placed_ && std::hypot(matrix_of(jet_actor_).translation().x - me.x, matrix_of(jet_actor_).translation().y - me.y) < kEnterJet) hint_ = std::string(k) + "\u2708 JET EINSTEIGEN";
+      if (vehicle_.jet_placed && std::hypot(matrix_of(jet_actor_).translation().x - me.x, matrix_of(jet_actor_).translation().y - me.y) < kEnterJet) hint_ = std::string(k) + "\u2708 JET EINSTEIGEN";
       for (const TrafficCar& c : cars_) {
         if (!c.placed) continue;
         const Vec3 p = matrix_of(c.actor).translation();
@@ -1485,7 +1485,7 @@ std::string Game::command(const std::string& cmd) {
     if (mode_ != Mode::foot) return "busy";
     if (m == "drone") { toggle_drone(); return mode_name(mode_); }
     const Vec3 me = matrix_of(soldier_).translation();
-    if (m == "jet" && jet_placed_) {
+    if (m == "jet" && vehicle_.jet_placed) {
       // Walk up to the jet (debug / tests): stand next to it, then board.
       const Vec3 j = matrix_of(jet_actor_).translation();
       world_->teleport(soldier_, {j.x + 4, j.y, city_.ground_height(j.x + 4, j.y) + 0.73f});
@@ -1522,7 +1522,7 @@ std::string Game::command(const std::string& cmd) {
       }
       {
         const Vec3 p = matrix_of(cars_[best].actor).translation();
-        jacked_at_ = std::hypot(p.x - me.x, p.y - me.y);  // tests: how far away the car was
+        vehicle_.jacked_at = std::hypot(p.x - me.x, p.y - me.y);  // tests: how far away the car was
       }
       switch_mode(Mode::car, best);
       return mode_name(mode_);
@@ -1540,15 +1540,15 @@ std::string Game::command(const std::string& cmd) {
   }
   // simulator.mjs camFpv / camFollow / camThird: the drone's camera by name (any mode: the preference)
   if (cmd == "cam fpv" || cmd == "cam follow" || cmd == "cam third") {
-    drone_cam_ = cmd == "cam fpv" ? 0 : cmd == "cam follow" ? 1 : 2;
-    rig_init_ = false;
+    view_.drone_cam = cmd == "cam fpv" ? 0 : cmd == "cam follow" ? 1 : 2;
+    view_.rig_init = false;
     return cmd.substr(4);
   }
   if (cmd == "cam") {
     // Same as C / View: the mode's next camera.
-    if (mode_ == Mode::drone) { drone_cam_ = (drone_cam_ + 1) % 3; rig_init_ = false; return drone_cam_ == 0 ? "fpv" : drone_cam_ == 1 ? "follow" : "third"; }
-    if (mode_ == Mode::car) { car_cockpit_ = !car_cockpit_; return car_cockpit_ ? "cockpit" : "chase"; }
-    if (mode_ == Mode::jet) { jet_cockpit_ = !jet_cockpit_; return jet_cockpit_ ? "cockpit" : "chase"; }
+    if (mode_ == Mode::drone) { view_.drone_cam = (view_.drone_cam + 1) % 3; view_.rig_init = false; return view_.drone_cam == 0 ? "fpv" : view_.drone_cam == 1 ? "follow" : "third"; }
+    if (mode_ == Mode::car) { view_.car_cockpit = !view_.car_cockpit; return view_.car_cockpit ? "cockpit" : "chase"; }
+    if (mode_ == Mode::jet) { view_.jet_cockpit = !view_.jet_cockpit; return view_.jet_cockpit ? "cockpit" : "chase"; }
     return "none";
   }
   // Multiplayer, voice, pings, big map and navigation (game_net.cpp).
@@ -1558,25 +1558,25 @@ std::string Game::command(const std::string& cmd) {
   if (starts("lamps ")) { show_lamps_ = cmd[6] == '1'; return show_lamps_ ? "on" : "off"; }
   if (cmd == "attack") {
     // Tests: one attack with the weapon in hand (as a click).
-    const std::size_t before = projectiles_.size();
+    const std::size_t before = weapons_.projectiles.size();
     if (mode_ == Mode::foot) foot_attack(true, true);
     else if (mode_ == Mode::drone) drone_attack(true, true);
     else if (mode_ == Mode::jet) jet_attack(true, true, false);
-    std::string r = std::to_string(projectiles_.size() - before) + " " + std::to_string(next_attack_ - world_->sim_time()) + " mag " + std::to_string(ammo_mag_[static_cast<u8>(foot_weapon_)]);
-    if (!projectiles_.empty()) {
-      const Projectile& p = projectiles_.back();
+    std::string r = std::to_string(weapons_.projectiles.size() - before) + " " + std::to_string(weapons_.next_attack - world_->sim_time()) + " mag " + std::to_string(weapons_.ammo_mag[static_cast<u8>(weapons_.foot_weapon)]);
+    if (!weapons_.projectiles.empty()) {
+      const Projectile& p = weapons_.projectiles.back();
       char b[160];
       std::snprintf(b, sizeof b, " pos %.1f %.1f %.1f vel %.1f %.1f %.1f", p.pos.x, p.pos.y, p.pos.z, p.vel.x, p.vel.y, p.vel.z);
       r += b;
     }
     return r;
   }
-  if (starts("vr hud ")) { vr_hud_tex_ = static_cast<u32>(std::atoi(cmd.c_str() + 7)); vr_hud_mesh_ = 0; return "hud"; }
+  if (starts("vr hud ")) { vr_.hud_tex = static_cast<u32>(std::atoi(cmd.c_str() + 7)); vr_.hud_mesh = 0; return "hud"; }
   if (cmd == "vr state") {
     char b[200];
     const Vec3 rf = engine_ ? engine_->xr_room_forward : Vec3{};
     std::snprintf(b, sizeof b, "{\"body\":%.1f,\"head\":%.1f,\"room\":%.1f,\"follow\":%d,\"hand\":%d,\"arms\":%d,\"scope\":%d}", world_->camera_yaw(), engine_ ? engine_->xr_head_yaw : 0,
-                  std::atan2(rf.y, rf.x) / kDeg, engine_ && engine_->xr_follow_head ? 1 : 0, vr_hands_[1].valid ? 1 : 0, vr_arms_ ? 1 : 0, engine_ && engine_->xr_scope ? 1 : 0);
+                  std::atan2(rf.y, rf.x) / kDeg, engine_ && engine_->xr_follow_head ? 1 : 0, vr_.hands[1].valid ? 1 : 0, vr_.arms ? 1 : 0, engine_ && engine_->xr_scope ? 1 : 0);
     return b;
   }
   if (cmd == "destroy sync") return dsync_json();
@@ -1585,19 +1585,19 @@ std::string Game::command(const std::string& cmd) {
   if (cmd == "world list") return worldsync_list();  // the street life here (tests: game_worldsync.cpp)
   if (cmd == "vr 1" || cmd == "vr 0") {
     // the page entered / left VR: the views from the inside (FPV drone, cockpits), a level camera
-    vr_ = cmd == "vr 1";
-    if (vr_) { drone_cam_ = 0; car_cockpit_ = true; jet_cockpit_ = true; rig_init_ = false; }
+    vr_.on = cmd == "vr 1";
+    if (vr_.on) { view_.drone_cam = 0; view_.car_cockpit = true; view_.jet_cockpit = true; view_.rig_init = false; }
     // a headset draws two eyes at 72-90 Hz: start low, never above the middle level (a missed
     // frame there is a stutter you feel); back on the page the platform's own ladder
-    if (vr_) look_.gov.reset(1, 2);
+    if (vr_.on) look_.gov.reset(1, 2);
     else look_.gov.reset(mobile_ ? perf::kMobileStart : perf::kDesktopStart, mobile_ ? perf::kMobileMax : perf::kTiers - 1);
     look_apply_tier();
-    return vr_ ? "vr" : "flat";
+    return vr_.on ? "vr" : "flat";
   }
   if (starts("weapon ")) {
     const int n = std::atoi(cmd.c_str() + 7);
     if (n >= 0 && n < 8) select_foot_weapon(static_cast<weapons::Id>(n));
-    return weapons::spec(foot_weapon_).name;
+    return weapons::spec(weapons_.foot_weapon).name;
   }
   if (cmd == "blueprints") {
     // Tests / debugging: the level's Blueprints as they run - name, how they are executed
@@ -1617,7 +1617,7 @@ std::string Game::command(const std::string& cmd) {
     const int n = std::atoi(cmd.c_str() + 7);
     wanted::clear();
     for (int k = 0; k < 64 && wanted::stars() < n; ++k) wanted::report(wanted::Crime::police_officer, true);
-    if (n > 0) star_since_ = world_->sim_time() - wanted::arrival_delay_ms(wanted::stars()) / 1000;  // units are due at once
+    if (n > 0) police_.star_since = world_->sim_time() - wanted::arrival_delay_ms(wanted::stars()) / 1000;  // units are due at once
     return std::to_string(wanted::stars());
   }
   {
@@ -1719,8 +1719,8 @@ std::string Game::command(const std::string& cmd) {
   if (cmd == "camera") {
     // tests: where the view is (the overview while loading, else the mode's camera)
     char b[256];
-    std::snprintf(b, sizeof b, "{\"eye\":[%.1f,%.1f,%.1f],\"target\":[%.1f,%.1f,%.1f],\"valid\":%s,\"soldier\":%s,\"placed\":%s,\"mode\":\"%s\"}", cam_.eye.x, cam_.eye.y,
-                  cam_.eye.z, cam_.target.x, cam_.target.y, cam_.target.z, cam_valid_ ? "true" : "false", world_->actor_alive(soldier_) ? "true" : "false", world_placed_ ? "true" : "false",
+    std::snprintf(b, sizeof b, "{\"eye\":[%.1f,%.1f,%.1f],\"target\":[%.1f,%.1f,%.1f],\"valid\":%s,\"soldier\":%s,\"placed\":%s,\"mode\":\"%s\"}", view_.cam.eye.x, view_.cam.eye.y,
+                  view_.cam.eye.z, view_.cam.target.x, view_.cam.target.y, view_.cam.target.z, view_.cam_valid ? "true" : "false", world_->actor_alive(soldier_) ? "true" : "false", world_placed_ ? "true" : "false",
                   mode_name(mode_));
     return b;
   }

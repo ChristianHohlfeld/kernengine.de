@@ -93,7 +93,7 @@ void Game::toss_update(f32 dt) {
   const f32 now = world_->sim_time();
   auto body_ok = [&](kern::physics::Body b) { return b.valid() && w.body_valid(b) && w.body_type(b) == kern::physics::BodyType::dynamic; };
   auto held_here = [&](const TossState::Own& o) {
-    for (const VrHand& h : vr_hands_) {
+    for (const VrHand& h : vr_.hands) {
       if (o.kind == kPerson && h.grab_person == o.local) return true;
       if (o.kind == kBird && h.bird == o.local) return true;
       if ((o.kind == kCow || o.kind == kPet) && h.grab.valid()) { u64 id = 0; const u8 a = L.animal_of(h.grab, id); if ((a == 1 && o.kind == kCow && id == o.id) || (a == 2 && o.kind == kPet && id == o.id)) return true; }
@@ -303,7 +303,7 @@ std::string Game::toss_json() {
   char b[256];
   u32 ghosts = 0, rounds = 0;
   Vec3 gp;
-  for (const Projectile& p : projectiles_) { if (!p.alive) continue; if (p.ghost) { ++ghosts; gp = p.pos; } else ++rounds; }
+  for (const Projectile& p : weapons_.projectiles) { if (!p.alive) continue; if (p.ghost) { ++ghosts; gp = p.pos; } else ++rounds; }
   std::snprintf(b, sizeof b, "{\"own\":%zu,\"remote\":%zu,\"sent\":%u,\"got\":%u,\"rounds\":%u,\"ghosts\":%u,\"ghost\":[%.2f,%.2f,%.2f]}", t.own.size(), t.remote.size(), t.sent, t.got, rounds, ghosts, gp.x, gp.y, gp.z);
   return b;
 }

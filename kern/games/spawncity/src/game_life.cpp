@@ -155,7 +155,7 @@ void Game::life_update(f32 dt) {
     G.interiors.init(engine_->renderer, world_->physics());
     G.ready = true;
   }
-  if (!G.sounds_ready && mixer_.ready()) { make_sounds(mixer_, G.clips); G.sounds_ready = true; }
+  if (!G.sounds_ready && audio_.mixer.ready()) { make_sounds(audio_.mixer, G.clips); G.sounds_ready = true; }
   const f32 now = world_->sim_time();
   kern::physics::World& w = world_->physics();
   // the world as street life sees it
@@ -166,7 +166,7 @@ void Game::life_update(f32 dt) {
   v.focus = focus_position();
   v.player = player_position();
   if (mode_ == Mode::foot) v.player.z -= 0.73f;
-  v.eye = cam_.eye;
+  v.eye = view_.cam.eye;
   v.on_foot = mode_ == Mode::foot;
   v.people_on = ui_.settings.on(Opt::world_people);
   v.birds_on = ui_.settings.on(Opt::world_birds);
@@ -225,7 +225,7 @@ void Game::life_update(f32 dt) {
         pp.spatial = true;
         pp.position = p.pos + Vec3{0, 0, 1};
         pp.max_distance = 60;
-        mixer_.play(G.clips[static_cast<u32>(Sound::thud)], pp);
+        audio_.mixer.play(G.clips[static_cast<u32>(Sound::thud)], pp);
       }
       osfx("people_impacts.thump", p.pos, std::fmin(0.9f, 0.25f + sp * 0.04f));
     } else {
@@ -297,7 +297,7 @@ void Game::life_update(f32 dt) {
       osfx("street_voices.scream", p.pos + Vec3{0, 0, 1.6f}, static_cast<f32>((static_cast<u32>(i) * 2654435761u + p.seed) & 0xffffff));
     G.prev_hands[i] = p.hands_up_until;
     if (p.kind != People::Kind::citizen || p.state == People::State::down || p.state == People::State::gone) continue;
-    const f32 hear = kern::length(p.pos + Vec3{0, 0, 1.6f} - cam_.eye);
+    const f32 hear = kern::length(p.pos + Vec3{0, 0, 1.6f} - view_.cam.eye);
     if (hear > 55) continue;
     const u32 seed = static_cast<u32>(i) * 2654435761u + p.seed;
     if (p.state == People::State::flee && was != st && was != 255) {
@@ -336,12 +336,12 @@ void Game::life_update(f32 dt) {
       if (since <= 0) since = now;
       const f32 wait = now - since;
       f32& next = slot(G.next_honk);
-      if (web_audio_ && (wait < (who == -1 ? 2.6f : 7.0f) || now < next)) continue;
+      if (audio_.web_audio && (wait < (who == -1 ? 2.6f : 7.0f) || now < next)) continue;
       const bool bus = c.half.x > 3;
-      const bool honked = G.life.honk(c.position, bus, static_cast<u32>(c.car), now, kern::length(c.position - cam_.eye), out);
+      const bool honked = G.life.honk(c.position, bus, static_cast<u32>(c.car), now, kern::length(c.position - view_.cam.eye), out);
       if (honked) { next = now + 9 + rng_.unit() * 7; osfx("street_voices.honk", c.position + Vec3{0, 0, 0.4f}, bus ? 1 : 0, wait > 6 ? 2 : who == -1 ? 1 : 0); }
       if (honked && who >= 0)
-        G.life.shout(all[who].pos, "honked", static_cast<u32>(who) * 2654435761u, now, kern::length(all[who].pos - cam_.eye), out);
+        G.life.shout(all[who].pos, "honked", static_cast<u32>(who) * 2654435761u, now, kern::length(all[who].pos - view_.cam.eye), out);
     }
   }
   // ---- walkable buildings
@@ -357,7 +357,7 @@ void Game::life_update(f32 dt) {
     pp.min_distance = s.sound == Sound::horn_bus ? 9 : 4;
     pp.max_distance = s.sound == Sound::horn || s.sound == Sound::horn_bus ? 160 : s.sound == Sound::jingle ? 400 : 60;
     if (s.sound == Sound::jingle) pp.spatial = false;
-    mixer_.play(G.clips[static_cast<u32>(s.sound)], pp);
+    audio_.mixer.play(G.clips[static_cast<u32>(s.sound)], pp);
     osfx("life", s.at, static_cast<f32>(static_cast<u32>(s.sound)), s.volume, s.pitch);  // audio.mjs LIFE: cows / pigeons / joggers / animals / voices
   }
   for (const LifeOut::Burst& b : out.bursts) world_->particle_burst(b.at, b.color);
@@ -384,8 +384,8 @@ void Game::life_draw() {
   const f32 now = world_ ? world_->sim_time() : 0;
   G.art.begin();
   if (world_placed_) {
-    G.art.life(G.life, now, cam_.eye, 170 * std::fmin(view_zoom(), 3.0f));  // the scope sees farther
-    G.interiors.draw(G.art, now, cam_.eye);
+    G.art.life(G.life, now, view_.cam.eye, 170 * std::fmin(view_zoom(), 3.0f));  // the scope sees farther
+    G.interiors.draw(G.art, now, view_.cam.eye);
   }
   G.art.end();
 }
@@ -399,7 +399,7 @@ void Game::life_draw_people() {
   const u32 skins[5] = {0xe0b08c, 0xc48e6c, 0xa87052, 0x7b4a33, 0xd2a27e};
   for (u32 i = 0; i < 10; ++i) {
     const Life::Runner& r = c->runners[i];
-    if (!r.alive || kern::length(r.pos - cam_.eye) > 220) continue;
+    if (!r.alive || kern::length(r.pos - view_.cam.eye) > 220) continue;
     People::Person p;
     p.pos = r.pos;
     p.yaw = r.yaw_s;
@@ -492,7 +492,7 @@ void Game::life_hud(std::string& s) {
   s += "],\"bubbles\":[";
   bool first = true;
   const f32 aspect = frame_h_ > 0 ? frame_w_ / frame_h_ : 16.0f / 9;
-  const kern::Mat4 vp = kern::projection_matrix(cam_, aspect) * kern::Mat4::look_at(cam_.eye, cam_.target, cam_.up);
+  const kern::Mat4 vp = kern::projection_matrix(view_.cam, aspect) * kern::Mat4::look_at(view_.cam.eye, view_.cam.target, view_.cam.up);
   for (const Life::Voice& vc : L.voices()) {
     const kern::Vec4 c = vp.transform({vc.at.x, vc.at.y, vc.at.z, 1});
     if (c.w <= 0.1f) continue;
@@ -517,7 +517,7 @@ bool Game::life_command(const std::string& cmd, std::string& out) {
   const f32 now = world_->sim_time();
   Vec3 me = player_position();
   if (mode_ == Mode::foot) me.z -= 0.73f;
-  const Vec3 look = kern::normalize(Vec3{cam_.target.x - cam_.eye.x, cam_.target.y - cam_.eye.y, 0}, {1, 0, 0});
+  const Vec3 look = kern::normalize(Vec3{view_.cam.target.x - view_.cam.eye.x, view_.cam.target.y - view_.cam.eye.y, 0}, {1, 0, 0});
   char b[256];
   if (cmd == "life") {
     std::string s;
@@ -560,7 +560,7 @@ bool Game::life_command(const std::string& cmd, std::string& out) {
     v.physics = &world_->physics();
     v.city = &city_;
     v.focus = v.player = me;
-    v.eye = cam_.eye;
+    v.eye = view_.cam.eye;
     out = G.life.spawn_joggers(v, now, rng_) ? "ok" : "no street";
     return true;
   }
@@ -620,7 +620,7 @@ bool Game::life_command(const std::string& cmd, std::string& out) {
         pp.spatial = true;
         pp.position = s.at;
         pp.max_distance = 160;
-        mixer_.play(G.clips[static_cast<u32>(s.sound)], pp);
+        audio_.mixer.play(G.clips[static_cast<u32>(s.sound)], pp);
       }
     return true;
   }

@@ -25,22 +25,22 @@ constexpr Loadout kFoot[] = {{Id::smg, 30, 150}, {Id::glock, 17, 85}, {Id::snipe
 
 void Game::init_weapons() {
   for (const Loadout& l : kFoot) {
-    ammo_mag_[static_cast<u8>(l.id)] = l.magazine;
-    ammo_reserve_[static_cast<u8>(l.id)] = l.reserve;
+    weapons_.ammo_mag[static_cast<u8>(l.id)] = l.magazine;
+    weapons_.ammo_reserve[static_cast<u8>(l.id)] = l.reserve;
   }
-  grenades_ = 4;
-  foot_weapon_ = Id::glock;  // SpawnCity starts with the pistol
+  weapons_.grenades = 4;
+  weapons_.foot_weapon = Id::glock;  // SpawnCity starts with the pistol
 }
 
 void Game::select_foot_weapon(Id id) {
-  if (id == foot_weapon_) return;
+  if (id == weapons_.foot_weapon) return;
   // Keep the rounds of the gun we put away.
   kern::game::SoldierState st;
-  if (world_->soldier_state(soldier_, st) && hitscan_on_foot(foot_weapon_) && st.ammo >= 0) {
-    ammo_mag_[static_cast<u8>(foot_weapon_)] = st.ammo;
-    ammo_reserve_[static_cast<u8>(foot_weapon_)] = st.reserve;
+  if (world_->soldier_state(soldier_, st) && hitscan_on_foot(weapons_.foot_weapon) && st.ammo >= 0) {
+    weapons_.ammo_mag[static_cast<u8>(weapons_.foot_weapon)] = st.ammo;
+    weapons_.ammo_reserve[static_cast<u8>(weapons_.foot_weapon)] = st.reserve;
   }
-  foot_weapon_ = id;
+  weapons_.foot_weapon = id;
   const weapons::Spec& s = weapons::spec(id);
   using kern::json::Value;
   auto set = [&](const char* key, Value v) { world_->set_property(soldier_, std::string("components.weapon.") + key, v); };
@@ -67,25 +67,25 @@ void Game::select_foot_weapon(Id id) {
     set("aimSpread", Value(0.0));
     set("recoil", Value(0.0));
     if (world_->soldier_state(soldier_, st)) {
-      st.ammo = ammo_mag_[static_cast<u8>(id)];
-      st.reserve = ammo_reserve_[static_cast<u8>(id)];
+      st.ammo = weapons_.ammo_mag[static_cast<u8>(id)];
+      st.reserve = weapons_.ammo_reserve[static_cast<u8>(id)];
       world_->apply_soldier_state(st);
     }
   }
   toast_ = std::string("Waffe: ") + s.name;
   toast_age_ = 0;
-  next_attack_ = std::max(next_attack_, world_->sim_time() + 0.25f);
+  weapons_.next_attack = std::max(weapons_.next_attack, world_->sim_time() + 0.25f);
 }
 
 void Game::cycle_foot_weapon(i32 step) {
   const i32 n = static_cast<i32>(sizeof kFoot / sizeof kFoot[0]);
   i32 cur = 0;
   for (i32 i = 0; i < n; ++i)
-    if (kFoot[i].id == foot_weapon_) cur = i;
+    if (kFoot[i].id == weapons_.foot_weapon) cur = i;
   select_foot_weapon(kFoot[((cur + step) % n + n) % n].id);
 }
 
-bool Game::game_weapon_in_hand() const { return mode_ == Mode::foot && !hitscan_on_foot(foot_weapon_); }
+bool Game::game_weapon_in_hand() const { return mode_ == Mode::foot && !hitscan_on_foot(weapons_.foot_weapon); }
 
 // ---------------------------------------------------------------------------------------------
 // hits
@@ -93,8 +93,8 @@ bool Game::game_weapon_in_hand() const { return mode_ == Mode::foot && !hitscan_
 Vec3 Game::aim_ray(Vec3& dir) const {
   // touch: the shot goes through the finger (foot_touch_controller.mjs fireAt, game_controls.cpp)
   if (ctl_.aim_point || (engine_ && engine_->xr)) { Vec3 from; ctl_screen_ray(ctl_.aim_x, ctl_.aim_y, from, dir); return from; }
-  dir = kern::normalize(cam_.target - cam_.eye, {1, 0, 0});
-  return cam_.eye;
+  dir = kern::normalize(view_.cam.target - view_.cam.eye, {1, 0, 0});
+  return view_.cam.eye;
 }
 
 bool Game::hit_scan(Vec3 from, Vec3 dir, f32 range, f32 damage, bool by_player, kern::physics::Body ignore, kern::game::ShotEvent& out) {
@@ -109,7 +109,7 @@ bool Game::hit_scan(Vec3 from, Vec3 dir, f32 range, f32 damage, bool by_player, 
   if (by_player) people_.frighten(from, 22, now, 1);
   Vec3 to = out.to;
   // Police drones on the line.
-  for (PoliceDrone& d : pdrones_) {
+  for (PoliceDrone& d : police_.pdrones) {
     if (!d.active) continue;
     const Vec3 seg = to - from;
     const f32 t = clampf(kern::dot(d.pos - from, seg) / std::fmax(1e-6f, kern::dot(seg, seg)), 0, 1);
@@ -130,7 +130,7 @@ bool Game::hit_scan(Vec3 from, Vec3 dir, f32 range, f32 damage, bool by_player, 
   }
   i32 person = -1;
   bool remote = false;
-  shot_flesh_ = false;
+  weapons_.shot_flesh = false;
   // the pilot standing below his drone: your own rounds hurt him as anyone's (the original's
   // self-hit; his body is the soldier's capsule, the hit is by the person's pose)
   if (by_player && mode_ == Mode::drone && !player_dead_ && world_->actor_alive(soldier_)) {
@@ -141,17 +141,17 @@ bool Game::hit_scan(Vec3 from, Vec3 dir, f32 range, f32 damage, bool by_player, 
       out.to = from + (to - from) * t;
       out.surface = 3;
       out.impact = true;
-      shot_flesh_ = true;
+      weapons_.shot_flesh = true;
       world_->damage(soldier_, damage * (part == BodyPart::head ? 2.0f : part == BodyPart::legs ? 0.7f : 1.0f), 0, false, from);
       return true;
     }
   }
   if ((by_player && (remote = hit_remotes(from, to, damage))) || (person = people_.shot(from, to, damage, by_player, now)) >= 0 || (by_player && life_shot(from, to, damage))) {  // life_shot: M3 life
-    shot_flesh_ = remote || person >= 0;  // world_action_feedback.mjs materialKind: person / player -> flesh
+    weapons_.shot_flesh = remote || person >= 0;  // world_action_feedback.mjs materialKind: person / player -> flesh
     if (person >= 0 && by_player) osfx("gameplay_polish_lite.playPersonGroan", to);  // a person hit (registerWorldPopulationHit)
     // a touch shot with the Glock or the sniper goes through bodies too (glockShotAt / sniperShotAt:
     // up to three, 0.6 m on past each), as handle_shots does for Kern's own rounds
-    if (by_player && mode_ == Mode::foot && (foot_weapon_ == Id::glock || foot_weapon_ == Id::sniper)) {
+    if (by_player && mode_ == Mode::foot && (weapons_.foot_weapon == Id::glock || weapons_.foot_weapon == Id::sniper)) {
       const Vec3 end = r.hit ? r.point : from + dir * range;
       Vec3 at = to + dir * 0.6f;
       for (int pierced = 1; pierced < 3 && kern::dot(end - at, dir) > 0.5f; ++pierced) {
@@ -198,7 +198,7 @@ void Game::fire_projectile(Id id, Vec3 from, Vec3 vel, bool by_player, kern::phy
   if (id == Id::hand_grenade) p.next_collision = p.born + 0.06f;  // throwHandGrenade nextCollisionAt +60 ms
   p.guided = id == Id::drone_guided;
   p.net = ++proj_serial_ & 0x7fff;
-  projectiles_.push_back(p);
+  weapons_.projectiles.push_back(p);
   const char* snd = id == Id::hand_grenade || id == Id::jet_bomb ? "builtin:jump" : "builtin:launcher";
   world_->play_sound(snd, from, 0.9f, id == Id::jet_missile ? 0.8f : 1.0f, true);
   osfx("launch", from, static_cast<f32>(static_cast<i32>(id)), by_player ? 1 : 0);  // audio.mjs: the weapon's own launch sound
@@ -206,11 +206,11 @@ void Game::fire_projectile(Id id, Vec3 from, Vec3 vel, bool by_player, kern::phy
 }
 
 void Game::update_projectiles(f32 dt) {
-  if (projectiles_.empty()) return;
+  if (weapons_.projectiles.empty()) return;
   const f32 now = world_->sim_time();
   Vec3 aim_dir;
   const Vec3 aim_from = aim_ray(aim_dir);
-  for (Projectile& p : projectiles_) {
+  for (Projectile& p : weapons_.projectiles) {
     if (!p.alive || p.ghost) continue;  // (a mate's round: moved by its stream, game_projsync.cpp)
     bool boom = false;
     Vec3 at = p.pos;
@@ -250,7 +250,7 @@ void Game::update_projectiles(f32 dt) {
       if (!boom && people_.shot(p.pos, seg_to, 0, false, now, -1, 0) >= 0) { boom = true; at = seg_to; }
       if (!boom && p.by_player && round_meets_mate(p.pos, seg_to, at)) boom = true;  // a mate's body or vehicle
       if (!boom)
-        for (const PoliceDrone& d : pdrones_)
+        for (const PoliceDrone& d : police_.pdrones)
           if (d.active && kern::length(d.pos - (p.pos + step * 0.5f)) < 1.2f + len * 0.5f) { boom = true; at = d.pos; }
     }
     p.pos = at;
@@ -264,7 +264,7 @@ void Game::update_projectiles(f32 dt) {
       p.alive = false;
     }
   }
-  projectiles_.erase(std::remove_if(projectiles_.begin(), projectiles_.end(), [](const Projectile& p) { return !p.alive; }), projectiles_.end());
+  weapons_.projectiles.erase(std::remove_if(weapons_.projectiles.begin(), weapons_.projectiles.end(), [](const Projectile& p) { return !p.alive; }), weapons_.projectiles.end());
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -274,13 +274,13 @@ void Game::foot_attack(bool trigger, bool pressed) {
   const f32 now = world_->sim_time();
   if (gaps_riding() && !(gaps_ && gaps_->ride_car)) return;  // a jet's passenger has nothing to fire; a car's does (game_seats.cpp)
   // launchFootGrenade: the clacker comes before the cooldown - a press while a round flies sets it off
-  if (trigger && pressed && !player_dead_ && foot_weapon_ == Id::grenade_launcher && foot_remote_detonate(now)) return;
-  if (!trigger || now < next_attack_ || player_dead_) return;
-  const weapons::Spec& s = weapons::spec(foot_weapon_);
+  if (trigger && pressed && !player_dead_ && weapons_.foot_weapon == Id::grenade_launcher && foot_remote_detonate(now)) return;
+  if (!trigger || now < weapons_.next_attack || player_dead_) return;
+  const weapons::Spec& s = weapons::spec(weapons_.foot_weapon);
   Vec3 dir;
   const Vec3 eye = aim_ray(dir);
-  const u8 slot = static_cast<u8>(foot_weapon_);
-  switch (foot_weapon_) {
+  const u8 slot = static_cast<u8>(weapons_.foot_weapon);
+  switch (weapons_.foot_weapon) {
     case Id::fists:
     case Id::knife: {
       if (!pressed) return;  // one blow per click
@@ -292,22 +292,22 @@ void Game::foot_attack(bool trigger, bool pressed) {
       if (!pressed) return;
       // gameplay_final_runtime_v2.mjs has no magazines: only the cooldown (760 / 900 ms) gates a shot
       (void)slot;
-      next_attack_ = now + s.interval_ms / 1000;
+      weapons_.next_attack = now + s.interval_ms / 1000;
       // footMuzzle: the launcher's muzzle (its view model held right of the view, game_look.cpp:
       // .245 / -.2 / -.47 + the barrel's mouth .03 up, .81 forward), then .10 (grenade) / .25 (rocket)
       // along the shot's ray - the ray itself goes through the finger / the crosshair (footRay)
       (void)eye;
-      const Vec3 cf = kern::normalize(cam_.target - cam_.eye, {1, 0, 0}), cr = kern::normalize(kern::cross(cf, cam_.up), {0, -1, 0}), cu = kern::cross(cr, cf);
+      const Vec3 cf = kern::normalize(view_.cam.target - view_.cam.eye, {1, 0, 0}), cr = kern::normalize(kern::cross(cf, view_.cam.up), {0, -1, 0}), cu = kern::cross(cr, cf);
       kern::Mat4 vrh;
       const bool vrm = vr_hand_matrix(1, vrh);
-      const Vec3 muzzle = vrm ? vrh.translation() + kern::normalize(Vec3{-vrh.m[8], -vrh.m[9], -vrh.m[10]}, dir) * (foot_weapon_ == Id::rocket ? 0.75f : 0.85f)  // VR: the launcher's mouth in the hand, along its ray
-                        : foot_weapon_ == Id::rocket ? cam_.eye + cr * 0.285f - cu * 0.215f + cf * 1.14f + dir * 0.25f  // the new tube's mouth (game_look.cpp)
-                                                     : cam_.eye + cr * 0.245f - cu * 0.17f + cf * 1.28f + dir * 0.10f;
+      const Vec3 muzzle = vrm ? vrh.translation() + kern::normalize(Vec3{-vrh.m[8], -vrh.m[9], -vrh.m[10]}, dir) * (weapons_.foot_weapon == Id::rocket ? 0.75f : 0.85f)  // VR: the launcher's mouth in the hand, along its ray
+                        : weapons_.foot_weapon == Id::rocket ? view_.cam.eye + cr * 0.285f - cu * 0.215f + cf * 1.14f + dir * 0.25f  // the new tube's mouth (game_look.cpp)
+                                                     : view_.cam.eye + cr * 0.245f - cu * 0.17f + cf * 1.28f + dir * 0.10f;
       // GRENADE_SPEED_MPS 40 straight along the aim; the rocket leaves at ROCKET_FOOT_LAUNCH_MPS 22
-      const Vec3 v = dir * (foot_weapon_ == Id::rocket ? 22.0f : s.speed_mps);
-      fire_projectile(foot_weapon_, muzzle, v, true, body(soldier_));
-      if (foot_weapon_ == Id::rocket) foot_rocket_launched();
-      world_->shake_camera(foot_weapon_ == Id::rocket ? 0.35f : 0.2f);
+      const Vec3 v = dir * (weapons_.foot_weapon == Id::rocket ? 22.0f : s.speed_mps);
+      fire_projectile(weapons_.foot_weapon, muzzle, v, true, body(soldier_));
+      if (weapons_.foot_weapon == Id::rocket) foot_rocket_launched();
+      world_->shake_camera(weapons_.foot_weapon == Id::rocket ? 0.35f : 0.2f);
       return;
     }
     default: return;  // Kern fires the hitscan guns
@@ -316,13 +316,13 @@ void Game::foot_attack(bool trigger, bool pressed) {
 
 void Game::throw_grenade() {
   const f32 now = world_->sim_time();
-  if (grenades_ <= 0 || now < next_grenade_ || player_dead_) {
-    toast_ = grenades_ <= 0 ? "Keine Granaten mehr" : "";
-    toast_age_ = grenades_ <= 0 ? 0 : 99;
+  if (weapons_.grenades <= 0 || now < weapons_.next_grenade || player_dead_) {
+    toast_ = weapons_.grenades <= 0 ? "Keine Granaten mehr" : "";
+    toast_age_ = weapons_.grenades <= 0 ? 0 : 99;
     return;
   }
-  --grenades_;
-  next_grenade_ = now + weapons::spec(Id::hand_grenade).interval_ms / 1000;
+  --weapons_.grenades;
+  weapons_.next_grenade = now + weapons::spec(Id::hand_grenade).interval_ms / 1000;
   Vec3 dir;
   const Vec3 eye = aim_ray(dir);
   const Vec3 v = dir * kGrenadeThrow + Vec3{0, 0, 3.5f} + world_->actor_velocity(soldier_);
@@ -331,17 +331,17 @@ void Game::throw_grenade() {
 
 void Game::drone_attack(bool trigger, bool pressed) {
   const f32 now = world_->sim_time();
-  if (!drone_out_ || !trigger) return;
+  if (!vehicle_.drone_out || !trigger) return;
   const BodyState s = state_of(drone_actor_);
   Vec3 dir;
   aim_ray(dir);
   // From the nose (-X of the airframe) of the drone as it is drawn (not its physics step: strafing,
   // the round would leave beside the drone), along the camera's aim.
   const Vec3 nose = matrix_of(drone_actor_).transform_point({-0.16f, 0, -0.02f});
-  if (drone_weapon_ == 0) {
+  if (weapons_.drone_weapon == 0) {
     const weapons::Spec& g = weapons::spec(Id::drone_gun);
-    if (now < next_drone_fire_) return;
-    next_drone_fire_ = now + g.interval_ms / 1000;
+    if (now < weapons_.next_drone_fire) return;
+    weapons_.next_drone_fire = now + g.interval_ms / 1000;
     kern::game::ShotEvent e;
     hit_scan(nose, dir, g.range_m, g.damage, true, body(drone_actor_), e);
     e.shooter = drone_actor_;
@@ -350,26 +350,26 @@ void Game::drone_attack(bool trigger, bool pressed) {
     if (e.impact) ctl_.impacts[ctl_.impact_serial++ % 8] = e.to;
     if (e.surface >= 2) ++ctl_.drone_hits;
     world_->play_sound(combat_sfx(combat_audio::Kind::shot), nose, 0.55f, 1.35f, true);
-    osfx("flight_fire_fx.fire", e.to, e.impact ? hit_material(e.to, e.surface, shot_flesh_) : 0);  // shotSound + playShotBody(1) + playImpactSound(materialKind)
-  } else if (pressed && drone_weapon_ == 2) {
+    osfx("flight_fire_fx.fire", e.to, e.impact ? hit_material(e.to, e.surface, weapons_.shot_flesh) : 0);  // shotSound + playShotBody(1) + playImpactSound(materialKind)
+  } else if (pressed && weapons_.drone_weapon == 2) {
     guided_press();  // lock on what is nearest the crosshair and launch (game_guided.cpp)
   } else if (pressed) {
-    const Id id = drone_weapon_ == 1 ? Id::drone_rockets : Id::drone_guided;
+    const Id id = weapons_.drone_weapon == 1 ? Id::drone_rockets : Id::drone_guided;
     const weapons::Spec& g = weapons::spec(id);
-    if (now < next_drone_fire_) return;
-    next_drone_fire_ = now + g.interval_ms / 1000;
+    if (now < weapons_.next_drone_fire) return;
+    weapons_.next_drone_fire = now + g.interval_ms / 1000;
     fire_projectile(id, nose + dir * 0.3f, dir * g.speed_mps + s.velocity, true, body(drone_actor_));
   }
 }
 
 void Game::jet_attack(bool gun, bool missile, bool bomb) {
-  if (!jet_placed_ || mode_ != Mode::jet) return;
+  if (!vehicle_.jet_placed || mode_ != Mode::jet) return;
   const f32 now = world_->sim_time();
   const BodyState s = state_of(jet_actor_);
   const Vec3 fwd = s.rotation.rotate({0, 1, 0});
-  if (gun && now >= next_jet_gun_) {
+  if (gun && now >= weapons_.next_jet_gun) {
     const weapons::Spec& g = weapons::spec(Id::jet_cannon);
-    next_jet_gun_ = now + g.interval_ms / 1000;
+    weapons_.next_jet_gun = now + g.interval_ms / 1000;
     const Vec3 o = s.position + fwd * 10.5f;
     Vec3 aim = fwd;
     if (ctl_.jet_aim) {
@@ -391,11 +391,11 @@ void Game::jet_attack(bool gun, bool missile, bool bomb) {
     world_->play_sound("builtin:smg", o, 0.5f, 0.7f, true);
     osfx("jet_mode.gun", o);
   }
-  if (missile && now >= next_jet_missile_ && jet_.telemetry().contacts == 0) {
+  if (missile && now >= weapons_.next_jet_missile && jet_.telemetry().contacts == 0) {
     // jet_mode.mjs fireRocket: from the wing pods, left and right in turn (3.2 m out, 2 m ahead,
     // 0.6 m down), along the aim (tapAim) at 260 m/s on top of the jet's velocity; not on the ground
     const weapons::Spec& m = weapons::spec(Id::jet_missile);
-    next_jet_missile_ = now + m.interval_ms / 1000;
+    weapons_.next_jet_missile = now + m.interval_ms / 1000;
     Vec3 aim = fwd;
     if (ctl_.jet_aim) {
       Vec3 from;
@@ -403,17 +403,17 @@ void Game::jet_attack(bool gun, bool missile, bool bomb) {
       const f32 c = kern::dot(aim, fwd);
       if (c < std::cos(0.62f)) aim = kern::normalize(fwd * std::cos(0.62f) + kern::normalize(aim - fwd * c, fwd) * std::sin(0.62f), fwd);
     }
-    jet_rocket_side_ = -jet_rocket_side_;
-    fire_projectile(Id::jet_missile, s.position + s.rotation.rotate({jet_rocket_side_ * 3.2f, 0, 0}) + fwd * 2.0f + s.rotation.rotate({0, 0, -0.6f}), aim * m.speed_mps + s.velocity, true, body(jet_actor_));
+    weapons_.jet_rocket_side = -weapons_.jet_rocket_side;
+    fire_projectile(Id::jet_missile, s.position + s.rotation.rotate({weapons_.jet_rocket_side * 3.2f, 0, 0}) + fwd * 2.0f + s.rotation.rotate({0, 0, -0.6f}), aim * m.speed_mps + s.velocity, true, body(jet_actor_));
   }
-  if (bomb && now >= next_jet_bomb_ && jet_.telemetry().contacts == 0) {
-    next_jet_bomb_ = now + weapons::spec(Id::jet_bomb).interval_ms / 1000;
+  if (bomb && now >= weapons_.next_jet_bomb && jet_.telemetry().contacts == 0) {
+    weapons_.next_jet_bomb = now + weapons::spec(Id::jet_bomb).interval_ms / 1000;
     fire_projectile(Id::jet_bomb, s.position + s.rotation.rotate({0, 0, -1.6f}), s.velocity, true, body(jet_actor_));
   }
 }
 
 void Game::draw_projectiles() {
-  for (const Projectile& p : projectiles_) {
+  for (const Projectile& p : weapons_.projectiles) {
     switch (p.id) {
       case Id::hand_grenade: people_art_.projectile(p.pos, p.vel, 0.05f, 0.14f, false); break;
       case Id::grenade_launcher: break;  // the glowing 40 mm round: draw_military (makeGrenade)

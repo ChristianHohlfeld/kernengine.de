@@ -303,7 +303,7 @@ void Game::update_scores(f32 dt) {
   std::vector<People::Death> deaths;
   people_.take_deaths(deaths);
   for (const People::Death& d : deaths) {
-    if (d.head && d.by_player) { world_->play_sound(combat_sfx(combat_audio::Kind::crack), cam_.eye, 0.32f, 1.0f, false); osfx("headshot_feedback.announceHeadshot", cam_.eye); }  // headshot_feedback.mjs: a neutral short click
+    if (d.head && d.by_player) { world_->play_sound(combat_sfx(combat_audio::Kind::crack), view_.cam.eye, 0.32f, 1.0f, false); osfx("headshot_feedback.announceHeadshot", view_.cam.eye); }  // headshot_feedback.mjs: a neutral short click
     if (!d.by_player) continue;
     // "npc-death": the mates' copy of this person falls too (the same id on every machine)
     if (net_.active() && d.kind == People::Kind::citizen && d.index >= 0) {
@@ -359,7 +359,7 @@ void Game::update_scores(f32 dt) {
   // police drones: destroyed / knocked out by EMP
   i32 emp_hits = 0;
   for (int i = 0; i < 5; ++i) {
-    const PoliceDrone& d = pdrones_[i];
+    const PoliceDrone& d = police_.pdrones[i];
     if (C.pd_was[i] && !d.active && d.destroyed_until > now) { award(300, "COP DRONE DOWN!"); pop(C.fun.apply(FunEvent::police_kill, now, stars)); }
     if (d.active && d.emp && !C.pd_emp[i]) ++emp_hits;
     C.pd_was[i] = d.active;
@@ -385,14 +385,14 @@ void Game::update_scores(f32 dt) {
 
 void Game::update_race() {
   CombatState& C = combat_;
-  if (!C.race_on || mode_ != Mode::drone || !drone_out_ || !drone_.telemetry().armed) return;
+  if (!C.race_on || mode_ != Mode::drone || !vehicle_.drone_out || !drone_.telemetry().armed) return;
   const f32 now = world_->sim_time();
   const i32 passed = C.race.update(matrix_of(drone_actor_).translation() - C.race_origin, now);
   if (passed < 0) return;
   if (C.race.finished) combat_banner("ZIEL · " + race_time(C.race.finish_time) + " · Bestrunde " + race_time(C.race.best_lap));
   else if (passed == 0) { C.pop = "RUNDE " + std::to_string(C.race.lap) + "/" + std::to_string(kRaceLaps); C.pop_at = now; }
   else { C.pop = kGateNames[passed]; C.pop_at = now; }
-  world_->play_sound("builtin:checkpoint", cam_.eye, 0.6f, 1, false);
+  world_->play_sound("builtin:checkpoint", view_.cam.eye, 0.6f, 1, false);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -425,9 +425,9 @@ void Game::update_combat(f32 dt) {
   CombatState& C = combat_;
   // The air strike is aimed and called in game_controls.cpp (4 / J / D-pad up / STRIKE, fighter_jets.mjs);
   // the race ("race") and the next contract ("contract") are commands: spawncity.de has no keys for them.
-  C.scope = mode_ == Mode::foot && foot_weapon_ == weapons::Id::sniper && world_->aim_blend() > 0.85f && !player_dead_;  // stepAds scoped
+  C.scope = mode_ == Mode::foot && weapons_.foot_weapon == weapons::Id::sniper && world_->aim_blend() > 0.85f && !player_dead_;  // stepAds scoped
   // player rockets / grenades that fly into the helicopter, the tank or a flak gun go off there
-  for (Projectile& p : projectiles_) {
+  for (Projectile& p : weapons_.projectiles) {
     if (!p.alive || !p.by_player || p.id == weapons::Id::hand_grenade) continue;
     bool boom = false;
     for (const Heli& h : C.helis) boom = boom || (h.state != Heli::State::down && kern::length(h.p - p.pos) < 3.2f);
@@ -478,7 +478,7 @@ void Game::draw_events() {
       if (!c.driver && !(mode_ == Mode::car && static_cast<i32>(ci) == car_index_)) continue;  // a parked, empty car is dark
       const Mat4 m = matrix_of(c.actor);
       const Vec3 pos = m.translation();
-      if (kern::length(pos - cam_.eye) > 160) continue;
+      if (kern::length(pos - view_.cam.eye) > 160) continue;
       const Vec3 fwd = kern::normalize(Vec3{m.m[0], m.m[1], 0}, {1, 0, 0}), side{-fwd.y, fwd.x, 0};
       const Vec3 h = c.car->spec().half;
       for (f32 sd : {-1.0f, 1.0f})
@@ -570,7 +570,7 @@ bool Game::combat_command(const std::string& cmd, std::string& out) {
   if (cmd == "person show" && world_placed_) {
     // Tests: a citizen 3 m ahead, facing the camera, standing (the look of the people)
     const Vec3 me = player_position();
-    const Vec3 fwd = kern::normalize(cam_.target - cam_.eye, {1, 0, 0});
+    const Vec3 fwd = kern::normalize(view_.cam.target - view_.cam.eye, {1, 0, 0});
     const Vec3 p{me.x + fwd.x * 3.0f, me.y + fwd.y * 3.0f, city_.ground_height(me.x + fwd.x * 3.0f, me.y + fwd.y * 3.0f)};
     people_.add_scripted(People::Kind::zombie, p, std::atan2(-fwd.y, -fwd.x), 100, rng_.next(), {0.7f, 0.2f, 0.18f}, {0.15f, 0.18f, 0.3f}, {0.86f, 0.66f, 0.5f}, 0);
     out = "ok";
@@ -580,7 +580,7 @@ bool Game::combat_command(const std::string& cmd, std::string& out) {
     // Tests: heat to N (witnessed police kills, severity 3 each)
     const f32 n = static_cast<f32>(std::atof(cmd.c_str() + 5));
     for (int k = 0; k < 200 && wanted::heat() < n; ++k) wanted::report(wanted::Crime::police_officer, true);
-    star_since_ = now - wanted::arrival_delay_ms(wanted::stars()) / 1000;
+    police_.star_since = now - wanted::arrival_delay_ms(wanted::stars()) / 1000;
     out = std::to_string(wanted::heat());
     return true;
   }
@@ -612,7 +612,7 @@ bool Game::combat_command(const std::string& cmd, std::string& out) {
     out = air_strike(at) ? "ok" : "cooldown";
     return true;
   }
-  if (cmd == "flyover") { launch_jets(cam_.eye.x, cam_.eye.y, false, now, 70, 0); out = "ok"; return true; }
+  if (cmd == "flyover") { launch_jets(view_.cam.eye.x, view_.cam.eye.y, false, now, 70, 0); out = "ok"; return true; }
   if (starts("zombies ")) {
     const std::string a = cmd.substr(8);
     if (a == "force") C.zombie_force = true;
@@ -625,7 +625,7 @@ bool Game::combat_command(const std::string& cmd, std::string& out) {
     C.race_on = !C.race_on;
     C.race.reset();
     // the course around where the drone (or the pilot) is: the start gate 4.5 m behind
-    const Vec3 at = mode_ == Mode::drone && drone_out_ ? matrix_of(drone_actor_).translation() : player_position();
+    const Vec3 at = mode_ == Mode::drone && vehicle_.drone_out ? matrix_of(drone_actor_).translation() : player_position();
     C.race_origin = {at.x + 4.5f, at.y, city_.ground_height(at.x, at.y)};
     combat_banner(C.race_on ? "RENNSTRECKE · 3 RUNDEN" : "RENNSTRECKE AUS");
     out = C.race_on ? "on" : "off";
@@ -647,7 +647,7 @@ bool Game::combat_command(const std::string& cmd, std::string& out) {
   if (cmd == "rounds") {
     // tests: rounds in flight, launcher bounces so far
     char b[64];
-    std::snprintf(b, sizeof b, "%d in flight, %u bounces", static_cast<int>(projectiles_.size()), bounce_fx_next_);
+    std::snprintf(b, sizeof b, "%d in flight, %u bounces", static_cast<int>(weapons_.projectiles.size()), rounds_.bounce_fx_next);
     out = b;
     return true;
   }
@@ -681,7 +681,7 @@ bool Game::combat_command(const std::string& cmd, std::string& out) {
     }
     const EnemyType type = t == "heavy" ? EnemyType::heavy : t == "swat" ? EnemyType::swat : EnemyType::cop;
     const Vec3 me = player_position();
-    const Vec3 fwd = kern::normalize(cam_.target - cam_.eye, {1, 0, 0});
+    const Vec3 fwd = kern::normalize(view_.cam.target - view_.cam.eye, {1, 0, 0});
     const f32 dist = near ? 1.3f : 20.0f;
     const Vec3 p{me.x + fwd.x * dist, me.y + fwd.y * dist, near ? me.z : 0};
     const EnemySpec& s = enemy_spec(type);

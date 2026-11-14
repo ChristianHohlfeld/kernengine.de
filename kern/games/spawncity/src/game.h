@@ -255,27 +255,31 @@ class Game {
   bool world_puppet() const;
   std::vector<Vec3> mate_foci() const;
   bool puppet_car_step(TrafficCar& c, std::size_t i, f32 h);
-  bool puppet_world_ = false;
-  f32 world_send_clock_ = 0, people_send_clock_ = 0;
-  f64 world_send_real_ = 0;
-  u32 world_tick_ = 0;  // the host's car snapshots so far (a car at rest sends its whole entry every 20th)
-  u32 world_sent_ = 0, world_got_ = 0;
-  f32 world_heard_at_ = -99;
-  std::vector<bool> car_seen_;
-  std::vector<People::NetPerson> people_acc_;
-  std::vector<i32> car_net_;           // client: the host's index each of our cars plays (-1 none)
-  std::vector<mp::PoseTimeline> car_line_;   // client: the host's poses of each of his cars
-  std::vector<Quat> car_rest_q_;             // ... and how each last stood (a car at rest is only named)
-  std::map<u8, WorldParts> world_parts_;
-  std::vector<Life::NetCow> cows_acc_;
-  std::vector<Life::NetPet> pets_acc_;
-  std::vector<Life::NetFlock> flocks_acc_;
-  f64 host_epoch_off_ = 0;                   // client: the host's wall clock minus our real clock (kern::now_ms)
-  bool host_epoch_ok_ = false;
-  f64 world_clock_ = 0;              // client: his clock to ours (ms, game_worldsync.cpp)
-  bool world_clock_ok_ = false;
-  std::vector<bool> car_lent_;         // host: a mate drives this car of ours
-  std::vector<std::pair<Vec3, Quat>> car_lent_at_;
+  // the state of the one world (game_worldsync.cpp)
+  struct WorldSyncState {
+    bool puppet_world = false;
+    f32 world_send_clock = 0, people_send_clock = 0;
+    f64 world_send_real = 0;
+    u32 world_tick = 0;  // the host's car snapshots so far (a car at rest sends its whole entry every 20th)
+    u32 world_sent = 0, world_got = 0;
+    f32 world_heard_at = -99;
+    std::vector<bool> car_seen;
+    std::vector<People::NetPerson> people_acc;
+    std::vector<i32> car_net;           // client: the host's index each of our cars plays (-1 none)
+    std::vector<mp::PoseTimeline> car_line;   // client: the host's poses of each of his cars
+    std::vector<Quat> car_rest_q;             // ... and how each last stood (a car at rest is only named)
+    std::map<u8, WorldParts> world_parts;
+    std::vector<Life::NetCow> cows_acc;
+    std::vector<Life::NetPet> pets_acc;
+    std::vector<Life::NetFlock> flocks_acc;
+    f64 host_epoch_off = 0;                   // client: the host's wall clock minus our real clock (kern::now_ms)
+    bool host_epoch_ok = false;
+    f64 world_clock = 0;              // client: his clock to ours (ms, game_worldsync.cpp)
+    bool world_clock_ok = false;
+    std::vector<bool> car_lent;         // host: a mate drives this car of ours
+    std::vector<std::pair<Vec3, Quat>> car_lent_at;
+  };
+  WorldSyncState worldsync_;
   void step_parachute(f32 h);
   // the town: people, police, damage (game_town.cpp)
   void update_town(f32 dt);
@@ -327,16 +331,19 @@ class Game {
     bool fallen = false;  // an officer / enemy who went down: his body lies here, the unit only waits to be dropped
   };
   struct RemoteSwarm { f64 seen = 0; std::vector<RemoteUnit> units; };
-  std::unordered_map<u8, RemoteSwarm> swarms_;
-  f64 swarm_clock_ = 0;
-  u16 swarm_serial_ = 0;
   // ours as last sent: an officer or enemy missing from the next list who lies dead is sent on for
   // a moment as fallen, so he falls on the mates' machines too instead of vanishing
   struct SwarmSent { net::SwarmUnit unit; i32 person = -1; u32 seed = 0; };
   struct SwarmFallen { net::SwarmUnit unit; f64 until = 0; };
-  std::vector<SwarmSent> swarm_sent_;
-  std::vector<SwarmFallen> swarm_fallen_;
-  std::unique_ptr<Car> swarm_cruiser_;  // the mates' cruisers are drawn with it
+  struct SwarmState {
+    std::unordered_map<u8, RemoteSwarm> mates;  // each mate's units as he last sent them
+    f64 clock = 0;
+    u16 serial = 0;
+    std::vector<SwarmSent> sent;
+    std::vector<SwarmFallen> fallen;
+    std::unique_ptr<Car> cruiser;  // the mates' cruisers are drawn with it
+  };
+  SwarmState swarm_;
   void swarm_update(f32 dt);
   void swarm_clear();
   void swarm_collect(std::vector<net::SwarmUnit>& out);  // ours, every kind
@@ -507,18 +514,22 @@ class Game {
   void foot_rocket_launched();
   // updateRocketLaser: the dot's source - a finger on the picture > the point it was lifted at
   // (while a guided rocket flies) > the crosshair
-  bool laser_finger_ = false, laser_pinned_ = false, laser_valid_ = false;
-  f32 laser_fx_ = 0, laser_fy_ = 0;
-  Vec3 laser_pin_{}, laser_dot_{};
   Vec3 rocket_laser_dot();
   // gameplay_final_runtime_v2.mjs visualBlast: every explosion's orange core and flat shock ring (540 ms)
   struct VisualBlast { Vec3 p; f32 born = 0, scale = 1; };
-  std::vector<VisualBlast> visual_blasts_;
   // spawnGrenadeBounceFx: a launcher round's bounce - an orange ring on the surface and a white
   // flash, 180 ms (a pool of 8, the oldest reused)
   struct BounceFx { Vec3 p, n{0, 0, 1}; f32 born = -99, strength = 1; };
-  BounceFx bounce_fx_[8];
-  u32 bounce_fx_next_ = 0;
+  struct FootRoundsState {
+    // updateRocketLaser's dot (rocket_laser_dot)
+    bool laser_finger = false, laser_pinned = false, laser_valid = false;
+    f32 laser_fx = 0, laser_fy = 0;
+    Vec3 laser_pin{}, laser_dot{};
+    std::vector<VisualBlast> visual_blasts;
+    BounceFx bounce_fx[8];
+    u32 bounce_fx_next = 0;
+  };
+  FootRoundsState rounds_;
   void rocket_smoke_emit(Projectile& p, f32 now);
   void foot_rounds_update(f32 dt);
   void blast_police_drones(Vec3 at, f32 radius, f32 damage, bool by_player);
@@ -594,32 +605,37 @@ class Game {
   void update_sound(f32 dt);
 
   kern::Engine* engine_ = nullptr;
-  bool vr_ = false;  // the page runs a WebXR session ("vr 1")
   // VR rig (game_vr.cpp): the controllers' pointing rays in the room (WebXR local space)
   struct VrHand { bool valid = false, had = false, world_ok = false, grab_was = false, swish = false; Vec3 p, prev, prev_strike, world_prev, grab_local, throw_v; Quat q; f32 swing = 0, strike_at = -9, grab_t = 0; kern::physics::Body grab; i32 grab_person = -1, grab_slot = -1, bird = -1; f32 grab_mate_at = 0; };
-  VrHand vr_hands_[2];
-  bool vr_snap_armed_ = true, vr_arms_ = false, vr_both_clicks_ = false, vr_wpn_armed_ = true;
-  bool vr_fire_was_ = false;  // the drone's trigger in VR (an edge)
-  f32 vr_pulse_[2] = {0, 0};  // a rumble the page plays on the controller (vr json, host.mjs)
-  // the comfort tunnel (game_vr.cpp vr_comfort): its mesh, its strength, the last frame's room / eye
-  u32 vr_tunnel_mesh_ = 0, vr_tunnel_tex_ = 0;
-  f32 vr_tunnel_ = 0;
-  Vec3 vr_prev_f_{1, 0, 0}, vr_prev_up_{0, 0, 1}, vr_prev_eye_, vr_prev_v_;
-  bool vr_prev_ok_ = false;
+  struct VrState {
+    bool on = false;  // the page runs a WebXR session ("vr 1")
+    VrHand hands[2];
+    bool snap_armed = true, arms = false, both_clicks = false, wpn_armed = true;
+    bool fire_was = false;  // the drone's trigger in VR (an edge)
+    f32 pulse[2] = {0, 0};  // a rumble the page plays on the controller (vr json, host.mjs)
+    // the comfort tunnel (game_vr.cpp vr_comfort): its mesh, its strength, the last frame's room / eye
+    u32 tunnel_mesh = 0, tunnel_tex = 0;
+    f32 tunnel = 0;
+    Vec3 prev_f{1, 0, 0}, prev_up{0, 0, 1}, prev_eye, prev_v;
+    bool prev_ok = false;
+    // the wrist menu
+    bool menu_open = false, menu_trigger = false, menu_valid = false;
+    i32 menu_hover = -1, menu_hover_was = -1, menu_page = 0, menu_sel = 0;
+    bool menu_stick_used = false, menu_stick_armed = true, y_fired = false, near_vehicle = false;
+    f32 y_held = 0;
+    bool cam_request = false, scoped = false;  // the wrist menu's KAMERA (game_controls.cpp)
+    Vec3 menu_c, menu_r, menu_u, menu_n;
+    f32 menu_w = 1, menu_h = 1;
+    std::string action;
+    u32 scope_tex = 0, scope_mesh = 0;
+    u32 hud_tex = 0, hud_mesh = 0;  // the headset HUD panel (the page's texture, "vr hud <id>")
+  };
+  VrState vr_;
   void vr_comfort(f32 dt);
   void vr_room(Vec3& f, Vec3& r, Vec3& up) const;
-  bool vr_menu_open_ = false, vr_menu_trigger_ = false, vr_menu_valid_ = false;
-  i32 vr_menu_hover_ = -1, vr_menu_hover_was_ = -1, vr_menu_page_ = 0, vr_menu_sel_ = 0;
-  bool vr_menu_stick_used_ = false, vr_menu_stick_armed_ = true, vr_y_fired_ = false, vr_near_vehicle_ = false;
-  f32 vr_y_held_ = 0;
-  bool vr_cam_request_ = false, vr_scoped_ = false;  // the wrist menu's KAMERA (game_controls.cpp)
-  Vec3 vr_menu_c_, vr_menu_r_, vr_menu_u_, vr_menu_n_;
-  f32 vr_menu_w_ = 1, vr_menu_h_ = 1;
-  std::string vr_action_;
   void vr_melee(i32 side, f32 dt);
   void vr_grab(i32 side, bool want, f32 dt);
   void vr_scope_update();
-  u32 vr_scope_tex_ = 0, vr_scope_mesh_ = 0;
   void vr_menu_input(f32 dt);
   void life_draw_ragdolls();
   std::string vr_menu_json();
@@ -631,7 +647,6 @@ class Game {
   bool vr_hand_ray(Vec3& from, Vec3& dir) const;
   void vr_foot(kern::game::PlayInput& p, f32& forward, f32& strafe, f32 dt);
   void vr_update_view();
-  u32 vr_hud_tex_ = 0, vr_hud_mesh_ = 0;  // the headset HUD panel (the page's texture, "vr hud <id>")
   void look_vr_hud();
   /// The view's magnification against the mode's own field of view (the sniper scope, ADS: > 1):
   /// draw distances follow it, so a zoomed view shows what an unzoomed one shows nearer.
@@ -649,26 +664,38 @@ class Game {
   i32 car_index_ = -1;       // the car the player drives
   Vec3 focus_prev_;
   bool focus_prev_valid_ = false;
-  bool jet_flown_ = false, jet_v_valid_ = false;  // crash damage (game.cpp fixed_step)
-  Vec3 jet_v_ctrl_;
-  bool drone_out_ = false, jet_placed_ = false, world_placed_ = false, chute_open_ = false;
-  f32 chute_time_ = 0;
-  Vec2 chute_steer_;
-  DroneSticks sticks_;
-  JetInput jet_in_;
-  bool landing_ = false;     // drone: ARM in the air lands it (simulator.mjs)
-  f32 landing_still_ = 0;
-  bool height_held_ = false;
-  i32 drone_cam_ = 0;        // 0 fpv, 1 follow, 2 third (the page restores the player's last choice; FPV first)
-  bool car_cockpit_ = false, jet_cockpit_ = false;
-  f32 fpv_tilt_deg_ = -15, fpv_fov_deg_ = 105;
+  bool world_placed_ = false;
+  // the player's drone, jet, car and parachute (game.cpp, game_controls.cpp)
+  struct VehicleState {
+    bool jet_flown = false, jet_v_valid = false;  // crash damage (game.cpp fixed_step)
+    Vec3 jet_v_ctrl;
+    bool drone_out = false, jet_placed = false, chute_open = false;
+    f32 chute_time = 0;
+    Vec2 chute_steer;
+    DroneSticks sticks;
+    JetInput jet_in;
+    bool landing = false;     // drone: ARM in the air lands it (simulator.mjs)
+    f32 landing_still = 0;
+    bool height_held = false;
+    f32 drone_hp = 100, jet_hp = 400;  // jet: jet_mode.mjs HP_MAX 400
+    f32 jacked_at = -1;  // tests: distance of the car "mode car" took
+  };
+  VehicleState vehicle_;
   Spot spawn_{};
-  kern::Camera cam_;
-  bool cam_valid_ = false;
-  Vec3 cam_anchor_, cam_vel_;
-  Vec2 cam_heading_{1, 0};
-  bool rig_init_ = false;
-  f32 head_yaw_ = 0, head_pitch_ = 0;
+  // the camera (game.cpp update_camera)
+  struct ViewState {
+    i32 drone_cam = 0;        // 0 fpv, 1 follow, 2 third (the page restores the player's last choice; FPV first)
+    bool car_cockpit = false, jet_cockpit = false;
+    f32 fpv_tilt_deg = -15, fpv_fov_deg = 105;
+    kern::Camera cam;
+    bool cam_valid = false;
+    Vec3 cam_anchor, cam_vel;
+    Vec2 cam_heading{1, 0};
+    bool rig_init = false;
+    f32 head_yaw = 0, head_pitch = 0;
+    Vec3 jet_cam_off;         // jet_mode.mjs camOff (the chase camera's eased offset)
+  };
+  ViewState view_;
   f32 sensitivity_ = 1;
   f32 dpr_ = 1;
   // input devices
@@ -684,39 +711,54 @@ class Game {
   CombatArt combat_art_;
   Destruction destruction_;  // buildings broken by weapons (destruction.h)
   CombatState combat_;
-  std::vector<guided::Flight> guided_;  // GUIDED missiles in flight (game_guided.cpp)
-  f32 guided_last_ = -99;
-  std::string guided_lock_;
-  guided::Target guided_mark_;  // the first press marks, the second launches (game_guided.cpp)
-  Vec3 guided_mark_at_;
-  f32 guided_mark_time_ = -99;
-  bool guided_marked_ = false;
-  // game_details.cpp: critical countdowns (critical_damage_logic.mjs), the rule ballot
-  std::vector<f32> car_last_hp_, car_burn_seen_;
-  detail::CriticalClock pd_crit_[5], drone_crit_;
-  mp::Ballot ballot_{0, 0, false, 0, {}, {}, 0, mp::Ballot::Status::invalid};  // the console's ballot ("ballot ...", game_details.cpp)
-  u32 ballot_serial_ = 0;
-  u32 bullet_pushes_ = 0, crit_blasts_ = 0;
-  u32 sfx_cursor_[16] = {};
-  bool combat_audio_ready_ = false;
+  // GUIDED missiles (game_guided.cpp)
+  struct GuidedState {
+    std::vector<guided::Flight> flights;  // in flight
+    f32 last = -99;
+    std::string lock;
+    guided::Target mark;  // the first press marks, the second launches
+    Vec3 mark_at;
+    f32 mark_time = -99;
+    bool marked = false;
+  };
+  GuidedState guided_;
+  // game_details.cpp: critical countdowns (critical_damage_logic.mjs), the rule ballot, the combat sounds
+  struct DetailsState {
+    std::vector<f32> car_last_hp, car_burn_seen;
+    detail::CriticalClock pd_crit[5], drone_crit;
+    mp::Ballot ballot{0, 0, false, 0, {}, {}, 0, mp::Ballot::Status::invalid};  // the console's ballot ("ballot ...")
+    u32 ballot_serial = 0;
+    u32 bullet_pushes = 0, crit_blasts = 0;
+    u32 sfx_cursor[16] = {};
+    bool combat_audio_ready = false;
+  };
+  DetailsState details_;
   RoadGraph roads_;
-  std::vector<PoliceUnit> units_;
-  PoliceDrone pdrones_[5];
-  Vec3 last_known_;
-  f32 last_contact_ = -99, next_drone_wave_ = -1, emp_ready_at_ = 0, last_drone_shot_ = -99, last_player_hit_ = -99;
-  u32 drone_serial_ = 0;
-  bool drone_wave_live_ = false;
-  // weapons
-  std::vector<Projectile> projectiles_;
-  weapons::Id foot_weapon_ = weapons::Id::glock;
-  i32 ammo_mag_[16] = {}, ammo_reserve_[16] = {};
-  i32 grenades_ = 4, drone_weapon_ = 0;
-  f32 jet_rocket_side_ = 1;
-  f32 jacked_at_ = -1;
-  Vec3 jet_cam_off_;         // jet_mode.mjs camOff (the chase camera's eased offset)       // tests: distance of the car "mode car" took  // jet_mode.mjs rocketSide: the pods fire in turn
-  f32 next_attack_ = 0, next_grenade_ = 0, next_drone_fire_ = 0, next_jet_gun_ = 0, next_jet_missile_ = 0, next_jet_bomb_ = 0;
-  bool trigger_was_ = false;
-  u32 explosions_ = 0;
+  // the police: cruisers with officers, drones, the wanted level's clocks (game_town.cpp)
+  struct PoliceState {
+    std::vector<PoliceUnit> units;
+    PoliceDrone pdrones[5];
+    Vec3 last_known;
+    f32 last_contact = -99, next_drone_wave = -1, emp_ready_at = 0, last_drone_shot = -99, last_player_hit = -99;
+    u32 drone_serial = 0;
+    bool drone_wave_live = false;
+    f32 star_since = -1, last_wave = -99, last_cop_shot = -99;
+    i32 last_stars = 0;
+  };
+  PoliceState police_;
+  // weapons (game_weapons.cpp)
+  struct WeaponsState {
+    std::vector<Projectile> projectiles;
+    weapons::Id foot_weapon = weapons::Id::glock;
+    i32 ammo_mag[16] = {}, ammo_reserve[16] = {};
+    i32 grenades = 4, drone_weapon = 0;
+    f32 jet_rocket_side = 1;  // jet_mode.mjs rocketSide: the pods fire in turn
+    f32 next_attack = 0, next_grenade = 0, next_drone_fire = 0, next_jet_gun = 0, next_jet_missile = 0, next_jet_bomb = 0;
+    bool trigger_was = false;
+    u32 explosions = 0;
+    bool shot_flesh = false;  // hit_scan's last round struck a person or a player
+  };
+  WeaponsState weapons_;
   // multiplayer
   net::Session net_;
   std::unique_ptr<Car> remote_car_, remote_bus_;
@@ -729,8 +771,6 @@ class Game {
   std::vector<kern::Vec4> ground_changes_;  // where the ground changed this frame (city_stream.h take_ground_changes)
   f32 night_ = 0;
   bool show_lamps_ = true;
-  f32 star_since_ = -1, last_wave_ = -99, last_cop_shot_ = -99, drone_hp_ = 100, jet_hp_ = 400;  // jet: jet_mode.mjs HP_MAX 400
-  i32 last_stars_ = 0;
   bool player_dead_ = false;
   // vs_combat_presentation.mjs: down until the player asks (R / Enter / Space, pad A / Y, the
   // RESPAWN button) - not before 3 s (RESPAWN_COOLDOWN_MS); back 3..5 m from where he went down
@@ -757,16 +797,18 @@ class Game {
   bool spawn_checked_ = false;  // world_spawn_guard (Game::spawn_guard)
   void spawn_guard();
   // audio
-  kern::audio::Mixer mixer_;
-  std::unique_ptr<kern::game::SoundBank> bank_;
-  std::unique_ptr<kern::game::GameAudio> game_audio_;
-  SoundFx fx_;
-  std::vector<f32> audio_out_;
-  // the original's sound on the page (game_audio_web.cpp): events and state for web/audio.mjs
-  bool web_audio_ = false;
-  std::string osfx_;
+  struct AudioState {
+    kern::audio::Mixer mixer;
+    std::unique_ptr<kern::game::SoundBank> bank;
+    std::unique_ptr<kern::game::GameAudio> game_audio;
+    SoundFx fx;
+    std::vector<f32> out;
+    // the original's sound on the page (game_audio_web.cpp): events and state for web/audio.mjs
+    bool web_audio = false;
+    std::string osfx;
+  };
+  AudioState audio_;
   void osfx(const char* fn, Vec3 at, f32 a = 0, f32 b = 0, f32 c = 0);
-  bool shot_flesh_ = false;  // hit_scan's last round struck a person or a player
   f32 hit_material(Vec3 at, u8 surface, bool flesh) const;
   std::string web_audio_state();
   bool web_audio_command(const std::string& cmd, std::string& out);

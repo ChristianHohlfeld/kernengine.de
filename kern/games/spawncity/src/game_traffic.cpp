@@ -161,7 +161,7 @@ void Game::update_traffic_world(f32 dt) {
       pp.max_distance = 120;
       pp.min_distance = 3;
       pp.volume = 0.7f;
-      mixer_.play(L.sounds.horn, pp);
+      audio_.mixer.play(L.sounds.horn, pp);
       ++L.honk_count;
     }
   L.honks.clear();
@@ -174,7 +174,7 @@ void Game::update_traffic_world(f32 dt) {
       explosion(world_->physics().pose(t.body).position + Vec3{0, 0, 0.3f}, 7, 110, false);
     }
   // ---- tow service: who needs help (every 0.5 s) ----
-  if (puppet_world_) return;  // MP client in the host's town: his cars, his tow trucks
+  if (worldsync_.puppet_world) return;  // MP client in the host's town: his cars, his tow trucks
   if (now - L.tow_scan_at < 0.5f) return;
   L.tow_scan_at = now;
   if (L.watch.size() < cars_.size()) L.watch.resize(cars_.size());
@@ -409,7 +409,7 @@ void Game::draw_traffic_lights() {
     }
   }
   std::vector<i32> near;
-  L.rules.near({cam_.eye.x, cam_.eye.y}, 160, near);
+  L.rules.near({view_.cam.eye.x, view_.cam.eye.y}, 160, near);
   for (i32 ji : near) {
     const TrafficRules::Junction& j = L.rules.junctions()[ji];
     if (!j.lights) continue;
