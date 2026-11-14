@@ -9,6 +9,7 @@
 #include <array>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common.h"
 
@@ -16,8 +17,8 @@ namespace sc::nostr {
 
 using Bytes32 = std::array<u8, 32>;
 
-void sha256(const u8* data, std::size_t length, u8 out[32]);
-Bytes32 sha256(std::string_view s);
+Bytes32 sha256(const std::vector<u8>& data);
+Bytes32 sha256(std::string_view text);
 /// x-only public key of a secret key (false for 0 or >= n).
 bool public_key(const Bytes32& secret, Bytes32& out);
 /// BIP-340 signature of a 32-byte message with auxiliary randomness.
@@ -25,8 +26,11 @@ bool sign(const Bytes32& secret, const Bytes32& message, const Bytes32& aux, std
 /// BIP-340 verification.
 bool verify(const Bytes32& pubkey, const Bytes32& message, const std::array<u8, 64>& sig);
 
-std::string hex(const u8* data, std::size_t n);
-bool from_hex(std::string_view s, u8* out, std::size_t n);
+/// Lower-case hex of 32 bytes (a hash, a key) and of 64 (a signature).
+std::string hex(const Bytes32& data);
+std::string hex(const std::array<u8, 64>& data);
+/// 64 hex digits as 32 bytes (false: another length, or something that is no hex digit).
+bool from_hex(std::string_view s, Bytes32& out);
 /// NIP-01 string escaping (\n \" \\ \r \t \b \f).
 std::string escape(std::string_view s);
 /// A signed event as JSON. `tags` is the tags array as compact JSON; `content` the raw text.
