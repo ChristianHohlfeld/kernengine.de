@@ -100422,7 +100422,7 @@
     "logic": {
      "kind": "kern-logic",
      "version": 1,
-     "nextId": 391,
+     "nextId": 392,
      "variables": [],
      "library": true,
      "uses": [
@@ -100690,105 +100690,16 @@
        }
       },
       {
-       "id": 17,
-       "type": "list.clear",
-       "x": 560,
-       "y": 0,
-       "params": {
-        "variable": "made",
-        "scope": "SmokeField_new"
-       }
-      },
-      {
        "id": 18,
        "type": "var.set",
        "x": 840,
-       "y": 0,
-       "params": {
-        "variable": "count",
-        "scope": "SmokeField_new"
-       }
-      },
-      {
-       "id": 19,
-       "type": "flow.while",
-       "x": 1120,
-       "y": 0
-      },
-      {
-       "id": 20,
-       "type": "math.compare",
-       "x": 1000,
-       "y": 150,
-       "params": {
-        "op": "<"
-       }
-      },
-      {
-       "id": 21,
-       "type": "list.length",
-       "x": 1000,
-       "y": 240,
-       "params": {
-        "type": "gaps_Puff"
-       }
-      },
-      {
-       "id": 22,
-       "type": "var.get",
-       "x": 1000,
-       "y": 330,
-       "params": {
-        "variable": "made",
-        "scope": "SmokeField_new"
-       }
-      },
-      {
-       "id": 23,
-       "type": "var.get",
-       "x": 1000,
-       "y": 420,
-       "params": {
-        "variable": "count",
-        "scope": "SmokeField_new"
-       }
-      },
-      {
-       "id": 24,
-       "type": "list.add",
-       "x": 1400,
        "y": 0,
        "params": {
         "variable": "made",
         "scope": "SmokeField_new"
        },
        "values": {
-        "item": {
-         "alive": false,
-         "ember": false,
-         "pos": [
-          0,
-          0,
-          0
-         ],
-         "vel": [
-          0,
-          0,
-          0
-         ],
-         "born": 0,
-         "expires": 0,
-         "s0": 1,
-         "s1": 2,
-         "opacity": 0,
-         "rotation": 0,
-         "serial": 0,
-         "color": [
-          0,
-          0,
-          0
-         ]
-        }
+        "value": []
        }
       },
       {
@@ -100920,68 +100831,64 @@
        "values": {
         "value": false
        }
+      },
+      {
+       "id": 391,
+       "type": "list.resize",
+       "x": 1128,
+       "y": 56,
+       "params": {
+        "variable": "made",
+        "scope": "SmokeField_new"
+       },
+       "values": {
+        "value": {
+         "alive": false,
+         "ember": false,
+         "pos": [
+          0,
+          0,
+          0
+         ],
+         "vel": [
+          0,
+          0,
+          0
+         ],
+         "born": 0,
+         "expires": 0,
+         "s0": 1,
+         "s1": 2,
+         "opacity": 0,
+         "rotation": 0,
+         "serial": 0,
+         "color": [
+          0,
+          0,
+          0
+         ]
+        }
+       }
       }
      ],
      "links": [
       [
        15,
        "pool",
-       18,
-       "value"
+       391,
+       "length"
       ],
       [
        15,
        "then",
-       17,
-       "exec"
-      ],
-      [
-       17,
-       "then",
        18,
        "exec"
       ],
       [
        18,
        "then",
-       19,
+       391,
        "exec"
-      ],
-      [
-       19,
-       "body",
-       24,
-       "exec"
-      ],
-      [
-       19,
-       "completed",
-       25,
-       "exec"
-      ],
-      [
-       20,
-       "result",
-       19,
-       "condition"
-      ],
-      [
-       21,
-       "length",
-       20,
-       "a"
-      ],
-      [
-       22,
-       "value",
-       21,
-       "list"
-      ],
-      [
-       23,
-       "value",
-       20,
-       "b"
       ],
       [
        25,
@@ -101036,6 +100943,12 @@
        "then",
        37,
        "exec"
+      ],
+      [
+       391,
+       "then",
+       25,
+       "exec"
       ]
      ],
      "machines": [],
@@ -101076,11 +100989,6 @@
          "type": "struct_list",
          "of": "gaps_Puff",
          "value": []
-        },
-        {
-         "name": "count",
-         "type": "int",
-         "value": 0
         }
        ]
       },
@@ -116880,7 +116788,7 @@
     "logic": {
      "kind": "kern-logic",
      "version": 1,
-     "nextId": 543,
+     "nextId": 548,
      "variables": [],
      "library": true,
      "uses": [
@@ -117420,37 +117328,7 @@
        "id": 10,
        "type": "flow.for",
        "x": 1400,
-       "y": 600
-      },
-      {
-       "id": 11,
-       "type": "flow.for",
-       "x": 1400,
-       "y": 1720
-      },
-      {
-       "id": 12,
-       "type": "flow.for",
-       "x": 1400,
-       "y": 2550
-      },
-      {
-       "id": 13,
-       "type": "flow.for",
-       "x": 1400,
-       "y": 3380
-      },
-      {
-       "id": 14,
-       "type": "flow.for",
-       "x": 1400,
-       "y": 4210
-      },
-      {
-       "id": 15,
-       "type": "flow.for",
-       "x": 840,
-       "y": 5040,
+       "y": 600,
        "values": {
         "first": 0
        }
@@ -117565,118 +117443,6 @@
        }
       },
       {
-       "id": 35,
-       "type": "var.set",
-       "x": 560,
-       "y": 600,
-       "params": {
-        "variable": "from",
-        "scope": "People_take_reports"
-       }
-      },
-      {
-       "id": 36,
-       "type": "var.get",
-       "x": 440,
-       "y": 750,
-       "params": {
-        "variable": "self",
-        "scope": "People_take_reports",
-        "path": ".reports_"
-       }
-      },
-      {
-       "id": 37,
-       "type": "var.set",
-       "x": 840,
-       "y": 600,
-       "params": {
-        "variable": "first",
-        "scope": "People_take_reports"
-       },
-       "values": {
-        "value": 0
-       }
-      },
-      {
-       "id": 38,
-       "type": "var.set",
-       "x": 1120,
-       "y": 600,
-       "params": {
-        "variable": "last",
-        "scope": "People_take_reports"
-       }
-      },
-      {
-       "id": 39,
-       "type": "math.formula",
-       "x": 1000,
-       "y": 750,
-       "params": {
-        "formula": "a - 1"
-       }
-      },
-      {
-       "id": 40,
-       "type": "list.length",
-       "x": 1000,
-       "y": 840,
-       "params": {
-        "type": "CrimeReport"
-       }
-      },
-      {
-       "id": 41,
-       "type": "var.get",
-       "x": 1000,
-       "y": 930,
-       "params": {
-        "variable": "self",
-        "scope": "People_take_reports",
-        "path": ".reports_"
-       }
-      },
-      {
-       "id": 42,
-       "type": "var.get",
-       "x": 1280,
-       "y": 750,
-       "params": {
-        "variable": "first",
-        "scope": "People_take_reports"
-       }
-      },
-      {
-       "id": 43,
-       "type": "var.get",
-       "x": 1280,
-       "y": 840,
-       "params": {
-        "variable": "last",
-        "scope": "People_take_reports"
-       }
-      },
-      {
-       "id": 44,
-       "type": "list.insert",
-       "x": 1680,
-       "y": 600,
-       "params": {
-        "variable": "out",
-        "scope": "People_take_reports"
-       }
-      },
-      {
-       "id": 45,
-       "type": "math.formula",
-       "x": 1560,
-       "y": 750,
-       "params": {
-        "formula": "a + b"
-       }
-      },
-      {
        "id": 46,
        "type": "var.get",
        "x": 1560,
@@ -117687,47 +117453,14 @@
        }
       },
       {
-       "id": 47,
-       "type": "value.int",
-       "x": 1560,
-       "y": 930
-      },
-      {
-       "id": 48,
-       "type": "math.formula",
-       "x": 1560,
-       "y": 1020,
-       "params": {
-        "formula": "a - b"
-       }
-      },
-      {
-       "id": 49,
-       "type": "var.get",
-       "x": 1560,
-       "y": 1110,
-       "params": {
-        "variable": "first",
-        "scope": "People_take_reports"
-       }
-      },
-      {
-       "id": 50,
-       "type": "list.get",
-       "x": 1560,
-       "y": 1200,
-       "params": {
-        "type": "CrimeReport"
-       }
-      },
-      {
        "id": 51,
        "type": "var.get",
        "x": 1560,
        "y": 1290,
        "params": {
-        "variable": "from",
-        "scope": "People_take_reports"
+        "variable": "self",
+        "scope": "People_take_reports",
+        "path": ".reports_"
        }
       },
       {
@@ -117809,118 +117542,6 @@
        }
       },
       {
-       "id": 60,
-       "type": "var.set",
-       "x": 560,
-       "y": 1720,
-       "params": {
-        "variable": "from",
-        "scope": "People_take_deaths"
-       }
-      },
-      {
-       "id": 61,
-       "type": "var.get",
-       "x": 440,
-       "y": 1870,
-       "params": {
-        "variable": "self",
-        "scope": "People_take_deaths",
-        "path": ".deaths_"
-       }
-      },
-      {
-       "id": 62,
-       "type": "var.set",
-       "x": 840,
-       "y": 1720,
-       "params": {
-        "variable": "first",
-        "scope": "People_take_deaths"
-       },
-       "values": {
-        "value": 0
-       }
-      },
-      {
-       "id": 63,
-       "type": "var.set",
-       "x": 1120,
-       "y": 1720,
-       "params": {
-        "variable": "last",
-        "scope": "People_take_deaths"
-       }
-      },
-      {
-       "id": 64,
-       "type": "math.formula",
-       "x": 1000,
-       "y": 1870,
-       "params": {
-        "formula": "a - 1"
-       }
-      },
-      {
-       "id": 65,
-       "type": "list.length",
-       "x": 1000,
-       "y": 1960,
-       "params": {
-        "type": "People_Death"
-       }
-      },
-      {
-       "id": 66,
-       "type": "var.get",
-       "x": 1000,
-       "y": 2050,
-       "params": {
-        "variable": "self",
-        "scope": "People_take_deaths",
-        "path": ".deaths_"
-       }
-      },
-      {
-       "id": 67,
-       "type": "var.get",
-       "x": 1280,
-       "y": 1870,
-       "params": {
-        "variable": "first",
-        "scope": "People_take_deaths"
-       }
-      },
-      {
-       "id": 68,
-       "type": "var.get",
-       "x": 1280,
-       "y": 1960,
-       "params": {
-        "variable": "last",
-        "scope": "People_take_deaths"
-       }
-      },
-      {
-       "id": 69,
-       "type": "list.insert",
-       "x": 1680,
-       "y": 1720,
-       "params": {
-        "variable": "out",
-        "scope": "People_take_deaths"
-       }
-      },
-      {
-       "id": 70,
-       "type": "math.formula",
-       "x": 1560,
-       "y": 1870,
-       "params": {
-        "formula": "a + b"
-       }
-      },
-      {
        "id": 71,
        "type": "var.get",
        "x": 1560,
@@ -117931,47 +117552,14 @@
        }
       },
       {
-       "id": 72,
-       "type": "value.int",
-       "x": 1560,
-       "y": 2050
-      },
-      {
-       "id": 73,
-       "type": "math.formula",
-       "x": 1560,
-       "y": 2140,
-       "params": {
-        "formula": "a - b"
-       }
-      },
-      {
-       "id": 74,
-       "type": "var.get",
-       "x": 1560,
-       "y": 2230,
-       "params": {
-        "variable": "first",
-        "scope": "People_take_deaths"
-       }
-      },
-      {
-       "id": 75,
-       "type": "list.get",
-       "x": 1560,
-       "y": 2320,
-       "params": {
-        "type": "People_Death"
-       }
-      },
-      {
        "id": 76,
        "type": "var.get",
        "x": 1560,
        "y": 2410,
        "params": {
-        "variable": "from",
-        "scope": "People_take_deaths"
+        "variable": "self",
+        "scope": "People_take_deaths",
+        "path": ".deaths_"
        }
       },
       {
@@ -118024,118 +117612,6 @@
        }
       },
       {
-       "id": 82,
-       "type": "var.set",
-       "x": 560,
-       "y": 2550,
-       "params": {
-        "variable": "from",
-        "scope": "People_take_remote_hits"
-       }
-      },
-      {
-       "id": 83,
-       "type": "var.get",
-       "x": 440,
-       "y": 2700,
-       "params": {
-        "variable": "self",
-        "scope": "People_take_remote_hits",
-        "path": ".remote_hits_"
-       }
-      },
-      {
-       "id": 84,
-       "type": "var.set",
-       "x": 840,
-       "y": 2550,
-       "params": {
-        "variable": "first",
-        "scope": "People_take_remote_hits"
-       },
-       "values": {
-        "value": 0
-       }
-      },
-      {
-       "id": 85,
-       "type": "var.set",
-       "x": 1120,
-       "y": 2550,
-       "params": {
-        "variable": "last",
-        "scope": "People_take_remote_hits"
-       }
-      },
-      {
-       "id": 86,
-       "type": "math.formula",
-       "x": 1000,
-       "y": 2700,
-       "params": {
-        "formula": "a - 1"
-       }
-      },
-      {
-       "id": 87,
-       "type": "list.length",
-       "x": 1000,
-       "y": 2790,
-       "params": {
-        "type": "People_RemoteHit"
-       }
-      },
-      {
-       "id": 88,
-       "type": "var.get",
-       "x": 1000,
-       "y": 2880,
-       "params": {
-        "variable": "self",
-        "scope": "People_take_remote_hits",
-        "path": ".remote_hits_"
-       }
-      },
-      {
-       "id": 89,
-       "type": "var.get",
-       "x": 1280,
-       "y": 2700,
-       "params": {
-        "variable": "first",
-        "scope": "People_take_remote_hits"
-       }
-      },
-      {
-       "id": 90,
-       "type": "var.get",
-       "x": 1280,
-       "y": 2790,
-       "params": {
-        "variable": "last",
-        "scope": "People_take_remote_hits"
-       }
-      },
-      {
-       "id": 91,
-       "type": "list.insert",
-       "x": 1680,
-       "y": 2550,
-       "params": {
-        "variable": "out",
-        "scope": "People_take_remote_hits"
-       }
-      },
-      {
-       "id": 92,
-       "type": "math.formula",
-       "x": 1560,
-       "y": 2700,
-       "params": {
-        "formula": "a + b"
-       }
-      },
-      {
        "id": 93,
        "type": "var.get",
        "x": 1560,
@@ -118146,47 +117622,14 @@
        }
       },
       {
-       "id": 94,
-       "type": "value.int",
-       "x": 1560,
-       "y": 2880
-      },
-      {
-       "id": 95,
-       "type": "math.formula",
-       "x": 1560,
-       "y": 2970,
-       "params": {
-        "formula": "a - b"
-       }
-      },
-      {
-       "id": 96,
-       "type": "var.get",
-       "x": 1560,
-       "y": 3060,
-       "params": {
-        "variable": "first",
-        "scope": "People_take_remote_hits"
-       }
-      },
-      {
-       "id": 97,
-       "type": "list.get",
-       "x": 1560,
-       "y": 3150,
-       "params": {
-        "type": "People_RemoteHit"
-       }
-      },
-      {
        "id": 98,
        "type": "var.get",
        "x": 1560,
        "y": 3240,
        "params": {
-        "variable": "from",
-        "scope": "People_take_remote_hits"
+        "variable": "self",
+        "scope": "People_take_remote_hits",
+        "path": ".remote_hits_"
        }
       },
       {
@@ -118239,118 +117682,6 @@
        }
       },
       {
-       "id": 104,
-       "type": "var.set",
-       "x": 560,
-       "y": 3380,
-       "params": {
-        "variable": "from",
-        "scope": "People_take_hurts"
-       }
-      },
-      {
-       "id": 105,
-       "type": "var.get",
-       "x": 440,
-       "y": 3530,
-       "params": {
-        "variable": "self",
-        "scope": "People_take_hurts",
-        "path": ".hurts_"
-       }
-      },
-      {
-       "id": 106,
-       "type": "var.set",
-       "x": 840,
-       "y": 3380,
-       "params": {
-        "variable": "first",
-        "scope": "People_take_hurts"
-       },
-       "values": {
-        "value": 0
-       }
-      },
-      {
-       "id": 107,
-       "type": "var.set",
-       "x": 1120,
-       "y": 3380,
-       "params": {
-        "variable": "last",
-        "scope": "People_take_hurts"
-       }
-      },
-      {
-       "id": 108,
-       "type": "math.formula",
-       "x": 1000,
-       "y": 3530,
-       "params": {
-        "formula": "a - 1"
-       }
-      },
-      {
-       "id": 109,
-       "type": "list.length",
-       "x": 1000,
-       "y": 3620,
-       "params": {
-        "type": "People_Hurt"
-       }
-      },
-      {
-       "id": 110,
-       "type": "var.get",
-       "x": 1000,
-       "y": 3710,
-       "params": {
-        "variable": "self",
-        "scope": "People_take_hurts",
-        "path": ".hurts_"
-       }
-      },
-      {
-       "id": 111,
-       "type": "var.get",
-       "x": 1280,
-       "y": 3530,
-       "params": {
-        "variable": "first",
-        "scope": "People_take_hurts"
-       }
-      },
-      {
-       "id": 112,
-       "type": "var.get",
-       "x": 1280,
-       "y": 3620,
-       "params": {
-        "variable": "last",
-        "scope": "People_take_hurts"
-       }
-      },
-      {
-       "id": 113,
-       "type": "list.insert",
-       "x": 1680,
-       "y": 3380,
-       "params": {
-        "variable": "out",
-        "scope": "People_take_hurts"
-       }
-      },
-      {
-       "id": 114,
-       "type": "math.formula",
-       "x": 1560,
-       "y": 3530,
-       "params": {
-        "formula": "a + b"
-       }
-      },
-      {
        "id": 115,
        "type": "var.get",
        "x": 1560,
@@ -118361,47 +117692,14 @@
        }
       },
       {
-       "id": 116,
-       "type": "value.int",
-       "x": 1560,
-       "y": 3710
-      },
-      {
-       "id": 117,
-       "type": "math.formula",
-       "x": 1560,
-       "y": 3800,
-       "params": {
-        "formula": "a - b"
-       }
-      },
-      {
-       "id": 118,
-       "type": "var.get",
-       "x": 1560,
-       "y": 3890,
-       "params": {
-        "variable": "first",
-        "scope": "People_take_hurts"
-       }
-      },
-      {
-       "id": 119,
-       "type": "list.get",
-       "x": 1560,
-       "y": 3980,
-       "params": {
-        "type": "People_Hurt"
-       }
-      },
-      {
        "id": 120,
        "type": "var.get",
        "x": 1560,
        "y": 4070,
        "params": {
-        "variable": "from",
-        "scope": "People_take_hurts"
+        "variable": "self",
+        "scope": "People_take_hurts",
+        "path": ".hurts_"
        }
       },
       {
@@ -118454,118 +117752,6 @@
        }
       },
       {
-       "id": 126,
-       "type": "var.set",
-       "x": 560,
-       "y": 4210,
-       "params": {
-        "variable": "from",
-        "scope": "People_take_falls"
-       }
-      },
-      {
-       "id": 127,
-       "type": "var.get",
-       "x": 440,
-       "y": 4360,
-       "params": {
-        "variable": "self",
-        "scope": "People_take_falls",
-        "path": ".falls_"
-       }
-      },
-      {
-       "id": 128,
-       "type": "var.set",
-       "x": 840,
-       "y": 4210,
-       "params": {
-        "variable": "first",
-        "scope": "People_take_falls"
-       },
-       "values": {
-        "value": 0
-       }
-      },
-      {
-       "id": 129,
-       "type": "var.set",
-       "x": 1120,
-       "y": 4210,
-       "params": {
-        "variable": "last",
-        "scope": "People_take_falls"
-       }
-      },
-      {
-       "id": 130,
-       "type": "math.formula",
-       "x": 1000,
-       "y": 4360,
-       "params": {
-        "formula": "a - 1"
-       }
-      },
-      {
-       "id": 131,
-       "type": "list.length",
-       "x": 1000,
-       "y": 4450,
-       "params": {
-        "type": "People_Fall"
-       }
-      },
-      {
-       "id": 132,
-       "type": "var.get",
-       "x": 1000,
-       "y": 4540,
-       "params": {
-        "variable": "self",
-        "scope": "People_take_falls",
-        "path": ".falls_"
-       }
-      },
-      {
-       "id": 133,
-       "type": "var.get",
-       "x": 1280,
-       "y": 4360,
-       "params": {
-        "variable": "first",
-        "scope": "People_take_falls"
-       }
-      },
-      {
-       "id": 134,
-       "type": "var.get",
-       "x": 1280,
-       "y": 4450,
-       "params": {
-        "variable": "last",
-        "scope": "People_take_falls"
-       }
-      },
-      {
-       "id": 135,
-       "type": "list.insert",
-       "x": 1680,
-       "y": 4210,
-       "params": {
-        "variable": "out",
-        "scope": "People_take_falls"
-       }
-      },
-      {
-       "id": 136,
-       "type": "math.formula",
-       "x": 1560,
-       "y": 4360,
-       "params": {
-        "formula": "a + b"
-       }
-      },
-      {
        "id": 137,
        "type": "var.get",
        "x": 1560,
@@ -118576,47 +117762,14 @@
        }
       },
       {
-       "id": 138,
-       "type": "value.int",
-       "x": 1560,
-       "y": 4540
-      },
-      {
-       "id": 139,
-       "type": "math.formula",
-       "x": 1560,
-       "y": 4630,
-       "params": {
-        "formula": "a - b"
-       }
-      },
-      {
-       "id": 140,
-       "type": "var.get",
-       "x": 1560,
-       "y": 4720,
-       "params": {
-        "variable": "first",
-        "scope": "People_take_falls"
-       }
-      },
-      {
-       "id": 141,
-       "type": "list.get",
-       "x": 1560,
-       "y": 4810,
-       "params": {
-        "type": "People_Fall"
-       }
-      },
-      {
        "id": 142,
        "type": "var.get",
        "x": 1560,
        "y": 4900,
        "params": {
-        "variable": "from",
-        "scope": "People_take_falls"
+        "variable": "self",
+        "scope": "People_take_falls",
+        "path": ".falls_"
        }
       },
       {
@@ -118817,143 +117970,73 @@
         "scope": "People_last_head",
         "path": ".last_head_"
        }
+      },
+      {
+       "id": 543,
+       "type": "list.insert_list",
+       "x": 568,
+       "y": 656,
+       "params": {
+        "variable": "out",
+        "scope": "People_take_reports"
+       }
+      },
+      {
+       "id": 544,
+       "type": "list.insert_list",
+       "x": 568,
+       "y": 1776,
+       "params": {
+        "variable": "out",
+        "scope": "People_take_deaths"
+       }
+      },
+      {
+       "id": 545,
+       "type": "list.insert_list",
+       "x": 568,
+       "y": 2608,
+       "params": {
+        "variable": "out",
+        "scope": "People_take_remote_hits"
+       }
+      },
+      {
+       "id": 546,
+       "type": "list.insert_list",
+       "x": 568,
+       "y": 3440,
+       "params": {
+        "variable": "out",
+        "scope": "People_take_hurts"
+       }
+      },
+      {
+       "id": 547,
+       "type": "list.insert_list",
+       "x": 568,
+       "y": 4264,
+       "params": {
+        "variable": "out",
+        "scope": "People_take_falls"
+       }
       }
      ],
      "links": [
       [
        10,
        "body",
-       44,
-       "exec"
-      ],
-      [
-       10,
-       "completed",
-       52,
-       "exec"
-      ],
-      [
-       10,
-       "index",
-       48,
-       "a"
-      ],
-      [
-       10,
-       "index",
-       50,
-       "index"
-      ],
-      [
-       11,
-       "body",
-       69,
-       "exec"
-      ],
-      [
-       11,
-       "completed",
-       77,
-       "exec"
-      ],
-      [
-       11,
-       "index",
-       73,
-       "a"
-      ],
-      [
-       11,
-       "index",
-       75,
-       "index"
-      ],
-      [
-       12,
-       "body",
-       91,
-       "exec"
-      ],
-      [
-       12,
-       "completed",
-       99,
-       "exec"
-      ],
-      [
-       12,
-       "index",
-       95,
-       "a"
-      ],
-      [
-       12,
-       "index",
-       97,
-       "index"
-      ],
-      [
-       13,
-       "body",
-       113,
-       "exec"
-      ],
-      [
-       13,
-       "completed",
-       121,
-       "exec"
-      ],
-      [
-       13,
-       "index",
-       117,
-       "a"
-      ],
-      [
-       13,
-       "index",
-       119,
-       "index"
-      ],
-      [
-       14,
-       "body",
-       135,
-       "exec"
-      ],
-      [
-       14,
-       "completed",
-       143,
-       "exec"
-      ],
-      [
-       14,
-       "index",
-       139,
-       "a"
-      ],
-      [
-       14,
-       "index",
-       141,
-       "index"
-      ],
-      [
-       15,
-       "body",
        154,
        "exec"
       ],
       [
-       15,
+       10,
        "index",
        156,
        "path0"
       ],
       [
-       15,
+       10,
        "index",
        157,
        "path0"
@@ -119009,7 +118092,7 @@
       [
        32,
        "then",
-       35,
+       543,
        "exec"
       ],
       [
@@ -119025,100 +118108,16 @@
        "list"
       ],
       [
-       35,
-       "then",
-       37,
-       "exec"
-      ],
-      [
-       36,
-       "value",
-       35,
-       "value"
-      ],
-      [
-       37,
-       "then",
-       38,
-       "exec"
-      ],
-      [
-       38,
-       "then",
-       10,
-       "exec"
-      ],
-      [
-       39,
-       "result",
-       38,
-       "value"
-      ],
-      [
-       40,
-       "length",
-       39,
-       "a"
-      ],
-      [
-       41,
-       "value",
-       40,
-       "list"
-      ],
-      [
-       42,
-       "value",
-       10,
-       "first"
-      ],
-      [
-       43,
-       "value",
-       10,
-       "last"
-      ],
-      [
-       45,
-       "result",
-       44,
-       "index"
-      ],
-      [
        46,
        "value",
-       45,
-       "a"
-      ],
-      [
-       47,
-       "result",
-       45,
-       "b"
-      ],
-      [
-       48,
-       "result",
-       47,
-       "value"
-      ],
-      [
-       49,
-       "value",
-       48,
-       "b"
-      ],
-      [
-       50,
-       "item",
-       44,
-       "item"
+       543,
+       "index"
       ],
       [
        51,
        "value",
-       50,
-       "list"
+       543,
+       "items"
       ],
       [
        53,
@@ -119141,7 +118140,7 @@
       [
        57,
        "then",
-       60,
+       544,
        "exec"
       ],
       [
@@ -119157,100 +118156,16 @@
        "list"
       ],
       [
-       60,
-       "then",
-       62,
-       "exec"
-      ],
-      [
-       61,
-       "value",
-       60,
-       "value"
-      ],
-      [
-       62,
-       "then",
-       63,
-       "exec"
-      ],
-      [
-       63,
-       "then",
-       11,
-       "exec"
-      ],
-      [
-       64,
-       "result",
-       63,
-       "value"
-      ],
-      [
-       65,
-       "length",
-       64,
-       "a"
-      ],
-      [
-       66,
-       "value",
-       65,
-       "list"
-      ],
-      [
-       67,
-       "value",
-       11,
-       "first"
-      ],
-      [
-       68,
-       "value",
-       11,
-       "last"
-      ],
-      [
-       70,
-       "result",
-       69,
-       "index"
-      ],
-      [
        71,
        "value",
-       70,
-       "a"
-      ],
-      [
-       72,
-       "result",
-       70,
-       "b"
-      ],
-      [
-       73,
-       "result",
-       72,
-       "value"
-      ],
-      [
-       74,
-       "value",
-       73,
-       "b"
-      ],
-      [
-       75,
-       "item",
-       69,
-       "item"
+       544,
+       "index"
       ],
       [
        76,
        "value",
-       75,
-       "list"
+       544,
+       "items"
       ],
       [
        78,
@@ -119261,7 +118176,7 @@
       [
        79,
        "then",
-       82,
+       545,
        "exec"
       ],
       [
@@ -119277,100 +118192,16 @@
        "list"
       ],
       [
-       82,
-       "then",
-       84,
-       "exec"
-      ],
-      [
-       83,
-       "value",
-       82,
-       "value"
-      ],
-      [
-       84,
-       "then",
-       85,
-       "exec"
-      ],
-      [
-       85,
-       "then",
-       12,
-       "exec"
-      ],
-      [
-       86,
-       "result",
-       85,
-       "value"
-      ],
-      [
-       87,
-       "length",
-       86,
-       "a"
-      ],
-      [
-       88,
-       "value",
-       87,
-       "list"
-      ],
-      [
-       89,
-       "value",
-       12,
-       "first"
-      ],
-      [
-       90,
-       "value",
-       12,
-       "last"
-      ],
-      [
-       92,
-       "result",
-       91,
-       "index"
-      ],
-      [
        93,
        "value",
-       92,
-       "a"
-      ],
-      [
-       94,
-       "result",
-       92,
-       "b"
-      ],
-      [
-       95,
-       "result",
-       94,
-       "value"
-      ],
-      [
-       96,
-       "value",
-       95,
-       "b"
-      ],
-      [
-       97,
-       "item",
-       91,
-       "item"
+       545,
+       "index"
       ],
       [
        98,
        "value",
-       97,
-       "list"
+       545,
+       "items"
       ],
       [
        100,
@@ -119381,7 +118212,7 @@
       [
        101,
        "then",
-       104,
+       546,
        "exec"
       ],
       [
@@ -119397,100 +118228,16 @@
        "list"
       ],
       [
-       104,
-       "then",
-       106,
-       "exec"
-      ],
-      [
-       105,
-       "value",
-       104,
-       "value"
-      ],
-      [
-       106,
-       "then",
-       107,
-       "exec"
-      ],
-      [
-       107,
-       "then",
-       13,
-       "exec"
-      ],
-      [
-       108,
-       "result",
-       107,
-       "value"
-      ],
-      [
-       109,
-       "length",
-       108,
-       "a"
-      ],
-      [
-       110,
-       "value",
-       109,
-       "list"
-      ],
-      [
-       111,
-       "value",
-       13,
-       "first"
-      ],
-      [
-       112,
-       "value",
-       13,
-       "last"
-      ],
-      [
-       114,
-       "result",
-       113,
-       "index"
-      ],
-      [
        115,
        "value",
-       114,
-       "a"
-      ],
-      [
-       116,
-       "result",
-       114,
-       "b"
-      ],
-      [
-       117,
-       "result",
-       116,
-       "value"
-      ],
-      [
-       118,
-       "value",
-       117,
-       "b"
-      ],
-      [
-       119,
-       "item",
-       113,
-       "item"
+       546,
+       "index"
       ],
       [
        120,
        "value",
-       119,
-       "list"
+       546,
+       "items"
       ],
       [
        122,
@@ -119501,7 +118248,7 @@
       [
        123,
        "then",
-       126,
+       547,
        "exec"
       ],
       [
@@ -119517,100 +118264,16 @@
        "list"
       ],
       [
-       126,
-       "then",
-       128,
-       "exec"
-      ],
-      [
-       127,
-       "value",
-       126,
-       "value"
-      ],
-      [
-       128,
-       "then",
-       129,
-       "exec"
-      ],
-      [
-       129,
-       "then",
-       14,
-       "exec"
-      ],
-      [
-       130,
-       "result",
-       129,
-       "value"
-      ],
-      [
-       131,
-       "length",
-       130,
-       "a"
-      ],
-      [
-       132,
-       "value",
-       131,
-       "list"
-      ],
-      [
-       133,
-       "value",
-       14,
-       "first"
-      ],
-      [
-       134,
-       "value",
-       14,
-       "last"
-      ],
-      [
-       136,
-       "result",
-       135,
-       "index"
-      ],
-      [
        137,
        "value",
-       136,
-       "a"
-      ],
-      [
-       138,
-       "result",
-       136,
-       "b"
-      ],
-      [
-       139,
-       "result",
-       138,
-       "value"
-      ],
-      [
-       140,
-       "value",
-       139,
-       "b"
-      ],
-      [
-       141,
-       "item",
-       135,
-       "item"
+       547,
+       "index"
       ],
       [
        142,
        "value",
-       141,
-       "list"
+       547,
+       "items"
       ],
       [
        144,
@@ -119663,13 +118326,13 @@
       [
        150,
        "then",
-       15,
+       10,
        "exec"
       ],
       [
        151,
        "result",
-       15,
+       10,
        "last"
       ],
       [
@@ -119725,6 +118388,36 @@
        "value",
        162,
        "Result"
+      ],
+      [
+       543,
+       "then",
+       52,
+       "exec"
+      ],
+      [
+       544,
+       "then",
+       77,
+       "exec"
+      ],
+      [
+       545,
+       "then",
+       99,
+       "exec"
+      ],
+      [
+       546,
+       "then",
+       121,
+       "exec"
+      ],
+      [
+       547,
+       "then",
+       143,
+       "exec"
       ]
      ],
      "machines": [],
@@ -119860,22 +118553,6 @@
          "name": "place",
          "type": "int",
          "value": 0
-        },
-        {
-         "name": "from",
-         "type": "struct_list",
-         "of": "CrimeReport",
-         "value": []
-        },
-        {
-         "name": "first",
-         "type": "int",
-         "value": 0
-        },
-        {
-         "name": "last",
-         "type": "int",
-         "value": 0
         }
        ]
       },
@@ -119950,22 +118627,6 @@
          "name": "place",
          "type": "int",
          "value": 0
-        },
-        {
-         "name": "from",
-         "type": "struct_list",
-         "of": "People_Death",
-         "value": []
-        },
-        {
-         "name": "first",
-         "type": "int",
-         "value": 0
-        },
-        {
-         "name": "last",
-         "type": "int",
-         "value": 0
         }
        ]
       },
@@ -120004,22 +118665,6 @@
        "locals": [
         {
          "name": "place",
-         "type": "int",
-         "value": 0
-        },
-        {
-         "name": "from",
-         "type": "struct_list",
-         "of": "People_RemoteHit",
-         "value": []
-        },
-        {
-         "name": "first",
-         "type": "int",
-         "value": 0
-        },
-        {
-         "name": "last",
          "type": "int",
          "value": 0
         }
@@ -120062,22 +118707,6 @@
          "name": "place",
          "type": "int",
          "value": 0
-        },
-        {
-         "name": "from",
-         "type": "struct_list",
-         "of": "People_Hurt",
-         "value": []
-        },
-        {
-         "name": "first",
-         "type": "int",
-         "value": 0
-        },
-        {
-         "name": "last",
-         "type": "int",
-         "value": 0
         }
        ]
       },
@@ -120116,22 +118745,6 @@
        "locals": [
         {
          "name": "place",
-         "type": "int",
-         "value": 0
-        },
-        {
-         "name": "from",
-         "type": "struct_list",
-         "of": "People_Fall",
-         "value": []
-        },
-        {
-         "name": "first",
-         "type": "int",
-         "value": 0
-        },
-        {
-         "name": "last",
          "type": "int",
          "value": 0
         }
@@ -121621,7 +120234,7 @@
     "logic": {
      "kind": "kern-logic",
      "version": 1,
-     "nextId": 534,
+     "nextId": 535,
      "variables": [],
      "library": true,
      "uses": [
@@ -122552,12 +121165,6 @@
      ],
      "nodes": [
       {
-       "id": 10,
-       "type": "flow.for",
-       "x": 280,
-       "y": 290
-      },
-      {
        "id": 24,
        "type": "var.set",
        "x": 280,
@@ -122627,118 +121234,6 @@
        }
       },
       {
-       "id": 47,
-       "type": "var.set",
-       "x": 560,
-       "y": 1230,
-       "params": {
-        "variable": "from",
-        "scope": "Ragdolls_take_ups"
-       }
-      },
-      {
-       "id": 48,
-       "type": "var.get",
-       "x": 440,
-       "y": 1380,
-       "params": {
-        "variable": "self",
-        "scope": "Ragdolls_take_ups",
-        "path": ".ups_"
-       }
-      },
-      {
-       "id": 49,
-       "type": "var.set",
-       "x": 840,
-       "y": 1230,
-       "params": {
-        "variable": "first",
-        "scope": "Ragdolls_take_ups"
-       },
-       "values": {
-        "value": 0
-       }
-      },
-      {
-       "id": 50,
-       "type": "var.set",
-       "x": 1120,
-       "y": 1230,
-       "params": {
-        "variable": "last",
-        "scope": "Ragdolls_take_ups"
-       }
-      },
-      {
-       "id": 51,
-       "type": "math.formula",
-       "x": 1000,
-       "y": 1380,
-       "params": {
-        "formula": "a - 1"
-       }
-      },
-      {
-       "id": 52,
-       "type": "list.length",
-       "x": 1000,
-       "y": 1470,
-       "params": {
-        "type": "Ragdolls_Up"
-       }
-      },
-      {
-       "id": 53,
-       "type": "var.get",
-       "x": 1000,
-       "y": 1560,
-       "params": {
-        "variable": "self",
-        "scope": "Ragdolls_take_ups",
-        "path": ".ups_"
-       }
-      },
-      {
-       "id": 54,
-       "type": "var.get",
-       "x": 1280,
-       "y": 1380,
-       "params": {
-        "variable": "first",
-        "scope": "Ragdolls_take_ups"
-       }
-      },
-      {
-       "id": 55,
-       "type": "var.get",
-       "x": 1280,
-       "y": 1470,
-       "params": {
-        "variable": "last",
-        "scope": "Ragdolls_take_ups"
-       }
-      },
-      {
-       "id": 56,
-       "type": "list.insert",
-       "x": 1680,
-       "y": 1230,
-       "params": {
-        "variable": "out",
-        "scope": "Ragdolls_take_ups"
-       }
-      },
-      {
-       "id": 57,
-       "type": "math.formula",
-       "x": 1560,
-       "y": 1380,
-       "params": {
-        "formula": "a + b"
-       }
-      },
-      {
        "id": 58,
        "type": "var.get",
        "x": 1560,
@@ -122749,47 +121244,14 @@
        }
       },
       {
-       "id": 59,
-       "type": "value.int",
-       "x": 1560,
-       "y": 1560
-      },
-      {
-       "id": 60,
-       "type": "math.formula",
-       "x": 1560,
-       "y": 1650,
-       "params": {
-        "formula": "a - b"
-       }
-      },
-      {
-       "id": 61,
-       "type": "var.get",
-       "x": 1560,
-       "y": 1740,
-       "params": {
-        "variable": "first",
-        "scope": "Ragdolls_take_ups"
-       }
-      },
-      {
-       "id": 62,
-       "type": "list.get",
-       "x": 1560,
-       "y": 1830,
-       "params": {
-        "type": "Ragdolls_Up"
-       }
-      },
-      {
        "id": 63,
        "type": "var.get",
        "x": 1560,
        "y": 1920,
        "params": {
-        "variable": "from",
-        "scope": "Ragdolls_take_ups"
+        "variable": "self",
+        "scope": "Ragdolls_take_ups",
+        "path": ".ups_"
        }
       },
       {
@@ -122840,33 +121302,19 @@
        "params": {
         "function": "Ragdolls_init"
        }
+      },
+      {
+       "id": 534,
+       "type": "list.insert_list",
+       "x": 568,
+       "y": 1288,
+       "params": {
+        "variable": "out",
+        "scope": "Ragdolls_take_ups"
+       }
       }
      ],
      "links": [
-      [
-       10,
-       "body",
-       56,
-       "exec"
-      ],
-      [
-       10,
-       "completed",
-       64,
-       "exec"
-      ],
-      [
-       10,
-       "index",
-       60,
-       "a"
-      ],
-      [
-       10,
-       "index",
-       62,
-       "index"
-      ],
       [
        24,
        "then",
@@ -122888,7 +121336,7 @@
       [
        44,
        "then",
-       47,
+       534,
        "exec"
       ],
       [
@@ -122904,100 +121352,16 @@
        "list"
       ],
       [
-       47,
-       "then",
-       49,
-       "exec"
-      ],
-      [
-       48,
-       "value",
-       47,
-       "value"
-      ],
-      [
-       49,
-       "then",
-       50,
-       "exec"
-      ],
-      [
-       50,
-       "then",
-       10,
-       "exec"
-      ],
-      [
-       51,
-       "result",
-       50,
-       "value"
-      ],
-      [
-       52,
-       "length",
-       51,
-       "a"
-      ],
-      [
-       53,
-       "value",
-       52,
-       "list"
-      ],
-      [
-       54,
-       "value",
-       10,
-       "first"
-      ],
-      [
-       55,
-       "value",
-       10,
-       "last"
-      ],
-      [
-       57,
-       "result",
-       56,
-       "index"
-      ],
-      [
        58,
        "value",
-       57,
-       "a"
-      ],
-      [
-       59,
-       "result",
-       57,
-       "b"
-      ],
-      [
-       60,
-       "result",
-       59,
-       "value"
-      ],
-      [
-       61,
-       "value",
-       60,
-       "b"
-      ],
-      [
-       62,
-       "item",
-       56,
-       "item"
+       534,
+       "index"
       ],
       [
        63,
        "value",
-       62,
-       "list"
+       534,
+       "items"
       ],
       [
        65,
@@ -123028,6 +121392,12 @@
        "w",
        24,
        "value"
+      ],
+      [
+       534,
+       "then",
+       64,
+       "exec"
       ]
      ],
      "machines": [],
@@ -123092,22 +121462,6 @@
        "locals": [
         {
          "name": "place",
-         "type": "int",
-         "value": 0
-        },
-        {
-         "name": "from",
-         "type": "struct_list",
-         "of": "Ragdolls_Up",
-         "value": []
-        },
-        {
-         "name": "first",
-         "type": "int",
-         "value": 0
-        },
-        {
-         "name": "last",
          "type": "int",
          "value": 0
         }
@@ -169308,7 +167662,7 @@
     "logic": {
      "kind": "kern-logic",
      "version": 1,
-     "nextId": 837,
+     "nextId": 848,
      "variables": [
       {
        "name": "TAU",
@@ -169960,23 +168314,16 @@
        }
       },
       {
-       "id": 69,
-       "type": "list.clear",
-       "x": 1680,
-       "y": 960,
-       "params": {
-        "variable": "made",
-        "scope": "finish"
-       }
-      },
-      {
        "id": 70,
        "type": "var.set",
        "x": 1960,
        "y": 960,
        "params": {
-        "variable": "count",
+        "variable": "made",
         "scope": "finish"
+       },
+       "values": {
+        "value": []
        }
       },
       {
@@ -169996,63 +168343,6 @@
        "params": {
         "variable": "d",
         "scope": "finish"
-       }
-      },
-      {
-       "id": 73,
-       "type": "flow.while",
-       "x": 2240,
-       "y": 960
-      },
-      {
-       "id": 74,
-       "type": "math.compare",
-       "x": 2120,
-       "y": 1110,
-       "params": {
-        "op": "<"
-       }
-      },
-      {
-       "id": 75,
-       "type": "list.length",
-       "x": 2120,
-       "y": 1200,
-       "params": {
-        "type": "float"
-       }
-      },
-      {
-       "id": 76,
-       "type": "var.get",
-       "x": 2120,
-       "y": 1290,
-       "params": {
-        "variable": "made",
-        "scope": "finish"
-       }
-      },
-      {
-       "id": 77,
-       "type": "var.get",
-       "x": 2120,
-       "y": 1380,
-       "params": {
-        "variable": "count",
-        "scope": "finish"
-       }
-      },
-      {
-       "id": 78,
-       "type": "list.add",
-       "x": 2520,
-       "y": 960,
-       "params": {
-        "variable": "made",
-        "scope": "finish"
-       },
-       "values": {
-        "item": 0
        }
       },
       {
@@ -170357,23 +168647,16 @@
        }
       },
       {
-       "id": 112,
-       "type": "list.clear",
-       "x": 560,
-       "y": 2190,
-       "params": {
-        "variable": "made",
-        "scope": "shot"
-       }
-      },
-      {
        "id": 113,
        "type": "var.set",
        "x": 840,
        "y": 2190,
        "params": {
-        "variable": "count",
+        "variable": "made",
         "scope": "shot"
+       },
+       "values": {
+        "value": []
        }
       },
       {
@@ -170393,63 +168676,6 @@
        "params": {
         "variable": "duration",
         "scope": "shot"
-       }
-      },
-      {
-       "id": 116,
-       "type": "flow.while",
-       "x": 1120,
-       "y": 2190
-      },
-      {
-       "id": 117,
-       "type": "math.compare",
-       "x": 1000,
-       "y": 2340,
-       "params": {
-        "op": "<"
-       }
-      },
-      {
-       "id": 118,
-       "type": "list.length",
-       "x": 1000,
-       "y": 2430,
-       "params": {
-        "type": "float"
-       }
-      },
-      {
-       "id": 119,
-       "type": "var.get",
-       "x": 1000,
-       "y": 2520,
-       "params": {
-        "variable": "made",
-        "scope": "shot"
-       }
-      },
-      {
-       "id": 120,
-       "type": "var.get",
-       "x": 1000,
-       "y": 2610,
-       "params": {
-        "variable": "count",
-        "scope": "shot"
-       }
-      },
-      {
-       "id": 121,
-       "type": "list.add",
-       "x": 1400,
-       "y": 2190,
-       "params": {
-        "variable": "made",
-        "scope": "shot"
-       },
-       "values": {
-        "item": 0
        }
       },
       {
@@ -170473,23 +168699,16 @@
        }
       },
       {
-       "id": 124,
-       "type": "list.clear",
-       "x": 1960,
-       "y": 2190,
-       "params": {
-        "variable": "made_2",
-        "scope": "shot"
-       }
-      },
-      {
        "id": 125,
        "type": "var.set",
        "x": 2240,
        "y": 2190,
        "params": {
-        "variable": "count_2",
+        "variable": "made_2",
         "scope": "shot"
+       },
+       "values": {
+        "value": []
        }
       },
       {
@@ -170509,63 +168728,6 @@
        "params": {
         "variable": "data",
         "scope": "shot"
-       }
-      },
-      {
-       "id": 128,
-       "type": "flow.while",
-       "x": 2520,
-       "y": 2190
-      },
-      {
-       "id": 129,
-       "type": "math.compare",
-       "x": 2400,
-       "y": 2340,
-       "params": {
-        "op": "<"
-       }
-      },
-      {
-       "id": 130,
-       "type": "list.length",
-       "x": 2400,
-       "y": 2430,
-       "params": {
-        "type": "float"
-       }
-      },
-      {
-       "id": 131,
-       "type": "var.get",
-       "x": 2400,
-       "y": 2520,
-       "params": {
-        "variable": "made_2",
-        "scope": "shot"
-       }
-      },
-      {
-       "id": 132,
-       "type": "var.get",
-       "x": 2400,
-       "y": 2610,
-       "params": {
-        "variable": "count_2",
-        "scope": "shot"
-       }
-      },
-      {
-       "id": 133,
-       "type": "list.add",
-       "x": 2800,
-       "y": 2190,
-       "params": {
-        "variable": "made_2",
-        "scope": "shot"
-       },
-       "values": {
-        "item": 0
        }
       },
       {
@@ -171898,23 +170060,16 @@
        }
       },
       {
-       "id": 266,
-       "type": "list.clear",
-       "x": 560,
-       "y": 3200,
-       "params": {
-        "variable": "made",
-        "scope": "hit"
-       }
-      },
-      {
        "id": 267,
        "type": "var.set",
        "x": 840,
        "y": 3200,
        "params": {
-        "variable": "count",
+        "variable": "made",
         "scope": "hit"
+       },
+       "values": {
+        "value": []
        }
       },
       {
@@ -171934,63 +170089,6 @@
        "params": {
         "variable": "duration",
         "scope": "hit"
-       }
-      },
-      {
-       "id": 270,
-       "type": "flow.while",
-       "x": 1120,
-       "y": 3200
-      },
-      {
-       "id": 271,
-       "type": "math.compare",
-       "x": 1000,
-       "y": 3350,
-       "params": {
-        "op": "<"
-       }
-      },
-      {
-       "id": 272,
-       "type": "list.length",
-       "x": 1000,
-       "y": 3440,
-       "params": {
-        "type": "float"
-       }
-      },
-      {
-       "id": 273,
-       "type": "var.get",
-       "x": 1000,
-       "y": 3530,
-       "params": {
-        "variable": "made",
-        "scope": "hit"
-       }
-      },
-      {
-       "id": 274,
-       "type": "var.get",
-       "x": 1000,
-       "y": 3620,
-       "params": {
-        "variable": "count",
-        "scope": "hit"
-       }
-      },
-      {
-       "id": 275,
-       "type": "list.add",
-       "x": 1400,
-       "y": 3200,
-       "params": {
-        "variable": "made",
-        "scope": "hit"
-       },
-       "values": {
-        "item": 0
        }
       },
       {
@@ -172587,23 +170685,16 @@
        }
       },
       {
-       "id": 336,
-       "type": "list.clear",
-       "x": 560,
-       "y": 4030,
-       "params": {
-        "variable": "made",
-        "scope": "crack"
-       }
-      },
-      {
        "id": 337,
        "type": "var.set",
        "x": 840,
        "y": 4030,
        "params": {
-        "variable": "count",
+        "variable": "made",
         "scope": "crack"
+       },
+       "values": {
+        "value": []
        }
       },
       {
@@ -172623,63 +170714,6 @@
        "params": {
         "variable": "duration",
         "scope": "crack"
-       }
-      },
-      {
-       "id": 340,
-       "type": "flow.while",
-       "x": 1120,
-       "y": 4030
-      },
-      {
-       "id": 341,
-       "type": "math.compare",
-       "x": 1000,
-       "y": 4180,
-       "params": {
-        "op": "<"
-       }
-      },
-      {
-       "id": 342,
-       "type": "list.length",
-       "x": 1000,
-       "y": 4270,
-       "params": {
-        "type": "float"
-       }
-      },
-      {
-       "id": 343,
-       "type": "var.get",
-       "x": 1000,
-       "y": 4360,
-       "params": {
-        "variable": "made",
-        "scope": "crack"
-       }
-      },
-      {
-       "id": 344,
-       "type": "var.get",
-       "x": 1000,
-       "y": 4450,
-       "params": {
-        "variable": "count",
-        "scope": "crack"
-       }
-      },
-      {
-       "id": 345,
-       "type": "list.add",
-       "x": 1400,
-       "y": 4030,
-       "params": {
-        "variable": "made",
-        "scope": "crack"
-       },
-       "values": {
-        "item": 0
        }
       },
       {
@@ -173168,23 +171202,16 @@
        }
       },
       {
-       "id": 395,
-       "type": "list.clear",
-       "x": 560,
-       "y": 4680,
-       "params": {
-        "variable": "made",
-        "scope": "damage"
-       }
-      },
-      {
        "id": 396,
        "type": "var.set",
        "x": 840,
        "y": 4680,
        "params": {
-        "variable": "count",
+        "variable": "made",
         "scope": "damage"
+       },
+       "values": {
+        "value": []
        }
       },
       {
@@ -173204,63 +171231,6 @@
        "params": {
         "variable": "duration",
         "scope": "damage"
-       }
-      },
-      {
-       "id": 399,
-       "type": "flow.while",
-       "x": 1120,
-       "y": 4680
-      },
-      {
-       "id": 400,
-       "type": "math.compare",
-       "x": 1000,
-       "y": 4830,
-       "params": {
-        "op": "<"
-       }
-      },
-      {
-       "id": 401,
-       "type": "list.length",
-       "x": 1000,
-       "y": 4920,
-       "params": {
-        "type": "float"
-       }
-      },
-      {
-       "id": 402,
-       "type": "var.get",
-       "x": 1000,
-       "y": 5010,
-       "params": {
-        "variable": "made",
-        "scope": "damage"
-       }
-      },
-      {
-       "id": 403,
-       "type": "var.get",
-       "x": 1000,
-       "y": 5100,
-       "params": {
-        "variable": "count",
-        "scope": "damage"
-       }
-      },
-      {
-       "id": 404,
-       "type": "list.add",
-       "x": 1400,
-       "y": 4680,
-       "params": {
-        "variable": "made",
-        "scope": "damage"
-       },
-       "values": {
-        "item": 0
        }
       },
       {
@@ -173795,23 +171765,16 @@
        }
       },
       {
-       "id": 459,
-       "type": "list.clear",
-       "x": 560,
-       "y": 5710,
-       "params": {
-        "variable": "made",
-        "scope": "explosion"
-       }
-      },
-      {
        "id": 460,
        "type": "var.set",
        "x": 840,
        "y": 5710,
        "params": {
-        "variable": "count",
+        "variable": "made",
         "scope": "explosion"
+       },
+       "values": {
+        "value": []
        }
       },
       {
@@ -173831,63 +171794,6 @@
        "params": {
         "variable": "duration",
         "scope": "explosion"
-       }
-      },
-      {
-       "id": 463,
-       "type": "flow.while",
-       "x": 1120,
-       "y": 5710
-      },
-      {
-       "id": 464,
-       "type": "math.compare",
-       "x": 1000,
-       "y": 5860,
-       "params": {
-        "op": "<"
-       }
-      },
-      {
-       "id": 465,
-       "type": "list.length",
-       "x": 1000,
-       "y": 5950,
-       "params": {
-        "type": "float"
-       }
-      },
-      {
-       "id": 466,
-       "type": "var.get",
-       "x": 1000,
-       "y": 6040,
-       "params": {
-        "variable": "made",
-        "scope": "explosion"
-       }
-      },
-      {
-       "id": 467,
-       "type": "var.get",
-       "x": 1000,
-       "y": 6130,
-       "params": {
-        "variable": "count",
-        "scope": "explosion"
-       }
-      },
-      {
-       "id": 468,
-       "type": "list.add",
-       "x": 1400,
-       "y": 5710,
-       "params": {
-        "variable": "made",
-        "scope": "explosion"
-       },
-       "values": {
-        "item": 0
        }
       },
       {
@@ -174425,23 +172331,16 @@
        }
       },
       {
-       "id": 523,
-       "type": "list.clear",
-       "x": 560,
-       "y": 6360,
-       "params": {
-        "variable": "made",
-        "scope": "step"
-       }
-      },
-      {
        "id": 524,
        "type": "var.set",
        "x": 840,
        "y": 6360,
        "params": {
-        "variable": "count",
+        "variable": "made",
         "scope": "step"
+       },
+       "values": {
+        "value": []
        }
       },
       {
@@ -174461,63 +172360,6 @@
        "params": {
         "variable": "duration",
         "scope": "step"
-       }
-      },
-      {
-       "id": 527,
-       "type": "flow.while",
-       "x": 1120,
-       "y": 6360
-      },
-      {
-       "id": 528,
-       "type": "math.compare",
-       "x": 1000,
-       "y": 6510,
-       "params": {
-        "op": "<"
-       }
-      },
-      {
-       "id": 529,
-       "type": "list.length",
-       "x": 1000,
-       "y": 6600,
-       "params": {
-        "type": "float"
-       }
-      },
-      {
-       "id": 530,
-       "type": "var.get",
-       "x": 1000,
-       "y": 6690,
-       "params": {
-        "variable": "made",
-        "scope": "step"
-       }
-      },
-      {
-       "id": 531,
-       "type": "var.get",
-       "x": 1000,
-       "y": 6780,
-       "params": {
-        "variable": "count",
-        "scope": "step"
-       }
-      },
-      {
-       "id": 532,
-       "type": "list.add",
-       "x": 1400,
-       "y": 6360,
-       "params": {
-        "variable": "made",
-        "scope": "step"
-       },
-       "values": {
-        "item": 0
        }
       },
       {
@@ -174899,23 +172741,16 @@
        }
       },
       {
-       "id": 571,
-       "type": "list.clear",
-       "x": 560,
-       "y": 7010,
-       "params": {
-        "variable": "made",
-        "scope": "bounce"
-       }
-      },
-      {
        "id": 572,
        "type": "var.set",
        "x": 840,
        "y": 7010,
        "params": {
-        "variable": "count",
+        "variable": "made",
         "scope": "bounce"
+       },
+       "values": {
+        "value": []
        }
       },
       {
@@ -174935,63 +172770,6 @@
        "params": {
         "variable": "duration",
         "scope": "bounce"
-       }
-      },
-      {
-       "id": 575,
-       "type": "flow.while",
-       "x": 1120,
-       "y": 7010
-      },
-      {
-       "id": 576,
-       "type": "math.compare",
-       "x": 1000,
-       "y": 7160,
-       "params": {
-        "op": "<"
-       }
-      },
-      {
-       "id": 577,
-       "type": "list.length",
-       "x": 1000,
-       "y": 7250,
-       "params": {
-        "type": "float"
-       }
-      },
-      {
-       "id": 578,
-       "type": "var.get",
-       "x": 1000,
-       "y": 7340,
-       "params": {
-        "variable": "made",
-        "scope": "bounce"
-       }
-      },
-      {
-       "id": 579,
-       "type": "var.get",
-       "x": 1000,
-       "y": 7430,
-       "params": {
-        "variable": "count",
-        "scope": "bounce"
-       }
-      },
-      {
-       "id": 580,
-       "type": "list.add",
-       "x": 1400,
-       "y": 7010,
-       "params": {
-        "variable": "made",
-        "scope": "bounce"
-       },
-       "values": {
-        "item": 0
        }
       },
       {
@@ -175766,23 +173544,16 @@
        }
       },
       {
-       "id": 659,
-       "type": "list.clear",
-       "x": 1680,
-       "y": 8040,
-       "params": {
-        "variable": "made",
-        "scope": "cue"
-       }
-      },
-      {
        "id": 660,
        "type": "var.set",
        "x": 1960,
        "y": 8040,
        "params": {
-        "variable": "count",
+        "variable": "made",
         "scope": "cue"
+       },
+       "values": {
+        "value": []
        }
       },
       {
@@ -175820,63 +173591,6 @@
        "y": 8460,
        "params": {
         "variable": "kSixteenth"
-       }
-      },
-      {
-       "id": 665,
-       "type": "flow.while",
-       "x": 2240,
-       "y": 8040
-      },
-      {
-       "id": 666,
-       "type": "math.compare",
-       "x": 2120,
-       "y": 8190,
-       "params": {
-        "op": "<"
-       }
-      },
-      {
-       "id": 667,
-       "type": "list.length",
-       "x": 2120,
-       "y": 8280,
-       "params": {
-        "type": "float"
-       }
-      },
-      {
-       "id": 668,
-       "type": "var.get",
-       "x": 2120,
-       "y": 8370,
-       "params": {
-        "variable": "made",
-        "scope": "cue"
-       }
-      },
-      {
-       "id": 669,
-       "type": "var.get",
-       "x": 2120,
-       "y": 8460,
-       "params": {
-        "variable": "count",
-        "scope": "cue"
-       }
-      },
-      {
-       "id": 670,
-       "type": "list.add",
-       "x": 2520,
-       "y": 8040,
-       "params": {
-        "variable": "made",
-        "scope": "cue"
-       },
-       "values": {
-        "item": 0
        }
       },
       {
@@ -176160,7 +173874,7 @@
        "x": 6160,
        "y": 8040,
        "params": {
-        "variable": "count_2",
+        "variable": "count",
         "scope": "cue"
        }
       },
@@ -176265,7 +173979,7 @@
        "x": 7440,
        "y": 8370,
        "params": {
-        "formula": "(i < 0) != (count_2 < 0) ? count_2 < 0 : i < count_2"
+        "formula": "(i < 0) != (count < 0) ? count < 0 : i < count"
        }
       },
       {
@@ -176284,7 +173998,7 @@
        "x": 7440,
        "y": 8550,
        "params": {
-        "variable": "count_2",
+        "variable": "count",
         "scope": "cue"
        }
       },
@@ -176777,23 +174491,16 @@
        }
       },
       {
-       "id": 762,
-       "type": "list.clear",
-       "x": 10640,
-       "y": 8040,
-       "params": {
-        "variable": "made_2",
-        "scope": "cue"
-       }
-      },
-      {
        "id": 763,
        "type": "var.set",
        "x": 10920,
        "y": 8040,
        "params": {
-        "variable": "count_3",
+        "variable": "made_2",
         "scope": "cue"
+       },
+       "values": {
+        "value": []
        }
       },
       {
@@ -176813,63 +174520,6 @@
        "params": {
         "variable": "dry",
         "scope": "cue"
-       }
-      },
-      {
-       "id": 766,
-       "type": "flow.while",
-       "x": 11200,
-       "y": 8040
-      },
-      {
-       "id": 767,
-       "type": "math.compare",
-       "x": 11080,
-       "y": 8190,
-       "params": {
-        "op": "<"
-       }
-      },
-      {
-       "id": 768,
-       "type": "list.length",
-       "x": 11080,
-       "y": 8280,
-       "params": {
-        "type": "float"
-       }
-      },
-      {
-       "id": 769,
-       "type": "var.get",
-       "x": 11080,
-       "y": 8370,
-       "params": {
-        "variable": "made_2",
-        "scope": "cue"
-       }
-      },
-      {
-       "id": 770,
-       "type": "var.get",
-       "x": 11080,
-       "y": 8460,
-       "params": {
-        "variable": "count_3",
-        "scope": "cue"
-       }
-      },
-      {
-       "id": 771,
-       "type": "list.add",
-       "x": 11480,
-       "y": 8040,
-       "params": {
-        "variable": "made_2",
-        "scope": "cue"
-       },
-       "values": {
-        "item": 0
        }
       },
       {
@@ -177514,6 +175164,149 @@
        "params": {
         "function": "cue"
        }
+      },
+      {
+       "id": 837,
+       "type": "list.resize",
+       "x": 2248,
+       "y": 1016,
+       "params": {
+        "variable": "made",
+        "scope": "finish"
+       },
+       "values": {
+        "value": 0
+       }
+      },
+      {
+       "id": 838,
+       "type": "list.resize",
+       "x": 1128,
+       "y": 2248,
+       "params": {
+        "variable": "made",
+        "scope": "shot"
+       },
+       "values": {
+        "value": 0
+       }
+      },
+      {
+       "id": 839,
+       "type": "list.resize",
+       "x": 2528,
+       "y": 2248,
+       "params": {
+        "variable": "made_2",
+        "scope": "shot"
+       },
+       "values": {
+        "value": 0
+       }
+      },
+      {
+       "id": 840,
+       "type": "list.resize",
+       "x": 1128,
+       "y": 3256,
+       "params": {
+        "variable": "made",
+        "scope": "hit"
+       },
+       "values": {
+        "value": 0
+       }
+      },
+      {
+       "id": 841,
+       "type": "list.resize",
+       "x": 1128,
+       "y": 4088,
+       "params": {
+        "variable": "made",
+        "scope": "crack"
+       },
+       "values": {
+        "value": 0
+       }
+      },
+      {
+       "id": 842,
+       "type": "list.resize",
+       "x": 1128,
+       "y": 4736,
+       "params": {
+        "variable": "made",
+        "scope": "damage"
+       },
+       "values": {
+        "value": 0
+       }
+      },
+      {
+       "id": 843,
+       "type": "list.resize",
+       "x": 1128,
+       "y": 5768,
+       "params": {
+        "variable": "made",
+        "scope": "explosion"
+       },
+       "values": {
+        "value": 0
+       }
+      },
+      {
+       "id": 844,
+       "type": "list.resize",
+       "x": 1128,
+       "y": 6416,
+       "params": {
+        "variable": "made",
+        "scope": "step"
+       },
+       "values": {
+        "value": 0
+       }
+      },
+      {
+       "id": 845,
+       "type": "list.resize",
+       "x": 1128,
+       "y": 7064,
+       "params": {
+        "variable": "made",
+        "scope": "bounce"
+       },
+       "values": {
+        "value": 0
+       }
+      },
+      {
+       "id": 846,
+       "type": "list.resize",
+       "x": 2248,
+       "y": 8096,
+       "params": {
+        "variable": "made",
+        "scope": "cue"
+       },
+       "values": {
+        "value": 0
+       }
+      },
+      {
+       "id": 847,
+       "type": "list.resize",
+       "x": 11208,
+       "y": 8096,
+       "params": {
+        "variable": "made_2",
+        "scope": "cue"
+       },
+       "values": {
+        "value": 0
+       }
       }
      ],
      "links": [
@@ -177826,7 +175619,7 @@
       [
        32,
        "completed",
-       762,
+       763,
        "exec"
       ],
       [
@@ -178066,7 +175859,7 @@
       [
        66,
        "then",
-       69,
+       70,
        "exec"
       ],
       [
@@ -178082,64 +175875,22 @@
        "peak"
       ],
       [
-       69,
-       "then",
-       70,
-       "exec"
-      ],
-      [
        70,
        "then",
-       73,
+       837,
        "exec"
       ],
       [
        71,
        "length",
-       70,
-       "value"
+       837,
+       "length"
       ],
       [
        72,
        "value",
        71,
        "list"
-      ],
-      [
-       73,
-       "body",
-       78,
-       "exec"
-      ],
-      [
-       73,
-       "completed",
-       79,
-       "exec"
-      ],
-      [
-       74,
-       "result",
-       73,
-       "condition"
-      ],
-      [
-       75,
-       "length",
-       74,
-       "a"
-      ],
-      [
-       76,
-       "value",
-       75,
-       "list"
-      ],
-      [
-       77,
-       "value",
-       74,
-       "b"
       ],
       [
        79,
@@ -178468,7 +176219,7 @@
       [
        110,
        "then",
-       112,
+       113,
        "exec"
       ],
       [
@@ -178478,22 +176229,16 @@
        "value"
       ],
       [
-       112,
-       "then",
-       113,
-       "exec"
-      ],
-      [
        113,
        "then",
-       116,
+       838,
        "exec"
       ],
       [
        114,
        "Result",
-       113,
-       "value"
+       838,
+       "length"
       ],
       [
        115,
@@ -178502,45 +176247,9 @@
        "duration"
       ],
       [
-       116,
-       "body",
-       121,
-       "exec"
-      ],
-      [
-       116,
-       "completed",
-       122,
-       "exec"
-      ],
-      [
-       117,
-       "result",
-       116,
-       "condition"
-      ],
-      [
-       118,
-       "length",
-       117,
-       "a"
-      ],
-      [
-       119,
-       "value",
-       118,
-       "list"
-      ],
-      [
-       120,
-       "value",
-       117,
-       "b"
-      ],
-      [
        122,
        "then",
-       124,
+       125,
        "exec"
       ],
       [
@@ -178550,64 +176259,22 @@
        "value"
       ],
       [
-       124,
-       "then",
-       125,
-       "exec"
-      ],
-      [
        125,
        "then",
-       128,
+       839,
        "exec"
       ],
       [
        126,
        "length",
-       125,
-       "value"
+       839,
+       "length"
       ],
       [
        127,
        "value",
        126,
        "list"
-      ],
-      [
-       128,
-       "body",
-       133,
-       "exec"
-      ],
-      [
-       128,
-       "completed",
-       134,
-       "exec"
-      ],
-      [
-       129,
-       "result",
-       128,
-       "condition"
-      ],
-      [
-       130,
-       "length",
-       129,
-       "a"
-      ],
-      [
-       131,
-       "value",
-       130,
-       "list"
-      ],
-      [
-       132,
-       "value",
-       129,
-       "b"
       ],
       [
        134,
@@ -179434,7 +177101,7 @@
       [
        264,
        "then",
-       266,
+       267,
        "exec"
       ],
       [
@@ -179444,64 +177111,22 @@
        "value"
       ],
       [
-       266,
-       "then",
-       267,
-       "exec"
-      ],
-      [
        267,
        "then",
-       270,
+       840,
        "exec"
       ],
       [
        268,
        "Result",
-       267,
-       "value"
+       840,
+       "length"
       ],
       [
        269,
        "value",
        268,
        "duration"
-      ],
-      [
-       270,
-       "body",
-       275,
-       "exec"
-      ],
-      [
-       270,
-       "completed",
-       276,
-       "exec"
-      ],
-      [
-       271,
-       "result",
-       270,
-       "condition"
-      ],
-      [
-       272,
-       "length",
-       271,
-       "a"
-      ],
-      [
-       273,
-       "value",
-       272,
-       "list"
-      ],
-      [
-       274,
-       "value",
-       271,
-       "b"
       ],
       [
        276,
@@ -179896,7 +177521,7 @@
       [
        334,
        "then",
-       336,
+       337,
        "exec"
       ],
       [
@@ -179906,64 +177531,22 @@
        "value"
       ],
       [
-       336,
-       "then",
-       337,
-       "exec"
-      ],
-      [
        337,
        "then",
-       340,
+       841,
        "exec"
       ],
       [
        338,
        "Result",
-       337,
-       "value"
+       841,
+       "length"
       ],
       [
        339,
        "value",
        338,
        "duration"
-      ],
-      [
-       340,
-       "body",
-       345,
-       "exec"
-      ],
-      [
-       340,
-       "completed",
-       346,
-       "exec"
-      ],
-      [
-       341,
-       "result",
-       340,
-       "condition"
-      ],
-      [
-       342,
-       "length",
-       341,
-       "a"
-      ],
-      [
-       343,
-       "value",
-       342,
-       "list"
-      ],
-      [
-       344,
-       "value",
-       341,
-       "b"
       ],
       [
        346,
@@ -180280,7 +177863,7 @@
       [
        393,
        "then",
-       395,
+       396,
        "exec"
       ],
       [
@@ -180290,64 +177873,22 @@
        "value"
       ],
       [
-       395,
-       "then",
-       396,
-       "exec"
-      ],
-      [
        396,
        "then",
-       399,
+       842,
        "exec"
       ],
       [
        397,
        "Result",
-       396,
-       "value"
+       842,
+       "length"
       ],
       [
        398,
        "value",
        397,
        "duration"
-      ],
-      [
-       399,
-       "body",
-       404,
-       "exec"
-      ],
-      [
-       399,
-       "completed",
-       405,
-       "exec"
-      ],
-      [
-       400,
-       "result",
-       399,
-       "condition"
-      ],
-      [
-       401,
-       "length",
-       400,
-       "a"
-      ],
-      [
-       402,
-       "value",
-       401,
-       "list"
-      ],
-      [
-       403,
-       "value",
-       400,
-       "b"
       ],
       [
        405,
@@ -180706,7 +178247,7 @@
       [
        457,
        "then",
-       459,
+       460,
        "exec"
       ],
       [
@@ -180716,64 +178257,22 @@
        "value"
       ],
       [
-       459,
-       "then",
-       460,
-       "exec"
-      ],
-      [
        460,
        "then",
-       463,
+       843,
        "exec"
       ],
       [
        461,
        "Result",
-       460,
-       "value"
+       843,
+       "length"
       ],
       [
        462,
        "value",
        461,
        "duration"
-      ],
-      [
-       463,
-       "body",
-       468,
-       "exec"
-      ],
-      [
-       463,
-       "completed",
-       469,
-       "exec"
-      ],
-      [
-       464,
-       "result",
-       463,
-       "condition"
-      ],
-      [
-       465,
-       "length",
-       464,
-       "a"
-      ],
-      [
-       466,
-       "value",
-       465,
-       "list"
-      ],
-      [
-       467,
-       "value",
-       464,
-       "b"
       ],
       [
        469,
@@ -181120,7 +178619,7 @@
       [
        521,
        "then",
-       523,
+       524,
        "exec"
       ],
       [
@@ -181130,64 +178629,22 @@
        "value"
       ],
       [
-       523,
-       "then",
-       524,
-       "exec"
-      ],
-      [
        524,
        "then",
-       527,
+       844,
        "exec"
       ],
       [
        525,
        "Result",
-       524,
-       "value"
+       844,
+       "length"
       ],
       [
        526,
        "value",
        525,
        "duration"
-      ],
-      [
-       527,
-       "body",
-       532,
-       "exec"
-      ],
-      [
-       527,
-       "completed",
-       533,
-       "exec"
-      ],
-      [
-       528,
-       "result",
-       527,
-       "condition"
-      ],
-      [
-       529,
-       "length",
-       528,
-       "a"
-      ],
-      [
-       530,
-       "value",
-       529,
-       "list"
-      ],
-      [
-       531,
-       "value",
-       528,
-       "b"
       ],
       [
        533,
@@ -181450,7 +178907,7 @@
       [
        569,
        "then",
-       571,
+       572,
        "exec"
       ],
       [
@@ -181460,64 +178917,22 @@
        "value"
       ],
       [
-       571,
-       "then",
-       572,
-       "exec"
-      ],
-      [
        572,
        "then",
-       575,
+       845,
        "exec"
       ],
       [
        573,
        "Result",
-       572,
-       "value"
+       845,
+       "length"
       ],
       [
        574,
        "value",
        573,
        "duration"
-      ],
-      [
-       575,
-       "body",
-       580,
-       "exec"
-      ],
-      [
-       575,
-       "completed",
-       581,
-       "exec"
-      ],
-      [
-       576,
-       "result",
-       575,
-       "condition"
-      ],
-      [
-       577,
-       "length",
-       576,
-       "a"
-      ],
-      [
-       578,
-       "value",
-       577,
-       "list"
-      ],
-      [
-       579,
-       "value",
-       576,
-       "b"
       ],
       [
        581,
@@ -182044,7 +179459,7 @@
       [
        655,
        "then",
-       659,
+       660,
        "exec"
       ],
       [
@@ -182066,22 +179481,16 @@
        "kSixteenth"
       ],
       [
-       659,
-       "then",
-       660,
-       "exec"
-      ],
-      [
        660,
        "then",
-       665,
+       846,
        "exec"
       ],
       [
        661,
        "Result",
-       660,
-       "value"
+       846,
+       "length"
       ],
       [
        662,
@@ -182100,42 +179509,6 @@
        "value",
        662,
        "kSixteenth"
-      ],
-      [
-       665,
-       "body",
-       670,
-       "exec"
-      ],
-      [
-       665,
-       "completed",
-       671,
-       "exec"
-      ],
-      [
-       666,
-       "result",
-       665,
-       "condition"
-      ],
-      [
-       667,
-       "length",
-       666,
-       "a"
-      ],
-      [
-       668,
-       "value",
-       667,
-       "list"
-      ],
-      [
-       669,
-       "value",
-       666,
-       "b"
       ],
       [
        671,
@@ -182393,7 +179766,7 @@
        711,
        "value",
        709,
-       "count_2"
+       "count"
       ],
       [
        712,
@@ -182684,64 +180057,22 @@
        "amount"
       ],
       [
-       762,
-       "then",
-       763,
-       "exec"
-      ],
-      [
        763,
        "then",
-       766,
+       847,
        "exec"
       ],
       [
        764,
        "length",
-       763,
-       "value"
+       847,
+       "length"
       ],
       [
        765,
        "value",
        764,
        "list"
-      ],
-      [
-       766,
-       "body",
-       771,
-       "exec"
-      ],
-      [
-       766,
-       "completed",
-       772,
-       "exec"
-      ],
-      [
-       767,
-       "result",
-       766,
-       "condition"
-      ],
-      [
-       768,
-       "length",
-       767,
-       "a"
-      ],
-      [
-       769,
-       "value",
-       768,
-       "list"
-      ],
-      [
-       770,
-       "value",
-       767,
-       "b"
       ],
       [
        772,
@@ -183126,6 +180457,72 @@
        "value",
        827,
        "fade"
+      ],
+      [
+       837,
+       "then",
+       79,
+       "exec"
+      ],
+      [
+       838,
+       "then",
+       122,
+       "exec"
+      ],
+      [
+       839,
+       "then",
+       134,
+       "exec"
+      ],
+      [
+       840,
+       "then",
+       276,
+       "exec"
+      ],
+      [
+       841,
+       "then",
+       346,
+       "exec"
+      ],
+      [
+       842,
+       "then",
+       405,
+       "exec"
+      ],
+      [
+       843,
+       "then",
+       469,
+       "exec"
+      ],
+      [
+       844,
+       "then",
+       533,
+       "exec"
+      ],
+      [
+       845,
+       "then",
+       581,
+       "exec"
+      ],
+      [
+       846,
+       "then",
+       671,
+       "exec"
+      ],
+      [
+       847,
+       "then",
+       772,
+       "exec"
       ]
      ],
      "machines": [],
@@ -183262,11 +180659,6 @@
          "name": "made",
          "type": "float_list",
          "value": []
-        },
-        {
-         "name": "count",
-         "type": "int",
-         "value": 0
         }
        ]
       },
@@ -183359,11 +180751,6 @@
          "value": []
         },
         {
-         "name": "count",
-         "type": "int",
-         "value": 0
-        },
-        {
          "name": "dry",
          "type": "float_list",
          "value": []
@@ -183372,11 +180759,6 @@
          "name": "made_2",
          "type": "float_list",
          "value": []
-        },
-        {
-         "name": "count_2",
-         "type": "int",
-         "value": 0
         },
         {
          "name": "random",
@@ -183527,11 +180909,6 @@
          "value": []
         },
         {
-         "name": "count",
-         "type": "int",
-         "value": 0
-        },
-        {
          "name": "random",
          "type": "struct",
          "of": "combat_audio_Random",
@@ -183629,11 +181006,6 @@
          "value": []
         },
         {
-         "name": "count",
-         "type": "int",
-         "value": 0
-        },
-        {
          "name": "random",
          "type": "struct",
          "of": "combat_audio_Random",
@@ -183719,11 +181091,6 @@
          "name": "made",
          "type": "float_list",
          "value": []
-        },
-        {
-         "name": "count",
-         "type": "int",
-         "value": 0
         },
         {
          "name": "random",
@@ -183848,11 +181215,6 @@
          "value": []
         },
         {
-         "name": "count",
-         "type": "int",
-         "value": 0
-        },
-        {
          "name": "random",
          "type": "struct",
          "of": "combat_audio_Random",
@@ -183945,11 +181307,6 @@
          "value": []
         },
         {
-         "name": "count",
-         "type": "int",
-         "value": 0
-        },
-        {
          "name": "random",
          "type": "struct",
          "of": "combat_audio_Random",
@@ -184020,11 +181377,6 @@
          "name": "made",
          "type": "float_list",
          "value": []
-        },
-        {
-         "name": "count",
-         "type": "int",
-         "value": 0
         },
         {
          "name": "random",
@@ -184177,11 +181529,6 @@
          "value": []
         },
         {
-         "name": "count",
-         "type": "int",
-         "value": 0
-        },
-        {
          "name": "t0",
          "type": "float",
          "value": 0
@@ -184212,7 +181559,7 @@
          "value": 0
         },
         {
-         "name": "count_2",
+         "name": "count",
          "type": "int",
          "value": 0
         },
@@ -184265,11 +181612,6 @@
          "name": "made_2",
          "type": "float_list",
          "value": []
-        },
-        {
-         "name": "count_3",
-         "type": "int",
-         "value": 0
         },
         {
          "name": "delay",
@@ -186407,7 +183749,7 @@
     "logic": {
      "kind": "kern-logic",
      "version": 1,
-     "nextId": 169,
+     "nextId": 171,
      "variables": [
       {
        "name": "kPathInterval",
@@ -187615,160 +184957,12 @@
        }
       },
       {
-       "id": 89,
-       "type": "var.set",
-       "x": 2520,
-       "y": 1280,
-       "params": {
-        "variable": "count",
-        "scope": "FlightLog_finish"
-       }
-      },
-      {
        "id": 90,
        "type": "var.get",
        "x": 2400,
        "y": 1430,
        "params": {
         "variable": "kMaxFlights"
-       }
-      },
-      {
-       "id": 91,
-       "type": "flow.while",
-       "x": 2800,
-       "y": 1280
-      },
-      {
-       "id": 92,
-       "type": "math.compare",
-       "x": 2680,
-       "y": 1430,
-       "params": {
-        "op": ">"
-       }
-      },
-      {
-       "id": 93,
-       "type": "list.length",
-       "x": 2680,
-       "y": 1520,
-       "params": {
-        "type": "Flight"
-       }
-      },
-      {
-       "id": 94,
-       "type": "var.get",
-       "x": 2680,
-       "y": 1610,
-       "params": {
-        "variable": "self",
-        "scope": "FlightLog_finish",
-        "path": ".flights_"
-       }
-      },
-      {
-       "id": 95,
-       "type": "var.get",
-       "x": 2680,
-       "y": 1700,
-       "params": {
-        "variable": "count",
-        "scope": "FlightLog_finish"
-       }
-      },
-      {
-       "id": 96,
-       "type": "list.remove_at",
-       "x": 3080,
-       "y": 1280,
-       "params": {
-        "variable": "self",
-        "scope": "FlightLog_finish",
-        "path": ".flights_"
-       }
-      },
-      {
-       "id": 97,
-       "type": "var.get",
-       "x": 2960,
-       "y": 1430,
-       "params": {
-        "variable": "count",
-        "scope": "FlightLog_finish"
-       }
-      },
-      {
-       "id": 98,
-       "type": "flow.while",
-       "x": 3360,
-       "y": 1280
-      },
-      {
-       "id": 99,
-       "type": "math.compare",
-       "x": 3240,
-       "y": 1430,
-       "params": {
-        "op": "<"
-       }
-      },
-      {
-       "id": 100,
-       "type": "list.length",
-       "x": 3240,
-       "y": 1520,
-       "params": {
-        "type": "Flight"
-       }
-      },
-      {
-       "id": 101,
-       "type": "var.get",
-       "x": 3240,
-       "y": 1610,
-       "params": {
-        "variable": "self",
-        "scope": "FlightLog_finish",
-        "path": ".flights_"
-       }
-      },
-      {
-       "id": 102,
-       "type": "var.get",
-       "x": 3240,
-       "y": 1700,
-       "params": {
-        "variable": "count",
-        "scope": "FlightLog_finish"
-       }
-      },
-      {
-       "id": 103,
-       "type": "list.add",
-       "x": 3640,
-       "y": 1280,
-       "params": {
-        "variable": "self",
-        "scope": "FlightLog_finish",
-        "path": ".flights_"
-       },
-       "values": {
-        "item": {
-         "id": 0,
-         "start": 0,
-         "duration": 0,
-         "distance": 0,
-         "max_speed": 0,
-         "max_agl": 0,
-         "max_alt": 0,
-         "volts_start": 0,
-         "volts_end": 0,
-         "volts_min": 0,
-         "reason": "",
-         "path": []
-        }
        }
       },
       {
@@ -187941,150 +185135,12 @@
        }
       },
       {
-       "id": 121,
-       "type": "var.set",
-       "x": 1400,
-       "y": 1930,
-       "params": {
-        "variable": "count",
-        "scope": "FlightLog_network"
-       }
-      },
-      {
        "id": 122,
        "type": "var.get",
        "x": 1280,
        "y": 2080,
        "params": {
         "variable": "kMaxEvents"
-       }
-      },
-      {
-       "id": 123,
-       "type": "flow.while",
-       "x": 1680,
-       "y": 1930
-      },
-      {
-       "id": 124,
-       "type": "math.compare",
-       "x": 1560,
-       "y": 2080,
-       "params": {
-        "op": ">"
-       }
-      },
-      {
-       "id": 125,
-       "type": "list.length",
-       "x": 1560,
-       "y": 2170,
-       "params": {
-        "type": "FlightLog_Event"
-       }
-      },
-      {
-       "id": 126,
-       "type": "var.get",
-       "x": 1560,
-       "y": 2260,
-       "params": {
-        "variable": "self",
-        "scope": "FlightLog_network",
-        "path": ".events_"
-       }
-      },
-      {
-       "id": 127,
-       "type": "var.get",
-       "x": 1560,
-       "y": 2350,
-       "params": {
-        "variable": "count",
-        "scope": "FlightLog_network"
-       }
-      },
-      {
-       "id": 128,
-       "type": "list.remove_at",
-       "x": 1960,
-       "y": 1930,
-       "params": {
-        "variable": "self",
-        "scope": "FlightLog_network",
-        "path": ".events_"
-       }
-      },
-      {
-       "id": 129,
-       "type": "var.get",
-       "x": 1840,
-       "y": 2080,
-       "params": {
-        "variable": "count",
-        "scope": "FlightLog_network"
-       }
-      },
-      {
-       "id": 130,
-       "type": "flow.while",
-       "x": 2240,
-       "y": 1930
-      },
-      {
-       "id": 131,
-       "type": "math.compare",
-       "x": 2120,
-       "y": 2080,
-       "params": {
-        "op": "<"
-       }
-      },
-      {
-       "id": 132,
-       "type": "list.length",
-       "x": 2120,
-       "y": 2170,
-       "params": {
-        "type": "FlightLog_Event"
-       }
-      },
-      {
-       "id": 133,
-       "type": "var.get",
-       "x": 2120,
-       "y": 2260,
-       "params": {
-        "variable": "self",
-        "scope": "FlightLog_network",
-        "path": ".events_"
-       }
-      },
-      {
-       "id": 134,
-       "type": "var.get",
-       "x": 2120,
-       "y": 2350,
-       "params": {
-        "variable": "count",
-        "scope": "FlightLog_network"
-       }
-      },
-      {
-       "id": 135,
-       "type": "list.add",
-       "x": 2520,
-       "y": 1930,
-       "params": {
-        "variable": "self",
-        "scope": "FlightLog_network",
-        "path": ".events_"
-       },
-       "values": {
-        "item": {
-         "t": 0,
-         "stage": ""
-        }
        }
       },
       {
@@ -188411,6 +185467,50 @@
        "y": 4190,
        "params": {
         "formula": "440 * 2 ^ ((n - 69) / 12)"
+       }
+      },
+      {
+       "id": 169,
+       "type": "list.resize",
+       "x": 2528,
+       "y": 1336,
+       "params": {
+        "variable": "self",
+        "scope": "FlightLog_finish",
+        "path": ".flights_"
+       },
+       "values": {
+        "value": {
+         "id": 0,
+         "start": 0,
+         "duration": 0,
+         "distance": 0,
+         "max_speed": 0,
+         "max_agl": 0,
+         "max_alt": 0,
+         "volts_start": 0,
+         "volts_end": 0,
+         "volts_min": 0,
+         "reason": "",
+         "path": []
+        }
+       }
+      },
+      {
+       "id": 170,
+       "type": "list.resize",
+       "x": 1408,
+       "y": 1984,
+       "params": {
+        "variable": "self",
+        "scope": "FlightLog_network",
+        "path": ".events_"
+       },
+       "values": {
+        "value": {
+         "t": 0,
+         "stage": ""
+        }
        }
       }
      ],
@@ -188940,7 +186040,7 @@
       [
        83,
        "true",
-       89,
+       169,
        "exec"
       ],
       [
@@ -188974,94 +186074,10 @@
        "list"
       ],
       [
-       89,
-       "then",
-       91,
-       "exec"
-      ],
-      [
        90,
        "value",
-       89,
-       "value"
-      ],
-      [
-       91,
-       "body",
-       96,
-       "exec"
-      ],
-      [
-       91,
-       "completed",
-       98,
-       "exec"
-      ],
-      [
-       92,
-       "result",
-       91,
-       "condition"
-      ],
-      [
-       93,
-       "length",
-       92,
-       "a"
-      ],
-      [
-       94,
-       "value",
-       93,
-       "list"
-      ],
-      [
-       95,
-       "value",
-       92,
-       "b"
-      ],
-      [
-       97,
-       "value",
-       96,
-       "index"
-      ],
-      [
-       98,
-       "body",
-       103,
-       "exec"
-      ],
-      [
-       98,
-       "completed",
-       104,
-       "exec"
-      ],
-      [
-       99,
-       "result",
-       98,
-       "condition"
-      ],
-      [
-       100,
-       "length",
-       99,
-       "a"
-      ],
-      [
-       101,
-       "value",
-       100,
-       "list"
-      ],
-      [
-       102,
-       "value",
-       99,
-       "b"
+       169,
+       "length"
       ],
       [
        105,
@@ -189138,7 +186154,7 @@
       [
        115,
        "true",
-       121,
+       170,
        "exec"
       ],
       [
@@ -189172,94 +186188,10 @@
        "list"
       ],
       [
-       121,
-       "then",
-       123,
-       "exec"
-      ],
-      [
        122,
        "value",
-       121,
-       "value"
-      ],
-      [
-       123,
-       "body",
-       128,
-       "exec"
-      ],
-      [
-       123,
-       "completed",
-       130,
-       "exec"
-      ],
-      [
-       124,
-       "result",
-       123,
-       "condition"
-      ],
-      [
-       125,
-       "length",
-       124,
-       "a"
-      ],
-      [
-       126,
-       "value",
-       125,
-       "list"
-      ],
-      [
-       127,
-       "value",
-       124,
-       "b"
-      ],
-      [
-       129,
-       "value",
-       128,
-       "index"
-      ],
-      [
-       130,
-       "body",
-       135,
-       "exec"
-      ],
-      [
-       130,
-       "completed",
-       136,
-       "exec"
-      ],
-      [
-       131,
-       "result",
-       130,
-       "condition"
-      ],
-      [
-       132,
-       "length",
-       131,
-       "a"
-      ],
-      [
-       133,
-       "value",
-       132,
-       "list"
-      ],
-      [
-       134,
-       "value",
-       131,
-       "b"
+       170,
+       "length"
       ],
       [
        137,
@@ -189464,6 +186396,18 @@
        "result",
        167,
        "Result"
+      ],
+      [
+       169,
+       "then",
+       104,
+       "exec"
+      ],
+      [
+       170,
+       "then",
+       136,
+       "exec"
       ]
      ],
      "machines": [],
@@ -189612,11 +186556,6 @@
           "reason": "",
           "path": []
          }
-        },
-        {
-         "name": "count",
-         "type": "int",
-         "value": 0
         }
        ]
       },
@@ -189685,11 +186624,6 @@
           "t": 0,
           "stage": ""
          }
-        },
-        {
-         "name": "count",
-         "type": "int",
-         "value": 0
         }
        ]
       },
@@ -192102,7 +189036,7 @@
     "logic": {
      "kind": "kern-logic",
      "version": 1,
-     "nextId": 371,
+     "nextId": 372,
      "variables": [
       {
        "name": "kPi",
@@ -195060,23 +191994,16 @@
        }
       },
       {
-       "id": 288,
-       "type": "list.clear",
-       "x": 560,
-       "y": 3430,
-       "params": {
-        "variable": "made",
-        "scope": "jet_roar_pcm"
-       }
-      },
-      {
        "id": 289,
        "type": "var.set",
        "x": 840,
        "y": 3430,
        "params": {
-        "variable": "count",
+        "variable": "made",
         "scope": "jet_roar_pcm"
+       },
+       "values": {
+        "value": []
        }
       },
       {
@@ -195087,63 +192014,6 @@
        "params": {
         "variable": "n",
         "scope": "jet_roar_pcm"
-       }
-      },
-      {
-       "id": 291,
-       "type": "flow.while",
-       "x": 1120,
-       "y": 3430
-      },
-      {
-       "id": 292,
-       "type": "math.compare",
-       "x": 1000,
-       "y": 3580,
-       "params": {
-        "op": "<"
-       }
-      },
-      {
-       "id": 293,
-       "type": "list.length",
-       "x": 1000,
-       "y": 3670,
-       "params": {
-        "type": "float"
-       }
-      },
-      {
-       "id": 294,
-       "type": "var.get",
-       "x": 1000,
-       "y": 3760,
-       "params": {
-        "variable": "made",
-        "scope": "jet_roar_pcm"
-       }
-      },
-      {
-       "id": 295,
-       "type": "var.get",
-       "x": 1000,
-       "y": 3850,
-       "params": {
-        "variable": "count",
-        "scope": "jet_roar_pcm"
-       }
-      },
-      {
-       "id": 296,
-       "type": "list.add",
-       "x": 1400,
-       "y": 3430,
-       "params": {
-        "variable": "made",
-        "scope": "jet_roar_pcm"
-       },
-       "values": {
-        "item": 0
        }
       },
       {
@@ -195883,6 +192753,19 @@
        "params": {
         "variable": "d",
         "scope": "jet_roar_pcm"
+       }
+      },
+      {
+       "id": 371,
+       "type": "list.resize",
+       "x": 1128,
+       "y": 3488,
+       "params": {
+        "variable": "made",
+        "scope": "jet_roar_pcm"
+       },
+       "values": {
+        "value": 0
        }
       }
      ],
@@ -197786,7 +194669,7 @@
       [
        286,
        "then",
-       288,
+       289,
        "exec"
       ],
       [
@@ -197796,58 +194679,16 @@
        "value"
       ],
       [
-       288,
-       "then",
-       289,
-       "exec"
-      ],
-      [
        289,
        "then",
-       291,
+       371,
        "exec"
       ],
       [
        290,
        "value",
-       289,
-       "value"
-      ],
-      [
-       291,
-       "body",
-       296,
-       "exec"
-      ],
-      [
-       291,
-       "completed",
-       297,
-       "exec"
-      ],
-      [
-       292,
-       "result",
-       291,
-       "condition"
-      ],
-      [
-       293,
-       "length",
-       292,
-       "a"
-      ],
-      [
-       294,
-       "value",
-       293,
-       "list"
-      ],
-      [
-       295,
-       "value",
-       292,
-       "b"
+       371,
+       "length"
       ],
       [
        297,
@@ -198268,6 +195109,12 @@
        "value",
        369,
        "Result"
+      ],
+      [
+       371,
+       "then",
+       297,
+       "exec"
       ]
      ],
      "machines": [],
@@ -198852,11 +195699,6 @@
          "value": []
         },
         {
-         "name": "count",
-         "type": "int",
-         "value": 0
-        },
-        {
          "name": "s",
          "type": "int",
          "value": 0
@@ -198946,7 +195788,7 @@
     "logic": {
      "kind": "kern-logic",
      "version": 1,
-     "nextId": 133,
+     "nextId": 135,
      "variables": [
       {
        "name": "kPi",
@@ -199136,23 +195978,16 @@
        }
       },
       {
-       "id": 22,
-       "type": "list.clear",
-       "x": 280,
-       "y": 940,
-       "params": {
-        "variable": "made",
-        "scope": "glass_pcm"
-       }
-      },
-      {
        "id": 23,
        "type": "var.set",
        "x": 560,
        "y": 940,
        "params": {
-        "variable": "count",
+        "variable": "made",
         "scope": "glass_pcm"
+       },
+       "values": {
+        "value": []
        }
       },
       {
@@ -199162,63 +195997,6 @@
        "y": 1090,
        "params": {
         "formula": "trunc(rate * 0.4)"
-       }
-      },
-      {
-       "id": 25,
-       "type": "flow.while",
-       "x": 840,
-       "y": 940
-      },
-      {
-       "id": 26,
-       "type": "math.compare",
-       "x": 720,
-       "y": 1090,
-       "params": {
-        "op": "<"
-       }
-      },
-      {
-       "id": 27,
-       "type": "list.length",
-       "x": 720,
-       "y": 1180,
-       "params": {
-        "type": "float"
-       }
-      },
-      {
-       "id": 28,
-       "type": "var.get",
-       "x": 720,
-       "y": 1270,
-       "params": {
-        "variable": "made",
-        "scope": "glass_pcm"
-       }
-      },
-      {
-       "id": 29,
-       "type": "var.get",
-       "x": 720,
-       "y": 1360,
-       "params": {
-        "variable": "count",
-        "scope": "glass_pcm"
-       }
-      },
-      {
-       "id": 30,
-       "type": "list.add",
-       "x": 1120,
-       "y": 940,
-       "params": {
-        "variable": "made",
-        "scope": "glass_pcm"
-       },
-       "values": {
-        "item": 0
        }
       },
       {
@@ -199791,23 +196569,16 @@
        }
       },
       {
-       "id": 88,
-       "type": "list.clear",
-       "x": 280,
-       "y": 1680,
-       "params": {
-        "variable": "made",
-        "scope": "clang_pcm"
-       }
-      },
-      {
        "id": 89,
        "type": "var.set",
        "x": 560,
        "y": 1680,
        "params": {
-        "variable": "count",
+        "variable": "made",
         "scope": "clang_pcm"
+       },
+       "values": {
+        "value": []
        }
       },
       {
@@ -199817,63 +196588,6 @@
        "y": 1830,
        "params": {
         "formula": "trunc(rate * 1.2)"
-       }
-      },
-      {
-       "id": 91,
-       "type": "flow.while",
-       "x": 840,
-       "y": 1680
-      },
-      {
-       "id": 92,
-       "type": "math.compare",
-       "x": 720,
-       "y": 1830,
-       "params": {
-        "op": "<"
-       }
-      },
-      {
-       "id": 93,
-       "type": "list.length",
-       "x": 720,
-       "y": 1920,
-       "params": {
-        "type": "float"
-       }
-      },
-      {
-       "id": 94,
-       "type": "var.get",
-       "x": 720,
-       "y": 2010,
-       "params": {
-        "variable": "made",
-        "scope": "clang_pcm"
-       }
-      },
-      {
-       "id": 95,
-       "type": "var.get",
-       "x": 720,
-       "y": 2100,
-       "params": {
-        "variable": "count",
-        "scope": "clang_pcm"
-       }
-      },
-      {
-       "id": 96,
-       "type": "list.add",
-       "x": 1120,
-       "y": 1680,
-       "params": {
-        "variable": "made",
-        "scope": "clang_pcm"
-       },
-       "values": {
-        "item": 0
        }
       },
       {
@@ -200238,6 +196952,32 @@
         "variable": "out",
         "scope": "clang_pcm"
        }
+      },
+      {
+       "id": 133,
+       "type": "list.resize",
+       "x": 848,
+       "y": 1000,
+       "params": {
+        "variable": "made",
+        "scope": "glass_pcm"
+       },
+       "values": {
+        "value": 0
+       }
+      },
+      {
+       "id": 134,
+       "type": "list.resize",
+       "x": 848,
+       "y": 1736,
+       "params": {
+        "variable": "made",
+        "scope": "clang_pcm"
+       },
+       "values": {
+        "value": 0
+       }
       }
      ],
      "links": [
@@ -200352,62 +197092,20 @@
       [
        21,
        "then",
-       22,
-       "exec"
-      ],
-      [
-       22,
-       "then",
        23,
        "exec"
       ],
       [
        23,
        "then",
-       25,
+       133,
        "exec"
       ],
       [
        24,
        "result",
-       23,
-       "value"
-      ],
-      [
-       25,
-       "body",
-       30,
-       "exec"
-      ],
-      [
-       25,
-       "completed",
-       31,
-       "exec"
-      ],
-      [
-       26,
-       "result",
-       25,
-       "condition"
-      ],
-      [
-       27,
-       "length",
-       26,
-       "a"
-      ],
-      [
-       28,
-       "value",
-       27,
-       "list"
-      ],
-      [
-       29,
-       "value",
-       26,
-       "b"
+       133,
+       "length"
       ],
       [
        31,
@@ -200754,62 +197452,20 @@
       [
        87,
        "then",
-       88,
-       "exec"
-      ],
-      [
-       88,
-       "then",
        89,
        "exec"
       ],
       [
        89,
        "then",
-       91,
+       134,
        "exec"
       ],
       [
        90,
        "result",
-       89,
-       "value"
-      ],
-      [
-       91,
-       "body",
-       96,
-       "exec"
-      ],
-      [
-       91,
-       "completed",
-       97,
-       "exec"
-      ],
-      [
-       92,
-       "result",
-       91,
-       "condition"
-      ],
-      [
-       93,
-       "length",
-       92,
-       "a"
-      ],
-      [
-       94,
-       "value",
-       93,
-       "list"
-      ],
-      [
-       95,
-       "value",
-       92,
-       "b"
+       134,
+       "length"
       ],
       [
        97,
@@ -201014,6 +197670,18 @@
        "value",
        131,
        "Result"
+      ],
+      [
+       133,
+       "then",
+       31,
+       "exec"
+      ],
+      [
+       134,
+       "then",
+       97,
+       "exec"
       ]
      ],
      "machines": [],
@@ -201215,11 +197883,6 @@
          "value": []
         },
         {
-         "name": "count",
-         "type": "int",
-         "value": 0
-        },
-        {
          "name": "s",
          "type": "int",
          "value": 0
@@ -201304,11 +197967,6 @@
          "name": "made",
          "type": "float_list",
          "value": []
-        },
-        {
-         "name": "count",
-         "type": "int",
-         "value": 0
         },
         {
          "name": "list",
@@ -225810,7 +222468,7 @@
     "logic": {
      "kind": "kern-logic",
      "version": 1,
-     "nextId": 358,
+     "nextId": 361,
      "variables": [
       {
        "name": "kEccPerBlock",
@@ -226523,100 +223181,16 @@
        }
       },
       {
-       "id": 68,
-       "type": "list.clear",
-       "x": 280,
-       "y": 1680,
-       "params": {
-        "variable": "made",
-        "scope": "rs_divisor"
-       }
-      },
-      {
-       "id": 69,
-       "type": "var.set",
-       "x": 560,
-       "y": 1680,
-       "params": {
-        "variable": "count",
-        "scope": "rs_divisor"
-       }
-      },
-      {
        "id": 70,
        "type": "var.set",
        "x": 840,
        "y": 1680,
        "params": {
-        "variable": "fill",
+        "variable": "made",
         "scope": "rs_divisor"
        },
        "values": {
-        "value": 0
-       }
-      },
-      {
-       "id": 71,
-       "type": "flow.while",
-       "x": 1120,
-       "y": 1680
-      },
-      {
-       "id": 72,
-       "type": "math.compare",
-       "x": 1000,
-       "y": 1830,
-       "params": {
-        "op": "<"
-       }
-      },
-      {
-       "id": 73,
-       "type": "list.length",
-       "x": 1000,
-       "y": 1920,
-       "params": {
-        "type": "int"
-       }
-      },
-      {
-       "id": 74,
-       "type": "var.get",
-       "x": 1000,
-       "y": 2010,
-       "params": {
-        "variable": "made",
-        "scope": "rs_divisor"
-       }
-      },
-      {
-       "id": 75,
-       "type": "var.get",
-       "x": 1000,
-       "y": 2100,
-       "params": {
-        "variable": "count",
-        "scope": "rs_divisor"
-       }
-      },
-      {
-       "id": 76,
-       "type": "list.add",
-       "x": 1400,
-       "y": 1680,
-       "params": {
-        "variable": "made",
-        "scope": "rs_divisor"
-       }
-      },
-      {
-       "id": 77,
-       "type": "var.get",
-       "x": 1280,
-       "y": 1830,
-       "params": {
-        "variable": "fill",
-        "scope": "rs_divisor"
+        "value": []
        }
       },
       {
@@ -227059,23 +223633,16 @@
        }
       },
       {
-       "id": 122,
-       "type": "list.clear",
-       "x": 280,
-       "y": 2510,
-       "params": {
-        "variable": "made",
-        "scope": "rs_remainder"
-       }
-      },
-      {
        "id": 123,
        "type": "var.set",
        "x": 560,
        "y": 2510,
        "params": {
-        "variable": "count",
+        "variable": "made",
         "scope": "rs_remainder"
+       },
+       "values": {
+        "value": []
        }
       },
       {
@@ -227094,83 +223661,6 @@
        "y": 2750,
        "params": {
         "variable": "the_div",
-        "scope": "rs_remainder"
-       }
-      },
-      {
-       "id": 126,
-       "type": "var.set",
-       "x": 840,
-       "y": 2510,
-       "params": {
-        "variable": "fill",
-        "scope": "rs_remainder"
-       },
-       "values": {
-        "value": 0
-       }
-      },
-      {
-       "id": 127,
-       "type": "flow.while",
-       "x": 1120,
-       "y": 2510
-      },
-      {
-       "id": 128,
-       "type": "math.compare",
-       "x": 1000,
-       "y": 2660,
-       "params": {
-        "op": "<"
-       }
-      },
-      {
-       "id": 129,
-       "type": "list.length",
-       "x": 1000,
-       "y": 2750,
-       "params": {
-        "type": "int"
-       }
-      },
-      {
-       "id": 130,
-       "type": "var.get",
-       "x": 1000,
-       "y": 2840,
-       "params": {
-        "variable": "made",
-        "scope": "rs_remainder"
-       }
-      },
-      {
-       "id": 131,
-       "type": "var.get",
-       "x": 1000,
-       "y": 2930,
-       "params": {
-        "variable": "count",
-        "scope": "rs_remainder"
-       }
-      },
-      {
-       "id": 132,
-       "type": "list.add",
-       "x": 1400,
-       "y": 2510,
-       "params": {
-        "variable": "made",
-        "scope": "rs_remainder"
-       }
-      },
-      {
-       "id": 133,
-       "type": "var.get",
-       "x": 1280,
-       "y": 2660,
-       "params": {
-        "variable": "fill",
         "scope": "rs_remainder"
        }
       },
@@ -227611,23 +224101,16 @@
        }
       },
       {
-       "id": 177,
-       "type": "list.clear",
-       "x": 1680,
-       "y": 3430,
-       "params": {
-        "variable": "made",
-        "scope": "alignment_positions"
-       }
-      },
-      {
        "id": 178,
        "type": "var.set",
        "x": 1960,
        "y": 3430,
        "params": {
-        "variable": "count",
+        "variable": "made",
         "scope": "alignment_positions"
+       },
+       "values": {
+        "value": []
        }
       },
       {
@@ -227638,63 +224121,6 @@
        "params": {
         "variable": "n",
         "scope": "alignment_positions"
-       }
-      },
-      {
-       "id": 180,
-       "type": "flow.while",
-       "x": 2240,
-       "y": 3430
-      },
-      {
-       "id": 181,
-       "type": "math.compare",
-       "x": 2120,
-       "y": 3580,
-       "params": {
-        "op": "<"
-       }
-      },
-      {
-       "id": 182,
-       "type": "list.length",
-       "x": 2120,
-       "y": 3670,
-       "params": {
-        "type": "int"
-       }
-      },
-      {
-       "id": 183,
-       "type": "var.get",
-       "x": 2120,
-       "y": 3760,
-       "params": {
-        "variable": "made",
-        "scope": "alignment_positions"
-       }
-      },
-      {
-       "id": 184,
-       "type": "var.get",
-       "x": 2120,
-       "y": 3850,
-       "params": {
-        "variable": "count",
-        "scope": "alignment_positions"
-       }
-      },
-      {
-       "id": 185,
-       "type": "list.add",
-       "x": 2520,
-       "y": 3430,
-       "params": {
-        "variable": "made",
-        "scope": "alignment_positions"
-       },
-       "values": {
-        "item": 0
        }
       },
       {
@@ -229423,6 +225849,45 @@
         "variable": "bits",
         "scope": "read_format"
        }
+      },
+      {
+       "id": 358,
+       "type": "list.resize",
+       "x": 1128,
+       "y": 1736,
+       "params": {
+        "variable": "made",
+        "scope": "rs_divisor"
+       },
+       "values": {
+        "value": 0
+       }
+      },
+      {
+       "id": 359,
+       "type": "list.resize",
+       "x": 848,
+       "y": 2568,
+       "params": {
+        "variable": "made",
+        "scope": "rs_remainder"
+       },
+       "values": {
+        "value": 0
+       }
+      },
+      {
+       "id": 360,
+       "type": "list.resize",
+       "x": 2248,
+       "y": 3488,
+       "params": {
+        "variable": "made",
+        "scope": "alignment_positions"
+       },
+       "values": {
+        "value": 0
+       }
       }
      ],
      "links": [
@@ -229981,29 +226446,17 @@
       [
        67,
        "degree",
-       69,
-       "value"
-      ],
-      [
-       67,
-       "degree",
        85,
        "n"
       ],
       [
        67,
-       "then",
-       68,
-       "exec"
+       "degree",
+       358,
+       "length"
       ],
       [
-       68,
-       "then",
-       69,
-       "exec"
-      ],
-      [
-       69,
+       67,
        "then",
        70,
        "exec"
@@ -230011,50 +226464,8 @@
       [
        70,
        "then",
-       71,
+       358,
        "exec"
-      ],
-      [
-       71,
-       "body",
-       76,
-       "exec"
-      ],
-      [
-       71,
-       "completed",
-       78,
-       "exec"
-      ],
-      [
-       72,
-       "result",
-       71,
-       "condition"
-      ],
-      [
-       73,
-       "length",
-       72,
-       "a"
-      ],
-      [
-       74,
-       "value",
-       73,
-       "list"
-      ],
-      [
-       75,
-       "value",
-       72,
-       "b"
-      ],
-      [
-       77,
-       "value",
-       76,
-       "item"
       ],
       [
        78,
@@ -230311,80 +226722,26 @@
       [
        121,
        "then",
-       122,
-       "exec"
-      ],
-      [
-       122,
-       "then",
        123,
        "exec"
       ],
       [
        123,
        "then",
-       126,
+       359,
        "exec"
       ],
       [
        124,
        "length",
-       123,
-       "value"
+       359,
+       "length"
       ],
       [
        125,
        "value",
        124,
        "list"
-      ],
-      [
-       126,
-       "then",
-       127,
-       "exec"
-      ],
-      [
-       127,
-       "body",
-       132,
-       "exec"
-      ],
-      [
-       127,
-       "completed",
-       134,
-       "exec"
-      ],
-      [
-       128,
-       "result",
-       127,
-       "condition"
-      ],
-      [
-       129,
-       "length",
-       128,
-       "a"
-      ],
-      [
-       130,
-       "value",
-       129,
-       "list"
-      ],
-      [
-       131,
-       "value",
-       128,
-       "b"
-      ],
-      [
-       133,
-       "value",
-       132,
-       "item"
       ],
       [
        134,
@@ -230641,7 +226998,7 @@
       [
        174,
        "then",
-       177,
+       178,
        "exec"
       ],
       [
@@ -230657,58 +227014,16 @@
        "n"
       ],
       [
-       177,
-       "then",
-       178,
-       "exec"
-      ],
-      [
        178,
        "then",
-       180,
+       360,
        "exec"
       ],
       [
        179,
        "value",
-       178,
-       "value"
-      ],
-      [
-       180,
-       "body",
-       185,
-       "exec"
-      ],
-      [
-       180,
-       "completed",
-       186,
-       "exec"
-      ],
-      [
-       181,
-       "result",
-       180,
-       "condition"
-      ],
-      [
-       182,
-       "length",
-       181,
-       "a"
-      ],
-      [
-       183,
-       "value",
-       182,
-       "list"
-      ],
-      [
-       184,
-       "value",
-       181,
-       "b"
+       360,
+       "length"
       ],
       [
        186,
@@ -231729,6 +228044,24 @@
        "value",
        356,
        "bits"
+      ],
+      [
+       358,
+       "then",
+       78,
+       "exec"
+      ],
+      [
+       359,
+       "then",
+       134,
+       "exec"
+      ],
+      [
+       360,
+       "then",
+       186,
+       "exec"
       ]
      ],
      "machines": [],
@@ -231880,16 +228213,6 @@
          "value": []
         },
         {
-         "name": "count",
-         "type": "int",
-         "value": 0
-        },
-        {
-         "name": "fill",
-         "type": "int",
-         "value": 0
-        },
-        {
          "name": "root",
          "type": "int",
          "value": 0
@@ -231935,16 +228258,6 @@
          "name": "made",
          "type": "int_list",
          "value": []
-        },
-        {
-         "name": "count",
-         "type": "int",
-         "value": 0
-        },
-        {
-         "name": "fill",
-         "type": "int",
-         "value": 0
         },
         {
          "name": "b",
@@ -232005,11 +228318,6 @@
          "name": "made",
          "type": "int_list",
          "value": []
-        },
-        {
-         "name": "count",
-         "type": "int",
-         "value": 0
         },
         {
          "name": "i",
@@ -335717,7 +332025,7 @@
     "logic": {
      "kind": "kern-logic",
      "version": 1,
-     "nextId": 856,
+     "nextId": 858,
      "variables": [
       {
        "name": "kTeleportM",
@@ -338990,16 +335298,6 @@
        }
       },
       {
-       "id": 318,
-       "type": "var.set",
-       "x": 6440,
-       "y": 6680,
-       "params": {
-        "variable": "count",
-        "scope": "VoiceStream_push"
-       }
-      },
-      {
        "id": 319,
        "type": "list.length",
        "x": 6320,
@@ -339016,131 +335314,6 @@
        "params": {
         "variable": "mulaw",
         "scope": "VoiceStream_push"
-       }
-      },
-      {
-       "id": 321,
-       "type": "flow.while",
-       "x": 6720,
-       "y": 6680
-      },
-      {
-       "id": 322,
-       "type": "math.compare",
-       "x": 6600,
-       "y": 6830,
-       "params": {
-        "op": ">"
-       }
-      },
-      {
-       "id": 323,
-       "type": "list.length",
-       "x": 6600,
-       "y": 6920,
-       "params": {
-        "type": "float"
-       }
-      },
-      {
-       "id": 324,
-       "type": "var.get",
-       "x": 6600,
-       "y": 7010,
-       "params": {
-        "variable": "c",
-        "scope": "VoiceStream_push",
-        "path": ".pcm"
-       }
-      },
-      {
-       "id": 325,
-       "type": "var.get",
-       "x": 6600,
-       "y": 7100,
-       "params": {
-        "variable": "count",
-        "scope": "VoiceStream_push"
-       }
-      },
-      {
-       "id": 326,
-       "type": "list.remove_at",
-       "x": 7000,
-       "y": 6680,
-       "params": {
-        "variable": "c",
-        "scope": "VoiceStream_push",
-        "path": ".pcm"
-       }
-      },
-      {
-       "id": 327,
-       "type": "var.get",
-       "x": 6880,
-       "y": 6830,
-       "params": {
-        "variable": "count",
-        "scope": "VoiceStream_push"
-       }
-      },
-      {
-       "id": 328,
-       "type": "flow.while",
-       "x": 7280,
-       "y": 6680
-      },
-      {
-       "id": 329,
-       "type": "math.compare",
-       "x": 7160,
-       "y": 6830,
-       "params": {
-        "op": "<"
-       }
-      },
-      {
-       "id": 330,
-       "type": "list.length",
-       "x": 7160,
-       "y": 6920,
-       "params": {
-        "type": "float"
-       }
-      },
-      {
-       "id": 331,
-       "type": "var.get",
-       "x": 7160,
-       "y": 7010,
-       "params": {
-        "variable": "c",
-        "scope": "VoiceStream_push",
-        "path": ".pcm"
-       }
-      },
-      {
-       "id": 332,
-       "type": "var.get",
-       "x": 7160,
-       "y": 7100,
-       "params": {
-        "variable": "count",
-        "scope": "VoiceStream_push"
-       }
-      },
-      {
-       "id": 333,
-       "type": "list.add",
-       "x": 7560,
-       "y": 6680,
-       "params": {
-        "variable": "c",
-        "scope": "VoiceStream_push",
-        "path": ".pcm"
-       },
-       "values": {
-        "item": 0
        }
       },
       {
@@ -339366,56 +335539,12 @@
        }
       },
       {
-       "id": 357,
-       "type": "flow.while",
-       "x": 1120,
-       "y": 8160
-      },
-      {
-       "id": 358,
-       "type": "math.compare",
-       "x": 1000,
-       "y": 8310,
-       "params": {
-        "op": "<"
-       }
-      },
-      {
-       "id": 359,
-       "type": "list.length",
-       "x": 1000,
-       "y": 8400,
-       "params": {
-        "type": "float"
-       }
-      },
-      {
-       "id": 360,
-       "type": "var.get",
-       "x": 1000,
-       "y": 8490,
-       "params": {
-        "variable": "cum",
-        "scope": "project_on"
-       }
-      },
-      {
        "id": 361,
        "type": "var.get",
        "x": 1000,
        "y": 8580,
        "params": {
         "variable": "count",
-        "scope": "project_on"
-       }
-      },
-      {
-       "id": 362,
-       "type": "list.add",
-       "x": 1400,
-       "y": 8160,
-       "params": {
-        "variable": "cum",
         "scope": "project_on"
        }
       },
@@ -344063,6 +340192,30 @@
        "params": {
         "function": "fmin2"
        }
+      },
+      {
+       "id": 856,
+       "type": "list.resize",
+       "x": 6448,
+       "y": 6736,
+       "params": {
+        "variable": "c",
+        "scope": "VoiceStream_push",
+        "path": ".pcm"
+       },
+       "values": {
+        "value": 0
+       }
+      },
+      {
+       "id": 857,
+       "type": "list.resize",
+       "x": 1128,
+       "y": 8216,
+       "params": {
+        "variable": "cum",
+        "scope": "project_on"
+       }
       }
      ],
      "links": [
@@ -346211,104 +342364,20 @@
       [
        317,
        "then",
-       318,
-       "exec"
-      ],
-      [
-       318,
-       "then",
-       321,
+       856,
        "exec"
       ],
       [
        319,
        "length",
-       318,
-       "value"
+       856,
+       "length"
       ],
       [
        320,
        "value",
        319,
        "list"
-      ],
-      [
-       321,
-       "body",
-       326,
-       "exec"
-      ],
-      [
-       321,
-       "completed",
-       328,
-       "exec"
-      ],
-      [
-       322,
-       "result",
-       321,
-       "condition"
-      ],
-      [
-       323,
-       "length",
-       322,
-       "a"
-      ],
-      [
-       324,
-       "value",
-       323,
-       "list"
-      ],
-      [
-       325,
-       "value",
-       322,
-       "b"
-      ],
-      [
-       327,
-       "value",
-       326,
-       "index"
-      ],
-      [
-       328,
-       "body",
-       333,
-       "exec"
-      ],
-      [
-       328,
-       "completed",
-       21,
-       "exec"
-      ],
-      [
-       329,
-       "result",
-       328,
-       "condition"
-      ],
-      [
-       330,
-       "length",
-       329,
-       "a"
-      ],
-      [
-       331,
-       "value",
-       330,
-       "list"
-      ],
-      [
-       332,
-       "value",
-       329,
-       "b"
       ],
       [
        334,
@@ -346439,50 +342508,20 @@
       [
        356,
        "then",
-       357,
+       857,
        "exec"
-      ],
-      [
-       357,
-       "body",
-       362,
-       "exec"
-      ],
-      [
-       357,
-       "completed",
-       364,
-       "exec"
-      ],
-      [
-       358,
-       "result",
-       357,
-       "condition"
-      ],
-      [
-       359,
-       "length",
-       358,
-       "a"
-      ],
-      [
-       360,
-       "value",
-       359,
-       "list"
       ],
       [
        361,
        "value",
-       358,
-       "b"
+       857,
+       "length"
       ],
       [
        363,
        "value",
-       362,
-       "item"
+       857,
+       "value"
       ],
       [
        364,
@@ -349585,6 +345624,18 @@
        "then",
        28,
        "exec"
+      ],
+      [
+       856,
+       "then",
+       21,
+       "exec"
+      ],
+      [
+       857,
+       "then",
+       364,
+       "exec"
       ]
      ],
      "machines": [],
@@ -350103,11 +346154,6 @@
           "pcm": [],
           "gain": 0
          }
-        },
-        {
-         "name": "count",
-         "type": "int",
-         "value": 0
         }
        ]
       },
@@ -377177,7 +373223,7 @@
     "logic": {
      "kind": "kern-logic",
      "version": 1,
-     "nextId": 805,
+     "nextId": 808,
      "variables": [
       {
        "name": "kPi",
@@ -382900,41 +378946,6 @@
        }
       },
       {
-       "id": 314,
-       "type": "flow.while",
-       "x": 2240,
-       "y": 8820
-      },
-      {
-       "id": 315,
-       "type": "math.compare",
-       "x": 2120,
-       "y": 8970,
-       "params": {
-        "op": "<"
-       }
-      },
-      {
-       "id": 316,
-       "type": "list.length",
-       "x": 2120,
-       "y": 9060,
-       "params": {
-        "type": "Life_Pet"
-       }
-      },
-      {
-       "id": 317,
-       "type": "var.get",
-       "x": 2120,
-       "y": 9150,
-       "params": {
-        "variable": "self",
-        "scope": "Life_init",
-        "path": ".pets_"
-       }
-      },
-      {
        "id": 318,
        "type": "var.get",
        "x": 2120,
@@ -382942,17 +378953,6 @@
        "params": {
         "variable": "count",
         "scope": "Life_init"
-       }
-      },
-      {
-       "id": 319,
-       "type": "list.add",
-       "x": 2520,
-       "y": 8820,
-       "params": {
-        "variable": "self",
-        "scope": "Life_init",
-        "path": ".pets_"
        }
       },
       {
@@ -383122,41 +379122,6 @@
        }
       },
       {
-       "id": 334,
-       "type": "flow.while",
-       "x": 4760,
-       "y": 8820
-      },
-      {
-       "id": 335,
-       "type": "math.compare",
-       "x": 4640,
-       "y": 8970,
-       "params": {
-        "op": "<"
-       }
-      },
-      {
-       "id": 336,
-       "type": "list.length",
-       "x": 4640,
-       "y": 9060,
-       "params": {
-        "type": "Life_Bird"
-       }
-      },
-      {
-       "id": 337,
-       "type": "var.get",
-       "x": 4640,
-       "y": 9150,
-       "params": {
-        "variable": "self",
-        "scope": "Life_init",
-        "path": ".birds_"
-       }
-      },
-      {
        "id": 338,
        "type": "var.get",
        "x": 4640,
@@ -383164,17 +379129,6 @@
        "params": {
         "variable": "count_2",
         "scope": "Life_init"
-       }
-      },
-      {
-       "id": 339,
-       "type": "list.add",
-       "x": 5040,
-       "y": 8820,
-       "params": {
-        "variable": "self",
-        "scope": "Life_init",
-        "path": ".birds_"
        }
       },
       {
@@ -386453,146 +382407,6 @@
        }
       },
       {
-       "id": 675,
-       "type": "var.set",
-       "x": 1440,
-       "y": 18224,
-       "params": {
-        "variable": "count",
-        "scope": "Life_spawn_herd"
-       },
-       "values": {
-        "value": 1
-       }
-      },
-      {
-       "id": 676,
-       "type": "flow.while",
-       "x": 1728,
-       "y": 18280
-      },
-      {
-       "id": 677,
-       "type": "math.compare",
-       "x": 1680,
-       "y": 18432,
-       "params": {
-        "op": ">"
-       }
-      },
-      {
-       "id": 678,
-       "type": "list.length",
-       "x": 1680,
-       "y": 18536,
-       "params": {
-        "type": "Vector_row"
-       }
-      },
-      {
-       "id": 679,
-       "type": "var.get",
-       "x": 1680,
-       "y": 18640,
-       "params": {
-        "variable": "m",
-        "scope": "Life_spawn_herd",
-        "path": ".rings"
-       }
-      },
-      {
-       "id": 680,
-       "type": "var.get",
-       "x": 1680,
-       "y": 18744,
-       "params": {
-        "variable": "count",
-        "scope": "Life_spawn_herd"
-       }
-      },
-      {
-       "id": 681,
-       "type": "list.remove_at",
-       "x": 2016,
-       "y": 18336,
-       "params": {
-        "variable": "m",
-        "scope": "Life_spawn_herd",
-        "path": ".rings"
-       }
-      },
-      {
-       "id": 682,
-       "type": "var.get",
-       "x": 1968,
-       "y": 18488,
-       "params": {
-        "variable": "count",
-        "scope": "Life_spawn_herd"
-       }
-      },
-      {
-       "id": 683,
-       "type": "flow.while",
-       "x": 2304,
-       "y": 18392
-      },
-      {
-       "id": 684,
-       "type": "math.compare",
-       "x": 2256,
-       "y": 18544,
-       "params": {
-        "op": "<"
-       }
-      },
-      {
-       "id": 685,
-       "type": "list.length",
-       "x": 2256,
-       "y": 18648,
-       "params": {
-        "type": "Vector_row"
-       }
-      },
-      {
-       "id": 686,
-       "type": "var.get",
-       "x": 2256,
-       "y": 18752,
-       "params": {
-        "variable": "m",
-        "scope": "Life_spawn_herd",
-        "path": ".rings"
-       }
-      },
-      {
-       "id": 687,
-       "type": "var.get",
-       "x": 2256,
-       "y": 18856,
-       "params": {
-        "variable": "count",
-        "scope": "Life_spawn_herd"
-       }
-      },
-      {
-       "id": 688,
-       "type": "list.add",
-       "x": 2592,
-       "y": 18448,
-       "params": {
-        "variable": "m",
-        "scope": "Life_spawn_herd",
-        "path": ".rings"
-       },
-       "values": {
-        "item": {
-         "items": []
-        }
-       }
-      },
-      {
        "id": 689,
        "type": "list.add",
        "x": 2880,
@@ -387750,6 +383564,45 @@
         "variable": "self",
         "scope": "Life_heard_shot",
         "path": ".flocks_[].next_flight"
+       }
+      },
+      {
+       "id": 805,
+       "type": "list.resize",
+       "x": 2248,
+       "y": 8880,
+       "params": {
+        "variable": "self",
+        "scope": "Life_init",
+        "path": ".pets_"
+       }
+      },
+      {
+       "id": 806,
+       "type": "list.resize",
+       "x": 4768,
+       "y": 8880,
+       "params": {
+        "variable": "self",
+        "scope": "Life_init",
+        "path": ".birds_"
+       }
+      },
+      {
+       "id": 807,
+       "type": "list.resize",
+       "x": 1440,
+       "y": 18224,
+       "params": {
+        "variable": "m",
+        "scope": "Life_spawn_herd",
+        "path": ".rings"
+       },
+       "values": {
+        "length": 1,
+        "value": {
+         "items": []
+        }
        }
       }
      ],
@@ -389833,50 +385686,20 @@
       [
        313,
        "then",
-       314,
+       805,
        "exec"
-      ],
-      [
-       314,
-       "body",
-       319,
-       "exec"
-      ],
-      [
-       314,
-       "completed",
-       12,
-       "exec"
-      ],
-      [
-       315,
-       "result",
-       314,
-       "condition"
-      ],
-      [
-       316,
-       "length",
-       315,
-       "a"
-      ],
-      [
-       317,
-       "value",
-       316,
-       "list"
       ],
       [
        318,
        "value",
-       315,
-       "b"
+       805,
+       "length"
       ],
       [
        320,
        "value",
-       319,
-       "item"
+       805,
+       "value"
       ],
       [
        321,
@@ -389947,50 +385770,20 @@
       [
        333,
        "then",
-       334,
+       806,
        "exec"
-      ],
-      [
-       334,
-       "body",
-       339,
-       "exec"
-      ],
-      [
-       334,
-       "completed",
-       13,
-       "exec"
-      ],
-      [
-       335,
-       "result",
-       334,
-       "condition"
-      ],
-      [
-       336,
-       "length",
-       335,
-       "a"
-      ],
-      [
-       337,
-       "value",
-       336,
-       "list"
       ],
       [
        338,
        "value",
-       335,
-       "b"
+       806,
+       "length"
       ],
       [
        340,
        "value",
-       339,
-       "item"
+       806,
+       "value"
       ],
       [
        341,
@@ -392221,7 +388014,7 @@
       [
        672,
        "then",
-       675,
+       807,
        "exec"
       ],
       [
@@ -392235,90 +388028,6 @@
        "value",
        673,
        "kPi"
-      ],
-      [
-       675,
-       "then",
-       676,
-       "exec"
-      ],
-      [
-       676,
-       "body",
-       681,
-       "exec"
-      ],
-      [
-       676,
-       "completed",
-       683,
-       "exec"
-      ],
-      [
-       677,
-       "result",
-       676,
-       "condition"
-      ],
-      [
-       678,
-       "length",
-       677,
-       "a"
-      ],
-      [
-       679,
-       "value",
-       678,
-       "list"
-      ],
-      [
-       680,
-       "value",
-       677,
-       "b"
-      ],
-      [
-       682,
-       "value",
-       681,
-       "index"
-      ],
-      [
-       683,
-       "body",
-       688,
-       "exec"
-      ],
-      [
-       683,
-       "completed",
-       689,
-       "exec"
-      ],
-      [
-       684,
-       "result",
-       683,
-       "condition"
-      ],
-      [
-       685,
-       "length",
-       684,
-       "a"
-      ],
-      [
-       686,
-       "value",
-       685,
-       "list"
-      ],
-      [
-       687,
-       "value",
-       684,
-       "b"
       ],
       [
        690,
@@ -393051,6 +388760,24 @@
        "value",
        803,
        "a"
+      ],
+      [
+       805,
+       "then",
+       12,
+       "exec"
+      ],
+      [
+       806,
+       "then",
+       13,
+       "exec"
+      ],
+      [
+       807,
+       "then",
+       689,
+       "exec"
       ]
      ],
      "machines": [],
@@ -395063,11 +390790,6 @@
         {
          "name": "a",
          "type": "float",
-         "value": 0
-        },
-        {
-         "name": "count",
-         "type": "int",
          "value": 0
         },
         {

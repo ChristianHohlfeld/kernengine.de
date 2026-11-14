@@ -2437,7 +2437,7 @@ class Emit:
             if base is not None and not self.is_this(base) and self.tp(base).startswith("List<"):
                 it = self.tp(base)[5:-1]
                 args = kids(n)[1:]
-                if name in ("reserve", "shrink_to_fit", "rehash", "max_load_factor"):
+                if name in ("shrink_to_fit", "rehash", "max_load_factor") or (name == "reserve" and (self.keyed(base) or len(args) != 1)):
                     return []
                 if self.keyed(base) and name in ("insert", "emplace", "try_emplace", "insert_or_assign", "erase") and not (name == "erase" and len(args) != 1):
                     return self.keyed_change(base, name, args)[0]
@@ -2448,8 +2448,8 @@ class Emit:
                     return before + [f"list_clear({lv});"] + after
                 if name == "pop_back":
                     return before + [f"list_remove_at({lv}, kern::to<Int>(kern::formula([](Float n) -> Float {{ return n - 1.0; }}, kern::to<Float>(list_length<{it}>({lv})))));"] + after
-                if name in ("reserve", "shrink_to_fit"):
-                    return []
+                if name == "reserve":   # (room for that many entries: one request for memory, as in C++)
+                    return before + [f"list_reserve({lv}, {self.ex(args[0], 'Int')});"] + after
                 return before + self.list_step(name, base, lv, it, args) + after
             raise Wait(f"call: {name}() of an object")
         raise Wait(f"a statement: {k}")
@@ -3039,6 +3039,9 @@ class Emit:
                 st = self.tp(s0)
                 if st != f"List<{it}>":
                     raise Wait("list: insert() of entries of another type")
+                if self.whole_list(args[1], args[2]):
+                    # the whole list, in one go (one request for memory, as in C++)
+                    return lines + [f"list_append({lv}, {self.ex(s0, st)});" if end else f"list_insert_list({lv}, {p}, {self.ex(s0, st)});"]
                 src = self.temp("from", st)
                 a, b = self.temp("first", "Int"), self.temp("last", "Int")
                 lines += [f"{src} = {self.ex(s0, st)};", f"{a} = {first};", f"{b} = {self.whole_math('-', last, '1')};"]
@@ -3055,18 +3058,26 @@ class Emit:
             v = self.temp("item", it)
             return lines + [f"{v} = {self.ex(args[1], it)};", put(v, "0")]
         if name in ("resize", "assign") and len(args) in (1, 2) and not (name == "assign" and len(args) == 1):
-            n = self.temp("count", "Int")
-            lines = [f"{n} = {self.ex(args[0], 'Int')};"]
-            fill = self.u.zero(it)
-            if len(args) == 2:
-                fill = self.temp("fill", it)
-                lines.append(f"{fill} = {self.ex(args[1], it)};")
-            if name == "assign":
-                lines.append(f"list_clear({lv});")
-            else:
-                lines += [f'while (loop(math_compare<">">({length}, kern::to<Float>({n})))) {{', f"  list_remove_at({lv}, {n});", "}"]
-            return lines + [f'while (loop(math_compare<"<">({length}, kern::to<Float>({n})))) {{', f"  list_add({lv}, {fill});", "}"]
+            # the list that long, in one go (Set Length): cut at its end or filled up
+            if name == "resize":
+                return [f"list_resize({lv}, {self.ex(args[0], 'Int')}, {self.ex(args[1], it) if len(args) == 2 else self.u.zero(it)});"]
+            # (assign: what it is given is worked out before the list is emptied)
+            n, fill = self.temp("count", "Int"), self.temp("fill", it)
+            return [f"{n} = {self.ex(args[0], 'Int')};", f"{fill} = {self.ex(args[1], it)};", f"list_clear({lv});", f"list_resize({lv}, {n}, {fill});"]
         raise Wait(f"list: {name}()")
+
+    def whole_list(self, first, last):
+        """Are these two places the begin and the end of one list - begin()/end(), cbegin()/cend(),
+        std::begin(x)/std::end(x)? (`place` has already said that it is one list.)"""
+        def which(n):
+            n = self.unwrap(n)
+            while n.get("kind") in ("CXXConstructExpr", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr", "CXXFunctionalCastExpr") and len(kids(n)) == 1:
+                n = self.unwrap(kids(n)[0])
+            if n.get("kind") in ("CXXMemberCallExpr", "CallExpr") and len(kids(n)) in (1, 2):
+                c = callee(n) if n.get("kind") == "CXXMemberCallExpr" else None
+                return c.get("name") if c is not None else callee_name(n)
+            return None
+        return which(first) in ("begin", "cbegin") and which(last) in ("end", "cend")
 
     def own_value(self, n):
         """Is this a variable of the function alone - a local variable or an input by value: what nobody
@@ -4463,13 +4474,8 @@ class Emit:
                 return self.ex(a[0], t), t
             if len(a) in (1, 2) and self.tp_or_none(a[0]) in ("Int", "Float") and (len(a) == 1 or self.tp_or_none(a[1]) is not None):
                 # std::vector<T>(n) and (n, x): n entries, each T's zero or x
-                made, n = self.temp("made", t), self.temp("count", "Int")
-                lines = [f"list_clear({made});", f"{n} = {self.ex(a[0], 'Int')};"]
-                fill = u.zero(it)
-                if len(a) == 2:
-                    fill = self.temp("fill", it)
-                    lines.append(f"{fill} = {self.ex(a[1], it)};")
-                self.hoist(lines + [f'while (loop(math_compare<"<">(kern::to<Float>(list_length<{it}>({made})), kern::to<Float>({n})))) {{', f"  list_add({made}, {fill});", "}"])
+                made = self.temp("made", t)
+                self.hoist([f"{made} = {t}{{}};", f"list_resize({made}, {self.ex(a[0], 'Int')}, {self.ex(a[1], it) if len(a) == 2 else u.zero(it)});"])
                 return made, t
             if len(a) == 2:
                 # std::vector<T>(first, last): the entries of a list from one place to another
@@ -4477,8 +4483,11 @@ class Emit:
                 st = self.tp(s0)
                 if not self.same_list(s0, s1) or st != t:
                     raise Wait("a list made of a range of another type")
+                if self.whole_list(a[0], a[1]):
+                    return self.ex(s0, st), t   # (the whole list: a copy of it)
                 made, src, i0, i1 = self.temp("made", t), self.temp("from", st), self.temp("first", "Int"), self.temp("last", "Int")
-                self.hoist([f"list_clear({made});", f"{src} = {self.ex(s0, st)};", f"{i0} = {first};", f"{i1} = {self.whole_math('-', last, '1')};"]
+                self.hoist([f"{made} = {t}{{}};", f"{src} = {self.ex(s0, st)};", f"{i0} = {first};", f"{i1} = {self.whole_math('-', last, '1')};",
+                            f"list_reserve({made}, {self.whole_math('+', self.whole_math('-', i1, i0), '1')});"]
                            + self.count_loop(i0, i1, lambda i: [f"list_add({made}, list_get<{it}>({src}, {i}));"]))
                 return made, t
             raise Wait("a list made by a constructor")

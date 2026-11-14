@@ -714,7 +714,11 @@ struct Shape {
     };
     std::vector<std::vector<Write>> writes(count);
     std::vector<int> raises(count, -1);      // a step of the function that may run handlers (NodeDef::raises): anything the Blueprint holds may change
-    auto writes_place = [](const std::string& t) { return t == "var.set" || t == "var.take" || t == "list.add" || t == "list.insert" || t == "list.remove_at" || t == "list.remove" || t == "list.clear"; };
+    // (Reserve changes nothing one can read - but in the class the list moves: what a function holds of it would be gone)
+    auto writes_place = [](const std::string& t) {
+      return t == "var.set" || t == "var.take" || t == "list.add" || t == "list.insert" || t == "list.remove_at" || t == "list.remove" || t == "list.clear" || t == "list.resize" ||
+             t == "list.append" || t == "list.insert_list" || t == "list.reserve";
+    };
     // what a call's function does, as the caller sees it: a write through one of its reference
     // inputs is a write at the place the call gave that input
     auto through = [&](std::size_t callee, int call) {

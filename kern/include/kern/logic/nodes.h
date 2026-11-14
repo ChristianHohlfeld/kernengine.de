@@ -376,6 +376,33 @@ template <class T> bool remove(std::vector<T>& items, const std::type_identity_t
   return removed;
 }
 template <class T> void clear(std::vector<T>& items) { items.clear(); }
+/// The longest list Set Length makes and Reserve makes room for: a length beyond it is this
+/// one (a length is defined for every number, like an index).
+inline constexpr i64 kLongest = i64{1} << 24;
+/// Makes the list `length` long in one go: cut at its end, or filled up with `value`. Less than
+/// 0: empty. It does not grow beyond kLongest.
+template <class T> void resize(std::vector<T>& items, i64 length, const std::type_identity_t<T>& value) {
+  const std::size_t most = items.size() > static_cast<std::size_t>(kLongest) ? items.size() : static_cast<std::size_t>(kLongest);
+  items.resize(length <= 0 ? 0 : static_cast<u64>(length) > most ? most : static_cast<std::size_t>(length), value);
+}
+/// Makes room for `count` items (std::vector::reserve): nothing one can read changes - the list
+/// then grows that far without moving.
+template <class T> void reserve(std::vector<T>& items, i64 count) {
+  if (count > 0) items.reserve(static_cast<std::size_t>(count > kLongest ? kLongest : count));
+}
+/// Puts the items of `more`, in their order, in front of what is at `index` (before the first: at
+/// the start; past the end: at the end) - in one go. A list into itself: its items as they were.
+template <class T> void insert_list(std::vector<T>& items, i64 index, const std::vector<T>& more) {
+  const std::ptrdiff_t at = index <= 0 ? 0 : static_cast<u64>(index) >= items.size() ? static_cast<std::ptrdiff_t>(items.size()) : static_cast<std::ptrdiff_t>(index);
+  if (&more == &items) {
+    const std::vector<T> were = more;
+    items.insert(items.begin() + at, were.begin(), were.end());
+    return;
+  }
+  items.insert(items.begin() + at, more.begin(), more.end());
+}
+/// Adds the items of `more` at the end, in one go.
+template <class T> void append(std::vector<T>& items, const std::vector<T>& more) { insert_list(items, static_cast<i64>(items.size()), more); }
 }  // namespace list
 
 /// What the enum nodes do. An enum's values have names; a value is its place among them (the

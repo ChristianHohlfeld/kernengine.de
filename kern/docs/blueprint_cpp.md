@@ -206,7 +206,7 @@ KERN_LAYOUT(Demo) {
 | Get Variable | der Name der Variablen – oder der Platz, den der Knoten nennt: `Held.Damage`, `Cars[i].Wheels[j].Slip` |
 | Set / Add to Variable | `Heat = wert;` / `Heat += wert;` – an einem Platz genauso: `Held.Damage = wert;`, `Scores[i] = wert;`, `Cars[i].Speed += wert;`; wird ihr Ergebnis gelesen: `n5.value = (Heat += wert);` |
 | Take Variable | `var_take(Punkte);` – der Platz ist das Argument, eine Variable oder ein Platz in ihr (`var_take(Cars[i].Wheels);`); wird sein Ergebnis gelesen: `var_take(n7, Punkte);` und `n7.value`. Gibt, was am Platz steht, und lässt dort den leeren Wert des Typs (siehe „Übergeben statt kopieren“) |
-| Schritt, der eine Liste ändert (Add to List, Insert, Remove, Clear) | `list_add(Scores, wert);` – der Platz der Liste ist das erste Argument, eine Variable oder eine Liste darin (`list_add(Cars[i].Wheels, rad);`); wird sein Ergebnis gelesen: `list_add(n7, Scores, wert);` und `n7.index` |
+| Schritt, der eine Liste ändert (Add to List, Insert, Remove, Clear – und in einem Zug: Set Length, Append List, Insert List, Reserve) | `list_add(Scores, wert);` – der Platz der Liste ist das erste Argument, eine Variable oder eine Liste darin (`list_add(Cars[i].Wheels, rad);`); wird sein Ergebnis gelesen: `list_add(n7, Scores, wert);` und `n7.index` |
 | Wert-Knoten auf einer Liste (Length, Get Item, Contains, Find, Make List) | `list_get<Float>(Scores, 0)`, `list_make<Text, "2">("a", "b")` – die Einstellung „Type“ ist der Typ der Einträge |
 | For Each | `for (auto it9 = flow_for_each<Float>(n9, Scores); it9.next();) { ... }` – im Rumpf `n9.item` und `n9.index` |
 | Wert-Knoten einer Aufzählung (Equal, Enum to Text, Text to Enum, Enum to Index, Index to Enum, All Values) | `enum_name<Mode>(State)`, `enum_from_name<Mode>(text).value`, `enum_values<Mode>()` – die Einstellung „Enum“ ist die Aufzählung selbst |
@@ -296,6 +296,14 @@ void on1(Actor actor, Float value, Text text) {
 - **Eine Liste wird nur zu Text.** `kern::to<Text>(Scores)` ergibt `[1, 2.5]`; sonst passt eine
   Liste nur in einen Eingang ihres eigenen Typs, und nichts wird still zu einer Liste. (Eine Liste
   einer Aufzählung wird auch nicht zu Text: die Namen ihrer Werte kennt nur die Aufzählung.)
+- **In einem Zug.** Was `std::vector` mit einer Anforderung von Speicher tut, tut ein Schritt:
+  `list_resize(Scores, 10, 0.0);` (Set Length: am Ende abgeschnitten oder mit dem Wert
+  aufgefüllt – kleiner als 0 ist leer, mehr als 16.777.216 Einträge werden es nicht),
+  `list_append(Scores, weitere);` und `list_insert_list(Scores, index, weitere);` (eine ganze
+  Liste hinein, in ihrer Reihenfolge – auch die Liste in sich selbst: ihre Einträge, wie sie
+  waren), `list_reserve(Scores, 64);` (Platz vorhalten: Nichts, was man lesen kann, ändert sich –
+  die Liste wächst danach so weit, ohne noch einmal Speicher anzufordern). Eine Schleife aus
+  einzelnen Add wächst mehrmals; darum gibt es diese Schritte.
 - **Die generischen Knoten** (Length, Get Item, Contains, Find, Make List, For Each, auch Select
   und Reroute) tragen den Typ als Einstellung; im Editor nimmt ein solcher Knoten den Typ des
   ersten Drahts an, der an ihn kommt.
@@ -1105,13 +1113,15 @@ Aufruf Zeichen für Zeichen mit dem Interpreter** – Ergebnisse und alle Variab
 und beim Namen durch eine `logic::Instance`, die den Graphen als diese Klasse ausführt. Dazu
 spielen die Tier-Fälle (`logic_cases.h`), die ein Compiler schon ausführt, als Klassen dasselbe
 Szenario wie Interpreter und JIT – Begin Play, Events, Ticks, Wartezeiten, State Machines – mit
-demselben Ergebnis: alle 22, auch Aufrufe auf einem Blueprint (`call_on`: eine Funktion, die sich
+demselben Ergebnis: alle 23, auch Aufrufe auf einem Blueprint (`call_on`: eine Funktion, die sich
 so selbst aufruft, eine erklärte Funktion, die niemand hat, und Aufrufe ohne Ende), lokale Variablen (`locals`: Zahlen und ein Text, zwei
 Funktionen mit einer gleichnamigen, eine Pure-Funktion, die ihre eigene setzt, und ein Aufruf, den
 ein zweiter Aufruf derselben Funktion unterbricht), Übergeben (`handing_over`: ein Return, das eine
 lokale Variable und Eingänge weiterreicht, ein Set und ein Aufruf, die nehmen, was der Schritt davor
 gab – und daneben dieselben Werte dort, wo sie noch gebraucht und also kopiert werden; Take an einer
-Variablen, einem Feld, einem Listeneintrag, neben einer Liste und in einer lokalen Variablen), Listen (`lists`: jeder Schritt, For Each über eine Liste, die
+Variablen, einem Feld, einem Listeneintrag, neben einer Liste und in einer lokalen Variablen), Listen in
+einem Zug (`lists_at_once`: Set Length kürzt und füllt, Append und Insert List vorn, mittendrin, hinter dem
+Ende und in sich selbst, Reserve), Listen (`lists`: jeder Schritt, For Each über eine Liste, die
 ihr Rumpf ändert, und eine Schleife, deren Rumpf sie selbst wieder startet), Aufzählungen
 (`enums`: eine Variable und eine Liste vom Typ einer Aufzählung, Switch on Enum, der Weg zu Index
 und Name und zurück, alle Werte in einem For Each), Strukturen (`structs`: eine Variable und eine
