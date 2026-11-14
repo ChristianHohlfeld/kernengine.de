@@ -20,10 +20,10 @@
 // and who holds a junction: the loops over cars and people that ask the laws.
 #pragma once
 
-#include <unordered_map>
 #include <vector>
 
 #include "city_stream.h"
+#include "kern/core/map.h"
 #include "kern/logic/logic.h"
 
 namespace sc {
@@ -83,8 +83,8 @@ class TrafficRules {
  private:
   struct Blocked { f32 since = -1, next_honk = 0, wait_since = -1; };
   std::vector<Junction> junctions_;
-  std::unordered_map<u64, std::vector<i32>> grid_;
-  std::unordered_map<i32, Blocked> blocked_;
+  kern::Map<u64, std::vector<i32>> grid_;
+  kern::Map<i32, Blocked> blocked_;
 };
 
 }  // namespace sc

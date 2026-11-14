@@ -31,12 +31,12 @@ WorldArt::PartId WorldArt::part(const kern::MeshData& mesh, const kern::Material
   Part p;
   p.id = r_->allocate_id();
   p.tinted = tinted;
-  kern::MeshInput in = mesh.as_input(kern::kMaxExtensionAttributes);
-  in.material = m;
-  in.visible = false;
-  static const Mat4 parked = Mat4::translate({0, 0, -1000});
-  in.transforms = kern::Span<const f32>(parked.m, 16);
-  if (!r_->upsert(p.id, in)) { r_->release_id(p.id); return 0; }
+  kern::MeshLook look;
+  look.material = m;
+  look.extra_slot = kern::kMaxExtensionAttributes;
+  look.visible = false;
+  const Mat4 parked = Mat4::translate({0, 0, -1000});
+  if (!kern::upsert(*r_, p.id, mesh, look, kern::Span<const f32>(parked.m, 16))) { r_->release_id(p.id); return 0; }
   parts_.push_back(std::move(p));
   return static_cast<PartId>(parts_.size() - 1);
 }
@@ -67,10 +67,10 @@ void WorldArt::set_mesh(u32& slot, const kern::MeshData& mesh, const kern::Mater
     slot = 0;
     return;
   }
-  kern::MeshInput in = mesh.as_input();
-  in.material = m;
+  kern::MeshLook look;
+  look.material = m;
   if (!slot) slot = r_->allocate_id();
-  if (!r_->upsert(slot, in)) { r_->release_id(slot); slot = 0; }
+  if (!kern::upsert(*r_, slot, mesh, look)) { r_->release_id(slot); slot = 0; }
 }
 
 }  // namespace sc

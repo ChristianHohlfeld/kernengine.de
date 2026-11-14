@@ -4,9 +4,9 @@
 
 #include <cmath>
 #include <cstring>
-#include <unordered_map>
-#include <unordered_set>
 #include <string_view>
+
+#include "kern/core/map.h"
 
 namespace sc {
 
@@ -269,7 +269,7 @@ struct FurnishIndex {
   struct Ring { bool apron; u32 index; kern::Vec4 box; };
   std::vector<Seg> segs;
   std::vector<Ring> rings;
-  std::unordered_map<u64, std::vector<u32>> seg_cells, ring_cells;
+  kern::Map<u64, std::vector<u32>> seg_cells, ring_cells;
   static u64 key(i32 x, i32 y) { return (static_cast<u64>(static_cast<u32>(x)) << 32) | static_cast<u32>(y); }
   static i32 cell(f32 v) { return static_cast<i32>(std::floor(v / kCell)); }
   void add_seg(Vec2 a, Vec2 b, f32 half, u32 road, bool paved) {
@@ -335,7 +335,7 @@ void furnish(MapFeatures& out, const kern::Vec4& sq, const std::vector<std::vect
   for (u32 ai = 0; ai < apron.size(); ++ai) ix.add_ring(apron[ai], true, ai);
   auto inside = [&](Vec2 p) { return p.x >= sq.x && p.x < sq.z && p.y >= sq.y && p.y < sq.w; };
   constexpr f32 kPi2 = 6.2831853f;
-  std::unordered_set<u64> lamp_cells;
+  kern::Set<u64> lamp_cells;
   for (u32 ri = 0; ri < out.roads.size(); ++ri) {
     const MapFeatures::Road& r = out.roads[ri];
     if (road_is_water(r.cls) || r.points.size() < 2) continue;

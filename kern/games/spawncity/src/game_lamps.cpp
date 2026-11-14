@@ -63,12 +63,12 @@ void Game::gaps_lamps_init(kern::Renderer& r) {
   GapsState& g = *gaps_;
   auto make = [&](GapsState::Part& p, const kern::MeshData& mesh, kern::Material m) {
     p.id = r.allocate_id();
-    kern::MeshInput in = mesh.as_input(kern::kMaxExtensionAttributes);
-    in.material = m;
-    in.visible = false;
-    static const Mat4 parked = Mat4::translate({0, 0, -1000});
-    in.transforms = kern::Span<const f32>(parked.m, 16);
-    if (!r.upsert(p.id, in)) { r.release_id(p.id); p.id = 0; }
+    kern::MeshLook look;
+    look.material = m;
+    look.extra_slot = kern::kMaxExtensionAttributes;
+    look.visible = false;
+    const Mat4 parked = Mat4::translate({0, 0, -1000});
+    if (!kern::upsert(r, p.id, mesh, look, kern::Span<const f32>(parked.m, 16))) { r.release_id(p.id); p.id = 0; }
   };
   const Vec3 steel = rgb(0x2b2e31), head = rgb(0x2a2a28);
   kern::MeshData pole;

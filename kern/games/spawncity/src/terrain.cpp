@@ -4,10 +4,10 @@
 #include <algorithm>
 #include <cstdio>
 
+#include "kern/core/map.h"
 #include "kern/core/base.h"
 #include "kern/core/jobs.h"
 #include <cstring>
-#include <unordered_map>
 
 namespace sc {
 
@@ -120,7 +120,7 @@ void dem_grid_job(kern::Span<const u8> in, std::vector<u8>& out) {
   u32 n = 0, count = 0;
   get(&lon0, 8); get(&lat0, 8); get(&x0, 4); get(&y0, 4); get(&step, 4); get(&n, 4); get(&open, 4); get(&blur, 4); get(&count, 4);
   if (!ok || n < 2 || n > 4096) return;
-  std::unordered_map<u64, DemBytes> tiles;
+  kern::Map<u64, DemBytes> tiles;
   for (u32 k = 0; k < count && ok; ++k) {
     u32 x = 0, y = 0, w = 0, h = 0;
     get(&x, 4); get(&y, 4); get(&w, 4); get(&h, 4);
@@ -1042,7 +1042,7 @@ void Terrain::want_tiles(Vec3 focus, Vec3 anchor) {
       }
   }
   // Water: 320 m chunks holding water within 2.4 km.
-  std::unordered_set<u64> chunks;
+  kern::Set<u64> chunks;
   for (const auto& [k, b] : water_) {
     (void)b;
     const i32 bx = static_cast<i32>(k >> 32), by = static_cast<i32>(k & 0xffffffffu);
@@ -1150,12 +1150,12 @@ void Terrain::build_render_tile(i32 level, i32 ti, i32 tj) {
   skirt(0, n - 1, 1, 0, true);
   skirt(0, 0, 0, 1, true);
   skirt(n - 1, 0, 0, 1, false);
-  kern::MeshInput in = m.as_input();
-  in.material.roughness = 1;
-  in.material.cast_shadow = false;
-  in.material.double_sided = true;
+  kern::MeshLook look;
+  look.material.roughness = 1;
+  look.material.cast_shadow = false;
+  look.material.double_sided = true;
   const u32 id = r_->allocate_id();
-  if (!r_->upsert(id, in)) { r_->release_id(id); return; }
+  if (!kern::upsert(*r_, id, m, look)) { r_->release_id(id); return; }
   RenderTile& t = render_[key3(level, ti, tj)];
   if (t.mesh) r_->remove(t.mesh);
   t.mesh = id;
@@ -1303,13 +1303,14 @@ void Terrain::build_water_chunk(i32 ci, i32 cj, bool detail) {
   u32& slot = water_meshes_[key];
   water_detail_[key] = detail;
   if (m.vertex_count() == 0) { if (slot) r_->remove(slot); slot = 0; return; }
-  kern::MeshInput in = m.as_input(1);  // the second extension's stream (main.cpp: facades, water)
-  in.material.roughness = 0.08f;  // world_water.mjs: roughness .08, metalness 0, transparent .94
-  in.material.metalness = 0;
-  in.material.cast_shadow = false;
-  in.material.alpha = kern::AlphaMode::blend;
+  kern::MeshLook look;
+  look.material.roughness = 0.08f;  // world_water.mjs: roughness .08, metalness 0, transparent .94
+  look.material.metalness = 0;
+  look.material.cast_shadow = false;
+  look.material.alpha = kern::AlphaMode::blend;
+  look.extra_slot = 1;  // the second extension's stream (main.cpp: facades, water)
   const u32 id = r_->allocate_id();
-  if (!r_->upsert(id, in)) { r_->release_id(id); return; }
+  if (!kern::upsert(*r_, id, m, look)) { r_->release_id(id); return; }
   if (slot) r_->remove(slot);
   slot = id;
 }
@@ -1382,12 +1383,12 @@ void Terrain::update(Vec3 focus, Vec3 anchor, f64 budget_ms) {
   }
   if (!missing) {
     // Everything wanted is there: drop what is no longer wanted (never before - no holes).
-    std::unordered_set<u64> keep(want_render_.begin(), want_render_.end());
+    kern::Set<u64> keep(want_render_.begin(), want_render_.end());
     for (auto it = render_.begin(); it != render_.end();) {
       if (!keep.count(it->first)) { if (it->second.mesh) r_->remove(it->second.mesh); dirty_render_.erase(it->first); it = render_.erase(it); }
       else ++it;
     }
-    keep = std::unordered_set<u64>(want_collision_.begin(), want_collision_.end());
+    keep = kern::Set<u64>(want_collision_.begin(), want_collision_.end());
     for (auto it = collision_.begin(); it != collision_.end();) {
       if (!keep.count(it->first)) {
         if (it->second.body.valid() && world_->body_valid(it->second.body)) world_->destroy_body(it->second.body);
@@ -1395,7 +1396,7 @@ void Terrain::update(Vec3 focus, Vec3 anchor, f64 budget_ms) {
         it = collision_.erase(it);
       } else ++it;
     }
-    keep = std::unordered_set<u64>(want_water_.begin(), want_water_.end());
+    keep = kern::Set<u64>(want_water_.begin(), want_water_.end());
     for (auto it = water_meshes_.begin(); it != water_meshes_.end();) {
       if (!keep.count(it->first)) { if (it->second) r_->remove(it->second); dirty_water_.erase(it->first); water_detail_.erase(it->first); it = water_meshes_.erase(it); }
       else ++it;

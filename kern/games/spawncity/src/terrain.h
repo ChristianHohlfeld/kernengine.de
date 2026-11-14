@@ -22,11 +22,10 @@
 
 #include <memory>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "common.h"
+#include "kern/core/map.h"
 #include "kern/geo/mesh_data.h"
 #include "kern/geo/roads.h"
 #include "kern/gfx/renderer.h"
@@ -180,7 +179,7 @@ class Terrain {
   struct Bridge { Vec2 c; f32 hl, hw, yaw; };
   struct Crater { Vec2 c; f32 r, depth, rim; };
   struct CorridorSeg { f32 ax, ay, dx, dy, l2, ha, hb, half; };
-  struct CorridorSet { u64 owner = 0; kern::Vec4 bounds, box; std::unordered_map<u64, std::vector<CorridorSeg>> grid; };
+  struct CorridorSet { u64 owner = 0; kern::Vec4 bounds, box; kern::Map<u64, std::vector<CorridorSeg>> grid; };
   std::vector<std::unique_ptr<CorridorSet>> corridors_;
   mutable i32 corridor_hit_ = -1;  // the set of the last query, its place in corridors_ (queries come in runs); -1: none
   /// The place in corridors_ of the map tile's set whose square holds the point, or -1.
@@ -189,7 +188,7 @@ class Terrain {
   f32 road_level(f32 x, f32 y, f32 h) const;
   struct Tint { u64 owner; kern::Vec4 box; Vec3 lin; std::vector<std::vector<Vec2>> rings; };
   struct Image { TileKey key; std::vector<f32> albedo; bool requested = false, failed = false; };  // 64 x 64 linear rgb
-  std::unordered_map<u64, Image> images_;
+  kern::Map<u64, Image> images_;
   std::vector<TileKey> image_requests_;
   Vec2 image_at_{1e9f, 1e9f};
   void plan_images(Vec3 focus);
@@ -223,22 +222,22 @@ class Terrain {
   Grid grid_;
   std::vector<Grid> side_;  // host: windows round far mates (plan_side_dem)
   std::unique_ptr<Job> job_;
-  std::unordered_map<u64, DemTile> dem_tiles_;
+  kern::Map<u64, DemTile> dem_tiles_;
   std::vector<TileKey> requests_;
   u32 dem_failures_ = 0;
   f64 retry_at_ = 0;
   // water raster: 64 m blocks of 16 x 16 cells (4 m)
-  std::unordered_map<u64, WaterBlock> water_;
+  kern::Map<u64, WaterBlock> water_;
   std::vector<Bridge> bridges_;
   std::vector<Crater> craters_;
   std::vector<Tint> tints_;
   void repaint(const kern::Vec4& box);
   // tiles: render keyed by (level, i, j), collision by (i, j)
-  std::unordered_map<u64, RenderTile> render_;
-  std::unordered_map<u64, CollisionTile> collision_;
-  std::unordered_map<u64, u32> water_meshes_;
-  std::unordered_map<u64, bool> water_detail_;  // the chunk is drawn cell by cell (world_water.mjs, 1000 m)
-  std::unordered_set<u64> dirty_render_, dirty_collision_, dirty_water_;
+  kern::Map<u64, RenderTile> render_;
+  kern::Map<u64, CollisionTile> collision_;
+  kern::Map<u64, u32> water_meshes_;
+  kern::Map<u64, bool> water_detail_;  // the chunk is drawn cell by cell (world_water.mjs, 1000 m)
+  kern::Set<u64> dirty_render_, dirty_collision_, dirty_water_;
   std::vector<u64> want_render_, want_collision_, want_water_;
   Vec3 planned_focus_{1e9f, 1e9f, 0}, planned_anchor_{1e9f, 1e9f, 0};
   std::vector<Vec3> planned_extra_;

@@ -4,10 +4,13 @@
 // cast a ray through the physics world, draw a mesh, play a sound. Each such function is a node -
 // kern::physics::World::cast_ray is engine.world.cast_ray, in a Blueprint's C++
 // engine_world_cast_ray(world, origin, translation, filter, ignore):
-//   - a const method and a function that only gives something is a value, everything else a step;
-//   - what a function writes through a parameter is a further output;
+//   - a const method and a function that only gives something is a value, everything else a step
+//     (a function handed an object of the engine to change is a step);
+//   - what a function writes through a parameter is a further output, and so is what it reports
+//     through a pointer that is null by default (`bool* changed = nullptr`);
 //   - an object of the engine with a life of its own (a class: the physics world, the renderer,
-//     the mixer) is a handle, a whole number the host gives - the first input of its nodes;
+//     the mixer; a struct that cannot be copied or holds such an object) is a handle, a whole
+//     number the host gives - the first input of its nodes, which are all its public methods;
 //   - a plain struct of the engine (Pose, BodySettings, RayHit) is a struct the Blueprint declares
 //     with the same fields: the pin names it.
 // The table is written from the headers by tools/engine_api.py (engine_api.gen.cpp), and so are
@@ -29,7 +32,7 @@ struct EnginePin {
   const char* id;     // the pin: the parameter's name in the engine's header ("result": what the function returns)
   PinType type;
   const char* of;     // a struct or an enum (or a list of them): its name
-  const char* shape;  // the value's form, written out: n i b v t, e<values>, {fields}, [items]
+  const char* shape;  // the value's form, written out: n i b v t, l (Int64), e<values>, {fields}, [items]
 };
 
 struct EngineFunction {

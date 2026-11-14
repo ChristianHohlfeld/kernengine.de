@@ -11,12 +11,11 @@
 // asks the Blueprint about each lamp in reach and decides nothing itself.
 #pragma once
 
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "city_stream.h"
 #include "common.h"
+#include "kern/core/map.h"
 #include "kern/logic/logic.h"
 
 namespace sc::lamps {
@@ -80,9 +79,9 @@ class Field {
 
  private:
   std::vector<Lamp> lamps_;
-  std::unordered_set<i64> seen_;
-  std::unordered_map<i64, u8> broken_;
-  std::unordered_map<i64, std::vector<i32>> grid_;
+  kern::Set<i64> seen_;
+  kern::Map<i64, u8> broken_;
+  kern::Map<i64, std::vector<i32>> grid_;
 };
 
 }  // namespace sc::lamps

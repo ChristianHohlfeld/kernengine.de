@@ -4,7 +4,7 @@
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
 #pragma once
 
-#include <map>
+#include "kern/core/map.h"
 #include <utility>
 #include <vector>
 
@@ -15,7 +15,7 @@ namespace sc {
 
 struct ProjSync {
   struct Ghost { mp::PoseTimeline line; Vec3 v; f32 heard = 0; bool gone = false; };
-  std::map<u32, Ghost> ghosts;            // (shooter << 16 | id)
+  kern::Map<u32, Ghost> ghosts;            // (shooter << 16 | id)
   std::vector<std::pair<u16, u8>> sent;   // ours in the last message, and how often "gone" went out
   f32 clock = 0;
   u32 sent_msgs = 0, got = 0;

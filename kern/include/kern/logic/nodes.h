@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <charconv>
 #include <cmath>
 #include <compare>
@@ -105,6 +106,7 @@ struct Whole {
     v = whole_add(v, amount.v);
     return *this;
   }
+  u64 hash() const { return KeyHash<i64>{}(v); }  // (a key of a Map, a Set)
 };
 
 /// `Text` in a Blueprint's C++. A text written out in the program - "abc": a value typed into a
@@ -358,6 +360,10 @@ template <> struct Held<ActorHandle> {
   static constexpr PinType type = PinType::actor;
   static ActorHandle from(const Value& v) { return {v.as_actor()}; }
 };
+template <> struct Held<Int64> {
+  static constexpr PinType type = PinType::int64;
+  static Int64 from(const Value& v) { return Int64(v.type == PinType::int64 ? static_cast<u64>(v.i) : 0); }
+};
 template <class T> struct Held<std::vector<T>> {
   static constexpr PinType type = list_type_of<T>();
   static std::vector<T> from(const Value& v) { return v.items<T>(); }
@@ -473,6 +479,7 @@ inline Value to_value(std::string v) { return Value::text(std::move(v)); }
 inline Value to_value(const Text& v) { return Value::text(v.str()); }
 inline Value to_value(Text&& v) { return Value::text(std::move(v).str()); }
 inline Value to_value(ActorHandle v) { return Value::actor(v.id); }
+inline Value to_value(Int64 v) { return Value::int64(v.bits); }
 inline Value to_value(Value v) { return v; }  // (a struct in the interpreter)
 template <class T> Value to_value(std::vector<T> v) { return Value::of(std::move(v)); }
 template <detail::NativeStruct S> Value to_value(const S& v) { return detail::Held<S>::to(v); }
@@ -599,6 +606,159 @@ template <class T> void insert_list(std::vector<T>& items, i64 index, const std:
 /// Adds the items of `more` at the end, in one go.
 template <class T> void append(std::vector<T>& items, const std::vector<T>& more) { insert_list(items, static_cast<i64>(items.size()), more); }
 }  // namespace list
+
+/// A Map in a Blueprint's C++ (Map<Int, Float>, Map<Int, List<Int>> ...): kern::Map - its values
+/// under their keys, in the order the keys came. A value is a place by its entry's place in that
+/// order (Cells[i], Cells[i].Count += 1): [] never reaches beside the map - there it gives an
+/// entry of its own (beside), as a List's does. Its keys are found by the map's nodes (map::).
+template <class K, class V> struct Map : kern::Map<K, typename detail::Entry<V>::type> {
+  using Item = typename detail::Entry<V>::type;
+  using Entries = kern::Map<K, Item>;
+  using Entries::Entries;
+  Map() = default;
+  template <class I>
+    requires std::is_integral_v<I> || std::is_same_v<I, Whole>
+  Item& operator[](I index) {
+    const i64 at = static_cast<i64>(index);
+    if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return this->value_at(static_cast<std::size_t>(at));
+    return beside::entry<Item>();
+  }
+  template <class I>
+    requires std::is_integral_v<I> || std::is_same_v<I, Whole>
+  const Item& operator[](I index) const {
+    const i64 at = static_cast<i64>(index);
+    if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return this->value_at(static_cast<std::size_t>(at));
+    static const Item zero{};
+    return zero;
+  }
+};
+/// A Set in a Blueprint's C++ (Set<Int>): kern::Set - its keys in the order they came.
+template <class K> struct Set : kern::Set<K> {
+  using kern::Set<K>::Set;
+  Set() = default;
+};
+
+// A Map and a Set of a Blueprint's class as the interpreter holds them: their entries, keys and
+// values each as the value it is.
+namespace detail {
+template <class K, class V> struct Held<Map<K, V>> {
+  static constexpr PinType type = PinType::map;
+  static bool is(const Value& v) {
+    if (v.type != type) return false;
+    for (std::size_t k = 0; k < v.size(); ++k)
+      if (!is_value_of<K>(key_value(v.keyed().key_at(k), Held<K>::type)) || !is_value_of<V>(v.keyed().value_at(k))) return false;
+    return true;
+  }
+  static Map<K, V> from(const Value& v) {
+    Map<K, V> m;
+    m.reserve(v.size());
+    for (std::size_t k = 0; k < v.size(); ++k) m.try_emplace(Held<K>::from(key_value(v.keyed().key_at(k), Held<K>::type)), Held<V>::from(v.keyed().value_at(k)));
+    return m;
+  }
+  template <class T> static bool is_value_of(const Value& x) {
+    if constexpr (requires { Held<T>::is(x); }) return Held<T>::is(x);
+    else return x.type == Held<T>::type;
+  }
+};
+template <class K> struct Held<Set<K>> {
+  static constexpr PinType type = PinType::set;
+  static bool is(const Value& v) {
+    if (v.type != type) return false;
+    for (std::size_t k = 0; k < v.size(); ++k)
+      if (!Held<Map<K, bool>>::template is_value_of<K>(key_value(v.keyed().key_at(k), Held<K>::type))) return false;
+    return true;
+  }
+  static Set<K> from(const Value& v) {
+    Set<K> s;
+    s.reserve(v.size());
+    for (std::size_t k = 0; k < v.size(); ++k) s.insert(Held<K>::from(key_value(v.keyed().key_at(k), Held<K>::type)));
+    return s;
+  }
+};
+}  // namespace detail
+template <class K, class V> Value to_value(const Map<K, V>& m) {
+  Value r = Value::zero(PinType::map);
+  if (m.empty()) return r;
+  MapEntries& e = r.own_entries();
+  e.reserve(m.size());
+  for (const auto& [k, v] : m) e.try_emplace(key_of(to_value(k)), to_value(V(v)));
+  return r;
+}
+template <class K> Value to_value(const Set<K>& s) {
+  Value r = Value::zero(PinType::set);
+  if (s.empty()) return r;
+  MapEntries& e = r.own_entries();
+  e.reserve(s.size());
+  for (const K& k : s) e.try_emplace(key_of(to_value(k)));
+  return r;
+}
+
+/// What the nodes of a map do - on a Map of a Blueprint's class and on the interpreter's entries
+/// (MapEntries) alike: the same steps on the same container.
+namespace map {
+template <class M> i64 length(const M& m) { return static_cast<i64>(m.size()); }
+template <class M> bool contains(const M& m, const typename M::key_type& key) { return m.contains(key); }
+/// The place of the key's entry in the order of the keys, -1: there is none.
+template <class M> i64 index_of(const M& m, const typename M::key_type& key) {
+  const std::size_t at = m.index_of(key);
+  return at == M::npos ? -1 : static_cast<i64>(at);
+}
+/// The key of the entry at `at`; beyond the map: the zero of the keys' type.
+template <class M> typename M::key_type key_at(const M& m, i64 at) {
+  if (at < 0 || static_cast<u64>(at) >= m.size()) return typename M::key_type{};
+  return m.key_at(static_cast<std::size_t>(at));
+}
+/// The key's value (none: the zero of the values' type): (is there one, the value, its place - -1).
+template <class M> std::tuple<bool, typename M::mapped_type, i64> find(const M& m, const typename M::key_type& key) {
+  const i64 at = index_of(m, key);
+  if (at < 0) return {false, typename M::mapped_type{}, -1};
+  return {true, m.value_at(static_cast<std::size_t>(at)), at};
+}
+/// Set: the key gets the value - a new entry at the end when there is none. (was it new, its place)
+template <class M> std::pair<bool, i64> set(M& m, const typename M::key_type& key, typename M::mapped_type value) {
+  auto [it, fresh] = m.insert_or_assign(key, std::move(value));
+  return {fresh, static_cast<i64>(it - m.begin())};
+}
+/// Add: a new entry at the end with the zero of the values' type, unless the key has one. (was it new, its place)
+template <class M> std::pair<bool, i64> add(M& m, const typename M::key_type& key) {
+  auto [it, fresh] = m.try_emplace(key);
+  return {fresh, static_cast<i64>(it - m.begin())};
+}
+/// Takes the key's entry out (the others keep their order); was there one?
+template <class M> bool remove(M& m, const typename M::key_type& key) { return m.erase(key) > 0; }
+/// Takes the entry at `at` out; beyond the map: nothing.
+template <class M> void remove_at(M& m, i64 at) {
+  if (at >= 0 && static_cast<u64>(at) < m.size()) m.erase_at(static_cast<std::size_t>(at));
+}
+template <class M> void clear(M& m) { m.clear(); }
+/// Room for `count` entries (no more than list::kLongest).
+template <class M> void reserve(M& m, i64 count) { m.reserve(count <= 0 ? 0 : count > list::kLongest ? static_cast<std::size_t>(list::kLongest) : static_cast<std::size_t>(count)); }
+}  // namespace map
+
+/// What the nodes of a set do (see map::).
+namespace set {
+template <class S> i64 length(const S& s) { return static_cast<i64>(s.size()); }
+template <class S> bool contains(const S& s, const typename S::key_type& key) { return s.contains(key); }
+template <class S> i64 index_of(const S& s, const typename S::key_type& key) {
+  const std::size_t at = s.index_of(key);
+  return at == S::npos ? -1 : static_cast<i64>(at);
+}
+template <class S> typename S::key_type key_at(const S& s, i64 at) {
+  if (at < 0 || static_cast<u64>(at) >= s.size()) return typename S::key_type{};
+  return s.key_at(static_cast<std::size_t>(at));
+}
+/// Add: the key at the end, unless it is there. (was it new, its place)
+template <class S> std::pair<bool, i64> add(S& s, const typename S::key_type& key) {
+  auto [it, fresh] = s.insert(key);
+  return {fresh, static_cast<i64>(it - s.begin())};
+}
+template <class S> bool remove(S& s, const typename S::key_type& key) { return s.erase(key) > 0; }
+template <class S> void remove_at(S& s, i64 at) {
+  if (at >= 0 && static_cast<u64>(at) < s.size()) s.erase_at(static_cast<std::size_t>(at));
+}
+template <class S> void clear(S& s) { s.clear(); }
+template <class S> void reserve(S& s, i64 count) { s.reserve(count <= 0 ? 0 : count > list::kLongest ? static_cast<std::size_t>(list::kLongest) : static_cast<std::size_t>(count)); }
+}  // namespace set
 
 /// What the enum nodes do. An enum's values have names; a value is its place among them (the
 /// first is 0). The node library and a Blueprint's C++ call these.
@@ -1135,6 +1295,91 @@ struct PureNodes {
   using Text = std::string;
   using Actor = ActorHandle;
   static constexpr f64 kDegrees = 3.14159265358979323846 / 180.0;
+
+  // ---- Int64: 64 bits, as u64 and i64 of C++ (WebAssembly's i64) ----
+  // Adding, subtracting, multiplying and shifting left go round at 2^64; what C++ leaves open is
+  // defined here for every value, the same in every tier: dividing by 0 gives 0 (and the
+  // smallest i64 by -1 itself), a shift goes by the amount's last 6 bits, a Float that is no
+  // number is 0 as an Int64, beyond its ends it is the nearest end.
+  using Int64 = logic::Int64;
+  static Int64 int64_add(Int64 a, Int64 b) { return Int64(a.bits + b.bits); }
+  static Int64 int64_sub(Int64 a, Int64 b) { return Int64(a.bits - b.bits); }
+  static Int64 int64_mul(Int64 a, Int64 b) { return Int64(a.bits * b.bits); }
+  static Int64 int64_div(Int64 a, Int64 b) {
+    const i64 x = static_cast<i64>(a.bits), y = static_cast<i64>(b.bits);
+    if (y == 0) return Int64(0);
+    if (y == -1) return Int64(0 - a.bits);  // (the smallest i64 by -1: itself, as it goes round)
+    return Int64(static_cast<u64>(x / y));
+  }
+  static Int64 int64_div_unsigned(Int64 a, Int64 b) { return Int64(b.bits ? a.bits / b.bits : 0); }
+  static Int64 int64_rem(Int64 a, Int64 b) {
+    const i64 x = static_cast<i64>(a.bits), y = static_cast<i64>(b.bits);
+    if (y == 0 || y == -1) return Int64(0);
+    return Int64(static_cast<u64>(x % y));
+  }
+  static Int64 int64_rem_unsigned(Int64 a, Int64 b) { return Int64(b.bits ? a.bits % b.bits : 0); }
+  static Int64 int64_and(Int64 a, Int64 b) { return Int64(a.bits & b.bits); }
+  static Int64 int64_or(Int64 a, Int64 b) { return Int64(a.bits | b.bits); }
+  static Int64 int64_xor(Int64 a, Int64 b) { return Int64(a.bits ^ b.bits); }
+  static Int64 int64_not(Int64 a) { return Int64(~a.bits); }
+  static Int64 int64_shift_left(Int64 a, Int by) { return Int64(a.bits << (static_cast<u64>(by) & 63)); }
+  static Int64 int64_shift_right(Int64 a, Int by) { return Int64(static_cast<u64>(static_cast<i64>(a.bits) >> (static_cast<u64>(by) & 63))); }
+  static Int64 int64_shift_right_unsigned(Int64 a, Int by) { return Int64(a.bits >> (static_cast<u64>(by) & 63)); }
+  static Int64 int64_rotate_left(Int64 a, Int by) { return Int64(std::rotl(a.bits, static_cast<int>(static_cast<u64>(by) & 63))); }
+  static Int64 int64_rotate_right(Int64 a, Int by) { return Int64(std::rotr(a.bits, static_cast<int>(static_cast<u64>(by) & 63))); }
+  static Bool int64_equal(Int64 a, Int64 b) { return a.bits == b.bits; }
+  static Bool int64_less(Int64 a, Int64 b) { return static_cast<i64>(a.bits) < static_cast<i64>(b.bits); }
+  static Bool int64_less_unsigned(Int64 a, Int64 b) { return a.bits < b.bits; }
+  /// An Int as 64 bits: an i64 (a whole number below 0 is its two's complement).
+  static Int64 int64_of_int(Int a) { return Int64(static_cast<u64>(static_cast<i64>(a))); }
+  /// The bits as an i64 / a u64, as an Int holds that (exact up to 2^53, beyond: the nearest).
+  static Int int64_to_int(Int64 a) { return normal(static_cast<i64>(a.bits)); }
+  static Int int64_to_int_unsigned(Int64 a) { return whole(static_cast<f64>(a.bits)); }
+  static Float int64_to_float(Int64 a) { return static_cast<f64>(static_cast<i64>(a.bits)); }
+  static Float int64_to_float_unsigned(Int64 a) { return static_cast<f64>(a.bits); }
+  /// A Float toward zero as an i64 / a u64 (no number: 0; beyond the ends: the nearest end).
+  static Int64 int64_of_float(Float a) {
+    if (!(a == a)) return Int64(0);
+    if (a >= 9223372036854775808.0) return Int64(static_cast<u64>(std::numeric_limits<i64>::max()));
+    if (a < -9223372036854775808.0) return Int64(static_cast<u64>(std::numeric_limits<i64>::min()));
+    return Int64(static_cast<u64>(static_cast<i64>(a)));
+  }
+  static Int64 int64_of_float_unsigned(Float a) {
+    if (!(a > 0)) return Int64(0);
+    if (a >= 18446744073709551616.0) return Int64(~u64{0});
+    return Int64(static_cast<u64>(a));
+  }
+  /// A Float's 64 bits (IEEE 754), and the Float of 64 bits.
+  static Int64 int64_bits_of_float(Float a) { return Int64(std::bit_cast<u64>(a)); }
+  static Float int64_float_of_bits(Int64 a) { return std::bit_cast<f64>(a.bits); }
+  /// Two halves of 32 bits each (an Int each, cut to its last 32 bits), and the halves again (0 .. 2^32 - 1).
+  static Int64 int64_of_halves(Int high, Int low) { return Int64((static_cast<u64>(static_cast<u32>(high)) << 32) | static_cast<u32>(low)); }
+  static Int int64_high(Int64 a) { return static_cast<i64>(a.bits >> 32); }
+  static Int int64_low(Int64 a) { return static_cast<i64>(a.bits & 0xffffffffu); }
+  static Int int64_count_ones(Int64 a) { return static_cast<i64>(std::popcount(a.bits)); }
+  static Int int64_leading_zeros(Int64 a) { return static_cast<i64>(std::countl_zero(a.bits)); }
+  static Int int64_trailing_zeros(Int64 a) { return static_cast<i64>(std::countr_zero(a.bits)); }
+  /// The bits as a text: a u64 in decimal, an i64 in decimal, hexadecimal (lower case, no 0x).
+  static std::string int64_text(Int64 a) { return std::to_string(a.bits); }
+  static std::string int64_text_signed(Int64 a) { return std::to_string(static_cast<i64>(a.bits)); }
+  static std::string int64_text_hex(Int64 a) {
+    char b[20];
+    auto [end, ec] = std::to_chars(b, b + sizeof b, a.bits, 16);
+    (void)ec;
+    return std::string(b, end);
+  }
+  /// A text as 64 bits: its whole number (decimal, 0x hexadecimal; a - in front: two's complement), 0 if it is none.
+  static Int64 int64_of_text(const std::string& text) { return int64_parse(text); }
+  static Int64 int64_parse(std::string_view a) {
+    bool minus = !a.empty() && a.front() == '-';
+    if (minus) a.remove_prefix(1);
+    int base = 10;
+    if (a.size() > 2 && a[0] == '0' && (a[1] == 'x' || a[1] == 'X')) base = 16, a.remove_prefix(2);
+    u64 v = 0;
+    const auto [end, ec] = std::from_chars(a.data(), a.data() + a.size(), v, base);
+    if (ec != std::errc() || end != a.data() + a.size()) return Int64(0);
+    return Int64(minus ? 0 - v : v);
+  }
 
   // ---- math ----
   static Float math_add(Float a, Float b) { return a + b; }

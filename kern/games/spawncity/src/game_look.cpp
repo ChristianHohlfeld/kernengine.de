@@ -525,14 +525,15 @@ void Game::look_vr_hud() {
     q.push({-0.5f, 0, -0.5f}, {0, -1, 0}, {1, 1, 1}, {0, 1});
     q.indices = {0, 2, 1, 0, 3, 2};
     vr_hud_mesh_ = r.allocate_id();
-    kern::MeshInput in = q.as_input(kern::kMaxExtensionAttributes);
-    in.material.unlit = true;
-    in.material.double_sided = true;
-    in.material.cast_shadow = false;
-    in.material.frustum_culled = false;
-    in.material.alpha = kern::AlphaMode::blend;
-    in.texture = vr_hud_tex_;
-    if (!r.upsert(vr_hud_mesh_, in)) { r.release_id(vr_hud_mesh_); vr_hud_mesh_ = 0; return; }
+    kern::MeshLook look;
+    look.material.unlit = true;
+    look.material.double_sided = true;
+    look.material.cast_shadow = false;
+    look.material.frustum_culled = false;
+    look.material.alpha = kern::AlphaMode::blend;
+    look.extra_slot = kern::kMaxExtensionAttributes;
+    look.texture = vr_hud_tex_;
+    if (!kern::upsert(r, vr_hud_mesh_, q, look)) { r.release_id(vr_hud_mesh_); vr_hud_mesh_ = 0; return; }
   }
   // On the left wrist, like a watch (out of the view - raise the arm to read it, Y opens the menu
   // there); without the left controller low in front, where you look down to.
@@ -585,10 +586,11 @@ void Game::look_view_models(f32 dt) {
         auto make = [&](const MeshData& d, bool g, u32& id) {
           if (d.positions.empty()) return;
           id = r.allocate_id();
-          kern::MeshInput in = d.as_input(kern::kMaxExtensionAttributes);
-          in.material = vm_material(g, set == 1);
-          in.visible = false;
-          if (!r.upsert(id, in)) { r.release_id(id); id = 0; }
+          kern::MeshLook look;
+          look.material = vm_material(g, set == 1);
+          look.extra_slot = kern::kMaxExtensionAttributes;
+          look.visible = false;
+          if (!kern::upsert(r, id, d, look)) { r.release_id(id); id = 0; }
         };
         make(body, false, set ? L.vm_body_vr[i] : L.vm_body[i]);
         make(glow, true, set ? L.vm_glow_vr[i] : L.vm_glow[i]);

@@ -144,10 +144,11 @@ void Game::gaps_barricades_draw() {
     m.roughness = 0.85f;
     kern::MeshData box = kern::primitives::box({kDoorW + 0.5f, 0.06f, 0.2f}, {0.42f, 0.29f, 0.17f});
     g.plank_part.id = g.renderer->allocate_id();
-    kern::MeshInput in = box.as_input(kern::kMaxExtensionAttributes);
-    in.material = m;
-    in.visible = false;
-    if (!g.renderer->upsert(g.plank_part.id, in)) { g.renderer->release_id(g.plank_part.id); g.plank_part.id = 0; return; }
+    kern::MeshLook look;
+    look.material = m;
+    look.extra_slot = kern::kMaxExtensionAttributes;
+    look.visible = false;
+    if (!kern::upsert(*g.renderer, g.plank_part.id, box, look)) { g.renderer->release_id(g.plank_part.id); g.plank_part.id = 0; return; }
   }
   g.plank_part.transforms.clear();
   g.plank_part.tints.clear();

@@ -8,10 +8,8 @@
 // jet (F at the jet; F in the air = ejection seat and parachute). Switching never loads anything.
 #pragma once
 
-#include <map>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "car.h"
@@ -36,6 +34,7 @@
 #include "game_townsync.h"
 #include "game_world.h"  // WorldLife (M3 world, game_world.cpp)
 #include "jet.h"
+#include "kern/core/map.h"
 #include "kern/app/app.h"
 #include "kern/audio/audio.h"
 #include "kern/game/runtime.h"
@@ -266,7 +265,7 @@ class Game {
   std::vector<i32> car_net_;           // client: the host's index each of our cars plays (-1 none)
   std::vector<mp::PoseTimeline> car_line_;   // client: the host's poses of each of his cars
   std::vector<Quat> car_rest_q_;             // ... and how each last stood (a car at rest is only named)
-  std::map<u8, WorldParts> world_parts_;
+  kern::Map<u8, WorldParts> world_parts_;
   std::vector<Life::NetCow> cows_acc_;
   std::vector<Life::NetPet> pets_acc_;
   std::vector<Life::NetFlock> flocks_acc_;
@@ -327,7 +326,7 @@ class Game {
     bool fallen = false;  // an officer / enemy who went down: his body lies here, the unit only waits to be dropped
   };
   struct RemoteSwarm { f64 seen = 0; std::vector<RemoteUnit> units; };
-  std::unordered_map<u8, RemoteSwarm> swarms_;
+  kern::Map<u8, RemoteSwarm> swarms_;
   f64 swarm_clock_ = 0;
   u16 swarm_serial_ = 0;
   // ours as last sent: an officer or enemy missing from the next list who lies dead is sent on for

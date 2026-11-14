@@ -562,26 +562,24 @@ void Interiors::activate(const CityStream::BuildingRef& ref, CityStream& city, f
   if (!world_->create_shape(body_, ss).valid()) { clear(); return; }
   kern::weld(plan_.mesh);
   mesh_id_ = r_->allocate_id();
-  kern::MeshInput in = plan_.mesh.as_input(kern::kMaxExtensionAttributes);
-  kern::Material m;
-  m.roughness = 0.85f;
-  m.double_sided = true;
-  m.cast_shadow = false;
-  in.material = m;
-  if (!r_->upsert(mesh_id_, in)) { r_->release_id(mesh_id_); mesh_id_ = 0; }
+  kern::MeshLook look;
+  look.material.roughness = 0.85f;
+  look.material.double_sided = true;
+  look.material.cast_shadow = false;
+  look.extra_slot = kern::kMaxExtensionAttributes;
+  if (!kern::upsert(*r_, mesh_id_, plan_.mesh, look)) { r_->release_id(mesh_id_); mesh_id_ = 0; }
   plan_.mesh = kern::MeshData{};
   if (plan_.glass.vertex_count()) {
     glass_id_ = r_->allocate_id();
-    kern::MeshInput gi = plan_.glass.as_input(kern::kMaxExtensionAttributes);
-    kern::Material g;
-    g.roughness = 0.05f;
-    g.color = {1, 1, 1, 0.22f};
-    g.alpha = kern::AlphaMode::blend;
-    g.double_sided = true;
-    g.cast_shadow = false;
-    g.emissive = {0.02f, 0.025f, 0.03f};
-    gi.material = g;
-    if (!r_->upsert(glass_id_, gi)) { r_->release_id(glass_id_); glass_id_ = 0; }
+    kern::MeshLook glass;
+    glass.material.roughness = 0.05f;
+    glass.material.color = {1, 1, 1, 0.22f};
+    glass.material.alpha = kern::AlphaMode::blend;
+    glass.material.double_sided = true;
+    glass.material.cast_shadow = false;
+    glass.material.emissive = {0.02f, 0.025f, 0.03f};
+    glass.extra_slot = kern::kMaxExtensionAttributes;
+    if (!kern::upsert(*r_, glass_id_, plan_.glass, glass)) { r_->release_id(glass_id_); glass_id_ = 0; }
     plan_.glass = kern::MeshData{};
   }
   active_ = true;

@@ -70,18 +70,23 @@ const char* cpp_type(PinType t) {
     case PinType::vector: return "Vector";
     case PinType::text: return "Text";
     case PinType::actor: return "Actor";
+    case PinType::int64: return "Int64";
     case PinType::boolean_list: return "List<Bool>";
     case PinType::integer_list: return "List<Int>";
     case PinType::number_list: return "List<Float>";
     case PinType::vector_list: return "List<Vector>";
     case PinType::text_list: return "List<Text>";
     case PinType::actor_list: return "List<Actor>";
+    case PinType::int64_list: return "List<Int64>";
     default: return "void";
   }
 }
 /// A type as the notation writes it: Float, List<Text>; an enum or a struct by its name - Mode,
 /// List<Mode>.
 std::string cpp_type(const TypeRef& t) {
+  // (a map, a set: Map<Int, List<Weapon>>, Set<Text>)
+  if (t.type == PinType::map) return "Map<" + cpp_type(key_type(t)) + ", " + cpp_type(value_type(t)) + ">";
+  if (t.type == PinType::set) return "Set<" + cpp_type(key_type(t)) + ">";
   // (a list of a fixed length, as a place is declared: Fixed<Float, 16>)
   if (t.count && is_list(t.type)) return "Fixed<" + cpp_type(TypeRef{element_of(t.type), t.of}) + ", " + std::to_string(t.count) + ">";
   if (element_of(t.type) != PinType::enumeration && element_of(t.type) != PinType::structure) return cpp_type(t.type);
@@ -89,7 +94,7 @@ std::string cpp_type(const TypeRef& t) {
 }
 /// A value type by its name (a list is List<that>).
 bool type_of_cpp(std::string_view name, PinType& out) {
-  for (PinType t : {PinType::boolean, PinType::integer, PinType::number, PinType::vector, PinType::text, PinType::actor})
+  for (PinType t : {PinType::boolean, PinType::integer, PinType::number, PinType::vector, PinType::text, PinType::actor, PinType::int64})
     if (name == cpp_type(t)) { out = t; return true; }
   return false;
 }
@@ -161,6 +166,11 @@ std::string literal(const Value& v) {
     case PinType::vector: return "Vector{" + f32_text(v.v.x) + ", " + f32_text(v.v.y) + ", " + f32_text(v.v.z) + "}";
     case PinType::text: return text_literal(v.s);
     case PinType::actor: return "Actor{" + std::to_string(v.a) + "}";
+    case PinType::int64: {  // its bits: Int64{0x1f}
+      char b[24];
+      std::snprintf(b, sizeof b, "0x%llx", static_cast<unsigned long long>(static_cast<u64>(v.i)));
+      return std::string("Int64{") + b + "}";
+    }
     default: break;
   }
   if (!is_list(v.type)) return "0";
@@ -178,6 +188,7 @@ std::string literal(const Value& v, const std::string& of, const Graph& g, std::
 /// (logic::said): what it does not say is zero, as in C++ - a buffer of 24000 zeros is
 /// Fixed<Float, 24000>{}.
 std::string literal(const Value& v, const TypeRef& declared, const Graph& g, std::size_t depth = 0) {
+  if (is_keyed(declared.type)) return literal(v, declared.of, g, depth);
   if (!declared.count || !is_list(declared.type) || v.type != declared.type) return literal(v, declared.of, g, depth);
   const TypeRef item{element_of(declared.type), declared.of};
   std::string r = cpp_type(declared) + "{";
@@ -185,6 +196,16 @@ std::string literal(const Value& v, const TypeRef& declared, const Graph& g, std
   return r + "}";
 }
 std::string literal(const Value& v, const std::string& of, const Graph& g, std::size_t depth) {
+  if (is_keyed(v.type)) {
+    // a map: Map<Int, Float>{{1, 2.5}, {3, 4.0}} - its entries in their order; a set: Set<Int>{1, 3}
+    const TypeRef t{v.type, of}, key = key_type(t), value = v.type == PinType::map ? value_type(t) : TypeRef{};
+    std::string r = cpp_type(t) + "{";
+    for (std::size_t k = 0, n = v.size(); k < n; ++k) {
+      const std::string kt = literal(key_value(v.keyed().key_at(k), key.type), key, g, depth);
+      r += (k ? ", " : "") + (v.type == PinType::map ? "{" + kt + ", " + literal(v.keyed().value_at(k), value, g, depth) + "}" : kt);
+    }
+    return r + "}";
+  }
   if (element_of(v.type) == PinType::structure) {
     const StructType* s = depth < g.structs.size() ? g.structure(of) : nullptr;  // (a struct holds structs declared above it: no deeper than there are structs)
     auto one = [&](const Value& x) {
@@ -737,7 +758,10 @@ struct Shape {
     // (Reserve changes nothing one can read - but in the class the list moves: what a function holds of it would be gone)
     auto writes_place = [](const std::string& t) {
       return t == "var.set" || t == "var.take" || t == "list.add" || t == "list.insert" || t == "list.remove_at" || t == "list.remove" || t == "list.clear" || t == "list.resize" ||
-             t == "list.append" || t == "list.insert_list" || t == "list.reserve" || t == "list.sort";
+             t == "list.append" || t == "list.insert_list" || t == "list.reserve" || t == "list.sort" ||
+             // (a map's or a set's steps put entries in or take them out - and move the others: a map's values are its entries)
+             t == "map.set" || t == "map.add" || t == "map.remove" || t == "map.remove_at" || t == "map.clear" || t == "map.reserve" ||
+             t == "set.add" || t == "set.remove" || t == "set.remove_at" || t == "set.clear" || t == "set.reserve";
     };
     // what a call's function does, as the caller sees it: a write through one of its reference
     // inputs is a write at the place the call gave that input
@@ -1852,8 +1876,8 @@ struct Writer {
 // ---------------------------------------------------------------------------
 // reading
 
-const char* const kTypes = "a type (Bool, Int, Float, Vector, Text, Actor, an enum or a struct of the Blueprint, or List<one of them>) expected, not ";
-const char* const kListTypes = "List<Bool>, List<Int>, List<Float>, List<Vector>, List<Text>, List<Actor>, List<an enum> or List<a struct of the Blueprint>";
+const char* const kTypes = "a type (Bool, Int, Float, Vector, Text, Actor, Int64, an enum or a struct of the Blueprint, List<one of them>, Map<key, value> or Set<key>) expected, not ";
+const char* const kListTypes = "List<Bool>, List<Int>, List<Float>, List<Vector>, List<Text>, List<Actor>, List<Int64>, List<an enum> or List<a struct of the Blueprint>";
 
 struct Tok {
   enum Kind : u8 { id, number, text, punct, doc, end } kind = end;
@@ -2216,6 +2240,42 @@ struct Reader {
       v = Value::vector(Vec3{static_cast<f32>(x), static_cast<f32>(y), static_cast<f32>(z)});
       return true;
     }
+    if (t.kind == Tok::id && t.s == "Int64" && is("{", 1)) {
+      // Int64{0x1f}: its 64 bits (written as hex, read as any whole number C++ writes)
+      p += 2;
+      if (peek().kind != Tok::number || peek().real) {
+        fail(p, "an Int64 is written with its bits: Int64{0x1f}");
+        return true;
+      }
+      v = Value::int64(std::strtoull(toks[p++].s.c_str(), nullptr, 0));
+      expect("}");
+      return true;
+    }
+    if (t.kind == Tok::id && (t.s == "Map" || t.s == "Set") && is("<", 1)) {
+      // Map<Int, Float>{{1, 2.5}, {3, 4.0}}, Set<Int>{1, 3}: the entries in their order
+      TypeRef keyed;
+      if (!type_here(keyed)) return true;
+      if (!expect("{", "(a map written out is " + cpp_type(keyed) + "{...})")) return true;
+      const TypeRef key = key_type(keyed), value = keyed.type == PinType::map ? value_type(keyed) : TypeRef{};
+      v = Value::zero(keyed.type);
+      while (!is("}")) {
+        const bool pair = keyed.type == PinType::map;
+        if (pair && !expect("{", "(an entry of a map is {key, value})")) return true;
+        Value k, x;
+        if (!typed_literal(key, k, "a key")) return true;
+        if (pair && (!expect(",") || !typed_literal(value, x, "a value") || !expect("}"))) return true;
+        const MapKey mk = key_of(k);
+        if (v.keyed().contains(mk)) {
+          fail(p, "the key " + literal(k, key, g) + " is said twice");
+          return true;
+        }
+        v.own_entries().try_emplace(mk, std::move(x));
+        if (!accept(",")) break;
+      }
+      if (!expect("}")) return true;
+      if (of) *of = keyed.of;
+      return true;
+    }
     if (t.kind == Tok::id && t.s == "Actor" && is("{", 1)) {
       p += 2;
       i64 a = 0;
@@ -2292,6 +2352,21 @@ struct Reader {
       t.type = g.enumeration(peek().s) ? PinType::enumeration : PinType::structure;
       t.of = toks[p++].s;
       return true;
+    }
+    if ((is("Map") || is("Set")) && is("<", 1)) {
+      // Map<Int, Float>: values under keys; Set<Int>: keys - in the order the keys came. A key is a
+      // Bool, an Int, an Int64, an enum's value or a Text; a value any type but a map or a set.
+      const bool map = is("Map");
+      const std::size_t at = p;
+      p += 2;
+      TypeRef key, value;
+      if (!type_here(key) || !key_type_ok(key.type) || key.count) return fail(at + 2, "the keys of a map or a set are Bool, Int, Int64, Text or an enum");
+      if (map) {
+        if (!expect(",")) return false;
+        if (!type_here(value) || is_keyed(value.type) || value.count) return fail(p, "the values of a map are a type a variable can be, but no map, set or list of a fixed length");
+      }
+      t = {map ? PinType::map : PinType::set, keyed_of(key, map ? &value : nullptr)};
+      return expect(">");
     }
     if ((is("List") || is("Fixed")) && is("<", 1)) {
       // List<Float>: a list of values of one type. Fixed<Float, 16>: one of a fixed length - what a
@@ -4628,11 +4703,17 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
       case PinType::vector_list: return "kern::List<kern::Vec3>";
       case PinType::text_list: return "kern::List<kern::logic::Text>";
       case PinType::actor_list: return "kern::List<kern::logic::ActorHandle>";
+      case PinType::int64: return "kern::logic::Int64";
+      case PinType::int64_list: return "kern::List<kern::logic::Int64>";
       default: return "kern::logic::ActorHandle";
     }
   };
   // (an enum and a struct are the class's own: <Class>::Mode)
-  auto type = [&](PinType t, const std::string& of) -> std::string {
+  std::function<std::string(PinType, const std::string&)> type = [&](PinType t, const std::string& of) -> std::string {
+    // (in a map or a set an Int is the class's: kern::logic::Whole, as in its lists)
+    auto inner = [&](const TypeRef& x) { return x.type == PinType::integer ? std::string("kern::logic::Whole") : type(x.type, x.of); };
+    if (t == PinType::map) return "kern::logic::Map<" + inner(key_type({t, of})) + ", " + inner(value_type({t, of})) + ">";
+    if (t == PinType::set) return "kern::logic::Set<" + inner(key_type({t, of})) + ">";
     if (element_of(t) != PinType::enumeration && element_of(t) != PinType::structure) return builtin(t);
     return is_list(t) ? "kern::List<" + name + "::" + of + ">" : name + "::" + of;
   };
@@ -4643,6 +4724,15 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
       const StructType* s = g.structure(of);
       std::string r = name + "::" + of + "{";
       for (std::size_t k = 0; s && k < s->fields.size(); ++k) r += (k ? ", " : "") + spelled(field_of(v, *s, k, g), s->fields[k].type.of);
+      return r + "}";
+    }
+    if (is_keyed(v.type)) {
+      const TypeRef t{v.type, of}, key = key_type(t), val = v.type == PinType::map ? value_type(t) : TypeRef{};
+      std::string r = type(v.type, of) + "{";
+      for (std::size_t k = 0, n = v.size(); k < n; ++k) {
+        const std::string kt = spelled(key_value(v.keyed().key_at(k), key.type), key.of);
+        r += (k ? ", " : "") + (v.type == PinType::map ? "{" + kt + ", " + spelled(v.keyed().value_at(k), val.of) + "}" : kt);
+      }
       return r + "}";
     }
     const std::string text = literal(v);
@@ -4662,6 +4752,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     if (!st.from.empty()) continue;  // (a struct of a library is the library's type: its glue says how it is held)
     const std::string full = rooted + "::" + st.name;
     auto held = [&](const StructField& f) -> std::string {
+      if (is_keyed(f.type.type)) return type(f.type.type, f.type.of);
       if (element_of(f.type.type) != PinType::enumeration && element_of(f.type.type) != PinType::structure) return builtin(f.type.type);
       return is_list(f.type.type) ? "kern::List<" + rooted + "::" + f.type.of + ">" : rooted + "::" + f.type.of;
     };
