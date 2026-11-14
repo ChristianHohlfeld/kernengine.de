@@ -80,7 +80,10 @@ using kern::u8;
 struct Num32 {
   float v = 0;
   constexpr Num32() = default;
-  constexpr Num32(double x) : v(static_cast<float>(x)) {}
+  // (explicit: read, a component is a number - `c ? p.x : 0.5` is a number, as in the Blueprint; what is
+  // written into one is brought to 32 bit)
+  constexpr explicit Num32(double x) : v(static_cast<float>(x)) {}
+  constexpr Num32& operator=(double x) { v = static_cast<float>(x); return *this; }
   constexpr operator double() const { return static_cast<double>(v); }
   constexpr Num32& operator+=(double x) { return *this = Num32(static_cast<double>(v) + x); }
   constexpr Num32& operator-=(double x) { return *this = Num32(static_cast<double>(v) - x); }
