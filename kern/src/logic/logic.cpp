@@ -1149,7 +1149,17 @@ bool take_types(Graph& g, const std::vector<std::string>& libraries, const Bluep
   std::set<std::string> named;
   if (!whole) {
     std::vector<std::string> todo;
-    auto name = [&](const std::string& of) { if (!of.empty() && named.insert(of).second) todo.push_back(of); };
+    auto one = [&](const std::string& of) { if (!of.empty() && named.insert(of).second) todo.push_back(of); };
+    // (what a map or a set says of its keys and values - "int64>struct_list:Tree" - names the types in it)
+    auto name = [&](const std::string& of) {
+      if (of.find_first_of(":>") == std::string::npos) return one(of);
+      for (std::size_t at = 0; at <= of.size();) {
+        const std::size_t end = std::min(of.find('>', at), of.size());
+        const std::size_t colon = of.find(':', at);
+        if (colon != std::string::npos && colon < end) one(of.substr(colon + 1, end - colon - 1));
+        at = end + 1;
+      }
+    };
     for (const Variable& v : g.variables) name(v.of);
     for (const Function& f : g.functions)
       for (const auto* pins : {&f.inputs, &f.outputs, &f.locals})

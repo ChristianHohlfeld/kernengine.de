@@ -532,7 +532,7 @@ class Tree:
             if o.get("completeDefinition"):
                 self.records[q] = o
                 o["_q"] = q
-            else:
+            elif not o.get("isImplicit"):   # (not the name a class has in itself)
                 self.declared.add(q)   # (declared here - defined here too, or not: then `records` has it not)
             for c in kids(o):
                 if c.get("kind") in ("CXXMethodDecl", "CXXConstructorDecl", "CXXDestructorDecl", "FieldDecl") and "id" in c:
@@ -893,8 +893,9 @@ class Unit:
             cands = [q for q in cands if q in local]
         # (a name of a class only declared here - struct Tile; in a class - is that class, not another one of its
         # last name that is defined: what it is, this file does not know)
-        if not cands or "::" not in t:
-            if any(q.split("::")[-1] == t.split("::")[-1] and q not in self.tree.records and (q.endswith("::" + t) or q == t) for q in self.tree.declared):
+        last = t.split("::")[-1]
+        for q in self.tree.declared:
+            if q.split("::")[-1] == last and q not in self.tree.records and (q.endswith("::" + t) or q == t) and not any(q == c or q.endswith("::" + c) for c in cands):
                 raise Wait(f"the type {t} is only declared here (its definition is in another file)")
         if len(cands) == 1:
             return cands[0]
