@@ -671,13 +671,20 @@ bool Game::life_command(const std::string& cmd, std::string& out) {
     out = b;
     return true;
   }
-  if (starts("interior")) return G.interiors.command(cmd, me, out, [&](Vec3 p, f32 yaw) {
-    (void)yaw;
-    if (mode_ != Mode::foot) return false;
-    world_->teleport(soldier_, p + Vec3{0, 0, 0.73f});
-    world_->set_actor_velocity(soldier_, {});
-    return true;
-  });
+  if (starts("interior")) {
+    std::optional<Vec3> go;
+    const bool known = G.interiors.command(cmd, me, out, go);
+    if (go) {
+      if (mode_ != Mode::foot) {
+        out = "not on foot";
+      } else {
+        world_->teleport(soldier_, *go + Vec3{0, 0, 0.73f});
+        world_->set_actor_velocity(soldier_, {});
+        out = "ok";
+      }
+    }
+    return known;
+  }
   return false;
 }
 

@@ -707,7 +707,7 @@ void Interiors::hud(std::string& s) const {
   s += b;
 }
 
-bool Interiors::command(const std::string& cmd, Vec3 me, std::string& out, const std::function<bool(Vec3, f32)>& teleport) {
+bool Interiors::command(const std::string& cmd, Vec3 me, std::string& out, std::optional<Vec3>& go) {
   char b[256];
   if (cmd == "interior") {
     std::snprintf(b, sizeof b, "{\"active\":%s,\"inside\":%s,\"level\":%d,\"levels\":%u,\"roof\":%s,\"z\":%.2f,\"floor0\":%.2f,\"top\":%.2f}", active_ ? "true" : "false",
@@ -729,7 +729,7 @@ bool Interiors::command(const std::string& cmd, Vec3 me, std::string& out, const
     const Vec2 q = c.o + c.u * (kCoreW / 2) + c.v * (kLand / 2);
     to = {q.x, q.y, (roof ? plan_.top : plan_.levels[1]) + 0.05f};
   } else { out = "?"; return true; }
-  out = teleport(to, 0) ? "ok" : "not on foot";
+  go = to;
   return true;
 }
 
