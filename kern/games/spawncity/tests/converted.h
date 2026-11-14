@@ -1121,6 +1121,9 @@ struct Blueprint {
 
 // ---- the Blueprint of a state (a class of the program there is one object of: its fields are the
 // Blueprint's variables, its methods the Blueprint's functions) ----
+/// Of a Blueprint of a state whose test holds none of its methods - only free functions that share the
+/// program's variables: no object (the variables are the program's own).
+struct NoObject {};
 /// The variables as the source's object has them before a call: by name, as the Blueprint holds them.
 using Variables = std::vector<std::pair<const char*, Value>>;
 /// Is this a variable of the Blueprint that a call may change? (A field whose variable no part of the

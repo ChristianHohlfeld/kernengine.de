@@ -7704,12 +7704,12 @@ class TestWriter:
         q = self.u.state
         if self.state_info is None:
             try:
-                if q not in self.names:
-                    raise Wait(f"the class {q.split('::')[-1]} of the state is not part of the test")
-                t, key = self.names[q], re.sub(r"\W", "_", q.strip(":"))
-                info = {"draw": f"draw_state_{key}", "variables": f"variables_{key}", "struct": f"State_{key}"}
+                # (the object, where the test holds the class - where it holds none of its methods, only free
+                # functions that share the program's variables, there is none: converted::NoObject)
+                t, key = self.names.get(q, "converted::NoObject"), re.sub(r"\W", "_", q.strip(":"))
+                info = {"draw": f"draw_state_{key}", "variables": f"variables_{key}", "struct": f"State_{key}", "object": t}
                 draws, values, checks, texts, fine, missing = [], [], [], [], [], []
-                for c in kids(self.tree.records[q]):
+                for c in (kids(self.tree.records[q]) if q in self.names else []):
                     if c.get("kind") != "FieldDecl" or not c.get("name"):
                         continue
                     try:
@@ -8453,6 +8453,9 @@ class TestWriter:
             while first.get("previousDecl") in tree.decl:
                 first = tree.decl[first["previousDecl"]]
             text = tree.said(self.cut(d["_file"], key[1], d["_at"][1])) + ";"
+            if d.get("storageClass") == "extern" and not d.get("init") and d["id"] not in tree.body:
+                # a variable of the program another file defines: the test's own (the test sets and compares it)
+                text = re.sub(r"^\s*extern\s+", "", text, count=1)
             scope = tree.scope_of.get(first["id"], "")
             if self.top_of(scope.rstrip(":")) not in records:
                 # where it stands: a constant of a class the Blueprint does not have in the namespace of that
@@ -8944,7 +8947,7 @@ class TestWriter:
                 f"  {{  // {f.cpp}",
                 f'    converted::Tally tally("{f.name}");',
                 "    converted::Draw draw;   // (every function its own arguments, the same in every run)",
-                *([f"    std::unique_ptr<{self.names[u.state]}> s;   // (the object of the state: drawn for every call)"] if f.state else []),
+                *([f"    std::unique_ptr<{state['object']}> s;   // (the object of the state: drawn for every call)"] if f.state else []),
                 f"    const auto run = [&]({', '.join(f'[[maybe_unused]] const {t}& {n}' if n in held_lists else f'[[maybe_unused]] {t} {n}' for t, n in zip(types, names))}) {{ {give} }};",
                 "    for (int i = 0; tally.more(i); ++i) {",
                 *[f"      {x}" for x in decl_lines],
