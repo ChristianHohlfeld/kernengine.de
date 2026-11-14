@@ -692,7 +692,7 @@ std::string text(E e) { return "#" + std::to_string(static_cast<long long>(e)); 
 template <class A, class B> std::string text(const std::pair<A, B>& p) { return "{" + text(p.first) + ", " + text(p.second) + "}"; }
 template <class T> std::string text(const std::vector<T>& v) {
   std::string out = "[";
-  for (std::size_t i = 0; i < v.size(); ++i) out += (i ? ", " : "") + text(static_cast<T>(v[i]));
+  for (std::size_t i = 0; i < v.size(); ++i) out += (i ? ", " : "") + text(static_cast<const T&>(v[i]));
   return out + "]";
 }
 
@@ -1048,8 +1048,8 @@ template <class C, class I> auto at(C&& c, I i) -> decltype(c[0]) {
   if (k >= 0 && k < n) return c[static_cast<std::size_t>(k)];
   open_read();
   if constexpr (std::is_reference_v<R>) {
-    static std::remove_cvref_t<R> none;
-    none = std::remove_cvref_t<R>{};
+    static std::remove_cvref_t<R> none;   // (an entry that is an array - T[3][2] - too: every entry of it zero)
+    fill_array(none, [] { return std::remove_all_extents_t<std::remove_cvref_t<R>>{}; });
     return none;
   } else {
     static std::vector<bool> none(1);
