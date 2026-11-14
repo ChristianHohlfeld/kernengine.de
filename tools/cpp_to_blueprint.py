@@ -8588,8 +8588,10 @@ class TestWriter:
         the functions the test does not hold the source of: they are not part of it."""
         tree = self.tree
         d = tree.records[q]
+        # (a lambda in a method's body is that method's: its call operator is no member of the class)
+        in_lambdas = {c["id"] for x in walk(d) if x.get("kind") == "LambdaExpr" for c in walk(x) if c is not x and "id" in c}
         members = [m for m in walk(d) if m is not d and m.get("kind") in ("CXXMethodDecl", "CXXConstructorDecl", "CXXDestructorDecl", "CXXConversionDecl", "FunctionDecl", "FunctionTemplateDecl")
-                   and not m.get("isImplicit") and m.get("_file") == d.get("_file") and m.get("_at", (None, None))[0] is not None and m["_at"][1] is not None and d["_at"][0] <= m["_at"][0] and m["_at"][1] <= d["_at"][1]]
+                   and m.get("id") not in in_lambdas and not m.get("isImplicit") and m.get("_file") == d.get("_file") and m.get("_at", (None, None))[0] is not None and m["_at"][1] is not None and d["_at"][0] <= m["_at"][0] and m["_at"][1] <= d["_at"][1]]
         inner_templates, unconverted = set(), set()
         for m in members:
             if m.get("kind") == "FunctionTemplateDecl":
