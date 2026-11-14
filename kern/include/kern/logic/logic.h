@@ -945,7 +945,8 @@ struct CodeLayout {
   static constexpr int kNodeSlots = 8;   // per node: 4 state + 4 data outputs
   static constexpr int kStack = 512;     // continuation entries (pc, entry): at least; an instance has as
                                          // many as its graph can ever need (Instance::stack_capacity)
-  static constexpr int kStackMost = 1 << 15;  // a graph that could need more is not compiled by the JIT
+  static constexpr int kStackMost = 1 << 17;  // a graph that could need more is not compiled by the JIT (the bound is what it can
+                                              // ever need: every node that leaves something to go on with open in each of 66 nested chains)
 };
 
 /// Compiles an instance's graph to a WebAssembly module (the JIT's input).
