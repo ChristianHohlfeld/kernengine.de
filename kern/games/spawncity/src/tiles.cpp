@@ -108,24 +108,37 @@ struct Projector {
 // Vector tiles repeat a building that crosses a tile edge in both tiles (clipped at the buffer):
 // drawn twice, the copies' walls lie in one plane and flicker (z-fighting). Clipped to the square,
 // the two halves meet at the edge, their cut walls inside the house facing away from each other.
+namespace {
+/// The four sides of the square, in the order a ring is clipped to them: x >= 0, x <= ext, y >= 0, y <= ext.
+bool inside_side(i32 side, Vec2 p, f32 ext) { return side == 0 ? p.x >= 0 : side == 1 ? p.x <= ext : side == 2 ? p.y >= 0 : p.y <= ext; }
+/// Where the edge p..q crosses the side's line.
+Vec2 cut_side(i32 side, Vec2 p, Vec2 q, f32 ext) {
+  if (side < 2) {
+    const f32 x = side == 0 ? 0.0f : ext;
+    const f32 t = (x - p.x) / (q.x - p.x);
+    return Vec2{x, p.y + (q.y - p.y) * t};
+  }
+  const f32 y = side == 2 ? 0.0f : ext;
+  const f32 t = (y - p.y) / (q.y - p.y);
+  return Vec2{p.x + (q.x - p.x) * t, y};
+}
+/// One pass of the clip: what of `a` lies inside the side, into `b` - then `a` is that.
+void clip_pass(std::vector<Vec2>& a, std::vector<Vec2>& b, i32 side, f32 ext) {
+  b.clear();
+  for (std::size_t i = 0; i < a.size(); ++i) {
+    const Vec2 p = a[i], q = a[(i + 1) % a.size()];
+    const bool pi = inside_side(side, p, ext), qi = inside_side(side, q, ext);
+    if (pi) b.push_back(p);
+    if (pi != qi) b.push_back(cut_side(side, p, q, ext));
+  }
+  a.swap(b);
+}
+}  // namespace
+
 std::vector<Vec2> clip_to_tile(const std::vector<Vec2>& ring, f32 ext) {
   std::vector<Vec2> a = ring, b;
-  auto pass = [&](auto inside, auto cut) {
-    b.clear();
-    for (std::size_t i = 0; i < a.size(); ++i) {
-      const Vec2 p = a[i], q = a[(i + 1) % a.size()];
-      const bool pi = inside(p), qi = inside(q);
-      if (pi) b.push_back(p);
-      if (pi != qi) b.push_back(cut(p, q));
-    }
-    a.swap(b);
-  };
-  auto lerp_x = [](Vec2 p, Vec2 q, f32 x) { const f32 t = (x - p.x) / (q.x - p.x); return Vec2{x, p.y + (q.y - p.y) * t}; };
-  auto lerp_y = [](Vec2 p, Vec2 q, f32 y) { const f32 t = (y - p.y) / (q.y - p.y); return Vec2{p.x + (q.x - p.x) * t, y}; };
-  if (a.size() >= 3) pass([](Vec2 p) { return p.x >= 0; }, [&](Vec2 p, Vec2 q) { return lerp_x(p, q, 0); });
-  if (a.size() >= 3) pass([&](Vec2 p) { return p.x <= ext; }, [&](Vec2 p, Vec2 q) { return lerp_x(p, q, ext); });
-  if (a.size() >= 3) pass([](Vec2 p) { return p.y >= 0; }, [&](Vec2 p, Vec2 q) { return lerp_y(p, q, 0); });
-  if (a.size() >= 3) pass([&](Vec2 p) { return p.y <= ext; }, [&](Vec2 p, Vec2 q) { return lerp_y(p, q, ext); });
+  for (i32 side = 0; side < 4; ++side)
+    if (a.size() >= 3) clip_pass(a, b, side, ext);
   return a;
 }
 
