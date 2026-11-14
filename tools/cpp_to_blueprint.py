@@ -923,7 +923,10 @@ class Unit:
         m = re.match(r"std::vector<(.+)>$", t)
         if m:
             return f"List<{self.entry(template_args(t)[0])}>"
-        m = re.match(r"std::array<(.+), (\d+)>$", t) or re.match(r"(.+?)\s*\[(\d*)\]$", t)
+        # (T[3][2] is 3 entries of T[2]: the first length is the outer one)
+        m = re.match(r"std::array<(.+), (\d+)>$", t) or re.match(r"(.+?)\s*\[(\d*)\]((?:\s*\[\d*\])*)$", t)
+        if m and m.lastindex == 3 and m.group(3):
+            return f"List<{self.entry(m.group(1) + m.group(3))}>"
         if m:
             return f"List<{self.entry(m.group(1))}>"
         if t.startswith("std::unique_ptr<") or t.startswith("std::optional<"):
@@ -1038,7 +1041,8 @@ class Unit:
     def entries(self, raw):
         """How many entries a list of fixed length has (`f32 m[16]`, std::array<u8, 32>); None: a list of any length."""
         c = self.clean(raw)
-        m = re.search(r"\[(\d+)\]$", c) or re.match(r"std::array<.*,\s*(\d+)U?L?L?>$", c)
+        # (T[3][2] has 3 entries, each a T[2]: the first length is the outer one)
+        m = re.match(r"std::array<.*,\s*(\d+)U?L?L?>$", c) or re.match(r"[^\[]*\[(\d+)\](?:\s*\[\d+\])*$", c)
         return int(m.group(1)) if m else None
 
     def zero(self, t):
@@ -4223,8 +4227,8 @@ class Emit:
             y = bare(kids(y)[-1])
         if x.get("kind") != "UnaryExprOrTypeTraitExpr" or y.get("kind") != "UnaryExprOrTypeTraitExpr" or x.get("name") != "sizeof" or y.get("name") != "sizeof" or not kids(x) or not kids(y):
             return None
-        m = re.search(r"\[(\d+)\]\s*$", qtype(bare(kids(x)[0])))
-        return int(m.group(1)) if m and bare(kids(y)[0]).get("kind") == "ArraySubscriptExpr" else None
+        n = self.u.entries(qtype(bare(kids(x)[0])))   # (the outer length: T[3][2] has 3 entries)
+        return n if n is not None and bare(kids(y)[0]).get("kind") == "ArraySubscriptExpr" else None
 
     # ---- 64-bit bit patterns ----
     def whole64(self):
@@ -5426,7 +5430,9 @@ class TestWriter:
                     lines[lines.index(make):lines.index(make)] = [f"  static std::deque<{self.spell(inner)}> kept_{f};", f"  kept_{f}.push_back({self.draw(inner)});"]
                     held.append(f)
                     continue
-                m = re.match(r"(.+?)\s*\[(\d+)\]$", self.u.clean(ft))
+                m = re.match(r"(.+?)\s*\[(\d+)\]((?:\s*\[\d+\])*)$", self.u.clean(ft))   # (T[3][2]: 3 entries of T[2])
+                if m and m.group(3):
+                    raise Wait("the test has no values of an array of arrays")
                 if m:
                     arrays[f] = self.spell(m.group(1))
                     lines.append(f"  for (auto& e : s.{f}) e = {self.draw(m.group(1))};")
