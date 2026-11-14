@@ -1769,9 +1769,9 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
       for (const logic::FunctionPin& o : f.outputs) body += " + \" " + o.name + "=\" + show(out." + o.name + ")";
       body += changed + " + variables() + \"\\n\";\n";
       // ... and the same call by name
-      body += "      std::vector<kern::logic::Value> results;\n      if (!inst->call(\"" + f.name + "\", {";
+      body += "      std::vector<kern::logic::Value> results;\n      if (!named(inst->call(\"" + f.name + "\", {";
       for (std::size_t i = 0; i < f.inputs.size(); ++i) body += std::string(i ? ", " : "") + "kern::logic::to_value(r.a" + std::to_string(i) + ")";
-      body += "}, results)) hosted += \"(no call) \";\n      hosted += " + shown + " + \") ->\"";
+      body += "}, results))) hosted += \"(no call) \";\n      hosted += " + shown + " + \") ->\"";
       for (std::size_t k = 0; k < f.outputs.size(); ++k)
         body += " + \" " + f.outputs[k].name + "=\" + native_show(results.size() > " + std::to_string(k) + " ? results[" + std::to_string(k) + "] : kern::logic::Value())";
       body += changed_by_name + " + hosted_variables() + \"\\n\";\n    }\n  }\n";
@@ -1804,7 +1804,7 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
       }
       body += "  {\n    const std::vector<kern::logic::Value> given = {" + given + "};\n" + places + "    " + (f.outputs.empty() ? "" : "const auto out = ") + direct + ");\n    got += " + shown + " + \") ->\"";
       for (const logic::FunctionPin& o : f.outputs) body += " + \" " + o.name + "=\" + show(out." + o.name + ")";
-      body += changed + " + variables() + \"\\n\";\n    std::vector<kern::logic::Value> results;\n    if (!inst->call(\"" + f.name + "\", given, results)) hosted += \"(no call) \";\n    hosted += " + shown + " + \") ->\"";
+      body += changed + " + variables() + \"\\n\";\n    std::vector<kern::logic::Value> results;\n    if (!named(inst->call(\"" + f.name + "\", given, results))) hosted += \"(no call) \";\n    hosted += " + shown + " + \") ->\"";
       for (std::size_t k = 0; k < f.outputs.size(); ++k)
         body += " + \" " + f.outputs[k].name + "=\" + native_show(results.size() > " + std::to_string(k) + " ? results[" + std::to_string(k) + "] : kern::logic::Value())";
       body += changed_by_name + " + hosted_variables() + \"\\n\";\n  }\n";
@@ -1812,6 +1812,11 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
     runs += body + "}\n\n";
   }
   main += "\ntemplate <class T> static std::string show(const T& v) { return native_show(kern::logic::to_value(v)); }\n\n"
+          "// A call by name that reached its function: the class's glue says when the function begins and when it has\n"
+          "// returned (logic::native_probe) - once each, the begin first. (A function that calls one of another\n"
+          "// Blueprint by name: that call begins and returns inside it.)\n"
+          "static long g_named = 0, g_begun = 0, g_returned = 0, g_running = 0, g_out_of_turn = 0;\n"
+          "static bool named(bool called) { g_named += called ? 1 : 0; return called; }\n\n"
           "// The lines that are not the interpreter's (0: none).\n"
           "static int differs(const std::string& got, const std::string& expected, const char* what) {\n"
           "  if (got == expected) return 0;\n  std::size_t a = 0, b = 0, shown = 0;\n"
@@ -1821,7 +1826,8 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
           "    if (x != y) { std::printf(\"FAIL %s: %s\\n     the interpreter: %s\\n\", what, x.c_str(), y.c_str()); ++shown; }\n"
           "    a = ae == std::string::npos ? got.size() : ae + 1;\n    b = be == std::string::npos ? expected.size() : be + 1;\n  }\n  return 1;\n}\n\n" + runs;
   main += "int main(int argc, char** argv) {\n  if (argc < 2) { std::fprintf(stderr, \"usage: blueprint_native_test <blueprint_native_expected.txt>\\n\"); return 2; }\n"
-          "  std::ifstream in(argv[1]);\n  std::stringstream want;\n  want << in.rdbuf();\n  std::string got, hosted;\n";
+          "  std::ifstream in(argv[1]);\n  std::stringstream want;\n  want << in.rdbuf();\n  std::string got, hosted;\n"
+          "  kern::logic::native_probe = [](bool begins) {\n    g_running += begins ? 1 : -1;\n    g_out_of_turn += g_running < 0 ? 1 : 0;\n    ++(begins ? g_begun : g_returned);\n  };\n";
   std::size_t count = 0, calls = 0;
   for (const Case& c : all) {
     main += "  run_" + c.name + "(got, hosted);\n";
@@ -1830,7 +1836,9 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
   }
   main += "  const std::string expected = want.str();\n  int failures = 0;\n"
           "  failures += differs(got, expected, \"the compiled Blueprint\");\n"
-          "  failures += differs(hosted, expected, \"its class behind logic::Instance\");\n";
+          "  failures += differs(hosted, expected, \"its class behind logic::Instance\");\n"
+          "  if (g_begun < g_named || g_returned != g_begun || g_running != 0 || g_out_of_turn || g_named == 0) {\n"
+          "    std::printf(\"FAIL the glue says when a function runs: %ld calls by name, begun %ld, returned %ld, %ld out of turn\\n\", g_named, g_begun, g_returned, g_out_of_turn);\n    ++failures;\n  }\n";
   main += "  std::printf(\"%s blueprint_native_test (" + std::to_string(count) + " Blueprints as their C++, " + std::to_string(calls) +
           " calls on the class and by name through logic::Instance)\\n\", failures ? \"FAIL\" : \"ok  \");\n  return failures ? 1 : 0;\n}\n";
   if (!write_file(dir + "/blueprint_native_main.cpp", main) || !write_file(dir + "/blueprint_native_expected.txt", expected)) {

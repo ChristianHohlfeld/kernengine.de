@@ -45,7 +45,7 @@ SC_TEST(converted_facades) {
   {  // Facades::name
     converted::Tally tally("Facades_name");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted_facades::Facades::name(); };
+    const auto run = [&]() { return converted::counted([&] { return converted_facades::Facades::name(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)

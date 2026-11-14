@@ -101,7 +101,7 @@ SC_TEST(converted_settings) {
   {  // Settings::get
     converted::Tally tally("Settings_get");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Settings a0, [[maybe_unused]] Opt a1) { return a0.get(a1); };
+    const auto run = [&]([[maybe_unused]] Settings a0, [[maybe_unused]] Opt a1) { return converted::counted([&] { return a0.get(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Settings a0 = draw_Settings(draw);
       const Opt a1 = static_cast<Opt>(draw.below(61));
@@ -118,7 +118,7 @@ SC_TEST(converted_settings) {
   {  // Settings::on
     converted::Tally tally("Settings_on");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Settings a0, [[maybe_unused]] Opt a1) { return a0.on(a1); };
+    const auto run = [&]([[maybe_unused]] Settings a0, [[maybe_unused]] Opt a1) { return converted::counted([&] { return a0.on(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Settings a0 = draw_Settings(draw);
       const Opt a1 = static_cast<Opt>(draw.below(61));
@@ -135,7 +135,7 @@ SC_TEST(converted_settings) {
   {  // Settings::version
     converted::Tally tally("Settings_version");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Settings a0) { return a0.version(); };
+    const auto run = [&]([[maybe_unused]] Settings a0) { return converted::counted([&] { return a0.version(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Settings a0 = draw_Settings(draw);
       const converted::Watch watch;

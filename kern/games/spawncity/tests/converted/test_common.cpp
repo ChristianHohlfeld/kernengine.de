@@ -290,7 +290,7 @@ SC_TEST(converted_common) {
   {  // clampf
     converted::Tally tally("clampf");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted_common::clampf(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_common::clampf(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
@@ -308,7 +308,7 @@ SC_TEST(converted_common) {
   {  // sign0
     converted::Tally tally("sign0");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted_common::sign0(a0); };
+    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_common::sign0(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
@@ -324,7 +324,7 @@ SC_TEST(converted_common) {
   {  // rate_limit
     converted::Tally tally("rate_limit");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted_common::rate_limit(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_common::rate_limit(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
@@ -342,7 +342,7 @@ SC_TEST(converted_common) {
   {  // damp_alpha
     converted::Tally tally("damp_alpha");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted_common::damp_alpha(a0, a1); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_common::damp_alpha(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
@@ -359,7 +359,7 @@ SC_TEST(converted_common) {
   {  // wrap_pi
     converted::Tally tally("wrap_pi");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted_common::wrap_pi(a0); };
+    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_common::wrap_pi(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
@@ -375,7 +375,7 @@ SC_TEST(converted_common) {
   {  // conj
     converted::Tally tally("conj");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Quat a0) { return converted_common::conj(a0); };
+    const auto run = [&]([[maybe_unused]] Quat a0) { return converted::counted([&] { return converted_common::conj(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Quat a0 = draw_kern__Quat(draw);
       const converted::Watch watch;
@@ -391,7 +391,7 @@ SC_TEST(converted_common) {
   {  // to_local
     converted::Tally tally("to_local");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Quat a0, [[maybe_unused]] Vec3 a1) { return converted_common::to_local(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Quat a0, [[maybe_unused]] Vec3 a1) { return converted::counted([&] { return converted_common::to_local(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Quat a0 = draw_kern__Quat(draw);
       const Vec3 a1 = draw.vector();
@@ -408,7 +408,7 @@ SC_TEST(converted_common) {
   {  // qnormalize
     converted::Tally tally("qnormalize");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Quat a0) { return converted_common::qnormalize(a0); };
+    const auto run = [&]([[maybe_unused]] Quat a0) { return converted::counted([&] { return converted_common::qnormalize(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Quat a0 = draw_kern__Quat(draw);
       const converted::Watch watch;
@@ -424,7 +424,7 @@ SC_TEST(converted_common) {
   {  // yaw_quat
     converted::Tally tally("yaw_quat");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted_common::yaw_quat(a0); };
+    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_common::yaw_quat(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
@@ -440,7 +440,7 @@ SC_TEST(converted_common) {
   {  // heading_of
     converted::Tally tally("heading_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted_common::heading_of(a0); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted::counted([&] { return converted_common::heading_of(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const converted::Watch watch;
@@ -456,7 +456,7 @@ SC_TEST(converted_common) {
   {  // slerp
     converted::Tally tally("slerp");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Quat a0, [[maybe_unused]] Quat a1, [[maybe_unused]] double a2) { return converted_common::slerp(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] Quat a0, [[maybe_unused]] Quat a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_common::slerp(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Quat a0 = draw_kern__Quat(draw);
       const Quat a1 = draw_kern__Quat(draw);
@@ -474,7 +474,7 @@ SC_TEST(converted_common) {
   {  // read_body
     converted::Tally tally("read_body");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] const World& a0, [[maybe_unused]] Body a1) { return converted_common::read_body(a0, a1); };
+    const auto run = [&]([[maybe_unused]] const World& a0, [[maybe_unused]] Body a1) { return converted::counted([&] { return converted_common::read_body(a0, std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const World& a0 = *converted::engine_object<World>(1 + draw.below(6));
       const Body a1 = draw_kern__physics__Body(draw);
@@ -491,7 +491,7 @@ SC_TEST(converted_common) {
   {  // Rng::Rng
     converted::Tally tally("Rng_new");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return Rng(a0); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return Rng(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
@@ -507,7 +507,7 @@ SC_TEST(converted_common) {
   {  // Rng::next
     converted::Tally tally("Rng_next");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Rng a0) { const auto r = a0.next(); return Out_Rng_next{a0, r}; };
+    const auto run = [&]([[maybe_unused]] Rng a0) { const auto r = converted::counted([&] { return a0.next(); }); return Out_Rng_next{a0, r}; };
     for (int i = 0; tally.more(i); ++i) {
       const Rng a0 = draw_Rng(draw);
       const converted::Watch watch;
@@ -523,7 +523,7 @@ SC_TEST(converted_common) {
   {  // Rng::unit
     converted::Tally tally("Rng_unit");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Rng a0) { const auto r = a0.unit(); return Out_Rng_unit{a0, r}; };
+    const auto run = [&]([[maybe_unused]] Rng a0) { const auto r = converted::counted([&] { return a0.unit(); }); return Out_Rng_unit{a0, r}; };
     for (int i = 0; tally.more(i); ++i) {
       const Rng a0 = draw_Rng(draw);
       const converted::Watch watch;
@@ -539,7 +539,7 @@ SC_TEST(converted_common) {
   {  // Rng::range
     converted::Tally tally("Rng_range");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Rng a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { const auto r = a0.range(a1, a2); return Out_Rng_range{a0, r}; };
+    const auto run = [&]([[maybe_unused]] Rng a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { const auto r = converted::counted([&] { return a0.range(std::move(a1), std::move(a2)); }); return Out_Rng_range{a0, r}; };
     for (int i = 0; tally.more(i); ++i) {
       const Rng a0 = draw_Rng(draw);
       const double a1 = draw.number();
@@ -557,7 +557,7 @@ SC_TEST(converted_common) {
   {  // Rng::gaussian
     converted::Tally tally("Rng_gaussian");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Rng a0) { const auto r = a0.gaussian(); return Out_Rng_gaussian{a0, r}; };
+    const auto run = [&]([[maybe_unused]] Rng a0) { const auto r = converted::counted([&] { return a0.gaussian(); }); return Out_Rng_gaussian{a0, r}; };
     for (int i = 0; tally.more(i); ++i) {
       const Rng a0 = draw_Rng(draw);
       const converted::Watch watch;
@@ -573,7 +573,7 @@ SC_TEST(converted_common) {
   {  // cast
     converted::Tally tally("cast");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] const World& a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] Body a4, [[maybe_unused]] u64 a5) { return converted_common::cast(a0, a1, a2, a3, a4, a5); };
+    const auto run = [&]([[maybe_unused]] const World& a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] Body a4, [[maybe_unused]] u64 a5) { return converted::counted([&] { return converted_common::cast(a0, std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const World& a0 = *converted::engine_object<World>(1 + draw.below(6));
       const Vec3 a1 = draw.vector();

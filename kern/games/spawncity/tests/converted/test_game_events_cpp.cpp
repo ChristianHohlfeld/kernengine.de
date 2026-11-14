@@ -175,7 +175,7 @@ SC_TEST(converted_game_events_cpp) {
   {  // dist2d
     converted::Tally tally("dist2d");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1) { return converted_game_events_cpp::dist2d(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1) { return converted::counted([&] { return converted_game_events_cpp::dist2d(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const Vec3 a1 = draw.vector();
@@ -192,7 +192,7 @@ SC_TEST(converted_game_events_cpp) {
   {  // approach_angle
     converted::Tally tally("approach_angle");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted_game_events_cpp::approach_angle(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_game_events_cpp::approach_angle(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
@@ -210,7 +210,7 @@ SC_TEST(converted_game_events_cpp) {
   {  // alive
     converted::Tally tally("alive");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People::Person a0) { return converted_game_events_cpp::alive(a0); };
+    const auto run = [&]([[maybe_unused]] People::Person a0) { return converted::counted([&] { return converted_game_events_cpp::alive(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       const People::Person a0 = draw_People__Person(draw);
       const converted::Watch watch;

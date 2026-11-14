@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "blueprint_native.h"
+#include "cost.h"
 #include "rules.h"
 #include "test_util.h"
 
@@ -18,6 +19,29 @@ namespace sct {
 std::vector<Case>& cases() { static std::vector<Case> c; return c; }
 int failures = 0, checks = 0;
 }  // namespace sct
+
+// The allocator says every piece of memory it is asked for (cost.h): with the sanitizers, their
+// allocator through its hook; without them, operator new itself.
+#if defined(__SANITIZE_ADDRESS__)
+// (the sanitizers' own interface - sanitizer/allocator_interface.h, where a compiler brings that header)
+extern "C" int __sanitizer_install_malloc_and_free_hooks(void (*asked)(const volatile void*, std::size_t), void (*given_back)(const volatile void*));
+static void asked_for_memory(const volatile void*, std::size_t) { sc::cost::asked(); }
+static void gave_memory_back(const volatile void*) {}
+static void count_memory() { __sanitizer_install_malloc_and_free_hooks(asked_for_memory, gave_memory_back); }
+#else
+#include <new>
+void* operator new(std::size_t size) {
+  sc::cost::asked();
+  if (void* p = std::malloc(size ? size : 1)) return p;
+  std::abort();
+}
+void* operator new[](std::size_t size) { return operator new(size); }
+void operator delete(void* p) noexcept { std::free(p); }
+void operator delete[](void* p) noexcept { std::free(p); }
+void operator delete(void* p, std::size_t) noexcept { std::free(p); }
+void operator delete[](void* p, std::size_t) noexcept { std::free(p); }
+static void count_memory() {}
+#endif
 
 // The calls of the native test of the rules' Blueprint: every function with many values, then a
 // chase - crimes, out of sight, the escape.
@@ -164,6 +188,7 @@ int main(int argc, char** argv) {
   }
   const char* only = argc > 1 ? argv[1] : nullptr;
   int ran = 0;
+  count_memory();
   for (const sct::Case& c : sct::cases()) {
     if (only && !std::strstr(c.name, only)) continue;
     const int before = sct::failures;

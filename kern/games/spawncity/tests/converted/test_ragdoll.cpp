@@ -334,7 +334,7 @@ SC_TEST(converted_ragdoll) {
   {  // Ragdolls::init
     converted::Tally tally("Ragdolls_init");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Ragdolls a0, [[maybe_unused]] World& a1, [[maybe_unused]] bool a2) { a0.init(a1, a2); return a0; };
+    const auto run = [&]([[maybe_unused]] Ragdolls a0, [[maybe_unused]] World& a1, [[maybe_unused]] bool a2) { converted::counted([&] { return a0.init(a1, std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Ragdolls a0 = draw_Ragdolls(draw);
       World& a1 = *converted::engine_object<World>(1 + draw.below(6));
@@ -352,7 +352,7 @@ SC_TEST(converted_ragdoll) {
   {  // Ragdolls::take_ups
     converted::Tally tally("Ragdolls_take_ups");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Ragdolls a0, [[maybe_unused]] std::vector<Ragdolls::Up> a1) { a0.take_ups(a1); return Out_Ragdolls_take_ups{a0, a1}; };
+    const auto run = [&]([[maybe_unused]] Ragdolls a0, [[maybe_unused]] std::vector<Ragdolls::Up> a1) { converted::counted([&] { return a0.take_ups(a1); }); return Out_Ragdolls_take_ups{a0, a1}; };
     for (int i = 0; tally.more(i); ++i) {
       const Ragdolls a0 = draw_Ragdolls(draw);
       const std::vector<Ragdolls::Up> a1 = draw_list(draw, [&]() -> Ragdolls::Up { return draw_Ragdolls__Up(draw); });
@@ -369,7 +369,7 @@ SC_TEST(converted_ragdoll) {
   {  // Ragdolls::spawned
     converted::Tally tally("Ragdolls_spawned");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Ragdolls a0) { return a0.spawned(); };
+    const auto run = [&]([[maybe_unused]] Ragdolls a0) { return converted::counted([&] { return a0.spawned(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Ragdolls a0 = draw_Ragdolls(draw);
       const converted::Watch watch;

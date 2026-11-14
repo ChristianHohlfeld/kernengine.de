@@ -291,7 +291,7 @@ SC_TEST(converted_game_gaps_cpp) {
   {  // Biquad::run
     converted::Tally tally("Biquad_run");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Biquad a0, [[maybe_unused]] double a1) { const auto r = a0.run(a1); return Out_Biquad_run{a0, r}; };
+    const auto run = [&]([[maybe_unused]] Biquad a0, [[maybe_unused]] double a1) { const auto r = converted::counted([&] { return a0.run(std::move(a1)); }); return Out_Biquad_run{a0, r}; };
     for (int i = 0; tally.more(i); ++i) {
       const Biquad a0 = draw_Biquad(draw);
       const double a1 = draw.number();
@@ -308,7 +308,7 @@ SC_TEST(converted_game_gaps_cpp) {
   {  // Biquad::lowpass
     converted::Tally tally("Biquad_lowpass");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return Biquad::lowpass(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return Biquad::lowpass(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
@@ -326,7 +326,7 @@ SC_TEST(converted_game_gaps_cpp) {
   {  // Biquad::peaking
     converted::Tally tally("Biquad_peaking");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return Biquad::peaking(a0, a1, a2, a3); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return converted::counted([&] { return Biquad::peaking(std::move(a0), std::move(a1), std::move(a2), std::move(a3)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
@@ -345,7 +345,7 @@ SC_TEST(converted_game_gaps_cpp) {
   {  // billboard
     converted::Tally tally("billboard");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { return converted_game_gaps_cpp::billboard(a0, a1, a2, a3, a4, a5); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { return converted::counted([&] { return converted_game_gaps_cpp::billboard(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const Vec3 a1 = draw.vector();
@@ -366,7 +366,7 @@ SC_TEST(converted_game_gaps_cpp) {
   {  // smoke_disc
     converted::Tally tally("smoke_disc");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted_game_gaps_cpp::smoke_disc(); };
+    const auto run = [&]() { return converted::counted([&] { return converted_game_gaps_cpp::smoke_disc(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
@@ -381,7 +381,7 @@ SC_TEST(converted_game_gaps_cpp) {
   {  // jet_roar_pcm
     converted::Tally tally("jet_roar_pcm");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] double a1) { return converted_game_gaps_cpp::jet_roar_pcm(a0, a1); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_game_gaps_cpp::jet_roar_pcm(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const double a1 = draw.number();

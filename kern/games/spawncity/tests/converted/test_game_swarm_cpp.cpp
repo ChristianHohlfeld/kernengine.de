@@ -93,7 +93,7 @@ SC_TEST(converted_game_swarm_cpp) {
   {  // is_person
     converted::Tally tally("is_person");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] SwarmKind a0) { return converted_game_swarm_cpp::is_person(a0); };
+    const auto run = [&]([[maybe_unused]] SwarmKind a0) { return converted::counted([&] { return converted_game_swarm_cpp::is_person(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const SwarmKind a0 = static_cast<SwarmKind>(draw.below(8));
       const converted::Watch watch;
@@ -109,7 +109,7 @@ SC_TEST(converted_game_swarm_cpp) {
   {  // falls
     converted::Tally tally("falls");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] SwarmKind a0) { return converted_game_swarm_cpp::falls(a0); };
+    const auto run = [&]([[maybe_unused]] SwarmKind a0) { return converted::counted([&] { return converted_game_swarm_cpp::falls(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const SwarmKind a0 = static_cast<SwarmKind>(draw.below(8));
       const converted::Watch watch;
@@ -125,7 +125,7 @@ SC_TEST(converted_game_swarm_cpp) {
   {  // drone_id
     converted::Tally tally("drone_id");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PoliceDrone a0) { return converted_game_swarm_cpp::drone_id(a0); };
+    const auto run = [&]([[maybe_unused]] PoliceDrone a0) { return converted::counted([&] { return converted_game_swarm_cpp::drone_id(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       const PoliceDrone a0 = draw_PoliceDrone(draw);
       const converted::Watch watch;

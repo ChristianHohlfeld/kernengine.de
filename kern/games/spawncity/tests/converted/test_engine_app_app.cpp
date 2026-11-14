@@ -121,7 +121,7 @@ SC_TEST(converted_engine_app_app) {
   {  // Input::button
     converted::Tally tally("Input_button");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Input a0, [[maybe_unused]] unsigned int a1) { return a0.button(a1); };
+    const auto run = [&]([[maybe_unused]] Input a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return a0.button(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Input a0 = draw_kern__Input(draw);
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -138,7 +138,7 @@ SC_TEST(converted_engine_app_app) {
   {  // Input::button_pressed
     converted::Tally tally("Input_button_pressed");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Input a0, [[maybe_unused]] unsigned int a1) { return a0.button_pressed(a1); };
+    const auto run = [&]([[maybe_unused]] Input a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return a0.button_pressed(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Input a0 = draw_kern__Input(draw);
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -155,7 +155,7 @@ SC_TEST(converted_engine_app_app) {
   {  // Input::wheel
     converted::Tally tally("Input_wheel");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Input a0) { return a0.wheel(); };
+    const auto run = [&]([[maybe_unused]] Input a0) { return converted::counted([&] { return a0.wheel(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Input a0 = draw_kern__Input(draw);
       const converted::Watch watch;

@@ -306,7 +306,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::right_inset
     converted::Tally tally("TouchPlay_right_inset");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return TouchPlay{}.right_inset(); };
+    const auto run = [&]() { return converted::counted([&] { return TouchPlay{}.right_inset(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
@@ -321,7 +321,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::move
     converted::Tally tally("TouchPlay_move");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return a0.move(); };
+    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.move(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const TouchPlay a0 = draw_TouchPlay(draw);
       const converted::Watch watch;
@@ -337,7 +337,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::look
     converted::Tally tally("TouchPlay_look");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return a0.look(); };
+    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.look(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const TouchPlay a0 = draw_TouchPlay(draw);
       const converted::Watch watch;
@@ -353,7 +353,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::move_live
     converted::Tally tally("TouchPlay_move_live");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return a0.move_live(); };
+    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.move_live(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const TouchPlay a0 = draw_TouchPlay(draw);
       const converted::Watch watch;
@@ -369,7 +369,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::look_live
     converted::Tally tally("TouchPlay_look_live");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return a0.look_live(); };
+    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.look_live(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const TouchPlay a0 = draw_TouchPlay(draw);
       const converted::Watch watch;
@@ -385,7 +385,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::look_edge
     converted::Tally tally("TouchPlay_look_edge");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return a0.look_edge(); };
+    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.look_edge(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const TouchPlay a0 = draw_TouchPlay(draw);
       const converted::Watch watch;
@@ -401,7 +401,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::clearance
     converted::Tally tally("TouchPlay_clearance");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return a0.clearance(); };
+    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.clearance(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const TouchPlay a0 = draw_TouchPlay(draw);
       const converted::Watch watch;
@@ -417,7 +417,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::grenade_drag
     converted::Tally tally("TouchPlay_grenade_drag");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return a0.grenade_drag(); };
+    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.grenade_drag(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const TouchPlay a0 = draw_TouchPlay(draw);
       const converted::Watch watch;
@@ -433,7 +433,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::inject
     converted::Tally tally("TouchPlay_inject");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0, [[maybe_unused]] std::string a1) { a0.inject(a1); return a0; };
+    const auto run = [&]([[maybe_unused]] TouchPlay a0, [[maybe_unused]] std::string a1) { converted::counted([&] { return a0.inject(a1); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const TouchPlay a0 = draw_TouchPlay(draw);
       const std::string a1 = draw.word();
@@ -450,7 +450,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::any
     converted::Tally tally("TouchPlay_any");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return a0.any(); };
+    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.any(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const TouchPlay a0 = draw_TouchPlay(draw);
       const converted::Watch watch;
@@ -466,7 +466,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::buttons
     converted::Tally tally("TouchPlay_buttons");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return a0.buttons(); };
+    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.buttons(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const TouchPlay a0 = draw_TouchPlay(draw);
       const converted::Watch watch;
@@ -482,7 +482,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::mode
     converted::Tally tally("TouchPlay_mode");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return a0.mode(); };
+    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.mode(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const TouchPlay a0 = draw_TouchPlay(draw);
       const converted::Watch watch;
@@ -498,7 +498,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::no_sticks
     converted::Tally tally("TouchPlay_no_sticks");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return a0.no_sticks(); };
+    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.no_sticks(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const TouchPlay a0 = draw_TouchPlay(draw);
       const converted::Watch watch;
@@ -514,7 +514,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::add
     converted::Tally tally("TouchPlay_add");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0, [[maybe_unused]] TouchBtn a1) { a0.add(a1); return a0; };
+    const auto run = [&]([[maybe_unused]] TouchPlay a0, [[maybe_unused]] TouchBtn a1) { converted::counted([&] { return a0.add(a1); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const TouchPlay a0 = draw_TouchPlay(draw);
       const TouchBtn a1 = draw_TouchBtn(draw);

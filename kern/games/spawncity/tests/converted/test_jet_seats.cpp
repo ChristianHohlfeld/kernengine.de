@@ -94,7 +94,7 @@ SC_TEST(converted_jet_seats) {
   {  // Table::rows
     converted::Tally tally("Table_rows");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Table a0) { return a0.rows(); };
+    const auto run = [&]([[maybe_unused]] Table a0) { return converted::counted([&] { return a0.rows(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Table a0 = draw_seats__Table(draw);
       const converted::Watch watch;
@@ -110,7 +110,7 @@ SC_TEST(converted_jet_seats) {
   {  // Table::revision
     converted::Tally tally("Table_revision");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Table a0) { return a0.revision(); };
+    const auto run = [&]([[maybe_unused]] Table a0) { return converted::counted([&] { return a0.revision(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Table a0 = draw_seats__Table(draw);
       const converted::Watch watch;
@@ -126,7 +126,7 @@ SC_TEST(converted_jet_seats) {
   {  // Table::clear
     converted::Tally tally("Table_clear");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Table a0) { a0.clear(); return a0; };
+    const auto run = [&]([[maybe_unused]] Table a0) { converted::counted([&] { return a0.clear(); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Table a0 = draw_seats__Table(draw);
       const converted::Watch watch;

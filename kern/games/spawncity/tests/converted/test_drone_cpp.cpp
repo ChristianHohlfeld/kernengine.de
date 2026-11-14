@@ -103,7 +103,7 @@ SC_TEST(converted_drone_cpp) {
   {  // battery_ocv
     converted::Tally tally("battery_ocv");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted_drone_cpp::battery_ocv(a0, a1); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_drone_cpp::battery_ocv(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
@@ -120,7 +120,7 @@ SC_TEST(converted_drone_cpp) {
   {  // battery_under_load
     converted::Tally tally("battery_under_load");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return converted_drone_cpp::battery_under_load(a0, a1, a2, a3); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return converted::counted([&] { return converted_drone_cpp::battery_under_load(std::move(a0), std::move(a1), std::move(a2), std::move(a3)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
@@ -139,7 +139,7 @@ SC_TEST(converted_drone_cpp) {
   {  // quat_yaw_deg
     converted::Tally tally("quat_yaw_deg");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Quat a0) { return converted_drone_cpp::quat_yaw_deg(a0); };
+    const auto run = [&]([[maybe_unused]] Quat a0) { return converted::counted([&] { return converted_drone_cpp::quat_yaw_deg(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Quat a0 = draw_kern__Quat(draw);
       const converted::Watch watch;
@@ -155,7 +155,7 @@ SC_TEST(converted_drone_cpp) {
   {  // clearance_rate
     converted::Tally tally("clearance_rate");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted_drone_cpp::clearance_rate(a0); };
+    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_drone_cpp::clearance_rate(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
@@ -171,7 +171,7 @@ SC_TEST(converted_drone_cpp) {
   {  // clearance_lead
     converted::Tally tally("clearance_lead");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted_drone_cpp::clearance_lead(a0); };
+    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_drone_cpp::clearance_lead(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;

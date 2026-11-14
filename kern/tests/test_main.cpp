@@ -3796,7 +3796,10 @@ TEST(logic_native_blueprints) {
   // the glue for it: every function and variable by name, registered under the graph's hash
   std::string glue, why;
   CHECK(logic::native_glue(g, "Hosted", glue, &why));
-  for (const char* line : {"struct Hosted_Native final : kern::logic::NativeBlueprint {", "const auto out = self.Twice(native_arg<kern::f64>(args, 0, 0.0));", "results = {to_value(out.r)};",
+  for (const char* line : {"struct Hosted_Native final : kern::logic::NativeBlueprint {",
+                           // (the argument is made, the function runs between the two calls a host can measure by, what it gave is handed back)
+                           "      kern::f64 in0 = native_arg<kern::f64>(args, 0, 0.0);\n      kern::logic::native_call(true);\n      const auto out = self.Twice(std::move(in0));\n"
+                           "      kern::logic::native_call(false);\n      results = {to_value(out.r)};",
                            "if (variable == \"Heat\") { kern::logic::native_set(self.Heat, value); return true; }", "kern::logic::register_native_blueprint(0x"})
     CHECK(glue.find(line) != std::string::npos);
   {

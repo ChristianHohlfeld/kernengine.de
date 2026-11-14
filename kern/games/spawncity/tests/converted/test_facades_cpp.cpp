@@ -112,7 +112,7 @@ SC_TEST(converted_facades_cpp) {
   {  // Facades::vertex_declarations
     converted::Tally tally("Facades_vertex_declarations");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted_facades_cpp::Facades::vertex_declarations(); };
+    const auto run = [&]() { return converted::counted([&] { return converted_facades_cpp::Facades::vertex_declarations(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
@@ -127,7 +127,7 @@ SC_TEST(converted_facades_cpp) {
   {  // Facades::vertex
     converted::Tally tally("Facades_vertex");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted_facades_cpp::Facades::vertex(); };
+    const auto run = [&]() { return converted::counted([&] { return converted_facades_cpp::Facades::vertex(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
@@ -142,7 +142,7 @@ SC_TEST(converted_facades_cpp) {
   {  // Facades::fragment_declarations
     converted::Tally tally("Facades_fragment_declarations");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted_facades_cpp::Facades::fragment_declarations(); };
+    const auto run = [&]() { return converted::counted([&] { return converted_facades_cpp::Facades::fragment_declarations(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
@@ -157,7 +157,7 @@ SC_TEST(converted_facades_cpp) {
   {  // Facades::fragment_surface
     converted::Tally tally("Facades_fragment_surface");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted_facades_cpp::Facades::fragment_surface(); };
+    const auto run = [&]() { return converted::counted([&] { return converted_facades_cpp::Facades::fragment_surface(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)

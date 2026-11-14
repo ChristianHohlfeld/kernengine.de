@@ -306,7 +306,7 @@ SC_TEST(converted_mp_rules) {
   {  // PoseTimeline::reset
     converted::Tally tally("PoseTimeline_reset");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PoseTimeline a0) { a0.reset(); return a0; };
+    const auto run = [&]([[maybe_unused]] PoseTimeline a0) { converted::counted([&] { return a0.reset(); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const PoseTimeline a0 = draw_mp__PoseTimeline(draw);
       const converted::Watch watch;
@@ -322,7 +322,7 @@ SC_TEST(converted_mp_rules) {
   {  // PoseTimeline::empty
     converted::Tally tally("PoseTimeline_empty");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PoseTimeline a0) { return a0.empty(); };
+    const auto run = [&]([[maybe_unused]] PoseTimeline a0) { return converted::counted([&] { return a0.empty(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const PoseTimeline a0 = draw_mp__PoseTimeline(draw);
       const converted::Watch watch;
@@ -338,7 +338,7 @@ SC_TEST(converted_mp_rules) {
   {  // PoseTimeline::last_position
     converted::Tally tally("PoseTimeline_last_position");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PoseTimeline a0) { return a0.last_position(); };
+    const auto run = [&]([[maybe_unused]] PoseTimeline a0) { return converted::counted([&] { return a0.last_position(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const PoseTimeline a0 = draw_mp__PoseTimeline(draw);
       const converted::Watch watch;
@@ -354,7 +354,7 @@ SC_TEST(converted_mp_rules) {
   {  // PoseTimeline::clock_offset_ms
     converted::Tally tally("PoseTimeline_clock_offset_ms");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PoseTimeline a0) { return a0.clock_offset_ms(); };
+    const auto run = [&]([[maybe_unused]] PoseTimeline a0) { return converted::counted([&] { return a0.clock_offset_ms(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const PoseTimeline a0 = draw_mp__PoseTimeline(draw);
       const converted::Watch watch;
@@ -370,7 +370,7 @@ SC_TEST(converted_mp_rules) {
   {  // PoseTimeline::delay_ms
     converted::Tally tally("PoseTimeline_delay_ms");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PoseTimeline a0) { return a0.delay_ms(); };
+    const auto run = [&]([[maybe_unused]] PoseTimeline a0) { return converted::counted([&] { return a0.delay_ms(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const PoseTimeline a0 = draw_mp__PoseTimeline(draw);
       const converted::Watch watch;
@@ -386,7 +386,7 @@ SC_TEST(converted_mp_rules) {
   {  // NavTimeline::reset
     converted::Tally tally("NavTimeline_reset");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] NavTimeline a0) { a0.reset(); return a0; };
+    const auto run = [&]([[maybe_unused]] NavTimeline a0) { converted::counted([&] { return a0.reset(); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const NavTimeline a0 = draw_mp__NavTimeline(draw);
       const converted::Watch watch;
@@ -402,7 +402,7 @@ SC_TEST(converted_mp_rules) {
   {  // rgb
     converted::Tally tally("rgb");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted_mp_rules::rgb(a0); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_mp_rules::rgb(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
@@ -418,7 +418,7 @@ SC_TEST(converted_mp_rules) {
   {  // Scoreboard::clear
     converted::Tally tally("Scoreboard_clear");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Scoreboard a0) { a0.clear(); return a0; };
+    const auto run = [&]([[maybe_unused]] Scoreboard a0) { converted::counted([&] { return a0.clear(); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Scoreboard a0 = draw_mp__Scoreboard(draw);
       const converted::Watch watch;
@@ -434,7 +434,7 @@ SC_TEST(converted_mp_rules) {
   {  // Scoreboard::rows
     converted::Tally tally("Scoreboard_rows");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Scoreboard a0) { return a0.rows(); };
+    const auto run = [&]([[maybe_unused]] Scoreboard a0) { return converted::counted([&] { return a0.rows(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Scoreboard a0 = draw_mp__Scoreboard(draw);
       const converted::Watch watch;
@@ -450,7 +450,7 @@ SC_TEST(converted_mp_rules) {
   {  // Scoreboard::set
     converted::Tally tally("Scoreboard_set");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Scoreboard a0, [[maybe_unused]] std::vector<Score> a1) { a0.set(a1); return a0; };
+    const auto run = [&]([[maybe_unused]] Scoreboard a0, [[maybe_unused]] std::vector<Score> a1) { converted::counted([&] { return a0.set(a1); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Scoreboard a0 = draw_mp__Scoreboard(draw);
       const std::vector<Score> a1 = draw_list(draw, [&]() -> Score { return draw_mp__Score(draw); });
@@ -467,7 +467,7 @@ SC_TEST(converted_mp_rules) {
   {  // VoiceStream::speaking
     converted::Tally tally("VoiceStream_speaking");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] VoiceStream a0) { return a0.speaking(); };
+    const auto run = [&]([[maybe_unused]] VoiceStream a0) { return converted::counted([&] { return a0.speaking(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const VoiceStream a0 = draw_mp__VoiceStream(draw);
       const converted::Watch watch;
@@ -483,7 +483,7 @@ SC_TEST(converted_mp_rules) {
   {  // VoiceStream::reset
     converted::Tally tally("VoiceStream_reset");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] VoiceStream a0) { a0.reset(); return a0; };
+    const auto run = [&]([[maybe_unused]] VoiceStream a0) { converted::counted([&] { return a0.reset(); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const VoiceStream a0 = draw_mp__VoiceStream(draw);
       const converted::Watch watch;
@@ -499,7 +499,7 @@ SC_TEST(converted_mp_rules) {
   {  // VoiceCapture::clear
     converted::Tally tally("VoiceCapture_clear");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] VoiceCapture a0) { a0.clear(); return a0; };
+    const auto run = [&]([[maybe_unused]] VoiceCapture a0) { converted::counted([&] { return a0.clear(); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const VoiceCapture a0 = draw_mp__VoiceCapture(draw);
       const converted::Watch watch;
@@ -515,7 +515,7 @@ SC_TEST(converted_mp_rules) {
   {  // PingBoard::clear_all
     converted::Tally tally("PingBoard_clear_all");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PingBoard a0) { a0.clear_all(); return a0; };
+    const auto run = [&]([[maybe_unused]] PingBoard a0) { converted::counted([&] { return a0.clear_all(); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const PingBoard a0 = draw_mp__PingBoard(draw);
       const converted::Watch watch;
@@ -531,7 +531,7 @@ SC_TEST(converted_mp_rules) {
   {  // PingBoard::all
     converted::Tally tally("PingBoard_all");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PingBoard a0) { return a0.all(); };
+    const auto run = [&]([[maybe_unused]] PingBoard a0) { return converted::counted([&] { return a0.all(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const PingBoard a0 = draw_mp__PingBoard(draw);
       const converted::Watch watch;

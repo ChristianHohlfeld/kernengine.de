@@ -399,7 +399,7 @@ SC_TEST(converted_touch_play_cpp) {
   {  // btn
     converted::Tally tally("btn");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] const char* a0, [[maybe_unused]] std::string a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] unsigned int a4, [[maybe_unused]] bool a5, [[maybe_unused]] bool a6) { return converted_touch_play_cpp::btn(a0, a1, a2, a3, a4, a5, a6); };
+    const auto run = [&]([[maybe_unused]] const char* a0, [[maybe_unused]] std::string a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] unsigned int a4, [[maybe_unused]] bool a5, [[maybe_unused]] bool a6) { return converted::counted([&] { return converted_touch_play_cpp::btn(a0, a1, std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const char* a0 = draw.c_word();
       const std::string a1 = draw.word();
@@ -421,7 +421,7 @@ SC_TEST(converted_touch_play_cpp) {
   {  // TouchPlay::place_row
     converted::Tally tally("TouchPlay_place_row");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0, [[maybe_unused]] std::vector<TouchBtn> a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { a0.place_row(a1, a2, a3, a4, a5); return Out_TouchPlay_place_row{a0, a1}; };
+    const auto run = [&]([[maybe_unused]] TouchPlay a0, [[maybe_unused]] std::vector<TouchBtn> a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { converted::counted([&] { return a0.place_row(a1, std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); return Out_TouchPlay_place_row{a0, a1}; };
     for (int i = 0; tally.more(i); ++i) {
       const TouchPlay a0 = draw_TouchPlay(draw);
       const std::vector<TouchBtn> a1 = draw_list(draw, [&]() -> TouchBtn { return draw_TouchBtn(draw); });
@@ -442,7 +442,7 @@ SC_TEST(converted_touch_play_cpp) {
   {  // TouchPlay::apply_dom_rects
     converted::Tally tally("TouchPlay_apply_dom_rects");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { a0.apply_dom_rects(); return a0; };
+    const auto run = [&]([[maybe_unused]] TouchPlay a0) { converted::counted([&] { return a0.apply_dom_rects(); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const TouchPlay a0 = draw_TouchPlay(draw);
       const converted::Watch watch;
@@ -458,7 +458,7 @@ SC_TEST(converted_touch_play_cpp) {
   {  // TouchPlay::in_circle
     converted::Tally tally("TouchPlay_in_circle");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { return TouchPlay{}.in_circle(a0, a1, a2, a3, a4); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { return converted::counted([&] { return TouchPlay{}.in_circle(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
@@ -478,7 +478,7 @@ SC_TEST(converted_touch_play_cpp) {
   {  // TouchPlay::take_drag
     converted::Tally tally("TouchPlay_take_drag");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { const auto r = a0.take_drag(); return Out_TouchPlay_take_drag{a0, r}; };
+    const auto run = [&]([[maybe_unused]] TouchPlay a0) { const auto r = converted::counted([&] { return a0.take_drag(); }); return Out_TouchPlay_take_drag{a0, r}; };
     for (int i = 0; tally.more(i); ++i) {
       const TouchPlay a0 = draw_TouchPlay(draw);
       const converted::Watch watch;
@@ -494,7 +494,7 @@ SC_TEST(converted_touch_play_cpp) {
   {  // TouchPlay::sprint
     converted::Tally tally("TouchPlay_sprint");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return a0.sprint(); };
+    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.sprint(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const TouchPlay a0 = draw_TouchPlay(draw);
       const converted::Watch watch;
@@ -510,7 +510,7 @@ SC_TEST(converted_touch_play_cpp) {
   {  // TouchPlay::take_zoom
     converted::Tally tally("TouchPlay_take_zoom");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { const auto r = a0.take_zoom(); return Out_TouchPlay_take_zoom{a0, r}; };
+    const auto run = [&]([[maybe_unused]] TouchPlay a0) { const auto r = converted::counted([&] { return a0.take_zoom(); }); return Out_TouchPlay_take_zoom{a0, r}; };
     for (int i = 0; tally.more(i); ++i) {
       const TouchPlay a0 = draw_TouchPlay(draw);
       const converted::Watch watch;
@@ -526,7 +526,7 @@ SC_TEST(converted_touch_play_cpp) {
   {  // TouchPlay::held
     converted::Tally tally("TouchPlay_held");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0, [[maybe_unused]] std::string a1) { return a0.held(a1); };
+    const auto run = [&]([[maybe_unused]] TouchPlay a0, [[maybe_unused]] std::string a1) { return converted::counted([&] { return a0.held(a1); }); };
     for (int i = 0; tally.more(i); ++i) {
       const TouchPlay a0 = draw_TouchPlay(draw);
       const std::string a1 = draw.word();
@@ -543,7 +543,7 @@ SC_TEST(converted_touch_play_cpp) {
   {  // TouchPlay::take_strike_tap
     converted::Tally tally("TouchPlay_take_strike_tap");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { const auto r = a0.take_strike_tap(a1, a2); return Out_TouchPlay_take_strike_tap{a0, r, a1, a2}; };
+    const auto run = [&]([[maybe_unused]] TouchPlay a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { const auto r = converted::counted([&] { return a0.take_strike_tap(a1, a2); }); return Out_TouchPlay_take_strike_tap{a0, r, a1, a2}; };
     for (int i = 0; tally.more(i); ++i) {
       const TouchPlay a0 = draw_TouchPlay(draw);
       const double a1 = draw.number();

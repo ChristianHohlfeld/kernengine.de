@@ -107,7 +107,7 @@ SC_TEST(converted_road_graph) {
   {  // RoadGraph::empty
     converted::Tally tally("RoadGraph_empty");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] RoadGraph a0) { return a0.empty(); };
+    const auto run = [&]([[maybe_unused]] RoadGraph a0) { return converted::counted([&] { return a0.empty(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const RoadGraph a0 = draw_RoadGraph(draw);
       const converted::Watch watch;
@@ -123,7 +123,7 @@ SC_TEST(converted_road_graph) {
   {  // RoadGraph::size
     converted::Tally tally("RoadGraph_size");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] RoadGraph a0) { return a0.size(); };
+    const auto run = [&]([[maybe_unused]] RoadGraph a0) { return converted::counted([&] { return a0.size(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const RoadGraph a0 = draw_RoadGraph(draw);
       const converted::Watch watch;

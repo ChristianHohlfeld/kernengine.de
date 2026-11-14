@@ -177,7 +177,7 @@ SC_TEST(converted_qr_code_cpp) {
   {  // raw_modules
     converted::Tally tally("raw_modules");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0) { return converted_qr_code_cpp::raw_modules(a0); };
+    const auto run = [&]([[maybe_unused]] int a0) { return converted::counted([&] { return converted_qr_code_cpp::raw_modules(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const int a0 = static_cast<int>(draw.whole());
       const converted::Watch watch;
@@ -193,7 +193,7 @@ SC_TEST(converted_qr_code_cpp) {
   {  // data_codewords
     converted::Tally tally("data_codewords");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0) { return converted_qr_code_cpp::data_codewords(a0); };
+    const auto run = [&]([[maybe_unused]] int a0) { return converted::counted([&] { return converted_qr_code_cpp::data_codewords(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const int a0 = static_cast<int>(draw.whole());
       const converted::Watch watch;
@@ -209,7 +209,7 @@ SC_TEST(converted_qr_code_cpp) {
   {  // gf_mul
     converted::Tally tally("gf_mul");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned char a0, [[maybe_unused]] unsigned char a1) { return converted_qr_code_cpp::gf_mul(a0, a1); };
+    const auto run = [&]([[maybe_unused]] unsigned char a0, [[maybe_unused]] unsigned char a1) { return converted::counted([&] { return converted_qr_code_cpp::gf_mul(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned char a0 = static_cast<unsigned char>(draw.below(40));
       const unsigned char a1 = static_cast<unsigned char>(draw.below(40));
@@ -226,7 +226,7 @@ SC_TEST(converted_qr_code_cpp) {
   {  // rs_divisor
     converted::Tally tally("rs_divisor");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0) { return converted_qr_code_cpp::rs_divisor(a0); };
+    const auto run = [&]([[maybe_unused]] int a0) { return converted::counted([&] { return converted_qr_code_cpp::rs_divisor(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const int a0 = static_cast<int>(draw.whole());
       const converted::Watch watch;
@@ -242,7 +242,7 @@ SC_TEST(converted_qr_code_cpp) {
   {  // rs_remainder
     converted::Tally tally("rs_remainder");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] std::vector<unsigned char> a1) { return converted_qr_code_cpp::rs_remainder(a0, a1); };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] std::vector<unsigned char> a1) { return converted::counted([&] { return converted_qr_code_cpp::rs_remainder(a0, a1); }); };
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       const std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
@@ -259,7 +259,7 @@ SC_TEST(converted_qr_code_cpp) {
   {  // alignment_positions
     converted::Tally tally("alignment_positions");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0) { return converted_qr_code_cpp::alignment_positions(a0); };
+    const auto run = [&]([[maybe_unused]] int a0) { return converted::counted([&] { return converted_qr_code_cpp::alignment_positions(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const int a0 = static_cast<int>(draw.whole());
       const converted::Watch watch;
@@ -275,7 +275,7 @@ SC_TEST(converted_qr_code_cpp) {
   {  // Grid::set
     converted::Tally tally("Grid_set");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Grid a0, [[maybe_unused]] int a1, [[maybe_unused]] int a2, [[maybe_unused]] bool a3) { a0.set(a1, a2, a3); return a0; };
+    const auto run = [&]([[maybe_unused]] Grid a0, [[maybe_unused]] int a1, [[maybe_unused]] int a2, [[maybe_unused]] bool a3) { converted::counted([&] { return a0.set(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Grid a0 = draw_qr__Grid(draw);
       const int a1 = static_cast<int>(draw.whole());
@@ -294,7 +294,7 @@ SC_TEST(converted_qr_code_cpp) {
   {  // finder
     converted::Tally tally("finder");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Grid a0, [[maybe_unused]] int a1, [[maybe_unused]] int a2) { converted_qr_code_cpp::finder(a0, a1, a2); return a0; };
+    const auto run = [&]([[maybe_unused]] Grid a0, [[maybe_unused]] int a1, [[maybe_unused]] int a2) { converted::counted([&] { return converted_qr_code_cpp::finder(a0, std::move(a1), std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Grid a0 = draw_qr__Grid(draw);
       const int a1 = static_cast<int>(draw.whole());
@@ -312,7 +312,7 @@ SC_TEST(converted_qr_code_cpp) {
   {  // format_bits
     converted::Tally tally("format_bits");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Grid a0, [[maybe_unused]] unsigned int a1) { converted_qr_code_cpp::format_bits(a0, a1); return a0; };
+    const auto run = [&]([[maybe_unused]] Grid a0, [[maybe_unused]] unsigned int a1) { converted::counted([&] { return converted_qr_code_cpp::format_bits(a0, std::move(a1)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Grid a0 = draw_qr__Grid(draw);
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -329,7 +329,7 @@ SC_TEST(converted_qr_code_cpp) {
   {  // read_format
     converted::Tally tally("read_format");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Code a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] unsigned int a2) { const auto r = converted_qr_code_cpp::read_format(a0, a1, a2); return Out_read_format{r, a1, a2}; };
+    const auto run = [&]([[maybe_unused]] Code a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] unsigned int a2) { const auto r = converted::counted([&] { return converted_qr_code_cpp::read_format(a0, a1, a2); }); return Out_read_format{r, a1, a2}; };
     for (int i = 0; tally.more(i); ++i) {
       const Code a0 = draw_qr__Code(draw);
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));

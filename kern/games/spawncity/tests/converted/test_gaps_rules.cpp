@@ -192,7 +192,7 @@ SC_TEST(converted_gaps_rules) {
   {  // SmokeField::SmokeField
     converted::Tally tally("SmokeField_new");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return SmokeField(a0); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return SmokeField(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
@@ -208,7 +208,7 @@ SC_TEST(converted_gaps_rules) {
   {  // SmokeField::puffs
     converted::Tally tally("SmokeField_puffs");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] SmokeField a0) { return a0.puffs(); };
+    const auto run = [&]([[maybe_unused]] SmokeField a0) { return converted::counted([&] { return a0.puffs(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const SmokeField a0 = draw_gaps__SmokeField(draw);
       const converted::Watch watch;
@@ -224,7 +224,7 @@ SC_TEST(converted_gaps_rules) {
   {  // SmokeField::effects
     converted::Tally tally("SmokeField_effects");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] SmokeField a0) { return a0.effects(); };
+    const auto run = [&]([[maybe_unused]] SmokeField a0) { return converted::counted([&] { return a0.effects(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const SmokeField a0 = draw_gaps__SmokeField(draw);
       const converted::Watch watch;
@@ -240,7 +240,7 @@ SC_TEST(converted_gaps_rules) {
   {  // VisualPose::invalidate
     converted::Tally tally("VisualPose_invalidate");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] VisualPose a0) { a0.invalidate(); return a0; };
+    const auto run = [&]([[maybe_unused]] VisualPose a0) { converted::counted([&] { return a0.invalidate(); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const VisualPose a0 = draw_gaps__VisualPose(draw);
       const converted::Watch watch;

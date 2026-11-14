@@ -210,7 +210,7 @@ SC_TEST(converted_road_graph_cpp) {
   {  // cell_key
     converted::Tally tally("cell_key");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0, [[maybe_unused]] int a1) { return converted_road_graph_cpp::cell_key(a0, a1); };
+    const auto run = [&]([[maybe_unused]] int a0, [[maybe_unused]] int a1) { return converted::counted([&] { return converted_road_graph_cpp::cell_key(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const int a0 = static_cast<int>(draw.whole());
       const int a1 = static_cast<int>(draw.whole());
@@ -227,7 +227,7 @@ SC_TEST(converted_road_graph_cpp) {
   {  // dist
     converted::Tally tally("dist");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec2 a0, [[maybe_unused]] Vec2 a1) { return converted_road_graph_cpp::dist(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Vec2 a0, [[maybe_unused]] Vec2 a1) { return converted::counted([&] { return converted_road_graph_cpp::dist(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec2 a0 = draw.vector2();
       const Vec2 a1 = draw.vector2();
@@ -244,7 +244,7 @@ SC_TEST(converted_road_graph_cpp) {
   {  // lane_signature
     converted::Tally tally("lane_signature");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<Lane> a0) { return converted_road_graph_cpp::lane_signature(a0); };
+    const auto run = [&]([[maybe_unused]] std::vector<Lane> a0) { return converted::counted([&] { return converted_road_graph_cpp::lane_signature(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<Lane> a0 = draw_list(draw, [&]() -> Lane { return draw_Lane(draw); });
       const converted::Watch watch;
@@ -260,7 +260,7 @@ SC_TEST(converted_road_graph_cpp) {
   {  // RoadGraph::node_at
     converted::Tally tally("RoadGraph_node_at");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] RoadGraph a0, [[maybe_unused]] Vec2 a1) { const auto r = a0.node_at(a1); return Out_RoadGraph_node_at{a0, r}; };
+    const auto run = [&]([[maybe_unused]] RoadGraph a0, [[maybe_unused]] Vec2 a1) { const auto r = converted::counted([&] { return a0.node_at(std::move(a1)); }); return Out_RoadGraph_node_at{a0, r}; };
     for (int i = 0; tally.more(i); ++i) {
       const RoadGraph a0 = draw_RoadGraph(draw);
       const Vec2 a1 = draw.vector2();
@@ -277,7 +277,7 @@ SC_TEST(converted_road_graph_cpp) {
   {  // RoadGraph::rebuild
     converted::Tally tally("RoadGraph_rebuild");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] RoadGraph a0, [[maybe_unused]] std::vector<Lane> a1) { a0.rebuild(a1); return a0; };
+    const auto run = [&]([[maybe_unused]] RoadGraph a0, [[maybe_unused]] std::vector<Lane> a1) { converted::counted([&] { return a0.rebuild(a1); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const RoadGraph a0 = draw_RoadGraph(draw);
       const std::vector<Lane> a1 = draw_list(draw, [&]() -> Lane { return draw_Lane(draw); });
@@ -294,7 +294,7 @@ SC_TEST(converted_road_graph_cpp) {
   {  // RoadGraph::nearest
     converted::Tally tally("RoadGraph_nearest");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] RoadGraph a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2) { return a0.nearest(a1, a2); };
+    const auto run = [&]([[maybe_unused]] RoadGraph a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2) { return converted::counted([&] { return a0.nearest(std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const RoadGraph a0 = draw_RoadGraph(draw);
       const Vec2 a1 = draw.vector2();
@@ -312,7 +312,7 @@ SC_TEST(converted_road_graph_cpp) {
   {  // RoadGraph::pursuit_point
     converted::Tally tally("RoadGraph_pursuit_point");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2) { return RoadGraph::pursuit_point(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2) { return converted::counted([&] { return RoadGraph::pursuit_point(a0, std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       const Vec2 a1 = draw.vector2();

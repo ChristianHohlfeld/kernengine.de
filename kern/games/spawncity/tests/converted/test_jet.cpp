@@ -246,7 +246,7 @@ SC_TEST(converted_jet) {
   {  // Jet::mode
     converted::Tally tally("Jet_mode");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Jet a0) { return a0.mode(); };
+    const auto run = [&]([[maybe_unused]] Jet a0) { return converted::counted([&] { return a0.mode(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Jet a0 = draw_Jet(draw);
       const converted::Watch watch;
@@ -262,7 +262,7 @@ SC_TEST(converted_jet) {
   {  // Jet::telemetry
     converted::Tally tally("Jet_telemetry");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Jet a0) { return a0.telemetry(); };
+    const auto run = [&]([[maybe_unused]] Jet a0) { return converted::counted([&] { return a0.telemetry(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Jet a0 = draw_Jet(draw);
       const converted::Watch watch;
@@ -278,7 +278,7 @@ SC_TEST(converted_jet) {
   {  // Jet::landed
     converted::Tally tally("Jet_landed");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Jet a0) { return a0.landed(); };
+    const auto run = [&]([[maybe_unused]] Jet a0) { return converted::counted([&] { return a0.landed(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Jet a0 = draw_Jet(draw);
       const converted::Watch watch;
@@ -294,7 +294,7 @@ SC_TEST(converted_jet) {
   {  // Jet::gear_down
     converted::Tally tally("Jet_gear_down");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Jet a0) { return a0.gear_down(); };
+    const auto run = [&]([[maybe_unused]] Jet a0) { return converted::counted([&] { return a0.gear_down(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Jet a0 = draw_Jet(draw);
       const converted::Watch watch;
@@ -310,7 +310,7 @@ SC_TEST(converted_jet) {
   {  // Jet::gear_impact
     converted::Tally tally("Jet_gear_impact");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Jet a0) { return a0.gear_impact(); };
+    const auto run = [&]([[maybe_unused]] Jet a0) { return converted::counted([&] { return a0.gear_impact(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Jet a0 = draw_Jet(draw);
       const converted::Watch watch;
@@ -326,7 +326,7 @@ SC_TEST(converted_jet) {
   {  // Jet::nozzle
     converted::Tally tally("Jet_nozzle");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Jet a0) { return a0.nozzle(); };
+    const auto run = [&]([[maybe_unused]] Jet a0) { return converted::counted([&] { return a0.nozzle(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Jet a0 = draw_Jet(draw);
       const converted::Watch watch;
@@ -342,7 +342,7 @@ SC_TEST(converted_jet) {
   {  // Jet::thrust
     converted::Tally tally("Jet_thrust");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Jet a0) { return a0.thrust(); };
+    const auto run = [&]([[maybe_unused]] Jet a0) { return converted::counted([&] { return a0.thrust(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Jet a0 = draw_Jet(draw);
       const converted::Watch watch;
@@ -358,7 +358,7 @@ SC_TEST(converted_jet) {
   {  // Jet::lever
     converted::Tally tally("Jet_lever");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Jet a0) { return a0.lever(); };
+    const auto run = [&]([[maybe_unused]] Jet a0) { return converted::counted([&] { return a0.lever(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Jet a0 = draw_Jet(draw);
       const converted::Watch watch;
@@ -374,7 +374,7 @@ SC_TEST(converted_jet) {
   {  // Jet::spec
     converted::Tally tally("Jet_spec");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Jet a0) { return a0.spec(); };
+    const auto run = [&]([[maybe_unused]] Jet a0) { return converted::counted([&] { return a0.spec(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Jet a0 = draw_Jet(draw);
       const converted::Watch watch;

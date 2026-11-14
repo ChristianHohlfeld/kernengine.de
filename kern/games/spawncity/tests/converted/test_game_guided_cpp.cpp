@@ -173,7 +173,7 @@ SC_TEST(converted_game_guided_cpp) {
   {  // person_up
     converted::Tally tally("person_up");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People::Person a0) { return converted_game_guided_cpp::person_up(a0); };
+    const auto run = [&]([[maybe_unused]] People::Person a0) { return converted::counted([&] { return converted_game_guided_cpp::person_up(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       const People::Person a0 = draw_People__Person(draw);
       const converted::Watch watch;
@@ -189,7 +189,7 @@ SC_TEST(converted_game_guided_cpp) {
   {  // person_label
     converted::Tally tally("person_label");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People::Person a0) { return converted_game_guided_cpp::person_label(a0); };
+    const auto run = [&]([[maybe_unused]] People::Person a0) { return converted::counted([&] { return converted_game_guided_cpp::person_label(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       const People::Person a0 = draw_People__Person(draw);
       const converted::Watch watch;

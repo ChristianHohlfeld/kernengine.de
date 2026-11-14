@@ -244,7 +244,7 @@ SC_TEST(converted_equipment_cpp) {
   {  // FlightLog::record
     converted::Tally tally("FlightLog_record");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] FlightLog a0, [[maybe_unused]] FlightSample a1, [[maybe_unused]] bool a2) { a0.record(a1, a2); return a0; };
+    const auto run = [&]([[maybe_unused]] FlightLog a0, [[maybe_unused]] FlightSample a1, [[maybe_unused]] bool a2) { converted::counted([&] { return a0.record(a1, std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const FlightLog a0 = draw_FlightLog(draw);
       const FlightSample a1 = draw_FlightSample(draw);
@@ -262,7 +262,7 @@ SC_TEST(converted_equipment_cpp) {
   {  // FlightLog::finish
     converted::Tally tally("FlightLog_finish");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] FlightLog a0, [[maybe_unused]] const char* a1) { a0.finish(a1); return a0; };
+    const auto run = [&]([[maybe_unused]] FlightLog a0, [[maybe_unused]] const char* a1) { converted::counted([&] { return a0.finish(a1); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const FlightLog a0 = draw_FlightLog(draw);
       const char* a1 = draw.c_word();
@@ -279,7 +279,7 @@ SC_TEST(converted_equipment_cpp) {
   {  // FlightLog::network
     converted::Tally tally("FlightLog_network");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] FlightLog a0, [[maybe_unused]] std::string a1, [[maybe_unused]] double a2) { a0.network(a1, a2); return a0; };
+    const auto run = [&]([[maybe_unused]] FlightLog a0, [[maybe_unused]] std::string a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.network(a1, std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const FlightLog a0 = draw_FlightLog(draw);
       const std::string a1 = draw.word();
@@ -297,7 +297,7 @@ SC_TEST(converted_equipment_cpp) {
   {  // prog_of
     converted::Tally tally("prog_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0) { return converted_equipment_cpp::prog_of(a0); };
+    const auto run = [&]([[maybe_unused]] int a0) { return converted::counted([&] { return converted_equipment_cpp::prog_of(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const int a0 = static_cast<int>(draw.whole());
       const converted::Watch watch;
@@ -313,7 +313,7 @@ SC_TEST(converted_equipment_cpp) {
   {  // midi
     converted::Tally tally("midi");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted_equipment_cpp::midi(a0); };
+    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_equipment_cpp::midi(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;

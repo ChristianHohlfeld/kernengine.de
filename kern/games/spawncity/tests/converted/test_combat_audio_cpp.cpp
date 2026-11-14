@@ -245,7 +245,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // Random::Random
     converted::Tally tally("Random_new");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return Random(a0); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return Random(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
@@ -261,7 +261,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // Random::operator()
     converted::Tally tally("Random_call");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Random a0) { const auto r = a0.operator()(); return Out_Random_call{a0, r}; };
+    const auto run = [&]([[maybe_unused]] Random a0) { const auto r = converted::counted([&] { return a0.operator()(); }); return Out_Random_call{a0, r}; };
     for (int i = 0; tally.more(i); ++i) {
       const Random a0 = draw_combat_audio__Random(draw);
       const converted::Watch watch;
@@ -277,7 +277,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // envelope
     converted::Tally tally("envelope");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return converted_combat_audio_cpp::envelope(a0, a1, a2, a3); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return converted::counted([&] { return converted_combat_audio_cpp::envelope(std::move(a0), std::move(a1), std::move(a2), std::move(a3)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
@@ -296,7 +296,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // finish
     converted::Tally tally("finish");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<double> a0, [[maybe_unused]] double a1) { const auto r = converted_combat_audio_cpp::finish(a0, a1); return Out_finish{r, a0}; };
+    const auto run = [&]([[maybe_unused]] std::vector<double> a0, [[maybe_unused]] double a1) { const auto r = converted::counted([&] { return converted_combat_audio_cpp::finish(a0, std::move(a1)); }); return Out_finish{r, a0}; };
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<double> a0 = draw_list(draw, [&]() -> double { return draw.number(); });
       const double a1 = draw.number();
@@ -313,7 +313,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // samples
     converted::Tally tally("samples");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] unsigned int a1) { return converted_combat_audio_cpp::samples(a0, a1); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_combat_audio_cpp::samples(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -330,7 +330,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // nwave_at
     converted::Tally tally("nwave_at");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted_combat_audio_cpp::nwave_at(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_combat_audio_cpp::nwave_at(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
@@ -348,7 +348,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // shot
     converted::Tally tally("shot");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted_combat_audio_cpp::shot(a0, a1); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_combat_audio_cpp::shot(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -365,7 +365,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // hit
     converted::Tally tally("hit");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted_combat_audio_cpp::hit(a0, a1); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_combat_audio_cpp::hit(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -382,7 +382,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // crack
     converted::Tally tally("crack");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted_combat_audio_cpp::crack(a0, a1); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_combat_audio_cpp::crack(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -399,7 +399,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // damage
     converted::Tally tally("damage");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted_combat_audio_cpp::damage(a0, a1); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_combat_audio_cpp::damage(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -416,7 +416,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // gaussian
     converted::Tally tally("gaussian");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted_combat_audio_cpp::gaussian(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_combat_audio_cpp::gaussian(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
@@ -434,7 +434,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // explosion
     converted::Tally tally("explosion");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted_combat_audio_cpp::explosion(a0, a1); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_combat_audio_cpp::explosion(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -451,7 +451,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // step
     converted::Tally tally("step");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted_combat_audio_cpp::step(a0, a1); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_combat_audio_cpp::step(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -468,7 +468,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // bounce
     converted::Tally tally("bounce");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted_combat_audio_cpp::bounce(a0, a1); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_combat_audio_cpp::bounce(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -485,7 +485,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // note_hz
     converted::Tally tally("note_hz");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0) { return converted_combat_audio_cpp::note_hz(a0); };
+    const auto run = [&]([[maybe_unused]] int a0) { return converted::counted([&] { return converted_combat_audio_cpp::note_hz(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const int a0 = static_cast<int>(draw.whole());
       const converted::Watch watch;
@@ -501,7 +501,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // cue
     converted::Tally tally("cue");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] std::vector<int> a1, [[maybe_unused]] std::vector<double> a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { return converted_combat_audio_cpp::cue(a0, a1, a2, a3, a4, a5); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] std::vector<int> a1, [[maybe_unused]] std::vector<double> a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { return converted::counted([&] { return converted_combat_audio_cpp::cue(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const std::vector<int> a1 = draw_list(draw, [&]() -> int { return static_cast<int>(draw.whole()); });

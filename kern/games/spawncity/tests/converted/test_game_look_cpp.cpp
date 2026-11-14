@@ -287,7 +287,7 @@ SC_TEST(converted_game_look_cpp) {
   {  // clock_ms
     converted::Tally tally("clock_ms");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted_game_look_cpp::clock_ms(); };
+    const auto run = [&]() { return converted::counted([&] { return converted_game_look_cpp::clock_ms(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
@@ -302,7 +302,7 @@ SC_TEST(converted_game_look_cpp) {
   {  // srgb
     converted::Tally tally("srgb");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted_game_look_cpp::srgb(a0); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_game_look_cpp::srgb(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
@@ -318,7 +318,7 @@ SC_TEST(converted_game_look_cpp) {
   {  // box
     converted::Tally tally("box");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MeshData a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] unsigned int a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] Mat4 a4) { converted_game_look_cpp::box(a0, a1, a2, a3, a4); return a0; };
+    const auto run = [&]([[maybe_unused]] MeshData a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] unsigned int a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] Mat4 a4) { converted::counted([&] { return converted_game_look_cpp::box(a0, std::move(a1), std::move(a2), std::move(a3), a4); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const MeshData a0 = draw_kern__MeshData(draw);
       const Vec3 a1 = draw.vector();
@@ -338,7 +338,7 @@ SC_TEST(converted_game_look_cpp) {
   {  // cyl
     converted::Tally tally("cyl");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MeshData a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] unsigned int a3, [[maybe_unused]] Vec3 a4, [[maybe_unused]] unsigned int a5, [[maybe_unused]] Mat4 a6) { converted_game_look_cpp::cyl(a0, a1, a2, a3, a4, a5, a6); return a0; };
+    const auto run = [&]([[maybe_unused]] MeshData a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] unsigned int a3, [[maybe_unused]] Vec3 a4, [[maybe_unused]] unsigned int a5, [[maybe_unused]] Mat4 a6) { converted::counted([&] { return converted_game_look_cpp::cyl(a0, std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), a6); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const MeshData a0 = draw_kern__MeshData(draw);
       const double a1 = draw.number();
@@ -360,7 +360,7 @@ SC_TEST(converted_game_look_cpp) {
   {  // glow_box
     converted::Tally tally("glow_box");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MeshData a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] Vec3 a3) { converted_game_look_cpp::glow_box(a0, a1, a2, a3); return a0; };
+    const auto run = [&]([[maybe_unused]] MeshData a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] Vec3 a3) { converted::counted([&] { return converted_game_look_cpp::glow_box(a0, std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const MeshData a0 = draw_kern__MeshData(draw);
       const Vec3 a1 = draw.vector();
@@ -379,7 +379,7 @@ SC_TEST(converted_game_look_cpp) {
   {  // glow_cyl
     converted::Tally tally("glow_cyl");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MeshData a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] Vec3 a4) { converted_game_look_cpp::glow_cyl(a0, a1, a2, a3, a4); return a0; };
+    const auto run = [&]([[maybe_unused]] MeshData a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] Vec3 a4) { converted::counted([&] { return converted_game_look_cpp::glow_cyl(a0, std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const MeshData a0 = draw_kern__MeshData(draw);
       const double a1 = draw.number();
@@ -399,7 +399,7 @@ SC_TEST(converted_game_look_cpp) {
   {  // vm_index
     converted::Tally tally("vm_index");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Id a0) { return converted_game_look_cpp::vm_index(a0); };
+    const auto run = [&]([[maybe_unused]] Id a0) { return converted::counted([&] { return converted_game_look_cpp::vm_index(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Id a0 = static_cast<Id>(draw.below(14));
       const converted::Watch watch;
@@ -415,7 +415,7 @@ SC_TEST(converted_game_look_cpp) {
   {  // camera_frame
     converted::Tally tally("camera_frame");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Camera a0) { return converted_game_look_cpp::camera_frame(a0); };
+    const auto run = [&]([[maybe_unused]] Camera a0) { return converted::counted([&] { return converted_game_look_cpp::camera_frame(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Camera a0 = draw_kern__Camera(draw);
       const converted::Watch watch;
@@ -431,7 +431,7 @@ SC_TEST(converted_game_look_cpp) {
   {  // euler
     converted::Tally tally("euler");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted_game_look_cpp::euler(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_game_look_cpp::euler(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();

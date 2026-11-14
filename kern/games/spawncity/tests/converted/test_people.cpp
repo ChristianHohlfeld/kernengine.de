@@ -377,7 +377,7 @@ SC_TEST(converted_people) {
   {  // People::set_budget
     converted::Tally tally("People_set_budget");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] unsigned int a1) { a0.set_budget(a1); return a0; };
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] unsigned int a1) { converted::counted([&] { return a0.set_budget(std::move(a1)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const People a0 = draw_People(draw);
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -394,7 +394,7 @@ SC_TEST(converted_people) {
   {  // People::set_ranges
     converted::Tally tally("People_set_ranges");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { a0.set_ranges(a1, a2); return a0; };
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.set_ranges(std::move(a1), std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const People a0 = draw_People(draw);
       const double a1 = draw.number();
@@ -412,7 +412,7 @@ SC_TEST(converted_people) {
   {  // People::clear
     converted::Tally tally("People_clear");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0) { a0.clear(); return a0; };
+    const auto run = [&]([[maybe_unused]] People a0) { converted::counted([&] { return a0.clear(); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const People a0 = draw_People(draw);
       const converted::Watch watch;
@@ -428,7 +428,7 @@ SC_TEST(converted_people) {
   {  // People::take_reports
     converted::Tally tally("People_take_reports");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] std::vector<CrimeReport> a1) { a0.take_reports(a1); return Out_People_take_reports{a0, a1}; };
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] std::vector<CrimeReport> a1) { converted::counted([&] { return a0.take_reports(a1); }); return Out_People_take_reports{a0, a1}; };
     for (int i = 0; tally.more(i); ++i) {
       const People a0 = draw_People(draw);
       const std::vector<CrimeReport> a1 = draw_list(draw, [&]() -> CrimeReport { return draw_CrimeReport(draw); });
@@ -445,7 +445,7 @@ SC_TEST(converted_people) {
   {  // People::all
     converted::Tally tally("People_all");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0) { return a0.all(); };
+    const auto run = [&]([[maybe_unused]] People a0) { return converted::counted([&] { return a0.all(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const People a0 = draw_People(draw);
       const converted::Watch watch;
@@ -461,7 +461,7 @@ SC_TEST(converted_people) {
   {  // People::take_deaths
     converted::Tally tally("People_take_deaths");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] std::vector<People::Death> a1) { a0.take_deaths(a1); return Out_People_take_deaths{a0, a1}; };
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] std::vector<People::Death> a1) { converted::counted([&] { return a0.take_deaths(a1); }); return Out_People_take_deaths{a0, a1}; };
     for (int i = 0; tally.more(i); ++i) {
       const People a0 = draw_People(draw);
       const std::vector<People::Death> a1 = draw_list(draw, [&]() -> People::Death { return draw_People__Death(draw); });
@@ -478,7 +478,7 @@ SC_TEST(converted_people) {
   {  // People::take_remote_hits
     converted::Tally tally("People_take_remote_hits");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] std::vector<People::RemoteHit> a1) { a0.take_remote_hits(a1); return Out_People_take_remote_hits{a0, a1}; };
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] std::vector<People::RemoteHit> a1) { converted::counted([&] { return a0.take_remote_hits(a1); }); return Out_People_take_remote_hits{a0, a1}; };
     for (int i = 0; tally.more(i); ++i) {
       const People a0 = draw_People(draw);
       const std::vector<People::RemoteHit> a1 = draw_list(draw, [&]() -> People::RemoteHit { return draw_People__RemoteHit(draw); });
@@ -495,7 +495,7 @@ SC_TEST(converted_people) {
   {  // People::take_hurts
     converted::Tally tally("People_take_hurts");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] std::vector<People::Hurt> a1) { a0.take_hurts(a1); return Out_People_take_hurts{a0, a1}; };
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] std::vector<People::Hurt> a1) { converted::counted([&] { return a0.take_hurts(a1); }); return Out_People_take_hurts{a0, a1}; };
     for (int i = 0; tally.more(i); ++i) {
       const People a0 = draw_People(draw);
       const std::vector<People::Hurt> a1 = draw_list(draw, [&]() -> People::Hurt { return draw_People__Hurt(draw); });
@@ -512,7 +512,7 @@ SC_TEST(converted_people) {
   {  // People::take_falls
     converted::Tally tally("People_take_falls");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] std::vector<People::Fall> a1) { a0.take_falls(a1); return Out_People_take_falls{a0, a1}; };
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] std::vector<People::Fall> a1) { converted::counted([&] { return a0.take_falls(a1); }); return Out_People_take_falls{a0, a1}; };
     for (int i = 0; tally.more(i); ++i) {
       const People a0 = draw_People(draw);
       const std::vector<People::Fall> a1 = draw_list(draw, [&]() -> People::Fall { return draw_People__Fall(draw); });
@@ -529,7 +529,7 @@ SC_TEST(converted_people) {
   {  // People::set_puppets
     converted::Tally tally("People_set_puppets");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] bool a1) { a0.set_puppets(a1); return a0; };
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] bool a1) { converted::counted([&] { return a0.set_puppets(std::move(a1)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const People a0 = draw_People(draw);
       const bool a1 = draw.flag();
@@ -546,7 +546,7 @@ SC_TEST(converted_people) {
   {  // People::puppets
     converted::Tally tally("People_puppets");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0) { return a0.puppets(); };
+    const auto run = [&]([[maybe_unused]] People a0) { return converted::counted([&] { return a0.puppets(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const People a0 = draw_People(draw);
       const converted::Watch watch;
@@ -562,7 +562,7 @@ SC_TEST(converted_people) {
   {  // People::last_head
     converted::Tally tally("People_last_head");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0) { return a0.last_head(); };
+    const auto run = [&]([[maybe_unused]] People a0) { return converted::counted([&] { return a0.last_head(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const People a0 = draw_People(draw);
       const converted::Watch watch;

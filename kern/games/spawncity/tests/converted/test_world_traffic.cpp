@@ -172,7 +172,7 @@ SC_TEST(converted_world_traffic) {
   {  // TrafficRules::junctions
     converted::Tally tally("TrafficRules_junctions");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TrafficRules a0) { return a0.junctions(); };
+    const auto run = [&]([[maybe_unused]] TrafficRules a0) { return converted::counted([&] { return a0.junctions(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const TrafficRules a0 = draw_TrafficRules(draw);
       const converted::Watch watch;

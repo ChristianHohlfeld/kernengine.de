@@ -187,7 +187,7 @@ SC_TEST(converted_destruction) {
   {  // Destruction::init
     converted::Tally tally("Destruction_init");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Destruction a0, [[maybe_unused]] Renderer& a1) { a0.init(a1); return a0; };
+    const auto run = [&]([[maybe_unused]] Destruction a0, [[maybe_unused]] Renderer& a1) { converted::counted([&] { return a0.init(a1); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Destruction a0 = draw_Destruction(draw);
       Renderer& a1 = *converted::engine_object<Renderer>(1 + draw.below(6));
@@ -204,7 +204,7 @@ SC_TEST(converted_destruction) {
   {  // Destruction::stats
     converted::Tally tally("Destruction_stats");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Destruction a0) { return a0.stats(); };
+    const auto run = [&]([[maybe_unused]] Destruction a0) { return converted::counted([&] { return a0.stats(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Destruction a0 = draw_Destruction(draw);
       const converted::Watch watch;
@@ -220,7 +220,7 @@ SC_TEST(converted_destruction) {
   {  // Destruction::take_points_log
     converted::Tally tally("Destruction_take_points_log");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Destruction a0) { const auto r = a0.take_points_log(); return Out_Destruction_take_points_log{a0, r}; };
+    const auto run = [&]([[maybe_unused]] Destruction a0) { const auto r = converted::counted([&] { return a0.take_points_log(); }); return Out_Destruction_take_points_log{a0, r}; };
     for (int i = 0; tally.more(i); ++i) {
       const Destruction a0 = draw_Destruction(draw);
       const converted::Watch watch;

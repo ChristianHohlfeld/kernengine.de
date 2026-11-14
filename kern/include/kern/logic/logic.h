@@ -909,6 +909,14 @@ struct Visit {
 /// Code compiled into the binary: the class of the Blueprint with this content hash. A graph with
 /// that hash then runs as this class (Runtime::native), not in the interpreter or the JIT.
 void register_native_blueprint(u64 hash, NativeBlueprintFactory make);
+/// Where the engine calls a function of a compiled Blueprint class by name, the class's glue says
+/// when the function itself begins (true) and when it has returned (false): what converts the
+/// arguments and the results is outside. For a host that measures the class's own work - a test
+/// counts how often it asks for memory. Null: nobody asks.
+inline void (*native_probe)(bool begins) = nullptr;
+inline void native_call(bool begins) {
+  if (native_probe) native_probe(begins);
+}
 /// The C++ that makes a Blueprint's class reachable by name and registers it under the graph's
 /// hash: compiled after the Blueprint's text (to_cpp(g, name)) in the same source. For graphs that
 /// are native_ready. It is glue for the engine, not part of the notation: nothing to edit there.

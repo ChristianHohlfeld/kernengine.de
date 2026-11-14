@@ -137,7 +137,7 @@ SC_TEST(converted_mvt_cpp) {
   {  // zigzag
     converted::Tally tally("zigzag");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] u64 a0) { return converted_mvt_cpp::zigzag(a0); };
+    const auto run = [&]([[maybe_unused]] u64 a0) { return converted::counted([&] { return converted_mvt_cpp::zigzag(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const u64 a0 = static_cast<u64>(draw.bits());
       const converted::Watch watch;
@@ -153,7 +153,7 @@ SC_TEST(converted_mvt_cpp) {
   {  // ring_area
     converted::Tally tally("ring_area");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0) { return converted_mvt_cpp::ring_area(a0); };
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0) { return converted::counted([&] { return converted_mvt_cpp::ring_area(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       const converted::Watch watch;
@@ -169,7 +169,7 @@ SC_TEST(converted_mvt_cpp) {
   {  // wanted_layer
     converted::Tally tally("wanted_layer");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::string a0, [[maybe_unused]] std::vector<std::string> a1) { return converted_mvt_cpp::wanted_layer(a0, a1); };
+    const auto run = [&]([[maybe_unused]] std::string a0, [[maybe_unused]] std::vector<std::string> a1) { return converted::counted([&] { return converted_mvt_cpp::wanted_layer(a0, a1); }); };
     for (int i = 0; tally.more(i); ++i) {
       const std::string a0 = draw.word();
       const std::vector<std::string> a1 = draw_list(draw, [&]() -> std::string { return draw.word(); });
@@ -186,7 +186,7 @@ SC_TEST(converted_mvt_cpp) {
   {  // put_varint
     converted::Tally tally("put_varint");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] u64 a1) { converted_mvt_cpp::put_varint(a0, a1); return a0; };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] u64 a1) { converted::counted([&] { return converted_mvt_cpp::put_varint(a0, std::move(a1)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       const u64 a1 = static_cast<u64>(draw.bits());
@@ -203,7 +203,7 @@ SC_TEST(converted_mvt_cpp) {
   {  // put_key
     converted::Tally tally("put_key");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] unsigned int a2) { converted_mvt_cpp::put_key(a0, a1, a2); return a0; };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] unsigned int a2) { converted::counted([&] { return converted_mvt_cpp::put_key(a0, std::move(a1), std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -221,7 +221,7 @@ SC_TEST(converted_mvt_cpp) {
   {  // zz
     converted::Tally tally("zz");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] i64 a0) { return converted_mvt_cpp::zz(a0); };
+    const auto run = [&]([[maybe_unused]] i64 a0) { return converted::counted([&] { return converted_mvt_cpp::zz(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const i64 a0 = static_cast<i64>(draw.bits());
       const converted::Watch watch;
@@ -237,7 +237,7 @@ SC_TEST(converted_mvt_cpp) {
   {  // Writer::begin_layer
     converted::Tally tally("Writer_begin_layer");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Writer a0, [[maybe_unused]] std::string a1, [[maybe_unused]] unsigned int a2) { a0.begin_layer(a1, a2); return a0; };
+    const auto run = [&]([[maybe_unused]] Writer a0, [[maybe_unused]] std::string a1, [[maybe_unused]] unsigned int a2) { converted::counted([&] { return a0.begin_layer(a1, std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Writer a0 = draw_mvt__Writer(draw);
       const std::string a1 = draw.word();

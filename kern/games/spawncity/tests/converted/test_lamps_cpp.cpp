@@ -166,7 +166,7 @@ SC_TEST(converted_lamps_cpp) {
   {  // grid_key
     converted::Tally tally("grid_key");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted_lamps_cpp::grid_key(a0, a1); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_lamps_cpp::grid_key(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
@@ -183,7 +183,7 @@ SC_TEST(converted_lamps_cpp) {
   {  // cell_key
     converted::Tally tally("cell_key");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted_lamps_cpp::cell_key(a0, a1); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_lamps_cpp::cell_key(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
@@ -200,7 +200,7 @@ SC_TEST(converted_lamps_cpp) {
   {  // Field::near
     converted::Tally tally("Field_near");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Field a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return a0.near(a1, a2, a3); };
+    const auto run = [&]([[maybe_unused]] Field a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return converted::counted([&] { return a0.near(std::move(a1), std::move(a2), std::move(a3)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Field a0 = draw_lamps__Field(draw);
       const double a1 = draw.number();

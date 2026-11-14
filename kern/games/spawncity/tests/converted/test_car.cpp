@@ -282,7 +282,7 @@ SC_TEST(converted_car) {
   {  // CarSpec::car
     converted::Tally tally("CarSpec_car");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return CarSpec::car(); };
+    const auto run = [&]() { return converted::counted([&] { return CarSpec::car(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
@@ -297,7 +297,7 @@ SC_TEST(converted_car) {
   {  // Car::Car
     converted::Tally tally("Car_new");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CarSpec a0) { return Car(a0); };
+    const auto run = [&]([[maybe_unused]] CarSpec a0) { return converted::counted([&] { return Car(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       const CarSpec a0 = draw_CarSpec(draw);
       const converted::Watch watch;
@@ -313,7 +313,7 @@ SC_TEST(converted_car) {
   {  // Car::rigged
     converted::Tally tally("Car_rigged");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Car a0) { return a0.rigged(); };
+    const auto run = [&]([[maybe_unused]] Car a0) { return converted::counted([&] { return a0.rigged(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Car a0 = draw_Car(draw);
       const converted::Watch watch;
@@ -329,7 +329,7 @@ SC_TEST(converted_car) {
   {  // Car::show
     converted::Tally tally("Car_show");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Car a0, [[maybe_unused]] double a1) { a0.show(a1); return a0; };
+    const auto run = [&]([[maybe_unused]] Car a0, [[maybe_unused]] double a1) { converted::counted([&] { return a0.show(std::move(a1)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Car a0 = draw_Car(draw);
       const double a1 = draw.number();
@@ -346,7 +346,7 @@ SC_TEST(converted_car) {
   {  // Car::roll
     converted::Tally tally("Car_roll");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Car a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { a0.roll(a1, a2); return a0; };
+    const auto run = [&]([[maybe_unused]] Car a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.roll(std::move(a1), std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Car a0 = draw_Car(draw);
       const double a1 = draw.number();
@@ -364,7 +364,7 @@ SC_TEST(converted_car) {
   {  // Car::wheel_body
     converted::Tally tally("Car_wheel_body");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Car a0, [[maybe_unused]] int a1) { return a0.wheel_body(a1); };
+    const auto run = [&]([[maybe_unused]] Car a0, [[maybe_unused]] int a1) { return converted::counted([&] { return a0.wheel_body(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Car a0 = draw_Car(draw);
       const int a1 = static_cast<int>(draw.whole());
@@ -381,7 +381,7 @@ SC_TEST(converted_car) {
   {  // Car::ground_offset
     converted::Tally tally("Car_ground_offset");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CarSpec a0) { return Car::ground_offset(a0); };
+    const auto run = [&]([[maybe_unused]] CarSpec a0) { return converted::counted([&] { return Car::ground_offset(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       const CarSpec a0 = draw_CarSpec(draw);
       const converted::Watch watch;
@@ -397,7 +397,7 @@ SC_TEST(converted_car) {
   {  // Car::spec
     converted::Tally tally("Car_spec");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Car a0) { return a0.spec(); };
+    const auto run = [&]([[maybe_unused]] Car a0) { return converted::counted([&] { return a0.spec(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Car a0 = draw_Car(draw);
       const converted::Watch watch;
@@ -413,7 +413,7 @@ SC_TEST(converted_car) {
   {  // Car::wheel
     converted::Tally tally("Car_wheel");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Car a0, [[maybe_unused]] int a1) { return a0.wheel(a1); };
+    const auto run = [&]([[maybe_unused]] Car a0, [[maybe_unused]] int a1) { return converted::counted([&] { return a0.wheel(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Car a0 = draw_Car(draw);
       const int a1 = static_cast<int>(draw.whole());
@@ -430,7 +430,7 @@ SC_TEST(converted_car) {
   {  // Car::steer_angle
     converted::Tally tally("Car_steer_angle");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Car a0) { return a0.steer_angle(); };
+    const auto run = [&]([[maybe_unused]] Car a0) { return converted::counted([&] { return a0.steer_angle(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Car a0 = draw_Car(draw);
       const converted::Watch watch;
@@ -446,7 +446,7 @@ SC_TEST(converted_car) {
   {  // Car::forward_speed
     converted::Tally tally("Car_forward_speed");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Car a0) { return a0.forward_speed(); };
+    const auto run = [&]([[maybe_unused]] Car a0) { return converted::counted([&] { return a0.forward_speed(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Car a0 = draw_Car(draw);
       const converted::Watch watch;
@@ -462,7 +462,7 @@ SC_TEST(converted_car) {
   {  // Car::gear
     converted::Tally tally("Car_gear");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Car a0) { return a0.gear(); };
+    const auto run = [&]([[maybe_unused]] Car a0) { return converted::counted([&] { return a0.gear(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Car a0 = draw_Car(draw);
       const converted::Watch watch;
@@ -478,7 +478,7 @@ SC_TEST(converted_car) {
   {  // Car::throttle
     converted::Tally tally("Car_throttle");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Car a0) { return a0.throttle(); };
+    const auto run = [&]([[maybe_unused]] Car a0) { return converted::counted([&] { return a0.throttle(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Car a0 = draw_Car(draw);
       const converted::Watch watch;

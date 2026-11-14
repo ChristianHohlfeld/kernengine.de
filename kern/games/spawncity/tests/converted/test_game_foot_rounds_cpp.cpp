@@ -48,7 +48,7 @@ SC_TEST(converted_game_foot_rounds_cpp) {
   {  // foot_round
     converted::Tally tally("foot_round");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Id a0) { return converted_game_foot_rounds_cpp::foot_round(a0); };
+    const auto run = [&]([[maybe_unused]] Id a0) { return converted::counted([&] { return converted_game_foot_rounds_cpp::foot_round(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Id a0 = static_cast<Id>(draw.below(14));
       const converted::Watch watch;

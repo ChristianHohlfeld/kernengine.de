@@ -136,7 +136,7 @@ SC_TEST(converted_game) {
   {  // PadState::down
     converted::Tally tally("PadState_down");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PadState a0, [[maybe_unused]] int a1) { return a0.down(a1); };
+    const auto run = [&]([[maybe_unused]] PadState a0, [[maybe_unused]] int a1) { return converted::counted([&] { return a0.down(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const PadState a0 = draw_PadState(draw);
       const int a1 = static_cast<int>(draw.whole());
@@ -153,7 +153,7 @@ SC_TEST(converted_game) {
   {  // PadState::hit
     converted::Tally tally("PadState_hit");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PadState a0, [[maybe_unused]] int a1) { return a0.hit(a1); };
+    const auto run = [&]([[maybe_unused]] PadState a0, [[maybe_unused]] int a1) { return converted::counted([&] { return a0.hit(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const PadState a0 = draw_PadState(draw);
       const int a1 = static_cast<int>(draw.whole());

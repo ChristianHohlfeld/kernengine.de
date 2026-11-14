@@ -127,7 +127,7 @@ SC_TEST(converted_controls) {
   {  // RateStick::reset
     converted::Tally tally("RateStick_reset");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] RateStick a0) { a0.reset(); return a0; };
+    const auto run = [&]([[maybe_unused]] RateStick a0) { converted::counted([&] { return a0.reset(); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const RateStick a0 = draw_controls__RateStick(draw);
       const converted::Watch watch;
@@ -143,7 +143,7 @@ SC_TEST(converted_controls) {
   {  // GrenadeCook::reset
     converted::Tally tally("GrenadeCook_reset");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GrenadeCook a0) { a0.reset(); return a0; };
+    const auto run = [&]([[maybe_unused]] GrenadeCook a0) { converted::counted([&] { return a0.reset(); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const GrenadeCook a0 = draw_controls__GrenadeCook(draw);
       const converted::Watch watch;
@@ -159,7 +159,7 @@ SC_TEST(converted_controls) {
   {  // Devices::set
     converted::Tally tally("Devices_set");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Devices a0, [[maybe_unused]] bool a1) { a0.set(a1); return a0; };
+    const auto run = [&]([[maybe_unused]] Devices a0, [[maybe_unused]] bool a1) { converted::counted([&] { return a0.set(std::move(a1)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Devices a0 = draw_controls__Devices(draw);
       const bool a1 = draw.flag();

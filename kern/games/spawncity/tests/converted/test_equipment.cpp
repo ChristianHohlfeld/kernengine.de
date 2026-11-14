@@ -274,7 +274,7 @@ SC_TEST(converted_equipment) {
   {  // FlightLog::flights
     converted::Tally tally("FlightLog_flights");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] FlightLog a0) { return a0.flights(); };
+    const auto run = [&]([[maybe_unused]] FlightLog a0) { return converted::counted([&] { return a0.flights(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const FlightLog a0 = draw_FlightLog(draw);
       const converted::Watch watch;
@@ -290,7 +290,7 @@ SC_TEST(converted_equipment) {
   {  // FlightLog::flying
     converted::Tally tally("FlightLog_flying");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] FlightLog a0) { return a0.flying(); };
+    const auto run = [&]([[maybe_unused]] FlightLog a0) { return converted::counted([&] { return a0.flying(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const FlightLog a0 = draw_FlightLog(draw);
       const converted::Watch watch;
@@ -306,7 +306,7 @@ SC_TEST(converted_equipment) {
   {  // FlightLog::serial
     converted::Tally tally("FlightLog_serial");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] FlightLog a0) { return a0.serial(); };
+    const auto run = [&]([[maybe_unused]] FlightLog a0) { return converted::counted([&] { return a0.serial(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const FlightLog a0 = draw_FlightLog(draw);
       const converted::Watch watch;

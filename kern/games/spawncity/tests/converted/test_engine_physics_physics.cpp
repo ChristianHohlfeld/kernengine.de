@@ -100,7 +100,7 @@ SC_TEST(converted_engine_physics_physics) {
   {  // Body::valid
     converted::Tally tally("Body_valid");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Body a0) { return a0.valid(); };
+    const auto run = [&]([[maybe_unused]] Body a0) { return converted::counted([&] { return a0.valid(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Body a0 = draw_kern__physics__Body(draw);
       const converted::Watch watch;
@@ -116,7 +116,7 @@ SC_TEST(converted_engine_physics_physics) {
   {  // Body::operator==
     converted::Tally tally("Body_equal");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Body a0, [[maybe_unused]] Body a1) { return a0.operator==(a1); };
+    const auto run = [&]([[maybe_unused]] Body a0, [[maybe_unused]] Body a1) { return converted::counted([&] { return a0.operator==(a1); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Body a0 = draw_kern__physics__Body(draw);
       const Body a1 = draw_kern__physics__Body(draw);
@@ -133,7 +133,7 @@ SC_TEST(converted_engine_physics_physics) {
   {  // Shape::valid
     converted::Tally tally("Shape_valid");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Shape a0) { return a0.valid(); };
+    const auto run = [&]([[maybe_unused]] Shape a0) { return converted::counted([&] { return a0.valid(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Shape a0 = draw_kern__physics__Shape(draw);
       const converted::Watch watch;
@@ -149,7 +149,7 @@ SC_TEST(converted_engine_physics_physics) {
   {  // Joint::valid
     converted::Tally tally("Joint_valid");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Joint a0) { return a0.valid(); };
+    const auto run = [&]([[maybe_unused]] Joint a0) { return converted::counted([&] { return a0.valid(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Joint a0 = draw_kern__physics__Joint(draw);
       const converted::Watch watch;
@@ -165,7 +165,7 @@ SC_TEST(converted_engine_physics_physics) {
   {  // QueryFilter::QueryFilter
     converted::Tally tally("QueryFilter_new");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] u64 a0, [[maybe_unused]] u64 a1) { return QueryFilter(a0, a1); };
+    const auto run = [&]([[maybe_unused]] u64 a0, [[maybe_unused]] u64 a1) { return converted::counted([&] { return QueryFilter(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const u64 a0 = static_cast<u64>(draw.bits());
       const u64 a1 = static_cast<u64>(draw.bits());

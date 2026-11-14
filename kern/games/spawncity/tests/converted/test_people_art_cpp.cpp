@@ -372,7 +372,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // rot
     converted::Tally tally("rot");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return converted_people_art_cpp::rot(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_people_art_cpp::rot(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const double a1 = draw.number();
@@ -389,7 +389,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // at
     converted::Tally tally("at");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted_people_art_cpp::at(a0); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted::counted([&] { return converted_people_art_cpp::at(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const converted::Watch watch;
@@ -405,7 +405,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // PeopleArt::put
     converted::Tally tally("PeopleArt_put");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PeopleArt::Part a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { PeopleArt{}.put(a0, a1, a2); return a0; };
+    const auto run = [&]([[maybe_unused]] PeopleArt::Part a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { converted::counted([&] { return PeopleArt{}.put(a0, a1, std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const PeopleArt::Part a0 = draw_PeopleArt__Part(draw);
       const Mat4 a1 = draw_kern__Mat4(draw);
@@ -423,7 +423,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // PeopleArt::street_lamp
     converted::Tally tally("PeopleArt_street_lamp");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PeopleArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { a0.street_lamp(a1, a2, a3); return a0; };
+    const auto run = [&]([[maybe_unused]] PeopleArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { converted::counted([&] { return a0.street_lamp(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const PeopleArt a0 = draw_PeopleArt(draw);
       const Vec3 a1 = draw.vector();
@@ -442,7 +442,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // PeopleArt::beacon
     converted::Tally tally("PeopleArt_beacon");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PeopleArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3) { a0.beacon(a1, a2, a3); return a0; };
+    const auto run = [&]([[maybe_unused]] PeopleArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3) { converted::counted([&] { return a0.beacon(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const PeopleArt a0 = draw_PeopleArt(draw);
       const Vec3 a1 = draw.vector();
@@ -461,7 +461,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // PeopleArt::light_bar
     converted::Tally tally("PeopleArt_light_bar");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PeopleArt a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] bool a2, [[maybe_unused]] double a3) { a0.light_bar(a1, a2, a3); return a0; };
+    const auto run = [&]([[maybe_unused]] PeopleArt a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] bool a2, [[maybe_unused]] double a3) { converted::counted([&] { return a0.light_bar(a1, std::move(a2), std::move(a3)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const PeopleArt a0 = draw_PeopleArt(draw);
       const Mat4 a1 = draw_kern__Mat4(draw);
@@ -480,7 +480,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // PeopleArt::fire
     converted::Tally tally("PeopleArt_fire");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PeopleArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { a0.fire(a1, a2, a3); return a0; };
+    const auto run = [&]([[maybe_unused]] PeopleArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { converted::counted([&] { return a0.fire(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const PeopleArt a0 = draw_PeopleArt(draw);
       const Vec3 a1 = draw.vector();
@@ -499,7 +499,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // PeopleArt::police_drone
     converted::Tally tally("PeopleArt_police_drone");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PeopleArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] bool a5, [[maybe_unused]] double a6, [[maybe_unused]] unsigned int a7) { a0.police_drone(a1, a2, a3, a4, a5, a6, a7); return a0; };
+    const auto run = [&]([[maybe_unused]] PeopleArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] bool a5, [[maybe_unused]] double a6, [[maybe_unused]] unsigned int a7) { converted::counted([&] { return a0.police_drone(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6), std::move(a7)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const PeopleArt a0 = draw_PeopleArt(draw);
       const Vec3 a1 = draw.vector();

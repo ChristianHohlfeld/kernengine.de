@@ -158,7 +158,7 @@ SC_TEST(converted_blueprint_whole64) {
   {  // w64_make
     converted::Tally tally("w64_make");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted_blueprint_whole64::w64_make(a0, a1); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_blueprint_whole64::w64_make(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -175,7 +175,7 @@ SC_TEST(converted_blueprint_whole64) {
   {  // w64_from_number
     converted::Tally tally("w64_from_number");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted_blueprint_whole64::w64_from_number(a0); };
+    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_blueprint_whole64::w64_from_number(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
@@ -191,7 +191,7 @@ SC_TEST(converted_blueprint_whole64) {
   {  // w64_to_number
     converted::Tally tally("w64_to_number");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Whole64 a0) { return converted_blueprint_whole64::w64_to_number(a0); };
+    const auto run = [&]([[maybe_unused]] Whole64 a0) { return converted::counted([&] { return converted_blueprint_whole64::w64_to_number(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Whole64 a0 = draw_w64__Whole64(draw);
       const converted::Watch watch;
@@ -207,7 +207,7 @@ SC_TEST(converted_blueprint_whole64) {
   {  // w64_to_signed_number
     converted::Tally tally("w64_to_signed_number");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Whole64 a0) { return converted_blueprint_whole64::w64_to_signed_number(a0); };
+    const auto run = [&]([[maybe_unused]] Whole64 a0) { return converted::counted([&] { return converted_blueprint_whole64::w64_to_signed_number(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Whole64 a0 = draw_w64__Whole64(draw);
       const converted::Watch watch;
@@ -223,7 +223,7 @@ SC_TEST(converted_blueprint_whole64) {
   {  // w64_is_zero
     converted::Tally tally("w64_is_zero");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Whole64 a0) { return converted_blueprint_whole64::w64_is_zero(a0); };
+    const auto run = [&]([[maybe_unused]] Whole64 a0) { return converted::counted([&] { return converted_blueprint_whole64::w64_is_zero(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Whole64 a0 = draw_w64__Whole64(draw);
       const converted::Watch watch;
@@ -239,7 +239,7 @@ SC_TEST(converted_blueprint_whole64) {
   {  // w64_bit_and
     converted::Tally tally("w64_bit_and");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_blueprint_whole64::w64_bit_and(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted::counted([&] { return converted_blueprint_whole64::w64_bit_and(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Whole64 a0 = draw_w64__Whole64(draw);
       const Whole64 a1 = draw_w64__Whole64(draw);
@@ -256,7 +256,7 @@ SC_TEST(converted_blueprint_whole64) {
   {  // w64_bit_or
     converted::Tally tally("w64_bit_or");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_blueprint_whole64::w64_bit_or(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted::counted([&] { return converted_blueprint_whole64::w64_bit_or(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Whole64 a0 = draw_w64__Whole64(draw);
       const Whole64 a1 = draw_w64__Whole64(draw);
@@ -273,7 +273,7 @@ SC_TEST(converted_blueprint_whole64) {
   {  // w64_bit_xor
     converted::Tally tally("w64_bit_xor");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_blueprint_whole64::w64_bit_xor(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted::counted([&] { return converted_blueprint_whole64::w64_bit_xor(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Whole64 a0 = draw_w64__Whole64(draw);
       const Whole64 a1 = draw_w64__Whole64(draw);
@@ -290,7 +290,7 @@ SC_TEST(converted_blueprint_whole64) {
   {  // w64_bit_not
     converted::Tally tally("w64_bit_not");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Whole64 a0) { return converted_blueprint_whole64::w64_bit_not(a0); };
+    const auto run = [&]([[maybe_unused]] Whole64 a0) { return converted::counted([&] { return converted_blueprint_whole64::w64_bit_not(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Whole64 a0 = draw_w64__Whole64(draw);
       const converted::Watch watch;
@@ -306,7 +306,7 @@ SC_TEST(converted_blueprint_whole64) {
   {  // w64_shift_left
     converted::Tally tally("w64_shift_left");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] unsigned int a1) { return converted_blueprint_whole64::w64_shift_left(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_blueprint_whole64::w64_shift_left(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Whole64 a0 = draw_w64__Whole64(draw);
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -323,7 +323,7 @@ SC_TEST(converted_blueprint_whole64) {
   {  // w64_shift_right
     converted::Tally tally("w64_shift_right");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] unsigned int a1) { return converted_blueprint_whole64::w64_shift_right(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_blueprint_whole64::w64_shift_right(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Whole64 a0 = draw_w64__Whole64(draw);
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -340,7 +340,7 @@ SC_TEST(converted_blueprint_whole64) {
   {  // w64_shift_right_signed
     converted::Tally tally("w64_shift_right_signed");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] unsigned int a1) { return converted_blueprint_whole64::w64_shift_right_signed(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_blueprint_whole64::w64_shift_right_signed(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Whole64 a0 = draw_w64__Whole64(draw);
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -357,7 +357,7 @@ SC_TEST(converted_blueprint_whole64) {
   {  // w64_add
     converted::Tally tally("w64_add");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_blueprint_whole64::w64_add(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted::counted([&] { return converted_blueprint_whole64::w64_add(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Whole64 a0 = draw_w64__Whole64(draw);
       const Whole64 a1 = draw_w64__Whole64(draw);
@@ -374,7 +374,7 @@ SC_TEST(converted_blueprint_whole64) {
   {  // w64_subtract
     converted::Tally tally("w64_subtract");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_blueprint_whole64::w64_subtract(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted::counted([&] { return converted_blueprint_whole64::w64_subtract(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Whole64 a0 = draw_w64__Whole64(draw);
       const Whole64 a1 = draw_w64__Whole64(draw);
@@ -391,7 +391,7 @@ SC_TEST(converted_blueprint_whole64) {
   {  // w64_negate
     converted::Tally tally("w64_negate");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Whole64 a0) { return converted_blueprint_whole64::w64_negate(a0); };
+    const auto run = [&]([[maybe_unused]] Whole64 a0) { return converted::counted([&] { return converted_blueprint_whole64::w64_negate(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Whole64 a0 = draw_w64__Whole64(draw);
       const converted::Watch watch;
@@ -407,7 +407,7 @@ SC_TEST(converted_blueprint_whole64) {
   {  // w64_multiply_high
     converted::Tally tally("w64_multiply_high");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted_blueprint_whole64::w64_multiply_high(a0, a1); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_blueprint_whole64::w64_multiply_high(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -424,7 +424,7 @@ SC_TEST(converted_blueprint_whole64) {
   {  // w64_multiply
     converted::Tally tally("w64_multiply");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_blueprint_whole64::w64_multiply(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted::counted([&] { return converted_blueprint_whole64::w64_multiply(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Whole64 a0 = draw_w64__Whole64(draw);
       const Whole64 a1 = draw_w64__Whole64(draw);
@@ -441,7 +441,7 @@ SC_TEST(converted_blueprint_whole64) {
   {  // w64_equal
     converted::Tally tally("w64_equal");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_blueprint_whole64::w64_equal(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted::counted([&] { return converted_blueprint_whole64::w64_equal(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Whole64 a0 = draw_w64__Whole64(draw);
       const Whole64 a1 = draw_w64__Whole64(draw);
@@ -458,7 +458,7 @@ SC_TEST(converted_blueprint_whole64) {
   {  // w64_less
     converted::Tally tally("w64_less");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_blueprint_whole64::w64_less(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted::counted([&] { return converted_blueprint_whole64::w64_less(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Whole64 a0 = draw_w64__Whole64(draw);
       const Whole64 a1 = draw_w64__Whole64(draw);
@@ -475,7 +475,7 @@ SC_TEST(converted_blueprint_whole64) {
   {  // w64_less_signed
     converted::Tally tally("w64_less_signed");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_blueprint_whole64::w64_less_signed(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted::counted([&] { return converted_blueprint_whole64::w64_less_signed(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Whole64 a0 = draw_w64__Whole64(draw);
       const Whole64 a1 = draw_w64__Whole64(draw);
@@ -492,7 +492,7 @@ SC_TEST(converted_blueprint_whole64) {
   {  // w64_divide_both
     converted::Tally tally("w64_divide_both");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_blueprint_whole64::w64_divide_both(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted::counted([&] { return converted_blueprint_whole64::w64_divide_both(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Whole64 a0 = draw_w64__Whole64(draw);
       const Whole64 a1 = draw_w64__Whole64(draw);
@@ -509,7 +509,7 @@ SC_TEST(converted_blueprint_whole64) {
   {  // w64_divide
     converted::Tally tally("w64_divide");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_blueprint_whole64::w64_divide(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted::counted([&] { return converted_blueprint_whole64::w64_divide(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Whole64 a0 = draw_w64__Whole64(draw);
       const Whole64 a1 = draw_w64__Whole64(draw);
@@ -526,7 +526,7 @@ SC_TEST(converted_blueprint_whole64) {
   {  // w64_remainder
     converted::Tally tally("w64_remainder");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_blueprint_whole64::w64_remainder(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted::counted([&] { return converted_blueprint_whole64::w64_remainder(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Whole64 a0 = draw_w64__Whole64(draw);
       const Whole64 a1 = draw_w64__Whole64(draw);
@@ -543,7 +543,7 @@ SC_TEST(converted_blueprint_whole64) {
   {  // w64_divide_signed
     converted::Tally tally("w64_divide_signed");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_blueprint_whole64::w64_divide_signed(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted::counted([&] { return converted_blueprint_whole64::w64_divide_signed(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Whole64 a0 = draw_w64__Whole64(draw);
       const Whole64 a1 = draw_w64__Whole64(draw);
@@ -560,7 +560,7 @@ SC_TEST(converted_blueprint_whole64) {
   {  // w64_remainder_signed
     converted::Tally tally("w64_remainder_signed");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted_blueprint_whole64::w64_remainder_signed(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Whole64 a0, [[maybe_unused]] Whole64 a1) { return converted::counted([&] { return converted_blueprint_whole64::w64_remainder_signed(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Whole64 a0 = draw_w64__Whole64(draw);
       const Whole64 a1 = draw_w64__Whole64(draw);

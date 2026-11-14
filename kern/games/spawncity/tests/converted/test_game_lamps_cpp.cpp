@@ -204,7 +204,7 @@ SC_TEST(converted_game_lamps_cpp) {
   {  // yaw_at
     converted::Tally tally("yaw_at");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return converted_game_lamps_cpp::yaw_at(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_game_lamps_cpp::yaw_at(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const double a1 = draw.number();
@@ -221,7 +221,7 @@ SC_TEST(converted_game_lamps_cpp) {
   {  // rgb
     converted::Tally tally("rgb");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted_game_lamps_cpp::rgb(a0); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_game_lamps_cpp::rgb(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
@@ -237,7 +237,7 @@ SC_TEST(converted_game_lamps_cpp) {
   {  // glass_pcm
     converted::Tally tally("glass_pcm");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted_game_lamps_cpp::glass_pcm(a0); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_game_lamps_cpp::glass_pcm(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
@@ -253,7 +253,7 @@ SC_TEST(converted_game_lamps_cpp) {
   {  // clang_pcm
     converted::Tally tally("clang_pcm");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted_game_lamps_cpp::clang_pcm(a0); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_game_lamps_cpp::clang_pcm(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;

@@ -67,7 +67,7 @@ SC_TEST(converted_tiles) {
   {  // TileKey::operator==
     converted::Tally tally("TileKey_equal");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TileKey a0, [[maybe_unused]] TileKey a1) { return a0.operator==(a1); };
+    const auto run = [&]([[maybe_unused]] TileKey a0, [[maybe_unused]] TileKey a1) { return converted::counted([&] { return a0.operator==(a1); }); };
     for (int i = 0; tally.more(i); ++i) {
       const TileKey a0 = draw_TileKey(draw);
       const TileKey a1 = draw_TileKey(draw);
@@ -84,7 +84,7 @@ SC_TEST(converted_tiles) {
   {  // TileKey::hash
     converted::Tally tally("TileKey_hash");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TileKey a0) { return a0.hash(); };
+    const auto run = [&]([[maybe_unused]] TileKey a0) { return converted::counted([&] { return a0.hash(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const TileKey a0 = draw_TileKey(draw);
       const converted::Watch watch;

@@ -519,7 +519,7 @@ SC_TEST(converted_people_cpp) {
   {  // dist2d
     converted::Tally tally("dist2d");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1) { return converted_people_cpp::dist2d(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1) { return converted::counted([&] { return converted_people_cpp::dist2d(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const Vec3 a1 = draw.vector();
@@ -536,7 +536,7 @@ SC_TEST(converted_people_cpp) {
   {  // approach_angle
     converted::Tally tally("approach_angle");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted_people_cpp::approach_angle(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_people_cpp::approach_angle(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
@@ -554,7 +554,7 @@ SC_TEST(converted_people_cpp) {
   {  // People::route_point
     converted::Tally tally("People_route_point");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People::Person a0, [[maybe_unused]] std::vector<Lane> a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3) { const auto r = People{}.route_point(a0, a1, a2, a3); return Out_People_route_point{r, a2, a3}; };
+    const auto run = [&]([[maybe_unused]] People::Person a0, [[maybe_unused]] std::vector<Lane> a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3) { const auto r = converted::counted([&] { return People{}.route_point(a0, a1, a2, a3); }); return Out_People_route_point{r, a2, a3}; };
     for (int i = 0; tally.more(i); ++i) {
       const People::Person a0 = draw_People__Person(draw);
       const std::vector<Lane> a1 = draw_list(draw, [&]() -> Lane { return draw_Lane(draw); });
@@ -573,7 +573,7 @@ SC_TEST(converted_people_cpp) {
   {  // People::add_officer
     converted::Tally tally("People_add_officer");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] int a3, [[maybe_unused]] unsigned int a4) { const auto r = a0.add_officer(a1, a2, a3, a4); return Out_People_add_officer{a0, r}; };
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] int a3, [[maybe_unused]] unsigned int a4) { const auto r = converted::counted([&] { return a0.add_officer(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return Out_People_add_officer{a0, r}; };
     for (int i = 0; tally.more(i); ++i) {
       const People a0 = draw_People(draw);
       const Vec3 a1 = draw.vector();
@@ -593,7 +593,7 @@ SC_TEST(converted_people_cpp) {
   {  // People::add_citizen
     converted::Tally tally("People_add_citizen");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] unsigned int a3) { const auto r = a0.add_citizen(a1, a2, a3); return Out_People_add_citizen{a0, r}; };
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] unsigned int a3) { const auto r = converted::counted([&] { return a0.add_citizen(std::move(a1), std::move(a2), std::move(a3)); }); return Out_People_add_citizen{a0, r}; };
     for (int i = 0; tally.more(i); ++i) {
       const People a0 = draw_People(draw);
       const Vec3 a1 = draw.vector();
@@ -612,7 +612,7 @@ SC_TEST(converted_people_cpp) {
   {  // People::add_scripted
     converted::Tally tally("People_add_scripted");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] People::Kind a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] unsigned int a5, [[maybe_unused]] Vec3 a6, [[maybe_unused]] Vec3 a7, [[maybe_unused]] Vec3 a8, [[maybe_unused]] unsigned char a9) { const auto r = a0.add_scripted(a1, a2, a3, a4, a5, a6, a7, a8, a9); return Out_People_add_scripted{a0, r}; };
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] People::Kind a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] unsigned int a5, [[maybe_unused]] Vec3 a6, [[maybe_unused]] Vec3 a7, [[maybe_unused]] Vec3 a8, [[maybe_unused]] unsigned char a9) { const auto r = converted::counted([&] { return a0.add_scripted(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6), std::move(a7), std::move(a8), std::move(a9)); }); return Out_People_add_scripted{a0, r}; };
     for (int i = 0; tally.more(i); ++i) {
       const People a0 = draw_People(draw);
       const People::Kind a1 = static_cast<People::Kind>(draw.below(5));
@@ -637,7 +637,7 @@ SC_TEST(converted_people_cpp) {
   {  // People::count
     converted::Tally tally("People_count");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] People::Kind a1, [[maybe_unused]] bool a2) { return a0.count(a1, a2); };
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] People::Kind a1, [[maybe_unused]] bool a2) { return converted::counted([&] { return a0.count(std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const People a0 = draw_People(draw);
       const People::Kind a1 = static_cast<People::Kind>(draw.below(5));
@@ -655,7 +655,7 @@ SC_TEST(converted_people_cpp) {
   {  // People::witnessed
     converted::Tally tally("People_witnessed");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] Vec3 a1) { return a0.witnessed(a1); };
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] Vec3 a1) { return converted::counted([&] { return a0.witnessed(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const People a0 = draw_People(draw);
       const Vec3 a1 = draw.vector();
@@ -672,7 +672,7 @@ SC_TEST(converted_people_cpp) {
   {  // People::dress
     converted::Tally tally("People_dress");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People::Person a0) { People::dress(a0); return a0; };
+    const auto run = [&]([[maybe_unused]] People::Person a0) { converted::counted([&] { return People::dress(a0); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const People::Person a0 = draw_People__Person(draw);
       const converted::Watch watch;
@@ -688,7 +688,7 @@ SC_TEST(converted_people_cpp) {
   {  // People::frighten
     converted::Tally tally("People_frighten");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { a0.frighten(a1, a2, a3, a4); return a0; };
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { converted::counted([&] { return a0.frighten(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const People a0 = draw_People(draw);
       const Vec3 a1 = draw.vector();

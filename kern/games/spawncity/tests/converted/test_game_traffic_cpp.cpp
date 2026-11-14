@@ -91,7 +91,7 @@ SC_TEST(converted_game_traffic_cpp) {
   {  // lane_distance
     converted::Tally tally("lane_distance");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Lane a0, [[maybe_unused]] Vec2 a1) { return converted_game_traffic_cpp::lane_distance(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Lane a0, [[maybe_unused]] Vec2 a1) { return converted::counted([&] { return converted_game_traffic_cpp::lane_distance(a0, std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Lane a0 = draw_Lane(draw);
       const Vec2 a1 = draw.vector2();

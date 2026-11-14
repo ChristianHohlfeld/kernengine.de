@@ -874,7 +874,7 @@ SC_TEST(converted_life) {
   {  // Life::ragdolls
     converted::Tally tally("Life_ragdolls_2");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0) { return a0.ragdolls(); };
+    const auto run = [&]([[maybe_unused]] Life a0) { return converted::counted([&] { return a0.ragdolls(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const converted::Watch watch;
@@ -890,7 +890,7 @@ SC_TEST(converted_life) {
   {  // Life::cows
     converted::Tally tally("Life_cows");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0) { return a0.cows(); };
+    const auto run = [&]([[maybe_unused]] Life a0) { return converted::counted([&] { return a0.cows(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const converted::Watch watch;
@@ -906,7 +906,7 @@ SC_TEST(converted_life) {
   {  // Life::flocks
     converted::Tally tally("Life_flocks");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0) { return a0.flocks(); };
+    const auto run = [&]([[maybe_unused]] Life a0) { return converted::counted([&] { return a0.flocks(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const converted::Watch watch;
@@ -922,7 +922,7 @@ SC_TEST(converted_life) {
   {  // Life::trees_down
     converted::Tally tally("Life_trees_down");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0) { return a0.trees_down(); };
+    const auto run = [&]([[maybe_unused]] Life a0) { return converted::counted([&] { return a0.trees_down(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const converted::Watch watch;
@@ -938,7 +938,7 @@ SC_TEST(converted_life) {
   {  // Life::birds
     converted::Tally tally("Life_birds");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0) { return a0.birds(); };
+    const auto run = [&]([[maybe_unused]] Life a0) { return converted::counted([&] { return a0.birds(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const converted::Watch watch;
@@ -954,7 +954,7 @@ SC_TEST(converted_life) {
   {  // Life::trees
     converted::Tally tally("Life_trees");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0) { return a0.trees(); };
+    const auto run = [&]([[maybe_unused]] Life a0) { return converted::counted([&] { return a0.trees(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const converted::Watch watch;
@@ -970,7 +970,7 @@ SC_TEST(converted_life) {
   {  // Life::pets
     converted::Tally tally("Life_pets");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0) { return a0.pets(); };
+    const auto run = [&]([[maybe_unused]] Life a0) { return converted::counted([&] { return a0.pets(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const converted::Watch watch;
@@ -986,7 +986,7 @@ SC_TEST(converted_life) {
   {  // Life::cat_attack
     converted::Tally tally("Life_cat_attack");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0) { return a0.cat_attack(); };
+    const auto run = [&]([[maybe_unused]] Life a0) { return converted::counted([&] { return a0.cat_attack(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const converted::Watch watch;
@@ -1002,7 +1002,7 @@ SC_TEST(converted_life) {
   {  // Life::epoch
     converted::Tally tally("Life_epoch");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0) { return a0.epoch(); };
+    const auto run = [&]([[maybe_unused]] Life a0) { return converted::counted([&] { return a0.epoch(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const converted::Watch watch;
@@ -1018,7 +1018,7 @@ SC_TEST(converted_life) {
   {  // Life::set_remote_joggers
     converted::Tally tally("Life_set_remote_joggers");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] bool a1) { a0.set_remote_joggers(a1); return a0; };
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] bool a1) { converted::counted([&] { return a0.set_remote_joggers(std::move(a1)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const bool a1 = draw.flag();
@@ -1035,7 +1035,7 @@ SC_TEST(converted_life) {
   {  // Life::animal_of
     converted::Tally tally("Life_animal_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Body a1, [[maybe_unused]] u64 a2) { const auto r = a0.animal_of(a1, a2); return Out_Life_animal_of{r, a2}; };
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Body a1, [[maybe_unused]] u64 a2) { const auto r = converted::counted([&] { return a0.animal_of(std::move(a1), a2); }); return Out_Life_animal_of{r, a2}; };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const Body a1 = draw_kern__physics__Body(draw);
@@ -1053,7 +1053,7 @@ SC_TEST(converted_life) {
   {  // Life::cow_body
     converted::Tally tally("Life_cow_body");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] u64 a1) { return a0.cow_body(a1); };
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] u64 a1) { return converted::counted([&] { return a0.cow_body(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const u64 a1 = static_cast<u64>(draw.bits());
@@ -1070,7 +1070,7 @@ SC_TEST(converted_life) {
   {  // Life::pet_body
     converted::Tally tally("Life_pet_body");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] unsigned int a1) { return a0.pet_body(a1); };
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return a0.pet_body(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -1087,7 +1087,7 @@ SC_TEST(converted_life) {
   {  // Life::remote_animals
     converted::Tally tally("Life_remote_animals");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0) { return a0.remote_animals(); };
+    const auto run = [&]([[maybe_unused]] Life a0) { return converted::counted([&] { return a0.remote_animals(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const converted::Watch watch;
@@ -1103,7 +1103,7 @@ SC_TEST(converted_life) {
   {  // Life::pet_anchors
     converted::Tally tally("Life_pet_anchors");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0) { return a0.pet_anchors(); };
+    const auto run = [&]([[maybe_unused]] Life a0) { return converted::counted([&] { return a0.pet_anchors(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const converted::Watch watch;
@@ -1119,7 +1119,7 @@ SC_TEST(converted_life) {
   {  // Life::anchor_of
     converted::Tally tally("Life_anchor_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] unsigned int a1) { return a0.anchor_of(a1); };
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return a0.anchor_of(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -1136,7 +1136,7 @@ SC_TEST(converted_life) {
   {  // Life::voices
     converted::Tally tally("Life_voices");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0) { return a0.voices(); };
+    const auto run = [&]([[maybe_unused]] Life a0) { return converted::counted([&] { return a0.voices(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const converted::Watch watch;
@@ -1152,7 +1152,7 @@ SC_TEST(converted_life) {
   {  // Life::cow_hits
     converted::Tally tally("Life_cow_hits");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0) { return a0.cow_hits(); };
+    const auto run = [&]([[maybe_unused]] Life a0) { return converted::counted([&] { return a0.cow_hits(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const converted::Watch watch;
@@ -1168,7 +1168,7 @@ SC_TEST(converted_life) {
   {  // Life::bird_hits
     converted::Tally tally("Life_bird_hits");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0) { return a0.bird_hits(); };
+    const auto run = [&]([[maybe_unused]] Life a0) { return converted::counted([&] { return a0.bird_hits(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const converted::Watch watch;
@@ -1184,7 +1184,7 @@ SC_TEST(converted_life) {
   {  // Life::jogger_streak
     converted::Tally tally("Life_jogger_streak");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0) { return a0.jogger_streak(); };
+    const auto run = [&]([[maybe_unused]] Life a0) { return converted::counted([&] { return a0.jogger_streak(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const converted::Watch watch;
@@ -1200,7 +1200,7 @@ SC_TEST(converted_life) {
   {  // Life::shouts
     converted::Tally tally("Life_shouts");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0) { return a0.shouts(); };
+    const auto run = [&]([[maybe_unused]] Life a0) { return converted::counted([&] { return a0.shouts(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const converted::Watch watch;
@@ -1216,7 +1216,7 @@ SC_TEST(converted_life) {
   {  // Life::honks
     converted::Tally tally("Life_honks");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0) { return a0.honks(); };
+    const auto run = [&]([[maybe_unused]] Life a0) { return converted::counted([&] { return a0.honks(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const converted::Watch watch;
@@ -1232,7 +1232,7 @@ SC_TEST(converted_life) {
   {  // Life::hold_animal
     converted::Tally tally("Life_hold_animal");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Body a1) { a0.hold_animal(a1); return a0; };
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Body a1) { converted::counted([&] { return a0.hold_animal(std::move(a1)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const Body a1 = draw_kern__physics__Body(draw);
@@ -1249,7 +1249,7 @@ SC_TEST(converted_life) {
   {  // Life::loose_birds
     converted::Tally tally("Life_loose_birds");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0) { return a0.loose_birds(); };
+    const auto run = [&]([[maybe_unused]] Life a0) { return converted::counted([&] { return a0.loose_birds(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const converted::Watch watch;

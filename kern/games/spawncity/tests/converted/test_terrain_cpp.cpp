@@ -150,7 +150,7 @@ SC_TEST(converted_terrain_cpp) {
   {  // key2
     converted::Tally tally("key2");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0, [[maybe_unused]] int a1) { return converted_terrain_cpp::key2(a0, a1); };
+    const auto run = [&]([[maybe_unused]] int a0, [[maybe_unused]] int a1) { return converted::counted([&] { return converted_terrain_cpp::key2(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const int a0 = static_cast<int>(draw.whole());
       const int a1 = static_cast<int>(draw.whole());
@@ -167,7 +167,7 @@ SC_TEST(converted_terrain_cpp) {
   {  // key3
     converted::Tally tally("key3");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0, [[maybe_unused]] int a1, [[maybe_unused]] int a2) { return converted_terrain_cpp::key3(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] int a0, [[maybe_unused]] int a1, [[maybe_unused]] int a2) { return converted::counted([&] { return converted_terrain_cpp::key3(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const int a0 = static_cast<int>(draw.whole());
       const int a1 = static_cast<int>(draw.whole());
@@ -185,7 +185,7 @@ SC_TEST(converted_terrain_cpp) {
   {  // sx28
     converted::Tally tally("sx28");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] u64 a0) { return converted_terrain_cpp::sx28(a0); };
+    const auto run = [&]([[maybe_unused]] u64 a0) { return converted::counted([&] { return converted_terrain_cpp::sx28(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const u64 a0 = static_cast<u64>(draw.bits());
       const converted::Watch watch;
@@ -201,7 +201,7 @@ SC_TEST(converted_terrain_cpp) {
   {  // unkey3
     converted::Tally tally("unkey3");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] u64 a0, [[maybe_unused]] int a1, [[maybe_unused]] int a2, [[maybe_unused]] int a3) { converted_terrain_cpp::unkey3(a0, a1, a2, a3); return Out_unkey3{a1, a2, a3}; };
+    const auto run = [&]([[maybe_unused]] u64 a0, [[maybe_unused]] int a1, [[maybe_unused]] int a2, [[maybe_unused]] int a3) { converted::counted([&] { return converted_terrain_cpp::unkey3(std::move(a0), a1, a2, a3); }); return Out_unkey3{a1, a2, a3}; };
     for (int i = 0; tally.more(i); ++i) {
       const u64 a0 = static_cast<u64>(draw.bits());
       const int a1 = static_cast<int>(draw.whole());
@@ -220,7 +220,7 @@ SC_TEST(converted_terrain_cpp) {
   {  // rect_distance
     converted::Tally tally("rect_distance");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { return converted_terrain_cpp::rect_distance(a0, a1, a2, a3, a4, a5); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { return converted::counted([&] { return converted_terrain_cpp::rect_distance(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
@@ -241,7 +241,7 @@ SC_TEST(converted_terrain_cpp) {
   {  // merc_y
     converted::Tally tally("merc_y");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] int a1) { return converted_terrain_cpp::merc_y(a0, a1); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] int a1) { return converted::counted([&] { return converted_terrain_cpp::merc_y(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const int a1 = static_cast<int>(draw.whole());
@@ -258,7 +258,7 @@ SC_TEST(converted_terrain_cpp) {
   {  // merc_x
     converted::Tally tally("merc_x");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] int a1) { return converted_terrain_cpp::merc_x(a0, a1); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] int a1) { return converted::counted([&] { return converted_terrain_cpp::merc_x(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const int a1 = static_cast<int>(draw.whole());
@@ -275,7 +275,7 @@ SC_TEST(converted_terrain_cpp) {
   {  // crater_profile
     converted::Tally tally("crater_profile");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return converted_terrain_cpp::crater_profile(a0, a1, a2, a3); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return converted::counted([&] { return converted_terrain_cpp::crater_profile(std::move(a0), std::move(a1), std::move(a2), std::move(a3)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
@@ -294,7 +294,7 @@ SC_TEST(converted_terrain_cpp) {
   {  // interior_of
     converted::Tally tally("interior_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return converted_terrain_cpp::interior_of(a0, a1, a2, a3); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return converted::counted([&] { return converted_terrain_cpp::interior_of(std::move(a0), std::move(a1), std::move(a2), std::move(a3)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
@@ -313,7 +313,7 @@ SC_TEST(converted_terrain_cpp) {
   {  // rect_in
     converted::Tally tally("rect_in");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec4 a0, [[maybe_unused]] Vec4 a1) { return converted_terrain_cpp::rect_in(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Vec4 a0, [[maybe_unused]] Vec4 a1) { return converted::counted([&] { return converted_terrain_cpp::rect_in(a0, a1); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec4 a0 = draw_kern__Vec4(draw);
       const Vec4 a1 = draw_kern__Vec4(draw);
@@ -330,7 +330,7 @@ SC_TEST(converted_terrain_cpp) {
   {  // Terrain::interior
     converted::Tally tally("Terrain_interior");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Terrain::Grid a0) { return converted_terrain_cpp::Terrain::interior(a0); };
+    const auto run = [&]([[maybe_unused]] Terrain::Grid a0) { return converted::counted([&] { return converted_terrain_cpp::Terrain::interior(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Terrain::Grid a0 = draw_Terrain__Grid(draw);
       const converted::Watch watch;
@@ -346,7 +346,7 @@ SC_TEST(converted_terrain_cpp) {
   {  // road_key
     converted::Tally tally("road_key");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0, [[maybe_unused]] int a1) { return converted_terrain_cpp::road_key(a0, a1); };
+    const auto run = [&]([[maybe_unused]] int a0, [[maybe_unused]] int a1) { return converted::counted([&] { return converted_terrain_cpp::road_key(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const int a0 = static_cast<int>(draw.whole());
       const int a1 = static_cast<int>(draw.whole());
@@ -363,7 +363,7 @@ SC_TEST(converted_terrain_cpp) {
   {  // albedo
     converted::Tally tally("albedo");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted_terrain_cpp::albedo(a0); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted::counted([&] { return converted_terrain_cpp::albedo(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const converted::Watch watch;
@@ -379,7 +379,7 @@ SC_TEST(converted_terrain_cpp) {
   {  // srgb_lin8
     converted::Tally tally("srgb_lin8");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned char a0) { return converted_terrain_cpp::srgb_lin8(a0); };
+    const auto run = [&]([[maybe_unused]] unsigned char a0) { return converted::counted([&] { return converted_terrain_cpp::srgb_lin8(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned char a0 = static_cast<unsigned char>(draw.below(40));
       const converted::Watch watch;
@@ -395,7 +395,7 @@ SC_TEST(converted_terrain_cpp) {
   {  // srgb_to_linear
     converted::Tally tally("srgb_to_linear");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted_terrain_cpp::srgb_to_linear(a0); };
+    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_terrain_cpp::srgb_to_linear(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
@@ -411,7 +411,7 @@ SC_TEST(converted_terrain_cpp) {
   {  // linear_to_srgb
     converted::Tally tally("linear_to_srgb");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted_terrain_cpp::linear_to_srgb(a0); };
+    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_terrain_cpp::linear_to_srgb(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
@@ -427,7 +427,7 @@ SC_TEST(converted_terrain_cpp) {
   {  // to_linear
     converted::Tally tally("to_linear");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted_terrain_cpp::to_linear(a0); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted::counted([&] { return converted_terrain_cpp::to_linear(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const converted::Watch watch;
@@ -443,7 +443,7 @@ SC_TEST(converted_terrain_cpp) {
   {  // to_srgb
     converted::Tally tally("to_srgb");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted_terrain_cpp::to_srgb(a0); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted::counted([&] { return converted_terrain_cpp::to_srgb(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const converted::Watch watch;

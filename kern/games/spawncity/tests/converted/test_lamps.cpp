@@ -132,7 +132,7 @@ SC_TEST(converted_lamps) {
   {  // Field::clear
     converted::Tally tally("Field_clear");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Field a0) { a0.clear(); return a0; };
+    const auto run = [&]([[maybe_unused]] Field a0) { converted::counted([&] { return a0.clear(); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Field a0 = draw_lamps__Field(draw);
       const converted::Watch watch;
@@ -148,7 +148,7 @@ SC_TEST(converted_lamps) {
   {  // Field::all
     converted::Tally tally("Field_all_2");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Field a0) { return a0.all(); };
+    const auto run = [&]([[maybe_unused]] Field a0) { return converted::counted([&] { return a0.all(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Field a0 = draw_lamps__Field(draw);
       const converted::Watch watch;
@@ -164,7 +164,7 @@ SC_TEST(converted_lamps) {
   {  // Field::reset_broken
     converted::Tally tally("Field_reset_broken");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Field a0) { a0.reset_broken(); return a0; };
+    const auto run = [&]([[maybe_unused]] Field a0) { converted::counted([&] { return a0.reset_broken(); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Field a0 = draw_lamps__Field(draw);
       const converted::Watch watch;
@@ -180,7 +180,7 @@ SC_TEST(converted_lamps) {
   {  // Field::broken
     converted::Tally tally("Field_broken");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Field a0) { return a0.broken(); };
+    const auto run = [&]([[maybe_unused]] Field a0) { return converted::counted([&] { return a0.broken(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Field a0 = draw_lamps__Field(draw);
       const converted::Watch watch;

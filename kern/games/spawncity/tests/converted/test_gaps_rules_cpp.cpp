@@ -308,7 +308,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // unit_hash
     converted::Tally tally("unit_hash");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted_gaps_rules_cpp::unit_hash(a0); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_gaps_rules_cpp::unit_hash(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
@@ -324,7 +324,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // rgb
     converted::Tally tally("rgb");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted_gaps_rules_cpp::rgb(a0); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_gaps_rules_cpp::rgb(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
@@ -340,7 +340,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // SmokeField::accelerate
     converted::Tally tally("SmokeField_accelerate");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] SmokeField a0, [[maybe_unused]] std::string a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { const auto r = a0.accelerate(a1, a2, a3); return Out_SmokeField_accelerate{a0, r}; };
+    const auto run = [&]([[maybe_unused]] SmokeField a0, [[maybe_unused]] std::string a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { const auto r = converted::counted([&] { return a0.accelerate(a1, std::move(a2), std::move(a3)); }); return Out_SmokeField_accelerate{a0, r}; };
     for (int i = 0; tally.more(i); ++i) {
       const SmokeField a0 = draw_gaps__SmokeField(draw);
       const std::string a1 = draw.word();
@@ -359,7 +359,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // SmokeField::move
     converted::Tally tally("SmokeField_move");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] SmokeField a0, [[maybe_unused]] std::string a1, [[maybe_unused]] Vec3 a2) { a0.move(a1, a2); return a0; };
+    const auto run = [&]([[maybe_unused]] SmokeField a0, [[maybe_unused]] std::string a1, [[maybe_unused]] Vec3 a2) { converted::counted([&] { return a0.move(a1, std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const SmokeField a0 = draw_gaps__SmokeField(draw);
       const std::string a1 = draw.word();
@@ -377,7 +377,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // SmokeField::active
     converted::Tally tally("SmokeField_active");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] SmokeField a0, [[maybe_unused]] std::string a1) { return a0.active(a1); };
+    const auto run = [&]([[maybe_unused]] SmokeField a0, [[maybe_unused]] std::string a1) { return converted::counted([&] { return a0.active(a1); }); };
     for (int i = 0; tally.more(i); ++i) {
       const SmokeField a0 = draw_gaps__SmokeField(draw);
       const std::string a1 = draw.word();
@@ -394,7 +394,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // SmokeField::live_puffs
     converted::Tally tally("SmokeField_live_puffs");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] SmokeField a0) { return a0.live_puffs(); };
+    const auto run = [&]([[maybe_unused]] SmokeField a0) { return converted::counted([&] { return a0.live_puffs(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const SmokeField a0 = draw_gaps__SmokeField(draw);
       const converted::Watch watch;
@@ -410,7 +410,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // SmokeField::opacity
     converted::Tally tally("SmokeField_opacity");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Puff a0, [[maybe_unused]] double a1) { return SmokeField::opacity(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Puff a0, [[maybe_unused]] double a1) { return converted::counted([&] { return SmokeField::opacity(a0, std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Puff a0 = draw_gaps__Puff(draw);
       const double a1 = draw.number();
@@ -427,7 +427,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // SmokeField::size
     converted::Tally tally("SmokeField_size");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Puff a0, [[maybe_unused]] double a1) { return SmokeField::size(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Puff a0, [[maybe_unused]] double a1) { return converted::counted([&] { return SmokeField::size(a0, std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Puff a0 = draw_gaps__Puff(draw);
       const double a1 = draw.number();
@@ -444,7 +444,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // damping
     converted::Tally tally("damping");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted_gaps_rules_cpp::damping(a0, a1); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_gaps_rules_cpp::damping(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
@@ -461,7 +461,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // normalized
     converted::Tally tally("normalized");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Quat a0) { return converted_gaps_rules_cpp::normalized(a0); };
+    const auto run = [&]([[maybe_unused]] Quat a0) { return converted::counted([&] { return converted_gaps_rules_cpp::normalized(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Quat a0 = draw_kern__Quat(draw);
       const converted::Watch watch;
@@ -477,7 +477,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // slerp
     converted::Tally tally("slerp");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Quat a0, [[maybe_unused]] Quat a1, [[maybe_unused]] double a2) { return converted_gaps_rules_cpp::slerp(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] Quat a0, [[maybe_unused]] Quat a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_gaps_rules_cpp::slerp(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Quat a0 = draw_kern__Quat(draw);
       const Quat a1 = draw_kern__Quat(draw);
@@ -495,7 +495,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // quat_angle
     converted::Tally tally("quat_angle");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Quat a0, [[maybe_unused]] Quat a1) { return converted_gaps_rules_cpp::quat_angle(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Quat a0, [[maybe_unused]] Quat a1) { return converted::counted([&] { return converted_gaps_rules_cpp::quat_angle(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Quat a0 = draw_kern__Quat(draw);
       const Quat a1 = draw_kern__Quat(draw);
@@ -512,7 +512,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // VisualPose::update
     converted::Tally tally("VisualPose_update");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] VisualPose a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Quat a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] int a4, [[maybe_unused]] double a5, [[maybe_unused]] Vec3 a6, [[maybe_unused]] Quat a7) { a0.update(a1, a2, a3, a4, a5, a6, a7); return Out_VisualPose_update{a0, a6, a7}; };
+    const auto run = [&]([[maybe_unused]] VisualPose a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Quat a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] int a4, [[maybe_unused]] double a5, [[maybe_unused]] Vec3 a6, [[maybe_unused]] Quat a7) { converted::counted([&] { return a0.update(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), a6, a7); }); return Out_VisualPose_update{a0, a6, a7}; };
     for (int i = 0; tally.more(i); ++i) {
       const VisualPose a0 = draw_gaps__VisualPose(draw);
       const Vec3 a1 = draw.vector();

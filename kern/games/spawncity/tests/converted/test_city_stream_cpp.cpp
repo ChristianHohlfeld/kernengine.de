@@ -169,7 +169,7 @@ SC_TEST(converted_city_stream_cpp) {
   {  // konstanz_style
     converted::Tally tally("konstanz_style");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted_city_stream_cpp::konstanz_style(); };
+    const auto run = [&]() { return converted::counted([&] { return converted_city_stream_cpp::konstanz_style(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
@@ -184,7 +184,7 @@ SC_TEST(converted_city_stream_cpp) {
   {  // road_palette
     converted::Tally tally("road_palette");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted_city_stream_cpp::road_palette(); };
+    const auto run = [&]() { return converted::counted([&] { return converted_city_stream_cpp::road_palette(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
@@ -199,7 +199,7 @@ SC_TEST(converted_city_stream_cpp) {
   {  // signed_area
     converted::Tally tally("signed_area");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0) { return converted_city_stream_cpp::signed_area(a0); };
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0) { return converted::counted([&] { return converted_city_stream_cpp::signed_area(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       const converted::Watch watch;
@@ -215,7 +215,7 @@ SC_TEST(converted_city_stream_cpp) {
   {  // rect_distance_to
     converted::Tally tally("rect_distance_to");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec4 a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted_city_stream_cpp::rect_distance_to(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] Vec4 a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_city_stream_cpp::rect_distance_to(a0, std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec4 a0 = draw_kern__Vec4(draw);
       const double a1 = draw.number();
@@ -233,7 +233,7 @@ SC_TEST(converted_city_stream_cpp) {
   {  // cell_key
     converted::Tally tally("cell_key");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0, [[maybe_unused]] int a1) { return converted_city_stream_cpp::cell_key(a0, a1); };
+    const auto run = [&]([[maybe_unused]] int a0, [[maybe_unused]] int a1) { return converted::counted([&] { return converted_city_stream_cpp::cell_key(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const int a0 = static_cast<int>(draw.whole());
       const int a1 = static_cast<int>(draw.whole());
@@ -250,7 +250,7 @@ SC_TEST(converted_city_stream_cpp) {
   {  // cell_of
     converted::Tally tally("cell_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec2 a0) { return converted_city_stream_cpp::cell_of(a0); };
+    const auto run = [&]([[maybe_unused]] Vec2 a0) { return converted::counted([&] { return converted_city_stream_cpp::cell_of(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec2 a0 = draw.vector2();
       const converted::Watch watch;
@@ -266,7 +266,7 @@ SC_TEST(converted_city_stream_cpp) {
   {  // building_options
     converted::Tally tally("building_options");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted_city_stream_cpp::building_options(); };
+    const auto run = [&]() { return converted::counted([&] { return converted_city_stream_cpp::building_options(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)

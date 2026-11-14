@@ -4440,23 +4440,29 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     if (f.external || !f.from.empty()) continue;  // (a function of another Blueprint, or of a library: nothing of it is here to call by name)
     // (a reference input: called by name it is a variable of the call that starts as the argument;
     // what the function made of it stands behind the outputs - Instance::call)
+    // The arguments are made first, then the function runs - between the two calls of native_call,
+    // so that a host can measure the function's own work (logic::native_probe) -, then what it gave
+    // is handed back. An input by value is moved in: the function gets it without a copy.
     std::string call = "self." + f.name + "(", places, changed;
     for (std::size_t k = 0; k < f.inputs.size(); ++k) {
-      const std::string given = "native_arg<" + type(f.inputs[k].type, f.inputs[k].of) + ">(args, " + std::to_string(k) + ", " + value(f.inputs[k].value, f.inputs[k].type, f.inputs[k].of) + ")";
+      const std::string at = std::to_string(k);
       if (f.inputs[k].ref) {
         // (a variable of exactly the type the function takes: its reference binds to it)
-        const std::string held = "kern::logic::NativeParam<&" + name + "::" + f.name + ", " + std::to_string(k) + ">";
-        places += "      " + held + " place" + std::to_string(k) + " = native_arg<" + held + ">(args, " + std::to_string(k) + ", " + held + "{});\n";
-        if (!f.inputs[k].constant) changed += "      results.push_back(to_value(place" + std::to_string(k) + "));\n";
+        const std::string held = "kern::logic::NativeParam<&" + name + "::" + f.name + ", " + at + ">";
+        places += "      " + held + " place" + at + " = native_arg<" + held + ">(args, " + at + ", " + held + "{});\n";
+        if (!f.inputs[k].constant) changed += "      results.push_back(to_value(place" + at + "));\n";
+      } else {
+        const std::string held = type(f.inputs[k].type, f.inputs[k].of);
+        places += "      " + held + " in" + at + " = native_arg<" + held + ">(args, " + at + ", " + value(f.inputs[k].value, f.inputs[k].type, f.inputs[k].of) + ");\n";
       }
-      call += std::string(k ? ", " : "") + (f.inputs[k].ref ? "place" + std::to_string(k) : given);
+      call += std::string(k ? ", " : "") + (f.inputs[k].ref ? "place" + at : "std::move(in" + at + ")");
     }
     call += ")";
-    s += "    if (function == \"" + f.name + "\") {\n" + places;
+    s += "    if (function == \"" + f.name + "\") {\n" + places + "      kern::logic::native_call(true);\n";
     if (f.outputs.empty()) {
-      s += "      " + call + ";\n";
+      s += "      " + call + ";\n      kern::logic::native_call(false);\n";
     } else {
-      s += "      const auto out = " + call + ";\n      results = {";
+      s += "      const auto out = " + call + ";\n      kern::logic::native_call(false);\n      results = {";
       for (std::size_t k = 0; k < f.outputs.size(); ++k) s += std::string(k ? ", " : "") + "to_value(out." + f.outputs[k].name + ")";
       s += "};\n";
     }

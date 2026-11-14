@@ -5646,7 +5646,10 @@ class TestWriter:
                     self.result_ok(ret)
                 if owner:
                     self.helpers(owner) if (f.mutates or f.ctor) else None
-                args = ", ".join(names[first:])
+                # (what the function takes by value is handed over, as a call hands a value it does not need
+                # again: the count of what the function asks for memory is of its own work - see converted.h)
+                by_value = lambda p: not any(ch in qtype(p) for ch in "&*") and not self.u.object_of(qtype(p))
+                args = ", ".join(f"std::move({n})" if by_value(p) else n for n, p in zip(names[first:], params))
                 if owner and f.self_type is None and not f.ctor and not static:
                     self.helpers(owner)   # (a method that does not use its object: called on one as its class makes it)
                 here = f"{ns}::"   # (by its full name: the test's own function, whatever its arguments are)
@@ -5657,15 +5660,17 @@ class TestWriter:
                     parts[("ref", place_)] = f"a{place_}"
                 out_lines = []
                 want_type = ""   # (how the test spells what the call gives, see `wrap`)
+                # the function's own call is counted: how often it asks for memory (converted::counted)
+                counted = f"converted::counted([&] {{ return {target}; }})"
                 if f.ctor:
-                    give = f"return {target};"
+                    give = f"return {counted};"
                 elif len(f.out_fields) > 1:
                     fields = [(n, types[0] if src_ == "self" else self.spell(ret) if src_ == "result" else types[src_[1]]) for n, _, src_ in f.out_fields]
                     out_lines = self.plain_struct(f"Out_{f.name}", fields)
-                    give = f"{'const auto r = ' if f.value is not None else ''}{target}; return Out_{f.name}{{{', '.join(parts[src_] for _, _, src_ in f.out_fields)}}};"
+                    give = f"{'const auto r = ' if f.value is not None else ''}{counted}; return Out_{f.name}{{{', '.join(parts[src_] for _, _, src_ in f.out_fields)}}};"
                 else:
                     src_ = f.out_fields[0][2]
-                    give = f"return {target};" if src_ == "result" else f"{target}; return {parts[src_]};"
+                    give = f"return {counted};" if src_ == "result" else f"{counted}; return {parts[src_]};"
                     want_type = types[0] if src_ == "self" else self.spell(ret) if src_ == "result" else types[src_[1]]
             except Wait as w:
                 skipped.append((f, str(w)))

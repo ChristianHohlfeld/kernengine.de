@@ -220,7 +220,7 @@ SC_TEST(converted_world_art_cpp) {
   {  // WorldArt::begin
     converted::Tally tally("WorldArt_begin");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] WorldArt a0) { a0.begin(); return a0; };
+    const auto run = [&]([[maybe_unused]] WorldArt a0) { converted::counted([&] { return a0.begin(); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const WorldArt a0 = draw_WorldArt(draw);
       const converted::Watch watch;
@@ -236,7 +236,7 @@ SC_TEST(converted_world_art_cpp) {
   {  // WorldArt::put
     converted::Tally tally("WorldArt_put");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] WorldArt a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] Mat4 a2, [[maybe_unused]] Vec3 a3) { a0.put(a1, a2, a3); return a0; };
+    const auto run = [&]([[maybe_unused]] WorldArt a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] Mat4 a2, [[maybe_unused]] Vec3 a3) { converted::counted([&] { return a0.put(std::move(a1), a2, std::move(a3)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const WorldArt a0 = draw_WorldArt(draw);
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));

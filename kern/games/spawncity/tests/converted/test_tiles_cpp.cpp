@@ -370,7 +370,7 @@ SC_TEST(converted_tiles_cpp) {
   {  // tile_at
     converted::Tally tally("tile_at");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] int a2) { return converted_tiles_cpp::tile_at(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] int a2) { return converted::counted([&] { return converted_tiles_cpp::tile_at(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
@@ -388,7 +388,7 @@ SC_TEST(converted_tiles_cpp) {
   {  // tile_lonlat
     converted::Tally tally("tile_lonlat");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TileKey a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { converted_tiles_cpp::tile_lonlat(a0, a1, a2, a3, a4); return Out_tile_lonlat{a3, a4}; };
+    const auto run = [&]([[maybe_unused]] TileKey a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { converted::counted([&] { return converted_tiles_cpp::tile_lonlat(a0, std::move(a1), std::move(a2), a3, a4); }); return Out_tile_lonlat{a3, a4}; };
     for (int i = 0; tally.more(i); ++i) {
       const TileKey a0 = draw_TileKey(draw);
       const double a1 = draw.number();
@@ -408,7 +408,7 @@ SC_TEST(converted_tiles_cpp) {
   {  // unproject
     converted::Tally tally("unproject");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GeoProjector a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { converted_tiles_cpp::unproject(a0, a1, a2, a3, a4); return Out_unproject{a3, a4}; };
+    const auto run = [&]([[maybe_unused]] GeoProjector a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { converted::counted([&] { return converted_tiles_cpp::unproject(a0, std::move(a1), std::move(a2), a3, a4); }); return Out_unproject{a3, a4}; };
     for (int i = 0; tally.more(i); ++i) {
       const GeoProjector a0 = draw_kern__GeoProjector(draw);
       const double a1 = draw.number();
@@ -428,7 +428,7 @@ SC_TEST(converted_tiles_cpp) {
   {  // road_width
     converted::Tally tally("road_width");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] RoadClass a0) { return converted_tiles_cpp::road_width(a0); };
+    const auto run = [&]([[maybe_unused]] RoadClass a0) { return converted::counted([&] { return converted_tiles_cpp::road_width(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const RoadClass a0 = static_cast<RoadClass>(draw.below(13));
       const converted::Watch watch;
@@ -444,7 +444,7 @@ SC_TEST(converted_tiles_cpp) {
   {  // road_is_water
     converted::Tally tally("road_is_water");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] RoadClass a0) { return converted_tiles_cpp::road_is_water(a0); };
+    const auto run = [&]([[maybe_unused]] RoadClass a0) { return converted::counted([&] { return converted_tiles_cpp::road_is_water(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const RoadClass a0 = static_cast<RoadClass>(draw.below(13));
       const converted::Watch watch;
@@ -460,7 +460,7 @@ SC_TEST(converted_tiles_cpp) {
   {  // road_drivable
     converted::Tally tally("road_drivable");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] RoadClass a0) { return converted_tiles_cpp::road_drivable(a0); };
+    const auto run = [&]([[maybe_unused]] RoadClass a0) { return converted::counted([&] { return converted_tiles_cpp::road_drivable(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const RoadClass a0 = static_cast<RoadClass>(draw.below(13));
       const converted::Watch watch;
@@ -476,7 +476,7 @@ SC_TEST(converted_tiles_cpp) {
   {  // Projector::Projector
     converted::Tally tally("Projector_new");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TileKey a0, [[maybe_unused]] GeoProjector a1, [[maybe_unused]] double a2) { return Projector(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] TileKey a0, [[maybe_unused]] GeoProjector a1, [[maybe_unused]] double a2) { return converted::counted([&] { return Projector(a0, a1, std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const TileKey a0 = draw_TileKey(draw);
       const GeoProjector a1 = draw_kern__GeoProjector(draw);
@@ -494,7 +494,7 @@ SC_TEST(converted_tiles_cpp) {
   {  // Projector::operator()
     converted::Tally tally("Projector_call");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Projector a0, [[maybe_unused]] Vec2 a1) { return a0.operator()(a1); };
+    const auto run = [&]([[maybe_unused]] Projector a0, [[maybe_unused]] Vec2 a1) { return converted::counted([&] { return a0.operator()(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Projector a0 = draw_Projector(draw);
       const Vec2 a1 = draw.vector2();
@@ -511,7 +511,7 @@ SC_TEST(converted_tiles_cpp) {
   {  // hash_u32
     converted::Tally tally("hash_u32");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] u64 a0) { return converted_tiles_cpp::hash_u32(a0); };
+    const auto run = [&]([[maybe_unused]] u64 a0) { return converted::counted([&] { return converted_tiles_cpp::hash_u32(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const u64 a0 = static_cast<u64>(draw.bits());
       const converted::Watch watch;
@@ -527,7 +527,7 @@ SC_TEST(converted_tiles_cpp) {
   {  // FurnishIndex::key
     converted::Tally tally("FurnishIndex_key");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0, [[maybe_unused]] int a1) { return converted_tiles_cpp::FurnishIndex::key(a0, a1); };
+    const auto run = [&]([[maybe_unused]] int a0, [[maybe_unused]] int a1) { return converted::counted([&] { return converted_tiles_cpp::FurnishIndex::key(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const int a0 = static_cast<int>(draw.whole());
       const int a1 = static_cast<int>(draw.whole());
@@ -544,7 +544,7 @@ SC_TEST(converted_tiles_cpp) {
   {  // FurnishIndex::cell
     converted::Tally tally("FurnishIndex_cell");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted_tiles_cpp::FurnishIndex::cell(a0); };
+    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_tiles_cpp::FurnishIndex::cell(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
@@ -560,7 +560,7 @@ SC_TEST(converted_tiles_cpp) {
   {  // procedural_city
     converted::Tally tally("procedural_city");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] unsigned int a3, [[maybe_unused]] MapFeatures a4) { converted_tiles_cpp::procedural_city(a0, a1, a2, a3, a4); return a4; };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] unsigned int a3, [[maybe_unused]] MapFeatures a4) { converted::counted([&] { return converted_tiles_cpp::procedural_city(std::move(a0), std::move(a1), std::move(a2), std::move(a3), a4); }); return a4; };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();

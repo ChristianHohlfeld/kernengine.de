@@ -85,7 +85,7 @@ SC_TEST(converted_engine_geo_buildings) {
   {  // FootprintStream::FootprintStream
     converted::Tally tally("FootprintStream_new");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return FootprintStream(); };
+    const auto run = [&]() { return converted::counted([&] { return FootprintStream(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
@@ -100,7 +100,7 @@ SC_TEST(converted_engine_geo_buildings) {
   {  // FootprintStream::begin
     converted::Tally tally("FootprintStream_begin_2");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] FootprintStream a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { a0.begin(a1, a2, a3, a4, a5); return a0; };
+    const auto run = [&]([[maybe_unused]] FootprintStream a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { converted::counted([&] { return a0.begin(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const FootprintStream a0 = draw_kern__FootprintStream(draw);
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -121,7 +121,7 @@ SC_TEST(converted_engine_geo_buildings) {
   {  // FootprintStream::size
     converted::Tally tally("FootprintStream_size");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] FootprintStream a0) { return a0.size(); };
+    const auto run = [&]([[maybe_unused]] FootprintStream a0) { return converted::counted([&] { return a0.size(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const FootprintStream a0 = draw_kern__FootprintStream(draw);
       const converted::Watch watch;

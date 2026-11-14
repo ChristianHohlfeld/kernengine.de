@@ -93,7 +93,7 @@ SC_TEST(converted_weapons) {
   {  // spec
     converted::Tally tally("spec");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Id a0) { return converted_weapons::spec(a0); };
+    const auto run = [&]([[maybe_unused]] Id a0) { return converted::counted([&] { return converted_weapons::spec(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Id a0 = static_cast<Id>(draw.below(14));
       const converted::Watch watch;
@@ -109,7 +109,7 @@ SC_TEST(converted_weapons) {
   {  // blast_factor
     converted::Tally tally("blast_factor");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] bool a2) { return converted_weapons::blast_factor(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] bool a2) { return converted::counted([&] { return converted_weapons::blast_factor(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();

@@ -258,7 +258,7 @@ SC_TEST(converted_interiors) {
   {  // Interiors::init
     converted::Tally tally("Interiors_init");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Interiors a0, [[maybe_unused]] Renderer& a1, [[maybe_unused]] World& a2) { a0.init(a1, a2); return a0; };
+    const auto run = [&]([[maybe_unused]] Interiors a0, [[maybe_unused]] Renderer& a1, [[maybe_unused]] World& a2) { converted::counted([&] { return a0.init(a1, a2); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Interiors a0 = draw_Interiors(draw);
       Renderer& a1 = *converted::engine_object<Renderer>(1 + draw.below(6));
@@ -276,7 +276,7 @@ SC_TEST(converted_interiors) {
   {  // Interiors::active
     converted::Tally tally("Interiors_active");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Interiors a0) { return a0.active(); };
+    const auto run = [&]([[maybe_unused]] Interiors a0) { return converted::counted([&] { return a0.active(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Interiors a0 = draw_Interiors(draw);
       const converted::Watch watch;
@@ -292,7 +292,7 @@ SC_TEST(converted_interiors) {
   {  // Interiors::plan
     converted::Tally tally("Interiors_plan");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Interiors a0) { return a0.plan(); };
+    const auto run = [&]([[maybe_unused]] Interiors a0) { return converted::counted([&] { return a0.plan(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Interiors a0 = draw_Interiors(draw);
       const converted::Watch watch;

@@ -103,7 +103,7 @@ SC_TEST(converted_engine_geo_roads) {
   {  // RoadStream::size
     converted::Tally tally("RoadStream_size");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] RoadStream a0) { return a0.size(); };
+    const auto run = [&]([[maybe_unused]] RoadStream a0) { return converted::counted([&] { return a0.size(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const RoadStream a0 = draw_kern__RoadStream(draw);
       const converted::Watch watch;
@@ -119,7 +119,7 @@ SC_TEST(converted_engine_geo_roads) {
   {  // GeoProjector::project
     converted::Tally tally("GeoProjector_project");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GeoProjector a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { a0.project(a1, a2, a3, a4); return Out_GeoProjector_project{a3, a4}; };
+    const auto run = [&]([[maybe_unused]] GeoProjector a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { converted::counted([&] { return a0.project(std::move(a1), std::move(a2), a3, a4); }); return Out_GeoProjector_project{a3, a4}; };
     for (int i = 0; tally.more(i); ++i) {
       const GeoProjector a0 = draw_kern__GeoProjector(draw);
       const double a1 = draw.number();

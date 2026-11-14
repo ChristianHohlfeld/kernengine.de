@@ -60,7 +60,7 @@ SC_TEST(converted_game_worldsync_cpp) {
   {  // dist2d
     converted::Tally tally("dist2d");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1) { return converted_game_worldsync_cpp::dist2d(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1) { return converted::counted([&] { return converted_game_worldsync_cpp::dist2d(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const Vec3 a1 = draw.vector();
@@ -77,7 +77,7 @@ SC_TEST(converted_game_worldsync_cpp) {
   {  // uq16
     converted::Tally tally("uq16");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] short a0) { return converted_game_worldsync_cpp::uq16(a0); };
+    const auto run = [&]([[maybe_unused]] short a0) { return converted::counted([&] { return converted_game_worldsync_cpp::uq16(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const short a0 = static_cast<short>(draw.whole());
       const converted::Watch watch;
@@ -93,7 +93,7 @@ SC_TEST(converted_game_worldsync_cpp) {
   {  // col8
     converted::Tally tally("col8");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted_game_worldsync_cpp::col8(a0); };
+    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_game_worldsync_cpp::col8(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;

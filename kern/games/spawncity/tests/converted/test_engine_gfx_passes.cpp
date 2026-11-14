@@ -242,7 +242,7 @@ SC_TEST(converted_engine_gfx_passes) {
   {  // SunShadowMap::set_filter
     converted::Tally tally("SunShadowMap_set_filter");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] SunShadowMap a0, [[maybe_unused]] int a1) { a0.set_filter(a1); return a0; };
+    const auto run = [&]([[maybe_unused]] SunShadowMap a0, [[maybe_unused]] int a1) { converted::counted([&] { return a0.set_filter(std::move(a1)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const SunShadowMap a0 = draw_kern__SunShadowMap(draw);
       const int a1 = static_cast<int>(draw.whole());

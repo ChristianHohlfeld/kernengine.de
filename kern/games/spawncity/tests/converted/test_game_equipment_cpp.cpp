@@ -145,7 +145,7 @@ SC_TEST(converted_game_equipment_cpp) {
   {  // drive_loop
     converted::Tally tally("drive_loop");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Mixer& a0, [[maybe_unused]] u64 a1, [[maybe_unused]] unsigned int a2, [[maybe_unused]] double a3, [[maybe_unused]] Bus a4, [[maybe_unused]] bool a5, [[maybe_unused]] Vec3 a6) { converted_game_equipment_cpp::drive_loop(a0, a1, a2, a3, a4, a5, a6); return a1; };
+    const auto run = [&]([[maybe_unused]] Mixer& a0, [[maybe_unused]] u64 a1, [[maybe_unused]] unsigned int a2, [[maybe_unused]] double a3, [[maybe_unused]] Bus a4, [[maybe_unused]] bool a5, [[maybe_unused]] Vec3 a6) { converted::counted([&] { return converted_game_equipment_cpp::drive_loop(a0, a1, std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6)); }); return a1; };
     for (int i = 0; tally.more(i); ++i) {
       Mixer& a0 = *converted::engine_object<Mixer>(1 + draw.below(6));
       const u64 a1 = static_cast<u64>(draw.bits());

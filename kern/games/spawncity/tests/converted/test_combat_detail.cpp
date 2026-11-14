@@ -61,7 +61,7 @@ SC_TEST(converted_combat_detail) {
   {  // CriticalClock::armed
     converted::Tally tally("CriticalClock_armed");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CriticalClock a0) { return a0.armed(); };
+    const auto run = [&]([[maybe_unused]] CriticalClock a0) { return converted::counted([&] { return a0.armed(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const CriticalClock a0 = draw_detail__CriticalClock(draw);
       const converted::Watch watch;
@@ -77,7 +77,7 @@ SC_TEST(converted_combat_detail) {
   {  // CriticalClock::reset
     converted::Tally tally("CriticalClock_reset");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CriticalClock a0) { a0.reset(); return a0; };
+    const auto run = [&]([[maybe_unused]] CriticalClock a0) { converted::counted([&] { return a0.reset(); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const CriticalClock a0 = draw_detail__CriticalClock(draw);
       const converted::Watch watch;

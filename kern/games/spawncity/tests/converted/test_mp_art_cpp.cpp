@@ -262,7 +262,7 @@ SC_TEST(converted_mp_art_cpp) {
   {  // MpArt::put
     converted::Tally tally("MpArt_put");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MpArt::Part a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { MpArt{}.put(a0, a1, a2); return a0; };
+    const auto run = [&]([[maybe_unused]] MpArt::Part a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { converted::counted([&] { return MpArt{}.put(a0, a1, std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const MpArt::Part a0 = draw_MpArt__Part(draw);
       const Mat4 a1 = draw_kern__Mat4(draw);
@@ -280,7 +280,7 @@ SC_TEST(converted_mp_art_cpp) {
   {  // MpArt::ping
     converted::Tally tally("MpArt_ping");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MpArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { a0.ping(a1, a2, a3, a4, a5); return a0; };
+    const auto run = [&]([[maybe_unused]] MpArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { converted::counted([&] { return a0.ping(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const MpArt a0 = draw_MpArt(draw);
       const Vec3 a1 = draw.vector();
@@ -301,7 +301,7 @@ SC_TEST(converted_mp_art_cpp) {
   {  // MpArt::tracer
     converted::Tally tally("MpArt_tracer");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MpArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] Vec3 a4) { a0.tracer(a1, a2, a3, a4); return a0; };
+    const auto run = [&]([[maybe_unused]] MpArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] Vec3 a4) { converted::counted([&] { return a0.tracer(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const MpArt a0 = draw_MpArt(draw);
       const Vec3 a1 = draw.vector();
@@ -321,7 +321,7 @@ SC_TEST(converted_mp_art_cpp) {
   {  // MpArt::flash
     converted::Tally tally("MpArt_flash");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MpArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { a0.flash(a1, a2, a3); return a0; };
+    const auto run = [&]([[maybe_unused]] MpArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { converted::counted([&] { return a0.flash(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const MpArt a0 = draw_MpArt(draw);
       const Vec3 a1 = draw.vector();
@@ -340,7 +340,7 @@ SC_TEST(converted_mp_art_cpp) {
   {  // MpArt::drone_accent
     converted::Tally tally("MpArt_drone_accent");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MpArt a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { a0.drone_accent(a1, a2); return a0; };
+    const auto run = [&]([[maybe_unused]] MpArt a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { converted::counted([&] { return a0.drone_accent(a1, std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const MpArt a0 = draw_MpArt(draw);
       const Mat4 a1 = draw_kern__Mat4(draw);
@@ -358,7 +358,7 @@ SC_TEST(converted_mp_art_cpp) {
   {  // MpArt::shield
     converted::Tally tally("MpArt_shield");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MpArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { a0.shield(a1, a2, a3); return a0; };
+    const auto run = [&]([[maybe_unused]] MpArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { converted::counted([&] { return a0.shield(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const MpArt a0 = draw_MpArt(draw);
       const Vec3 a1 = draw.vector();

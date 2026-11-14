@@ -35,6 +35,7 @@
 #include "kern/logic/engine_api.h"
 #include "../src/common.h"
 #include "kern/logic/nodes.h"
+#include "cost.h"
 #include "rule_blueprint.h"
 #include "test_util.h"
 
@@ -744,6 +745,30 @@ inline std::string shown(const Value& v) {
 
 inline constexpr int kCalls = 300;
 
+// ---- what a call costs ----
+// The class of a Blueprint costs what the source it was written from costs: it does not ask for memory more
+// often. The allocator counts (cost.h) while the source's function runs - a generated test calls it through
+// `counted` - and while the class's function runs: the class's glue says when (logic::native_probe).
+// What makes the arguments and takes the results is outside on both sides.
+inline long g_source_asks = 0, g_class_asks = 0;
+/// The source's own call, counted: from where it begins until it has returned what it gives.
+template <class Call> decltype(auto) counted(Call&& call) {
+  struct Ends {
+    ~Ends() { g_source_asks = cost::end(); }
+  };
+  cost::begin();
+  const Ends ends;
+  return call();
+}
+inline void class_runs(bool begins) {
+  static int depth = 0;   // (a function of a class that calls one of another class by name: the outer call counts all of it)
+  if (begins) {
+    if (depth++ == 0) cost::begin();
+  } else if (--depth == 0) {
+    g_class_asks = cost::end();
+  }
+}
+
 /// A converted source file's Blueprint, in the interpreter and as its compiled class.
 struct Blueprint {
   RuleBlueprint interpreted, compiled;
@@ -753,6 +778,8 @@ struct Blueprint {
     interpreted.rt.budget = compiled.rt.budget = 2000000000u;
     SC_CHECK(interpreted.inst && compiled.inst, "%s: %s%s", actor, interpreted.problems.c_str(), compiled.problems.c_str());
     SC_CHECK(interpreted.problems.empty(), "%s: %s", actor, interpreted.problems.c_str());
+    SC_CHECK(compiled.inst && std::string(compiled.inst->tier()) == "native C++", "%s runs as its C++ class (it runs: %s)", actor, compiled.inst ? compiled.inst->tier() : "not at all");
+    kern::logic::native_probe = class_runs;
   }
 };
 
@@ -760,6 +787,8 @@ struct Blueprint {
 struct Tally {
   const char* function;
   int compared = 0, outside = 0, wrong = 0, class_only = 0;
+  int costlier = 0;                  // calls in which the class asked for memory more often than the source
+  long most_class = 0, with_source = 0;  // (the one with the most: how often the class, how often the source)
   double slowest = 0;
   std::chrono::steady_clock::time_point began = std::chrono::steady_clock::now();
   explicit Tally(const char* f) : function(f) {}
@@ -796,7 +825,10 @@ struct Tally {
     bp.compiled.host.stand_in.calls.clear();
     bp.interpreted.host.stand_in.calls.clear();
     const auto before = std::chrono::steady_clock::now();
+    const long source_asks = g_source_asks;
+    g_class_asks = 0;
     const bool ib = bp.compiled.inst->call(function, args, b);
+    const long class_asks = g_class_asks;
     const double took = std::chrono::duration<double>(std::chrono::steady_clock::now() - before).count();
     const bool both = took < 0.005;
     const bool ia = both ? bp.interpreted.inst->call(function, args, a) : ib;
@@ -822,6 +854,10 @@ struct Tally {
       slowest = std::max(slowest, took);
     }
     ++compared;
+    if (class_asks > source_asks) {
+      ++costlier;
+      if (class_asks - source_asks > most_class - with_source) most_class = class_asks, with_source = source_asks;
+    }
     if (ia && ib && a.size() == 1 && b.size() == 1 && a[0] == b[0] && same(want, a[0]) && same(want, b[0])) return;
     if (++wrong <= 3)
       std::printf("  %s(%s): the source gives %s, the Blueprint %s (interpreter) and %s (class)\n", function, describe().c_str(), text(want).c_str(),
@@ -834,6 +870,8 @@ struct Tally {
       std::printf("  note: %s: %d of %d calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to %.0f ms - is not run in the interpreter)\n",
                   function, class_only, compared, slowest * 1000);
     SC_CHECK(wrong == 0, "%s: %d of %d calls differ", function, wrong, compared);
+    if (costlier > 0)
+      std::printf("  cost: %s: in %d of %d calls the class asks for memory more often than the source (up to %ld times instead of %ld)\n", function, costlier, compared, most_class, with_source);
     const bool long_calls = compared >= 5 && compared < 20 && seconds() >= kLong;
     if (long_calls) std::printf("  note: %s: %d calls compared (they take %.0f s; of a function whose calls take less, twenty at least are)\n", function, compared, seconds());
     SC_CHECK(compared >= 20 || long_calls, "%s: only %d calls could be compared (in %d the source left the numbers)", function, compared, outside);

@@ -483,6 +483,22 @@ Eine Form, die Gestalt oder Kosten ändert, ist keine von beiden.
 - **Kosten:** Derselbe Test zählt für jeden verglichenen Aufruf, wie oft Quelltext und Klasse
   Speicher anfordern; fordert die Klasse öfter an, ist das ein Fehler. Die Zeit misst ein
   Export-Build (ohne Prüfwerkzeuge) für dieselben Aufrufe gegen den Quelltext.
+  - **Der Test zählt (seit 14.11.2026, 07:25).** Der Speicherverwalter der Tests zählt, während
+    die Funktion selbst läuft – im Quelltext um ihren Aufruf (`converted::counted`), in der
+    Klasse zwischen den zwei Meldungen ihres Aufrufcodes (`logic::native_probe`, eine allgemeine
+    Messstelle der Engine: Argumente bauen und Ergebnisse zurückgeben liegt außerhalb). Der
+    Vergleichstest prüft dabei auch, dass wirklich die Klasse läuft.
+  - **Der Stand:** Von 600 verglichenen Funktionen fordert die Klasse bei 470 nicht öfter an als
+    ihr Quelltext. Bei 130 tut sie es; der Test nennt jede (`cost:` in seiner Ausgabe) und ist
+    noch kein Fehler – er wird es, sobald die Liste leer ist. Woran es liegt, nach Häufigkeit:
+    1. Listen fester Länge (`f32 m[16]`, `std::array`) sind in der Sprache Listen und liegen im
+       Speicher, im C++ nicht (jede `Mat4`: 3 statt 0; die 256-Bit-Zahlen in `nostr`).
+       → Die Sprache bekommt Listen fester Länge.
+    2. Eine Struktur aus Werten bauen kopiert die Werte (`struct_make`, `list_make`), und ein
+       `return {x}` kopiert die lokale Variable. → Die Klasse reicht sie durch, wie C++ es tut.
+    3. `std::move` aus einem Feld (`take_…`) ist heute „kopieren, dann leeren“. → Ein Baustein,
+       der nimmt und leer zurücklässt.
+    4. Ein Text aus einem festen Wortlaut (`const char*`) ist in der Klasse ein `std::string`.
 - **Gestalt:** Nach 1 bis 3 steht im Level keine Methode mehr, die ihr Objekt hinein- und
   herausbekommt; nach 5 und 6 keine Map als Liste und kein `Whole64`.
 

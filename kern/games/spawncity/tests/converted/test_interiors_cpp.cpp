@@ -364,7 +364,7 @@ SC_TEST(converted_interiors_cpp) {
   {  // rgb
     converted::Tally tally("rgb");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted_interiors_cpp::rgb(a0); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_interiors_cpp::rgb(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
@@ -380,7 +380,7 @@ SC_TEST(converted_interiors_cpp) {
   {  // signed_area
     converted::Tally tally("signed_area");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0) { return converted_interiors_cpp::signed_area(a0); };
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0) { return converted::counted([&] { return converted_interiors_cpp::signed_area(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       const converted::Watch watch;
@@ -396,7 +396,7 @@ SC_TEST(converted_interiors_cpp) {
   {  // clean
     converted::Tally tally("clean");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0) { return converted_interiors_cpp::clean(a0); };
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0) { return converted::counted([&] { return converted_interiors_cpp::clean(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       const converted::Watch watch;
@@ -412,7 +412,7 @@ SC_TEST(converted_interiors_cpp) {
   {  // pip
     converted::Tally tally("pip");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec2 a0, [[maybe_unused]] std::vector<Vec2> a1) { return converted_interiors_cpp::pip(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Vec2 a0, [[maybe_unused]] std::vector<Vec2> a1) { return converted::counted([&] { return converted_interiors_cpp::pip(std::move(a0), a1); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec2 a0 = draw.vector2();
       const std::vector<Vec2> a1 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
@@ -429,7 +429,7 @@ SC_TEST(converted_interiors_cpp) {
   {  // seg_dist
     converted::Tally tally("seg_dist");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec2 a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] Vec2 a2) { return converted_interiors_cpp::seg_dist(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] Vec2 a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] Vec2 a2) { return converted::counted([&] { return converted_interiors_cpp::seg_dist(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec2 a0 = draw.vector2();
       const Vec2 a1 = draw.vector2();
@@ -447,7 +447,7 @@ SC_TEST(converted_interiors_cpp) {
   {  // ring_dist
     converted::Tally tally("ring_dist");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec2 a0, [[maybe_unused]] std::vector<Vec2> a1) { return converted_interiors_cpp::ring_dist(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Vec2 a0, [[maybe_unused]] std::vector<Vec2> a1) { return converted::counted([&] { return converted_interiors_cpp::ring_dist(std::move(a0), a1); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec2 a0 = draw.vector2();
       const std::vector<Vec2> a1 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
@@ -464,7 +464,7 @@ SC_TEST(converted_interiors_cpp) {
   {  // offset_ring
     converted::Tally tally("offset_ring");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] double a1) { return converted_interiors_cpp::offset_ring(a0, a1); };
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_interiors_cpp::offset_ring(a0, std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       const double a1 = draw.number();
@@ -481,7 +481,7 @@ SC_TEST(converted_interiors_cpp) {
   {  // hash_key
     converted::Tally tally("hash_key");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted_interiors_cpp::hash_key(a0, a1); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_interiors_cpp::hash_key(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -498,7 +498,7 @@ SC_TEST(converted_interiors_cpp) {
   {  // h01
     converted::Tally tally("h01");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted_interiors_cpp::h01(a0, a1); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_interiors_cpp::h01(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -515,7 +515,7 @@ SC_TEST(converted_interiors_cpp) {
   {  // door_gap
     converted::Tally tally("door_gap");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<Interiors::Door> a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] Vec2 a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { const auto r = converted_interiors_cpp::door_gap(a0, a1, a2, a3, a4, a5); return Out_door_gap{r, a4, a5}; };
+    const auto run = [&]([[maybe_unused]] std::vector<Interiors::Door> a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] Vec2 a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { const auto r = converted::counted([&] { return converted_interiors_cpp::door_gap(a0, std::move(a1), std::move(a2), std::move(a3), a4, a5); }); return Out_door_gap{r, a4, a5}; };
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<Interiors::Door> a0 = draw_list(draw, [&]() -> Interiors::Door { return draw_Interiors__Door(draw); });
       const Vec2 a1 = draw.vector2();
@@ -536,7 +536,7 @@ SC_TEST(converted_interiors_cpp) {
   {  // Interiors::clear
     converted::Tally tally("Interiors_clear");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Interiors a0) { a0.clear(); return a0; };
+    const auto run = [&]([[maybe_unused]] Interiors a0) { converted::counted([&] { return a0.clear(); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Interiors a0 = draw_Interiors(draw);
       const converted::Watch watch;
@@ -552,7 +552,7 @@ SC_TEST(converted_interiors_cpp) {
   {  // Interiors::inside
     converted::Tally tally("Interiors_inside");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Interiors a0, [[maybe_unused]] Vec3 a1) { return a0.inside(a1); };
+    const auto run = [&]([[maybe_unused]] Interiors a0, [[maybe_unused]] Vec3 a1) { return converted::counted([&] { return a0.inside(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Interiors a0 = draw_Interiors(draw);
       const Vec3 a1 = draw.vector();
@@ -569,7 +569,7 @@ SC_TEST(converted_interiors_cpp) {
   {  // Interiors::level_at
     converted::Tally tally("Interiors_level_at");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Interiors a0, [[maybe_unused]] Vec3 a1) { return a0.level_at(a1); };
+    const auto run = [&]([[maybe_unused]] Interiors a0, [[maybe_unused]] Vec3 a1) { return converted::counted([&] { return a0.level_at(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Interiors a0 = draw_Interiors(draw);
       const Vec3 a1 = draw.vector();

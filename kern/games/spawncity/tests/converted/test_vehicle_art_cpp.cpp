@@ -568,7 +568,7 @@ SC_TEST(converted_vehicle_art_cpp) {
   {  // rot
     converted::Tally tally("rot");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return converted_vehicle_art_cpp::rot(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_vehicle_art_cpp::rot(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const double a1 = draw.number();
@@ -585,7 +585,7 @@ SC_TEST(converted_vehicle_art_cpp) {
   {  // at
     converted::Tally tally("at");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted_vehicle_art_cpp::at(a0); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted::counted([&] { return converted_vehicle_art_cpp::at(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const converted::Watch watch;
@@ -601,7 +601,7 @@ SC_TEST(converted_vehicle_art_cpp) {
   {  // VehicleArt::put
     converted::Tally tally("VehicleArt_put");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] VehicleArt::Part a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { VehicleArt{}.put(a0, a1, a2); return a0; };
+    const auto run = [&]([[maybe_unused]] VehicleArt::Part a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { converted::counted([&] { return VehicleArt{}.put(a0, a1, std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const VehicleArt::Part a0 = draw_VehicleArt__Part(draw);
       const Mat4 a1 = draw_kern__Mat4(draw);
@@ -619,7 +619,7 @@ SC_TEST(converted_vehicle_art_cpp) {
   {  // VehicleArt::car
     converted::Tally tally("VehicleArt_car");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] VehicleArt a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Car a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] bool a4, [[maybe_unused]] bool a5) { a0.car(a1, a2, a3, a4, a5); return a0; };
+    const auto run = [&]([[maybe_unused]] VehicleArt a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Car a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] bool a4, [[maybe_unused]] bool a5) { converted::counted([&] { return a0.car(a1, a2, std::move(a3), std::move(a4), std::move(a5)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const VehicleArt a0 = draw_VehicleArt(draw);
       const Mat4 a1 = draw_kern__Mat4(draw);
@@ -640,7 +640,7 @@ SC_TEST(converted_vehicle_art_cpp) {
   {  // VehicleArt::jet
     converted::Tally tally("VehicleArt_jet");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] VehicleArt a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] bool a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] bool a5) { a0.jet(a1, a2, a3, a4, a5); return a0; };
+    const auto run = [&]([[maybe_unused]] VehicleArt a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] bool a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] bool a5) { converted::counted([&] { return a0.jet(a1, std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const VehicleArt a0 = draw_VehicleArt(draw);
       const Mat4 a1 = draw_kern__Mat4(draw);
@@ -661,7 +661,7 @@ SC_TEST(converted_vehicle_art_cpp) {
   {  // VehicleArt::parachute
     converted::Tally tally("VehicleArt_parachute");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] VehicleArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] bool a3) { a0.parachute(a1, a2, a3); return a0; };
+    const auto run = [&]([[maybe_unused]] VehicleArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] bool a3) { converted::counted([&] { return a0.parachute(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const VehicleArt a0 = draw_VehicleArt(draw);
       const Vec3 a1 = draw.vector();

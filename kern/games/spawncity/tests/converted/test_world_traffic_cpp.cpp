@@ -270,7 +270,7 @@ SC_TEST(converted_world_traffic_cpp) {
   {  // cell
     converted::Tally tally("cell");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0, [[maybe_unused]] int a1) { return converted_world_traffic_cpp::cell(a0, a1); };
+    const auto run = [&]([[maybe_unused]] int a0, [[maybe_unused]] int a1) { return converted::counted([&] { return converted_world_traffic_cpp::cell(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const int a0 = static_cast<int>(draw.whole());
       const int a1 = static_cast<int>(draw.whole());
@@ -287,7 +287,7 @@ SC_TEST(converted_world_traffic_cpp) {
   {  // TrafficRules::near
     converted::Tally tally("TrafficRules_near");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TrafficRules a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2, [[maybe_unused]] std::vector<int> a3) { a0.near(a1, a2, a3); return a3; };
+    const auto run = [&]([[maybe_unused]] TrafficRules a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2, [[maybe_unused]] std::vector<int> a3) { converted::counted([&] { return a0.near(std::move(a1), std::move(a2), a3); }); return a3; };
     for (int i = 0; tally.more(i); ++i) {
       const TrafficRules a0 = draw_TrafficRules(draw);
       const Vec2 a1 = draw.vector2();
@@ -306,7 +306,7 @@ SC_TEST(converted_world_traffic_cpp) {
   {  // TrafficRules::pursuit
     converted::Tally tally("TrafficRules_pursuit");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Lane a0, [[maybe_unused]] int a1, [[maybe_unused]] int a2, [[maybe_unused]] Vec2 a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { return TrafficRules::pursuit(a0, a1, a2, a3, a4, a5); };
+    const auto run = [&]([[maybe_unused]] Lane a0, [[maybe_unused]] int a1, [[maybe_unused]] int a2, [[maybe_unused]] Vec2 a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { return converted::counted([&] { return TrafficRules::pursuit(a0, std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Lane a0 = draw_Lane(draw);
       const int a1 = static_cast<int>(draw.whole());

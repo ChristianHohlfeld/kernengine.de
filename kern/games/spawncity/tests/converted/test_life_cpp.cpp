@@ -1167,7 +1167,7 @@ SC_TEST(converted_life_cpp) {
   {  // Life::species
     converted::Tally tally("Life_species");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] double a2) { return a0.species(a1, a2); };
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] double a2) { return converted::counted([&] { return a0.species(std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -1185,7 +1185,7 @@ SC_TEST(converted_life_cpp) {
   {  // hash01
     converted::Tally tally("hash01");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] u64 a0) { return converted_life_cpp::hash01(a0); };
+    const auto run = [&]([[maybe_unused]] u64 a0) { return converted::counted([&] { return converted_life_cpp::hash01(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const u64 a0 = static_cast<u64>(draw.bits());
       const converted::Watch watch;
@@ -1201,7 +1201,7 @@ SC_TEST(converted_life_cpp) {
   {  // mix
     converted::Tally tally("mix");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] u64 a0, [[maybe_unused]] u64 a1) { return converted_life_cpp::mix(a0, a1); };
+    const auto run = [&]([[maybe_unused]] u64 a0, [[maybe_unused]] u64 a1) { return converted::counted([&] { return converted_life_cpp::mix(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const u64 a0 = static_cast<u64>(draw.bits());
       const u64 a1 = static_cast<u64>(draw.bits());
@@ -1218,7 +1218,7 @@ SC_TEST(converted_life_cpp) {
   {  // dist2d
     converted::Tally tally("dist2d");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1) { return converted_life_cpp::dist2d(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1) { return converted::counted([&] { return converted_life_cpp::dist2d(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const Vec3 a1 = draw.vector();
@@ -1235,7 +1235,7 @@ SC_TEST(converted_life_cpp) {
   {  // dist2d
     converted::Tally tally("dist2d_2");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec2 a0, [[maybe_unused]] Vec2 a1) { return converted_life_cpp::dist2d(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Vec2 a0, [[maybe_unused]] Vec2 a1) { return converted::counted([&] { return converted_life_cpp::dist2d(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec2 a0 = draw.vector2();
       const Vec2 a1 = draw.vector2();
@@ -1252,7 +1252,7 @@ SC_TEST(converted_life_cpp) {
   {  // rgb
     converted::Tally tally("rgb");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted_life_cpp::rgb(a0); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_life_cpp::rgb(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
@@ -1268,7 +1268,7 @@ SC_TEST(converted_life_cpp) {
   {  // in_ring
     converted::Tally tally("in_ring");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] Vec2 a1) { return converted_life_cpp::in_ring(a0, a1); };
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] Vec2 a1) { return converted::counted([&] { return converted_life_cpp::in_ring(a0, std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       const Vec2 a1 = draw.vector2();
@@ -1285,7 +1285,7 @@ SC_TEST(converted_life_cpp) {
   {  // seg_sphere
     converted::Tally tally("seg_sphere");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3) { return converted_life_cpp::seg_sphere(a0, a1, a2, a3); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3) { return converted::counted([&] { return converted_life_cpp::seg_sphere(std::move(a0), std::move(a1), std::move(a2), std::move(a3)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const Vec3 a1 = draw.vector();
@@ -1304,7 +1304,7 @@ SC_TEST(converted_life_cpp) {
   {  // Life::in_rings
     converted::Tally tally("Life_in_rings");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<std::vector<Vec2>> a0, [[maybe_unused]] Vec2 a1) { return Life::in_rings(a0, a1); };
+    const auto run = [&]([[maybe_unused]] std::vector<std::vector<Vec2>> a0, [[maybe_unused]] Vec2 a1) { return converted::counted([&] { return Life::in_rings(a0, std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<std::vector<Vec2>> a0 = draw_list(draw, [&]() -> std::vector<Vec2> { return draw_list(draw, [&]() -> Vec2 { return draw.vector2(); }); });
       const Vec2 a1 = draw.vector2();
@@ -1321,7 +1321,7 @@ SC_TEST(converted_life_cpp) {
   {  // Life::ring_area
     converted::Tally tally("Life_ring_area");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0) { return Life::ring_area(a0); };
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0) { return converted::counted([&] { return Life::ring_area(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       const converted::Watch watch;
@@ -1337,7 +1337,7 @@ SC_TEST(converted_life_cpp) {
   {  // Life::pet_params
     converted::Tally tally("Life_pet_params");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life::Pet a0, [[maybe_unused]] unsigned int a1) { Life::pet_params(a0, a1); return a0; };
+    const auto run = [&]([[maybe_unused]] Life::Pet a0, [[maybe_unused]] unsigned int a1) { converted::counted([&] { return Life::pet_params(a0, std::move(a1)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Life::Pet a0 = draw_Life__Pet(draw);
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -1354,7 +1354,7 @@ SC_TEST(converted_life_cpp) {
   {  // Life::init
     converted::Tally tally("Life_init");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] World& a1, [[maybe_unused]] bool a2) { a0.init(a1, a2); return a0; };
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] World& a1, [[maybe_unused]] bool a2) { converted::counted([&] { return a0.init(a1, std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       World& a1 = *converted::engine_object<World>(1 + draw.below(6));
@@ -1372,7 +1372,7 @@ SC_TEST(converted_life_cpp) {
   {  // Life::spawn_herd
     converted::Tally tally("Life_spawn_herd");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2, [[maybe_unused]] unsigned int a3, [[maybe_unused]] double a4) { const auto r = a0.spawn_herd(a1, a2, a3, a4); return Out_Life_spawn_herd{a0, r}; };
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2, [[maybe_unused]] unsigned int a3, [[maybe_unused]] double a4) { const auto r = converted::counted([&] { return a0.spawn_herd(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return Out_Life_spawn_herd{a0, r}; };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const Vec2 a1 = draw.vector2();
@@ -1392,7 +1392,7 @@ SC_TEST(converted_life_cpp) {
   {  // Life::scare_cow
     converted::Tally tally("Life_scare_cow");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life::Cow a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { Life{}.scare_cow(a0, a1, a2, a3); return a0; };
+    const auto run = [&]([[maybe_unused]] Life::Cow a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { converted::counted([&] { return Life{}.scare_cow(a0, std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Life::Cow a0 = draw_Life__Cow(draw);
       const Vec2 a1 = draw.vector2();
@@ -1411,7 +1411,7 @@ SC_TEST(converted_life_cpp) {
   {  // Life::hold_pigeon
     converted::Tally tally("Life_hold_pigeon");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] int a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3) { a0.hold_pigeon(a1, a2, a3); return a0; };
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] int a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3) { converted::counted([&] { return a0.hold_pigeon(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const int a1 = static_cast<int>(draw.whole());
@@ -1430,7 +1430,7 @@ SC_TEST(converted_life_cpp) {
   {  // Life::release_pigeon
     converted::Tally tally("Life_release_pigeon");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] int a1, [[maybe_unused]] Vec3 a2) { a0.release_pigeon(a1, a2); return a0; };
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] int a1, [[maybe_unused]] Vec3 a2) { converted::counted([&] { return a0.release_pigeon(std::move(a1), std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const int a1 = static_cast<int>(draw.whole());
@@ -1448,7 +1448,7 @@ SC_TEST(converted_life_cpp) {
   {  // Life::spook_pigeons
     converted::Tally tally("Life_spook_pigeons");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] double a1) { a0.spook_pigeons(a1); return a0; };
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] double a1) { converted::counted([&] { return a0.spook_pigeons(std::move(a1)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const double a1 = draw.number();
@@ -1465,7 +1465,7 @@ SC_TEST(converted_life_cpp) {
   {  // Life::provoke_cat
     converted::Tally tally("Life_provoke_cat");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] double a1) { const auto r = a0.provoke_cat(a1); return Out_Life_provoke_cat{a0, r}; };
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] double a1) { const auto r = converted::counted([&] { return a0.provoke_cat(std::move(a1)); }); return Out_Life_provoke_cat{a0, r}; };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const double a1 = draw.number();
@@ -1482,7 +1482,7 @@ SC_TEST(converted_life_cpp) {
   {  // Life::sample
     converted::Tally tally("Life_sample");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] Vec2 a3) { const auto r = a0.sample(a1, a2, a3); return Out_Life_sample{r, a2, a3}; };
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] Vec2 a3) { const auto r = converted::counted([&] { return a0.sample(std::move(a1), a2, a3); }); return Out_Life_sample{r, a2, a3}; };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const double a1 = draw.number();
@@ -1501,7 +1501,7 @@ SC_TEST(converted_life_cpp) {
   {  // Life::set_remote_animals
     converted::Tally tally("Life_set_remote_animals");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] bool a1) { a0.set_remote_animals(a1); return a0; };
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] bool a1) { converted::counted([&] { return a0.set_remote_animals(std::move(a1)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const bool a1 = draw.flag();
@@ -1518,7 +1518,7 @@ SC_TEST(converted_life_cpp) {
   {  // Life::heard_shot
     converted::Tally tally("Life_heard_shot");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3) { a0.heard_shot(a1, a2, a3); return a0; };
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3) { converted::counted([&] { return a0.heard_shot(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const Vec3 a1 = draw.vector();
@@ -1537,7 +1537,7 @@ SC_TEST(converted_life_cpp) {
   {  // Life::honk
     converted::Tally tally("Life_honk");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] bool a2, [[maybe_unused]] unsigned int a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5, [[maybe_unused]] LifeOut a6) { const auto r = a0.honk(a1, a2, a3, a4, a5, a6); return Out_Life_honk{a0, r, a6}; };
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] bool a2, [[maybe_unused]] unsigned int a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5, [[maybe_unused]] LifeOut a6) { const auto r = converted::counted([&] { return a0.honk(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), a6); }); return Out_Life_honk{a0, r, a6}; };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const Vec3 a1 = draw.vector();
@@ -1559,7 +1559,7 @@ SC_TEST(converted_life_cpp) {
   {  // Life::scream
     converted::Tally tally("Life_scream");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] unsigned int a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] LifeOut a5) { const auto r = a0.scream(a1, a2, a3, a4, a5); return Out_Life_scream{a0, r, a5}; };
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] unsigned int a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] LifeOut a5) { const auto r = converted::counted([&] { return a0.scream(std::move(a1), std::move(a2), std::move(a3), std::move(a4), a5); }); return Out_Life_scream{a0, r, a5}; };
     for (int i = 0; tally.more(i); ++i) {
       const Life a0 = draw_Life(draw);
       const Vec3 a1 = draw.vector();

@@ -116,7 +116,7 @@ SC_TEST(converted_nostr_cpp) {
   {  // rotr
     converted::Tally tally("rotr");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted_nostr_cpp::rotr(a0, a1); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_nostr_cpp::rotr(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -133,7 +133,7 @@ SC_TEST(converted_nostr_cpp) {
   {  // cmp
     converted::Tally tally("cmp");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] U256 a0, [[maybe_unused]] U256 a1) { return converted_nostr_cpp::cmp(a0, a1); };
+    const auto run = [&]([[maybe_unused]] U256 a0, [[maybe_unused]] U256 a1) { return converted::counted([&] { return converted_nostr_cpp::cmp(a0, a1); }); };
     for (int i = 0; tally.more(i); ++i) {
       const U256 a0 = draw_nostr__U256(draw);
       const U256 a1 = draw_nostr__U256(draw);
@@ -150,7 +150,7 @@ SC_TEST(converted_nostr_cpp) {
   {  // is_zero
     converted::Tally tally("is_zero");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] U256 a0) { return converted_nostr_cpp::is_zero(a0); };
+    const auto run = [&]([[maybe_unused]] U256 a0) { return converted::counted([&] { return converted_nostr_cpp::is_zero(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       const U256 a0 = draw_nostr__U256(draw);
       const converted::Watch watch;
@@ -166,7 +166,7 @@ SC_TEST(converted_nostr_cpp) {
   {  // add
     converted::Tally tally("add");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] U256 a0, [[maybe_unused]] U256 a1, [[maybe_unused]] U256 a2) { const auto r = converted_nostr_cpp::add(a0, a1, a2); return Out_add{r, a0}; };
+    const auto run = [&]([[maybe_unused]] U256 a0, [[maybe_unused]] U256 a1, [[maybe_unused]] U256 a2) { const auto r = converted::counted([&] { return converted_nostr_cpp::add(a0, a1, a2); }); return Out_add{r, a0}; };
     for (int i = 0; tally.more(i); ++i) {
       const U256 a0 = draw_nostr__U256(draw);
       const U256 a1 = draw_nostr__U256(draw);
@@ -184,7 +184,7 @@ SC_TEST(converted_nostr_cpp) {
   {  // sub
     converted::Tally tally("sub");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] U256 a0, [[maybe_unused]] U256 a1, [[maybe_unused]] U256 a2) { const auto r = converted_nostr_cpp::sub(a0, a1, a2); return Out_sub{r, a0}; };
+    const auto run = [&]([[maybe_unused]] U256 a0, [[maybe_unused]] U256 a1, [[maybe_unused]] U256 a2) { const auto r = converted::counted([&] { return converted_nostr_cpp::sub(a0, a1, a2); }); return Out_sub{r, a0}; };
     for (int i = 0; tally.more(i); ++i) {
       const U256 a0 = draw_nostr__U256(draw);
       const U256 a1 = draw_nostr__U256(draw);
@@ -202,7 +202,7 @@ SC_TEST(converted_nostr_cpp) {
   {  // addm
     converted::Tally tally("addm");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] U256 a0, [[maybe_unused]] U256 a1, [[maybe_unused]] U256 a2) { return converted_nostr_cpp::addm(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] U256 a0, [[maybe_unused]] U256 a1, [[maybe_unused]] U256 a2) { return converted::counted([&] { return converted_nostr_cpp::addm(a0, a1, a2); }); };
     for (int i = 0; tally.more(i); ++i) {
       const U256 a0 = draw_nostr__U256(draw);
       const U256 a1 = draw_nostr__U256(draw);
@@ -220,7 +220,7 @@ SC_TEST(converted_nostr_cpp) {
   {  // subm
     converted::Tally tally("subm");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] U256 a0, [[maybe_unused]] U256 a1, [[maybe_unused]] U256 a2) { return converted_nostr_cpp::subm(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] U256 a0, [[maybe_unused]] U256 a1, [[maybe_unused]] U256 a2) { return converted::counted([&] { return converted_nostr_cpp::subm(a0, a1, a2); }); };
     for (int i = 0; tally.more(i); ++i) {
       const U256 a0 = draw_nostr__U256(draw);
       const U256 a1 = draw_nostr__U256(draw);
@@ -238,7 +238,7 @@ SC_TEST(converted_nostr_cpp) {
   {  // mulm
     converted::Tally tally("mulm");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] U256 a0, [[maybe_unused]] U256 a1, [[maybe_unused]] U256 a2) { return converted_nostr_cpp::mulm(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] U256 a0, [[maybe_unused]] U256 a1, [[maybe_unused]] U256 a2) { return converted::counted([&] { return converted_nostr_cpp::mulm(a0, a1, a2); }); };
     for (int i = 0; tally.more(i); ++i) {
       const U256 a0 = draw_nostr__U256(draw);
       const U256 a1 = draw_nostr__U256(draw);
@@ -256,7 +256,7 @@ SC_TEST(converted_nostr_cpp) {
   {  // powm
     converted::Tally tally("powm");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] U256 a0, [[maybe_unused]] U256 a1, [[maybe_unused]] U256 a2) { return converted_nostr_cpp::powm(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] U256 a0, [[maybe_unused]] U256 a1, [[maybe_unused]] U256 a2) { return converted::counted([&] { return converted_nostr_cpp::powm(a0, a1, a2); }); };
     for (int i = 0; tally.more(i); ++i) {
       const U256 a0 = draw_nostr__U256(draw);
       const U256 a1 = draw_nostr__U256(draw);
@@ -274,7 +274,7 @@ SC_TEST(converted_nostr_cpp) {
   {  // reduce
     converted::Tally tally("reduce");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] U256 a0, [[maybe_unused]] U256 a1) { return converted_nostr_cpp::reduce(a0, a1); };
+    const auto run = [&]([[maybe_unused]] U256 a0, [[maybe_unused]] U256 a1) { return converted::counted([&] { return converted_nostr_cpp::reduce(a0, a1); }); };
     for (int i = 0; tally.more(i); ++i) {
       const U256 a0 = draw_nostr__U256(draw);
       const U256 a1 = draw_nostr__U256(draw);

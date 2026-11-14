@@ -982,6 +982,13 @@ Klasse `Name_Native`, über die die Engine Funktionen und Variablen beim Namen e
 kompilierten Code aus; `Instance::tier()` sagt dann „native C++“. Beim Namen wird nur an dieser
 Grenze nachgesehen – in der Klasse ist jeder Aufruf ein direkter Aufruf.
 
+An dieser Grenze baut der Kleber zuerst die Argumente, ruft dann die Funktion und gibt danach
+zurück, was sie gab; ein Eingang per Wert wird der Funktion übergeben, nicht kopiert. Wer messen
+will, was die Funktion selbst kostet, setzt `logic::native_probe`: Der Kleber meldet dort, wann
+die Funktion beginnt und wann sie zurück ist – Umwandeln von Argumenten und Ergebnissen liegt
+außerhalb. (Ein Test zählt so, wie oft die Klasse Speicher anfordert, und vergleicht das mit dem
+C++, aus dem der Blueprint stammt.) Ohne Zuhörer ist es ein Vergleich mit null.
+
 **Als fertiges Spiel.** `tools/export_game.sh level.klevel spiel.html` macht beides in einem
 Zug: die Klassen schreiben, die Engine mit ihnen bauen (`kern/build.sh --studio`, ThinLTO – der
 Compiler sieht Blueprint und Engine zusammen), die Seite schreiben. Der Editor im Browser kann

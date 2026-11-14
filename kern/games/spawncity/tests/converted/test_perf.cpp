@@ -124,7 +124,7 @@ SC_TEST(converted_perf) {
   {  // Meter::begin_frame
     converted::Tally tally("Meter_begin_frame");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Meter a0, [[maybe_unused]] double a1) { a0.begin_frame(a1); return a0; };
+    const auto run = [&]([[maybe_unused]] Meter a0, [[maybe_unused]] double a1) { converted::counted([&] { return a0.begin_frame(std::move(a1)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Meter a0 = draw_perf__Meter(draw);
       const double a1 = draw.number();
@@ -141,7 +141,7 @@ SC_TEST(converted_perf) {
   {  // Meter::ms
     converted::Tally tally("Meter_ms");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Meter a0, [[maybe_unused]] Slot a1) { return a0.ms(a1); };
+    const auto run = [&]([[maybe_unused]] Meter a0, [[maybe_unused]] Slot a1) { return converted::counted([&] { return a0.ms(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Meter a0 = draw_perf__Meter(draw);
       const Slot a1 = static_cast<Slot>(draw.below(5));
@@ -158,7 +158,7 @@ SC_TEST(converted_perf) {
   {  // Meter::update_ms
     converted::Tally tally("Meter_update_ms");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Meter a0) { return a0.update_ms(); };
+    const auto run = [&]([[maybe_unused]] Meter a0) { return converted::counted([&] { return a0.update_ms(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Meter a0 = draw_perf__Meter(draw);
       const converted::Watch watch;
@@ -174,7 +174,7 @@ SC_TEST(converted_perf) {
   {  // Meter::render_ms
     converted::Tally tally("Meter_render_ms");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Meter a0) { return a0.render_ms(); };
+    const auto run = [&]([[maybe_unused]] Meter a0) { return converted::counted([&] { return a0.render_ms(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Meter a0 = draw_perf__Meter(draw);
       const converted::Watch watch;
@@ -190,7 +190,7 @@ SC_TEST(converted_perf) {
   {  // Meter::gpu_ms
     converted::Tally tally("Meter_gpu_ms");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Meter a0) { return a0.gpu_ms(); };
+    const auto run = [&]([[maybe_unused]] Meter a0) { return converted::counted([&] { return a0.gpu_ms(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Meter a0 = draw_perf__Meter(draw);
       const converted::Watch watch;
@@ -206,7 +206,7 @@ SC_TEST(converted_perf) {
   {  // Governor::tier
     converted::Tally tally("Governor_tier");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Governor a0) { return a0.tier(); };
+    const auto run = [&]([[maybe_unused]] Governor a0) { return converted::counted([&] { return a0.tier(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Governor a0 = draw_perf__Governor(draw);
       const converted::Watch watch;
@@ -222,7 +222,7 @@ SC_TEST(converted_perf) {
   {  // Governor::max_tier
     converted::Tally tally("Governor_max_tier");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Governor a0) { return a0.max_tier(); };
+    const auto run = [&]([[maybe_unused]] Governor a0) { return converted::counted([&] { return a0.max_tier(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Governor a0 = draw_perf__Governor(draw);
       const converted::Watch watch;
@@ -238,7 +238,7 @@ SC_TEST(converted_perf) {
   {  // Governor::automatic
     converted::Tally tally("Governor_automatic");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Governor a0) { return a0.automatic(); };
+    const auto run = [&]([[maybe_unused]] Governor a0) { return converted::counted([&] { return a0.automatic(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Governor a0 = draw_perf__Governor(draw);
       const converted::Watch watch;
@@ -254,7 +254,7 @@ SC_TEST(converted_perf) {
   {  // Governor::set_auto
     converted::Tally tally("Governor_set_auto");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Governor a0) { a0.set_auto(); return a0; };
+    const auto run = [&]([[maybe_unused]] Governor a0) { converted::counted([&] { return a0.set_auto(); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Governor a0 = draw_perf__Governor(draw);
       const converted::Watch watch;
@@ -270,7 +270,7 @@ SC_TEST(converted_perf) {
   {  // Governor::fps
     converted::Tally tally("Governor_fps");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Governor a0) { return a0.fps(); };
+    const auto run = [&]([[maybe_unused]] Governor a0) { return converted::counted([&] { return a0.fps(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Governor a0 = draw_perf__Governor(draw);
       const converted::Watch watch;
@@ -286,7 +286,7 @@ SC_TEST(converted_perf) {
   {  // Governor::changes
     converted::Tally tally("Governor_changes");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Governor a0) { return a0.changes(); };
+    const auto run = [&]([[maybe_unused]] Governor a0) { return converted::counted([&] { return a0.changes(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Governor a0 = draw_perf__Governor(draw);
       const converted::Watch watch;
@@ -302,7 +302,7 @@ SC_TEST(converted_perf) {
   {  // Governor::blocked
     converted::Tally tally("Governor_blocked");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Governor a0, [[maybe_unused]] int a1) { return a0.blocked(a1); };
+    const auto run = [&]([[maybe_unused]] Governor a0, [[maybe_unused]] int a1) { return converted::counted([&] { return a0.blocked(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Governor a0 = draw_perf__Governor(draw);
       const int a1 = static_cast<int>(draw.whole());

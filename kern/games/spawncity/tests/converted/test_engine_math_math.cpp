@@ -193,7 +193,7 @@ SC_TEST(converted_engine_math_math) {
   {  // Vec4::Vec4
     converted::Tally tally("Vec4_new");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return Vec4(a0, a1, a2, a3); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return converted::counted([&] { return Vec4(std::move(a0), std::move(a1), std::move(a2), std::move(a3)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
@@ -212,7 +212,7 @@ SC_TEST(converted_engine_math_math) {
   {  // Quat::axis_angle
     converted::Tally tally("Quat_axis_angle");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return Quat::axis_angle(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return converted::counted([&] { return Quat::axis_angle(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const double a1 = draw.number();
@@ -229,7 +229,7 @@ SC_TEST(converted_engine_math_math) {
   {  // Quat::operator*
     converted::Tally tally("Quat_mul");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Quat a0, [[maybe_unused]] Quat a1) { return a0.operator*(a1); };
+    const auto run = [&]([[maybe_unused]] Quat a0, [[maybe_unused]] Quat a1) { return converted::counted([&] { return a0.operator*(a1); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Quat a0 = draw_kern__Quat(draw);
       const Quat a1 = draw_kern__Quat(draw);
@@ -246,7 +246,7 @@ SC_TEST(converted_engine_math_math) {
   {  // Quat::rotate
     converted::Tally tally("Quat_rotate");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Quat a0, [[maybe_unused]] Vec3 a1) { return a0.rotate(a1); };
+    const auto run = [&]([[maybe_unused]] Quat a0, [[maybe_unused]] Vec3 a1) { return converted::counted([&] { return a0.rotate(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Quat a0 = draw_kern__Quat(draw);
       const Vec3 a1 = draw.vector();
@@ -263,7 +263,7 @@ SC_TEST(converted_engine_math_math) {
   {  // Mat4::translation
     converted::Tally tally("Mat4_translation");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Mat4 a0) { return a0.translation(); };
+    const auto run = [&]([[maybe_unused]] Mat4 a0) { return converted::counted([&] { return a0.translation(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Mat4 a0 = draw_kern__Mat4(draw);
       const converted::Watch watch;
@@ -279,7 +279,7 @@ SC_TEST(converted_engine_math_math) {
   {  // Mat4::operator*
     converted::Tally tally("Mat4_mul");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Mat4 a0, [[maybe_unused]] Mat4 a1) { return a0.operator*(a1); };
+    const auto run = [&]([[maybe_unused]] Mat4 a0, [[maybe_unused]] Mat4 a1) { return converted::counted([&] { return a0.operator*(a1); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Mat4 a0 = draw_kern__Mat4(draw);
       const Mat4 a1 = draw_kern__Mat4(draw);
@@ -296,7 +296,7 @@ SC_TEST(converted_engine_math_math) {
   {  // Mat4::transform_point
     converted::Tally tally("Mat4_transform_point");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Mat4 a0, [[maybe_unused]] Vec3 a1) { return a0.transform_point(a1); };
+    const auto run = [&]([[maybe_unused]] Mat4 a0, [[maybe_unused]] Vec3 a1) { return converted::counted([&] { return a0.transform_point(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Mat4 a0 = draw_kern__Mat4(draw);
       const Vec3 a1 = draw.vector();
@@ -313,7 +313,7 @@ SC_TEST(converted_engine_math_math) {
   {  // Mat4::transform_vector
     converted::Tally tally("Mat4_transform_vector");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Mat4 a0, [[maybe_unused]] Vec3 a1) { return a0.transform_vector(a1); };
+    const auto run = [&]([[maybe_unused]] Mat4 a0, [[maybe_unused]] Vec3 a1) { return converted::counted([&] { return a0.transform_vector(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Mat4 a0 = draw_kern__Mat4(draw);
       const Vec3 a1 = draw.vector();
@@ -330,7 +330,7 @@ SC_TEST(converted_engine_math_math) {
   {  // Mat4::transform
     converted::Tally tally("Mat4_transform");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Mat4 a0, [[maybe_unused]] Vec4 a1) { return a0.transform(a1); };
+    const auto run = [&]([[maybe_unused]] Mat4 a0, [[maybe_unused]] Vec4 a1) { return converted::counted([&] { return a0.transform(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Mat4 a0 = draw_kern__Mat4(draw);
       const Vec4 a1 = draw_kern__Vec4(draw);
@@ -347,7 +347,7 @@ SC_TEST(converted_engine_math_math) {
   {  // Mat4::translate
     converted::Tally tally("Mat4_translate");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0) { return Mat4::translate(a0); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted::counted([&] { return Mat4::translate(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const converted::Watch watch;
@@ -363,7 +363,7 @@ SC_TEST(converted_engine_math_math) {
   {  // Mat4::scale
     converted::Tally tally("Mat4_scale");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0) { return Mat4::scale(a0); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted::counted([&] { return Mat4::scale(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const converted::Watch watch;
@@ -379,7 +379,7 @@ SC_TEST(converted_engine_math_math) {
   {  // Mat4::trs
     converted::Tally tally("Mat4_trs");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Quat a1, [[maybe_unused]] Vec3 a2) { return Mat4::trs(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Quat a1, [[maybe_unused]] Vec3 a2) { return converted::counted([&] { return Mat4::trs(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const Quat a1 = draw_kern__Quat(draw);

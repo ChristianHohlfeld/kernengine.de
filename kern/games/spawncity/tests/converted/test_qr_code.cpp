@@ -60,7 +60,7 @@ SC_TEST(converted_qr_code) {
   {  // Code::dark
     converted::Tally tally("Code_dark");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Code a0, [[maybe_unused]] int a1, [[maybe_unused]] int a2) { return a0.dark(a1, a2); };
+    const auto run = [&]([[maybe_unused]] Code a0, [[maybe_unused]] int a1, [[maybe_unused]] int a2) { return converted::counted([&] { return a0.dark(std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Code a0 = draw_qr__Code(draw);
       const int a1 = static_cast<int>(draw.whole());

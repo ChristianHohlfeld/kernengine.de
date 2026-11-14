@@ -66,7 +66,7 @@ SC_TEST(converted_terrain) {
   {  // CraterRec::operator==
     converted::Tally tally("CraterRec_equal");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Terrain::CraterRec a0, [[maybe_unused]] Terrain::CraterRec a1) { return a0.operator==(a1); };
+    const auto run = [&]([[maybe_unused]] Terrain::CraterRec a0, [[maybe_unused]] Terrain::CraterRec a1) { return converted::counted([&] { return a0.operator==(a1); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Terrain::CraterRec a0 = draw_Terrain__CraterRec(draw);
       const Terrain::CraterRec a1 = draw_Terrain__CraterRec(draw);

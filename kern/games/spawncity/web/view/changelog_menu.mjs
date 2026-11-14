@@ -7,6 +7,9 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-14",time:"07:25",title:"Blueprints: der Test zählt die Kosten",items:[
+    "Unter der Haube: Der Vergleichstest zählt jetzt für jede Funktion, wie oft der Export Speicher anfordert und wie oft der Quelltext. Bei 470 von 600 Funktionen ist der Export schon gleichauf oder sparsamer; die übrigen 130 nennt der Test, sie sind die nächste Arbeit. Am Spiel selbst ändert sich nichts.",
+  ]},
   {date:"2026-11-14",time:"06:00",title:"Konverter: jede Funktion einmal",items:[
     "Unter der Haube: Der Konverter schreibt das Spiel jetzt als Bibliotheken – jeder Header und jede Quelldatei ist ein Blueprint, jede Funktion und jeder Typ steht einmal im Projekt, Aufrufe gehen direkt. 572 von 1.748 Funktionen stehen so im Level (118 Bibliotheken), 600 Vergleiche Bit für Bit mit dem Quelltext. Am Spiel selbst ändert sich nichts.",
   ]},

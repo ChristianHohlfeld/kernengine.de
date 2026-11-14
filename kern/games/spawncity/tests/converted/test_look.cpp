@@ -70,7 +70,7 @@ SC_TEST(converted_look) {
   {  // impact_trauma
     converted::Tally tally("impact_trauma");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted_look::impact_trauma(a0); };
+    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_look::impact_trauma(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
@@ -86,7 +86,7 @@ SC_TEST(converted_look) {
   {  // Stabilizer::reset
     converted::Tally tally("Stabilizer_reset");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Stabilizer a0) { a0.reset(); return a0; };
+    const auto run = [&]([[maybe_unused]] Stabilizer a0) { converted::counted([&] { return a0.reset(); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Stabilizer a0 = draw_look__Stabilizer(draw);
       const converted::Watch watch;
@@ -102,7 +102,7 @@ SC_TEST(converted_look) {
   {  // lamp_glow
     converted::Tally tally("lamp_glow");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted_look::lamp_glow(a0); };
+    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_look::lamp_glow(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;

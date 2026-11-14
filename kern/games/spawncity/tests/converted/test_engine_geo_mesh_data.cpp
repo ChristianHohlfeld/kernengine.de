@@ -83,7 +83,7 @@ SC_TEST(converted_engine_geo_mesh_data) {
   {  // MeshData::vertex_count
     converted::Tally tally("MeshData_vertex_count");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MeshData a0) { return a0.vertex_count(); };
+    const auto run = [&]([[maybe_unused]] MeshData a0) { return converted::counted([&] { return a0.vertex_count(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const MeshData a0 = draw_kern__MeshData(draw);
       const converted::Watch watch;
@@ -99,7 +99,7 @@ SC_TEST(converted_engine_geo_mesh_data) {
   {  // MeshData::triangle_count
     converted::Tally tally("MeshData_triangle_count");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MeshData a0) { return a0.triangle_count(); };
+    const auto run = [&]([[maybe_unused]] MeshData a0) { return converted::counted([&] { return a0.triangle_count(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const MeshData a0 = draw_kern__MeshData(draw);
       const converted::Watch watch;
@@ -115,7 +115,7 @@ SC_TEST(converted_engine_geo_mesh_data) {
   {  // MeshData::clear
     converted::Tally tally("MeshData_clear");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MeshData a0) { a0.clear(); return a0; };
+    const auto run = [&]([[maybe_unused]] MeshData a0) { converted::counted([&] { return a0.clear(); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const MeshData a0 = draw_kern__MeshData(draw);
       const converted::Watch watch;
@@ -131,7 +131,7 @@ SC_TEST(converted_engine_geo_mesh_data) {
   {  // MeshData::push
     converted::Tally tally("MeshData_push");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MeshData a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] Vec2 a4) { a0.push(a1, a2, a3, a4); return a0; };
+    const auto run = [&]([[maybe_unused]] MeshData a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] Vec2 a4) { converted::counted([&] { return a0.push(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const MeshData a0 = draw_kern__MeshData(draw);
       const Vec3 a1 = draw.vector();

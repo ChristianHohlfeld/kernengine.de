@@ -55,7 +55,7 @@ SC_TEST(converted_game_toss_cpp) {
   {  // uq16
     converted::Tally tally("uq16");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] short a0) { return converted_game_toss_cpp::uq16(a0); };
+    const auto run = [&]([[maybe_unused]] short a0) { return converted::counted([&] { return converted_game_toss_cpp::uq16(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const short a0 = static_cast<short>(draw.whole());
       const converted::Watch watch;

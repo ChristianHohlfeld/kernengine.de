@@ -73,7 +73,7 @@ SC_TEST(converted_blueprint_call) {
   {  // decimal
     converted::Tally tally("decimal");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted_blueprint_call::decimal(a0); };
+    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_blueprint_call::decimal(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;

@@ -103,7 +103,7 @@ SC_TEST(converted_person_hit) {
   {  // lean
     converted::Tally tally("lean");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted_person_hit::lean(a0); };
+    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_person_hit::lean(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
@@ -119,7 +119,7 @@ SC_TEST(converted_person_hit) {
   {  // box_entry
     converted::Tally tally("box_entry");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] Vec3 a4, [[maybe_unused]] Vec3 a5, [[maybe_unused]] Vec3 a6, [[maybe_unused]] double a7) { const auto r = converted_person_hit::box_entry(a0, a1, a2, a3, a4, a5, a6, a7); return Out_box_entry{r, a7}; };
+    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] Vec3 a4, [[maybe_unused]] Vec3 a5, [[maybe_unused]] Vec3 a6, [[maybe_unused]] double a7) { const auto r = converted::counted([&] { return converted_person_hit::box_entry(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6), a7); }); return Out_box_entry{r, a7}; };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const Vec3 a1 = draw.vector();
@@ -142,7 +142,7 @@ SC_TEST(converted_person_hit) {
   {  // sphere_entry
     converted::Tally tally("sphere_entry");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { const auto r = converted_person_hit::sphere_entry(a0, a1, a2, a3, a4); return Out_sphere_entry{r, a4}; };
+    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { const auto r = converted::counted([&] { return converted_person_hit::sphere_entry(std::move(a0), std::move(a1), std::move(a2), std::move(a3), a4); }); return Out_sphere_entry{r, a4}; };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const Vec3 a1 = draw.vector();
@@ -162,7 +162,7 @@ SC_TEST(converted_person_hit) {
   {  // hit
     converted::Tally tally("hit");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] Vec3 a4, [[maybe_unused]] double a5, [[maybe_unused]] double a6, [[maybe_unused]] double a7) { const auto r = converted_person_hit::hit(a0, a1, a2, a3, a4, a5, a6, a7); return Out_hit{r, a5}; };
+    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] Vec3 a4, [[maybe_unused]] double a5, [[maybe_unused]] double a6, [[maybe_unused]] double a7) { const auto r = converted::counted([&] { return converted_person_hit::hit(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), a5, std::move(a6), std::move(a7)); }); return Out_hit{r, a5}; };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const double a1 = draw.number();

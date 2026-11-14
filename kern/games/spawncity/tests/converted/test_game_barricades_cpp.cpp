@@ -183,7 +183,7 @@ SC_TEST(converted_game_barricades_cpp) {
   {  // building_key
     converted::Tally tally("building_key");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Interiors::Plan a0) { return converted_game_barricades_cpp::building_key(a0); };
+    const auto run = [&]([[maybe_unused]] Interiors::Plan a0) { return converted::counted([&] { return converted_game_barricades_cpp::building_key(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Interiors::Plan a0 = draw_Interiors__Plan(draw);
       const converted::Watch watch;

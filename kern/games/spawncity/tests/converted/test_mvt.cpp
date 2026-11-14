@@ -107,7 +107,7 @@ SC_TEST(converted_mvt) {
   {  // Writer::bytes
     converted::Tally tally("Writer_bytes");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Writer a0) { return a0.bytes(); };
+    const auto run = [&]([[maybe_unused]] Writer a0) { return converted::counted([&] { return a0.bytes(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Writer a0 = draw_mvt__Writer(draw);
       const converted::Watch watch;

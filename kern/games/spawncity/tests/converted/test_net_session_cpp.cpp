@@ -192,7 +192,7 @@ SC_TEST(converted_net_session_cpp) {
   {  // config
     converted::Tally tally("config");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted_net_session_cpp::config(); };
+    const auto run = [&]() { return converted::counted([&] { return converted_net_session_cpp::config(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
@@ -207,7 +207,7 @@ SC_TEST(converted_net_session_cpp) {
   {  // sane
     converted::Tally tally("sane");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted_net_session_cpp::sane(a0); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted::counted([&] { return converted_net_session_cpp::sane(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const converted::Watch watch;

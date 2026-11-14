@@ -78,7 +78,7 @@ SC_TEST(converted_water_look_cpp) {
   {  // WaterLook::vertex_declarations
     converted::Tally tally("WaterLook_vertex_declarations");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted_water_look_cpp::WaterLook::vertex_declarations(); };
+    const auto run = [&]() { return converted::counted([&] { return converted_water_look_cpp::WaterLook::vertex_declarations(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
@@ -93,7 +93,7 @@ SC_TEST(converted_water_look_cpp) {
   {  // WaterLook::vertex
     converted::Tally tally("WaterLook_vertex");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted_water_look_cpp::WaterLook::vertex(); };
+    const auto run = [&]() { return converted::counted([&] { return converted_water_look_cpp::WaterLook::vertex(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
@@ -108,7 +108,7 @@ SC_TEST(converted_water_look_cpp) {
   {  // WaterLook::fragment_declarations
     converted::Tally tally("WaterLook_fragment_declarations");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted_water_look_cpp::WaterLook::fragment_declarations(); };
+    const auto run = [&]() { return converted::counted([&] { return converted_water_look_cpp::WaterLook::fragment_declarations(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
@@ -123,7 +123,7 @@ SC_TEST(converted_water_look_cpp) {
   {  // WaterLook::fragment_surface
     converted::Tally tally("WaterLook_fragment_surface");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted_water_look_cpp::WaterLook::fragment_surface(); };
+    const auto run = [&]() { return converted::counted([&] { return converted_water_look_cpp::WaterLook::fragment_surface(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)

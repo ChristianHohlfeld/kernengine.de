@@ -192,7 +192,7 @@ SC_TEST(converted_life_art_cpp) {
   {  // rot
     converted::Tally tally("rot");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return converted_life_art_cpp::rot(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_life_art_cpp::rot(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const double a1 = draw.number();
@@ -209,7 +209,7 @@ SC_TEST(converted_life_art_cpp) {
   {  // at
     converted::Tally tally("at");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted_life_art_cpp::at(a0); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted::counted([&] { return converted_life_art_cpp::at(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const converted::Watch watch;
@@ -225,7 +225,7 @@ SC_TEST(converted_life_art_cpp) {
   {  // sc3
     converted::Tally tally("sc3");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted_life_art_cpp::sc3(a0); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted::counted([&] { return converted_life_art_cpp::sc3(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const converted::Watch watch;
@@ -241,7 +241,7 @@ SC_TEST(converted_life_art_cpp) {
   {  // rgb
     converted::Tally tally("rgb");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted_life_art_cpp::rgb(a0); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_life_art_cpp::rgb(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
@@ -257,7 +257,7 @@ SC_TEST(converted_life_art_cpp) {
   {  // LifeArt::put
     converted::Tally tally("LifeArt_put");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] LifeArt::Part a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { converted_life_art_cpp::LifeArt::put(a0, a1, a2); return a0; };
+    const auto run = [&]([[maybe_unused]] LifeArt::Part a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { converted::counted([&] { return converted_life_art_cpp::LifeArt::put(a0, a1, std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const LifeArt::Part a0 = draw_LifeArt__Part(draw);
       const Mat4 a1 = draw_kern__Mat4(draw);

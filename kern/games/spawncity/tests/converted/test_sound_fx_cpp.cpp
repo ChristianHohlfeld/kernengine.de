@@ -239,7 +239,7 @@ SC_TEST(converted_sound_fx_cpp) {
   {  // SoundFx::drive
     converted::Tally tally("SoundFx_drive");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] SoundFx a0, [[maybe_unused]] SoundFx::Loop a1, [[maybe_unused]] bool a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] Vec3 a4, [[maybe_unused]] double a5, [[maybe_unused]] double a6, [[maybe_unused]] bool a7, [[maybe_unused]] double a8) { a0.drive(a1, a2, a3, a4, a5, a6, a7, a8); return Out_SoundFx_drive{a0, a1}; };
+    const auto run = [&]([[maybe_unused]] SoundFx a0, [[maybe_unused]] SoundFx::Loop a1, [[maybe_unused]] bool a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] Vec3 a4, [[maybe_unused]] double a5, [[maybe_unused]] double a6, [[maybe_unused]] bool a7, [[maybe_unused]] double a8) { converted::counted([&] { return a0.drive(a1, std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6), std::move(a7), std::move(a8)); }); return Out_SoundFx_drive{a0, a1}; };
     for (int i = 0; tally.more(i); ++i) {
       const SoundFx a0 = draw_SoundFx(draw);
       const SoundFx::Loop a1 = draw_SoundFx__Loop(draw);
@@ -263,7 +263,7 @@ SC_TEST(converted_sound_fx_cpp) {
   {  // SoundFx::update
     converted::Tally tally("SoundFx_update");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] SoundFx a0, [[maybe_unused]] SoundState a1, [[maybe_unused]] double a2) { a0.update(a1, a2); return a0; };
+    const auto run = [&]([[maybe_unused]] SoundFx a0, [[maybe_unused]] SoundState a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.update(a1, std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const SoundFx a0 = draw_SoundFx(draw);
       const SoundState a1 = draw_SoundState(draw);

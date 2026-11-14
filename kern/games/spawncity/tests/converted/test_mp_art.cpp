@@ -102,7 +102,7 @@ SC_TEST(converted_mp_art) {
   {  // MpArt::ready
     converted::Tally tally("MpArt_ready");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MpArt a0) { return a0.ready(); };
+    const auto run = [&]([[maybe_unused]] MpArt a0) { return converted::counted([&] { return a0.ready(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const MpArt a0 = draw_MpArt(draw);
       const converted::Watch watch;

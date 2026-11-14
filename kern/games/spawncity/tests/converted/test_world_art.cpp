@@ -109,7 +109,7 @@ SC_TEST(converted_world_art) {
   {  // WorldArt::renderer
     converted::Tally tally("WorldArt_renderer");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] WorldArt a0) { const auto r = a0.renderer(); return Out_WorldArt_renderer{a0, r}; };
+    const auto run = [&]([[maybe_unused]] WorldArt a0) { const auto r = converted::counted([&] { return a0.renderer(); }); return Out_WorldArt_renderer{a0, r}; };
     for (int i = 0; tally.more(i); ++i) {
       const WorldArt a0 = draw_WorldArt(draw);
       const converted::Watch watch;

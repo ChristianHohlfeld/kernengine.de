@@ -527,7 +527,7 @@ SC_TEST(converted_mp_rules_cpp) {
   {  // fmin2
     converted::Tally tally("fmin2");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted_mp_rules_cpp::fmin2(a0, a1); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_mp_rules_cpp::fmin2(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
@@ -544,7 +544,7 @@ SC_TEST(converted_mp_rules_cpp) {
   {  // clampd
     converted::Tally tally("clampd");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted_mp_rules_cpp::clampd(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_mp_rules_cpp::clampd(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
@@ -562,7 +562,7 @@ SC_TEST(converted_mp_rules_cpp) {
   {  // nlerp_slerp
     converted::Tally tally("nlerp_slerp");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Quat a0, [[maybe_unused]] Quat a1, [[maybe_unused]] double a2) { return converted_mp_rules_cpp::nlerp_slerp(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] Quat a0, [[maybe_unused]] Quat a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_mp_rules_cpp::nlerp_slerp(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Quat a0 = draw_kern__Quat(draw);
       const Quat a1 = draw_kern__Quat(draw);
@@ -580,7 +580,7 @@ SC_TEST(converted_mp_rules_cpp) {
   {  // NavTimeline::push
     converted::Tally tally("NavTimeline_push");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] NavTimeline a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] unsigned char a3, [[maybe_unused]] double a4) { const auto r = a0.push(a1, a2, a3, a4); return Out_NavTimeline_push{a0, r}; };
+    const auto run = [&]([[maybe_unused]] NavTimeline a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] unsigned char a3, [[maybe_unused]] double a4) { const auto r = converted::counted([&] { return a0.push(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return Out_NavTimeline_push{a0, r}; };
     for (int i = 0; tally.more(i); ++i) {
       const NavTimeline a0 = draw_mp__NavTimeline(draw);
       const Vec3 a1 = draw.vector();
@@ -600,7 +600,7 @@ SC_TEST(converted_mp_rules_cpp) {
   {  // NavTimeline::sample
     converted::Tally tally("NavTimeline_sample");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] NavTimeline a0, [[maybe_unused]] double a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3) { const auto r = a0.sample(a1, a2, a3); return Out_NavTimeline_sample{r, a2, a3}; };
+    const auto run = [&]([[maybe_unused]] NavTimeline a0, [[maybe_unused]] double a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3) { const auto r = converted::counted([&] { return a0.sample(std::move(a1), a2, a3); }); return Out_NavTimeline_sample{r, a2, a3}; };
     for (int i = 0; tally.more(i); ++i) {
       const NavTimeline a0 = draw_mp__NavTimeline(draw);
       const double a1 = draw.number();
@@ -619,7 +619,7 @@ SC_TEST(converted_mp_rules_cpp) {
   {  // Scoreboard::ensure
     converted::Tally tally("Scoreboard_ensure");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Scoreboard a0, [[maybe_unused]] unsigned char a1) { a0.ensure(a1); return a0; };
+    const auto run = [&]([[maybe_unused]] Scoreboard a0, [[maybe_unused]] unsigned char a1) { converted::counted([&] { return a0.ensure(std::move(a1)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Scoreboard a0 = draw_mp__Scoreboard(draw);
       const unsigned char a1 = static_cast<unsigned char>(draw.below(40));
@@ -636,7 +636,7 @@ SC_TEST(converted_mp_rules_cpp) {
   {  // Scoreboard::died
     converted::Tally tally("Scoreboard_died");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Scoreboard a0, [[maybe_unused]] unsigned char a1, [[maybe_unused]] int a2) { a0.died(a1, a2); return a0; };
+    const auto run = [&]([[maybe_unused]] Scoreboard a0, [[maybe_unused]] unsigned char a1, [[maybe_unused]] int a2) { converted::counted([&] { return a0.died(std::move(a1), std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Scoreboard a0 = draw_mp__Scoreboard(draw);
       const unsigned char a1 = static_cast<unsigned char>(draw.below(40));
@@ -654,7 +654,7 @@ SC_TEST(converted_mp_rules_cpp) {
   {  // Scoreboard::of
     converted::Tally tally("Scoreboard_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Scoreboard a0, [[maybe_unused]] unsigned char a1) { return a0.of(a1); };
+    const auto run = [&]([[maybe_unused]] Scoreboard a0, [[maybe_unused]] unsigned char a1) { return converted::counted([&] { return a0.of(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Scoreboard a0 = draw_mp__Scoreboard(draw);
       const unsigned char a1 = static_cast<unsigned char>(draw.below(40));
@@ -671,7 +671,7 @@ SC_TEST(converted_mp_rules_cpp) {
   {  // encode_mulaw
     converted::Tally tally("encode_mulaw");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted_mp_rules_cpp::encode_mulaw(a0); };
+    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_mp_rules_cpp::encode_mulaw(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
@@ -687,7 +687,7 @@ SC_TEST(converted_mp_rules_cpp) {
   {  // decode_mulaw
     converted::Tally tally("decode_mulaw");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned char a0) { return converted_mp_rules_cpp::decode_mulaw(a0); };
+    const auto run = [&]([[maybe_unused]] unsigned char a0) { return converted::counted([&] { return converted_mp_rules_cpp::decode_mulaw(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned char a0 = static_cast<unsigned char>(draw.below(40));
       const converted::Watch watch;
@@ -703,7 +703,7 @@ SC_TEST(converted_mp_rules_cpp) {
   {  // VoiceStream::push
     converted::Tally tally("VoiceStream_push");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] VoiceStream a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] std::vector<unsigned char> a2, [[maybe_unused]] double a3) { const auto r = a0.push(a1, a2, a3); return Out_VoiceStream_push{a0, r}; };
+    const auto run = [&]([[maybe_unused]] VoiceStream a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] std::vector<unsigned char> a2, [[maybe_unused]] double a3) { const auto r = converted::counted([&] { return a0.push(std::move(a1), a2, std::move(a3)); }); return Out_VoiceStream_push{a0, r}; };
     for (int i = 0; tally.more(i); ++i) {
       const VoiceStream a0 = draw_mp__VoiceStream(draw);
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -722,7 +722,7 @@ SC_TEST(converted_mp_rules_cpp) {
   {  // VoiceCapture::take
     converted::Tally tally("VoiceCapture_take");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] VoiceCapture a0, [[maybe_unused]] std::vector<unsigned char> a1) { const auto r = a0.take(a1); return Out_VoiceCapture_take{a0, r, a1}; };
+    const auto run = [&]([[maybe_unused]] VoiceCapture a0, [[maybe_unused]] std::vector<unsigned char> a1) { const auto r = converted::counted([&] { return a0.take(a1); }); return Out_VoiceCapture_take{a0, r, a1}; };
     for (int i = 0; tally.more(i); ++i) {
       const VoiceCapture a0 = draw_mp__VoiceCapture(draw);
       const std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
@@ -739,7 +739,7 @@ SC_TEST(converted_mp_rules_cpp) {
   {  // project_on
     converted::Tally tally("project_on");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] std::vector<double> a2) { const auto r = converted_mp_rules_cpp::project_on(a0, a1, a2); return Out_project_on{r, a2}; };
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] std::vector<double> a2) { const auto r = converted::counted([&] { return converted_mp_rules_cpp::project_on(a0, std::move(a1), a2); }); return Out_project_on{r, a2}; };
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       const Vec2 a1 = draw.vector2();
@@ -757,7 +757,7 @@ SC_TEST(converted_mp_rules_cpp) {
   {  // point_at
     converted::Tally tally("point_at");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] std::vector<double> a1, [[maybe_unused]] double a2) { return converted_mp_rules_cpp::point_at(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] std::vector<double> a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_mp_rules_cpp::point_at(a0, a1, std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       const std::vector<double> a1 = draw_list(draw, [&]() -> double { return draw.number(); });
@@ -775,7 +775,7 @@ SC_TEST(converted_mp_rules_cpp) {
   {  // sample_breadcrumbs
     converted::Tally tally("sample_breadcrumbs");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] unsigned int a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { return converted_mp_rules_cpp::sample_breadcrumbs(a0, a1, a2, a3, a4); };
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] unsigned int a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { return converted::counted([&] { return converted_mp_rules_cpp::sample_breadcrumbs(a0, std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       const Vec2 a1 = draw.vector2();
@@ -795,7 +795,7 @@ SC_TEST(converted_mp_rules_cpp) {
   {  // upcoming_turn
     converted::Tally tally("upcoming_turn");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { return converted_mp_rules_cpp::upcoming_turn(a0, a1, a2, a3, a4); };
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { return converted::counted([&] { return converted_mp_rules_cpp::upcoming_turn(a0, std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       const Vec2 a1 = draw.vector2();
@@ -815,7 +815,7 @@ SC_TEST(converted_mp_rules_cpp) {
   {  // route_left
     converted::Tally tally("route_left");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] Vec2 a1) { return converted_mp_rules_cpp::route_left(a0, a1); };
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] Vec2 a1) { return converted::counted([&] { return converted_mp_rules_cpp::route_left(a0, std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       const Vec2 a1 = draw.vector2();
@@ -832,7 +832,7 @@ SC_TEST(converted_mp_rules_cpp) {
   {  // PingBoard::set
     converted::Tally tally("PingBoard_set");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PingBoard a0, [[maybe_unused]] unsigned char a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] unsigned int a3, [[maybe_unused]] double a4) { a0.set(a1, a2, a3, a4); return a0; };
+    const auto run = [&]([[maybe_unused]] PingBoard a0, [[maybe_unused]] unsigned char a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] unsigned int a3, [[maybe_unused]] double a4) { converted::counted([&] { return a0.set(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const PingBoard a0 = draw_mp__PingBoard(draw);
       const unsigned char a1 = static_cast<unsigned char>(draw.below(40));

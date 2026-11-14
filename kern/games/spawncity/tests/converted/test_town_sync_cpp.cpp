@@ -127,7 +127,7 @@ SC_TEST(converted_town_sync_cpp) {
   {  // In::done
     converted::Tally tally("In_done");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] In a0) { return a0.done(); };
+    const auto run = [&]([[maybe_unused]] In a0) { return converted::counted([&] { return a0.done(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const In a0 = draw_town__In(draw);
       const converted::Watch watch;
@@ -143,7 +143,7 @@ SC_TEST(converted_town_sync_cpp) {
   {  // vec_finite
     converted::Tally tally("vec_finite");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted_town_sync_cpp::vec_finite(a0); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted::counted([&] { return converted_town_sync_cpp::vec_finite(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const converted::Watch watch;
@@ -159,7 +159,7 @@ SC_TEST(converted_town_sync_cpp) {
   {  // lamp_ok
     converted::Tally tally("lamp_ok");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] LampRec a0) { return converted_town_sync_cpp::lamp_ok(a0); };
+    const auto run = [&]([[maybe_unused]] LampRec a0) { return converted::counted([&] { return converted_town_sync_cpp::lamp_ok(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       const LampRec a0 = draw_town__LampRec(draw);
       const converted::Watch watch;
@@ -175,7 +175,7 @@ SC_TEST(converted_town_sync_cpp) {
   {  // plank_ok
     converted::Tally tally("plank_ok");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PlankRec a0) { return converted_town_sync_cpp::plank_ok(a0); };
+    const auto run = [&]([[maybe_unused]] PlankRec a0) { return converted::counted([&] { return converted_town_sync_cpp::plank_ok(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       const PlankRec a0 = draw_town__PlankRec(draw);
       const converted::Watch watch;
@@ -191,7 +191,7 @@ SC_TEST(converted_town_sync_cpp) {
   {  // mark_ok
     converted::Tally tally("mark_ok");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MarkRec a0) { return converted_town_sync_cpp::mark_ok(a0); };
+    const auto run = [&]([[maybe_unused]] MarkRec a0) { return converted::counted([&] { return converted_town_sync_cpp::mark_ok(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       const MarkRec a0 = draw_town__MarkRec(draw);
       const converted::Watch watch;
@@ -207,7 +207,7 @@ SC_TEST(converted_town_sync_cpp) {
   {  // kind_of
     converted::Tally tally("kind_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0) { return converted_town_sync_cpp::kind_of(a0); };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0) { return converted::counted([&] { return converted_town_sync_cpp::kind_of(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       const std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       const converted::Watch watch;
@@ -223,7 +223,7 @@ SC_TEST(converted_town_sync_cpp) {
   {  // pack_ask
     converted::Tally tally("pack_ask");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted_town_sync_cpp::pack_ask(); };
+    const auto run = [&]() { return converted::counted([&] { return converted_town_sync_cpp::pack_ask(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)

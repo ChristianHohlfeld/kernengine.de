@@ -246,7 +246,7 @@ SC_TEST(converted_destruction_cpp) {
   {  // norm2
     converted::Tally tally("norm2");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec2 a0, [[maybe_unused]] Vec2 a1) { return converted_destruction_cpp::norm2(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Vec2 a0, [[maybe_unused]] Vec2 a1) { return converted::counted([&] { return converted_destruction_cpp::norm2(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec2 a0 = draw.vector2();
       const Vec2 a1 = draw.vector2();
@@ -263,7 +263,7 @@ SC_TEST(converted_destruction_cpp) {
   {  // Destruction::spawn
     converted::Tally tally("Destruction_spawn");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Destruction a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] double a4, [[maybe_unused]] Vec3 a5, [[maybe_unused]] Rng a6) { a0.spawn(a1, a2, a3, a4, a5, a6); return Out_Destruction_spawn{a0, a6}; };
+    const auto run = [&]([[maybe_unused]] Destruction a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] double a4, [[maybe_unused]] Vec3 a5, [[maybe_unused]] Rng a6) { converted::counted([&] { return a0.spawn(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), a6); }); return Out_Destruction_spawn{a0, a6}; };
     for (int i = 0; tally.more(i); ++i) {
       const Destruction a0 = draw_Destruction(draw);
       const Vec3 a1 = draw.vector();
@@ -285,7 +285,7 @@ SC_TEST(converted_destruction_cpp) {
   {  // Destruction::free_torn
     converted::Tally tally("Destruction_free_torn");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Destruction a0, [[maybe_unused]] Destruction::Torn a1) { a0.free_torn(a1); return Out_Destruction_free_torn{a0, a1}; };
+    const auto run = [&]([[maybe_unused]] Destruction a0, [[maybe_unused]] Destruction::Torn a1) { converted::counted([&] { return a0.free_torn(a1); }); return Out_Destruction_free_torn{a0, a1}; };
     for (int i = 0; tally.more(i); ++i) {
       const Destruction a0 = draw_Destruction(draw);
       const Destruction::Torn a1 = draw_Destruction__Torn(draw);

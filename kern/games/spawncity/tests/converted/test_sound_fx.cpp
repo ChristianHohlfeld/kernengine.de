@@ -96,7 +96,7 @@ SC_TEST(converted_sound_fx) {
   {  // SoundFx::ready
     converted::Tally tally("SoundFx_ready");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] SoundFx a0) { return a0.ready(); };
+    const auto run = [&]([[maybe_unused]] SoundFx a0) { return converted::counted([&] { return a0.ready(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const SoundFx a0 = draw_SoundFx(draw);
       const converted::Watch watch;

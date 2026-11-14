@@ -106,7 +106,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // cell_rand
     converted::Tally tally("cell_rand");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted_combat_rules_cpp::cell_rand(a0, a1); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_combat_rules_cpp::cell_rand(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -123,7 +123,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // agent_random
     converted::Tally tally("agent_random");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted_combat_rules_cpp::agent_random(a0); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_combat_rules_cpp::agent_random(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
@@ -139,7 +139,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // Race::reset
     converted::Tally tally("Race_reset");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Race a0) { a0.reset(); return a0; };
+    const auto run = [&]([[maybe_unused]] Race a0) { converted::counted([&] { return a0.reset(); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Race a0 = draw_combat__Race(draw);
       const converted::Watch watch;

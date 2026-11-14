@@ -515,7 +515,7 @@ SC_TEST(converted_ragdoll_cpp) {
   {  // Ragdolls::find
     converted::Tally tally("Ragdolls_find");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Ragdolls a0, [[maybe_unused]] u64 a1) { return a0.find(a1); };
+    const auto run = [&]([[maybe_unused]] Ragdolls a0, [[maybe_unused]] u64 a1) { return converted::counted([&] { return a0.find(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Ragdolls a0 = draw_Ragdolls(draw);
       const u64 a1 = static_cast<u64>(draw.bits());
@@ -532,7 +532,7 @@ SC_TEST(converted_ragdoll_cpp) {
   {  // Ragdolls::has
     converted::Tally tally("Ragdolls_has");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Ragdolls a0, [[maybe_unused]] u64 a1) { return a0.has(a1); };
+    const auto run = [&]([[maybe_unused]] Ragdolls a0, [[maybe_unused]] u64 a1) { return converted::counted([&] { return a0.has(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Ragdolls a0 = draw_Ragdolls(draw);
       const u64 a1 = static_cast<u64>(draw.bits());
@@ -549,7 +549,7 @@ SC_TEST(converted_ragdoll_cpp) {
   {  // Ragdolls::bone_body
     converted::Tally tally("Ragdolls_bone_body");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Ragdolls a0, [[maybe_unused]] u64 a1, [[maybe_unused]] Ragdolls::Bone a2) { return a0.bone_body(a1, a2); };
+    const auto run = [&]([[maybe_unused]] Ragdolls a0, [[maybe_unused]] u64 a1, [[maybe_unused]] Ragdolls::Bone a2) { return converted::counted([&] { return a0.bone_body(std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Ragdolls a0 = draw_Ragdolls(draw);
       const u64 a1 = static_cast<u64>(draw.bits());
@@ -567,7 +567,7 @@ SC_TEST(converted_ragdoll_cpp) {
   {  // hash_noise
     converted::Tally tally("hash_noise");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] u64 a0, [[maybe_unused]] unsigned int a1) { return converted_ragdoll_cpp::hash_noise(a0, a1); };
+    const auto run = [&]([[maybe_unused]] u64 a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_ragdoll_cpp::hash_noise(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const u64 a0 = static_cast<u64>(draw.bits());
       const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -584,7 +584,7 @@ SC_TEST(converted_ragdoll_cpp) {
   {  // smooth
     converted::Tally tally("smooth");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted_ragdoll_cpp::smooth(a0); };
+    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_ragdoll_cpp::smooth(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const converted::Watch watch;
@@ -600,7 +600,7 @@ SC_TEST(converted_ragdoll_cpp) {
   {  // Ragdolls::rest_center
     converted::Tally tally("Ragdolls_rest_center");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return Ragdolls::rest_center(a0); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return Ragdolls::rest_center(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
@@ -616,7 +616,7 @@ SC_TEST(converted_ragdoll_cpp) {
   {  // Ragdolls::rest_half
     converted::Tally tally("Ragdolls_rest_half");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return Ragdolls::rest_half(a0); };
+    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return Ragdolls::rest_half(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const converted::Watch watch;
@@ -632,7 +632,7 @@ SC_TEST(converted_ragdoll_cpp) {
   {  // Ragdolls::release
     converted::Tally tally("Ragdolls_release");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Ragdolls a0, [[maybe_unused]] Ragdolls::Doll a1) { a0.release(a1); return Out_Ragdolls_release{a0, a1}; };
+    const auto run = [&]([[maybe_unused]] Ragdolls a0, [[maybe_unused]] Ragdolls::Doll a1) { converted::counted([&] { return a0.release(a1); }); return Out_Ragdolls_release{a0, a1}; };
     for (int i = 0; tally.more(i); ++i) {
       const Ragdolls a0 = draw_Ragdolls(draw);
       const Ragdolls::Doll a1 = draw_Ragdolls__Doll(draw);
@@ -649,7 +649,7 @@ SC_TEST(converted_ragdoll_cpp) {
   {  // Ragdolls::clear
     converted::Tally tally("Ragdolls_clear");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Ragdolls a0) { a0.clear(); return a0; };
+    const auto run = [&]([[maybe_unused]] Ragdolls a0) { converted::counted([&] { return a0.clear(); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Ragdolls a0 = draw_Ragdolls(draw);
       const converted::Watch watch;
@@ -665,7 +665,7 @@ SC_TEST(converted_ragdoll_cpp) {
   {  // Ragdolls::remove
     converted::Tally tally("Ragdolls_remove");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Ragdolls a0, [[maybe_unused]] u64 a1) { a0.remove(a1); return a0; };
+    const auto run = [&]([[maybe_unused]] Ragdolls a0, [[maybe_unused]] u64 a1) { converted::counted([&] { return a0.remove(std::move(a1)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Ragdolls a0 = draw_Ragdolls(draw);
       const u64 a1 = static_cast<u64>(draw.bits());
@@ -682,7 +682,7 @@ SC_TEST(converted_ragdoll_cpp) {
   {  // Ragdolls::begin_getup
     converted::Tally tally("Ragdolls_begin_getup");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Ragdolls a0, [[maybe_unused]] Ragdolls::Doll a1, [[maybe_unused]] double a2) { a0.begin_getup(a1, a2); return Out_Ragdolls_begin_getup{a0, a1}; };
+    const auto run = [&]([[maybe_unused]] Ragdolls a0, [[maybe_unused]] Ragdolls::Doll a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.begin_getup(a1, std::move(a2)); }); return Out_Ragdolls_begin_getup{a0, a1}; };
     for (int i = 0; tally.more(i); ++i) {
       const Ragdolls a0 = draw_Ragdolls(draw);
       const Ragdolls::Doll a1 = draw_Ragdolls__Doll(draw);
@@ -700,7 +700,7 @@ SC_TEST(converted_ragdoll_cpp) {
   {  // Ragdolls::update
     converted::Tally tally("Ragdolls_update");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Ragdolls a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { a0.update(a1, a2); return a0; };
+    const auto run = [&]([[maybe_unused]] Ragdolls a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.update(std::move(a1), std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Ragdolls a0 = draw_Ragdolls(draw);
       const double a1 = draw.number();
@@ -718,7 +718,7 @@ SC_TEST(converted_ragdoll_cpp) {
   {  // Ragdolls::blast
     converted::Tally tally("Ragdolls_blast");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Ragdolls a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { a0.blast(a1, a2, a3); return a0; };
+    const auto run = [&]([[maybe_unused]] Ragdolls a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { converted::counted([&] { return a0.blast(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const Ragdolls a0 = draw_Ragdolls(draw);
       const Vec3 a1 = draw.vector();
@@ -737,7 +737,7 @@ SC_TEST(converted_ragdoll_cpp) {
   {  // Ragdolls::where
     converted::Tally tally("Ragdolls_where");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Ragdolls a0, [[maybe_unused]] u64 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3) { const auto r = a0.where(a1, a2, a3); return Out_Ragdolls_where{r, a2, a3}; };
+    const auto run = [&]([[maybe_unused]] Ragdolls a0, [[maybe_unused]] u64 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3) { const auto r = converted::counted([&] { return a0.where(std::move(a1), a2, a3); }); return Out_Ragdolls_where{r, a2, a3}; };
     for (int i = 0; tally.more(i); ++i) {
       const Ragdolls a0 = draw_Ragdolls(draw);
       const u64 a1 = static_cast<u64>(draw.bits());
@@ -756,7 +756,7 @@ SC_TEST(converted_ragdoll_cpp) {
   {  // Ragdolls::physical
     converted::Tally tally("Ragdolls_physical");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Ragdolls a0, [[maybe_unused]] u64 a1) { return a0.physical(a1); };
+    const auto run = [&]([[maybe_unused]] Ragdolls a0, [[maybe_unused]] u64 a1) { return converted::counted([&] { return a0.physical(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Ragdolls a0 = draw_Ragdolls(draw);
       const u64 a1 = static_cast<u64>(draw.bits());
@@ -773,7 +773,7 @@ SC_TEST(converted_ragdoll_cpp) {
   {  // Ragdolls::active
     converted::Tally tally("Ragdolls_active");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Ragdolls a0) { return a0.active(); };
+    const auto run = [&]([[maybe_unused]] Ragdolls a0) { return converted::counted([&] { return a0.active(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Ragdolls a0 = draw_Ragdolls(draw);
       const converted::Watch watch;

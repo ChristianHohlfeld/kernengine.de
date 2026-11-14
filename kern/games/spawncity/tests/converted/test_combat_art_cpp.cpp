@@ -337,7 +337,7 @@ SC_TEST(converted_combat_art_cpp) {
   {  // rot
     converted::Tally tally("rot");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return converted_combat_art_cpp::rot(a0, a1); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_combat_art_cpp::rot(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const double a1 = draw.number();
@@ -354,7 +354,7 @@ SC_TEST(converted_combat_art_cpp) {
   {  // at
     converted::Tally tally("at");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted_combat_art_cpp::at(a0); };
+    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted::counted([&] { return converted_combat_art_cpp::at(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Vec3 a0 = draw.vector();
       const converted::Watch watch;
@@ -370,7 +370,7 @@ SC_TEST(converted_combat_art_cpp) {
   {  // sc3
     converted::Tally tally("sc3");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted_combat_art_cpp::sc3(a0, a1, a2); };
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_combat_art_cpp::sc3(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const double a0 = draw.number();
       const double a1 = draw.number();
@@ -388,7 +388,7 @@ SC_TEST(converted_combat_art_cpp) {
   {  // CombatArt::begin
     converted::Tally tally("CombatArt_begin");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CombatArt a0) { a0.begin(); return a0; };
+    const auto run = [&]([[maybe_unused]] CombatArt a0) { converted::counted([&] { return a0.begin(); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const CombatArt a0 = draw_CombatArt(draw);
       const converted::Watch watch;
@@ -404,7 +404,7 @@ SC_TEST(converted_combat_art_cpp) {
   {  // CombatArt::put
     converted::Tally tally("CombatArt_put");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CombatArt a0, [[maybe_unused]] CombatArt::Shape a1, [[maybe_unused]] Mat4 a2, [[maybe_unused]] Vec3 a3) { a0.put(a1, a2, a3); return a0; };
+    const auto run = [&]([[maybe_unused]] CombatArt a0, [[maybe_unused]] CombatArt::Shape a1, [[maybe_unused]] Mat4 a2, [[maybe_unused]] Vec3 a3) { converted::counted([&] { return a0.put(std::move(a1), a2, std::move(a3)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const CombatArt a0 = draw_CombatArt(draw);
       const CombatArt::Shape a1 = static_cast<CombatArt::Shape>(draw.below(10));
@@ -423,7 +423,7 @@ SC_TEST(converted_combat_art_cpp) {
   {  // CombatArt::put
     converted::Tally tally("CombatArt_put_2");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CombatArt a0, [[maybe_unused]] CombatArt::Shape a1, [[maybe_unused]] Mat4 a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] double a4) { a0.put(a1, a2, a3, a4); return a0; };
+    const auto run = [&]([[maybe_unused]] CombatArt a0, [[maybe_unused]] CombatArt::Shape a1, [[maybe_unused]] Mat4 a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] double a4) { converted::counted([&] { return a0.put(std::move(a1), a2, std::move(a3), std::move(a4)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const CombatArt a0 = draw_CombatArt(draw);
       const CombatArt::Shape a1 = static_cast<CombatArt::Shape>(draw.below(10));
@@ -443,7 +443,7 @@ SC_TEST(converted_combat_art_cpp) {
   {  // CombatArt::beam
     converted::Tally tally("CombatArt_beam");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CombatArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] Vec3 a4) { a0.beam(a1, a2, a3, a4); return a0; };
+    const auto run = [&]([[maybe_unused]] CombatArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] Vec3 a4) { converted::counted([&] { return a0.beam(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const CombatArt a0 = draw_CombatArt(draw);
       const Vec3 a1 = draw.vector();
@@ -463,7 +463,7 @@ SC_TEST(converted_combat_art_cpp) {
   {  // CombatArt::heli
     converted::Tally tally("CombatArt_heli");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CombatArt a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] double a2, [[maybe_unused]] bool a3) { a0.heli(a1, a2, a3); return a0; };
+    const auto run = [&]([[maybe_unused]] CombatArt a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] double a2, [[maybe_unused]] bool a3) { converted::counted([&] { return a0.heli(a1, std::move(a2), std::move(a3)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const CombatArt a0 = draw_CombatArt(draw);
       const Mat4 a1 = draw_kern__Mat4(draw);
@@ -482,7 +482,7 @@ SC_TEST(converted_combat_art_cpp) {
   {  // CombatArt::tank
     converted::Tally tally("CombatArt_tank");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CombatArt a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] double a2, [[maybe_unused]] bool a3) { a0.tank(a1, a2, a3); return a0; };
+    const auto run = [&]([[maybe_unused]] CombatArt a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] double a2, [[maybe_unused]] bool a3) { converted::counted([&] { return a0.tank(a1, std::move(a2), std::move(a3)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const CombatArt a0 = draw_CombatArt(draw);
       const Mat4 a1 = draw_kern__Mat4(draw);
@@ -501,7 +501,7 @@ SC_TEST(converted_combat_art_cpp) {
   {  // CombatArt::flak
     converted::Tally tally("CombatArt_flak");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CombatArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] bool a5, [[maybe_unused]] bool a6) { a0.flak(a1, a2, a3, a4, a5, a6); return a0; };
+    const auto run = [&]([[maybe_unused]] CombatArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] bool a5, [[maybe_unused]] bool a6) { converted::counted([&] { return a0.flak(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const CombatArt a0 = draw_CombatArt(draw);
       const Vec3 a1 = draw.vector();
@@ -523,7 +523,7 @@ SC_TEST(converted_combat_art_cpp) {
   {  // CombatArt::fighter
     converted::Tally tally("CombatArt_fighter");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CombatArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2) { a0.fighter(a1, a2); return a0; };
+    const auto run = [&]([[maybe_unused]] CombatArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.fighter(std::move(a1), std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const CombatArt a0 = draw_CombatArt(draw);
       const Vec3 a1 = draw.vector();
@@ -541,7 +541,7 @@ SC_TEST(converted_combat_art_cpp) {
   {  // CombatArt::gate
     converted::Tally tally("CombatArt_gate");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CombatArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] Vec3 a5) { a0.gate(a1, a2, a3, a4, a5); return a0; };
+    const auto run = [&]([[maybe_unused]] CombatArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] Vec3 a5) { converted::counted([&] { return a0.gate(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const CombatArt a0 = draw_CombatArt(draw);
       const Vec3 a1 = draw.vector();

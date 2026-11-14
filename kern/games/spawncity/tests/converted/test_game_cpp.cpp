@@ -84,7 +84,7 @@ SC_TEST(converted_game_cpp) {
   {  // mode_name
     converted::Tally tally("mode_name");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Mode a0) { return converted_game_cpp::mode_name(a0); };
+    const auto run = [&]([[maybe_unused]] Mode a0) { return converted::counted([&] { return converted_game_cpp::mode_name(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Mode a0 = static_cast<Mode>(draw.below(5));
       const converted::Watch watch;

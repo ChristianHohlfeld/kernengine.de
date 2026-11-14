@@ -109,7 +109,7 @@ SC_TEST(converted_gps_live) {
   {  // GpsLive::stop
     converted::Tally tally("GpsLive_stop");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GpsLive a0) { a0.stop(); return a0; };
+    const auto run = [&]([[maybe_unused]] GpsLive a0) { converted::counted([&] { return a0.stop(); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const GpsLive a0 = draw_GpsLive(draw);
       const converted::Watch watch;
@@ -125,7 +125,7 @@ SC_TEST(converted_gps_live) {
   {  // GpsLive::active
     converted::Tally tally("GpsLive_active");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GpsLive a0) { return a0.active(); };
+    const auto run = [&]([[maybe_unused]] GpsLive a0) { return converted::counted([&] { return a0.active(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const GpsLive a0 = draw_GpsLive(draw);
       const converted::Watch watch;
@@ -141,7 +141,7 @@ SC_TEST(converted_gps_live) {
   {  // GpsLive::compass
     converted::Tally tally("GpsLive_compass");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GpsLive a0, [[maybe_unused]] double a1) { a0.compass(a1); return a0; };
+    const auto run = [&]([[maybe_unused]] GpsLive a0, [[maybe_unused]] double a1) { converted::counted([&] { return a0.compass(std::move(a1)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
       const GpsLive a0 = draw_GpsLive(draw);
       const double a1 = draw.number();
@@ -158,7 +158,7 @@ SC_TEST(converted_gps_live) {
   {  // GpsLive::has_fix
     converted::Tally tally("GpsLive_has_fix");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GpsLive a0) { return a0.has_fix(); };
+    const auto run = [&]([[maybe_unused]] GpsLive a0) { return converted::counted([&] { return a0.has_fix(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const GpsLive a0 = draw_GpsLive(draw);
       const converted::Watch watch;
@@ -174,7 +174,7 @@ SC_TEST(converted_gps_live) {
   {  // GpsLive::shown
     converted::Tally tally("GpsLive_shown");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GpsLive a0) { return a0.shown(); };
+    const auto run = [&]([[maybe_unused]] GpsLive a0) { return converted::counted([&] { return a0.shown(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const GpsLive a0 = draw_GpsLive(draw);
       const converted::Watch watch;
@@ -190,7 +190,7 @@ SC_TEST(converted_gps_live) {
   {  // GpsLive::position
     converted::Tally tally("GpsLive_position");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GpsLive a0) { return a0.position(); };
+    const auto run = [&]([[maybe_unused]] GpsLive a0) { return converted::counted([&] { return a0.position(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const GpsLive a0 = draw_GpsLive(draw);
       const converted::Watch watch;
@@ -206,7 +206,7 @@ SC_TEST(converted_gps_live) {
   {  // GpsLive::heading
     converted::Tally tally("GpsLive_heading");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GpsLive a0) { return a0.heading(); };
+    const auto run = [&]([[maybe_unused]] GpsLive a0) { return converted::counted([&] { return a0.heading(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const GpsLive a0 = draw_GpsLive(draw);
       const converted::Watch watch;
@@ -222,7 +222,7 @@ SC_TEST(converted_gps_live) {
   {  // GpsLive::speed
     converted::Tally tally("GpsLive_speed");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GpsLive a0) { return a0.speed(); };
+    const auto run = [&]([[maybe_unused]] GpsLive a0) { return converted::counted([&] { return a0.speed(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const GpsLive a0 = draw_GpsLive(draw);
       const converted::Watch watch;
@@ -238,7 +238,7 @@ SC_TEST(converted_gps_live) {
   {  // GpsLive::distance
     converted::Tally tally("GpsLive_distance");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GpsLive a0) { return a0.distance(); };
+    const auto run = [&]([[maybe_unused]] GpsLive a0) { return converted::counted([&] { return a0.distance(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const GpsLive a0 = draw_GpsLive(draw);
       const converted::Watch watch;
@@ -254,7 +254,7 @@ SC_TEST(converted_gps_live) {
   {  // GpsLive::accuracy
     converted::Tally tally("GpsLive_accuracy");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GpsLive a0) { return a0.accuracy(); };
+    const auto run = [&]([[maybe_unused]] GpsLive a0) { return converted::counted([&] { return a0.accuracy(); }); };
     for (int i = 0; tally.more(i); ++i) {
       const GpsLive a0 = draw_GpsLive(draw);
       const converted::Watch watch;
@@ -270,7 +270,7 @@ SC_TEST(converted_gps_live) {
   {  // GpsLive::elapsed
     converted::Tally tally("GpsLive_elapsed");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GpsLive a0, [[maybe_unused]] double a1) { return a0.elapsed(a1); };
+    const auto run = [&]([[maybe_unused]] GpsLive a0, [[maybe_unused]] double a1) { return converted::counted([&] { return a0.elapsed(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const GpsLive a0 = draw_GpsLive(draw);
       const double a1 = draw.number();
