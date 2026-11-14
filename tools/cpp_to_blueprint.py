@@ -6312,7 +6312,9 @@ class Emit:
 ENGINE_SKIP = ("kern::logic::", "kern::json::", "kern::detail::", "kern::dm::", "kern::game::nodes::")
 # Functions that give something and change something (the rule below would call them values).
 ENGINE_STEPS = {"kern::jobs::submit", "kern::jobs::take"}
-ENGINE_PIN = {"Bool": "boolean", "Int": "integer", "Float": "number", "Vector": "vector", "Text": "text"}
+# (a u64 or an i64 the engine takes or gives - a mask of bits, a key, a counter of 64 bits - is an Int64 pin: 64
+# bits, as C++ has them; a list of them a List<Int64>)
+ENGINE_PIN = {"Bool": "boolean", "Int": "integer", "Float": "number", "Vector": "vector", "Text": "text", "Int64": "int64"}
 
 
 def snake(name):
@@ -6321,7 +6323,8 @@ def snake(name):
 
 class Api:
     """The engine's functions as nodes, from a compiler's tree that holds the engine's headers. (The
-    converter asks the same object: a call in a game's source and the node it becomes have one name.)"""
+    converter asks the same object: a call in a game's source and the node it becomes have one name, and
+    one set of pins - tools/engine_api.py writes the engine's table with this class.)"""
 
     def __init__(self, tree, unit):
         self.tree, self.u = tree, unit
@@ -6388,7 +6391,7 @@ class Api:
     def shape(self, bt):
         """A value's form, written out: n i b v t, e<values>, {fields}, [items]."""
         if bt in ENGINE_PIN:
-            return {"Bool": "b", "Int": "i", "Float": "n", "Vector": "v", "Text": "t"}[bt]
+            return {"Bool": "b", "Int": "i", "Float": "n", "Vector": "v", "Text": "t", "Int64": "l"}[bt]
         if bt in self.u.enum_values:
             return f"e{len(self.u.enum_values[bt])}"
         if bt in self.u.struct_fields:

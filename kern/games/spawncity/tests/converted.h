@@ -47,9 +47,9 @@ namespace sc::converted {
 
 using Value = kern::logic::Value;
 
-/// A 64-bit bit pattern of the program (its u64, i64) as the test hands it to a Blueprint: the Blueprint's
-/// Whole64, two 32-bit halves (tools/blueprint_whole64.h). In C++ a u64 and a size_t are one type; the
-/// program's spelling tells them apart, and the generated test says which is which (shaped, below).
+/// A 64-bit bit pattern of the program (its u64, i64) as the test hands it to a Blueprint: the language's
+/// Int64, 64 bits as C++ holds them. In C++ a u64 and a size_t are one type; the program's spelling tells
+/// them apart, and the generated test says which is which (shaped, below).
 struct Whole {
   unsigned long long v = 0;
 };
@@ -594,7 +594,7 @@ template <class U> wide::Span<const U> kept_span(std::vector<U> entries) {
 inline Value arg(f64 x) { return Value::number(x); }
 inline Value arg(f32 x) { return Value::number(static_cast<f64>(x)); }
 inline Value arg(bool x) { return Value::boolean(x); }
-inline Value arg(Whole w) { return Value::structure({Value::integer(static_cast<kern::i64>(w.v >> 32)), Value::integer(static_cast<kern::i64>(w.v & 0xFFFFFFFFull))}); }
+inline Value arg(Whole w) { return Value::int64(w.v); }
 inline Value arg(Vec3 v) { return Value::vector(v); }
 inline Value arg(Vec2 v) { return Value::vector({v.x, v.y, 0}); }
 inline Value arg(wide::Vec3 v) { return arg(kern::Vec3(v)); }
@@ -654,9 +654,7 @@ inline bool same(Vec2 want, const Value& got) {
   const Vec3 v = got.as_vector();
   return same_bits(want.x, v.x) && same_bits(want.y, v.y);
 }
-inline bool same(Whole want, const Value& got) {
-  return got.rows && got.rows->size() == 2 && (*got.rows)[0].as_int() == static_cast<kern::i64>(want.v >> 32) && (*got.rows)[1].as_int() == static_cast<kern::i64>(want.v & 0xFFFFFFFFull);
-}
+inline bool same(Whole want, const Value& got) { return got.type == kern::logic::PinType::int64 && static_cast<unsigned long long>(got.i) == want.v; }
 inline bool same(wide::Vec3 want, const Value& got) { return same(kern::Vec3(want), got); }
 inline bool same(wide::Vec2 want, const Value& got) { return same(kern::Vec2(want), got); }
 inline bool same(const EngineObject* want, const Value& got) { return got.as_int() == (want ? want->kern_handle : 0); }
@@ -866,7 +864,7 @@ template <class S> struct Take {
 };
 template <> struct Take<Whole> {
   template <class T> static void to(T& target, const Value& v) {
-    target = v.rows && v.rows->size() == 2 ? static_cast<T>((static_cast<unsigned long long>((*v.rows)[0].as_int()) << 32) | static_cast<unsigned long long>((*v.rows)[1].as_int())) : T{};
+    target = v.type == kern::logic::PinType::int64 ? static_cast<T>(static_cast<unsigned long long>(v.i)) : T{};
   }
 };
 template <class S> struct Take<std::vector<S>> {
@@ -1392,7 +1390,7 @@ template <class A, class B> constexpr A& rem_to(A& a, B b) { return a = static_c
 template <class A, class B> constexpr A& shl_to(A& a, B b) { return a = static_cast<A>(shl(a, b)); }
 template <class A, class B> constexpr A& shr_to(A& a, B b) { return a = static_cast<A>(shr(a, b)); }
 
-// A 64-bit bit pattern (the program's u64 and i64 - a Blueprint's Whole64, see tools/blueprint_whole64.h) is
+// A 64-bit bit pattern (the program's u64 and i64 - a Blueprint's Int64) is
 // computed around 2^64, as C++ computes with unsigned numbers: nothing to mark there. What C++ leaves open
 // marks the call: signed arithmetic that leaves the 64 bits, a division by zero, a shift by 64 or more.
 template <class R> constexpr R kept_bits(__int128 exact) {
