@@ -463,6 +463,32 @@ inline const std::vector<Case>& cases() {
           {"name":"Mul","pure":true,"inputs":[{"name":"a","type":"struct","of":"Mat","ref":"const","value":{"m":[1,0,0,1],"Name":"m"}},{"name":"b","type":"struct","of":"Mat","ref":"const","value":{"m":[1,0,0,1],"Name":"m"}}],"outputs":[{"name":"out","type":"struct","of":"Mat","value":{"m":[1,0,0,1],"Name":"m"}}],"locals":[{"name":"R","type":"struct","of":"Mat","value":{"m":[1,0,0,1],"Name":"m"}}]},
           {"name":"Scaled","inputs":[{"name":"v","type":"float_list","count":3,"value":[1,1,1]},{"name":"by","type":"float","value":2}],"outputs":[{"name":"v","type":"float_list","count":3,"value":[]}],"locals":[{"name":"Made","type":"float_list","count":3,"value":[]}]},
           {"name":"Bump","inputs":[{"name":"axis","type":"float_list","count":3,"ref":true,"value":[]},{"name":"by","type":"float","value":1}],"outputs":[]}]})"},
+      // Sort List: a list of structs in the order a pure function says (more kills first, then fewer
+      // deaths; equal ones as they stood), numbers and texts by their own order.
+      {"list_sort",
+       R"({"structs":[{"name":"Score","fields":[{"name":"Name","type":"text","value":""},{"name":"Kills","type":"int","value":0},{"name":"Deaths","type":"int","value":0}]}],"variables":[
+          {"name":"Scores","type":"struct_list","of":"Score","value":[]},{"name":"Times","type":"float_list","value":[3.5,1,2,1]},
+          {"name":"Names","type":"text_list","value":["c","a","b"]},{"name":"Shown","type":"text","value":""}],"nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},
+          {"id":2,"type":"func.entry","params":{"function":"Before"}},{"id":3,"type":"func.return","params":{"function":"Before"}},{"id":4,"type":"logic.or"},
+          {"id":5,"type":"math.compare","params":{"op":">"}},{"id":6,"type":"var.get","params":{"variable":"a","scope":"Before","path":".Kills"}},
+          {"id":7,"type":"var.get","params":{"variable":"b","scope":"Before","path":".Kills"}},{"id":8,"type":"logic.and"},{"id":9,"type":"math.compare","params":{"op":"=="}},
+          {"id":10,"type":"var.get","params":{"variable":"a","scope":"Before","path":".Kills"}},
+          {"id":11,"type":"var.get","params":{"variable":"b","scope":"Before","path":".Kills"}},{"id":12,"type":"math.compare","params":{"op":"<"}},
+          {"id":13,"type":"var.get","params":{"variable":"a","scope":"Before","path":".Deaths"}},
+          {"id":14,"type":"var.get","params":{"variable":"b","scope":"Before","path":".Deaths"}},{"id":15,"type":"list.add","params":{"variable":"Scores"}},
+          {"id":16,"type":"struct.make","params":{"struct":"Score"},"values":{"Name":"x","Kills":2,"Deaths":3}},{"id":17,"type":"list.add","params":{"variable":"Scores"}},
+          {"id":18,"type":"struct.make","params":{"struct":"Score"},"values":{"Name":"y","Kills":5,"Deaths":1}},{"id":19,"type":"list.add","params":{"variable":"Scores"}},
+          {"id":20,"type":"struct.make","params":{"struct":"Score"},"values":{"Name":"z","Kills":2,"Deaths":1}},{"id":21,"type":"list.add","params":{"variable":"Scores"}},
+          {"id":22,"type":"struct.make","params":{"struct":"Score"},"values":{"Name":"w","Kills":2,"Deaths":3}},
+          {"id":23,"type":"list.sort","params":{"variable":"Scores","function":"Before"}},{"id":24,"type":"list.sort","params":{"variable":"Times","function":""}},
+          {"id":25,"type":"list.sort","params":{"variable":"Names","function":""}},{"id":26,"type":"var.set","params":{"variable":"Shown"}},{"id":27,"type":"text.append"},
+          {"id":28,"type":"var.get","params":{"variable":"Scores","path":"[].Name"},"values":{"path0":0}},
+          {"id":29,"type":"var.get","params":{"variable":"Scores","path":"[].Name"},"values":{"path0":3}},{"id":30,"type":"var.get","params":{"variable":"Times"}}],"links":[
+          [1,"then",15,"exec"],[2,"then",3,"exec"],[4,"result",3,"before"],[5,"result",4,"a"],[6,"value",5,"a"],[7,"value",5,"b"],[8,"result",4,"b"],[9,"result",8,"a"],
+          [10,"value",9,"a"],[11,"value",9,"b"],[12,"result",8,"b"],[13,"value",12,"a"],[14,"value",12,"b"],[15,"then",17,"exec"],[16,"value",15,"item"],[17,"then",19,"exec"],
+          [18,"value",17,"item"],[19,"then",21,"exec"],[20,"value",19,"item"],[21,"then",23,"exec"],[22,"value",21,"item"],[23,"then",24,"exec"],[24,"then",25,"exec"],
+          [25,"then",26,"exec"],[27,"result",26,"value"],[28,"value",27,"a"],[29,"value",27,"b"],[30,"value",27,"c"]],"functions":[
+          {"name":"Before","pure":true,"inputs":[{"name":"a","type":"struct","of":"Score","value":{"Name":"","Kills":0,"Deaths":0}},{"name":"b","type":"struct","of":"Score","value":{"Name":"","Kills":0,"Deaths":0}}],"outputs":[{"name":"before","type":"bool","value":false}]}]})"},
       // Format Text: a format as printf has it with Int, Float and Text values - widths, precision,
       // %x %c %%, the Most input cutting what it gives (snprintf's size).
       {"text_format",

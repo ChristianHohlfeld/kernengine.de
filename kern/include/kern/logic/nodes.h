@@ -5,6 +5,7 @@
 // Nothing here knows about graphs.
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <charconv>
 #include <cmath>
@@ -552,6 +553,11 @@ template <class T> bool remove(std::vector<T>& items, const std::type_identity_t
   return removed;
 }
 template <class T> void clear(std::vector<T>& items) { items.clear(); }
+/// Sort List: the items in order - `less(a, b)`: a goes before b; without it, by their `<` -, items
+/// that are equal in that order as they stood (a stable sort: the order it gives is the one order there
+/// is, on every machine and in every tier).
+template <class T, class Less> void sort(std::vector<T>& items, Less less) { std::stable_sort(items.begin(), items.end(), less); }
+template <class T> void sort(std::vector<T>& items) { std::stable_sort(items.begin(), items.end()); }
 /// The longest list Set Length makes and Reserve makes room for: a length beyond it is this
 /// one (a length is defined for every number, like an index).
 inline constexpr i64 kLongest = i64{1} << 24;

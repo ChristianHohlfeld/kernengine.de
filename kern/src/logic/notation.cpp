@@ -208,12 +208,18 @@ std::string literal(const Value& v, const std::string& of, const Graph& g, std::
 /// The settings of a node as they stand behind its function's name: <"smooth">. A setting that
 /// names a variable is not among them - the variable itself is the call's first value.
 /// A setting that names a type is that type: logic_select<Float>, list_make<Text, "2">.
-std::string settings_of(const NodeDef& def, const Node& n, const Graph& g) {
+/// A setting that names a function of the Blueprint is that member function: &Board::Before, and
+/// nullptr where it names none (`cls`: the name of the Blueprint's class in the text).
+std::string settings_of(const NodeDef& def, const Node& n, const Graph& g, const std::string& cls = {}) {
   std::string r;
   for (std::size_t k = 0; k < def.params.size(); ++k) {
     const ParamDef& pd = def.params[k];
     if (pd.kind == ParamDef::Kind::variable || pd.kind == ParamDef::Kind::scope || pd.kind == ParamDef::Kind::path) continue;
     const std::string value = n.param(pd.key, pd.def);
+    if (pd.kind == ParamDef::Kind::function) {
+      r += (r.empty() ? "<" : ", ") + (value.empty() ? std::string("nullptr") : "&" + cls + "::" + value);
+      continue;
+    }
     // (a struct and one of its fields are one setting, as C++ names a field: &Weapon::Name)
     if (pd.kind == ParamDef::Kind::type && pd.structs_only && k + 1 < def.params.size() && def.params[k + 1].kind == ParamDef::Kind::field) {
       r += (r.empty() ? "<&" : ", &") + value + "::" + n.param(def.params[k + 1].key, def.params[k + 1].def);
@@ -731,7 +737,7 @@ struct Shape {
     // (Reserve changes nothing one can read - but in the class the list moves: what a function holds of it would be gone)
     auto writes_place = [](const std::string& t) {
       return t == "var.set" || t == "var.take" || t == "list.add" || t == "list.insert" || t == "list.remove_at" || t == "list.remove" || t == "list.clear" || t == "list.resize" ||
-             t == "list.append" || t == "list.insert_list" || t == "list.reserve";
+             t == "list.append" || t == "list.insert_list" || t == "list.reserve" || t == "list.sort";
     };
     // what a call's function does, as the caller sees it: a write through one of its reference
     // inputs is a write at the place the call gave that input
@@ -788,7 +794,7 @@ struct Shape {
         w.kind = g.root_of(*at(x).node, named);
         w.root = at(x).node->param("variable");
         if (w.kind == Graph::Root::none || !path_steps(at(x).node->param("path"), w.path)) continue;
-        w.resizes = t != "var.set" && t != "var.take";  // (a Take puts the zero where something stood, like a Set)
+        w.resizes = t != "var.set" && t != "var.take" && t != "list.sort";  // (a Take puts the zero where something stood, like a Set; Sort puts other items there)
         w.node = x;
         writes[f].push_back(std::move(w));
       }
@@ -1074,7 +1080,8 @@ struct Writer {
   std::string id(int x) { return std::to_string(at(x).node->id); }
 
   /// The name of a node's function with its settings: flow_tween<"smooth">.
-  std::string callee(int x) { return node_name(at(x).def->type) + settings_of(*at(x).def, *at(x).node, s.g); }
+  std::string callee(int x) { return node_name(at(x).def->type) + settings_of(*at(x).def, *at(x).node, s.g, cls_); }
+  std::string cls_;  // the name of the Blueprint's class in the text (write)
 
   std::string literal_of(int x, int k) {
     const Info& X = at(x);
@@ -1671,6 +1678,7 @@ struct Writer {
   void write(const std::string& name, bool layout = true) {
     const Graph& g = s.g;
     const std::string type = struct_name(g, name);
+    cls_ = type;
     out += "// Kern Blueprint, C++ notation 1: this text and the graph in Kern Studio are one thing in two\n";
     out += "// notations, each read from the other without loss (kern/docs/blueprint_cpp.md).\n";
     out += "#include \"kern/logic/blueprint.h\"\n\n";
@@ -2413,11 +2421,25 @@ struct Reader {
       TypeRef t;
       if (accept("&")) {
         // &Weapon::Name   a struct and one of its fields: two settings in one
+        // &Board::Before  a function of this Blueprint (its class): one setting, the function's name
         std::string owner, field;
         if (!word(owner, "a struct") || !expect("::") || !word(field, "a field of " + owner)) return false;
+        if (owner == name) {
+          out.push_back(std::move(field));
+          if (types) types->push_back(false);
+          if (!accept(",")) break;
+          continue;
+        }
         out.push_back(std::move(owner));
         out.push_back(std::move(field));
         if (types) { types->push_back(true); types->push_back(false); }
+        if (!accept(",")) break;
+        continue;
+      }
+      if (peek().kind == Tok::id && peek().s == "nullptr") {
+        ++p;  // (a setting that names no function)
+        out.emplace_back();
+        if (types) types->push_back(false);
         if (!accept(",")) break;
         continue;
       }

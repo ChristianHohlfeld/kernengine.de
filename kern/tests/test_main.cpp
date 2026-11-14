@@ -2858,6 +2858,15 @@ TEST(logic_tier_cases_interpreter) {
       CHECK(inst->get("Gate").as_int() == 3);   // opened after the first 3 calls
       CHECK(inst->get("Flips").as_int() == 303);
     }
+    if (std::string(c.name) == "list_sort") {
+      // every Go adds four scores and sorts them all: the y's (most kills) first, then the z's (fewer
+      // deaths), then x and w as they were added - stable: w is the last; Times and Names in order
+      const logic::Value scores = inst->get("Scores");
+      const std::string shown = inst->get("Shown").as_text();
+      CHECK(scores.size() > 4 && scores.item(0).field(0)->as_text() == "y" && scores.item(scores.size() - 1).field(0)->as_text() == "w" &&
+            scores.item(scores.size() - 2).field(0)->as_text() == "x");
+      CHECK(shown.size() > 2 && shown[0] == 'y' && shown.find("[1, 1, 2, 3.5]") != std::string::npos && inst->get("Names").as_text() == "[a, b, c]");
+    }
     if (std::string(c.name) == "text_format") {
       // the last Go: value 1, no text - as snprintf writes it ("%s" of three bytes at most: "abc")
       char want[64];

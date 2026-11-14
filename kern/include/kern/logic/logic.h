@@ -673,6 +673,7 @@ struct ParamDef {
   bool with_lists = false;  // Kind::type: the list types are among them (not for the type of a list's items)
   bool enums_only = false;  // Kind::type: an enum of the Blueprint and nothing else (the enum nodes' "Enum")
   bool structs_only = false;  // Kind::type: a struct of the Blueprint and nothing else (the struct nodes' "Struct")
+  bool optional = false;      // Kind::function: it may name none (Sort List without an Order: the items' own)
 };
 /// The types a Kind::type setting can name in the Blueprint `g` - its enums and structs among
 /// them -, in the order they are offered.

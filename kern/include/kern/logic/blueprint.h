@@ -287,6 +287,22 @@ struct BlueprintCore : logic::PureNodes {
   template <class T> static void list_clear(List<T>& list) { logic::list::clear(list); }
   /// (in one go: what std::vector does in one request for memory - resize, insert of a range, reserve)
   template <class T> static void list_resize(List<T>& list, Int length, const std::type_identity_t<T>& value) { logic::list::resize(list, length, value); }
+  /// Sort List: list_sort<&Board::Before>(Scores) - in the order a function of the Blueprint says (it
+  /// takes two items and gives whether the first goes before the second); list_sort<nullptr>(Scores):
+  /// by the items' `<`. Stable: equal items keep their order.
+  template <auto Less, class T> void list_sort(List<T>& list) {
+    if constexpr (std::is_null_pointer_v<decltype(Less)>) {
+      logic::list::sort(list);
+    } else {
+      auto& self = static_cast<typename kern_member_of<decltype(Less)>::type&>(*this);
+      logic::list::sort(list, [&self](const auto& a, const auto& b) -> bool {
+        const auto [before] = (self.*Less)(a, b);
+        return before;
+      });
+    }
+  }
+  template <class M> struct kern_member_of;
+  template <class C, class F> struct kern_member_of<F C::*> { using type = C; };
   template <class T> static void list_append(List<T>& list, std::type_identity_t<logic::Items<T>> items) {
     logic::list::insert_items(list, static_cast<i64>(list.size()), items.first, items.count);
   }
