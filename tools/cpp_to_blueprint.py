@@ -2148,6 +2148,8 @@ class Emit:
                 up = parents[-1] if parents else {}
                 if up.get("kind") == "UnaryExprOrTypeTraitExpr" and up.get("name") == "sizeof":
                     return
+                if up.get("kind") == "LambdaExpr":
+                    return   # (captured by a local function: what it does with it is among the uses walked here)
                 if not (up.get("kind") == "ImplicitCastExpr" and up.get("castKind") == "ArrayToPointerDecay"):
                     ok = False
                     return
@@ -3167,9 +3169,15 @@ class Emit:
         if not by_ref and any(c for _, _, c in free):
             raise Wait("a local function that changes its own copy of what it captured (mutable)")
         lines, args, params = [], [], []
+        for entry in free:
+            if self.types.get(entry[0]) == "Text" and re.fullmatch(r"(?:const\s+)?char\s*\[\d+\]", re.sub(r"\s*&+\s*$", "", qtype(entry[1]))):
+                # (a text buffer of the function: the text it holds - snprintf into it in here changes it)
+                entry[2] = entry[2] or any(x.get("kind") == "CallExpr" and callee_name(x) == "snprintf" and len(kids(x)) > 1 and self.refers(kids(x)[1], entry[0]) for x in walk(body))
         for i, node, is_changed in free:
             raw = re.sub(r"\s*&+\s*$", "", qtype(node))
             raw = re.sub(r"^const\s+", "", raw)
+            if self.types.get(i) == "Text" and re.fullmatch(r"char\s*\[\d+\]", raw):
+                raw = "std::string"
             params.append({"id": i, "kind": "ParmVarDecl", "name": re.sub(r"\W+", "_", self.names[i]).strip("_"), "type": {"qualType": raw + " &" if is_changed else "const " + raw + " &"}})
             if by_ref:
                 args.append(node)
