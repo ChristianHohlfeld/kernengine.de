@@ -1603,6 +1603,9 @@ class Const:
                     else:
                         vals.append(d)
                 return t + "{" + ", ".join(vals) + "}"
+            if k in ("CallExpr", "CXXOperatorCallExpr", "CXXMemberCallExpr"):
+                # (known only once the function has run: a constant of the language is a value written out)
+                raise Wait("a struct constant computed by a function")
             raise Wait(f"a struct constant written as {k}")
         if t.startswith("List<"):
             it = t[5:-1]
@@ -2739,7 +2742,9 @@ class Emit:
         method = next((c for c in kids(rec or {}) if c.get("kind") == "CXXMethodDecl" and c.get("name") == "operator()"), None)
         body = next((c for c in kids(method or {}) if c.get("kind") == "CompoundStmt"), None)
         if body is None:
-            raise Wait("a function value (lambda / std::function) of another shape")
+            # (a lambda with auto inputs is a template: a function for each type it is called with - one that takes
+            # functions is one for each function it is given; the language has no function values)
+            raise Wait("a function value (lambda / std::function) of another shape: a lambda with auto inputs")
         fields = [qtype(c) for c in kids(rec) if c.get("kind") == "FieldDecl"]
         uses_this = any(x.get("kind") == "CXXThisExpr" for x in walk(body))
         values = [t for t in fields if not (uses_this and t.rstrip().endswith("*") and "&" not in t)]
@@ -4124,6 +4129,8 @@ class Emit:
             if st in u.struct_fields:
                 fname, ft = u.field(st, b["name"])
                 return f"struct_break<{st}>({self.ex(base, st)}).{fname}", ft
+            if self.u.object_of(qtype(base)):
+                raise Wait("a field of an object of the engine (its state is the engine's)")
             raise Wait(f"a member of {st}")
         if k == "UnaryOperator":
             op = b.get("opcode")
