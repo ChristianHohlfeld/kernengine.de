@@ -5953,6 +5953,23 @@ class TestWriter:
             while n.get("kind") in ("ImplicitCastExpr", "CStyleCastExpr", "CXXStaticCastExpr", "CXXFunctionalCastExpr") and kids(n):
                 n = bare(kids(n)[-1])
             return n.get("kind") == "IntegerLiteral" and n.get("value") not in ("0", None)
+        def within(base, index):
+            """An entry of a list of fixed length (T[N], std::array<T, N>) at a constant place inside it."""
+            inner = bare(base)
+            while inner.get("kind") == "ImplicitCastExpr" and inner.get("castKind") in ("ArrayToPointerDecay", "NoOp") and kids(inner):
+                inner = bare(kids(inner)[0])
+            length = self.u.entries(qtype(inner))
+            i = bare(index)
+            while i.get("kind") in CAST and kids(i):
+                i = bare(kids(i)[-1])
+            ref = self.tree.decl.get((i.get("referencedDecl") or {}).get("id")) if i.get("kind") == "DeclRefExpr" else None
+            if length is None or not (i.get("kind") == "IntegerLiteral" or (ref is not None and ref.get("kind") == "VarDecl" and (ref.get("constexpr") or re.search(r"\bconst\b", qtype(ref))))):
+                return False
+            try:
+                at = Const(self.u).number(i)
+            except Wait:
+                return False
+            return at == int(at) and 0 <= at < length
         visited = set()
         def visit(n, depth):
             if n.get("_call") is not None:   # (a place written out for a call: the source has the call)
@@ -5974,6 +5991,8 @@ class TestWriter:
                 name = (callee.get("referencedDecl") or {}).get("name")
             if name == "operator[]" and KEYED.match(self.u.clean(qtype(ks[1]))):
                 pass   # (m[key] is said for every key)
+            elif (k == "ArraySubscriptExpr" or name == "operator[]") and within(*ks[-2:]):
+                pass   # (an entry of an array of fixed length at a constant place inside it: there for every call)
             elif k == "ArraySubscriptExpr" or name == "operator[]":
                 base, index = ks[-2:]
                 inner = bare(base)
