@@ -1142,7 +1142,8 @@ class Unit:
             return self.variables[decl["id"]]
         raw = qtype(d)
         if not (d.get("constexpr") or re.search(r"\bconst\b", raw)):
-            raise Wait("state outside a function (a variable of the file)")
+            # (a library keeps nothing: what every caller of the file's functions shares has no place in the language)
+            raise Wait("state outside a function (a variable of the file: a library keeps nothing)")
         t = self.btype(raw)
         init = kids(d)[-1] if kids(d) and d.get("init") else None
         if init is None:
@@ -4180,6 +4181,8 @@ class Emit:
                 return f"({x} < 0.0 ? {x} + 18446744073709551616.0 : {x})"
             return self.narrow(self.fx(inner, leaves), self.ctype(inner), self.ctype(b), inner)
         if not self.numeric(b):
+            if re.search(r"\*\s*(const\s*)?$", self.ctype(b)):
+                raise Wait("a pointer")   # (&p - list.data(): where an entry stands, counted by addresses)
             raise Wait("a value that is not a number in a computation")
         if k == "UnaryOperator" and b.get("opcode") in ("-", "+", "!"):
             x = self.fx(kids(b)[0], leaves)
