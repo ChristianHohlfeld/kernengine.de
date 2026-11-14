@@ -4368,6 +4368,18 @@ class Emit:
                          f"  {held} = list_get<{it}>({lv}, {a});", f"  {lv}[{a}] = list_get<{it}>({lv}, {b});", f"  {lv}[{b}] = {held};",
                          f"  {a} += 1;", f"  {b} = {self.whole_math('-', b, '1')};", "}"]
                 return before + lines + after
+            if name == "fill" and len(kids(n)) == 4 and not self.own(ref.get("id")):
+                # std::fill(first, last, x): every entry from first to before last this value - worked out once (as C++
+                # takes it, a const reference), then set where each entry stands: the loop C++ runs, nothing asked for
+                (l0, first), (l1, last) = self.place(kids(n)[1]), self.place(kids(n)[2])
+                if not self.same_list(l0, l1):
+                    raise Wait("call: fill() between two lists")
+                lt = self.tp(l0)
+                it = lt[5:-1]
+                before, lv, after = self.variable_of(l0, lt)
+                fill, a, b = self.temp("fill", it), self.temp("first", "Int"), self.temp("last", "Int")
+                lines = [f"{fill} = {self.ex(kids(n)[3], it)};", f"{a} = {first};", f"{b} = {self.whole_math('-', last, '1')};"]
+                return before + lines + self.count_loop(a, b, lambda i: [f"{lv}[{i}] = {fill};"]) + after
             if name == "swap" and len(kids(n)) == 3:
                 a, b = kids(n)[1:]
                 t = self.tp(a)
