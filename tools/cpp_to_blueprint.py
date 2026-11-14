@@ -1432,6 +1432,14 @@ class Const:
             if n["opcode"] == "-" and NUMBER.get(self.unit.clean(qtype(n))) == "Int":
                 return self.fit(-int(v), n)
             return -v if n["opcode"] == "-" else v if n["opcode"] == "+" else (0.0 if v else 1.0)
+        if k == "BinaryOperator" and n.get("opcode") == "/" and all(bare(c).get("kind") == "UnaryExprOrTypeTraitExpr" for c in kids(n)):
+            # sizeof a / sizeof a[0]: how many entries the array a has (what neither size is, in bytes, does not matter)
+            whole, one = (self.unit.clean(sized(bare(c)) or "") for c in kids(n))
+            m = re.match(r"(.+?)\s*\[(\d+)\]$", whole)
+            same = lambda t: self.unit.find_type(t) or t   # (a type of the program, however its name is spelled)
+            if m and one and same(self.unit.clean(m.group(1))) == same(one):
+                return self.fit(int(m.group(2)), n)
+            raise Wait("a constant computed with sizeof")
         if k == "BinaryOperator":
             a, b = (self.number(c) for c in kids(n))
             op = n["opcode"]
@@ -1583,6 +1591,15 @@ class Const:
                 return self.literal(kids(n)[0], t)
             raise Wait(f"a list constant written as {k}")
         raise Wait(f"a constant of type {t}")
+
+
+def sized(n):
+    """The C++ type a sizeof (or alignof) measures: the one it names, or its expression's - None for another node."""
+    if n.get("kind") != "UnaryExprOrTypeTraitExpr" or n.get("name") != "sizeof":
+        return None
+    if n.get("argType"):
+        return qtype({"type": n["argType"]})
+    return qtype(kids(n)[0]) if kids(n) else None
 
 
 def enum_value(unit, enum_name, cpp_value):
