@@ -407,7 +407,7 @@ void Game::worldsync_update(f32 dt) {
         // shot at it, our crime and our score, as when it goes up in our own town (wreck_car)
         if ((fl & 2) && !c.wreck) {
           c.wreck_at = now;
-          if (c.hit_by_player) wanted_.report(fl & 1 ? wanted::Crime::bus : wanted::Crime::car, people_.witnessed(at));
+          if (c.hit_by_player) wanted::report(fl & 1 ? wanted::Crime::bus : wanted::Crime::car, people_.witnessed(at));
         }
         c.wreck = fl & 2;
         // critical on his machine: it smokes here too (the countdown is his - update_town leaves it)

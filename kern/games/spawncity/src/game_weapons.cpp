@@ -121,7 +121,7 @@ bool Game::hit_scan(Vec3 from, Vec3 dir, f32 range, f32 damage, bool by_player, 
       if (d.hp <= 0) {
         osfx("wanted_police_drones.down", d.pos);
         explosion(d.pos, 3, 40, by_player);
-        if (by_player) wanted_.report(wanted::Crime::police_drone, true);
+        if (by_player) wanted::report(wanted::Crime::police_drone, true);
         d.active = false;
         d.destroyed_until = now + 9;
       }

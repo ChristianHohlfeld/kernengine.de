@@ -406,14 +406,14 @@ void Game::gaps_update(f32 dt) {
   const f32 now = world_->sim_time();
   g.frame_dt = dt;
   if (g.world_shown < 0) g.world_shown = now;
-  if (wanted_.stars() <= 0 || player_dead_)
+  if (wanted::stars() <= 0 || player_dead_)
     for (f32& d : g.pd_due) d = -1;
   // reportCrime: a crime that keeps (or raises) a wanted level reveals the player - the last contact
   // is now and the last known position is where he is (the drones search there); a new star sounds
   // a short square chirp 520 + 90 s -> 760 + 100 s Hz (0.16 s, .022).
   {
-    const f32 heat = wanted_.heat();
-    const i32 stars = wanted_.stars();
+    const f32 heat = wanted::heat();
+    const i32 stars = wanted::stars();
     if (heat > g.last_heat + 1e-3f && stars > 0) {
       last_contact_ = now;
       last_known_ = player_position();
@@ -815,7 +815,7 @@ void Game::gaps_hud(std::string& s) {
   // police dispatch (renderInboundHud): drones inbound and the next arrival
   u32 inbound = 0;
   f32 next = 1e9f;
-  if (wanted_.stars() > 0)
+  if (wanted::stars() > 0)
     for (u32 i = 0; i < 5; ++i)
       if (g.pd_due[i] > now && !pdrones_[i].active) { ++inbound; next = std::fmin(next, g.pd_due[i] - now); }
   std::snprintf(b, sizeof b, ",\"gaps\":{\"inbound\":%u,\"inboundS\":%.1f,\"sirenCar\":%.4f,\"sirenDrone\":%.4f,\"smoke\":%zu,\"puffs\":%u,\"organic\":%u,"

@@ -46,7 +46,7 @@ void Game::update_details(f32 dt) {
     if (!d.active) { pd_crit_[i].reset(); continue; }
     if (pd_crit_[i].update(detail::Critical::police_drone, d.hp, kPdHp, now)) {
       explosion(d.pos, 3, 40, true);
-      wanted_.report(wanted::Crime::police_drone, true);
+      wanted::report(wanted::Crime::police_drone, true);
       d.active = false;
       d.destroyed_until = now + 9;
       ++crit_blasts_;

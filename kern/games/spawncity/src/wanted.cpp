@@ -35,11 +35,11 @@ f32 fire_interval_ms(i32 stars) { return static_cast<f32>(call("FireIntervalMs",
 f32 hit_chance(i32 stars, f32 distance_m, f32 player_speed) { return static_cast<f32>(call("HitChance", {static_cast<f64>(stars), rules::decimal(distance_m), rules::decimal(player_speed)})); }
 f32 emp_impulse(f32 distance_m) { return static_cast<f32>(call("EmpImpulse", {rules::decimal(distance_m)})); }
 
-void Tracker::report(Crime c, bool witnessed) { call("Report", {static_cast<f64>(c), witnessed ? 1.0 : 0.0}); }
-void Tracker::update(f32 dt, bool seen) { call("Update", {rules::decimal(dt), seen ? 1.0 : 0.0}); }
-void Tracker::clear() { call("Clear", {}); }
-f32 Tracker::hidden_ms() const { return static_cast<f32>(variable("HiddenMs")); }
-f32 Tracker::heat() const { return static_cast<f32>(variable("Heat")); }
-i32 Tracker::stars() const { return static_cast<i32>(call("Stars", {})); }
+void report(Crime c, bool witnessed) { call("Report", {static_cast<f64>(c), witnessed ? 1.0 : 0.0}); }
+void update(f32 dt, bool seen) { call("Update", {rules::decimal(dt), seen ? 1.0 : 0.0}); }
+void clear() { call("Clear", {}); }
+f32 hidden_ms() { return static_cast<f32>(variable("HiddenMs")); }
+f32 heat() { return static_cast<f32>(variable("Heat")); }
+i32 stars() { return static_cast<i32>(call("Stars", {})); }
 
 }  // namespace sc::wanted

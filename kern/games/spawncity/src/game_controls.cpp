@@ -701,7 +701,7 @@ std::string Game::ctl_view_json() {
   }
   // ---- wanted (wanted_police_drones.mjs renderHud / renderEmpControl)
   {
-    const i32 stars = wanted_.stars();
+    const i32 stars = wanted::stars();
     if (V.last_stars > 0 && stars == 0) { V.banner_until = now + 2.1f; V.busted = player_dead_; }
     V.last_stars = stars;
     i32 active = 0, in_range = 0;
@@ -714,8 +714,8 @@ std::string Game::ctl_view_json() {
       if (!d.emp && kern::length(d.pos - me) <= emp_range) ++in_range;
       if (d.shots == 0) inbound = std::fmin(inbound, d.next_shot - now);
     }
-    const bool searching = stars > 0 && wanted_.hidden_ms() > 0;
-    const f32 escape_left = stars > 0 ? std::fmax(0.0f, wanted::escape_ms(stars) - wanted_.hidden_ms()) : 0;
+    const bool searching = stars > 0 && wanted::hidden_ms() > 0;
+    const f32 escape_left = stars > 0 ? std::fmax(0.0f, wanted::escape_ms(stars) - wanted::hidden_ms()) : 0;
     const f32 next_wave = active == 0 && next_drone_wave_ > now ? (next_drone_wave_ - now) * 1000 : -1;
     add(",\"wanted\":{\"stars\":%d,\"active\":%d,\"searching\":%s,\"escapeMs\":%.0f,\"inboundMs\":%.0f,\"nextWaveMs\":%.0f,\"banner\":%s,\"busted\":%s,"
         "\"empMs\":%.0f,\"inRange\":%d,\"miss\":%s}",
@@ -757,7 +757,7 @@ std::string Game::ctl_view_json() {
     add(",\"fun\":{\"reward\":%d,\"complete\":%s,\"overdrive\":%s,\"momentum\":%d,\"mercy\":%d,\"damageScale\":%.2f,\"risk\":%d,\"score\":%d,\"high\":%d,"
         "\"mult\":%.2f,\"name\":\"%s\",\"hint\":\"%s\",\"progress\":%d,\"target\":%d,\"stars\":%d,\"toasts\":[",
         k.reward, f.contract_complete ? "true" : "false", now < f.overdrive_until ? "true" : "false", f.momentum, f.mercy, f.police_damage_scale(), f.at_risk, f.score,
-        f.high_score, f.multiplier(now), jesc(k.name).c_str(), jesc(k.hint).c_str(), f.contract_progress, k.target, wanted_.stars());
+        f.high_score, f.multiplier(now), jesc(k.name).c_str(), jesc(k.hint).c_str(), f.contract_progress, k.target, wanted::stars());
     for (std::size_t i = 0; i < V.toasts.size(); ++i) s += (i ? "," : "") + V.toasts[i];
     s += "]}";
   }
@@ -1159,7 +1159,7 @@ void Game::update_touch_layout() {
   }
   ctl_.near_car = l.near_car;
   ctl_.near_jet = l.near_jet;
-  l.emp = wanted_.stars() > 0 && (mode_ == Mode::foot || mode_ == Mode::drone);
+  l.emp = wanted::stars() > 0 && (mode_ == Mode::foot || mode_ == Mode::drone);
   l.strike_ready = world_->sim_time() - combat_.last_strike >= kStrikeCooldownS;
   l.cockpit = car_cockpit_;
   l.hover = jet_.mode() == Jet::Mode::hover;
@@ -1344,7 +1344,7 @@ bool Game::ctl_command(const std::string& cmd, std::string& out) {
     return true;
   }
   if (starts("contract")) {
-    combat_.pop = combat_.fun.apply(FunEvent::cycle_contract, world_->sim_time(), wanted_.stars());
+    combat_.pop = combat_.fun.apply(FunEvent::cycle_contract, world_->sim_time(), wanted::stars());
     combat_.pop_at = world_->sim_time();
     out = combat_.pop;  // the new contract's line ("AUFTRAG ...")
     return true;

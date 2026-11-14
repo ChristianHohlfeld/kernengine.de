@@ -85,9 +85,8 @@ SC_TEST(rules_wanted_blueprint) {
 SC_TEST(rules_wanted_unbound) {
   // without the Blueprint there are no rules (the game refuses to start without it)
   SC_CHECK(wanted::blueprint() == nullptr && wanted::police_count(5) == 0 && wanted::arrival_delay_ms(1) == 0, "unbound: nothing");
-  wanted::Tracker t;
-  t.report(wanted::Crime::police_car, true);
-  SC_CHECK(t.stars() == 0 && t.heat() == 0, "unbound: no heat");
+  wanted::report(wanted::Crime::police_car, true);
+  SC_CHECK(wanted::stars() == 0 && wanted::heat() == 0, "unbound: no heat");
 }
 
 SC_TEST(rules_wanted_blueprint_is_its_cpp) {
@@ -141,31 +140,30 @@ SC_TEST(rules_wanted_levels) {
 
 SC_TEST(rules_wanted_escape) {
   WantedBlueprint bp;
-  wanted::Tracker t;
-  t.report(wanted::Crime::carjacking, false);
-  SC_CHECK(t.stars() == 0, "nobody saw it");
-  for (int i = 0; i < 4; ++i) t.report(wanted::Crime::carjacking, true);
-  SC_CHECK(t.stars() == 1, "four carjackings seen = one star (%d)", t.stars());
-  t.update(4.0f, false);
-  SC_CHECK(t.stars() == 1, "still searched after 4 s");
-  t.update(1.2f, false);
-  SC_CHECK(t.stars() == 0, "escaped after 5.1 s out of sight");
-  SC_CHECK(t.heat() == 0 && t.hidden_ms() == 0, "the escape clears the heat and the clock");
+  wanted::report(wanted::Crime::carjacking, false);
+  SC_CHECK(wanted::stars() == 0, "nobody saw it");
+  for (int i = 0; i < 4; ++i) wanted::report(wanted::Crime::carjacking, true);
+  SC_CHECK(wanted::stars() == 1, "four carjackings seen = one star (%d)", wanted::stars());
+  wanted::update(4.0f, false);
+  SC_CHECK(wanted::stars() == 1, "still searched after 4 s");
+  wanted::update(1.2f, false);
+  SC_CHECK(wanted::stars() == 0, "escaped after 5.1 s out of sight");
+  SC_CHECK(wanted::heat() == 0 && wanted::hidden_ms() == 0, "the escape clears the heat and the clock");
   // being seen restarts the clock; a new crime does too
-  for (int i = 0; i < 9; ++i) t.report(wanted::Crime::person_hit, true);
-  SC_CHECK(t.stars() == 2 && t.heat() == 9, "nine hits seen = two stars");
-  t.update(5.0f, false);
-  SC_CHECK(std::fabs(t.hidden_ms() - 5000) < 1e-3f && t.stars() == 2, "5 s of the 6 s out of sight");
-  t.update(0.1f, true);
-  SC_CHECK(t.hidden_ms() == 0 && t.stars() == 2, "seen again: the clock restarts");
-  t.update(5.9f, false);
-  t.report(wanted::Crime::bird, true);
-  SC_CHECK(t.hidden_ms() == 0 && t.heat() == 9, "a crime seen restarts the clock (a bird costs nothing)");
-  t.update(5.9f, false);
-  SC_CHECK(t.stars() == 2, "not yet");
-  t.update(0.2f, false);
-  SC_CHECK(t.stars() == 0, "gone after 6 s");
-  t.update(1.0f, false);
-  SC_CHECK(t.hidden_ms() == 0, "no stars: no clock");
+  for (int i = 0; i < 9; ++i) wanted::report(wanted::Crime::person_hit, true);
+  SC_CHECK(wanted::stars() == 2 && wanted::heat() == 9, "nine hits seen = two stars");
+  wanted::update(5.0f, false);
+  SC_CHECK(std::fabs(wanted::hidden_ms() - 5000) < 1e-3f && wanted::stars() == 2, "5 s of the 6 s out of sight");
+  wanted::update(0.1f, true);
+  SC_CHECK(wanted::hidden_ms() == 0 && wanted::stars() == 2, "seen again: the clock restarts");
+  wanted::update(5.9f, false);
+  wanted::report(wanted::Crime::bird, true);
+  SC_CHECK(wanted::hidden_ms() == 0 && wanted::heat() == 9, "a crime seen restarts the clock (a bird costs nothing)");
+  wanted::update(5.9f, false);
+  SC_CHECK(wanted::stars() == 2, "not yet");
+  wanted::update(0.2f, false);
+  SC_CHECK(wanted::stars() == 0, "gone after 6 s");
+  wanted::update(1.0f, false);
+  SC_CHECK(wanted::hidden_ms() == 0, "no stars: no clock");
   SC_CHECK(bp.host.errors.empty(), "no errors while it ran (%s)", bp.host.errors.c_str());
 }

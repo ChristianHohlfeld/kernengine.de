@@ -225,7 +225,7 @@ void Game::blast_police_drones(Vec3 at, f32 radius, f32 damage, bool by_player) 
     if (d.hp <= 0) {
       d.active = false;
       d.destroyed_until = now + 9;
-      if (by_player) wanted_.report(wanted::Crime::police_drone, true);
+      if (by_player) wanted::report(wanted::Crime::police_drone, true);
     }
   }
 }

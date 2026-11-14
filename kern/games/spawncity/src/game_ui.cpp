@@ -151,7 +151,7 @@ void Game::ui_gps_update(f32 dt) {
     world_->teleport(soldier_, {p.x, p.y, city_.ground_height(p.x, p.y) + 0.73f});
     world_->set_actor_velocity(soldier_, {});
   }
-  wanted_.clear();
+  wanted::clear();
   world_->heal(soldier_, 1000);
 }
 
@@ -391,8 +391,8 @@ void Game::ui_update(f32 dt) {
       c.placed = false;
     }
   }
-  if (!st.on(Opt::world_police) && (wanted_.stars() > 0 || !units_.empty())) {
-    wanted_.clear();
+  if (!st.on(Opt::world_police) && (wanted::stars() > 0 || !units_.empty())) {
+    wanted::clear();
     ui_clear_police();
   }
 }
@@ -463,7 +463,7 @@ void Game::ui_reset() {
     mode_ = Mode::foot;
   }
   if (mode_ != Mode::foot) command("mode foot");
-  wanted_.clear();
+  wanted::clear();
   ui_clear_police();
   projectiles_.clear();
   people_.clear();

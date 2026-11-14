@@ -632,7 +632,7 @@ void Game::switch_mode(Mode m, i32 vehicle) {
       TrafficCar& c = cars_[vehicle];
       if (c.driver && c.placed) {
         // Carjacking: the driver is thrown out; a witness reports it (wanted_system_logic.mjs).
-        wanted_.report(wanted::Crime::carjacking, true);
+        wanted::report(wanted::Crime::carjacking, true);
         eject_driver(vehicle);  // M3: the driver gets out and runs (game_traffic.cpp)
         toast_ = "Auto geklaut! Der Fahrer ist raus.";
         toast_age_ = 0;
@@ -1354,7 +1354,7 @@ std::string Game::hud_json() {
   if (vr_) s += vr_menu_json();  // the headset's wrist menu (game_vr.cpp)
   hud_world(s);  // terrain, water, animals, ... (game_world.cpp)
   life_hud(s);   // animals, street life, ragdolls, interiors (game_life.cpp)
-  add(",\"fps\":%.0f,\"touch\":%s,\"stars\":%d,\"heat\":%.1f", fps_, touch_mode_ ? "true" : "false", wanted_.stars(), wanted_.heat());
+  add(",\"fps\":%.0f,\"touch\":%s,\"stars\":%d,\"heat\":%.1f", fps_, touch_mode_ ? "true" : "false", wanted::stars(), wanted::heat());
   {
     u32 units = 0;
     for (const PoliceUnit& u : units_) units += u.car >= 0 ? 1 : 0;
@@ -1615,10 +1615,10 @@ std::string Game::command(const std::string& cmd) {
   if (starts("wanted ")) {
     // Tests / debugging: raise the wanted level to N stars (0 clears it).
     const int n = std::atoi(cmd.c_str() + 7);
-    wanted_.clear();
-    for (int k = 0; k < 64 && wanted_.stars() < n; ++k) wanted_.report(wanted::Crime::police_officer, true);
-    if (n > 0) star_since_ = world_->sim_time() - wanted::arrival_delay_ms(wanted_.stars()) / 1000;  // units are due at once
-    return std::to_string(wanted_.stars());
+    wanted::clear();
+    for (int k = 0; k < 64 && wanted::stars() < n; ++k) wanted::report(wanted::Crime::police_officer, true);
+    if (n > 0) star_since_ = world_->sim_time() - wanted::arrival_delay_ms(wanted::stars()) / 1000;  // units are due at once
+    return std::to_string(wanted::stars());
   }
   {
     std::string out;  // time, quality, perf, look (game_look.cpp)

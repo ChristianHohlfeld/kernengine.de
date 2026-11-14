@@ -756,8 +756,7 @@ class Game {
   Vec3 spawn_guard_;  // x, y, yaw (deg)
   f32 spawn_guard_until_ = -1, spawn_guard_ready_at_ = -1;
   f32 respawn_wait() const { return player_dead_ && died_at_ >= 0 ? std::fmax(0.0f, kRespawnCooldown - (world_->sim_time() - died_at_)) : -1; }
-  // rules / feedback
-  wanted::Tracker wanted_;
+  // rules / feedback (the wanted level is the "Wanted" Blueprint's: wanted.h)
   std::string hint_, toast_;
   f32 toast_age_ = 99;
   f64 time_ = 0;

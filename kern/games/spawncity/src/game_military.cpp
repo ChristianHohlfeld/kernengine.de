@@ -467,7 +467,7 @@ void Game::update_military(f32 dt) {
   bool drone, air;
   const bool have = combat_target(tp, tv, drone, air) && mode_ != Mode::jet;  // a pilot in the jet is out of their reach
   if (have) {
-    switch (C.military.update(now, wanted_.stars(), wanted_.heat(), C.military_enabled)) {
+    switch (C.military.update(now, wanted::stars(), wanted::heat(), C.military_enabled)) {
       case MilEvent::alert: combat_banner("MILITAER ALARMIERT"); break;
       case MilEvent::cancelled: combat_banner("MILITAER-ALARM AUFGEHOBEN"); break;
       case MilEvent::start:

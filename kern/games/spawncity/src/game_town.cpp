@@ -107,7 +107,7 @@ void Game::handle_shots() {
         if (d.hp <= 0) {
           osfx("wanted_police_drones.down", d.pos);
           explosion(d.pos, 3, 40, true);
-          wanted_.report(wanted::Crime::police_drone, true);
+          wanted::report(wanted::Crime::police_drone, true);
           d.active = false;
           d.destroyed_until = now + kPdRespawn;
         }
@@ -215,8 +215,8 @@ void Game::wreck_car(i32 i) {
   else explosion(at, 8, 100, by_player);
   if (!by_player) blast_shown(at, c.police ? 7.0f : 8.0f, c.police ? 110.0f : 100.0f);  // (ours goes to the mates as every blast of ours does)
   world_->push_actor(c.actor, {0, 0, 1450 * (c.police ? 5.5f : 3.5f)}, true);
-  if (by_player && c.police) wanted_.report(wanted::Crime::police_car, true);
-  else if (by_player) wanted_.report(c.car->spec().radius > 0.4f ? wanted::Crime::bus : wanted::Crime::car, people_.witnessed(at));
+  if (by_player && c.police) wanted::report(wanted::Crime::police_car, true);
+  else if (by_player) wanted::report(c.car->spec().radius > 0.4f ? wanted::Crime::bus : wanted::Crime::car, people_.witnessed(at));
 }
 
 void Game::damage_player_vehicle(f32 amount) {
@@ -234,7 +234,7 @@ void Game::damage_player_vehicle(f32 amount) {
       toggle_drone();
       drone_hp_ = kDroneHp;
       combat_.drone_ready_at = world_->sim_time() + 8;  // player_vitals_logic.mjs DRONE_REPLACEMENT_COOLDOWN_MS
-      combat_.pop = combat_.fun.apply(combat::FunEvent::drone_destroyed, world_->sim_time(), wanted_.stars());  // gameplay_fun_logic.mjs
+      combat_.pop = combat_.fun.apply(combat::FunEvent::drone_destroyed, world_->sim_time(), wanted::stars());  // gameplay_fun_logic.mjs
       combat_.pop_at = world_->sim_time();
     }
   } else if (mode_ == Mode::jet) {
@@ -352,7 +352,7 @@ void Game::step_cop(PoliceUnit& u, PoliceUnit::Cop& c, f32 dt) {
   if (p.seed != c.seed || p.state == People::State::gone) { c.person = -1; c.seed = 0; return; }
   if (p.state == People::State::down) { c.person = -1; c.seed = 0; return; }
   const f32 now = world_->sim_time();
-  const i32 stars = std::max(1, wanted_.stars());
+  const i32 stars = std::max(1, wanted::stars());
   Vec3 target = player_position();
   if (mode_ == Mode::foot) target.z -= 0.73f;
   const f32 dx = target.x - p.pos.x, dy = target.y - p.pos.y, d = std::hypot(dx, dy);
@@ -534,7 +534,7 @@ void Game::drive_police(PoliceUnit& u, f32 dt) {
       bool all_in = true;
       for (const PoliceUnit::Cop& cop : u.cops)
         if (cop.seed && !cop.inside) all_in = false;
-      if (all_in) u.state = wanted_.stars() > 0 ? PoliceUnit::State::pursuit : PoliceUnit::State::leave;
+      if (all_in) u.state = wanted::stars() > 0 ? PoliceUnit::State::pursuit : PoliceUnit::State::leave;
       return;
     }
     case PoliceUnit::State::leave: {
@@ -568,7 +568,7 @@ void Game::police_drone_mate_hit(u16 id, f32 damage) {
 
 void Game::spawn_police_drones() {
   const f32 now = world_->sim_time();
-  const i32 stars = wanted_.stars();
+  const i32 stars = wanted::stars();
   const i32 desired = wanted::police_count(stars);
   i32 active = 0;
   for (const PoliceDrone& d : pdrones_) active += d.active ? 1 : 0;
@@ -610,7 +610,7 @@ void Game::spawn_police_drones() {
 void Game::emp_pulse() {
   // EMP (wanted_police_drones.mjs): 30 m, 18 s cooldown; drones in range drop out of the sky.
   const f32 now = world_->sim_time();
-  if (now < emp_ready_at_ || wanted_.stars() <= 0) { toast_ = now < emp_ready_at_ ? "EMP laedt ..." : "EMP: keine Ziele"; toast_age_ = 0; return; }
+  if (now < emp_ready_at_ || wanted::stars() <= 0) { toast_ = now < emp_ready_at_ ? "EMP laedt ..." : "EMP: keine Ziele"; toast_age_ = 0; return; }
   const Vec3 me = player_position();
   {
     // wanted_police_drones.mjs triggerEmp: nothing in range = "NO TARGET IN RANGE" for 1.1 s, no cooldown
@@ -647,7 +647,7 @@ void Game::emp_pulse() {
 
 bool Game::update_police_drones(f32 dt) {
   const f32 now = world_->sim_time();
-  const i32 stars = wanted_.stars();
+  const i32 stars = wanted::stars();
   if (stars > 0 && !player_dead_) spawn_police_drones();
   Vec3 me = player_position();
   if (mode_ == Mode::foot) me.z -= 0.73f;
@@ -759,7 +759,7 @@ bool Game::update_police_drones(f32 dt) {
 
 void Game::update_police(f32 dt) {
   const f32 now = world_->sim_time();
-  const i32 stars = wanted_.stars();
+  const i32 stars = wanted::stars();
   if (stars > 0 && star_since_ < 0) star_since_ = now;
   if (stars == 0) { star_since_ = -1; next_drone_wave_ = -1; drone_wave_live_ = false; }
   // Units that are due (wantedPoliceCount, arrival delay, a break between waves).
@@ -850,7 +850,7 @@ void Game::update_town(f32 dt) {
     if (!dead) { reset_revive_ = false; world_->heal(soldier_, 10000); place_world(); }
     player_dead_ = false;
   } else if (dead && !player_dead_) {
-    wanted_.clear();
+    wanted::clear();
     toast_ = "Erwischt. Neuer Versuch.";
     toast_age_ = 0;
     died_at_ = now;
@@ -896,18 +896,18 @@ void Game::update_town(f32 dt) {
     for (const PoliceUnit::Cop& cop : u.cops)
       if (cop.person >= 0 && cop.los) police_sees = true;
     const Vec3 cp = matrix_of(cars_[u.car].actor).translation();
-    if (dist2d(cp, me) < wanted::detection_radius(std::max(1, wanted_.stars())) && line_of_sight(cp + Vec3{0, 0, 1.3f}, me + Vec3{0, 0, 0.6f})) police_sees = true;
+    if (dist2d(cp, me) < wanted::detection_radius(std::max(1, wanted::stars())) && line_of_sight(cp + Vec3{0, 0, 1.3f}, me + Vec3{0, 0, 0.6f})) police_sees = true;
   }
-  for (const CrimeReport& r : reports) wanted_.report(r.crime, r.witnessed || police_sees);
+  for (const CrimeReport& r : reports) wanted::report(r.crime, r.witnessed || police_sees);
   if (update_police_drones(dt)) police_sees = true;
   if (police_sees) { last_known_ = me; last_contact_ = now; }
   // The police must arrive before you can shake them: while they are on their way the escape
   // clock does not run (wanted_police_drones.mjs).
-  const i32 st = wanted_.stars();
+  const i32 st = wanted::stars();
   const bool en_route = st > 0 && star_since_ >= 0 && now < star_since_ + wanted::arrival_delay_ms(st) / 1000 + 6;
-  const bool had = wanted_.stars() > 0;
-  wanted_.update(dt, police_sees || en_route);
-  const i32 stars = wanted_.stars();
+  const bool had = wanted::stars() > 0;
+  wanted::update(dt, police_sees || en_route);
+  const i32 stars = wanted::stars();
   if (had && stars == 0) osfx("wanted_police_drones.escaped", me);  // clearWanted("escaped"): playTone 660 -> 1040
   if (stars > last_stars_) {
     toast_ = "Fahndung: " + std::string(static_cast<std::size_t>(stars), '*');

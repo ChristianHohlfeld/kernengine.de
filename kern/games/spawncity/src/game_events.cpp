@@ -195,7 +195,7 @@ void Game::update_zombies(f32 dt) {
 void Game::update_enemies(f32 dt) {
   CombatState& C = combat_;
   const f32 now = world_->sim_time();
-  const i32 stars = wanted_.stars();
+  const i32 stars = wanted::stars();
   Vec3 tp, tv;
   bool drone, air;
   const bool have = combat_target(tp, tv, drone, air) && mode_ != Mode::jet;
@@ -294,7 +294,7 @@ void Game::update_enemies(f32 dt) {
 void Game::update_scores(f32 dt) {
   CombatState& C = combat_;
   const f32 now = world_->sim_time();
-  const i32 stars = wanted_.stars();
+  const i32 stars = wanted::stars();
   auto pop = [&](const std::string& t) { if (!t.empty()) { C.pop = t; C.pop_at = now; } };
   auto award = [&](i32 pts, const char* label) {
     C.chaos.award(pts, now);
@@ -579,14 +579,14 @@ bool Game::combat_command(const std::string& cmd, std::string& out) {
   if (starts("heat ")) {
     // Tests: heat to N (witnessed police kills, severity 3 each)
     const f32 n = static_cast<f32>(std::atof(cmd.c_str() + 5));
-    for (int k = 0; k < 200 && wanted_.heat() < n; ++k) wanted_.report(wanted::Crime::police_officer, true);
-    star_since_ = now - wanted::arrival_delay_ms(wanted_.stars()) / 1000;
-    out = std::to_string(wanted_.heat());
+    for (int k = 0; k < 200 && wanted::heat() < n; ++k) wanted::report(wanted::Crime::police_officer, true);
+    star_since_ = now - wanted::arrival_delay_ms(wanted::stars()) / 1000;
+    out = std::to_string(wanted::heat());
     return true;
   }
   if (cmd == "military start") {
     // Tests: five stars at the trigger heat, then the army at once (no hold, no alert)
-    for (int k = 0; k < 200 && wanted_.heat() < kTriggerHeat; ++k) wanted_.report(wanted::Crime::police_officer, true);
+    for (int k = 0; k < 200 && wanted::heat() < kTriggerHeat; ++k) wanted::report(wanted::Crime::police_officer, true);
     C.military.active = true;
     C.military.alert_at = -1;
     C.military.next_reinforce = now + kFirstReinforceS;
@@ -709,7 +709,7 @@ bool Game::combat_command(const std::string& cmd, std::string& out) {
     out = std::string(a == Arms::gun ? "gun" : a == Arms::knife ? "knife" : "fists") + " " + std::to_string(static_cast<int>(bd));
     return true;
   }
-  if (cmd == "contract") { out = C.fun.apply(FunEvent::cycle_contract, now, wanted_.stars()); return true; }
+  if (cmd == "contract") { out = C.fun.apply(FunEvent::cycle_contract, now, wanted::stars()); return true; }
   if (cmd == "combat") { std::string s = "{\"x\":0"; combat_hud(s); out = s + "}"; return true; }
   return false;
 }

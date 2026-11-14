@@ -201,7 +201,7 @@ net::PlayerState Game::my_state() const {
   s.speed = std::hypot(b.velocity.x, b.velocity.y);
   const kern::game::Hud& h = world_->hud();
   s.health = h.health >= 0 ? clampf(h.health / std::fmax(1.0f, h.max_health) * 100, 0, 100) : 100;
-  s.stars = static_cast<u8>(wanted_.stars());
+  s.stars = static_cast<u8>(wanted::stars());
   s.weapon = static_cast<u8>(foot_weapon_);
   // the hands and the blows (the others draw his arms there: game_net.cpp draw)
   s.hands = 0;
@@ -289,7 +289,7 @@ void Game::rebase_origin(f64 lon, f64 lat) {
   for (PoliceDrone& d : pdrones_) d.active = false;
   people_.clear();
   projectiles_.clear();
-  wanted_.clear();
+  wanted::clear();
   if (mode_ != Mode::foot) command("mode foot");
   world_placed_ = false;
   world_->set_paused(true);
@@ -381,7 +381,7 @@ void Game::update_net(f32 dt) {
     if (k.by == net_.self_slot() && k.victim != net_.self_slot()) {
       m.hit_at = now;
       m.hit_kill = true;
-      wanted_.report(wanted::Crime::player, true);  // vs_multiplayer.mjs: a pvp kill is a crime
+      wanted::report(wanted::Crime::player, true);  // vs_multiplayer.mjs: a pvp kill is a crime
     }
   }
   for (const net::Fx& f : net_.take_fx()) {
