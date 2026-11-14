@@ -4739,14 +4739,16 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     }
   };
   // (an enum and a struct are the class's own: <Class>::Mode)
-  std::function<std::string(PinType, const std::string&)> type = [&](PinType t, const std::string& of) -> std::string {
+  // (`owner`: how the class is named where the type is written - by its name in its namespace, from anywhere `rooted`)
+  std::function<std::string(PinType, const std::string&, const std::string&)> type_in = [&](PinType t, const std::string& of, const std::string& owner) -> std::string {
     // (in a map or a set an Int is the class's: kern::logic::Whole, as in its lists)
-    auto inner = [&](const TypeRef& x) { return x.type == PinType::integer ? std::string("kern::logic::Whole") : type(x.type, x.of); };
+    auto inner = [&](const TypeRef& x) { return x.type == PinType::integer ? std::string("kern::logic::Whole") : type_in(x.type, x.of, owner); };
     if (t == PinType::map) return "kern::logic::Map<" + inner(key_type({t, of})) + ", " + inner(value_type({t, of})) + ">";
     if (t == PinType::set) return "kern::logic::Set<" + inner(key_type({t, of})) + ">";
     if (element_of(t) != PinType::enumeration && element_of(t) != PinType::structure) return builtin(t);
-    return is_list(t) ? "kern::List<" + name + "::" + of + ">" : name + "::" + of;
+    return is_list(t) ? "kern::List<" + owner + "::" + of + ">" : owner + "::" + of;
   };
+  auto type = [&](PinType t, const std::string& of) { return type_in(t, of, name); };
   // (the notation's literal, outside the class: with the types' own names)
   std::function<std::string(const Value&, const std::string&)> spelled = [&](const Value& v, const std::string& of) -> std::string {
     if (v.type == PinType::enumeration) return name + "::" + literal(v, of, g);
@@ -4783,7 +4785,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     if (!st.from.empty()) continue;  // (a struct of a library is the library's type: its glue says how it is held)
     const std::string full = rooted + "::" + st.name;
     auto held = [&](const StructField& f) -> std::string {
-      if (is_keyed(f.type.type)) return type(f.type.type, f.type.of);
+      if (is_keyed(f.type.type)) return type_in(f.type.type, f.type.of, rooted);
       if (element_of(f.type.type) != PinType::enumeration && element_of(f.type.type) != PinType::structure) return builtin(f.type.type);
       return is_list(f.type.type) ? "kern::List<" + rooted + "::" + f.type.of + ">" : rooted + "::" + f.type.of;
     };

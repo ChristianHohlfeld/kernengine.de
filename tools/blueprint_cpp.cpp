@@ -258,12 +258,15 @@ int main(int argc, char** argv) {
       continue;
     }
     const std::string cls = logic::cpp_class_name(h.name, g);  // (each class has a namespace of its own, below)
-    // (a namespace of its own, named by the graph's hash: the class meets no other class of that
-    // name - not the game's, not another level's)
+    // (a namespace of its own, named by the graph's hash and the class's name: the class meets no other
+    // class of that name - not the game's, not another level's; two libraries whose graphs are the same
+    // - both empty - are two classes, each by its own name)
+    u64 key = logic::graph_hash(whole);
+    for (unsigned char ch : cls) key = (key ^ ch) * 0x100000001b3ull;
     char space[48];
-    std::snprintf(space, sizeof space, "kern_blueprint_%016llx", static_cast<unsigned long long>(logic::graph_hash(whole)));
+    std::snprintf(space, sizeof space, "kern_blueprint_%016llx", static_cast<unsigned long long>(key));
     if (g.library) classes_of[h.name] = std::string("::") + space + "::" + cls;
-    if (!written.insert(logic::graph_hash(whole)).second) {
+    if (!written.insert(key).second) {
       out += ": the same Blueprint as one above.\n";
       continue;
     }
