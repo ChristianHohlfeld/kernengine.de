@@ -450,7 +450,11 @@ Eine Form, die Gestalt oder Kosten ändert, ist keine von beiden.
    - **Der Graph bleibt für sich lesbar:** Er hält, wie die Funktionen und Typen aussehen, die er
      von seinen Bibliotheken benutzt (wie heute bei `KERN_EXTERN` und den Typen des Projekts);
      der Text zeigt sie nicht noch einmal. Wer den Text liest, braucht die Bibliothek – wie ein
-     C++-Compiler ihren Header.
+     C++-Compiler ihren Header. Was er nicht benutzt, hält er nicht (seit 14.11.2026, 03:35):
+     die Funktionen, die er aufruft, die Typen, die er nennt. Eine Bibliothek, die etwas
+     dazubekommt, ändert an ihren Benutzern nichts – nicht ihren Graphen, nicht ihren Hash,
+     nicht ihre übersetzte Klasse; zwei Bibliotheken dürfen je einen Typ desselben Namens haben,
+     solange ein Blueprint keinen von beiden nennt.
    - **Interpreter und JIT:** Beim Start wird der Blueprint mit seinen Bibliotheken zu einem
      Graphen gebunden (ihre Funktionen heißen dort `Random::range`); danach ist ein Aufruf einer
      Bibliotheksfunktion ein Aufruf wie jeder andere – auch mit Referenzen. Keine zweite

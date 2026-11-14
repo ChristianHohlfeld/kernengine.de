@@ -4316,6 +4316,48 @@ TEST(logic_libraries) {
     later["Wheels"].uses.push_back("Wheels");
     CHECK(!logic::link(g, now, linked, &error) && error.find("the library Wheels uses itself") != std::string::npos);
   }
+  // Of its libraries a Blueprint holds what it uses - of their types those it names (and those
+  // the fields of these are of). What it does not use it does not hold: a library that gets
+  // another type leaves it as it is.
+  CHECK(read("Idle", "struct Idle : virtual kern::Blueprint, virtual Wheels {\n  Float X = 0.0;\n};\n").empty() && project["Idle"].structs.empty() && project["Idle"].enums.empty() &&
+        project["Idle"].functions.empty());
+  CHECK(read("Sided", "struct Sided : virtual kern::Blueprint, virtual Types {\n  Side At = Side::Rear;\n};\n").empty() && project["Sided"].enumeration("Side") && project["Sided"].structs.empty());
+  CHECK(g.structs.size() == 1 && g.enums.size() == 1);  // (Wheel, and Side: a field of Wheel is of it)
+  {
+    std::map<std::string, logic::Graph> later = project;
+    const logic::Blueprints now = [&](std::string_view name) -> const logic::Graph* {
+      auto it = later.find(std::string(name));
+      return it == later.end() ? nullptr : &it->second;
+    };
+    later["Types"].structs.push_back({"Axle", {{"Load", {logic::PinType::number, {}}, json::Value(0.0)}}, {}});
+    logic::Graph fresh = g, with, before;
+    CHECK(logic::take_libraries(fresh, now, &error) && fresh == g);
+    CHECK(logic::link(g, all, before, &error) && logic::link(g, now, with, &error) && logic::graph_hash(with) == logic::graph_hash(before) && !with.structure("Axle"));
+    // a type two libraries declare is two types: none of them is what a Blueprint means by the name
+    CHECK(read("More", "struct More : virtual kern::Library {\n  KERN_STRUCT(Wheel) {\n    Int Spokes = 0;\n  };\n};\n").empty());
+    CHECK(read("Both", "struct Both : virtual kern::Blueprint, virtual Types, virtual More {\n  Side At = Side::Front;\n};\n").empty() && project["Both"].structs.empty());
+    CHECK(says(read("Both2", "struct Both2 : virtual kern::Blueprint, virtual Types, virtual More {\n  List<Wheel> All = List<Wheel>{};\n};\n"), "the libraries Types and More both declare a type \"Wheel\""));
+  }
+  // what a library's function names in its body comes along where the Blueprint runs: the one
+  // graph has the types the bodies need - the Blueprint itself holds none of them
+  CHECK(read("Deep", "struct Deep : virtual kern::Library, virtual Types {\n  struct slipResult { Float slip = 0.0; };\n  slipResult slip(Float by = 0.0) {\n    Wheel w = Wheel{0.5, Side::Front, List<Float>{}};\n"
+                     "    w.Slip += by;\n    return {w.Slip};\n  }\n};\n").empty());
+  CHECK(read("Far", "struct Far : virtual kern::Blueprint, virtual Deep {\n  Float Got = 0.0;\n\n  void Run() {\n    n3 = Deep::slip(1.0);\n    Got = n3.slip;\n  }\n\n"
+                    "  // ---- what nodes give and keep ----\n  Deep::slipResult n3;\n};\n").empty());
+  {
+    const logic::Graph& far = project["Far"];
+    logic::Graph one;
+    CHECK(far.structs.empty() && far.enums.empty() && far.functions.size() == 2);
+    CHECK(logic::link(far, all, one, &error) && one.structure("Wheel") && one.structure("Wheel")->from == "Types" && one.enumeration("Side") && no_errors(logic::check(one)));
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.jit = false;
+    rt.native = false;
+    rt.blueprints = all;
+    logic::Instance* inst = rt.add(far, 0, "Far");
+    std::vector<logic::Value> out;
+    CHECK(inst->call("Run", {}, out) && inst->get("Got").as_number() == 1.5 && host.errors.empty());
+  }
   // an entry of a list that is held stays where it is - also when a library's function holds it
   CHECK(read("Lists", "struct Lists : virtual kern::Library, virtual Types {\n  void grow(List<Wheel>& all, Wheel& one) {\n    list_add(all, one);\n  }\n};\n").empty());
   CHECK(read("Grows", "struct Grows : virtual kern::Blueprint, virtual Lists {\n  List<Wheel> Spare = List<Wheel>{};\n\n  void f() {\n    Lists::grow(Spare, Spare[0]);\n  }\n};\n").empty());
@@ -9486,6 +9528,8 @@ TEST(studio_logic_libraries) {
   CHECK(cmd({{"cmd", "logicLibrary"}, {"op", "use"}, {"name", "Crate"}})["error"].as_string().find("does not use itself") != std::string::npos);
   st = f.s->state();
   CHECK(st["logic"]["uses"].size() == 1 && st["logic"]["libraries"].size() == 0 && st["logic"]["structs"].size() == 1 && st["logic"]["structs"][0]["from"].as_string() == "Tally");
+  // (the editor offers every type of the library; the Blueprint holds those it uses - none yet)
+  CHECK(f.s->level().find(user)->logic->structs.empty());
   const json::Value pal = cmd({{"cmd", "logicPalette"}, {"query", "tally"}});
   bool hit = false, worst = false;
   for (const json::Value& e : pal["items"].items()) {
@@ -9495,6 +9539,8 @@ TEST(studio_logic_libraries) {
   }
   CHECK(hit && worst);
   CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Taken"}, {"type", "Hits"}})["ok"].as_bool());
+  CHECK(f.s->level().find(user)->logic->structure("Hits") && f.s->level().find(user)->logic->structure("Hits")->from == "Tally");
+  CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool() && f.s->level().find(user)->logic->structs.empty() && f.cmd(R"({"cmd":"redo"})")["ok"].as_bool());
   json::Value params = json::Value::object();
   params.set("function", "Tally::hit");
   CHECK(cmd({{"cmd", "logicAdd"}, {"type", "func.call"}, {"x", 0}, {"y", 0}, {"params", params}})["ok"].as_bool());

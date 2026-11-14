@@ -434,7 +434,8 @@ Eine Funktion hat einen Namen, typisierte Eingänge und typisierte Ausgänge. An
   Bibliothek heißt wie der Actor, der sie hat). Wer eine Bibliothek benutzt, hat ihre Typen (in
   den Listen mit einem **L**) und findet ihre Funktionen im Knotenmenü unter *Library <Name>*
   (`Workshop::skid`); ein Aufruf ist ein Aufruf wie der einer eigenen Funktion, auch mit
-  Referenzen. Was der Bibliothek gehört, wird dort geändert – und wer sie benutzt, folgt in
+  Referenzen. Zur Wahl steht alles, was die Bibliotheken haben; gespeichert wird im Blueprint,
+  was er davon benutzt – ändert sich an einer Bibliothek etwas anderes, bleibt er, wie er ist. Was der Bibliothek gehört, wird dort geändert – und wer sie benutzt, folgt in
   demselben Schritt; eine Änderung, der ein Benutzer nicht folgen kann (eine Funktion entfernen,
   die er aufruft), wird mit dem Grund abgelehnt. Im C++-Text ist die Bibliothek eine Basis:
   `struct Garage : virtual kern::Blueprint, virtual Workshop`.

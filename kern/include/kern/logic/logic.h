@@ -775,11 +775,15 @@ std::string library_function(std::string_view library, std::string_view function
 /// itself (what is declared first comes first). False: one is not there, is no library, or
 /// uses itself through others - `error` says which.
 bool libraries_of(const Graph& g, const Blueprints& all, std::vector<std::string>& out, std::string* error = nullptr);
-/// Brings what a Blueprint holds of its libraries up to date: their types (all of them, in front
-/// of its own) and how the functions look that its nodes call (`all_functions`: every function
-/// of every library it names in `uses` - what a text may call while it is read). False: a
-/// library is not there, or a type or function the Blueprint needs of it.
-bool take_libraries(Graph& g, const Blueprints& all, std::string* error = nullptr, bool all_functions = false);
+/// Brings what a Blueprint holds of its libraries up to date - what it uses of them: how the
+/// functions look that its nodes call, and the types it names (in its variables, in what its
+/// functions take, give and keep, in the settings of its nodes - and those the fields of these
+/// are of), in front of its own. What it does not use it does not hold: a library that changes
+/// elsewhere leaves it as it is. `whole`: everything it could use - every type of its libraries
+/// and every function of those it names in `uses` (what a text may name while it is read, what
+/// an edit may pick). False: a library is not there, or a type or function the Blueprint needs
+/// of it - or a type it holds would be declared twice.
+bool take_libraries(Graph& g, const Blueprints& all, std::string* error = nullptr, bool whole = false, const class Library* lib = nullptr);
 /// The Blueprint with its libraries as one graph, as the interpreter and the JIT run it and as
 /// the rules that follow calls judge it: the functions it calls of its libraries - and those
 /// they call - with their bodies, under their names "Library::function". The Blueprint's own

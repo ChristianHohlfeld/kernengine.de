@@ -3645,7 +3645,7 @@ struct Reader {
     // (of its libraries it holds what it uses: their types, and how the functions look that it calls)
     if (!g.uses.empty()) {
       std::string why;
-      if (!take_libraries(g, all ? *all : Blueprints(), &why)) return fail(0, why);
+      if (!take_libraries(g, all ? *all : Blueprints(), &why, false, &lib)) return fail(0, why);
     }
     return checked();
   }

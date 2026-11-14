@@ -427,6 +427,15 @@ std::vector<logic::Issue> whole_issues(const game::Level& level, const logic::Gr
   std::erase_if(issues, [&](const logic::Issue& i) { return i.node != 0 && !g.find(i.node); });
   return issues;
 }
+/// The Blueprint as an edit sees it: with every type of its libraries - those it does not use
+/// yet among them (a Blueprint holds of its libraries what it uses; an edit may pick the rest).
+logic::Graph with_library_types(const game::Level& level, const logic::Graph& g) {
+  if (g.uses.empty()) return g;
+  logic::Graph whole = g;
+  if (!logic::take_libraries(whole, blueprints_of(level), nullptr, true)) return g;
+  whole.functions = g.functions;
+  return whole;
+}
 }  // namespace
 json::Value Studio::logic_json() const {
   json::Value o = json::Value::object();
@@ -654,8 +663,10 @@ json::Value Studio::logic_json() const {
   }
   o.set("variables", std::move(vars));
   json::Value graph = logic::graph_to_json(*g);
-  o.set("enums", graph["enums"].is_array() ? graph["enums"] : json::Value::array());
-  o.set("structs", graph["structs"].is_array() ? graph["structs"] : json::Value::array());
+  // (the types: with all its libraries have - any of them can be picked)
+  const json::Value types = g->uses.empty() ? graph : logic::graph_to_json(with_library_types(level_, *g));
+  o.set("enums", types["enums"].is_array() ? types["enums"] : json::Value::array());
+  o.set("structs", types["structs"].is_array() ? types["structs"] : json::Value::array());
   o.set("functions", graph["functions"].is_array() ? graph["functions"] : json::Value::array());
   {
     // Libraries: is this Blueprint one, which does it use, and which of the level's could it use.
@@ -792,6 +803,9 @@ json::Value Studio::logic_palette(const json::Value& c) const {
   const logic::Graph* g = graph_of(level_, logic_owner_);
   logic::Graph empty;
   if (!g) g = &empty;
+  // (the nodes of its libraries' types are offered whether it uses the type yet or not)
+  const logic::Graph seen = with_library_types(level_, *g);
+  g = &seen;
   const std::string query = lower(c["query"].is_string() ? c["query"].as_string() : std::string());
   std::vector<std::string> words;
   {
@@ -1275,7 +1289,10 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     const bool done = edit(label, [&](game::Level& l) {
       logic::Graph* g = graph_of(l, owner, true);
       if (!g) { error = "the graph's actor is gone"; return false; }
-      // (what it holds of its libraries follows the edit - and so do the Blueprints that use it)
+      // An edit may pick whatever the Blueprint's libraries have - any type, any function: while
+      // it is made, the Blueprint holds all of it. After it, it holds what it uses - and the
+      // Blueprints that use it follow.
+      if (!g->uses.empty()) logic::take_libraries(*g, blueprints_of(l), nullptr, true);
       return fn(*g, l) && libraries_follow(l, owner, *g, error);
     });
     if (!done && !error.empty()) return fail_result(error);

@@ -1,8 +1,9 @@
 // Host tool: the Blueprints of a Kern level as C++ classes a game links.
 //
 //   tools/blueprint_cpp.sh <level.klevel> <out.cpp>      (builds this file once, then runs it)
-//   tools/blueprint_cpp.sh --apply <level.klevel> <actor | Level> <text.cpp>
-//                                                        (the other way: a Blueprint from its C++ text)
+//   tools/blueprint_cpp.sh --apply <level.klevel> <actor | Level> <text.cpp> [<actor> <text.cpp> ...]
+//                                                        (the other way: Blueprints from their C++ texts)
+//   tools/blueprint_cpp.sh --node-names                  (the names the nodes have in a Blueprint's C++)
 //
 // For every Blueprint of the level - the level's own and each actor's - that a C++ compiler can
 // run as it stands (logic::native_ready), <out.cpp> gets its C++ text, exactly as logic::to_cpp
@@ -48,18 +49,13 @@ bool read_file(const char* path, std::string& out) {
   return true;
 }
 
-/// --apply <level.klevel> <actor> <text.cpp>: the Blueprint of the actor called <actor> ("Level":
-/// the level's own) becomes what the C++ text says - the text is the Blueprint's other notation
+/// In the level `doc`, the Blueprint of the actor called <actor> ("Level": the level's own)
+/// becomes what the C++ text says - the text is the Blueprint's other notation
 /// (kern/docs/blueprint_cpp.md), read as the editor's C++ view reads it (Apply). An actor of that
-/// name that is not there yet is made, in the folder "Rules". Nothing is written unless the text
-/// is a Blueprint that compiles.
-int apply(const char* level_path, const std::string& actor, const char* text_path) {
-  std::string level_text, text, why;
-  json::Value doc;
-  if (!read_file(level_path, level_text) || !json::parse(level_text, doc, &why)) {
-    std::fprintf(stderr, "%s: %s\n", level_path, why.empty() ? "cannot read it" : why.c_str());
-    return 1;
-  }
+/// name that is not there yet is made, in the folder "Rules". 0: it is there; else the text is no
+/// Blueprint that compiles, and what is wrong is said.
+int apply_one(json::Value& doc, const char* level_path, const std::string& actor, const char* text_path) {
+  std::string text, why;
   if (!read_file(text_path, text)) {
     std::fprintf(stderr, "%s: cannot read it\n", text_path);
     return 1;
@@ -135,6 +131,22 @@ int apply(const char* level_path, const std::string& actor, const char* text_pat
   }
   if (errors) return 1;
   *held = logic::graph_to_json(g);
+  std::printf("%s: the Blueprint of %s is %s (%zu nodes, %zu functions)\n", level_path, actor.c_str(), text_path, g.nodes.size(), g.functions.size());
+  return 0;
+}
+
+/// --apply <level.klevel> <actor> <text.cpp> [<actor> <text.cpp> ...]: several Blueprints in the
+/// order given - a library before the Blueprints that use it. The level is written when all of
+/// them were read: all of them, or nothing.
+int apply(const char* level_path, int count, char** pairs) {
+  std::string level_text, why;
+  json::Value doc;
+  if (!read_file(level_path, level_text) || !json::parse(level_text, doc, &why)) {
+    std::fprintf(stderr, "%s: %s\n", level_path, why.empty() ? "cannot read it" : why.c_str());
+    return 1;
+  }
+  for (int k = 0; k + 1 < count; k += 2)
+    if (apply_one(doc, level_path, pairs[k], pairs[k + 1]) != 0) return 1;
   const std::string out = json::stringify(doc, 1) + "\n";
   if (out != level_text) {
     FILE* f = std::fopen(level_path, "wb");
@@ -143,7 +155,6 @@ int apply(const char* level_path, const std::string& actor, const char* text_pat
       return 1;
     }
   }
-  std::printf("%s: the Blueprint of %s is %s (%zu nodes, %zu functions)\n", level_path, actor.c_str(), text_path, g.nodes.size(), g.functions.size());
   return 0;
 }
 
@@ -151,9 +162,18 @@ int apply(const char* level_path, const std::string& actor, const char* text_pat
 
 int main(int argc, char** argv) {
   (void)game::logic_node_shapes_registered();  // the gameplay nodes, as the library knows them
-  if (argc == 5 && std::string(argv[1]) == "--apply") return apply(argv[2], argv[3], argv[4]);
-  if (argc < 3) {
-    std::fprintf(stderr, "usage: blueprint_cpp <level.klevel> <out.cpp>\n       blueprint_cpp --apply <level.klevel> <actor | Level> <text.cpp>\n");
+  if (argc >= 5 && argc % 2 == 1 && std::string(argv[1]) == "--apply") return apply(argv[2], argc - 3, argv + 3);
+  if (argc == 2 && std::string(argv[1]) == "--node-names") {
+    // (the names the nodes have in a Blueprint's C++ - math_add, list_get ...: nothing else of a Blueprint is called so)
+    for (const auto& d : logic::library().all()) {
+      std::string name = d->type;
+      for (char& ch : name) if (ch == '.') ch = '_';
+      std::printf("%s\n", name.c_str());
+    }
+    return 0;
+  }
+  if (argc < 3 || std::string(argv[1]) == "--apply") {
+    std::fprintf(stderr, "usage: blueprint_cpp <level.klevel> <out.cpp>\n       blueprint_cpp --apply <level.klevel> <actor | Level> <text.cpp> [<actor> <text.cpp> ...]\n       blueprint_cpp --node-names\n");
     return 2;
   }
   std::string text, why;

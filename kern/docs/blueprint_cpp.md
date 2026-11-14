@@ -643,21 +643,28 @@ struct Garage : virtual kern::Blueprint, virtual Workshop {     // ein Blueprint
   an keinen Namen dessen, der sie benutzt.
 - **Die Typen der Bibliothek hat, wer sie benutzt** – auch die der Bibliotheken, die sie selbst
   benutzt –, ohne sie noch einmal zu deklarieren: In C++ ist `Wheel` *ein* Typ, darum bindet eine
-  Referenz. Zwei Bibliotheken deklarieren nicht denselben Namen; ein Blueprint deklariert keinen
-  Typ, den eine seiner Bibliotheken hat.
+  Referenz. Ein Name ist ein Typ: Nennt ein Blueprint einen Typ, den zwei seiner Bibliotheken
+  deklarieren – oder er selbst und eine Bibliothek –, wird er abgelehnt. Was er nicht nennt,
+  stört ihn nicht.
 - **Die Konstanten einer Bibliothek sind ihre eigenen.** Ihre Funktionen lesen sie; wer die
   Bibliothek benutzt, hat seine eigenen – auch unter demselben Namen (in C++ verdeckt der eigene
   Member den der Basis; im einen Graphen des Interpreters heißt die der Bibliothek
   `Workshop::Step`).
-- **Der Graph hält, was er von seinen Bibliotheken benutzt:** ihre Typen (`from`: die
-  Bibliothek, die sie deklariert) und wie die Funktionen aussehen, die er aufruft (Funktionen
-  ohne Rumpf, `from` und der Name `Workshop::skid`). Der Text zeigt beides nicht noch einmal. Wer
-  einen Text liest, der Bibliotheken nennt, braucht sie (`from_cpp(…, blueprints)`) – wie ein
-  C++-Compiler ihren Header; `take_libraries` bringt auf Stand, was ein Graph von ihnen hält.
+- **Der Graph hält, was er von seinen Bibliotheken benutzt – und nur das:** wie die Funktionen
+  aussehen, die er aufruft (Funktionen ohne Rumpf, `from` und der Name `Workshop::skid`), und die
+  Typen, die er nennt (`from`: die Bibliothek, die sie deklariert) – in seinen Variablen, in dem,
+  was seine Funktionen nehmen, geben und behalten, in den Einstellungen seiner Knoten –, samt
+  denen, aus denen ihre Felder sind. Der Text zeigt beides nicht noch einmal. Was er nicht
+  benutzt, hält er nicht: Bekommt eine Bibliothek einen Typ oder eine Funktion dazu, bleiben ihre
+  Benutzer, wie sie sind – ihr Graph, ihr Hash, ihre übersetzte Klasse. Wer einen Text liest, der
+  Bibliotheken nennt, braucht sie (`from_cpp(…, blueprints)`) – wie ein C++-Compiler ihren
+  Header: Beim Lesen und bei einem Schritt im Editor steht alles der Bibliotheken zur Wahl
+  (`take_libraries(…, whole)`), danach hält der Graph wieder, was er benutzt.
 - **Interpreter und JIT führen einen Graphen aus:** Beim Start wird der Blueprint mit seinen
   Bibliotheken gebunden (`logic::link`): Die Funktionen, die er aufruft – und die sie aufrufen –,
   stehen dann mit ihrem Rumpf darin, unter ihrem Namen `Workshop::skid`. Ein Aufruf ist danach ein
-  Aufruf wie jeder andere, in jeder Stufe dasselbe. Die Regeln, die Aufrufen folgen (kein
+  Aufruf wie jeder andere, in jeder Stufe dasselbe – mit den Typen, die diese Rümpfe nennen
+  (der Blueprint selbst muss sie nicht halten). Die Regeln, die Aufrufen folgen (kein
   Selbstaufruf, „nur rechnen“, gehaltene Einträge), urteilen über diesen einen Graphen. Hält der
   Blueprint etwas anders, als seine Bibliothek es jetzt hat, bindet er nicht – und sagt, was.
 - **Die Klasse** ist registriert unter dem Hash dieses einen Graphen: Ändert sich eine

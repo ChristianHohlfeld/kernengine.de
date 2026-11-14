@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <map>
+#include <set>
 
 namespace kern::logic {
 
@@ -807,43 +808,90 @@ bool libraries_of(const Graph& g, const Blueprints& all, std::vector<std::string
   return follow(g.uses);
 }
 
-bool take_libraries(Graph& g, const Blueprints& all, std::string* error, bool all_functions) {
-  std::vector<std::string> libraries;
-  if (!libraries_of(g, all, libraries, error)) return false;
-  // Their types, in front of its own: what is declared first comes first (a library after the
-  // libraries it uses, a struct after the structs its fields are of).
-  std::vector<EnumType> enums;
-  std::vector<StructType> structs;
-  auto taken = [&](const std::string& name) -> const std::string* {
-    for (const EnumType& e : enums) if (e.name == name) return &e.from;
-    for (const StructType& t : structs) if (t.name == name) return &t.from;
-    return nullptr;
-  };
+namespace {
+/// The types a Blueprint has of the libraries `libraries` (each after those it uses), in front of
+/// its own: those it names - in its variables, in what its functions take, give and keep, in the
+/// settings of its nodes -, and those the fields of these are of (`whole`: all of them). What is
+/// declared first comes first: a library after the libraries it uses, a struct after the structs
+/// its fields are of. No name is two types: of those a Blueprint holds, each is declared once.
+bool take_types(Graph& g, const std::vector<std::string>& libraries, const Blueprints& all, std::string* error, bool whole, const Library& lib) {
+  struct Declared { std::string library; const EnumType* e = nullptr; const StructType* t = nullptr; };
+  std::vector<Declared> declared;  // (in the order they are declared in)
   for (const std::string& name : libraries) {
     const Graph& l = *all(name);
-    for (const EnumType& e : l.enums) {
-      if (!e.from.empty()) continue;
-      if (const std::string* other = taken(e.name)) return say(error, "the libraries " + *other + " and " + name + " both declare a type \"" + e.name + "\"");
-      enums.push_back(e);
-      enums.back().from = name;
+    for (const EnumType& e : l.enums) if (e.from.empty()) declared.push_back({name, &e, nullptr});
+    for (const StructType& t : l.structs) if (t.from.empty()) declared.push_back({name, nullptr, &t});
+  }
+  auto name_of = [](const Declared& d) -> const std::string& { return d.e ? d.e->name : d.t->name; };
+  // The names it names.
+  std::set<std::string> named;
+  if (!whole) {
+    std::vector<std::string> todo;
+    auto name = [&](const std::string& of) { if (!of.empty() && named.insert(of).second) todo.push_back(of); };
+    for (const Variable& v : g.variables) name(v.of);
+    for (const Function& f : g.functions)
+      for (const auto* pins : {&f.inputs, &f.outputs, &f.locals})
+        for (const FunctionPin& p : *pins) name(p.of);
+    for (const Node& n : g.nodes) {
+      const NodeDef* d = lib.find(n.type);
+      if (!d) continue;
+      for (const ParamDef& pd : d->params) {
+        if (pd.kind != ParamDef::Kind::type) continue;
+        std::string v = n.param(pd.key, pd.def);
+        if (v.size() > 5 && v.compare(v.size() - 5, 5, "_list") == 0) v.resize(v.size() - 5);
+        name(v);
+      }
     }
-    for (const StructType& t : l.structs) {
-      if (!t.from.empty()) continue;
-      if (const std::string* other = taken(t.name)) return say(error, "the libraries " + *other + " and " + name + " both declare a type \"" + t.name + "\"");
-      structs.push_back(t);
-      structs.back().from = name;
+    for (const StructType& t : g.structs)
+      if (t.from.empty())
+        for (const StructField& f : t.fields) name(f.type.of);
+    while (!todo.empty()) {  // (and the types the fields of those are of)
+      const std::string of = std::move(todo.back());
+      todo.pop_back();
+      for (const Declared& d : declared)
+        if (d.t && d.t->name == of)
+          for (const StructField& f : d.t->fields) name(f.type.of);
+    }
+  }
+  std::vector<EnumType> enums;
+  std::vector<StructType> structs;
+  std::map<std::string, std::string> from;  // a type it holds -> the library that declares it
+  for (const Declared& d : declared) {
+    const std::string& type = name_of(d);
+    if (!whole && !named.count(type)) continue;
+    if (auto [at, fresh] = from.emplace(type, d.library); !fresh) {
+      // (two libraries may each have a type of that name while the Blueprint names none of them;
+      // where everything is held to pick from, the name is the first's - what is picked is judged after)
+      if (whole) continue;
+      return say(error, "the libraries " + at->second + " and " + d.library + " both declare a type \"" + type + "\"");
+    }
+    if (d.e) {
+      enums.push_back(*d.e);
+      enums.back().from = d.library;
+    } else {
+      structs.push_back(*d.t);
+      structs.back().from = d.library;
     }
   }
   for (const EnumType& e : g.enums) {
     if (!e.from.empty()) continue;
-    if (const std::string* other = taken(e.name)) return say(error, "the type \"" + e.name + "\" is declared here and in the library " + *other);
+    if (auto at = from.find(e.name); at != from.end()) return say(error, "the type \"" + e.name + "\" is declared here and in the library " + at->second);
     enums.push_back(e);
   }
   for (const StructType& t : g.structs) {
     if (!t.from.empty()) continue;
-    if (const std::string* other = taken(t.name)) return say(error, "the type \"" + t.name + "\" is declared here and in the library " + *other);
+    if (auto at = from.find(t.name); at != from.end()) return say(error, "the type \"" + t.name + "\" is declared here and in the library " + at->second);
     structs.push_back(t);
   }
+  g.enums = std::move(enums);
+  g.structs = std::move(structs);
+  return true;
+}
+}  // namespace
+
+bool take_libraries(Graph& g, const Blueprints& all, std::string* error, bool whole, const Library* lib_) {
+  std::vector<std::string> libraries;
+  if (!libraries_of(g, all, libraries, error)) return false;
   // How the functions look that it calls of them.
   std::vector<Function> functions;
   auto take = [&](const std::string& library, const std::string& function) {
@@ -856,7 +904,7 @@ bool take_libraries(Graph& g, const Blueprints& all, std::string* error, bool al
     functions.push_back(declared(library, *f));
     return true;
   };
-  if (all_functions) {
+  if (whole) {
     for (const std::string& name : g.uses)
       for (const Function& f : all(name)->functions)
         if (f.from.empty() && !f.external && !take(name, f.name)) return false;
@@ -869,9 +917,8 @@ bool take_libraries(Graph& g, const Blueprints& all, std::string* error, bool al
   for (Function& f : g.functions)
     if (f.from.empty()) functions.push_back(std::move(f));
   g.functions = std::move(functions);
-  g.enums = std::move(enums);
-  g.structs = std::move(structs);
-  return true;
+  // Their types: those it names now - what a function it calls takes and gives among them.
+  return take_types(g, libraries, all, error, whole, lib_ ? *lib_ : library());
 }
 
 bool link(const Graph& g, const Blueprints& all, Graph& out, std::string* error, const Library* lib_) {
@@ -882,7 +929,7 @@ bool link(const Graph& g, const Blueprints& all, Graph& out, std::string* error,
   // written, against that.
   {
     Graph fresh = g;
-    if (!take_libraries(fresh, all, error)) return false;
+    if (!take_libraries(fresh, all, error, false, &lib)) return false;
     auto stale = [&](const std::string& what) { return say(error, "the Blueprint holds " + what + " as its library had it before: its libraries have changed since (compile it again)"); };
     for (const Function& f : fresh.functions) {
       if (f.from.empty()) continue;
@@ -990,6 +1037,9 @@ bool link(const Graph& g, const Blueprints& all, Graph& out, std::string* error,
     }
   }
   out.next_id = next;
+  // The types the bodies name that came along are the graph's too: as their libraries declare them.
+  std::vector<std::string> libraries;
+  if (!libraries_of(g, all, libraries, error) || !take_types(out, libraries, all, error, false, lib)) return false;
   out.uses.clear();  // (one graph now: nothing is used from outside it)
   return true;
 }
