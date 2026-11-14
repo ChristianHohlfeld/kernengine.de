@@ -325,7 +325,7 @@ bool Game::ui_equipment_command(const std::string& cmd, std::string& out) {
       rest = rest.substr(sp + 1);
     }
     nostr::Bytes32 sk{}, aux{};
-    if (!nostr::from_hex(part[1], sk.data(), 32) || !nostr::from_hex(part[2], aux.data(), 32) || part[3].empty() || part[3].front() != '[') { out = "bad key or tags"; return true; }
+    if (!nostr::from_hex(part[1], sk) || !nostr::from_hex(part[2], aux) || part[3].empty() || part[3].front() != '[') { out = "bad key or tags"; return true; }
     if (!nostr::event_json(sk, aux, std::atoll(part[0].c_str()), 30078, part[3], rest, out)) out = "sign failed";
     return true;
   }
