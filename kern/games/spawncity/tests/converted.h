@@ -38,8 +38,11 @@
 #include "../src/blueprint_call.h"
 #include "kern/logic/engine_api.h"
 #include "../src/common.h"
+#include "kern/core/map.h"
 #include "kern/logic/nodes.h"
 #include "cost.h"
+#include "kern/game/runtime.h"
+#include "kern/kern.h"
 #include "rule_blueprint.h"
 #include "test_util.h"
 
@@ -47,11 +50,13 @@ namespace sc::converted {
 
 using Value = kern::logic::Value;
 
-/// A 64-bit bit pattern of the program (its u64, i64) as the test hands it to a Blueprint: the Blueprint's
-/// Whole64, two 32-bit halves (tools/blueprint_whole64.h). In C++ a u64 and a size_t are one type; the
-/// program's spelling tells them apart, and the generated test says which is which (shaped, below).
+/// A 64-bit bit pattern of the program (its u64, i64) as the test hands it to a Blueprint: the language's
+/// Int64 (Value::int64). In C++ a u64 and a size_t are one type; the program's spelling tells them apart,
+/// and the generated test says which is which (shaped, below).
 struct Whole {
   unsigned long long v = 0;
+  bool operator==(const Whole&) const = default;
+  kern::u64 hash() const { return kern::KeyHash<unsigned long long>{}(v); }   // (a key of a map, as the u64 it is)
 };
 struct SignedWhole {};
 
@@ -143,177 +148,22 @@ inline double log2_bp(double x) { return kern::math::div(kern::math::log(x), 0.6
 inline double log10_bp(double x) { return kern::math::div(kern::math::log(x), 2.302585092994046); }
 inline double cbrt_bp(double x) { return (kern::math::sign(x) * kern::math::pow(kern::math::abs(x), 0.3333333333333333)); }
 
-// A map and a set as the Blueprint language has them: the rows in the order they were put in (a
-// Blueprint's map is the list of its rows, its set the list of its keys). What std::unordered_map and
-// std::unordered_set leave open - the order - is this order. They have what the program uses of the
-// standard ones. (std::map and std::set keep their keys in order: they are themselves, SortedMap and
-// SortedSet.) What C++ leaves open marks the call (g_open, below): at() of a key that is not there.
-inline void mark_open();
-template <class K, class V> class Map {
- public:
-  using key_type = K;
-  using mapped_type = V;
-  using value_type = std::pair<const K, V>;
-  using iterator = typename std::list<value_type>::iterator;
-  using const_iterator = typename std::list<value_type>::const_iterator;
-  using size_type = std::size_t;
-  Map() = default;
-  Map(std::initializer_list<value_type> rows) {
-    for (const value_type& r : rows) insert(r);
-  }
-  Map(const Map& o) : rows_(o.rows_) {}
-  Map(Map&&) = default;
-  Map& operator=(const Map& o) {
-    if (this != &o) {
-      rows_.clear();
-      for (const value_type& r : o.rows_) rows_.push_back(r);
-    }
-    return *this;
-  }
-  Map& operator=(Map&&) = default;
-  iterator begin() { return rows_.begin(); }
-  iterator end() { return rows_.end(); }
-  const_iterator begin() const { return rows_.begin(); }
-  const_iterator end() const { return rows_.end(); }
-  const_iterator cbegin() const { return rows_.begin(); }
-  const_iterator cend() const { return rows_.end(); }
-  std::size_t size() const { return rows_.size(); }
-  bool empty() const { return rows_.empty(); }
-  void clear() { rows_.clear(); }
-  void reserve(std::size_t) {}
-  void rehash(std::size_t) {}
-  iterator find(const K& k) {
-    for (iterator it = rows_.begin(); it != rows_.end(); ++it)
-      if (it->first == k) return it;
-    return rows_.end();
-  }
-  const_iterator find(const K& k) const {
-    for (const_iterator it = rows_.begin(); it != rows_.end(); ++it)
-      if (it->first == k) return it;
-    return rows_.end();
-  }
-  std::size_t count(const K& k) const { return find(k) != end() ? 1 : 0; }
-  bool contains(const K& k) const { return find(k) != end(); }
-  V& operator[](const K& k) { return try_emplace(k).first->second; }
-  V& at(const K& k) {
-    const iterator it = find(k);
-    if (it != end()) return it->second;
-    mark_open();
-    static V none;
-    none = V{};
-    return none;
-  }
-  const V& at(const K& k) const { return const_cast<Map*>(this)->at(k); }
-  template <class... A> std::pair<iterator, bool> try_emplace(const K& k, A&&... a) {
-    const iterator it = find(k);
-    if (it != end()) return {it, false};
-    rows_.emplace_back(std::piecewise_construct, std::forward_as_tuple(k), std::forward_as_tuple(std::forward<A>(a)...));
-    return {std::prev(rows_.end()), true};
-  }
-  template <class... A> std::pair<iterator, bool> emplace(A&&... a) { return put(value_type(std::forward<A>(a)...)); }
-  std::pair<iterator, bool> insert(const value_type& r) { return put(r); }
-  template <class P>
-    requires std::is_constructible_v<value_type, P&&>
-  std::pair<iterator, bool> insert(P&& r) { return put(value_type(std::forward<P>(r))); }
-  template <class M> std::pair<iterator, bool> insert_or_assign(const K& k, M&& v) {
-    const iterator it = find(k);
-    if (it != end()) {
-      it->second = std::forward<M>(v);
-      return {it, false};
-    }
-    rows_.emplace_back(k, std::forward<M>(v));
-    return {std::prev(rows_.end()), true};
-  }
-  std::size_t erase(const K& k) {
-    const iterator it = find(k);
-    if (it == end()) return 0;
-    rows_.erase(it);
-    return 1;
-  }
-  iterator erase(iterator it) { return rows_.erase(it); }
-  iterator erase(const_iterator it) { return rows_.erase(it); }
-  void swap(Map& o) { rows_.swap(o.rows_); }
-
- private:
-  std::pair<iterator, bool> put(const value_type& r) {
-    const iterator it = find(r.first);
-    if (it != end()) return {it, false};
-    rows_.push_back(r);
-    return {std::prev(rows_.end()), true};
-  }
-  std::list<value_type> rows_;
-};
-template <class K> class Set {
- public:
-  using key_type = K;
-  using value_type = K;
-  using iterator = typename std::list<K>::const_iterator;
-  using const_iterator = iterator;
-  Set() = default;
-  Set(std::initializer_list<K> keys) {
-    for (const K& k : keys) insert(k);
-  }
-  iterator begin() const { return keys_.begin(); }
-  iterator end() const { return keys_.end(); }
-  iterator cbegin() const { return keys_.begin(); }
-  iterator cend() const { return keys_.end(); }
-  std::size_t size() const { return keys_.size(); }
-  bool empty() const { return keys_.empty(); }
-  void clear() { keys_.clear(); }
-  void reserve(std::size_t) {}
-  void rehash(std::size_t) {}
-  iterator find(const K& k) const {
-    for (iterator it = keys_.begin(); it != keys_.end(); ++it)
-      if (*it == k) return it;
-    return keys_.end();
-  }
-  std::size_t count(const K& k) const { return find(k) != end() ? 1 : 0; }
-  bool contains(const K& k) const { return find(k) != end(); }
-  std::pair<iterator, bool> insert(const K& k) {
-    const iterator it = find(k);
-    if (it != end()) return {it, false};
-    keys_.push_back(k);
-    return {std::prev(keys_.end()), true};
-  }
-  template <class... A> std::pair<iterator, bool> emplace(A&&... a) { return insert(K(std::forward<A>(a)...)); }
-  std::size_t erase(const K& k) {
-    const iterator it = find(k);
-    if (it == end()) return 0;
-    keys_.erase(it);
-    return 1;
-  }
-  iterator erase(iterator it) { return keys_.erase(it); }
-  void swap(Set& o) { keys_.swap(o.keys_); }
-
- private:
-  std::list<K> keys_;
-};
-template <class K, class V> class SortedMap : public std::map<K, V> {
- public:
-  using std::map<K, V>::map;
-  V& at(const K& k) {
-    const auto it = this->find(k);
-    if (it != this->end()) return it->second;
-    mark_open();
-    static V none;
-    none = V{};
-    return none;
-  }
-  const V& at(const K& k) const { return const_cast<SortedMap*>(this)->at(k); }
-};
-template <class K> using SortedSet = std::set<K>;
+// A map and a set (kern::Map, kern::Set - the program's): the language's Map and Set are these very
+// containers, in the order the keys came (kern/core/map.h). The test's source holds them as they are.
+using kern::Map;
+using kern::Set;
 }  // namespace wide
 
 /// A value of the source as the Blueprint holds it, where the two differ by more than their numbers: a
-/// 64-bit bit pattern is a Whole, a map the list of its rows (pairs of key and value), a set the list of
-/// its keys. S is the type as the program spells it, with Whole where it says u64 or i64.
+/// 64-bit bit pattern is a Whole - also in a list, a pair, a map or a set. S is the type as the program
+/// spells it, with Whole where it says u64 or i64.
 template <class S> struct Shape {
   template <class T> static const T& of(const T& v) { return v; }
 };
 template <> struct Shape<Whole> {
   template <class T> static Whole of(T v) { return {static_cast<unsigned long long>(v)}; }
 };
-template <class S, class T> auto shaped(const T& v) { return Shape<S>::of(v); }
+template <class S, class T> decltype(auto) shaped(const T& v) { return Shape<S>::of(v); }   // (a value that needs no shape: as it is, not a copy)
 template <class S, class T> using Shaped = std::decay_t<decltype(Shape<S>::of(std::declval<const T&>()))>;
 template <class S> struct Shape<std::vector<S>> {
   template <class T> static auto of(const std::vector<T>& v) {
@@ -332,27 +182,19 @@ template <class S, std::size_t N> struct Shape<std::array<S, N>> {   // (a list 
 template <class A, class B> struct Shape<std::pair<A, B>> {
   template <class X, class Y> static auto of(const std::pair<X, Y>& p) { return std::pair<Shaped<A, X>, Shaped<B, Y>>(Shape<A>::of(p.first), Shape<B>::of(p.second)); }
 };
-template <class SK, class SV, class M> auto shaped_rows(const M& m) {
-  std::vector<std::pair<Shaped<SK, typename M::key_type>, Shaped<SV, typename M::mapped_type>>> rows;
-  for (const auto& r : m) rows.emplace_back(Shape<SK>::of(r.first), Shape<SV>::of(r.second));
-  return rows;
-}
-template <class SK, class M> auto shaped_keys(const M& m) {
-  std::vector<Shaped<SK, typename M::key_type>> keys;
-  for (const auto& k : m) keys.push_back(Shape<SK>::of(k));
-  return keys;
-}
-template <class K, class V> struct Shape<wide::Map<K, V>> {
-  template <class M> static auto of(const M& m) { return shaped_rows<K, V>(m); }
+/// A map or a set seen with its keys and values as the Blueprint holds them (a view: what it holds may be
+/// a value that is not to be copied - std::unique_ptr).
+template <class SK, class SV, class M> struct ShapedMap {
+  const M& m;
 };
-template <class K, class V> struct Shape<wide::SortedMap<K, V>> {
-  template <class M> static auto of(const M& m) { return shaped_rows<K, V>(m); }
+template <class SK, class M> struct ShapedSet {
+  const M& s;
 };
-template <class K> struct Shape<wide::Set<K>> {
-  template <class M> static auto of(const M& m) { return shaped_keys<K>(m); }
+template <class SK, class SV> struct Shape<kern::Map<SK, SV>> {
+  template <class M> static ShapedMap<SK, SV, M> of(const M& m) { return {m}; }
 };
-template <class K> struct Shape<std::set<K>> {
-  template <class M> static auto of(const M& m) { return shaped_keys<K>(m); }
+template <class SK> struct Shape<kern::Set<SK>> {
+  template <class M> static ShapedSet<SK, M> of(const M& s) { return {s}; }
 };
 
 /// The arguments a function is tried with: the same in every run.
@@ -580,6 +422,20 @@ template <class T>
   requires(!std::is_base_of_v<EngineObject, T>)
 std::string text(const std::unique_ptr<T>& p);
 template <class T> std::string text(const std::optional<T>& p);
+template <class SK, class SV, class M> Value arg(const ShapedMap<SK, SV, M>& w);
+template <class SK, class M> Value arg(const ShapedSet<SK, M>& w);
+template <class SK, class SV, class M> bool same(const ShapedMap<SK, SV, M>& want, const Value& got);
+template <class SK, class M> bool same(const ShapedSet<SK, M>& want, const Value& got);
+template <class SK, class SV, class M> bool defined(const ShapedMap<SK, SV, M>& w);
+template <class SK, class M> bool defined(const ShapedSet<SK, M>& w);
+template <class K, class V, class H> Value arg(const kern::Map<K, V, H>& m);
+template <class K, class H> Value arg(const kern::Set<K, H>& s);
+template <class K, class V, class H> bool same(const kern::Map<K, V, H>& want, const Value& got);
+template <class K, class H> bool same(const kern::Set<K, H>& want, const Value& got);
+template <class K, class V, class H> bool defined(const kern::Map<K, V, H>& m);
+template <class K, class H> bool defined(const kern::Set<K, H>& s);
+template <class K, class V, class H> std::string text(const kern::Map<K, V, H>& m);
+template <class K, class H> std::string text(const kern::Set<K, H>& s);
 template <class A, class B> Value arg(const std::pair<A, B>& p);
 template <class A, class B> bool same(const std::pair<A, B>& want, const Value& got);
 template <class A, class B> bool defined(const std::pair<A, B>& p);
@@ -594,7 +450,7 @@ template <class U> wide::Span<const U> kept_span(std::vector<U> entries) {
 inline Value arg(f64 x) { return Value::number(x); }
 inline Value arg(f32 x) { return Value::number(static_cast<f64>(x)); }
 inline Value arg(bool x) { return Value::boolean(x); }
-inline Value arg(Whole w) { return Value::structure({Value::integer(static_cast<kern::i64>(w.v >> 32)), Value::integer(static_cast<kern::i64>(w.v & 0xFFFFFFFFull))}); }
+inline Value arg(Whole w) { return Value::int64(w.v); }
 inline Value arg(Vec3 v) { return Value::vector(v); }
 inline Value arg(Vec2 v) { return Value::vector({v.x, v.y, 0}); }
 inline Value arg(wide::Vec3 v) { return arg(kern::Vec3(v)); }
@@ -654,9 +510,7 @@ inline bool same(Vec2 want, const Value& got) {
   const Vec3 v = got.as_vector();
   return same_bits(want.x, v.x) && same_bits(want.y, v.y);
 }
-inline bool same(Whole want, const Value& got) {
-  return got.rows && got.rows->size() == 2 && (*got.rows)[0].as_int() == static_cast<kern::i64>(want.v >> 32) && (*got.rows)[1].as_int() == static_cast<kern::i64>(want.v & 0xFFFFFFFFull);
-}
+inline bool same(Whole want, const Value& got) { return got.type == kern::logic::PinType::int64 && static_cast<unsigned long long>(got.i) == want.v; }
 inline bool same(wide::Vec3 want, const Value& got) { return same(kern::Vec3(want), got); }
 inline bool same(wide::Vec2 want, const Value& got) { return same(kern::Vec2(want), got); }
 inline bool same(const EngineObject* want, const Value& got) { return got.as_int() == (want ? want->kern_handle : 0); }
@@ -789,6 +643,85 @@ template <class T, std::size_t N> bool same(const std::array<T, N>& want, const 
 template <class T, std::size_t N> bool defined(const std::array<T, N>& a) { return defined(as_list(a)); }
 template <class T, std::size_t N> std::string text(const std::array<T, N>& a) { return text(as_list(a)); }
 
+// ---- a map, a set (kern::Map, kern::Set): the language's, their entries in their order ----
+template <class K, class V, class H> Value arg(const kern::Map<K, V, H>& m) {
+  Value r = Value::zero(kern::logic::PinType::map);
+  if (m.empty()) return r;
+  kern::logic::MapEntries& e = r.own_entries();
+  e.reserve(m.size());
+  for (const auto& [k, v] : m) e.try_emplace(kern::logic::key_of(arg(k)), arg(v));
+  return r;
+}
+template <class K, class H> Value arg(const kern::Set<K, H>& s) {
+  Value r = Value::zero(kern::logic::PinType::set);
+  if (s.empty()) return r;
+  kern::logic::MapEntries& e = r.own_entries();
+  e.reserve(s.size());
+  for (const K& k : s) e.try_emplace(kern::logic::key_of(arg(k)));
+  return r;
+}
+template <class K, class V, class H> bool same(const kern::Map<K, V, H>& want, const Value& got) {
+  if (got.type != kern::logic::PinType::map || got.size() != want.size()) return false;
+  for (std::size_t k = 0; k < want.size(); ++k)
+    if (!(kern::logic::key_of(arg(want.key_at(k))) == got.keyed().key_at(k)) || !same(want.value_at(k), got.keyed().value_at(k))) return false;
+  return true;
+}
+template <class K, class H> bool same(const kern::Set<K, H>& want, const Value& got) {
+  if (got.type != kern::logic::PinType::set || got.size() != want.size()) return false;
+  std::size_t k = 0;
+  for (const K& key : want)
+    if (!(kern::logic::key_of(arg(key)) == got.keyed().key_at(k++))) return false;
+  return true;
+}
+template <class SK, class SV, class M> Value arg(const ShapedMap<SK, SV, M>& w) {
+  Value r = Value::zero(kern::logic::PinType::map);
+  if (w.m.empty()) return r;
+  kern::logic::MapEntries& e = r.own_entries();
+  e.reserve(w.m.size());
+  for (const auto& [k, v] : w.m) e.try_emplace(kern::logic::key_of(arg(shaped<SK>(k))), arg(shaped<SV>(v)));
+  return r;
+}
+template <class SK, class M> Value arg(const ShapedSet<SK, M>& w) {
+  Value r = Value::zero(kern::logic::PinType::set);
+  if (w.s.empty()) return r;
+  kern::logic::MapEntries& e = r.own_entries();
+  e.reserve(w.s.size());
+  for (const auto& k : w.s) e.try_emplace(kern::logic::key_of(arg(shaped<SK>(k))));
+  return r;
+}
+template <class SK, class SV, class M> bool same(const ShapedMap<SK, SV, M>& want, const Value& got) {
+  if (got.type != kern::logic::PinType::map || got.size() != want.m.size()) return false;
+  for (std::size_t k = 0; k < want.m.size(); ++k)
+    if (!(kern::logic::key_of(arg(shaped<SK>(want.m.key_at(k)))) == got.keyed().key_at(k)) || !same(shaped<SV>(want.m.value_at(k)), got.keyed().value_at(k))) return false;
+  return true;
+}
+template <class SK, class M> bool same(const ShapedSet<SK, M>& want, const Value& got) {
+  if (got.type != kern::logic::PinType::set || got.size() != want.s.size()) return false;
+  std::size_t k = 0;
+  for (const auto& key : want.s)
+    if (!(kern::logic::key_of(arg(shaped<SK>(key))) == got.keyed().key_at(k++))) return false;
+  return true;
+}
+template <class SK, class SV, class M> bool defined(const ShapedMap<SK, SV, M>& w) { return defined(w.m); }
+template <class SK, class M> bool defined(const ShapedSet<SK, M>&) { return true; }
+template <class SK, class SV, class M> std::string text(const ShapedMap<SK, SV, M>& w) { return text(w.m); }
+template <class SK, class M> std::string text(const ShapedSet<SK, M>& w) { return text(w.s); }
+template <class K, class V, class H> bool defined(const kern::Map<K, V, H>& m) {
+  for (const auto& [k, v] : m) if (!defined(v)) return false;
+  return true;
+}
+template <class K, class H> bool defined(const kern::Set<K, H>&) { return true; }
+template <class K, class V, class H> std::string text(const kern::Map<K, V, H>& m) {
+  std::string out = "{";
+  for (const auto& [k, v] : m) out += (out.size() > 1 ? ", " : "") + text(k) + ": " + text(v);
+  return out + "}";
+}
+template <class K, class H> std::string text(const kern::Set<K, H>& s) {
+  std::string out = "{";
+  for (const K& k : s) out += (out.size() > 1 ? ", " : "") + text(k);
+  return out + "}";
+}
+
 // ---- what may be there or not (std::unique_ptr, std::optional of a value): as the Blueprint has it, a
 // list of no entry or one ----
 /// (Without a copy of what is there: a class may be one that is not to be copied.)
@@ -865,9 +798,7 @@ template <class S> struct Take {
   template <class T> static void to(T& target, const Value& v) { take(target, v); }
 };
 template <> struct Take<Whole> {
-  template <class T> static void to(T& target, const Value& v) {
-    target = v.rows && v.rows->size() == 2 ? static_cast<T>((static_cast<unsigned long long>((*v.rows)[0].as_int()) << 32) | static_cast<unsigned long long>((*v.rows)[1].as_int())) : T{};
-  }
+  template <class T> static void to(T& target, const Value& v) { target = v.type == kern::logic::PinType::int64 ? static_cast<T>(static_cast<unsigned long long>(v.i)) : T{}; }
 };
 template <class S> struct Take<std::vector<S>> {
   template <class T> static void to(std::vector<T>& target, const Value& v) {
@@ -936,38 +867,29 @@ template <class A, class B> struct Take<std::pair<A, B>> {
     Take<B>::to(target.second, (*v.rows)[1]);
   }
 };
-/// A map from its rows, a set from its keys.
-template <class SK, class SV, class M> void take_rows(M& target, const Value& v) {
-  target.clear();
-  for (std::size_t k = 0; k < v.size(); ++k) {
-    const Value row = v.item(k);
-    if (!row.rows || row.rows->size() != 2) continue;
-    typename M::key_type key{};
-    typename M::mapped_type held{};
-    Take<SK>::to(key, (*row.rows)[0]);
-    Take<SV>::to(held, (*row.rows)[1]);
-    target.insert_or_assign(std::move(key), std::move(held));
-  }
+/// A map, a set: its entries in their order, each key as the value it is (a key of the type S says).
+template <class SK, class K> K key_from(const kern::logic::MapKey& key) {
+  K out{};
+  Take<SK>::to(out, kern::logic::key_value(key, arg(shaped<SK>(K{})).type));
+  return out;
 }
-template <class SK, class M> void take_keys(M& target, const Value& v) {
-  target.clear();
-  for (std::size_t k = 0; k < v.size(); ++k) {
-    typename M::key_type key{};
-    Take<SK>::to(key, v.item(k));
-    target.insert(std::move(key));
+template <class SK, class SV> struct Take<kern::Map<SK, SV>> {
+  template <class K, class V> static void to(kern::Map<K, V>& target, const Value& v) {
+    target.clear();
+    if (v.type != kern::logic::PinType::map) return;
+    for (std::size_t k = 0; k < v.size(); ++k) {
+      V held{};
+      Take<SV>::to(held, v.keyed().value_at(k));
+      target.insert_or_assign(key_from<SK, K>(v.keyed().key_at(k)), std::move(held));
+    }
   }
-}
-template <class K, class V> struct Take<wide::Map<K, V>> {
-  template <class M> static void to(M& target, const Value& v) { take_rows<K, V>(target, v); }
 };
-template <class K, class V> struct Take<wide::SortedMap<K, V>> {
-  template <class M> static void to(M& target, const Value& v) { take_rows<K, V>(target, v); }
-};
-template <class K> struct Take<wide::Set<K>> {
-  template <class M> static void to(M& target, const Value& v) { take_keys<K>(target, v); }
-};
-template <class K> struct Take<std::set<K>> {
-  template <class M> static void to(M& target, const Value& v) { take_keys<K>(target, v); }
+template <class SK> struct Take<kern::Set<SK>> {
+  template <class K> static void to(kern::Set<K>& target, const Value& v) {
+    target.clear();
+    if (v.type != kern::logic::PinType::set) return;
+    for (std::size_t k = 0; k < v.size(); ++k) target.insert(key_from<SK, K>(v.keyed().key_at(k)));
+  }
 };
 template <class S, class T> void take_as(T& target, const Value& v) { Take<S>::to(target, v); }
 template <class T> void take(std::vector<T>& to, const Value& v) { Take<std::vector<T>>::to(to, v); }
@@ -1031,17 +953,163 @@ inline void class_runs(bool begins) {
   }
 }
 
-/// A converted source file's Blueprint, in the interpreter and as its compiled class.
+/// Is what the Blueprint gives this very value, bit for bit? (Numbers by their bits; a struct, a list, a map
+/// entry for entry.)
+inline bool same_value(const Value& a, const Value& b) {
+  using kern::logic::PinType;
+  if (a.type != b.type) return false;
+  if (a.type == PinType::number) return same_bits(a.n, b.n);
+  if (a.type == PinType::vector) return same_bits(a.v.x, b.v.x) && same_bits(a.v.y, b.v.y) && same_bits(a.v.z, b.v.z);
+  if (a.type == PinType::structure) {
+    const std::size_t n = a.rows ? a.rows->size() : 0;
+    if (n != (b.rows ? b.rows->size() : 0)) return false;
+    for (std::size_t k = 0; k < n; ++k) if (!same_value((*a.rows)[k], (*b.rows)[k])) return false;
+    return true;
+  }
+  if (a.type == PinType::map || a.type == PinType::set) {
+    if (a.size() != b.size()) return false;
+    for (std::size_t k = 0; k < a.size(); ++k)
+      if (!(a.keyed().key_at(k) == b.keyed().key_at(k)) || (a.type == PinType::map && !same_value(a.keyed().value_at(k), b.keyed().value_at(k)))) return false;
+    return true;
+  }
+  if (kern::logic::is_list(a.type)) {
+    if (a.size() != b.size()) return false;
+    for (std::size_t k = 0; k < a.size(); ++k) if (!same_value(a.item(k), b.item(k))) return false;
+    return true;
+  }
+  return a == b;
+}
+
+/// The Blueprints of the level's actors a converted Blueprint calls on them (Call on Actor, Get Variable on
+/// Actor - kern::logic::ActorBlueprint in the source), running in a game world of their own: one for the
+/// source (bound to its ActorBlueprints), one with the Blueprint in the interpreter, one with it as its
+/// class. Every call begins with the actors' variables as they were when the world started, in all three,
+/// and they must be the same after it.
+struct ActorWorld {
+  kern::Renderer renderer;
+  kern::game::NightWindows windows;
+  std::unique_ptr<kern::game::GameWorld> world;
+  std::string problems;
+  std::vector<kern::game::ActorId> ids;
+  std::vector<std::pair<kern::logic::Instance*, std::vector<std::pair<std::string, Value>>>> started;   // (the actors' variables at the start)
+  ActorWorld(const std::vector<std::string>& actors, bool native) {
+    kern::ShaderExtension* ext[1] = {&windows};
+    kern::RendererOptions o;
+    renderer.init(o, kern::Span<kern::ShaderExtension* const>(ext, 1));
+    world = std::make_unique<kern::game::GameWorld>(renderer, &windows);
+    world->logic_native = native;
+    kern::game::Level level;
+    level.world.ground = false;
+    // (the libraries the Blueprints use are Blueprints of the level's actors too: with them)
+    std::vector<std::string> all;
+    for (const std::string& name : actors) {
+      std::vector<std::string> libraries;
+      std::string why;
+      if (const kern::logic::Graph* g = level_blueprint(name, &why)) {
+        if (!kern::logic::libraries_of(*g, [](std::string_view n) { return level_blueprint(n); }, libraries, &why)) problems += name + ": " + why + "\n";
+      } else {
+        problems += why + "\n";
+      }
+      for (const std::string& l : libraries)
+        if (std::find(all.begin(), all.end(), l) == all.end()) all.push_back(l);
+      if (std::find(all.begin(), all.end(), name) == all.end()) all.push_back(name);
+    }
+    for (const std::string& name : all) {
+      kern::game::Actor a;
+      a.name = name;
+      if (const kern::logic::Graph* g = level_blueprint(name)) a.logic = *g;
+      ids.push_back(level.add(std::move(a)).id);
+    }
+    if (!world->start(level, kern::game::SimMode::simulate)) problems += "the world does not start\n";
+    if (kern::logic::Runtime* rt = world->logic_runtime()) rt->budget = 2000000000u;
+    for (const std::string& name : actors)
+      if (kern::logic::Instance* i = find(name)) {
+        std::vector<std::pair<std::string, Value>> vars;
+        for (const kern::logic::Variable& v : i->graph().variables)
+          if (!v.constant) vars.emplace_back(v.name, i->get(v.name));
+        started.emplace_back(i, std::move(vars));
+      }
+  }
+  ~ActorWorld() {
+    world.reset();
+    renderer.shutdown();
+  }
+  kern::logic::Instance* find(std::string_view name) {
+    kern::logic::Runtime* rt = world->logic_runtime();
+    return rt ? rt->find(static_cast<kern::logic::ActorRef>(world->find_actor(name))) : nullptr;
+  }
+  /// The actors' variables as they were at the start.
+  void restore() {
+    for (auto& [inst, vars] : started)
+      for (const auto& [name, value] : vars) inst->set(name, value);
+  }
+  /// What the actors' variables are now (of those the converted Blueprint calls).
+  std::vector<Value> now() const {
+    std::vector<Value> out;
+    for (const auto& [inst, vars] : started)
+      for (const auto& [name, value] : vars) out.push_back(inst->get(name));
+    return out;
+  }
+};
+
+/// A converted source file's Blueprint, in the interpreter and as its compiled class. (`actors`: the
+/// level's actors whose Blueprints it calls on them - see ActorWorld; then the engine of the test is the
+/// world's own, and a converted function that asks it anything is not one the test compares.)
 struct Blueprint {
-  RuleBlueprint interpreted, compiled;
-  explicit Blueprint(const char* actor) : interpreted(actor, [](kern::logic::Instance*) {}, false), compiled(actor, [](kern::logic::Instance*) {}, true) {
-    // (The loop guard is the host's: a program whose functions loop long - a sound computed sample by
-    // sample, a number raised to a 256-bit power - sets it to what they take.)
-    interpreted.rt.budget = compiled.rt.budget = 2000000000u;
-    SC_CHECK(interpreted.inst && compiled.inst, "%s: %s%s", actor, interpreted.problems.c_str(), compiled.problems.c_str());
-    SC_CHECK(interpreted.problems.empty(), "%s: %s", actor, interpreted.problems.c_str());
-    SC_CHECK(compiled.inst && std::string(compiled.inst->tier()) == "native C++", "%s runs as its C++ class (it runs: %s)", actor, compiled.inst ? compiled.inst->tier() : "not at all");
+  std::unique_ptr<RuleBlueprint> interpreted, compiled;
+  std::unique_ptr<ActorWorld> interpreted_world, compiled_world, source_world;
+  kern::logic::Instance* interp = nullptr;
+  kern::logic::Instance* native = nullptr;
+  explicit Blueprint(const char* actor, std::vector<std::string> actors = {}) {
+    if (actors.empty()) {
+      interpreted = std::make_unique<RuleBlueprint>(actor, [](kern::logic::Instance*) {}, false);
+      compiled = std::make_unique<RuleBlueprint>(actor, [](kern::logic::Instance*) {}, true);
+      // (The loop guard is the host's: a program whose functions loop long - a sound computed sample by
+      // sample, a number raised to a 256-bit power - sets it to what they take.)
+      interpreted->rt.budget = compiled->rt.budget = 2000000000u;
+      interp = interpreted->inst;
+      native = compiled->inst;
+      SC_CHECK(interp && native, "%s: %s%s", actor, interpreted->problems.c_str(), compiled->problems.c_str());
+      SC_CHECK(interpreted->problems.empty(), "%s: %s", actor, interpreted->problems.c_str());
+    } else {
+      std::vector<std::string> mine = actors;
+      mine.insert(mine.begin(), actor);
+      interpreted_world = std::make_unique<ActorWorld>(mine, false);
+      compiled_world = std::make_unique<ActorWorld>(mine, true);
+      source_world = std::make_unique<ActorWorld>(actors, true);
+      interp = interpreted_world->find(actor);
+      native = compiled_world->find(actor);
+      SC_CHECK(interp && native, "%s: %s%s", actor, interpreted_world->problems.c_str(), compiled_world->problems.c_str());
+      SC_CHECK(interpreted_world->problems.empty() && source_world->problems.empty(), "%s: %s%s", actor, interpreted_world->problems.c_str(), source_world->problems.c_str());
+    }
+    SC_CHECK(native && std::string(native->tier()) == "native C++", "%s runs as its C++ class (it runs: %s)", actor, native ? native->tier() : "not at all");
     kern::logic::native_probe = class_runs;
+  }
+  /// The running Blueprint of an actor for the source's ActorBlueprint (kern::logic::ActorBlueprint::running).
+  kern::logic::Instance* source_actor(const char* name) { return source_world ? source_world->find(name) : nullptr; }
+  /// Before the source's call: the actors' Blueprints as they started.
+  void before_source() {
+    if (source_world) source_world->restore();
+  }
+  /// What the Blueprint asked the engine's stand-in (in the actors' world: the engine is the world's own -
+  /// nothing).
+  const std::vector<std::string>& calls(bool in_class) {
+    static const std::vector<std::string> none;
+    RuleBlueprint* r = in_class ? compiled.get() : interpreted.get();
+    return r ? r->host.stand_in.calls : none;
+  }
+  void before_call(bool in_class) {
+    if (RuleBlueprint* r = in_class ? compiled.get() : interpreted.get()) r->host.stand_in.calls.clear();
+    if (ActorWorld* w = in_class ? compiled_world.get() : interpreted_world.get()) w->restore();
+  }
+  /// The actors' variables after the calls: the same in the source's world and in the Blueprint's.
+  bool actors_same(bool both) const {
+    if (!source_world) return true;
+    const std::vector<Value> want = source_world->now(), b = compiled_world->now(), a = both ? interpreted_world->now() : b;
+    if (want.size() != a.size() || want.size() != b.size()) return false;
+    for (std::size_t k = 0; k < want.size(); ++k)
+      if (!same_value(want[k], a[k]) || !same_value(want[k], b[k])) return false;
+    return true;
   }
 };
 
@@ -1101,9 +1169,9 @@ struct Tally {
   template <class Want, class Describe>
   void take(Blueprint& bp, const std::vector<Value>& args, const Want& want, bool left, Describe describe, const std::vector<int>& order = {}, const Variables* state = nullptr,
             bool changes = false) {
-    if (!bp.interpreted.inst || !bp.compiled.inst) return;
+    if (!bp.interp || !bp.native) return;
     if (left || !defined(want)) { ++outside; return; }
-    if (state && !(set_state(*bp.compiled.inst, *state) && set_state(*bp.interpreted.inst, *state))) {
+    if (state && !(set_state(*bp.native, *state) && set_state(*bp.interp, *state))) {
       ++compared;
       if (++wrong <= 3) std::printf("  %s(%s): the Blueprint's variables do not take the values of the source's object\n", function, describe().c_str());
       return;
@@ -1118,32 +1186,37 @@ struct Tally {
     // raised to a 256-bit power) would take the interpreter minutes: such a call is compared with the class
     // alone, and the function's line says so (~Tally).
     std::vector<Value> a, b;
-    bp.compiled.host.stand_in.calls.clear();
-    bp.interpreted.host.stand_in.calls.clear();
+    bp.before_call(true);
     const auto before = std::chrono::steady_clock::now();
     const long source_asks = g_source_asks;
     g_class_asks = 0;
-    const bool ib = bp.compiled.inst->call(function, args, b);
+    const bool ib = bp.native->call(function, args, b);
     const long class_asks = g_class_asks;
     const double took = std::chrono::duration<double>(std::chrono::steady_clock::now() - before).count();
     const bool both = took < 0.005;
-    const bool ia = both ? bp.interpreted.inst->call(function, args, a) : ib;
+    if (both) bp.before_call(false);
+    const bool ia = both ? bp.interp->call(function, args, a) : ib;
     if (state && changes) {
-      b.push_back(read_state(*bp.compiled.inst, *state));
-      if (both) a.push_back(read_state(*bp.interpreted.inst, *state));
+      b.push_back(read_state(*bp.native, *state));
+      if (both) a.push_back(read_state(*bp.interp, *state));
     }
     // what the three asked the engine: the same calls, in the same order, with the same values
     const std::vector<std::string>& asked = g_source_engine.calls;
-    const bool engine_same = bp.compiled.host.stand_in.calls == asked && (!both || bp.interpreted.host.stand_in.calls == asked);
+    const bool engine_same = bp.calls(true) == asked && (!both || bp.calls(false) == asked);
     if (!engine_same) {
       ++compared;
       if (++wrong <= 3) {
-        const std::vector<std::string>& got = bp.compiled.host.stand_in.calls == asked ? bp.interpreted.host.stand_in.calls : bp.compiled.host.stand_in.calls;
+        const std::vector<std::string>& got = bp.calls(true) == asked ? bp.calls(false) : bp.calls(true);
         std::size_t k = 0;
         while (k < asked.size() && k < got.size() && asked[k] == got[k]) ++k;
         std::printf("  %s(%s): call %zu of the engine - the source asks %s, the Blueprint %s (%zu and %zu calls)\n", function, describe().c_str(), k + 1,
                     k < asked.size() ? asked[k].c_str() : "nothing more", k < got.size() ? got[k].c_str() : "nothing more", asked.size(), got.size());
       }
+      return;
+    }
+    if (!bp.actors_same(both)) {   // (what the call did to the Blueprints of the actors it calls on)
+      ++compared;
+      if (++wrong <= 3) std::printf("  %s(%s): the Blueprints of the actors it calls are not the same after the call in the source's world and in the Blueprint's\n", function, describe().c_str());
       return;
     }
     parts(b);
@@ -1211,7 +1284,6 @@ inline void open_read() {
     std::longjmp(g_bail, 1);
   }
 }
-inline void wide::mark_open() { g_open = true; }
 
 /// How many entries a list has: a container, an array - or a view (kern::Span says its length as a field).
 template <class C> constexpr std::size_t entries(const C& c) {

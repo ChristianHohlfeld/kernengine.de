@@ -561,6 +561,11 @@ class Tree:
                     if spelled:
                         self.unnamed[spelled.group(0)] = qtype({"type": under})
         elif k == "CXXRecordDecl" and o.get("name"):
+            outer = self.decl.get(o["parentDeclContextId"]) if o.get("parentDeclContextId") else None
+            if outer is not None and outer.get("kind") == "CXXRecordDecl" and outer.get("_q"):
+                # (a class of a class defined outside it - `struct CityStream::Tile { ... };`: the class's own)
+                scope = outer["_q"] + "::"
+                self.scope_of[o["id"]] = scope
             q = scope + o["name"]
             if o.get("completeDefinition"):
                 self.records[q] = o
@@ -1526,11 +1531,8 @@ class Unit:
                 Emit(self, f).run()
             finally:
                 self.local_scope = outer
-            if f.on_actors:
-                # The test calls the function's source and the Blueprint with the same arguments: the source
-                # calls the actor's Blueprint as the program binds it, the Blueprint calls it on that actor.
-                f.text = None
-                raise Wait(f"its test cannot compare it yet (it calls a function on the Blueprint of the actor {f.on_actors[0][0]}, which the test does not run)")
+            # (what calls a function on the Blueprint of an actor of the level: its test runs that Blueprint - the
+            # source calls it as the program binds it, the Blueprint calls it on that actor; TestWriter)
             self.order.append(f)
         except Wait as w:
             f.wait = str(w)
@@ -1567,6 +1569,7 @@ class Unit:
             f.self_type, f.mutates, f.refs, f.value, f.ctor = e["self_type"], e["mutates"], list(e["refs"]), e["value"], e["ctor"]
             f.out_fields = [(n, t, tuple(src) if isinstance(src, list) else src) for n, t, src in e["out_fields"]]
             f.open, f.state = e["open"], e["state"]
+            f.on_actors = [(a, None) for a in e.get("actors", ())]   # (the actors whose Blueprints it calls on them, itself or through what it calls)
             f.pointers = list(e["pointers"])
             if not f.wait and f.open and d["id"] not in self.tree.body and self.world.closures is not None and key not in self.world.closures:
                 # A function is written when its test compares it, and the test holds the source of all it
@@ -1598,7 +1601,8 @@ class Unit:
         return {"unit": self.name, "name": f.name, "cpp": f.cpp, "wait": (f.wait or (self.PLACE if f.place else None)) if not f.text else None, "pure": f.pure, "params": f.params, "kinds": f.kinds, "result": f.result,
                 "fixed": dict(f.fixed), "result_fixed": f.result_fixed,
                 "indexes": f.indexes, "self_type": f.self_type, "mutates": f.mutates, "refs": f.refs, "value": f.value, "ctor": f.ctor, "out_fields": f.out_fields,
-                "open": self.job in self.world.source_units, "state": f.state, "pointers": f.pointers}
+                "open": self.job in self.world.source_units, "state": f.state, "pointers": f.pointers,
+                "actors": sorted(actors_called(f))}
 
     def uses(self):
         """The Blueprints whose functions the written functions call."""
@@ -1658,6 +1662,18 @@ class Unit:
         Blueprint together from what all files say)."""
         variables, functions, members, types = self.parts()
         return blueprint_text(self.name, self.uses(), [line for _, line, _ in types.values()], variables, functions, members, state=self.state is not None)
+
+
+def actors_called(f, met=None):
+    """The actors of the level whose Blueprints a function calls on them - itself, or through what it calls."""
+    met = set() if met is None else met
+    if id(f) in met:
+        return set()
+    met.add(id(f))
+    out = {a for a, _ in f.on_actors}
+    for g in f.calls:
+        out |= actors_called(g, met)
+    return out
 
 
 def blueprint_text(name, uses, types, variables, functions, members, state=False):
@@ -6682,7 +6698,6 @@ using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converte
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;"""
 
 
-KEYED_TEST = {"unordered_map": "Map", "unordered_set": "Set", "map": "SortedMap", "set": "SortedSet"}
 
 
 class Held:
@@ -6765,8 +6780,6 @@ class TestWriter:
         text = re.sub(r"(?<![\w.])((?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?)[fF]\b", lambda m: m.group(1) if re.search(r"[.eE]", m.group(1)) else m.group(1) + ".0", text)
         text = re.sub(r"\bfloat\b", "double", text)
         text = re.sub(r"\b(?:std::)?(u?)int64_t\b", lambda m: "u64" if m.group(1) else "i64", text)
-        # (a map and a set as the Blueprint language has them: rows in the order they were put in - converted.h)
-        text = re.sub(r"\bstd::(unordered_map|unordered_set|map|set)\s*<", lambda m: "converted::wide::" + KEYED_TEST[m.group(1)] + "<", text)
         text = re.sub(r"\b(?:" + ENGINE + r"::)?dm::(" + "|".join(WIDE_MATH) + r")\s*\(", lambda m: WIDE_MATH[m.group(1)] + "(", text)   # (the engine's own functions of numbers: the formula's)
         return re.sub(r"\bstd::(" + "|".join(WIDE_MATH) + r")f?\s*\(", lambda m: WIDE_MATH[m.group(1)] + "(", text)
 
@@ -6860,7 +6873,7 @@ class TestWriter:
                 while callee.get("kind") == "ImplicitCastExpr" and kids(callee):
                     callee = bare(kids(callee)[0])
                 name = (callee.get("referencedDecl") or {}).get("name")
-            if name == "operator[]" and KEYED.match(self.u.clean(qtype(ks[1]))):
+            if name == "operator[]" and (KEYED.match(self.u.clean(qtype(ks[1]))) or KEYED_KERN.match(self.u.clean(qtype(ks[1])))):
                 pass   # (m[key] is said for every key)
             elif name == "operator[]" and self.u.clean(qtype(ks[1])) == "kern::Vec3":
                 pass   # (a vector's component by its number: x, y - and z for any other number; there for every call)
@@ -6889,7 +6902,7 @@ class TestWriter:
                 edits.append((a, 2, depth, a, "converted::at("))
                 swap(bb, ia, "[", ", ")
                 swap(ib, b, "]", ")")
-            elif k == "CXXMemberCallExpr" and ks and ks[0].get("kind") == "MemberExpr" and ks[0].get("name") in ("at", "front", "back") and kids(ks[0]) and not KEYED.match(self.u.clean(qtype(kids(ks[0])[0]))):
+            elif k == "CXXMemberCallExpr" and ks and ks[0].get("kind") == "MemberExpr" and ks[0].get("name") in ("at", "front", "back") and kids(ks[0]) and not KEYED.match(self.u.clean(qtype(kids(ks[0])[0]))) and not KEYED_KERN.match(self.u.clean(qtype(kids(ks[0])[0]))):
                 base = kids(ks[0])[0]
                 if ks[0].get("isArrow") or base.get("kind") == "CXXThisExpr":
                     raise Wait("an entry by a pointer")
@@ -7060,13 +7073,9 @@ class TestWriter:
     @staticmethod
     def wrap(expr, spelled):
         """A value of the test as the Blueprint has it where the two differ by more than their numbers: a
-        64-bit bit pattern (the program's u64) is the Blueprint's Whole64, a map the list of its rows, a
-        set the list of its keys - converted::shaped makes it that, by the type as the program spells it."""
-        if spelled.startswith("std::array<"):
-            # (a std::array: the list of its entries, as a C++ array of a struct's is - see helpers)
-            inner = template_args(spelled)[0]
-            expr, spelled = f"[](const auto& a) {{ return std::vector<{inner}>(std::begin(a), std::end(a)); }}({expr})", f"std::vector<{inner}>"
-        if not re.search(r"\b[ui]64\b|converted::wide::(?:Sorted)?(?:Map|Set)<", spelled):
+        64-bit bit pattern (the program's u64, i64) is the language's Int64 - also in a list, a pair, a map
+        or a set: converted::shaped makes it that, by the type as the program spells it."""
+        if not re.search(r"\b[ui]64\b", spelled):
             return expr
         return f"converted::shaped<{re.sub(r'\b[ui]64\b', 'converted::Whole', spelled)}>({expr})"
 
@@ -7114,16 +7123,10 @@ class TestWriter:
             if "[" in inner:
                 raise Wait("the test has no values of a list inside a list")
             return f"std::vector<{self.spell(inner)}>"
-        if c.startswith("std::array<"):
-            inner = template_args(c)[0]
-            if inner.startswith("std::array<") or "[" in inner:
-                raise Wait("the test has no values of a list inside a list")
-            return f"std::array<{self.spell(inner)}, {self.u.entries(c)}>"
-        m = KEYED.match(c)
-        if m and not m.group(2):
+        m = KEYED_KERN.match(c)
+        if m:   # (a map, a set: the program's kern::Map, kern::Set - the language's very containers, of the test's values)
             a = template_args(c)
-            name = "converted::wide::" + KEYED_TEST[(m.group(1) or "") + m.group(3)]
-            return f"{name}<{self.spell(a[0])}>" if m.group(3) == "set" else f"{name}<{self.spell(a[0])}, {self.spell(a[1])}>"
+            return f"converted::wide::Set<{self.spell(a[0])}>" if m.group(1) == "Set" else f"converted::wide::Map<{self.spell(a[0])}, {self.spell(a[1])}>"
         if c.startswith("std::pair<"):
             a = template_args(c)
             return f"std::pair<{self.spell(a[0])}, {self.spell(a[1])}>"
@@ -7146,11 +7149,24 @@ class TestWriter:
         """The class or enum of the program a type of the test's values names - the one it names by its full
         name. (A class this file only declares - its definition stands in another source file - is none
         the test has: its values wait.)"""
-        q = self.u.find_type(c)
         named = c[len(self.tree.namespace) + 2:] if c.startswith(self.tree.namespace + "::") else c
+        q = named if named in self.tree.records or named in self.tree.enums else self.u.find_type(c)
         if q is not None and "::" in named and q != named and not q.endswith("::" + named):
             raise Wait(f"the test has no values of {c} (its class is defined in another file)")
         return q
+
+    def actor_blueprint(self, t):
+        """Is this the type of the program's way to call the Blueprint of an actor of the level - the engine's
+        kern::logic::ActorBlueprint, or a class of the program made of it?"""
+        c = re.sub(r"^const\s+", "", self.u.clean(t)).strip()
+        if c == ENGINE + "::logic::ActorBlueprint":
+            return True
+        try:
+            q = self.record_named(c)
+        except Wait:
+            return False
+        d = self.tree.records.get(q)
+        return d is not None and any(self.actor_blueprint(b.get("type", {}).get("qualType", "")) for b in d.get("bases", []) or [])
 
     def draw(self, raw):
         c = self.u.clean(raw)
@@ -7192,13 +7208,11 @@ class TestWriter:
         if m:
             inner = template_args(c)[0]
             return f"draw_list(draw, [&]() -> {self.spell(inner)} {{ return {self.draw(inner)}; }})" if self.u.clean(inner) != "bool" else "draw_list(draw, [&] { return draw.flag(); })"
-        if c.startswith("std::array<"):   # (every entry drawn on its own)
-            return f"[&] {{ {self.spell(raw)} a{{}}; for (auto& e : a) e = {self.draw(template_args(c)[0])}; return a; }}()"
-        m = KEYED.match(c)
-        if m and not m.group(2):
+        m = KEYED_KERN.match(c)
+        if m:   # (each key once: one drawn again is put in once, where it came first)
             a = template_args(c)
             key = f"[&]() -> {self.spell(a[0])} {{ return {self.draw(a[0])}; }}"
-            if m.group(3) == "set":
+            if m.group(1) == "Set":
                 return f"converted::draw_set<{self.spell(raw)}>(draw, {key})"
             return f"converted::draw_map<{self.spell(raw)}>(draw, {key}, [&]() -> {self.spell(a[1])} {{ return {self.draw(a[1])}; }})"
         if c.startswith("std::pair<"):
@@ -7228,10 +7242,10 @@ class TestWriter:
             """The classes a type is made of, through lists, maps, sets and pairs."""
             if re.match(r"std::(vector|array|unique_ptr|optional|initializer_list)<", c):
                 return parts(template_args(c)[0])
-            m = KEYED.match(c)
+            m = KEYED_KERN.match(c)
             if m or c.startswith("std::pair<"):
                 a = template_args(c)
-                return parts(a[0]) + (parts(a[1]) if not (m and m.group(3) == "set") else [])
+                return parts(a[0]) + (parts(a[1]) if not (m and m.group(1) == "Set") else [])
             return [c]
         for part in parts(c):
             q = self.u.find_type(part)
@@ -7391,6 +7405,31 @@ class TestWriter:
                     checks.append(f"same({of('w.s->')}, (*got.rows)[{len(checks)}])")
                     fine.append(f"defined({of('w.s->')})")
                     texts.append(f'"{variable} = " + text({of("w.s->")})')
+                # what the state keeps besides its fields (Unit.state_static): a variable of a file at the level of a
+                # namespace is one of the test's source too - drawn, set and compared by its name there; one a
+                # method keeps in itself (static in its body) no code outside the method reaches
+                for i, (variable, _) in self.u.state_statics.items():
+                    v = self.tree.decl.get(i) or {}
+                    if self.in_function(v) or v.get("storageClass") == "static" and v.get("isStaticLocal") or not v.get("name"):
+                        missing.append(f"{variable} (kept in the body of a method - static there: the test does not reach it from outside)")
+                        continue
+                    if i not in self.whole.consts:
+                        continue   # (not named by the source the test holds)
+                    first = v
+                    while first.get("previousDecl") in self.tree.decl:
+                        first = self.tree.decl[first["previousDecl"]]
+                    held = "::".join(self.classes_of(self.tree.scope_of.get(first["id"], "")) + [v["name"]])
+                    try:
+                        spelled = self.spell(qtype(v))
+                        draws.append(f"  {held} = {self.draw(qtype(v))};")
+                    except Wait as w:
+                        missing.append(f"{variable} ({w})")
+                        continue
+                    shown = self.wrap(held, spelled)
+                    values.append(f'{{"{variable}", arg({shown})}}')
+                    checks.append(f"same({shown}, (*got.rows)[{len(checks)}])")
+                    fine.append(f"defined({shown})")
+                    texts.append(f'"{variable} = " + text({shown})')
                 if missing:   # (every variable is set and compared: one the test has no values of, and it cannot compare any)
                     raise Wait(f"the test has no values of the variables of {self.u.name}: {'; '.join(missing)}")
                 n = len(values)
@@ -7668,6 +7707,42 @@ class TestWriter:
             out.append((part, "::".join(parts[:i + 1]) in self.tree.records))
         return out
 
+    def compiled_top(self, q, records):
+        """The class among `records` (those the test compiles along, outermost) whose text holds this type - or
+        that is it; None: none."""
+        d = self.tree.records.get(q) or self.tree.enums.get(q)
+        parts = q.split("::")
+        for i in range(1, len(parts) + 1):
+            p = "::".join(parts[:i])
+            if p in records and (p == q or (d is not None and self.inside(d, [self.tree.records[p]]) is not None)):
+                return p
+        return None
+
+    def home_of(self, q):
+        """The class a type is compiled along with: the outermost one the Blueprint has as a struct whose text
+        holds it - or itself, defined outside its class (`struct CityStream::Tile { ... };`)."""
+        t = self.top_of(q)
+        if t == q:
+            return q
+        d, top = self.tree.records.get(q) or self.tree.enums.get(q), self.tree.records.get(t)
+        if d is None or top is None or self.inside(d, [top]) is not None:
+            return t
+        parts = q.split("::")
+        for i in range(len(parts) - 1, 0, -1):   # (in a class defined outside its own: there)
+            p = "::".join(parts[:i])
+            if p in self.tree.records and p != t and self.inside(d, [self.tree.records[p]]) is not None:
+                return self.home_of(p)
+        return q
+
+    def wrapped(self, q, text, local=None):
+        """A class's text where it stands in the test: in its namespaces - one defined outside its class
+        (`struct CityStream::Tile { ... };`) names that class itself."""
+        scope = q.rsplit("::", 1)[0] + "::" if "::" in q else ""
+        if self.top_of(q) != q:
+            names = self.spaces_of(scope) + ([local] if local else [])
+            return "".join(f"namespace {c} {{ " for c in names) + text + " }" * len(names)
+        return self.in_classes(scope, text, local)
+
     def classes_of(self, scope):
         """The names of a scope in the test, outermost first (see steps_of)."""
         return [name for name, _ in self.steps_of(scope)]
@@ -7740,8 +7815,12 @@ class TestWriter:
         G = Held()
         todo, seen_types = [], set()
         def want_record(q):
-            t = self.top_of(q)
+            t = self.home_of(q)
+            if t != self.top_of(q):
+                want_record(self.top_of(q))   # (a class defined outside its class: with that class, after it)
             d = tree.records.get(t)
+            if t.startswith(ENGINE + "::logic::"):
+                return   # (the engine's logic - how C++ calls a Blueprint: in a test the engine's own, which runs the Blueprints)
             if q in vectors or d is None or t in G.records or d.get("_at", (None, None))[1] is None or t in u.objects_seen or t in G.objects or q in tree.local_types:
                 return   # (of the engine's classes with a life of their own the test has stand-ins: see stand_ins)
             G.records.add(t)
@@ -7757,7 +7836,7 @@ class TestWriter:
             if d is None or not d.get("name") or d.get("_at", (None, None))[1] is None or q in tree.local_types:
                 return
             if self.top_of(q) != q:
-                want_record(self.top_of(q))
+                want_record(self.home_of(q))
             else:
                 G.enums.add(q)
         def want_types(text):
@@ -7786,6 +7865,9 @@ class TestWriter:
             if owner in tree.records and self.top_of(owner) in self.struct_tops:
                 want_record(owner)   # (a constant of a class the Blueprint does not have stands for itself)
         def want_function(i):
+            e = tree.template_of.get(i) or tree.body.get(i) or tree.decl.get(i) or {}
+            if (tree.owner.get(e.get("id")) or tree.owner.get(i) or tree.scope_of.get(e.get("id"), "")).startswith(ENGINE + "::logic"):
+                return   # (the engine's logic: its own in the test - see want_record)
             if i in tree.template_of:
                 t = tree.template_of[i]
                 if t.get("_at", (None, None))[1] is not None and t["id"] not in G.templates:
@@ -7929,6 +8011,13 @@ class TestWriter:
             scan_record(d) if kind == "record" else scan(d)
             scan_text(d)
         G.records.difference_update(G.objects)
+        # (a class or an enum declared in a class that is compiled along stands in that class's text - not for
+        # itself as well, as one in a class the Blueprint does not have would: in the namespace of its name)
+        def held_by_record(q, d):
+            parts = q.split("::")
+            return any("::".join(parts[:i]) in G.records and self.inside(d, [tree.records["::".join(parts[:i])]]) is not None for i in range(1, len(parts)))
+        G.records = {q for q in G.records if not held_by_record(q, tree.records[q])}
+        G.enums = {q for q in G.enums if not held_by_record(q, tree.enums[q])}
         return G
 
     # ---- the pieces of the test's source ----
@@ -8105,9 +8194,9 @@ class TestWriter:
             return within if own(d) else None
         def outer(q):
             return q.rsplit("::", 1)[0] + "::" if "::" in q else ""
-        names = {q: "::".join(self.local_path(q + "::", local_of(tree.records[self.top_of(q)]))) for q in tree.records if self.top_of(q) in G.records}
-        enum_names = {q: "::".join(self.local_path(outer(q), local_of(tree.enums[q] if q in G.enums else tree.records[self.top_of(q)])) + [q.split("::")[-1]])
-                      for q in tree.enums if q in G.enums or self.top_of(q) in G.records}
+        names = {q: "::".join(self.local_path(q + "::", local_of(tree.records[self.compiled_top(q, G.records)]))) for q in tree.records if self.compiled_top(q, G.records)}
+        enum_names = {q: "::".join(self.local_path(outer(q), local_of(tree.enums[q] if q in G.enums else tree.records[self.compiled_top(q, G.records)])) + [q.split("::")[-1]])
+                      for q in tree.enums if q in G.enums or self.compiled_top(q, G.records)}
         # the types of this file alone the pieces declare, at the level of a namespace: a function of a header
         # that names one has it by a declaration at the start of its body (its name -> its name in the test)
         own_types = {q.split("::")[-1]: names[q] for q in G.records if own(tree.records[q]) and not any(c for _, c in self.steps_of(outer(q)))}
@@ -8197,13 +8286,14 @@ class TestWriter:
                 segments.append((text, None if m.get("explicitlyDefaulted") else self.ident(m), raw[ma:mb].count("\n")))
                 at = end
             segments.append((tree.said(self.cut(d["_file"], at, b0, [])), None, 0))
-            inside_of = self.local_path(outer(q), local_of(d))
+            inside_of = self.local_path(outer(q), local_of(d)) if self.top_of(q) == q else self.spaces_of(outer(q)) + ([local_of(d)] if local_of(d) else [])
             put(d, {"kind": "record", "segments": segments, "head": "".join(f"namespace {c} {{ " for c in inside_of), "tail": " }" * len(inside_of),
-                    "pairs": [(self.absolute(x), names[x]) for x in names if self.top_of(x) == q] + [(self.absolute(x), enum_names[x]) for x in enum_names if self.top_of(x) == q and x not in G.enums]})
+                    "pairs": [(self.absolute(x), names[x]) for x in names if self.compiled_top(x, G.records) == q] + [(self.absolute(x), enum_names[x]) for x in enum_names if self.compiled_top(x, G.records) == q and x not in G.enums]})
         for q in sorted(G.enums):
             put(tree.enums[q], {"kind": "enum", "text": self.enum_text(q, local_of(tree.enums[q])), "pairs": [(self.absolute(q), enum_names[q])]})
         for d, text, said, pairs in self.const_pieces(G.consts, decls, G.records, local_of):
-            put(d, {"kind": "const", "text": text, "names": [self.ident(x) for x in said], "pairs": pairs})
+            put(d, {"kind": "const", "text": text, "names": [self.ident(x) for x in said], "pairs": pairs,
+                    "actors": ["::".join(self.local_path(tree.scope_of.get(x["id"], ""), local_of(x)) + [x["name"]]) for x in said if self.actor_blueprint(qtype(x))]})
         for d, text, named in self.unnamed_pieces(G.unnamed, decls, G.records, local_of):
             put(d, {"kind": "unnamed", "text": text, "pairs": named})
         for o, text, pair in aliases:
@@ -8259,10 +8349,10 @@ class TestWriter:
         # the names of the test's own types
         decls = [tree.records[q] for q in sorted(records)]
         for q in tree.records:
-            if top_of(q) in records:
+            if self.compiled_top(q, records):
                 self.names[q] = "::".join(classes_of(q + "::"))
         for q in tree.enums:
-            if q in enums or top_of(q) in records:
+            if q in enums or self.compiled_top(q, records):
                 self.enum_names[q] = "::".join(classes_of(q.rsplit("::", 1)[0] + "::" if "::" in q else "") + [q.split("::")[-1]])
         top = sorted(records)
         types_at_top = [self.names[q] for q in top] + [self.enum_names[q] for q in enums]
@@ -8278,7 +8368,7 @@ class TestWriter:
         pairs += [(f"::{ENGINE}::Vec3", "Vec3"), (f"::{ENGINE}::Vec2", "Vec2"), (f"::{ENGINE}::Span", "Span"), (f"::{tree.namespace}::Vec3", "Vec3"), (f"::{tree.namespace}::Vec2", "Vec2")]
         pairs += [(f"::{space}::{n}", n) for space in (ENGINE, tree.namespace) for n in ("f32", "f64", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64")]
         # (by their full names: a local variable of a function may have the name of one - `const f32 length = kern::length(d)`)
-        pairs += [(f"::{ENGINE}::{n}", n, "converted::wide::") for n in ("dot", "cross", "length", "length_sq", "distance", "distance_sq", "finite", "lerp", "vmin", "vmax", "normalize", "hex_color", "Span")]
+        pairs += [(f"::{ENGINE}::{n}", n, "converted::wide::") for n in ("dot", "cross", "length", "length_sq", "distance", "distance_sq", "finite", "lerp", "vmin", "vmax", "normalize", "hex_color", "Span", "Map", "Set")]
         # (an enum of a class of the engine the test has a stand-in of - logic::Runtime::Chain - stands in that stand-in)
         self.object_enums.clear()
         in_objects = set()
@@ -8333,10 +8423,26 @@ class TestWriter:
                     continue
                 said_consts.add(self.widen(piece["text"]))
             foreign_chunks.append(((first[0], first[1] - 0.5, i), ("foreign", place), None))
+        # The Blueprints of the level's actors the source calls on them (kern::logic::ActorBlueprint): the test runs
+        # them (converted::ActorWorld) - for the source, bound to the objects it calls them by, and for the
+        # Blueprint, where actor_find finds them.
+        actors = sorted({a for f in u.order for a in actors_called(f)})
+        bindings = []
+        for v in G.consts.values():
+            first = v
+            while first.get("previousDecl") in tree.decl:
+                first = tree.decl[first["previousDecl"]]
+            if v.get("name") and self.actor_blueprint(qtype(v)) and self.inside(v, [tree.records[q] for q in sorted(G.records)]) is None:
+                bindings.append("::".join(classes_of(tree.scope_of.get(first["id"], "")) + [v["name"]]))
+        bindings += [name for p in G.foreign.values() for name in p.get("actors", ())]
+        engine_too = bool(actors) and bool(u.engine_calls or self.engine_called(G))
         for f in u.order:
             d = f.decl
             if f.lifted:
                 continue   # (a local function: in the source of the function it stands in, compared with it)
+            if engine_too:
+                skipped.append((f, "its Blueprint calls the engine and the Blueprint of an actor of the level: the world that runs the actor's Blueprint has the engine itself, not the test's stand-in"))
+                continue
             owner = tree.owner.get(d["id"])
             free = G.freed.get(d["id"], (None,))[0]
             if free:
@@ -8469,7 +8575,10 @@ class TestWriter:
                 "      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)",
                 "      converted::g_can_bail = true;",
                 "      converted::may_bail(true);",
-                f"      const auto want = {self.wrap('run(' + ', '.join(f'std::move({n})' if n in moved else n for n in names) + ')', want_type)};",
+                "      bp.before_source();   // (the Blueprints of the actors it calls, as they started)",
+                # (what the source gave, kept: as the Blueprint holds it, a view of it may be what is compared)
+                f"      const auto made = run({', '.join(f'std::move({n})' if n in moved else n for n in names)});",
+                f"      const auto& want = {self.wrap('made', want_type)};" if self.wrap('made', want_type) != 'made' else "      const auto& want = made;",
                 "      converted::g_can_bail = false;",
                 "      converted::may_bail(false);",
                 f"      tally.take(bp, given, want, watch.left(), [&] {{ return converted::shown_all(given); }}, {{{', '.join(str(k) for k in order)}}}"
@@ -8528,8 +8637,9 @@ class TestWriter:
             return lambda text: renamers[h](self.widen(text))
         # a name of the program or the engine that is still written out in full: not the test's own
         # (a further namespace of the program - fc:: - stands in the test as the source has it, like one inside
-        # the program's own: only from outside every namespace - ::fc:: - it names the program's)
-        foreign = re.compile(r"(?<![\w:])(?:(?:::)?(?:" + re.escape(tree.namespace) + "|" + re.escape(ENGINE) + r")" + "".join(f"|::{re.escape(x)}" for x in tree.spaces) + r")::(?!math::)(\w+)")
+        # the program's own: only from outside every namespace - ::fc:: - it names the program's; kern::logic is
+        # the real engine in the test)
+        foreign = re.compile(r"(?<![\w:])(?:(?:::)?(?:" + re.escape(tree.namespace) + "|" + re.escape(ENGINE) + r")" + "".join(f"|::{re.escape(x)}" for x in tree.spaces) + r")::(?!math::|logic::)(\w+)")
         def is_record(key):
             return key[0] == "record" or (key[0] == "foreign" and G.foreign[key[1]]["kind"] == "record")
 
@@ -8599,7 +8709,7 @@ class TestWriter:
                     else:
                         inner.append((raw[a0:ma].count("\n"), raw[a0:mb].count("\n"), ("member", m["id"])))
                 text += self.cut(d["_file"], at, b0)
-                first = add(("record", q), in_classes(q.rsplit("::", 1)[0] + "::" if "::" in q else "", re.sub(r"^\s*class\b", "struct", wide(tree.said(text))) + ";"))
+                first = add(("record", q), self.wrapped(q, re.sub(r"^\s*class\b", "struct", wide(tree.said(text))) + ";"))
                 where.extend((first + x, first + y, key) for x, y, key in inner)
             add(None, "\n".join(["#undef private", "#undef protected", '#pragma GCC diagnostic pop', ""]))
             for q, hl in self.helped.items():
@@ -8609,7 +8719,10 @@ class TestWriter:
                     made = self.made.get(q)
                     hl = hl if not made or ("member", made[0]) not in dropped else [hl[0], made[1], *hl[2:]]
                     # (where the class's compiled text stands: its helpers next to it, for a call from converted.h)
-                    spaces = classes_of(top_of(q).rsplit("::", 1)[0] + "::") if "::" in top_of(q) else []
+                    home = self.compiled_top(q, records) or top_of(q)
+                    outer_scope = home.rsplit("::", 1)[0] + "::" if "::" in home else ""
+                    # (of a class defined outside its class - struct CityStream::Tile: the namespaces that class stands in)
+                    spaces = self.spaces_of(outer_scope) if top_of(home) != home else classes_of(outer_scope)
                     if spaces:   # (of a class in a namespace: there, where a call from converted.h looks for them)
                         hl = [*hl[:-5], "".join(f"namespace {c} {{ " for c in spaces) + "using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;",
                               *hl[-5:], "}" * len(spaces)]
@@ -8620,7 +8733,11 @@ class TestWriter:
             for key, text in outs:
                 if key not in dropped and text:
                     add(key, text)
-            add(None, "\n".join(["", f"SC_TEST(converted_{stem}) {{", f'  converted::Blueprint bp("{u.name}");']))
+            add(None, "\n".join(["", f"SC_TEST(converted_{stem}) {{",
+                                  f'  converted::Blueprint bp("{u.name}"' + (", {" + ", ".join(text_literal(a) for a in actors) + "}" if actors else "") + ");"]))
+            for b in dict.fromkeys(bindings):
+                if ("bind", b) not in dropped:   # (the source calls the actor's Blueprint as the program binds it)
+                    add(("bind", b), f"  {b}.running = bp.source_actor({b}.actor);")
             for key, text in cases:
                 if key not in dropped:
                     add(key, text)
