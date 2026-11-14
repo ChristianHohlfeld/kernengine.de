@@ -1040,7 +1040,14 @@ rules.call("HitChance", std::tie(chance), distance, speed);
 ist als Blueprint `func_call_on<"HitChance">(actor_find("Military"), kern::out(n7.chance), distance,
 speed);` – mit `KERN_EXTERN HitChanceResult HitChance(Float d = 0.0, Float speed = 0.0);`. Werte sind
 Flags, ganze Zahlen, Kommazahlen (64 Bit: eine 32-Bit-Zahl geht als die Dezimalzahl hinein, für die
-sie steht), Vektoren, Texte und Werte von Aufzählungen. Jeder Ausgang beginnt mit der Null seines
+sie steht), Vektoren, Texte, Werte von Aufzählungen, Strukturen und Listen von all dem. Eine Struktur
+ist eine einfache Struktur des Programms (ein Aggregat: öffentliche Felder, kein eigener Konstruktor,
+keine Basis), deren Felder der Reihe nach die des Structs im Blueprint des Actors sind –
+`kern::fields_of(s)` (kern/core/fields.h) nennt sie, ohne dass eine Liste der Felder daneben steht.
+Ein Feld ist selbst ein solcher Wert, eine Kommazahl darin hat 64 Bit. Der Konverter prüft jeden Pin
+gegen den Blueprint des Actors: ein Wert für sich wird umgewandelt wie an einem Draht, ein Feld einer
+Struktur und ein Eintrag einer Liste nicht – sie müssen den Typ des Blueprints haben, sonst wartet
+der Aufruf mit Grund. Jeder Ausgang beginnt mit der Null seines
 Typs: Ist kein Blueprint gebunden oder hat er die Funktion nicht, gibt der Aufruf das – wie Call on
 Actor die erklärten Defaults gibt, und die Erklärung einer Funktion eines anderen Blueprints hat die
 Nullen. Die Werte werden vor den Ausgängen genommen: Ein Wert darf aus einem Platz kommen, in den ein
