@@ -278,8 +278,20 @@ std::vector<f32> cue(u32 rate, std::vector<int> notes, std::vector<double> lengt
 }  // namespace
 
 const char* kind_name(Kind k) {
-  static const char* names[] = {"shot", "pistol", "hit", "crack", "damage", "scream", "explosion", "step", "bounce", "reward", "fail"};
-  return k < Kind::count ? names[static_cast<u8>(k)] : "";
+  switch (k) {
+    case Kind::shot: return "shot";
+    case Kind::pistol: return "pistol";
+    case Kind::hit: return "hit";
+    case Kind::crack: return "crack";
+    case Kind::damage: return "damage";
+    case Kind::scream: return "scream";
+    case Kind::explosion: return "explosion";
+    case Kind::step: return "step";
+    case Kind::bounce: return "bounce";
+    case Kind::reward: return "reward";
+    case Kind::fail: return "fail";
+    default: return "";
+  }
 }
 
 std::vector<f32> render(Kind k, u32 v, u32 rate) {

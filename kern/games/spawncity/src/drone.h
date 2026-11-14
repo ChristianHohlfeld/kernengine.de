@@ -85,7 +85,7 @@ class Drone {
   bool parked() const { return parked_; }
 
  private:
-  void motor_tick(f32 dt, const BodyState& s, f32 altitude, f32 (&thrust_out)[4], f32 (&torque_out)[4]);
+  void motor_tick(f32 dt, const BodyState& s, f32 altitude, std::array<f32, 4>& thrust_out, std::array<f32, 4>& torque_out);
   void imu_bytes(f32 dt, const BodyState& s, std::array<u8, 14>& out);
 
   DroneParams p_;

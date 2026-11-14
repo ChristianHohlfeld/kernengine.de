@@ -36,7 +36,7 @@ std::vector<f32> layered(std::initializer_list<std::pair<SynthPatch, f32>> layer
 
 // The voices of street life as synth patches (animal_audio.mjs, cows.mjs moo, pigeons.mjs coo and
 // wing clatter, jogger_chain.mjs stomp and jingle, street_voices.mjs horn and scream).
-void make_sounds(kern::audio::Mixer& mixer, kern::audio::ClipId (&clips)[static_cast<u32>(LifeOut::Sound::kCount)]) {
+void make_sounds(kern::audio::Mixer& mixer, std::array<kern::audio::ClipId, static_cast<u32>(LifeOut::Sound::kCount)>& clips) {
   const u32 rate = mixer.sample_rate();
   auto clip = [&](Sound s, std::vector<f32> v, const char* name) { clips[static_cast<u32>(s)] = mixer.adopt_clip(std::move(v), 1, name); };
   {  // moo: two detuned saws 105..135 Hz through a band-pass that opens (cows.mjs)

@@ -217,7 +217,7 @@ kern::game::Level Game::build_level() const {
     cap.length = 1.1f;
     rs.colliders.push_back(cap);
     rs.mass.mass = 90;
-    box_inertia(90, {0.6f, 0.6f, 1.7f}, rs.mass.inertia);
+    box_inertia(90, {0.6f, 0.6f, 1.7f}, rs.mass);
     Actor a = vehicle_actor("Parachute", rs, {0, 0, -500}, 0);
     a.body->lock_angular[0] = a.body->lock_angular[1] = a.body->lock_angular[2] = true;
     l.add(a);

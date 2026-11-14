@@ -22,7 +22,7 @@ f32 battery_under_load(f32 ocv, f32 amps, f32 r, f32 cells) {
   return clampf(ocv - std::fmax(0.0f, amps) * r, 3 * cells, 4.2f * cells);
 }
 
-void encode_sbus(const u16 (&ch)[16], std::array<u8, 25>& p) {
+void encode_sbus(const std::array<u16, 16>& ch, std::array<u8, 25>& p) {
   p.fill(0);
   p[0] = 0x0F;
   for (int c = 0; c < 16; ++c)
@@ -207,7 +207,7 @@ void Drone::imu_bytes(f32 dt, const BodyState& s, std::array<u8, 14>& out) {
   put_be16(out, 12, gyro.z * 16.4f);
 }
 
-void Drone::motor_tick(f32 dt, const BodyState& s, f32 altitude, f32 (&thrust_out)[4], f32 (&torque_out)[4]) {
+void Drone::motor_tick(f32 dt, const BodyState& s, f32 altitude, std::array<f32, 4>& thrust_out, std::array<f32, 4>& torque_out) {
   const f32 ocv = battery_ocv(soc_, p_.cells);
   const f32 limit = std::fmin(p_.motor_limit_a, p_.esc_limit_a);
   f32 total = 0;
@@ -283,7 +283,7 @@ void Drone::step(kern::physics::World& world, kern::physics::Body body, f32 h, c
   const f32 altitude = std::fmax(0.001f, below.hit ? below.distance : 50.0f);
 
   // SBUS channels (simulator.mjs controls()).
-  u16 ch[16];
+  std::array<u16, 16> ch;
   for (u16& c : ch) c = 992;
   auto centered = [](f32 v) { return static_cast<u16>(std::lround(992 + 820 * clampf(v, -1, 1))); };
   ch[0] = centered(sticks.roll);
@@ -302,7 +302,7 @@ void Drone::step(kern::physics::World& world, kern::physics::Body body, f32 h, c
 
   const int ticks = std::max(1, static_cast<int>(std::lround(h * 1000.0f)));
   const f32 dt = h / static_cast<f32>(ticks);
-  f32 thrust[4] = {}, yaw_torque[4] = {};
+  std::array<f32, 4> thrust = {}, yaw_torque = {};
   fc::RuntimeOutput out{};
   for (int t = 0; t < ticks; ++t) {
     fc::HardwareFrame hw{};

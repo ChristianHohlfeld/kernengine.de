@@ -3,6 +3,7 @@
 // Kept apart from game.h so the other modules' headers do not change with it.
 #pragma once
 
+#include <array>
 #include <string>
 #include <vector>
 
@@ -19,7 +20,7 @@ struct GameLife {
   LifeOut out;
   Interiors interiors;
   bool ready = false, art_ready = false, sounds_ready = false;
-  kern::audio::ClipId clips[static_cast<u32>(LifeOut::Sound::kCount)] = {};
+  std::array<kern::audio::ClipId, static_cast<u32>(LifeOut::Sound::kCount)> clips = {};
   // speech for the page (browser speech synthesis), handed out once by the HUD
   std::vector<LifeOut::Say> speech;
   std::string banner;

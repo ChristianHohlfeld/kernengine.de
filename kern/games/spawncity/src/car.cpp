@@ -1,6 +1,8 @@
 // SpawnCity's vehicle dynamics on a ray-cast chassis (see car.h).
 #include "car.h"
 
+#include <array>
+
 namespace sc {
 
 namespace {
@@ -12,7 +14,7 @@ const f32 kAlphaPeak = std::tan(6.5f * kPi / 180);
 constexpr f32 kAsphaltMu = 1.0f;  // terrain_craters.mjs groundSurfaceAt: asphalt / default ground
 
 /// Combined-slip tyre force (longitudinal, lateral) on the friction ellipse.
-void tyre(f32 kappa, f32 tan_a, f32 muN, f32 (&out)[2]) {
+void tyre(f32 kappa, f32 tan_a, f32 muN, std::array<f32, 2>& out) {
   const f32 sx = kappa / kKappaPeak, sy = tan_a / kAlphaPeak, s = std::hypot(sx, sy);
   if (s < 1e-6f || !(muN > 0)) {
     out[0] = 0;
@@ -63,7 +65,7 @@ RigidSpec Car::rigid_spec(const CarSpec& s) {
   const f32 total = s.mass;
   r.mass.mass = total;
   r.mass.center = {s.com_x, 0, s.com_z};
-  box_inertia(total, s.half * 2.0f, r.mass.inertia);
+  box_inertia(total, s.half * 2.0f, r.mass);
   r.linear_damping = 0;
   r.angular_damping = 0.05f;
   return r;
@@ -325,7 +327,8 @@ void Car::step(kern::physics::World& world, kern::physics::Body body, f32 dt, co
                     w.kappa};
   }
   auto align_at = [&](f32 d) {
-    f32 M = 0, tf[2];
+    f32 M = 0;
+    std::array<f32, 2> tf;
     for (int i = 0; i < nf; ++i) {
       const Front& f = fronts[i];
       const f32 ca = std::cos(d), sa = std::sin(d), vx = f.pf * ca + f.pl * sa, vy = -f.pf * sa + f.pl * ca, ta = vy / std::fmax(std::fabs(vx), kVReg);
@@ -380,7 +383,8 @@ void Car::step(kern::physics::World& world, kern::physics::Body body, f32 dt, co
     const f32 drive_t = front ? spec.torque_front : spec.torque_rear, share = drive_t / drive_sum;
     f32 brake_t = (mode == brake ? spec.brake * std::fabs(pedal) : 0) + (drive_t > 0 && mode == coast ? spec.coast : 0) + spec.wheel_mass * 0.15f;
     if (handbrake && !front) brake_t = std::fmax(brake_t, spec.handbrake);
-    f32 om = w.omega, fx_sum = 0, fy_sum = 0, tf[2], tf2[2];
+    f32 om = w.omega, fx_sum = 0, fy_sum = 0;
+    std::array<f32, 2> tf, tf2;
     for (int sub = 0; sub < kTyreSubsteps; ++sub) {
       const f32 kap = (om * r - vx) / V;
       f32 Td = 0;

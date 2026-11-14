@@ -111,7 +111,8 @@ void SmokeField::emit(SmokeEffect& e, f32 now) {
       if (puffs_[i].born < puffs_[static_cast<std::size_t>(at)].born) at = static_cast<i32>(i);
   }
   const f32 progress = clampf((now - e.started) / std::fmax(1e-3f, e.expires - e.started), 0, 1);
-  const u32 serial = e.serial++;
+  const u32 serial = e.serial;
+  e.serial += 1;
   const u32 seed = hash_text(e.id + ":" + std::to_string(serial));
   const f32 a = unit_hash(seed) * 2 * kPi, side = (unit_hash(seed + 17) - 0.5f) * (0.22f + e.scale * 0.18f);
   const bool ember = progress > 0.67f && serial % 5 == 0;
