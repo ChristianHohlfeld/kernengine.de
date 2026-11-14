@@ -97,6 +97,9 @@ struct BlueprintCore : logic::PureNodes {
   /// A list of values of one type: List<Float>, List<Int> ...
   template <class T> using List = kern::List<T>;
   template <class T, std::size_t N> using Fixed = kern::Fixed<T, N>;
+  /// A map of values under their keys and a set of keys, in the order the keys came: Map<Int, Float>, Set<Int>.
+  template <class K, class V> using Map = logic::Map<K, V>;
+  template <class K> using Set = logic::Set<K>;
 
   /// The world the Blueprint runs in (the engine sets it; see logic::BlueprintWorld).
   logic::BlueprintWorld kern_world;
@@ -287,6 +290,54 @@ struct BlueprintCore : logic::PureNodes {
   template <class T> static void list_clear(List<T>& list) { logic::list::clear(list); }
   /// (in one go: what std::vector does in one request for memory - resize, insert of a range, reserve)
   template <class T> static void list_resize(List<T>& list, Int length, const std::type_identity_t<T>& value) { logic::list::resize(list, length, value); }
+  // ---- maps and sets ----
+  // What they do is logic::map and logic::set (nodes.h) - on the same container the interpreter's
+  // nodes use. The values take any map or set - its keys' and values' types are their settings,
+  // map_find<Int, Float>(Cells, 7); the steps change one at a place - the place is their first value.
+  template <class V> struct MapFound {
+    Bool found = false;
+    V value{};
+    Int index = -1;
+  };
+  template <class K, class V> static Int map_length(const Map<K, V>& m) { return logic::map::length(m); }
+  template <class K, class V> static Bool map_contains(const Map<K, V>& m, const std::type_identity_t<K>& key) { return logic::map::contains(m, key); }
+  template <class K, class V> static K map_key_at(const Map<K, V>& m, Int index) { return logic::map::key_at(m, index); }
+  template <class K, class V> static MapFound<V> map_find(const Map<K, V>& m, const std::type_identity_t<K>& key) {
+    MapFound<V> r;
+    const i64 at = logic::map::index_of(m, key);
+    if (at >= 0) r.found = true, r.value = V(m.value_at(static_cast<std::size_t>(at))), r.index = at;
+    return r;
+  }
+  template <class K, class V> static void map_set(Map<K, V>& m, const std::type_identity_t<K>& key, std::type_identity_t<V> value) { logic::map::set(m, key, std::move(value)); }
+  template <class N, class K, class V> static void map_set(N& n, Map<K, V>& m, const std::type_identity_t<K>& key, std::type_identity_t<V> value) {
+    const auto [added, at] = logic::map::set(m, key, std::move(value));
+    n.added = added, n.index = at;
+  }
+  template <class K, class V> static void map_add(Map<K, V>& m, const std::type_identity_t<K>& key) { logic::map::add(m, key); }
+  template <class N, class K, class V> static void map_add(N& n, Map<K, V>& m, const std::type_identity_t<K>& key) {
+    const auto [added, at] = logic::map::add(m, key);
+    n.added = added, n.index = at;
+  }
+  template <class K, class V> static void map_remove(Map<K, V>& m, const std::type_identity_t<K>& key) { logic::map::remove(m, key); }
+  template <class N, class K, class V> static void map_remove(N& n, Map<K, V>& m, const std::type_identity_t<K>& key) { n.removed = logic::map::remove(m, key); }
+  template <class K, class V> static void map_remove_at(Map<K, V>& m, Int index) { logic::map::remove_at(m, index); }
+  template <class K, class V> static void map_clear(Map<K, V>& m) { logic::map::clear(m); }
+  template <class K, class V> static void map_reserve(Map<K, V>& m, Int count) { logic::map::reserve(m, count); }
+  template <class K> static Int set_length(const Set<K>& s) { return logic::set::length(s); }
+  template <class K> static Bool set_contains(const Set<K>& s, const std::type_identity_t<K>& key) { return logic::set::contains(s, key); }
+  template <class K> static K set_key_at(const Set<K>& s, Int index) { return logic::set::key_at(s, index); }
+  template <class K> static Int set_find(const Set<K>& s, const std::type_identity_t<K>& key) { return logic::set::index_of(s, key); }
+  template <class K> static void set_add(Set<K>& s, const std::type_identity_t<K>& key) { logic::set::add(s, key); }
+  template <class N, class K> static void set_add(N& n, Set<K>& s, const std::type_identity_t<K>& key) {
+    const auto [added, at] = logic::set::add(s, key);
+    n.added = added, n.index = at;
+  }
+  template <class K> static void set_remove(Set<K>& s, const std::type_identity_t<K>& key) { logic::set::remove(s, key); }
+  template <class N, class K> static void set_remove(N& n, Set<K>& s, const std::type_identity_t<K>& key) { n.removed = logic::set::remove(s, key); }
+  template <class K> static void set_remove_at(Set<K>& s, Int index) { logic::set::remove_at(s, index); }
+  template <class K> static void set_clear(Set<K>& s) { logic::set::clear(s); }
+  template <class K> static void set_reserve(Set<K>& s, Int count) { logic::set::reserve(s, count); }
+
   /// Sort List: list_sort<&Board::Before>(Scores) - in the order a function of the Blueprint says (it
   /// takes two items and gives whether the first goes before the second); list_sort<nullptr>(Scores):
   /// by the items' `<`. Stable: equal items keep their order.

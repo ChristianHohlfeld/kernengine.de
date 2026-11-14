@@ -82,6 +82,9 @@ const char* cpp_type(PinType t) {
 /// A type as the notation writes it: Float, List<Text>; an enum or a struct by its name - Mode,
 /// List<Mode>.
 std::string cpp_type(const TypeRef& t) {
+  // (a map, a set: Map<Int, List<Weapon>>, Set<Text>)
+  if (t.type == PinType::map) return "Map<" + cpp_type(key_type(t)) + ", " + cpp_type(value_type(t)) + ">";
+  if (t.type == PinType::set) return "Set<" + cpp_type(key_type(t)) + ">";
   // (a list of a fixed length, as a place is declared: Fixed<Float, 16>)
   if (t.count && is_list(t.type)) return "Fixed<" + cpp_type(TypeRef{element_of(t.type), t.of}) + ", " + std::to_string(t.count) + ">";
   if (element_of(t.type) != PinType::enumeration && element_of(t.type) != PinType::structure) return cpp_type(t.type);
@@ -178,6 +181,7 @@ std::string literal(const Value& v, const std::string& of, const Graph& g, std::
 /// (logic::said): what it does not say is zero, as in C++ - a buffer of 24000 zeros is
 /// Fixed<Float, 24000>{}.
 std::string literal(const Value& v, const TypeRef& declared, const Graph& g, std::size_t depth = 0) {
+  if (is_keyed(declared.type)) return literal(v, declared.of, g, depth);
   if (!declared.count || !is_list(declared.type) || v.type != declared.type) return literal(v, declared.of, g, depth);
   const TypeRef item{element_of(declared.type), declared.of};
   std::string r = cpp_type(declared) + "{";
@@ -185,6 +189,16 @@ std::string literal(const Value& v, const TypeRef& declared, const Graph& g, std
   return r + "}";
 }
 std::string literal(const Value& v, const std::string& of, const Graph& g, std::size_t depth) {
+  if (is_keyed(v.type)) {
+    // a map: Map<Int, Float>{{1, 2.5}, {3, 4.0}} - its entries in their order; a set: Set<Int>{1, 3}
+    const TypeRef t{v.type, of}, key = key_type(t), value = v.type == PinType::map ? value_type(t) : TypeRef{};
+    std::string r = cpp_type(t) + "{";
+    for (std::size_t k = 0, n = v.size(); k < n; ++k) {
+      const std::string kt = literal(key_value(v.keyed().key_at(k), key.type), key, g, depth);
+      r += (k ? ", " : "") + (v.type == PinType::map ? "{" + kt + ", " + literal(v.keyed().value_at(k), value, g, depth) + "}" : kt);
+    }
+    return r + "}";
+  }
   if (element_of(v.type) == PinType::structure) {
     const StructType* s = depth < g.structs.size() ? g.structure(of) : nullptr;  // (a struct holds structs declared above it: no deeper than there are structs)
     auto one = [&](const Value& x) {
@@ -737,7 +751,10 @@ struct Shape {
     // (Reserve changes nothing one can read - but in the class the list moves: what a function holds of it would be gone)
     auto writes_place = [](const std::string& t) {
       return t == "var.set" || t == "var.take" || t == "list.add" || t == "list.insert" || t == "list.remove_at" || t == "list.remove" || t == "list.clear" || t == "list.resize" ||
-             t == "list.append" || t == "list.insert_list" || t == "list.reserve" || t == "list.sort";
+             t == "list.append" || t == "list.insert_list" || t == "list.reserve" || t == "list.sort" ||
+             // (a map's or a set's steps put entries in or take them out - and move the others: a map's values are its entries)
+             t == "map.set" || t == "map.add" || t == "map.remove" || t == "map.remove_at" || t == "map.clear" || t == "map.reserve" ||
+             t == "set.add" || t == "set.remove" || t == "set.remove_at" || t == "set.clear" || t == "set.reserve";
     };
     // what a call's function does, as the caller sees it: a write through one of its reference
     // inputs is a write at the place the call gave that input
@@ -2292,6 +2309,21 @@ struct Reader {
       t.type = g.enumeration(peek().s) ? PinType::enumeration : PinType::structure;
       t.of = toks[p++].s;
       return true;
+    }
+    if ((is("Map") || is("Set")) && is("<", 1)) {
+      // Map<Int, Float>: values under keys; Set<Int>: keys - in the order the keys came. A key is a
+      // Bool, an Int, an enum's value or a Text; a value any type but a map or a set.
+      const bool map = is("Map");
+      const std::size_t at = p;
+      p += 2;
+      TypeRef key, value;
+      if (!type_here(key) || !key_type_ok(key.type) || key.count) return fail(at + 2, "the keys of a map or a set are Bool, Int, Text or an enum");
+      if (map) {
+        if (!expect(",")) return false;
+        if (!type_here(value) || is_keyed(value.type) || value.count) return fail(p, "the values of a map are a type a variable can be, but no map, set or list of a fixed length");
+      }
+      t = {map ? PinType::map : PinType::set, keyed_of(key, map ? &value : nullptr)};
+      return expect(">");
     }
     if ((is("List") || is("Fixed")) && is("<", 1)) {
       // List<Float>: a list of values of one type. Fixed<Float, 16>: one of a fixed length - what a
@@ -4632,7 +4664,11 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     }
   };
   // (an enum and a struct are the class's own: <Class>::Mode)
-  auto type = [&](PinType t, const std::string& of) -> std::string {
+  std::function<std::string(PinType, const std::string&)> type = [&](PinType t, const std::string& of) -> std::string {
+    // (in a map or a set an Int is the class's: kern::logic::Whole, as in its lists)
+    auto inner = [&](const TypeRef& x) { return x.type == PinType::integer ? std::string("kern::logic::Whole") : type(x.type, x.of); };
+    if (t == PinType::map) return "kern::logic::Map<" + inner(key_type({t, of})) + ", " + inner(value_type({t, of})) + ">";
+    if (t == PinType::set) return "kern::logic::Set<" + inner(key_type({t, of})) + ">";
     if (element_of(t) != PinType::enumeration && element_of(t) != PinType::structure) return builtin(t);
     return is_list(t) ? "kern::List<" + name + "::" + of + ">" : name + "::" + of;
   };
@@ -4643,6 +4679,15 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
       const StructType* s = g.structure(of);
       std::string r = name + "::" + of + "{";
       for (std::size_t k = 0; s && k < s->fields.size(); ++k) r += (k ? ", " : "") + spelled(field_of(v, *s, k, g), s->fields[k].type.of);
+      return r + "}";
+    }
+    if (is_keyed(v.type)) {
+      const TypeRef t{v.type, of}, key = key_type(t), val = v.type == PinType::map ? value_type(t) : TypeRef{};
+      std::string r = type(v.type, of) + "{";
+      for (std::size_t k = 0, n = v.size(); k < n; ++k) {
+        const std::string kt = spelled(key_value(v.keyed().key_at(k), key.type), key.of);
+        r += (k ? ", " : "") + (v.type == PinType::map ? "{" + kt + ", " + spelled(v.keyed().value_at(k), val.of) + "}" : kt);
+      }
       return r + "}";
     }
     const std::string text = literal(v);
@@ -4662,6 +4707,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     if (!st.from.empty()) continue;  // (a struct of a library is the library's type: its glue says how it is held)
     const std::string full = rooted + "::" + st.name;
     auto held = [&](const StructField& f) -> std::string {
+      if (is_keyed(f.type.type)) return type(f.type.type, f.type.of);
       if (element_of(f.type.type) != PinType::enumeration && element_of(f.type.type) != PinType::structure) return builtin(f.type.type);
       return is_list(f.type.type) ? "kern::List<" + rooted + "::" + f.type.of + ">" : rooted + "::" + f.type.of;
     };

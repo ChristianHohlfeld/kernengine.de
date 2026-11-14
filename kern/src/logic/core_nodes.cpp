@@ -97,7 +97,7 @@ ParamDef struct_param() {
 /// check says so). `lists`: a list type may be meant.
 TypeRef setting_type(const Node& n, const Graph& g, bool lists) {
   TypeRef t;
-  if (!type_from_text(n.param("type", "float"), g, t) || (!lists && is_list(t.type))) t = {PinType::number, {}};
+  if (!type_from_text(n.param("type", "float"), g, t) || (!lists && is_list(t.type)) || is_keyed(t.type)) t = {PinType::number, {}};
   return t;
 }
 /// A data pin of a type a Blueprint names (an enum's with the enum, a struct's with the struct).
@@ -977,6 +977,262 @@ void add_lists(Library& lib) {
 }
 
 // ---------------------------------------------------------------------------
+// maps and sets
+// ---------------------------------------------------------------------------
+// A map holds values of one type, each under a key of its own, in the order the keys came; a set
+// holds keys in that order (kern/core/map.h). The value nodes read one; the steps change one at
+// a place (a variable, a field, an entry of a list ...). A value of a map is a place by its
+// entry's place in that order (Cells[i]). What they do is in kern/logic/nodes.h (logic::map,
+// logic::set): a Blueprint's C++ calls the same functions on the same container.
+
+namespace {
+ParamDef key_param() {
+  ParamDef p = param("key", "Key", ParamDef::Kind::type, "int");
+  p.keys_only = true;
+  return p;
+}
+ParamDef value_param() {
+  ParamDef p = param("value", "Value", ParamDef::Kind::type, "float");
+  p.with_lists = true;
+  return p;
+}
+/// The keys' type a node's setting "Key" names (an Int when it names none a key can be).
+TypeRef key_setting(const Node& n, const Graph& g) {
+  TypeRef t;
+  if (!type_from_text(n.param("key", "int"), g, t) || !key_type_ok(t.type)) t = {PinType::integer, {}};
+  return t;
+}
+/// The values' type the setting "Value" names (a Float when it names none a value can be).
+TypeRef value_setting(const Node& n, const Graph& g) {
+  TypeRef t;
+  if (!type_from_text(n.param("value", "float"), g, t) || is_keyed(t.type)) t = {PinType::number, {}};
+  return t;
+}
+/// The map or set at a node's place: its type (none: the place is no map or set of `kind`).
+bool keyed_place(const Node& n, const Graph& g, PinType kind, TypeRef& out) {
+  Variable named;
+  if (!g.place_of(n, named) || named.type != kind) return false;
+  out = {named.type, named.of};
+  return true;
+}
+}  // namespace
+
+void add_maps(Library& lib) {
+  // ---- values: generic over the keys' and the values' types (the settings Key, Value) ----
+  auto typed = [](bool of_map) {
+    return [of_map](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
+      const TypeRef key = key_setting(n, g), value = value_setting(n, g);
+      const TypeRef whole = of_map ? TypeRef{PinType::map, keyed_of(key, &value)} : TypeRef{PinType::set, keyed_of(key, nullptr)};
+      for (std::vector<PinDef>* pins : {&in, &out})
+        for (PinDef& p : *pins) {
+          if (p.id == "map" || p.id == "set") { retype(p, whole, g); p.def = json::Value::array(); }
+          if (p.id == "key") retype(p, key, g);
+          if (p.id == "value") retype(p, value, g);
+        }
+    };
+  };
+  auto value_node = [&](const char* type, const char* label, const char* help, const char* keywords, bool of_map, std::vector<PinDef> in, std::vector<PinDef> out) {
+    NodeDef d = make(type, label, of_map ? "Maps" : "Sets", NodeKind::pure, help, keywords);
+    d.params = of_map ? std::vector<ParamDef>{key_param(), value_param()} : std::vector<ParamDef>{key_param()};
+    d.inputs = {data(of_map ? "map" : "set", of_map ? "Map" : "Set", of_map ? PinType::map : PinType::set)};
+    for (PinDef& p : in) d.inputs.push_back(std::move(p));
+    d.outputs = std::move(out);
+    d.shape = typed(of_map);
+    return d;
+  };
+  for (bool of_map : {true, false}) {
+    const std::string kind = of_map ? "map" : "set";
+    {
+      NodeDef d = value_node(of_map ? "map.length" : "set.length", "Length", of_map ? "How many entries the map has." : "How many keys the set has.", "count size number of entries", of_map, {},
+                             {data("length", "Length", PinType::integer)});
+      d.run = [](Context& c) {
+        c.out(std::size_t{0}, Value::integer(static_cast<i64>(c.in(std::size_t{0}).size())));
+        return kStop;
+      };
+      lib.add(std::move(d));
+    }
+    {
+      NodeDef d = value_node(of_map ? "map.contains" : "set.contains", "Has Key", of_map ? "Is there an entry under the key?" : "Is the key in the set?", "contains in has find", of_map,
+                             {data("key", "Key", PinType::integer, 0)}, {data("result", "Result", PinType::boolean)});
+      d.run = [](Context& c) {
+        const Value m = c.in(std::size_t{0});
+        c.out(std::size_t{0}, Value::boolean(map::contains(m.keyed(), key_of(c.in("key")))));
+        return kStop;
+      };
+      lib.add(std::move(d));
+    }
+    {
+      NodeDef d = value_node(of_map ? "map.key_at" : "set.key_at", "Key At",
+                             of_map ? "The key of the entry at the index, in the order the keys came (the first is 0). Beyond the map: the zero of the keys' type."
+                                    : "The key at the index, in the order the keys came (the first is 0). Beyond the set: the zero of the keys' type.",
+                             "key by index entry at", of_map, {data("index", "Index", PinType::integer, 0)}, {data("key", "Key", PinType::integer)});
+      d.run = [](Context& c) {
+        const Value m = c.in(std::size_t{0});
+        const i64 at = c.in_int("index");
+        const PinType key = c.output(0).type;
+        c.out(std::size_t{0}, at >= 0 && static_cast<u64>(at) < m.size() ? key_value(m.keyed().key_at(static_cast<std::size_t>(at)), key) : key_value(MapKey{}, key));
+        return kStop;
+      };
+      lib.add(std::move(d));
+    }
+    if (of_map) {
+      NodeDef d = value_node("map.find", "Find", "The value under the key. Found: is there an entry? (If not: the zero of the values' type, index -1.) Index: the entry's place.", "get lookup value at key",
+                             true, {data("key", "Key", PinType::integer, 0)},
+                             {data("found", "Found", PinType::boolean), data("value", "Value", PinType::number), data("index", "Index", PinType::integer)});
+      d.run = [](Context& c) {
+        const Value m = c.in(std::size_t{0});
+        const i64 at = map::index_of(m.keyed(), key_of(c.in("key")));
+        c.out("found", Value::boolean(at >= 0));
+        c.out("value", at >= 0 ? m.keyed().value_at(static_cast<std::size_t>(at)) : zero_of({c.output(1).type, c.output(1).of}, c.instance().graph()));
+        c.out("index", Value::integer(at));
+        return kStop;
+      };
+      lib.add(std::move(d));
+    } else {
+      NodeDef d = value_node("set.find", "Find Key", "The place of the key in the order the keys came, or -1.", "index of search", false, {data("key", "Key", PinType::integer, 0)},
+                             {data("index", "Index", PinType::integer)});
+      d.run = [](Context& c) {
+        const Value m = c.in(std::size_t{0});
+        c.out(std::size_t{0}, Value::integer(set::index_of(m.keyed(), key_of(c.in("key")))));
+        return kStop;
+      };
+      lib.add(std::move(d));
+    }
+  }
+
+  // ---- steps: they change a map or a set at the node's place (the settings Variable, Path) ----
+  auto of_place = [](PinType kind) {
+    return [kind](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>&) {
+      TypeRef t;
+      if (!keyed_place(n, g, kind, t)) return;
+      for (PinDef& p : in) {
+        if (p.id == "key") retype(p, key_type(t), g);
+        if (p.id == "value") retype(p, value_type(t), g);
+      }
+    };
+  };
+  auto needs = [](PinType kind) {
+    return [kind](const Node& n, const Graph& g) {
+      Variable named;
+      if (g.place_of(n, named) && named.type != kind)
+        return "needs a " + std::string(kind == PinType::map ? "map" : "set") + ": \"" + named.name + "\" is " + type_text({named.type, named.of, named.count});
+      return std::string();
+    };
+  };
+  auto step = [&](PinType kind, const char* type, const char* label, const char* help, const char* keywords, std::vector<PinDef> in, std::vector<PinDef> out) {
+    NodeDef d = make(type, label, kind == PinType::map ? "Maps" : "Sets", NodeKind::action, help, keywords);
+    d.params = {param("variable", kind == PinType::map ? "Map" : "Set", ParamDef::Kind::variable), local_of(), path_of()};
+    d.inputs = {exec_in()};
+    for (PinDef& p : in) d.inputs.push_back(std::move(p));
+    d.outputs = {exec_out()};
+    for (PinDef& p : out) d.outputs.push_back(std::move(p));
+    d.shape = of_place(kind);
+    d.problem = needs(kind);
+    return d;
+  };
+  // The map or set at the node's place, to change it: `change(entries)`. The node's own inputs
+  // have been read by then; the indices of its path are read here.
+  auto on_entries = [](Context& c, PinType kind, const std::function<void(MapEntries&)>& change) {
+    const std::vector<i64> at = c.path();
+    c.instance().change(c.node(), at, [&](Value& v) {
+      if (v.type == kind) change(v.own_entries());
+    });
+  };
+  {
+    NodeDef d = step(PinType::map, "map.set", "Set at Key", "The key gets the value: its entry - or a new one at the end, when there is none. Added: was it new? Index: the entry's place.",
+                     "put insert assign store", {data("key", "Key", PinType::integer, 0), data("value", "Value", PinType::number, 0.0)},
+                     {data("added", "Added", PinType::boolean), data("index", "Index", PinType::integer)});
+    d.title = [](const NodeDef&, const Node& n) { return "Set in " + place_title(n); };
+    d.run = [on_entries](Context& c) {
+      const MapKey key = key_of(c.in("key"));
+      const Value value = c.in("value");
+      on_entries(c, PinType::map, [&](MapEntries& e) {
+        const auto [added, at] = map::set(e, key, value);
+        c.out("added", Value::boolean(added));
+        c.out("index", Value::integer(at));
+      });
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
+  for (bool of_map : {true, false}) {
+    const PinType kind = of_map ? PinType::map : PinType::set;
+    {
+      NodeDef d = step(kind, of_map ? "map.add" : "set.add", "Add Key",
+                       of_map ? "A new entry at the end with the zero of the values' type - unless the key has one. Added: was it new? Index: the entry's place."
+                              : "Puts the key in at the end, unless it is there. Added: was it new? Index: its place.",
+                       "insert put emplace", {data("key", "Key", PinType::integer, 0)}, {data("added", "Added", PinType::boolean), data("index", "Index", PinType::integer)});
+      d.title = [](const NodeDef&, const Node& n) { return "Add to " + place_title(n); };
+      d.run = [on_entries, of_map, kind](Context& c) {
+        const MapKey key = key_of(c.in("key"));
+        on_entries(c, kind, [&](MapEntries& e) {
+          bool added;
+          i64 at;
+          if (of_map) {
+            const auto [fresh, place] = map::add(e, key);
+            added = fresh, at = place;
+            // (the zero of the values' type, as the map is declared - a struct at its defaults)
+            if (fresh) {
+              TypeRef t;
+              if (keyed_place(c.node(), c.instance().graph(), PinType::map, t)) e.value_at(static_cast<std::size_t>(at)) = zero_of(value_type(t), c.instance().graph());
+            }
+          } else {
+            const auto [fresh, place] = map::add(e, key);
+            added = fresh, at = place;
+          }
+          c.out("added", Value::boolean(added));
+          c.out("index", Value::integer(at));
+        });
+        return 0;
+      };
+      lib.add(std::move(d));
+    }
+    {
+      NodeDef d = step(kind, of_map ? "map.remove" : "set.remove", "Remove Key", of_map ? "Takes the key's entry out (the others keep their order). Removed: was there one?" : "Takes the key out (the others keep their order). Removed: was it there?",
+                       "delete erase", {data("key", "Key", PinType::integer, 0)}, {data("removed", "Removed", PinType::boolean)});
+      d.title = [](const NodeDef&, const Node& n) { return "Remove from " + place_title(n); };
+      d.run = [on_entries, kind](Context& c) {
+        const MapKey key = key_of(c.in("key"));
+        on_entries(c, kind, [&](MapEntries& e) { c.out("removed", Value::boolean(map::remove(e, key))); });
+        return 0;
+      };
+      lib.add(std::move(d));
+    }
+    {
+      NodeDef d = step(kind, of_map ? "map.remove_at" : "set.remove_at", "Remove Index", "Takes the entry at the index out (the others keep their order). Beyond it: nothing.", "delete erase",
+                       {data("index", "Index", PinType::integer, 0)}, {});
+      d.title = [](const NodeDef&, const Node& n) { return "Remove from " + place_title(n); };
+      d.run = [on_entries, kind](Context& c) {
+        const i64 at = c.in_int("index");
+        on_entries(c, kind, [&](MapEntries& e) { map::remove_at(e, at); });
+        return 0;
+      };
+      lib.add(std::move(d));
+    }
+    {
+      NodeDef d = step(kind, of_map ? "map.clear" : "set.clear", of_map ? "Clear Map" : "Clear Set", "Takes every entry out.", "empty reset", {}, {});
+      d.title = [](const NodeDef&, const Node& n) { return "Clear " + place_title(n); };
+      d.run = [on_entries, kind](Context& c) {
+        on_entries(c, kind, [&](MapEntries& e) { map::clear(e); });
+        return 0;
+      };
+      lib.add(std::move(d));
+    }
+    {
+      NodeDef d = step(kind, of_map ? "map.reserve" : "set.reserve", "Reserve", "Makes room for that many entries in one go (what is there stays as it is).", "capacity room",
+                       {data("count", "Count", PinType::integer, 0)}, {});
+      d.title = [](const NodeDef&, const Node& n) { return "Reserve " + place_title(n); };
+      d.run = [on_entries, kind](Context& c) {
+        const i64 count = c.in_int("count");
+        on_entries(c, kind, [&](MapEntries& e) { map::reserve(e, count); });
+        return 0;
+      };
+      lib.add(std::move(d));
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // enums
 // ---------------------------------------------------------------------------
 // A Blueprint declares enums (Graph::enums); these nodes work on the values of one of them - the
@@ -1541,6 +1797,7 @@ Library& Library::core() {
     add_flow(lib);
     add_variables(lib);
     add_lists(lib);
+    add_maps(lib);
     add_enums(lib);
     add_structs(lib);
     add_math(lib);

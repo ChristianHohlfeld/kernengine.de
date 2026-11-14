@@ -54,6 +54,7 @@
 #include <vector>
 
 #include "kern/core/base.h"
+#include "kern/core/map.h"
 #include "kern/core/json.h"
 #include "kern/math/math.h"
 
@@ -64,18 +65,24 @@ using ActorRef = u32;  // game actor id (0 = none)
 /// What a pin carries: exec, a value, or a list of values of one type (after the value types, in
 /// their order). `enumeration`: a value of an enum the Blueprint declares, `structure`: a value of
 /// one of its structs - which one says the name beside the type (PinDef::of, Variable::of ...).
+/// `map`: values of one type, each under a key of its own, in the order the keys came; `set`:
+/// keys in the order they came - of what types says the name beside it (keyed_of).
 enum class PinType : u8 {
   exec, boolean, integer, number, vector, text, actor, enumeration, structure,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, count
+  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list,
+  map, set, count
 };
 constexpr u8 kValueTypes = 8;  // boolean ... structure
 /// A list type, the type of a list's items (of a value: the type itself), and the list of a type.
-constexpr bool is_list(PinType t) { return t >= PinType::boolean_list && t < PinType::count; }
+constexpr bool is_list(PinType t) { return t >= PinType::boolean_list && t <= PinType::structure_list; }
+/// A map or a set: its entries are found by their keys (kern::Map, kern::Set - kern/core/map.h).
+constexpr bool is_keyed(PinType t) { return t == PinType::map || t == PinType::set; }
 constexpr PinType element_of(PinType t) { return is_list(t) ? static_cast<PinType>(static_cast<u8>(t) - kValueTypes) : t; }
 constexpr PinType list_of(PinType t) { return t >= PinType::boolean && t <= PinType::structure ? static_cast<PinType>(static_cast<u8>(t) + kValueTypes) : t; }
 /// The names of the pin types, in the order of PinType.
 inline constexpr std::string_view kPinTypeNames[] = {"exec",      "bool",     "int",        "float",       "vector",    "text",      "actor",      "enum",      "struct",
-                                                     "bool_list", "int_list", "float_list", "vector_list", "text_list", "actor_list", "enum_list", "struct_list"};
+                                                     "bool_list", "int_list", "float_list", "vector_list", "text_list", "actor_list", "enum_list", "struct_list",
+                                                     "map",       "set"};
 static_assert(sizeof kPinTypeNames / sizeof kPinTypeNames[0] == static_cast<std::size_t>(PinType::count));
 /// "bool", "int", "float", "vector", "text", "actor"; a list: "float_list" ...
 const char* pin_type_name(PinType t);
@@ -143,6 +150,19 @@ struct ActorHandle {
   bool operator==(const ActorHandle&) const = default;
 };
 
+/// The key of an entry of a map or a set, as the interpreter holds it: a whole number (Int, the
+/// place of an enum's value, Bool as 0 or 1) or a text.
+/// (A map holds keys of one type: a whole number or a text, never both.)
+struct MapKey {
+  i64 i = 0;
+  std::string s;
+  bool operator==(const MapKey&) const = default;
+  u64 hash() const { return KeyHash<i64>{}(i) ^ KeyHash<std::string>{}(s); }
+};
+struct Value;
+/// The entries of a map or a set value (a set's values are none).
+using MapEntries = kern::Map<MapKey, Value>;
+
 /// The items of a list value: the vector of the list's type holds them (the others are empty).
 using ListItems = std::tuple<std::vector<bool>, std::vector<i64>, std::vector<f64>, std::vector<Vec3>, std::vector<std::string>, std::vector<ActorHandle>>;
 /// The list type whose items are T (bool, i64, f64, Vec3, std::string, ActorHandle).
@@ -170,6 +190,9 @@ struct Value {
   /// Shared like a list's items. A struct that holds none (Value::zero) has every field at its
   /// declared default - what a field is, is read through the declaration (logic::field_of).
   std::shared_ptr<const std::vector<Value>> rows;
+  /// A map's or a set's entries, in the order their keys came (none: it is empty). Shared like a
+  /// list's items.
+  std::shared_ptr<const MapEntries> entries;
 
   static Value boolean(bool x) { Value r; r.type = PinType::boolean; r.b = x; return r; }
   static Value integer(i64 x) { Value r; r.type = PinType::integer; r.i = normal(x); return r; }
@@ -261,7 +284,11 @@ struct Value {
     else if (rows.use_count() > 1) rows = std::make_shared<std::vector<Value>>(*rows);  // (someone else reads these)
     return const_cast<std::vector<Value>&>(*rows);  // (made as a vector, here and in structure())
   }
-  /// How many items a list has (no list: 0).
+  /// The entries of a map or a set (none: empty).
+  const MapEntries& keyed() const;
+  /// The entries of a map or a set, to change them: this value's own.
+  MapEntries& own_entries();
+  /// How many items a list has, how many entries a map or a set (none of these: 0).
   std::size_t size() const;
   /// A list's item as a value (beyond its end, or no list: the zero of the item's type).
   Value item(std::size_t index) const;
@@ -368,6 +395,18 @@ inline constexpr u32 kLongestFixed = 65536;
 /// Can what comes out of a pin of type `from` go into one of type `to`? (convertible, and two
 /// enums are the same enum, two structs the same struct.)
 bool fits(const TypeRef& from, const TypeRef& to);
+/// A map's and a set's types (TypeRef::of beside PinType::map / set): the keys' and, of a map,
+/// the values' - "int>float", "enum:Mode>struct_list:Weapon", of a set "int". A key is a Bool,
+/// an Int, an enum's value or a Text; a value is any type a variable can be but a map or a set.
+TypeRef key_type(const TypeRef& keyed);
+TypeRef value_type(const TypeRef& map);
+/// What TypeRef::of says of a map with these keys and values (`value` null: of a set).
+std::string keyed_of(const TypeRef& key, const TypeRef* value);
+/// Can a map's or a set's keys be of this type?
+constexpr bool key_type_ok(PinType t) { return t == PinType::boolean || t == PinType::integer || t == PinType::enumeration || t == PinType::text; }
+/// The key of an entry as the interpreter holds it, and back (`key`: the keys' type).
+MapKey key_of(const Value& v);
+Value key_value(const MapKey& k, PinType key);
 
 /// A structure a Blueprint declares: a type with named fields, each of a type and with a default.
 /// A field is a value type, an enum of the Blueprint, a struct declared above this one, or a list
@@ -674,6 +713,7 @@ struct ParamDef {
   bool enums_only = false;  // Kind::type: an enum of the Blueprint and nothing else (the enum nodes' "Enum")
   bool structs_only = false;  // Kind::type: a struct of the Blueprint and nothing else (the struct nodes' "Struct")
   bool optional = false;      // Kind::function: it may name none (Sort List without an Order: the items' own)
+  bool keys_only = false;     // Kind::type: a type a map's or a set's keys can be (Bool, Int, an enum, Text)
 };
 /// The types a Kind::type setting can name in the Blueprint `g` - its enums and structs among
 /// them -, in the order they are offered.
