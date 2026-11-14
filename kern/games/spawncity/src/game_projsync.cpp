@@ -43,16 +43,8 @@ struct In {
 kern::i16 dms(f32 v) { return static_cast<kern::i16>(std::lround(clampf(v * 10, -32000, 32000))); }
 }  // namespace
 
-struct ProjSync {
-  struct Ghost { mp::PoseTimeline line; Vec3 v; f32 heard = 0; bool gone = false; };
-  std::map<u32, Ghost> ghosts;            // (shooter << 16 | id)
-  std::vector<std::pair<u16, u8>> sent;   // ours in the last message, and how often "gone" went out
-  f32 clock = 0;
-  u32 sent_msgs = 0, got = 0;
-};
-
 ProjSync& Game::projsync() {
-  if (!projsync_) projsync_ = std::make_shared<ProjSync>();
+  if (!projsync_) projsync_ = std::make_unique<ProjSync>();
   return *projsync_;
 }
 

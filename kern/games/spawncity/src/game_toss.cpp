@@ -54,17 +54,8 @@ f32 uq16(kern::i16 v) { return static_cast<f32>(v) / 32767; }
 kern::i16 cms(f32 v) { return static_cast<kern::i16>(std::lround(clampf(v * 100, -32000, 32000))); }
 }  // namespace
 
-struct TossState {
-  struct Own { u8 kind = 0; u64 id = 0; i32 local = -1; f32 still = 0, born = 0; u8 done_sent = 0; };
-  struct Remote { u8 from = 0, kind = 0, flags = 0; u64 id = 0; Vec3 p, v; Quat q; f32 at = 0; i32 local = -1; bool released = false; std::shared_ptr<mp::PoseTimeline> line; };
-  std::vector<Own> own;
-  std::vector<Remote> remote;
-  f32 clock = 0;
-  u32 sent = 0, got = 0;
-};
-
 TossState& Game::toss() {
-  if (!toss_) toss_ = std::make_shared<TossState>();
+  if (!toss_) toss_ = std::make_unique<TossState>();
   return *toss_;
 }
 
@@ -181,8 +172,9 @@ void Game::toss_update(f32 dt) {
       auto it = std::find_if(t.remote.begin(), t.remote.end(), [&](const TossState::Remote& q2) { return q2.from == r.from && q2.kind == r.kind && q2.id == r.id; });
       // the track on his clock (mp::PoseTimeline: a jitter buffer behind it, interpolated) - the
       // body here follows the throw as he threw it, not as the packets happened to arrive
-      if (it == t.remote.end()) { r.line = std::make_shared<mp::PoseTimeline>(); r.line->push(r.p, r.q, r.v, true, t_ms, static_cast<f64>(now) * 1000); t.remote.push_back(r); }
-      else { r.local = it->local; r.line = it->line; r.line->push(r.p, r.q, r.v, true, t_ms, static_cast<f64>(now) * 1000); *it = r; }
+      // (a body heard of before keeps its track: handed on to the new record, not copied)
+      if (it == t.remote.end()) { r.line.push(r.p, r.q, r.v, true, t_ms, static_cast<f64>(now) * 1000); t.remote.push_back(std::move(r)); }
+      else { r.local = it->local; r.line = std::move(it->line); r.line.push(r.p, r.q, r.v, true, t_ms, static_cast<f64>(now) * 1000); *it = std::move(r); }
     }
   }
   // ---- theirs: our copy of each body steered onto their track
@@ -190,7 +182,7 @@ void Game::toss_update(f32 dt) {
     const bool live = !(r.flags & kDone) && now - r.at < kQuiet;
     if (r.kind == kBird) {
       Vec3 bp = r.p;
-      if (r.line) { const mp::PoseSample smp = r.line->sample(static_cast<f64>(now) * 1000); if (smp.valid) bp = smp.p; }
+      { const mp::PoseSample smp = r.line.sample(static_cast<f64>(now) * 1000); if (smp.valid) bp = smp.p; }
       L.net_bird(r.id, bp, std::atan2(r.q.rotate({1, 0, 0}).y, r.q.rotate({1, 0, 0}).x), r.v, live && (r.flags & kHeld));
       continue;
     }
@@ -220,7 +212,7 @@ void Game::toss_update(f32 dt) {
     const kern::physics::Pose ps = w.pose(b);
     Vec3 want_p = r.p + r.v * (now - r.at);
     Quat want_q = r.q;
-    if (r.line) { const mp::PoseSample smp = r.line->sample(static_cast<f64>(now) * 1000); if (smp.valid) { want_p = smp.p; want_q = smp.q; } }
+    { const mp::PoseSample smp = r.line.sample(static_cast<f64>(now) * 1000); if (smp.valid) { want_p = smp.p; want_q = smp.q; } }
     const Vec3 off = want_p - ps.position;
     if (kern::length(off) > 6) { w.set_pose(b, {want_p, want_q}); w.set_linear_velocity(b, r.v); continue; }  // too far apart (a hitch): there
     w.set_linear_velocity(b, r.v + off * 10.0f);

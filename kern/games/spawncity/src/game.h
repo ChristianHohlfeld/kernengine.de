@@ -26,8 +26,15 @@
 #include "drone.h"
 #include "game_ui.h"
 #include "game_combat.h"
+#include "game_destruction_sync.h"  // the states of the sessions' syncs: destruction, thrown things, rounds, the town
 #include "game_gaps.h"
+#include "game_life.h"   // GameLife (M3 life, game_life.cpp)
 #include "game_look.h"
+#include "game_net.h"    // MpLocal (game_net.cpp)
+#include "game_projsync.h"
+#include "game_toss.h"
+#include "game_townsync.h"
+#include "game_world.h"  // WorldLife (M3 world, game_world.cpp)
 #include "jet.h"
 #include "kern/app/app.h"
 #include "kern/audio/audio.h"
@@ -49,13 +56,6 @@
 #include "weapons.h"
 
 namespace sc {
-
-struct MpLocal;  // multiplayer presentation state (game_net.cpp)
-struct DestroySync;  // the destruction state in a session (game_destruction_sync.cpp)
-struct TossState;    // thrown things in a session (game_toss.cpp)
-struct ProjSync;     // rounds in flight in a session (game_projsync.cpp)
-struct TownSync;     // the town's lasting state and a client's hits on it in a session (game_townsync.cpp)
-struct MpLocalDelete { void operator()(MpLocal* m) const; };
 
 enum class Mode : u8 { foot, drone, car, jet, parachute };
 const char* mode_name(Mode m);
@@ -130,9 +130,6 @@ struct PoliceDrone {
   f32 hp = 100, yaw = 0, next_sensor = 0, next_shot = 0, sight_since = 0, destroyed_until = -1, retreat_until = -1, distance = 0, roof = 0, roof_at = -1;
   u32 shots = 0, serial = 0;
 };
-
-struct WorldLife;  // game_world.h
-struct GameLife;   // game_life.h (M3 life)
 
 class Game {
  public:
@@ -222,7 +219,7 @@ class Game {
   void dsync_reset_epoch();
   std::string dsync_json();
   DestroySync& dsync();
-  std::shared_ptr<DestroySync> dsync_;
+  std::unique_ptr<DestroySync> dsync_;
   // thrown things (game_toss.cpp): what our hand takes flies on every machine
   void toss_update(f32 dt);
   void toss_own(u8 kind, i32 local, u64 id);
@@ -231,12 +228,12 @@ class Game {
   std::string toss_command(const std::string& cmd);
   i32 toss_test_ = -1;
   TossState& toss();
-  std::shared_ptr<TossState> toss_;
+  std::unique_ptr<TossState> toss_;
   // every round in flight replicated (game_projsync.cpp): ours streamed, the mates' drawn on their track
   void projsync_update(f32 dt);
   void projsync_blast(u8 owner, Vec3 at);
   ProjSync& projsync();
-  std::shared_ptr<ProjSync> projsync_;
+  std::unique_ptr<ProjSync> projsync_;
   u32 proj_serial_ = 0;
   // the town's lasting state and a client's hits on it (game_townsync.cpp, town_sync.h): street
   // lamps, barricade planks and the blasts that left marks are the host's; what a client does to a
@@ -254,7 +251,7 @@ class Game {
   bool town_car_remote(i32 car) const;
   std::string townsync_json();
   TownSync& townsync();
-  std::shared_ptr<TownSync> townsync_;
+  std::unique_ptr<TownSync> townsync_;
   std::string worldsync_list() const;
   bool world_puppet() const;
   std::vector<Vec3> mate_foci() const;
@@ -730,7 +727,7 @@ class Game {
   std::unique_ptr<Car> remote_car_, remote_bus_;
   bool rebased_ = false;
   u8 my_color_ = 0;
-  std::unique_ptr<MpLocal, MpLocalDelete> mp_;  // pings, feed, voice, big map (game_net.cpp)
+  std::unique_ptr<MpLocal> mp_;  // pings, feed, voice, big map (game_net.h)
   // street lamps and night
   struct Lamp { Vec3 foot; f32 yaw; u32 lane; u8 state = 0; };  // state: street_lamps.mjs 0 lit, 1 dark, 2 down
   std::vector<Lamp> lamps_;

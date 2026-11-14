@@ -32,19 +32,8 @@
 
 namespace sc {
 
-struct TownSync {
-  u32 epoch = 1;                          // the host's (a client: the one he has; 0 none yet)
-  bool was_active = false, hosting = false;
-  bool marks_taken = false;               // client: the host's marks were run here (once a session)
-  std::vector<u8> known;                  // host: the slots that have the whole state
-  std::vector<town::LampRec> lamps_out;   // lamps that broke here (a host: or at a client's), still to tell
-  std::vector<town::MarkRec> marks;       // the blasts that left marks here, the newest last
-  std::vector<town::MarkRec> marks_in;    // client: the host's, to run once the world stands
-  u32 car_hits[3] = {0, 0, 0}, person_hits = 0, sent_states = 0, got_states = 0, asks = 0;
-};
-
 TownSync& Game::townsync() {
-  if (!townsync_) townsync_ = std::make_shared<TownSync>();
+  if (!townsync_) townsync_ = std::make_unique<TownSync>();
   return *townsync_;
 }
 
