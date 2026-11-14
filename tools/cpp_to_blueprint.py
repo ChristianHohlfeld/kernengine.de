@@ -2500,6 +2500,12 @@ class Emit:
         if k == "BinaryOperator" and n.get("opcode") == ",":
             a, b = kids(n)
             return self.effect(a) + self.effect(b)
+        if k == "ConditionalOperator" and len(kids(n)) == 3:
+            # c ? x() : y(); as a statement: a branch - the one C++ evaluates runs
+            c, x, y = kids(n)
+            cond = self.bx(c)
+            then, other = self.effect_stmt(x), self.effect_stmt(y)
+            return [f"if ({cond}) {{", *["  " + ln for ln in then], *(["} else {", *["  " + ln for ln in other]] if other else []), "}"]
         if k == "CompoundAssignOperator":
             a, b = kids(n)
             op = n["opcode"][:-1]
