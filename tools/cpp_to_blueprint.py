@@ -356,6 +356,9 @@ class Tree:
         self.aliases = {}     # a name the program gives a type (using Bytes32 = ...) -> that type
         self.alias_decls = []
         self.template_of = {}  # a function made from a template (its id) -> the template
+        self.unnamed = {}     # how the compiler spells the type of an enum without a name -> its underlying type
+        self.local_types = {}  # a type a function declares in its body (qualified name) -> that function's scope
+        self.local_spans = []  # (file, from, to, scope) of the functions that declare types of their own
         self.w64 = run_clang(path, "w64", flags) if STEADY else []
         st = {"file": ""}
         for o in self.w64:
@@ -378,6 +381,60 @@ class Tree:
         for i, n in list(self.decl.items()):  # (a constant declared in a header and defined later)
             if n.get("kind") == "VarDecl" and n.get("init") and n.get("previousDecl"):
                 self.body.setdefault(n["previousDecl"], n)
+        self.take_locals(seen)
+        self.number_names()
+
+    def take_locals(self, seen):
+        """The types a function declares in its body - `struct Seg { Vec2 m; f32 len; };` between its
+        statements - are types of the program like any other, in the scope of that function: its name is
+        part of theirs (Destruction::fracture::Seg). They are known where C++ knows them: in that function
+        (Unit.find_type)."""
+        done = set()
+        for d in list(self.body.values()):
+            if d["id"] in done or d.get("_at", (None, None))[1] is None:
+                continue
+            done.add(d["id"])
+            body = next((c for c in kids(d) if c.get("kind") == "CompoundStmt"), None)
+            local = [c for n in walk(body) if n.get("kind") == "DeclStmt" for c in kids(n) if c.get("kind") in ("CXXRecordDecl", "EnumDecl")] if body else []
+            if not local:
+                continue
+            owner = self.owner.get(d["id"])
+            base = (owner + "::" if owner else self.scope_of.get(d["id"], "")) + (d.get("name") or "function")
+            scope, k = base + "::", 2
+            while any(q.startswith(scope) for q in self.local_types):   # (a function of the same name: its own scope)
+                scope, k = f"{base}{k}::", k + 1
+            before = set(self.records) | set(self.enums)
+            for c in local:
+                c["_local"] = d["id"]
+                self.take(c, scope, seen)
+            for q in (set(self.records) | set(self.enums)) - before:
+                self.local_types[q] = scope
+            self.local_spans.append((d.get("_file", ""), d["_at"][0], d["_at"][1], scope))
+
+    def local_scope(self, d):
+        """The scope of the types a function declares in its body - the function `d` stands in (itself, or
+        the function a local function is written in). "": it stands in none that declares types."""
+        a = d.get("_at", (None, None))[0]
+        best = ""
+        for file, lo, hi, scope in self.local_spans:
+            if a is not None and file == d.get("_file", "") and lo <= a < hi and len(scope) > len(best):
+                best = scope
+        return best
+
+    def number_names(self):
+        """A value of an enum without a name is a name for a whole number: `enum : u64 { kCatWorld = 1 };`
+        declares constants, and no type anybody names. Where one is used, the tree has the number it is,
+        of the enum's underlying type - as C++ converts it there. (`_unnamed`: the enum it is of; the
+        source a test holds names it.)"""
+        for o in [*self.dumps, *self.engine]:
+            for n in walk(o):
+                if n.get("kind") != "DeclRefExpr" or (n.get("referencedDecl") or {}).get("kind") != "EnumConstantDecl":
+                    continue
+                c = self.decl.get(n["referencedDecl"].get("id"))
+                if c is None or "_number" not in c:
+                    continue
+                n["kind"], n["value"], n["type"], n["_unnamed"] = "IntegerLiteral", str(c["_number"]), dict(c["_under"]), c["_of"]
+                del n["referencedDecl"]
 
     def scope_from(self, o):
         """The scope a dumped declaration stands in: clang says it for those defined outside their class."""
@@ -442,6 +499,18 @@ class Tree:
                 if "id" in c:
                     self.decl[c["id"]] = c
                     c["_enum"] = q
+        elif k == "EnumDecl":
+            # An enum without a name: its values are whole numbers of its underlying type (number_names).
+            numbers = enum_numbers(o)
+            under = o.get("fixedUnderlyingType") or {"qualType": enum_underlying([v for _, v in numbers])}
+            for c in kids(o):
+                if c.get("kind") == "EnumConstantDecl" and "id" in c:
+                    self.decl[c["id"]] = c
+                    self.scope_of[c["id"]] = scope
+                    c["_number"], c["_under"], c["_of"] = dict(numbers)[c["name"]], under, o["id"]
+                    spelled = re.search(r"\((?:unnamed|anonymous) enum at [^)]*\)", c.get("type", {}).get("qualType", ""))
+                    if spelled:
+                        self.unnamed[spelled.group(0)] = qtype({"type": under})
         elif k == "CXXRecordDecl" and o.get("name"):
             q = scope + o["name"]
             if o.get("completeDefinition"):
@@ -456,6 +525,16 @@ class Tree:
                 r = self.decl.get(o["parentDeclContextId"])
                 if r is not None and r.get("_q"):
                     self.owner[o["id"]] = r["_q"]
+
+
+def enum_underlying(values):
+    """The type an enum that names none is held as: the first of int, unsigned int, long, unsigned long
+    that has all its values (as the compilers the program is built with choose it)."""
+    lo, hi = min(values, default=0), max(values, default=0)
+    for name, a, b in (("int", -2 ** 31, 2 ** 31 - 1), ("unsigned int", 0, 2 ** 32 - 1), ("long", -2 ** 63, 2 ** 63 - 1)):
+        if a <= lo and hi <= b:
+            return name
+    return "unsigned long"
 
 
 def enum_numbers(enum_decl):
@@ -703,6 +782,7 @@ class Unit:
         self.short = collections.defaultdict(list)
         for q in list(tree.records) + list(tree.enums):
             self.short[q.split("::")[-1]].append(q)
+        self.local_scope = ""       # the scope of the types the function being written declares in its body (Tree.take_locals)
 
     # ---- names ----
     def fresh(self, want, taken=None, among=None):
@@ -737,6 +817,8 @@ class Unit:
 
     # ---- types ----
     def clean(self, t):
+        if "enum at " in t:   # (a place of an enum without a name holds a number of its underlying type)
+            t = re.sub(r"(?:[A-Za-z_]\w*::)*(\((?:unnamed|anonymous) enum at [^)]*\))", lambda m: self.tree.unnamed.get(m.group(1), m.group(0)), t)
         t = re.sub(r"\b(const|volatile|struct|class|enum)\b", " ", t).replace("&&", " ").replace("&", " ")
         t = re.sub(r"(?<![\w:])(?:kern::|std::)?(f32|f64|i8|i16|i32|i64|u8|u16|u32|u64|uint64_t|int64_t|usize|Vec2|Vec3|Vec4|Quat|Mat4|size_t)\b", lambda m: ALIAS[m.group(1)], t)
         t = t.replace("std::size_t", "unsigned long").replace("(anonymous namespace)::", "")
@@ -759,6 +841,11 @@ class Unit:
             return t
         t = t.replace("(anonymous namespace)::", "")
         cands = [q for q in self.short.get(t.split("::")[-1], []) if q.endswith(t) or t.endswith(q)]
+        # (a type a function declares in its body is known in that function - and there it is the one meant)
+        local = self.tree.local_types
+        cands = [q for q in cands if q not in local or (self.local_scope and local[q] == self.local_scope)]
+        if any(q in local for q in cands):
+            cands = [q for q in cands if q in local]
         if len(cands) == 1:
             return cands[0]
         if len(cands) > 1:
@@ -1156,7 +1243,11 @@ class Unit:
                 raise Wait(self.world.bars[f.key])
             if d["id"] in getattr(self, "barred", {}):
                 raise Wait(self.barred[d["id"]])
-            Emit(self, f).run()
+            outer, self.local_scope = self.local_scope, self.tree.local_scope(d)
+            try:
+                Emit(self, f).run()
+            finally:
+                self.local_scope = outer
             self.order.append(f)
         except Wait as w:
             f.wait = str(w)
@@ -1987,6 +2078,10 @@ class Emit:
                     self.note_home(v["id"], init, of_pair=True)
                     out += self.take_pre() + [f"{name} = {text};"]
                     continue
+                if v.get("kind") in ("UsingDirectiveDecl", "UsingDecl", "TypeAliasDecl", "TypedefDecl", "StaticAssertDecl", "EnumDecl"):
+                    continue   # (a name for what the compiler has resolved; an enum: a type like any other, or - without a name - numbers)
+                if v.get("kind") == "CXXRecordDecl" and v.get("_q") in self.tree.local_types:
+                    continue   # (a type of the function's own: a struct of the program, declared where it is first used)
                 if v.get("kind") != "VarDecl":
                     raise Wait(f"a declaration in a body: {v.get('kind')}")
                 if v.get("storageClass") == "static":
@@ -5456,7 +5551,8 @@ class TestWriter:
         ns = f"converted_{stem}"
         vectors = (ENGINE + "::Vec3", ENGINE + "::Vec2")
         converted = {f.decl["id"]: f for f in u.order if not f.lifted}
-        structs = {q for q, n in u.structs.items() if isinstance(q, str) and n and n in used and q in tree.records}
+        # (a type a function declares in its body stands in the source of that function: not at the top again)
+        structs = {q for q, n in u.structs.items() if isinstance(q, str) and n and n in used and q in tree.records and q not in tree.local_types}
 
         # ---- what the source of the converted functions names: gathered, and compiled along ----
         # (Nothing else of the program is in reach of the test's source: what it names and the test does
@@ -5484,13 +5580,20 @@ class TestWriter:
         def want_record(q):
             t = top_of(q)
             d = tree.records.get(t)
-            if q in vectors or d is None or t in records or d.get("_at", (None, None))[1] is None or t in u.objects_seen:
+            if q in vectors or d is None or t in records or d.get("_at", (None, None))[1] is None or t in u.objects_seen or q in tree.local_types:
                 return   # (of the engine's classes with a life of their own the test has stand-ins: see stand_ins)
             records.add(t)
             todo.append(("record", d))
+        unnamed_enums = {}
+        def want_unnamed(i):
+            """An enum without a name whose values the source names (they are numbers in the Blueprint): its
+            declaration is part of the source."""
+            d = tree.decl.get(i)
+            if d is not None and d.get("_at", (None, None))[1] is not None:
+                unnamed_enums[i] = d
         def want_enum(q):
             d = tree.enums.get(q)
-            if d is None or not d.get("name") or d.get("_at", (None, None))[1] is None:
+            if d is None or not d.get("name") or d.get("_at", (None, None))[1] is None or q in tree.local_types:
                 return
             if top_of(q) != q:
                 want_record(top_of(q))
@@ -5563,6 +5666,8 @@ class TestWriter:
                     want_types(t["qualType"])
                     if t.get("desugaredQualType"):
                         want_types(t["desugaredQualType"])
+                if x.get("_unnamed") is not None:
+                    want_unnamed(x["_unnamed"])
                 if k == "DeclRefExpr":
                     r = x.get("referencedDecl", {})
                     if r.get("kind") in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXConversionDecl"):
@@ -5675,6 +5780,20 @@ class TestWriter:
             if self.widen(text) not in said_consts:   # (the program and the engine both say what pi is: once)
                 said_consts.add(self.widen(text))
                 const_chunks.append((tree.place(d), ("const", f"{os.path.basename(key[0])}:{key[1]}"), text))
+        # the enums without a name whose values the source names: their own text, like a constant's
+        for i, d in unnamed_enums.items():
+            if self.inside(d, decls) is not None or in_function(d):
+                continue   # (in a class that is compiled along, in a function: there)
+            scope = tree.scope_of.get(i, "")
+            text = self.piece(d) + ";"
+            if classes_of(scope) and top_of(scope.rstrip(":")) not in records:
+                text = in_classes(scope, text)
+                for c in kids(d):
+                    if c.get("kind") == "EnumConstantDecl" and c.get("name"):
+                        pairs.append((absolute(d, c["name"]), "::".join(classes_of(scope) + [c["name"]])))
+            if self.widen(text) not in said_consts:
+                said_consts.add(self.widen(text))
+                const_chunks.append((tree.place(d), ("const", f"{os.path.basename(d['_file'])}:{d['_at'][0]}"), text))
         # the functions
         fn_chunks, cases, outs, case_of = [], [], [], {}
         for d in [*functions.values(), *templates.values()]:
