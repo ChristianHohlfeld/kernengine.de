@@ -265,6 +265,17 @@ def main(argv):
             functions.append(api.function(d))
         except Wait as w:
             waiting.append((api.home(d) + "::" + d["name"], str(w)))
+    # the objects of the engine a Blueprint makes and ends: their constructors and their destructor
+    for q in sorted(q for q in tree.records if q.startswith("kern::")):
+        made = 0
+        for d in api.makers(q):
+            try:
+                functions.append(api.maker(d))
+                made += 1
+            except Wait as w:
+                waiting.append((q + "::" + q.split("::")[-1], str(w)))
+        if made:
+            functions.append(api.releaser(q))
     types = [f["type"] for f in functions]
     assert len(set(types)) == len(types), [t for t in types if types.count(t) > 1]
     if "--list" in argv:

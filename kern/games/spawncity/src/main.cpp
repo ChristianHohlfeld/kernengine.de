@@ -48,16 +48,16 @@ class SpawnCityApp final : public kern::App {
       s.extent = 70;
       s.bias = 0.0016f;
       s.filter = 4;
-      e.renderer.set_shadows(&s);
+      e.renderer().set_shadows(&s);
       kern::AoOptions ao;
       ao.quality = kern::AoQuality::low;
       ao.half_resolution = true;
-      e.renderer.set_ambient_occlusion(ao);
+      e.renderer().set_ambient_occlusion(ao);
     } else {
       kern::AoOptions ao;
       ao.quality = kern::AoQuality::medium;
       ao.half_resolution = false;
-      e.renderer.set_ambient_occlusion(ao);
+      e.renderer().set_ambient_occlusion(ao);
     }
     return sc::game().start(e);
   }

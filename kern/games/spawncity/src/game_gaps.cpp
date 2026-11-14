@@ -130,7 +130,7 @@ void Game::gaps_init(kern::Engine& e) {
   gaps_ = std::make_unique<GapsState>();
   GapsState& g = *gaps_;
   g.smoke = gaps::SmokeField::of(mobile_ ? 48 : 78);  // MAX_PUFFS
-  g.renderer = &e.renderer;
+  g.renderer = &e.renderer();
   const kern::MeshData disc = smoke_disc();
   for (GapsState::Part* p : {&g.disc, &g.ember}) {
     kern::Material m;
@@ -139,15 +139,15 @@ void Game::gaps_init(kern::Engine& e) {
     m.double_sided = true;
     m.cast_shadow = false;
     if (p == &g.ember) m.emissive = {1.0f, 0.54f, 0.24f};  // 0xff8a3d, additive in SpawnCity
-    p->id = e.renderer.allocate_id();
+    p->id = e.renderer().allocate_id();
     kern::MeshLook look;
     look.material = m;
     look.extra_slot = kern::kMaxExtensionAttributes;
     look.visible = false;
     const Mat4 parked = Mat4::translate({0, 0, -1000});
-    if (!kern::upsert(e.renderer, p->id, disc, look, kern::Span<const f32>(parked.m, 16))) { e.renderer.release_id(p->id); p->id = 0; }
+    if (!kern::upsert(e.renderer(), p->id, disc, look, kern::Span<const f32>(parked.m, 16))) { e.renderer().release_id(p->id); p->id = 0; }
   }
-  gaps_lamps_init(e.renderer);  // street lamps (game_lamps.cpp)
+  gaps_lamps_init(e.renderer());  // street lamps (game_lamps.cpp)
   {
     // the GUIDED trail: soft light-grey puffs (0xd9dcdf, opacity .42, 1.6 m)
     kern::Material m;
@@ -156,18 +156,18 @@ void Game::gaps_init(kern::Engine& e) {
     m.double_sided = true;
     m.cast_shadow = false;
     m.color = {0.851f, 0.863f, 0.875f, 1};
-    g.trail_part.id = e.renderer.allocate_id();
+    g.trail_part.id = e.renderer().allocate_id();
     kern::MeshLook look;
     look.material = m;
     look.extra_slot = kern::kMaxExtensionAttributes;
     look.visible = false;
     const Mat4 parked = Mat4::translate({0, 0, -1000});
-    if (!kern::upsert(e.renderer, g.trail_part.id, disc, look, kern::Span<const f32>(parked.m, 16))) { e.renderer.release_id(g.trail_part.id); g.trail_part.id = 0; }
+    if (!kern::upsert(e.renderer(), g.trail_part.id, disc, look, kern::Span<const f32>(parked.m, 16))) { e.renderer().release_id(g.trail_part.id); g.trail_part.id = 0; }
     // the foot rocket's smoke (gameplay_final_runtime_v2.mjs ensureSmoke: 0xd8d8d8 sprites)
     m.color = {0.847f, 0.847f, 0.847f, 1};
     look.material = m;
-    g.rocket_part.id = e.renderer.allocate_id();
-    if (!kern::upsert(e.renderer, g.rocket_part.id, disc, look, kern::Span<const f32>(parked.m, 16))) { e.renderer.release_id(g.rocket_part.id); g.rocket_part.id = 0; }
+    g.rocket_part.id = e.renderer().allocate_id();
+    if (!kern::upsert(e.renderer(), g.rocket_part.id, disc, look, kern::Span<const f32>(parked.m, 16))) { e.renderer().release_id(g.rocket_part.id); g.rocket_part.id = 0; }
   }
 }
 

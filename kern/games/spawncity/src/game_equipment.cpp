@@ -238,8 +238,8 @@ void Game::ui_equipment(f32 dt) {
   const bool in_car = mode_ == Mode::car && !ui_.paused;
   if (in_car && engine_ && !web_audio_) {  // on the page with the original's sound, car_radio.mjs itself (game_audio_web.cpp)
     // car_radio.mjs: N / B, the pad's D-pad right / left (padTick; D-pad right pings as well, pad_actions.mjs)
-    const bool next = engine_->input.pressed(kern::Key::n) || pad.hit(kPadRight) || pad_touch_.take_pressed("radio");
-    const bool prev = engine_->input.pressed(kern::Key::b) || pad.hit(kPadLeft);
+    const bool next = engine_->input().pressed(kern::Key::n) || pad.hit(kPadRight) || pad_touch_.take_pressed("radio");
+    const bool prev = engine_->input().pressed(kern::Key::b) || pad.hit(kPadLeft);
     if (next || prev) ui_radio(next ? 1 : -1);
   }
   ui_.banner_age += dt;

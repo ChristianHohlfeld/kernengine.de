@@ -163,7 +163,7 @@ KERN_EXPORT(kern_app_start) i32 kern_app_start(i32 width, i32 height) {
   RendererOptions options = g_app->configure();
   options.width = width;
   options.height = height;
-  if (!engine.renderer.init(options, g_app->extensions())) return 0;
+  if (!engine.renderer().init(options, g_app->extensions())) return 0;
   if (!g_app->start(engine)) return 0;
   g_running = true;
   g_start_ms = g_last_ms = -1;
@@ -174,7 +174,7 @@ KERN_EXPORT(kern_app_start) i32 kern_app_start(i32 width, i32 height) {
 /// One display frame: update + render. Returns 0 when rendering failed.
 KERN_EXPORT(kern_app_frame) i32 kern_app_frame(f64 now_ms, i32 page_hidden) {
   if (!g_running) return 0;
-  g_engine->xr = false;
+  g_engine->set_xr(false);
   if (g_start_ms < 0) g_start_ms = g_last_ms = now_ms;
   Frame frame;
   frame.time = (now_ms - g_start_ms) / 1000.0;
@@ -182,34 +182,35 @@ KERN_EXPORT(kern_app_frame) i32 kern_app_frame(f64 now_ms, i32 page_hidden) {
   frame.index = g_frame++;
   g_last_ms = now_ms;
   g_app->update(*g_engine, frame);
-  g_engine->input.end_frame();
-  if (g_engine->renderer.lost()) return 1;
+  g_engine->input().end_frame();
+  if (g_engine->renderer().lost()) return 1;
   RenderParams params;
-  params.clear_color = g_engine->clear_color;
+  params.clear_color = g_engine->clear_color();
   params.page_hidden = page_hidden != 0;
   RenderStats stats;
-  if (g_engine->stereo && g_engine->renderer.width() >= 4) {
+  if (g_engine->stereo() && g_engine->renderer().width() >= 4) {
     // side by side: each half the camera's own view, the eye shifted half the eye distance along
     // the camera's right (parallel eyes, the same fov over half the width)
-    Camera& cam = g_engine->renderer.camera;
+    Camera cam = g_engine->renderer().camera();
     const Camera anchor = cam;
     const Vec3 f = normalize(anchor.target - anchor.eye, {0, 1, 0});
     const Vec3 r = normalize(cross(f, anchor.up), {1, 0, 0});
-    const i32 w = g_engine->renderer.width(), h = g_engine->renderer.height(), half = w / 2;
+    const i32 w = g_engine->renderer().width(), h = g_engine->renderer().height(), half = w / 2;
     bool ok = true;
     for (int e = 0; e < 2; ++e) {
-      const f32 side = (e == 0) != g_engine->stereo_cross ? -0.5f : 0.5f;
+      const f32 side = (e == 0) != g_engine->stereo_cross() ? -0.5f : 0.5f;
       cam = anchor;
-      cam.eye = anchor.eye + r * (side * g_engine->stereo_ipd);
-      cam.target = anchor.target + r * (side * g_engine->stereo_ipd);
+      cam.eye = anchor.eye + r * (side * g_engine->stereo_ipd());
+      cam.target = anchor.target + r * (side * g_engine->stereo_ipd());
       params.has_viewport = true;
       params.viewport = {e == 0 ? 0 : half, 0, e == 0 ? half : w - half, h};
-      ok = g_engine->renderer.render(params, stats) && ok;
+      g_engine->renderer().set_camera(cam);
+      ok = g_engine->renderer().render(params, stats) && ok;
     }
-    cam = anchor;
+    g_engine->renderer().set_camera(anchor);
     return ok ? 1 : 0;
   }
-  return g_engine->renderer.render(params, stats) ? 1 : 0;
+  return g_engine->renderer().render(params, stats) ? 1 : 0;
 }
 
 /// One WebXR frame: update once, then every eye. `views` holds `count` x 27 floats: the eye's
@@ -233,37 +234,37 @@ KERN_EXPORT(kern_app_frame_xr) i32 kern_app_frame_xr(f64 now_ms, i32 count, cons
     if (ql > 1e-6f) {
       q = {q.x / ql, q.y / ql, q.z / ql, q.w / ql};
       const Vec3 hf = q.rotate({0, 0, -1});
-      if (hf.x * hf.x + hf.z * hf.z > 1e-6f) g_engine->xr_head_yaw = std::atan2(-hf.x, -hf.z) * (180.0f / kPi);
+      if (hf.x * hf.x + hf.z * hf.z > 1e-6f) g_engine->set_xr_head_yaw(std::atan2(-hf.x, -hf.z) * (180.0f / kPi));
     }
   }
   g_app->update(*g_engine, frame);
-  g_engine->input.end_frame();
-  if (g_engine->renderer.lost()) return 1;
-  Camera& cam = g_engine->renderer.camera;
+  g_engine->input().end_frame();
+  if (g_engine->renderer().lost()) return 1;
+  Camera cam = g_engine->renderer().camera();
   const Camera anchor = cam;
   Vec3 f = anchor.target - anchor.eye;
   f.z = 0;
   f = normalize(f, {0, 1, 0});
   Vec3 up{0, 0, 1};
-  if (g_engine->xr_hold_room) f = normalize(Vec3{g_engine->xr_room_forward.x, g_engine->xr_room_forward.y, 0}, f);
-  else if (g_engine->xr_follow_head) {
+  if (g_engine->xr_hold_room()) f = normalize(Vec3{g_engine->xr_room_forward().x, g_engine->xr_room_forward().y, 0}, f);
+  else if (g_engine->xr_follow_head()) {
     // the body faces where the head does: the room is the body's heading less the head's yaw
-    const f32 a = -g_engine->xr_head_yaw * (kPi / 180.0f), c = std::cos(a), s = std::sin(a);
+    const f32 a = -g_engine->xr_head_yaw() * (kPi / 180.0f), c = std::cos(a), s = std::sin(a);
     f = normalize(Vec3{f.x * c - f.y * s, f.x * s + f.y * c, 0}, {0, 1, 0});
-  } else if (g_engine->xr_full_room) {
+  } else if (g_engine->xr_full_room()) {
     // the craft is the rest frame: the room pitches and rolls with the camera
     const Vec3 ff = normalize(anchor.target - anchor.eye, f);
     const Vec3 rr = normalize(cross(ff, anchor.up), Vec3{f.y, -f.x, 0});
     f = ff;
     up = cross(rr, ff);
   }
-  g_engine->xr_room_forward = f;
-  g_engine->xr_room_up = up;
+  g_engine->set_xr_room_forward(f);
+  g_engine->set_xr_room_up(up);
 
   const Vec3 r = normalize(cross(f, up), Vec3{f.y, -f.x, 0});
-  const f32 vig = g_engine->xr_vignette;
-  const u32 vig_mesh = g_engine->xr_vignette_mesh;
-  if (vig_mesh) g_engine->renderer.set_visible(vig_mesh, vig > 0.01f);
+  const f32 vig = g_engine->xr_vignette();
+  const u32 vig_mesh = g_engine->xr_vignette_mesh();
+  if (vig_mesh) g_engine->renderer().set_visible(vig_mesh, vig > 0.01f);
   // a WebXR vector (x right, y up, -z forward) in the world
   auto world = [&](Vec3 v) { return r * v.x + up * v.y + f * (-v.z); };
   bool ok = true;
@@ -281,7 +282,7 @@ KERN_EXPORT(kern_app_frame_xr) i32 kern_app_frame_xr(f64 now_ms, i32 count, cons
     cam.has_projection = true;
     std::memcpy(cam.projection.m, v, 16 * sizeof(f32));
     RenderParams params;
-    params.clear_color = g_engine->clear_color;
+    params.clear_color = g_engine->clear_color();
     params.has_viewport = true;
     params.reuse_shadow = i > 0;  // one sun shadow map per XR frame, not per eye
     if (vig_mesh && vig > 0.01f) {
@@ -290,53 +291,55 @@ KERN_EXPORT(kern_app_frame_xr) i32 kern_app_frame_xr(f64 now_ms, i32 count, cons
       const f32 d = std::fmax(0.3f, cam.near * 1.5f), half = (60.0f - 34.0f * std::fmin(vig, 1.0f)) * (kPi / 180.0f), sc = d * std::tan(half);
       const Vec3 c = eye + ef * d;
       const f32 m[16] = {er.x * sc, er.y * sc, er.z * sc, 0, ef.x, ef.y, ef.z, 0, eu.x * sc, eu.y * sc, eu.z * sc, 0, c.x, c.y, c.z, 1};
-      g_engine->renderer.update_instances(vig_mesh, {m, 16}, {});
+      g_engine->renderer().update_instances(vig_mesh, {m, 16}, {});
     }
     params.viewport = {static_cast<i32>(v[23]), static_cast<i32>(v[24]), static_cast<i32>(v[25]), static_cast<i32>(v[26])};
     RenderStats stats;
-    ok = g_engine->renderer.render(params, stats) && ok;
-    if (i == 0) { g_engine->xr = true; g_engine->xr_eye = cam.eye; g_engine->xr_forward = normalize(cam.target - cam.eye, {1, 0, 0}); }
+    g_engine->renderer().set_camera(cam);
+    ok = g_engine->renderer().render(params, stats) && ok;
+    if (i == 0) { g_engine->set_xr(true); g_engine->set_xr_eye(cam.eye); g_engine->set_xr_forward(normalize(cam.target - cam.eye, {1, 0, 0})); }
   }
-  if (g_engine->xr_scope && g_engine->xr_scope_fbo && g_engine->xr_scope_size > 0) {
+  if (g_engine->xr_scope() && g_engine->xr_scope_fbo() && g_engine->xr_scope_size() > 0) {
     // the scope's own picture after the eyes (their shadow map reused; the lens shows it next frame);
     // the comfort tunnel is the eyes', not the scope's
-    if (vig_mesh) g_engine->renderer.set_visible(vig_mesh, false);
-    cam = g_engine->xr_scope_camera;
+    if (vig_mesh) g_engine->renderer().set_visible(vig_mesh, false);
+    cam = g_engine->xr_scope_camera();
     cam.has_projection = false;
     RenderParams sp;
-    sp.clear_color = g_engine->clear_color;
+    sp.clear_color = g_engine->clear_color();
     sp.has_viewport = true;
     sp.reuse_shadow = true;
-    sp.framebuffer = g_engine->xr_scope_fbo;
-    sp.viewport = {0, 0, g_engine->xr_scope_size, g_engine->xr_scope_size};
+    sp.framebuffer = g_engine->xr_scope_fbo();
+    sp.viewport = {0, 0, g_engine->xr_scope_size(), g_engine->xr_scope_size()};
     RenderStats ss;
-    if (!g_engine->renderer.render(sp, ss)) g_engine->xr_scope = false;
+    g_engine->renderer().set_camera(cam);
+    if (!g_engine->renderer().render(sp, ss)) g_engine->set_xr_scope(false);
   }
-  cam = anchor;
+  g_engine->renderer().set_camera(anchor);
   return ok ? 1 : 0;
 }
 
 KERN_EXPORT(kern_app_resize) i32 kern_app_resize(i32 width, i32 height) {
   if (!g_running) return 0;
-  if (!g_engine->renderer.resize(width, height)) return 0;
+  if (!g_engine->renderer().resize(width, height)) return 0;
   g_app->resized(*g_engine);
   return 1;
 }
 
 KERN_EXPORT(kern_app_key) void kern_app_key(u32 key, i32 down) {
-  if (g_engine && key < static_cast<u32>(Key::count)) g_engine->input.key(static_cast<Key>(key), down != 0);
+  if (g_engine && key < static_cast<u32>(Key::count)) g_engine->input().key(static_cast<Key>(key), down != 0);
 }
 KERN_EXPORT(kern_app_pointer) void kern_app_pointer(f32 x, f32 y, f32 dx, f32 dy, u32 buttons) {
   if (!g_engine) return;
-  g_engine->input.pointer_move({x, y}, {dx, dy});
-  g_engine->input.pointer_buttons(buttons);
+  g_engine->input().pointer_move({x, y}, {dx, dy});
+  g_engine->input().pointer_buttons(buttons);
 }
-KERN_EXPORT(kern_app_wheel) void kern_app_wheel(f32 dy) { if (g_engine) g_engine->input.add_wheel(dy); }
-KERN_EXPORT(kern_app_touch) void kern_app_touch(i32 id, i32 phase, f32 x, f32 y) { if (g_engine) g_engine->input.touch(id, phase, {x, y}); }
-KERN_EXPORT(kern_app_focus) void kern_app_focus(i32 focused) { if (g_engine) g_engine->input.set_focus(focused != 0); }
+KERN_EXPORT(kern_app_wheel) void kern_app_wheel(f32 dy) { if (g_engine) g_engine->input().add_wheel(dy); }
+KERN_EXPORT(kern_app_touch) void kern_app_touch(i32 id, i32 phase, f32 x, f32 y) { if (g_engine) g_engine->input().touch(id, phase, {x, y}); }
+KERN_EXPORT(kern_app_focus) void kern_app_focus(i32 focused) { if (g_engine) g_engine->input().set_focus(focused != 0); }
 KERN_EXPORT(kern_app_stop) void kern_app_stop() {
   if (!g_running) return;
   g_app->stop(*g_engine);
-  g_engine->renderer.shutdown();
+  g_engine->renderer().shutdown();
   g_running = false;
 }

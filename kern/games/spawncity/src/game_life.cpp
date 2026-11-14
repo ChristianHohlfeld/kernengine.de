@@ -151,8 +151,8 @@ void Game::life_update(f32 dt) {
   GameLife& G = *glife_;
   if (!G.ready) {
     G.life.init(world_->physics(), mobile_);
-    G.art_ready = G.art.init(engine_->renderer);
-    G.interiors.init(engine_->renderer, world_->physics());
+    G.art_ready = G.art.init(engine_->renderer());
+    G.interiors.init(engine_->renderer(), world_->physics());
     G.ready = true;
   }
   if (!G.sounds_ready && mixer_.ready()) { make_sounds(mixer_, G.clips); G.sounds_ready = true; }

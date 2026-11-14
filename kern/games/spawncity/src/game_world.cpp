@@ -91,7 +91,7 @@ void Game::update_world(f32 dt) {
   if (!life_ || !world_placed_) return;
   WorldLife& L = *life_;
   if (!L.sounds.ready && mixer_.ready()) init_world_sounds(mixer_, L.sounds);
-  if (!L.art_ready) L.art_ready = L.art.init(engine_->renderer);
+  if (!L.art_ready) L.art_ready = L.art.init(engine_->renderer());
   L.marks.update(world_->sim_time(), city_, world_->physics());
   update_traffic_world(dt);
   const Terrain& t = city_.terrain();

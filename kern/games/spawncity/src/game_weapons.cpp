@@ -92,7 +92,7 @@ bool Game::game_weapon_in_hand() const { return mode_ == Mode::foot && !hitscan_
 
 Vec3 Game::aim_ray(Vec3& dir) const {
   // touch: the shot goes through the finger (foot_touch_controller.mjs fireAt, game_controls.cpp)
-  if (ctl_.aim_point || (engine_ && engine_->xr)) { Vec3 from; ctl_screen_ray(ctl_.aim_x, ctl_.aim_y, from, dir); return from; }
+  if (ctl_.aim_point || (engine_ && engine_->xr())) { Vec3 from; ctl_screen_ray(ctl_.aim_x, ctl_.aim_y, from, dir); return from; }
   dir = kern::normalize(cam_.target - cam_.eye, {1, 0, 0});
   return cam_.eye;
 }

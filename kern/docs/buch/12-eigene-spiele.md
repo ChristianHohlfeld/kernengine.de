@@ -256,7 +256,7 @@ abdeckt. Breite und Höhe trägt die Engine selbst ein.
 
 ```cpp
   bool start(Engine& engine) override {
-    Renderer& r = engine.renderer;
+    Renderer& r = engine.renderer();
     ground_ = r.allocate_id();
     MeshInput g = ground_mesh_.as_input();
     g.material.color = {0.42f, 0.47f, 0.40f, 1};
@@ -286,7 +286,7 @@ vorher.
 
 ```cpp
   void update(Engine& engine, const Frame& frame) override {
-    Input& in = engine.input;
+    Input& in = engine.input();
     if (in.button(0)) yaw_ -= in.pointer_delta().x * 0.005f;
     if (in.down(Key::left)) yaw_ += frame.dt * 1.5f;
     if (in.down(Key::right)) yaw_ -= frame.dt * 1.5f;
@@ -297,16 +297,17 @@ Gehaltene linke Maustaste dreht um die Bewegung des Zeigers, die Pfeiltasten dre
 (mit `frame.dt` unabhängig von der Bildrate), das Mausrad ändert den Abstand zwischen 8 und 80 m.
 
 ```cpp
-    Camera& c = engine.renderer.camera;
+    Camera c = engine.renderer().camera();
     c.target = {0, 0, 1};
     c.eye = {std::cos(yaw_) * distance_, std::sin(yaw_) * distance_, distance_ * 0.6f};
+    engine.renderer().set_camera(c);
 ```
 
-Die Kamera ist ein Feld des Renderers: Augpunkt, Ziel (und Sichtfeld, Near, Far). Z zeigt nach oben.
+Die Kamera gehört zum Renderer (`camera()`, `set_camera()`): Augpunkt, Ziel (und Sichtfeld, Near, Far). Z zeigt nach oben.
 
 ```cpp
     layout(static_cast<f32>(frame.time));
-    engine.renderer.update_instances(boxes_, Span<const f32>(transforms_.data(), transforms_.size()),
+    engine.renderer().update_instances(boxes_, Span<const f32>(transforms_.data(), transforms_.size()),
                                      Span<const f32>(tints_.data(), tints_.size()));
 ```
 
@@ -316,7 +317,7 @@ Unveränderte Instanzen erkennt der Renderer und lädt sie nicht erneut.
 ```cpp
     if (in.button_pressed(0)) {
       PickHit hit;
-      if (engine.renderer.pick(in.pointer().x, in.pointer().y, {}, hit) && hit.mesh == boxes_) {
+      if (engine.renderer().pick(in.pointer().x, in.pointer().y, {}, hit) && hit.mesh == boxes_) {
         tints_[hit.instance * 4 + 0] = 1.0f; tints_[hit.instance * 4 + 1] = 0.25f; tints_[hit.instance * 4 + 2] = 0.2f;
       }
     }
@@ -443,8 +444,8 @@ Touch: linke Bildschirmhälfte lenkt und gibt Gas (Ausschlag ab dem Aufsetzpunkt
 
 ```cpp
   void update(Engine& engine, const Frame& frame) override {
-    Renderer& r = engine.renderer;
-    Input& in = engine.input;
+    Renderer& r = engine.renderer();
+    Input& in = engine.input();
     const f32 dt = frame.dt;
     if (in.pressed(Key::enter)) new_run(engine, rng_.next());
     if (in.pressed(Key::n)) fast_time_ = !fast_time_;
@@ -519,9 +520,12 @@ wird gemischt, ebenso Himmel-, Boden- und Nebelfarbe, Umgebungslicht und Belicht
     l.sun_direction = sun.z > -0.04f ? sun : moon;
     l.sun_color = mix3(mix3(day_sun, dusk_sun, dusk), moon_light, night);
     ...
-    r.sky.sun = sun;
-    r.sky.moon = moon;
-    r.sky.night = night;
+    r.set_lighting(l);
+    SkyState sky = r.sky();
+    sky.sun = sun;
+    sky.moon = moon;
+    sky.night = night;
+    r.set_sky(sky);
     windows_.night = night;
 ```
 
