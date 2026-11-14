@@ -8612,6 +8612,9 @@ class TestWriter:
             d = tree.records.get(t)
             if t.startswith(ENGINE + "::logic::"):
                 return   # (the engine's logic - how C++ calls a Blueprint: in a test the engine's own, which runs the Blueprints)
+            parts = t.split("::")
+            if t.startswith(ENGINE + "::") and any("::".join(parts[:i]) in tree.records and u.engine_object("::".join(parts[:i])) for i in range(2, len(parts))):
+                return   # (what an object of the engine has inside it - LightPool::Request -: its stand-in has none of it)
             if q in vectors or d is None or t in G.records or d.get("_at", (None, None))[1] is None or t in u.objects_seen or t in G.objects or q in tree.local_types:
                 return   # (of the engine's classes with a life of their own the test has stand-ins: see stand_ins)
             G.records.add(t)
@@ -8678,6 +8681,8 @@ class TestWriter:
                 return   # (a node of the engine - a method of its object, defined in its header or not: the test has its stand-in)
             f = converted.get(d["id"])
             owner = tree.owner.get(d["id"]) or tree.owner.get(i)
+            if (d.get("kind") == "CXXConstructorDecl" or d.get("isImplicit") or d.get("name") == "operator=") and (owner or "").startswith(ENGINE + "::") and u.engine_object(owner):
+                return   # (an object of the engine is made, set and ended by its stand-in: <class>.make, <class>.release)
             if owner in vectors:
                 return   # (what a vector does: converted.h has it, as the nodes do it)
             if f is None and not owner and tree.scope_of.get(d["id"], "").startswith(ENGINE + "::") and d.get("name") in VECTOR_FUNCTIONS and re.search(r"\bVec[23]\b", qtype(d)):
