@@ -1104,7 +1104,9 @@ bool split_library_function(std::string_view name, std::string& library, std::st
   function = std::string(name.substr(at + 2));
   return true;
 }
-bool calls_function(const Node& n) { return n.type == "func.call" || n.type == "func.pure"; }
+// (a node that runs a function of the Blueprint: a call - and Sort List with its order, which it asks
+// again and again: a library's function it names comes along like one it calls)
+bool calls_function(const Node& n) { return n.type == "func.call" || n.type == "func.pure" || (n.type == "list.sort" && !n.param("function").empty()); }
 bool same_pins(const std::vector<FunctionPin>& a, const std::vector<FunctionPin>& b) {
   if (a.size() != b.size()) return false;
   for (std::size_t k = 0; k < a.size(); ++k)

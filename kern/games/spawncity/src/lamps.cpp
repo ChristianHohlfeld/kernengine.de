@@ -102,7 +102,7 @@ bool Field::set_state(i32 i, u8 state) {
 
 std::vector<std::pair<i64, u8>> Field::broken_list() const {
   std::vector<std::pair<i64, u8>> out(broken_.begin(), broken_.end());
-  std::sort(out.begin(), out.end());
+  std::stable_sort(out.begin(), out.end(), [](const std::pair<i64, u8>& a, const std::pair<i64, u8>& b) { return a.first < b.first || (!(b.first < a.first) && a.second < b.second); });
   return out;
 }
 

@@ -270,7 +270,7 @@ Vec2 spawn_ring_offset(u32 slot) {
 namespace {
 /// A roster as the vote compares it: in order, each player once.
 void roster(std::vector<u8>& members) {
-  std::sort(members.begin(), members.end());
+  std::stable_sort(members.begin(), members.end());
   members.erase(std::unique(members.begin(), members.end()), members.end());
 }
 }  // namespace

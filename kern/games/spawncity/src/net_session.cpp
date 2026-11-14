@@ -244,7 +244,7 @@ i32 Session::remote_index(u8 slot) const {
 std::vector<u8> Session::roster() const {
   std::vector<u8> r{self_slot_};
   for (const Remote& x : remotes_) r.push_back(x.state.slot);
-  std::sort(r.begin(), r.end());
+  std::stable_sort(r.begin(), r.end());
   r.erase(std::unique(r.begin(), r.end()), r.end());
   return r;
 }

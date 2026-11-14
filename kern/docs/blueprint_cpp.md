@@ -316,6 +316,14 @@ void on1(Actor actor, Float value, Text text) {
   waren), `list_reserve(Scores, 64);` (Platz vorhalten: Nichts, was man lesen kann, ändert sich –
   die Liste wächst danach so weit, ohne noch einmal Speicher anzufordern). Eine Schleife aus
   einzelnen Add wächst mehrmals; darum gibt es diese Schritte.
+- **Ordnen.** Sort List bringt eine Liste an ihrem Platz in eine Reihenfolge, stabil (gleiche Einträge
+  behalten ihre): `list_sort<nullptr>(Scores);` nach der eigenen Ordnung der Einträge (Zahlen, ganze
+  Zahlen, Flags, Texte, Werte von Aufzählungen, Int64 nach den Bits als `u64`), oder
+  `list_sort<&Board::Before>(*this, Scores);` nach einer reinen Funktion des Blueprints, die zwei
+  Einträge nimmt (als Wert oder als const-Referenz) und ein Flag gibt: Steht der erste vor dem
+  zweiten? `*this` ist das Objekt, auf dem sie läuft – die Klasse, in der der Aufruf steht, auch
+  wenn sie eine Bibliothek ist, die andere Blueprints benutzen (deren Funktion kommt dann mit, wie
+  eine, die sie aufruft). In C++ ist das `std::stable_sort(v.begin(), v.end(), before)`.
 - **Die generischen Knoten** (Length, Get Item, Contains, Find, Make List, For Each, auch Select
   und Reroute) tragen den Typ als Einstellung; im Editor nimmt ein solcher Knoten den Typ des
   ersten Drahts an, der an ihn kommt.

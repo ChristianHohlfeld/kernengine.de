@@ -13,6 +13,8 @@ namespace sc {
 using kern::game::ActorId;
 
 namespace {
+/// The minimap's draw order of a feature's kind, as the original's map layers stand (water, green, roads, buildings).
+int map_layer(char kind) { return kind == 'w' ? 0 : kind == 'g' ? 1 : kind == 'r' ? 2 : 3; }
 // police_ground_units.mjs
 constexpr f32 kStopFoot = 17, kEngageMin = 6, kEngageMax = 15, kReturnM = 42, kRunMps = 3.7f;
 constexpr f32 kSpawnMin = 70, kSpawnMax = 125, kDespawn = 230, kPathSeconds = 1.8f, kSightSeconds = 0.3f;
@@ -1072,11 +1074,10 @@ std::string Game::minimap_json() {
     }
   }
   std::erase_if(feats, [&](const Feat& f) { return f.d > range; });
-  std::sort(feats.begin(), feats.end(), [](const Feat& a, const Feat& b) { return a.d < b.d; });
+  std::stable_sort(feats.begin(), feats.end(), [](const Feat& a, const Feat& b) { return a.d < b.d; });
   if (feats.size() > 80) feats.resize(80);
   // draw order of the original: the map's layer order (water, green, roads, buildings)
-  auto order = [](char k) { return k == 'w' ? 0 : k == 'g' ? 1 : k == 'r' ? 2 : 3; };
-  std::stable_sort(feats.begin(), feats.end(), [&](const Feat& a, const Feat& b) { return order(a.kind) < order(b.kind); });
+  std::stable_sort(feats.begin(), feats.end(), [](const Feat& a, const Feat& b) { return map_layer(a.kind) < map_layer(b.kind); });
   // the subject's heading (compass degrees) and the view's (the minimap turns with the look)
   const Vec3 look = cam_.target - cam_.eye;
   auto compass = [](f32 x, f32 y) { return 90.0f - std::atan2(y, x) * 180.0f / kPi; };

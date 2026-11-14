@@ -841,9 +841,11 @@ void add_lists(Library& lib) {
       const Function* f = g.function(fn);
       if (!f) return "Order: there is no function \"" + fn + "\"";
       if (!f->pure) return "Order: " + fn + " is to be pure (it is asked again and again while the list is put in order)";
-      const bool takes = f->inputs.size() == 2 && f->inputs[0].type == e && f->inputs[1].type == e && f->inputs[0].of == named.of && f->inputs[1].of == named.of && !f->inputs[0].ref && !f->inputs[1].ref;
+      // (by value or as a const reference: it reads them where they stand, it changes nothing)
+      auto item = [&](const FunctionPin& in) { return in.type == e && in.of == named.of && (!in.ref || in.constant); };
+      const bool takes = f->inputs.size() == 2 && item(f->inputs[0]) && item(f->inputs[1]);
       if (!takes || f->outputs.size() != 1 || f->outputs[0].type != PinType::boolean)
-        return "Order: " + fn + " takes two items of the list (by value) and gives one Bool";
+        return "Order: " + fn + " takes two items of the list (by value or as const references) and gives one Bool";
       return {};
     };
     d.run = [](Context& c) {

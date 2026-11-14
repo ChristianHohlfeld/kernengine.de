@@ -3882,7 +3882,7 @@ TEST(logic_native_blueprints) {
   CHECK(logic::native_glue(logic_graph(R"({"variables":[{"name":"A","type":"float","value":0}],
       "nodes":[{"id":7,"type":"var.set","params":{"variable":"A"}},{"id":5,"type":"event.custom","params":{"name":"Hit"}}],"links":[[5,"then",7,"exec"],[5,"value",7,"value"]]})"), "X", glue, &why));
   CHECK(glue.find("case 1: self.on5(native_out<kern::logic::ActorHandle>(*self.kern_world.instance, 1, 1), native_out<kern::f64>(*self.kern_world.instance, 1, 2), "
-                  "native_out<std::string>(*self.kern_world.instance, 1, 3)); break;  // Event Hit") != std::string::npos);
+                  "native_out<kern::logic::Text>(*self.kern_world.instance, 1, 3)); break;  // Event Hit") != std::string::npos);
 }
 
 TEST(game_blueprints_as_classes) {
@@ -4353,7 +4353,7 @@ TEST(logic_maps_and_sets) {
     logic::Graph g, back;
     std::string error, text, twice;
     CHECK(read(in_event("    map_set(Scores, 7, value);\n    map_add(Cells, \"a\");\n    Cells[0].Count += 1;\n    list_add(Cells[0].Tags, text);\n"
-                        "    map_set(Lists, Kind::B, List<Float>{value, 2.5});\n    set_add(Seen, Int64{0x10000000000000});\n    map_set(Big, Int64{0x20000000000001}, \"far\");\n"
+                        "    map_set(Lists, Kind::B, list_make<Float, \"2\">(value, 2.5));\n    set_add(Seen, Int64{0x10000000000000});\n    map_set(Big, Int64{0x20000000000001}, \"far\");\n"
                         "    Got = map_find<Int, Float>(Scores, 7).value;\n    N = map_length<Int, Float>(Scores);\n    map_remove(Scores, 3);\n    set_remove_at(Seen, 0);"),
                g, error));
     if (!error.empty()) std::printf("%s\n", error.c_str());

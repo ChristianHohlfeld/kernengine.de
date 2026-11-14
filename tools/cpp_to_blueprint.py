@@ -2067,7 +2067,7 @@ def callee_name(n):
 CAST = ("ImplicitCastExpr", "CXXStaticCastExpr", "CStyleCastExpr", "CXXFunctionalCastExpr")
 # (The language has no step that puts a list in an order: a loop of Blueprint steps would cost more than the
 # library's sort - and of entries the order says are equal, std::sort leaves their order to the library.)
-ORDER_WAIT = "algorithm: std::{} (a list put in an order: the language has no step for it)"
+ORDER_WAIT = "algorithm: std::{} (it leaves the order of equal entries open - std::stable_sort is Sort List)"
 COMPARE = ("<", "<=", ">", ">=", "==", "!=")
 
 
@@ -3428,7 +3428,7 @@ class Emit:
                 tmp = self.temp("swapped", t)
                 return [f"{tmp} = {self.ex(a, t)};"] + self.store(a, lambda want: self.ex(b, want)) + self.store(b, self.typed(tmp, t))
             if name in ("sort", "stable_sort") and not self.own(ref.get("id")):
-                raise Wait(ORDER_WAIT.format(name))
+                return self.sorted_list(name, kids(n)[1:])
             if name in ("memmove", "memcpy") and len(kids(n)) == 4 and not self.own(ref.get("id")) and self.byte_places(kids(n)[1:3]) is not None:
                 return self.moved_bytes(name, kids(n)[1:])
             if name in ("memset", "memcpy") and len(kids(n)) == 4 and not self.own(ref.get("id")):
@@ -4550,6 +4550,49 @@ class Emit:
         if it not in ("Int", "Float", "Bool") and it not in self.u.enum_values and not self.is64(x):
             raise Wait(f"algorithm: std::find of a {it}")
         return self.bx({"kind": "BinaryOperator", "opcode": "==", "type": {"qualType": "bool"}, "inner": [x, y]})
+
+    def sorted_list(self, name, a):
+        """std::stable_sort(v.begin(), v.end()[, before]): Sort List - the list put in order where it stands,
+        stably, as std::stable_sort does: by the function it is given (a lambda that takes two entries and
+        gives whether the first goes before the second: a pure function of the Blueprint, asked again and
+        again), or by the entries' own < (numbers, whole numbers, flags, texts, enum values, Int64).
+        std::sort leaves the order of equal entries open: it waits."""
+        if name == "sort":
+            raise Wait(ORDER_WAIT.format(name))
+        if len(a) not in (2, 3):
+            raise Wait(f"algorithm: std::{name} with {len(a)} arguments")
+        ends = []
+        for x, want in ((a[0], "begin"), (a[1], "end")):
+            b = self.unwrap(x)
+            while b.get("kind") in ("CXXConstructExpr", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr", "ImplicitCastExpr") and len(kids(b)) == 1:
+                b = self.unwrap(kids(b)[0])
+            m = callee(b) if b.get("kind") == "CXXMemberCallExpr" else {}
+            if m.get("name") != want or not kids(m) or len(kids(b)) != 1:
+                raise Wait(f"algorithm: std::{name} of a part of a list (Sort List orders the whole list: begin() to end())")
+            ends.append(kids(m)[0])
+        if not self.same_list(ends[0], ends[1]):
+            raise Wait(f"algorithm: std::{name} between two lists")
+        lst = ends[0]
+        lt = self.tp(lst)
+        if not lt.startswith("List<"):
+            raise Wait(f"algorithm: std::{name} of a {lt}")
+        it = lt[5:-1]
+        if len(a) == 2:
+            if it not in ("Int", "Float", "Bool", "Text", "Int64") and it not in self.u.enum_values:
+                raise Wait(f"algorithm: std::{name} of {it} by its own < (a list of {it} has no order of its own: a function says it)")
+            order = "nullptr"
+        else:
+            g, given, lines = self.function_value(name, a[2])
+            if given or lines:
+                raise Wait(f"algorithm: std::{name} with an order that uses what the function it stands in has (an order is a function of its two entries alone)")
+            self.f.calls.append(g)
+            if g.wait is not None:
+                raise Wait(f"it calls {g.cpp}(), which waits")
+            if g.text is None or not g.pure or g.result != "Bool" or len(g.params) != 2 or any(t != it for _, t in g.params) or any(k == "ref" for k in g.kinds):
+                raise Wait(f"algorithm: std::{name} with an order that is no pure function of two {it} giving a Bool")
+            order = f"&{self.u.name}::{g.name}"
+        before, lv, after = self.variable_of(lst, lt)
+        return before + [f"list_sort<{order}>({'*this, ' if order != 'nullptr' else ''}{lv});"] + after
 
     def first_match(self, name, a):
         """std::find(first, last, x) / std::find_if(first, last, f) / std::find_if_not: the place of the first

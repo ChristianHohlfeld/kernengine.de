@@ -1091,7 +1091,10 @@ static json::Value retyped_default(const logic::Graph& g, const json::Value& val
   // (what the place held - a list of a fixed length with all its entries, also those its default
   // does not say - as the new type holds it: a list of a fixed length at its length)
   if (same) return logic::fitted(logic::Value::from_json(value, from, g), to, g).to_json(g, to);
-  return logic::Value::from_json(logic::Value::from_json(value, from, g).converted(to.type).to_json(), to, g).to_json(g, to);
+  // (a list of another kind of entries: each entry as the new kind reads it - numbers stay numbers)
+  const logic::Value held = logic::Value::from_json(value, from, g);
+  const logic::Value as = logic::is_list(from.type) && logic::is_list(to.type) ? held : held.converted(to.type);
+  return logic::Value::from_json(as.to_json(), to, g).to_json(g, to);
 }
 
 /// Everything in the Blueprint that holds a value: the defaults of variables, of functions' pins

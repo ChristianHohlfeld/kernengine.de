@@ -67,7 +67,7 @@ void Marks::add_soot(Vec3 at, f32 r, const std::vector<CityStream::Wall>& walls,
     if (side <= 0.05f || u < 0 || u > wl.len) continue;
     if (side < r * 0.55f) cand.push_back({&wl, u, side});
   }
-  std::sort(cand.begin(), cand.end(), [](const C& a, const C& b) { return a.d < b.d; });
+  std::stable_sort(cand.begin(), cand.end(), [](const C& a, const C& b) { return a.d < b.d; });
   i32 placed = 0;
   for (const C& c : cand) {
     if (placed >= 2) break;
@@ -99,7 +99,7 @@ void Marks::add_breach(Vec3 at, f32 r, f32 strength, const std::vector<CityStrea
     if (side <= -0.3f || u < 0 || u > wl.len) continue;
     if (side < r * 0.5f) cand.push_back({&wl, u, std::fmax(0.0f, side)});
   }
-  std::sort(cand.begin(), cand.end(), [](const C& a, const C& b) { return a.d < b.d; });
+  std::stable_sort(cand.begin(), cand.end(), [](const C& a, const C& b) { return a.d < b.d; });
   i32 placed = 0;
   for (const C& c : cand) {
     if (placed >= 2) break;

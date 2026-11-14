@@ -253,6 +253,14 @@ std::string settings_of(const NodeDef& def, const Node& n, const Graph& g, const
   return r.empty() ? r : r + ">";
 }
 /// Does a node of this kind name a place (a variable and a path from it: ParamDef::Kind::path)?
+/// Does the node run a function of the Blueprint that a setting names (Sort List's Order)? Its call
+/// then begins with the object the function runs on: list_sort<&Board::Before>(*this, Scores).
+bool runs_function(const NodeDef& def, const Node& n) {
+  if (def.type.rfind("func.", 0) == 0) return false;   // (a call is written as the function's own call)
+  for (const ParamDef& pd : def.params)
+    if (pd.kind == ParamDef::Kind::function && !n.param(pd.key, pd.def).empty()) return true;
+  return false;
+}
 bool names_place(const NodeDef& def) {
   for (const ParamDef& pd : def.params)
     if (pd.kind == ParamDef::Kind::path) return true;
@@ -1492,6 +1500,7 @@ struct Writer {
     std::vector<std::string> head;
     if (at(x).member) head.push_back("n" + id(x));
     if (at(x).exec_in.size() >= 2) head.push_back(definition ? std::string("entry") : text_literal(at(x).in[static_cast<std::size_t>(entry)].id));
+    if (runs_function(*at(x).def, *at(x).node)) head.push_back("*this");
     if (names_place(*at(x).def)) head.push_back(place_text(x, c));
     else
       for (std::string& v : variables_of(*at(x).def, *at(x).node)) head.push_back(std::move(v));
@@ -3339,7 +3348,16 @@ struct Reader {
   /// The arguments of a step in front of its values: its member n<id>, the exec input it is
   /// entered through when it has several, then the variable it changes. `entry`: that input
   /// ("": the first).
-  bool head(int node, Args& a, std::string& entry) { return member_and_entry(node, a, entry) && variable_args(node, a); }
+  bool head(int node, Args& a, std::string& entry) { return member_and_entry(node, a, entry) && object_arg(node, a) && variable_args(node, a); }
+  /// `*this` - the object the function a setting names runs on (runs_function), where the node has one.
+  bool object_arg(int node, Args& a) {
+    const Made& m = made[static_cast<std::size_t>(node)];
+    if (!runs_function(*m.def, m.node)) return true;
+    if (!a.more() || !is("*") || peek(1).kind != Tok::id || peek(1).s != "this")
+      return fail(p, node_name(m.def->type) + ": its function runs on the Blueprint's object, which comes first: *this");
+    p += 2;
+    return true;
+  }
   bool member_and_entry(int node, Args& a, std::string& entry) {
     const Made& m = made[static_cast<std::size_t>(node)];
     if (!member_arg(node, a)) return false;

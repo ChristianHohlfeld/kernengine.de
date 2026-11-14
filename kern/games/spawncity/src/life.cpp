@@ -176,7 +176,7 @@ void Life::rebuild_herds(const LifeView& view, const CityStream& city, f32 now) 
     if (d > kHerdRadius + std::sqrt(area)) continue;
     cand.push_back({std::move(m), d});
   }
-  std::sort(cand.begin(), cand.end(), [](const Cand& a, const Cand& b) { return a.d < b.d; });
+  std::stable_sort(cand.begin(), cand.end(), [](const Cand& a, const Cand& b) { return a.d < b.d; });
   // keep the cows of herds that stay (dead ones keep their bodies), add the new herds
   std::vector<Cow> next;
   std::vector<Meadow> meadows;
