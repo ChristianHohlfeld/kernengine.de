@@ -705,6 +705,7 @@ class World:
         self.function_units = {}   # a function's key -> the Blueprint it stands in (see unit_of_function)
         self.source_units = set()  # the Blueprints of source files: what stands there, a test in another file does not hold
         self.actors = {}       # the level's actors with a Blueprint: name -> {"library": does it keep nothing, "functions": {name: ([inputs], [outputs])}}
+        self.pointer_lists = {}    # (a function's key, the place of a parameter that is a pointer into a list) -> the length of the list every call hands it ("list": any; "mixed", "other": see main)
 
     def program(self, file):
         """Is this a file of the program itself - one of those to convert as a whole?"""
@@ -2039,6 +2040,13 @@ class Emit:
                 # a pointer into a list: the list, read where it stands, and the place in it (Unit.pointed)
                 if p["id"] in assigned:
                     raise Wait("a pointer that is moved (the place it holds changes)")
+                into = u.world.pointer_lists.get((f.key, [x["id"] for x in kids(d) if x.get("kind") == "ParmVarDecl"].index(p["id"])), "list")
+                if into == "mixed":
+                    raise Wait("a pointer into lists of different lengths (the language has no view of a list: a reference input is one type)")
+                if into == "other":
+                    raise Wait("a pointer into something that is no list (the address of a value)")
+                if isinstance(into, int):
+                    f.fixed[len(f.params)] = into   # (the list it points into: of that fixed length, as every call hands it)
                 lname = u.fresh(p.get("name") or f"arg{len(f.params) + 1}", self.taken)
                 self.taken.add(lname)
                 aname = u.fresh(lname + "_at", self.taken)
@@ -3872,12 +3880,12 @@ class Emit:
         b = self.unwrap(n)
         return self.pointers.get(b.get("referencedDecl", {}).get("id")) if b.get("kind") == "DeclRefExpr" else None
 
-    def pointer_arg(self, a, entries):
+    def pointer_arg(self, a, entries, fixed=None):
         """What a call hands a pointer into a list (Unit.pointed): [the list, the place in it] - the list where it
-        stands, read there (nothing is copied)."""
+        stands, read there (nothing is copied). `fixed`: the input is a list of that fixed length."""
         lt = f"List<{entries}>"
-        if self.nothing(a):
-            return [f"{lt}{{}}", "-1"]
+        if self.nothing(a):   # (null: no place - in a list of nothing)
+            return [self.temp("none", lt, fixed), "-1"]
         lst, at = self.place(a)
         if self.tp(lst) != lt:
             raise Wait("a pointer into a list of entries of another type")
@@ -4512,6 +4520,8 @@ class Emit:
             else:
                 base, idx = kids(t)
             base = self.unwrap(base) if not self.is_this(base) else base
+            if self.is_vec(base) and self.ctype(base) != "kern::Vec3":
+                raise Wait("a component of a vector by its number is set")
             if self.is_vec(base):
                 # a component of a vector by its number, as the vector's operator[] picks it (0: x, 1: y, any
                 # other: z) - the number and the value worked out once, the vector set anew where it stands
@@ -4577,7 +4587,7 @@ class Emit:
         j = 0
         for a in args:
             if first + j in g.pointers:   # (a pointer into a list: the list and the place in it - Unit.pointed)
-                texts += self.pointer_arg(a, params[j][1][5:-1])
+                texts += self.pointer_arg(a, params[j][1][5:-1], g.fixed.get(first + j))
                 j += 2
                 continue
             (_, pt), kind = params[j], kinds[j]
@@ -6155,6 +6165,8 @@ class TestWriter:
                 name = (callee.get("referencedDecl") or {}).get("name")
             if name == "operator[]" and KEYED.match(self.u.clean(qtype(ks[1]))):
                 pass   # (m[key] is said for every key)
+            elif name == "operator[]" and self.u.clean(qtype(ks[1])) == "kern::Vec3":
+                pass   # (a vector's component by its number: x, y - and z for any other number; there for every call)
             elif (k == "ArraySubscriptExpr" or name == "operator[]") and within(*ks[-2:]):
                 pass   # (an entry of an array of fixed length at a constant place inside it: there for every call)
             elif k == "ArraySubscriptExpr" and into_list(ks[0]):
@@ -7008,7 +7020,9 @@ class TestWriter:
                         lst, at = f"a{len(names)}", f"a{len(names) + 1}"
                         types += [f"std::vector<{inner}>", "long long"]
                         # (never empty - an empty list's data() may be null -; now and then null itself, the place -1)
-                        decl_lines += [f"std::vector<{inner}> {lst} = draw_list(draw, [&]() -> {inner} {{ return {self.draw(entry)}; }}); {lst}.push_back({self.draw(entry)});",
+                        n_fixed = f.fixed.get(len(names))   # (the list it points into has a fixed length: that many entries)
+                        decl_lines += [f"std::vector<{inner}> {lst}({n_fixed}); for (auto& e : {lst}) e = {self.draw(entry)};" if n_fixed else
+                                       f"std::vector<{inner}> {lst} = draw_list(draw, [&]() -> {inner} {{ return {self.draw(entry)}; }}); {lst}.push_back({self.draw(entry)});",
                                        f"const long long {at} = draw.below(8) == 0 ? -1 : static_cast<long long>(draw.below(static_cast<u32>({lst}.size()) + 1));"]
                         names += [lst, at]
                         held_lists.append(lst)
@@ -7327,6 +7341,36 @@ def declared_in_header_of(tree, d):
 
 
 # ---- the program ---------------------------------------------------------------------------------
+POINTER_PARAM = re.compile(r"const\s+(?!void\s*\*|char\s*\*)[^*&]+?\s*\*$")   # (a parameter that may be a pointer into a list: Unit.pointed)
+
+
+def pointer_source(tree, a):
+    """What a call hands a parameter that may be a pointer into a list (Unit.pointed), for the plan of the whole
+    program: the fixed length of the list it points into (a.data() of a std::array<T, N>, an array T[N]),
+    "list" (one of any length: a std::vector), "null", ("param", id) - the caller's own such parameter -, or
+    "other" (the address of anything else)."""
+    x = bare(a)
+    while x.get("kind") in ("ImplicitCastExpr", "ParenExpr") and x.get("castKind") != "ArrayToPointerDecay" and kids(x):
+        x = bare(kids(x)[0])
+    k = x.get("kind")
+    def length(raw):
+        c = re.sub(r"\b(const|volatile)\b|&", " ", raw).strip()
+        m = re.match(r"std::array<.*,\s*(\d+)U?L*>$", c) or re.match(r"[^\[]*\[(\d+)\]$", c)
+        return int(m.group(1)) if m else "list" if c.startswith("std::vector<") else "other"
+    if k in ("CXXNullPtrLiteralExpr", "GNUNullExpr"):
+        return "null"
+    if k == "CXXMemberCallExpr" and callee(x).get("name") == "data" and len(kids(x)) == 1 and kids(callee(x)):
+        return length(qtype(kids(callee(x))[0]))
+    if k == "ImplicitCastExpr" and x.get("castKind") == "ArrayToPointerDecay" and kids(x):
+        return length(qtype(kids(x)[0]))
+    if k == "BinaryOperator" and x.get("opcode") in ("+", "-") and len(kids(x)) == 2:
+        left, right = kids(x)
+        return pointer_source(tree, left if "*" in qtype(left) else right)
+    if k == "DeclRefExpr" and (x.get("referencedDecl") or {}).get("kind") == "ParmVarDecl":
+        return ("param", x["referencedDecl"]["id"])
+    return "other"
+
+
 def survey_one(job):
     """One source file as the compiler reads it, for the plan of the whole program: the functions that
     have a body there (their key, their file, the functions they call - with a body or only declared) and
@@ -7334,7 +7378,7 @@ def survey_one(job):
     path, namespace, flags, spaces = job
     tree = Tree(path, namespace, flags, spaces)
     me = os.path.abspath(path)
-    functions = []
+    functions, pointer_args, params_of = [], [], {}
     for i, d in tree.body.items():
         if i != d["id"] or not d.get("_file") or d.get("kind") == "VarDecl" or d.get("isImplicit") or d.get("explicitlyDefaulted") or d.get("kind") == "CXXDestructorDecl":
             continue
@@ -7342,7 +7386,16 @@ def survey_one(job):
         if file != me and not is_header(file):
             continue
         calls = set()
+        params_of.update({p["id"]: (function_key(tree, d), k) for k, p in enumerate(x for x in kids(d) if x.get("kind") == "ParmVarDecl")})
         for n in walk(d):
+            if n.get("kind") in ("CallExpr", "CXXMemberCallExpr"):
+                c = callee(n)
+                rid = (c.get("referencedDecl") or {}).get("id") or c.get("referencedMemberDecl")
+                t = (tree.body.get(rid) or tree.decl.get(rid)) if rid else None
+                if t is not None and t.get("kind") in ("FunctionDecl", "CXXMethodDecl"):
+                    for k, (p, a) in enumerate(zip([x for x in kids(t) if x.get("kind") == "ParmVarDecl"], kids(n)[1:])):
+                        if POINTER_PARAM.match(qtype(p).strip()):
+                            pointer_args.append((function_key(tree, t), k, pointer_source(tree, a)))
             ids = [n.get("referencedDecl", {}).get("id"), n.get("referencedMemberDecl")]
             if n.get("kind") == "CXXConstructExpr":
                 ids.append((constructor_of(tree, n) or {}).get("id"))
@@ -7359,7 +7412,9 @@ def survey_one(job):
         functions.append({"key": function_key(tree, d), "file": file, "at": a or 0, "calls": sorted(calls), "lines": tree.text(d["_file"]).count("\n", a, b) + 1 if a is not None else 0,
                           "name": Unit.cpp_name_of(tree, d)})
     types = [(q, os.path.abspath(o.get("_file") or "?")) for q, o in [*tree.records.items(), *tree.enums.items()] if o.get("_file")]
-    return {"path": path, "functions": functions, "types": types}
+    # (what a caller's own parameter hands on: by the caller's key and the parameter's place)
+    pointer_args = [(key, k, ("param", *params_of[src[1]]) if isinstance(src, tuple) and src[1] in params_of else "other" if isinstance(src, tuple) else src) for key, k, src in pointer_args]
+    return {"path": path, "functions": functions, "types": types, "pointer_args": pointer_args}
 
 
 def convert_unit(job):
@@ -7559,10 +7614,26 @@ def main(argv):
             raise SystemExit(f"{path} and {sources[unit]} would both be the Blueprint {unit}")
         sources[unit] = os.path.abspath(path)
     world.source_units = set(sources)
+    handed = collections.defaultdict(set)   # (a function, a parameter that may be a pointer into a list) -> what the calls hand it
     for r in pool.map(survey_one, [(path, namespace, flags, world.spaces) for path in files]):
         for f in r["functions"]:
             functions.setdefault(f["key"], f)
         types.update((q, file) for q, file in r["types"])
+        for key, k, src in r["pointer_args"]:
+            handed[(key, k)].add(src)
+    # A pointer into a list is the list it points into, read where it stands: of the type every call hands it
+    # (a std::array<T, N> - Fixed<T, N> -, or a list of any length). Calls that hand lists of other lengths, or
+    # the address of anything else, it cannot take (World.pointer_lists).
+    def pointer_list(at, open_=()):
+        if at in open_:
+            return set()
+        out = set()
+        for src in handed.get(at, ()):
+            out |= pointer_list((src[1], src[2]), (*open_, at)) if isinstance(src, tuple) else {src}
+        return out
+    for at in list(handed):
+        got = pointer_list(at) - {"null"}
+        world.pointer_lists[at] = "other" if "other" in got else "mixed" if len(got) > 1 else next(iter(got)) if got else "list"
     # A header's function stands in the header's Blueprint when all it calls stands in headers too
     # (whoever includes the header has all of it); one that needs a source file - it calls what stands in
     # one - stands with the source file of the header's name.
@@ -7618,6 +7689,7 @@ def main(argv):
         w = World(files, flags, more)
         w.units, w.type_names, w.taken, w.nodes, w.function_units, w.source_units = world.units, world.type_names, world.taken, world.nodes, world.function_units, world.source_units
         w.actors = world.actors
+        w.pointer_lists = world.pointer_lists
         w.table = {k: e for d in need for k, e in tables.get(d, {}).items()}
         w.wanted = None if u in program else set(wanted[u])
         return (u, sources.get(u), files_, namespace, flags, w, test)
