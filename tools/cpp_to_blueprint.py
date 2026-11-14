@@ -2748,8 +2748,8 @@ class Emit:
                     target = kids(target)[0]
                 else:
                     target = None
-            if not own and (root is None or root not in self.names):
-                continue
+            if not own and (root is None or (root not in self.names and root not in self.keyed_vars)):
+                continue   # (a place of a variable of the function, of an entry of a map it goes through - or of its object)
             rest = {"kind": "CompoundStmt", "inner": stmts[i + 1:]}
             changed = self.assigned(rest)
             if re.search(r"\bconst\b", raw) and not own and root not in changed:
