@@ -6352,9 +6352,8 @@ class Emit:
             if name in ("memcpy", "memset", "memcmp"):
                 raise Wait("raw memory (memcpy / memset)")
             raise Wait(f"call: {name}()")
-        if defaulted:
-            raise Wait("a call with default arguments")
-        got = self.invoke(u.function(ref["id"]), a)
+        # (an argument the call leaves out: invoke gives it the default the declaration has)
+        got = self.invoke(u.function(ref["id"]), kids(b)[1:] if defaulted else a)
         if got[0] is None:
             raise Wait("a call without a result as a value")
         return got
