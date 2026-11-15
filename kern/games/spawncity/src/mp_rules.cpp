@@ -158,7 +158,7 @@ u32 hash_id(const std::string& id) {
 }
 
 std::vector<u32> assign_colors(const std::vector<std::string>& ids) {
-  std::vector<i64> numbers;
+  std::vector<u32> numbers;  // (each id's hash: a whole number the Blueprint takes as it is)
   for (const std::string& id : ids) numbers.push_back(hash_id(id));
   std::vector<u32> out;
   g_rules.call("ColorSlots", std::tie(out), numbers);

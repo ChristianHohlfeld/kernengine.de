@@ -28,6 +28,7 @@ struct I8 { kern::i8 v = 0; };
 struct U16 { u16 v = 0; };
 struct I16 { kern::i16 v = 0; };
 struct U32 { u32 v = 0; };
+struct I32 { i32 v = 0; };
 struct U64 { u64 v = 0; };
 struct I64 { i64 v = 0; };
 struct F32 { f32 v = 0; };
@@ -57,6 +58,10 @@ inline void put_i16(std::vector<u8>& b, kern::i16 v) {
 }
 inline void put_u32(std::vector<u8>& b, u32 v) {
   const std::array<u8, 4> x = std::bit_cast<std::array<u8, 4>>(U32{v});
+  b.insert(b.end(), x.begin(), x.end());
+}
+inline void put_i32(std::vector<u8>& b, i32 v) {
+  const std::array<u8, 4> x = std::bit_cast<std::array<u8, 4>>(I32{v});
   b.insert(b.end(), x.begin(), x.end());
 }
 inline void put_u64(std::vector<u8>& b, u64 v) {
@@ -126,6 +131,13 @@ struct Reader {
   u32 get_u32(const std::vector<u8>& b) {
     if (at + 4 > b.size()) { ok = false; return 0; }
     U32 x;
+    std::memcpy(&x, b.data() + at, sizeof x);
+    at += 4;
+    return x.v;
+  }
+  i32 get_i32(const std::vector<u8>& b) {
+    if (at + 4 > b.size()) { ok = false; return 0; }
+    I32 x;
     std::memcpy(&x, b.data() + at, sizeof x);
     at += 4;
     return x.v;
