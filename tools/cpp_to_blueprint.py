@@ -650,6 +650,44 @@ class Tree:
                 self.decl[rid] = d
                 if d["id"] in self.body:
                     self.body[rid] = self.body[d["id"]]
+        # The same for a member a dump names by an address the other dump does not give it (`b.begin(...)` of a
+        # kern::BuildingBuilder, `proj.init(...)` of a kern::GeoProjector: how far the second run's addresses lie
+        # from the first's depends on how long the arguments of each are, the path of the file among them): the
+        # member of that name of the class the expression before it is - of several of one name, the one whose
+        # parameters are the call's arguments.
+        members = collections.defaultdict(list)
+        for d in self.decl.values():
+            if d.get("kind") in ("CXXMethodDecl", "FieldDecl", "VarDecl") and d.get("name") and d["id"] in self.owner:
+                members[(self.owner[d["id"]], d["name"])].append(d)
+        bare_type = lambda t: re.sub(r"\b(const|volatile|struct|class)\b|[&*]", " ", t or "").strip()
+        def visit(n, parent):
+            rid = n.get("referencedMemberDecl") if n.get("kind") == "MemberExpr" else None
+            if rid and rid not in self.decl and kids(n):
+                t = (kids(n)[0].get("type") or {})
+                rec = bare_type(t.get("desugaredQualType") or t.get("qualType"))
+                rec = re.sub(r"\s+", " ", rec)
+                cands = {self.body.get(d["id"], d)["id"]: d for d in members.get((rec, n.get("name")), ())}
+                if len(cands) > 1 and parent is not None and parent.get("kind") == "CXXMemberCallExpr":
+                    args = kids(parent)[1:]
+                    def fits(d):
+                        ps = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
+                        if not len([p for p in ps if not p.get("init")]) <= len(args) <= len(ps):
+                            return False
+                        return all(bare_type(qtype(p)) == bare_type(qtype(x)) for p, x in zip(ps, args))
+                    cands = {i: d for i, d in cands.items() if d.get("kind") == "CXXMethodDecl" and fits(d)}
+                if len(cands) == 1:
+                    d = next(iter(cands.values()))
+                    self.decl[rid] = d
+                    self.owner.setdefault(rid, self.owner.get(d["id"]))
+                    if d["id"] in self.scope_of:
+                        self.scope_of.setdefault(rid, self.scope_of[d["id"]])
+                    if d["id"] in self.body:
+                        self.body[rid] = self.body[d["id"]]
+            for c in kids(n):
+                visit(c, n)
+        for dumps in [self.dumps, *[ds for _, ds in self.more], self.engine]:
+            for o in dumps:
+                visit(o, None)
 
     def take_locals(self, seen):
         """The types a function declares in its body - `struct Seg { Vec2 m; f32 len; };` between its
