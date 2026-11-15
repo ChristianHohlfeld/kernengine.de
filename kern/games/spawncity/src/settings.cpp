@@ -1,5 +1,6 @@
 // SpawnCity's settings: the table and its laws are the Blueprint of the level's actor "Settings"
-// (see settings.h); here are a player's values and the JSON the page gets.
+// (see settings.h); here are a player's values and the JSON the page gets. The table the game holds
+// (SettingsTable) is handed to every function that reads it.
 #include "settings.h"
 
 #include <cmath>
@@ -13,16 +14,6 @@ namespace sc {
 
 namespace {
 rules::Blueprint g_rules{"Settings"};
-/// The Blueprint's struct Option, as it gives and takes it.
-struct Option {
-  std::string key, section, label, help;
-  f64 min = 0, max = 0, step = 0, def = 0;
-  bool toggle = false, live = false;
-};
-/// The table as the Blueprint has it - its rows (what Snap and InSection take; the specs point into
-/// their texts) - and the specs.
-std::vector<Option> g_rows;
-std::vector<OptSpec> g_specs;
 const OptSpec kNone = {"", "", "", "", 0, 0, 0, 0, false, false};
 constexpr u32 kCount = static_cast<u32>(Opt::count);
 
@@ -40,78 +31,80 @@ std::string num(f32 v) {
 }
 }  // namespace
 
-bool bind_settings(kern::logic::Runtime& logic) {
+bool bind_settings(kern::logic::Runtime& logic, SettingsTable& table) {
   const bool runs = g_rules.bind(logic);
-  g_specs.clear();
-  g_rows = g_rules.get<std::vector<Option>>("Options");
-  if (!runs || g_rows.size() != kCount) {
-    g_rows.clear();
+  table.specs.clear();
+  table.rows = g_rules.get<std::vector<Option>>("Options");
+  if (!runs || table.rows.size() != kCount) {
+    table.rows.clear();
     return false;
   }
-  for (const Option& t : g_rows)
-    g_specs.push_back({t.key, t.section, t.label, t.help, static_cast<f32>(t.min), static_cast<f32>(t.max), static_cast<f32>(t.step), static_cast<f32>(t.def),
+  for (const Option& t : table.rows)
+    table.specs.push_back({t.key, t.section, t.label, t.help, static_cast<f32>(t.min), static_cast<f32>(t.max), static_cast<f32>(t.step), static_cast<f32>(t.def),
                        t.toggle, t.live});
   return true;
 }
 
-const OptSpec& opt_spec(Opt o) { return static_cast<u32>(o) < g_specs.size() ? g_specs[static_cast<u32>(o)] : kNone; }
+const OptSpec& opt_spec(const SettingsTable& table, Opt o) {
+  return static_cast<u32>(o) < table.specs.size() ? table.specs[static_cast<u32>(o)] : kNone;
+}
 
-bool find_opt(std::string_view key, Opt& out) {
-  for (u32 i = 0; i < g_specs.size(); ++i)
-    if (key == g_specs[i].key) { out = static_cast<Opt>(i); return true; }
+bool find_opt(const SettingsTable& table, std::string_view key, Opt& out) {
+  for (u32 i = 0; i < table.specs.size(); ++i)
+    if (key == table.specs[i].key) { out = static_cast<Opt>(i); return true; }
   return false;
 }
 
-Settings::Settings() {
-  for (u32 i = 0; i < kCount; ++i) v_[i] = opt_spec(static_cast<Opt>(i)).def;
+Settings::Settings(const SettingsTable& table) {
+  for (u32 i = 0; i < kCount; ++i) v_[i] = opt_spec(table, static_cast<Opt>(i)).def;
 }
 
-void Settings::set(Opt o, f32 value) {
+void Settings::set(const SettingsTable& table, Opt o, f32 value) {
   const u32 i = static_cast<u32>(o);
-  if (i >= g_rows.size() || !std::isfinite(value)) return;
-  const f32 v = static_cast<f32>(g_rules.number("Snap", g_rows[i], rules::decimal(value)));
+  if (i >= table.rows.size() || !std::isfinite(value)) return;
+  const f32 v = static_cast<f32>(g_rules.number("Snap", table.rows[i], rules::decimal(value)));
   if (v != v_[i]) { v_[i] = v; ++version_; }
 }
 
-bool Settings::set(std::string_view key, std::string_view value) {
+bool Settings::set(const SettingsTable& table, std::string_view key, std::string_view value) {
   Opt o;
-  if (!find_opt(key, o)) return false;
+  if (!find_opt(table, key, o)) return false;
   bool known = false;
   f64 word = 0;
   g_rules.call("Word", std::tie(known, word), value);
   if (known) {
-    set(o, static_cast<f32>(word));
+    set(table, o, static_cast<f32>(word));
     return true;
   }
   const std::string text(value);
   char* end = nullptr;
   const double d = std::strtod(text.c_str(), &end);
   if (end == text.c_str()) return false;
-  set(o, static_cast<f32>(d));
+  set(table, o, static_cast<f32>(d));
   return true;
 }
 
-void Settings::reset_section(std::string_view section) {
-  for (u32 i = 0; i < g_rows.size(); ++i)
-    if (g_rules.flag("InSection", g_rows[i], section)) set(static_cast<Opt>(i), g_specs[i].def);
+void Settings::reset_section(const SettingsTable& table, std::string_view section) {
+  for (u32 i = 0; i < table.rows.size(); ++i)
+    if (g_rules.flag("InSection", table.rows[i], section)) set(table, static_cast<Opt>(i), table.specs[i].def);
 }
 
-std::string Settings::values_json() const {
+std::string Settings::values_json(const SettingsTable& table) const {
   std::string o = "{";
-  for (u32 i = 0; i < g_specs.size(); ++i) {
+  for (u32 i = 0; i < table.specs.size(); ++i) {
     if (i) o += ',';
     o += '"';
-    o += g_specs[i].key;
+    o += table.specs[i].key;
     o += "\":";
     o += num(v_[i]);
   }
   return o + "}";
 }
 
-std::string Settings::schema_json() const {
+std::string Settings::schema_json(const SettingsTable& table) const {
   std::string o = "[";
-  for (u32 i = 0; i < g_specs.size(); ++i) {
-    const OptSpec& s = g_specs[i];
+  for (u32 i = 0; i < table.specs.size(); ++i) {
+    const OptSpec& s = table.specs[i];
     if (i) o += ',';
     o += "{\"key\":\"";
     escape_into(o, s.key);

@@ -13,6 +13,7 @@
 
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common.h"
 #include "kern/logic/logic.h"
@@ -53,34 +54,51 @@ struct OptSpec {
   bool live;            // false: a WORLD kind the game does not have yet (shown as "bald")
 };
 
+/// The Blueprint's struct Option, as it gives and takes it.
+struct Option {
+  std::string key, section, label, help;
+  f64 min = 0, max = 0, step = 0, def = 0;
+  bool toggle = false, live = false;
+};
+
+/// The table of the settings, as the Blueprint of the level's actor "Settings" has it: its rows (what
+/// Snap and InSection take) and the specs made of them. There is one table for the program: the game
+/// holds it (bind_settings fills it), and every function that needs it is handed it.
+struct SettingsTable {
+  std::vector<Option> rows;
+  std::vector<OptSpec> specs;
+};
+
 /// Binds the settings to the logic the level's Blueprints run in (the game once its world has started,
 /// tests the one they run) - the Blueprint of the actor "Settings", found by its name at every call -
 /// and takes its table. False when the actor has no Blueprint that runs there or the table has not
-/// one row per Opt.
-bool bind_settings(kern::logic::Runtime& logic);
-/// A setting's row (an empty one while no Blueprint is bound).
-const OptSpec& opt_spec(Opt o);
-bool find_opt(std::string_view key, Opt& out);
+/// one row per Opt (the table is then empty).
+bool bind_settings(kern::logic::Runtime& logic, SettingsTable& table);
+/// A setting's row (an empty one while the table is empty).
+const OptSpec& opt_spec(const SettingsTable& table, Opt o);
+bool find_opt(const SettingsTable& table, std::string_view key, Opt& out);
 
 class Settings {
  public:
-  /// Every setting at its default (as the table bound at this moment has it).
-  Settings();
+  /// Every setting at 0 (as an empty table has it).
+  Settings() = default;
+  /// Every setting at its default (as the table has it).
+  explicit Settings(const SettingsTable& table);
   f32 get(Opt o) const { return v_[static_cast<u32>(o)]; }
   bool on(Opt o) const { return get(o) > 0.5f; }
   /// Clamped and snapped to the step; false for an unknown key or a non-number.
-  bool set(std::string_view key, std::string_view value);
-  void set(Opt o, f32 value);
-  void reset_section(std::string_view section);  // "" = everything
+  bool set(const SettingsTable& table, std::string_view key, std::string_view value);
+  void set(const SettingsTable& table, Opt o, f32 value);
+  void reset_section(const SettingsTable& table, std::string_view section);  // "" = everything
   /// Increases on every change (the game re-applies what depends on the settings).
   u32 version() const { return version_; }
   /// {"key":value,...}
-  std::string values_json() const;
+  std::string values_json(const SettingsTable& table) const;
   /// [{"key":..,"section":..,"label":..,"help":..,"min":..,"max":..,"step":..,"def":..,"toggle":..,"live":..,"value":..},...]
-  std::string schema_json() const;
+  std::string schema_json(const SettingsTable& table) const;
 
  private:
-  f32 v_[static_cast<u32>(Opt::count)];
+  f32 v_[static_cast<u32>(Opt::count)] = {};
   u32 version_ = 1;
 };
 

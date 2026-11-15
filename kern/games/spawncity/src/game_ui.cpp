@@ -20,11 +20,12 @@ bool Game::ui_command(const std::string& cmd, std::string& out) {
   auto starts = [&](const char* p) { return cmd.rfind(p, 0) == 0; };
   if (ui_equipment_command(cmd, out)) return true;
   Settings& st = ui_.settings;
-  if (cmd == "settings" || cmd == "settings schema") { out = st.schema_json(); return true; }
-  if (cmd == "settings values") { out = st.values_json(); return true; }
+  const SettingsTable& table = ui_.settings_table;
+  if (cmd == "settings" || cmd == "settings schema") { out = st.schema_json(table); return true; }
+  if (cmd == "settings values") { out = st.values_json(table); return true; }
   if (starts("settings reset")) {
-    st.reset_section(cmd.size() > 15 ? cmd.substr(15) : std::string());
-    out = st.values_json();
+    st.reset_section(table, cmd.size() > 15 ? cmd.substr(15) : std::string());
+    out = st.values_json(table);
     return true;
   }
   if (starts("set ")) {
@@ -39,8 +40,8 @@ bool Game::ui_command(const std::string& cmd, std::string& out) {
       const std::size_t sp = pair.find(' ');
       Opt o;
       // in a session the host's WORLD switches apply: a client cannot change them
-      if (sp != std::string::npos && find_opt(std::string_view(pair).substr(0, sp), o) && world_rule_locked(o)) ++locked;
-      else if (sp != std::string::npos && st.set(std::string_view(pair).substr(0, sp), std::string_view(pair).substr(sp + 1))) ++ok;
+      if (sp != std::string::npos && find_opt(table, std::string_view(pair).substr(0, sp), o) && world_rule_locked(o)) ++locked;
+      else if (sp != std::string::npos && st.set(table, std::string_view(pair).substr(0, sp), std::string_view(pair).substr(sp + 1))) ++ok;
       else if (!pair.empty()) ++bad;
       at = end + 1;
     }
@@ -49,7 +50,7 @@ bool Game::ui_command(const std::string& cmd, std::string& out) {
   }
   if (starts("get ")) {
     Opt o;
-    if (!find_opt(cmd.substr(4), o)) { out = "unknown setting"; return true; }
+    if (!find_opt(table, cmd.substr(4), o)) { out = "unknown setting"; return true; }
     char b[32];
     std::snprintf(b, sizeof b, "%g", static_cast<double>(st.get(o)));
     out = b;
@@ -359,8 +360,8 @@ void Game::ui_apply_settings() {
   Settings& st = ui_.settings;
   if (ui_.applied == 0 && engine_) {
     // Start parameters (?mouse=, ?fpvtilt=) are settings too.
-    if (engine_->has_arg("mouse")) st.set(Opt::mouse_sensitivity, static_cast<f32>(engine_->arg_number("mouse", 100)));
-    if (engine_->has_arg("fpvtilt")) st.set(Opt::cam_fpv_tilt, static_cast<f32>(engine_->arg_number("fpvtilt", -15)));
+    if (engine_->has_arg("mouse")) st.set(ui_.settings_table, Opt::mouse_sensitivity, static_cast<f32>(engine_->arg_number("mouse", 100)));
+    if (engine_->has_arg("fpvtilt")) st.set(ui_.settings_table, Opt::cam_fpv_tilt, static_cast<f32>(engine_->arg_number("fpvtilt", -15)));
   }
   if (ui_.applied == st.version()) return;
   ui_.applied = st.version();
