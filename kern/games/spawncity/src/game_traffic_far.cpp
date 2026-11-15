@@ -56,8 +56,8 @@ void Game::traffic_make_far(TrafficCar& c) {
   if (!b.valid() || !w.body_valid(b)) { c.far = false; return; }
   if (c.solid_masks.empty()) {
     w.body_masks(b, c.solid_masks);
-    const u64 nothing = kCatQuery;  // (no shape is of this category: found by rays and blasts, touched by nothing)
-    w.set_body_masks(b, kern::Span<const u64>(&nothing, 1));
+    const u64 nothing[1] = {kCatQuery};  // (no shape is of this category: found by rays and blasts, touched by nothing)
+    w.set_body_masks(b, kern::Span<const u64>(nothing, 1));
   }
   if (w.body_type(b) != kern::physics::BodyType::kinematic) w.set_body_type(b, kern::physics::BodyType::kinematic);
   w.set_linear_velocity(b, {});
