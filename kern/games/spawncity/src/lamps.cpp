@@ -11,12 +11,15 @@ namespace sc::lamps {
 namespace {
 using rules::decimal;
 rules::Blueprint g_rules{"Lamps"};  // what happens to one lamp
-/// The Blueprint's function Worse: may a lamp in `state` become `to`?
+}  // namespace
+
 bool worse(u8 state, u8 to) {
   bool worse = false;
   g_rules.call("Worse", std::tie(worse), state, to);
   return worse;
 }
+
+namespace {
 i64 grid_key(f32 x, f32 y) { return (static_cast<i64>(std::floor(x / kGridM)) << 32) ^ (static_cast<i64>(std::floor(y / kGridM)) & 0xffffffffll); }
 }  // namespace
 
@@ -92,11 +95,15 @@ std::vector<i32> Field::near(f32 x, f32 y, f32 r) const {
 
 bool Field::set_state(i32 i, u8 state) {
   if (i < 0 || i >= static_cast<i32>(lamps_.size())) return false;
+  if (!worse(lamps_[static_cast<std::size_t>(i)].state, state)) return false;
+  set(i, state);
+  return true;
+}
+
+void Field::set(i32 i, u8 state) {
   Lamp& l = lamps_[static_cast<std::size_t>(i)];
-  if (!worse(l.state, state)) return false;
   l.state = state;
   broken_[l.key] = state;
-  return true;
 }
 
 std::vector<std::pair<i64, u8>> Field::broken_list() const {

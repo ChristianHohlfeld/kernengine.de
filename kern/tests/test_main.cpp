@@ -5242,6 +5242,12 @@ TEST(logic_notation_refuses_with_place_and_reason) {
                    in_event("    Mark(Mine.Marks[0], Mine);"),
                "while Mark holds it, the length of Mine.Marks is changed"));
     CHECK(says("  void Shout(Car& car) {\n    flow_call<\"Go\">(Actor{0}, Actor{0}, car.Speed, \"\");\n  }\n" + in_event("    Shout(Cars[0]);"), "may run handlers while it holds it"));
+    // (an entry of a list of a fixed length stays where it is whatever the handlers do: nothing changes how long
+    // that list is - but an entry of a list of any length inside it can go)
+    const std::string shout = "  Fixed<Car, 2> Two = List<Car>{};\n  void Shout(Car& car) {\n    flow_call<\"Go\">(Actor{0}, Actor{0}, car.Speed, \"\");\n  }\n"
+                              "  void Hum(Float& mark) {\n    flow_call<\"Go\">(Actor{0}, Actor{0}, mark, \"\");\n  }\n";
+    CHECK(wrong(shout + in_event("    Shout(Two[1]);\n    Hum(Two[0].Speed);")).empty());
+    CHECK(says(shout + in_event("    Hum(Two[1].Marks[0]);"), "may run handlers while it holds it"));
     // ... and what is fine: the list itself, another list, a field of the entry, a variable that is no entry
     CHECK(wrong("  void Grow(List<Car>& cars, Car& car) {\n    car.Speed = 1.0;\n    list_add(car.Marks, 2.0);\n  }\n  void More(List<Float>& marks) {\n    list_add(marks, 1.0);\n  }\n" +
                 in_event("    Grow(Cars, Mine);\n    More(Cars[0].Marks);\n    More(Mine.Marks);"))

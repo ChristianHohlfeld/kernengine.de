@@ -979,7 +979,9 @@ void on1(Float delta) {
   „kein Index führt ins Leere“ auch dort wahr, wo die Referenz eine
   Referenz von C++ ist. Die Liste selbst als Referenz zu geben und zu ändern
   (`Fill(Cars[i].Marks)`), ein Feld des Eintrags zu ändern oder eine andere Liste – das alles
-  geht.
+  geht. Ein Eintrag einer Liste fester Länge (`Fixed<Car, 2> Two`, siehe „Listen fester Länge“)
+  bleibt immer, wo er ist – nichts ändert, wie lang sie ist –: `Shout(Two[1])` darf Handler
+  starten; `Hum(Two[1].Marks[0])` nicht, denn `Marks` hat irgendeine Länge.
 - **Von außen** (`Instance::call`, der Kleber der Klasse) nimmt ein Referenz-Eingang einen Wert:
   Er ist dann eine eigene Variable des Aufrufs, die mit diesem Wert beginnt, und was die
   Funktion aus ihr gemacht hat, steht hinter den Ausgängen in `results` – für jeden

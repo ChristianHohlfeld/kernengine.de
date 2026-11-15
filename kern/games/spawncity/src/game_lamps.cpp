@@ -138,7 +138,8 @@ void Game::gaps_lamp_break(i32 i, u8 state, Vec2 dir, f32 speed, bool net) {
   GapsState& g = *gaps_;
   if (i < 0 || i >= static_cast<i32>(g.lamps.all().size())) return;
   const u8 was = g.lamps.all()[static_cast<std::size_t>(i)].state;
-  if (!g.lamps.set_state(i, state)) return;
+  if (!lamps::worse(was, state)) return;  // setState: only ever worse (asked before the field is changed)
+  g.lamps.set(i, state);
   const lamps::Lamp& l = g.lamps.all()[static_cast<std::size_t>(i)];
   g.lamps_dirty = true;
   ++g.lamps_broken_events;
