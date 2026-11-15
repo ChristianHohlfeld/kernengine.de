@@ -1059,6 +1059,16 @@ inline void insert(std::string& a, i64 at, std::string_view b) {
 inline void replace(std::string& a, i64 at, i64 count, std::string_view b) {
   if (place(at) <= a.size()) a.replace(place(at), place(count), b);
 }
+/// (no longer than 2^24 characters: a length is defined for every number, as Set Length's - list::kLongest)
+inline constexpr i64 kLongest = i64{1} << 24;
+inline std::string repeat(std::string_view a, i64 count) {
+  std::string r;
+  if (count <= 0 || a.empty()) return r;
+  const i64 times = std::min(count, kLongest / static_cast<i64>(a.size()));
+  r.reserve(a.size() * static_cast<std::size_t>(times));
+  for (i64 k = 0; k < times; ++k) r.append(a);
+  return r;
+}
 template <class List> std::string of_bytes(const List& bytes, i64 at, i64 count) {
   std::string r;
   if (at < 0 || count <= 0 || static_cast<u64>(at) >= bytes.size()) return r;
@@ -2345,6 +2355,9 @@ struct PureNodes {
   /// The text the bytes of a list are (each number cut to 8 bits, as a char holds it): Count of them from At
   /// on - what std::string(reinterpret_cast<const char*>(bytes) + at, count) makes; beyond the list: up to its end.
   static Text text_of_bytes(std::vector<i64> bytes, Int at, Int count) { return texts::of_bytes(bytes, at, count); }
+  /// Text so many times one after the other - std::string(count, c) of one character (none: count 0 or less;
+  /// at most 2^24 characters).
+  static Text text_repeat(Text a, Int count) { return texts::repeat(a, count); }
   static ParsedFloat text_parse_float(Text a, Int at) {
     const scan::Real r = scan::real(scan::c_string(a, at), false);
     return {r.value, at + static_cast<i64>(r.end)};

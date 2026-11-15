@@ -7883,6 +7883,9 @@ class Emit:
                 return '""', "Text"
             if len(a) == 1 and self.tp(a[0]) == "Text":
                 return self.ex(a[0], "Text"), "Text"
+            if len(a) == 2 and self.numeric(a[0]) and re.sub(r"^const\s+", "", self.u.clean(self.ctype(a[1]))).strip() in ("char", "signed char", "unsigned char"):
+                # (count, character): the character so many times (Repeat Text)
+                return f"text_repeat({self.text_or_char(a[1])}, {self.ex(a[0], 'Int')})", "Text"
             if len(a) == 2 and self.numeric(a[1]):
                 # (characters, count): so many characters from a place - of a text (a C string at a place), or of a
                 # list of bytes read as characters (reinterpret_cast<const char*>(bytes.data()) + at)

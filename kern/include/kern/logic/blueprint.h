@@ -450,6 +450,7 @@ struct BlueprintCore : logic::PureNodes {
   }
   /// Text of Bytes: the text a list of bytes is, from At on (one request for memory, as std::string makes it).
   static Text text_of_bytes(logic::Items<Int> bytes, Int at, Int count) { return logic::texts::of_bytes(bytes, at, count); }
+  static Text text_repeat(const Text& a, Int count) { return logic::texts::repeat(a.view(), count); }
   /// Parse Float, Parse Int: the number at a place of a text as C reads it there (logic::scan).
   struct ParsedFloat {
     Float value = 0.0;

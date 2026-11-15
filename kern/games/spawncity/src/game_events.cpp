@@ -367,11 +367,7 @@ void Game::update_scores(f32 dt) {
   }
   if (emp_hits) pop(C.fun.apply(FunEvent::emp, now, stars, static_cast<f32>(emp_hits)));
   // stars
-  if (stars > C.last_stars && stars > 0) {
-    std::string shown = "WANTED ";
-    for (i32 k = 0; k < stars; ++k) shown += '*';  // (a star for each)
-    pop(shown);
-  }
+  if (stars > C.last_stars && stars > 0) pop("WANTED " + std::string(static_cast<std::size_t>(stars), '*'));
   if (C.last_stars > 0 && stars == 0 && !player_dead_) { award(400 * C.last_stars, "ESCAPED!"); pop(C.fun.apply(FunEvent::escape, now, C.last_stars)); }
   C.last_stars = stars;
   // damage and death

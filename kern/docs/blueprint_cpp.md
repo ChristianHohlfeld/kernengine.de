@@ -940,6 +940,8 @@ Befehl = text_erase(std::move(Befehl), 0, 3);         // cmd.erase(0, 3) – am 
 | Starts With, Ends With | `starts_with(b)`, `ends_with(b)` | Bool |
 | Text Less | `a < b` | Bool – Byte für Byte als `unsigned char`, wie `std::string` ordnet |
 | Insert Text, Erase Text, Replace Text | `insert(at, b)`, `erase(at, count)`, `replace(at, count, b)` | den geänderten Text |
+| Repeat Text | `std::string(count, c)` | den Text so oft hintereinander (höchstens 2^24 Zeichen) |
+| Text of Bytes | `std::string(reinterpret_cast<const char*>(bytes) + at, count)` | Count Bytes einer Liste ab At, jedes auf 8 Bit geschnitten |
 
 - **Wo C++ wirft** (`at` hinter dem Ende bei `substr`, `insert`, `erase`, `replace`: `std::out_of_range`,
   was ein Programm ohne Ausnahmen beendet), gibt Sub Text den leeren Text, die drei anderen den Text,

@@ -1868,6 +1868,8 @@ void add_math(Library& lib) {
     lib.add(pure("text.replace", "Replace Text", "Text",
                  {data("a", "Text", K::text, ""), data("at", "At", K::integer, 0), data("count", "Count", K::integer, 0), data("b", "With", K::text, "")}, text, of(&P::text_replace),
                  "Text with Count characters from At on replaced by With (std::string::replace); At beyond the end: Text as it is", "replace string"));
+    lib.add(pure("text.repeat", "Repeat Text", "Text", {data("a", "Text", K::text, "*"), data("count", "Count", K::integer, 3)}, text, of(&P::text_repeat),
+                 "Text so many times, one after the other (std::string(count, c) of a character); Count 0 or less: no text", "repeat times fill padding string"));
     lib.add(pure("text.of_bytes", "Text of Bytes", "Text", {data("bytes", "Bytes", K::integer_list), data("at", "At", K::integer, 0), data("count", "Count", K::integer, 0)}, text,
                  of(&P::text_of_bytes), "Count bytes of the list from At on as a text, each cut to 8 bits (beyond the list: up to its end)",
                  "bytes chars string decode utf8 buffer"));
