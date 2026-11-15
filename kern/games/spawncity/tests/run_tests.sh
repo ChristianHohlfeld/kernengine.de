@@ -58,6 +58,10 @@ cpp_objects=()
 for f in "${sources[@]}"; do cpp_objects+=("$(object_of "$f")"); done
 "$cxx" "${link[@]}" "${cpp_objects[@]}" "${objects[@]}" -lm -o "$out/spawncity_tests"
 "$out/spawncity_tests" "$@"
+# The converted functions once more against the engine itself: the source and its Blueprint (interpreter,
+# class) call the real functions of the engine's nodes, each side with objects of its own, set up alike
+# for every call - the description of every node they call has to fit the real function (rule_blueprint.h).
+if [ $# -eq 0 ]; then SC_ENGINE=real "$out/spawncity_tests" converted_; fi
 # The game's own sources - what includes game.h and is not linked into the tests - compile: a
 # rule's header that changed is caught here, not first by the game's build.
 if [ $# -eq 0 ]; then

@@ -60,6 +60,20 @@ struct Span {
   constexpr bool empty() const { return size == 0; }
 };
 
+/// A count beside a pointer a function writes numbers through, where each thing it counts is `Per`
+/// numbers: `void render(f32* out, Count<2> frames)` writes 2 * frames numbers (interleaved stereo).
+/// It is the whole number it holds - given as one, read as one; what a function writes there is said
+/// by its signature (the engine's nodes give the room it says: kern/logic/engine_api.h).
+template <u32 Per>
+struct Count {
+  static_assert(Per > 0);
+  static constexpr u32 per = Per;
+  u32 n = 0;
+  constexpr Count() = default;
+  constexpr Count(u32 v) : n(v) {}
+  constexpr operator u32() const { return n; }
+};
+
 /// FNV-1a, used for string keys and cache signatures.
 constexpr u64 hash_bytes(const void* data, std::size_t n, u64 seed = 1469598103934665603ull) {
   const u8* p = static_cast<const u8*>(data);

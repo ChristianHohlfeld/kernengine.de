@@ -153,8 +153,8 @@ class Mixer {
   void set_reverb(f32 room_size, f32 damping, f32 wet);
 
   // ---- output ----
-  /// Mixes `frames` frames of interleaved stereo into `out`.
-  void render(f32* out, u32 frames);
+  /// Mixes `frames` frames of interleaved stereo into `out`: 2 numbers a frame, left then right.
+  void render(f32* out, Count<2> frames);
   const Stats& stats() const { return stats_; }
 
  private:
