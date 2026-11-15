@@ -10077,7 +10077,7 @@ class TestWriter:
                 self.object_enums[owner].append("  " + self.piece(tree.enums[q]) + ";")
                 in_objects.add(q)
         enum_chunks = [(tree.place(tree.enums[q]), ("enum", q), self.enum_text(q)) for q in sorted(enums) if q not in in_objects]
-        const_chunks, said_consts = [], set()
+        const_chunks, said_consts, const_gives = [], set(), {}
         # (in the order they stand: of two that say the same - the program and the engine both say what pi is -
         # the first is said, where what follows it can use it)
         for d, text, _, named in sorted(self.const_pieces(G.consts, decls, records), key=lambda c: tree.place(c[0])):
@@ -10085,6 +10085,7 @@ class TestWriter:
             if self.widen(text) not in said_consts:   # (the program and the engine both say what pi is: once)
                 said_consts.add(self.widen(text))
                 const_chunks.append((tree.place(d), ("const", f"{os.path.basename(d['_file'])}:{d['_at'][0]}"), text))
+                const_gives[const_chunks[-1][1]] = [a for a, *_ in named]   # (what it declares: no `using` of it before it)
         # the enums without a name whose values the source names: their own text, like a constant's
         for d, text, named in sorted(self.unnamed_pieces(G.unnamed, decls, records), key=lambda c: tree.place(c[0])):
             pairs += named
@@ -10437,7 +10438,7 @@ class TestWriter:
                 if key[0] != "record":
                     own_names = set(re.findall(r"\b(?:enum\s+(?:class\s+|struct\s+)?|using\s+)(\w+)", text)) if key[0] in ("enum", "alias") else ()
                     d = tree.decl.get(key[1]) if key[0] == "function" and isinstance(key[1], str) else None
-                    gives = [self.absolute_of(d, d["name"])] if d is not None and d.get("name") else ()
+                    gives = [self.absolute_of(d, d["name"])] if d is not None and d.get("name") else const_gives.get(key, ())
                     add(key, self.with_usings(wide(text), tu_usings, wide, own_names, gives) if key[0] not in ("object", "engine") else wide(text))
                     continue
                 q = key[1]
