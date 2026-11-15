@@ -13,6 +13,7 @@
 
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common.h"
 #include "kern/logic/logic.h"
@@ -54,18 +55,24 @@ struct OptSpec {
 };
 
 /// Binds the settings to the logic the level's Blueprints run in (the game once its world has started,
-/// tests the one they run) - the Blueprint of the actor "Settings", found by its name at every call -
-/// and takes its table. False when the actor has no Blueprint that runs there or the table has not
-/// one row per Opt.
+/// tests the one they run) - the Blueprint of the actor "Settings", found by its name at every call.
+/// False when the actor has no Blueprint that runs there. (Its table a Settings takes: take_table.)
 bool bind_settings(kern::logic::Runtime& logic);
-/// A setting's row (an empty one while no Blueprint is bound).
-const OptSpec& opt_spec(Opt o);
-bool find_opt(std::string_view key, Opt& out);
 
 class Settings {
  public:
-  /// Every setting at its default (as the table bound at this moment has it).
-  Settings();
+  /// The Blueprint's struct Option, as it gives and takes it: a row of its table Options.
+  struct Row {
+    std::string key, section, label, help;
+    f64 min = 0, max = 0, step = 0, def = 0;
+    bool toggle = false, live = false;
+  };
+  /// Takes the table of the bound Blueprint (bind_settings), every setting at its default. False when
+  /// it has not one row per Opt (then there is no table: every row an empty one).
+  bool take_table();
+  /// A setting's row (an empty one while there is no table).
+  const OptSpec& spec(Opt o) const;
+  bool find(std::string_view key, Opt& out) const;
   f32 get(Opt o) const { return v_[static_cast<u32>(o)]; }
   bool on(Opt o) const { return get(o) > 0.5f; }
   /// Clamped and snapped to the step; false for an unknown key or a non-number.
@@ -80,7 +87,10 @@ class Settings {
   std::string schema_json() const;
 
  private:
-  f32 v_[static_cast<u32>(Opt::count)];
+  /// The table as the Blueprint has it - its rows (what Snap and InSection take) - and the specs.
+  std::vector<Row> rows_;
+  std::vector<OptSpec> specs_;
+  f32 v_[static_cast<u32>(Opt::count)] = {};
   u32 version_ = 1;
 };
 

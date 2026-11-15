@@ -39,7 +39,7 @@ bool Game::ui_command(const std::string& cmd, std::string& out) {
       const std::size_t sp = pair.find(' ');
       Opt o;
       // in a session the host's WORLD switches apply: a client cannot change them
-      if (sp != std::string::npos && find_opt(std::string_view(pair).substr(0, sp), o) && world_rule_locked(o)) ++locked;
+      if (sp != std::string::npos && st.find(std::string_view(pair).substr(0, sp), o) && world_rule_locked(o)) ++locked;
       else if (sp != std::string::npos && st.set(std::string_view(pair).substr(0, sp), std::string_view(pair).substr(sp + 1))) ++ok;
       else if (!pair.empty()) ++bad;
       at = end + 1;
@@ -49,7 +49,7 @@ bool Game::ui_command(const std::string& cmd, std::string& out) {
   }
   if (starts("get ")) {
     Opt o;
-    if (!find_opt(cmd.substr(4), o)) { out = "unknown setting"; return true; }
+    if (!st.find(cmd.substr(4), o)) { out = "unknown setting"; return true; }
     char b[32];
     std::snprintf(b, sizeof b, "%g", static_cast<double>(st.get(o)));
     out = b;

@@ -8449,10 +8449,12 @@ class TestWriter:
         """The guards of all the functions the test holds the source of (a function with a place the test
         cannot guard: said, by its declaration's id - see `write`)."""
         self.edits, unguarded, done = {}, {}, set()
+        self.kept = {}
         for d in self.held(decls):
             if d["id"] in done:
                 continue
             done.add(d["id"])
+            self.edits.setdefault(d["_file"], []).extend(self.kept_edits(d))
             try:
                 file, edits = self.guard(d)
                 self.edits.setdefault(file, []).extend(edits)
@@ -8461,6 +8463,72 @@ class TestWriter:
         for file, edits in self.edits.items():
             self.edits[file] = self.in_turn(edits)
         return unguarded
+
+    def kept_edits(self, d):
+        """What a function of the Blueprint of a state keeps from one call to the next (`static int last_tick = 0;`)
+        is a variable of that Blueprint (Unit.state_static) - the test sets and compares it like the others. In the
+        test's source it stands outside the function, in the namespace the function stands in (`hoisted`), and the
+        function names it where its declaration stood (`auto& last_tick = kept_...;`). That is the same C++: a
+        static local variable that starts at a constant (the only kind the Blueprint has) is made before anything
+        runs, as one of a namespace is; it is one variable, kept from one call to the next, in both places. (A
+        function defined in its class: its text is the class's - it is not hoisted, and the test has no values of
+        it.) The edits; self.kept: the declaration's id -> (the name in the test, the function, the declaration)."""
+        u, tree = self.u, self.tree
+        if u.state is None or not (tree.owner.get(d["id"]) == u.state or function_key(tree, d) in u.world.state_functions):
+            return []
+        owner = tree.records.get(tree.owner.get(d["id"]) or "")
+        if owner is not None and owner.get("_file") == d.get("_file") and owner.get("_at", (None, None))[1] is not None and owner["_at"][0] <= d["_at"][0] < owner["_at"][1]:
+            return []
+        raw, edits = tree.text(d["_file"]), []
+        for s in walk(d):
+            vs = kids(s) if s.get("kind") == "DeclStmt" else []
+            if not vs or not all(v.get("kind") == "VarDecl" and v.get("storageClass") == "static" and v["id"] in u.state_statics for v in vs):
+                continue
+            a, b = s.get("_at", (None, None))
+            if a is None or b is None or s.get("_file", d["_file"]) != d["_file"] or not raw[a:b].lstrip().startswith("static"):
+                continue   # (written by a macro: as it stands - the test has no values of it)
+            if raw[b - 1:b] != ";":
+                m = re.match(r"\s*;", raw[b:])
+                if not m:
+                    continue
+                b += m.end()
+            said = []
+            for v in vs:
+                name = "kept_" + sane_name(self.u.cpp_name(d).replace("::", "_") + "_" + (v.get("name") or "kept"))
+                while name in {n for n, _, _ in self.kept.values()}:
+                    name += "_"
+                self.kept[v["id"]] = (name, d, v)
+                said.append(f"auto& {v.get('name')} = {name};")
+            edits.append((a, -1, 0, b, " ".join(said)))
+        return edits
+
+    def hoisted(self, v):
+        """The text of a variable a function keeps (see kept_edits) where the test has it: before the function,
+        in its namespaces - `static <type> <name> = <what it starts at>;` (the type as the test spells it, or as
+        the source does where the test has no values of it)."""
+        name, d, _ = self.kept[v["id"]]
+        raw = self.tree.text(v["_file"])
+        a, b = v["_at"]
+        at = (v.get("loc") or {}).get("offset")   # (where its name stands - in `static bool a = false, b = false;` b's too)
+        if at is None or not a <= at < b or raw[at:at + len(v.get("name") or "?")] != v.get("name"):
+            m = list(re.finditer(r"\b" + re.escape(v.get("name") or "?") + r"\b", raw[a:b]))
+            at = a + m[-1].start() if m else b
+        init = self.tree.said(raw[at + len(v.get("name") or ""):b]) if at < b else ""
+        scope = (self.tree.owner.get(d["id"]) or "") + "::" if self.tree.owner.get(d["id"]) else self.tree.scope_of.get(d["id"], "")
+        try:
+            spelled = self.spell(self.in_scope(qtype(v), scope.rstrip(":")))
+        except Wait:
+            spelled = qtype(v)
+        return self.in_spaces(d, f"static {spelled} {name}{init};")
+
+    def kept_held(self, i):
+        """How the test names a variable a function keeps (see kept_edits) - None: its source does not hold it."""
+        if i not in self.kept:
+            return None
+        name, d, _ = self.kept[i]
+        if d["id"] not in self.whole.functions:
+            return None
+        return "::".join(self.spaces_of(self.tree.scope_of.get(d["id"], "")) + [name])
 
     @staticmethod
     def in_turn(edits):
@@ -8867,15 +8935,20 @@ class TestWriter:
                 # method keeps in itself (static in its body) no code outside the method reaches
                 for i, (variable, _) in self.u.state_statics.items():
                     v = self.tree.decl.get(i) or {}
-                    if self.in_function(v) or v.get("storageClass") == "static" and v.get("isStaticLocal") or not v.get("name"):
-                        missing.append(f"{variable} (kept in the body of a method - static there: the test does not reach it from outside)")
+                    if i in self.kept:   # (kept by a function in its body: before it in the test's source - see kept_edits)
+                        held = self.kept_held(i)
+                        if held is None:
+                            continue   # (not held by the source the test holds)
+                    elif self.in_function(v) or v.get("storageClass") == "static" and v.get("isStaticLocal") or not v.get("name"):
+                        missing.append(f"{variable} (kept in the body of a function defined in its class: the test does not reach it from outside)")
                         continue
-                    if i not in self.whole.consts:
+                    elif i not in self.whole.consts:
                         continue   # (not named by the source the test holds)
-                    first = v
-                    while first.get("previousDecl") in self.tree.decl:
-                        first = self.tree.decl[first["previousDecl"]]
-                    held = "::".join(self.classes_of(self.tree.scope_of.get(first["id"], "")) + [v["name"]])
+                    else:
+                        first = v
+                        while first.get("previousDecl") in self.tree.decl:
+                            first = self.tree.decl[first["previousDecl"]]
+                        held = "::".join(self.classes_of(self.tree.scope_of.get(first["id"], "")) + [v["name"]])
                     try:
                         spelled = self.spell(qtype(v))
                         draws.append(f"  {held} = {self.draw(qtype(v))};")
@@ -9703,6 +9776,8 @@ class TestWriter:
             for o, scope in self.tree.alias_decls:
                 if o["id"] in taken or o.get("name") in numbers or o.get("name") not in words:
                     continue
+                if (scope or "").startswith(ENGINE + "::logic::"):
+                    continue   # (the engine's logic - how C++ runs and calls a Blueprint: in a test the engine's own, see gather)
                 # (one in a class the test compiles along stands in its text; one in a class it does not has the
                 # namespace of the class's name - in_classes)
                 if o.get("_at", (None, None))[0] is None or o["_at"][1] is None or self.inside(o, decls) is not None or self.in_function(o):
@@ -9975,13 +10050,15 @@ class TestWriter:
                 in_objects.add(q)
         enum_chunks = [(tree.place(tree.enums[q]), ("enum", q), self.enum_text(q)) for q in sorted(enums) if q not in in_objects]
         const_chunks, said_consts = [], set()
-        for d, text, _, named in self.const_pieces(G.consts, decls, records):
+        # (in the order they stand: of two that say the same - the program and the engine both say what pi is -
+        # the first is said, where what follows it can use it)
+        for d, text, _, named in sorted(self.const_pieces(G.consts, decls, records), key=lambda c: tree.place(c[0])):
             pairs += named
             if self.widen(text) not in said_consts:   # (the program and the engine both say what pi is: once)
                 said_consts.add(self.widen(text))
                 const_chunks.append((tree.place(d), ("const", f"{os.path.basename(d['_file'])}:{d['_at'][0]}"), text))
         # the enums without a name whose values the source names: their own text, like a constant's
-        for d, text, named in self.unnamed_pieces(G.unnamed, decls, records):
+        for d, text, named in sorted(self.unnamed_pieces(G.unnamed, decls, records), key=lambda c: tree.place(c[0])):
             pairs += named
             if self.widen(text) not in said_consts:
                 said_consts.add(self.widen(text))
@@ -9996,6 +10073,9 @@ class TestWriter:
             if self.inside(d, decls) is not None:
                 continue   # (declared in its class with its body: there)
             fn_chunks.append((tree.place(d), ("function", d["id"]), self.in_spaces(d, self.piece(d))))
+            for k, (i, (_, fd, v)) in enumerate(x for x in self.kept.items() if x[1][1]["id"] == d["id"]):
+                at = tree.place(d)   # (what it keeps: before it - see kept_edits)
+                fn_chunks.append(((at[0], at[1] - 0.5, k), ("kept", i), self.hoisted(v)))
             if tree.owner.get(d["id"]) is None and d.get("name"):
                 first = d
                 while first.get("previousDecl") in tree.decl:
@@ -10575,11 +10655,15 @@ def survey_one(job):
             continue
         if tree.owner.get(d["id"]) == ENGINE + "::logic::ActorBlueprint":
             continue   # (no function of a Blueprint: its calls are nodes - own_function)
-        calls, shares = set(), False
+        calls, shares, keeps = set(), False, []
         params_of.update({p["id"]: (function_key(tree, d), k) for k, p in enumerate(x for x in kids(d) if x.get("kind") == "ParmVarDecl")})
         for n in walk(d):
             if n.get("kind") == "DeclRefExpr" and (n.get("referencedDecl") or {}).get("kind") == "VarDecl" and not shares:
                 shares = shared_variable(tree, tree.decl.get(n["referencedDecl"]["id"]))
+            if n.get("kind") == "VarDecl" and n.get("storageClass") == "static" and not n.get("constexpr") and not re.search(r"\bconst\b", qtype(n)):
+                # (what it keeps from one call to the next - `static int last = 0;` - the program has once, as it has
+                # a variable of a namespace: a variable of its one object, unless it is that object - main)
+                keeps.append((os.path.abspath(n.get("_file") or "?"), n.get("_at", (None,))[0]))
             if n.get("kind") in ("CallExpr", "CXXMemberCallExpr"):
                 c = callee(n)
                 rid = (c.get("referencedDecl") or {}).get("id") or c.get("referencedMemberDecl")
@@ -10612,7 +10696,7 @@ def survey_one(job):
                 calls.add(function_key(tree, t))
         a, b = d.get("_at", (None, None))
         functions.append({"key": function_key(tree, d), "file": file, "at": a or 0, "calls": sorted(calls), "lines": tree.text(d["_file"]).count("\n", a, b) + 1 if a is not None else 0,
-                          "name": Unit.cpp_name_of(tree, d), "owner": tree.owner.get(d["id"]), "shares": shares, "free": d.get("kind") == "FunctionDecl" and not tree.owner.get(d["id"]),
+                          "name": Unit.cpp_name_of(tree, d), "owner": tree.owner.get(d["id"]), "shares": shares, "keeps": keeps, "free": d.get("kind") == "FunctionDecl" and not tree.owner.get(d["id"]),
                           "defaulted": defaulted_maker(d)})
     types = [(q, os.path.abspath(o.get("_file") or "?")) for q, o in [*tree.records.items(), *tree.enums.items()] if o.get("_file")]
     statics, made = objects_made(tree)
@@ -11013,7 +11097,10 @@ def main(argv):
         for k, f in functions.items():
             for c in f["calls"]:
                 callers[c].add(k)
-        kept = {k for k, f in functions.items() if f.get("shares") and f.get("free") and world.program(f["file"])}
+        # (a static local variable is kept by the program as a variable of a namespace is - but the one object
+        # of the state itself, `static Game g;`, is the Blueprint)
+        itself = {tuple(p) for r in surveys for q, places in r["statics"].items() if q in world.states for p in places}
+        kept = {k for k, f in functions.items() if (f.get("shares") or any(tuple(p) not in itself for p in f.get("keeps", ()))) and f.get("free") and world.program(f["file"])}
         todo = list(kept)
         while todo:
             for k in callers.get(todo.pop(), ()):
