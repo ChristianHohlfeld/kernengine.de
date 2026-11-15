@@ -150,7 +150,7 @@ int vm_index(weapons::Id id) {
     default: return -1;
   }
 }
-const char* kVmNames[4] = {"BOOMSTICK 40 mm", "ROCKET LAUNCHER", "FISTS", "KNIFE"};
+const char* const kVmNames[4] = {"BOOMSTICK 40 mm", "ROCKET LAUNCHER", "FISTS", "KNIFE"};
 
 /// Camera space (x right, y up, z back) -> world.
 Mat4 camera_frame(const kern::Camera& c) {

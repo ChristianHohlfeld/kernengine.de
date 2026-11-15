@@ -25,7 +25,7 @@ bool alive(const P& p) { return p.state != People::State::down && p.state != Peo
 const Vec3 kZSkin[4] = {{0.54f, 0.6f, 0.47f}, {0.49f, 0.55f, 0.44f}, {0.58f, 0.63f, 0.51f}, {0.44f, 0.49f, 0.4f}};
 const Vec3 kZShirt[4] = {{0.36f, 0.35f, 0.29f}, {0.29f, 0.3f, 0.26f}, {0.42f, 0.36f, 0.29f}, {0.25f, 0.29f, 0.31f}};
 const Vec3 kZPants[4] = {{0.18f, 0.17f, 0.16f}, {0.23f, 0.21f, 0.19f}, {0.15f, 0.16f, 0.18f}, {0.25f, 0.22f, 0.18f}};
-const char* kGateNames[] = {"START / FINISH", "GATE 2", "GATE 3", "HIGH GATE", "GATE 5", "GATE 6", "LOW GATE", "GATE 8"};
+const char* const kGateNames[] = {"START / FINISH", "GATE 2", "GATE 3", "HIGH GATE", "GATE 5", "GATE 6", "LOW GATE", "GATE 8"};
 }  // namespace
 
 // ---------------------------------------------------------------------------------------------

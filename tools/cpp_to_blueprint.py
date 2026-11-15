@@ -1409,7 +1409,9 @@ class Unit:
             return "Int"
         if t == "std::_Bit_reference":
             return "Bool"   # (std::vector<bool>'s entry where it stands: in a List<Bool> a place like any other - see member_call, for_each)
-        if "*" in re.sub(r"<.*>", "<>", t):   # (a pointer itself - one inside a type's arguments is that type's: an iterator holds one)
+        if "*" in re.sub(r"<.*>", "<>", t) and not re.match(r"(?:const\s+)?char\s*\*\s*(?:const\s*)?(?:\[\d+\]\s*)+$", t):
+            # (a pointer itself - one inside a type's arguments is that type's: an iterator holds one; an array of
+            # texts written out, const char* [4], is a list of texts: below)
             raise Wait("a pointer")
         m = re.match(r"(?:kern::)?Span<\s*(.+)>$", t)
         if m and ENGINE_NODES:   # (a view of a list: the list)
