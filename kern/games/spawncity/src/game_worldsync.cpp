@@ -27,7 +27,6 @@
 //
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
 #include <algorithm>
-#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -83,7 +82,7 @@ f64 Game::life_epoch() const {
   // the clock the animals' rounds run on: the wall clock - in a session the host's (a client
   // counts on from what the host last sent), so a dog is at the same place of its round everywhere
   if (net_.active() && !net_.hosting() && host_epoch_ok_) return kern::now_ms() / 1000 + host_epoch_off_;
-  return static_cast<f64>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()) / 1000.0;
+  return kern::wall_ms() / 1000.0;
 }
 
 void Game::car_body_dynamic(TrafficCar& c) {
@@ -387,8 +386,8 @@ void Game::worldsync_update(f32 dt) {
       if (type == kPets) pets_acc_.clear();
       if (type == kFlocks) flocks_acc_.clear();
     }
-    if (part < 64) P.mask |= 1ull << part;
-    const bool whole = last && part < 64 && P.mask == (part == 63 ? ~0ull : (1ull << (part + 1)) - 1);
+    if (part < 64) P.mask |= u64{1} << part;
+    const bool whole = last && part < 64 && P.mask == (part == 63 ? ~u64{0} : (u64{1} << (part + 1)) - 1);
     auto un8 = [](u8 a) { return static_cast<f32>(static_cast<i8>(a)) / 128 * kPi; };
     auto x5 = [&](f32 base) { return base + r.get_i16(blob) / 20.0f; };
     auto x1 = [&](f32 base) { return base + r.get_i16(blob) / 100.0f; };
