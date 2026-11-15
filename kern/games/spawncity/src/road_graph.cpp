@@ -132,7 +132,7 @@ bool RoadGraph::path(Vec2 from, Vec2 to, std::vector<Vec2>& out) const {
   std::vector<Vec2> rev;
   for (i32 c = b; c >= 0; c = c == a ? -1 : came[c]) rev.push_back(nodes_[c].p);
   out.push_back(from);
-  for (auto it = rev.rbegin(); it != rev.rend(); ++it) out.push_back(*it);
+  for (std::size_t k = 0; k < rev.size(); ++k) out.push_back(rev[rev.size() - 1 - k]);  // (from the start on)
   out.push_back(to);
   return true;
 }
