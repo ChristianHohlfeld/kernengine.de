@@ -370,6 +370,13 @@ template <class T, class C, class H> void from_held(EngineObjects& o, const H& h
   else Conv<T>::from(o, Value::int64(h.bits), c);
 }
 
+/// Entry k of a list the value holds, as the type it holds (a std::vector<bool> gives a proxy for an entry -
+/// libc++ one that is not a bool - so its entry is read as the bool it is).
+template <class H> decltype(auto) held_at(const std::vector<H>& h, std::size_t k) {
+  if constexpr (std::is_same_v<H, bool>) return static_cast<bool>(h[k]);
+  else return h[k];
+}
+
 template <class C> struct ListOf { static constexpr bool is = false; };
 template <class X, class A> struct ListOf<std::vector<X, A>> { static constexpr bool is = true, grows = true, maybe = false; using item = X; };
 template <class X, std::size_t N> struct ListOf<std::array<X, N>> { static constexpr bool is = true, grows = false, maybe = false; using item = X; };
@@ -399,14 +406,14 @@ template <class T> struct Conv<List<T>> {
     if constexpr (requires { c.data; c.size; }) {   // (a view: of entries held for the call)
       auto& kept = o.held<typename L::item>();
       kept.resize(h.size());
-      for (std::size_t k = 0; k < h.size(); ++k) from_held<T>(o, h[k], kept[k]);
+      for (std::size_t k = 0; k < h.size(); ++k) from_held<T>(o, held_at(h, k), kept[k]);
       c = C(kept.data(), kept.size());
     } else if constexpr (L::maybe) {
       if (h.empty()) {
         c = C{};
       } else {
         auto x = blank<typename L::item>();
-        from_held<T>(o, h[0], x);
+        from_held<T>(o, held_at(h, 0), x);
         if constexpr (std::is_same_v<C, std::optional<typename L::item>>) c = std::move(x);
         else c = std::make_unique<typename L::item>(std::move(x));
       }
@@ -415,14 +422,14 @@ template <class T> struct Conv<List<T>> {
       c.resize(h.size());
       for (std::size_t k = 0; k < h.size(); ++k) {
         auto x = blank<typename L::item>();
-        from_held<T>(o, h[k], x);
+        from_held<T>(o, held_at(h, k), x);
         c[k] = std::move(x);
       }
     } else {
       const std::size_t n = std::extent_v<C> ? std::extent_v<C> : std::size(c);
       for (std::size_t k = 0; k < n; ++k) {   // (a list of a fixed length: what the value does not have is zero)
         auto x = blank<typename L::item>();
-        if (k < h.size()) from_held<T>(o, h[k], x);
+        if (k < h.size()) from_held<T>(o, held_at(h, k), x);
         c[k] = std::move(x);
       }
     }
