@@ -7679,6 +7679,10 @@ class Emit:
             if b.get("kind") != "InitListExpr":
                 if len(a) == 1 and self.tp(a[0]) == t:
                     return self.ex(a[0], t), t
+                if len(a) == 1 and self.u.alike(self.tp_or_none(a[0]), t) and self.u.clean(self.ctype(a[0])).replace("std::", "") == self.u.clean(self.ctype(b)).replace("std::", ""):
+                    # a copy of a value of the same C++ type, which the compiler names without the names the program
+                    # gave it (const value_type for a std::pair<u64, u32>): of the type of what it copies
+                    return self.value(a[0])
                 q = next((x for x, n_ in u.structs.items() if n_ == t), None)
                 rec = self.tree.records.get(q, {})
                 want = b.get("ctorType", {}).get("qualType")
@@ -8572,7 +8576,9 @@ class TestWriter:
                 edits.append((a, 2, depth, a, "converted::at("))
                 swap(bb, ia, "[", ", ")
                 swap(ib, b, "]", ")")
-            elif k == "CXXMemberCallExpr" and ks and ks[0].get("kind") == "MemberExpr" and ks[0].get("name") in ("at", "front", "back") and kids(ks[0]) and not KEYED.match(self.u.clean(qtype(kids(ks[0])[0]))) and not KEYED_KERN.match(self.u.clean(qtype(kids(ks[0])[0]))):
+            elif (k == "CXXMemberCallExpr" and ks and ks[0].get("kind") == "MemberExpr" and ks[0].get("name") in ("at", "front", "back") and kids(ks[0])
+                  and re.match(r"(const )?std::(vector|array)<", self.u.clean(qtype(kids(ks[0])[0])))):
+                # (an entry of a list of the library - not a function of the program that is called at())
                 base = kids(ks[0])[0]
                 if ks[0].get("isArrow") or base.get("kind") == "CXXThisExpr":
                     raise Wait("an entry by a pointer")
