@@ -9050,10 +9050,32 @@ class TestWriter:
         d = self.tree.records.get(q)
         return d is not None and any(self.actor_blueprint(b.get("type", {}).get("qualType", "")) for b in d.get("bases", []) or [])
 
+    said = ()
+
+    @staticmethod
+    def said_words(d):
+        """The words a function itself says (the texts written out in it that a text it is given may begin with or be:
+        "settings reset", "gps ", "on") - its texts are drawn from them too, with numbers and words after them, so that
+        what it does with a text is compared, not only what it does with one it does not know."""
+        out = []
+        for x in walk(d):
+            if x.get("kind") != "StringLiteral":
+                continue
+            raw = c_string(x["value"])
+            if not raw or len(raw) > 32 or any(ch < 32 or ch > 126 for ch in raw) or any(ch in b'%"{}\\[]' for ch in raw):
+                continue
+            w = raw.decode("ascii")
+            if w not in out:
+                out.append(w)
+        return tuple(out[:32])
+
+    def said_list(self):
+        return "{" + ", ".join(text_literal(w.encode("ascii")) for w in self.said) + "}"
+
     def draw(self, raw):
         c = self.u.clean(raw)
         if raw.replace(" ", "") in ("constchar*", "constchar*const"):
-            return "draw.c_word()"
+            return f"draw.said_c_word({self.said_list()})" if self.said else "draw.c_word()"
         q = self.u.object_of(raw)
         if q:   # (an object of the engine: one of a few the test keeps, by its handle)
             one = f"converted::engine_object<{self.object_name(q)}>(1 + draw.below(6))"
@@ -9081,9 +9103,10 @@ class TestWriter:
         if m:   # (a view of a list, handed to a function: the list)
             return self.draw("std::vector<" + re.sub(r"^const\s+", "", m.group(1)) + ">")
         if self.spell(raw) == "std::string":
-            return "draw.word()"
+            return f"draw.said_word({self.said_list()})" if self.said else "draw.word()"
         if self.spell(raw) == "std::string_view":
-            return "std::string_view(draw.c_word())"   # (the drawn words live as long as the test)
+            # (the drawn words live as long as the test)
+            return f"std::string_view(draw.said_c_word({self.said_list()}))" if self.said else "std::string_view(draw.c_word())"
         m = re.match(r"std::array<(.+),\s*(\d+)U?L?L?>$", c)
         if m:
             inner = template_args(c)[0]
@@ -10502,6 +10525,7 @@ class TestWriter:
                     names.append("a0")
                 first = len(names)
                 held_lists = []   # (the lists the source gets a pointer into: the list and the place - Unit.pointed)
+                self.said = self.said_words(d)
                 for p in params:
                     if self.u.is_logic(qtype(p)):
                         continue   # (the logic the actors' Blueprints run in: the source's own - no input of the Blueprint)
@@ -10531,6 +10555,7 @@ class TestWriter:
                     if not types[-1].startswith("const ") and not types[-1].endswith("&"):
                         moved.add(f"a{len(names)}")
                     names.append(f"a{len(names)}")
+                self.said = ()
                 if held_lists:
                     self.pointed = True
                     decl_lines.append("converted_pointed_lists = {" + ", ".join(f"{{reinterpret_cast<const unsigned char*>({x}.data()), reinterpret_cast<const unsigned char*>({x}.data() + {x}.size())}}" for x in held_lists) + "};")
