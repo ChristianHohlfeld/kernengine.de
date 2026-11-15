@@ -1249,10 +1249,19 @@ inline bool changeable(const kern::logic::Instance& inst, const char* name) {
   const kern::logic::Variable* v = inst.graph().variable(name);
   return v && !v->constant;
 }
-/// The Blueprint's variables set to the source's: false - one of them does not take its value.
+/// The Blueprint's variables set to the source's: false - one of them does not take its value. (A value that
+/// is not one of the variable's type - a field of another type somewhere in it - the Blueprint would hold as
+/// the type's default: that is no value it takes.)
+inline const char* g_untaken = "";   // (the variable that did not take its value)
 inline bool set_state(kern::logic::Instance& inst, const Variables& vars) {
-  for (const auto& [name, value] : vars)
-    if (changeable(inst, name) && !inst.set(name, value)) return false;
+  for (const auto& [name, value] : vars) {
+    if (!changeable(inst, name)) continue;
+    const kern::logic::Variable* v = inst.graph().variable(name);
+    if (!kern::logic::is_value_of(value, kern::logic::TypeRef{v->type, v->of, v->count}, inst.graph()) || !inst.set(name, value)) {
+      g_untaken = name;
+      return false;
+    }
+  }
   return true;
 }
 /// The variables after a call, as a struct of them in their order. Where the Blueprint has no such
@@ -1299,7 +1308,7 @@ struct Tally {
     if (left || !defined(want)) { ++outside; return; }
     if (state && !(set_state(*bp.native, *state) && set_state(*bp.interp, *state))) {
       ++compared;
-      if (++wrong <= 3) std::printf("  %s(%s): the Blueprint's variables do not take the values of the source's object\n", function, describe().c_str());
+      if (++wrong <= 3) std::printf("  %s(%s): the Blueprint's variables do not take the values of the source's object (%s)\n", function, describe().c_str(), g_untaken);
       return;
     }
     const auto parts = [&](std::vector<Value>& given) {
