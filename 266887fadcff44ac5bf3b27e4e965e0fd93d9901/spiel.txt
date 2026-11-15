@@ -1,0 +1,300 @@
+  cost: jet_roar_pcm: in 27 of 39 calls the class asks for memory more often than the source (up to 220 times instead of 219)
+ok   converted_game_gaps_cpp
+ok   converted_game_guided_cpp
+  cost: yaw_at: in 300 of 300 calls the class asks for memory more often than the source (up to 2 times instead of 0)
+  cost: clang_pcm: in 124 of 124 calls the class asks for memory more often than the source (up to 2 times instead of 1)
+ok   converted_game_lamps_cpp
+ok   converted_game_life_cpp
+  cost: clock_ms: in 1 of 300 calls the class asks for memory more often than the source (up to 2 times instead of 1)
+  note: box: 4 of 247 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 27 ms - is not run in the interpreter)
+  cost: box: in 242 of 247 calls the class asks for memory more often than the source (up to 180 times instead of 171)
+  note: cyl: 1 of 233 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 17 ms - is not run in the interpreter)
+  cost: cyl: in 230 of 233 calls the class asks for memory more often than the source (up to 1156 times instead of 1147)
+  note: glow_box: 1 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 23 ms - is not run in the interpreter)
+  cost: glow_box: in 223 of 300 calls the class asks for memory more often than the source (up to 1337 times instead of 1331)
+  note: glow_cyl: 3 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 18 ms - is not run in the interpreter)
+  cost: glow_cyl: in 217 of 300 calls the class asks for memory more often than the source (up to 593 times instead of 587)
+  cost: camera_frame: in 300 of 300 calls the class asks for memory more often than the source (up to 2 times instead of 0)
+  cost: euler: in 300 of 300 calls the class asks for memory more often than the source (up to 2 times instead of 0)
+ok   converted_game_look_cpp
+ok   converted_game_military_cpp
+ok   converted_game_net_cpp
+ok   converted_game_swarm_cpp
+ok   converted_game_toss_cpp
+ok   converted_game_town_cpp
+ok   converted_game_traffic_cpp
+ok   converted_game_weapons_cpp
+ok   converted_game_worldsync_cpp
+ok   converted_gaps_rules
+ok   converted_gaps_rules_cpp
+ok   converted_gps_live
+ok   converted_gps_live_cpp
+ok   converted_interiors
+  cost: clean: in 1 of 300 calls the class asks for memory more often than the source (up to 2 times instead of 0)
+  cost: Interiors_clear: in 1 of 300 calls the class asks for memory more often than the source (up to 21 times instead of 18)
+ok   converted_interiors_cpp
+  cost: Jet_spec: in 300 of 300 calls the class asks for memory more often than the source (up to 1 times instead of 0)
+ok   converted_jet
+  cost: Jet_new: in 300 of 300 calls the class asks for memory more often than the source (up to 1 times instead of 0)
+ok   converted_jet_cpp
+ok   converted_jet_seats
+  note: Field_reset_broken: 1 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 9 ms - is not run in the interpreter)
+ok   converted_lamps
+  note: Field_near: 2 of 45 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 99 ms - is not run in the interpreter)
+ok   converted_lamps_cpp
+  cost: Life_ragdolls_2: in 240 of 300 calls the class asks for memory more often than the source (up to 22 times instead of 2)
+  note: Life_birds: 1 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 11 ms - is not run in the interpreter)
+  note: Life_pet_body: 2 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 13 ms - is not run in the interpreter)
+  note: Life_anchor_of: 2 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 12 ms - is not run in the interpreter)
+  note: Life_cow_hits: 1 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 11 ms - is not run in the interpreter)
+  note: Life_honks: 1 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 12 ms - is not run in the interpreter)
+ok   converted_life
+  cost: rot: in 300 of 300 calls the class asks for memory more often than the source (up to 2 times instead of 0)
+  cost: at: in 300 of 300 calls the class asks for memory more often than the source (up to 2 times instead of 0)
+  cost: sc3: in 300 of 300 calls the class asks for memory more often than the source (up to 2 times instead of 0)
+  cost: LifeArt_put: in 300 of 300 calls the class asks for memory more often than the source (up to 9 times instead of 2)
+ok   converted_life_art_cpp
+  note: Life_hold_pigeon: 1 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 17 ms - is not run in the interpreter)
+  note: Life_spook_pigeons: 1 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 13 ms - is not run in the interpreter)
+  cost: Life_provoke_cat: in 1 of 300 calls the class asks for memory more often than the source (up to 2 times instead of 0)
+  note: Life_set_remote_animals: 1 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 36 ms - is not run in the interpreter)
+  cost: Life_set_remote_animals: in 2 of 300 calls the class asks for memory more often than the source (up to 59 times instead of 55)
+  note: Life_scream: 2 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 13 ms - is not run in the interpreter)
+ok   converted_life_cpp
+ok   converted_look
+ok   converted_look_cpp
+  note: MpArt_ready: 1 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 17 ms - is not run in the interpreter)
+ok   converted_mp_art
+  note: MpArt_put: 1 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 30 ms - is not run in the interpreter)
+  cost: MpArt_put: in 300 of 300 calls the class asks for memory more often than the source (up to 9 times instead of 2)
+  cost: MpArt_ping: in 176 of 176 calls the class asks for memory more often than the source (up to 35 times instead of 6)
+  cost: MpArt_tracer: in 300 of 300 calls the class asks for memory more often than the source (up to 12 times instead of 2)
+  note: MpArt_flash: 1 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 30 ms - is not run in the interpreter)
+  cost: MpArt_flash: in 300 of 300 calls the class asks for memory more often than the source (up to 12 times instead of 2)
+  cost: MpArt_drone_accent: in 148 of 148 calls the class asks for memory more often than the source (up to 30 times instead of 4)
+  cost: MpArt_shield: in 300 of 300 calls the class asks for memory more often than the source (up to 12 times instead of 2)
+ok   converted_mp_art_cpp
+  note: VoiceStream_speaking: 1 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 16 ms - is not run in the interpreter)
+ok   converted_mp_rules
+  cost: NavTimeline_push: in 1 of 300 calls the class asks for memory more often than the source (up to 3 times instead of 1)
+ok   converted_mp_rules_cpp
+ok   converted_mvt
+ok   converted_mvt_cpp
+  cost: config: in 300 of 300 calls the class asks for memory more often than the source (up to 3 times instead of 1)
+ok   converted_net_session_cpp
+  cost: addm: in 138 of 138 calls the class asks for memory more often than the source (up to 2 times instead of 0)
+  cost: subm: in 172 of 172 calls the class asks for memory more often than the source (up to 2 times instead of 0)
+  note: mulm: 300 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 9 ms - is not run in the interpreter)
+  cost: mulm: in 300 of 300 calls the class asks for memory more often than the source (up to 570 times instead of 0)
+  note: powm: 10 of 10 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 2082 ms - is not run in the interpreter)
+  cost: powm: in 10 of 10 calls the class asks for memory more often than the source (up to 197802 times instead of 0)
+  note: powm: 10 calls compared (they take 20 s; of a function whose calls take less, twenty at least are)
+  cost: reduce: in 300 of 300 calls the class asks for memory more often than the source (up to 1 times instead of 0)
+ok   converted_nostr_cpp
+ok   converted_people
+  cost: rot: in 300 of 300 calls the class asks for memory more often than the source (up to 2 times instead of 0)
+  cost: at: in 300 of 300 calls the class asks for memory more often than the source (up to 2 times instead of 0)
+  cost: PeopleArt_put: in 300 of 300 calls the class asks for memory more often than the source (up to 9 times instead of 2)
+  note: PeopleArt_street_lamp: 1 of 119 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 9 ms - is not run in the interpreter)
+  cost: PeopleArt_street_lamp: in 119 of 119 calls the class asks for memory more often than the source (up to 31 times instead of 4)
+  cost: PeopleArt_beacon: in 238 of 238 calls the class asks for memory more often than the source (up to 18 times instead of 2)
+  cost: PeopleArt_light_bar: in 88 of 88 calls the class asks for memory more often than the source (up to 43 times instead of 7)
+  cost: PeopleArt_fire: in 92 of 92 calls the class asks for memory more often than the source (up to 36 times instead of 6)
+  cost: PeopleArt_police_drone: in 28 of 28 calls the class asks for memory more often than the source (up to 94 times instead of 10)
+ok   converted_people_art_cpp
+  cost: People_route_point: in 26 of 300 calls the class asks for memory more often than the source (up to 1 times instead of 0)
+ok   converted_people_cpp
+ok   converted_perf
+ok   converted_perf_cpp
+  cost: box_entry: in 300 of 300 calls the class asks for memory more often than the source (up to 3 times instead of 0)
+  cost: hit: in 300 of 300 calls the class asks for memory more often than the source (up to 6 times instead of 0)
+ok   converted_person_hit
+ok   converted_qr_code
+  note: rs_divisor: 5 of 31 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 148 ms - is not run in the interpreter)
+  note: rs_remainder: 5 of 20 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 1054 ms - is not run in the interpreter)
+ok   converted_qr_code_cpp
+  note: Ragdolls_init: 1 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 15 ms - is not run in the interpreter)
+  note: Ragdolls_take_ups: 1 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 25 ms - is not run in the interpreter)
+ok   converted_ragdoll
+  note: Ragdolls_has: 1 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 14 ms - is not run in the interpreter)
+  note: Ragdolls_bone_body: 1 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 14 ms - is not run in the interpreter)
+  cost: Ragdolls_bone_body: in 1 of 300 calls the class asks for memory more often than the source (up to 5 times instead of 0)
+  cost: Ragdolls_release: in 1 of 108 calls the class asks for memory more often than the source (up to 290 times instead of 284)
+  note: Ragdolls_remove: 1 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 17 ms - is not run in the interpreter)
+  note: Ragdolls_begin_getup: 2 of 63 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 25 ms - is not run in the interpreter)
+  note: Ragdolls_active: 1 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 20 ms - is not run in the interpreter)
+ok   converted_ragdoll_cpp
+ok   converted_rigid_spec
+ok   converted_road_graph
+  cost: RoadGraph_node_at: in 2 of 225 calls the class asks for memory more often than the source (up to 4 times instead of 2)
+  cost: RoadGraph_rebuild: in 8 of 123 calls the class asks for memory more often than the source (up to 17 times instead of 14)
+ok   converted_road_graph_cpp
+ok   converted_settings
+ok   converted_sound_fx
+  cost: SoundFx_drive: in 3 of 300 calls the class asks for memory more often than the source (up to 7 times instead of 6)
+  cost: SoundFx_update: in 1 of 300 calls the class asks for memory more often than the source (up to 141 times instead of 138)
+ok   converted_sound_fx_cpp
+ok   converted_terrain
+ok   converted_terrain_cpp
+ok   converted_tiles
+  note: procedural_city: 3 of 20 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 8 ms - is not run in the interpreter)
+ok   converted_tiles_cpp
+ok   converted_touch_play
+  note: TouchPlay_take_drag: 1 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 13 ms - is not run in the interpreter)
+ok   converted_touch_play_cpp
+  cost: kind_of: in 1 of 300 calls the class asks for memory more often than the source (up to 4 times instead of 0)
+ok   converted_town_sync_cpp
+  cost: rot: in 300 of 300 calls the class asks for memory more often than the source (up to 2 times instead of 0)
+  cost: at: in 300 of 300 calls the class asks for memory more often than the source (up to 2 times instead of 0)
+  cost: VehicleArt_put: in 300 of 300 calls the class asks for memory more often than the source (up to 9 times instead of 2)
+  cost: VehicleArt_car: in 25 of 25 calls the class asks for memory more often than the source (up to 128 times instead of 13)
+  cost: VehicleArt_jet: in 113 of 113 calls the class asks for memory more often than the source (up to 81 times instead of 11)
+  note: VehicleArt_parachute: 1 of 36 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 17 ms - is not run in the interpreter)
+  cost: VehicleArt_parachute: in 36 of 36 calls the class asks for memory more often than the source (up to 100 times instead of 8)
+ok   converted_vehicle_art_cpp
+ok   converted_water_look
+  cost: WaterLook_vertex_declarations: in 300 of 300 calls the class asks for memory more often than the source (up to 1 times instead of 0)
+  cost: WaterLook_vertex: in 300 of 300 calls the class asks for memory more often than the source (up to 1 times instead of 0)
+  cost: WaterLook_fragment_declarations: in 300 of 300 calls the class asks for memory more often than the source (up to 1 times instead of 0)
+  cost: WaterLook_fragment_surface: in 300 of 300 calls the class asks for memory more often than the source (up to 1 times instead of 0)
+ok   converted_water_look_cpp
+  cost: spec: in 16 of 300 calls the class asks for memory more often than the source (up to 1 times instead of 0)
+ok   converted_weapons
+ok   converted_world_art
+  note: WorldArt_begin: 1 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 13 ms - is not run in the interpreter)
+  cost: WorldArt_put: in 12 of 300 calls the class asks for memory more often than the source (up to 8 times instead of 2)
+ok   converted_world_art_cpp
+ok   converted_world_marks_cpp
+ok   converted_world_traffic
+ok   converted_world_traffic_cpp
+ok   car_ride_height
+ok   car_accelerates_and_brakes
+ok   car_steers_left
+ok   car_ai_driver_reaches_target
+ok   bus_drives
+ok   bus_dropped_does_not_bounce_higher
+ok   bus_takes_kerbs_without_flying
+ok   bus_at_traffic_rate_takes_kerbs
+ok   combat_military_escalation
+ok   combat_flak_cells
+ok   combat_tempers
+ok   combat_zombie_rounds
+ok   combat_fun_bank
+ok   combat_chaos_combo
+ok   combat_race_gates
+ok   controls_dead_zones
+ok   controls_fps_stick
+ok   controls_look_rates
+ok   controls_drone_sticks
+ok   controls_mouse_and_look
+ok   controls_pad_buttons
+ok   controls_grenade_cook
+ok   controls_devices
+ok   controls_touch_foot
+ok   controls_touch_vehicles
+ok   controls_aim_assist
+     Controls as its C++ class, per call: GamepadAxis 3798 ns, ShapeFpsStick 6689 ns, GrenadeStep 14076 ns
+ok   controls_call_cost
+ok   controls_numbers_cross_exactly
+ok   destruction_floors_collapse_and_reset
+  CombatDetail.ClockUpdate from C++: 6999 ns as its class, 157747 ns in the interpreter (this build checks every memory access)
+ok   details_blueprint
+ok   guided_cruise_dive_and_fuze
+ok   guided_turn_limit_and_dodge
+ok   guided_pick_score
+ok   details_critical_clocks
+ok   details_bullet_momentum
+ok   details_combat_audio_bank
+ok   drone_mass_properties
+ok   drone_calibrates_arms_and_hovers
+ok   drone_flies_along_its_nose
+ok   drone_yaw_and_climb
+ok   drone_angle_mode_throttle
+ok   drone_clearance_law
+ok   drone_roll_moves_right
+ok   equipment_jetpack
+ok   equipment_flight_log
+ok   equipment_music
+ok   gaps_crossing_junctions
+ok   spawn_guard_rules
+ok   vehicle_clearance_sat
+ok   gaps_sirens
+ok   gaps_smoke
+ok   gaps_visual_pose
+ok   gaps_street_lamps
+ok   gaps_jet_seats
+ok   jet_rests_on_gear
+ok   jet_vertical_takeoff_and_hover
+ok   jet_transition_and_climb
+ok   jet_arcade_dogfight_turns
+ok   jet_soft_landing
+ok   jet_air_density
+ok   life_ragdoll_falls_and_rests
+ok   life_ragdoll_gets_up
+ok   life_interior_plan_and_stairs
+ok   life_cows_birds_shots
+ok   life_dogs_cats_black_cat
+ok   perf_meter_laps
+ok   perf_governor_steps_down_and_up
+ok   look_camera_shake
+ok   look_fpv_stabilizer
+ok   look_speed_lines
+ok   look_day_clock
+ok   look_lights
+ok   map_tile_math
+ok   map_mvt_round_trip
+ok   map_procedural_city
+ok   map_line_clipped_to_square
+ok   mp_pose_timeline_interpolates_on_sender_clock
+ok   mp_rules[spawncity net] message type 25 (146322 bytes) was not sent
+_damage_regen_spawn_vote
+ok   mp_voice_codec_and_stream
+ok   mp_navigation_math
+ok   mp_sessions_host_two_clients
+ok   mp_a_client_keeps_asking_until_the_host_answers
+ok   mp_host_leaves_the_oldest_takes_over
+ok   mp_qr_code_structure
+ok   mp_swarm_police_and_enemies_are_seen_by_the_others
+ok   mp_people_note_hits_on_a_mates_unit
+ok   mp_swarm_larger_than_one_message_arrives_whole
+ok   mp_town_a_clients_hits_reach_the_host
+ok   mp_town_state_for_a_late_joiner
+ok   nostr_sha256
+ok   nostr_bip340_vectors
+ok   rules_wanted_blueprint
+ok   rules_wanted_unbound
+ok   rules_wanted_blueprint_is_its_cpp
+ok   rules_wanted_levels
+ok   rules_wanted_escape
+ok   settings_defaults_and_ranges
+ok   start_gps_live_filter
+ok   stream_tile_pipeline
+ok   stream_offline_town
+ok   terrain_crater_profile
+ok   terrain_bare_earth
+ok   terrain_dem_tiles
+ok   terrain_water
+ok   terrain_ground_imagery
+ok   town_road_graph_route
+ok   town_people_hits_and_crimes
+ok   town_passerby_hit_model
+ok   town_people_flee_and_walls
+ok   traffic_junctions_and_lights
+ok   traffic_first_come_and_people
+ok   traffic_keeps_its_distance
+ok   traffic_pursuit_point
+214 tests, 3050 checks, 0 failures
+ok   the game's own sources compile (31 files)
+/tmp/spawncity-tests/native/blueprint_native_main.cpp: In function ‘void run_Controls(std::string&, std::string&)’:
+/tmp/spawncity-tests/native/blueprint_native_main.cpp:7514:13: note: variable tracking size limit exceeded with ‘-fvar-tracking-assignments’, retrying without
+ 7514 | static void run_Controls(std::string& got, std::string& hosted) {
+      |             ^~~~~~~~~~~~
+/tmp/spawncity-tests/native/blueprint_native_main.cpp: In function ‘void run_JetSeats(std::string&, std::string&)’:
+/tmp/spawncity-tests/native/blueprint_native_main.cpp:2715:13: note: variable tracking size limit exceeded with ‘-fvar-tracking-assignments’, retrying without
+ 2715 | static void run_JetSeats(std::string& got, std::string& hosted) {
+      |             ^~~~~~~~~~~~
+/tmp/spawncity-tests/native/blueprint_native_main.cpp: In function ‘void run_Multiplayer(std::string&, std::string&)’:
+/tmp/spawncity-tests/native/blueprint_native_main.cpp:12427:13: note: variable tracking size limit exceeded with ‘-fvar-tracking-assignments’, retrying without
+12427 | static void run_Multiplayer(std::string& got, std::string& hosted) {
+      |             ^~~~~~~~~~~~~~~
+ok   blueprint_native_test (17 Blueprints as their C++, 6949 calls on the class and by name through logic::Instance)

@@ -1,0 +1,203 @@
+ok   math_matrices
+ok   math_camera
+ok   bvh_matches_brute_force
+ok   earcut_shapes
+ok   weld_and_hash
+ok   building_builder
+ok   road_and_terrain_builders
+ok   primitives_closed
+ok   renderer_meshes
+ok   renderer_frame
+ok   renderer_lines_and_layers
+ok   renderer_context_loss
+ok   particles_and_lights
+ok   stream_guards
+ok   renderer_id_ownership
+ok   renderer_instance_updates
+ok   renderer_mirrored_instances
+ok   renderer_restore_failure_and_queries
+ok   primitives_capsule_torus
+ok   physics_query_filter_is_box3ds
+ok   level_collision_channels_have_names
+ok   physics_world_bodies_and_events
+ok   physics_joints_and_grab
+ok   physics_scale_is_a_unit_system
+ok   physics_mesh_data_freed_with_its_shape
+ok   physics_hull_mesh
+ok   json_numbers_match_javascript
+ok   json_base64_carries_binary_data
+ok   json_parse_and_stringify
+ok   renderer_orthographic_camera
+ok   game_euler_and_transforms
+ok   game_level_round_trip_and_validation
+ok   game_body_planning
+ok   game_city_generation
+ok   game_world_presentation
+ok   game_world_orb_run_play
+ok   game_world_physics_lab
+ok   game_world_rules
+ok   game_orbit_camera_mouse_sense
+ok   game_soldier_moves_shoots_and_respawns
+ok   logic_flow_variables_and_latent_nodes
+ok   logic_sequence_gates_switch_and_events
+ok   logic_state_machine_timers_events_conditions
+ok   logic_formulas
+ok   logic_local_variables
+ok   logic_call_on_actor
+ok   logic_functions
+ok   logic_lists
+ok   logic_enums
+ok   logic_checks_and_infinite_loops
+ok   logic_random_nodes_have_their_own_sequences
+ok   logic_tween_and_every
+ok   game_logic_graphs_drive_the_world
+ok   logic_tier_cases_interpreter
+ok   logic_structs
+ok   logic_notation_tier_cases
+ok   logic_notation_every_node_type
+ok   logic_notation_reads_what_a_person_writes
+ok   logic_native_blueprints
+ok   game_blueprints_as_classes
+ok   logic_fixed_lists
+ok   logic_notation_hands_over
+ok   logic_notation_refuses_with_place_and_reason
+ok   logic_libraries
+ok   logic_constants
+ok   logic_notation_rules_are_errors_of_the_graph
+ok   logic_notation_survives_any_text
+ok   logic_notation_apply_keeps_ids_and_places
+ok   game_character_mover
+ok   audio_mixer_panning_and_limits
+ok   audio_mixer_resampling_and_stereo
+ok   audio_mixer_spatial
+ok   audio_mixer_voice_stealing
+ok   audio_builtin_library
+ok   audio_level_fields_round_trip
+ok   audio_collider_impact_sounds
+ok   audio_game_world_cues
+ok   audio_imported_sounds_in_the_bank
+ok   net_serialization
+ok   net_endpoint_acks_and_fragments
+ok   net_reliable_channel_under_bad_network
+ok   net_client_server
+ok   game_shooting_range_template
+ok   net_game_soldier_replication
+ok   net_game_replicates_logic_changes
+ok   net_game_server_and_clients
+ok   studio_observer_camera_grabs_bodies
+ok   studio_lehrer_poses_the_duck_on_its_stage
+ok   studio_lehrer_a_posed_limb_rests_where_the_hand_rests
+ok   studio_lehrer_keeps_what_the_duck_learned_in_the_level
+ok   studio_simulate_drags_bodies_without_ctrl
+ok   studio_starts_with_orb_run
+ok   studio_fly_and_orbit
+ok   studio_spawn_every_catalog_item_and_simulate
+ok   studio_gizmo_translate_and_undo
+ok   studio_left_mouse_selects_and_never_drags_actors
+ok   studio_audio_integration
+ok   studio_soldier_input_and_hud
+ok   input_device_arbiter_rules
+ok   touch_controls_layout_and_sticks
+ok   studio_touch_navigates_the_editor_viewport
+ok   studio_touch_play_without_pointer_lock
+ok   soldier_models_are_closed_and_outward
+ok   soldier_art_in_play
+ok   micro_duck_policy_matches_the_onnx_reference
+ok   micro_duck_stands_walks_and_turns_on_its_policy
+ok   switching_levels_keeps_the_new_levels_meshes
+ok   micro_duck_stands_on_the_floor
+ok   micro_duck_holds_itself_steady
+ok   micro_duck_policy_loader_reads_the_onnx_files
+ok   micro_duck_rolls_forward_on_its_skates
+ok   lehrer_mlp_gradient_matches_finite_differences
+ok   lehrer_adam_fits_a_curve_and_the_normaliser_tracks
+ok   lehrer_motion_keyframes_are_valid_and_match_the_50hz_controller
+  reach: return -5.386 -> -0.820
+ok   lehrer_ppo_learns_to_reach
+  reach (2 collectors): return -5.163 -> -0.886
+ok   lehrer_ppo_learns_from_collectors_elsewhere
+ok   determinism_is_bit_identical_across_builds_and_platforms
+ok   lehrer_runs_the_same_on_any_number_of_workers
+    servo calibration: fit 125.77 -> 1.397 mrad, held out 93.75 -> 1.269 mrad (481 runs)
+    K 0.433 (0.443) D 0.0674 (0.0689) F 0.0064 (0.0072) T 0.919 (0.867) A 0.00216 (0.00216) delay 0.029 (0.030)
+ok   lehrer_calibrates_a_servo_from_bench_logs
+    robot log, 120 ticks: same servos 0.0000 rad, nominal servos joints 0.0045 rad, gyro 0.0166 rad/s
+ok   lehrer_replays_robot_logs_against_the_simulation
+ok   lehrer_exports_onnx_like_pollens_networks
+ok   micro_duck_jumps_for_real_in_the_studio
+ok   game_level_keeps_learned_motions
+ok   micro_duck_plays_the_motions_its_level_taught
+ok   micro_duck_jumps_with_a_network_trained_in_kern
+ok   micro_duck_observation_between_ticks_is_what_its_controller_sees
+ok   lehrer_free_scenario_defines_physics_goals_and_rewards
+  headless duck: 573 control ticks/s (11.5x real time, sanitizer build)
+ok   lehrer_duck_env_runs_episodes_headless
+ok   micro_duck_walks_with_the_robot_daemons_action_profile
+ok   micro_duck_walks_on_its_alpha_gait
+ok   micro_duck_runs_every_move_of_its_set
+ok   micro_duck_servo_load_drives_its_sound
+ok   micro_duck_steps_and_taps_sound
+ok   micro_duck_joints_stay_in_their_ranges
+ok   micro_duck_speaks_with_its_own_voice
+ok   micro_duck_picks_up_a_sock
+ok   micro_duck_answers_and_melts_when_petted
+ok   micro_duck_camera_sees_the_floor_in_front_when_looking_down
+ok   physics_materials_of_meshes_and_the_ground
+ok   micro_duck_plays_with_a_ball_on_its_own
+ok   micro_duck_plays_ball_as_pollens_brain_does
+ok   micro_duck_pickup_detector_matches_onnxruntime
+ok   micro_duck_pauses_in_the_hand_and_walks_when_put_down
+ok   micro_duck_goes_for_a_sock_and_bites
+ok   micro_duck_roams_on_its_own_with_its_tof
+ok   micro_duck_looks_around_when_left_alone
+ok   micro_duck_blueprint_nodes_drive_and_sense
+ok   micro_duck_example_level_runs
+ok   studio_robot_template_compiles
+ok   micro_duck_builds_from_its_mjcf
+ok   studio_player_presets_and_gameplay_blocks
+ok   game_gameplay_blocks
+ok   studio_shortcuts_follow_the_keyboard_layout
+ok   studio_logic_functions
+ok   studio_logic_local_variables
+ok   studio_logic_reference_inputs
+ok   studio_logic_libraries
+ok   studio_logic_call_on_actor
+ok   studio_logic_project_types
+ok   studio_logic_cpp_view
+ok   studio_logic_editor_commands
+ok   studio_logic_lists
+ok   studio_logic_enums
+ok   studio_logic_structs
+ok   studio_blueprint_breakpoints_pause_the_game
+ok   studio_blueprint_comments_reroutes_promote
+ok   studio_multiplayer_play
+ok   studio_shortcuts_and_commands
+ok   studio_outliner_hierarchy
+ok   studio_play_orb_run
+    orbRun: worst on-screen shake 0.026 deg
+    physicsLab: worst on-screen shake 0.020 deg
+ok   studio_fast_player_does_not_shake_on_screen
+ok   studio_simulate_keep_changes
+ok   studio_save_load_and_textures
+    seed 19088743: 30 history steps, 9 actors
+    seed 12648430: 76 history steps, 43 actors
+    seed 20261022: 103 history steps, 31 actors
+ok   studio_undo_redo_is_exact_and_deterministic
+ok   studio_undo_transactions_and_dirty_state
+ok   studio_autosave_only_while_unsaved
+ok   studio_user_settings
+ok   studio_player_only
+ok   app_input_and_args
+26665 checks, 0 failures
+/tmp/kern-tests/native_gen/blueprint_native_main.cpp: In function ‘void run_Nodes(std::string&, std::string&)’:
+/tmp/kern-tests/native_gen/blueprint_native_main.cpp:5117:13: note: variable tracking size limit exceeded with ‘-fvar-tracking-assignments’, retrying without
+ 5117 | static void run_Nodes(std::string& got, std::string& hosted) {
+      |             ^~~~~~~~~
+/tmp/kern-tests/native_gen/blueprint_native_main.cpp: In function ‘void run_Structs(std::string&, std::string&)’:
+/tmp/kern-tests/native_gen/blueprint_native_main.cpp:1146:13: note: variable tracking size limit exceeded with ‘-fvar-tracking-assignments’, retrying without
+ 1146 | static void run_Structs(std::string& got, std::string& hosted) {
+      |             ^~~~~~~~~~~
+ok   blueprint_native_test (41 Blueprints as their C++, 7064 calls on the class and by name through logic::Instance)
+/tmp/kern-tests/game_native_gen/arena_blueprints.cpp: 6 of 8 Blueprint(s) as C++ classes
+/tmp/kern-tests/game_native_gen/robot_blueprints.cpp: 1 of 1 Blueprint(s) as C++ classes
+ok   game_native_test (9 Blueprints of two levels as their C++ classes, 705 lines compared with the interpreter's)
