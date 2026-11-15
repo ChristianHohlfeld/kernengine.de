@@ -8077,6 +8077,7 @@ class TestWriter:
         # pieces its test holds, and the pieces by their places
         self.closures, self.pieces = unit.world.closures or {}, unit.world.pieces or {}
         self.more_engine, self.more_objects = {}, set()   # what those pieces call and hold of the engine
+        self.free_stand_ins = {}   # a free function of the engine the test has a stand-in of -> (its declaration, its definition, its pair) - see items
 
     # ---- the source, with a Blueprint's numbers ----
     QUOTED = re.compile(r'''(R"([^()\\\s]{0,16})\((?:.|\n)*?\)\2"|"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])+'|//[^\n]*|/\*(?:.|\n)*?\*/)''')
@@ -9206,6 +9207,7 @@ class TestWriter:
             chunks.append((tree.place(d), ("engine", d["id"]), "".join(f"struct {n}; " for n in named) + head + a + tail))
             defs.append((("engine", d["id"]), head + b + tail))
             pairs.append(("::" + tree.scope_of.get(d["id"], "") + d["name"], "::".join(spaces + [d["name"]])))
+            self.free_stand_ins[d["id"]] = (chunks[-1][2], defs[-1][1], pairs[-1])
         if os.environ.get("STAND_INS"):
             for _, key, text in chunks:
                 sys.stderr.write(f"{key}: {text}\n")
@@ -9596,8 +9598,8 @@ class TestWriter:
                     continue
                 d = self.at(place)
                 if d is None:   # (not in this file's reach: the piece as the other file's test has it)
-                    if kind not in ("member", "inside", "engine"):
-                        G.foreign[place] = piece
+                    if kind not in ("member", "inside", "engine") or (kind == "engine" and piece.get("stand_in")):
+                        G.foreign[place] = piece   # (a function of the engine this file does not see: the other test's stand-in of it)
                 elif kind in ("function", "inside", "freed"):
                     want_function(d["id"])
                 elif kind == "template":
@@ -9996,7 +9998,9 @@ class TestWriter:
         # what of the engine the pieces call and hold: the test that takes them has its own stand-ins
         for d in self.engine_called(G).values():
             if d.get("_at", (None, None))[1] is not None:
-                out.append(((-1, 0), self.ident(d), {"kind": "engine"}))
+                # (of a free function: its stand-in as this test has it - for a test whose file does not see its header)
+                said = self.free_stand_ins.get(d["id"])
+                out.append(((-1, 0), self.ident(d), {"kind": "engine", **({"stand_in": [said[0], said[1]], "pairs": [said[2]]} if said else {})}))
         words = set(re.findall(r"[A-Za-z_]\w*", "\n".join([*sources, *(p.get("text", "") for _, _, p in out)])))
         for q in sorted(u.objects_seen | G.objects):
             if q.split("::")[-1] in words:
@@ -10122,7 +10126,8 @@ class TestWriter:
                 if self.widen(piece["text"]) in said_consts:
                     continue
                 said_consts.add(self.widen(piece["text"]))
-            foreign_chunks.append(((first[0], first[1] - 0.5, i), ("foreign", place), None))
+            # (the stand-in of a function of the engine this file does not see: before the pieces that call it)
+            foreign_chunks.append(((first[0], first[1] - (0.75 if piece["kind"] == "engine" else 0.5), i), ("foreign", place), None))
         # The Blueprints of the level's actors the source calls on them (kern::logic::ActorBlueprint): the test runs
         # them (converted::Blueprint, RuleBlueprint) - for the source, bound to the objects it calls them by, and
         # for the Blueprint beside it, where actor_find finds them (the host's find_actor); the engine is the
@@ -10343,16 +10348,20 @@ class TestWriter:
                 except Wait:
                     pass
         object_chunks, object_defs = self.stand_ins(pairs)
+        for place, piece in G.foreign.items():   # (the stand-ins other tests hand on: defined with this test's own)
+            if piece["kind"] == "engine":
+                pairs += [tuple(x) for x in piece.get("pairs", ())]
+                object_defs.append((("foreign", place), piece["stand_in"][1]))
         rename = self.renamer(pairs)
         wide = lambda text: rename(self.widen(text))
         # the pieces of other files: named as there - a file's own names first, see `exports`
-        outer = [pair for p in G.foreign.values() if not p["local"] for pair in p["pairs"]]
+        outer = [pair for p in G.foreign.values() if not p.get("local") for pair in p.get("pairs", ())]
         named_spaces = [tuple(s) for p in G.foreign.values() for s in p.get("spaces", ())]
         renamers = {}
         def wide_of(piece):
             h = piece.get("home")
             if h not in renamers:
-                mine = [pair for p in G.foreign.values() if p["local"] and p.get("home") == h for pair in p["pairs"]] if h else []
+                mine = [pair for p in G.foreign.values() if p.get("local") and p.get("home") == h for pair in p.get("pairs", ())] if h else []
                 renamers[h] = self.renamer([*mine, *pairs, *outer], named_spaces)
             return lambda text: renamers[h](self.widen(text))
         # a name of the program or the engine that is still written out in full: not the test's own
@@ -10407,6 +10416,9 @@ class TestWriter:
                 if key[0] == "foreign":
                     piece = G.foreign[key[1]]
                     there = wide_of(piece)   # (a piece of another file alone stands in its namespace: its text says so - see `items`)
+                    if piece["kind"] == "engine":
+                        add(key, wide(piece["stand_in"][0]))
+                        continue
                     if piece["kind"] != "record":
                         add(key, self.with_usings(there(piece["text"]), piece.get("usings", ()), there, () if piece["kind"] not in ("enum", "alias") else set(re.findall(r"\b(?:enum\s+(?:class\s+|struct\s+)?|using\s+)(\w+)", piece["text"])),
                                                   [a for a, _ in piece.get("pairs", ())]))
