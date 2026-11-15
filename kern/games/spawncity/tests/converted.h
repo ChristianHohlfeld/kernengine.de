@@ -419,7 +419,8 @@ template <class S, class Key> S draw_set(Draw& draw, Key key) {
 
 // ---- the engine in a test ----
 // A converted function that calls the engine calls a node of the engine in its Blueprint (kern/logic/
-// engine_api.h). In a test both go to a stand-in that answers from the call itself and keeps every call:
+// engine_api.h). In a test both go to a stand-in that answers from the call itself and keeps every call
+// (or, SC_ENGINE=real, to the engine itself, each side with objects of its own - sc::real_engine):
 // the source through the stand-in classes the test has for the engine's (they derive from EngineObject -
 // an object of the engine is a handle in the Blueprint), the Blueprint through its host. The two must
 // have asked the same, call for call (Tally::take).
@@ -503,13 +504,15 @@ template <class T> T* engine_object(long long handle) {
   object->kern_handle = static_cast<long long>(static_cast<unsigned long long>(handle) % 8);
   return object;
 }
-/// What the source asked the engine in the call being compared.
+/// What the source asked the engine in the call being compared - and, where the test runs on the engine
+/// itself (SC_ENGINE=real: sc::real_engine), the source's objects of the engine in that call.
 inline kern::logic::EngineStandIn g_source_engine;
+inline kern::logic::EngineObjects g_source_objects;
 inline std::vector<Value> engine_call(const char* function, const std::vector<Value>& in) {
   std::vector<Value> out;
   if (const kern::logic::EngineFunction* f = kern::logic::engine_function(function))
     for (const kern::logic::EnginePin& p : f->outputs) out.push_back(Value::zero(p.type));
-  g_source_engine.engine(function, in, out);
+  test_engine(g_source_engine, g_source_objects, function, in, out);
   return out;
 }
 /// What a stand-in's constructor is given by the engine: the handle of the object it made, its own.
@@ -1191,6 +1194,7 @@ struct Blueprint {
       source = std::make_unique<RuleBlueprint>(nullptr, nullptr, true, actors);
       source->rt.budget = 2000000000u;
       source->host.keeps = &g_source_engine;   // (what the actors ask the engine for the source: what the source asks)
+      source->host.keeps_objects = &g_source_objects;
       SC_CHECK(source->problems.empty(), "%s: %s", actor, source->problems.c_str());
       interpreted_actors.keep(*interpreted, actors);
       compiled_actors.keep(*compiled, actors);
@@ -1208,6 +1212,7 @@ struct Blueprint {
   const std::vector<std::string>& calls(bool in_class) { return (in_class ? compiled : interpreted)->host.stand_in.calls; }
   void before_call(bool in_class) {
     (in_class ? compiled : interpreted)->host.stand_in.calls.clear();
+    if (real_engine()) fresh_engine((in_class ? compiled : interpreted)->host.objects);
     (in_class ? compiled_actors : interpreted_actors).restore();
   }
   /// The actors' variables after the calls: the same in the source's runtime and in the Blueprint's.
@@ -1661,6 +1666,7 @@ struct Watch {
     g_open = false;
     g_open_reads = 0;
     g_source_engine.calls.clear();
+    if (real_engine()) fresh_engine(g_source_objects);
   }
   bool left() const { return g_open || std::fetestexcept(FE_DIVBYZERO | FE_INVALID) != 0; }
 };

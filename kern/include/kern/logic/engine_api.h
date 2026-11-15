@@ -73,5 +73,8 @@ struct EngineStandIn {
 };
 /// A value as the stand-in writes it down: every number with all its digits.
 std::string engine_shown(const Value& v);
+/// A call as the stand-in writes it down - "engine.world.pose(1, {2, 0})": what a test compares between
+/// two sides that call the engine (the stand-in, or the engine itself).
+std::string engine_call_shown(std::string_view function, const std::vector<Value>& in);
 
 }  // namespace kern::logic
