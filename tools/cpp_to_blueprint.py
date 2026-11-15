@@ -8288,6 +8288,16 @@ class TestWriter:
                 for c in ks[-1:]:
                     visit(c, depth + 1)
                 return
+            if k == "CXXOperatorCallExpr" and len(ks) == 2:
+                callee = bare(ks[0])
+                while callee.get("kind") == "ImplicitCastExpr" and kids(callee):
+                    callee = bare(kids(callee)[0])
+                if (callee.get("referencedDecl") or {}).get("name") in ("operator*", "operator->") and re.match(r"(?:const\s+)?std::(?:unique_ptr|optional)<", self.u.clean(qtype(ks[1]))):
+                    # what may be there or not, read where it is (`*p`, `p->x`): one that holds nothing C++ leaves
+                    # open - the call is given up (converted::present)
+                    xa, xb = span(ks[1])
+                    edits.append((xa, 2, depth, xa, "converted::present("))
+                    edits.append((xb, 0, -depth, xb, ")"))
             name = None
             if k == "CXXOperatorCallExpr" and len(ks) == 3:
                 callee = bare(ks[0])
