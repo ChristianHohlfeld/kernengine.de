@@ -409,6 +409,14 @@ struct BlueprintCore : logic::PureNodes {
     made.append(a.view()).append(b.view()).append(c.view());
     return made;
   }
+  /// (a text handed on - std::move, `Log = text_append(std::move(Log), x, "")` - that holds its characters
+  /// gets the others appended where it is, as std::string's += appends: in the room it has, without a copy)
+  static Text text_append(Text&& a, const Text& b, const Text& c) {
+    if (!a.holds() || &b == &a || &c == &a) return text_append(static_cast<const Text&>(a), b, c);
+    std::string t = std::move(a).str();
+    t.append(b.view()).append(c.view());
+    return t;
+  }
   static Bool text_equal(const Text& a, const Text& b) { return a == b; }
   static Bool text_contains(const Text& a, const Text& b) { return a.view().find(b.view()) != std::string_view::npos; }
   static Int text_length(const Text& a) { return static_cast<i64>(a.size()); }

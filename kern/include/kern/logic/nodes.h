@@ -167,6 +167,8 @@ class Text {
   constexpr operator std::string_view() const { return view(); }  // NOLINT (implicit: read as its characters)
   constexpr std::size_t size() const { return view().size(); }
   constexpr bool empty() const { return view().empty(); }
+  /// Does it hold its characters (a text made while running), or refer to the program's?
+  constexpr bool holds() const { return holds_; }
   /// Its characters as a std::string of their own (a copy), and handed on without one where it holds them.
   std::string str() const& { return std::string(view()); }
   std::string str() && { return holds_ ? std::move(made_) : std::string(written_); }
