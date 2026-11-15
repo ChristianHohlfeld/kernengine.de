@@ -8157,6 +8157,14 @@ class TestWriter:
             if raw[a:b].strip() != token:
                 raise Wait("written by a macro")
             edits.append((a, 1, 0, b, text))
+        def token_at(at, upto, token, lo):
+            """Where `token` begins that stands right before `upto` in a node beginning at `lo`: after the base, as
+            a rule (at) - where the base is a name for a place written out elsewhere (Emit.dissolve: `rs[i]` of
+            `const auto& rs = net_.remotes();`), its own span is there: then the token is found where it is."""
+            if raw[at:upto].strip() == token:
+                return at
+            p = raw.rfind(token[0], lo, upto)
+            return p if p >= 0 and raw[p:upto].strip() == token else at
         def whole(n):
             c = self.u.clean(qtype(n))
             return NUMBER.get(c) == "Int" or self.u.find_type(c) in self.tree.enums
@@ -8319,7 +8327,7 @@ class TestWriter:
                 # an entry through a pointer into a list (Unit.pointed): checked against the list the test handed it
                 (a, b), (ba, bb), (ia, ib) = span(n), span(ks[0]), span(ks[1])
                 edits.append((a, 2, depth, a, "converted_pointed("))
-                swap(bb, ia, "[", ", ")
+                swap(token_at(bb, ia, "[", a), ia, "[", ", ")
                 swap(ib, b, "]", ")")
                 self.pointed = True
             elif k == "UnaryOperator" and n.get("opcode") == "*" and ks and into_list(ks[0]):
@@ -8336,7 +8344,7 @@ class TestWriter:
                     raise Wait("an entry of a list whose length stands in another file")
                 (a, b), (ba, bb), (ia, ib) = span(n), span(base), span(index)
                 edits.append((a, 2, depth, a, "converted::at("))
-                swap(bb, ia, "[", ", ")
+                swap(token_at(bb, ia, "[", a), ia, "[", ", ")
                 swap(ib, b, "]", ")")
             elif k == "CXXMemberCallExpr" and ks and ks[0].get("kind") == "MemberExpr" and ks[0].get("name") in ("at", "front", "back") and kids(ks[0]) and not KEYED.match(self.u.clean(qtype(kids(ks[0])[0]))) and not KEYED_KERN.match(self.u.clean(qtype(kids(ks[0])[0]))):
                 base = kids(ks[0])[0]
@@ -8346,10 +8354,10 @@ class TestWriter:
                 edits.append((a, 2, depth, a, f"converted::{ks[0]['name']}("))
                 if ks[0]["name"] == "at" and len(ks) == 2:
                     ia, ib = span(ks[1])
-                    swap(bb, ia, ".at(", ", ")
+                    swap(token_at(bb, ia, ".at(", a), ia, ".at(", ", ")
                     swap(ib, b, ")", ")")
                 else:
-                    swap(bb, b, f".{ks[0]['name']}()", ")")
+                    swap(token_at(bb, b, f".{ks[0]['name']}()", a), b, f".{ks[0]['name']}()", ")")
             elif n.get("castKind") == "FloatingToIntegral" and ks and self.u.clean(qtype(n)) in Const.BITS:
                 # a number as a whole number of a type that does not hold it
                 ca, cb = span(ks[-1])
@@ -8380,9 +8388,9 @@ class TestWriter:
                 (a, b), (ba, bb) = span(n), span(base)
                 edits.append((a, 2, depth, a, f"converted::{ks[0]['name']}("))
                 if len(ks) > 1:
-                    swap(bb, span(ks[1])[0], f".{ks[0]['name']}(", ", ")
+                    swap(token_at(bb, span(ks[1])[0], f".{ks[0]['name']}(", a), span(ks[1])[0], f".{ks[0]['name']}(", ", ")
                 else:
-                    swap(bb, b, f".{ks[0]['name']}()", ")")
+                    swap(token_at(bb, b, f".{ks[0]['name']}()", a), b, f".{ks[0]['name']}()", ")")
             elif k == "CallExpr" and callee_name(n) in ("snprintf", "sprintf", "printf", "fprintf") and len(ks) > 2:
                 # a number formatted as text: a 32-bit one goes as the double it is promoted to (in the test a
                 # vector's component is converted::wide::Num32 - one that is not a number goes nowhere as such)
