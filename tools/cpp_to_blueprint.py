@@ -8546,7 +8546,9 @@ class TestWriter:
         """Changes of a file in the order of the file (a place two functions share - never - or one inside the
         other's: the outer one stays)."""
         kept, at = [], 0
-        for e in sorted(dict.fromkeys(edits), key=lambda e: e[:3]):
+        # (at one place, what is put in before what is put in place of a piece: `quot(` before `sizeof c` becomes
+        # `std::size_t{120}`)
+        for e in sorted(dict.fromkeys(edits), key=lambda e: (e[0], e[3] > e[0], e[1], e[2])):
             if e[0] >= at:
                 kept.append(e)
                 at = max(at, e[3])
