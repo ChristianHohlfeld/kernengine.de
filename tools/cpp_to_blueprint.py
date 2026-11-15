@@ -841,6 +841,15 @@ def enum_numbers(enum_decl):
     return out
 
 
+def count_per(t):
+    """kern::Count<Per> - a count beside a pointer the engine writes numbers through, each thing it counts
+    `Per` numbers (kern/core/base.h): Per. A whole number that counts what it writes: 1. Else None."""
+    m = re.fullmatch(r"(?:kern::)?Count<\s*(\d+)\s*[uU]?\s*>", t.strip())
+    if m:
+        return int(m.group(1))
+    return 1 if NUMBER.get(t.strip()) == "Int" and t.strip() not in ("bool", "char") else None
+
+
 def template_args(t):
     """The arguments of a template type's name: "std::pair<int, std::vector<float>>" -> ["int", "std::vector<float>"]."""
     a, b = t.find("<"), t.rfind(">")
@@ -1375,7 +1384,7 @@ class Unit:
                 text = open(os.path.join(ROOT, "kern", "src", "logic", "engine_api.gen.cpp")).read()
             except OSError:
                 text = ""
-            pins = lambda t: [(m.group(1), m.group(2), m.group(3)) for m in re.finditer(r'\{"(\w+)", PinType::(\w+), "(\w*)", "[^"]*"(?:, "\w*")?\}', t)]
+            pins = lambda t: [(m.group(1), m.group(2), m.group(3)) for m in re.finditer(r'\{"(\w+)", PinType::(\w+), "(\w*)", "[^"]*"(?:, "\w*"(?:, \d+)?)?\}', t)]
             for m in re.finditer(r'\{"(engine\.[\w.]+)", (?:"(?:\\.|[^"\\])*", ){4}(true|false),\n\s*\{(.*)\},\n\s*\{(.*)\}\},', text):
                 self._table[m.group(1)] = (m.group(2) == "true", pins(m.group(3)), pins(m.group(4)))
         return self._table
@@ -1389,6 +1398,8 @@ class Unit:
         t = self.clean(raw)
         if t in NUMBER:
             return NUMBER[t]
+        if re.fullmatch(r"(?:kern::)?Count<\s*\d+\s*[uU]?\s*>", t):
+            return "Int"   # (kern::Count<Per>: the whole number it holds)
         if t in W64:
             return "Int64"   # (64 bits as C++ holds them: the language's Int64 - what they mean, its nodes say)
         if t in TEXT or t.startswith("std::basic_string<char") or t.startswith("std::basic_string_view<char"):
@@ -5037,8 +5048,13 @@ class Emit:
                     raise Wait("a pointer")
                 continue
             name, bt = pin_in, in_pins[pin_in]
-            nodes[name] = a
             raw = qtype(params[i]).strip()
+            if count_per(u.clean(raw)) not in (None, 1) and not NUMBER.get(u.clean(raw)):
+                # (a kern::Count<Per> made of a whole number where it is handed over: that number)
+                while a.get("kind") in ("ImplicitCastExpr", "CXXConstructExpr", "CXXFunctionalCastExpr", "MaterializeTemporaryExpr", "ExprWithCleanups", "CXXBindTemporaryExpr") and \
+                        len([x for x in kids(a) if x.get("kind") != "CXXDefaultArgExpr"]) == 1 and count_per(u.clean(qtype(a))) not in (None, 1):
+                    a = [x for x in kids(a) if x.get("kind") != "CXXDefaultArgExpr"][0]
+            nodes[name] = a
             made = self.unwrap(a)
             while made.get("kind") in ("MaterializeTemporaryExpr", "CXXBindTemporaryExpr", "CXXFunctionalCastExpr") and len(kids(made)) == 1:
                 made = self.unwrap(kids(made)[0])
@@ -7783,6 +7799,21 @@ class Api:
                 return access == "public"
         return d.get("access", "public") == "public"
 
+    def reachable(self, q):
+        """Can code outside the engine name the class `q`: is every class it is declared in, and is it in each,
+        public? (A class declared in a private part of a class is that class's own.)"""
+        outer = q.rsplit("::", 1)[0] if "::" in q else ""
+        if outer not in self.tree.records:
+            return True
+        rec, out = self.tree.records[q], self.tree.records[outer]
+        access = "private" if out.get("tagUsed") == "class" else "public"
+        for c in kids(out):
+            if c.get("kind") == "AccessSpecDecl":
+                access = c.get("access", access)
+            elif c.get("id") == rec.get("id") or (c.get("kind") == "CXXRecordDecl" and c.get("name") == q.rsplit("::", 1)[-1] and c.get("completeDefinition")):
+                return access == "public" and self.reachable(outer)
+        return self.reachable(outer)
+
     def of_object(self, d):
         """Is `d` a method of a class of the engine that is an object (not plain data a Blueprint holds)?"""
         owner = self.tree.owner.get(d["id"])
@@ -7813,6 +7844,8 @@ class Api:
         rec = self.tree.records.get(q)
         if rec is None or not q.startswith(ENGINE + "::") or not self.opaque(q) or any((q + "::").startswith(s) for s in ENGINE_SKIP):
             return []
+        if not self.reachable(q):
+            return []   # (a class declared where no one outside it sees it - Renderer::Texture: the engine's own)
         if (rec.get("definitionData") or {}).get("isAbstract") or any(c.get("pure") for c in kids(rec) if c.get("kind") == "CXXMethodDecl"):
             return []
         if any(c.get("kind") == "CXXDestructorDecl" and (c.get("explicitlyDeleted") or not (c.get("isImplicit") or self.public(c))) for c in kids(rec)):
@@ -7839,6 +7872,13 @@ class Api:
         makers = self.makers(q)
         if d not in makers:
             raise Wait("a constructor that makes no object of the engine")
+        looked, self.u.lookup_scope = self.u.lookup_scope, q + "::"
+        try:
+            return self.maker1(d, q, makers)
+        finally:
+            self.u.lookup_scope = looked
+
+    def maker1(self, d, q, makers):
         group = snake(q.split("::")[-1])
         nth = makers.index(d) + 1
         ins, params, taken = [], [], {"exec", "then", "result"}
@@ -7870,7 +7910,16 @@ class Api:
                 "value": False, "ins": [(group, "Int", q)], "outs": [], "params": [], "decl": rec, "role": "release", "class": q}
 
     def function(self, d):
-        """The node of a declared function of the engine: a dict - or Wait, when its types have no place."""
+        """The node of a declared function of the engine: a dict - or Wait, when its types have no place. (Its
+        types' names are looked up as C++ looks them up where it is declared: `Shape` in kern::game is
+        kern::game::Shape, also where kern::physics has a Shape of its own.)"""
+        looked, self.u.lookup_scope = self.u.lookup_scope, self.tree.scope_of.get(d["id"]) or self.u.lookup_scope
+        try:
+            return self.function1(d)
+        finally:
+            self.u.lookup_scope = looked
+
+    def function1(self, d):
         tree, u = self.tree, self.u
         if d.get("kind") == "CXXConstructorDecl":
             return self.maker(d)
@@ -7901,6 +7950,7 @@ class Api:
         changes = False   # (an object of the engine it is handed to change - Renderer&, physics::World*: a step)
         params = []   # per parameter of the C++ function: (its input pin or None, its output pin or None)
         counts = {}   # an output list the engine writes through a pointer -> the input that is its count (written_list)
+        per = {}      # ... -> how many numbers each one it counts is (kern::Count<Per>; else 1)
         all_params = [x for x in kids(d) if x.get("kind") == "ParmVarDecl"]
         for i, p in enumerate(all_params):
             optional = self.optional_out(p)
@@ -7915,6 +7965,7 @@ class Api:
                 outs.append((name, written, None))
                 params.append((None, name))
                 counts[name] = i + 1   # (the parameter after it - its input's name is known once it is read)
+                per[name] = count_per(self.u.clean(qtype(all_params[i + 1]).strip()))
                 continue
             bt, writes, handle = self.handed(qtype(p))
             name = name_of(p.get("name") or f"value{i + 1}")
@@ -7936,7 +7987,7 @@ class Api:
             self.shape(bt)
         words = d["name"].replace("_", " ").title()
         return {"type": self.type_of(d), "cpp": qualified, "label": words, "category": "Engine: " + self.home(d).split("::")[-1].replace("kern", "Engine"),
-                "help": u.comment_of(d), "value": value, "ins": ins, "outs": outs, "params": params, "decl": d, "counts": counts}
+                "help": u.comment_of(d), "value": value, "ins": ins, "outs": outs, "params": params, "decl": d, "counts": counts, "per": per}
 
     def written_list(self, p, after):
         """A parameter that is a pointer to numbers the function writes through, with their count beside it -
@@ -7952,7 +8003,7 @@ class Api:
         if "*" in inner or "&" in inner or re.search(r"\bconst\b", inner) or self.u.object_of(raw) is not None:
             return None   # (a pointer to an object of the engine is its handle)
         count = self.u.clean(qtype(after).strip())
-        if NUMBER.get(count) != "Int" or count in ("bool", "char"):
+        if count_per(count) is None and (NUMBER.get(count) != "Int" or count in ("bool", "char")):
             return None
         if self.u.clean(inner) == "char":
             return None   # (characters: a text's, not numbers)
@@ -8537,6 +8588,8 @@ class TestWriter:
             return f"converted::wide::Span<{const}{self.spell(inner)}>"
         if c in W64:
             return "u64" if c == "whole64u" else "i64"
+        if count_per(c) not in (None, 1) and c not in NUMBER:
+            return "u32"   # (kern::Count<Per>: the whole number it holds - the source hands it one)
         if c in ("float", "double", "long double"):
             return "double"
         if c in NUMBER:
@@ -8935,7 +8988,7 @@ class TestWriter:
                 # stand-in gives, one after the other from there on - no more than the count says
                 inner = self.spell(re.sub(r"\*\s*$", "", raw))
                 params.append((f"{inner}* {pin_out}", default))
-                takes.append((pin_out, inner, ("into", f["counts"][pin_out])))
+                takes.append((pin_out, inner, ("into", f["counts"][pin_out], f.get("per", {}).get(pin_out, 1))))
                 continue
             if pin_in is None:
                 # what the function reports if it is asked to: written where the pointer says, if it says
@@ -8992,7 +9045,8 @@ class TestWriter:
             k = 1
         for name, t, optional in takes:
             if isinstance(optional, tuple):   # (into the entries the pointer points at, as many as the count beside it allows)
-                body.append(f"converted::take_into<{shape(t)}>({name}, {optional[1]}, kern_out[{k}]);")
+                count = optional[1] if optional[2] == 1 else f"{optional[2]} * static_cast<long long>({optional[1]})"   # (kern::Count<Per>: Per numbers each)
+                body.append(f"converted::take_into<{shape(t)}>({name}, {count}, kern_out[{k}]);")
             else:
                 body.append(f"if ({name}) converted::take_as<{shape(t)}>(*{name}, kern_out[{k}]);" if optional else f"converted::take_as<{shape(t)}>({name}, kern_out[{k}]);")
             k += 1

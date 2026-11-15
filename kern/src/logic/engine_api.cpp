@@ -177,7 +177,7 @@ bool EngineStandIn::engine(std::string_view function, const std::vector<Value>& 
     u64 most = ~u64{0};
     if (f->outputs[k].count[0])
       for (std::size_t j = 0; j < f->inputs.size() && j < in.size(); ++j)
-        if (std::strcmp(f->inputs[j].id, f->outputs[k].count) == 0) most = in[j].i > 0 ? static_cast<u64>(in[j].i) : 0;
+        if (std::strcmp(f->inputs[j].id, f->outputs[k].count) == 0) most = in[j].i > 0 ? static_cast<u64>(in[j].i) * f->outputs[k].per : 0;
     std::size_t at = 0;
     out[k] = answer(f->outputs[k].shape, at, state, most);
   }

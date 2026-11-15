@@ -175,7 +175,7 @@ template <class Core> struct EngineNodesOf : Core {
   template <class T1> EngineValue engine_mixer_bus_2(Int mixer, const T1& b) const { return {this->kern_engine("engine.mixer.bus_2", {to_value(mixer), to_value(b)}, {PinType::structure})[0]}; }
   /// Reverb character of the master return.
   void engine_mixer_set_reverb(Int mixer, Float room_size, Float damping, Float wet) { this->kern_engine("engine.mixer.set_reverb", {to_value(mixer), to_value(room_size), to_value(damping), to_value(wet)}, {}); }
-  /// ---- output ---- Mixes `frames` frames of interleaved stereo into `out`.
+  /// ---- output ---- Mixes `frames` frames of interleaved stereo into `out`: 2 numbers a frame, left then right.
   void engine_mixer_render(Int mixer, Int frames) { this->kern_engine("engine.mixer.render", {to_value(mixer), to_value(frames)}, {PinType::number_list}); }
   template <class KernNode> void engine_mixer_render(KernNode& kern_n, Int mixer, Int frames) { const std::vector<Value> kern_out = this->kern_engine("engine.mixer.render", {to_value(mixer), to_value(frames)}, {PinType::number_list}); kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[0]); }
   EngineValue engine_mixer_stats(Int mixer) const { return {this->kern_engine("engine.mixer.stats", {to_value(mixer)}, {PinType::structure})[0]}; }
@@ -257,8 +257,8 @@ template <class Core> struct EngineNodesOf : Core {
   /// Decomposes a matrix without shear into a transform (scale signs stay positive).
   template <class T1> EngineValue engine_game_matrix_transform(const T1& m) const { return {this->kern_engine("engine.game.matrix_transform", {to_value(m)}, {PinType::structure})[0]}; }
   template <class T1> Text engine_game_shape_name(const T1& s) const { return from_value<Text>(this->kern_engine("engine.game.shape_name", {to_value(s)}, {PinType::text})[0].converted(pin_type_of<Text>())); }
-  template <class T1> void engine_game_parse_shape(const Text& s, const T1& out) { this->kern_engine("engine.game.parse_shape", {to_value(s), to_value(out)}, {PinType::boolean, PinType::structure}); }
-  template <class KernNode, class T1> void engine_game_parse_shape(KernNode& kern_n, const Text& s, const T1& out) { const std::vector<Value> kern_out = this->kern_engine("engine.game.parse_shape", {to_value(s), to_value(out)}, {PinType::boolean, PinType::structure}); kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]); kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]); }
+  template <class T1> void engine_game_parse_shape(const Text& s, const T1& out) { this->kern_engine("engine.game.parse_shape", {to_value(s), to_value(out)}, {PinType::boolean, PinType::enumeration}); }
+  template <class KernNode, class T1> void engine_game_parse_shape(KernNode& kern_n, const Text& s, const T1& out) { const std::vector<Value> kern_out = this->kern_engine("engine.game.parse_shape", {to_value(s), to_value(out)}, {PinType::boolean, PinType::enumeration}); kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]); kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]); }
   template <class T1> Text engine_game_motion_name(const T1& m) const { return from_value<Text>(this->kern_engine("engine.game.motion_name", {to_value(m)}, {PinType::text})[0].converted(pin_type_of<Text>())); }
   template <class T1> Text engine_game_collider_shape_name(const T1& s) const { return from_value<Text>(this->kern_engine("engine.game.collider_shape_name", {to_value(s)}, {PinType::text})[0].converted(pin_type_of<Text>())); }
   template <class T1> Text engine_game_joint_kind_name(const T1& k) const { return from_value<Text>(this->kern_engine("engine.game.joint_kind_name", {to_value(k)}, {PinType::text})[0].converted(pin_type_of<Text>())); }
@@ -1304,11 +1304,6 @@ template <class Core> struct EngineNodesOf : Core {
   template <class KernNode> void engine_renderer_make(KernNode& kern_n) { const std::vector<Value> kern_out = this->kern_engine("engine.renderer.make", {}, {PinType::integer}); kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]); }
   /// Ends the Renderer (its destructor): the handle is none after it.
   void engine_renderer_release(Int renderer) { this->kern_engine("engine.renderer.release", {to_value(renderer)}, {}); }
-  /// Makes a Texture of the engine: its handle (the host keeps it until it is released).
-  void engine_texture_make() { this->kern_engine("engine.texture.make", {}, {PinType::integer}); }
-  template <class KernNode> void engine_texture_make(KernNode& kern_n) { const std::vector<Value> kern_out = this->kern_engine("engine.texture.make", {}, {PinType::integer}); kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]); }
-  /// Ends the Texture (its destructor): the handle is none after it.
-  void engine_texture_release(Int texture) { this->kern_engine("engine.texture.release", {to_value(texture)}, {}); }
   /// Makes a RoadBuilder of the engine: its handle (the host keeps it until it is released).
   void engine_road_builder_make() { this->kern_engine("engine.road_builder.make", {}, {PinType::integer}); }
   template <class KernNode> void engine_road_builder_make(KernNode& kern_n) { const std::vector<Value> kern_out = this->kern_engine("engine.road_builder.make", {}, {PinType::integer}); kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]); }
@@ -1364,11 +1359,6 @@ template <class Core> struct EngineNodesOf : Core {
   template <class KernNode> void engine_game_world_make(KernNode& kern_n, Int renderer, Int windows) { const std::vector<Value> kern_out = this->kern_engine("engine.game_world.make", {to_value(renderer), to_value(windows)}, {PinType::integer}); kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]); }
   /// Ends the GameWorld (its destructor): the handle is none after it.
   void engine_game_world_release(Int game_world) { this->kern_engine("engine.game_world.release", {to_value(game_world)}, {}); }
-  /// Makes a Pawn of the engine: its handle (the host keeps it until it is released).
-  void engine_pawn_make() { this->kern_engine("engine.pawn.make", {}, {PinType::integer}); }
-  template <class KernNode> void engine_pawn_make(KernNode& kern_n) { const std::vector<Value> kern_out = this->kern_engine("engine.pawn.make", {}, {PinType::integer}); kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]); }
-  /// Ends the Pawn (its destructor): the handle is none after it.
-  void engine_pawn_release(Int pawn) { this->kern_engine("engine.pawn.release", {to_value(pawn)}, {}); }
   /// Makes a PropertyChange of the engine: its handle (the host keeps it until it is released).
   void engine_property_change_make() { this->kern_engine("engine.property_change.make", {}, {PinType::integer}); }
   template <class KernNode> void engine_property_change_make(KernNode& kern_n) { const std::vector<Value> kern_out = this->kern_engine("engine.property_change.make", {}, {PinType::integer}); kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]); }
@@ -1399,11 +1389,6 @@ template <class Core> struct EngineNodesOf : Core {
   template <class KernNode> void engine_sound_bank_make(KernNode& kern_n, Int mixer) { const std::vector<Value> kern_out = this->kern_engine("engine.sound_bank.make", {to_value(mixer)}, {PinType::integer}); kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]); }
   /// Ends the SoundBank (its destructor): the handle is none after it.
   void engine_sound_bank_release(Int sound_bank) { this->kern_engine("engine.sound_bank.release", {to_value(sound_bank)}, {}); }
-  /// Makes a Entry of the engine: its handle (the host keeps it until it is released).
-  void engine_entry_make() { this->kern_engine("engine.entry.make", {}, {PinType::integer}); }
-  template <class KernNode> void engine_entry_make(KernNode& kern_n) { const std::vector<Value> kern_out = this->kern_engine("engine.entry.make", {}, {PinType::integer}); kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]); }
-  /// Ends the Entry (its destructor): the handle is none after it.
-  void engine_entry_release(Int entry) { this->kern_engine("engine.entry.release", {to_value(entry)}, {}); }
   /// Makes a TextureAsset of the engine: its handle (the host keeps it until it is released).
   void engine_texture_asset_make() { this->kern_engine("engine.texture_asset.make", {}, {PinType::integer}); }
   template <class KernNode> void engine_texture_asset_make(KernNode& kern_n) { const std::vector<Value> kern_out = this->kern_engine("engine.texture_asset.make", {}, {PinType::integer}); kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]); }
@@ -1429,11 +1414,6 @@ template <class Core> struct EngineNodesOf : Core {
   template <class KernNode> void engine_loopback_network_make(KernNode& kern_n, Int seed) { const std::vector<Value> kern_out = this->kern_engine("engine.loopback_network.make", {to_value(seed)}, {PinType::integer}); kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]); }
   /// Ends the LoopbackNetwork (its destructor): the handle is none after it.
   void engine_loopback_network_release(Int loopback_network) { this->kern_engine("engine.loopback_network.release", {to_value(loopback_network)}, {}); }
-  /// Makes a Inbox of the engine: its handle (the host keeps it until it is released).
-  void engine_inbox_make() { this->kern_engine("engine.inbox.make", {}, {PinType::integer}); }
-  template <class KernNode> void engine_inbox_make(KernNode& kern_n) { const std::vector<Value> kern_out = this->kern_engine("engine.inbox.make", {}, {PinType::integer}); kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]); }
-  /// Ends the Inbox (its destructor): the handle is none after it.
-  void engine_inbox_release(Int inbox) { this->kern_engine("engine.inbox.release", {to_value(inbox)}, {}); }
   /// Makes a MeasureStream of the engine: its handle (the host keeps it until it is released).
   void engine_measure_stream_make() { this->kern_engine("engine.measure_stream.make", {}, {PinType::integer}); }
   template <class KernNode> void engine_measure_stream_make(KernNode& kern_n) { const std::vector<Value> kern_out = this->kern_engine("engine.measure_stream.make", {}, {PinType::integer}); kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]); }
