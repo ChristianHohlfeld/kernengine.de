@@ -3303,10 +3303,8 @@ class Emit:
                     ref = {"kind": "ImplicitCastExpr", "castKind": "LValueToRValue", "type": dict(pt), "valueCategory": "prvalue",
                            "inner": [{"kind": "DeclRefExpr", "type": dict(pt), "valueCategory": "lvalue",
                                       "referencedDecl": {"id": pid, "kind": "VarDecl", "name": decl["name"], "type": dict(pt)}}]}
-                    inner = [c for c in node["inner"]]
-                    real = [c for c in inner if isinstance(c, dict) and c.get("kind") and not c["kind"].endswith("Comment") and not c["kind"].endswith("Attr")]
-                    node["inner"][inner.index(real[at])] = ref
-                    s["inner"].insert(s["inner"].index(v), decl)
+                    node["inner"][next(j for j, c in enumerate(node["inner"]) if c is pick)] = ref
+                    s["inner"].insert(next(j for j, c in enumerate(s["inner"]) if c is v), decl)
                     self.tree.decl[pid] = decl
                 if (self.reads(init) - {root}) & later:
                     raise Wait("a reference to an entry at a place that changes while the reference lives")
