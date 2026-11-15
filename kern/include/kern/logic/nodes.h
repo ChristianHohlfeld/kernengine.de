@@ -1071,6 +1071,14 @@ inline std::string repeat(std::string_view a, i64 count) {
   for (i64 k = 0; k < times; ++k) r.append(a);
   return r;
 }
+/// The bytes of a text as whole numbers 0 .. 255 (each char as an unsigned char), put into a list of whole
+/// numbers in front of the entry at `index` (0: at the start; past the end: at the end) - in one go, as
+/// std::vector::insert of the text's range: what `bytes.insert(bytes.end(), text.begin(), text.end())` does.
+template <class W> void insert_bytes(std::vector<W>& items, i64 index, std::string_view text) {
+  const std::size_t at = index <= 0 ? 0 : static_cast<u64>(index) >= items.size() ? items.size() : static_cast<std::size_t>(index);
+  items.insert(items.begin() + static_cast<std::ptrdiff_t>(at), text.size(), W{});
+  for (std::size_t k = 0; k < text.size(); ++k) items[at + k] = W(static_cast<i64>(static_cast<u8>(text[k])));
+}
 template <class List> std::string of_bytes(const List& bytes, i64 at, i64 count) {
   std::string r;
   if (at < 0 || count <= 0 || static_cast<u64>(at) >= bytes.size()) return r;
@@ -2357,6 +2365,12 @@ struct PureNodes {
   /// The text the bytes of a list are (each number cut to 8 bits, as a char holds it): Count of them from At
   /// on - what std::string(reinterpret_cast<const char*>(bytes) + at, count) makes; beyond the list: up to its end.
   static Text text_of_bytes(std::vector<i64> bytes, Int at, Int count) { return texts::of_bytes(bytes, at, count); }
+  /// Bytes of Text: its bytes as whole numbers 0 .. 255 - std::vector<u8>(text.begin(), text.end()).
+  static std::vector<i64> text_bytes(Text a) {
+    std::vector<i64> r;
+    texts::insert_bytes(r, 0, a);
+    return r;
+  }
   /// Reserve Text: the text as it is - room for Count characters is a matter of the class (std::string::reserve).
   static Text text_reserve(Text a, Int count) {
     (void)count;

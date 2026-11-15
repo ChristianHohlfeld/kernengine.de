@@ -3513,6 +3513,13 @@ TEST(logic_tier_cases_interpreter) {
         std::snprintf(more, sizeof more, "|%s %d %d %d %d %s %d %.9g %d|%llu", w, hh, hu, x, nread, set, i, static_cast<double>(g), got, llu);
         std::strncat(want, more, sizeof want - std::strlen(want) - 1);
       }
+      {
+        // the bytes of "A\u00e4" put in after the first of [1, 2], "hi" appended; three of them from the second on
+        // as a text; "r" three times; and the three flags of Starts With, Ends With, Text Less
+        const std::string bytes = "[1, 65, 195, 164, 2, 104, 105]";
+        const std::string part = std::string("rrr") + "\x41\xc3\xa4" + "|111" + bytes;
+        std::strncat(want, part.c_str(), sizeof want - std::strlen(want) - 1);
+      }
       if (inst->get("Shown").as_text() != want) std::printf("text_scan: %s\n    want: %s\n", inst->get("Shown").as_text().c_str(), want);
       CHECK(inst->get("Shown").as_text() == want);
     }

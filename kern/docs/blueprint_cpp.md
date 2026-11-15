@@ -943,6 +943,8 @@ Befehl = text_erase(std::move(Befehl), 0, 3);         // cmd.erase(0, 3) – am 
 | Repeat Text | `std::string(count, c)` | den Text so oft hintereinander (höchstens 2^24 Zeichen) |
 | Reserve Text | `reserve(count)` | den Text, wie er ist – in der Klasse mit Platz für Count Zeichen (höchstens 2^24) |
 | Text of Bytes | `std::string(reinterpret_cast<const char*>(bytes) + at, count)` | Count Bytes einer Liste ab At, jedes auf 8 Bit geschnitten |
+| Bytes of Text | `std::vector<u8>(text.begin(), text.end())` | die Bytes des Texts als `List<Int>`, je 0 bis 255 |
+| Insert Text Bytes (Schritt) | `bytes.insert(bytes.begin() + at, text.begin(), text.end())` | die Bytes des Texts in eine Liste ganzer Zahlen, wo sie steht, in einem Zug |
 
 - **Wo C++ wirft** (`at` hinter dem Ende bei `substr`, `insert`, `erase`, `replace`: `std::out_of_range`,
   was ein Programm ohne Ausnahmen beendet), gibt Sub Text den leeren Text, die drei anderen den Text,

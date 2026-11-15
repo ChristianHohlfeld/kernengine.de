@@ -459,6 +459,14 @@ struct BlueprintCore : logic::PureNodes {
   /// Text of Bytes: the text a list of bytes is, from At on (one request for memory, as std::string makes it).
   static Text text_of_bytes(logic::Items<Int> bytes, Int at, Int count) { return logic::texts::of_bytes(bytes, at, count); }
   static Text text_repeat(const Text& a, Int count) { return logic::texts::repeat(a.view(), count); }
+  /// Bytes of Text: its bytes, 0 .. 255 (one request for memory, as std::vector of the text's range makes it).
+  static List<Int> text_bytes(const Text& a) {
+    List<Int> r;
+    logic::texts::insert_bytes(r, 0, a.view());
+    return r;
+  }
+  /// Insert Text Bytes: the bytes of a text into a list where it stands (std::vector::insert of the text's range).
+  static void list_insert_text(List<Int>& list, Int index, const Text& text) { logic::texts::insert_bytes(list, index, text.view()); }
   /// Reserve Text: the same text, with room for Count characters (std::string::reserve, at most 2^24) - handed on
   /// with std::move, where it is: the appends after it fill that room.
   static Text text_reserve(Text a, Int count) {

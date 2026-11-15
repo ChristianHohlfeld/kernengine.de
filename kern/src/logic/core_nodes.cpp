@@ -933,6 +933,31 @@ void add_lists(Library& lib) {
     lib.add(std::move(d));
   }
   {
+    // Insert Text Bytes: the bytes of a text (0 .. 255) into a list of whole numbers (logic::texts::insert_bytes)
+    NodeDef d = step("list.insert_text", "Insert Text Bytes",
+                     "Puts the bytes of a text - each a whole number 0 to 255 - in front of the item at the index of a list of whole numbers, in their order and in one go "
+                     "(0: at the start; past the end: at the end): what inserting a text's range into a std::vector<u8> does.",
+                     "bytes text string utf8 append insert array", {data("index", "Index", PinType::integer, 0), data("text", "Text", PinType::text, "")}, {});
+    d.title = [](const NodeDef&, const Node& n) { return "Insert Text Bytes into " + place_title(n); };
+    d.problem = [needs_list](const Node& n, const Graph& g) {
+      const std::string why = needs_list(n, g);
+      if (!why.empty()) return why;
+      Variable named;
+      const Variable* v = g.place_of(n, named) ? &named : nullptr;
+      if (v && v->type != PinType::integer_list) return "needs a list of whole numbers: \"" + v->name + "\" is " + std::string(pin_type_name(v->type));
+      return std::string();
+    };
+    d.run = [on_list](Context& c) {
+      const i64 index = c.in_int("index");
+      const std::string text = c.in_text("text");
+      on_list(c, [&](Value& v) {
+        if (v.type == PinType::integer_list) texts::insert_bytes(v.template edit<i64>(), index, text);
+      });
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
+  {
     NodeDef d = step("list.reserve", "Reserve",
                      "Makes room for that many items in a list variable: nothing one can read changes - the list then grows that far without asking for memory again.",
                      "capacity room memory array", {data("count", "Count", PinType::integer, 0)}, {});
@@ -1870,6 +1895,8 @@ void add_math(Library& lib) {
                  "Text with Count characters from At on replaced by With (std::string::replace); At beyond the end: Text as it is", "replace string"));
     lib.add(pure("text.repeat", "Repeat Text", "Text", {data("a", "Text", K::text, "*"), data("count", "Count", K::integer, 3)}, text, of(&P::text_repeat),
                  "Text so many times, one after the other (std::string(count, c) of a character); Count 0 or less: no text", "repeat times fill padding string"));
+    lib.add(pure("text.bytes", "Bytes of Text", "Text", {data("a", "Text", K::text, "")}, data("result", "", K::integer_list), of(&P::text_bytes),
+                 "The bytes of the text, each a whole number 0 to 255 (a std::vector<u8> of its range)", "bytes chars utf8 encode array"));
     lib.add(pure("text.reserve", "Reserve Text", "Text", {data("a", "Text", K::text, ""), data("count", "Count", K::integer, 0)}, text, of(&P::text_reserve),
                  "The text as it is - in a Blueprint's class with room for Count characters, so that what is appended to it fits (std::string::reserve)",
                  "reserve capacity room string"));

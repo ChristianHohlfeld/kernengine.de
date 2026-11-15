@@ -4187,8 +4187,8 @@ class Emit:
         if b.get("kind") not in ("CXXReinterpretCastExpr", "CStyleCastExpr") or not kids(b) or not self.char_pointer(b):
             return None
         inner = kids(b)[0]
-        if not BYTE_POINTER.match(self.u.clean(qtype(inner)).strip()):
-            return None
+        if not re.fullmatch(r"(?:unsigned\s+char|signed\s+char|char|std::byte)\s*\*", self.u.clean(qtype(inner)).strip()):
+            return None   # (a pointer to bytes: clean has taken its const away)
         try:
             lst, at = self.place(inner)
         except Wait:
@@ -4198,6 +4198,25 @@ class Emit:
         for op, k in reversed(steps):
             at = self.whole_math(op, at, self.ex(k, "Int"))
         return f"text_of_bytes({self.place_arg(lst, 'List<Int>', 'const', [])}, {at}, {self.ex(count, 'Int')})"
+
+    def text_range(self, first, last):
+        """`text.begin(), text.end()` of one text (std::string, std::string_view): the text - None: no such range."""
+        ends = []
+        for x, want in ((first, ("begin", "cbegin")), (last, ("end", "cend"))):
+            b = self.unwrap(x)
+            while b.get("kind") in ("CXXConstructExpr", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr") and len(kids(b)) == 1:
+                b = self.unwrap(kids(b)[0])
+            if b.get("kind") != "CXXMemberCallExpr" or callee(b).get("name") not in want or len(kids(b)) != 1 or not kids(callee(b)):
+                return None
+            base = kids(callee(b))[0]
+            if self.tp_or_none(base) != "Text" or any(y.get("kind") not in ("DeclRefExpr", "MemberExpr", "ImplicitCastExpr", "CXXThisExpr", "ParenExpr") for y in walk(base)):
+                return None
+            ends.append(base)
+        # (one text: both ends name the same place - a variable, a field, an entry - as the notation writes it)
+        a, b = self.ex(ends[0], "Text"), self.ex(ends[1], "Text")
+        if a != b or not re.fullmatch(r"[\w.\[\]]+", a):
+            return None
+        return a
 
     def text_pointer_local(self, v):
         """`char* end = nullptr;` - a pointer into a text that C's strtod / strtol set (`&end`): a place in that
@@ -4874,6 +4893,11 @@ class Emit:
                     return before + [f"list_remove_at({lv}, kern::to<Int>(kern::formula([](Float n) -> Float {{ return n - 1.0; }}, kern::to<Float>(list_length<{it}>({lv})))));"] + after
                 if name == "reserve":   # (room for that many entries: one request for memory, as in C++)
                     return before + [f"list_reserve({lv}, {self.ex(args[0], 'Int')});"] + after
+                if name == "insert" and len(args) == 3 and it == "Int" and self.text_range(args[1], args[2]) is not None:
+                    # bytes.insert(at, text.begin(), text.end()): the bytes of the text there (Insert Text Bytes)
+                    text = self.text_range(args[1], args[2])
+                    _, at = self.place(args[0])
+                    return before + self.take_pre() + [f"list_insert_text({lv}, {at}, {text});"] + after
                 return before + self.list_step(name, base, lv, it, args) + after
             if base is not None and not self.is_this(base) and self.tp_or_none(base) == "Text":
                 return self.text_step(base, name, kids(n)[1:])
@@ -7982,6 +8006,9 @@ class Emit:
                 made = self.temp("made", t)
                 self.hoist([f"{made} = {t}{{}};", f"list_resize({made}, {self.ex(a[0], 'Int')}, {self.ex(a[1], it) if len(a) == 2 else u.zero(it)});"])
                 return made, t
+            if len(a) == 2 and t == "List<Int>" and self.text_range(a[0], a[1]) is not None:
+                # std::vector<u8>(text.begin(), text.end()): the bytes of the text (Bytes of Text)
+                return f"text_bytes({self.text_range(a[0], a[1])})", t
             if len(a) == 2:
                 # std::vector<T>(first, last): the entries of a list from one place to another
                 (s0, first), (s1, last) = self.place(a[0]), self.place(a[1])
