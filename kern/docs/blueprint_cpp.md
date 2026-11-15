@@ -1157,7 +1157,8 @@ ein Knoten (`tools/engine_api.py` liest die Header der Engine und schreibt die T
 `kern/tests/engine_case.gen.h`, der jeden Knoten einmal aufruft): `kern::physics::World::cast_ray`
 ist `engine.world.cast_ray`, im Text `engine_world_cast_ray(world, from, to …)`. Jede Stufe ruft
 ihn durch eine Tür, `logic::Host::engine`; ein Test bindet dort den Stellvertreter
-`logic::EngineStandIn`, der aus der Form jedes Ausgangs antwortet – gleich in jeder Stufe.
+`logic::EngineStandIn`, der aus der Form jedes Ausgangs antwortet – gleich in jeder Stufe – oder
+die Engine selbst.
 
 - **Eine Methode eines Objekts der Engine ist ihr Knoten** (ein Objekt mit einem Leben für sich:
   eine Klasse – die Physik, der Renderer, der Mixer –, eine Struktur, die nicht kopiert werden kann
@@ -1174,7 +1175,28 @@ ihn durch eine Tür, `logic::Host::engine`; ein Test bindet dort den Stellvertre
   Tabelle nennt der Ausgang seine Anzahl (`EnginePin::count`); der Stellvertreter gibt nicht mehr
   Einträge, als sie sagt – den Platz, den der Aufruf ihm gibt. Der Aufruf `mixer_.render(out_.data(),
   frames)` schreibt die Zahlen des Knotens in die Liste, auf die der Zeiger zeigt, ab dem Eintrag,
-  auf den er zeigt, einen nach dem anderen; die Liste behält ihre Länge, wie in C++.
+  auf den er zeigt, einen nach dem anderen; die Liste behält ihre Länge, wie in C++. Zählt die
+  Anzahl Dinge aus mehreren Zahlen, sagt ihr Typ es: `void render(f32* out, Count<2> frames)`
+  (`kern::Count<Per>`, kern/core/base.h – die ganze Zahl, die er hält) schreibt 2 × frames Zahlen;
+  die Tabelle sagt es (`EnginePin::per`), der Stellvertreter gibt so viele, der Aufruf im Test nimmt
+  so viele.
+- **Der Knoten auf der Engine selbst** (`kern/logic/engine_host.h`): `logic::call_engine(objects,
+  function, in, out)` ruft die echte Funktion eines Knotens – `tools/engine_api.py` schreibt jeden
+  Aufruf aus den Headern (`kern/src/<Teil>/engine_calls.gen.cpp`, ein Teil der Engine je Datei: ein
+  Build hat die Funktionen der Teile, die er bindet). Jeder Eingang wird, was die C++-Funktion nimmt,
+  jeder Ausgang kommt aus dem, was sie gibt oder schreibt; welcher C++-Typ ein Pin ist, sagt der
+  Compiler, welcher Typ des Blueprints, sagt die Tabelle – passt beides nicht zusammen (ein Int-Pin,
+  wo C++ ein `TextureAsset` hat; eine Struktur `physics_Shape`, wo es `game::Shape` ist), übersetzt
+  die Datei nicht: Das prüft jede Beschreibung gegen die echte Funktion. Was die Engine durch einen
+  Zeiger schreibt, bekommt genau den Platz, den die Tabelle sagt, und einen Zaun dahinter; schreibt
+  sie darüber hinaus, scheitert der Aufruf (die Tabelle sagt dann nicht, was die Engine tut).
+  `logic::EngineObjects` hält die Objekte hinter den Handles: was ein Make-Knoten macht oder eine
+  Funktion als Wert gibt, gehört ihm bis zum Release (oder bis es endet, in umgekehrter Reihenfolge);
+  was eine Funktion als Referenz oder Zeiger gibt, ist das des Hosts – dasselbe Objekt hat immer
+  dasselbe Handle. Handles zählen ab 1 in der Reihenfolge, in der die Objekte kamen. Der Host eines
+  Spiels (`GameWorld`) ruft so die Engine; ein Test, der Quelle und Blueprint gegen die echte Engine
+  vergleicht, gibt jeder Seite eigene Objekte, gleich aufgesetzt: Ein Handle, das sie noch nicht
+  kennt, nennt ein Objekt, wie C++ es ohne Argumente macht (`engine_make_default`).
 
 ### Formeln
 

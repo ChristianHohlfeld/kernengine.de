@@ -1,16 +1,46 @@
 // A rule actor of the level as the tests run it (see blueprint_call.h for how the game calls one).
 #pragma once
+#include <cstdlib>
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "../src/rules.h"
 #include "kern/logic/engine_api.h"
+#include "kern/logic/engine_host.h"
 #include "kern/logic/logic.h"
 
 namespace sc {
+
+/// The engine of the tests: the stand-in (it answers from the call itself), or - SC_ENGINE=real - the engine
+/// itself: every side a test compares calls the real functions (kern/logic/engine_host.h), each with objects
+/// of its own, set up the same way for every call (none to begin with; a handle it does not know yet names an
+/// object as C++ makes it without arguments - engine_make_default). The calls are written down as the
+/// stand-in writes them, and compared the same way.
+inline bool real_engine() {
+  static const bool real = [] {
+    const char* e = std::getenv("SC_ENGINE");
+    return e && std::string_view(e) == "real";
+  }();
+  return real;
+}
+/// The engine's objects of one side, as a call being compared begins with them.
+inline void fresh_engine(kern::logic::EngineObjects& objects) {
+  objects.clear();
+  objects.on_missing(kern::logic::engine_make_default);
+}
+/// One call of the engine on one side: written down in `kept`, answered by the stand-in or the engine.
+inline bool test_engine(kern::logic::EngineStandIn& kept, kern::logic::EngineObjects& objects, std::string_view function, const std::vector<kern::logic::Value>& in,
+                        std::vector<kern::logic::Value>& out) {
+  if (!real_engine()) return kept.engine(function, in, out);
+  if (!kern::logic::engine_function(function)) return false;
+  kept.calls.push_back(kern::logic::engine_call_shown(function, in));
+  kern::logic::call_engine(objects, function, in, out);   // (a call that fails leaves the zeros, on every side alike)
+  return true;
+}
 
 /// The Blueprint of an actor of the level, read once for all the tests (null: the level has none of
 /// that name, and `error` says so).
@@ -51,12 +81,16 @@ struct RuleBlueprint {
     void print(const std::string&, bool) override {}
     void error(const std::string& text) override { errors += text + "\n"; }
     kern::u32 random() override { return 4; }
-    /// The engine of a test: the stand-in, which answers by the outputs' forms and keeps every call.
+    /// The engine of a test: the stand-in, which answers by the outputs' forms and keeps every call - or the
+    /// engine itself (real_engine), with the objects of this side.
     kern::logic::EngineStandIn stand_in;
-    /// (another that keeps the calls, where a test compares them with those of other code: else this one's)
+    kern::logic::EngineObjects objects;
+    /// (another that keeps the calls, where a test compares them with those of other code: else this one's -
+    /// with the objects of that code)
     kern::logic::EngineStandIn* keeps = nullptr;
+    kern::logic::EngineObjects* keeps_objects = nullptr;
     bool engine(std::string_view function, const std::vector<kern::logic::Value>& in, std::vector<kern::logic::Value>& out) override {
-      return (keeps ? *keeps : stand_in).engine(function, in, out);
+      return test_engine(keeps ? *keeps : stand_in, keeps && keeps_objects ? *keeps_objects : objects, function, in, out);
     }
     /// The actors of this runtime by their names.
     std::map<std::string, kern::logic::ActorRef, std::less<>> actors;

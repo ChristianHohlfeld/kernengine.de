@@ -845,7 +845,7 @@ void Game::update_town(f32 dt) {
     const i32 rule = net_.active() ? 1 : 0;
     if (rule != respawn_rule_) {
       respawn_rule_ = rule;
-      world_->set_property(soldier_, "components.health.respawnDelay", kern::json::Value(rule ? 3.0 : 1e5));
+      world_->set_property_number(soldier_, "components.health.respawnDelay", rule ? 3.0 : 1e5);
     }
   }
   const bool dead = world_->hud().respawn_in > 0 || (world_->hud().health >= 0 && world_->hud().health <= 0);

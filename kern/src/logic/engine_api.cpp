@@ -86,6 +86,14 @@ std::string engine_shown(const Value& v) {
   }
 }
 
+std::string engine_call_shown(std::string_view function, const std::vector<Value>& in) {
+  std::string call(function);
+  call += "(";
+  for (std::size_t k = 0; k < in.size(); ++k) call += (k ? ", " : "") + engine_shown(in[k]);
+  call += ")";
+  return call;
+}
+
 namespace {
 
 /// The next number of a sequence (splitmix64).
@@ -164,10 +172,7 @@ Value answer(std::string_view shape, std::size_t& at, u64& state, u64 most = ~u6
 bool EngineStandIn::engine(std::string_view function, const std::vector<Value>& in, std::vector<Value>& out) {
   const EngineFunction* f = engine_function(function);
   if (!f) return false;
-  std::string call(function);
-  call += "(";
-  for (std::size_t k = 0; k < in.size(); ++k) call += (k ? ", " : "") + engine_shown(in[k]);
-  call += ")";
+  std::string call = engine_call_shown(function, in);
   // the answer: from the call itself, and from how many calls came before it (the engine may say
   // something else when it is asked again)
   u64 state = 1469598103934665603ull + calls.size();
@@ -177,7 +182,7 @@ bool EngineStandIn::engine(std::string_view function, const std::vector<Value>& 
     u64 most = ~u64{0};
     if (f->outputs[k].count[0])
       for (std::size_t j = 0; j < f->inputs.size() && j < in.size(); ++j)
-        if (std::strcmp(f->inputs[j].id, f->outputs[k].count) == 0) most = in[j].i > 0 ? static_cast<u64>(in[j].i) : 0;
+        if (std::strcmp(f->inputs[j].id, f->outputs[k].count) == 0) most = in[j].i > 0 ? static_cast<u64>(in[j].i) * f->outputs[k].per : 0;
     std::size_t at = 0;
     out[k] = answer(f->outputs[k].shape, at, state, most);
   }

@@ -226,8 +226,7 @@ class Game {
   std::string toss_json();
   std::string toss_command(const std::string& cmd);
   i32 toss_test_ = -1;
-  TossState& toss();
-  std::unique_ptr<TossState> toss_;
+  TossState toss_;
   // every round in flight replicated (game_projsync.cpp): ours streamed, the mates' drawn on their track
   void projsync_update(f32 dt);
   void projsync_blast(u8 owner, Vec3 at);

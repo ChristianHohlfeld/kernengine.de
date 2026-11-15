@@ -1,5 +1,5 @@
 // State of the thrown things in a session (game_toss.cpp): the bodies our hand took, and the
-// mates' on their tracks. One member of Game (`toss_`), made when a session first needs it.
+// mates' on their tracks. One member of Game (`toss_`), empty until a session uses it.
 //
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
 #pragma once

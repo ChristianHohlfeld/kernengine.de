@@ -30,6 +30,7 @@
 #include "kern/logic/actor_blueprint.h"
 #include "kern/logic/blueprint.h"
 #include "kern/logic/logic.h"
+#include "kern/logic/engine_host.h"
 #include "blueprint_native.h"
 #include "game_cases.h"
 #include "kern/logic/nodes.h"
@@ -37,6 +38,7 @@
 #include "../src/game/soldier_models.h"
 
 #include <algorithm>
+#include <bit>
 #include <memory>
 
 using namespace kern;
@@ -6204,6 +6206,104 @@ std::vector<f32> sine(u32 rate, f32 seconds, f32 hz, f32 amp = 0.5f) {
   return v;
 }
 }  // namespace
+
+// The engine's nodes on the engine itself (kern/logic/engine_host.h): every node of the table has its
+// call in a build that links every part of the engine, and a call is the real function - what it gives
+// and writes is what the C++ function gives and writes, bit for bit, and the room the table gives what
+// the engine writes through a pointer is the room the engine needs.
+TEST(engine_calls_every_node) {
+  int missing = 0;
+  for (const logic::EngineFunction& f : logic::engine_functions())
+    if (!logic::engine_call(f.type)) {
+      if (++missing <= 5) std::printf("  no call of %s\n", f.type);
+    }
+  CHECK(missing == 0);
+  // every object a make node makes without inputs is made and ended through the table
+  logic::EngineObjects objects;
+  int made = 0;
+  for (const logic::EngineFunction& f : logic::engine_functions()) {
+    const std::string type = f.type;
+    if (type.size() < 5 || type.compare(type.size() - 5, 5, ".make") != 0 || !f.inputs.empty()) continue;
+    std::vector<logic::Value> out{logic::Value::zero(logic::PinType::integer)};
+    CHECK(logic::call_engine(objects, f.type, {}, out));
+    CHECK(out[0].i > 0);
+    std::vector<logic::Value> none;
+    CHECK(logic::call_engine(objects, type.substr(0, type.size() - 5) + ".release", {out[0]}, none));
+    // (once ended, the handle names nothing: a second release fails)
+    CHECK(!logic::call_engine(objects, type.substr(0, type.size() - 5) + ".release", {out[0]}, none));
+    ++made;
+  }
+  CHECK(made > 10);
+  CHECK(objects.size() == 0);
+}
+
+TEST(engine_calls_mixer_is_the_mixer) {
+  using logic::Value;
+  // what the engine writes through `out` is 2 numbers a frame: the table says so
+  const logic::EngineFunction* render = logic::engine_function("engine.mixer.render");
+  CHECK(render && render->outputs.size() == 1 && std::string(render->outputs[0].count) == "frames" && render->outputs[0].per == 2);
+  // the same steps through the nodes and on a mixer of C++: the same numbers, bit for bit
+  logic::EngineObjects objects;
+  std::vector<Value> out{Value::zero(logic::PinType::integer)};
+  CHECK(logic::call_engine(objects, "engine.mixer.make", {}, out));
+  const Value mixer = out[0];
+  out = {Value::zero(logic::PinType::boolean)};
+  CHECK(logic::call_engine(objects, "engine.mixer.init", {mixer, Value::integer(48000), Value::integer(16)}, out) && out[0].b);
+  const std::vector<f32> tone = sine(48000, 0.25f, 440);
+  std::vector<f64> samples(tone.begin(), tone.end());
+  out = {Value::zero(logic::PinType::integer)};
+  CHECK(logic::call_engine(objects, "engine.mixer.adopt_clip", {mixer, Value::of(samples), Value::integer(1), Value::text("tone"), Value::boolean(false)}, out));
+  const Value clip = out[0];
+  out = {Value::zero(logic::PinType::int64)};
+  CHECK(logic::call_engine(objects, "engine.mixer.play", {mixer, clip, Value::zero(logic::PinType::structure)}, out));
+  out = {Value::zero(logic::PinType::number_list)};
+  CHECK(logic::call_engine(objects, "engine.mixer.render", {mixer, Value::integer(300)}, out));
+  const std::vector<f64>& got = out[0].items<f64>();
+  CHECK(got.size() == 600);
+
+  audio::Mixer m;
+  CHECK(m.init(48000, 16));
+  const audio::ClipId c = m.adopt_clip(tone, 1, "tone");
+  CHECK(static_cast<i64>(c) == clip.i);
+  m.play(c, audio::PlayParams{});
+  std::vector<f32> want(600);
+  m.render(want.data(), 300);
+  bool same = got.size() == want.size();
+  for (std::size_t k = 0; same && k < want.size(); ++k) same = std::bit_cast<u64>(got[k]) == std::bit_cast<u64>(static_cast<f64>(want[k]));
+  CHECK(same);
+  bool sounds = false;
+  for (f32 x : want) sounds |= x != 0;
+  CHECK(sounds);
+  std::vector<Value> none;
+  CHECK(logic::call_engine(objects, "engine.mixer.release", {mixer}, none));
+  // a handle of no mixer: the call fails and says so
+  out = {Value::zero(logic::PinType::number_list)};
+  CHECK(!logic::call_engine(objects, "engine.mixer.render", {mixer, Value::integer(4)}, out));
+  CHECK(objects.error.find("mixer") != std::string::npos);
+  // the room behind what the engine writes: writing past the count is caught
+  logic::engine_values::Written<f32> room(4);
+  room.data()[3] = 1;
+  CHECK(room.kept(objects, "out") && room.room.size() == 4);
+  logic::engine_values::Written<f32> past(4);
+  past.data()[4] = 1;
+  CHECK(!past.kept(objects, "out"));
+}
+
+// A test's host makes what a handle names where it has nothing yet - the same object on every side it
+// compares (engine_make_default: as C++ makes it without arguments, at that handle).
+TEST(engine_calls_default_objects) {
+  logic::EngineObjects a, b;
+  a.on_missing(logic::engine_make_default);
+  b.on_missing(logic::engine_make_default);
+  for (logic::EngineObjects* o : {&a, &b}) {
+    std::vector<logic::Value> out{logic::Value::zero(logic::PinType::boolean)};
+    CHECK(logic::call_engine(*o, "engine.mixer.init", {logic::Value::integer(5), logic::Value::integer(44100), logic::Value::integer(8)}, out) && out[0].b);
+    out = {logic::Value::zero(logic::PinType::integer)};
+    CHECK(logic::call_engine(*o, "engine.mixer.sample_rate", {logic::Value::integer(5)}, out));
+    CHECK(out[0].i == 44100);
+  }
+  CHECK(a.size() == 1 && b.size() == 1);
+}
 
 TEST(audio_mixer_panning_and_limits) {
   audio::Mixer m;

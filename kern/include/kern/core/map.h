@@ -193,10 +193,14 @@ template <class K, class V, class Hash = KeyHash<K>> class Map {
     entries_.erase(entries_.begin() + static_cast<std::ptrdiff_t>(at));
     index_.moved(entries_.size(), [this](std::size_t k) { return hash_(entries_[k].first); });
   }
+  /// Ends every entry, from the last to the first: the order is the map's own, whatever the library's
+  /// vector does (libstdc++ ends a vector's entries from the first, libc++ from the last) - what an entry
+  /// holds of the engine ends in the same order everywhere. The end of the map ends them so too.
   void clear() {
-    entries_.clear();
+    while (!entries_.empty()) entries_.pop_back();
     index_.clear();
   }
+  ~Map() { clear(); }
   void reserve(std::size_t count) {
     entries_.reserve(count);
     index_.reserve(count);

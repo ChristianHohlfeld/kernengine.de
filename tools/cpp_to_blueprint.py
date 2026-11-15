@@ -894,6 +894,15 @@ def enum_numbers(enum_decl):
     return out
 
 
+def count_per(t):
+    """kern::Count<Per> - a count beside a pointer the engine writes numbers through, each thing it counts
+    `Per` numbers (kern/core/base.h): Per. A whole number that counts what it writes: 1. Else None."""
+    m = re.fullmatch(r"(?:kern::)?Count<\s*(\d+)\s*[uU]?\s*>", t.strip())
+    if m:
+        return int(m.group(1))
+    return 1 if NUMBER.get(t.strip()) == "Int" and t.strip() not in ("bool", "char") else None
+
+
 def template_args(t):
     """The arguments of a template type's name: "std::pair<int, std::vector<float>>" -> ["int", "std::vector<float>"]."""
     a, b = t.find("<"), t.rfind(">")
@@ -1428,7 +1437,7 @@ class Unit:
                 text = open(os.path.join(ROOT, "kern", "src", "logic", "engine_api.gen.cpp")).read()
             except OSError:
                 text = ""
-            pins = lambda t: [(m.group(1), m.group(2), m.group(3)) for m in re.finditer(r'\{"(\w+)", PinType::(\w+), "(\w*)", "[^"]*"(?:, "\w*")?\}', t)]
+            pins = lambda t: [(m.group(1), m.group(2), m.group(3)) for m in re.finditer(r'\{"(\w+)", PinType::(\w+), "(\w*)", "[^"]*"(?:, "\w*"(?:, \d+)?)?\}', t)]
             for m in re.finditer(r'\{"(engine\.[\w.]+)", (?:"(?:\\.|[^"\\])*", ){4}(true|false),\n\s*\{(.*)\},\n\s*\{(.*)\}\},', text):
                 self._table[m.group(1)] = (m.group(2) == "true", pins(m.group(3)), pins(m.group(4)))
         return self._table
@@ -1442,6 +1451,8 @@ class Unit:
         t = self.clean(raw)
         if t in NUMBER:
             return NUMBER[t]
+        if re.fullmatch(r"(?:kern::)?Count<\s*\d+\s*[uU]?\s*>", t):
+            return "Int"   # (kern::Count<Per>: the whole number it holds)
         if t in W64:
             return "Int64"   # (64 bits as C++ holds them: the language's Int64 - what they mean, its nodes say)
         if t in TEXT or t.startswith("std::basic_string<char") or t.startswith("std::basic_string_view<char"):
@@ -3618,6 +3629,23 @@ class Emit:
                 except Wait:
                     continue
             return False
+        def entries_end(raw):
+            """Does what an algorithm is handed move or end what ends: a range of entries that end something
+            (an iterator into a list of them, a pointer to one, such a value) - not a range of pointers to them
+            (`std::vector<Tile*>`: a pointer only names what another holds)."""
+            c = u.clean(re.sub(r"&", "", raw)).strip()
+            m = re.match(r"__gnu_cxx::__normal_iterator<(.+)>$", c) or re.match(r"std::(?:__1::)?__wrap_iter<(.+)>$", c) or re.match(r"std::reverse_iterator<(.+)>$", c)
+            if m:
+                c = template_args(c)[0]
+            if re.search(r"\*\s*(const)?$", c):
+                c = re.sub(r"\*\s*(const)?$", "", c).strip()   # (the entry a pointer into the range points at)
+            if "(lambda" in c:
+                return False
+            try:
+                return u.held_life(c) is not None
+            except Wait:
+                return mentions(c)
+
         def entries_made(raw):
             """Does C++ make the new entries of this list or map (its values) with a constructor of their own?"""
             c = u.clean(re.sub(r"&", "", raw))
@@ -3670,14 +3698,16 @@ class Emit:
             elif k == "CXXMemberCallExpr" and kids(callee(n)):
                 name = callee(n).get("name")
                 h = u.held_life(re.sub(r"\*\s*(const)?\s*$", "", qtype(kids(callee(n))[0])))
-                if h is not None and h[0] == "many" and name in self.MUTATING:
+                if h is not None and h[0] == "many" and name in self.MUTATING and not self.entries_change(n, name):
+                    if name == "clear":
+                        raise Wait(f"clear() of {what(h)} (C++ leaves open in which order a std::vector's entries end: libstdc++ from the first, libc++ from the last)")
                     raise Wait(f"{name}() of {what(h)}")
                 if h is not None and h[0] in ("box", "owned") and name in ("release", "swap", "emplace"):
                     raise Wait(f"{name}() of what owns {what(h)}")
             elif k == "CXXOperatorCallExpr" and callee_name(n) == "operator[]" and len(kids(n)) > 1:
                 h = u.held_life(qtype(kids(n)[1]))
                 keyed = re.match(r"(?:kern::Map|std::(?:unordered_)?map)<", u.clean(qtype(kids(n)[1])))
-                if h is not None and h[0] == "many" and keyed:
+                if h is not None and h[0] == "many" and keyed and not self.row_holds_nothing(qtype(kids(n)[1])):
                     raise Wait(f"a row of {what(h)} by its key (C++ makes it where there is none)")
                 if keyed and entries_made(qtype(kids(n)[1])):
                     raise Wait("a row of a map by its key, whose value C++ makes with its constructor where there is none")
@@ -3689,7 +3719,7 @@ class Emit:
                 if len(given) == 1 and NUMBER.get(u.clean(qtype(given[0]))) == "Int":
                     raise Wait("a list whose entries C++ makes with their constructor")
             elif k == "CallExpr" and callee_name(n) in self.ALGORITHMS and not (callee_name(n) == "move" and len(kids(n)) == 2):
-                if any(mentions(qtype(a)) for a in kids(n)[1:]):
+                if any(entries_end(qtype(a)) for a in kids(n)[1:]):
                     raise Wait(f"std::{callee_name(n)} over what ends (objects of the engine, values that hold them)")
             elif k == "VarDecl" and up:
                 h = u.held_life(qtype(n))
@@ -3703,6 +3733,63 @@ class Emit:
                     raise Wait("an owned object of the engine as a local variable")
             elif k in ("CXXNewExpr", "CXXDeleteExpr") and mentions(qtype(n)):
                 raise Wait("an object that ends something made with new or ended with delete")
+
+    # ---- lists and maps of what ends: an entry ends where C++ ends it ----
+    def entry_life(self, raw):
+        """What ends with an entry of the list or map of the C++ type `raw` (Unit.held_life of its entries - of a
+        map: of its values), or None."""
+        c = self.u.clean(re.sub(r"&", "", raw)).strip()
+        c = re.sub(r"\*\s*(const)?\s*$", "", c).strip()
+        if not re.fullmatch(r"(?:std|kern)::[\w:]+<.*>", c):
+            return None
+        args = template_args(c)
+        entry = args[1] if re.match(r"(?:kern::Map|std::(?:unordered_)?map)<", c) and len(args) > 1 else args[0] if args else None
+        return self.u.held_life(entry) if entry else None
+
+    def row_holds_nothing(self, raw):
+        """Is a new row of this map one C++ makes holding nothing that ends - its value owns or may hold one
+        (std::unique_ptr<Tile>: null)? Then `m[key]` makes nothing where the key is new."""
+        h = self.entry_life(raw)
+        return h is not None and h[0] in ("box", "owned")
+
+    def entries_change(self, n, name):
+        """A change of a list or map whose entries end something (Unit.held_life) that the Blueprint does as C++
+        does: erase() and pop_back() end the entry they take out, there (ended_entry) - a std::vector moves the
+        ones after it down, so the one taken out is the one that ends -; clear() of a kern::Map or kern::Set
+        ends its entries from the last to the first (kern/core/map.h); push_back(std::move(x)) and
+        emplace_back(std::move(x)) take x into the list - it is empty where it was (a Take), nothing is copied
+        and nothing ends."""
+        base = kids(callee(n))[0] if kids(callee(n)) else {}
+        c = self.u.clean(re.sub(r"\*\s*(const)?\s*$", "", qtype(base)))
+        args = [x for x in kids(n)[1:] if x.get("kind") != "CXXDefaultArgExpr"]
+        if name in ("erase", "pop_back"):
+            return name == "pop_back" or len(args) == 1
+        if name == "clear":
+            return bool(KEYED_KERN.match(c))
+        if name in ("push_back", "emplace_back") and len(args) == 1:
+            a = self.unwrap(args[0])
+            while a.get("kind") in ("MaterializeTemporaryExpr", "ImplicitCastExpr") and len(kids(a)) == 1:
+                a = self.unwrap(kids(a)[0])
+            return a.get("kind") == "CallExpr" and callee_name(a) == "move" and len(kids(a)) == 2
+        return False
+
+    def ended_entry(self, h, place):
+        """The steps that end an entry of a list or map at `place` as C++ ends it (h: what ends with it)."""
+        kind, what = h
+        if kind in ("object", "owned"):
+            return self.release(what, place)
+        if kind == "value":
+            return self.ended_parts(what, place)
+        if kind == "box":
+            return self.ended_box(what, place)
+        raise Wait("the end of an entry that is itself a list, a map or an array of what ends")
+
+    def entries_ended(self, h, kind, row, lv):
+        """The steps that end every entry of a list or map at `lv`, from the last to the first."""
+        count, at = self.temp("count", "Int"), self.temp("at", "Int")
+        last = self.whole_math("-", count, "1")
+        return [f"{count} = kern::to<Int>({kind}_length<{row}>({lv}));",
+                *self.count_loop("0", last, lambda i: [f"{at} = {self.whole_math('-', last, i)};", *self.ended_entry(h, f"{lv}[{at}]")])]
 
     def block_of(self, stmts):
         """The statements of a block, and whether it always returns (then its objects are released by the return)."""
@@ -4883,7 +4970,9 @@ class Emit:
                     return self.keyed_change(base, name, args)[0]
                 before, lv, after = self.variable_of(base, self.tp(base))
                 if name == "clear" and not args:
-                    return before + [f"{kind}_clear({lv});"] + after
+                    h = self.entry_life(self.ctype(base))
+                    ends = self.entries_ended(h, kind, self.rows(base)[1], lv) if h is not None and kind == "map" else []
+                    return before + ends + [f"{kind}_clear({lv});"] + after
                 if name == "reserve" and len(args) == 1:
                     return before + [f"{kind}_reserve({lv}, {self.ex(args[0], 'Int')});"] + after
                 raise Wait(f"{kind}: {name}()")
@@ -4901,6 +4990,11 @@ class Emit:
                 if name == "clear":
                     return before + [f"list_clear({lv});"] + after
                 if name == "pop_back":
+                    h = self.entry_life(self.ctype(base))
+                    if h is not None:   # (the last entry ends)
+                        at = self.temp("at", "Int")
+                        return before + [f"{at} = kern::to<Int>(kern::formula([](Float n) -> Float {{ return n - 1.0; }}, kern::to<Float>(list_length<{it}>({lv}))));",
+                                         *self.ended_entry(h, f"{lv}[{at}]"), f"list_remove_at({lv}, {at});"] + after
                     return before + [f"list_remove_at({lv}, kern::to<Int>(kern::formula([](Float n) -> Float {{ return n - 1.0; }}, kern::to<Float>(list_length<{it}>({lv})))));"] + after
                 if name == "reserve":   # (room for that many entries: one request for memory, as in C++)
                     return before + [f"list_reserve({lv}, {self.ex(args[0], 'Int')});"] + after
@@ -5471,8 +5565,13 @@ class Emit:
                     raise Wait("a pointer")
                 continue
             name, bt = pin_in, in_pins[pin_in]
-            nodes[name] = a
             raw = qtype(params[i]).strip()
+            if count_per(u.clean(raw)) not in (None, 1) and not NUMBER.get(u.clean(raw)):
+                # (a kern::Count<Per> made of a whole number where it is handed over: that number)
+                while a.get("kind") in ("ImplicitCastExpr", "CXXConstructExpr", "CXXFunctionalCastExpr", "MaterializeTemporaryExpr", "ExprWithCleanups", "CXXBindTemporaryExpr") and \
+                        len([x for x in kids(a) if x.get("kind") != "CXXDefaultArgExpr"]) == 1 and count_per(u.clean(qtype(a))) not in (None, 1):
+                    a = [x for x in kids(a) if x.get("kind") != "CXXDefaultArgExpr"][0]
+            nodes[name] = a
             made = self.unwrap(a)
             while made.get("kind") in ("MaterializeTemporaryExpr", "CXXBindTemporaryExpr", "CXXFunctionalCastExpr") and len(kids(made)) == 1:
                 made = self.unwrap(kids(made)[0])
@@ -5714,14 +5813,20 @@ class Emit:
         kind, _ = self.keyed(base)
         lt, row, kt, vt = self.rows(base)
         if name == "erase" and len(a) == 1:
+            h = self.entry_life(self.ctype(base)) if kind == "map" else None   # (what ends with the entry taken out)
             if self.is_iter(a[0]):   # (erase(it): the entry at that place goes - the next one is there then)
                 at = self.temp("at", "Int")
                 place = self.ex(a[0], "Int")
                 before, lv, after = self.variable_of(base, lt)
-                return before + [f"{at} = {place};", f"{kind}_remove_at({lv}, {at});"] + after, at, "true"
+                ends = self.ended_entry(h, f"{lv}[{at}]") if h is not None else []
+                return before + [f"{at} = {place};", *ends, f"{kind}_remove_at({lv}, {at});"] + after, at, "true"
             key = self.temp("key", kt)
             lines = [f"{key} = {self.ex(a[0], kt)};"]
             before, lv, after = self.variable_of(base, lt)
+            if h is not None:   # (the key's entry, if there is one, ends)
+                at = self.temp("at", "Int")
+                lines += [f"{at} = {self.found_at(kind, row, lv, key)};", f'if (math_compare<">=">(kern::to<Float>({at}), 0.0)) {{',
+                          *["  " + x for x in self.ended_entry(h, f"{lv}[{at}]")], "}"]
             node = self.u.next_node
             self.u.next_node += 1
             self.u.members.append(f"  struct {{ Bool removed = false; }} n{node};")
@@ -6002,6 +6107,10 @@ class Emit:
             lst, at = self.place(args[0])
             if not self.same_list(lst, base):
                 raise Wait("list: erase() at a place of another list")
+            h = self.entry_life(self.ctype(base))
+            if h is not None:   # (the entry taken out ends: the ones after it move down)
+                held = self.temp("at", "Int")
+                return [f"{held} = {at};", *self.ended_entry(h, f"{lv}[{held}]"), f"list_remove_at({lv}, {held});"]
             return [f"list_remove_at({lv}, {at});"]
         if name == "erase" and len(args) == 2:
             inner = self.unwrap(args[0])
@@ -7683,6 +7792,11 @@ class Emit:
                 # what is moved out of an owned value is gone there
                 lt = self.tp(a[0])
                 return self.taken_out(a[0], lt), lt
+            if name == "move" and len(a) == 1 and u.held_life(qtype(a[0])) is not None and not self.u.object_of(qtype(a[0])):
+                # a value that holds what ends, moved into another place (push_back(std::move(c))): it is there now,
+                # and empty where it was - what ends with it there ends nothing (its handles are none)
+                lt = self.tp(a[0])
+                return self.taken_out(a[0], lt), lt
             if name == "move" and len(a) == 1 and b.get("_taken") and not self.own_value(a[0]):
                 # A value a constructor or an assignment takes out of a place that stays - a field of the
                 # object, what a reference names: a list (std::vector) is empty there afterwards. Of anything
@@ -8248,6 +8362,21 @@ class Api:
                 return access == "public"
         return d.get("access", "public") == "public"
 
+    def reachable(self, q):
+        """Can code outside the engine name the class `q`: is every class it is declared in, and is it in each,
+        public? (A class declared in a private part of a class is that class's own.)"""
+        outer = q.rsplit("::", 1)[0] if "::" in q else ""
+        if outer not in self.tree.records:
+            return True
+        rec, out = self.tree.records[q], self.tree.records[outer]
+        access = "private" if out.get("tagUsed") == "class" else "public"
+        for c in kids(out):
+            if c.get("kind") == "AccessSpecDecl":
+                access = c.get("access", access)
+            elif c.get("id") == rec.get("id") or (c.get("kind") == "CXXRecordDecl" and c.get("name") == q.rsplit("::", 1)[-1] and c.get("completeDefinition")):
+                return access == "public" and self.reachable(outer)
+        return self.reachable(outer)
+
     def of_object(self, d):
         """Is `d` a method of a class of the engine that is an object (not plain data a Blueprint holds)?"""
         owner = self.tree.owner.get(d["id"])
@@ -8278,6 +8407,8 @@ class Api:
         rec = self.tree.records.get(q)
         if rec is None or not q.startswith(ENGINE + "::") or not self.opaque(q) or any((q + "::").startswith(s) for s in ENGINE_SKIP):
             return []
+        if not self.reachable(q):
+            return []   # (a class declared where no one outside it sees it - Renderer::Texture: the engine's own)
         if (rec.get("definitionData") or {}).get("isAbstract") or any(c.get("pure") for c in kids(rec) if c.get("kind") == "CXXMethodDecl"):
             return []
         if any(c.get("kind") == "CXXDestructorDecl" and (c.get("explicitlyDeleted") or not (c.get("isImplicit") or self.public(c))) for c in kids(rec)):
@@ -8304,6 +8435,13 @@ class Api:
         makers = self.makers(q)
         if d not in makers:
             raise Wait("a constructor that makes no object of the engine")
+        looked, self.u.lookup_scope = self.u.lookup_scope, q + "::"
+        try:
+            return self.maker1(d, q, makers)
+        finally:
+            self.u.lookup_scope = looked
+
+    def maker1(self, d, q, makers):
         group = snake(q.split("::")[-1])
         nth = makers.index(d) + 1
         ins, params, taken = [], [], {"exec", "then", "result"}
@@ -8335,7 +8473,16 @@ class Api:
                 "value": False, "ins": [(group, "Int", q)], "outs": [], "params": [], "decl": rec, "role": "release", "class": q}
 
     def function(self, d):
-        """The node of a declared function of the engine: a dict - or Wait, when its types have no place."""
+        """The node of a declared function of the engine: a dict - or Wait, when its types have no place. (Its
+        types' names are looked up as C++ looks them up where it is declared: `Shape` in kern::game is
+        kern::game::Shape, also where kern::physics has a Shape of its own.)"""
+        looked, self.u.lookup_scope = self.u.lookup_scope, self.tree.scope_of.get(d["id"]) or self.u.lookup_scope
+        try:
+            return self.function1(d)
+        finally:
+            self.u.lookup_scope = looked
+
+    def function1(self, d):
         tree, u = self.tree, self.u
         if d.get("kind") == "CXXConstructorDecl":
             return self.maker(d)
@@ -8366,6 +8513,7 @@ class Api:
         changes = False   # (an object of the engine it is handed to change - Renderer&, physics::World*: a step)
         params = []   # per parameter of the C++ function: (its input pin or None, its output pin or None)
         counts = {}   # an output list the engine writes through a pointer -> the input that is its count (written_list)
+        per = {}      # ... -> how many numbers each one it counts is (kern::Count<Per>; else 1)
         all_params = [x for x in kids(d) if x.get("kind") == "ParmVarDecl"]
         for i, p in enumerate(all_params):
             optional = self.optional_out(p)
@@ -8380,6 +8528,7 @@ class Api:
                 outs.append((name, written, None))
                 params.append((None, name))
                 counts[name] = i + 1   # (the parameter after it - its input's name is known once it is read)
+                per[name] = count_per(self.u.clean(qtype(all_params[i + 1]).strip()))
                 continue
             bt, writes, handle = self.handed(qtype(p))
             name = name_of(p.get("name") or f"value{i + 1}")
@@ -8401,7 +8550,7 @@ class Api:
             self.shape(bt)
         words = d["name"].replace("_", " ").title()
         return {"type": self.type_of(d), "cpp": qualified, "label": words, "category": "Engine: " + self.home(d).split("::")[-1].replace("kern", "Engine"),
-                "help": u.comment_of(d), "value": value, "ins": ins, "outs": outs, "params": params, "decl": d, "counts": counts}
+                "help": u.comment_of(d), "value": value, "ins": ins, "outs": outs, "params": params, "decl": d, "counts": counts, "per": per}
 
     def written_list(self, p, after):
         """A parameter that is a pointer to numbers the function writes through, with their count beside it -
@@ -8417,7 +8566,7 @@ class Api:
         if "*" in inner or "&" in inner or re.search(r"\bconst\b", inner) or self.u.object_of(raw) is not None:
             return None   # (a pointer to an object of the engine is its handle)
         count = self.u.clean(qtype(after).strip())
-        if NUMBER.get(count) != "Int" or count in ("bool", "char"):
+        if count_per(count) is None and (NUMBER.get(count) != "Int" or count in ("bool", "char")):
             return None
         if self.u.clean(inner) == "char":
             return None   # (characters: a text's, not numbers)
@@ -9002,6 +9151,8 @@ class TestWriter:
             return f"converted::wide::Span<{const}{self.spell(inner)}>"
         if c in W64:
             return "u64" if c == "whole64u" else "i64"
+        if count_per(c) not in (None, 1) and c not in NUMBER:
+            return "u32"   # (kern::Count<Per>: the whole number it holds - the source hands it one)
         if c in ("float", "double", "long double"):
             return "double"
         if c in NUMBER:
@@ -9423,7 +9574,7 @@ class TestWriter:
                 # stand-in gives, one after the other from there on - no more than the count says
                 inner = self.spell(re.sub(r"\*\s*$", "", raw))
                 params.append((f"{inner}* {pin_out}", default))
-                takes.append((pin_out, inner, ("into", f["counts"][pin_out])))
+                takes.append((pin_out, inner, ("into", f["counts"][pin_out], f.get("per", {}).get(pin_out, 1))))
                 continue
             if pin_in is None:
                 # what the function reports if it is asked to: written where the pointer says, if it says
@@ -9480,7 +9631,8 @@ class TestWriter:
             k = 1
         for name, t, optional in takes:
             if isinstance(optional, tuple):   # (into the entries the pointer points at, as many as the count beside it allows)
-                body.append(f"converted::take_into<{shape(t)}>({name}, {optional[1]}, kern_out[{k}]);")
+                count = optional[1] if optional[2] == 1 else f"{optional[2]} * static_cast<long long>({optional[1]})"   # (kern::Count<Per>: Per numbers each)
+                body.append(f"converted::take_into<{shape(t)}>({name}, {count}, kern_out[{k}]);")
             else:
                 body.append(f"if ({name}) converted::take_as<{shape(t)}>(*{name}, kern_out[{k}]);" if optional else f"converted::take_as<{shape(t)}>({name}, kern_out[{k}]);")
             k += 1

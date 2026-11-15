@@ -1234,6 +1234,9 @@ inline Case nodes_case(const logic::Library& lib = logic::library()) {
   const std::vector<std::string>& of_the_game = game::logic_node_types();
   for (const auto& d : lib.all()) {
     if (d->kind != logic::NodeKind::pure || std::find(of_the_game.begin(), of_the_game.end(), d->type) != of_the_game.end()) continue;
+    // (what another actor's Blueprint holds or whether there is one asks the runtime the class runs in - a class
+    // called by itself has none: the tier case on_actor plays them, in every stage, as the engine runs them)
+    if (d->type == "func.get_on" || d->type == "func.has_blueprint") continue;
     std::vector<std::vector<std::pair<std::string, std::string>>> variants{{}};
     if (d->type == "math.formula") {
       variants.clear();
