@@ -113,17 +113,24 @@ template <class T> void draw(Draw& d, T& x) {
 }
 
 // ---- carried: the same value in the type of the other side (a class of the file is two classes, sc_old's
-// and sc_new's - field by field, by name: source_diff.py checks that they have the same fields) ----
+// and sc_new's - field by field, by name: source_diff.py checks that they have the same fields). A list and a
+// text get the room the old side's has (its capacity): what the two ask for memory is then compared alike ----
 template <class A, class B> void carry(const A& a, B& b) {
   using X = std::remove_cv_t<A>;
   using Y = std::remove_cv_t<B>;
-  if constexpr (std::is_same_v<X, Y> && !Named<X> && !std::is_array_v<X>) b = a;
-  else if constexpr (std::is_enum_v<X> && std::is_enum_v<Y>) b = static_cast<Y>(static_cast<std::underlying_type_t<X>>(a));
+  if constexpr (std::is_same_v<X, Y> && std::is_trivially_copyable_v<X> && !Named<X> && !std::is_array_v<X>) b = a;
+  else if constexpr (std::is_same_v<X, std::string> && std::is_same_v<Y, std::string>) {
+    b.clear();
+    b.reserve(a.capacity());
+    b.append(a);
+  } else if constexpr (std::is_enum_v<X> && std::is_enum_v<Y>) b = static_cast<Y>(static_cast<std::underlying_type_t<X>>(a));
   else if constexpr (std::is_arithmetic_v<X> && std::is_arithmetic_v<Y>) {
     static_assert(std::is_same_v<X, Y>, "a number of another type");
     b = a;
   } else if constexpr (is_vector<X>::value && is_vector<Y>::value) {
     b.clear();
+    b.shrink_to_fit();
+    b.reserve(a.capacity());
     b.resize(a.size());
     for (std::size_t k = 0; k < a.size(); ++k) {
       if constexpr (std::is_same_v<typename Y::value_type, bool>) b[k] = a[k];
