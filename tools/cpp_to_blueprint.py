@@ -8950,6 +8950,10 @@ class TestWriter:
                         if held is None:
                             continue   # (not held by the source the test holds)
                     elif self.in_function(v) or v.get("storageClass") == "static" and v.get("isStaticLocal") or not v.get("name"):
+                        at = (v.get("_at") or (None,))[0]
+                        if at is not None and not any(f.get("_file") == v.get("_file") and f.get("_at", (None, None))[1] is not None and f["_at"][0] <= at < f["_at"][1]
+                                   for f in self.whole.functions.values()):
+                            continue   # (kept by a function the test does not hold the source of: nothing it holds touches it)
                         missing.append(f"{variable} (kept in the body of a function defined in its class: the test does not reach it from outside)")
                         continue
                     elif i not in self.whole.consts:
