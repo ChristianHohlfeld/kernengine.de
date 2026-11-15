@@ -7238,6 +7238,10 @@ class Emit:
                 v = self.ex(a[0], "Vector")
                 return (f'math_compare<"==">(kern::formula([](Float x, Float y, Float z) -> Float {{ return (x - x) + (y - y) + (z - z); }}, '
                         f"vector_break({v}).x, vector_break({v}).y, vector_break({v}).z), 0.0)"), "Bool"
+            if name in ("size", "ssize") and len(a) == 1 and (self.tp(a[0]).startswith("List<") or self.tp(a[0]) == "Text"):
+                # std::size of a list, an array (a list of a fixed length) or a text: how many entries it has
+                t = self.tp(a[0])
+                return (f"list_length<{t[5:-1]}>({self.ex(a[0], t)})" if t != "Text" else f"text_length({self.ex(a[0], t)})"), "Int"
             if name == "move" and len(a) == 1 and self.is_box(a[0]):
                 # what is moved out of an owned value is gone there
                 lt = self.tp(a[0])
