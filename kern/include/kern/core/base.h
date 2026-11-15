@@ -36,6 +36,9 @@ void log(LogLevel level, const char* format, ...) __attribute__((format(printf, 
 
 /// Monotonic milliseconds (performance.now() in the browser).
 f64 now_ms();
+/// The wall clock: whole milliseconds since 1970-01-01 00:00 UTC (Date.now() in the browser) - a time
+/// several machines agree on (a shared round, a time of day); for measuring durations, now_ms.
+f64 wall_ms();
 
 template <class T>
 constexpr T min_of(T a, T b) { return b < a ? b : a; }
