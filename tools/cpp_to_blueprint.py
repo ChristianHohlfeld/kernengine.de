@@ -3633,14 +3633,16 @@ class Emit:
             elif k == "CXXMemberCallExpr" and kids(callee(n)):
                 name = callee(n).get("name")
                 h = u.held_life(re.sub(r"\*\s*(const)?\s*$", "", qtype(kids(callee(n))[0])))
-                if h is not None and h[0] == "many" and name in self.MUTATING:
+                if h is not None and h[0] == "many" and name in self.MUTATING and not self.entries_change(n, name):
+                    if name == "clear":
+                        raise Wait(f"clear() of {what(h)} (C++ leaves open in which order a std::vector's entries end: libstdc++ from the first, libc++ from the last)")
                     raise Wait(f"{name}() of {what(h)}")
                 if h is not None and h[0] in ("box", "owned") and name in ("release", "swap", "emplace"):
                     raise Wait(f"{name}() of what owns {what(h)}")
             elif k == "CXXOperatorCallExpr" and callee_name(n) == "operator[]" and len(kids(n)) > 1:
                 h = u.held_life(qtype(kids(n)[1]))
                 keyed = re.match(r"(?:kern::Map|std::(?:unordered_)?map)<", u.clean(qtype(kids(n)[1])))
-                if h is not None and h[0] == "many" and keyed:
+                if h is not None and h[0] == "many" and keyed and not self.row_holds_nothing(qtype(kids(n)[1])):
                     raise Wait(f"a row of {what(h)} by its key (C++ makes it where there is none)")
                 if keyed and entries_made(qtype(kids(n)[1])):
                     raise Wait("a row of a map by its key, whose value C++ makes with its constructor where there is none")
@@ -3666,6 +3668,63 @@ class Emit:
                     raise Wait("an owned object of the engine as a local variable")
             elif k in ("CXXNewExpr", "CXXDeleteExpr") and mentions(qtype(n)):
                 raise Wait("an object that ends something made with new or ended with delete")
+
+    # ---- lists and maps of what ends: an entry ends where C++ ends it ----
+    def entry_life(self, raw):
+        """What ends with an entry of the list or map of the C++ type `raw` (Unit.held_life of its entries - of a
+        map: of its values), or None."""
+        c = self.u.clean(re.sub(r"&", "", raw)).strip()
+        c = re.sub(r"\*\s*(const)?\s*$", "", c).strip()
+        if not re.fullmatch(r"(?:std|kern)::[\w:]+<.*>", c):
+            return None
+        args = template_args(c)
+        entry = args[1] if re.match(r"(?:kern::Map|std::(?:unordered_)?map)<", c) and len(args) > 1 else args[0] if args else None
+        return self.u.held_life(entry) if entry else None
+
+    def row_holds_nothing(self, raw):
+        """Is a new row of this map one C++ makes holding nothing that ends - its value owns or may hold one
+        (std::unique_ptr<Tile>: null)? Then `m[key]` makes nothing where the key is new."""
+        h = self.entry_life(raw)
+        return h is not None and h[0] in ("box", "owned")
+
+    def entries_change(self, n, name):
+        """A change of a list or map whose entries end something (Unit.held_life) that the Blueprint does as C++
+        does: erase() and pop_back() end the entry they take out, there (ended_entry) - a std::vector moves the
+        ones after it down, so the one taken out is the one that ends -; clear() of a kern::Map or kern::Set
+        ends its entries from the last to the first (kern/core/map.h); push_back(std::move(x)) and
+        emplace_back(std::move(x)) take x into the list - it is empty where it was (a Take), nothing is copied
+        and nothing ends."""
+        base = kids(callee(n))[0] if kids(callee(n)) else {}
+        c = self.u.clean(re.sub(r"\*\s*(const)?\s*$", "", qtype(base)))
+        args = [x for x in kids(n)[1:] if x.get("kind") != "CXXDefaultArgExpr"]
+        if name in ("erase", "pop_back"):
+            return name == "pop_back" or len(args) == 1
+        if name == "clear":
+            return bool(KEYED_KERN.match(c))
+        if name in ("push_back", "emplace_back") and len(args) == 1:
+            a = self.unwrap(args[0])
+            while a.get("kind") in ("MaterializeTemporaryExpr", "ImplicitCastExpr") and len(kids(a)) == 1:
+                a = self.unwrap(kids(a)[0])
+            return a.get("kind") == "CallExpr" and callee_name(a) == "move" and len(kids(a)) == 2
+        return False
+
+    def ended_entry(self, h, place):
+        """The steps that end an entry of a list or map at `place` as C++ ends it (h: what ends with it)."""
+        kind, what = h
+        if kind in ("object", "owned"):
+            return self.release(what, place)
+        if kind == "value":
+            return self.ended_parts(what, place)
+        if kind == "box":
+            return self.ended_box(what, place)
+        raise Wait("the end of an entry that is itself a list, a map or an array of what ends")
+
+    def entries_ended(self, h, kind, row, lv):
+        """The steps that end every entry of a list or map at `lv`, from the last to the first."""
+        count, at = self.temp("count", "Int"), self.temp("at", "Int")
+        last = self.whole_math("-", count, "1")
+        return [f"{count} = kern::to<Int>({kind}_length<{row}>({lv}));",
+                *self.count_loop("0", last, lambda i: [f"{at} = {self.whole_math('-', last, i)};", *self.ended_entry(h, f"{lv}[{at}]")])]
 
     def block_of(self, stmts):
         """The statements of a block, and whether it always returns (then its objects are released by the return)."""
@@ -4484,7 +4543,9 @@ class Emit:
                     return self.keyed_change(base, name, args)[0]
                 before, lv, after = self.variable_of(base, self.tp(base))
                 if name == "clear" and not args:
-                    return before + [f"{kind}_clear({lv});"] + after
+                    h = self.entry_life(self.ctype(base))
+                    ends = self.entries_ended(h, kind, self.rows(base)[1], lv) if h is not None and kind == "map" else []
+                    return before + ends + [f"{kind}_clear({lv});"] + after
                 if name == "reserve" and len(args) == 1:
                     return before + [f"{kind}_reserve({lv}, {self.ex(args[0], 'Int')});"] + after
                 raise Wait(f"{kind}: {name}()")
@@ -4502,6 +4563,11 @@ class Emit:
                 if name == "clear":
                     return before + [f"list_clear({lv});"] + after
                 if name == "pop_back":
+                    h = self.entry_life(self.ctype(base))
+                    if h is not None:   # (the last entry ends)
+                        at = self.temp("at", "Int")
+                        return before + [f"{at} = kern::to<Int>(kern::formula([](Float n) -> Float {{ return n - 1.0; }}, kern::to<Float>(list_length<{it}>({lv}))));",
+                                         *self.ended_entry(h, f"{lv}[{at}]"), f"list_remove_at({lv}, {at});"] + after
                     return before + [f"list_remove_at({lv}, kern::to<Int>(kern::formula([](Float n) -> Float {{ return n - 1.0; }}, kern::to<Float>(list_length<{it}>({lv})))));"] + after
                 if name == "reserve":   # (room for that many entries: one request for memory, as in C++)
                     return before + [f"list_reserve({lv}, {self.ex(args[0], 'Int')});"] + after
@@ -5313,14 +5379,20 @@ class Emit:
         kind, _ = self.keyed(base)
         lt, row, kt, vt = self.rows(base)
         if name == "erase" and len(a) == 1:
+            h = self.entry_life(self.ctype(base)) if kind == "map" else None   # (what ends with the entry taken out)
             if self.is_iter(a[0]):   # (erase(it): the entry at that place goes - the next one is there then)
                 at = self.temp("at", "Int")
                 place = self.ex(a[0], "Int")
                 before, lv, after = self.variable_of(base, lt)
-                return before + [f"{at} = {place};", f"{kind}_remove_at({lv}, {at});"] + after, at, "true"
+                ends = self.ended_entry(h, f"{lv}[{at}]") if h is not None else []
+                return before + [f"{at} = {place};", *ends, f"{kind}_remove_at({lv}, {at});"] + after, at, "true"
             key = self.temp("key", kt)
             lines = [f"{key} = {self.ex(a[0], kt)};"]
             before, lv, after = self.variable_of(base, lt)
+            if h is not None:   # (the key's entry, if there is one, ends)
+                at = self.temp("at", "Int")
+                lines += [f"{at} = {self.found_at(kind, row, lv, key)};", f'if (math_compare<">=">(kern::to<Float>({at}), 0.0)) {{',
+                          *["  " + x for x in self.ended_entry(h, f"{lv}[{at}]")], "}"]
             node = self.u.next_node
             self.u.next_node += 1
             self.u.members.append(f"  struct {{ Bool removed = false; }} n{node};")
@@ -5601,6 +5673,10 @@ class Emit:
             lst, at = self.place(args[0])
             if not self.same_list(lst, base):
                 raise Wait("list: erase() at a place of another list")
+            h = self.entry_life(self.ctype(base))
+            if h is not None:   # (the entry taken out ends: the ones after it move down)
+                held = self.temp("at", "Int")
+                return [f"{held} = {at};", *self.ended_entry(h, f"{lv}[{held}]"), f"list_remove_at({lv}, {held});"]
             return [f"list_remove_at({lv}, {at});"]
         if name == "erase" and len(args) == 2:
             inner = self.unwrap(args[0])
@@ -7273,6 +7349,11 @@ class Emit:
                         f"vector_break({v}).x, vector_break({v}).y, vector_break({v}).z), 0.0)"), "Bool"
             if name == "move" and len(a) == 1 and self.is_box(a[0]):
                 # what is moved out of an owned value is gone there
+                lt = self.tp(a[0])
+                return self.taken_out(a[0], lt), lt
+            if name == "move" and len(a) == 1 and u.held_life(qtype(a[0])) is not None and not self.u.object_of(qtype(a[0])):
+                # a value that holds what ends, moved into another place (push_back(std::move(c))): it is there now,
+                # and empty where it was - what ends with it there ends nothing (its handles are none)
                 lt = self.tp(a[0])
                 return self.taken_out(a[0], lt), lt
             if name == "move" and len(a) == 1 and b.get("_taken") and not self.own_value(a[0]):

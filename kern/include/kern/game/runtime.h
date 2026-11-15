@@ -316,6 +316,11 @@ class GameWorld {
   void replicated_state(std::vector<PropertyChange>& props, std::vector<SpawnChange>& spawns) const;
   /// Sets a component property of a running actor by JSON path ("components.light.color").
   bool set_property(ActorId id, const std::string& path, const json::Value& value);
+  /// The same with a number, a truth value or a text as the value - the JSON value it is (what a
+  /// Blueprint has to give: it holds no JSON).
+  bool set_property_number(ActorId id, const std::string& path, f64 value);
+  bool set_property_flag(ActorId id, const std::string& path, bool value);
+  bool set_property_text(ActorId id, const std::string& path, const std::string& value);
   /// A copy of `source` (with children and logic) at a place; `id` forces the root id (replicas).
   ActorId spawn_copy(ActorId source, Vec3 position, Vec3 rotation_deg, ActorId id = 0);
   bool teleport(ActorId id, Vec3 position, const Vec3* rotation_deg = nullptr);

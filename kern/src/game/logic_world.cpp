@@ -160,6 +160,10 @@ json::Value* path_mut(json::Value& root, std::string_view path) {
 }
 }  // namespace
 
+bool GameWorld::set_property_number(ActorId id, const std::string& path, f64 value) { return set_property(id, path, json::Value(value)); }
+bool GameWorld::set_property_flag(ActorId id, const std::string& path, bool value) { return set_property(id, path, json::Value(value)); }
+bool GameWorld::set_property_text(ActorId id, const std::string& path, const std::string& value) { return set_property(id, path, json::Value(value)); }
+
 bool GameWorld::set_property(ActorId id, const std::string& path, const json::Value& value) {
   Actor* a = level_.find(id);
   if (!a || path.empty() || path == "id" || path == "parent" || path.rfind("components.logic", 0) == 0) return false;
