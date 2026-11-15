@@ -349,9 +349,9 @@ def kids(n):
 # the struct Whole64 (tools/blueprint_whole64.h). The compiler's tree says how a type is spelled (its
 # "qualType") next to what it is (its "desugaredQualType", where size_t and u64 are the same): where the
 # spelling names one of those, the spelling is the type - unless it also names something only the other
-# says (a list's value_type, auto).
+# says (a list's value_type - which the compiler may also name without its class -, auto).
 WHOLE64 = re.compile(r"(?<![\w:])(?:kern::|std::|sc::)?(u64|i64|uint64_t|int64_t)\b")
-UNSPELLED = re.compile(r"::(?:value_type|reference|const_reference|size_type|difference_type|key_type|mapped_type|element_type|iterator|const_iterator|pointer)\b|\bauto\b|\bdecltype\b|\btypename\b|__")
+UNSPELLED = re.compile(r"(?<![\w])(?:value_type|reference|const_reference|size_type|difference_type|key_type|mapped_type|element_type|iterator|const_iterator|pointer)\b|\bauto\b|\bdecltype\b|\btypename\b|__")
 
 
 def qtype(n):
@@ -1451,7 +1451,7 @@ class Unit:
         if m:
             return f"List<{self.entry(template_args(t)[0])}>"
         # (T[3][2] is 3 entries of T[2]: the first length is the outer one)
-        m = re.match(r"std::array<(.+), (\d+)>$", t) or re.match(r"(.+?)\s*\[(\d*)\]((?:\s*\[\d*\])*)$", t)
+        m = re.match(r"std::array<(.+), (\d+)[uUlL]*>$", t) or re.match(r"(.+?)\s*\[(\d*)\]((?:\s*\[\d*\])*)$", t)   # (its length as the compiler writes it: 12UL)
         if m and m.lastindex == 3 and m.group(3):
             return f"List<{self.entry(m.group(1) + m.group(3))}>"
         if m:
@@ -1656,7 +1656,7 @@ class Unit:
         """How many entries a list of fixed length has (`f32 m[16]`, std::array<u8, 32>); None: a list of any length."""
         c = self.clean(raw)
         # (T[3][2] has 3 entries, each a T[2]: the first length is the outer one)
-        m = re.match(r"std::array<.*,\s*(\d+)U?L?L?>$", c) or re.match(r"[^\[]*\[(\d+)\](?:\s*\[\d+\])*$", c)
+        m = re.match(r"std::array<.*,\s*(\d+)[uUlL]*>$", c) or re.match(r"[^\[]*\[(\d+)\](?:\s*\[\d+\])*$", c)
         return int(m.group(1)) if m else None
 
     def zero(self, t):
