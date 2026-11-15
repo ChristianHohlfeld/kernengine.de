@@ -459,6 +459,14 @@ struct BlueprintCore : logic::PureNodes {
   /// Text of Bytes: the text a list of bytes is, from At on (one request for memory, as std::string makes it).
   static Text text_of_bytes(logic::Items<Int> bytes, Int at, Int count) { return logic::texts::of_bytes(bytes, at, count); }
   static Text text_repeat(const Text& a, Int count) { return logic::texts::repeat(a.view(), count); }
+  /// Reserve Text: the same text, with room for Count characters (std::string::reserve, at most 2^24) - handed on
+  /// with std::move, where it is: the appends after it fill that room.
+  static Text text_reserve(Text a, Int count) {
+    if (count <= static_cast<i64>(a.size())) return a;
+    std::string t = std::move(a).str();
+    t.reserve(static_cast<std::size_t>(std::min<i64>(count, logic::texts::kLongest)));
+    return t;
+  }
   /// Parse Float, Parse Int: the number at a place of a text as C reads it there (logic::scan).
   struct ParsedFloat {
     Float value = 0.0;

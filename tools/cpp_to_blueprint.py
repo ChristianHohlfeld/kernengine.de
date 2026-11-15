@@ -4377,6 +4377,8 @@ class Emit:
             return self.store(base, lambda _t: '""')
         if name == "push_back" and len(a) == 1:
             return self.store(base, lambda _t: f'text_append({t}, {self.text_or_char(a[0])}, "")')
+        if name == "reserve" and len(a) == 1 and self.given(a[0]):
+            return self.store(base, lambda _t: f"text_reserve({t}, {self.ex(a[0], 'Int')})")
         if name == "pop_back" and not a:
             return self.store(base, lambda _t: f"text_erase({t}, {self.whole_math('-', f'text_length({t})', '1')}, 1)")
         if name in ("append", "assign") and len(a) == 1 and self.tp_or_none(a[0]) == "Text":

@@ -2357,6 +2357,11 @@ struct PureNodes {
   /// The text the bytes of a list are (each number cut to 8 bits, as a char holds it): Count of them from At
   /// on - what std::string(reinterpret_cast<const char*>(bytes) + at, count) makes; beyond the list: up to its end.
   static Text text_of_bytes(std::vector<i64> bytes, Int at, Int count) { return texts::of_bytes(bytes, at, count); }
+  /// Reserve Text: the text as it is - room for Count characters is a matter of the class (std::string::reserve).
+  static Text text_reserve(Text a, Int count) {
+    (void)count;
+    return a;
+  }
   /// Text so many times one after the other - std::string(count, c) of one character (none: count 0 or less;
   /// at most 2^24 characters).
   static Text text_repeat(Text a, Int count) { return texts::repeat(a, count); }

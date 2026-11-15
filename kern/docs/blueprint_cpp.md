@@ -941,6 +941,7 @@ Befehl = text_erase(std::move(Befehl), 0, 3);         // cmd.erase(0, 3) – am 
 | Text Less | `a < b` | Bool – Byte für Byte als `unsigned char`, wie `std::string` ordnet |
 | Insert Text, Erase Text, Replace Text | `insert(at, b)`, `erase(at, count)`, `replace(at, count, b)` | den geänderten Text |
 | Repeat Text | `std::string(count, c)` | den Text so oft hintereinander (höchstens 2^24 Zeichen) |
+| Reserve Text | `reserve(count)` | den Text, wie er ist – in der Klasse mit Platz für Count Zeichen (höchstens 2^24) |
 | Text of Bytes | `std::string(reinterpret_cast<const char*>(bytes) + at, count)` | Count Bytes einer Liste ab At, jedes auf 8 Bit geschnitten |
 
 - **Wo C++ wirft** (`at` hinter dem Ende bei `substr`, `insert`, `erase`, `replace`: `std::out_of_range`,
@@ -950,7 +951,10 @@ Befehl = text_erase(std::move(Befehl), 0, 3);         // cmd.erase(0, 3) – am 
   einem Teil (wie `substr`: eine Kopie seiner Zeichen). Insert, Erase und Replace ändern den Text, den
   sie bekommen – reicht der Text ihn mit `std::move` weiter, ändern sie ihn am Platz, ohne Kopie. (Ein
   Teil eines `std::string_view` ist in C++ keine Kopie, im Blueprint schon: ein Text hält seine
-  Zeichen – bis 15 Zeichen ohne Anforderung von Speicher, wie `std::string`.)
+  Zeichen – bis 15 Zeichen ohne Anforderung von Speicher, wie `std::string`.) Ebenso Append: Ein Text,
+  den der Text mit `std::move` weiterreicht und der seine Zeichen hält, bekommt das Angehängte an seinem
+  Platz – `Log = text_append(std::move(Log), x, "")` kostet, was `log += x` kostet; mit Reserve Text vorher
+  ohne neue Anforderung.
 - `compare()` sagt in C++ nur sein Vorzeichen fest zu – der Konverter schreibt es nicht, `==` und `<`
   schon.
 
