@@ -4464,11 +4464,15 @@ class Emit:
             have = {"whole64u": "unsigned long", "whole64s": "long", "long long": "long", "unsigned long long": "unsigned long"}.get(have, have)
             if have != c and not (c == "char" and have in ("signed char", "char")):
                 raise Wait(f"a value sscanf writes into a {have} where its format says {c}")
-            want = "Int64" if t == "Int64" else t
-            if self.tp(place) != want:
+            if t == "Int64" and self.tp(place) == "Int":
+                # (a long long the program counts with - not a bit pattern: its 64 bits as an Int holds them)
+                befores.append(f"int64_of_int({self.ex(place, 'Int')})")
+                stores.append((place, "Int64>Int"))
+                continue
+            if self.tp(place) != t:
                 raise Wait(f"a value sscanf writes as {t} into a {self.tp(place)}")
-            befores.append(self.ex(place, want))
-            stores.append((place, want))
+            befores.append(self.ex(place, t))
+            stores.append((place, t))
         if not used and not plan:
             self.hoist(self.take_pre() + [f"text_scan<{text_literal(raw)}>({', '.join([text, at])});"])
             return "0"
@@ -4480,6 +4484,8 @@ class Emit:
         for k, (place, t) in enumerate(stores):
             if place is None:
                 lines.append(f"{t} = n{node}.v{k};")
+            elif t == "Int64>Int":
+                lines += self.store(place, self.typed(f"int64_to_int(n{node}.v{k})", "Int"))
             else:
                 lines += self.store(place, self.typed(f"n{node}.v{k}", t))
         self.hoist(lines)
@@ -7059,7 +7065,8 @@ class Emit:
         if k == "DeclRefExpr":
             ref = b.get("referencedDecl", {})
             i = ref.get("id")
-            if ref.get("name") == "npos" and re.search(r"\bbasic_string(?:_view)?<", qtype(b)):
+            if ref.get("name") == "npos" and (re.search(r"\bbasic_string(?:_view)?\b|\bstring(?:_view)?\b|size_type", qtype(b) + " " + qtype(ref))
+                                             or (b.get("type", {}).get("desugaredQualType") or ref.get("type", {}).get("desugaredQualType") or "").replace("const ", "").strip() == "unsigned long"):
                 return "-1", "Int"   # (no place in a text: npos, a size_t read with its sign)
             if i in self.names:
                 return self.names[i], self.types[i]
@@ -7342,6 +7349,10 @@ class Emit:
         """An expression of numbers as the text of a formula over `leaves`."""
         b = bare(n)
         k = b.get("kind")
+        if k == "BinaryOperator" and b.get("opcode") == "-" and len(kids(b)) == 2 and self.char_pointer(kids(b)[0]) and self.char_pointer(kids(b)[1]):
+            return self.leaf(None, leaves, self.ex(b, "Float"))   # (end - s.c_str(): how far apart two places of a text are - a value of its own)
+        if (k == "UnaryOperator" and b.get("opcode") == "*" and kids(b) and self.is_c_text(kids(b)[0])) or (k == "ArraySubscriptExpr" and len(kids(b)) == 2 and self.is_c_text(kids(b)[0])):
+            return self.leaf(None, leaves, self.ex(b, "Float"))   # (a character of a C string at a place: read there)
         if self.is64(b):   # (a 64-bit bit pattern in a computation with numbers: the number it is)
             text, have = self.value(b)
             return self.leaf(None, leaves, self.from64(text, self.ctype(b), "double", "Float") if have == self.whole64() else self.conv(text, have, "Float"))
