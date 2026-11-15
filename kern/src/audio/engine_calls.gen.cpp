@@ -12,14 +12,14 @@ namespace ev = engine_values;
 struct E_audio_Bus { using type = kern::audio::Bus; static constexpr type values[] = {kern::audio::Bus::master, kern::audio::Bus::music, kern::audio::Bus::sfx, kern::audio::Bus::ambience, kern::audio::Bus::ui, kern::audio::Bus::voice, kern::audio::Bus::count}; };
 struct E_audio_Rolloff { using type = kern::audio::Rolloff; static constexpr type values[] = {kern::audio::Rolloff::inverse, kern::audio::Rolloff::linear, kern::audio::Rolloff::exponential}; };
 struct E_audio_Wave { using type = kern::audio::Wave; static constexpr type values[] = {kern::audio::Wave::square, kern::audio::Wave::saw, kern::audio::Wave::sine, kern::audio::Wave::triangle, kern::audio::Wave::noise, kern::audio::Wave::pink, kern::audio::Wave::pulse}; };
-struct S_audio_BuiltinSound { static Value to(EngineObjects& o, const kern::audio::BuiltinSound& x); static void from(EngineObjects& o, const Value& v, kern::audio::BuiltinSound& x); };
-struct S_audio_BusSettings { static Value to(EngineObjects& o, const kern::audio::BusSettings& x); static void from(EngineObjects& o, const Value& v, kern::audio::BusSettings& x); };
-struct S_audio_ClipInfo { static Value to(EngineObjects& o, const kern::audio::ClipInfo& x); static void from(EngineObjects& o, const Value& v, kern::audio::ClipInfo& x); };
-struct S_audio_Listener { static Value to(EngineObjects& o, const kern::audio::Listener& x); static void from(EngineObjects& o, const Value& v, kern::audio::Listener& x); };
-struct S_audio_Meter { static Value to(EngineObjects& o, const kern::audio::Meter& x); static void from(EngineObjects& o, const Value& v, kern::audio::Meter& x); };
-struct S_audio_PlayParams { static Value to(EngineObjects& o, const kern::audio::PlayParams& x); static void from(EngineObjects& o, const Value& v, kern::audio::PlayParams& x); };
-struct S_audio_Stats { static Value to(EngineObjects& o, const kern::audio::Stats& x); static void from(EngineObjects& o, const Value& v, kern::audio::Stats& x); };
-struct S_audio_SynthPatch { static Value to(EngineObjects& o, const kern::audio::SynthPatch& x); static void from(EngineObjects& o, const Value& v, kern::audio::SynthPatch& x); };
+struct S_audio_BuiltinSound { [[maybe_unused]] static Value to(EngineObjects& o, const kern::audio::BuiltinSound& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::audio::BuiltinSound& x); };
+struct S_audio_BusSettings { [[maybe_unused]] static Value to(EngineObjects& o, const kern::audio::BusSettings& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::audio::BusSettings& x); };
+struct S_audio_ClipInfo { [[maybe_unused]] static Value to(EngineObjects& o, const kern::audio::ClipInfo& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::audio::ClipInfo& x); };
+struct S_audio_Listener { [[maybe_unused]] static Value to(EngineObjects& o, const kern::audio::Listener& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::audio::Listener& x); };
+struct S_audio_Meter { [[maybe_unused]] static Value to(EngineObjects& o, const kern::audio::Meter& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::audio::Meter& x); };
+struct S_audio_PlayParams { [[maybe_unused]] static Value to(EngineObjects& o, const kern::audio::PlayParams& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::audio::PlayParams& x); };
+struct S_audio_Stats { [[maybe_unused]] static Value to(EngineObjects& o, const kern::audio::Stats& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::audio::Stats& x); };
+struct S_audio_SynthPatch { [[maybe_unused]] static Value to(EngineObjects& o, const kern::audio::SynthPatch& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::audio::SynthPatch& x); };
 Value S_audio_BuiltinSound::to(EngineObjects& o, const kern::audio::BuiltinSound& x) { return Value::structure({ev::Conv<ev::Text>::to(o, x.name), ev::Conv<ev::Text>::to(o, x.label), ev::Conv<ev::Text>::to(o, x.category), ev::Conv<ev::Bool>::to(o, x.loop)}); }
 void S_audio_BuiltinSound::from(EngineObjects& o, const Value& v, kern::audio::BuiltinSound& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Text>::from(o, *f, x.name); if (const Value* f = v.field(1)) ev::Conv<ev::Text>::from(o, *f, x.label); if (const Value* f = v.field(2)) ev::Conv<ev::Text>::from(o, *f, x.category); if (const Value* f = v.field(3)) ev::Conv<ev::Bool>::from(o, *f, x.loop); }
 Value S_audio_BusSettings::to(EngineObjects& o, const kern::audio::BusSettings& x) { return Value::structure({ev::Conv<ev::Float>::to(o, x.volume), ev::Conv<ev::Bool>::to(o, x.muted), ev::Conv<ev::Float>::to(o, x.lowpass_hz), ev::Conv<ev::Float>::to(o, x.reverb_send)}); }
@@ -205,7 +205,7 @@ bool c13(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 bool c14(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
-  auto a0 = ev::blank<std::remove_cvref_t<unsigned long>>();
+  auto a0 = ev::blank<std::remove_cvref_t<kern::u64>>();
   ev::take<ev::Int>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
   ev::take<ev::Float>(o, in, 2, a1);
@@ -229,7 +229,7 @@ bool c15(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 bool c16(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
-  auto a0 = ev::blank<std::remove_cvref_t<unsigned long>>();
+  auto a0 = ev::blank<std::remove_cvref_t<kern::u64>>();
   ev::take<ev::Int>(o, in, 1, a0);
   decltype(auto) r = self->playing(std::move(a0));
   ev::give<ev::Bool>(o, out, 0, r);
@@ -240,7 +240,7 @@ bool c16(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 bool c17(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
-  auto a0 = ev::blank<std::remove_cvref_t<unsigned long>>();
+  auto a0 = ev::blank<std::remove_cvref_t<kern::u64>>();
   ev::take<ev::Int>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
   ev::take<ev::Float>(o, in, 2, a1);
@@ -254,7 +254,7 @@ bool c17(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 bool c18(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
-  auto a0 = ev::blank<std::remove_cvref_t<unsigned long>>();
+  auto a0 = ev::blank<std::remove_cvref_t<kern::u64>>();
   ev::take<ev::Int>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
   ev::take<ev::Float>(o, in, 2, a1);
@@ -266,7 +266,7 @@ bool c18(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 bool c19(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
-  auto a0 = ev::blank<std::remove_cvref_t<unsigned long>>();
+  auto a0 = ev::blank<std::remove_cvref_t<kern::u64>>();
   ev::take<ev::Int>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
   ev::take<ev::Float>(o, in, 2, a1);
@@ -278,7 +278,7 @@ bool c19(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 bool c20(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
-  auto a0 = ev::blank<std::remove_cvref_t<unsigned long>>();
+  auto a0 = ev::blank<std::remove_cvref_t<kern::u64>>();
   ev::take<ev::Int>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 2, a1);
@@ -292,7 +292,7 @@ bool c20(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 bool c21(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
-  auto a0 = ev::blank<std::remove_cvref_t<unsigned long>>();
+  auto a0 = ev::blank<std::remove_cvref_t<kern::u64>>();
   ev::take<ev::Int>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<bool>>();
   ev::take<ev::Bool>(o, in, 2, a1);
@@ -314,7 +314,7 @@ bool c22(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 bool c23(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
-  auto a0 = ev::blank<std::remove_cvref_t<unsigned long>>();
+  auto a0 = ev::blank<std::remove_cvref_t<kern::u64>>();
   ev::take<ev::Int>(o, in, 1, a0);
   decltype(auto) r = self->position_of(std::move(a0));
   ev::give<ev::Float>(o, out, 0, r);

@@ -12,26 +12,26 @@ struct E_physics_BodyType { using type = kern::physics::BodyType; static constex
 struct E_physics_JointType { using type = kern::physics::JointType; static constexpr type values[] = {kern::physics::JointType::revolute, kern::physics::JointType::distance, kern::physics::JointType::prismatic, kern::physics::JointType::wheel, kern::physics::JointType::weld, kern::physics::JointType::motor, kern::physics::JointType::spherical, kern::physics::JointType::parallel, kern::physics::JointType::filter}; };
 struct E_physics_ShapeKind { using type = kern::physics::ShapeKind; static constexpr type values[] = {kern::physics::ShapeKind::box, kern::physics::ShapeKind::sphere, kern::physics::ShapeKind::capsule, kern::physics::ShapeKind::hull, kern::physics::ShapeKind::mesh}; };
 struct E_physics_Surface { using type = kern::physics::Surface; static constexpr type values[] = {kern::physics::Surface::none, kern::physics::Surface::cloth, kern::physics::Surface::tpu, kern::physics::Surface::floor}; };
-struct S_MeshData { static Value to(EngineObjects& o, const kern::MeshData& x); static void from(EngineObjects& o, const Value& v, kern::MeshData& x); };
-struct S_Quat { static Value to(EngineObjects& o, const kern::Quat& x); static void from(EngineObjects& o, const Value& v, kern::Quat& x); };
-struct S_physics_Body { static Value to(EngineObjects& o, const kern::physics::Body& x); static void from(EngineObjects& o, const Value& v, kern::physics::Body& x); };
-struct S_physics_BodySettings { static Value to(EngineObjects& o, const kern::physics::BodySettings& x); static void from(EngineObjects& o, const Value& v, kern::physics::BodySettings& x); };
-struct S_physics_Capsule { static Value to(EngineObjects& o, const kern::physics::Capsule& x); static void from(EngineObjects& o, const Value& v, kern::physics::Capsule& x); };
-struct S_physics_ContactPoint { static Value to(EngineObjects& o, const kern::physics::ContactPoint& x); static void from(EngineObjects& o, const Value& v, kern::physics::ContactPoint& x); };
-struct S_physics_HitEvent { static Value to(EngineObjects& o, const kern::physics::HitEvent& x); static void from(EngineObjects& o, const Value& v, kern::physics::HitEvent& x); };
-struct S_physics_Joint { static Value to(EngineObjects& o, const kern::physics::Joint& x); static void from(EngineObjects& o, const Value& v, kern::physics::Joint& x); };
-struct S_physics_JointSettings { static Value to(EngineObjects& o, const kern::physics::JointSettings& x); static void from(EngineObjects& o, const Value& v, kern::physics::JointSettings& x); };
-struct S_physics_MotionLocks { static Value to(EngineObjects& o, const kern::physics::MotionLocks& x); static void from(EngineObjects& o, const Value& v, kern::physics::MotionLocks& x); };
-struct S_physics_MoverPlane { static Value to(EngineObjects& o, const kern::physics::MoverPlane& x); static void from(EngineObjects& o, const Value& v, kern::physics::MoverPlane& x); };
-struct S_physics_Pose { static Value to(EngineObjects& o, const kern::physics::Pose& x); static void from(EngineObjects& o, const Value& v, kern::physics::Pose& x); };
-struct S_physics_QueryFilter { static Value to(EngineObjects& o, const kern::physics::QueryFilter& x); static void from(EngineObjects& o, const Value& v, kern::physics::QueryFilter& x); };
-struct S_physics_RayHit { static Value to(EngineObjects& o, const kern::physics::RayHit& x); static void from(EngineObjects& o, const Value& v, kern::physics::RayHit& x); };
-struct S_physics_Shape { static Value to(EngineObjects& o, const kern::physics::Shape& x); static void from(EngineObjects& o, const Value& v, kern::physics::Shape& x); };
-struct S_physics_ShapeMaterial { static Value to(EngineObjects& o, const kern::physics::ShapeMaterial& x); static void from(EngineObjects& o, const Value& v, kern::physics::ShapeMaterial& x); };
-struct S_physics_ShapeSettings { static Value to(EngineObjects& o, const kern::physics::ShapeSettings& x); static void from(EngineObjects& o, const Value& v, kern::physics::ShapeSettings& x); };
-struct S_physics_TouchEvent { static Value to(EngineObjects& o, const kern::physics::TouchEvent& x); static void from(EngineObjects& o, const Value& v, kern::physics::TouchEvent& x); };
-struct S_physics_Version { static Value to(EngineObjects& o, const kern::physics::Version& x); static void from(EngineObjects& o, const Value& v, kern::physics::Version& x); };
-struct S_physics_WorldSettings { static Value to(EngineObjects& o, const kern::physics::WorldSettings& x); static void from(EngineObjects& o, const Value& v, kern::physics::WorldSettings& x); };
+struct S_MeshData { [[maybe_unused]] static Value to(EngineObjects& o, const kern::MeshData& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::MeshData& x); };
+struct S_Quat { [[maybe_unused]] static Value to(EngineObjects& o, const kern::Quat& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::Quat& x); };
+struct S_physics_Body { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::Body& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::Body& x); };
+struct S_physics_BodySettings { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::BodySettings& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::BodySettings& x); };
+struct S_physics_Capsule { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::Capsule& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::Capsule& x); };
+struct S_physics_ContactPoint { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::ContactPoint& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::ContactPoint& x); };
+struct S_physics_HitEvent { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::HitEvent& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::HitEvent& x); };
+struct S_physics_Joint { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::Joint& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::Joint& x); };
+struct S_physics_JointSettings { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::JointSettings& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::JointSettings& x); };
+struct S_physics_MotionLocks { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::MotionLocks& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::MotionLocks& x); };
+struct S_physics_MoverPlane { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::MoverPlane& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::MoverPlane& x); };
+struct S_physics_Pose { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::Pose& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::Pose& x); };
+struct S_physics_QueryFilter { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::QueryFilter& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::QueryFilter& x); };
+struct S_physics_RayHit { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::RayHit& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::RayHit& x); };
+struct S_physics_Shape { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::Shape& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::Shape& x); };
+struct S_physics_ShapeMaterial { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::ShapeMaterial& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::ShapeMaterial& x); };
+struct S_physics_ShapeSettings { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::ShapeSettings& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::ShapeSettings& x); };
+struct S_physics_TouchEvent { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::TouchEvent& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::TouchEvent& x); };
+struct S_physics_Version { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::Version& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::Version& x); };
+struct S_physics_WorldSettings { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::WorldSettings& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::WorldSettings& x); };
 Value S_MeshData::to(EngineObjects& o, const kern::MeshData& x) { return Value::structure({ev::Conv<ev::List<ev::Float>>::to(o, x.positions), ev::Conv<ev::List<ev::Float>>::to(o, x.normals), ev::Conv<ev::List<ev::Float>>::to(o, x.colors), ev::Conv<ev::List<ev::Float>>::to(o, x.uvs), ev::Conv<ev::List<ev::Float>>::to(o, x.extra), ev::Conv<ev::Int>::to(o, x.extra_size), ev::Conv<ev::List<ev::Int>>::to(o, x.indices)}); }
 void S_MeshData::from(EngineObjects& o, const Value& v, kern::MeshData& x) { if (const Value* f = v.field(0)) ev::Conv<ev::List<ev::Float>>::from(o, *f, x.positions); if (const Value* f = v.field(1)) ev::Conv<ev::List<ev::Float>>::from(o, *f, x.normals); if (const Value* f = v.field(2)) ev::Conv<ev::List<ev::Float>>::from(o, *f, x.colors); if (const Value* f = v.field(3)) ev::Conv<ev::List<ev::Float>>::from(o, *f, x.uvs); if (const Value* f = v.field(4)) ev::Conv<ev::List<ev::Float>>::from(o, *f, x.extra); if (const Value* f = v.field(5)) ev::Conv<ev::Int>::from(o, *f, x.extra_size); if (const Value* f = v.field(6)) ev::Conv<ev::List<ev::Int>>::from(o, *f, x.indices); }
 Value S_Quat::to(EngineObjects& o, const kern::Quat& x) { return Value::structure({ev::Conv<ev::Float>::to(o, x.x), ev::Conv<ev::Float>::to(o, x.y), ev::Conv<ev::Float>::to(o, x.z), ev::Conv<ev::Float>::to(o, x.w)}); }
@@ -485,7 +485,7 @@ bool c36(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
   ev::take<ev::Struct<S_physics_Body>>(o, in, 1, a0);
-  auto a1 = ev::blank<std::remove_cvref_t<std::vector<unsigned long, std::allocator<unsigned long> >&>>();
+  auto a1 = ev::blank<std::remove_cvref_t<std::vector<kern::u64, std::allocator<kern::u64> >&>>();
   ev::take<ev::List<ev::Int64>>(o, in, 2, a1);
   self->body_masks(std::move(a0), a1);
   ev::give<ev::List<ev::Int64>>(o, out, 0, a1);
@@ -498,9 +498,9 @@ bool c37(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::physics::Body>>();
   ev::take<ev::Struct<S_physics_Body>>(o, in, 1, a0);
-  std::vector<unsigned long> a1;
+  std::vector<kern::u64> a1;
   ev::take<ev::List<ev::Int64>>(o, in, 2, a1);
-  self->set_body_masks(std::move(a0), kern::Span<unsigned long const>(a1.data(), a1.size()));
+  self->set_body_masks(std::move(a0), kern::Span<kern::u64 const>(a1.data(), a1.size()));
   return true;
 }
 
@@ -871,7 +871,7 @@ bool c64(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   ev::take<ev::Float>(o, in, 3, a2);
   auto a3 = ev::blank<std::remove_cvref_t<float>>();
   ev::take<ev::Float>(o, in, 4, a3);
-  auto a4 = ev::blank<std::remove_cvref_t<unsigned long>>();
+  auto a4 = ev::blank<std::remove_cvref_t<kern::u64>>();
   ev::take<ev::Int64>(o, in, 5, a4);
   self->explode(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
   return true;

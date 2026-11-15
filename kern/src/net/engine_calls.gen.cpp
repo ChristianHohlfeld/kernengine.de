@@ -15,14 +15,14 @@ namespace ev = engine_values;
 struct E_net_ChannelType { using type = kern::net::ChannelType; static constexpr type values[] = {kern::net::ChannelType::reliable_ordered, kern::net::ChannelType::unreliable_unordered}; };
 struct E_net_ClientState { using type = kern::net::ClientState; static constexpr type values[] = {kern::net::ClientState::denied, kern::net::ClientState::timed_out, kern::net::ClientState::error, kern::net::ClientState::disconnected, kern::net::ClientState::connecting, kern::net::ClientState::challenged, kern::net::ClientState::connected}; };
 struct E_net_ConnectionError { using type = kern::net::ConnectionError; static constexpr type values[] = {kern::net::ConnectionError::none, kern::net::ConnectionError::desync, kern::net::ConnectionError::send_queue_full, kern::net::ConnectionError::message_too_large, kern::net::ConnectionError::bad_packet, kern::net::ConnectionError::out_of_memory}; };
-struct S_net_Address { static Value to(EngineObjects& o, const kern::net::Address& x); static void from(EngineObjects& o, const Value& v, kern::net::Address& x); };
-struct S_net_ChannelConfig { static Value to(EngineObjects& o, const kern::net::ChannelConfig& x); static void from(EngineObjects& o, const Value& v, kern::net::ChannelConfig& x); };
-struct S_net_ClientServerConfig { static Value to(EngineObjects& o, const kern::net::ClientServerConfig& x); static void from(EngineObjects& o, const Value& v, kern::net::ClientServerConfig& x); };
-struct S_net_ConnectionConfig { static Value to(EngineObjects& o, const kern::net::ConnectionConfig& x); static void from(EngineObjects& o, const Value& v, kern::net::ConnectionConfig& x); };
-struct S_net_EndpointConfig { static Value to(EngineObjects& o, const kern::net::EndpointConfig& x); static void from(EngineObjects& o, const Value& v, kern::net::EndpointConfig& x); };
-struct S_net_EndpointStats { static Value to(EngineObjects& o, const kern::net::EndpointStats& x); static void from(EngineObjects& o, const Value& v, kern::net::EndpointStats& x); };
-struct S_net_Message { static Value to(EngineObjects& o, const kern::net::Message& x); static void from(EngineObjects& o, const Value& v, kern::net::Message& x); };
-struct S_net_Simulator_Packet { static Value to(EngineObjects& o, const kern::net::Simulator::Packet& x); static void from(EngineObjects& o, const Value& v, kern::net::Simulator::Packet& x); };
+struct S_net_Address { [[maybe_unused]] static Value to(EngineObjects& o, const kern::net::Address& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::net::Address& x); };
+struct S_net_ChannelConfig { [[maybe_unused]] static Value to(EngineObjects& o, const kern::net::ChannelConfig& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::net::ChannelConfig& x); };
+struct S_net_ClientServerConfig { [[maybe_unused]] static Value to(EngineObjects& o, const kern::net::ClientServerConfig& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::net::ClientServerConfig& x); };
+struct S_net_ConnectionConfig { [[maybe_unused]] static Value to(EngineObjects& o, const kern::net::ConnectionConfig& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::net::ConnectionConfig& x); };
+struct S_net_EndpointConfig { [[maybe_unused]] static Value to(EngineObjects& o, const kern::net::EndpointConfig& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::net::EndpointConfig& x); };
+struct S_net_EndpointStats { [[maybe_unused]] static Value to(EngineObjects& o, const kern::net::EndpointStats& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::net::EndpointStats& x); };
+struct S_net_Message { [[maybe_unused]] static Value to(EngineObjects& o, const kern::net::Message& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::net::Message& x); };
+struct S_net_Simulator_Packet { [[maybe_unused]] static Value to(EngineObjects& o, const kern::net::Simulator::Packet& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::net::Simulator::Packet& x); };
 Value S_net_Address::to(EngineObjects& o, const kern::net::Address& x) { return Value::structure({ev::Conv<ev::Int64>::to(o, x.id)}); }
 void S_net_Address::from(EngineObjects& o, const Value& v, kern::net::Address& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Int64>::from(o, *f, x.id); }
 Value S_net_ChannelConfig::to(EngineObjects& o, const kern::net::ChannelConfig& x) { return Value::structure({ev::Conv<ev::Enum<E_net_ChannelType>>::to(o, x.type), ev::Conv<ev::Int>::to(o, x.send_queue_size), ev::Conv<ev::Int>::to(o, x.receive_queue_size), ev::Conv<ev::Int>::to(o, x.max_messages_per_packet), ev::Conv<ev::Int>::to(o, x.packet_budget), ev::Conv<ev::Int>::to(o, x.max_message_size), ev::Conv<ev::Int>::to(o, x.block_threshold), ev::Conv<ev::Int>::to(o, x.block_fragment_size), ev::Conv<ev::Float>::to(o, x.resend_time)}); }
@@ -1290,7 +1290,7 @@ bool c120(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   if (!a0) return false;
   auto a1 = ev::blank<std::remove_cvref_t<kern::net::ClientServerConfig const&>>();
   ev::take<ev::Struct<S_net_ClientServerConfig>>(o, in, 1, a1);
-  auto a2 = ev::blank<std::remove_cvref_t<unsigned long>>();
+  auto a2 = ev::blank<std::remove_cvref_t<kern::u64>>();
   ev::take<ev::Int64>(o, in, 2, a2);
   out[0] = Value::integer(o.own<kern::net::Client>(std::unique_ptr<kern::net::Client>(new kern::net::Client(*a0, a1, std::move(a2)))));
   return true;
@@ -1379,7 +1379,7 @@ bool c130(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   if (!a0) return false;
   auto a1 = ev::blank<std::remove_cvref_t<kern::net::ClientServerConfig const&>>();
   ev::take<ev::Struct<S_net_ClientServerConfig>>(o, in, 1, a1);
-  auto a2 = ev::blank<std::remove_cvref_t<unsigned long>>();
+  auto a2 = ev::blank<std::remove_cvref_t<kern::u64>>();
   ev::take<ev::Int64>(o, in, 2, a2);
   out[0] = Value::integer(o.own<kern::net::Server>(std::unique_ptr<kern::net::Server>(new kern::net::Server(*a0, a1, std::move(a2)))));
   return true;

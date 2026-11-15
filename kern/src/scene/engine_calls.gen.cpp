@@ -9,12 +9,12 @@ namespace {
 
 namespace ev = engine_values;
 
-struct S_Camera { static Value to(EngineObjects& o, const kern::Camera& x); static void from(EngineObjects& o, const Value& v, kern::Camera& x); };
-struct S_Mat4 { static Value to(EngineObjects& o, const kern::Mat4& x); static void from(EngineObjects& o, const Value& v, kern::Mat4& x); };
-struct S_PickHit { static Value to(EngineObjects& o, const kern::PickHit& x); static void from(EngineObjects& o, const Value& v, kern::PickHit& x); };
-struct S_PickQuery { static Value to(EngineObjects& o, const kern::PickQuery& x); static void from(EngineObjects& o, const Value& v, kern::PickQuery& x); };
-struct S_PickStats { static Value to(EngineObjects& o, const kern::PickStats& x); static void from(EngineObjects& o, const Value& v, kern::PickStats& x); };
-struct S_Ray { static Value to(EngineObjects& o, const kern::Ray& x); static void from(EngineObjects& o, const Value& v, kern::Ray& x); };
+struct S_Camera { [[maybe_unused]] static Value to(EngineObjects& o, const kern::Camera& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::Camera& x); };
+struct S_Mat4 { [[maybe_unused]] static Value to(EngineObjects& o, const kern::Mat4& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::Mat4& x); };
+struct S_PickHit { [[maybe_unused]] static Value to(EngineObjects& o, const kern::PickHit& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::PickHit& x); };
+struct S_PickQuery { [[maybe_unused]] static Value to(EngineObjects& o, const kern::PickQuery& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::PickQuery& x); };
+struct S_PickStats { [[maybe_unused]] static Value to(EngineObjects& o, const kern::PickStats& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::PickStats& x); };
+struct S_Ray { [[maybe_unused]] static Value to(EngineObjects& o, const kern::Ray& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::Ray& x); };
 Value S_Camera::to(EngineObjects& o, const kern::Camera& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.eye), ev::Conv<ev::Vector>::to(o, x.target), ev::Conv<ev::Vector>::to(o, x.up), ev::Conv<ev::Float>::to(o, x.fov), ev::Conv<ev::Float>::to(o, x.near), ev::Conv<ev::Float>::to(o, x.far), ev::Conv<ev::Bool>::to(o, x.orthographic), ev::Conv<ev::Float>::to(o, x.ortho_height), ev::Conv<ev::Bool>::to(o, x.has_projection), ev::Conv<ev::Struct<S_Mat4>>::to(o, x.projection)}); }
 void S_Camera::from(EngineObjects& o, const Value& v, kern::Camera& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.eye); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.target); if (const Value* f = v.field(2)) ev::Conv<ev::Vector>::from(o, *f, x.up); if (const Value* f = v.field(3)) ev::Conv<ev::Float>::from(o, *f, x.fov); if (const Value* f = v.field(4)) ev::Conv<ev::Float>::from(o, *f, x.near); if (const Value* f = v.field(5)) ev::Conv<ev::Float>::from(o, *f, x.far); if (const Value* f = v.field(6)) ev::Conv<ev::Bool>::from(o, *f, x.orthographic); if (const Value* f = v.field(7)) ev::Conv<ev::Float>::from(o, *f, x.ortho_height); if (const Value* f = v.field(8)) ev::Conv<ev::Bool>::from(o, *f, x.has_projection); if (const Value* f = v.field(9)) ev::Conv<ev::Struct<S_Mat4>>::from(o, *f, x.projection); }
 Value S_Mat4::to(EngineObjects& o, const kern::Mat4& x) { return Value::structure({ev::Conv<ev::List<ev::Float>>::to(o, x.m)}); }

@@ -220,6 +220,32 @@ def portable(t):
     return re.sub(r"\b(?:__cxx11|__1)::", "", t).strip()
 
 
+# Which whole number a type of this platform is, by the name the declaration gives it: the compiler spells the
+# type underneath (unsigned long), and that is a different type on another platform (u64 is unsigned long long on
+# macOS, size_t is unsigned long there) - so the call is written with the declaration's own name for it.
+WIDTH_NAMES = {"unsigned long": [(r"\b(?:std::)?size_t\b", "std::size_t"), (r"\b(?:kern::)?u64\b|\b(?:std::)?uint64_t\b", "kern::u64")],
+               "long": [(r"\b(?:std::)?ptrdiff_t\b", "std::ptrdiff_t"), (r"\b(?:kern::)?i64\b|\b(?:std::)?int64_t\b", "kern::i64")]}
+WIDTH_TYPE = re.compile(r"(?<![\w ])(unsigned long|long)(?! long| double)\b|(?<=[<(, ])(unsigned long|long)(?! long| double)\b")
+
+
+def fixed_width(P, declared, aliases):
+    """A parameter type with each whole number of a platform's width (unsigned long, long) spelled as the
+    declaration names it (std::size_t, kern::u64, ...) - a name the program gives a type (using VoiceId = u64)
+    stands for the type it names."""
+    known = {"size_t", "ptrdiff_t", "u64", "uint64_t", "i64", "int64_t"}   # (the names WIDTH_NAMES tells by)
+    for _ in range(8):
+        named = re.sub(r"\b(?:\w+::)*(\w+)\b", lambda m: m.group(0) if m.group(1) in known or m.group(1) not in aliases else f"({aliases[m.group(1)]})", declared)
+        if named == declared:
+            break
+        declared = named
+    def name(m):
+        t = m.group(1) or m.group(2)
+        found = {spell for pattern, spell in WIDTH_NAMES[t] if re.search(pattern, declared)}
+        assert len(found) == 1, f"the type {P} (declared {declared}): which {t} it is cannot be told from its name"
+        return found.pop()
+    return WIDTH_TYPE.sub(name, P)
+
+
 def parameters_of(name):
     """The parameter types of a demangled function name: kern::World::cast(kern::Pose const&, unsigned int) const."""
     s = re.sub(r"(\s*(const|volatile|&|&&|noexcept))+\s*$", "", name.strip())
@@ -318,7 +344,7 @@ class Calls:
         for kind, bt in sorted(need):
             if kind == "struct":
                 q = self.struct_q[bt]
-                lines.append(f"struct S_{bt} {{ static Value to(EngineObjects& o, const {q}& x); static void from(EngineObjects& o, const Value& v, {q}& x); }};")
+                lines.append(f"struct S_{bt} {{ [[maybe_unused]] static Value to(EngineObjects& o, const {q}& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, {q}& x); }};")
                 fields = u.struct_fields[bt]
                 tags = [self.tag(ft, set()) for _, ft, _, _ in fields]
                 to = ", ".join(f"ev::Conv<{tg}>::to(o, x.{c})" for (_, _, _, c), tg in zip(fields, tags))
@@ -336,6 +362,9 @@ class Calls:
                     f"  o.error = \"the handle names no {q.split('::')[-1]} that was made\";", "  return false;", "}", "return true;"]
         mangled = d.get("mangledName")
         ptypes = parameters_of(self.names[mangled]) if mangled else []
+        declared = [x.get("type", {}).get("qualType", "") for x in d.get("inner", []) or [] if x.get("kind") == "ParmVarDecl"]
+        if len(declared) == len(ptypes):
+            ptypes = [fixed_width(P, t, tree.aliases) for P, t in zip(ptypes, declared)]
         params = f["params"]
         assert len(ptypes) == len(params), (f["type"], ptypes, params)
         in_at = {name: k for k, (name, _, _) in enumerate(f["ins"])}

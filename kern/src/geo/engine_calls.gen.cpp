@@ -13,17 +13,17 @@ namespace {
 namespace ev = engine_values;
 
 struct E_AlphaMode { using type = kern::AlphaMode; static constexpr type values[] = {kern::AlphaMode::opaque, kern::AlphaMode::mask, kern::AlphaMode::blend}; };
-struct S_BuildingOptions { static Value to(EngineObjects& o, const kern::BuildingOptions& x); static void from(EngineObjects& o, const Value& v, kern::BuildingOptions& x); };
-struct S_BuildingStyle { static Value to(EngineObjects& o, const kern::BuildingStyle& x); static void from(EngineObjects& o, const Value& v, kern::BuildingStyle& x); };
-struct S_GeoChunk { static Value to(EngineObjects& o, const kern::GeoChunk& x); static void from(EngineObjects& o, const Value& v, kern::GeoChunk& x); };
-struct S_Mat4 { static Value to(EngineObjects& o, const kern::Mat4& x); static void from(EngineObjects& o, const Value& v, kern::Mat4& x); };
-struct S_Material { static Value to(EngineObjects& o, const kern::Material& x); static void from(EngineObjects& o, const Value& v, kern::Material& x); };
-struct S_MeshData { static Value to(EngineObjects& o, const kern::MeshData& x); static void from(EngineObjects& o, const Value& v, kern::MeshData& x); };
-struct S_MeshInput { static Value to(EngineObjects& o, const kern::MeshInput& x); static void from(EngineObjects& o, const Value& v, kern::MeshInput& x); };
-struct S_MeshLook { static Value to(EngineObjects& o, const kern::MeshLook& x); static void from(EngineObjects& o, const Value& v, kern::MeshLook& x); };
-struct S_Rgb { static Value to(EngineObjects& o, const kern::Rgb& x); static void from(EngineObjects& o, const Value& v, kern::Rgb& x); };
-struct S_Vec4 { static Value to(EngineObjects& o, const kern::Vec4& x); static void from(EngineObjects& o, const Value& v, kern::Vec4& x); };
-struct S_WeldStats { static Value to(EngineObjects& o, const kern::WeldStats& x); static void from(EngineObjects& o, const Value& v, kern::WeldStats& x); };
+struct S_BuildingOptions { [[maybe_unused]] static Value to(EngineObjects& o, const kern::BuildingOptions& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::BuildingOptions& x); };
+struct S_BuildingStyle { [[maybe_unused]] static Value to(EngineObjects& o, const kern::BuildingStyle& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::BuildingStyle& x); };
+struct S_GeoChunk { [[maybe_unused]] static Value to(EngineObjects& o, const kern::GeoChunk& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::GeoChunk& x); };
+struct S_Mat4 { [[maybe_unused]] static Value to(EngineObjects& o, const kern::Mat4& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::Mat4& x); };
+struct S_Material { [[maybe_unused]] static Value to(EngineObjects& o, const kern::Material& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::Material& x); };
+struct S_MeshData { [[maybe_unused]] static Value to(EngineObjects& o, const kern::MeshData& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::MeshData& x); };
+struct S_MeshInput { [[maybe_unused]] static Value to(EngineObjects& o, const kern::MeshInput& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::MeshInput& x); };
+struct S_MeshLook { [[maybe_unused]] static Value to(EngineObjects& o, const kern::MeshLook& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::MeshLook& x); };
+struct S_Rgb { [[maybe_unused]] static Value to(EngineObjects& o, const kern::Rgb& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::Rgb& x); };
+struct S_Vec4 { [[maybe_unused]] static Value to(EngineObjects& o, const kern::Vec4& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::Vec4& x); };
+struct S_WeldStats { [[maybe_unused]] static Value to(EngineObjects& o, const kern::WeldStats& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::WeldStats& x); };
 Value S_BuildingOptions::to(EngineObjects& o, const kern::BuildingOptions& x) { return Value::structure({ev::Conv<ev::Float>::to(o, x.chunk_size), ev::Conv<ev::Int>::to(o, x.max_buildings), ev::Conv<ev::Bool>::to(o, x.cornice), ev::Conv<ev::Bool>::to(o, x.wall_records), ev::Conv<ev::Struct<S_BuildingStyle>>::to(o, x.style)}); }
 void S_BuildingOptions::from(EngineObjects& o, const Value& v, kern::BuildingOptions& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Float>::from(o, *f, x.chunk_size); if (const Value* f = v.field(1)) ev::Conv<ev::Int>::from(o, *f, x.max_buildings); if (const Value* f = v.field(2)) ev::Conv<ev::Bool>::from(o, *f, x.cornice); if (const Value* f = v.field(3)) ev::Conv<ev::Bool>::from(o, *f, x.wall_records); if (const Value* f = v.field(4)) ev::Conv<ev::Struct<S_BuildingStyle>>::from(o, *f, x.style); }
 Value S_BuildingStyle::to(EngineObjects& o, const kern::BuildingStyle& x) { return Value::structure({ev::Conv<ev::List<ev::Struct<S_Rgb>>>::to(o, x.walls), ev::Conv<ev::List<ev::Struct<S_Rgb>>>::to(o, x.roofs), ev::Conv<ev::Struct<S_Rgb>>::to(o, x.trim), ev::Conv<ev::Float>::to(o, x.trim_mix)}); }
@@ -53,7 +53,7 @@ bool c0(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
   if (!self) return false;
   std::vector<double> a0;
   ev::take<ev::List<ev::Float>>(o, in, 1, a0);
-  auto a1 = ev::blank<std::remove_cvref_t<unsigned long>>();
+  auto a1 = ev::blank<std::remove_cvref_t<std::size_t>>();
   ev::take<ev::Int>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<kern::BuildingOptions const&>>();
   ev::take<ev::Struct<S_BuildingOptions>>(o, in, 3, a2);
@@ -298,7 +298,7 @@ bool c19(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 bool c20(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<kern::MeshData&>>();
   ev::take<ev::Struct<S_MeshData>>(o, in, 0, a0);
-  auto a1 = ev::blank<std::remove_cvref_t<unsigned long>>();
+  auto a1 = ev::blank<std::remove_cvref_t<std::size_t>>();
   ev::take<ev::Int>(o, in, 1, a1);
   decltype(auto) r = kern::weld(a0, std::move(a1));
   ev::give<ev::Struct<S_WeldStats>>(o, out, 0, r);
@@ -450,7 +450,7 @@ bool c31(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   if (!self) return false;
   std::vector<double> a0;
   ev::take<ev::List<ev::Float>>(o, in, 1, a0);
-  auto a1 = ev::blank<std::remove_cvref_t<unsigned long>>();
+  auto a1 = ev::blank<std::remove_cvref_t<std::size_t>>();
   ev::take<ev::Int>(o, in, 2, a1);
   kern::RoadOptions* a2 = ev::object<kern::RoadOptions>(o, in, 3, "options");
   if (!a2) return false;
