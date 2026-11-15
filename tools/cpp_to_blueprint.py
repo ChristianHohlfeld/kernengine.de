@@ -2709,6 +2709,19 @@ class Emit:
                     mine = None
                 if mine is not None and self.u.alike(mine, inner):
                     return inner
+        if (k == "CXXOperatorCallExpr" and callee_name(b) == "operator[]" or k == "ArraySubscriptExpr") and len(kids(b)) >= 2:
+            # (an entry of a list is of the type of the list's entries - the compiler names it value_type, without
+            # the names the program gave it)
+            base = kids(b)[-2]
+            lt = self.tp_or_none(base) if self.keyed(base) is None else None
+            if lt is not None and lt.startswith("List<"):
+                try:
+                    mine = self.u.btype(qtype(b))
+                except Wait:
+                    mine = None
+                entry = self.u.rows.get(lt[5:-1], lt[5:-1])
+                if mine is not None and mine != entry and self.u.alike(mine, entry):
+                    return lt[5:-1]
         try:
             if k == "MemberExpr" and kids(b) and not self.is_this(kids(b)[0]):
                 e = self.entry_of(kids(b)[0])
