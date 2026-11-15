@@ -8081,6 +8081,7 @@ class TestWriter:
         # pieces its test holds, and the pieces by their places
         self.closures, self.pieces = unit.world.closures or {}, unit.world.pieces or {}
         self.more_engine, self.more_objects = {}, set()   # what those pieces call and hold of the engine
+        self.held_locals = None    # the ids of the variables declared in the functions the test holds the source of (state_helpers)
         self.free_stand_ins = {}   # a free function of the engine the test has a stand-in of -> (its declaration, its definition, its pair) - see items
 
     # ---- the source, with a Blueprint's numbers ----
@@ -8965,9 +8966,9 @@ class TestWriter:
                         if held is None:
                             continue   # (not held by the source the test holds)
                     elif self.in_function(v) or v.get("storageClass") == "static" and v.get("isStaticLocal") or not v.get("name"):
-                        at = (v.get("_at") or (None,))[0]
-                        if at is not None and not any(f.get("_file") == v.get("_file") and f.get("_at", (None, None))[1] is not None and f["_at"][0] <= at < f["_at"][1]
-                                   for f in self.whole.functions.values()):
+                        if self.held_locals is None:
+                            self.held_locals = {x.get("id") for f in self.whole.functions.values() for x in walk(f) if x.get("kind") == "VarDecl"}
+                        if i not in self.held_locals:
                             continue   # (kept by a function the test does not hold the source of: nothing it holds touches it)
                         missing.append(f"{variable} (kept in the body of a function defined in its class: the test does not reach it from outside)")
                         continue
