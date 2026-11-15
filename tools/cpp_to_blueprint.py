@@ -5280,6 +5280,21 @@ class Emit:
             if self.box(b) is not None:   # (*p: what an owned value holds - named as p is)
                 b = self.unwrap(self.box(b))
                 continue
+            k = b.get("kind")
+            if k in ("ArraySubscriptExpr", "CXXOperatorCallExpr") and (k == "ArraySubscriptExpr" or (callee_name(b) == "operator[]" and len(kids(b)) == 3)):
+                # (an entry of a list by an index that is the same as long as anything lives - a number written
+                # out, a const variable: list[at])
+                base, idx = (kids(b)[0], kids(b)[1]) if k == "ArraySubscriptExpr" else (kids(b)[1], kids(b)[2])
+                if k == "CXXOperatorCallExpr" and not re.match(r"(?:const\s+)?std::(?:vector|array)<", self.u.clean(self.ctype(base))):
+                    raise Wait("an iterator kept into a list at a place that is computed")
+                i = bare(idx)
+                while i.get("kind") in CAST and kids(i):
+                    i = bare(kids(i)[-1])
+                ref = i.get("referencedDecl") or {}
+                if i.get("kind") == "IntegerLiteral" or (i.get("kind") == "DeclRefExpr" and ref.get("kind") in ("VarDecl", "ParmVarDecl")
+                                                         and re.match(r"\s*const\b", (ref.get("type") or {}).get("qualType", "")) and "&" not in (ref.get("type") or {}).get("qualType", "")):
+                    b = self.unwrap(base)
+                    continue
             raise Wait("an iterator kept into a list at a place that is computed")
 
     def note_home(self, decl_id, source, of_pair=False):
@@ -6987,6 +7002,8 @@ class Emit:
             x, y = kids(b)
             if op == "/" and self.entries_of(b) is not None:
                 return flit(float(self.entries_of(b)))
+            if op == "-" and self.entry_index(x, y) is not None:
+                return self.leaf(None, leaves, self.cast("Float", self.entry_index(x, y)))
             if op in ("+", "-", "*"):
                 if self.ctype(b) in WIDE_UNSIGNED:
                     return f"({self.fx(x, leaves)} {op} {self.fx(y, leaves)})"
@@ -7120,6 +7137,28 @@ class Emit:
         if k in CAST and kids(b):
             return self.fb(kids(b)[-1], leaves)
         return f"({self.leaf(b, leaves, self.conv(self.bx(b), 'Bool', 'Float'))} != 0.0)"
+
+    def entry_index(self, p, base):
+        """`&e - list.data()`, `&d - array`: where an entry stands in its list, counted by addresses (C++: the
+        difference of two pointers into one array) - its index, when e is the entry of that list at a place
+        the notation names (the entry a loop over the list is at, list[i]). None: anything else."""
+        if not (re.search(r"\*\s*(const\s*)?$", self.ctype(p)) and re.search(r"\*\s*(const\s*)?$", self.ctype(base))):
+            return None
+        a = bare(p)
+        while a.get("kind") in CAST and kids(a) and a.get("castKind") in ("NoOp", "BitCast"):
+            a = bare(kids(a)[-1])
+        if a.get("kind") != "UnaryOperator" or a.get("opcode") != "&" or not kids(a):
+            return None
+        l = bare(base)
+        while l.get("kind") == "ImplicitCastExpr" and kids(l) and l.get("castKind") in ("ArrayToPointerDecay", "NoOp", "LValueToRValue"):
+            l = bare(kids(l)[0])
+        if l.get("kind") == "CXXMemberCallExpr" and callee(l).get("name") == "data" and kids(callee(l)):
+            l = kids(callee(l))[0]
+        got, lst = self.spot(kids(a)[0]), self.spot(l)
+        if got is None or lst is None or not lst[1].startswith("List<"):
+            return None
+        m = re.fullmatch(re.escape(lst[0]) + r"\[(.+)\]", got[0])
+        return m.group(1) if m and got[1] == lst[1][5:-1] else None
 
     def entries_of(self, b):
         """`sizeof a / sizeof a[0]`: how many entries the array a has (its type says it)."""

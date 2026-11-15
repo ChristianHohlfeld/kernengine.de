@@ -433,7 +433,7 @@ void Game::step_cop(PoliceUnit& u, PoliceUnit::Cop& c, f32 dt) {
   osfx("police_ground_units.playShot", from);
 }
 
-void Game::drive_police(PoliceUnit& u, f32 dt) {
+void Game::drive_police(PoliceUnit& u, i32 unit, f32 dt) {
   (void)dt;
   TrafficCar& c = cars_[u.car];
   const f32 now = world_->sim_time();
@@ -459,7 +459,7 @@ void Game::drive_police(PoliceUnit& u, f32 dt) {
       at.z = city_.ground_height(at.x, at.y);
       if (!line_of_sight(pos + Vec3{0, 0, 1.0f}, at + Vec3{0, 0, 1.0f})) at = pos - fwd * 2.6f;
       at.z = city_.ground_height(at.x, at.y);
-      cop.person = people_.add_officer(at, yaw + static_cast<f32>(cop.seat) * kPi / 2, static_cast<i32>(&u - units_.data()), cop.seed);
+      cop.person = people_.add_officer(at, yaw + static_cast<f32>(cop.seat) * kPi / 2, unit, cop.seed);
       cop.inside = false;
       cop.next_shot = now + 0.7f + rng_.unit() * 0.5f;
       cop.los = false;
@@ -805,7 +805,7 @@ void Game::update_police(f32 dt) {
     }
     if (stars == 0 && (u.state == PoliceUnit::State::pursuit || u.state == PoliceUnit::State::stopping)) u.state = PoliceUnit::State::leave;
     if (stars == 0 && u.state == PoliceUnit::State::engage) u.state = PoliceUnit::State::back;
-    if (own_car && c.unit >= 0) drive_police(u, dt);
+    if (own_car && c.unit >= 0) drive_police(u, static_cast<i32>(ui), dt);
     // Gone: far away (leaving or abandoned and out of sight), or nobody left of the unit.
     const f32 d = dist2d(matrix_of(c.actor).translation(), me);
     const bool done = (u.state == PoliceUnit::State::leave && (d > kDespawn || now - u.left_at > 30)) ||
