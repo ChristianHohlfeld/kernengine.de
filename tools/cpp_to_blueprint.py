@@ -3564,6 +3564,23 @@ class Emit:
                 except Wait:
                     continue
             return False
+        def entries_end(raw):
+            """Does what an algorithm is handed move or end what ends: a range of entries that end something
+            (an iterator into a list of them, a pointer to one, such a value) - not a range of pointers to them
+            (`std::vector<Tile*>`: a pointer only names what another holds)."""
+            c = u.clean(re.sub(r"&", "", raw)).strip()
+            m = re.match(r"__gnu_cxx::__normal_iterator<(.+)>$", c) or re.match(r"std::(?:__1::)?__wrap_iter<(.+)>$", c) or re.match(r"std::reverse_iterator<(.+)>$", c)
+            if m:
+                c = template_args(c)[0]
+            if re.search(r"\*\s*(const)?$", c):
+                c = re.sub(r"\*\s*(const)?$", "", c).strip()   # (the entry a pointer into the range points at)
+            if "(lambda" in c:
+                return False
+            try:
+                return u.held_life(c) is not None
+            except Wait:
+                return mentions(c)
+
         def entries_made(raw):
             """Does C++ make the new entries of this list or map (its values) with a constructor of their own?"""
             c = u.clean(re.sub(r"&", "", raw))
@@ -3635,7 +3652,7 @@ class Emit:
                 if len(given) == 1 and NUMBER.get(u.clean(qtype(given[0]))) == "Int":
                     raise Wait("a list whose entries C++ makes with their constructor")
             elif k == "CallExpr" and callee_name(n) in self.ALGORITHMS and not (callee_name(n) == "move" and len(kids(n)) == 2):
-                if any(mentions(qtype(a)) for a in kids(n)[1:]):
+                if any(entries_end(qtype(a)) for a in kids(n)[1:]):
                     raise Wait(f"std::{callee_name(n)} over what ends (objects of the engine, values that hold them)")
             elif k == "VarDecl" and up:
                 h = u.held_life(qtype(n))

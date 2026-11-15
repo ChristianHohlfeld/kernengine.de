@@ -38,15 +38,10 @@ f32 uq16(kern::i16 v) { return static_cast<f32>(v) / 32767; }
 kern::i16 cms(f32 v) { return static_cast<kern::i16>(std::lround(clampf(v * 100, -32000, 32000))); }
 }  // namespace
 
-TossState& Game::toss() {
-  if (!toss_) toss_ = std::make_unique<TossState>();
-  return *toss_;
-}
-
 // The hand took something (game_vr.cpp vr_grab): ours to stream until it lies still.
 void Game::toss_own(u8 kind, i32 local, u64 id) {
   if (!net_.active()) return;
-  TossState& t = toss();
+  TossState& t = toss_;
   u64 net_id = id;
   if (kind == kPerson) {
     if (local < 0 || local >= static_cast<i32>(people_.all().size())) return;
@@ -70,7 +65,7 @@ void Game::toss_own_body(kern::physics::Body b) {
 }
 
 void Game::toss_update(f32 dt) {
-  TossState& t = toss();
+  TossState& t = toss_;
   if (!net_.active() || !glife_) { t.own.clear(); t.remote.clear(); (void)net_.take_toss(); return; }
   kern::physics::World& w = world_->physics();
   Life& L = glife_->life;
@@ -286,7 +281,7 @@ std::string Game::toss_command(const std::string& cmd) {
 }
 
 std::string Game::toss_json() {
-  TossState& t = toss();
+  TossState& t = toss_;
   char b[256];
   u32 ghosts = 0, rounds = 0;
   Vec3 gp;
