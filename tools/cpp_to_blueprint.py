@@ -6528,6 +6528,9 @@ class Emit:
             if want in self.u.enum_numbers:
                 index = f"list_find<Int>({self.u.enum_numbers[want]}, {index})"
             return f"enum_from_index<{want}>({index}).value"
+        if want in self.u.enum_values and have in self.u.enum_values:
+            # (an enum's value as one of another enum - static_cast<B>(a): the one with its number)
+            return self.conv(self.conv(text, have, "Int"), "Int", want)
         if want in self.u.rows and have == self.u.rows[want]:
             return f"struct_make<{want}>({text})"
         if have in self.u.rows and want == self.u.rows[have]:
@@ -8597,7 +8600,8 @@ class TestWriter:
                 edits.append((ca, 2, depth, ca, f"converted::fits<{target}>("))
                 edits.append((cb, 0, -depth, cb, ")"))
             elif (k in ("CXXStaticCastExpr", "CStyleCastExpr", "CXXFunctionalCastExpr") and ks and n.get("castKind") == "IntegralCast"
-                  and self.u.find_type(self.u.clean(qtype(n))) in self.tree.enums and NUMBER.get(self.u.clean(qtype(ks[-1]))) == "Int"):
+                  and self.u.find_type(self.u.clean(qtype(n))) in self.tree.enums
+                  and (NUMBER.get(self.u.clean(qtype(ks[-1]))) == "Int" or self.u.find_type(self.u.clean(qtype(ks[-1]))) in self.tree.enums)):
                 # a whole number as a value of an enum that has no such value
                 ca, cb = span(ks[-1])
                 valid = ", ".join(str(v) for _, v in enum_numbers(self.tree.enums[self.u.find_type(self.u.clean(qtype(n)))]))
