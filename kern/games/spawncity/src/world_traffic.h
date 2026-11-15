@@ -48,9 +48,11 @@ class TrafficRules {
   };
 
   /// Binds the rules to the logic the level's Blueprints run in (the game once its world has started,
-  /// tests the one they run) - the Blueprint of the actor "Traffic", found by its name at every call -
-  /// and takes its distances and times. True: the actor has a Blueprint that runs there.
+  /// tests the one they run) - the Blueprint of the actor "Traffic", found by its name at every call.
+  /// True: the actor has a Blueprint that runs there.
   static bool bind(kern::logic::Runtime& logic);
+  /// Takes the distances and times of the bound Blueprint (zeros where none runs).
+  void take_laws();
   void rebuild(const std::vector<Lane>& lanes);
   u64 built_from = ~0ull;
   /// The signals' clock (seconds; the game sets it every frame from the wall clock - in a session
@@ -77,12 +79,15 @@ class TrafficRules {
   /// lies 1..40 m ahead and no further to the side than half the own body (1.25 m, bus 1.6 m) +
   /// 0.6 m; the gap is the distance between the centres less both half lengths (1.9 m, bus 4 m);
   /// 2.5 m of it are kept, the rest is driven at 1.6 s headway. `limiter`: who it is (or -1).
-  static f32 gap_speed(i32 self, Vec2 pos, Vec2 fwd, bool bus, const std::vector<Vehicle>& all, i32& limiter);
+  f32 gap_speed(i32 self, Vec2 pos, Vec2 fwd, bool bus, const std::vector<Vehicle>& all, i32& limiter) const;
   /// Junctions near p (drawing).
   void near(Vec2 p, f32 r, std::vector<i32>& out) const;
 
  private:
   struct Blocked { f32 since = -1, next_honk = 0, wait_since = -1; };
+  /// The distances and times of the Blueprint (take_laws).
+  struct Laws { f32 ahead_min = 0, ahead_max = 0, stop_line = 0, first_come = 0, claim_s = 0, patience_s = 0; };
+  Laws laws_;
   std::vector<Junction> junctions_;
   kern::Map<u64, std::vector<i32>> grid_;
   kern::Map<i32, Blocked> blocked_;

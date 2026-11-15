@@ -277,6 +277,7 @@ bool Game::start(kern::Engine& e) {
     if (!bind_settings(*logic) || !ui_.settings.take_table()) return kern::fail("the level's Blueprint \"Settings\" is missing, has errors or not one row per setting");
     if (!Jetpack::bind(*logic)) return kern::fail("the level's Blueprint \"Jetpack\" is missing or has errors");
     if (!TrafficRules::bind(*logic)) return kern::fail("the level's Blueprint \"Traffic\" is missing or has errors");
+    life_->rules.take_laws();
     if (!mp::bind(*logic)) return kern::fail("the level's Blueprint \"Multiplayer\" is missing or has errors");
     // the combat and event rules (combat_rules.h)
     if (!combat::bind_military(*logic)) return kern::fail("the level's Blueprint \"Military\" is missing, has errors or a table the game cannot read");
