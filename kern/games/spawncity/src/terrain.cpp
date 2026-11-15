@@ -673,7 +673,7 @@ void Terrain::set_water_cell(i32 cx, i32 cy) {
   WaterBlock& b = water_[key2(cx >> 4, cy >> 4)];
   const u32 idx = static_cast<u32>((cy & 15) * 16 + (cx & 15));
   if (!((b.bits[idx >> 6] >> (idx & 63)) & 1u)) ++stats_.water_cells;
-  b.bits[idx >> 6] |= 1ull << (idx & 63);
+  b.bits[idx >> 6] |= u64{1} << (idx & 63);
 }
 
 bool Terrain::on_bridge(f32 x, f32 y) const {
