@@ -1868,6 +1868,9 @@ void add_math(Library& lib) {
     lib.add(pure("text.replace", "Replace Text", "Text",
                  {data("a", "Text", K::text, ""), data("at", "At", K::integer, 0), data("count", "Count", K::integer, 0), data("b", "With", K::text, "")}, text, of(&P::text_replace),
                  "Text with Count characters from At on replaced by With (std::string::replace); At beyond the end: Text as it is", "replace string"));
+    lib.add(pure("text.of_bytes", "Text of Bytes", "Text", {data("bytes", "Bytes", K::integer_list), data("at", "At", K::integer, 0), data("count", "Count", K::integer, 0)}, text,
+                 of(&P::text_of_bytes), "Count bytes of the list from At on as a text, each cut to 8 bits (beyond the list: up to its end)",
+                 "bytes chars string decode utf8 buffer"));
     // Numbers read from a text at a place, as C reads them (scan, nodes.h): Value, and End - the place just
     // after what was read (nothing read: At itself, as C's end pointer)
     struct Parse { const char* type; const char* label; bool whole; P::ParsedFloat (*real)(std::string, i64); P::ParsedWhole (*integral)(std::string, i64, i64); const char* help; const char* keywords; };
@@ -1903,12 +1906,12 @@ void add_math(Library& lib) {
     // Scan Text: what sscanf reads with a format (scan, nodes.h) - Count, what sscanf gives, and a value
     // for each conversion; the inputs Before hold what was there before, which stays where the scan
     // does not reach (as a variable sscanf did not write keeps its value)
-    NodeDef d = make("text.scan", "Scan Text", "Text", NodeKind::pure,
+    NodeDef d = make("text.scan", "Scan Text", "Text", NodeKind::action,
                      "Reads Text from At on as C's sscanf reads it with a format: %d %i %u %o %x %b take whole numbers (l ll: 64 bits), %f %e %g %a a float (l: a double), %s and "
                      "%[set] a word, %n how many characters were read; a width, * (read, not given). Count: how many values were read (-1: the text ended before the first).");
     d.params = {param("format", "Format", ParamDef::Kind::text, "%d")};
-    d.inputs = {data("a", "Text", K::text, ""), data("at", "At", K::integer, 0)};
-    d.outputs = {data("count", "Count", K::integer)};
+    d.inputs = {exec_in(), data("a", "Text", K::text, ""), data("at", "At", K::integer, 0)};
+    d.outputs = {exec_out(), data("count", "Count", K::integer)};
     d.keywords = "scan sscanf scanf parse read numbers words format";
     auto pin_of = [](scan::Kind k) { return k == scan::Kind::whole ? K::integer : k == scan::Kind::whole64 ? K::int64 : k == scan::Kind::number ? K::number : K::text; };
     d.shape = [pin_of](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>& out) {
@@ -1936,14 +1939,14 @@ void add_math(Library& lib) {
       for (std::size_t k = 0; k < plan.count; ++k) {
         scan::Slot& s = slots[k];
         s.kind = plan.kinds[k];
-        const Value v = k + 2 < c.input_count() ? c.in(k + 2) : Value{};
+        const Value v = c.in("p" + std::to_string(k));
         if (s.kind == scan::Kind::whole) s.whole = v.as_int();
         else if (s.kind == scan::Kind::whole64) s.bits = v.type == PinType::int64 ? static_cast<u64>(v.i) : 0;
         else if (s.kind == scan::Kind::number) s.number = v.as_number();
         else s.text = v.as_text();
       }
-      const std::string a = c.in(std::size_t{0}).as_text();
-      const i64 count = scan::run(scan::c_string(a, c.in(std::size_t{1}).as_int()), fmt, slots, plan.count);
+      const std::string a = c.in_text("a");
+      const i64 count = scan::run(scan::c_string(a, c.in_int("at")), fmt, slots, plan.count);
       c.out("count", Value::integer(count));
       for (std::size_t k = 0; k < plan.count; ++k) {
         const scan::Slot& s = slots[k];
@@ -1951,7 +1954,7 @@ void add_math(Library& lib) {
         c.out(pin, s.kind == scan::Kind::whole ? Value::integer(s.whole) : s.kind == scan::Kind::whole64 ? Value::int64(s.bits) : s.kind == scan::Kind::number ? Value::number(s.number)
                                                                                                                                  : Value::text(s.text));
       }
-      return kStop;
+      return 0;
     };
     lib.add(std::move(d));
   }

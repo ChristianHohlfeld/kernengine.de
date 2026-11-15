@@ -1059,6 +1059,15 @@ inline void insert(std::string& a, i64 at, std::string_view b) {
 inline void replace(std::string& a, i64 at, i64 count, std::string_view b) {
   if (place(at) <= a.size()) a.replace(place(at), place(count), b);
 }
+template <class List> std::string of_bytes(const List& bytes, i64 at, i64 count) {
+  std::string r;
+  if (at < 0 || count <= 0 || static_cast<u64>(at) >= bytes.size()) return r;
+  const std::size_t from = static_cast<std::size_t>(at);
+  const std::size_t n = std::min(static_cast<std::size_t>(static_cast<u64>(count)), bytes.size() - from);
+  r.resize(n);
+  for (std::size_t k = 0; k < n; ++k) r[k] = static_cast<char>(static_cast<u8>(static_cast<i64>(bytes[from + k])));
+  return r;
+}
 }  // namespace texts
 
 /// Parse Float, Parse Int and Scan Text (text.parse_float, text.parse_int, text.scan): numbers and
@@ -1363,6 +1372,26 @@ inline void store_whole(Slot& slot, const Spec& sp, u64 v, bool is_signed) {
   else if (sp.size == 'h') slot.whole = is_signed ? static_cast<i64>(static_cast<i16>(v)) : static_cast<i64>(static_cast<u16>(v));
   else slot.whole = is_signed ? static_cast<i64>(static_cast<i32>(static_cast<u32>(v))) : static_cast<i64>(static_cast<u32>(v));
 }
+/// The characters of a number as the scanner gathers them: here, in the call's own memory - a number of
+/// more than 255 characters in a std::string.
+struct Gathered {
+  char held[256] = {};
+  std::size_t n = 0;
+  std::string more;
+  void clear() { n = 0, more.clear(); }
+  void push_back(char c) {
+    if (n < sizeof held && more.empty()) held[n++] = c;
+    else {
+      if (more.empty()) more.assign(held, n);
+      more.push_back(c);
+    }
+  }
+  std::size_t size() const { return more.empty() ? n : more.size(); }
+  bool empty() const { return size() == 0; }
+  char back() const { return more.empty() ? held[n - 1] : more.back(); }
+  char operator[](std::size_t k) const { return more.empty() ? held[k] : more[k]; }
+  operator std::string_view() const { return more.empty() ? std::string_view(held, n) : std::string_view(more); }  // NOLINT
+};
 /// sscanf(input, fmt, ...): the count it gives (-1: EOF - the input ended before the first value was
 /// read), the slots of the values it read written. `slots`: one for each value the format gives
 /// (plan), holding what was there before.
@@ -1376,7 +1405,7 @@ inline i64 run(std::string_view in, std::string_view fmt, Slot* slots, std::size
   std::size_t slot = 0;
   bool skip_space = false;
   bool input_error = false;
-  std::string buf;  // (the characters of a number, as glibc gathers them)
+  Gathered buf;  // (the characters of a number, as glibc gathers them)
   for (std::size_t f = 0; f < fmt.size();) {
     const char fc = fmt[f++];
     int c = 0;
@@ -1513,7 +1542,7 @@ inline i64 run(std::string_view in, std::string_view fmt, Slot* slots, std::size
           failed = true;
           break;
         }
-        const Whole w = whole(buf, base, is_signed);
+        const Whole w = whole(std::string_view(buf), base, is_signed);
         if (w.end == 0) {
           failed = true;
           break;
@@ -1618,7 +1647,7 @@ inline i64 run(std::string_view in, std::string_view fmt, Slot* slots, std::size
           }
         }
         const bool single = sp.size != 'l';
-        const Real got = real(buf, single);
+        const Real got = real(std::string_view(buf), single);
         if (got.end == 0) {
           failed = true;
           break;
@@ -2313,6 +2342,9 @@ struct PureNodes {
     Int64 value{};
     Int end = 0;
   };
+  /// The text the bytes of a list are (each number cut to 8 bits, as a char holds it): Count of them from At
+  /// on - what std::string(reinterpret_cast<const char*>(bytes) + at, count) makes; beyond the list: up to its end.
+  static Text text_of_bytes(std::vector<i64> bytes, Int at, Int count) { return texts::of_bytes(bytes, at, count); }
   static ParsedFloat text_parse_float(Text a, Int at) {
     const scan::Real r = scan::real(scan::c_string(a, at), false);
     return {r.value, at + static_cast<i64>(r.end)};

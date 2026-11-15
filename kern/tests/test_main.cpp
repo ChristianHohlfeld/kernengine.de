@@ -3407,6 +3407,20 @@ TEST(logic_tier_cases_interpreter) {
                     static_cast<int>(std::string("  x").find_first_not_of(" ")), hello.substr(6).c_str(), replaced.c_str(), inserted.c_str(), erased.c_str(), d,
                     static_cast<int>(end - number), static_cast<double>(std::strtof("0.1", nullptr)), n, static_cast<double>(f), static_cast<int>(q), word, rest,
                     static_cast<int>(static_cast<u32>(std::strtoull("-1", nullptr, 10))), none);
+      {
+        char w[8] = "", set[16] = "";
+        signed char hh = 0;
+        unsigned short hu = 0;
+        unsigned long long llu = 0;
+        unsigned x = 0, o = 0;
+        int nread = 0, i = 0;
+        float g = 0;
+        const int got = std::sscanf("  name -129 70000 18446744073709551615 0x1Fg 9 a b,0b101 1.25%017 rest", " %7s %hhd %hu %llu %x%n %*d %15[^,],%i %3f%%%o", w, &hh, &hu, &llu, &x, &nread,
+                                    set, &i, &g, &o);
+        char more[256];
+        std::snprintf(more, sizeof more, "|%s %d %d %d %d %s %d %.9g %d|%llu", w, hh, hu, x, nread, set, i, static_cast<double>(g), got, llu);
+        std::strncat(want, more, sizeof want - std::strlen(want) - 1);
+      }
       if (inst->get("Shown").as_text() != want) std::printf("text_scan: %s\n    want: %s\n", inst->get("Shown").as_text().c_str(), want);
       CHECK(inst->get("Shown").as_text() == want);
     }

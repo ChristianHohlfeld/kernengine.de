@@ -1250,9 +1250,6 @@ inline Case nodes_case(const logic::Library& lib = logic::library()) {
       // (a generic node in every type it can have; an enum node for the enum, Make and Break for every struct)
       variants.clear();
       for (const logic::TypeRef& t : logic::type_choices(d->params[0], c.graph)) variants.push_back({{d->params[0].key, logic::type_text(t)}});
-    } else if (d->type == "text.scan") {
-      // (whole numbers of every width, floats and doubles, words, a set, a count, literal characters, values not given)
-      variants = {{{"format", "%d"}}, {{"format", "%f %lf %s"}}, {{"format", " %31s %hhd %hu %llu %x"}}, {{"format", "%[^,],%i%n %*d %lld"}}, {{"format", "x=%3f%%%o"}}, {{"format", "plain"}}};
     } else if (d->type == "list.make") {
       // (a list of every item type, and lists of no, one and many items)
       variants.clear();

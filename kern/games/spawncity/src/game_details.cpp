@@ -6,9 +6,11 @@
 //    the hit point - 9 mm 2.9 N*s, 5.56 mm 3.8 N*s, .50 BMG 41 N*s; no knockback multipliers,
 //  * the rule ballot (rules_vote_engine.mjs) run locally by the `ballot` command; carrying the
 //    votes between players is the network's.
+#include <climits>
 #include <cmath>
 #include <cstdio>
-#include <sstream>
+#include <cstdlib>
+#include <string>
 
 #include "game.h"
 
@@ -17,6 +19,76 @@ namespace sc {
 namespace {
 constexpr f32 kCarHp = 300, kPdHp = 100, kDroneHp = 100;  // police_ground_units.mjs, wanted_police_drones.mjs, player_vitals_logic.mjs
 bool is_bus(const TrafficCar& c) { return c.car->spec().radius > 0.4f; }
+
+// The words of a command from `at` on, as std::istream's >> reads them (libstdc++, the C locale): spaces
+// are skipped; a word goes up to the next space; a whole number is decimal, with a sign - none there: 0,
+// beyond its type: the type's end - and once one read has failed (`good`), none after it reads anything
+// or changes its value (also where only spaces are left).
+constexpr const char* kSpaces = " \t\n\v\f\r";
+bool read_word(const std::string& s, std::size_t& at, bool& good, std::string& w) {
+  if (!good) return false;
+  const std::size_t from = s.find_first_not_of(kSpaces, at);
+  if (from == std::string::npos) {
+    good = false;
+    return false;
+  }
+  const std::size_t to = s.find_first_of(kSpaces, from);
+  w = s.substr(from, to == std::string::npos ? std::string::npos : to - from);
+  at = to == std::string::npos ? s.size() : to;
+  return true;
+}
+// (where the next thing to read begins - npos: only spaces are left)
+std::size_t next_at(const std::string& s, std::size_t at) { return s.find_first_not_of(kSpaces, at); }
+// (the number that begins at `from`: strtoll reads the characters >> reads there - a sign, digits - and
+// where they end; false: there is none)
+bool number_at(const std::string& s, std::size_t from, std::size_t& at, long long& x) {
+  char* end = nullptr;
+  x = std::strtoll(s.c_str() + from, &end, 10);
+  if (end == s.c_str() + from) return false;
+  at = static_cast<std::size_t>(end - s.c_str());
+  return true;
+}
+bool read_int(const std::string& s, std::size_t& at, bool& good, int& v) {
+  if (!good) return false;
+  const std::size_t from = next_at(s, at);
+  long long x = 0;
+  if (from == std::string::npos) {
+    good = false;  // (nothing left: v stays)
+  } else if (!number_at(s, from, at, x)) {
+    v = 0;
+    good = false;
+  } else if (x > INT_MAX || x < INT_MIN) {
+    v = x > INT_MAX ? INT_MAX : INT_MIN;
+    good = false;
+  } else {
+    v = static_cast<int>(x);
+  }
+  return good;
+}
+bool read_u32(const std::string& s, std::size_t& at, bool& good, u32& v) {
+  if (!good) return false;
+  const std::size_t from = next_at(s, at);
+  long long x = 0;
+  if (from == std::string::npos) {
+    good = false;
+    return false;
+  }
+  if (!number_at(s, from, at, x)) {
+    v = 0;
+    good = false;
+    return false;
+  }
+  // (unsigned: a - in front gives the two's complement of the number; beyond 2^32 - 1 it is the end)
+  const bool minus = x < 0;
+  const unsigned long long m = minus ? 0ull - static_cast<unsigned long long>(x) : static_cast<unsigned long long>(x);
+  if (m > UINT_MAX) {
+    v = UINT_MAX;
+    good = false;
+    return false;
+  }
+  v = minus ? 0u - static_cast<u32>(m) : static_cast<u32>(m);
+  return true;
+}
 }  // namespace
 
 void Game::update_details(f32 dt) {
@@ -109,9 +181,10 @@ bool Game::details_command(const std::string& cmd, std::string& out) {
   }
   if (starts("ballot")) {
     // ballot new KEY 0|1 HOST M1 M2 ... | ballot vote PEER 0|1 M1 M2 ... | ballot
-    std::istringstream in(cmd.substr(6));
+    std::size_t at = 6;  // (the words after "ballot", read as std::istream reads them)
+    bool good = true;
     std::string op;
-    in >> op;
+    read_word(cmd, at, good, op);
     // (a ballot of its own, beside a session's - the same rules: mp_rules.h; KEY is only its label)
     std::vector<u8> members;
     const f64 now_ms = static_cast<f64>(world_->sim_time()) * 1000;
@@ -119,14 +192,17 @@ bool Game::details_command(const std::string& cmd, std::string& out) {
       std::string key;
       int value = 0;
       u32 host = 0, m = 0;
-      in >> key >> value >> host;
-      while (in >> m) members.push_back(static_cast<u8>(m));
+      read_word(cmd, at, good, key);
+      read_int(cmd, at, good, value);
+      read_u32(cmd, at, good, host);
+      while (read_u32(cmd, at, good, m)) members.push_back(static_cast<u8>(m));
       mp::create_ballot(ballot_, key.empty() ? 0 : ++ballot_serial_, 0, value != 0, static_cast<u8>(host), members, now_ms);
     } else if (op == "vote") {
       u32 peer = 0, m = 0;
       int yes = 0;
-      in >> peer >> yes;
-      while (in >> m) members.push_back(static_cast<u8>(m));
+      read_u32(cmd, at, good, peer);
+      read_int(cmd, at, good, yes);
+      while (read_u32(cmd, at, good, m)) members.push_back(static_cast<u8>(m));
       mp::Ballot::Status did = ballot_.status;
       mp::cast_vote(ballot_, static_cast<u8>(peer), yes != 0, members, now_ms, did);
       out = mp::ballot_name(did);

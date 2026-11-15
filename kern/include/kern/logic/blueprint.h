@@ -448,6 +448,8 @@ struct BlueprintCore : logic::PureNodes {
     logic::texts::replace(t, at, count, b.view());
     return t;
   }
+  /// Text of Bytes: the text a list of bytes is, from At on (one request for memory, as std::string makes it).
+  static Text text_of_bytes(logic::Items<Int> bytes, Int at, Int count) { return logic::texts::of_bytes(bytes, at, count); }
   /// Parse Float, Parse Int: the number at a place of a text as C reads it there (logic::scan).
   struct ParsedFloat {
     Float value = 0.0;
@@ -473,89 +475,64 @@ struct BlueprintCore : logic::PureNodes {
     const logic::scan::Whole r = logic::scan::whole(logic::scan::c_string(a.view(), at), base < 0 || base > 36 ? -1 : static_cast<int>(static_cast<i64>(base)), false);
     return {Int64(r.bits), static_cast<i64>(at) + static_cast<i64>(r.end)};
   }
-  /// Scan Text: text_scan<"%f %f">(text, at, x, y) - what sscanf reads (logic::scan): .count, and .v0, .v1 ...
-  /// a value for each conversion, of the type the format says (Before: what stays where the scan does not
-  /// reach). A format without values gives the count alone.
-  struct NoScanned {};
-  template <logic::scan::Kind K>
-  using Scanned = std::conditional_t<K == logic::scan::Kind::whole, Int,
-                                     std::conditional_t<K == logic::scan::Kind::whole64, Int64, std::conditional_t<K == logic::scan::Kind::number, Float, Text>>>;
-  template <class T0 = NoScanned, class T1 = NoScanned, class T2 = NoScanned, class T3 = NoScanned, class T4 = NoScanned, class T5 = NoScanned, class T6 = NoScanned,
-            class T7 = NoScanned, class T8 = NoScanned, class T9 = NoScanned, class T10 = NoScanned, class T11 = NoScanned, class T12 = NoScanned, class T13 = NoScanned,
-            class T14 = NoScanned, class T15 = NoScanned>
-  struct ScanResult {
-    Int count = 0;
-    T0 v0{};
-    T1 v1{};
-    T2 v2{};
-    T3 v3{};
-    T4 v4{};
-    T5 v5{};
-    T6 v6{};
-    T7 v7{};
-    T8 v8{};
-    T9 v9{};
-    T10 v10{};
-    T11 v11{};
-    T12 v12{};
-    T13 v13{};
-    T14 v14{};
-    T15 v15{};
-  };
-  template <std::size_t K, class R> static auto& scan_value(R& r) {
-    if constexpr (K == 0) return r.v0;
-    else if constexpr (K == 1) return r.v1;
-    else if constexpr (K == 2) return r.v2;
-    else if constexpr (K == 3) return r.v3;
-    else if constexpr (K == 4) return r.v4;
-    else if constexpr (K == 5) return r.v5;
-    else if constexpr (K == 6) return r.v6;
-    else if constexpr (K == 7) return r.v7;
-    else if constexpr (K == 8) return r.v8;
-    else if constexpr (K == 9) return r.v9;
-    else if constexpr (K == 10) return r.v10;
-    else if constexpr (K == 11) return r.v11;
-    else if constexpr (K == 12) return r.v12;
-    else if constexpr (K == 13) return r.v13;
-    else if constexpr (K == 14) return r.v14;
-    else return r.v15;
-  }
+  /// Scan Text: text_scan<"%f %f">(n, text, at, x, y) - what sscanf reads (logic::scan), a step: n.count, and
+  /// n.v0, n.v1 ... a value for each conversion, of the type the format says (`before`: what stays where the
+  /// scan does not reach). Without n: nothing it gives is read.
   template <Setting Format> static constexpr logic::scan::Plan scan_plan() {
     logic::scan::Plan p;
     if (!logic::scan::plan(Format.view(), &p, nullptr)) p = {};
     return p;
   }
-  /// (what a conversion had before, into its slot; a text stays where it is - the result takes it from there
-  /// when the scan does not write it)
+  /// (what a conversion had before, into its slot - a text stays where it is: it is taken from there when
+  /// the scan does not write it)
   template <logic::scan::Kind K, class V> static void scan_before(logic::scan::Slot& s, const V& v) {
     s.kind = K;
     if constexpr (K == logic::scan::Kind::whole) s.whole = static_cast<i64>(Int(v));
     else if constexpr (K == logic::scan::Kind::whole64) s.bits = Int64(v).bits;
     else if constexpr (K == logic::scan::Kind::number) s.number = static_cast<f64>(Float(v));
   }
-  template <logic::scan::Kind K, class V> static Scanned<K> scan_after(logic::scan::Slot& s, const V& before) {
-    if constexpr (K == logic::scan::Kind::whole) return Int(s.whole);
-    else if constexpr (K == logic::scan::Kind::whole64) return Int64(s.bits);
-    else if constexpr (K == logic::scan::Kind::number) return Float(s.number);
-    else return s.written ? Text(std::move(s.text)) : Text(before);
+  template <logic::scan::Kind K, class F, class V> static void scan_after(F& field, logic::scan::Slot& s, const V& before) {
+    if constexpr (K == logic::scan::Kind::whole) field = Int(s.whole);
+    else if constexpr (K == logic::scan::Kind::whole64) field = Int64(s.bits);
+    else if constexpr (K == logic::scan::Kind::number) field = Float(s.number);
+    else if (s.written) field = Text(std::move(s.text));
+    else field = Text(before);
   }
-  template <Setting Format, class... V, std::size_t... I> static auto text_scan_of(const Text& a, Int at, std::index_sequence<I...>, const V&... before) {
+  template <std::size_t K, class N> static auto& scan_value(N& n) {
+    if constexpr (K == 0) return n.v0;
+    else if constexpr (K == 1) return n.v1;
+    else if constexpr (K == 2) return n.v2;
+    else if constexpr (K == 3) return n.v3;
+    else if constexpr (K == 4) return n.v4;
+    else if constexpr (K == 5) return n.v5;
+    else if constexpr (K == 6) return n.v6;
+    else if constexpr (K == 7) return n.v7;
+    else if constexpr (K == 8) return n.v8;
+    else if constexpr (K == 9) return n.v9;
+    else if constexpr (K == 10) return n.v10;
+    else if constexpr (K == 11) return n.v11;
+    else if constexpr (K == 12) return n.v12;
+    else if constexpr (K == 13) return n.v13;
+    else if constexpr (K == 14) return n.v14;
+    else return n.v15;
+  }
+  template <Setting Format, class N, class... V, std::size_t... I> static void text_scan_into(N* n, const Text& a, Int at, std::index_sequence<I...>, const V&... before) {
     static constexpr logic::scan::Plan kPlan = scan_plan<Format>();
     static_assert(kPlan.count == sizeof...(V), "Scan Text: a value before for each value of the format");
     logic::scan::Slot slots[sizeof...(V) + 1];
     (scan_before<kPlan.kinds[I]>(slots[I], before), ...);
     const i64 count = logic::scan::run(logic::scan::c_string(a.view(), at), Format.view(), slots, sizeof...(V));
-    if constexpr (sizeof...(V) == 0) {
-      return Int(count);
-    } else {
-      ScanResult<Scanned<kPlan.kinds[I]>...> r;
-      r.count = count;
-      ((scan_value<I>(r) = scan_after<kPlan.kinds[I]>(slots[I], before)), ...);
-      return r;
+    if constexpr (!std::is_same_v<N, void>) {
+      n->count = count;
+      (scan_after<kPlan.kinds[I]>(scan_value<I>(*n), slots[I], before), ...);
     }
   }
-  template <Setting Format, class... V> static auto text_scan(const Text& a, Int at, const V&... before) {
-    return text_scan_of<Format>(a, at, std::index_sequence_for<V...>{}, before...);
+  template <Setting Format, class N, class... V> requires(!std::is_convertible_v<const N&, const Text&>)
+  static void text_scan(N& n, const Text& a, Int at, const V&... before) {
+    text_scan_into<Format>(&n, a, at, std::index_sequence_for<V...>{}, before...);
+  }
+  template <Setting Format, class... V> static void text_scan(const Text& a, Int at, const V&... before) {
+    text_scan_into<Format, void>(static_cast<void*>(nullptr), a, at, std::index_sequence_for<V...>{}, before...);
   }
   /// Format Text: text_format<"%02d:%06.3f">(most, minutes, seconds) - the values in the order of
   /// the format's conversions (logic::format).
