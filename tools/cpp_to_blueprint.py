@@ -1614,6 +1614,44 @@ class Unit:
                      [self.part(t) for _, t, _, _ in fields])
         return name
 
+    def moved_from(self, q, at=()):
+        """What stays in a value of the program's class `q` when it is moved out of (std::move into a
+        constructor or an assignment that takes it): the paths of its fields - by their names in the struct -
+        that keep what they held. A class whose moves are C++'s own (it declares no copy, move or destructor
+        of its own) moves field by field: a number, a flag, an enum's value, a vector stay as they were (their
+        move is a copy), a struct of the program as its own fields do, a std::vector, a kern::Map or Set and
+        an owned value (std::unique_ptr) are empty - what C++ leaves of them. Anything else (a std::string, an
+        optional, a class with moves of its own) C++ leaves open: Wait."""
+        rec = self.tree.records.get(q)
+        if rec is None:
+            raise Wait("what stays where a value was moved out of (std::move): its class is not known here")
+        last = q.split("::")[-1]
+        def of_itself(c):   # (one parameter, a reference to the class itself: a copy or a move)
+            ps = [x for x in kids(c) if x.get("kind") == "ParmVarDecl"]
+            return len(ps) == 1 and "&" in qtype(ps[0]) and self.clean(qtype(ps[0])).split("::")[-1] == last
+        for c in kids(rec):
+            if c.get("isImplicit"):
+                continue
+            k = c.get("kind")
+            special = k == "CXXDestructorDecl" or (k == "CXXConstructorDecl" and of_itself(c)) or (k == "CXXMethodDecl" and c.get("name") == "operator=")
+            if special:   # (one it declares, even = default, is no longer C++'s own move field by field: a destructor or a copy of its own leave it none)
+                raise Wait(f"what stays where a value was moved out of (std::move): {q.split('::')[-1]} moves as it says itself")
+        st = self.struct(q)
+        keep = []
+        fds = [c for c in kids(rec) if c.get("kind") == "FieldDecl"]
+        for (fname, ft, _, _), fd in zip(self.struct_fields[st], fds):
+            c = self.clean(qtype(fd))
+            path = at + (fname,)
+            if ft in ("Float", "Int", "Bool", "Int64", "Vector") or ft in self.enum_values:
+                keep.append(path)   # (a number's move is a copy)
+            elif re.match(r"std::(vector|unique_ptr)<|kern::(Map|Set)<", c):
+                continue            # (empty)
+            elif ft in self.struct_fields and self.find_type(c) in self.tree.records:
+                keep += self.moved_from(self.find_type(c), path)
+            else:
+                raise Wait(f"what stays where a value was moved out of (std::move): C++ leaves it open, but for a list (its field {fd.get('name')})")
+        return keep
+
     def entries(self, raw):
         """How many entries a list of fixed length has (`f32 m[16]`, std::array<u8, 32>); None: a list of any length."""
         c = self.clean(raw)
@@ -5552,6 +5590,11 @@ class Emit:
             if base is not None and not self.is_this(base) and m.get("name") in ("begin", "cbegin", "end", "cend", "data") and not kids(b)[1:] and (self.tp_or_none(base) or "").startswith("List<"):
                 lt = self.tp(base)
                 return base, ("0" if "begin" in m["name"] or m["name"] == "data" else f"list_length<{lt[5:-1]}>({self.ex(base, lt)})")
+            if base is not None and not self.is_this(base) and m.get("name") in ("begin", "cbegin", "end", "cend") and not kids(b)[1:] and self.keyed(base):
+                # (an iterator into a map or a set: the place of its entry - the end is the length)
+                kind, _ = self.keyed(base)
+                lt, row, _, _ = self.rows(base)
+                return base, ("0" if "begin" in m["name"] else f"{kind}_length<{row}>({self.ex(base, lt)})")
         if k == "MemberExpr" and b.get("name") == "data" and kids(b) and not b.get("isArrow") and re.match(r"(?:kern::)?Span<", self.ctype(kids(b)[0])):
             # (a view of a list - kern::Span - is the list: its data is the place of its first entry)
             return kids(b)[0], "0"
@@ -7385,6 +7428,21 @@ class Emit:
                 # object, what a reference names: a list (std::vector) is empty there afterwards. Of anything
                 # else C++ leaves open what stays.
                 lt = self.tp(a[0])
+                if lt in u.struct_fields and lt not in u.rows and u.find_type(self.ctype(a[0])) in self.tree.records:
+                    # a struct of the program: taken, and what C++ leaves of it put back where it was (Unit.moved_from)
+                    keep = u.moved_from(u.find_type(self.ctype(a[0])))
+                    got = self.spot(a[0])
+                    if got is None or got[1] != lt or not self.writable(got[0]):
+                        raise Wait("what stays where a value was moved out of (std::move): a value that is no place")
+                    taken = self.taken_out(a[0], lt)
+                    lines = []
+                    for path in keep:
+                        read, t = taken, lt
+                        for f in path:
+                            read, t = f"struct_break<{t}>({read}).{f}", next(ft for fn, ft, _, _ in u.struct_fields[t] if fn == f)
+                        lines.append(f"{got[0]}.{'.'.join(path)} = {read};")
+                    self.hoist(lines)
+                    return taken, lt
                 if not (lt.startswith("List<") and self.ctype(a[0]).startswith("std::vector<")):
                     raise Wait("what stays where a value was moved out of (std::move): C++ leaves it open, but for a list")
                 return self.taken_out(a[0], lt), lt
@@ -7665,8 +7723,10 @@ class Emit:
                 vals, fixed = said
                 if fixed <= 16:
                     return self.made_list(vals + [u.zero(it)] * (fixed - len(vals)), t), t
+                # (every entry set where it stands - those it does not write zero, as C++ makes them: also when
+                # the place was used before, in an earlier pass of a loop)
                 made = self.temp("made", t, fixed)
-                self.hoist([f"{made} = {self.made_list(vals, t)};"])
+                self.hoist([f"{made}[{i}] = {v};" for i, v in enumerate(vals + [u.zero(it)] * (fixed - len(vals)))])
                 return made, t
             if not a:
                 return t + "{}", t
@@ -7674,7 +7734,11 @@ class Emit:
                 items = a if b.get("kind") == "InitListExpr" else kids(bare(a[0]) if bare(a[0]).get("kind") == "InitListExpr" else bare(kids(bare(a[0]))[0]))
                 vals = [self.ex(x, it) for x in items]
                 if len(vals) > 16:
-                    raise Wait("a list made of more than 16 values")
+                    # (more than a Make List takes: the list asked for once, as long as it is - as C++ makes a
+                    # std::vector of a list in braces -, then each value added in its order)
+                    made = self.temp("made", t)
+                    self.hoist([f"{made} = {t}{{}};", f"list_reserve({made}, {len(vals)});"] + [f"list_add({made}, {v});" for v in vals])
+                    return made, t
                 return f'list_make<{it}, "{len(vals)}">({", ".join(vals)})', t
             if len(a) == 1 and self.tp_or_none(a[0]) == t:
                 return self.ex(a[0], t), t
@@ -7704,6 +7768,8 @@ class Emit:
                 # std::vector<T>(first, last): the entries of a list from one place to another
                 (s0, first), (s1, last) = self.place(a[0]), self.place(a[1])
                 st = self.tp(s0)
+                if st.startswith(("Map<", "Set<")) and self.same_list(s0, s1):
+                    return self.listed(s0, st, first, last, t), t
                 if not self.same_list(s0, s1) or st != t:
                     raise Wait("a list made of a range of another type")
                 if self.whole_list(a[0], a[1]):
@@ -7735,6 +7801,29 @@ class Emit:
                 return made, t
             raise Wait(f"a {t.split('<')[0].lower()} made of other arguments")
         raise Wait(f"a {t} made here")
+
+    def listed(self, s0, st, first, last, t):
+        """std::vector<T>(first, last) of a range of a map or a set: its entries from one place to another, in
+        their order - of a map each a pair of its key and value (std::pair<K, V>), of a set its keys. As C++ makes
+        it: the list asked for once, as long as the range, then each entry put in."""
+        it = t[5:-1]
+        kind = "map" if st.startswith("Map<") else "set"
+        _, row, kt, vt = self.rows(s0)
+        src = self.place_arg(s0, st, "const", [])
+        if kind == "map":
+            fields = self.u.struct_fields.get(it)
+            if not fields or len(fields) != 2 or not (self.u.alike(fields[0][1], kt) and self.u.alike(fields[1][1], vt)):
+                raise Wait("a list made of a range of another type")
+            entry = lambda i: f"struct_make<{it}>({self.conv(f'map_key_at<{row}>({src}, {i})', kt, fields[0][1])}, {self.conv(f'{src}[{i}]', vt, fields[1][1])})"
+        else:
+            if not self.u.alike(it, kt):
+                raise Wait("a list made of a range of another type")
+            entry = lambda i: self.conv(f"set_key_at<{row}>({src}, {i})", kt, it)
+        made, i0, i1 = self.temp("made", t), self.temp("first", "Int"), self.temp("last", "Int")
+        self.hoist([f"{made} = {t}{{}};", f"{i0} = {first};", f"{i1} = {self.whole_math('-', last, '1')};",
+                    f"list_reserve({made}, {self.whole_math('+', self.whole_math('-', i1, i0), '1')});"]
+                   + self.count_loop(i0, i1, lambda i: [f"list_add({made}, {entry(i)});"]))
+        return made
 
     def member_call(self, b):
         m = callee(b)
