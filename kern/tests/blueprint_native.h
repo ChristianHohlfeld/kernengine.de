@@ -1080,7 +1080,10 @@ inline std::vector<Value> samples(PinType t, std::size_t count = 0) {
       for (Vec3 v : {Vec3{0, 0, 0}, Vec3{1, 0, 0}, Vec3{0, -2, 0}, Vec3{1.5f, 2.5f, -3.5f}, Vec3{1000, 0.001f, 7}}) r.push_back(Value::vector(v));
       break;
     case PinType::text:
-      for (const char* v : {"", "a", "Kern", "hello world", "a \"b\" \\ c\n\ttab", "\xC3\xA4\xE2\x82\xAC"}) r.push_back(Value::text(v));
+      // (and texts C reads numbers from: signs, exponents, hexadecimal, inf and nan, what is beyond the ends)
+      for (const char* v : {"", "a", "Kern", "hello world", "a \"b\" \\ c\n\ttab", "\xC3\xA4\xE2\x82\xAC", " -12.5e3x 7", "0x1Fp-2,0b101 -0", "nan(0x7f) inf 99999999999999999999",
+                            "x=1.5%017,3 4"})
+        r.push_back(Value::text(v));
       break;
     case PinType::actor:
       for (logic::ActorRef v : {0u, 1u, 42u}) r.push_back(Value::actor(v));
@@ -1247,6 +1250,9 @@ inline Case nodes_case(const logic::Library& lib = logic::library()) {
       // (a generic node in every type it can have; an enum node for the enum, Make and Break for every struct)
       variants.clear();
       for (const logic::TypeRef& t : logic::type_choices(d->params[0], c.graph)) variants.push_back({{d->params[0].key, logic::type_text(t)}});
+    } else if (d->type == "text.scan") {
+      // (whole numbers of every width, floats and doubles, words, a set, a count, literal characters, values not given)
+      variants = {{{"format", "%d"}}, {{"format", "%f %lf %s"}}, {{"format", " %31s %hhd %hu %llu %x"}}, {{"format", "%[^,],%i%n %*d %lld"}}, {{"format", "x=%3f%%%o"}}, {{"format", "plain"}}};
     } else if (d->type == "list.make") {
       // (a list of every item type, and lists of no, one and many items)
       variants.clear();

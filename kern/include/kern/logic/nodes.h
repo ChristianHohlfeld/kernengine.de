@@ -12,10 +12,12 @@
 #include <cmath>
 #include <compare>
 #include <cstddef>
+#include <cstdlib>
 #include <deque>
 #include <functional>
 #include <initializer_list>
 #include <iterator>
+#include <limits>
 #include <new>
 #include <string>
 #include <string_view>
@@ -1022,6 +1024,617 @@ inline std::string text_of(std::string_view fmt, const Arg* args, std::size_t co
 }
 }  // namespace format
 
+/// The text nodes that read a text as C++ reads a std::string or a std::string_view - the same
+/// answers, character for character. A place in a text is an Int; where C++ gives npos (a size_t
+/// that is no place), the Int is -1 - the size_t read with its sign, as a Blueprint holds every
+/// size_t -, and a place handed in is read back the same way (-1: npos, "to the end").
+namespace texts {
+inline constexpr std::size_t npos = std::string_view::npos;
+/// An Int as the size_t C++ has there (a whole number below 0 is that size_t read with its sign).
+constexpr std::size_t place(i64 at) { return static_cast<std::size_t>(static_cast<u64>(at)); }
+/// A size_t C++ gives as the Int that holds it (npos: -1).
+constexpr i64 found(std::size_t at) { return at == npos ? -1 : static_cast<i64>(at); }
+inline i64 find(std::string_view a, std::string_view b, i64 from) { return found(a.find(b, place(from))); }
+inline i64 rfind(std::string_view a, std::string_view b, i64 from) { return found(a.rfind(b, place(from))); }
+inline i64 find_first_of(std::string_view a, std::string_view b, i64 from) { return found(a.find_first_of(b, place(from))); }
+inline i64 find_last_of(std::string_view a, std::string_view b, i64 from) { return found(a.find_last_of(b, place(from))); }
+inline i64 find_first_not_of(std::string_view a, std::string_view b, i64 from) { return found(a.find_first_not_of(b, place(from))); }
+inline i64 find_last_not_of(std::string_view a, std::string_view b, i64 from) { return found(a.find_last_not_of(b, place(from))); }
+/// substr(at, count): from `at` so many characters (count beyond the end, or -1: to the end). An
+/// `at` beyond the end gives no text (C++ throws std::out_of_range there - which ends a program
+/// that has no exceptions).
+constexpr std::string_view sub(std::string_view a, i64 at, i64 count) {
+  const std::size_t p = place(at);
+  if (p > a.size()) return {};
+  return a.substr(p, place(count));
+}
+/// The ranges insert, erase and replace work on, as C++ cuts them: `at` beyond the end - C++
+/// throws std::out_of_range - changes nothing.
+inline void erase(std::string& a, i64 at, i64 count) {
+  if (place(at) <= a.size()) a.erase(place(at), place(count));
+}
+inline void insert(std::string& a, i64 at, std::string_view b) {
+  if (place(at) <= a.size()) a.insert(place(at), b);
+}
+inline void replace(std::string& a, i64 at, i64 count, std::string_view b) {
+  if (place(at) <= a.size()) a.replace(place(at), place(count), b);
+}
+}  // namespace texts
+
+/// Parse Float, Parse Int and Scan Text (text.parse_float, text.parse_int, text.scan): numbers and
+/// words read from a text as C reads them - strtod, strtof, strtoll, strtoull (and with them atof,
+/// atoi, atol, strtol, strtoul of a 64-bit long) and sscanf -, character for character what glibc
+/// (2.39, in the mode of C23 that C++ compiles with: "0b" in front of a binary number) reads in the C
+/// locale: the same characters read, the same value, the same count. The text is read as a C string
+/// at a place (s.c_str() + at): from `at` up to its first zero byte; an `at` beyond the text (or
+/// below 0 - in C a pointer to nowhere) reads an empty one. A finite number's value is what the C
+/// library computes from the characters read (correctly rounded, so on every machine the same);
+/// infinity, NaN and the payload of a NaN ("nan(0x7f)") are worked out here, as glibc does.
+namespace scan {
+inline constexpr int kEnd = -1;  // (no character: where C's EOF is)
+constexpr bool space(int c) { return c == ' ' || (c >= '\t' && c <= '\r'); }
+constexpr bool digit(int c) { return c >= '0' && c <= '9'; }
+constexpr int lower(int c) { return c >= 'A' && c <= 'Z' ? c + ('a' - 'A') : c; }
+constexpr bool xdigit(int c) { return digit(c) || (lower(c) >= 'a' && lower(c) <= 'f'); }
+/// A digit's value in a base up to 36 (no digit: 99).
+constexpr int digit_value(int c) { return digit(c) ? c - '0' : lower(c) >= 'a' && lower(c) <= 'z' ? lower(c) - 'a' + 10 : 99; }
+/// The C string a call reads at a place of a text.
+constexpr std::string_view c_string(std::string_view s, i64 at) {
+  if (at < 0 || static_cast<u64>(at) > s.size()) return {};
+  s.remove_prefix(static_cast<std::size_t>(at));
+  const std::size_t zero = s.find('\0');
+  return zero == std::string_view::npos ? s : s.substr(0, zero);
+}
+
+/// What strtoll / strtoull read: the 64 bits, and how many characters (0: none - no number).
+struct Whole {
+  u64 bits = 0;
+  std::size_t end = 0;
+};
+/// strtoll (is_signed) or strtoull of a C string, in a base 2..36 or 0 (by the number's own prefix:
+/// 0x hexadecimal, 0b binary - with `binary` -, 0 octal, else decimal). Beyond the range: the end of
+/// it (signed: the largest or the least i64; unsigned: all ones); unsigned, a - in front is the
+/// two's complement. Another base reads nothing (glibc: EINVAL).
+constexpr Whole whole(std::string_view s, int base, bool is_signed, bool binary = true) {
+  Whole r;
+  if (base < 0 || base == 1 || base > 36) return r;
+  auto at = [&](std::size_t k) -> int { return k < s.size() ? static_cast<unsigned char>(s[k]) : 0; };
+  std::size_t i = 0;
+  while (space(at(i))) ++i;
+  bool minus = false;
+  if (at(i) == '-' || at(i) == '+') minus = at(i) == '-', ++i;
+  std::size_t prefix = 0;  // (just after a 0x or 0b that was taken as one)
+  if (at(i) == '0') {
+    if ((base == 0 || base == 16) && lower(at(i + 1)) == 'x') i += 2, base = 16, prefix = i;
+    else if (binary && (base == 0 || base == 2) && lower(at(i + 1)) == 'b') i += 2, base = 2, prefix = i;
+    else if (base == 0) base = 8;
+  } else if (base == 0) {
+    base = 10;
+  }
+  const std::size_t first = i;
+  const u64 b = static_cast<u64>(base);
+  u64 v = 0;
+  bool over = false;
+  for (; i < s.size() && digit_value(at(i)) < base; ++i) {
+    const u64 d = static_cast<u64>(digit_value(at(i)));
+    if (v > (~u64{0} - d) / b) over = true;
+    else if (!over) v = v * b + d;
+  }
+  if (i == first) {
+    r.end = prefix ? prefix - 1 : 0;  // (a 0x or 0b with no digit after it: the 0 is the number)
+    return r;
+  }
+  r.end = i;
+  if (is_signed) {
+    const u64 top = minus ? u64{1} << 63 : (u64{1} << 63) - 1;
+    r.bits = over || v > top ? top : minus ? u64{0} - v : v;
+  } else {
+    r.bits = over ? ~u64{0} : minus ? u64{0} - v : v;
+  }
+  return r;
+}
+
+/// What strtod / strtof read: the value (a float's as a double holds it), and how many characters
+/// (0: none - no number).
+struct Real {
+  f64 value = 0;
+  std::size_t end = 0;
+};
+/// The value of a finite number written out, as the C library computes it (correctly rounded):
+/// strtof with `single`, else strtod. `subject` is all of it, with its sign.
+inline f64 finite(std::string_view subject, bool single) {
+  char held[256];
+  std::string longer;
+  const char* text = held;
+  if (subject.size() < sizeof held) {
+    for (std::size_t k = 0; k < subject.size(); ++k) held[k] = subject[k];
+    held[subject.size()] = '\0';
+  } else {
+    longer.assign(subject);
+    text = longer.c_str();
+  }
+  return single ? static_cast<f64>(std::strtof(text, nullptr)) : std::strtod(text, nullptr);
+}
+/// strtod (or strtof, `single`) of a C string: the characters C reads as a number - spaces, a sign,
+/// then decimal digits with a point and an exponent (e), hexadecimal ones after 0x (exponent p),
+/// inf, infinity, nan, nan(chars) - and its value. NaN is quiet, its payload the number in the
+/// parentheses where they hold one (glibc's way).
+inline Real real(std::string_view s, bool single) {
+  Real r;
+  auto at = [&](std::size_t k) -> int { return k < s.size() ? static_cast<unsigned char>(s[k]) : 0; };
+  auto word = [&](std::size_t k, std::string_view w) {
+    for (std::size_t j = 0; j < w.size(); ++j)
+      if (lower(at(k + j)) != w[j]) return false;
+    return true;
+  };
+  std::size_t i = 0;
+  while (space(at(i))) ++i;
+  const std::size_t subject = i;
+  bool minus = false;
+  if (at(i) == '-' || at(i) == '+') minus = at(i) == '-', ++i;
+  if (!(at(i) == '.' && digit(at(i + 1))) && !digit(at(i))) {
+    if (word(i, "inf")) {
+      r.end = i + (word(i + 3, "inity") ? 8 : 3);
+      r.value = minus ? -std::numeric_limits<f64>::infinity() : std::numeric_limits<f64>::infinity();
+      return r;
+    }
+    if (word(i, "nan")) {
+      i += 3;
+      u64 bits = single ? u64{0x7fc00000} : u64{0x7ff8000000000000};
+      if (at(i) == '(') {
+        std::size_t j = i + 1;
+        while (digit(at(j)) || (lower(at(j)) >= 'a' && lower(at(j)) <= 'z') || at(j) == '_') ++j;
+        if (at(j) == ')') {
+          const std::string_view inside = s.substr(i + 1, j - i - 1);
+          const Whole w = whole(inside, 0, false, false);
+          if (w.end == inside.size()) bits |= w.bits & (single ? u64{0x3fffff} : u64{0x7ffffffffffff});
+          i = j + 1;
+        }
+      }
+      r.end = i;
+      r.value = single ? static_cast<f64>(std::bit_cast<f32>(static_cast<u32>(bits))) : std::bit_cast<f64>(bits);
+      if (minus) r.value = -r.value;
+      return r;
+    }
+    return r;  // (no number: nothing read)
+  }
+  const bool hex = at(i) == '0' && lower(at(i + 1)) == 'x';
+  if (hex) i += 2;
+  const std::size_t digits = i;
+  while (at(i) == '0') ++i;
+  const int c = at(i);
+  const bool more = digit(c) || (hex && xdigit(c)) || (c == '.' && (!hex || i != digits || xdigit(at(i + 1)))) || (hex && i != digits && lower(c) == 'p') ||
+                    (!hex && lower(c) == 'e');
+  if (!more) {
+    // (only zeros - or a 0x with nothing after it: the 0 is the number)
+    r.end = i != digits ? i : hex ? i - 1 : 0;
+    r.value = minus ? -0.0 : 0.0;
+    return r;
+  }
+  auto is_digit = [&](int d) { return digit(d) || (hex && xdigit(d)); };
+  while (is_digit(at(i))) ++i;
+  if (at(i) == '.') {
+    ++i;
+    while (is_digit(at(i))) ++i;
+  }
+  if (lower(at(i)) == (hex ? 'p' : 'e')) {
+    std::size_t j = i + 1;
+    if (at(j) == '-' || at(j) == '+') ++j;
+    if (digit(at(j))) {
+      while (digit(at(j))) ++j;
+      i = j;
+    }
+  }
+  r.end = i;
+  r.value = finite(s.substr(subject, i - subject), single);
+  return r;
+}
+
+/// Scan Text: what sscanf reads with a format - glibc's own scanner, step for step. The format's
+/// conversions: %d %i %u %o %x %X %b (whole numbers: hh h, none - 8, 16, 32 bit - or l ll j z t q L
+/// - 64 bit), %f %F %e %E %g %G %a %A (none: a float, l: a double), %s, %[set] (a word), %n (how
+/// many characters were read), %% and * (read, not given); a width; spaces match any spaces, other
+/// characters themselves. Each conversion that gives a value has a slot: what was there before
+/// stays where the scan does not reach it (as the variable sscanf did not write keeps its value).
+enum class Kind : u8 { whole, whole64, number, text };
+struct Slot {
+  Kind kind = Kind::whole;
+  i64 whole = 0;  // whole: the number its C type holds (read as an Int)
+  u64 bits = 0;   // whole64: the 64 bits
+  f64 number = 0;
+  std::string text;
+  bool written = false;  // (the scan gave it a value)
+};
+inline constexpr std::size_t kMostSlots = 16;
+/// One conversion of a format, read at fmt[at] (just after its %).
+struct Spec {
+  bool suppress = false;
+  int width = -1;   // (-1: none)
+  int size = 0;     // 'H' hh, 'h', 0 none, 'l', 'q' ll (and L), 'j', 'z', 't'
+  char conv = 0;
+  bool not_in = false;
+  bool set[256] = {};
+};
+constexpr bool read_spec(std::string_view fmt, std::size_t& at, Spec& sp, const char** why) {
+  auto fail = [&](const char* w) {
+    if (why) *why = w;
+    return false;
+  };
+  if (at < fmt.size() && fmt[at] == '*') sp.suppress = true, ++at;
+  if (at < fmt.size() && (fmt[at] == '\'' || fmt[at] == 'I' || fmt[at] == '*')) return fail("a flag that is not supported (only * - read, not given)");
+  int width = 0;
+  bool has_width = false;
+  while (at < fmt.size() && digit(fmt[at])) {
+    width = width * 10 + (fmt[at++] - '0');
+    has_width = true;
+    if (width > 1 << 20) return fail("a width of more than 2^20");
+  }
+  if (at < fmt.size() && fmt[at] == '$') return fail("a value by its number ($) is not supported");
+  sp.width = has_width && width > 0 ? width : -1;
+  if (at < fmt.size()) {
+    const char m = fmt[at];
+    if (m == 'h' || m == 'l') {
+      sp.size = m;
+      ++at;
+      if (at < fmt.size() && fmt[at] == m) sp.size = m == 'h' ? 'H' : 'q', ++at;
+    } else if (m == 'q' || m == 'L') sp.size = m == 'L' ? 'L' : 'q', ++at;
+    else if (m == 'j' || m == 'z' || m == 't') sp.size = m, ++at;
+    else if (m == 'm') return fail("a word sscanf makes room for itself (%m) is not supported");
+  }
+  if (at >= fmt.size()) return fail("the format ends inside a conversion (a % without its letter)");
+  sp.conv = fmt[at++];
+  switch (sp.conv) {
+    case 'd': case 'i': case 'u': case 'o': case 'x': case 'X': case 'b': case 'n':
+      if (sp.size == 'L') sp.size = 'q';  // (glibc: L of a whole number is ll)
+      return true;
+    case 'e': case 'E': case 'f': case 'F': case 'g': case 'G': case 'a': case 'A':
+      if (sp.size == 'L' || sp.size == 'q') return fail("a long double (%Lf) is not supported: a Float is a double");
+      if (sp.size != 0 && sp.size != 'l') return fail("a number of a size that is no float or double");
+      return true;
+    case 's':
+      if (sp.size != 0) return fail("a word of wide characters (%ls) is not supported");
+      return true;
+    case '%':
+      return true;
+    case '[': {
+      if (sp.size != 0) return fail("a word of wide characters (%l[) is not supported");
+      if (at < fmt.size() && fmt[at] == '^') sp.not_in = true, ++at;
+      if (at < fmt.size() && (fmt[at] == ']' || fmt[at] == '-')) sp.set[static_cast<unsigned char>(fmt[at])] = true, ++at;
+      char fc = 0;
+      bool closed = false;
+      while (at < fmt.size()) {
+        fc = fmt[at++];
+        if (fc == ']') {
+          closed = true;
+          break;
+        }
+        if (fc == '-' && at < fmt.size() && fmt[at] != ']' && static_cast<unsigned char>(fmt[at - 2]) <= static_cast<unsigned char>(fmt[at])) {
+          for (int k = static_cast<unsigned char>(fmt[at - 2]); k < static_cast<unsigned char>(fmt[at]); ++k) sp.set[k] = true;
+        } else {
+          sp.set[static_cast<unsigned char>(fc)] = true;
+        }
+      }
+      if (!closed) return fail("a set of characters without its ] (%[...])");
+      return true;
+    }
+    case 'c': return fail("%c is not supported (its characters have no end): read a word with %s or %[...]");
+    default: return fail("a conversion that is not supported (d i u o x X b f F e E g G a A s [ n %)");
+  }
+}
+/// The kind of what a conversion gives (it gives none: suppressed, or %%).
+constexpr bool gives(const Spec& sp) { return !sp.suppress && sp.conv != '%'; }
+constexpr Kind kind_of(const Spec& sp) {
+  switch (sp.conv) {
+    case 'e': case 'E': case 'f': case 'F': case 'g': case 'G': case 'a': case 'A': return Kind::number;
+    case 's': case '[': return Kind::text;
+    case 'n': return sp.size == 'l' || sp.size == 'q' || sp.size == 'j' || sp.size == 'z' || sp.size == 't' ? Kind::whole64 : Kind::whole;
+    default: return sp.size == 'l' || sp.size == 'q' || sp.size == 'j' || sp.size == 'z' || sp.size == 't' ? Kind::whole64 : Kind::whole;
+  }
+}
+/// The kinds of the values a format gives, in their order. False: the format is none - `why` says.
+struct Plan {
+  std::size_t count = 0;
+  Kind kinds[kMostSlots] = {};
+};
+constexpr bool plan(std::string_view fmt, Plan* out, const char** why) {
+  Plan p;
+  for (std::size_t at = 0; at < fmt.size();) {
+    if (fmt[at++] != '%') continue;
+    Spec sp;
+    if (!read_spec(fmt, at, sp, why)) return false;
+    if (!gives(sp)) continue;
+    if (p.count == kMostSlots) {
+      if (why) *why = "more than 16 values";
+      return false;
+    }
+    p.kinds[p.count++] = kind_of(sp);
+  }
+  if (out) *out = p;
+  return true;
+}
+/// The value a whole number is stored as by a conversion of this size: C's cast of the long sscanf read.
+inline void store_whole(Slot& slot, const Spec& sp, u64 v, bool is_signed) {
+  slot.written = true;
+  if (kind_of(sp) == Kind::whole64) {
+    slot.bits = v;
+    return;
+  }
+  if (sp.size == 'H') slot.whole = is_signed ? static_cast<i64>(static_cast<i8>(v)) : static_cast<i64>(static_cast<u8>(v));
+  else if (sp.size == 'h') slot.whole = is_signed ? static_cast<i64>(static_cast<i16>(v)) : static_cast<i64>(static_cast<u16>(v));
+  else slot.whole = is_signed ? static_cast<i64>(static_cast<i32>(static_cast<u32>(v))) : static_cast<i64>(static_cast<u32>(v));
+}
+/// sscanf(input, fmt, ...): the count it gives (-1: EOF - the input ended before the first value was
+/// read), the slots of the values it read written. `slots`: one for each value the format gives
+/// (plan), holding what was there before.
+inline i64 run(std::string_view in, std::string_view fmt, Slot* slots, std::size_t count) {
+  std::size_t pos = 0;
+  auto inchar = [&]() -> int { return pos < in.size() ? static_cast<unsigned char>(in[pos++]) : kEnd; };
+  auto unget = [&](int c) {
+    if (c != kEnd) --pos;
+  };
+  i64 done = 0;
+  std::size_t slot = 0;
+  bool skip_space = false;
+  bool input_error = false;
+  std::string buf;  // (the characters of a number, as glibc gathers them)
+  for (std::size_t f = 0; f < fmt.size();) {
+    const char fc = fmt[f++];
+    int c = 0;
+    if (fc != '%') {
+      if (space(static_cast<unsigned char>(fc))) {
+        skip_space = true;
+        continue;
+      }
+      c = inchar();
+      if (c == kEnd) {
+        input_error = true;
+        break;
+      }
+      if (skip_space) {
+        while (space(c)) {
+          c = inchar();
+          if (c == kEnd) break;
+        }
+        if (c == kEnd) {
+          input_error = true;
+          break;
+        }
+        skip_space = false;
+      }
+      if (c != static_cast<unsigned char>(fc)) {
+        unget(c);
+        break;
+      }
+      continue;
+    }
+    Spec sp;
+    if (!read_spec(fmt, f, sp, nullptr)) break;  // (a format that is none: what came before it - the check reports it)
+    if (skip_space || (sp.conv != '[' && sp.conv != 'n')) {
+      do c = inchar();
+      while (space(c));
+      unget(c);
+      skip_space = false;
+    }
+    Slot* out = gives(sp) && slot < count ? &slots[slot] : nullptr;
+    if (gives(sp)) ++slot;
+    int width = sp.width;
+    bool failed = false;
+    switch (sp.conv) {
+      case '%':
+        c = inchar();
+        if (c == kEnd) input_error = true;
+        else if (c != '%') unget(c), failed = true;
+        break;
+      case 'n':
+        if (out) store_whole(*out, sp, static_cast<u64>(pos), true);
+        break;
+      case 's': {
+        c = inchar();
+        if (c == kEnd) {
+          input_error = true;
+          break;
+        }
+        std::string word;
+        do {
+          if (space(c)) {
+            unget(c);
+            break;
+          }
+          word.push_back(static_cast<char>(c));
+        } while ((width <= 0 || --width > 0) && (c = inchar()) != kEnd);
+        if (out) out->text = std::move(word), out->written = true, ++done;
+        break;
+      }
+      case '[': {
+        if (width < 0) width = std::numeric_limits<int>::max();
+        c = inchar();
+        if (c == kEnd) {
+          input_error = true;
+          break;
+        }
+        std::string word;
+        do {
+          if (sp.set[c] == sp.not_in) {
+            unget(c);
+            break;
+          }
+          word.push_back(static_cast<char>(c));
+        } while (--width > 0 && (c = inchar()) != kEnd);
+        if (word.empty()) {
+          failed = true;
+          break;
+        }
+        if (out) out->text = std::move(word), out->written = true, ++done;
+        break;
+      }
+      case 'd': case 'i': case 'u': case 'o': case 'x': case 'X': case 'b': {
+        int base = sp.conv == 'd' || sp.conv == 'u' ? 10 : sp.conv == 'i' ? 0 : sp.conv == 'o' ? 8 : sp.conv == 'b' ? 2 : 16;
+        const bool is_signed = sp.conv == 'd' || sp.conv == 'i';
+        buf.clear();
+        c = inchar();
+        if (c == kEnd) {
+          input_error = true;
+          break;
+        }
+        if (c == '-' || c == '+') {
+          buf.push_back(static_cast<char>(c));
+          if (width > 0) --width;
+          c = inchar();
+        }
+        if (width != 0 && c == '0') {
+          if (width > 0) --width;
+          buf.push_back('0');
+          c = inchar();
+          if (width != 0 && lower(c) == 'x') {
+            if (base == 0) base = 16;
+            if (base == 16) {
+              if (width > 0) --width;
+              c = inchar();
+            }
+          } else if (width != 0 && lower(c) == 'b') {
+            if (base == 0) base = 2;
+            if (base == 2) {
+              if (width > 0) --width;
+              c = inchar();
+            }
+          } else if (base == 0) {
+            base = 8;
+          }
+        }
+        if (base == 0) base = 10;
+        while (c != kEnd && width != 0) {
+          if (base == 16 ? !xdigit(c) : !digit(c) || c - '0' >= base) break;
+          buf.push_back(static_cast<char>(c));
+          if (width > 0) --width;
+          c = inchar();
+        }
+        unget(c);
+        if (buf.empty() || (buf.size() == 1 && (buf[0] == '+' || buf[0] == '-'))) {
+          failed = true;
+          break;
+        }
+        const Whole w = whole(buf, base, is_signed);
+        if (w.end == 0) {
+          failed = true;
+          break;
+        }
+        if (out) store_whole(*out, sp, w.bits, is_signed), ++done;
+        break;
+      }
+      case 'e': case 'E': case 'f': case 'F': case 'g': case 'G': case 'a': case 'A': {
+        buf.clear();
+        c = inchar();
+        if (width > 0) --width;
+        if (c == kEnd) {
+          input_error = true;
+          break;
+        }
+        bool got_digit = false, got_dot = false, got_e = false, got_sign = false, hexa = false;
+        // (read the next character into c; false: the conversion fails)
+        auto next = [&](char want) {
+          if (width == 0 || (c = inchar()) == kEnd || lower(c) != want) return false;
+          if (width > 0) --width;
+          buf.push_back(static_cast<char>(c));
+          return true;
+        };
+        if (c == '-' || c == '+') {
+          got_sign = true;
+          buf.push_back(static_cast<char>(c));
+          if (width == 0 || (c = inchar()) == kEnd) {
+            failed = true;
+            break;
+          }
+          if (width > 0) --width;
+        }
+        bool special = false;
+        if (lower(c) == 'n') {
+          buf.push_back(static_cast<char>(c));
+          if (!next('a') || !next('n')) {
+            failed = true;
+            break;
+          }
+          special = true;
+        } else if (lower(c) == 'i') {
+          buf.push_back(static_cast<char>(c));
+          if (!next('n') || !next('f')) {
+            failed = true;
+            break;
+          }
+          if (width != 0 && (c = inchar()) != kEnd) {
+            if (lower(c) == 'i') {
+              if (width > 0) --width;
+              buf.push_back(static_cast<char>(c));
+              if (!next('n') || !next('i') || !next('t') || !next('y')) {
+                failed = true;
+                break;
+              }
+            } else {
+              unget(c);
+            }
+          }
+          special = true;
+        }
+        if (!special) {
+          char exp_char = 'e';
+          if (width != 0 && c == '0') {
+            buf.push_back('0');
+            c = inchar();
+            if (width > 0) --width;
+            if (width != 0 && lower(c) == 'x') {
+              buf.push_back(static_cast<char>(c));
+              hexa = true;
+              exp_char = 'p';
+              c = inchar();
+              if (width > 0) --width;
+            } else {
+              got_digit = true;
+            }
+          }
+          while (true) {
+            if (digit(c)) {
+              buf.push_back(static_cast<char>(c));
+              got_digit = true;
+            } else if (!got_e && hexa && xdigit(c)) {
+              buf.push_back(static_cast<char>(c));
+              got_digit = true;
+            } else if (got_e && !buf.empty() && buf.back() == exp_char && (c == '-' || c == '+')) {
+              buf.push_back(static_cast<char>(c));
+            } else if (got_digit && !got_e && lower(c) == exp_char) {
+              buf.push_back(exp_char);
+              got_e = got_dot = true;
+            } else if (!got_dot && c == '.') {
+              buf.push_back('.');
+              got_dot = true;
+            } else {
+              unget(c);
+              break;
+            }
+            if (width == 0 || (c = inchar()) == kEnd) break;
+            if (width > 0) --width;
+          }
+          if (buf.size() == (got_sign ? 1u : 0u) || (hexa && buf.size() == (got_sign ? 3u : 2u))) {
+            failed = true;
+            break;
+          }
+        }
+        const bool single = sp.size != 'l';
+        const Real got = real(buf, single);
+        if (got.end == 0) {
+          failed = true;
+          break;
+        }
+        if (out) out->number = got.value, out->written = true, ++done;
+        break;
+      }
+      default: failed = true; break;
+    }
+    if (input_error || failed) break;
+  }
+  if (input_error && done == 0) return -1;
+  return done;
+}
+}  // namespace scan
+
 namespace enums {
 /// `index` when it is the place of one of `count` values, else 0 (the first value).
 constexpr i64 valid(std::size_t count, i64 index) { return index >= 0 && static_cast<u64>(index) < count ? index : 0; }
@@ -1666,6 +2279,56 @@ struct PureNodes {
   static Int text_code_at(Text a, Int index) { return index >= 0 && static_cast<u64>(index) < a.size() ? static_cast<i64>(static_cast<u8>(a[static_cast<std::size_t>(index)])) : 0; }
   /// A text of one byte: the code cut to 8 bits, as a char holds it.
   static Text text_of_code(Int code) { return Text(1, static_cast<char>(static_cast<u8>(code))); }
+  // (what std::string and std::string_view do - texts, nodes.h: a place is an Int, npos -1)
+  static Int text_find(Text a, Text b, Int from) { return texts::find(a, b, from); }
+  static Int text_rfind(Text a, Text b, Int from) { return texts::rfind(a, b, from); }
+  static Int text_find_first_of(Text a, Text b, Int from) { return texts::find_first_of(a, b, from); }
+  static Int text_find_last_of(Text a, Text b, Int from) { return texts::find_last_of(a, b, from); }
+  static Int text_find_first_not_of(Text a, Text b, Int from) { return texts::find_first_not_of(a, b, from); }
+  static Int text_find_last_not_of(Text a, Text b, Int from) { return texts::find_last_not_of(a, b, from); }
+  static Text text_sub(Text a, Int at, Int count) { return Text(texts::sub(a, at, count)); }
+  static Bool text_starts_with(Text a, Text b) { return std::string_view(a).starts_with(b); }
+  static Bool text_ends_with(Text a, Text b) { return std::string_view(a).ends_with(b); }
+  /// a < b, byte for byte as unsigned chars (std::string's order).
+  static Bool text_less(Text a, Text b) { return a < b; }
+  static Text text_insert(Text a, Int at, Text b) {
+    texts::insert(a, at, b);
+    return a;
+  }
+  static Text text_erase(Text a, Int at, Int count) {
+    texts::erase(a, at, count);
+    return a;
+  }
+  static Text text_replace(Text a, Int at, Int count, Text b) {
+    texts::replace(a, at, count, b);
+    return a;
+  }
+  // (numbers read from a text at a place, as C reads them there - scan, nodes.h: the value and the place
+  // just after what was read; nothing read: the place itself, as C's end pointer is the one it was given)
+  struct ParsedFloat {
+    Float value = 0;
+    Int end = 0;
+  };
+  struct ParsedWhole {
+    Int64 value{};
+    Int end = 0;
+  };
+  static ParsedFloat text_parse_float(Text a, Int at) {
+    const scan::Real r = scan::real(scan::c_string(a, at), false);
+    return {r.value, at + static_cast<i64>(r.end)};
+  }
+  static ParsedFloat text_parse_float32(Text a, Int at) {
+    const scan::Real r = scan::real(scan::c_string(a, at), true);
+    return {r.value, at + static_cast<i64>(r.end)};
+  }
+  static ParsedWhole text_parse_int(Text a, Int at, Int base) {
+    const scan::Whole r = scan::whole(scan::c_string(a, at), base < 0 || base > 36 ? -1 : static_cast<int>(base), true);
+    return {Int64(r.bits), at + static_cast<i64>(r.end)};
+  }
+  static ParsedWhole text_parse_uint(Text a, Int at, Int base) {
+    const scan::Whole r = scan::whole(scan::c_string(a, at), base < 0 || base > 36 ? -1 : static_cast<int>(base), false);
+    return {Int64(r.bits), at + static_cast<i64>(r.end)};
+  }
 };
 
 /// The flow nodes that keep something between runs. `m`: the node's memory, four numbers (the

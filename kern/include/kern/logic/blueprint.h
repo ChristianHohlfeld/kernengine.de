@@ -419,6 +419,144 @@ struct BlueprintCore : logic::PureNodes {
     return index >= 0 && static_cast<u64>(index) < v.size() ? static_cast<i64>(static_cast<u8>(v[static_cast<std::size_t>(static_cast<i64>(index))])) : 0;
   }
   static Text text_of_code(Int code) { return std::string(1, static_cast<char>(static_cast<u8>(static_cast<i64>(code)))); }
+  // (what std::string and std::string_view do, on the characters where they are - logic::texts)
+  static Int text_find(const Text& a, const Text& b, Int from) { return logic::texts::find(a.view(), b.view(), from); }
+  static Int text_rfind(const Text& a, const Text& b, Int from) { return logic::texts::rfind(a.view(), b.view(), from); }
+  static Int text_find_first_of(const Text& a, const Text& b, Int from) { return logic::texts::find_first_of(a.view(), b.view(), from); }
+  static Int text_find_last_of(const Text& a, const Text& b, Int from) { return logic::texts::find_last_of(a.view(), b.view(), from); }
+  static Int text_find_first_not_of(const Text& a, const Text& b, Int from) { return logic::texts::find_first_not_of(a.view(), b.view(), from); }
+  static Int text_find_last_not_of(const Text& a, const Text& b, Int from) { return logic::texts::find_last_not_of(a.view(), b.view(), from); }
+  /// (a part of a text is a text of its own: its characters are copied, as std::string::substr copies them)
+  static Text text_sub(const Text& a, Int at, Int count) { return Text(logic::texts::sub(a.view(), at, count)); }
+  static Bool text_starts_with(const Text& a, const Text& b) { return a.view().starts_with(b.view()); }
+  static Bool text_ends_with(const Text& a, const Text& b) { return a.view().ends_with(b.view()); }
+  static Bool text_less(const Text& a, const Text& b) { return a.view() < b.view(); }
+  /// (Insert, Erase, Replace change the text they are handed - one handed on with std::move is changed
+  /// where it is, as std::string::insert changes it: no copy)
+  static Text text_insert(Text a, Int at, const Text& b) {
+    std::string t = std::move(a).str();
+    logic::texts::insert(t, at, b.view());
+    return t;
+  }
+  static Text text_erase(Text a, Int at, Int count) {
+    std::string t = std::move(a).str();
+    logic::texts::erase(t, at, count);
+    return t;
+  }
+  static Text text_replace(Text a, Int at, Int count, const Text& b) {
+    std::string t = std::move(a).str();
+    logic::texts::replace(t, at, count, b.view());
+    return t;
+  }
+  /// Parse Float, Parse Int: the number at a place of a text as C reads it there (logic::scan).
+  struct ParsedFloat {
+    Float value = 0.0;
+    Int end = 0;
+  };
+  struct ParsedWhole {
+    Int64 value{};
+    Int end = 0;
+  };
+  static ParsedFloat text_parse_float(const Text& a, Int at) {
+    const logic::scan::Real r = logic::scan::real(logic::scan::c_string(a.view(), at), false);
+    return {r.value, static_cast<i64>(at) + static_cast<i64>(r.end)};
+  }
+  static ParsedFloat text_parse_float32(const Text& a, Int at) {
+    const logic::scan::Real r = logic::scan::real(logic::scan::c_string(a.view(), at), true);
+    return {r.value, static_cast<i64>(at) + static_cast<i64>(r.end)};
+  }
+  static ParsedWhole text_parse_int(const Text& a, Int at, Int base) {
+    const logic::scan::Whole r = logic::scan::whole(logic::scan::c_string(a.view(), at), base < 0 || base > 36 ? -1 : static_cast<int>(static_cast<i64>(base)), true);
+    return {Int64(r.bits), static_cast<i64>(at) + static_cast<i64>(r.end)};
+  }
+  static ParsedWhole text_parse_uint(const Text& a, Int at, Int base) {
+    const logic::scan::Whole r = logic::scan::whole(logic::scan::c_string(a.view(), at), base < 0 || base > 36 ? -1 : static_cast<int>(static_cast<i64>(base)), false);
+    return {Int64(r.bits), static_cast<i64>(at) + static_cast<i64>(r.end)};
+  }
+  /// Scan Text: text_scan<"%f %f">(text, at, x, y) - what sscanf reads (logic::scan): .count, and .v0, .v1 ...
+  /// a value for each conversion, of the type the format says (Before: what stays where the scan does not
+  /// reach). A format without values gives the count alone.
+  struct NoScanned {};
+  template <logic::scan::Kind K>
+  using Scanned = std::conditional_t<K == logic::scan::Kind::whole, Int,
+                                     std::conditional_t<K == logic::scan::Kind::whole64, Int64, std::conditional_t<K == logic::scan::Kind::number, Float, Text>>>;
+  template <class T0 = NoScanned, class T1 = NoScanned, class T2 = NoScanned, class T3 = NoScanned, class T4 = NoScanned, class T5 = NoScanned, class T6 = NoScanned,
+            class T7 = NoScanned, class T8 = NoScanned, class T9 = NoScanned, class T10 = NoScanned, class T11 = NoScanned, class T12 = NoScanned, class T13 = NoScanned,
+            class T14 = NoScanned, class T15 = NoScanned>
+  struct ScanResult {
+    Int count = 0;
+    T0 v0{};
+    T1 v1{};
+    T2 v2{};
+    T3 v3{};
+    T4 v4{};
+    T5 v5{};
+    T6 v6{};
+    T7 v7{};
+    T8 v8{};
+    T9 v9{};
+    T10 v10{};
+    T11 v11{};
+    T12 v12{};
+    T13 v13{};
+    T14 v14{};
+    T15 v15{};
+  };
+  template <std::size_t K, class R> static auto& scan_value(R& r) {
+    if constexpr (K == 0) return r.v0;
+    else if constexpr (K == 1) return r.v1;
+    else if constexpr (K == 2) return r.v2;
+    else if constexpr (K == 3) return r.v3;
+    else if constexpr (K == 4) return r.v4;
+    else if constexpr (K == 5) return r.v5;
+    else if constexpr (K == 6) return r.v6;
+    else if constexpr (K == 7) return r.v7;
+    else if constexpr (K == 8) return r.v8;
+    else if constexpr (K == 9) return r.v9;
+    else if constexpr (K == 10) return r.v10;
+    else if constexpr (K == 11) return r.v11;
+    else if constexpr (K == 12) return r.v12;
+    else if constexpr (K == 13) return r.v13;
+    else if constexpr (K == 14) return r.v14;
+    else return r.v15;
+  }
+  template <Setting Format> static constexpr logic::scan::Plan scan_plan() {
+    logic::scan::Plan p;
+    if (!logic::scan::plan(Format.view(), &p, nullptr)) p = {};
+    return p;
+  }
+  /// (what a conversion had before, into its slot; a text stays where it is - the result takes it from there
+  /// when the scan does not write it)
+  template <logic::scan::Kind K, class V> static void scan_before(logic::scan::Slot& s, const V& v) {
+    s.kind = K;
+    if constexpr (K == logic::scan::Kind::whole) s.whole = static_cast<i64>(Int(v));
+    else if constexpr (K == logic::scan::Kind::whole64) s.bits = Int64(v).bits;
+    else if constexpr (K == logic::scan::Kind::number) s.number = static_cast<f64>(Float(v));
+  }
+  template <logic::scan::Kind K, class V> static Scanned<K> scan_after(logic::scan::Slot& s, const V& before) {
+    if constexpr (K == logic::scan::Kind::whole) return Int(s.whole);
+    else if constexpr (K == logic::scan::Kind::whole64) return Int64(s.bits);
+    else if constexpr (K == logic::scan::Kind::number) return Float(s.number);
+    else return s.written ? Text(std::move(s.text)) : Text(before);
+  }
+  template <Setting Format, class... V, std::size_t... I> static auto text_scan_of(const Text& a, Int at, std::index_sequence<I...>, const V&... before) {
+    static constexpr logic::scan::Plan kPlan = scan_plan<Format>();
+    static_assert(kPlan.count == sizeof...(V), "Scan Text: a value before for each value of the format");
+    logic::scan::Slot slots[sizeof...(V) + 1];
+    (scan_before<kPlan.kinds[I]>(slots[I], before), ...);
+    const i64 count = logic::scan::run(logic::scan::c_string(a.view(), at), Format.view(), slots, sizeof...(V));
+    if constexpr (sizeof...(V) == 0) {
+      return Int(count);
+    } else {
+      ScanResult<Scanned<kPlan.kinds[I]>...> r;
+      r.count = count;
+      ((scan_value<I>(r) = scan_after<kPlan.kinds[I]>(slots[I], before)), ...);
+      return r;
+    }
+  }
+  template <Setting Format, class... V> static auto text_scan(const Text& a, Int at, const V&... before) {
+    return text_scan_of<Format>(a, at, std::index_sequence_for<V...>{}, before...);
+  }
   /// Format Text: text_format<"%02d:%06.3f">(most, minutes, seconds) - the values in the order of
   /// the format's conversions (logic::format).
   template <Setting Format, class... V> static Text text_format(Int most, const V&... values) {

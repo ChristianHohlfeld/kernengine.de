@@ -3382,6 +3382,34 @@ TEST(logic_tier_cases_interpreter) {
       std::snprintf(want, sizeof want, "%02d:%06.3f|%s|%5.1f|%x|%c|100%%%s", 1, 1.0, "", 1.0, 1, 65, "abc");
       CHECK(inst->get("Shown").as_text() == want);
     }
+    if (std::string(c.name) == "text_scan") {
+      // what std::string and the C library give for the same texts
+      const std::string hello = "hello world";
+      float f = 0;
+      long long q = 0;
+      char word[32] = "x", rest[96] = "y";
+      const int n = std::sscanf(" 2.5 -7 word rest of it", "%f %lld %31s %95[^\n]", &f, &q, word, rest);
+      int five = 5;
+      const int none = std::sscanf("", "x%d", &five);
+      char* end = nullptr;
+      const char* number = "x 1e-3y";
+      const double d = std::strtod(number + 1, &end);
+      std::string replaced = hello;
+      replaced.replace(0, 5, "HELLO");
+      std::string inserted = "ac";
+      inserted.insert(1, "b");
+      std::string erased = "settings reset";
+      erased.erase(8);
+      char want[512];
+      std::snprintf(want, sizeof want, "%d|%d|%d|%d|%d|%d|%d|%s|%s|%s|%s|%.17g|%d|%.9g|%d %.9g %d %s|%s|%d|%d", static_cast<int>(hello.find("o", 5)), static_cast<int>(hello.rfind("o")),
+                    static_cast<int>(std::string("key=value;x").find_first_of("=;", 4)), static_cast<int>(std::string("trim   ").find_last_not_of(" ")),
+                    static_cast<int>(std::strtoll("  -0x1Fz", nullptr, 0)), static_cast<int>(std::string("a/b/c").find_last_of("/", 2)),
+                    static_cast<int>(std::string("  x").find_first_not_of(" ")), hello.substr(6).c_str(), replaced.c_str(), inserted.c_str(), erased.c_str(), d,
+                    static_cast<int>(end - number), static_cast<double>(std::strtof("0.1", nullptr)), n, static_cast<double>(f), static_cast<int>(q), word, rest,
+                    static_cast<int>(static_cast<u32>(std::strtoull("-1", nullptr, 10))), none);
+      if (inst->get("Shown").as_text() != want) std::printf("text_scan: %s\n    want: %s\n", inst->get("Shown").as_text().c_str(), want);
+      CHECK(inst->get("Shown").as_text() == want);
+    }
     if (std::string(c.name) == "while_nested") {
       CHECK(inst->get("I").as_int() == 7);
       CHECK(inst->get("Total").as_number() == 6.0 * (1 + 2 + 3 + 4 + 5 + 6 + 7));
