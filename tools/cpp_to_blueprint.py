@@ -4272,6 +4272,11 @@ class Emit:
         if k == "DeclRefExpr" and b.get("referencedDecl", {}).get("id") in self.text_ptrs:
             text, at = self.c_text(b)
             return f"text_sub({text}, {at}, -1)", "Text"
+        if k in CAST and kids(b) and self.is64(b):
+            # a whole number C read as a 64-bit pattern (an i64, a u64): its 64 bits, as C gives them
+            inner = self.unwrap(kids(b)[-1])
+            if inner.get("kind") == "CallExpr" and callee_name(inner) in C_PARSE and C_PARSE[callee_name(inner)][0] in ("long", "unsigned") and not self.own(callee(inner).get("referencedDecl", {}).get("id")):
+                return self.parsed(inner, callee_name(inner), kids(inner)[1:], bits=True)
         if k in CAST and kids(b) and self.ctype(b) in NARROW_WHOLE:
             # a whole number C read cut to 32 bits or less: of its 64 bits (exact, as C cuts them)
             inner = self.unwrap(kids(b)[-1])
@@ -7045,6 +7050,8 @@ class Emit:
         if k == "ConditionalOperator":
             c, x, y = kids(b)
             t = self.tp(b)
+            if re.fullmatch(r"(?:const\s+)?char\s*\[\d+\]", self.u.clean(qtype(b)).strip()):
+                t = "Text"   # (c ? "EIN" : "AUS" - two texts written out of one length: a text, as each of them)
             if t is None:
                 raise Wait("a choice between nothing")
             cond = self.bx(c)
