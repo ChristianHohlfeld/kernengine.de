@@ -85,14 +85,13 @@ void Game::handle_shots() {
   std::vector<kern::game::ShotEvent>& shots = world_->shots();
   // gameplay_final_runtime_v2.mjs sniperShotAt atArrival: what the .50 round does at the far end lands
   // when the bullet gets there (distance / SNIPER_TRACER_MPS 850 m/s); the rest acts at once
-  std::vector<kern::game::ShotEvent*> work;
   std::vector<kern::game::ShotEvent> arrived;
   gaps_sniper_rounds(shots, arrived, now);
-  for (kern::game::ShotEvent& s : shots)
-    if (s.shooter == soldier_ && !(mode_ == Mode::foot && foot_weapon_ == weapons::Id::sniper)) work.push_back(&s);
-  for (kern::game::ShotEvent& s : arrived) work.push_back(&s);
-  for (kern::game::ShotEvent* sp : work) {
-    kern::game::ShotEvent& s = *sp;
+  // the player's shots (their places in `shots`, picked before any is handled), then the rounds that arrived
+  std::vector<std::size_t> ours;
+  for (std::size_t i = 0; i < shots.size(); ++i)
+    if (shots[i].shooter == soldier_ && !(mode_ == Mode::foot && foot_weapon_ == weapons::Id::sniper)) ours.push_back(i);
+  auto handle = [&](kern::game::ShotEvent& s) {
     // Shots are heard: people close by run (pedestrian_agents.mjs: 10 m all, to 22 m some).
     people_.frighten(s.from, 22, now, 1);
     Vec3 to = s.to;
@@ -119,8 +118,8 @@ void Game::handle_shots() {
         break;
       }
     }
-    if (drone_hit) continue;
-    if (combat_shot(s)) continue;  // helicopter, tank, flak (game_military.cpp)
+    if (drone_hit) return;
+    if (combat_shot(s)) return;  // helicopter, tank, flak (game_military.cpp)
     const f32 damage = static_cast<f32>(world_->level().find(soldier_) && world_->level().find(soldier_)->weapon ? world_->level().find(soldier_)->weapon->damage : 30);
     i32 person = -1;
     if (hit_remotes(s.from, to, damage) || (person = people_.shot(s.from, to, damage, true, now)) >= 0 || life_shot(s.from, to, damage)) {  // life_shot: cows, birds, joggers (M3 life)
@@ -140,7 +139,7 @@ void Game::handle_shots() {
       s.to = to;
       s.surface = 3;  // flesh: no decal
       s.impact = true;
-      continue;
+      return;
     }
     if (s.impact && s.surface != 2) world_bullet(s.to);  // the world: a window pane may crack
     if (s.surface == 2 && s.impact) {
@@ -157,7 +156,9 @@ void Game::handle_shots() {
         }
       }
     }
-  }
+  };
+  for (std::size_t i : ours) handle(shots[i]);
+  for (kern::game::ShotEvent& s : arrived) handle(s);
 }
 
 // ---------------------------------------------------------------------------------------------

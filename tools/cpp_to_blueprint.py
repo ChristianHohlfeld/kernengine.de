@@ -3144,6 +3144,13 @@ class Emit:
                 continue
             if k == "BinaryOperator" and x.get("opcode") not in ("=", ","):
                 continue
+            if k == "CXXOperatorCallExpr" and len(kids(x)) >= 2:
+                # (an entry of a list - v[i] makes nothing, unlike a map's m[key] -, what an owned value holds: *p, p->)
+                base = self.u.clean(self.ctype(kids(x)[1]))
+                if callee_name(x) == "operator[]" and len(kids(x)) == 3 and re.match(r"(?:const\s+)?std::(?:vector|array)<", base):
+                    continue
+                if callee_name(x) in ("operator*", "operator->") and len(kids(x)) == 2 and self.is_box(kids(x)[1]):
+                    continue
             return False
         return True
 
@@ -6985,18 +6992,8 @@ class Emit:
             if op == ">>":
                 return f"kern::math::shr({self.fx(x, leaves)}, {self.fx(y, leaves)})"
             if op == "<<":
-                if self.ctype(b) in WIDE_UNSIGNED:
-                    # an unsigned 64-bit number shifted up: within what a Blueprint holds only when the bits it has
-                    # and the shift stay below 53 together - otherwise it is a bit pattern (a key, a hash)
-                    inner = self.unwrap(x)
-                    while inner.get("kind") in CAST and kids(inner) and self.ctype(inner) in WIDE_UNSIGNED and self.ctype(kids(inner)[-1]) in WIDE_UNSIGNED:
-                        inner = self.unwrap(kids(inner)[-1])
-                    has = {"unsigned int": 32, "unsigned short": 16, "unsigned char": 8, "bool": 1}.get(self.ctype(kids(inner)[-1]) if inner.get("kind") in CAST and kids(inner) else "", 64)
-                    by = bare(y)
-                    while by.get("kind") in CAST and kids(by):
-                        by = bare(kids(by)[-1])
-                    if by.get("kind") != "IntegerLiteral" or has + int(by["value"]) > 53:
-                        raise Wait("a 64-bit whole number that wraps around or is shifted (a Blueprint's are exact up to 2^53)")
+                if self.ctype(b) in WIDE_UNSIGNED and not self.shift_fits(b):
+                    raise Wait("a 64-bit whole number that wraps around or is shifted (a Blueprint's are exact up to 2^53)")
                 shifted = f"kern::math::shl({self.fx(x, leaves)}, {self.fx(y, leaves)})"
                 if self.ctype(b) in ("long", "long long") or self.ctype(b) in WIDE_UNSIGNED:
                     return shifted   # (a 64-bit number: what is shifted stays whole while it is below 2^53)
@@ -7111,9 +7108,26 @@ class Emit:
     def whole64(self):
         return "Int64"
 
+    def shift_fits(self, b):
+        """An unsigned 64-bit number shifted up (x << y): is it within what a Blueprint's numbers hold exactly -
+        the bits it has and the shift, a number written out, below 53 together? Otherwise it is a bit pattern
+        (a key, a hash, a mask 1ull << k)."""
+        x, y = kids(b)
+        inner = self.unwrap(x)
+        while inner.get("kind") in CAST and kids(inner) and self.ctype(inner) in WIDE_UNSIGNED and self.ctype(kids(inner)[-1]) in WIDE_UNSIGNED:
+            inner = self.unwrap(kids(inner)[-1])
+        has = {"unsigned int": 32, "unsigned short": 16, "unsigned char": 8, "bool": 1}.get(self.ctype(kids(inner)[-1]) if inner.get("kind") in CAST and kids(inner) else "", 64)
+        if inner.get("kind") == "IntegerLiteral":
+            has = max(1, int(inner["value"]).bit_length())   # (a number written out has the bits it is written with)
+        by = bare(y)
+        while by.get("kind") in CAST and kids(by):
+            by = bare(kids(by)[-1])
+        return by.get("kind") == "IntegerLiteral" and has + int(by["value"]) <= 53
+
     def is64(self, n):
         """Is this value a 64-bit bit pattern (a Whole64 in the Blueprint)? Its type's spelling says so; where
-        the compiler's tree has lost the spelling, what it is made of does."""
+        the compiler's tree has lost the spelling, what it is made of does - and an unsigned 64-bit number shifted
+        up past what a Blueprint's numbers hold exactly is one (1ull << k: C++ computes it with 64 bits)."""
         b = bare(n)
         if "_bt" in b:
             return b["_bt"] == "Int64"
@@ -7124,6 +7138,8 @@ class Emit:
             return False
         k, ks = b.get("kind"), kids(b)
         whole = "Int64"
+        if k == "BinaryOperator" and b.get("opcode") == "<<" and c in WIDE_UNSIGNED and len(ks) == 2 and not self.shift_fits(b):
+            return True
         if k == "MemberExpr" or (k == "CXXOperatorCallExpr" and callee_name(b) in ("operator*", "operator[]")):
             return self.tp_or_none(b) == whole   # (a field, a key of a map, what an iterator stands at: as the Blueprint holds it)
         if k == "DeclRefExpr":
