@@ -4108,7 +4108,7 @@ class Emit:
             t = self.ex(base, "Text")
             return self.char_of(t, self.whole_math("-", f"text_length({t})", "1"), qtype(b)), "Int"
         if name == "compare":
-            raise Wait("the value of compare() of a text (C++ says only its sign: compare the texts with == and <)")
+            raise Wait("the value of compare() of a text other than against 0 (C++ says only its sign)")
         return None
 
     # ---- C strings: a text at a place (s.c_str() + k), read as C reads it ----
@@ -4262,6 +4262,17 @@ class Emit:
                 order = (b["opcode"], kids(x)[1], kids(x)[2])
         if k == "CXXOperatorCallExpr" and callee_name(b) in ("operator<", "operator>", "operator<=", "operator>=") and len(kids(b)) == 3:
             order = (callee_name(b)[8:], kids(b)[1], kids(b)[2])
+        if k == "BinaryOperator" and b.get("opcode") in COMPARE and len(kids(b)) == 2:
+            # a.compare(b) against 0: C++ says its sign - the order of the two texts (== and < of them)
+            x, zero = self.unwrap(kids(b)[0]), self.unwrap(kids(b)[1])
+            if (x.get("kind") == "CXXMemberCallExpr" and callee(x).get("name") == "compare" and len(kids(x)) == 2 and kids(callee(x))
+                    and self.tp_or_none(kids(callee(x))[0]) == "Text" and zero.get("kind") == "IntegerLiteral" and int(zero.get("value", "1")) == 0):
+                op = b["opcode"]
+                p, q = self.ex(kids(callee(x))[0], "Text"), self.text_or_char(kids(x)[1])
+                if op in ("==", "!="):
+                    same = f"text_equal({p}, {q})"
+                    return (same if op == "==" else f"logic_not({same})"), "Bool"
+                return {"<": f"text_less({p}, {q})", ">": f"text_less({q}, {p})", "<=": f"logic_not(text_less({q}, {p}))", ">=": f"logic_not(text_less({p}, {q}))"}[op], "Bool"
         if order is not None and self.tp_or_none(order[1]) == "Text" and self.tp_or_none(order[2]) == "Text":
             op, x, y = order
             p, q = self.ex(x, "Text"), self.ex(y, "Text")
