@@ -9983,6 +9983,16 @@ class TestWriter:
             put(d, {"kind": "unnamed", "text": text, "pairs": named})
         for o, text, pair in aliases:
             put(o, {"kind": "alias", "text": text, "pairs": [pair]})
+        # a method declared in its class here whose body another file's test handed on: that it is a member, for
+        # the test that takes these pieces (its class's text holds the declaration) - and of a class this tree does
+        # not have either, the place of the member in the piece of the file that has it
+        for i in sorted(G.kept):
+            d = tree.decl.get(i)
+            if d is not None and d.get("_file") and d.get("_at", (None, None))[1] is not None:
+                put(d, {"kind": "member"})
+        for place in sorted(G.wanted, key=str):
+            if self.pieces.get(place, {}).get("kind") == "member" and self.at(place) is None:
+                out.append(((-1, 0), place, self.pieces[place]))
         # what of the engine the pieces call and hold: the test that takes them has its own stand-ins
         for d in self.engine_called(G).values():
             if d.get("_at", (None, None))[1] is not None:
