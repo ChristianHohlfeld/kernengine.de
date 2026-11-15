@@ -513,6 +513,14 @@ def walk(n):
         yield from walk(c)
 
 
+def uses_this(n):
+    """Does the code use the object of its method (`this`)? Not counted: what a class declared in it has
+    of its own - the members the compiler makes for a lambda's class (a lambda's body stands in the lambda too)."""
+    if n.get("kind") == "CXXThisExpr":
+        return True
+    return any(uses_this(c) for c in kids(n) if c.get("kind") != "CXXRecordDecl")
+
+
 def walk_source(n):
     """The tree as the source has it: where a call of a function that names a place was written out as
     that place (Emit.dissolve), the call - the source calls the function, and so does the test's."""
@@ -2737,7 +2745,8 @@ class Emit:
         self.dissolve(d)   # (a call of a function that names a place: the place)
         # a method: its object is the first parameter - a reference to a value of the struct its class's data is:
         # the place the call names, changed where it stands (a const method reads it there)
-        if d.get("kind") == "CXXMethodDecl" and d.get("storageClass") != "static" and not f.state and any(x.get("kind") == "CXXThisExpr" for x in walk(d)):
+        static = d.get("storageClass") == "static" or self.tree.decl.get(d.get("previousDecl"), {}).get("storageClass") == "static"
+        if d.get("kind") == "CXXMethodDecl" and not static and not f.state and uses_this(d):
             owner = self.tree.owner.get(d["id"])
             if owner is None:
                 raise Wait("the state of its object (its class is not known here)")
@@ -4692,8 +4701,8 @@ class Emit:
             # functions is one for each function it is given; the language has no function values)
             raise Wait("a function value (lambda / std::function) of another shape: a lambda with auto inputs")
         fields = [qtype(c) for c in kids(rec) if c.get("kind") == "FieldDecl"]
-        uses_this = any(x.get("kind") == "CXXThisExpr" for x in walk(body))
-        values = [t for t in fields if not (uses_this and t.rstrip().endswith("*") and "&" not in t)]
+        this_used = uses_this(body)
+        values = [t for t in fields if not (this_used and t.rstrip().endswith("*") and "&" not in t)]
         by_ref = all("&" in t for t in values)
         if not by_ref and any("&" in t for t in values):
             raise Wait("a local function that captures some things by value and others by reference")
@@ -4741,14 +4750,14 @@ class Emit:
         trailing = re.match(r"auto\s*(\(.*\)[^()]*?)\s*->\s*(.+)$", raw_type)
         if trailing:   # (a lambda without its own list of inputs, `[&] { ... }`: its type is spelled "auto () const -> void")
             raw_type = f"{trailing.group(2)} {trailing.group(1)}"
-        if uses_this:
+        if this_used:
             raw_type = re.sub(r"\s*\bconst\s*$", "", raw_type) + (" const" if not self.f.mutates else "")
-        synth = {"id": method["id"], "_mine": True, "kind": "CXXMethodDecl" if uses_this else "FunctionDecl", "name": f"{outer.get('name', 'f')}_{v.get('name', 'local')}",
+        synth = {"id": method["id"], "_mine": True, "kind": "CXXMethodDecl" if this_used else "FunctionDecl", "name": f"{outer.get('name', 'f')}_{v.get('name', 'local')}",
                  "type": {"qualType": raw_type}, "_file": lam.get("_file", ""), "_at": lam.get("_at", (None, None)),
                  "inner": params + [c for c in kids(method) if c.get("kind") == "ParmVarDecl"] + [body]}
         tree.body[method["id"]] = synth
         tree.scope_of[method["id"]] = tree.scope_of.get(outer["id"], "")
-        if uses_this:
+        if this_used:
             tree.owner[method["id"]] = tree.owner.get(outer["id"])
         u.lambdas[method["id"]] = {"free": free, "args": args, "snapshots": not by_ref}
         g = u.function(method["id"])
