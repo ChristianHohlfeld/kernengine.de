@@ -6659,23 +6659,27 @@ class Emit:
             return got[0]
         pre1, holds1 = self.lazily(test)
         pre2, holds2 = self.lazily(test)
-        node = self.u.next_node
-        self.u.next_node += 1
-        self.u.members.append(f"  struct {{ {it} value = {self.u.zero(it)}; }} n{node};")
+        def taken():
+            """A Take of its own (each step of the Blueprint is one node): the member that holds what it gives."""
+            node = self.u.next_node
+            self.u.next_node += 1
+            self.u.members.append(f"  struct {{ {it} value = {self.u.zero(it)}; }} n{node};")
+            return f"n{node}"
         more = f'math_compare<"<">({self.cast("Float", at)}, {self.cast("Float", end)})'
+        n_first, n_held, n_other, n_back = taken(), taken(), taken(), taken()
         def back(i):
-            return [f"var_take(n{node}, {rest}[{i}]);", f"{lv}[{self.whole_math('+', kept, i)}] = n{node}.value;"]
+            return [f"var_take({n_back}, {rest}[{i}]);", f"{lv}[{self.whole_math('+', kept, i)}] = {n_back}.value;"]
         return before + lines + [
             f"{at} = {first};", f"{end} = {last};", f"{go} = {more};",
             f"while (loop({go})) {{", *["  " + ln for ln in pre1], f"  if ({holds1}) {{", f"    {at} += 1;", f"    {go} = {more};", "  } else {", f"    {go} = false;", "  }", "}",
             f"if ({more}) {{",
             f"  {rest} = {lt}{{}};",
             f"  list_reserve({rest}, {self.whole_math('-', end, at)});",
-            f"  var_take(n{node}, {lv}[{at}]);", f"  list_add({rest}, n{node}.value);",
+            f"  var_take({n_first}, {lv}[{at}]);", f"  list_add({rest}, {n_first}.value);",
             f"  {kept} = {at};", f"  {at} += 1;",
             f"  while (loop({more})) {{", *["    " + ln for ln in pre2],
-            f"    if ({holds2}) {{", f"      var_take(n{node}, {lv}[{at}]);", f"      {lv}[{kept}] = n{node}.value;", f"      {kept} += 1;",
-            "    } else {", f"      var_take(n{node}, {lv}[{at}]);", f"      list_add({rest}, n{node}.value);", "    }",
+            f"    if ({holds2}) {{", f"      var_take({n_held}, {lv}[{at}]);", f"      {lv}[{kept}] = {n_held}.value;", f"      {kept} += 1;",
+            "    } else {", f"      var_take({n_other}, {lv}[{at}]);", f"      list_add({rest}, {n_other}.value);", "    }",
             f"    {at} += 1;", "  }",
             *["  " + ln for ln in self.count_loop("0", self.whole_math("-", f"list_length<{it}>({rest})", "1"), back)],
             "}"] + after
