@@ -90,15 +90,17 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
           if (u < 0 || u > 1 || v < 0 || v > 1) continue;
           const Vec2 p = s.a + r * u;
           const i32 ni = node_at(p);
-          for (const Seg* g : {&s, &t})
-            for (const Vec2 end : {g->a, g->b}) {
+          for (const u32 gi : {list[m], list[n]}) {  // (the two segments, by their place in segs)
+            const Seg& g = segs[gi];
+            for (const Vec2 end : {g.a, g.b}) {
               const f32 d = std::hypot(end.x - p.x, end.y - p.y);
               if (d < 0.5f) continue;
               const Vec2 dir{(end.x - p.x) / d, (end.y - p.y) / d};
               bool dup = false;
               for (const Arm& a : nodes[ni].arms) dup = dup || a.dir.x * dir.x + a.dir.y * dir.y > 0.97f;
-              if (!dup) nodes[ni].arms.push_back({dir, g->width});
+              if (!dup) nodes[ni].arms.push_back({dir, g.width});
             }
+          }
         }
     }
   }
@@ -126,25 +128,27 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
     // The signal posts: each on the kerb corner right of its arm's incoming traffic - between
     // this arm and the next one round the junction, 1.2 m off both carriageways (never on a
     // street: not on its own arm, not on the one crossing it).
-    for (Arm& a : j.arms) {
+    for (std::size_t ai = 0; ai < j.arms.size(); ++ai) {
+      Arm& a = j.arms[ai];
       const f32 aa = std::atan2(a.dir.y, a.dir.x);
       f32 best = 6.2831853f;
-      const Arm* next = nullptr;
-      for (const Arm& b : j.arms) {
-        if (&b == &a) continue;
+      std::size_t next = j.arms.size();  // the next arm round the junction: its place in j.arms (none: j.arms.size())
+      for (std::size_t bi = 0; bi < j.arms.size(); ++bi) {
+        if (bi == ai) continue;
+        const Arm& b = j.arms[bi];
         f32 d = std::atan2(b.dir.y, b.dir.x) - aa;
         while (d <= 1e-4f) d += 6.2831853f;
-        if (d < best) { best = d; next = &b; }
+        if (d < best) { best = d; next = bi; }
       }
       const f32 half = best / 2;
-      if (!next || best >= 3.1415927f) {
+      if (next == j.arms.size() || best >= 3.1415927f) {
         // no arm on that side: abeam of the junction, beside the arm's own kerb
         a.pole = Vec2{-a.dir.y, a.dir.x} * (a.width * 0.5f + 1.2f);
         a.has_pole = true;
         continue;
       }
       const f32 s = std::sin(half);
-      const f32 r = (std::fmax(a.width, next->width) * 0.5f + 1.2f) / std::fmax(s, 0.05f);
+      const f32 r = (std::fmax(a.width, j.arms[next].width) * 0.5f + 1.2f) / std::fmax(s, 0.05f);
       if (r > 30) continue;  // two arms nearly along each other: no corner to stand on
       a.pole = Vec2{std::cos(aa + half), std::sin(aa + half)} * r;
       a.has_pole = true;
@@ -296,7 +300,7 @@ f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 no
     const f32 stop = std::fmax(0.0f, view.distance - laws_.stop_line);  // the stop line before the junction
     bool must_stop = false;
     view.light = light(j, fwd, now);
-    if (view.light >= 0) must_stop = g_rules.flag("MustStop", static_cast<i64>(view.light), rules::decimal(stop), rules::decimal(v));  // red; amber: stop if it can
+    if (view.light >= 0) must_stop = g_rules.flag("MustStop", view.light, rules::decimal(stop), rules::decimal(v));  // red; amber: stop if it can
     else if (view.distance < laws_.first_come) {
       // Unsignalled: wait while someone else holds the junction (and is still in it).
       if (j.claim >= 0 && j.claim != car && j.claim < static_cast<i32>(cars.size()) && now - j.claim_at < laws_.claim_s) {
