@@ -699,3 +699,16 @@ mag rechnet unabhängig weiter (der volle Lauf `work-voll-162644-5528` seit 17:3
   im eigenen Kindprozess, real-Durchgang immer).
 - **Nächster Schritt:** Ergebnis von `alle` holen, die ganze Abweichungsliste je Gebiet in `stand/KOORDINATOR.md` schreiben und zuordnen; bereite Zweige (t1, t2, d)
   in `work-zusammen` einmischen, `voll` darauf; erst ein gültiger Lauf mit grüner Spiel-Suite (beide Durchgänge) und grüner Engine-Suite geht nach `work`.
+
+### 16.13 Stand 21:35 – earcut-Fix in work-zusammen, d beendet, Neustart des Servers
+- **`work-zusammen` = 8844531a** = 8874e79 + work-d 690ea4f (nur dieser Commit, per cherry-pick; `python3 tools/engine_api.py` danach ohne Unterschied, 818 Knoten,
+  keine Teile von „Platz der Engine“): Gruppe 3 der Suite – `earcut.triangulate(xy, Count<2> vertex_count, …)`, `ev::numbers()` in Tür und Klasse, der
+  Stellvertreter zeichnet Per · Zahl Werte auf. Bit für Bit noch nicht geprüft (erst die nächste Spiel-Suite). Laufen auf mag:
+  `work-zusammen-engine-213241-11183` (Engine-Suite, weil earcut.h/Tür geändert), `work-zusammen-probe-213256-11283` (city_stream, destruction).
+- **d ist beendet** (sein Lauf war zu Ende, nicht gestoppt). Zweig work-d = 2250736: Schritt 3 (Interpreter, 6310a9e) fertig, nur Syntax geprüft; Schritt 4
+  (Klasse, 64cb433) gebaut, nie instanziiert; Schritt 5 (Schreibweise, check() 2250736) teilweise, Palette fehlt; Schritt 6/7 offen; keine Engine-Suite, kein
+  CI-Lauf. Offene Frage von d: `list_append` auf einem Platz reserviert genau Länge + n – ein C++-insert wächst je nach Bibliothek anders (prüfen oder entscheiden).
+  Nachfolger liest `uebergabe/d.md`, Abschnitt B „Stand der 7 Schritte“. **Noch nicht gestartet** (Quote; „Start“ von Chris deckt d).
+- **~21:30 Neustart des Servers hinter der Sitzung:** t1, t2, p wurden abgebrochen (nicht von Chris gestoppt) und per SendMessage aus ihrem Verlauf fortgesetzt
+  (das geht in diesem Fall – anders als bei den um 17:50 vom Nutzer gestoppten). Aufträge auf mag liefen weiter. Nächste Kontrolle 22:02 (Auswertung von „alle“).
+

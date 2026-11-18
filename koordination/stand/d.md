@@ -32,3 +32,24 @@
 - Schritt 3 (Interpreter) fertig, Syntax ✓, gepusht: 6310a9e (Root::bound, Spot::bound, Context::bind, read/write über @get/@set,
   EngineStandIn::places). In Arbeit: Schritt 4 (Klasse).
 - Übergabe: $S/uebergabe/d.md
+
+## BEFUND earcut (Koordinator 21:2x) – Fix gebaut, Probe läuft
+- Commit **690ea4f** (work-d): Zeiger-Eingänge zählen Count<Per>: earcut.h `Count<2> vertex_count` (triangulate, deviation),
+  ev::numbers() in Tür/Klasse (engine_api.py, .gen neu), Test-Schreiber-Stellvertreter (cpp_to_blueprint.py, Zweig der
+  Zeiger-Eingänge ~Z. 10956: `per * count` Werte). Allgemein, keine Namensliste. Für t1: kleine Änderung in TestWriter (eine Zeile `per`).
+- Probe: mag `work-d-probe-212615-8375` auf 690ea4f: convert rc=0; CityStream::building_shape, Destruction::tear/collapse/fracture
+  „written“, Test übersetzt. Bit für Bit zeigt erst der nächste `voll` (Spiel-Suite).
+
+## BEREIT ZUM MERGEN (earcut / Count<Per> der Zeiger-Eingänge) – nur Commit 690ea4f per cherry-pick (s. o.), Beleg: Probe work-d-probe-212615-8375
+- Achtung: work-d trägt zugleich den unbewiesenen Zwischenstand „Platz der Engine“ (6310a9e, 64cb433). Nur den Fix
+  übernehmen: `git cherry-pick 690ea4f` (setzt nur auf earcut/engine_host/engine_api.py/cpp_to_blueprint.py auf; danach
+  `python3 tools/engine_api.py`, da engine_nodes.gen.h auch die Place-Teile hat).
+
+## engine_api.py (für Paket c)
+- Änderungen für „Platz der Engine“ (P_<Knoten>, Fields je Struktur, <Knoten>_place, Binden) und Count<Per> der
+  Zeiger-Eingänge sind gepusht (64cb433, 690ea4f). Weitere Änderungen an engine_api.py durch d: nur noch Fall-Text (case_text).
+
+## Platz der Engine – Stand 21:40 (Nachfolger 2, Lauf endet: Kontingent)
+- Schritt 3 ✓ (6310a9e), Schritt 4 ~ (64cb433, nur Header-Syntax, nie instanziiert), Schritt 5 ~ (Schreibweise 64cb433,
+  check() 2250736; Palette offen), Schritt 6 offen (Engine-Test, nativer Fall in case_text, Fall mit jedem Knoten, Doku), C/D offen.
+- Einzelheiten und nächste Schritte: $S/uebergabe/d.md, Abschnitt B „Stand der 7 Schritte“.

@@ -1,4 +1,11 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 21:35 **work-zusammen = 8844531a** (8874e79 + ds Fix für Zeiger-Eingänge, work-d 690ea4f): die Zahl neben einem Zeiger-Eingang sagt in ihrem Typ, wie viele
+  Zahlen jedes Gezählte ist (`kern::Count<Per>`, wie bei Ausgängen); earcut.triangulate/deviation nehmen `Count<2> vertex_count`; Tür und Klasse prüfen mit
+  `ev::numbers()`; der Stellvertreter des Quelltexts zeichnet Per · Zahl Werte auf (`count_per`). Erzeuger ohne Unterschied (818 Knoten), keine Teile von
+  „Platz der Engine“ dabei. Beleg bisher: Probe `work-d-probe-212615-8375`. Laufen: `work-zusammen-engine-213241-11183`, `work-zusammen-probe-213256-11283`
+  (city_stream, destruction). **Alle: vor der nächsten Probe origin/work-zusammen holen.**
+  · **d ist beendet** (Lauf zu Ende); „Platz der Engine“: Schritt 3 fertig, 4/5 gebaut, nichts davon bewiesen – Stand in `uebergabe/d.md` Abschnitt B. Nachfolger noch nicht gestartet.
+  · ~21:30 Neustart des Servers hinter der Sitzung: t1, t2, p wurden dabei abgebrochen und sind fortgesetzt (aus ihrem Verlauf).
 - 21:25 **Die erste ausgeführte Spiel-Suite ist ROT und unvollständig** (`work-zusammen-voll-203000-750`: convert rc=0, **suite rc=1**, engine rc=0).
   · Gelaufen sind nur 21 von 269 Tests (17 ok, 4 FAIL), dann brach ein ASan-Fehler in `converted_engine_geo_mesh_data` (MeshData_push_extra) das ganze
     Testprogramm ab; der Durchgang `SC_ENGINE=real` lief nicht. Auswertung von t1: `stand/t1.md`, Abschnitt „SUITE 203000“ (7 Gruppen) – **das ist die Arbeitsliste.**
