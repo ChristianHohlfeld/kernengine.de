@@ -43,7 +43,12 @@ template <std::size_t N> struct Setting {
   constexpr std::string_view view() const { return {text, N - 1}; }
 };
 
-namespace logic { struct Whole; }
+namespace logic {
+struct Whole;
+template <char Op, class A, class B> struct Sum;
+template <class T> inline constexpr bool is_sum = false;
+template <char Op, class A, class B> inline constexpr bool is_sum<Sum<Op, A, B>> = true;
+}  // namespace logic
 
 /// The functions of formulas (the Formula node; Formula::evaluate uses the same ones).
 namespace math {
@@ -106,7 +111,7 @@ inline i64 bits_of(Exact a) {
   return a.v >= -exact && a.v <= exact ? a.v : bits_of(static_cast<f64>(a.v));
 }
 /// (what these functions take: a number, or the whole number another of them gave)
-template <class T> concept Bits = std::same_as<T, Exact> || std::same_as<T, logic::Whole> || std::is_arithmetic_v<T>;
+template <class T> concept Bits = std::same_as<T, Exact> || std::same_as<T, logic::Whole> || logic::is_sum<T> || std::is_arithmetic_v<T>;
 template <Bits A, Bits B> inline Exact band(A a, B b) { return {bits_of(a) & bits_of(b)}; }
 template <Bits A, Bits B> inline Exact bor(A a, B b) { return {bits_of(a) | bits_of(b)}; }
 template <Bits A, Bits B> inline Exact bxor(A a, B b) { return {bits_of(a) ^ bits_of(b)}; }
@@ -150,6 +155,62 @@ namespace math {
 /// it is (bits_of(double(v))) - as Exact's, without the way through the double.
 inline i64 bits_of(const logic::Whole& a) { return bits_of(Exact{a.v}); }
 }  // namespace math
+namespace logic {
+/// +, - and * in a formula of whole numbers (docs/blueprint_cpp.md, "Formeln"): where one side is
+/// an Int (or such a sum) and the other an Int, what band ... mul32 give, or a number. Its value
+/// is what the formula's arithmetic of doubles gives - the two numbers as doubles (an Int and
+/// what band ... mul32 give: static_cast<f64>(v)), added, subtracted or multiplied as doubles -,
+/// worked out where it is asked for: as a number (f64) exactly that way; handed to band ...
+/// mul32 as the whole number it is, by the arithmetic of i64 where that is the same - every
+/// number in it is a whole number of at most 2^53 and so is every result on the way (then each
+/// double operation is exact: its double is that whole number) -, and else through the doubles.
+/// So it is the same value for every number, and the way through the double only where it
+/// makes a difference.
+template <class T> concept SumSide = std::same_as<T, Whole> || is_sum<T>;
+template <class T> concept SumOperand = SumSide<T> || std::same_as<T, math::Exact> || std::is_floating_point_v<T>;
+inline constexpr i64 kSumExact = i64{1} << 53;
+/// (a side as the formula's double)
+inline f64 sum_number(f64 x) { return x; }
+inline f64 sum_number(math::Exact x) { return static_cast<f64>(x.v); }
+inline f64 sum_number(Whole x) { return static_cast<f64>(x.v); }
+template <char Op, class A, class B> f64 sum_number(const Sum<Op, A, B>& s);
+/// (a side as a whole number of at most 2^53 that its double is exactly - false where it is none)
+inline bool sum_exact(f64 x, i64& r) {
+  if (!(x >= -0x1p53 && x <= 0x1p53)) return false;  // (not a number fails it too)
+  r = static_cast<i64>(x);
+  return static_cast<f64>(r) == x;
+}
+inline bool sum_exact(math::Exact x, i64& r) { r = x.v; return r >= -kSumExact && r <= kSumExact; }
+inline bool sum_exact(Whole x, i64& r) { r = x.v; return r >= -kSumExact && r <= kSumExact; }
+template <char Op, class A, class B> bool sum_exact(const Sum<Op, A, B>& s, i64& r);
+template <char Op, class A, class B> struct Sum {
+  A a;
+  B b;
+  operator f64() const {  // NOLINT (implicit: it is that number)
+    const f64 x = sum_number(a), y = sum_number(b);
+    if constexpr (Op == '+') return x + y;
+    else if constexpr (Op == '-') return x - y;
+    else return x * y;
+  }
+};
+template <char Op, class A, class B> f64 sum_number(const Sum<Op, A, B>& s) { return static_cast<f64>(s); }
+template <char Op, class A, class B> bool sum_exact(const Sum<Op, A, B>& s, i64& r) {
+  i64 x = 0, y = 0;
+  if (!sum_exact(s.a, x) || !sum_exact(s.b, y)) return false;
+  if constexpr (Op == '+') r = x + y;  // (|x|, |y| <= 2^53: no overflow)
+  else if constexpr (Op == '-') r = x - y;
+  else if (__builtin_mul_overflow(x, y, &r)) return false;
+  return r >= -kSumExact && r <= kSumExact;
+}
+/// (handed to band ... mul32: the whole number where it is exact, else bits_of of the double)
+template <char Op, class A, class B> inline i64 bits_of(const Sum<Op, A, B>& s) {
+  i64 r = 0;
+  return sum_exact(s, r) ? r : math::bits_of(static_cast<f64>(s));
+}
+template <SumOperand A, SumOperand B> requires(SumSide<A> || SumSide<B>) constexpr Sum<'+', A, B> operator+(A a, B b) { return {a, b}; }
+template <SumOperand A, SumOperand B> requires(SumSide<A> || SumSide<B>) constexpr Sum<'-', A, B> operator-(A a, B b) { return {a, b}; }
+template <SumOperand A, SumOperand B> requires(SumSide<A> || SumSide<B>) constexpr Sum<'*', A, B> operator*(A a, B b) { return {a, b}; }
+}  // namespace logic
 namespace logic {
 
 /// `Text` in a Blueprint's C++. A text written out in the program - "abc": a value typed into a

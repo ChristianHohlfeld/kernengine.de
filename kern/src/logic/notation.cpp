@@ -3396,7 +3396,7 @@ struct Reader {
     }
     if (whole && !f.whole()) {
       fail(body_tok, "Int inputs and an Int are a formula of whole numbers: one whose value is a whole number by band, bor, bxor, shl, shr, wrap32, wrap32s or mul32 "
-                     "and that reads each input only as an argument of one of them - this one is a formula of Floats: [](Float ...) -> Float");
+                     "and that reads each input only as an argument of one of them or through +, - and * between them - this one is a formula of Floats: [](Float ...) -> Float");
       return s;
     }
     const int node = make("math.formula", tok, {{"formula", f.text()}});

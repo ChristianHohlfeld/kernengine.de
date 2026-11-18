@@ -34,6 +34,11 @@ constexpr Fn kFunctions[] = {
     {"band", kBand, 2, true}, {"bor", kBor, 2, true}, {"bxor", kBxor, 2, true}, {"shl", kShl, 2, true}, {"shr", kShr, 2, true},
     {"wrap32", kWrap32, 1, true}, {"wrap32s", kWrap32s, 1, true}, {"mul32", kMul32, 2, true}, {"single", kSingle, 1},
 };
+// The operators that are whole where what they are given is (an Int, what a whole function gives, a
+// number written out, or another of them): +, - and *. In a formula of whole numbers the class works
+// them out as whole numbers where that is the same as the double the formula's arithmetic gives, and
+// through that double anywhere else (logic::Sum, nodes.h) - so they can stand between whole functions.
+constexpr Code kWholeOperators[] = {kAdd, kSub, kMul};
 constexpr f64 kPi = math::pi;
 constexpr int kMaxStack = 48;
 
@@ -345,12 +350,28 @@ bool Formula::whole() const {
     for (const Fn& x : kFunctions) if (x.code == code) return x.whole;
     return false;
   };
+  auto whole_op = [](u8 code) {
+    for (Code x : kWholeOperators) if (x == code) return true;
+    return false;
+  };
   if (!whole_fn(tree_[static_cast<std::size_t>(root_)].code)) return false;
-  // (every input is an argument of such a function itself - nowhere else is it read)
-  for (const Term& n : tree_)
-    for (int child : {n.a, n.b, n.c})
-      if (child >= 0 && tree_[static_cast<std::size_t>(child)].code == kInput && !whole_fn(n.code)) return false;
-  return true;
+  // Every input is read as a whole number: as an argument of such a function, or as what +, - or * is
+  // given whose own value is read so. Such an operator is given only inputs, numbers written out, such
+  // functions and such operators.
+  bool ok_all = true;
+  auto read = [&](auto&& self, int t, bool as_whole) -> void {
+    const Term& n = tree_[static_cast<std::size_t>(t)];
+    if (n.code == kInput) { if (!as_whole) ok_all = false; return; }
+    const bool op = as_whole && whole_op(n.code);
+    for (int child : {n.a, n.b, n.c}) {
+      if (child < 0) continue;
+      const u8 c = tree_[static_cast<std::size_t>(child)].code;
+      if (op && !(c == kInput || c == kConst || whole_fn(c) || whole_op(c))) ok_all = false;
+      self(self, child, whole_fn(n.code) || op);
+    }
+  };
+  read(read, root_, true);
+  return ok_all;
 }
 
 std::string Formula::text() const { return ok() ? print(root_, 0, false) : std::string(); }

@@ -1284,9 +1284,17 @@ Der Graph ist derselbe (der Draht vom Int in den Float-Eingang der Formel), und 
 Wert: Interpreter und JIT rechnen wie bei jeder Formel über das double; die Klasse reicht die ganze Zahl
 weiter (`kern::math::Exact`) – ihre Bits sind die des doubles, das sie ist (genau, solange sie in ±2^53
 liegt, sonst über dieses double), und ihr Int ist `normal` von ihr, also `whole` ihres doubles. Zahlen im
-Ausdruck sind wie sonst `double`-Literale (`13.0`; `band(a, 0.5)` nimmt 0). Ist ein Eingang ein Float, eine
-geschriebene Zahl oder liest die Formel einen Eingang anders (`a + 1`, `a < b`), ist sie eine Formel über
-Floats wie oben. Der Leser lehnt `[](Int …) -> Int` für eine Formel ab, die das nicht hergibt, ebenso
+Ausdruck sind wie sonst `double`-Literale (`13.0`; `band(a, 0.5)` nimmt 0).
+`+`, `−` und `×` dürfen zwischen solchen Funktionen stehen (`wrap32(a + b)`, `wrap32(base + mul32(i, s))`,
+`band(a * b - 1.0, 255.0)`): ganz sind sie dort, wo sie nur Eingänge, geschriebene Zahlen, solche Funktionen
+und einander bekommen und ihr Wert selbst als ganze Zahl gelesen wird (`kWholeOperators` in formula.cpp,
+neben der Tabelle). Ihr Wert ist in jeder Stufe der der Formel – die beiden Zahlen als double, als double
+verknüpft. Die Klasse rechnet ihn in i64, wo das dasselbe ist (jede Zahl darin und jedes Ergebnis auf dem
+Weg eine ganze Zahl von höchstens 2^53: dann ist jede Operation über das double exakt), sonst über die doubles
+(`logic::Sum` in nodes.h: der Wert wird erst ausgerechnet, wo er gebraucht wird – als Zahl genau wie die
+Formel, an `band` … `mul32` als ganze Zahl). Ist ein Eingang ein Float, eine
+geschriebene Zahl oder liest die Formel einen Eingang anders (`a + 1` an der Wurzel, `-a`, `a / 2`, `a < b`),
+ist sie eine Formel über Floats wie oben. Der Leser lehnt `[](Int …) -> Int` für eine Formel ab, die das nicht hergibt, ebenso
 gemischte Eingänge, eine geschriebene Zahl oder ein `kern::to` an einem ihrer Eingänge.
 
 ## Wo was steht

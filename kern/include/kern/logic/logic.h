@@ -699,7 +699,8 @@ class Formula {
   /// A formula of whole numbers: what it gives is a whole number, and it reads its inputs only as
   /// whole numbers - its root is a function that says so (band bor bxor shl shr wrap32 wrap32s
   /// mul32: each says it in the formula's table of functions), and every input is an argument of
-  /// such a function itself. In a Blueprint's C++ such a formula whose inputs are all wires from
+  /// such a function, or given to +, - or * whose value is read so (those operators are given only
+  /// inputs, numbers written out, such functions and such operators - kWholeOperators). In a Blueprint's C++ such a formula whose inputs are all wires from
   /// Ints is written with Int inputs and an Int result (docs/blueprint_cpp.md, "Formeln"): the same
   /// value, without the way through the double.
   bool whole() const;
