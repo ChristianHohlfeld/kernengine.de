@@ -1,0 +1,22 @@
+round 1: 59 Blueprints
+round 2: 21 Blueprints
+round 3: 30 Blueprints
+round 4: 4 Blueprints
+round 5: 2 Blueprints
+round 6: 5 Blueprints
+round 7: 2 Blueprints
+round 8: 1 Blueprints
+round 9: 30 Blueprints
+round 10: 30 Blueprints
+Game/game_events_cpp: Game::combat_hud() was written and waits now (its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘const struct converted_Game__game_events_cpp::combat::Fun’ has no member named ‘multiplier’ - that went with multiplier: ‘g_fun’ is not a member of ‘converted_Game__game_events_cpp::combat::combat_rules_cpp_local’))
+round 11: 30 Blueprints
+round 12: 30 Blueprints
+round 13: 30 Blueprints
+round 14: 30 Blueprints
+round 15: 30 Blueprints
+round 16: 30 Blueprints
+these Blueprints give, round after round, what they gave before (what one writes takes from the other what it writes): Game/game_audio_web_cpp, Game/game_barricades_cpp, Game/game_controls_cpp, Game/game_cpp, Game/game_details_cpp, Game/game_equipment_cpp, Game/game_events_cpp, Game/game_foot_rounds_cpp, Game/game_gaps_cpp, Game/game_guided_cpp, Game/game_lamps_cpp, Game/game_life_cpp, Game/game_look_cpp, Game/game_military_cpp, Game/game_net_cpp, Game/game_projsync_cpp, Game/game_seats_cpp, Game/game_swarm_cpp, Game/game_toss_cpp, Game/game_town_cpp, Game/game_townsync_cpp, Game/game_traffic_cpp, Game/game_traffic_far_cpp, Game/game_ui_cpp, Game/game_vehicle_damage_cpp, Game/game_vr_cpp, Game/game_weapons_cpp, Game/game_world_cpp, Game/game_worldsync_cpp, game_cpp
+
+real	80m14,347s
+user	548m23,726s
+sys	22m0,704s
