@@ -209,9 +209,12 @@ class GameWorld::LogicHost : public logic::Host {
   /// Blueprints made or were given, by their handles; a call that fails says why.
   bool engine(std::string_view function, const std::vector<logic::Value>& in, std::vector<logic::Value>& out) override {
     if (logic::call_engine(objects_, function, in, out)) return true;
-    error(std::string(function) + ": " + objects_.error);
+    engine_failed(function);
     return false;
   }
+  /// A Blueprint's class calls the engine's functions on the same objects itself (kern/logic/engine_direct.h).
+  logic::EngineObjects* engine_objects() override { return &objects_; }
+  void engine_failed(std::string_view function) override { error(std::string(function) + ": " + objects_.error); }
   logic::EngineObjects& objects() { return objects_; }
 
  private:

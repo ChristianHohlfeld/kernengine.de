@@ -2825,7 +2825,7 @@ struct Reader {
       if (it.kind == Item::function) {
         // Type Name = value;   its local variables, at the top of its body
         Function& f = g.functions.back();
-        for (TypeRef type; (((is("List") || is("Fixed")) && is("<", 1)) || (peek(1).kind == Tok::id && (is("=", 2) || is(";", 2)))) && type_here(type);) {
+        for (TypeRef type; (((is("List") || is("Fixed") || is("Map") || is("Set")) && is("<", 1)) || (peek(1).kind == Tok::id && (is("=", 2) || is(";", 2)))) && type_here(type);) {
           FunctionPin l;
           l.type = type.type;
           l.of = type.of;
