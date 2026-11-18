@@ -1024,12 +1024,11 @@ def declared_length(tree, parm):
 
 
 def count_per(t):
-    """kern::Count<Per> - a count beside a pointer the engine writes numbers through, each thing it counts
-    `Per` numbers (kern/core/base.h): Per. A whole number that counts what it writes: 1. Else None."""
+    """kern::Count<Per> - the count beside a pointer of the engine, each thing it counts `Per` numbers (or entries)
+    of what the pointer shows (kern/core/base.h): Per. Else None - a whole number beside a pointer says nothing
+    about its length (only the type says it: no name is read)."""
     m = re.fullmatch(r"(?:kern::)?Count<\s*(\d+)\s*[uU]?\s*>", t.strip())
-    if m:
-        return int(m.group(1))
-    return 1 if NUMBER.get(t.strip()) == "Int" and t.strip() not in ("bool", "char") else None
+    return int(m.group(1)) if m else None
 
 
 def template_args(t):
@@ -6163,10 +6162,10 @@ class Emit:
                 continue
             name, bt = pin_in, in_pins[pin_in]
             raw = qtype(params[i]).strip()
-            if count_per(u.clean(raw)) not in (None, 1) and not NUMBER.get(u.clean(raw)):
+            if count_per(u.clean(raw)) is not None:
                 # (a kern::Count<Per> made of a whole number where it is handed over: that number)
                 while a.get("kind") in ("ImplicitCastExpr", "CXXConstructExpr", "CXXFunctionalCastExpr", "MaterializeTemporaryExpr", "ExprWithCleanups", "CXXBindTemporaryExpr") and \
-                        len([x for x in kids(a) if x.get("kind") != "CXXDefaultArgExpr"]) == 1 and count_per(u.clean(qtype(a))) not in (None, 1):
+                        len([x for x in kids(a) if x.get("kind") != "CXXDefaultArgExpr"]) == 1 and count_per(u.clean(qtype(a))) is not None:
                     a = [x for x in kids(a) if x.get("kind") != "CXXDefaultArgExpr"][0]
             nodes[name] = a
             made = self.unwrap(a)
@@ -9577,6 +9576,29 @@ class Api:
         self.tree, self.u = tree, unit
         self.by_class = {}   # a class or a namespace -> its functions that are declared only, in their order
         self.implicit_makers = {}   # a class of the engine without a constructor of its own -> the one C++ gives it
+        self.unsaid = []   # declarations with a whole number beside a pointer that is no kern::Count<Per> (engine_api.py stops on them)
+
+    def unsaid_count(self, d, p, after):
+        """A pointer to data (not a handle, not a text) with a whole number beside it that does not say in its
+        type that it counts what the pointer shows (kern::Count<Per>): no node guesses its length from a name -
+        the declaration is noted (Api.unsaid) and its function has no node (Wait); the generator stops on it."""
+        raw = qtype(p).strip()
+        if after is None or not re.search(r"\*\s*(const)?$", raw) or raw.replace(" ", "") in ("constchar*", "constchar*const", "char*", "char*const"):
+            return
+        count = self.u.clean(qtype(after).strip())
+        if count_per(count) is not None or NUMBER.get(count) != "Int" or count in ("bool", "char"):
+            return
+        if self.u.object_of(raw) is not None:
+            return
+        try:
+            inner = self.u.btype(re.sub(r"^const\s+", "", re.sub(r"\*\s*(const)?$", "", raw).strip()))
+        except Wait:
+            return   # (a pointer to what has no type in the language: no node either way)
+        if inner is None:
+            return
+        where = f"{self.home(d)}::{d['name']}({raw} {p.get('name', '')}, {qtype(after).strip()} {after.get('name', '')})"
+        self.unsaid.append(where)
+        raise Wait(f"a whole number beside a pointer that does not say it is its count (kern::Count<Per>): {where}")
 
     def opaque(self, q):
         """Is this class an object of the engine with a life of its own (a handle in a Blueprint)?"""
@@ -9763,7 +9785,9 @@ class Api:
         group = snake(q.split("::")[-1])
         nth = makers.index(d) + 1
         ins, params, taken = [], [], {"exec", "then", "result"}
-        for i, p in enumerate(x for x in kids(d) if x.get("kind") == "ParmVarDecl"):
+        parms = [x for x in kids(d) if x.get("kind") == "ParmVarDecl"]
+        for i, p in enumerate(parms):
+            self.unsaid_count(d, p, parms[i + 1] if i + 1 < len(parms) else None)
             bt, writes, handle = self.handed(qtype(p))
             if writes:
                 raise Wait("a constructor that writes through a parameter")
@@ -9840,6 +9864,7 @@ class Api:
                 outs.append((name, optional, None))
                 params.append((None, name))
                 continue
+            self.unsaid_count(d, p, all_params[i + 1] if i + 1 < len(all_params) else None)
             written = self.written_list(p, all_params[i + 1] if i + 1 < len(all_params) else None)
             if written is not None:
                 name = name_of(p.get("name") or f"value{i + 1}")
@@ -9902,7 +9927,7 @@ class Api:
 
     def written_list(self, p, after):
         """A parameter that is a pointer to numbers the function writes through, with their count beside it -
-        the parameter after it, a whole number (`void render(f32* out, u32 frames)`): what the engine writes
+        the parameter after it, a kern::Count<Per> (`void render(f32* out, Count<2> frames)`): what the engine writes
         there is a further output, the list of those numbers (List<Float> ...); the count stays an input.
         None for any other parameter. (A call hands it a place in a list - `buf.data()`, `buf.data() + k`: the
         engine's numbers go there, entry by entry; the list keeps its length. The stand-in of the tests gives
@@ -9914,8 +9939,8 @@ class Api:
         if "*" in inner or "&" in inner or re.search(r"\bconst\b", inner) or self.u.object_of(raw) is not None:
             return None   # (a pointer to an object of the engine is its handle)
         count = self.u.clean(qtype(after).strip())
-        if count_per(count) is None and (NUMBER.get(count) != "Int" or count in ("bool", "char")):
-            return None
+        if count_per(count) is None:
+            return None   # (no count in its type: Api.unsaid_count reports it)
         if self.u.clean(inner) == "char":
             return None   # (characters: a text's, not numbers)
         try:
@@ -10646,7 +10671,7 @@ class TestWriter:
             return f"converted::wide::Span<{const}{self.spell(inner)}>"
         if c in W64:
             return "u64" if c == "whole64u" else "i64"
-        if count_per(c) not in (None, 1) and c not in NUMBER:
+        if count_per(c) is not None:
             return "u32"   # (kern::Count<Per>: the whole number it holds - the source hands it one)
         if c in ("float", "double", "long double"):
             return "double"
@@ -11100,7 +11125,7 @@ class TestWriter:
                 inner = self.spell(re.sub(r"\*\s*(const)?$", "", raw))
                 after = ps[i + 1] if i + 1 < len(ps) else None
                 per = count_per(self.u.clean(qtype(after))) if after is not None else None   # (Count<Per>: Per numbers each)
-                counted = per is not None and re.search(r"count|size|len|num|^n$", after.get("name", ""))
+                counted = per is not None   # (only the type says it - no name is read)
                 fixed = declared_length(self.tree, p)   # (an array of a fixed length: so many)
                 data = (f"std::vector<{inner}>({name}, {name} + {per} * static_cast<std::size_t>({after['name']}))" if counted else
                         f"({name} ? std::vector<{inner}>({name}, {name} + {fixed}) : std::vector<{inner}>{{}})" if fixed else

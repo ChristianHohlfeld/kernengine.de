@@ -34,11 +34,11 @@ bool c0(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
   if (!self) return false;
   std::vector<float> a0;
   ev::take<ev::List<ev::Float>>(o, in, 1, a0);
-  auto a1 = ev::blank<std::remove_cvref_t<unsigned int>>();
+  auto a1 = ev::blank<std::remove_cvref_t<kern::Count<3u>>>();
   ev::take<ev::Int>(o, in, 2, a1);
   std::vector<unsigned int> a2;
   ev::take<ev::List<ev::Int>>(o, in, 3, a2);
-  auto a3 = ev::blank<std::remove_cvref_t<unsigned int>>();
+  auto a3 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
   ev::take<ev::Int>(o, in, 4, a3);
   auto a4 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Int>(o, in, 5, a4);

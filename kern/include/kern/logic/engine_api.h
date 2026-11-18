@@ -8,10 +8,12 @@
 //     (a function handed an object of the engine to change is a step);
 //   - what a function writes through a parameter is a further output, and so is what it reports
 //     through a pointer that is null by default (`bool* changed = nullptr`), and what it writes
-//     through a pointer to numbers with their count beside it (`void render(f32* out, u32 frames)`:
-//     the output list `out`, its count an input - EnginePin::count; a count of things that are several
-//     numbers each says so in its type, kern::Count<Per>: `render(f32* out, Count<2> frames)` writes
-//     2 * frames numbers - EnginePin::per);
+//     through a pointer to numbers with their count beside it (`void render(f32* out, Count<2> frames)`:
+//     the output list `out`, its count an input - EnginePin::count; the count says in its type that it
+//     counts what the pointer shows, kern::Count<Per>, Per numbers each: 2 * frames numbers -
+//     EnginePin::per). The same for a pointer the engine reads (`push_incoming(from, const u8* data,
+//     Count<1> bytes)`). A whole number of another type beside a pointer says nothing about its length:
+//     tools/engine_api.py stops on it (no length is guessed from a name);
 //   - an object of the engine with a life of its own (a class: the physics world, the renderer,
 //     the mixer; a struct that cannot be copied or holds such an object) is a handle, a whole
 //     number the host gives - the first input of its nodes, which are all its public methods;
@@ -42,7 +44,7 @@ struct EnginePin {
   const char* of;     // a struct or an enum (or a list of them): its name
   const char* shape;  // the value's form, written out: n i b v t, l (Int64), e<values>, {fields}, [items]
   /// An output list the engine writes through a pointer, with their count beside it (`void render(f32*
-  /// out, u32 frames)`): the input that is the count - the room the call says it has ("" for any other pin).
+  /// out, Count<2> frames)`): the input that is the count - the room the call says it has ("" for any other pin).
   const char* count = "";
   /// How many numbers each one of that count is (`void render(f32* out, Count<2> frames)`: 2 - the
   /// engine writes 2 * frames numbers there).

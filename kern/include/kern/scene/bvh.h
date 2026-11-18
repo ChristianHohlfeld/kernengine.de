@@ -61,7 +61,7 @@ class Bvh {
   };
 
   /// positions: xyz per vertex; indices: triangle list (empty = non-indexed).
-  void build(const f32* positions, u32 vertex_count, const u32* indices, u32 index_count, u32 leaf_size = 8);
+  void build(const f32* positions, Count<3> vertex_count, const u32* indices, Count<1> index_count, u32 leaf_size = 8);
   bool empty() const { return nodes_.empty(); }
   u32 triangle_count() const { return static_cast<u32>(order_.size()); }
 

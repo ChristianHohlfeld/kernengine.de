@@ -107,13 +107,15 @@ bool UniformCache::same_floats(u32 location, const f32* values, u32 count) {
   return false;
 }
 
-void UniformCache::set_vec4_array(u32 location, const f32* values, i32 count) {
+void UniformCache::set_vec4_array(u32 location, const f32* values, Count<4> n) {
+  const i32 count = static_cast<i32>(static_cast<u32>(n));   // (the vectors, as many as the caller says)
   if (!location || count <= 0) return;
   if (same_floats(location, values, static_cast<u32>(count) * 4)) return;
   gl::uniform4fv(location, values, count);
 }
 
-void UniformCache::set_vec3_array(u32 location, const f32* values, i32 count) {
+void UniformCache::set_vec3_array(u32 location, const f32* values, Count<3> n) {
+  const i32 count = static_cast<i32>(static_cast<u32>(n));   // (the vectors, as many as the caller says)
   if (!location || count <= 0) return;
   if (same_floats(location, values, static_cast<u32>(count) * 3)) return;
   gl::uniform3fv(location, values, count);
