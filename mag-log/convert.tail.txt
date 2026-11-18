@@ -1,0 +1,80 @@
+    Rng::gaussian (8): written
+    cast (10): written
+tiles                           2 /    2 functions        2 /      2 lines
+    TileKey::operator== (1): written
+    TileKey::hash (1): written
+terrain                         8 /    9 functions       11 /     12 lines
+    Terrain::settled (1): written
+    Terrain::has_dem (1): written
+    Terrain::water_level (1): elevation() is defined in another file
+    Terrain::deformed (4): written
+    Terrain::crater_count (1): written
+    CraterRec::operator== (1): written
+    Terrain::take_changes (1): written
+    Terrain::stats (1): a name for a place - written where it is called
+    terrarium_height (1): written
+world_marks                     1 /    1 functions        1 /      1 lines
+--- car_cpp: without the function operator=: ‘Front’ does not name a type
+    Marks::stats (1): a name for a place - written where it is called
+car_cpp                        15 /   15 functions      414 /    414 lines
+    tyre (12): written
+    steer_torque_at (1): written
+    CarSpec::bus (17): written
+    Car::rigid_spec (23): written
+    Car::reset (7): written
+    Car::wheel_speed (5): written
+    suspension_tuning (5): written
+    Car::attach (92): written
+    Car::detach (12): written
+    Car::place (13): written
+    Car::ensure_rig (16): written
+    Car::push (5): written
+    Car::reapply (13): written
+    Car::step (171): written
+    ai_drive (22): written
+world_art                       1 /    1 functions        1 /      1 lines
+    WorldArt::renderer (1): written
+world_traffic                   1 /    1 functions        1 /      1 lines
+    TrafficRules::junctions (1): a name for a place - written where it is called
+world_marks_cpp                 7 /   15 functions       83 /    376 lines
+    ragged (1): written
+    Marks::ring_put_Scorch (5): written
+    Marks::ring_put_WallMark (5): written
+    Marks::clear (14): written
+    Marks::blast (22): height() is defined in another file
+    Marks::add_soot (32): height() is defined in another file
+    Marks::add_breach (44): height() is defined in another file
+    Marks::spawn_rubble (33): written
+    fh (1): written
+    facade_glass (24): written
+    Marks::bullet (23): walls_near() is defined in another file
+    Marks::update (13): walls_near() is defined in another file
+    Marks::prune_walls (22): walls_near() is defined in another file
+    Marks::rebuild (112): height() is defined in another file
+    Marks::draw (25): it calls Marks::rebuild(), which waits
+world_traffic_cpp               3 /    9 functions       45 /    308 lines
+    cell (1): written
+    TrafficRules::rebuild (142): a call on the Blueprint of the actor Traffic, which the level does not have
+    TrafficRules::near (12): written
+    TrafficRules::bind (1): the Blueprint of the actor Traffic, which the level does not have
+    TrafficRules::take_laws (8): a variable of the Blueprint of the actor Traffic, which the level does not have
+    TrafficRules::light (6): a call on the Blueprint of the actor Traffic, which the level does not have
+    TrafficRules::pursuit (32): written
+    TrafficRules::gap_speed (20): a call on the Blueprint of the actor Traffic, which the level does not have
+    TrafficRules::limit (86): a call on the Blueprint of the actor Traffic, which the level does not have
+
+91 of 107 functions of the program are written as Blueprints (704 of 1262 lines), and 10 of the engine's headers that they call: 19 Blueprints - 3 of source files, 0 of states, 16 of headers and of shapes
+86 functions of the Blueprints are compared with their source, bit for bit, by the tests in /dev/shm/spawncity-jobs-chris/work-f2-probe-161626-26175/pt/converted - each once, in the Blueprint it stands in; 1 give nothing
+
+what the others wait for: functions (lines)
+     4 (   254)   a call on the Blueprint of the actor Traffic, which the level does not have
+     5 (   211)   height() is defined in another file
+     3 (    58)   walls_near() is defined in another file
+     1 (    25)   it calls Marks::rebuild(), which waits
+     1 (     8)   a variable of the Blueprint of the actor Traffic, which the level does not have
+     1 (     1)   elevation() is defined in another file
+     1 (     1)   the Blueprint of the actor Traffic, which the level does not have
+
+real	2m39,627s
+user	6m49,186s
+sys	0m25,116s
