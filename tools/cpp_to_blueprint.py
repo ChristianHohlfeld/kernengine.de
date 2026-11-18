@@ -10391,8 +10391,13 @@ class TestWriter:
         function. (Their declarations where the engine's header has them, their definitions after the helpers
         of the test's structs.)"""
         u, tree = self.u, self.tree
-        by_class, free = collections.defaultdict(list), []
+        by_class, free, had = collections.defaultdict(list), [], set()
         for f in [*u.engine_calls.values(), *(f for i, f in self.more_engine.items() if i not in u.engine_calls)]:
+            # (one stand-in a node: a function the dumps declare more than once - each header a source includes is
+            # dumped with it - is the same function of the engine, called from here or there)
+            if f["type"] in had:
+                continue
+            had.add(f["type"])
             d = f["decl"]
             owner = tree.owner.get(d["id"])
             if f.get("role") in ("make", "release"):
@@ -11418,6 +11423,9 @@ class TestWriter:
             if f.indexes and d["id"] in unguarded:
                 skipped.append((f, f"it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, {unguarded[d['id']]}: C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is"))
                 continue
+            # (the types the case spells - of its parameters, of what it gives - are the ones C++ finds where the
+            # function is declared: `Reader` in a method of mvt's Reader is that one, also where wire has a Reader)
+            looked, self.u.lookup_scope = self.u.lookup_scope, tree.scope_of.get(d["id"]) or self.u.lookup_scope
             try:
                 params = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
                 decl_lines, names, types = [], [], []
@@ -11536,6 +11544,8 @@ class TestWriter:
             except Wait as w:
                 skipped.append((f, str(w)))
                 continue
+            finally:
+                self.u.lookup_scope = looked
             # where the Blueprint's call has what is compared: what it returns, then what it made of its
             # reference inputs that are not const, in their order (Instance::call)
             # (of a function of the Blueprint of a state: then its variables, as converted::Tally reads them)
