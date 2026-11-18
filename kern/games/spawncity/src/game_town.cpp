@@ -85,14 +85,13 @@ void Game::handle_shots() {
   std::vector<kern::game::ShotEvent>& shots = world_->shots();
   // gameplay_final_runtime_v2.mjs sniperShotAt atArrival: what the .50 round does at the far end lands
   // when the bullet gets there (distance / SNIPER_TRACER_MPS 850 m/s); the rest acts at once
-  std::vector<kern::game::ShotEvent*> work;
   std::vector<kern::game::ShotEvent> arrived;
   gaps_sniper_rounds(shots, arrived, now);
-  for (kern::game::ShotEvent& s : shots)
-    if (s.shooter == soldier_ && !(mode_ == Mode::foot && foot_weapon_ == weapons::Id::sniper)) work.push_back(&s);
-  for (kern::game::ShotEvent& s : arrived) work.push_back(&s);
-  for (kern::game::ShotEvent* sp : work) {
-    kern::game::ShotEvent& s = *sp;
+  // the player's shots (their places in `shots`, picked before any is handled), then the rounds that arrived
+  std::vector<std::size_t> ours;
+  for (std::size_t i = 0; i < shots.size(); ++i)
+    if (shots[i].shooter == soldier_ && !(mode_ == Mode::foot && foot_weapon_ == weapons::Id::sniper)) ours.push_back(i);
+  auto handle = [&](kern::game::ShotEvent& s) {
     // Shots are heard: people close by run (pedestrian_agents.mjs: 10 m all, to 22 m some).
     people_.frighten(s.from, 22, now, 1);
     Vec3 to = s.to;
@@ -119,8 +118,8 @@ void Game::handle_shots() {
         break;
       }
     }
-    if (drone_hit) continue;
-    if (combat_shot(s)) continue;  // helicopter, tank, flak (game_military.cpp)
+    if (drone_hit) return;
+    if (combat_shot(s)) return;  // helicopter, tank, flak (game_military.cpp)
     const f32 damage = static_cast<f32>(world_->level().find(soldier_) && world_->level().find(soldier_)->weapon ? world_->level().find(soldier_)->weapon->damage : 30);
     i32 person = -1;
     if (hit_remotes(s.from, to, damage) || (person = people_.shot(s.from, to, damage, true, now)) >= 0 || life_shot(s.from, to, damage)) {  // life_shot: cows, birds, joggers (M3 life)
@@ -140,7 +139,7 @@ void Game::handle_shots() {
       s.to = to;
       s.surface = 3;  // flesh: no decal
       s.impact = true;
-      continue;
+      return;
     }
     if (s.impact && s.surface != 2) world_bullet(s.to);  // the world: a window pane may crack
     if (s.surface == 2 && s.impact) {
@@ -157,7 +156,9 @@ void Game::handle_shots() {
         }
       }
     }
-  }
+  };
+  for (std::size_t i : ours) handle(shots[i]);
+  for (kern::game::ShotEvent& s : arrived) handle(s);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -432,7 +433,7 @@ void Game::step_cop(PoliceUnit& u, PoliceUnit::Cop& c, f32 dt) {
   osfx("police_ground_units.playShot", from);
 }
 
-void Game::drive_police(PoliceUnit& u, f32 dt) {
+void Game::drive_police(PoliceUnit& u, i32 unit, f32 dt) {
   (void)dt;
   TrafficCar& c = cars_[u.car];
   const f32 now = world_->sim_time();
@@ -458,7 +459,7 @@ void Game::drive_police(PoliceUnit& u, f32 dt) {
       at.z = city_.ground_height(at.x, at.y);
       if (!line_of_sight(pos + Vec3{0, 0, 1.0f}, at + Vec3{0, 0, 1.0f})) at = pos - fwd * 2.6f;
       at.z = city_.ground_height(at.x, at.y);
-      cop.person = people_.add_officer(at, yaw + static_cast<f32>(cop.seat) * kPi / 2, static_cast<i32>(&u - units_.data()), cop.seed);
+      cop.person = people_.add_officer(at, yaw + static_cast<f32>(cop.seat) * kPi / 2, unit, cop.seed);
       cop.inside = false;
       cop.next_shot = now + 0.7f + rng_.unit() * 0.5f;
       cop.los = false;
@@ -804,7 +805,7 @@ void Game::update_police(f32 dt) {
     }
     if (stars == 0 && (u.state == PoliceUnit::State::pursuit || u.state == PoliceUnit::State::stopping)) u.state = PoliceUnit::State::leave;
     if (stars == 0 && u.state == PoliceUnit::State::engage) u.state = PoliceUnit::State::back;
-    if (own_car && c.unit >= 0) drive_police(u, dt);
+    if (own_car && c.unit >= 0) drive_police(u, static_cast<i32>(ui), dt);
     // Gone: far away (leaving or abandoned and out of sight), or nobody left of the unit.
     const f32 d = dist2d(matrix_of(c.actor).translation(), me);
     const bool done = (u.state == PoliceUnit::State::leave && (d > kDespawn || now - u.left_at > 30)) ||

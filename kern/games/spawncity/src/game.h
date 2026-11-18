@@ -284,7 +284,7 @@ class Game {
   void handle_shots();
   void update_police(f32 dt);
   void spawn_police_unit();
-  void drive_police(PoliceUnit& u, f32 dt);
+  void drive_police(PoliceUnit& u, i32 unit, f32 dt);  // u is units_[unit]
   void step_cop(PoliceUnit& u, PoliceUnit::Cop& c, f32 dt);
   bool player_driving() const { return mode_ == Mode::car || mode_ == Mode::jet || mode_ == Mode::drone; }
   bool line_of_sight(Vec3 a, Vec3 b) const;

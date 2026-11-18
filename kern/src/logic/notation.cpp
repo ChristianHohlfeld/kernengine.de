@@ -857,7 +857,22 @@ struct Shape {
           if (std::find(held.begin(), held.end(), std::string()) == held.end()) continue;  // (no entry of a list on the way: nothing to hold)
           const std::string place = root + at(call).node->param(prefix + "path");
           (void)kind;
-          if (raises[static_cast<std::size_t>(callee)] >= 0)
+          // (an entry of a list of a fixed length stays where it is whatever runs: nothing changes how long that
+          // list is - TypeRef::count. Only an entry of a list of any length, of a map, can be gone after a handler)
+          bool movable = false;
+          TypeRef along{named.type, named.of, named.count};
+          for (const std::string& step : held) {
+            if (step.empty()) {
+              if (!is_list(along.type) || along.count == 0) { movable = true; break; }
+              along = TypeRef{element_of(along.type), along.of};
+              continue;
+            }
+            const StructType* s = along.type == PinType::structure ? g.structure(along.of) : nullptr;
+            const int k = s ? s->field(step) : -1;
+            if (k < 0) { movable = true; break; }
+            along = s->fields[static_cast<std::size_t>(k)].type;
+          }
+          if (raises[static_cast<std::size_t>(callee)] >= 0 && movable)
             return fail(title(call) + " gives " + fn.name + " the place " + place + " - an entry of a list -, and " + fn.name + " may run handlers while it holds it (" +
                             title(raises[static_cast<std::size_t>(callee)]) + "): they could change how long the list is. Give it the entry's index instead, or the value",
                         call);

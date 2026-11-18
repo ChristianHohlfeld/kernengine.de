@@ -830,7 +830,6 @@ std::string Game::mp_hud_json() {
   const f64 now = time_ * 1000;
   std::string s;
   char b[512];
-  auto add = [&](const char* fmt, auto... v) { std::snprintf(b, sizeof b, fmt, v...); s += b; };
   const f32 w = frame_w_, h = frame_h_;
   // Screen point of a world point (vs_multiplayer.mjs renderMarker: off screen at the edge with
   // an arrow; phones keep it off the sticks).
@@ -846,8 +845,10 @@ std::string Game::mp_hud_json() {
     angle = std::atan2(y, x) / kDeg - 90;
   };
   s += ",\"mp\":{";
-  add("\"frames\":%u,\"mapOpen\":%s", m.frames, m.map_open ? "true" : "false");
-  add(",\"voice\":{\"mic\":%s,\"muted\":%s,\"all\":%s,\"tx\":%u}", m.mic ? "true" : "false", m.muted ? "true" : "false", m.everywhere ? "true" : "false", m.seq);
+  std::snprintf(b, sizeof b, "\"frames\":%u,\"mapOpen\":%s", m.frames, m.map_open ? "true" : "false");
+  s += b;
+  std::snprintf(b, sizeof b, ",\"voice\":{\"mic\":%s,\"muted\":%s,\"all\":%s,\"tx\":%u}", m.mic ? "true" : "false", m.muted ? "true" : "false", m.everywhere ? "true" : "false", m.seq);
+  s += b;
   // Pings (labels: distance).
   s += ",\"pings\":[";
   bool first = true;
@@ -855,8 +856,9 @@ std::string Game::mp_hud_json() {
     const f32 d = kern::length(cam_.eye - p.p), sc = clampf(d / 22, 1, 40);
     f32 nx, ny, depth;
     const bool on = project_screen(p.p + Vec3{0, 0, 3.4f * sc}, nx, ny, depth);
-    add("%s{\"on\":%s,\"x\":%.0f,\"y\":%.0f,\"d\":%.0f,\"color\":\"%s\",\"fade\":%.2f,\"mine\":%s}", first ? "" : ",", on ? "true" : "false", (nx + 1) / 2 * w,
-        (1 - ny) / 2 * h, d, hex(p.color).c_str(), mp::PingBoard::fade(p, now), p.owner == net_.self_slot() ? "true" : "false");
+    std::snprintf(b, sizeof b, "%s{\"on\":%s,\"x\":%.0f,\"y\":%.0f,\"d\":%.0f,\"color\":\"%s\",\"fade\":%.2f,\"mine\":%s}", first ? "" : ",", on ? "true" : "false", (nx + 1) / 2 * w,
+                               (1 - ny) / 2 * h, d, hex(p.color).c_str(), mp::PingBoard::fade(p, now), p.owner == net_.self_slot() ? "true" : "false");
+    s += b;
     first = false;
   }
   s += "]";
@@ -878,25 +880,30 @@ std::string Game::mp_hud_json() {
     std::string turn;
     if (t.dir != mp::Turn::Dir::none)
       turn = std::string(t.dir == mp::Turn::Dir::left ? "links" : t.dir == mp::Turn::Dir::right ? "rechts" : "wenden") + " in " + mp::format_distance(t.distance);
-    add(",\"nav\":{\"name\":\"%s\",\"dist\":\"%s\",\"arrow\":\"%s\",\"turn\":\"%s\",\"x\":%.0f,\"y\":%.0f,\"on\":%s,\"angle\":%.0f,\"streets\":%s}",
-        esc(m.dest_name).c_str(), mp::format_distance(left).c_str(), mp::bearing_arrow(rel).c_str(), turn.c_str(), cx, cy, on ? "true" : "false", ca,
-        m.route_streets ? "true" : "false");
+    std::snprintf(b, sizeof b, ",\"nav\":{\"name\":\"%s\",\"dist\":\"%s\",\"arrow\":\"%s\",\"turn\":\"%s\",\"x\":%.0f,\"y\":%.0f,\"on\":%s,\"angle\":%.0f,\"streets\":%s}",
+                               esc(m.dest_name).c_str(), mp::format_distance(left).c_str(), mp::bearing_arrow(rel).c_str(), turn.c_str(), cx, cy, on ? "true" : "false", ca,
+                               m.route_streets ? "true" : "false");
+    s += b;
   }
   if (!m.fetch_json.empty()) s += ",\"navFetch\":" + m.fetch_json;
   if (net_.active()) {
     const u8 self = net_.self_slot();
-    add(",\"self\":%u,\"index\":%u,\"color\":\"%s\",\"host\":%s,\"connected\":%s,\"ff\":%s,\"vote\":\"%s\",\"votePending\":%s,\"status\":\"%s\",\"poses\":%u",
-        self, net_.index_of(self), hex(net_.color_of(self)).c_str(), net_.hosting() ? "true" : "false", net_.connected() ? "true" : "false",
-        net_.friendly_fire() ? "true" : "false", esc(net_.vote_text()).c_str(), net_.vote_pending() ? "true" : "false", esc(net_.status()).c_str(), net_.sent_poses());
-    add(",\"hit\":%.0f,\"hitKill\":%s,\"hitHead\":%s,\"hitShow\":%s", now - m.hit_at, m.hit_kill ? "true" : "false", m.hit_head ? "true" : "false",
-        now - m.hit_at < (m.hit_kill ? kKillMarkerMs : kHitMarkerMs) ? "true" : "false");
+    std::snprintf(b, sizeof b, ",\"self\":%u,\"index\":%u,\"color\":\"%s\",\"host\":%s,\"connected\":%s,\"ff\":%s,\"vote\":\"%s\",\"votePending\":%s,\"status\":\"%s\",\"poses\":%u",
+                               self, net_.index_of(self), hex(net_.color_of(self)).c_str(), net_.hosting() ? "true" : "false", net_.connected() ? "true" : "false",
+                               net_.friendly_fire() ? "true" : "false", esc(net_.vote_text()).c_str(), net_.vote_pending() ? "true" : "false", esc(net_.status()).c_str(), net_.sent_poses());
+    s += b;
+    std::snprintf(b, sizeof b, ",\"hit\":%.0f,\"hitKill\":%s,\"hitHead\":%s,\"hitShow\":%s", now - m.hit_at, m.hit_kill ? "true" : "false", m.hit_head ? "true" : "false",
+                               now - m.hit_at < (m.hit_kill ? kKillMarkerMs : kHitMarkerMs) ? "true" : "false");
+    s += b;
     {
       // Damage direction: where the hit came from relative to the view (mp_fun_hud.mjs onHurt).
       const Vec3 look = cam_.target - cam_.eye;
       const f32 ang = (std::atan2(look.y, look.x) - std::atan2(m.hurt_from.y - cam_.eye.y, m.hurt_from.x - cam_.eye.x)) / kDeg;
-      add(",\"hurt\":%s,\"hurtAngle\":%.0f", now - m.hurt_at < kHurtMs ? "true" : "false", ang);
+      std::snprintf(b, sizeof b, ",\"hurt\":%s,\"hurtAngle\":%.0f", now - m.hurt_at < kHurtMs ? "true" : "false", ang);
+      s += b;
     }
-    add(",\"shield\":%s", net_.protected_now(self, now) ? "true" : "false");
+    std::snprintf(b, sizeof b, ",\"shield\":%s", net_.protected_now(self, now) ? "true" : "false");
+    s += b;
     // Players: nameplates (P1.., distance, health), the board, who is talking.
     s += ",\"players\":[";
     first = true;
@@ -916,19 +923,21 @@ std::string Game::mp_hud_json() {
       const Vec3 look = cam_.target - cam_.eye;
       const f32 rel = wrap_pi(std::atan2(his.x - cam_.eye.x, his.y - cam_.eye.y) - std::atan2(look.x, look.y)) / kDeg;
       // (stars: his wanted level - his own, as in the original; the plate shows it)
-      add("%s{\"slot\":%u,\"index\":%u,\"color\":\"%s\",\"hp\":%.0f,\"dead\":%s,\"mode\":\"%s\",\"x\":%.0f,\"y\":%.0f,\"on\":%s,\"angle\":%.0f,\"d\":%.1f,"
-          "\"dz\":%.1f,\"rel\":%.0f,"
-          "\"talk\":%s,\"protected\":%s,\"wx\":%.1f,\"wy\":%.1f,\"stars\":%u}",
-          first ? "" : ",", r.state.slot, net_.index_of(r.state.slot), hex(net_.color_of(r.state.slot)).c_str(), r.shown_hp, r.state.flags & net::kDead ? "true" : "false",
-          mode_name(static_cast<Mode>(r.state.mode)), x, y, on ? "true" : "false", ang, d, dz, rel, now < r.speaking_until ? "true" : "false",
-          r.state.flags & net::kProtected ? "true" : "false", r.shown.x, r.shown.y, static_cast<unsigned>(std::min<u8>(r.state.stars, 5)));
+      std::snprintf(b, sizeof b, "%s{\"slot\":%u,\"index\":%u,\"color\":\"%s\",\"hp\":%.0f,\"dead\":%s,\"mode\":\"%s\",\"x\":%.0f,\"y\":%.0f,\"on\":%s,\"angle\":%.0f,\"d\":%.1f,"
+                                 "\"dz\":%.1f,\"rel\":%.0f,"
+                                 "\"talk\":%s,\"protected\":%s,\"wx\":%.1f,\"wy\":%.1f,\"stars\":%u}",
+                                 first ? "" : ",", r.state.slot, net_.index_of(r.state.slot), hex(net_.color_of(r.state.slot)).c_str(), r.shown_hp, r.state.flags & net::kDead ? "true" : "false",
+                                 mode_name(static_cast<Mode>(r.state.mode)), x, y, on ? "true" : "false", ang, d, dz, rel, now < r.speaking_until ? "true" : "false",
+                                 r.state.flags & net::kProtected ? "true" : "false", r.shown.x, r.shown.y, static_cast<unsigned>(std::min<u8>(r.state.stars, 5)));
+      s += b;
       first = false;
     }
     s += "],\"scores\":[";
     first = true;
     for (const mp::Score& sc : net_.scores().ranked()) {
-      add("%s{\"index\":%u,\"color\":\"%s\",\"self\":%s,\"k\":%u,\"d\":%u}", first ? "" : ",", net_.index_of(sc.slot), hex(net_.color_of(sc.slot)).c_str(),
-          sc.slot == self ? "true" : "false", sc.kills, sc.deaths);
+      std::snprintf(b, sizeof b, "%s{\"index\":%u,\"color\":\"%s\",\"self\":%s,\"k\":%u,\"d\":%u}", first ? "" : ",", net_.index_of(sc.slot), hex(net_.color_of(sc.slot)).c_str(),
+                                 sc.slot == self ? "true" : "false", sc.kills, sc.deaths);
+      s += b;
       first = false;
     }
     s += "],\"feed\":[";
@@ -936,14 +945,15 @@ std::string Game::mp_hud_json() {
     for (auto it = m.feed.rbegin(); it != m.feed.rend(); ++it) {
       const net::Kill& k = it->k;
       const bool accident = k.by == net::kNobody || k.by == k.victim;
-      add("%s{\"by\":%u,\"byColor\":\"%s\",\"bySelf\":%s,\"victim\":%u,\"victimColor\":\"%s\",\"victimSelf\":%s,\"weapon\":\"%s\",\"head\":%s,\"accident\":%s,\"age\":%.0f}",
-          first ? "" : ",", accident ? 0 : net_.index_of(k.by), accident ? "#ffffff" : hex(net_.color_of(k.by)).c_str(), k.by == self ? "true" : "false",
-          net_.index_of(k.victim), hex(net_.color_of(k.victim)).c_str(), k.victim == self ? "true" : "false",
-          mp::weapon_label(static_cast<mp::Weapon>(k.weapon)).c_str(), k.zone == static_cast<u8>(mp::Zone::head) ? "true" : "false", accident ? "true" : "false", now - it->at);
+      std::snprintf(b, sizeof b, "%s{\"by\":%u,\"byColor\":\"%s\",\"bySelf\":%s,\"victim\":%u,\"victimColor\":\"%s\",\"victimSelf\":%s,\"weapon\":\"%s\",\"head\":%s,\"accident\":%s,\"age\":%.0f}",
+                                 first ? "" : ",", accident ? 0 : net_.index_of(k.by), accident ? "#ffffff" : hex(net_.color_of(k.by)).c_str(), k.by == self ? "true" : "false",
+                                 net_.index_of(k.victim), hex(net_.color_of(k.victim)).c_str(), k.victim == self ? "true" : "false",
+                                 mp::weapon_label(static_cast<mp::Weapon>(k.weapon)).c_str(), k.zone == static_cast<u8>(mp::Zone::head) ? "true" : "false", accident ? "true" : "false", now - it->at);
+      s += b;
       first = false;
     }
     s += "]";
-    if (player_dead_) add(",\"respawnIn\":%.1f", std::fmax(0.0f, world_->hud().respawn_in));
+    if (player_dead_) { std::snprintf(b, sizeof b, ",\"respawnIn\":%.1f", std::fmax(0.0f, world_->hud().respawn_in)); s += b; }
   }
   return s + "}";
 }

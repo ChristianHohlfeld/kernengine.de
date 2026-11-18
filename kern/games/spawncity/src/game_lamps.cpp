@@ -138,7 +138,8 @@ void Game::gaps_lamp_break(i32 i, u8 state, Vec2 dir, f32 speed, bool net) {
   GapsState& g = *gaps_;
   if (i < 0 || i >= static_cast<i32>(g.lamps.all().size())) return;
   const u8 was = g.lamps.all()[static_cast<std::size_t>(i)].state;
-  if (!g.lamps.set_state(i, state)) return;
+  if (!lamps::worse(was, state)) return;  // setState: only ever worse (asked before the field is changed)
+  g.lamps.set(i, state);
   const lamps::Lamp& l = g.lamps.all()[static_cast<std::size_t>(i)];
   g.lamps_dirty = true;
   ++g.lamps_broken_events;
@@ -250,7 +251,11 @@ void Game::gaps_lamps_reset() {
 void Game::gaps_lamps_draw() {
   if (!gaps_) return;
   GapsState& g = *gaps_;
-  for (GapsState::Part* p : {&g.lamp_pole, &g.lamp_glow, &g.lamp_pool, &g.lamp_fallen}) { p->transforms.clear(); p->tints.clear(); }
+  auto clear = [](GapsState::Part& p) { p.transforms.clear(); p.tints.clear(); };
+  clear(g.lamp_pole);
+  clear(g.lamp_glow);
+  clear(g.lamp_pool);
+  clear(g.lamp_fallen);
   auto put = [](GapsState::Part& p, const Mat4& m, kern::Vec4 tint) {
     p.transforms.insert(p.transforms.end(), m.m, m.m + 16);
     p.tints.insert(p.tints.end(), {tint.x, tint.y, tint.z, tint.w});
@@ -279,12 +284,16 @@ void Game::gaps_lamps_draw() {
       put(g.lamp_fallen, Mat4::trs(s.position, s.rotation, {1, 1, 1}) * Mat4::translate({0, 0, -lamps::kPoleH / 2}), {1, 1, 1, 1});
     }
   }
-  for (GapsState::Part* p : {&g.lamp_pole, &g.lamp_glow, &g.lamp_pool, &g.lamp_fallen}) {
-    if (!p->id || !g.renderer) continue;
-    if (p->transforms.empty()) { g.renderer->set_visible(p->id, false); continue; }
-    g.renderer->update_instances(p->id, kern::Span<const f32>(p->transforms.data(), p->transforms.size()), kern::Span<const f32>(p->tints.data(), p->tints.size()));
-    g.renderer->set_visible(p->id, true);
-  }
+  auto show = [&](const GapsState::Part& p) {
+    if (!p.id || !g.renderer) return;
+    if (p.transforms.empty()) { g.renderer->set_visible(p.id, false); return; }
+    g.renderer->update_instances(p.id, kern::Span<const f32>(p.transforms.data(), p.transforms.size()), kern::Span<const f32>(p.tints.data(), p.tints.size()));
+    g.renderer->set_visible(p.id, true);
+  };
+  show(g.lamp_pole);
+  show(g.lamp_glow);
+  show(g.lamp_pool);
+  show(g.lamp_fallen);
 }
 
 }  // namespace sc

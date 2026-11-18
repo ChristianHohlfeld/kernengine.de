@@ -659,7 +659,6 @@ std::string Game::ctl_view_json() {
   const f32 now = world_->sim_time();
   std::string s = ",\"view\":{";
   char b[640];
-  auto add = [&](const char* fmt, auto... v) { std::snprintf(b, sizeof b, fmt, v...); s += b; };
   auto screen = [&](Vec3 p, f32& x, f32& y) {
     f32 nx, ny, depth;
     const bool on = project_screen(p, nx, ny, depth);
@@ -668,7 +667,8 @@ std::string Game::ctl_view_json() {
     return on && depth > 0;
   };
   // ---- the camera (speed_lines.mjs measures its speed itself)
-  add("\"eye\":[%.2f,%.2f,%.2f]", cam_.eye.x, cam_.eye.y, cam_.eye.z);
+  std::snprintf(b, sizeof b, "\"eye\":[%.2f,%.2f,%.2f]", cam_.eye.x, cam_.eye.y, cam_.eye.z);
+  s += b;
   // ---- damage taken (flight_fire_fx.mjs arondight:combat-damage -> .combat-damage-vignette)
   {
     const f32 hp = world_->hud().health, dhp = drone_hp_, jhp = jet_hp_, chp = car_index_ >= 0 ? cars_[car_index_].hp : -1;
@@ -677,12 +677,15 @@ std::string Game::ctl_view_json() {
       ++V.dmg;
     V.last_hp = hp; V.last_drone_hp = dhp; V.last_jet_hp = jhp; V.last_car_hp = chp;
   }
-  add(",\"dmg\":%u,\"droneHits\":%u,\"assist\":%s", V.dmg, C.drone_hits, C.assist_on ? "true" : "false");
+  std::snprintf(b, sizeof b, ",\"dmg\":%u,\"droneHits\":%u,\"assist\":%s", V.dmg, C.drone_hits, C.assist_on ? "true" : "false");
+  s += b;
   // ---- car (player_car_mode.mjs commandSpeed: along the car)
-  if (mode_ == Mode::car && car_index_ >= 0) add(",\"carKmh\":%.0f", std::fabs(cars_[car_index_].car->forward_speed()) * 3.6f);
-  add(",\"cockpit\":%s", car_cockpit_ ? "true" : "false");
+  if (mode_ == Mode::car && car_index_ >= 0) { std::snprintf(b, sizeof b, ",\"carKmh\":%.0f", std::fabs(cars_[car_index_].car->forward_speed()) * 3.6f); s += b; }
+  std::snprintf(b, sizeof b, ",\"cockpit\":%s", car_cockpit_ ? "true" : "false");
+  s += b;
   // xbox_control_mode.mjs: the AIM scheme's crosshair while LB looks (the drone)
-  add(",\"xboxAim\":%s", C.aim_scheme && mode_ == Mode::drone && pad.connected && pad.down(kPadLB) ? "true" : "false");
+  std::snprintf(b, sizeof b, ",\"xboxAim\":%s", C.aim_scheme && mode_ == Mode::drone && pad.connected && pad.down(kPadLB) ? "true" : "false");
+  s += b;
   // ---- jet (jet_mode.mjs renderHud / renderCityCue / renderButtons)
   if (mode_ == Mode::jet && jet_placed_) {
     const JetTelemetry& t = jet_.telemetry();
@@ -693,11 +696,12 @@ std::string Game::ctl_view_json() {
     if (v > 15) fpm = screen(st.position + st.velocity * 4.0f, fx, fy);
     const bool landed = jet_.landed() || (t.contacts >= 2 && v < 4);
     const f32 rocket_left = std::fmax(0.0f, next_jet_missile_ - now) * 1000;
-    add(",\"jet\":{\"kmh\":%.0f,\"mach\":%.3f,\"agl\":%.1f,\"nz\":%.2f,\"alpha\":%.2f,\"flight\":%s,\"nozzleCos\":%.3f,\"lever\":%.3f,"
-        "\"thrust\":%.3f,\"landed\":%s,\"hp\":%.0f,\"burning\":%s,\"rocketLeft\":%.0f,\"fpm\":%s,\"fx\":%.1f,\"fy\":%.1f}",
-        v * 3.6f, t.mach, t.agl, t.nz, v > 20 ? t.alpha / kDeg : 0.0f, jet_.mode() == Jet::Mode::flight ? "true" : "false", std::cos(jet_.nozzle()), jet_.lever(),
-        clampf(jet_.thrust() / jet_.spec().thrust_max, 0, 1), landed ? "true" : "false", std::round(jet_hp_ / 400 * 100),
-        gaps_ && gaps_->jet_burning ? "true" : "false", rocket_left, fpm ? "true" : "false", fx, fy);
+    std::snprintf(b, sizeof b, ",\"jet\":{\"kmh\":%.0f,\"mach\":%.3f,\"agl\":%.1f,\"nz\":%.2f,\"alpha\":%.2f,\"flight\":%s,\"nozzleCos\":%.3f,\"lever\":%.3f,"
+                               "\"thrust\":%.3f,\"landed\":%s,\"hp\":%.0f,\"burning\":%s,\"rocketLeft\":%.0f,\"fpm\":%s,\"fx\":%.1f,\"fy\":%.1f}",
+                               v * 3.6f, t.mach, t.agl, t.nz, v > 20 ? t.alpha / kDeg : 0.0f, jet_.mode() == Jet::Mode::flight ? "true" : "false", std::cos(jet_.nozzle()), jet_.lever(),
+                               clampf(jet_.thrust() / jet_.spec().thrust_max, 0, 1), landed ? "true" : "false", std::round(jet_hp_ / 400 * 100),
+                               gaps_ && gaps_->jet_burning ? "true" : "false", rocket_left, fpm ? "true" : "false", fx, fy);
+    s += b;
   }
   // ---- wanted (wanted_police_drones.mjs renderHud / renderEmpControl)
   {
@@ -717,10 +721,11 @@ std::string Game::ctl_view_json() {
     const bool searching = stars > 0 && wanted::hidden_ms() > 0;
     const f32 escape_left = stars > 0 ? std::fmax(0.0f, wanted::escape_ms(stars) - wanted::hidden_ms()) : 0;
     const f32 next_wave = active == 0 && next_drone_wave_ > now ? (next_drone_wave_ - now) * 1000 : -1;
-    add(",\"wanted\":{\"stars\":%d,\"active\":%d,\"searching\":%s,\"escapeMs\":%.0f,\"inboundMs\":%.0f,\"nextWaveMs\":%.0f,\"banner\":%s,\"busted\":%s,"
-        "\"empMs\":%.0f,\"inRange\":%d,\"miss\":%s}",
-        stars, active, searching ? "true" : "false", escape_left, inbound < 1e8f ? std::fmax(0.0f, inbound) * 1000 : 0.0f, next_wave, now < V.banner_until ? "true" : "false",
-        V.busted ? "true" : "false", std::fmax(0.0f, emp_ready_at_ - now) * 1000, in_range, now < C.emp_miss_until ? "true" : "false");
+    std::snprintf(b, sizeof b, ",\"wanted\":{\"stars\":%d,\"active\":%d,\"searching\":%s,\"escapeMs\":%.0f,\"inboundMs\":%.0f,\"nextWaveMs\":%.0f,\"banner\":%s,\"busted\":%s,"
+                               "\"empMs\":%.0f,\"inRange\":%d,\"miss\":%s}",
+                               stars, active, searching ? "true" : "false", escape_left, inbound < 1e8f ? std::fmax(0.0f, inbound) * 1000 : 0.0f, next_wave, now < V.banner_until ? "true" : "false",
+                               V.busted ? "true" : "false", std::fmax(0.0f, emp_ready_at_ - now) * 1000, in_range, now < C.emp_miss_until ? "true" : "false");
+    s += b;
   }
   // ---- the contract and its toasts (gameplay_fun_runtime.mjs render / toastFor)
   {
@@ -754,10 +759,11 @@ std::string Game::ctl_view_json() {
     V.fun_valid = true;
     V.was_dead = player_dead_;
     V.drone_was_alive = drone_out_;
-    add(",\"fun\":{\"reward\":%d,\"complete\":%s,\"overdrive\":%s,\"momentum\":%d,\"mercy\":%d,\"damageScale\":%.2f,\"risk\":%d,\"score\":%d,\"high\":%d,"
-        "\"mult\":%.2f,\"name\":\"%s\",\"hint\":\"%s\",\"progress\":%d,\"target\":%d,\"stars\":%d,\"toasts\":[",
-        k.reward, f.contract_complete ? "true" : "false", now < f.overdrive_until ? "true" : "false", f.momentum, f.mercy, f.police_damage_scale(), f.at_risk, f.score,
-        f.high_score, f.multiplier(now), jesc(k.name).c_str(), jesc(k.hint).c_str(), f.contract_progress, k.target, wanted::stars());
+    std::snprintf(b, sizeof b, ",\"fun\":{\"reward\":%d,\"complete\":%s,\"overdrive\":%s,\"momentum\":%d,\"mercy\":%d,\"damageScale\":%.2f,\"risk\":%d,\"score\":%d,\"high\":%d,"
+                               "\"mult\":%.2f,\"name\":\"%s\",\"hint\":\"%s\",\"progress\":%d,\"target\":%d,\"stars\":%d,\"toasts\":[",
+                               k.reward, f.contract_complete ? "true" : "false", now < f.overdrive_until ? "true" : "false", f.momentum, f.mercy, f.police_damage_scale(), f.at_risk, f.score,
+                               f.high_score, f.multiplier(now), jesc(k.name).c_str(), jesc(k.hint).c_str(), f.contract_progress, k.target, wanted::stars());
+    s += b;
     for (std::size_t i = 0; i < V.toasts.size(); ++i) s += (i ? "," : "") + V.toasts[i];
     s += "]}";
   }
@@ -785,18 +791,21 @@ std::string Game::ctl_view_json() {
       const f32 along = kern::dot(to, dir);
       if (along > 0 && along < reach && kern::length(to - dir * along) < 1.2f) { actor = true; break; }
     }
-    add(",\"guidedView\":{\"lock\":%s,\"x\":%.1f,\"y\":%.1f,\"d\":%.0f,\"label\":\"%s\",\"denied\":%s,\"actor\":%s,\"cdMs\":%.0f}", lock ? "true" : "false", lx, ly, ld,
-        jesc(label).c_str(), now < C.guided_denied_until ? "true" : "false", actor ? "true" : "false", std::fmax(0.0f, guided_last_ + guided::cooldown() - now) * 1000);
+    std::snprintf(b, sizeof b, ",\"guidedView\":{\"lock\":%s,\"x\":%.1f,\"y\":%.1f,\"d\":%.0f,\"label\":\"%s\",\"denied\":%s,\"actor\":%s,\"cdMs\":%.0f}", lock ? "true" : "false", lx, ly, ld,
+                               jesc(label).c_str(), now < C.guided_denied_until ? "true" : "false", actor ? "true" : "false", std::fmax(0.0f, guided_last_ + guided::cooldown() - now) * 1000);
+    s += b;
   }
   // ---- the strike's recharge (fighter_jets.mjs renderButton --cool)
-  add(",\"strikeK\":%.3f", clampf((now - combat_.last_strike) / kStrikeCooldownS, 0, 1));
+  std::snprintf(b, sizeof b, ",\"strikeK\":%.3f", clampf((now - combat_.last_strike) / kStrikeCooldownS, 0, 1));
+  s += b;
   // the drone's last impact marks [serial, x, y] (screen px); the page shows the ones it has not shown
   s += ",\"impacts\":[";
   bool first = true;
   for (u32 i = C.impact_serial > 8 ? C.impact_serial - 8 : 0; i < C.impact_serial; ++i) {
     f32 x, y;
     if (!screen(C.impacts[i % 8], x, y)) continue;
-    add("%s[%u,%.0f,%.0f]", first ? "" : ",", i + 1, x, y);
+    std::snprintf(b, sizeof b, "%s[%u,%.0f,%.0f]", first ? "" : ",", i + 1, x, y);
+    s += b;
     first = false;
   }
   s += "]";

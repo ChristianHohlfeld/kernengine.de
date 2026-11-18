@@ -1321,36 +1321,43 @@ void Game::update_sound(f32 dt) {
 std::string Game::hud_json() {
   char b[512];
   std::string s = "{";
-  auto add = [&](const char* fmt, auto... v) { std::snprintf(b, sizeof b, fmt, v...); s += b; };
-  add("\"mode\":\"%s\",\"placed\":%s,\"offline\":%s,\"realData\":%s", mode_name(mode_), world_placed_ ? "true" : "false", city_.offline() ? "true" : "false",
-      city_.has_real_data() ? "true" : "false");
+  std::snprintf(b, sizeof b, "\"mode\":\"%s\",\"placed\":%s,\"offline\":%s,\"realData\":%s", mode_name(mode_), world_placed_ ? "true" : "false", city_.offline() ? "true" : "false",
+                             city_.has_real_data() ? "true" : "false");
+  s += b;
   const StreamStats& st = city_.stats();
-  add(",\"tiles\":{\"ready\":%u,\"loading\":%u,\"failed\":%u,\"buildings\":%u,\"colliders\":%u", st.tiles_ready, st.tiles_loading, st.tiles_failed, st.buildings,
-      st.colliders);
-  add(",\"t\":{\"request\":%.0f,\"data\":%.0f,\"decoded\":%.0f,\"terrain\":%.0f,\"built\":%.0f,\"collision\":%.0f,\"work\":%.0f,\"worst\":%.1f,\"worstStep\":\"%s\",\"worstStepMs\":%.1f,\"rebuilds\":%u,\"relays\":%u,\"uploads\":%u,\"uploadKVerts\":%u}}", st.t_request, st.t_data,
-      st.t_decoded, st.t_terrain, st.t_built, st.t_collision, st.work_ms, st.worst_ms, st.worst_step, st.worst_step_ms, st.rebuilds, st.relays, st.uploads, st.upload_vertices);
+  std::snprintf(b, sizeof b, ",\"tiles\":{\"ready\":%u,\"loading\":%u,\"failed\":%u,\"buildings\":%u,\"colliders\":%u", st.tiles_ready, st.tiles_loading, st.tiles_failed, st.buildings,
+                             st.colliders);
+  s += b;
+  std::snprintf(b, sizeof b, ",\"t\":{\"request\":%.0f,\"data\":%.0f,\"decoded\":%.0f,\"terrain\":%.0f,\"built\":%.0f,\"collision\":%.0f,\"work\":%.0f,\"worst\":%.1f,\"worstStep\":\"%s\",\"worstStepMs\":%.1f,\"rebuilds\":%u,\"relays\":%u,\"uploads\":%u,\"uploadKVerts\":%u}}", st.t_request, st.t_data,
+                             st.t_decoded, st.t_terrain, st.t_built, st.t_collision, st.work_ms, st.worst_ms, st.worst_step, st.worst_step_ms, st.rebuilds, st.relays, st.uploads, st.upload_vertices);
+  s += b;
   if (vr_) s += vr_menu_json();  // the headset's wrist menu (game_vr.cpp)
   hud_world(s);  // terrain, water, animals, ... (game_world.cpp)
   life_hud(s);   // animals, street life, ragdolls, interiors (game_life.cpp)
-  add(",\"fps\":%.0f,\"touch\":%s,\"stars\":%d,\"heat\":%.1f", fps_, touch_mode_ ? "true" : "false", wanted::stars(), wanted::heat());
+  std::snprintf(b, sizeof b, ",\"fps\":%.0f,\"touch\":%s,\"stars\":%d,\"heat\":%.1f", fps_, touch_mode_ ? "true" : "false", wanted::stars(), wanted::heat());
+  s += b;
   {
     u32 units = 0;
     for (const PoliceUnit& u : units_) units += u.car >= 0 ? 1 : 0;
-    add(",\"people\":%u,\"officers\":%u,\"police\":%u", people_.count(People::Kind::citizen), people_.count(People::Kind::officer), units);
-    if (mode_ == Mode::car && car_index_ >= 0) add(",\"carHp\":%.0f", cars_[car_index_].hp);
+    std::snprintf(b, sizeof b, ",\"people\":%u,\"officers\":%u,\"police\":%u", people_.count(People::Kind::citizen), people_.count(People::Kind::officer), units);
+    s += b;
+    if (mode_ == Mode::car && car_index_ >= 0) { std::snprintf(b, sizeof b, ",\"carHp\":%.0f", cars_[car_index_].hp); s += b; }
     const f32 now = world_->sim_time();
-    add(",\"weapon\":\"%s\",\"grenades\":%d,\"emp\":%.1f,\"projectiles\":%u", mode_ == Mode::drone ? (drone_weapon_ == 0 ? "MG" : drone_weapon_ == 1 ? "Raketen" : "GUIDED")
-        : mode_ == Mode::jet ? "Bordkanone" : weapons::spec(foot_weapon_).name, grenades_, std::fmax(0.0f, emp_ready_at_ - now), static_cast<u32>(projectiles_.size()));
+    std::snprintf(b, sizeof b, ",\"weapon\":\"%s\",\"grenades\":%d,\"emp\":%.1f,\"projectiles\":%u", mode_ == Mode::drone ? (drone_weapon_ == 0 ? "MG" : drone_weapon_ == 1 ? "Raketen" : "GUIDED")
+                               : mode_ == Mode::jet ? "Bordkanone" : weapons::spec(foot_weapon_).name, grenades_, std::fmax(0.0f, emp_ready_at_ - now), static_cast<u32>(projectiles_.size()));
+    s += b;
     u32 drones = 0;
     for (const PoliceDrone& d : pdrones_) drones += d.active ? 1 : 0;
-    add(",\"policeDrones\":%u,\"explosions\":%u", drones, explosions_);
+    std::snprintf(b, sizeof b, ",\"policeDrones\":%u,\"explosions\":%u", drones, explosions_);
+    s += b;
     if (net_.active()) {
-      add(",\"net\":{\"host\":%s,\"connected\":%s,\"slot\":%u,\"players\":%zu,\"status\":\"%s\"}", net_.hosting() ? "true" : "false", net_.connected() ? "true" : "false",
-          net_.self_slot(), net_.remotes().size() + 1, json_escape(net_.status()).c_str());
+      std::snprintf(b, sizeof b, ",\"net\":{\"host\":%s,\"connected\":%s,\"slot\":%u,\"players\":%zu,\"status\":\"%s\"}", net_.hosting() ? "true" : "false", net_.connected() ? "true" : "false",
+                                 net_.self_slot(), net_.remotes().size() + 1, json_escape(net_.status()).c_str());
+      s += b;
     }
     s += mp_hud_json();  // multiplayer HUD data (game_net.cpp)
-    if (mode_ == Mode::drone) add(",\"droneHp\":%.0f", drone_hp_);
-    if (mode_ == Mode::jet) add(",\"jetHp\":%.0f", jet_hp_);
+    if (mode_ == Mode::drone) { std::snprintf(b, sizeof b, ",\"droneHp\":%.0f", drone_hp_); s += b; }
+    if (mode_ == Mode::jet) { std::snprintf(b, sizeof b, ",\"jetHp\":%.0f", jet_hp_); s += b; }
   }
   const kern::game::Hud& h = world_->hud();
   // Launchers and melee are the game's: their rounds (melee: none) instead of Kern's magazine.
@@ -1360,8 +1367,9 @@ std::string Game::hud_json() {
   (void)h.ammo;
   // player_vitals_runtime.mjs: PLAYER_MAX_HP 100, every hit divided by PLAYER_DAMAGE_TOLERANCE 1.18. Kern's
   // soldier holds 118 (the same thing for every source of damage, falls included): shown as 0..100
-  add(",\"health\":%.0f,\"maxHealth\":%.0f,\"ammo\":%d,\"mag\":%d,\"reserve\":%d,\"reload\":%.2f,\"spread\":%.2f,\"aiming\":%s,\"ads\":%.2f,\"respawn\":%.1f",
-      h.health >= 0 ? h.health / 1.18f : h.health, h.max_health > 0 ? h.max_health / 1.18f : h.max_health, ammo, mag, reserve, h.reload, h.spread, h.aiming ? "true" : "false", world_->aim_blend(), net_.active() ? h.respawn_in : respawn_wait());
+  std::snprintf(b, sizeof b, ",\"health\":%.0f,\"maxHealth\":%.0f,\"ammo\":%d,\"mag\":%d,\"reserve\":%d,\"reload\":%.2f,\"spread\":%.2f,\"aiming\":%s,\"ads\":%.2f,\"respawn\":%.1f",
+                             h.health >= 0 ? h.health / 1.18f : h.health, h.max_health > 0 ? h.max_health / 1.18f : h.max_health, ammo, mag, reserve, h.reload, h.spread, h.aiming ? "true" : "false", world_->aim_blend(), net_.active() ? h.respawn_in : respawn_wait());
+  s += b;
   Vec3 pos = focus_position(), vel;
   f32 agl = pos.z - city_.ground_height(pos.x, pos.y);
   switch (mode_) {
@@ -1370,11 +1378,12 @@ std::string Game::hud_json() {
       vel = world_->actor_velocity(drone_actor_);
       const DroneTelemetry& t = drone_.telemetry();
       agl = t.agl >= 0 ? t.agl : agl;
-      add(",\"drone\":{\"armed\":%s,\"calibrating\":%s,\"fault\":%s,\"game\":%s,\"landing\":%s,\"battery\":%.2f,\"volts\":%.2f,\"amps\":%.1f,\"clearance\":%.1f,"
-          "\"cam\":%d,\"pulses\":[%u,%u,%u,%u]}",
-          t.armed ? "true" : "false", t.calibrating ? "true" : "false", t.fault ? "true" : "false", sticks_.game_mode ? "true" : "false",
-          landing_ ? "true" : "false", t.battery_soc, t.battery_v, t.current_a, sticks_.clearance, drone_cam_, t.pulses[0], t.pulses[1], t.pulses[2],
-          t.pulses[3]);
+      std::snprintf(b, sizeof b, ",\"drone\":{\"armed\":%s,\"calibrating\":%s,\"fault\":%s,\"game\":%s,\"landing\":%s,\"battery\":%.2f,\"volts\":%.2f,\"amps\":%.1f,\"clearance\":%.1f,"
+                                 "\"cam\":%d,\"pulses\":[%u,%u,%u,%u]}",
+                                 t.armed ? "true" : "false", t.calibrating ? "true" : "false", t.fault ? "true" : "false", sticks_.game_mode ? "true" : "false",
+                                 landing_ ? "true" : "false", t.battery_soc, t.battery_v, t.current_a, sticks_.clearance, drone_cam_, t.pulses[0], t.pulses[1], t.pulses[2],
+                                 t.pulses[3]);
+      s += b;
       break;
     }
     case Mode::car:
@@ -1386,9 +1395,10 @@ std::string Game::hud_json() {
         const Vec3 cp = matrix_of(cars_[car_index_].actor).translation();
         i32 contacts = 0;
         for (int w = 0; w < 4; ++w) contacts += cc.wheel(w).contact ? 1 : 0;
-        add(",\"car\":{\"gear\":\"%s\",\"bus\":%s,\"throttle\":%.2f,\"vf\":%.2f,\"contacts\":%d,\"agl\":%.2f,\"jacked\":%.0f,\"awake\":%s}", cc.gear() < 0 ? "R" : "D",
-            cc.spec().radius > 0.4f ? "true" : "false", cc.throttle(), cc.forward_speed(), contacts, cp.z - city_.ground_height(cp.x, cp.y), jacked_at_,
-            world_->physics().body_valid(body(cars_[car_index_].actor)) && world_->physics().awake(body(cars_[car_index_].actor)) ? "true" : "false");
+        std::snprintf(b, sizeof b, ",\"car\":{\"gear\":\"%s\",\"bus\":%s,\"throttle\":%.2f,\"vf\":%.2f,\"contacts\":%d,\"agl\":%.2f,\"jacked\":%.0f,\"awake\":%s}", cc.gear() < 0 ? "R" : "D",
+                                   cc.spec().radius > 0.4f ? "true" : "false", cc.throttle(), cc.forward_speed(), contacts, cp.z - city_.ground_height(cp.x, cp.y), jacked_at_,
+                                   world_->physics().body_valid(body(cars_[car_index_].actor)) && world_->physics().awake(body(cars_[car_index_].actor)) ? "true" : "false");
+        s += b;
       }
       }
       break;
@@ -1396,18 +1406,21 @@ std::string Game::hud_json() {
       vel = world_->actor_velocity(jet_actor_);
       const JetTelemetry& t = jet_.telemetry();
       agl = t.agl;
-      add(",\"jet\":{\"mode\":\"%s\",\"thrust\":%.2f,\"lever\":%.2f,\"mach\":%.2f,\"alpha\":%.1f,\"nz\":%.1f,\"gear\":%s,\"heading\":%.0f,\"pitch\":%.1f,\"roll\":%.1f,"
-          "\"fuel\":%.2f}",
-          jet_.mode() == Jet::Mode::hover ? "SCHWEBEN" : "FLUG", jet_.thrust() / jet_.spec().thrust_max, jet_.lever(), t.mach, t.alpha / kDeg, t.nz,
-          jet_.gear_down() ? "true" : "false", std::fmod(-t.heading / kDeg + 360, 360.0f), t.pitch / kDeg, t.roll / kDeg, jet_.fuel);
+      std::snprintf(b, sizeof b, ",\"jet\":{\"mode\":\"%s\",\"thrust\":%.2f,\"lever\":%.2f,\"mach\":%.2f,\"alpha\":%.1f,\"nz\":%.1f,\"gear\":%s,\"heading\":%.0f,\"pitch\":%.1f,\"roll\":%.1f,"
+                                 "\"fuel\":%.2f}",
+                                 jet_.mode() == Jet::Mode::hover ? "SCHWEBEN" : "FLUG", jet_.thrust() / jet_.spec().thrust_max, jet_.lever(), t.mach, t.alpha / kDeg, t.nz,
+                                 jet_.gear_down() ? "true" : "false", std::fmod(-t.heading / kDeg + 360, 360.0f), t.pitch / kDeg, t.roll / kDeg, jet_.fuel);
+      s += b;
       break;
     }
-    case Mode::parachute: vel = world_->actor_velocity(chute_actor_); add(",\"chute\":%s", chute_open_ ? "true" : "false"); break;
+    case Mode::parachute: vel = world_->actor_velocity(chute_actor_); { std::snprintf(b, sizeof b, ",\"chute\":%s", chute_open_ ? "true" : "false"); s += b; } break;
   }
-  add(",\"speed\":%.2f,\"vz\":%.2f,\"agl\":%.1f,\"alt\":%.1f,\"t\":%.3f", kern::length(vel), vel.z, agl, pos.z, world_->sim_time());
+  std::snprintf(b, sizeof b, ",\"speed\":%.2f,\"vz\":%.2f,\"agl\":%.1f,\"alt\":%.1f,\"t\":%.3f", kern::length(vel), vel.z, agl, pos.z, world_->sim_time());
+  s += b;
   f64 lon, lat;
   unproject(city_.projector(), pos.x, pos.y, lon, lat);
-  add(",\"lon\":%.6f,\"lat\":%.6f", lon, lat);
+  std::snprintf(b, sizeof b, ",\"lon\":%.6f,\"lat\":%.6f", lon, lat);
+  s += b;
   // Context hint.
   hint_.clear();
   if (mode_ == Mode::foot && world_placed_) {

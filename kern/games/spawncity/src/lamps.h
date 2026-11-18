@@ -26,6 +26,8 @@ namespace sc::lamps {
 bool bind(kern::logic::Runtime& logic);
 /// The Blueprint's variable PoleRadius.
 f32 pole_radius();
+/// The Blueprint's function Worse: may a lamp in `state` become `to`?
+bool worse(u8 state, u8 to);
 
 // The lamp as it is built and laid out (the model and the field, not a rule).
 constexpr f32 kSpacing = 34, kPoleH = 6.2f, kGridM = 10, kArm = 1.42f, kHeadZ = kPoleH - 0.2f, kKerb = 1.15f;
@@ -60,6 +62,8 @@ class Field {
   std::vector<i32> near(f32 x, f32 y, f32 r) const;
   /// setState: only ever worse. Returns true when it changed; remembers it for re-placement.
   bool set_state(i32 i, u8 state);
+  /// Lamp i (one of all()) gets the state, remembered for re-placement - set_state once worse() has said yes.
+  void set(i32 i, u8 state);
   /// The lit head nearest along the segment a -> b within 0.38 m (onTracer), or -1.
   i32 shot(Vec3 a, Vec3 b) const;
   struct BlastHit { i32 lamp; u8 state; Vec2 dir; f32 speed; };
