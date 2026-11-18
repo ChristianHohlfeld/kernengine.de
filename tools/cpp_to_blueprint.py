@@ -10953,8 +10953,9 @@ class TestWriter:
                 # a pointer to data: one value that may be missing, or the first of as many as the count beside it says
                 inner = self.spell(re.sub(r"\*\s*(const)?$", "", raw))
                 after = ps[i + 1] if i + 1 < len(ps) else None
-                counted = after is not None and NUMBER.get(self.u.clean(qtype(after))) == "Int" and re.search(r"count|size|len|num|^n$", after.get("name", ""))
-                data = f"std::vector<{inner}>({name}, {name} + {after['name']})" if counted else f"({name} ? std::vector<{inner}>{{*{name}}} : std::vector<{inner}>{{}})"
+                per = count_per(self.u.clean(qtype(after))) if after is not None else None   # (Count<Per>: Per numbers each)
+                counted = per is not None and re.search(r"count|size|len|num|^n$", after.get("name", ""))
+                data = f"std::vector<{inner}>({name}, {name} + {per} * static_cast<std::size_t>({after['name']}))" if counted else f"({name} ? std::vector<{inner}>{{*{name}}} : std::vector<{inner}>{{}})"
                 params.append((f"const {inner}* {name}", default))
                 values.append(f"converted::value_of({self.wrap(data, f'std::vector<{inner}>')})")
             elif re.match(r"(?:kern::)?Span<", self.u.clean(raw)):

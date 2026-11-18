@@ -407,8 +407,8 @@ class Calls:
                 args.append(f"{a}.empty() ? nullptr : {a}.data()")
                 nxt = params[i + 1][0] if i + 1 < len(params) else None
                 if nxt is not None and re.search(r"count|size|len|num|^n$", nxt) and pin.get(nxt, ("", None))[0] == "Int":
-                    # (the first of as many as the count beside it says: no more than the list has - the engine reads them)
-                    after_take = f'if (ev::room(a{i + 1}) > {a}.size()) {{ o.error = "the list {pin_in} has fewer entries than {nxt} says"; return false; }}'
+                    # (the first of as many as the count beside it says - Count<Per>: Per numbers each -: no more than the list has - the engine reads them)
+                    after_take = f'if (ev::numbers(a{i + 1}) > {a}.size()) {{ o.error = "the list {pin_in} has fewer entries than {nxt} says"; return false; }}'
                     later.append(after_take)
             elif re.match(r"kern::Span<", re.sub(r"\s*\bconst\s*&$|\s*&$", "", P)):
                 span = re.sub(r"\s*\bconst\s*&$|\s*&$", "", P)
@@ -540,8 +540,8 @@ class Calls:
                 args.append(f"{a}.empty() ? nullptr : {a}.data()")
                 nxt = params[i + 1][0] if i + 1 < len(params) else None
                 if nxt is not None and re.search(r"count|size|len|num|^n$", nxt) and pin.get(nxt, ("", None))[0] == "Int":
-                    # (the first of as many as the count beside it says: no more than the list has - the engine reads them)
-                    later.append(f'if ({EV}room(kern_a{i + 1}) > {a}.size()) {{ kern_o->error = "the list {pin_in} has fewer entries than {nxt} says"; {fail(given)} }}')
+                    # (the first of as many as the count beside it says - Count<Per>: Per numbers each -: no more than the list has - the engine reads them)
+                    later.append(f'if ({EV}numbers(kern_a{i + 1}) > {a}.size()) {{ kern_o->error = "the list {pin_in} has fewer entries than {nxt} says"; {fail(given)} }}')
             elif re.match(r"kern::Span<", re.sub(r"\s*\bconst\s*&$|\s*&$", "", P)):
                 span = re.sub(r"\s*\bconst\s*&$|\s*&$", "", P)
                 item = c2b.template_args(span)[0].strip()
