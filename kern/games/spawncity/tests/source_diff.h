@@ -169,8 +169,7 @@ template <class T> constexpr bool drawn_on_new() {
 }
 /// The characters of a text the old side points to: kept for as long as the test runs.
 inline const char* kept_text(const std::string& t) {
-  static std::deque<std::string> kept;
-  if (kept.size() > 100000) kept.clear();   // (the texts of calls long done)
+  static std::deque<std::string> kept;   // (never given back: a text of a call before may still be pointed to)
   return kept.emplace_back(t).c_str();
 }
 template <class A, class B> void carry(const A& a, B& b) {
@@ -589,9 +588,11 @@ struct World {
 
 /// The rounds of the loops of a call: one that goes round more often than this is given up (not compared).
 inline long g_rounds = 0;
-inline constexpr long kRounds = 20000000;
+inline constexpr long kRounds = 500000000;
+inline std::chrono::steady_clock::time_point g_call_began;
 inline void tick() {
-  if (++g_rounds > kRounds && converted::g_can_bail) {
+  // (and one that runs longer than a minute: looked at every million rounds)
+  if (((++g_rounds > kRounds) || ((g_rounds & 0xFFFFF) == 0 && std::chrono::steady_clock::now() - g_call_began > std::chrono::seconds(60))) && converted::g_can_bail) {
     converted::g_can_bail = false;
     converted::g_open = true;
     std::longjmp(converted::g_bail, 1);
@@ -605,6 +606,7 @@ template <class F> bool run(F&& f, long& asks) {
   converted::g_open = false;
   converted::g_open_reads = 0;
   g_rounds = 0;
+  g_call_began = std::chrono::steady_clock::now();
   if (setjmp(converted::g_bail) != 0) {
     cost::end();
     converted::may_bail(false);
