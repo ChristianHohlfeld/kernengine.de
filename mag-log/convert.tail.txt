@@ -1,0 +1,80 @@
+    road_palette (4): written
+    area_color (11): written
+    signed_area (5): written
+    rect_distance_to (4): written
+    cell_key (1): written
+    cell_of (1): written
+    building_options (7): written
+    put_footprint (10): written
+    CityStream::start (12): remove_tints() is defined in another file
+    CityStream::clear (16): remove_tints() is defined in another file
+    CityStream::remove (32): remove_tints() is defined in another file
+    CityStream::request_around (28): unproject() is defined in another file
+    CityStream::ring_bounds (10): unproject() is defined in another file
+    CityStream::unload_far (18): unproject() is defined in another file
+    CityStream::take_requests (11): written
+    CityStream::provide (9): tile_input() is defined in another file
+    CityStream::fail (11): it calls CityStream::remove(), which waits
+    CityStream::go_offline (22): it calls CityStream::remove(), which waits
+    CityStream::furniture (6): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    CityStream::features (4): written
+    CityStream::ready_at (14): ready_at() is defined in another file
+    CityStream::feed_terrain (12): add_water_polygon() is defined in another file
+    CityStream::finish_features (61): road_is_water() is defined in another file
+    CityStream::select_cells (62): written
+    CityStream::drop_cell (10): written
+    CityStream::upload (15): written
+    CityStream::begin_roads (17): a member of Int is set
+    CityStream::relay (13): it calls CityStream::begin_roads(), which waits
+    CityStream::update_collision (54): written
+    CityStream::build_near (19): written
+    CityStream::building_shape (50): written
+    CityStream::damage_building (30): written
+    CityStream::damage_list (6): written
+    CityStream::damage_of (6): written
+    CityStream::merge_damage (44): written
+    CityStream::clear_damage (16): written
+    CityStream::begin_cells (22): buildings_input() is defined in another file
+    CityStream::finish_cells (44): chunk_count() is defined in another file
+    CityStream::work (110): read_features() is defined in another file
+    CityStream::update (85): it calls CityStream::request_around(), which waits
+    CityStream::step_time (4): written
+    CityStream::walls_near (32): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    CityStream::building_at (18): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    CityStream::street_point (19): it calls CityStream::ground_height(), which waits
+    CityStream::buildings_near (13): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    CityStream::ready_tiles (6): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    CityStream::areas_near (13): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    CityStream::recollide (5): written
+    CityStream::exclude_building (13): written
+    CityStream::exclusion_done (1): written
+
+116 of 152 functions of the program are written as Blueprints (1050 of 1763 lines), and 10 of the engine's headers that they call: 19 Blueprints - 3 of source files, 0 of states, 16 of headers and of shapes
+111 functions of the Blueprints are compared with their source, bit for bit, by the tests in /dev/shm/spawncity-jobs-chris/work-f2-probe-153935-13433/pt/converted - each once, in the Blueprint it stands in; 1 give nothing
+
+what the others wait for: functions (lines)
+     1 (   110)   read_features() is defined in another file
+     6 (    88)   its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+     1 (    85)   it calls CityStream::request_around(), which waits
+     1 (    61)   road_is_water() is defined in another file
+     3 (    60)   remove_tints() is defined in another file
+     3 (    56)   unproject() is defined in another file
+     4 (    48)   a call on the Blueprint of the actor Lamps, which the level does not have
+     1 (    44)   chunk_count() is defined in another file
+     2 (    33)   it calls CityStream::remove(), which waits
+     2 (    23)   it calls CityStream::ground_height(), which waits
+     1 (    22)   buildings_input() is defined in another file
+     1 (    17)   a member of Int is set
+     1 (    14)   ready_at() is defined in another file
+     2 (    14)   it calls worse(), which waits
+     1 (    13)   it calls CityStream::begin_roads(), which waits
+     1 (    12)   add_water_polygon() is defined in another file
+     1 (     9)   tile_input() is defined in another file
+     1 (     1)   height() is defined in another file
+     1 (     1)   the Blueprint of the actor Lamps, which the level does not have
+     1 (     1)   a variable of the Blueprint of the actor Lamps, which the level does not have
+     1 (     1)   elevation() is defined in another file
+
+real	3m26,572s
+user	7m13,686s
+sys	0m25,678s
