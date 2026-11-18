@@ -1256,7 +1256,7 @@ void Terrain::build_water_chunk(i32 ci, i32 cj, bool detail) {
         any = any || (w && i >= B && j >= B && i < W - B && j < W - B);
       }
     if (any) {
-      auto at = [&](i32 i, i32 j) -> f32& { return dist[static_cast<std::size_t>(j) * W + i]; };
+      auto at = [&](i32 i, i32 j) { return dist[static_cast<std::size_t>(j) * W + i]; };
       for (i32 j = 0; j < W; ++j)
         for (i32 i = 0; i < W; ++i) {
           if (!water[static_cast<std::size_t>(j) * W + i]) continue;
@@ -1265,7 +1265,7 @@ void Terrain::build_water_chunk(i32 ci, i32 cj, bool detail) {
           if (j > 0) d = std::fmin(d, at(i, j - 1) + 1);
           if (i > 0 && j > 0) d = std::fmin(d, at(i - 1, j - 1) + 1.414f);
           if (i < W - 1 && j > 0) d = std::fmin(d, at(i + 1, j - 1) + 1.414f);
-          at(i, j) = d;
+          dist[static_cast<std::size_t>(j) * W + i] = d;
         }
       for (i32 j = W - 1; j >= 0; --j)
         for (i32 i = W - 1; i >= 0; --i) {
@@ -1275,7 +1275,7 @@ void Terrain::build_water_chunk(i32 ci, i32 cj, bool detail) {
           if (j < W - 1) d = std::fmin(d, at(i, j + 1) + 1);
           if (i < W - 1 && j < W - 1) d = std::fmin(d, at(i + 1, j + 1) + 1.414f);
           if (i > 0 && j < W - 1) d = std::fmin(d, at(i - 1, j + 1) + 1.414f);
-          at(i, j) = d;
+          dist[static_cast<std::size_t>(j) * W + i] = d;
         }
       // corners shared by their cells (vtx in world_water.mjs)
       std::vector<i32> corner(static_cast<std::size_t>(per + 1) * (per + 1), -1);

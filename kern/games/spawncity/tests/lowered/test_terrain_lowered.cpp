@@ -3220,7 +3220,7 @@ void Terrain::build_water_chunk(i32 ci, i32 cj, bool detail) {
         any = any || (w && i >= B && j >= B && i < ::sc::lowered::minus(W, B) && j < ::sc::lowered::minus(W, B));
       }
     if (any) {
-      auto at = [&](i32 i, i32 j) -> f32& { return ::sc::converted::at(dist, static_cast<std::size_t>(j) * W + i); };
+      auto at = [&](i32 i, i32 j) { return ::sc::converted::at(dist, static_cast<std::size_t>(j) * W + i); };
       for (i32 j = 0; j < W; ::sc::lowered::pre_inc(j))
         for (i32 i = 0; i < W; ::sc::lowered::pre_inc(i)) {
           if (!::sc::converted::at(water, static_cast<std::size_t>(j) * W + i)) continue;
@@ -3229,7 +3229,7 @@ void Terrain::build_water_chunk(i32 ci, i32 cj, bool detail) {
           if (j > 0) d = std::fmin(d, at(i, ::sc::lowered::minus(j, 1)) + 1);
           if (i > 0 && j > 0) d = std::fmin(d, at(::sc::lowered::minus(i, 1), ::sc::lowered::minus(j, 1)) + 1.414f);
           if (i < ::sc::lowered::minus(W, 1) && j > 0) d = std::fmin(d, at(::sc::lowered::plus(i, 1), ::sc::lowered::minus(j, 1)) + 1.414f);
-          at(i, j) = d;
+          ::sc::converted::at(dist, static_cast<std::size_t>(j) * W + i) = d;
         }
       for (i32 j = ::sc::lowered::minus(W, 1); j >= 0; ::sc::lowered::pre_dec(j))
         for (i32 i = ::sc::lowered::minus(W, 1); i >= 0; ::sc::lowered::pre_dec(i)) {
@@ -3239,7 +3239,7 @@ void Terrain::build_water_chunk(i32 ci, i32 cj, bool detail) {
           if (j < ::sc::lowered::minus(W, 1)) d = std::fmin(d, at(i, ::sc::lowered::plus(j, 1)) + 1);
           if (i < ::sc::lowered::minus(W, 1) && j < ::sc::lowered::minus(W, 1)) d = std::fmin(d, at(::sc::lowered::plus(i, 1), ::sc::lowered::plus(j, 1)) + 1.414f);
           if (i > 0 && j < ::sc::lowered::minus(W, 1)) d = std::fmin(d, at(::sc::lowered::minus(i, 1), ::sc::lowered::plus(j, 1)) + 1.414f);
-          at(i, j) = d;
+          ::sc::converted::at(dist, static_cast<std::size_t>(j) * W + i) = d;
         }
       // corners shared by their cells (vtx in world_water.mjs)
       std::vector<i32> corner(static_cast<std::size_t>(::sc::lowered::plus(per, 1)) * (::sc::lowered::plus(per, 1)), -1);
@@ -3477,6 +3477,34 @@ SC_TEST(lowered_terrain_cpp) {
       long old_asks = 0, new_asks = 0;
       const bool old_defined = ::sc::lowered::run([&] { o_self.set_craters(o0.get()); }, old_asks);
       const bool new_defined = ::sc::lowered::run([&] { n_self.set_craters(n0.get()); }, new_asks);
+      ::sc::lowered::Differs differs;
+      differs.check("its object", o_self, n_self);
+      tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
+    }
+  }
+  {  // Terrain::build_water_chunk(i32, i32, bool)  ->  Terrain::build_water_chunk(i32, i32, bool)
+    ::sc::lowered::Tally tally("Terrain::build_water_chunk(i32, i32, bool)");
+    ::sc::converted::Draw draw;
+    for (int call = 0; tally.more(call); ++call) {
+      ::sc_old_terrain::sc::Terrain o_self{};
+      if (draw.flag()) ::sc::lowered::draw(draw, o_self);
+      ::sc_new_terrain::sc::Terrain n_self{};
+      ::sc::lowered::carry(o_self, n_self);
+      ::sc::lowered::Arg<i32> o0;
+      ::sc::lowered::draw(draw, o0);
+      ::sc::lowered::Arg<i32> n0;
+      ::sc::lowered::carry(o0, n0);
+      ::sc::lowered::Arg<i32> o1;
+      ::sc::lowered::draw(draw, o1);
+      ::sc::lowered::Arg<i32> n1;
+      ::sc::lowered::carry(o1, n1);
+      ::sc::lowered::Arg<bool> o2;
+      ::sc::lowered::draw(draw, o2);
+      ::sc::lowered::Arg<bool> n2;
+      ::sc::lowered::carry(o2, n2);
+      long old_asks = 0, new_asks = 0;
+      const bool old_defined = ::sc::lowered::run([&] { o_self.build_water_chunk(o0.get(), o1.get(), o2.get()); }, old_asks);
+      const bool new_defined = ::sc::lowered::run([&] { n_self.build_water_chunk(n0.get(), n1.get(), n2.get()); }, new_asks);
       ::sc::lowered::Differs differs;
       differs.check("its object", o_self, n_self);
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
