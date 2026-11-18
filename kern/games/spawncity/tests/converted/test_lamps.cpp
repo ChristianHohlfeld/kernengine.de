@@ -68,6 +68,8 @@ namespace lamps { struct Field {
   
   /// setState: only ever worse. Returns true when it changed; remembers it for re-placement.
   
+  /// Lamp i (one of all()) gets the state, remembered for re-placement - set_state once worse() has said yes.
+  
   /// The lit head nearest along the segment a -> b within 0.38 m (onTracer), or -1.
   
   struct BlastHit { i32 lamp; u8 state; Vec2 dir; f32 speed; };

@@ -42,7 +42,7 @@ struct Vec4 {
   
   
   
-  
+  constexpr bool operator==(const Vec4& o) const { return x == o.x && y == o.y && z == o.z && w == o.w; }
 };
 struct Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
@@ -189,11 +189,12 @@ struct MeshData {
   /// Borrowed MeshInput view (geometry only; material etc. stay default).
   
 };
+struct Renderer;
 namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
 namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
-namespace physics { struct Body { u64 id = 0; }; }
-namespace physics { struct Shape { u64 id = 0; }; }
-namespace physics { struct Joint { u64 id = 0; }; }
+namespace physics { struct Body { u64 id = 0; bool operator==(const Body& o) const { return id == o.id; } }; }
+namespace physics { struct Shape { u64 id = 0; bool operator==(const Shape& o) const { return id == o.id; } }; }
+namespace physics { struct Joint { u64 id = 0; bool operator==(const Joint& o) const { return id == o.id; } }; }
 namespace physics { struct Pose {
   Vec3 position;
   Quat rotation;
@@ -341,6 +342,7 @@ struct GeoProjector {
 };
 enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
 enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
+struct Renderer;
 struct Renderer : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -348,7 +350,7 @@ namespace mvt { enum class GeomType : u8 { unknown = 0, point = 1, line = 2, pol
 constexpr i32 kTileZoom = 14;
 struct TileKey {
   i32 z = kTileZoom, x = 0, y = 0;
-  
+  bool operator==(const TileKey& o) const { return z == o.z && x == o.x && y == o.y; }
   
 };
 enum class RoadClass : u8 { motorway, trunk, primary, secondary, tertiary, minor, service, track, path, pedestrian, river, canal, stream };
@@ -486,7 +488,7 @@ struct Terrain {
 
   
   /// One crater as it goes over the network (destruction sync: game_destruction_sync.cpp).
-  struct CraterRec { f32 x = 0, y = 0, r = 0, depth = 0; };
+  struct CraterRec { f32 x = 0, y = 0, r = 0, depth = 0; bool operator==(const CraterRec& o) const { return x == o.x && y == o.y && r == o.r && depth == o.depth; } };
   
   /// The host's craters, in his order: only what differs is dug or filled (its tiles rebuilt).
   
@@ -2290,9 +2292,29 @@ enum class Opt : u8 {
   vr_arms, vr_level, vr_tunnel, vr_smooth_turn,
   count
 };
+struct OptSpec {
+  std::string key;      // command / storage key
+  std::string section;  // menu section: maus, drohne, fuss, auto, kamera, ton, welt
+  std::string label;    // menu label (German)
+  std::string help;     // one line (settings_help.mjs)
+  f32 min, max, step, def;
+  bool toggle;
+  bool live;            // false: a WORLD kind the game does not have yet (shown as "bald")
+};
+struct Option {
+  std::string key, section, label, help;
+  f64 min = 0, max = 0, step = 0, def = 0;
+  bool toggle = false, live = false;
+};
+struct SettingsTable {
+  std::vector<Option> rows;
+  std::vector<OptSpec> specs;
+};
 struct Settings {
  public:
-  /// Every setting at its default (as the table bound at this moment has it).
+  /// Every setting at 0 (as an empty table has it).
+  Settings() = default;
+  /// Every setting at its default (as the table has it).
   
   
   
@@ -2308,11 +2330,12 @@ struct Settings {
   
 
  private:
-  f32 v_[static_cast<u32>(Opt::count)];
+  f32 v_[static_cast<u32>(Opt::count)] = {};
   u32 version_ = 1;
 };
 struct UiState {
   Settings settings;
+  SettingsTable settings_table;  // the table of the settings (the level's Blueprint "Settings", bind_settings)
   u32 applied = 0;          // settings version the game last applied
   bool paused = false;      // a menu is open (title, pause, settings): no input, no simulation
   bool audio_paused = false;
@@ -2625,6 +2648,8 @@ namespace lamps { struct Field {
   
   /// setState: only ever worse. Returns true when it changed; remembers it for re-placement.
   
+  /// Lamp i (one of all()) gets the state, remembered for re-placement - set_state once worse() has said yes.
+  
   /// The lit head nearest along the segment a -> b within 0.38 m (onTracer), or -1.
   
   struct BlastHit { i32 lamp; u8 state; Vec2 dir; f32 speed; };
@@ -2805,6 +2830,7 @@ struct GapsState {
   std::vector<SniperRound> sniper_rounds;
   Part rocket_part;
 };
+struct LifeArt;
 struct Interiors {
  public:
   struct Door { Vec2 c, d, n; };  // centre on the facade, along the wall, outward normal
@@ -3883,6 +3909,9 @@ struct Marks {
   struct Scorch { Vec2 c; f32 r = 0; u32 seed = 0; };
   struct WallMark { Vec3 c; Vec2 n, d; f32 size = 0, level = 0; u32 seed = 0; bool breach = false; u64 cell = 0; };
   struct Chunk { physics::Body body; Vec3 half; f32 until = 0; };
+  // A ring of at most `cap` items, the oldest gives way: one function per type of item.
+  
+  
   
   
   
@@ -3922,8 +3951,10 @@ struct TrafficRules {
   };
 
   /// Binds the rules to the logic the level's Blueprints run in (the game once its world has started,
-  /// tests the one they run) - the Blueprint of the actor "Traffic", found by its name at every call -
-  /// and takes its distances and times. True: the actor has a Blueprint that runs there.
+  /// tests the one they run) - the Blueprint of the actor "Traffic", found by its name at every call.
+  /// True: the actor has a Blueprint that runs there.
+  
+  /// Takes the distances and times of the bound Blueprint (zeros where none runs).
   
   
   u64 built_from = ~0ull;
@@ -3957,6 +3988,9 @@ struct TrafficRules {
 
  private:
   struct Blocked { f32 since = -1, next_honk = 0, wait_since = -1; };
+  /// The distances and times of the Blueprint (take_laws).
+  struct Laws { f32 ahead_min = 0, ahead_max = 0, stop_line = 0, first_come = 0, claim_s = 0, patience_s = 0; };
+  Laws laws_;
   std::vector<Junction> junctions_;
   converted::wide::Map<u64, std::vector<i32>> grid_;
   converted::wide::Map<i32, Blocked> blocked_;
@@ -4795,8 +4829,7 @@ struct Game {
   
   
   i32 toss_test_ = -1;
-  
-  std::unique_ptr<TossState> toss_;
+  TossState toss_;
   // every round in flight replicated (game_projsync.cpp): ours streamed, the mates' drawn on their track
   
   
@@ -4854,7 +4887,7 @@ struct Game {
   
   
   
-  
+    // u is units_[unit]
   
   
   
@@ -5355,7 +5388,7 @@ struct Game {
   LookState look_;
   std::unique_ptr<GameLife> glife_;  // M3 life (last: destroyed before world_)
 };
-bool is_bus(const TrafficCar& c) { return c.car->spec().radius > 0.4; }
+bool is_bus(const TrafficCar& c) { return converted::present(c.car)->spec().radius > 0.4; }
 f32 Game::car_max_hp(const TrafficCar& c) const {
   // police CAR_HP 300; TARGET_HP car 180, bus 320
   return c.police ? 300.0 : is_bus(c) ? 320.0 : 180.0;
@@ -6081,6 +6114,21 @@ namespace physics { using converted::arg; using converted::same; using converted
 [[maybe_unused]] static bool defined(const Marks& s) { return defined(s.scorches_) && defined(s.soots_) && defined(s.breaches_) && defined(s.cracks_) && defined(s.crack_cursor_) && defined(s.rubble_) && defined(s.scorch_cursor_) && defined(s.soot_cursor_) && defined(s.breach_cursor_) && defined(s.rubble_cursor_) && defined(s.near_) && defined(converted::array_list(s.ground_mesh_)) && defined(s.wall_mesh_) && defined(s.dirty_) && defined(s.damage_seen_) && defined(s.stats_) && defined(converted::array_list(s.ground_data_)) && defined(s.wall_data_) && defined(s.struck_); }
 [[maybe_unused]] static std::string text(const Marks& s) { return std::string("{") + text(s.scorches_) + ", " + text(s.soots_) + ", " + text(s.breaches_) + ", " + text(s.cracks_) + ", " + text(s.crack_cursor_) + ", " + text(s.rubble_) + ", " + text(s.scorch_cursor_) + ", " + text(s.soot_cursor_) + ", " + text(s.breach_cursor_) + ", " + text(s.rubble_cursor_) + ", " + text(s.near_) + ", " + text(converted::array_list(s.ground_mesh_)) + ", " + text(s.wall_mesh_) + ", " + text(s.dirty_) + ", " + text(s.damage_seen_) + ", " + text(s.stats_) + ", " + text(converted::array_list(s.ground_data_)) + ", " + text(s.wall_data_) + ", " + text(s.struck_) + "}"; }
 [[maybe_unused]] static void take(Marks& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 19) return; converted::take_as<std::vector<Marks::Scorch>>(s.scorches_, (*v.rows)[0]); converted::take_as<std::vector<Marks::WallMark>>(s.soots_, (*v.rows)[1]); converted::take_as<std::vector<Marks::WallMark>>(s.breaches_, (*v.rows)[2]); converted::take_as<std::vector<Marks::WallMark>>(s.cracks_, (*v.rows)[3]); converted::take_as<unsigned int>(s.crack_cursor_, (*v.rows)[4]); converted::take_as<std::vector<Marks::Chunk>>(s.rubble_, (*v.rows)[5]); converted::take_as<unsigned int>(s.scorch_cursor_, (*v.rows)[6]); converted::take_as<unsigned int>(s.soot_cursor_, (*v.rows)[7]); converted::take_as<unsigned int>(s.breach_cursor_, (*v.rows)[8]); converted::take_as<unsigned int>(s.rubble_cursor_, (*v.rows)[9]); converted::take_as<std::vector<CityStream::Wall>>(s.near_, (*v.rows)[10]); { std::vector<unsigned int> items; converted::take_as<std::vector<unsigned int>>(items, (*v.rows)[11]); converted::array_from(s.ground_mesh_, items); } converted::take_as<unsigned int>(s.wall_mesh_, (*v.rows)[12]); converted::take_as<bool>(s.dirty_, (*v.rows)[13]); converted::take_as<unsigned int>(s.damage_seen_, (*v.rows)[14]); converted::take_as<Marks::Stats>(s.stats_, (*v.rows)[15]); { std::vector<MeshData> items; converted::take_as<std::vector<MeshData>>(items, (*v.rows)[16]); converted::array_from(s.ground_data_, items); } converted::take_as<MeshData>(s.wall_data_, (*v.rows)[17]); converted::take_as<bool>(s.struck_, (*v.rows)[18]); }
+[[maybe_unused]] static TrafficRules::Laws draw_TrafficRules__Laws(converted::Draw& draw) {
+  TrafficRules::Laws s{};
+  s.ahead_min = draw.number();
+  s.ahead_max = draw.number();
+  s.stop_line = draw.number();
+  s.first_come = draw.number();
+  s.claim_s = draw.number();
+  s.patience_s = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const TrafficRules::Laws& s) { return converted::Value::structure({arg(s.ahead_min), arg(s.ahead_max), arg(s.stop_line), arg(s.first_come), arg(s.claim_s), arg(s.patience_s)}); }
+[[maybe_unused]] static bool same(const TrafficRules::Laws& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.ahead_min, (*got.rows)[0]) && same(want.ahead_max, (*got.rows)[1]) && same(want.stop_line, (*got.rows)[2]) && same(want.first_come, (*got.rows)[3]) && same(want.claim_s, (*got.rows)[4]) && same(want.patience_s, (*got.rows)[5]); }
+[[maybe_unused]] static bool defined(const TrafficRules::Laws& s) { return defined(s.ahead_min) && defined(s.ahead_max) && defined(s.stop_line) && defined(s.first_come) && defined(s.claim_s) && defined(s.patience_s); }
+[[maybe_unused]] static std::string text(const TrafficRules::Laws& s) { return std::string("{") + text(s.ahead_min) + ", " + text(s.ahead_max) + ", " + text(s.stop_line) + ", " + text(s.first_come) + ", " + text(s.claim_s) + ", " + text(s.patience_s) + "}"; }
+[[maybe_unused]] static void take(TrafficRules::Laws& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<double>(s.ahead_min, (*v.rows)[0]); converted::take_as<double>(s.ahead_max, (*v.rows)[1]); converted::take_as<double>(s.stop_line, (*v.rows)[2]); converted::take_as<double>(s.first_come, (*v.rows)[3]); converted::take_as<double>(s.claim_s, (*v.rows)[4]); converted::take_as<double>(s.patience_s, (*v.rows)[5]); }
 [[maybe_unused]] static TrafficRules::Arm draw_TrafficRules__Arm(converted::Draw& draw) {
   TrafficRules::Arm s{};
   s.dir = draw.vector2();
@@ -6127,16 +6175,17 @@ namespace physics { using converted::arg; using converted::same; using converted
   TrafficRules s{};
   s.built_from = static_cast<u64>(draw.bits());
   s.lights_time = draw.number();
+  s.laws_ = draw_TrafficRules__Laws(draw);
   s.junctions_ = draw_list(draw, [&]() -> TrafficRules::Junction { return draw_TrafficRules__Junction(draw); });
   s.grid_ = converted::draw_map<converted::wide::Map<u64, std::vector<int>>>(draw, [&]() -> u64 { return static_cast<u64>(draw.bits()); }, [&]() -> std::vector<int> { return draw_list(draw, [&]() -> int { return static_cast<int>(draw.whole()); }); });
   s.blocked_ = converted::draw_map<converted::wide::Map<int, TrafficRules::Blocked>>(draw, [&]() -> int { return static_cast<int>(draw.whole()); }, [&]() -> TrafficRules::Blocked { return draw_TrafficRules__Blocked(draw); });
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const TrafficRules& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.built_from)), arg(s.lights_time), arg(s.junctions_), arg(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_)), arg(s.blocked_)}); }
-[[maybe_unused]] static bool same(const TrafficRules& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(converted::shaped<converted::Whole>(want.built_from), (*got.rows)[0]) && same(want.lights_time, (*got.rows)[1]) && same(want.junctions_, (*got.rows)[2]) && same(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(want.grid_), (*got.rows)[3]) && same(want.blocked_, (*got.rows)[4]); }
-[[maybe_unused]] static bool defined(const TrafficRules& s) { return defined(converted::shaped<converted::Whole>(s.built_from)) && defined(s.lights_time) && defined(s.junctions_) && defined(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_)) && defined(s.blocked_); }
-[[maybe_unused]] static std::string text(const TrafficRules& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.built_from)) + ", " + text(s.lights_time) + ", " + text(s.junctions_) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_)) + ", " + text(s.blocked_) + "}"; }
-[[maybe_unused]] static void take(TrafficRules& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<converted::Whole>(s.built_from, (*v.rows)[0]); converted::take_as<double>(s.lights_time, (*v.rows)[1]); converted::take_as<std::vector<TrafficRules::Junction>>(s.junctions_, (*v.rows)[2]); converted::take_as<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_, (*v.rows)[3]); converted::take_as<converted::wide::Map<int, TrafficRules::Blocked>>(s.blocked_, (*v.rows)[4]); }
+[[maybe_unused]] static converted::Value arg(const TrafficRules& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.built_from)), arg(s.lights_time), arg(s.laws_), arg(s.junctions_), arg(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_)), arg(s.blocked_)}); }
+[[maybe_unused]] static bool same(const TrafficRules& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(converted::shaped<converted::Whole>(want.built_from), (*got.rows)[0]) && same(want.lights_time, (*got.rows)[1]) && same(want.laws_, (*got.rows)[2]) && same(want.junctions_, (*got.rows)[3]) && same(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(want.grid_), (*got.rows)[4]) && same(want.blocked_, (*got.rows)[5]); }
+[[maybe_unused]] static bool defined(const TrafficRules& s) { return defined(converted::shaped<converted::Whole>(s.built_from)) && defined(s.lights_time) && defined(s.laws_) && defined(s.junctions_) && defined(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_)) && defined(s.blocked_); }
+[[maybe_unused]] static std::string text(const TrafficRules& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.built_from)) + ", " + text(s.lights_time) + ", " + text(s.laws_) + ", " + text(s.junctions_) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_)) + ", " + text(s.blocked_) + "}"; }
+[[maybe_unused]] static void take(TrafficRules& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<converted::Whole>(s.built_from, (*v.rows)[0]); converted::take_as<double>(s.lights_time, (*v.rows)[1]); converted::take_as<TrafficRules::Laws>(s.laws_, (*v.rows)[2]); converted::take_as<std::vector<TrafficRules::Junction>>(s.junctions_, (*v.rows)[3]); converted::take_as<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_, (*v.rows)[4]); converted::take_as<converted::wide::Map<int, TrafficRules::Blocked>>(s.blocked_, (*v.rows)[5]); }
 [[maybe_unused]] static TrafficRules::View draw_TrafficRules__View(converted::Draw& draw) {
   TrafficRules::View s{};
   s.junction = static_cast<int>(draw.whole());
@@ -9805,6 +9854,55 @@ namespace mp { using converted::arg; using converted::same; using converted::def
 [[maybe_unused]] static bool defined(const SoundFx& s) { return defined(s.mixer_) && defined(s.rotor_) && defined(s.prop_wash_) && defined(s.engine_) && defined(s.turbine_) && defined(s.roar_) && defined(s.wind_) && defined(s.siren_); }
 [[maybe_unused]] static std::string text(const SoundFx& s) { return std::string("{") + text(s.mixer_) + ", " + text(s.rotor_) + ", " + text(s.prop_wash_) + ", " + text(s.engine_) + ", " + text(s.turbine_) + ", " + text(s.roar_) + ", " + text(s.wind_) + ", " + text(s.siren_) + "}"; }
 [[maybe_unused]] static void take(SoundFx& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 8) return; converted::take_as<Mixer*>(s.mixer_, (*v.rows)[0]); converted::take_as<SoundFx::Loop>(s.rotor_, (*v.rows)[1]); converted::take_as<SoundFx::Loop>(s.prop_wash_, (*v.rows)[2]); converted::take_as<SoundFx::Loop>(s.engine_, (*v.rows)[3]); converted::take_as<SoundFx::Loop>(s.turbine_, (*v.rows)[4]); converted::take_as<SoundFx::Loop>(s.roar_, (*v.rows)[5]); converted::take_as<SoundFx::Loop>(s.wind_, (*v.rows)[6]); converted::take_as<SoundFx::Loop>(s.siren_, (*v.rows)[7]); }
+[[maybe_unused]] static Option draw_Option(converted::Draw& draw) {
+  Option s{};
+  s.key = draw.word();
+  s.section = draw.word();
+  s.label = draw.word();
+  s.help = draw.word();
+  s.min = draw.number();
+  s.max = draw.number();
+  s.step = draw.number();
+  s.def = draw.number();
+  s.toggle = draw.flag();
+  s.live = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Option& s) { return converted::Value::structure({arg(s.key), arg(s.section), arg(s.label), arg(s.help), arg(s.min), arg(s.max), arg(s.step), arg(s.def), arg(s.toggle), arg(s.live)}); }
+[[maybe_unused]] static bool same(const Option& want, const converted::Value& got) { return got.rows && got.rows->size() == 10 && same(want.key, (*got.rows)[0]) && same(want.section, (*got.rows)[1]) && same(want.label, (*got.rows)[2]) && same(want.help, (*got.rows)[3]) && same(want.min, (*got.rows)[4]) && same(want.max, (*got.rows)[5]) && same(want.step, (*got.rows)[6]) && same(want.def, (*got.rows)[7]) && same(want.toggle, (*got.rows)[8]) && same(want.live, (*got.rows)[9]); }
+[[maybe_unused]] static bool defined(const Option& s) { return defined(s.key) && defined(s.section) && defined(s.label) && defined(s.help) && defined(s.min) && defined(s.max) && defined(s.step) && defined(s.def) && defined(s.toggle) && defined(s.live); }
+[[maybe_unused]] static std::string text(const Option& s) { return std::string("{") + text(s.key) + ", " + text(s.section) + ", " + text(s.label) + ", " + text(s.help) + ", " + text(s.min) + ", " + text(s.max) + ", " + text(s.step) + ", " + text(s.def) + ", " + text(s.toggle) + ", " + text(s.live) + "}"; }
+[[maybe_unused]] static void take(Option& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 10) return; converted::take_as<std::string>(s.key, (*v.rows)[0]); converted::take_as<std::string>(s.section, (*v.rows)[1]); converted::take_as<std::string>(s.label, (*v.rows)[2]); converted::take_as<std::string>(s.help, (*v.rows)[3]); converted::take_as<double>(s.min, (*v.rows)[4]); converted::take_as<double>(s.max, (*v.rows)[5]); converted::take_as<double>(s.step, (*v.rows)[6]); converted::take_as<double>(s.def, (*v.rows)[7]); converted::take_as<bool>(s.toggle, (*v.rows)[8]); converted::take_as<bool>(s.live, (*v.rows)[9]); }
+[[maybe_unused]] static OptSpec draw_OptSpec(converted::Draw& draw) {
+  OptSpec s{};
+  s.key = draw.word();
+  s.section = draw.word();
+  s.label = draw.word();
+  s.help = draw.word();
+  s.min = draw.number();
+  s.max = draw.number();
+  s.step = draw.number();
+  s.def = draw.number();
+  s.toggle = draw.flag();
+  s.live = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const OptSpec& s) { return converted::Value::structure({arg(s.key), arg(s.section), arg(s.label), arg(s.help), arg(s.min), arg(s.max), arg(s.step), arg(s.def), arg(s.toggle), arg(s.live)}); }
+[[maybe_unused]] static bool same(const OptSpec& want, const converted::Value& got) { return got.rows && got.rows->size() == 10 && same(want.key, (*got.rows)[0]) && same(want.section, (*got.rows)[1]) && same(want.label, (*got.rows)[2]) && same(want.help, (*got.rows)[3]) && same(want.min, (*got.rows)[4]) && same(want.max, (*got.rows)[5]) && same(want.step, (*got.rows)[6]) && same(want.def, (*got.rows)[7]) && same(want.toggle, (*got.rows)[8]) && same(want.live, (*got.rows)[9]); }
+[[maybe_unused]] static bool defined(const OptSpec& s) { return defined(s.key) && defined(s.section) && defined(s.label) && defined(s.help) && defined(s.min) && defined(s.max) && defined(s.step) && defined(s.def) && defined(s.toggle) && defined(s.live); }
+[[maybe_unused]] static std::string text(const OptSpec& s) { return std::string("{") + text(s.key) + ", " + text(s.section) + ", " + text(s.label) + ", " + text(s.help) + ", " + text(s.min) + ", " + text(s.max) + ", " + text(s.step) + ", " + text(s.def) + ", " + text(s.toggle) + ", " + text(s.live) + "}"; }
+[[maybe_unused]] static void take(OptSpec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 10) return; converted::take_as<std::string>(s.key, (*v.rows)[0]); converted::take_as<std::string>(s.section, (*v.rows)[1]); converted::take_as<std::string>(s.label, (*v.rows)[2]); converted::take_as<std::string>(s.help, (*v.rows)[3]); converted::take_as<double>(s.min, (*v.rows)[4]); converted::take_as<double>(s.max, (*v.rows)[5]); converted::take_as<double>(s.step, (*v.rows)[6]); converted::take_as<double>(s.def, (*v.rows)[7]); converted::take_as<bool>(s.toggle, (*v.rows)[8]); converted::take_as<bool>(s.live, (*v.rows)[9]); }
+[[maybe_unused]] static SettingsTable draw_SettingsTable(converted::Draw& draw) {
+  SettingsTable s{};
+  s.rows = draw_list(draw, [&]() -> Option { return draw_Option(draw); });
+  s.specs = draw_list(draw, [&]() -> OptSpec { return draw_OptSpec(draw); });
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const SettingsTable& s) { return converted::Value::structure({arg(s.rows), arg(s.specs)}); }
+[[maybe_unused]] static bool same(const SettingsTable& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.rows, (*got.rows)[0]) && same(want.specs, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const SettingsTable& s) { return defined(s.rows) && defined(s.specs); }
+[[maybe_unused]] static std::string text(const SettingsTable& s) { return std::string("{") + text(s.rows) + ", " + text(s.specs) + "}"; }
+[[maybe_unused]] static void take(SettingsTable& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<std::vector<Option>>(s.rows, (*v.rows)[0]); converted::take_as<std::vector<OptSpec>>(s.specs, (*v.rows)[1]); }
 [[maybe_unused]] static Settings draw_Settings(converted::Draw& draw) {
   Settings s{};
   converted::fill_array(s.v_, [&]() -> double { return draw.number(); });
@@ -9961,6 +10059,7 @@ namespace mp { using converted::arg; using converted::same; using converted::def
 [[maybe_unused]] static UiState draw_UiState(converted::Draw& draw) {
   UiState s{};
   s.settings = draw_Settings(draw);
+  s.settings_table = draw_SettingsTable(draw);
   s.applied = static_cast<unsigned int>(draw.below(40));
   s.paused = draw.flag();
   s.audio_paused = draw.flag();
@@ -10017,11 +10116,11 @@ namespace mp { using converted::arg; using converted::same; using converted::def
   s.thumps = static_cast<unsigned int>(draw.below(40));
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const UiState& s) { return converted::Value::structure({arg(s.settings), arg(s.applied), arg(s.paused), arg(s.audio_paused), arg(s.resets), arg(s.drone_seen), arg(s.head_yaw_before), arg(s.head_pitch_before), arg(s.assists), arg(s.grid_mesh), arg(s.collider_mesh), arg(s.grid_at), arg(s.collider_clock), arg(s.world_military), arg(s.world_zombies), arg(s.gps), arg(s.moves), arg(s.place), arg(s.gps_cam_eye), arg(s.gps_cam_look), arg(s.puck_acc), arg(s.puck_ring), arg(s.puck_dot), arg(s.puck_wedge), arg(s.trail_mesh), arg(s.trail), arg(s.trail_dirty), arg(s.trail_upload), arg(s.gps_cam_init), arg(s.jetpack), arg(s.jump_was), arg(s.jet_pending), arg(s.jet_acc), arg(converted::shaped<std::vector<converted::Whole>>(converted::array_list(s.remote_jet_voice))), arg(s.jet_voice), arg(s.city_voice), arg(s.birds_voice), arg(s.crickets_voice), arg(s.jet_clip), arg(s.whoomp_clip), arg(s.thump_clip), arg(s.city_clip), arg(s.birds_clip), arg(s.crickets_clip), arg(s.log), arg(s.net_status), arg(s.music), arg(s.station), arg(s.radio_on), arg(s.banner), arg(s.banner_sub), arg(s.banner_age), arg(s.car_vel), arg(s.car_vel_valid), arg(s.thumps)}); }
-[[maybe_unused]] static bool same(const UiState& want, const converted::Value& got) { return got.rows && got.rows->size() == 55 && same(want.settings, (*got.rows)[0]) && same(want.applied, (*got.rows)[1]) && same(want.paused, (*got.rows)[2]) && same(want.audio_paused, (*got.rows)[3]) && same(want.resets, (*got.rows)[4]) && same(want.drone_seen, (*got.rows)[5]) && same(want.head_yaw_before, (*got.rows)[6]) && same(want.head_pitch_before, (*got.rows)[7]) && same(want.assists, (*got.rows)[8]) && same(want.grid_mesh, (*got.rows)[9]) && same(want.collider_mesh, (*got.rows)[10]) && same(want.grid_at, (*got.rows)[11]) && same(want.collider_clock, (*got.rows)[12]) && same(want.world_military, (*got.rows)[13]) && same(want.world_zombies, (*got.rows)[14]) && same(want.gps, (*got.rows)[15]) && same(want.moves, (*got.rows)[16]) && same(want.place, (*got.rows)[17]) && same(want.gps_cam_eye, (*got.rows)[18]) && same(want.gps_cam_look, (*got.rows)[19]) && same(want.puck_acc, (*got.rows)[20]) && same(want.puck_ring, (*got.rows)[21]) && same(want.puck_dot, (*got.rows)[22]) && same(want.puck_wedge, (*got.rows)[23]) && same(want.trail_mesh, (*got.rows)[24]) && same(want.trail, (*got.rows)[25]) && same(want.trail_dirty, (*got.rows)[26]) && same(want.trail_upload, (*got.rows)[27]) && same(want.gps_cam_init, (*got.rows)[28]) && same(want.jetpack, (*got.rows)[29]) && same(want.jump_was, (*got.rows)[30]) && same(want.jet_pending, (*got.rows)[31]) && same(want.jet_acc, (*got.rows)[32]) && same(converted::shaped<std::vector<converted::Whole>>(converted::array_list(want.remote_jet_voice)), (*got.rows)[33]) && same(want.jet_voice, (*got.rows)[34]) && same(want.city_voice, (*got.rows)[35]) && same(want.birds_voice, (*got.rows)[36]) && same(want.crickets_voice, (*got.rows)[37]) && same(want.jet_clip, (*got.rows)[38]) && same(want.whoomp_clip, (*got.rows)[39]) && same(want.thump_clip, (*got.rows)[40]) && same(want.city_clip, (*got.rows)[41]) && same(want.birds_clip, (*got.rows)[42]) && same(want.crickets_clip, (*got.rows)[43]) && same(want.log, (*got.rows)[44]) && same(want.net_status, (*got.rows)[45]) && same(want.music, (*got.rows)[46]) && same(want.station, (*got.rows)[47]) && same(want.radio_on, (*got.rows)[48]) && same(want.banner, (*got.rows)[49]) && same(want.banner_sub, (*got.rows)[50]) && same(want.banner_age, (*got.rows)[51]) && same(want.car_vel, (*got.rows)[52]) && same(want.car_vel_valid, (*got.rows)[53]) && same(want.thumps, (*got.rows)[54]); }
-[[maybe_unused]] static bool defined(const UiState& s) { return defined(s.settings) && defined(s.applied) && defined(s.paused) && defined(s.audio_paused) && defined(s.resets) && defined(s.drone_seen) && defined(s.head_yaw_before) && defined(s.head_pitch_before) && defined(s.assists) && defined(s.grid_mesh) && defined(s.collider_mesh) && defined(s.grid_at) && defined(s.collider_clock) && defined(s.world_military) && defined(s.world_zombies) && defined(s.gps) && defined(s.moves) && defined(s.place) && defined(s.gps_cam_eye) && defined(s.gps_cam_look) && defined(s.puck_acc) && defined(s.puck_ring) && defined(s.puck_dot) && defined(s.puck_wedge) && defined(s.trail_mesh) && defined(s.trail) && defined(s.trail_dirty) && defined(s.trail_upload) && defined(s.gps_cam_init) && defined(s.jetpack) && defined(s.jump_was) && defined(s.jet_pending) && defined(s.jet_acc) && defined(converted::shaped<std::vector<converted::Whole>>(converted::array_list(s.remote_jet_voice))) && defined(s.jet_voice) && defined(s.city_voice) && defined(s.birds_voice) && defined(s.crickets_voice) && defined(s.jet_clip) && defined(s.whoomp_clip) && defined(s.thump_clip) && defined(s.city_clip) && defined(s.birds_clip) && defined(s.crickets_clip) && defined(s.log) && defined(s.net_status) && defined(s.music) && defined(s.station) && defined(s.radio_on) && defined(s.banner) && defined(s.banner_sub) && defined(s.banner_age) && defined(s.car_vel) && defined(s.car_vel_valid) && defined(s.thumps); }
-[[maybe_unused]] static std::string text(const UiState& s) { return std::string("{") + text(s.settings) + ", " + text(s.applied) + ", " + text(s.paused) + ", " + text(s.audio_paused) + ", " + text(s.resets) + ", " + text(s.drone_seen) + ", " + text(s.head_yaw_before) + ", " + text(s.head_pitch_before) + ", " + text(s.assists) + ", " + text(s.grid_mesh) + ", " + text(s.collider_mesh) + ", " + text(s.grid_at) + ", " + text(s.collider_clock) + ", " + text(s.world_military) + ", " + text(s.world_zombies) + ", " + text(s.gps) + ", " + text(s.moves) + ", " + text(s.place) + ", " + text(s.gps_cam_eye) + ", " + text(s.gps_cam_look) + ", " + text(s.puck_acc) + ", " + text(s.puck_ring) + ", " + text(s.puck_dot) + ", " + text(s.puck_wedge) + ", " + text(s.trail_mesh) + ", " + text(s.trail) + ", " + text(s.trail_dirty) + ", " + text(s.trail_upload) + ", " + text(s.gps_cam_init) + ", " + text(s.jetpack) + ", " + text(s.jump_was) + ", " + text(s.jet_pending) + ", " + text(s.jet_acc) + ", " + text(converted::shaped<std::vector<converted::Whole>>(converted::array_list(s.remote_jet_voice))) + ", " + text(s.jet_voice) + ", " + text(s.city_voice) + ", " + text(s.birds_voice) + ", " + text(s.crickets_voice) + ", " + text(s.jet_clip) + ", " + text(s.whoomp_clip) + ", " + text(s.thump_clip) + ", " + text(s.city_clip) + ", " + text(s.birds_clip) + ", " + text(s.crickets_clip) + ", " + text(s.log) + ", " + text(s.net_status) + ", " + text(s.music) + ", " + text(s.station) + ", " + text(s.radio_on) + ", " + text(s.banner) + ", " + text(s.banner_sub) + ", " + text(s.banner_age) + ", " + text(s.car_vel) + ", " + text(s.car_vel_valid) + ", " + text(s.thumps) + "}"; }
-[[maybe_unused]] static void take(UiState& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 55) return; converted::take_as<Settings>(s.settings, (*v.rows)[0]); converted::take_as<unsigned int>(s.applied, (*v.rows)[1]); converted::take_as<bool>(s.paused, (*v.rows)[2]); converted::take_as<bool>(s.audio_paused, (*v.rows)[3]); converted::take_as<unsigned int>(s.resets, (*v.rows)[4]); converted::take_as<bool>(s.drone_seen, (*v.rows)[5]); converted::take_as<double>(s.head_yaw_before, (*v.rows)[6]); converted::take_as<double>(s.head_pitch_before, (*v.rows)[7]); converted::take_as<unsigned int>(s.assists, (*v.rows)[8]); converted::take_as<unsigned int>(s.grid_mesh, (*v.rows)[9]); converted::take_as<unsigned int>(s.collider_mesh, (*v.rows)[10]); converted::take_as<Vec3>(s.grid_at, (*v.rows)[11]); converted::take_as<double>(s.collider_clock, (*v.rows)[12]); converted::take_as<int>(s.world_military, (*v.rows)[13]); converted::take_as<int>(s.world_zombies, (*v.rows)[14]); converted::take_as<GpsLive>(s.gps, (*v.rows)[15]); converted::take_as<unsigned int>(s.moves, (*v.rows)[16]); converted::take_as<std::string>(s.place, (*v.rows)[17]); converted::take_as<Vec3>(s.gps_cam_eye, (*v.rows)[18]); converted::take_as<Vec3>(s.gps_cam_look, (*v.rows)[19]); converted::take_as<unsigned int>(s.puck_acc, (*v.rows)[20]); converted::take_as<unsigned int>(s.puck_ring, (*v.rows)[21]); converted::take_as<unsigned int>(s.puck_dot, (*v.rows)[22]); converted::take_as<unsigned int>(s.puck_wedge, (*v.rows)[23]); converted::take_as<unsigned int>(s.trail_mesh, (*v.rows)[24]); converted::take_as<std::vector<Vec2>>(s.trail, (*v.rows)[25]); converted::take_as<bool>(s.trail_dirty, (*v.rows)[26]); converted::take_as<double>(s.trail_upload, (*v.rows)[27]); converted::take_as<bool>(s.gps_cam_init, (*v.rows)[28]); converted::take_as<Jetpack>(s.jetpack, (*v.rows)[29]); converted::take_as<bool>(s.jump_was, (*v.rows)[30]); converted::take_as<bool>(s.jet_pending, (*v.rows)[31]); converted::take_as<double>(s.jet_acc, (*v.rows)[32]); { std::vector<u64> items; converted::take_as<std::vector<converted::Whole>>(items, (*v.rows)[33]); converted::array_from(s.remote_jet_voice, items); } converted::take_as<unsigned long>(s.jet_voice, (*v.rows)[34]); converted::take_as<unsigned long>(s.city_voice, (*v.rows)[35]); converted::take_as<unsigned long>(s.birds_voice, (*v.rows)[36]); converted::take_as<unsigned long>(s.crickets_voice, (*v.rows)[37]); converted::take_as<unsigned int>(s.jet_clip, (*v.rows)[38]); converted::take_as<unsigned int>(s.whoomp_clip, (*v.rows)[39]); converted::take_as<unsigned int>(s.thump_clip, (*v.rows)[40]); converted::take_as<unsigned int>(s.city_clip, (*v.rows)[41]); converted::take_as<unsigned int>(s.birds_clip, (*v.rows)[42]); converted::take_as<unsigned int>(s.crickets_clip, (*v.rows)[43]); converted::take_as<FlightLog>(s.log, (*v.rows)[44]); converted::take_as<std::string>(s.net_status, (*v.rows)[45]); converted::take_as<MusicSynth>(s.music, (*v.rows)[46]); converted::take_as<int>(s.station, (*v.rows)[47]); converted::take_as<bool>(s.radio_on, (*v.rows)[48]); converted::take_as<std::string>(s.banner, (*v.rows)[49]); converted::take_as<std::string>(s.banner_sub, (*v.rows)[50]); converted::take_as<double>(s.banner_age, (*v.rows)[51]); converted::take_as<Vec3>(s.car_vel, (*v.rows)[52]); converted::take_as<bool>(s.car_vel_valid, (*v.rows)[53]); converted::take_as<unsigned int>(s.thumps, (*v.rows)[54]); }
+[[maybe_unused]] static converted::Value arg(const UiState& s) { return converted::Value::structure({arg(s.settings), arg(s.settings_table), arg(s.applied), arg(s.paused), arg(s.audio_paused), arg(s.resets), arg(s.drone_seen), arg(s.head_yaw_before), arg(s.head_pitch_before), arg(s.assists), arg(s.grid_mesh), arg(s.collider_mesh), arg(s.grid_at), arg(s.collider_clock), arg(s.world_military), arg(s.world_zombies), arg(s.gps), arg(s.moves), arg(s.place), arg(s.gps_cam_eye), arg(s.gps_cam_look), arg(s.puck_acc), arg(s.puck_ring), arg(s.puck_dot), arg(s.puck_wedge), arg(s.trail_mesh), arg(s.trail), arg(s.trail_dirty), arg(s.trail_upload), arg(s.gps_cam_init), arg(s.jetpack), arg(s.jump_was), arg(s.jet_pending), arg(s.jet_acc), arg(converted::shaped<std::vector<converted::Whole>>(converted::array_list(s.remote_jet_voice))), arg(s.jet_voice), arg(s.city_voice), arg(s.birds_voice), arg(s.crickets_voice), arg(s.jet_clip), arg(s.whoomp_clip), arg(s.thump_clip), arg(s.city_clip), arg(s.birds_clip), arg(s.crickets_clip), arg(s.log), arg(s.net_status), arg(s.music), arg(s.station), arg(s.radio_on), arg(s.banner), arg(s.banner_sub), arg(s.banner_age), arg(s.car_vel), arg(s.car_vel_valid), arg(s.thumps)}); }
+[[maybe_unused]] static bool same(const UiState& want, const converted::Value& got) { return got.rows && got.rows->size() == 56 && same(want.settings, (*got.rows)[0]) && same(want.settings_table, (*got.rows)[1]) && same(want.applied, (*got.rows)[2]) && same(want.paused, (*got.rows)[3]) && same(want.audio_paused, (*got.rows)[4]) && same(want.resets, (*got.rows)[5]) && same(want.drone_seen, (*got.rows)[6]) && same(want.head_yaw_before, (*got.rows)[7]) && same(want.head_pitch_before, (*got.rows)[8]) && same(want.assists, (*got.rows)[9]) && same(want.grid_mesh, (*got.rows)[10]) && same(want.collider_mesh, (*got.rows)[11]) && same(want.grid_at, (*got.rows)[12]) && same(want.collider_clock, (*got.rows)[13]) && same(want.world_military, (*got.rows)[14]) && same(want.world_zombies, (*got.rows)[15]) && same(want.gps, (*got.rows)[16]) && same(want.moves, (*got.rows)[17]) && same(want.place, (*got.rows)[18]) && same(want.gps_cam_eye, (*got.rows)[19]) && same(want.gps_cam_look, (*got.rows)[20]) && same(want.puck_acc, (*got.rows)[21]) && same(want.puck_ring, (*got.rows)[22]) && same(want.puck_dot, (*got.rows)[23]) && same(want.puck_wedge, (*got.rows)[24]) && same(want.trail_mesh, (*got.rows)[25]) && same(want.trail, (*got.rows)[26]) && same(want.trail_dirty, (*got.rows)[27]) && same(want.trail_upload, (*got.rows)[28]) && same(want.gps_cam_init, (*got.rows)[29]) && same(want.jetpack, (*got.rows)[30]) && same(want.jump_was, (*got.rows)[31]) && same(want.jet_pending, (*got.rows)[32]) && same(want.jet_acc, (*got.rows)[33]) && same(converted::shaped<std::vector<converted::Whole>>(converted::array_list(want.remote_jet_voice)), (*got.rows)[34]) && same(want.jet_voice, (*got.rows)[35]) && same(want.city_voice, (*got.rows)[36]) && same(want.birds_voice, (*got.rows)[37]) && same(want.crickets_voice, (*got.rows)[38]) && same(want.jet_clip, (*got.rows)[39]) && same(want.whoomp_clip, (*got.rows)[40]) && same(want.thump_clip, (*got.rows)[41]) && same(want.city_clip, (*got.rows)[42]) && same(want.birds_clip, (*got.rows)[43]) && same(want.crickets_clip, (*got.rows)[44]) && same(want.log, (*got.rows)[45]) && same(want.net_status, (*got.rows)[46]) && same(want.music, (*got.rows)[47]) && same(want.station, (*got.rows)[48]) && same(want.radio_on, (*got.rows)[49]) && same(want.banner, (*got.rows)[50]) && same(want.banner_sub, (*got.rows)[51]) && same(want.banner_age, (*got.rows)[52]) && same(want.car_vel, (*got.rows)[53]) && same(want.car_vel_valid, (*got.rows)[54]) && same(want.thumps, (*got.rows)[55]); }
+[[maybe_unused]] static bool defined(const UiState& s) { return defined(s.settings) && defined(s.settings_table) && defined(s.applied) && defined(s.paused) && defined(s.audio_paused) && defined(s.resets) && defined(s.drone_seen) && defined(s.head_yaw_before) && defined(s.head_pitch_before) && defined(s.assists) && defined(s.grid_mesh) && defined(s.collider_mesh) && defined(s.grid_at) && defined(s.collider_clock) && defined(s.world_military) && defined(s.world_zombies) && defined(s.gps) && defined(s.moves) && defined(s.place) && defined(s.gps_cam_eye) && defined(s.gps_cam_look) && defined(s.puck_acc) && defined(s.puck_ring) && defined(s.puck_dot) && defined(s.puck_wedge) && defined(s.trail_mesh) && defined(s.trail) && defined(s.trail_dirty) && defined(s.trail_upload) && defined(s.gps_cam_init) && defined(s.jetpack) && defined(s.jump_was) && defined(s.jet_pending) && defined(s.jet_acc) && defined(converted::shaped<std::vector<converted::Whole>>(converted::array_list(s.remote_jet_voice))) && defined(s.jet_voice) && defined(s.city_voice) && defined(s.birds_voice) && defined(s.crickets_voice) && defined(s.jet_clip) && defined(s.whoomp_clip) && defined(s.thump_clip) && defined(s.city_clip) && defined(s.birds_clip) && defined(s.crickets_clip) && defined(s.log) && defined(s.net_status) && defined(s.music) && defined(s.station) && defined(s.radio_on) && defined(s.banner) && defined(s.banner_sub) && defined(s.banner_age) && defined(s.car_vel) && defined(s.car_vel_valid) && defined(s.thumps); }
+[[maybe_unused]] static std::string text(const UiState& s) { return std::string("{") + text(s.settings) + ", " + text(s.settings_table) + ", " + text(s.applied) + ", " + text(s.paused) + ", " + text(s.audio_paused) + ", " + text(s.resets) + ", " + text(s.drone_seen) + ", " + text(s.head_yaw_before) + ", " + text(s.head_pitch_before) + ", " + text(s.assists) + ", " + text(s.grid_mesh) + ", " + text(s.collider_mesh) + ", " + text(s.grid_at) + ", " + text(s.collider_clock) + ", " + text(s.world_military) + ", " + text(s.world_zombies) + ", " + text(s.gps) + ", " + text(s.moves) + ", " + text(s.place) + ", " + text(s.gps_cam_eye) + ", " + text(s.gps_cam_look) + ", " + text(s.puck_acc) + ", " + text(s.puck_ring) + ", " + text(s.puck_dot) + ", " + text(s.puck_wedge) + ", " + text(s.trail_mesh) + ", " + text(s.trail) + ", " + text(s.trail_dirty) + ", " + text(s.trail_upload) + ", " + text(s.gps_cam_init) + ", " + text(s.jetpack) + ", " + text(s.jump_was) + ", " + text(s.jet_pending) + ", " + text(s.jet_acc) + ", " + text(converted::shaped<std::vector<converted::Whole>>(converted::array_list(s.remote_jet_voice))) + ", " + text(s.jet_voice) + ", " + text(s.city_voice) + ", " + text(s.birds_voice) + ", " + text(s.crickets_voice) + ", " + text(s.jet_clip) + ", " + text(s.whoomp_clip) + ", " + text(s.thump_clip) + ", " + text(s.city_clip) + ", " + text(s.birds_clip) + ", " + text(s.crickets_clip) + ", " + text(s.log) + ", " + text(s.net_status) + ", " + text(s.music) + ", " + text(s.station) + ", " + text(s.radio_on) + ", " + text(s.banner) + ", " + text(s.banner_sub) + ", " + text(s.banner_age) + ", " + text(s.car_vel) + ", " + text(s.car_vel_valid) + ", " + text(s.thumps) + "}"; }
+[[maybe_unused]] static void take(UiState& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 56) return; converted::take_as<Settings>(s.settings, (*v.rows)[0]); converted::take_as<SettingsTable>(s.settings_table, (*v.rows)[1]); converted::take_as<unsigned int>(s.applied, (*v.rows)[2]); converted::take_as<bool>(s.paused, (*v.rows)[3]); converted::take_as<bool>(s.audio_paused, (*v.rows)[4]); converted::take_as<unsigned int>(s.resets, (*v.rows)[5]); converted::take_as<bool>(s.drone_seen, (*v.rows)[6]); converted::take_as<double>(s.head_yaw_before, (*v.rows)[7]); converted::take_as<double>(s.head_pitch_before, (*v.rows)[8]); converted::take_as<unsigned int>(s.assists, (*v.rows)[9]); converted::take_as<unsigned int>(s.grid_mesh, (*v.rows)[10]); converted::take_as<unsigned int>(s.collider_mesh, (*v.rows)[11]); converted::take_as<Vec3>(s.grid_at, (*v.rows)[12]); converted::take_as<double>(s.collider_clock, (*v.rows)[13]); converted::take_as<int>(s.world_military, (*v.rows)[14]); converted::take_as<int>(s.world_zombies, (*v.rows)[15]); converted::take_as<GpsLive>(s.gps, (*v.rows)[16]); converted::take_as<unsigned int>(s.moves, (*v.rows)[17]); converted::take_as<std::string>(s.place, (*v.rows)[18]); converted::take_as<Vec3>(s.gps_cam_eye, (*v.rows)[19]); converted::take_as<Vec3>(s.gps_cam_look, (*v.rows)[20]); converted::take_as<unsigned int>(s.puck_acc, (*v.rows)[21]); converted::take_as<unsigned int>(s.puck_ring, (*v.rows)[22]); converted::take_as<unsigned int>(s.puck_dot, (*v.rows)[23]); converted::take_as<unsigned int>(s.puck_wedge, (*v.rows)[24]); converted::take_as<unsigned int>(s.trail_mesh, (*v.rows)[25]); converted::take_as<std::vector<Vec2>>(s.trail, (*v.rows)[26]); converted::take_as<bool>(s.trail_dirty, (*v.rows)[27]); converted::take_as<double>(s.trail_upload, (*v.rows)[28]); converted::take_as<bool>(s.gps_cam_init, (*v.rows)[29]); converted::take_as<Jetpack>(s.jetpack, (*v.rows)[30]); converted::take_as<bool>(s.jump_was, (*v.rows)[31]); converted::take_as<bool>(s.jet_pending, (*v.rows)[32]); converted::take_as<double>(s.jet_acc, (*v.rows)[33]); { std::vector<u64> items; converted::take_as<std::vector<converted::Whole>>(items, (*v.rows)[34]); converted::array_from(s.remote_jet_voice, items); } converted::take_as<unsigned long>(s.jet_voice, (*v.rows)[35]); converted::take_as<unsigned long>(s.city_voice, (*v.rows)[36]); converted::take_as<unsigned long>(s.birds_voice, (*v.rows)[37]); converted::take_as<unsigned long>(s.crickets_voice, (*v.rows)[38]); converted::take_as<unsigned int>(s.jet_clip, (*v.rows)[39]); converted::take_as<unsigned int>(s.whoomp_clip, (*v.rows)[40]); converted::take_as<unsigned int>(s.thump_clip, (*v.rows)[41]); converted::take_as<unsigned int>(s.city_clip, (*v.rows)[42]); converted::take_as<unsigned int>(s.birds_clip, (*v.rows)[43]); converted::take_as<unsigned int>(s.crickets_clip, (*v.rows)[44]); converted::take_as<FlightLog>(s.log, (*v.rows)[45]); converted::take_as<std::string>(s.net_status, (*v.rows)[46]); converted::take_as<MusicSynth>(s.music, (*v.rows)[47]); converted::take_as<int>(s.station, (*v.rows)[48]); converted::take_as<bool>(s.radio_on, (*v.rows)[49]); converted::take_as<std::string>(s.banner, (*v.rows)[50]); converted::take_as<std::string>(s.banner_sub, (*v.rows)[51]); converted::take_as<double>(s.banner_age, (*v.rows)[52]); converted::take_as<Vec3>(s.car_vel, (*v.rows)[53]); converted::take_as<bool>(s.car_vel_valid, (*v.rows)[54]); converted::take_as<unsigned int>(s.thumps, (*v.rows)[55]); }
 [[maybe_unused]] static perf::Meter draw_perf__Meter(converted::Draw& draw) {
   perf::Meter s{};
   s.start_ = draw.number();
@@ -10854,7 +10953,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   s->pad = draw_PadState(draw);
   s->dsync_ = converted::draw_maybe<std::unique_ptr<DestroySync>>(draw, [&]() -> DestroySync { return draw_DestroySync(draw); });
   s->toss_test_ = static_cast<int>(draw.whole());
-  s->toss_ = converted::draw_maybe<std::unique_ptr<TossState>>(draw, [&]() -> TossState { return draw_TossState(draw); });
+  s->toss_ = draw_TossState(draw);
   s->projsync_ = converted::draw_maybe<std::unique_ptr<ProjSync>>(draw, [&]() -> ProjSync { return draw_ProjSync(draw); });
   s->proj_serial_ = static_cast<unsigned int>(draw.below(40));
   s->townsync_ = converted::draw_maybe<std::unique_ptr<TownSync>>(draw, [&]() -> TownSync { return draw_TownSync(draw); });

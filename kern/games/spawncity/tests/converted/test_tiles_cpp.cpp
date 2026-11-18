@@ -43,7 +43,7 @@ struct Vec4 {
   constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}
   
   
-  
+  constexpr bool operator==(const Vec4& o) const { return x == o.x && y == o.y && z == o.z && w == o.w; }
 };
 namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
 namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
@@ -99,7 +99,7 @@ namespace mvt { f64 ring_area(const std::vector<Vec2>& ring); }
 constexpr i32 kTileZoom = 14;
 struct TileKey {
   i32 z = kTileZoom, x = 0, y = 0;
-  
+  bool operator==(const TileKey& o) const { return z == o.z && x == o.x && y == o.y; }
   
 };
 TileKey tile_at(f64 lon, f64 lat, i32 z = kTileZoom);
@@ -135,6 +135,7 @@ struct MapFeatures {
   std::vector<Spot> trees, lamps;  // furnish(): the tile's own, inside its square
   bool procedural = false;  // the stand-in city, not real map data
 };
+void furnish(MapFeatures& out, const Vec4& square, const std::vector<std::vector<Vec2>>& apron);
 std::vector<std::vector<Vec2>> clip_line(const std::vector<Vec2>& line, const Vec4& rect);
 void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out);
 void training_level(MapFeatures& out);
@@ -233,6 +234,22 @@ Vec2 cut_side(i32 side, Vec2 p, Vec2 q, f32 ext) {
   const f32 t = (y - p.y) / (q.y - p.y);
   return Vec2{p.x + (q.x - p.x) * t, y};
 }
+void clip_pass(std::vector<Vec2>& a, std::vector<Vec2>& b, i32 side, f32 ext) {
+  b.clear();
+  for (std::size_t i = 0; i < a.size(); converted::pre_inc(i)) {
+    const Vec2 p = converted::at(a, i), q = converted::at(a, converted::rem((converted::plus(i, 1)), a.size()));
+    const bool pi = inside_side(side, p, ext), qi = inside_side(side, q, ext);
+    if (pi) b.push_back(p);
+    if (pi != qi) b.push_back(cut_side(side, p, q, ext));
+  }
+  a.swap(b);
+}
+std::vector<Vec2> clip_to_tile(const std::vector<Vec2>& ring, f32 ext) {
+  std::vector<Vec2> a = ring, b;
+  for (i32 side = 0; side < 4; ++side)
+    if (a.size() >= 3) clip_pass(a, b, side, ext);
+  return a;
+}
 u32 hash_u32(u64 v) {
   v ^= converted::shr_bits(v, 33); converted::times_bits_to(v, 0xff51afd7ed558ccdull); v ^= converted::shr_bits(v, 33); converted::times_bits_to(v, 0xc4ceb9fe1a85ec53ull); v ^= converted::shr_bits(v, 33);
   return static_cast<u32>(v);
@@ -294,6 +311,70 @@ struct FurnishIndex {
     return true;
   }
 };
+void furnish(MapFeatures& out, const Vec4& sq, const std::vector<std::vector<Vec2>>& apron) {
+  out.trees.clear();
+  out.lamps.clear();
+  FurnishIndex ix;
+  for (u32 ri = 0; ri < out.roads.size(); ++ri) {
+    const MapFeatures::Road& r = converted::at(out.roads, ri);
+    if (road_is_water(r.cls)) continue;
+    const bool paved = r.cls != RoadClass::path && r.cls != RoadClass::track;
+    for (std::size_t k = 0; converted::plus(k, 1) < r.points.size(); converted::pre_inc(k)) ix.add_seg(converted::at(r.points, k), converted::at(r.points, converted::plus(k, 1)), road_width(r.cls) / 2, ri, paved);
+  }
+  for (u32 bi = 0; bi < out.buildings.size(); ++bi)
+    if (!converted::at(out.buildings, bi).rings.empty()) ix.add_ring(converted::at(converted::at(out.buildings, bi).rings, 0), false, bi);
+  for (u32 ai = 0; ai < apron.size(); ++ai) ix.add_ring(converted::at(apron, ai), true, ai);
+  auto inside = [&](Vec2 p) { return p.x >= sq.x && p.x < sq.z && p.y >= sq.y && p.y < sq.w; };
+  constexpr f32 kPi2 = 6.2831853;
+  converted::wide::Set<u64> lamp_cells;
+  for (u32 ri = 0; ri < out.roads.size(); ++ri) {
+    const MapFeatures::Road& r = converted::at(out.roads, ri);
+    if (road_is_water(r.cls) || r.points.size() < 2) continue;
+    const f32 w = road_width(r.cls);
+    // ---- trees beside the streets cars drive (world_liveliness.mjs: trunk 2.3 m, crown 0.92 m,
+    // 2.4 m clear of houses): every 37 m, alternating sides, beyond the pavement
+    if (road_drivable(r.cls) && !r.bridge && w <= 14) {
+      f32 carry = 17;
+      u32 i = ri * 7;
+      for (std::size_t k = 0; converted::plus(k, 1) < r.points.size(); converted::pre_inc(k)) {
+        const Vec2 a = converted::at(r.points, k), d = converted::at(r.points, converted::plus(k, 1)) - a;
+        const f32 len = hypot_bp(d.x, d.y);
+        if (len < 1) continue;
+        const Vec2 u = d * (1 / len), right{u.y, -u.x};
+        for (f32 t = carry; t < len; t += 37, ++i) {
+          const f32 side = (i & 1) ? 1.0 : -1.0, off = w * 0.5 + 2.2 + static_cast<f32>(i % 4) * 0.4;
+          const Vec2 c = a + u * t + right * (side * off);
+          if (!inside(c) || !ix.off_roads(c, 1.9, 0.6) || ix.built(c, out.buildings, apron)) continue;
+          bool free = true;
+          for (int j = 0; j < 6 && free; ++j) free = !ix.built(c + Vec2{kern::math::cos(static_cast<f32>(j) * kPi2 / 6), kern::math::sin(static_cast<f32>(j) * kPi2 / 6)} * 2.4, out.buildings, apron);
+          if (free) out.trees.push_back({c, 0.82 + static_cast<f32>(i % 5) * 0.045});
+        }
+        carry = kern::math::mod(carry + 37 - kern::math::mod(len, 37.0), 37.0);
+      }
+    }
+    // ---- street lamps (street_lamps.mjs setLampRoads): every street but paths and tracks
+    if (r.cls != RoadClass::path && r.cls != RoadClass::track) {
+      f32 carry = 34 * 0.5, side = 1;
+      for (std::size_t k = 0; converted::plus(k, 1) < r.points.size(); converted::pre_inc(k)) {
+        const Vec2 a = converted::at(r.points, k), d = converted::at(r.points, converted::plus(k, 1)) - a;
+        const f32 len = hypot_bp(d.x, d.y);
+        if (len < 0.5) continue;
+        const Vec2 u = d * (1 / len), n{-u.y, u.x};
+        for (f32 t = carry; t < len; t += 34) {
+          side = -side;
+          const Vec2 c = a + u * t + n * ((w / 2 + 1.15) * side);
+          if (!inside(c)) continue;
+          const u64 cell = (converted::shl_bits(static_cast<u64>(static_cast<u32>(std::lround(c.x / 8))), 32)) | static_cast<u32>(std::lround(c.y / 8));
+          // on its kerb: off every other street's carriageway, not in a house (nor its arm's foot)
+          if (!ix.off_roads(c, 0.35, 0.3) || ix.built(c, out.buildings, apron)) continue;
+          if (!lamp_cells.insert(cell).second) continue;
+          out.lamps.push_back({c, kern::math::atan2(-n.y * side, -n.x * side)});
+        }
+        carry = kern::math::mod(kern::math::mod(carry - len, 34.0) + 34.0, 34.0);
+      }
+    }
+  }
+}
 void training_level(MapFeatures& out) {
   out.procedural = true;
   auto road = [&](f32 x, f32 y, f32 w, f32 h, RoadClass c) {
@@ -629,6 +710,10 @@ struct Out_parse_road { bool Result; RoadClass out; };
 [[maybe_unused]] static bool same(const Out_parse_road& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.out, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_parse_road& s) { return defined(s.Result) && defined(s.out); }
 [[maybe_unused]] static std::string text(const Out_parse_road& s) { return std::string("{") + text(s.Result) + ", " + text(s.out) + "}"; }
+struct Out_clip_pass { std::vector<Vec2> a; std::vector<Vec2> b; };
+[[maybe_unused]] static bool same(const Out_clip_pass& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.a, (*got.rows)[0]) && same(want.b, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_clip_pass& s) { return defined(s.a) && defined(s.b); }
+[[maybe_unused]] static std::string text(const Out_clip_pass& s) { return std::string("{") + text(s.a) + ", " + text(s.b) + "}"; }
 
 SC_TEST(converted_tiles_cpp) {
   converted::Blueprint bp("tiles_cpp");
@@ -761,7 +846,7 @@ SC_TEST(converted_tiles_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] std::string_view a0, [[maybe_unused]] RoadClass a1) { auto r = converted::counted([&] { return converted_tiles_cpp::parse_road(std::move(a0), a1); }); return Out_parse_road{std::move(r), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
-      std::string_view a0 = std::string_view(draw.c_word());
+      std::string_view a0 = std::string_view(draw.said_c_word({"motorway", "trunk", "primary", "secondary", "tertiary", "minor", "service", "track", "path", "pedestrian", "raceway", "busway"}));
       RoadClass a1 = static_cast<RoadClass>(draw.below(13));
       const std::vector<converted::Value> given = {arg(a1), arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
@@ -874,6 +959,48 @@ SC_TEST(converted_tiles_cpp) {
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // clip_pass
+    converted::Tally tally("clip_pass");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] std::vector<Vec2> a1, [[maybe_unused]] int a2, [[maybe_unused]] double a3) { converted::counted([&] { return converted_tiles_cpp::clip_pass(a0, a1, std::move(a2), std::move(a3)); }); return Out_clip_pass{std::move(a0), std::move(a1)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+      std::vector<Vec2> a1 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+      int a2 = static_cast<int>(draw.whole());
+      double a3 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
+    }
+  }
+  {  // clip_to_tile
+    converted::Tally tally("clip_to_tile");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_tiles_cpp::clip_to_tile(a0, std::move(a1)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+      double a1 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1022,6 +1149,27 @@ SC_TEST(converted_tiles_cpp) {
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // furnish
+    converted::Tally tally("furnish");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] MapFeatures a0, [[maybe_unused]] Vec4 a1, [[maybe_unused]] std::vector<std::vector<Vec2>> a2) { converted::counted([&] { return converted_tiles_cpp::furnish(a0, a1, a2); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      MapFeatures a0 = draw_MapFeatures(draw);
+      Vec4 a1 = draw_kern__Vec4(draw);
+      std::vector<std::vector<Vec2>> a2 = draw_list(draw, [&]() -> std::vector<Vec2> { return draw_list(draw, [&]() -> Vec2 { return draw.vector2(); }); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

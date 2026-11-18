@@ -37,8 +37,8 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #define protected public
 enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
 namespace physics { struct Body { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Body& o) const { return id == o.id; } }; }
-namespace physics { struct Shape { u64 id = 0; bool valid() const { return id != 0; } }; }
-namespace physics { struct Joint { u64 id = 0; bool valid() const { return id != 0; } }; }
+namespace physics { struct Shape { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Shape& o) const { return id == o.id; } }; }
+namespace physics { struct Joint { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Joint& o) const { return id == o.id; } }; }
 namespace physics { struct QueryFilter {
   u64 mask_bits = ~0ull, category_bits = ~0ull;
   QueryFilter() = default;

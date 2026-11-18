@@ -241,6 +241,7 @@ namespace look { struct SpeedLines {
 }; }
 namespace look { f32 day_lighting(f32 tod, f32 sun_azimuth_deg, f32 fog_density, f32 exposure, Lighting& l, SkyState& sky); }
 namespace look { f32 follow_phase(f32 mine, f32 authority); }
+namespace look { bool parse_time(const char* text, f32& phase); }
 namespace look { f32 kern_intensity(f32 three_intensity, f32 range, f32 d_ref); }
 namespace look { Vec3 hex_linear(u32 rgb); }
 namespace look { int police_flash(f32 now_s); }
@@ -385,6 +386,24 @@ namespace look { f32 follow_phase(f32 mine, f32 authority) {
   f32 p = mine + (std::fabs(d) < 0.01 ? d * 0.5 : d);
   p -= std::floor(p);
   return p;
+} }
+namespace look { bool parse_time(const char* text, f32& phase) {
+  std::size_t at = 0;  // (where the reading stands)
+  while (text[at] == ' ') ++at;
+  if (!text[at]) return false;
+  char* end = nullptr;
+  const f64 a = std::strtod(text + at, &end);
+  if (end == text + at) return false;
+  if (*end == ':') {
+    const f64 m = std::strtod(end + 1, &end);
+    if (a < 0 || a > 24 || m < 0 || m >= 60) return false;
+    phase = static_cast<f32>(kern::math::mod((a + m / 60) / 24, 1.0));
+    return true;
+  }
+  if (a < 0) return false;
+  // Up to 1: a phase; otherwise hours.
+  phase = static_cast<f32>(a <= 1 ? kern::math::mod(a, 1.0) : kern::math::mod(a / 24, 1.0));
+  return true;
 } }
 namespace look { f32 kern_intensity(f32 three_intensity, f32 range, f32 d_ref) {
   const f32 d2 = std::fmax(d_ref * d_ref, 0.04), r2 = std::fmax(0.01, range * range);
@@ -573,6 +592,10 @@ struct Out_day_lighting { double Result; Lighting l; SkyState sky; };
 [[maybe_unused]] static bool same(const Out_day_lighting& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Result, (*got.rows)[0]) && same(want.l, (*got.rows)[1]) && same(want.sky, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const Out_day_lighting& s) { return defined(s.Result) && defined(s.l) && defined(s.sky); }
 [[maybe_unused]] static std::string text(const Out_day_lighting& s) { return std::string("{") + text(s.Result) + ", " + text(s.l) + ", " + text(s.sky) + "}"; }
+struct Out_parse_time { bool Result; double phase; };
+[[maybe_unused]] static bool same(const Out_parse_time& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.phase, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_parse_time& s) { return defined(s.Result) && defined(s.phase); }
+[[maybe_unused]] static std::string text(const Out_parse_time& s) { return std::string("{") + text(s.Result) + ", " + text(s.phase) + "}"; }
 
 SC_TEST(converted_look_cpp) {
   converted::Blueprint bp("look_cpp");
@@ -871,6 +894,26 @@ SC_TEST(converted_look_cpp) {
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // parse_time
+    converted::Tally tally("parse_time");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] const char* a0, [[maybe_unused]] double a1) { auto r = converted::counted([&] { return converted_look_cpp::look::parse_time(a0, a1); }); return Out_parse_time{std::move(r), std::move(a1)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      const char* a0 = draw.c_word();
+      double a1 = draw.number();
+      const std::vector<converted::Value> given = {arg(a1), arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(a0, std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
   {  // kern_intensity
