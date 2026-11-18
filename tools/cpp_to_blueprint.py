@@ -76,7 +76,16 @@ in or given back by value, a list or a map of them changed - waits (Emit.lifetim
 A parameter `const T*` a function reads entries through (`p[i]`, `*p`), hands on (`p + 2`) or asks
 whether it is null is a pointer into a list, like an iterator: the list, read where it stands (a const
 reference input), and the place in it (an Int; null is -1). Its list is of the type every call of the
-program hands it - a std::array<T, N> is Fixed<T, N> - and `a.data() + k` hands (a, k).
+program hands it - a std::array<T, N> is Fixed<T, N> - and `a.data() + k` hands (a, k). A pointer of a
+function to an entry of a list, or to none (`Car* job = there ? &cars[i] : nullptr;`, never given another
+value), is the same: the list where it stands and the place in it; `job->x` is the entry's field, read and
+changed there, `!job` asks whether it has a place. A text of the program or none (`const char* reason =
+nullptr;`) is two values of the function, the text and whether there is one; the text is read only behind
+the check that leaves the block (`if (!reason) continue;`). An array of texts (`const char* const kNames[]
+= {...}`) is a list of texts.
+
+A break in the middle of a switch's case leaves the case by a flag, as the break of a loop leaves the loop:
+what follows it in the case runs only while the flag is not set.
 
   tools/cpp_to_blueprint.py --check <namespace> <include flags...> -- <file.cpp>...
 
