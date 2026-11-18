@@ -751,3 +751,29 @@ mag rechnet unabhängig weiter (der volle Lauf `work-voll-162644-5528` seit 17:3
   (erster Lauf der Auftragsart – ansehen, ob sie sauber durchläuft), `work-k-vergleich-222911-25281`. Nächster voller Lauf, sobald t1 (Fehler 1+2, Testrahmen) und k
   (G4, G7) belegt und eingemischt sind; danach `grundlage` im Zweig mag/auftrag auf den neuen gültigen Lauf setzen.
 
+### 16.16 Stand 23:05 – t1 und k eingemischt, voller Lauf abgelegt, Entscheidungen E7–E9
+- **work-zusammen = 946303c2** = e9eec025 + Merge work-t1 a48ae637 (c6e4c1cf) + Merge work-k 20cb5259. Belege, vom Koordinator nachgesehen:
+  `work-t1-vergleich-223114-27906` (city_stream, city_jobs: beide Durchgänge 11 von 12 ok, kein Abbruch, kein Leck), `work-k-vergleich-224717-8097`
+  (flak_cell, Drone_step, CityStream_upload ohne Abweichung), `work-zusammen-engine-213241-11183` rc=0 (auf 8844531a), `work-p-engine-212302-7164` rc=0.
+  **Voller Lauf: `work-zusammen-voll-230430-15353`** (abgelegt 23:04; er wartet, bis die laufenden Aufträge ins Budget passen).
+- **Was der zusammengeführte Stand jetzt kann:** Testrahmen mit einem Kindprozess je Test und zeilenweisem stdout (kein Absturz hält die Suite an, der Durchgang
+  gegen die Engine selbst läuft immer), Ortsangabe der ersten abweichenden Stelle, keine Lecks nach longjmp, Bereich hinter gezogenen Zeigern, Listen ohne
+  Reserve-Platz, Quelltext auf genulltem Speicher; Count<Per> für Zeiger-Eingänge; i64/u64 in Formaten mit 64 Bit, ++/op= mit Rückschnitt auf den Typ,
+  Zurückschreiben einer geänderten Kopie; p Teil 1.
+- **Bekannt rot im abgelegten Lauf (Fix gebaut, Beleg läuft):** create_body (d: `inertia[6]` als 1 Zahl aufgezeichnet, Fix 5083222 auf work-d), CityStream_buildings_near
+  (k: u64-Schlüssel einer Map als Int, fa3dc97d), Car_new (t1: genullter Speicher ist drin – Beleg `work-t1-vergleich-225216-10251`), Destruction_collapse/fracture (E9).
+- **E7 (d):** `list_append` auf einem Platz der Engine wächst wie `insert` der Bibliothek – dieselbe Regel wie für Blueprint-Listen und den Quelltext.
+- **E8 (t1):** der Quelltext läuft im Test auf genulltem Speicher; ein von C++ unbestimmt gelassenes Mitglied ist kein Vergleichswert.
+- **E9 (k, t1) – berührt die Regel „jede Absenkung hat einen grünen Differenztest“, darum für Chris sichtbar:** Wo C++ eine Reihenfolge offen lässt und das Ergebnis
+  davon abhängt (destruction.cpp:191/194: zwei Argumente eines Aufrufs ziehen aus demselben rng), gilt die Bedeutung des Compilers, der das Spiel baut (clang über
+  emscripten: von links – wie das Original in JS). Die Quelle wird gesenkt (Werte in dieser Reihenfolge benannt), der Differenztest bleibt Pflicht und muss grün
+  sein – gebaut mit clang; t1 stellt run_tests.sh allgemein um (tests/lowered baut mit clang, keine Ausnahme je Test). Unter GCC kann dieser Differenztest nicht
+  grün sein: dort hat die heutige Quelle ein anderes Ergebnis als das Spiel. Lehnt Chris das ab, bleibt nur: die zwei Funktionen warten („C++ leaves open“).
+- **Sperre für `work`:** 12e3da24 (k) ist ein Ausweichen im Konverter um einen use-after-free von `text_format` in der Klasse (Befund für p, vorgezogen). Erst wenn
+  ps Fix in work-zusammen ist und k 12e3da24 zurückgenommen hat, darf ein grüner voller Lauf nach `work`.
+- **Einzelläufe auf mag schreiben seit lauf2.sh febe6fc8 über ein Terminal** (script): LeakSanitizer beendet den Prozess mit _exit, bevor stdout geleert ist – vorher
+  fehlte dann das Ende der Ausgabe. Kategorien in alle.txt: ok / FAIL / ABBRUCH / LECK / ZEIT. Der Lauf „alle“ auf dem alten Stand ist abgebrochen (zweimal):
+  der volle Lauf auf dem neuen Stand zeigt mehr.
+- Zweiter Neustart des Servers hinter der Sitzung um 22:43 (wie 21:30, jeweils zusammen mit einer Unterbrechung der Antwort): alle fünf Agenten per SendMessage an ihre
+  ID fortgesetzt. Ein beim Neustart laufender Auftrag kann seine Startmeldung auf mag verlieren (`work-k-vergleich-224717` erschien als „wartet“ und lieferte doch).
+

@@ -79,3 +79,10 @@
 - Weitere Commits: 42c86fe Palette („Places of the Engine“, Editor-Test), 62d0978 Doku. mag `work-d-engine-223942-31317` wartet noch
   (rechnet den Stand bei Start, also ≥ cf8786c); CI 44403776223 auf c0d6d24 läuft.
 - Offen: Schritt 7 (Stellvertreter im Quelltext-Test, Konverter-Regel).
+
+## Befund k (Array-Parameter fester Länge) – Fix gebaut, Beleg läuft
+- **50832229** (Eltern: work-zusammen e9eec02, nur dieser Fix; in work-d gemergt als 54ae4f7): `T name[N]` liest N Werte –
+  c2b.declared_length (aus der Quelle der ParmVarDecl), TestWriter zeichnet N Werte auf, Tür/Klasse weisen eine kürzere Liste ab.
+  Generator neu (physics/game engine_calls.gen.cpp, engine_nodes.gen.h). Beleg: mag `work-d-vergleich-225255-10477` (src/drone.cpp →
+  converted_rigid_spec), läuft. engine_api.py (für c): Prüfung der festen Länge bei Zeiger-Eingängen.
+- Schritt 7 (Konverter + Stellvertreter der Quelle) gebaut: e02ea24, unbewiesen (Probe/vergleich über game_events.cpp o. ä. folgt).

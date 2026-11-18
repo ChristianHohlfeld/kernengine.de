@@ -1,8 +1,15 @@
-# Stand Paket p (Leistung der exportierten Klasse) – 18.11.2026, 22:50
+# Stand Paket p (Leistung der exportierten Klasse) – 18.11.2026, 23:05
 
-Zweig work-p, letzter Commit 34c48761 (gepusht; origin/work-zusammen e9eec025 eingemischt).
-WARTET AUF mag (vom Vorgänger, auf 2416329): `work-p-engine-221509-17831`, `work-p-probe-221512-17868`. Danach EIN `vergleich` auf dem Kopf
-(deckt E2.1, E2.2 und E2.1 Schritt 2 zusammen), dann `engine` auf dem Kopf, CI.
+Zweig work-p, letzter Commit 63467c0b (gepusht; work-zusammen c6e4c1cf eingemischt).
+- BEWIESEN: E2.1 Schritt 1 (bis 2416329): mag `work-p-engine-221509-17831` engine rc=0 (197 ok, blueprint_native_test 55 Blueprints/14102 Aufrufe,
+  game_native_test ok). Probe `work-p-probe-221512-17868` (alle Quelltexte, vor der 22:25-Regel) abgebrochen – überholt durch den Kopf.
+- LÄUFT: `work-p-vergleich-230429-15316` (Kopf 63467c0b: E2.1, E2.2, E2.1 Schritt 2, Fix text_format) über qr_code, settings, nostr, controls,
+  combat_rules. Danach `engine` auf dem Kopf. CI: run 44407872390 (work-p, 63467c0b).
+
+## Fix text_format (Befund von k) – 25a7318f, lokal bewiesen, mag läuft
+- blueprint.h `format_arg(const std::string&)`/`(std::string_view)`: Sicht auf den Wert selbst (vorher vorläufiger Text, der vor dem Schreiben verging).
+  Engine-Fall `format_text_of_value`. Lokal mit ASan (g++): alter Header heap-use-after-free, neuer sauber; Ausgabe = Interpreter; Fixpunkt gleich.
+  Text der Klasse unverändert. Beleg auf mag: vergleich oben (combat_rules.cpp) + engine auf dem Kopf.
 
 ## E2.1 Schritt 2 (+, −, ×) – gebaut c064f234, lokal geprüft, auf mag UNBEWIESEN
 - formula.cpp `kWholeOperators` (+, −, × neben der Funktionstabelle); `Formula::whole`: ein Eingang darf auch Operand von +,−,× sein, deren Wert als

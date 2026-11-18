@@ -1,4 +1,14 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 23:05 **work-zusammen = 946303c2** (+ t1 a48ae637, + k 20cb5259). **Voller Lauf abgelegt: `work-zusammen-voll-230430-15353`** (startet, sobald die laufenden
+  Aufträge bis auf einen kleinen fertig sind; bis dahin nimmt die Warteschlange nichts Neues an). Alle: vor dem nächsten Vergleich `git merge origin/work-zusammen`.
+  · **Entscheidung E9 (Reihenfolge, die C++ offen lässt):** destruction.cpp:191/194 – zwei Argumente eines Aufrufs ziehen aus demselben rng; GCC (der Test) rechnet
+    von rechts, clang (der Compiler des Spiels, emscripten) und das Original in JS von links. **Es gilt die Bedeutung des Compilers, der das Spiel baut.** Die Quelle
+    wird gesenkt (Werte in dieser Reihenfolge benannt; k), der Differenztest ist Pflicht und grün – **gebaut mit clang**; t1 stellt run_tests.sh so um, dass
+    tests/lowered allgemein mit clang gebaut wird (keine Ausnahmeliste). Eine Wirkungsanalyse im Konverter (solche Aufrufe warten lassen) nicht jetzt.
+  · **Entscheidung E8 (t1):** der Aufruf des Quelltexts läuft im Test auf genulltem Speicher – ein Mitglied, das C++ unbestimmt lässt (Car: `applied_[i].on`),
+    ist kein Vergleichswert; genullt ist eine der Belegungen, die C++ erlaubt, und die, die der Blueprint hat. Versteckt nichts, was die Quelle festlegt.
+  · **Sperre für `work`:** 12e3da24 (k) ist ein Ausweichen um den use-after-free von `text_format` in der Klasse (p behebt ihn) – erst zurücknehmen, dann nach work.
+  · Offen in Arbeit: create_body/inertia[6] (d, Fix 5083222, Vergleich wartet), u64-Schlüssel einer Map (k, fa3dc97d, Vergleich läuft), Car (t1, Vergleich läuft).
 - 22:55 **Erste Ergebnisse von `vergleich` – die Auftragsart läuft (16 min für zwei Quelltexte unter Last):**
   · `work-zusammen-engine-213241-11183` **rc=0** (Engine-Suite auf 8844531a mit ds Count<Per>-Fix).
   · `work-zusammen-vergleich-222045-20677` (destruction, city_stream auf 8844531a): Destruction_tear und CityStream_building_shape weichen nicht mehr ab (earcut-Fix
