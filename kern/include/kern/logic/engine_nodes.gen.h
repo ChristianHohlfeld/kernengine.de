@@ -1867,15 +1867,15 @@ template <class Core> struct EngineNodesOf : Core {
     }
     return from_value<Bool>(this->kern_engine("engine.mixer.ready", {to_value(mixer)}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
   }
-  /// ---- clips ---- Copies `frames` frames of `channels` interleaved samples at `rate` and resamples them to the mixer rate. Returns 0 (and sets last_error) for invalid input.
-  void engine_mixer_create_clip(Int mixer, const List<Float>& samples, Int frames, Int channels, Int rate, const Text& name) {
+  /// ---- clips ---- Copies `samples` interleaved samples of `channels` channels at `rate` (samples / channels frames) and resamples them to the mixer rate. Returns 0 (and sets last_error) for invalid input - also a sample count that is no whole number of frames.
+  void engine_mixer_create_clip(Int mixer, const List<Float>& data, Int samples, Int channels, Int rate, const Text& name) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::audio::Mixer>(*kern_o, static_cast<::kern::i64>(mixer), "mixer");
       if (!kern_self) { this->kern_engine_failed("engine.mixer.create_clip"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, samples);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, frames, kern_a1);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, data);
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, samples, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, channels, kern_a2);
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
@@ -1886,16 +1886,16 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.mixer.create_clip", {to_value(mixer), to_value(samples), to_value(frames), to_value(channels), to_value(rate), to_value(name)}, {PinType::integer});
+    this->kern_engine("engine.mixer.create_clip", {to_value(mixer), to_value(data), to_value(samples), to_value(channels), to_value(rate), to_value(name)}, {PinType::integer});
   }
-  template <class KernNode> void engine_mixer_create_clip(KernNode& kern_n, Int mixer, const List<Float>& samples, Int frames, Int channels, Int rate, const Text& name) {
+  template <class KernNode> void engine_mixer_create_clip(KernNode& kern_n, Int mixer, const List<Float>& data, Int samples, Int channels, Int rate, const Text& name) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::audio::Mixer>(*kern_o, static_cast<::kern::i64>(mixer), "mixer");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.mixer.create_clip"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, samples);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, frames, kern_a1);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, data);
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, samples, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, channels, kern_a2);
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
@@ -1906,7 +1906,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.mixer.create_clip", {to_value(mixer), to_value(samples), to_value(frames), to_value(channels), to_value(rate), to_value(name)}, {PinType::integer});
+    const std::vector<Value> kern_out = this->kern_engine("engine.mixer.create_clip", {to_value(mixer), to_value(data), to_value(samples), to_value(channels), to_value(rate), to_value(name)}, {PinType::integer});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   /// Takes samples already at the mixer rate (synthesised sounds).
@@ -6521,16 +6521,16 @@ template <class Core> struct EngineNodesOf : Core {
     }
     return from_value<List<Text>>(this->kern_engine("engine.sound_bank.source", {to_value(sound_bank), to_value(id)}, {PinType::text_list})[0].converted(pin_type_of<List<Text>>()));
   }
-  /// Decoded PCM of an imported sound (interleaved, any rate); false when invalid.
-  void engine_sound_bank_set_pcm(Int sound_bank, const Text& id, const List<Float>& samples, Int frames, Int channels, Int rate) {
+  /// Decoded PCM of an imported sound: `samples` interleaved samples of `channels` channels (samples / channels frames) at any rate; false when invalid - also a sample count that is no whole number of frames.
+  void engine_sound_bank_set_pcm(Int sound_bank, const Text& id, const List<Float>& data, Int samples, Int channels, Int rate) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::SoundBank>(*kern_o, static_cast<::kern::i64>(sound_bank), "sound_bank");
       if (!kern_self) { this->kern_engine_failed("engine.sound_bank.set_pcm"); return; }
       const std::string_view kern_a0 = id.view();
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, samples);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, frames, kern_a2);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, data);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, samples, kern_a2);
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, channels, kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
@@ -6539,17 +6539,17 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.sound_bank.set_pcm", {to_value(sound_bank), to_value(id), to_value(samples), to_value(frames), to_value(channels), to_value(rate)}, {PinType::boolean});
+    this->kern_engine("engine.sound_bank.set_pcm", {to_value(sound_bank), to_value(id), to_value(data), to_value(samples), to_value(channels), to_value(rate)}, {PinType::boolean});
   }
-  template <class KernNode> void engine_sound_bank_set_pcm(KernNode& kern_n, Int sound_bank, const Text& id, const List<Float>& samples, Int frames, Int channels, Int rate) {
+  template <class KernNode> void engine_sound_bank_set_pcm(KernNode& kern_n, Int sound_bank, const Text& id, const List<Float>& data, Int samples, Int channels, Int rate) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::SoundBank>(*kern_o, static_cast<::kern::i64>(sound_bank), "sound_bank");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.sound_bank.set_pcm"); return; }
       const std::string_view kern_a0 = id.view();
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, samples);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, frames, kern_a2);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, data);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, samples, kern_a2);
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, channels, kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
@@ -6558,7 +6558,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.sound_bank.set_pcm", {to_value(sound_bank), to_value(id), to_value(samples), to_value(frames), to_value(channels), to_value(rate)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.sound_bank.set_pcm", {to_value(sound_bank), to_value(id), to_value(data), to_value(samples), to_value(channels), to_value(rate)}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   void engine_sound_bank_set_failed(Int sound_bank, const Text& id, const Text& reason) {

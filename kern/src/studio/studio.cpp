@@ -79,7 +79,10 @@ std::string Studio::sound_source(const std::string& id) const {
 }
 
 bool Studio::sound_pcm(const std::string& id, const f32* samples, u32 frames, u32 channels, u32 rate) {
-  const bool ok = bank_->set_pcm(id, samples, frames, channels, rate);
+  // (the host says frames; the bank counts the interleaved samples it reads - frames * channels)
+  const u64 n = static_cast<u64>(frames) * channels;
+  if (n > 0xffffffffull) { report("Could not use the sound \"" + id + "\": audio: clip longer than 60 s", "error"); return false; }
+  const bool ok = bank_->set_pcm(id, samples, static_cast<u32>(n), channels, rate);
   if (!ok) report("Could not use the sound \"" + id + "\": " + last_error(), "error");
   return ok;
 }

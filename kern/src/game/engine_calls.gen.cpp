@@ -2449,7 +2449,7 @@ bool c196(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   ev::take<ev::Text>(o, in, 1, a0);
   std::vector<float> a1;
   ev::take<ev::List<ev::Float>>(o, in, 2, a1);
-  auto a2 = ev::blank<std::remove_cvref_t<unsigned int>>();
+  auto a2 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
   ev::take<ev::Int>(o, in, 3, a2);
   auto a3 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Int>(o, in, 4, a3);

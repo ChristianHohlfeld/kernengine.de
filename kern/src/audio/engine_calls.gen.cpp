@@ -116,7 +116,7 @@ bool c7(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
   if (!self) return false;
   std::vector<float> a0;
   ev::take<ev::List<ev::Float>>(o, in, 1, a0);
-  auto a1 = ev::blank<std::remove_cvref_t<unsigned int>>();
+  auto a1 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
   ev::take<ev::Int>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Int>(o, in, 3, a2);
