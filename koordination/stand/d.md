@@ -131,3 +131,17 @@
     ohne Count neben einem Daten-Zeiger, engine_api.py hält an. 30 Erklärungen umgestellt (net/geo/scene/gfx/audio/game). Generator reproduziert.
   - Syntax lokal: g++ -Werror über 41 betroffene Dateien + test_main.cpp ✓; py_compile ✓.
 - Beleg läuft: mag `work-d-count-vergleich-000943-8780` (net_session.cpp + game_gaps.cpp); Engine-Suite (Filter) folgt.
+- **Beleg Punkt 1 (00:27):** `work-d-count-vergleich-000943-8780` (f384bdfd; net_session.cpp + game_gaps.cpp): convert rc=0, bau rc=0;
+  Stellvertreter 45/45 ok, real 44 ok / 1 FAIL. **Session_push weicht in keinem Durchgang mehr ab, kein ABBRUCH converted_net_session (real ok).**
+  Einziges FAIL (real, converted_net_session_cpp): Session_connected/join/stop „only 0 calls could be compared“ – wie vorher (g: Engine weist ab), nicht neu.
+  Punkt 3 hier NICHT belegt: ohne game.cpp warten die Game-Funktionen („the struct Game has more than 96 fields“) – gaps_guided_sounds nicht verglichen.
+- Punkt 2 gebaut: Zweig **work-d-array** = **83733dad** (auf work-zusammen e4aa2e8d): Api.shape schreibt `[N item]` für Felder fester Länge
+  (Mat4 `{[16n]}`), answer gibt genau N; Engine-Test engine_stand_in_fixed_length. Syntax ✓, Generator reproduziert.
+- Beleg-Zweig **work-d-belege** = work-zusammen 310c6e10 + work-d-count + work-d-array (Generator reproduziert). Läuft:
+  `work-d-belege-vergleich-002858-13659` (game.cpp + game_gaps.cpp: matrix_of, gaps_guided_sounds). Danach Engine-Suite auf work-d-belege.
+- **BEFUND (real-Durchgang, für t1/Koordinator):** actor_matrix (und jede Funktion auf GameWorld: eject, hide_soldier, step_parachute …) wird im Durchgang
+  gegen die Engine abgewiesen, weil `GameWorld` keinen Default-Macher hat (Konstruktor `GameWorld(Renderer&, NightWindows* = nullptr)`;
+  engine_make_default kennt nur Klassen mit Konstruktor ohne Eingänge) → on_missing macht kein Objekt → call_engine false → „refused“.
+  Das ist keine Frage der Form. Vorschlag (allgemein, im Generator): ein Default-Macher auch für Klassen, deren Konstruktor nur Objekte der Engine
+  nimmt, die selbst einen Default-Macher haben (und Parameter mit Default) – die mitgemachten Objekte unter eigenen Handles im selben EngineObjects,
+  freigegeben mit ihm. Nicht umgesetzt (über Punkt 2 hinaus; Testrahmen real = t1) – Entscheidung des Koordinators.

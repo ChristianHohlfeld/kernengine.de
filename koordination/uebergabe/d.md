@@ -208,6 +208,18 @@ Arbeitsweise (Nachtrag 17:10 in PAKET_COMMON3.md): Stand nach $S/stand/d.md, Nac
   Quelle belegt, weil die Funktionen mit shots() aus anderen Gründen warten.
 - Lokaler Harness: $S/d/ (siehe oben).
 
+### Stand Nachfolger 4 (19.11., ab 00:05)
+- Punkt 1+3 (Count im Typ, E14): Zweig `work-d-count` = 0c6840cc (E14) + f384bdfd (Count). Beleg: vergleich `work-d-count-vergleich-000943-8780`
+  (net_session.cpp, game_gaps.cpp), danach `mag.sh engine origin/work-d-count sound` (bzw. ohne Filter). Danach BEREIT ZUM MERGEN + in work-d mischen.
+- Arbeitsweise: Kurzzweig im Worktree w-d (`git checkout -b work-d-<kurz> origin/work-zusammen`), danach `git checkout work-d` und mischen.
+  Syntax-Skript: /tmp/d_syn.sh <dateien> (g++ -Werror -fsyntax-only, unter flock heavy3.lock) – bei Verlust neu schreiben.
+- Punkt 1 belegt (net_session): `work-d-count-vergleich-000943-8780` – Session_push ok in beiden Durchgängen, kein ABBRUCH.
+- Punkt 2 gebaut: `work-d-array` = 83733dad (Api.shape `[N item]`, answer genau N, Engine-Test engine_stand_in_fixed_length).
+- Beleg-Zweig `work-d-belege` (work-zusammen 310c6e10 + beide Kurzzweige): vergleich `work-d-belege-vergleich-002858-13659` (game.cpp + game_gaps.cpp:
+  matrix_of, gaps_guided_sounds – Game-Funktionen brauchen game.cpp, sonst „struct Game has more than 96 fields“), danach `mag.sh engine origin/work-d-belege`.
+- work-d: work-zusammen 310c6e10 eingemischt (e00222c9; Konflikt TestWriter: deren Zeroed-Fassung + meine places_close-Zeile).
+- BEFUND real-Durchgang: GameWorld ohne Default-Macher → alle GameWorld-Aufrufe „refused“ (stand/d.md).
+
 ## C. Wo der Code steht (gelesen, spart Suche)
 - Plätze: `Graph::root_of` (kern/src/logic/logic.cpp ~864), `path_of` (~909), `place_of` (~958); `Graph::Root`
   (logic.h ~579, `writable()`); `Instance::Spot` (logic.h ~1067: key | entry/output | beside, steps);

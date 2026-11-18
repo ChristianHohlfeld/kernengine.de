@@ -796,3 +796,31 @@ mag rechnet unabhängig weiter (der volle Lauf `work-voll-162644-5528` seit 17:3
 - **Nächste Schritte:** Zwischenstand des vollen Laufs (~23:50: convert rc, Zahlen; `grundlage` nachführen), Spiel-Suite (~00:20) → Liste (t1); Belegtes einmischen
   (g c4d4544b, p 25a7318f text_format → danach k 12e3da24 zurück, d Stellvertreter-Block, t1 clang); nächster voller Lauf mit clang.
 
+### 16.18 Stand 00:55 (19.11.) – die Konvertierung des ganzen Spiels pendelt; clang ist drin; Agentenwechsel
+- **Kein gültiger voller Lauf seit 20:53.** `work-zusammen-voll-232247-24031` (5a445af8): `convert rc=1` nach 27 min – ab Runde 9 geben 30 Game-Einheiten Runde für
+  Runde, was sie vorher gaben, bis zur Sicherung in Runde 16. Ursache (g, aus zwei Diagnose-Läufen `work-zusammen-konvert-235338-1934`, `work-g1-konvert-002324-11083`):
+  wartende Funktionen, deren GRUND Runde um Runde wechselt – `Game::explosion` wartet auf `look_blast()` „is not written“ und umgekehrt, dazu 15 Aufrufer in 11
+  Teilen (combat_hud mit seinem Test-Fehler fiel schon in Runde 10, vor dem Kreis). Eine kleine Probe (game_events + combat_rules + game) konvergiert – es zeigt sich
+  erst im ganzen Programm. **Abhilfe von g (480af66b, verallgemeinert 082acc7d):** was im Kreis wechselt (geschrieben/wartet oder der Grund) und dort wartet, wartet
+  von da an, Grund = der erste im Kreis + „(it went round with <Blueprint>)“; deterministisch, Läufe ohne Kreis unberührt. Dritter Versuch läuft:
+  `work-g1-konvert-005330-16535` auf 2a5d6f77 (enthält work-zusammen 9f10aa88), Ergebnis ~01:20. **Ist er gültig: g's Commits einmischen, `voll` ablegen.**
+  Offen danach bei g: die Wurzel (warum zwei Funktionen, die einander rufen, nicht zusammen geschrieben werden; Test-Stücke anderer Dateien in `<datei>_local`).
+- **work-zusammen = 9f10aa88** = 5a445af8 + g c4d4544b (Schleifengrenze, die die Engine fragt) + k c32f607b (Diagnose im Ablauf) + Merge work-t1 87e3d741
+  (**E13: die Spiel-Suite baut mit clang**, CI auf clang, SC_ASAN, Index-Prüfung; 310c6e10) + Merge work-t1 694d04c1 (der Konverter prüft das Übersetzen eines
+  Tests mit dem Compiler und den Schaltern der Suite, ohne -Werror; Rückfall aus 13464b5f behoben). Belege: `work-t1-vergleich-000108-5748` (clang 18.1.3 linkt
+  auf mag mit ASan/UBSan; 43 von 44 ok in beiden Durchgängen; destruction ohne Absenkung gleich), `work-t1-vergleich-002703-13260` (keine wartende Funktion in
+  controls, combat_rules, net_session, city_jobs), `work-g1-vergleich-232903-26675`.
+- **E13 ist damit vollzogen:** verglichen wird gegen die Bedeutung, die der Compiler des Spiels der Quelle gibt. Erledigt sind dadurch alle Abweichungen, die nur an
+  der Reihenfolge der Argumente hingen (Destruction_collapse/fracture/blast, eject, state_of). ks Absenkung von destruction.cpp (90ecf01f, nur auf work-k) ist nie
+  gemergt worden und entfällt. **E14:** `set_pcm` zählt Samples (`Count<1> samples`), die Engine rechnet frames = samples / channels.
+- **Agenten (vier laufen):** t1 (Testrahmen/Test-Schreiber; Reste von t2: lamps Field::Spot, scan_c-Beleg, Graph E12), g (Game-Dateien, jetzt: Pendeln),
+  d Nachfolger 4 (seit 00:02: Count im Typ statt Namensregel – `work-d-count`; `T m[N]` in Antwort/Form; set_pcm – Belege laufen), p Nachfolger (text_format-Fix
+  25a7318f gebaut, Vergleich `work-p-vergleich-230429-15316` 12 von 12 ok in beiden Durchgängen, ein Engine-Lauf rc=1 – Ursache bei p in Arbeit; E3-A gebaut).
+  **Beendet:** t2 (23:20), k (23:55; Nachfolger, sobald ein gültiger Lauf die Liste seiner Dateien gibt), d Nachfolger 3 (23:58).
+- **Platz der Engine (work-d ddb54b72):** Schritte 3–6 gebaut, Engine-Suite grün (`work-d-engine-223942-31317`), CI e2e rot allein wegen des alten Levels, Schritt 7
+  gebaut und unbelegt. **Wird erst nach dem ersten grünen Stand in `work` gemergt.**
+- **Sperren für `work` unverändert:** 12e3da24 (Ausweichen von k um den use-after-free in text_format) zurücknehmen, sobald ps Fix gemergt ist – k ist beendet, das
+  macht der Koordinator mit `git revert 12e3da24` in /home/claude/w-zus.
+- **mag:** Auftragsarten `konvert <ref> <kerne>` (nur Konvertierung, ~27 min bei 37 Kernen – der schnelle Test, ob das ganze Programm konvergiert), `vergleich`,
+  `alle`, `voll`; Budget in der Datei `cap` (84); `abbrechen`. `grundlage` für `vergleich` ist weiter der Lauf 203000 (der letzte gültige).
+
