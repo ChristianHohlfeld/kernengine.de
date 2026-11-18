@@ -1,0 +1,60 @@
+src/perf.cpp: clang failed
+setarch: failed to execute clang++: No such file or directory
+
+src/people_art.cpp: clang failed
+setarch: failed to execute clang++: No such file or directory
+
+src/touch_play.cpp: clang failed
+setarch: failed to execute clang++: No such file or directory
+
+src/wanted.cpp: clang failed
+setarch: failed to execute clang++: No such file or directory
+
+src/mvt.cpp: clang failed
+setarch: failed to execute clang++: No such file or directory
+
+src/town_sync.cpp: clang failed
+setarch: failed to execute clang++: No such file or directory
+
+src/water_look.cpp: clang failed
+setarch: failed to execute clang++: No such file or directory
+
+src/world_traffic.cpp: clang failed
+setarch: failed to execute clang++: No such file or directory
+
+src/mp_art.cpp: clang failed
+setarch: failed to execute clang++: No such file or directory
+
+src/vehicle_art.cpp: clang failed
+setarch: failed to execute clang++: No such file or directory
+
+src/qr_code.cpp: clang failed
+setarch: failed to execute clang++: No such file or directory
+
+src/world_marks.cpp: clang failed
+setarch: failed to execute clang++: No such file or directory
+
+src/settings.cpp: clang failed
+setarch: failed to execute clang++: No such file or directory
+
+src/terrain.cpp: clang failed
+setarch: failed to execute clang++: No such file or directory
+
+src/world_art.cpp: clang failed
+setarch: failed to execute clang++: No such file or directory
+
+src/world_traffic.cpp: clang failed
+setarch: failed to execute clang++: No such file or directory
+
+src/vehicle_art.cpp: clang failed
+setarch: failed to execute clang++: No such file or directory
+
+
+0 of 0 functions of the program are written as Blueprints (0 of 0 lines): 0 Blueprints - 0 of source files, 0 of states, 0 of headers and of shapes
+0 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+
+real	0m16,529s
+user	1m9,599s
+sys	0m4,963s

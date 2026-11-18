@@ -1,0 +1,60 @@
+ok   life_ragdoll_gets_up
+ok   life_interior_plan_and_stairs
+ok   life_cows_birds_shots
+ok   life_dogs_cats_black_cat
+ok   perf_meter_laps
+ok   perf_governor_steps_down_and_up
+ok   look_camera_shake
+ok   look_fpv_stabilizer
+ok   look_speed_lines
+ok   look_day_clock
+ok   look_lights
+ok   map_tile_math
+ok   map_mvt_round_trip
+ok   map_procedural_city
+ok   map_line_clipped_to_square
+ok   mp_pose_timeline_interpolates_on_sender_clock
+ok   mp_rules_damage_regen_spawn_vote
+ok   mp_voice_codec_and_stream
+ok   mp_navigation_math
+ok   mp_sessions_host_two_clients
+ok   mp_a_client_keeps_asking_until_the_host_answers
+ok   mp_host_leaves_the_oldest_takes_over
+ok   mp_qr_code_structure
+ok   mp_swarm_police_and_enemies_are_seen_by_the_others
+ok   mp_people_note_hits_on_a_mates_unit
+ok   mp_swarm_larger_than_one_message_arrives_whole
+ok   mp_town_a_clients_hits_reach_the_host
+ok   mp_town_state_for_a_late_joiner
+ok   nostr_sha256
+ok   nostr_bip340_vectors
+ok   rules_wanted_blueprint
+ok   rules_wanted_unbound
+ok   rules_wanted_blueprint_is_its_cpp
+ok   rules_wanted_levels
+ok   rules_wanted_escape
+ok   settings_defaults_and_ranges
+ok   start_gps_live_filter
+ok   stream_tile_pipeline
+ok   stream_offline_town
+ok   terrain_crater_profile
+ok   terrain_bare_earth
+ok   terrain_dem_tiles
+ok   terrain_water
+ok   terrain_ground_imagery
+ok   town_road_graph_route
+ok   town_people_hits_and_crimes
+ok   town_passerby_hit_model
+ok   town_people_flee_and_walls
+ok   traffic_junctions_and_lights
+ok   traffic_first_come_and_people
+ok   traffic_keeps_its_distance
+ok   traffic_pursuit_point
+115 tests, 1644 checks, 0 failures
+0 tests, 0 checks, 0 failures
+ok   the game's own sources compile (31 files)
+ok   blueprint_native_test (17 Blueprints as their C++, 6949 calls on the class and by name through logic::Instance)
+
+real	4m18,794s
+user	28m43,744s
+sys	1m17,915s
