@@ -3,12 +3,12 @@
 #   einmal starten:  nohup bash ~/spawncity-auftrag/lauf.sh > ~/spawncity-auftrag.log 2>&1 &
 #   beenden:         touch ~/spawncity-auftrag/STOP      (oder den Prozess beenden)
 # Die Schleife schaut jede Minute nach. Steht in "ref" eine neue Zeile "<nummer> <git-ref>", rechnet sie
-# diesen Stand (Konvertierung, Spiel-Suite, Engine-Suite) in ~/spawncity-lauf und pusht das Ergebnis auf
+# diesen Stand (Konvertierung, Spiel-Suite, Engine-Suite) in ~/spawncity-lauf-auftrag und pusht das Ergebnis auf
 # den Branch mag/schlusslauf-<nummer>: Commit 1 = Level und Tests, Commit 2 = Protokolle (mag-log/).
-# Sie pusht nie auf main oder work, erzwingt nichts, installiert nichts und räumt ~/spawncity-lauf danach weg.
+# Sie pusht nie auf main oder work, erzwingt nichts, installiert nichts und räumt ~/spawncity-lauf-auftrag danach weg.
 # Kerne: alle (nproc), oder CORES=42-55 JOBS=14 in der Umgebung, um sie zu begrenzen.
 set -u
-A="$(cd "$(dirname "$0")" && pwd)"; W=~/spawncity-lauf; REPO=https://github.com/ChristianHohlfeld/kernengine.de
+A="$(cd "$(dirname "$0")" && pwd)"; W=~/spawncity-lauf-auftrag; REPO=https://github.com/ChristianHohlfeld/kernengine.de
 JOBS="${JOBS:-$(nproc)}"; R=""; [ -n "${CORES:-}" ] && R="taskset -c $CORES"
 last="$(cat "$A/.done" 2>/dev/null || true)"
 while [ ! -e "$A/STOP" ]; do
