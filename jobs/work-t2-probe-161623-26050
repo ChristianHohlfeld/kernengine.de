@@ -1,1 +1,0 @@
-probe origin/work-t2 src/game_military.cpp src/game_events.cpp src/game_net.cpp src/game_ui.cpp src/game_town.cpp src/game_vehicle_damage.cpp src/game.cpp

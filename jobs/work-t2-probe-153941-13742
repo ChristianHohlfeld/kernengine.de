@@ -1,1 +1,0 @@
-probe origin/work-t2 src/game.cpp src/game_destruction_sync.cpp src/destruction_sync.cpp src/rules.cpp
