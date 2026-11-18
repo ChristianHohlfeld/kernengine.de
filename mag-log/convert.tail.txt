@@ -1,0 +1,80 @@
+    Game::start (111): it calls register_node(), which waits
+    Game::stop (4): the end of a Ragdolls runs its destructor ~Ragdolls(), which is not written yet
+    Game::matrix_of (5): written
+    Game::player_position (13): gaps_riding() is defined in another file
+    Game::focus_position (4): it calls Game::player_position(), which waits
+    Game::clear_spot (39): it calls CityStream::ground_height(), which waits
+    Game::spawn_guard (26): it calls Game::clear_spot(), which waits
+    Game::place_world (43): it calls Game::clear_spot(), which waits
+    Game::hide_soldier (4): written
+    Game::show_soldier (9): it calls CityStream::ground_height(), which waits
+    Game::put_down (8): it calls CityStream::ground_height(), which waits
+    Game::spawn_guard_step (34): ground_ready() is defined in another file
+    Game::standing_feet (11): it calls CityStream::ground_height(), which waits
+    Game::toggle_drone (41): gaps_riding() is defined in another file
+    Game::switch_mode (34): it calls Game::toggle_drone(), which waits
+    Game::try_enter (18): gaps_seat_press() is defined in another file
+    Game::exit_vehicle (31): it calls CityStream::ground_height(), which waits
+    Game::eject (14): written
+    Game::fixed_step (34): it calls Game::spawn_guard_step(), which waits
+    Game::drive_traffic (86): detach() is defined in another file
+    Game::traffic_advance (26): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a ImplicitCastExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    Game::step_parachute (20): written
+    Game::manage_traffic (98): it calls Game::focus_position(), which waits
+    Game::update (87): look_begin() is defined in another file
+    Game::update_camera (149): it calls CityStream::ground_height(), which waits
+    Game::draw_vehicles (27): begin() is defined in another file
+    Game::audio_init (11): init() is defined in another file
+    Game::audio_render (13): ui_render_music() is defined in another file
+    Game::update_sound (38): ui_mix_cues() is defined in another file
+    Game::hud_json (136): vr_menu_json() is defined in another file
+    Game::command (268): ctl_command() is defined in another file
+
+372 of 457 functions of the program are written as Blueprints (1768 of 4933 lines), and 18 of the engine's headers that they call: 56 Blueprints - 4 of source files, 1 of states, 51 of headers and of shapes
+327 functions of the Blueprints are compared with their source, bit for bit, by the tests in /dev/shm/spawncity-jobs-chris/work-g2-probe-154057-15435/pt/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+    10 (   360)   it calls CityStream::ground_height(), which waits
+     1 (   268)   ctl_command() is defined in another file
+     2 (   234)   the end of a Ragdolls runs its destructor ~Ragdolls(), which is not written yet
+     1 (   182)   Game::player_position() of the Blueprint Game is not written
+     1 (   136)   vr_menu_json() is defined in another file
+     2 (   134)   heli() is defined in another file
+     3 (   130)   gaps_riding() is defined in another file
+     1 (   111)   it calls register_node(), which waits
+     1 (   104)   send_swarm() is defined in another file
+     1 (   101)   flak_cell() is defined in another file
+     1 (    99)   an object of the engine as a local that is not made by a constructor of it
+     1 (    98)   it calls Game::focus_position(), which waits
+     1 (    87)   look_begin() is defined in another file
+     1 (    86)   detach() is defined in another file
+     1 (    81)   update() is defined in another file
+     1 (    71)   line_of_sight() is defined in another file
+     2 (    69)   it calls Game::clear_spot(), which waits
+     2 (    66)   car_rest_pose() is defined in another file
+     1 (    55)   it calls Game::launch_jets(), which waits
+     1 (    50)   blast() is defined in another file
+     1 (    49)   it calls People::hurt(), which waits
+     1 (    48)   active() is defined in another file
+     1 (    40)   lane_signature() is defined in another file
+     2 (    38)   begin() is defined in another file
+     1 (    38)   ui_mix_cues() is defined in another file
+     1 (    37)   its test cannot compare it yet (the class Graph is not written)
+     1 (    36)   combat_sfx() is defined in another file
+     1 (    34)   ground_ready() is defined in another file
+     1 (    34)   it calls Game::toggle_drone(), which waits
+     1 (    34)   it calls Game::spawn_guard_step(), which waits
+     1 (    26)   its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a ImplicitCastExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+     1 (    25)   it calls Game::spawn_unseen(), which waits
+     1 (    21)   person() is defined in another file
+     1 (    18)   an object of the engine (NodeDef) copied or moved as a whole
+     1 (    18)   gaps_seat_press() is defined in another file
+     1 (    17)   send_fx() is defined in another file
+     1 (    14)   send_swarm_hit() is defined in another file
+     1 (    13)   ui_render_music() is defined in another file
+     1 (    11)   init() is defined in another file
+     1 (    11)   remote_cow_death() is defined in another file
+
+real	12m52,820s
+user	26m17,995s
+sys	1m28,347s
