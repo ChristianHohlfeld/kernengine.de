@@ -33,7 +33,7 @@ run_job() {  # name
   W="$J/$name"; rm -rf "$W"
   git clone -q "$REPO" "$W" 2>/dev/null && cd "$W" && git checkout -q --detach "$ref" 2>/dev/null || { echo "$name: Stand $ref nicht gefunden"; return; }
   local SHA; SHA="$(git rev-parse --short HEAD)"
-  jobs="$N"; [ "$kind" = voll ] || jobs=$(( N / SLOTS ))
+  jobs=$(( N / SLOTS )); [ "$kind" = voll ] && jobs=$(( N * 2 / 3 ))
   export KERN_JOBS="$jobs" TMPDIR="$W/tmp" SC_TEST_OUT="$W/tmp/sc-tests"; mkdir -p "$TMPDIR" mag-log
   echo "$name: $kind auf $SHA ($ref), $jobs Kerne, Start $(date '+%F %T')" > mag-log/when
   echo "werkzeuge: clang=${CLANGXX:-FEHLT} ($("${CLANGXX:-false}" --version 2>/dev/null | head -1)) c++=$(command -v c++ || echo FEHLT) ($(c++ --version 2>/dev/null | head -1)) python=$(python3 --version 2>&1) PATH=$PATH" >> mag-log/when
@@ -63,14 +63,15 @@ run_job() {  # name
 }
 while [ ! -e "$A/STOP" ]; do
   git -C "$A" pull -q --ff-only origin mag/auftrag 2>/dev/null || true
-  if [ "$(sha256sum "$A/lauf2.sh" | cut -c1-16)" != "$me" ] && [ -z "$(jobs -rp)" ]; then echo "$(date '+%F %T') neue Fassung"; exec bash "$A/lauf2.sh"; fi
+  if [ "$(sha256sum "$A/lauf2.sh" | cut -c1-16)" != "$me" ]; then   # (neue Fassung: nichts Neues annehmen, auslaufen lassen, ersetzen)
+    echo "$(date '+%F %T') neue Fassung, warte auf $(jobs -rp | wc -l) laufende"; wait; exec bash "$A/lauf2.sh"; fi
   for f in "$A"/jobs/*; do
     [ -f "$f" ] || continue; name="$(basename "$f")"; [ -e "$A/.done/$name" ] && continue
     read -r kind _ < "$f"
     running="$(jobs -rp | wc -l)"
-    if [ "$kind" = voll ]; then [ "$running" -eq 0 ] || break; else [ "$running" -lt "$SLOTS" ] || break; fi
+    [ "$running" -lt "$SLOTS" ] || break
     touch "$A/.done/$name"; echo "$(date '+%F %T') $name: $(head -1 "$f")"
-    if [ "$kind" = voll ]; then run_job "$name"; else run_job "$name" & fi
+    run_job "$name" &   # (auch ein voller Lauf hält die Warteschlange nicht auf: die Proben laufen daneben)
   done
   sleep 20
 done
