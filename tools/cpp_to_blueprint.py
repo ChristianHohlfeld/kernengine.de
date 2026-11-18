@@ -7698,7 +7698,13 @@ class Emit:
         if got is not None and self.writable(got[0]):
             return [], got[0], []
         tmp = self.temp("t", t)
-        return [f"{tmp} = {self.ex(n, t)};"], tmp, self.store(n, self.typed(tmp, t))
+        before = [f"{tmp} = {self.ex(n, t)};"]
+        # (storing it back runs after the change: what the store does before it - `m[key] = v` takes the value
+        # first, `put = t` - belongs there too, not with the steps before the statement, where t is not read yet)
+        held, self.pre = self.pre, []
+        after = self.store(n, self.typed(tmp, t))
+        after, self.pre = self.pre + after, held
+        return before, tmp, after
 
     def typed(self, text, have):
         """A value for store: the text, converted to the type the place has."""
