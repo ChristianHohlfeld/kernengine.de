@@ -57,11 +57,13 @@ printf '%s\n' "${sources[@]}" | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c '
 cpp_objects=()
 for f in "${sources[@]}"; do cpp_objects+=("$(object_of "$f")"); done
 "$cxx" "${link[@]}" "${cpp_objects[@]}" "${objects[@]}" -lm -o "$out/spawncity_tests"
-"$out/spawncity_tests" "$@"
+# (every test runs, whatever an earlier one gave - see test_main.cpp; the run's result is that of all of it)
+rc=0
+"$out/spawncity_tests" "$@" || rc=1
 # The converted functions once more against the engine itself: the source and its Blueprint (interpreter,
 # class) call the real functions of the engine's nodes, each side with objects of its own, set up alike
 # for every call - the description of every node they call has to fit the real function (rule_blueprint.h).
-if [ $# -eq 0 ]; then SC_ENGINE=real "$out/spawncity_tests" converted_; fi
+if [ $# -eq 0 ]; then SC_ENGINE=real "$out/spawncity_tests" converted_ || rc=1; fi
 # The game's own sources - what includes game.h and is not linked into the tests - compile: a
 # rule's header that changed is caught here, not first by the game's build.
 if [ $# -eq 0 ]; then
@@ -83,3 +85,4 @@ if [ $# -eq 0 ]; then
   "$cxx" "${flags[@]}" -Werror -I"$nat" "$nat/blueprint_native_main.cpp" "${engine_objects[@]}" "${objects[@]}" -lm -o "$out/wanted_native_test"
   "$out/wanted_native_test" "$nat/blueprint_native_expected.txt"
 fi
+exit "$rc"

@@ -10,6 +10,9 @@
 #include <string>
 #include <vector>
 
+#include <sys/wait.h>
+#include <unistd.h>
+
 #include "blueprint_native.h"
 #include "cost.h"
 #include "rule_blueprint.h"
@@ -190,12 +193,47 @@ int main(int argc, char** argv) {
   const char* only = argc > 1 ? argv[1] : nullptr;
   int ran = 0;
   count_memory();
+  // Every test in a process of its own: one that crashes (a sanitizer's report, a signal) or leaks is that
+  // test's FAIL, and the tests after it still run - a run shows every test's result, not the first crash's.
+  // (Lines go out as they are written: what a crashing test printed before is in the log.)
+  std::setvbuf(stdout, nullptr, _IOLBF, 0);
   for (const sct::Case& c : sct::cases()) {
     if (only && !std::strstr(c.name, only)) continue;
-    const int before = sct::failures;
-    c.fn();
+    std::fflush(stdout);
+    int counts[2] = {0, 0}, pipe_fd[2];
+    if (pipe(pipe_fd) != 0) { std::printf("FAIL %s (no pipe)\n", c.name); ++sct::failures; continue; }
+    const pid_t child = fork();
+    if (child == 0) {
+      close(pipe_fd[0]);
+      c.fn();
+      counts[0] = sct::checks;
+      counts[1] = sct::failures;
+      std::fflush(stdout);
+      if (write(pipe_fd[1], counts, sizeof counts) != static_cast<ssize_t>(sizeof counts)) _exit(97);
+      close(pipe_fd[1]);
+      std::exit(0);   // (std::exit: a leak checker's report at the end of the test counts for it)
+    }
+    close(pipe_fd[1]);
+    std::size_t got = 0;
+    while (child > 0 && got < sizeof counts) {
+      const ssize_t n = read(pipe_fd[0], reinterpret_cast<char*>(counts) + got, sizeof counts - got);
+      if (n <= 0) break;
+      got += static_cast<std::size_t>(n);
+    }
+    close(pipe_fd[0]);
+    int status = 0;
+    if (child > 0) waitpid(child, &status, 0);
     ++ran;
-    std::printf("%s %s\n", sct::failures == before ? "ok  " : "FAIL", c.name);
+    sct::checks += counts[0];
+    sct::failures += counts[1];
+    if (child < 0 || got != sizeof counts || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+      ++sct::failures;
+      if (child < 0) std::printf("FAIL %s (no process)\n", c.name);
+      else if (WIFSIGNALED(status)) std::printf("FAIL %s (crashed: signal %d)\n", c.name, WTERMSIG(status));
+      else std::printf("FAIL %s (ended with %d)\n", c.name, WIFEXITED(status) ? WEXITSTATUS(status) : -1);
+      continue;
+    }
+    std::printf("%s %s\n", counts[1] == 0 ? "ok  " : "FAIL", c.name);
   }
   std::printf("%d tests, %d checks, %d failures\n", ran, sct::checks, sct::failures);
   return sct::failures ? 1 : 0;

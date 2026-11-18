@@ -9878,7 +9878,25 @@ template <class T> const T& converted_pointed(const T* p, long long i) {
   static T none;
   none = T{};
   return none;
-}"""
+}
+// p + n of a pointer into a list the test handed over: a place in it or just past its end (what C++ defines);
+// any other is marked (C++ leaves it open) and stands at p - a range up to it is empty, nothing is read there.
+template <class T, class N> const T* converted_pointed_end(const T* p, N n) {
+  const auto at = reinterpret_cast<std::uintptr_t>(p);
+  const long long k = static_cast<long long>(n);
+  for (const auto& [first, last] : converted_pointed_lists) {
+    const auto a = reinterpret_cast<std::uintptr_t>(first), b = reinterpret_cast<std::uintptr_t>(last);
+    if (at < a || at > b || (at - a) % sizeof(T) != 0) continue;
+    const long long e = static_cast<long long>((at - a) / sizeof(T)) + k;
+    if (e >= 0 && e <= static_cast<long long>((b - a) / sizeof(T))) return p + k;
+    converted::open_read();
+    return p;
+  }
+  if (p != nullptr || k == 0) return p + k;
+  converted::open_read();
+  return p;
+}
+template <class T, class N> requires (!std::is_const_v<T>) T* converted_pointed_end(T* p, N n) { return const_cast<T*>(converted_pointed_end(static_cast<const T*>(p), n)); }"""
 WIDE_PRELUDE = """// the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
@@ -10195,6 +10213,15 @@ class TestWriter:
                 (a, b), (xa, xb) = span(n), span(ks[0])
                 swap(a, xa, "*", "converted_pointed(")
                 edits.append((b, 0, -depth, b, ", 0)"))
+                self.pointed = True
+            elif k == "BinaryOperator" and n.get("opcode") in ("+", "-") and len(ks) == 2 and "*" in qtype(ks[0]) and into_list(ks[0]):
+                # a place further on in a list a pointer points into (`values + n`, the end of what a call of the
+                # library reads - `insert(end, values, values + n)`): in the list or just past its end, as C++
+                # defines it; beyond, C++ leaves it open - the call is marked (converted_pointed_end)
+                (a, b), (la, lb), (ra, rb) = span(n), span(ks[0]), span(ks[1])
+                edits.append((a, 2, depth, a, "converted_pointed_end("))
+                swap(lb, ra, n["opcode"], ", " if n["opcode"] == "+" else ", -(")
+                edits.append((b, 0, -depth, b, ")" if n["opcode"] == "+" else "))"))
                 self.pointed = True
             elif k == "ArraySubscriptExpr" or name == "operator[]":
                 base, index = ks[-2:]
@@ -12295,10 +12322,8 @@ class TestWriter:
             try:
                 params = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
                 decl_lines, names, types = [], [], []
-                # (what the Blueprint is given is said before the call: the drawn values are then handed over to
-                # it - moved, as a value that may only be moved (std::unique_ptr) must be - and what the call
-                # made of them is compared)
-                moved = set()
+                # (what the Blueprint is given is said before the call: the drawn values are then handed to run by
+                # reference - see `run` - and what the call made of them is compared)
                 static = d.get("storageClass") == "static" or tree.decl.get(d.get("previousDecl"), {}).get("storageClass") == "static"
                 if f.state:
                     # a function of the Blueprint of a state: called on an object of the class whose fields that are
@@ -12314,7 +12339,6 @@ class TestWriter:
                 if owner and f.self_type is not None and not f.ctor and not static:
                     types.append(self.names[owner])
                     decl_lines.append(f"{types[-1]} a0 = {self.helpers(owner)}(draw);")
-                    moved.add("a0")
                     names.append("a0")
                 first = len(names)
                 held_lists = []   # (the lists the source gets a pointer into: the list and the place - Unit.pointed)
@@ -12345,8 +12369,6 @@ class TestWriter:
                         continue
                     types.append(self.spell(qtype(p)))
                     decl_lines.append(f"{types[-1]} a{len(names)} = {self.draw(qtype(p))};")
-                    if not types[-1].startswith("const ") and not types[-1].endswith("&"):
-                        moved.add(f"a{len(names)}")
                     names.append(f"a{len(names)}")
                 self.said = ()
                 if held_lists:
@@ -12405,7 +12427,7 @@ class TestWriter:
                     give = f"{'auto r = ' if f.value is not None else ''}{counted}; return Out_{f.name}{{{', '.join(f'std::move({parts[src_]})' if src_ != "state" else parts[src_] for _, _, src_ in f.out_fields)}}};"
                 else:
                     src_ = f.out_fields[0][2]
-                    give = f"return {counted};" if src_ == "result" else f"{counted}; return {parts[src_]};"
+                    give = f"return {counted};" if src_ == "result" else f"{counted}; return {parts[src_] if src_ == 'state' else f'std::move({parts[src_]})'};"   # (run's values are the test's: handed back moved, as they are)
                     want_type = types[0] if src_ == "self" else "" if src_ == "state" else self.spell(ret) if src_ == "result" else types[src_[1]]
             except Wait as w:
                 skipped.append((f, str(w)))
@@ -12429,7 +12451,11 @@ class TestWriter:
                 "    converted::Draw draw;   // (every function its own arguments, the same in every run)",
                 *([f"    std::unique_ptr<{state['object']}> s;   // (the object of the state: drawn for every call)"] if f.state else []),
                 *([f"    std::unique_ptr<{state['object']}> made_state;   // (the one its constructor makes: compared after the call)"] if state_made else []),
-                f"    const auto run = [&]({', '.join(f'[[maybe_unused]] const {t}& {n}' if n in held_lists else f'[[maybe_unused]] {t} {n}' for t, n in zip(types, names))}) {{ {give} }};",
+                # (run takes the drawn values by reference: what the call does not take over stays the test's and ends
+                # after the comparison, outside what is recorded of the call - a destructor of the test's own copy,
+                # ~RoadBuilder of the object a method is called on, is no call of C++'s; what the function takes by
+                # value it takes from them itself, as C++ hands it over - see `handed`)
+                f"    const auto run = [&]({', '.join(f'[[maybe_unused]] const {t}& {n}' if n in held_lists else f'[[maybe_unused]] {t} {n}' if t.endswith('&') else f'[[maybe_unused]] {t}& {n}' for t, n in zip(types, names))}) {{ {give} }};",
                 "    for (int i = 0; tally.more(i); ++i) {",
                 *[f"      {x}" for x in decl_lines],
                 f"      const std::vector<converted::Value> given = {{{given_args}}};   // (what the Blueprint is given: before the call)",
@@ -12440,7 +12466,7 @@ class TestWriter:
                 "      converted::may_bail(true);",
                 "      bp.before_source();   // (the Blueprints of the actors it calls, as they started)",
                 # (what the source gave, kept: as the Blueprint holds it, a view of it may be what is compared)
-                f"      const auto made = run({', '.join(f'std::move({n})' if n in moved else n for n in names)});",
+                f"      const auto made = run({', '.join(names)});",
                 f"      const auto& want = {self.wrap('made', want_type)};" if self.wrap('made', want_type) != 'made' else "      const auto& want = made;",
                 "      converted::g_can_bail = false;",
                 "      converted::may_bail(false);",
