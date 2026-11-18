@@ -1,0 +1,13 @@
+FAIL converted_destruction_cpp (ended with 1)
+FAIL converted_destruction (ended with 1)
+ok   converted_city_stream
+ok   converted_common
+ok   converted_engine_geo_mesh_data
+ok   converted_engine_math_math
+ok   converted_engine_physics_physics
+ok   converted_mvt
+ok   converted_terrain
+ok   converted_tiles
+LECK converted_destruction_cpp: SUMMARY: AddressSanitizer: 553560 byte(s) leaked in 45 allocation(s).
+LECK converted_destruction: SUMMARY: AddressSanitizer: alloc-dealloc-mismatch (/dev/shm/spawncity-jobs-chris/work-t1-vergleich-233216-28135/tmp/sc-tests/spawncity_tests+0x528c7a) (BuildId:
+--- 8 ok, 2 FAIL, 0 ABBRUCH, 2 LECK, 0 ZEIT, von 10 Tests; cost: 4, note: 7

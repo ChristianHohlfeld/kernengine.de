@@ -1,0 +1,80 @@
+In file included from /dev/shm/spawncity-jobs-chris/work-t1-vergleich-233216-28135/kern/games/spawncity/src/life.cpp:2:
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-233216-28135/kern/games/spawncity/src/life.h:270:24: warning: private field 'tree_ground_cursor_' is not used [-Wunused-private-field]
+  270 |   u32 trees_down_ = 0, tree_ground_cursor_ = 0;
+      |                        ^
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-233216-28135/kern/games/spawncity/src/life.h:284:81: warning: private field 'ambient_chirp_' is not used [-Wunused-private-field]
+  284 |   f32 last_shout_ = -99, last_honk_ = -99, last_scream_ = -99, last_coo_ = -99, ambient_chirp_ = 0;
+      |                                                                                 ^
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-233216-28135/kern/games/spawncity/src/nostr.cpp:100:6: warning: unused function 'from_hex256' [-Wunused-function]
+  100 | U256 from_hex256(const char* s) {
+      |      ^~~~~~~~~~~
+1 warning generated.
+In file included from /dev/shm/spawncity-jobs-chris/work-t1-vergleich-233216-28135/kern/games/spawncity/src/people.cpp:2:
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-233216-28135/kern/games/spawncity/src/people.h:207:21: warning: private field 'serial_' is not used [-Wunused-private-field]
+  207 |   u32 budget_ = 60, serial_ = 1;
+      |                     ^
+1 warning generated.
+2 warnings generated.
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-233216-28135/kern/games/spawncity/src/world_traffic.cpp:52:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+   52 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-233216-28135/kern/games/spawncity/src/world_traffic.cpp:101:63: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  101 |               if (!dup) nodes[ni].arms.push_back({dir, g.width});
+      |                                                               ^
+2 warnings generated.
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-233216-28135/kern/games/spawncity/src/level_blueprints.cpp:22949:16: warning: unused variable 'a' [-Wunused-variable]
+ 22949 |     nostr_U256 a = nostr_U256{Fixed<Int, 8>{}};
+       |                ^
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-233216-28135/kern/games/spawncity/src/level_blueprints.cpp:22987:16: warning: unused variable 'a_4' [-Wunused-variable]
+ 22987 |     nostr_U256 a_4 = nostr_U256{Fixed<Int, 8>{}};
+       |                ^~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-233216-28135/kern/games/spawncity/src/level_blueprints.cpp:23053:16: warning: unused variable 'a' [-Wunused-variable]
+ 23053 |     nostr_U256 a = nostr_U256{Fixed<Int, 8>{}};
+       |                ^
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-233216-28135/kern/games/spawncity/src/level_blueprints.cpp:27125:9: warning: unused variable 'key_10' [-Wunused-variable]
+ 27125 |     Int key_10 = 0;
+       |         ^~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-233216-28135/kern/games/spawncity/src/level_blueprints.cpp:27127:9: warning: unused variable 'key_12' [-Wunused-variable]
+ 27127 |     Int key_12 = 0;
+       |         ^~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-233216-28135/kern/games/spawncity/src/level_blueprints.cpp:27138:9: warning: unused variable 'key_15' [-Wunused-variable]
+ 27138 |     Int key_15 = 0;
+       |         ^~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-233216-28135/kern/games/spawncity/src/level_blueprints.cpp:32002:10: warning: unused variable 'playing' [-Wunused-variable]
+ 32002 |     Bool playing = false;
+       |          ^~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-233216-28135/kern/games/spawncity/src/level_blueprints.cpp:32385:10: warning: unused variable 'playing' [-Wunused-variable]
+ 32385 |     Bool playing = false;
+       |          ^~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-233216-28135/kern/games/spawncity/src/level_blueprints.cpp:39519:9: warning: unused variable 'count' [-Wunused-variable]
+ 39519 |     Int count = 0;
+       |         ^~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-233216-28135/kern/games/spawncity/src/level_blueprints.cpp:39520:9: warning: unused variable 'at_5' [-Wunused-variable]
+ 39520 |     Int at_5 = 0;
+       |         ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-233216-28135/kern/games/spawncity/src/level_blueprints.cpp:39521:9: warning: unused variable 'end_4' [-Wunused-variable]
+ 39521 |     Int end_4 = 0;
+       |         ^~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-233216-28135/kern/games/spawncity/src/level_blueprints.cpp:44260:10: warning: variable 'remove' set but not used [-Wunused-but-set-variable]
+ 44260 |     Bool remove = false;
+       |          ^
+2 warnings generated.
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-233216-28135/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:174:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  174 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-233216-28135/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:222:85: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  222 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g->width});
+      |                                                                                     ^
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-233216-28135/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:610:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  610 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-233216-28135/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:659:84: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  659 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g.width});
+      |                                                                                    ^
+4 warnings generated.
+12 warnings generated.
+0 tests, 0 checks, 0 failures
+
+real	4m32,843s
+user	32m15,991s
+sys	0m47,063s

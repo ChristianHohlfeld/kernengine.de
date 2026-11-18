@@ -1,0 +1,12 @@
+FAIL converted_destruction_cpp
+FAIL converted_destruction (ended with 1)
+ok   converted_city_stream
+ok   converted_common
+ok   converted_destruction_cpp
+ok   converted_engine_geo_mesh_data
+ok   converted_engine_math_math
+ok   converted_engine_physics_physics
+ok   converted_mvt
+ok   converted_terrain
+ok   converted_tiles
+--- 9 ok, 2 FAIL, 0 ABBRUCH, 0 LECK, 0 ZEIT, von 10 Tests; cost: 5, note: 4

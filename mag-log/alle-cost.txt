@@ -1,0 +1,5 @@
+  cost: Destruction_collapse: in 2 of 64 calls the class asks for memory more often than the source (up to 2 times instead of 1)
+  cost: Destruction_collapse: in 2 of 65 calls the class asks for memory more often than the source (up to 2 times instead of 1)
+  cost: Destruction_merge_points: in 15 of 300 calls the class asks for memory more often than the source (up to 2 times instead of 1)
+  cost: Destruction_tear: in 76 of 185 calls the class asks for memory more often than the source (up to 41 times instead of 38)
+  cost: Destruction_tear: in 85 of 206 calls the class asks for memory more often than the source (up to 41 times instead of 38)
