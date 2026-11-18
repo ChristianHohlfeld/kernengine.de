@@ -7,6 +7,7 @@
 #include <string>
 #include <type_traits>
 #include <vector>
+#include <cstdint>
 #include "kern/gfx/mesh.h"
 #include "../converted.h"
 
@@ -23,6 +24,24 @@ using converted::wide::distance; using converted::wide::distance_sq; using conve
 using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
+inline std::vector<std::pair<const unsigned char*, const unsigned char*>> converted_pointed_lists;
+template <class T> const T& converted_pointed(const T* p, long long i) {
+  const auto at = reinterpret_cast<std::uintptr_t>(p);
+  bool held = false;
+  for (const auto& [first, last] : converted_pointed_lists) {
+    const auto a = reinterpret_cast<std::uintptr_t>(first), b = reinterpret_cast<std::uintptr_t>(last);
+    if (at < a || at > b || (at - a) % sizeof(T) != 0) continue;
+    held = true;
+    const long long e = static_cast<long long>((at - a) / sizeof(T)) + i;
+    if (e >= 0 && e < static_cast<long long>((b - a) / sizeof(T))) return reinterpret_cast<const T*>(first)[e];
+    break;
+  }
+  if (p != nullptr && !held) return p[i];
+  converted::open_read();
+  static T none;
+  none = T{};
+  return none;
+}
 
 // ---- mesh_data.h and what it uses, as it stands ----
 #pragma GCC diagnostic push
@@ -50,7 +69,7 @@ struct MeshData {
     colors.insert(colors.end(), {c.x, c.y, c.z});
     uvs.insert(uvs.end(), {uv.x, uv.y});
   }
-  
+  void push_extra(const f32* values) { extra.insert(extra.end(), values, values + extra_size); }
   
 
 
@@ -154,6 +173,28 @@ SC_TEST(converted_engine_geo_mesh_data) {
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // MeshData::push_extra
+    converted::Tally tally("MeshData_push_extra");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] MeshData a0, [[maybe_unused]] const std::vector<double>& a1, [[maybe_unused]] long long a2) { converted::counted([&] { return a0.push_extra((a2 < 0 ? nullptr : a1.data() + a2)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      MeshData a0 = draw_kern__MeshData(draw);
+      std::vector<double> a1(3); for (auto& e : a1) e = draw.number();
+      const long long a2 = draw.below(8) == 0 ? -1 : static_cast<long long>(draw.below(static_cast<u32>(a1.size()) + 1));
+      converted_pointed_lists = {{reinterpret_cast<const unsigned char*>(a1.data()), reinterpret_cast<const unsigned char*>(a1.data() + a1.size())}};
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), a1, a2);
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

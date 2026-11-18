@@ -83,7 +83,7 @@ struct TouchPlay {
   void set_layout(const TouchLayout& l);
   /// type 0 down, 1 move, 2 up, 3 cancel; t in ms. True when the controls own the finger (a finger
   /// they do not own - car pinch, the drone's tap fire, free screen - may also be a long-press ping).
-  
+  bool pointer(u32 type, i32 id, f32 x, f32 y, f64 t_ms);
   void release_all();
 
   // ---- what the fingers give (read by the game each frame) ----
@@ -165,6 +165,33 @@ namespace logic { enum class PinType : u8 {
   map, set, count
 }; }
 namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
+namespace controls { void touch_look_delta(f32 dx, f32 dy, f32 speed_px_s, f32& yaw, f32& pitch); }
+namespace controls { f32 clearance_pad_axis(f32 centre_y, f32 y, f32 height); }
+namespace rules { inline f64 decimal(f32 x) {
+  const f64 d = static_cast<f64>(x);
+  const f64 a = std::fabs(d);
+  if (!(a >= 1e-9 && a < 1e7) || d == std::trunc(d)) return d;
+  f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
+  for (f64 m = a; m < 1; m *= 10) scale *= 10;
+  for (f64 m = a; m >= 10; m /= 10) scale /= 10;
+  for (int digits = 1; digits <= 9; ++digits, scale *= 10) {
+    const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
+    if (static_cast<f32>(c) == x) return c;
+  }
+  return d;
+} }
+namespace rules { struct Blueprint : ::kern::logic::ActorBlueprint {
+  using ActorBlueprint::ActorBlueprint;
+}; }
+namespace controls { namespace controls_cpp_local { rules::Blueprint g_rules{"Controls"}; } }
+namespace controls { f32 clearance_pad_axis(f32 centre_y, f32 y, f32 height) { return static_cast<f32>(controls::controls_cpp_local::g_rules.number("ClearancePadAxis", rules::decimal(static_cast<f32>(centre_y)), rules::decimal(static_cast<f32>(y)), rules::decimal(static_cast<f32>(height)))); } }
+namespace controls { void touch_look_delta(f32 dx, f32 dy, f32 speed_px_s, f32& yaw, f32& pitch) {
+  f64 rx = 0, ry = 0;
+  controls::controls_cpp_local::g_rules.call("TouchLookDelta", std::tie(rx, ry), rules::decimal(dx), rules::decimal(dy), rules::decimal(speed_px_s));
+  const Vec2 r{static_cast<f32>(rx), static_cast<f32>(ry)};
+  yaw = r.x;
+  pitch = r.y;
+} }
 constexpr f32 kSafe = 10, kGap = 8;
 std::string esc(const std::string& s) {
   std::string o;
@@ -365,6 +392,176 @@ i32 TouchPlay::button_at(f32 x, f32 y) const {
     if (b.round ? in_circle(b.x + b.w / 2, b.y + b.h / 2, b.w / 2, x, y) : (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h)) return static_cast<i32>(i);
   }
   return -1;
+}
+bool TouchPlay::pointer(u32 type, i32 id, f32 x, f32 y, f64 t_ms) {
+  if (lay_.mode == TouchMode::off) return false;
+  auto it = std::find_if(fingers_.begin(), fingers_.end(), [&](const Finger& f) { return f.id == id; });
+  const f32 t = static_cast<f32>(t_ms / 1000.0);
+  if (type == 0) {
+    if (it != fingers_.end()) converted::erase(fingers_, it);
+    Finger f;
+    f.id = id;
+    f.x0 = f.x = f.last_x = x;
+    f.y0 = f.y = f.last_y = y;
+    f.t0 = f.last_t = t_ms;
+    const f32 r = kStick / 2;
+    const f32 Lcx = sl_ + r, Lcy = h_ - sb_ - r, Rcx = w_ - sr_ - right_inset() - r, Rcy = h_ - sb_ - r;
+    if (const i32 at = button_at(x, y); at >= 0) {
+      TouchBtn& b = converted::at(buttons_, static_cast<std::size_t>(at));
+      f.kind = Finger::press;
+      f.button = b.id;
+      b.pressed = true;
+      if (b.on_down) pressed_.push_back(b.id);
+      if (b.id == "clearance") { f.kind = Finger::clearance; clearance_ = controls::clearance_pad_axis(pad_y_ + pad_h_ / 2, y, pad_h_); }
+      if (b.id == "nade") nade_up_ = 0;
+    } else if (lay_.aiming) {
+      f.kind = Finger::strike;
+    } else if (lay_.alive && !no_sticks() && in_circle(Lcx, Lcy, r, x, y)) {
+      // The newest finger takes the stick over; deflection counts from where it lands.
+      converted::erase(fingers_, std::remove_if(fingers_.begin(), fingers_.end(), [](const Finger& g) { return g.kind == Finger::move; }), fingers_.end());
+      f.kind = Finger::move;
+      f.base = {};
+      move_id_ = id;
+      move_ = {};
+    } else if (lay_.alive && !no_sticks() && in_circle(Rcx, Rcy, r, x, y)) {
+      converted::erase(fingers_, std::remove_if(fingers_.begin(), fingers_.end(), [](const Finger& g) { return g.kind == Finger::look; }), fingers_.end());
+      f.kind = Finger::look;
+      look_id_ = id;
+      look_ = look_edge_ = {};
+    } else if (lay_.alive && (lay_.mode == TouchMode::foot || lay_.mode == TouchMode::drone || lay_.mode == TouchMode::jet)) {
+      // The screen fires at the finger (foot / drone / jet); dragging moves the aim point.
+      f.kind = Finger::fire;
+      TouchFire fire;
+      fire.id = id;
+      fire.x = x;
+      fire.y = y;
+      fire.down_t = t;
+      fire.hand = x < w_ / 2 ? 1 : 0;
+      fires_.push_back(fire);
+      if (lay_.mode == TouchMode::jet && std::count_if(fingers_.begin(), fingers_.end(), [](const Finger& g) { return g.kind == Finger::fire; }) > 0) {
+        converted::pop_back(fires_);  // jet_mode.mjs: one tap finger at a time
+        f.kind = Finger::none;
+      }
+    } else if (lay_.mode == TouchMode::car) {
+      f.kind = Finger::pinch;
+      // the other finger of the pinch: its place in fingers_ (the last one), fingers_.size() if none
+      std::size_t other = fingers_.size();
+      for (std::size_t i = 0; i < fingers_.size(); converted::pre_inc(i))
+        if (converted::at(fingers_, i).kind == Finger::pinch) other = i;
+      if (other < fingers_.size()) pinch_d_ = hypot_bp(converted::at(fingers_, other).x - x, converted::at(fingers_, other).y - y);
+    } else {
+      f.kind = Finger::none;
+    }
+    fingers_.push_back(f);
+    return !(f.kind == Finger::pinch || f.kind == Finger::none || (f.kind == Finger::fire && lay_.mode == TouchMode::drone));
+  }
+  if (it == fingers_.end()) return false;
+  Finger& f = *it;
+  if (type == 1) {
+    const f32 dx = x - f.last_x, dy = y - f.last_y;
+    const f64 dt_ms = std::max(1.0, t_ms - f.last_t);
+    f.x = x;
+    f.y = y;
+    const f32 radius = std::max(1.0, kStick * kRadiusK);
+    switch (f.kind) {
+      case Finger::move: {
+        f32 vx = f.base.x + (x - f.x0) / radius, vy = f.base.y + (y - f.y0) / radius;
+        const f32 m = hypot_bp(vx, vy);
+        if (m > 1) { vx /= m; vy /= m; }
+        move_ = {vx, vy};
+        break;
+      }
+      case Finger::look: {
+        if (lay_.mode == TouchMode::foot) {
+          // (a) 1:1 drag with the flick gain, (b) the edge turn past the ring (the origin follows).
+          if (dx != 0 || dy != 0) {
+            f32 yaw, pitch;
+            controls::touch_look_delta(dx, dy, static_cast<f32>(hypot_bp(dx, dy) / dt_ms * 1000.0), yaw, pitch);
+            drag_.x += yaw;
+            drag_.y += pitch;
+          }
+          const f32 cap = radius * kEdgeStart + kEdgeRampPx;
+          f32 ox = x - f.x0, oy = y - f.y0, dist = hypot_bp(ox, oy);
+          if (dist > cap) {
+            const f32 pull = (dist - cap) / dist;
+            f.x0 += ox * pull;
+            f.y0 += oy * pull;
+            ox *= 1 - pull;
+            oy *= 1 - pull;
+            dist = cap;
+          }
+          const f32 edge = clampf((dist - kEdgeStart * radius) / kEdgeRampPx, 0, 1);
+          const f32 m = dist / radius;
+          look_ = {std::min(1.0, m) * (dist > 0 ? ox / dist : 0), std::min(1.0, m) * (dist > 0 ? oy / dist : 0)};
+          look_edge_ = edge > 0 && m > 0 ? Vec2{ox / radius / m * edge, oy / radius / m * edge} : Vec2{};
+        } else {
+          f32 vx = (x - f.x0) / radius, vy = (y - f.y0) / radius;
+          const f32 m = hypot_bp(vx, vy);
+          if (m > 1) { vx /= m; vy /= m; }
+          look_ = {vx, vy};
+        }
+        break;
+      }
+      case Finger::fire:
+        for (TouchFire& fi : fires_)
+          if (fi.id == id) { fi.x = x; fi.y = y; }
+        break;
+      case Finger::clearance: clearance_ = controls::clearance_pad_axis(pad_y_ + pad_h_ / 2, y, pad_h_); break;
+      case Finger::press:
+        if (f.button == "nade") nade_up_ = f.y0 - y;  // drag "up" = stronger throw
+        break;
+      case Finger::pinch: {
+        std::size_t other = fingers_.size();
+        for (std::size_t i = 0; i < fingers_.size(); converted::pre_inc(i))
+          if (converted::at(fingers_, i).kind == Finger::pinch && converted::at(fingers_, i).id != id) other = i;
+        if (other < fingers_.size()) {
+          const f32 d = hypot_bp(converted::at(fingers_, other).x - x, converted::at(fingers_, other).y - y);
+          if (pinch_d_ > 10 && d > 10) zoom_ *= pinch_d_ / d;
+          pinch_d_ = d;
+        }
+        break;
+      }
+      default: break;
+    }
+    f.last_x = x;
+    f.last_y = y;
+    f.last_t = t_ms;
+    return true;
+  }
+  // up / cancel
+  switch (f.kind) {
+    case Finger::move: move_ = {}; move_id_ = -1; break;
+    case Finger::look: look_ = look_edge_ = {}; look_id_ = -1; break;
+    case Finger::fire:
+      // a tap that came and went inside one frame still fires once (pointerdown fires in the
+      // original: knifeAt / punchAt / fireAt): kept, marked lifted, dropped after the frame read it
+      for (TouchFire& fi : fires_)
+        if (fi.id == id && fi.fresh) fi.lifted = true;
+      converted::erase(fires_, std::remove_if(fires_.begin(), fires_.end(), [&](const TouchFire& fi) { return fi.id == id && !fi.lifted; }), fires_.end());
+      break;
+    case Finger::clearance: clearance_ = 0; break;
+    case Finger::strike:
+      if (type == 2) { strike_tap_ = true; strike_x_ = x; strike_y_ = y; }
+      break;
+    case Finger::press: {
+      bool still = false;
+      for (const Finger& g : fingers_)
+        if (g.id != id && g.kind == Finger::press && g.button == f.button) still = true;
+      for (TouchBtn& b : buttons_)
+        if (b.id == f.button) {
+          if (!still) b.pressed = false;
+          const bool inside = x >= b.x - 4 && x <= b.x + b.w + 4 && y >= b.y - 4 && y <= b.y + b.h + 4;
+          if (!b.on_down && type == 2 && inside) {
+            pressed_.push_back(b.id);  // jet EJECT too: a tap fires the seat
+          }
+        }
+      released_.push_back(f.button);
+      break;
+    }
+    default: break;
+  }
+  converted::erase(fingers_, it);
+  return true;
 }
 void TouchPlay::release_all() {
   for (const Finger& f : fingers_)
@@ -601,6 +798,10 @@ struct Out_TouchPlay_place_row { TouchPlay Self; std::vector<TouchBtn> items; };
 [[maybe_unused]] static bool same(const Out_TouchPlay_place_row& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.items, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_TouchPlay_place_row& s) { return defined(s.Self) && defined(s.items); }
 [[maybe_unused]] static std::string text(const Out_TouchPlay_place_row& s) { return std::string("{") + text(s.Self) + ", " + text(s.items) + "}"; }
+struct Out_TouchPlay_pointer { TouchPlay Self; bool Result; };
+[[maybe_unused]] static bool same(const Out_TouchPlay_pointer& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_TouchPlay_pointer& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_TouchPlay_pointer& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_TouchPlay_take_drag { TouchPlay Self; Vec2 Result; };
 [[maybe_unused]] static bool same(const Out_TouchPlay_take_drag& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_TouchPlay_take_drag& s) { return defined(s.Self) && defined(s.Result); }
@@ -623,7 +824,8 @@ struct Out_TouchPlay_take_strike_tap { TouchPlay Self; bool Result; double x; do
 [[maybe_unused]] static std::string text(const Out_TouchPlay_take_strike_tap& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + ", " + text(s.x) + ", " + text(s.y) + "}"; }
 
 SC_TEST(converted_touch_play_cpp) {
-  converted::Blueprint bp("touch_play_cpp");
+  converted::Blueprint bp("touch_play_cpp", {"Controls"});
+  controls::controls_cpp_local::g_rules.bind(bp.source_logic());
   {  // esc
     converted::Tally tally("esc");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -856,6 +1058,30 @@ SC_TEST(converted_touch_play_cpp) {
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // TouchPlay::pointer
+    converted::Tally tally("TouchPlay_pointer");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] TouchPlay a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] int a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { auto r = converted::counted([&] { return a0.pointer(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); return Out_TouchPlay_pointer{std::move(a0), std::move(r)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      TouchPlay a0 = draw_TouchPlay(draw);
+      unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      int a2 = static_cast<int>(draw.whole());
+      double a3 = draw.number();
+      double a4 = draw.number();
+      double a5 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
     }
   }
   {  // TouchPlay::take_drag

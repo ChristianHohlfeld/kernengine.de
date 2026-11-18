@@ -34,8 +34,8 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-namespace physics { struct Body { u64 id = 0; }; }
-namespace physics { struct Joint { u64 id = 0; }; }
+namespace physics { struct Body { u64 id = 0; bool operator==(const Body& o) const { return id == o.id; } }; }
+namespace physics { struct Joint { u64 id = 0; bool operator==(const Joint& o) const { return id == o.id; } }; }
 struct World : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -182,7 +182,7 @@ struct TrafficCar {
   Vec3 last_velocity;
 };
 namespace PoliceUnit { enum class State : u8 { pursuit, stopping, engage, back, leave, abandoned, wreck }; }
-bool is_bus(const TrafficCar& c) { return c.car->spec().radius > 0.4; }
+bool is_bus(const TrafficCar& c) { return converted::present(c.car)->spec().radius > 0.4; }
 #undef private
 #undef protected
 #pragma GCC diagnostic pop

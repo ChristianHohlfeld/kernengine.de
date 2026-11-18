@@ -66,7 +66,9 @@ enum class Opt : u8 {
 };
 struct Settings {
  public:
-  /// Every setting at its default (as the table bound at this moment has it).
+  /// Every setting at 0 (as an empty table has it).
+  Settings() = default;
+  /// Every setting at its default (as the table has it).
   
   f32 get(Opt o) const { return converted::at(v_, static_cast<u32>(o)); }
   bool on(Opt o) const { return get(o) > 0.5; }
@@ -82,7 +84,7 @@ struct Settings {
   
 
  private:
-  f32 v_[static_cast<u32>(Opt::count)];
+  f32 v_[static_cast<u32>(Opt::count)] = {};
   u32 version_ = 1;
 };
 #undef private

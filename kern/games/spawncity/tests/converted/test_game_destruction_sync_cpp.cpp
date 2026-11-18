@@ -36,7 +36,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-namespace Terrain { struct CraterRec { f32 x = 0, y = 0, r = 0, depth = 0; }; }
+namespace Terrain { struct CraterRec { f32 x = 0, y = 0, r = 0, depth = 0; bool operator==(const CraterRec& o) const { return x == o.x && y == o.y && r == o.r && depth == o.depth; } }; }
 namespace CityStream { struct DamageRec { u32 seed = 0; f32 height = 0; bool leveled = false; }; }
 namespace json { enum class Type : u8 { null, boolean, number, string, array, object }; }
 namespace logic { enum class PinType : u8 {
@@ -111,6 +111,13 @@ namespace wire { struct Reader {
     converted::plus_to(at, 4);
     return x.v;
   }
+  
+
+
+
+
+
+
   
 
 
@@ -220,6 +227,7 @@ u32 digest_of(const Craters& c, const DamageList& d) {
   }
   return h;
 }
+bool has(const Craters& v, const Terrain::CraterRec& c) { return std::find(v.begin(), v.end(), c) != v.end(); }
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
@@ -475,6 +483,26 @@ SC_TEST(converted_game_destruction_sync_cpp) {
     for (int i = 0; tally.more(i); ++i) {
       std::vector<Terrain::CraterRec> a0 = draw_list(draw, [&]() -> Terrain::CraterRec { return draw_Terrain__CraterRec(draw); });
       std::vector<CityStream::DamageRec> a1 = draw_list(draw, [&]() -> CityStream::DamageRec { return draw_CityStream__DamageRec(draw); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // has
+    converted::Tally tally("has");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<Terrain::CraterRec> a0, [[maybe_unused]] Terrain::CraterRec a1) { return converted::counted([&] { return converted_game_destruction_sync_cpp::has(a0, a1); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      std::vector<Terrain::CraterRec> a0 = draw_list(draw, [&]() -> Terrain::CraterRec { return draw_Terrain__CraterRec(draw); });
+      Terrain::CraterRec a1 = draw_Terrain__CraterRec(draw);
       const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)

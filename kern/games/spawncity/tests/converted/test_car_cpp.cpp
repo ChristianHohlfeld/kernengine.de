@@ -62,8 +62,8 @@ namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh
 namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
 namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
 namespace physics { struct Body { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Body& o) const { return id == o.id; } }; }
-namespace physics { struct Shape { u64 id = 0; }; }
-namespace physics { struct Joint { u64 id = 0; }; }
+namespace physics { struct Shape { u64 id = 0; bool operator==(const Shape& o) const { return id == o.id; } }; }
+namespace physics { struct Joint { u64 id = 0; bool operator==(const Joint& o) const { return id == o.id; } }; }
 namespace physics { struct Pose {
   Vec3 position;
   Quat rotation;
@@ -149,6 +149,8 @@ struct World : converted::EngineObject {
   void apply_force_to_center(const physics::Body& body, const Vec3& force) const;
   void apply_force(const physics::Body& body, const Vec3& force, const Vec3& point) const;
   physics::Pose pose(const physics::Body& body) const;
+  void set_wheel_steering(const physics::Joint& joint, const double& target) const;
+  double wheel_steering(const physics::Joint& joint) const;
   Vec3 linear_velocity(const physics::Body& body) const;
   Vec3 angular_velocity(const physics::Body& body) const;
 };
@@ -158,6 +160,7 @@ struct MouseGrab : converted::EngineObject {
 struct CharacterMover : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+constexpr f32 kG = 9.80665;
 constexpr f32 kPi = 3.14159265358979323846;
 enum : u64 { kCatWorld = 1, kCatVehicle = 2, kCatDrone = 4, kCatQuery = 8 };
 inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
@@ -255,7 +258,7 @@ struct Car {
   
 
   void reset();
-  
+  void step(World& world, physics::Body body, f32 h, const CarInput& in);
   /// The forces of the last step() again, in the chassis frame (no rays): AI traffic runs its
   /// tyres at 60 Hz as the original (world_rigid_body_runtime.mjs FIXED_DT 1/60) and holds them
   /// over Kern's 240 Hz steps in between (game.cpp drive_traffic).
@@ -290,7 +293,24 @@ struct Car {
   bool ensure_rig(World& world, physics::Body chassis, f32 dt);
 };
 CarInput ai_drive(Vec3 position, Vec3 forward, f32 vf, Vec3 target, f32 target_speed);
+constexpr f32 kKappaPeak = 0.1, kSlideGrip = 0.78, kLoadSensitivity = 0.15, kVReg = 2, kTcsSlip = 0.11, kAbsSlip = 0.11;
+constexpr int kTyreSubsteps = 5;
+constexpr f32 kPneumaticTrail = 0.03, kCasterTrail = 0.025, kSteerJacking = 0.18, kTrailCollapse = 3;
 constexpr f32 kBodyDamping = 0.45;
+const f32 kAlphaPeak = kern::math::tan(6.5 * kPi / 180);
+constexpr f32 kAsphaltMu = 1.0;
+void tyre(f32 kappa, f32 tan_a, f32 muN, std::array<f32, 2>& out) {
+  const f32 sx = kappa / kKappaPeak, sy = tan_a / kAlphaPeak, s = hypot_bp(sx, sy);
+  if (s < 1e-6 || !(muN > 0)) {
+    out[0] = 0;
+    out[1] = 0;
+    return;
+  }
+  const f32 g = s < 1 ? s * (2 - s) : 1 - (1 - kSlideGrip) * std::fmin(1.0, (s - 1) / 2.5);
+  const f32 F = muN * g;
+  out[0] = F * sx / s;
+  out[1] = -F * sy / s;
+}
 f32 steer_torque_at(const CarSpec& s, f32 v) { const f32 x = v / s.steer_assist_speed; return s.steer_hand + s.steer_assist / (1 + x * x); }
 CarSpec CarSpec::bus() {
   CarSpec s;
@@ -502,6 +522,177 @@ void Car::reapply(World& world, physics::Body body) const {
     if (a.on < 0) world.apply_force_to_center(body, f);
     else if (converted::at(rig_, a.on).body.valid() && world.body_valid(converted::at(rig_, a.on).body)) world.apply_force(converted::at(rig_, a.on).body, f, st.position + st.rotation.rotate(a.p));
   }
+}
+void Car::step(World& world, physics::Body body, f32 dt, const CarInput& input) {
+  const CarSpec& spec = s_;
+  n_applied_ = 0;
+  if (!ensure_rig(world, body, dt)) return;
+  const BodyState st = read_body(world, body);
+  const Quat q = st.rotation;
+  const Vec3 forward = q.rotate({1, 0, 0}), left = q.rotate({0, 1, 0}), up = q.rotate({0, 0, 1});
+  const Vec3 com = st.position + q.rotate(Vec3{spec.com_x, 0, spec.com_z});
+  auto point_velocity = [&](Vec3 p) { return st.velocity + converted::wide::cross(st.angular, p - com); };
+  const f32 vf = converted::wide::dot(st.velocity, forward), speed = converted::wide::length(st.velocity);
+  const f32 r = spec.radius, pedal = clampf(input.pedal, -1, 1);
+  const bool handbrake = input.handbrake;
+  const f32 max_speed = clampf(input.max_speed, 3, 80), max_reverse = clampf(input.max_reverse, 1, 30);
+  const f32 stick = clampf(input.steer, -1, 1), rack = spec.rack_rate * dt;
+
+  // Automatic direction selector: D <-> R only when (nearly) stopped.
+  gear_ = gear_ == -1 ? -1 : 1;
+  enum { coast, drive, reverse, brake } mode = coast;
+  if (std::fabs(pedal) > 0.02) {
+    const i32 desired = pedal > 0 ? 1 : -1;
+    if (gear_ != desired) {
+      if (speed > 0.65) mode = brake;
+      else { gear_ = desired; mode = desired > 0 ? drive : reverse; }
+    } else mode = desired > 0 ? drive : reverse;
+  }
+  throttle_ = mode == drive || mode == reverse ? std::fabs(pedal) : 0;
+
+  const f32 drive_sum = 2 * (spec.torque_front + spec.torque_rear) > 0 ? 2 * (spec.torque_front + spec.torque_rear) : 1;
+  const f32 mq = spec.mass / 4;
+  const f32 k = mq * kG / spec.sag, c_damp = 2 * kBodyDamping * kern::math::sqrt(k * mq);
+  const f32 I = spec.wheel_inertia, h = dt / kTyreSubsteps;
+
+  // ---- the wheels: where each hub is on its suspension, and the load it carries (the
+  // suspension's own spring + damper force at that travel: what presses the tyre on the ground)
+  Vec3 patch[4], hub[4], normal[4];
+  for (int i = 0; i < 4; ++i) {
+    WheelState& w = converted::at(w_, i);
+    const Vec3 attach = st.position + q.rotate(Vec3{converted::at(spec.wheels, i).x, converted::at(spec.wheels, i).y, spec.attach_z});
+    converted::at(hub, i) = world.pose(converted::at(rig_, i).body).position;
+    const f32 travel = converted::wide::dot(converted::at(hub, i) - attach, up);
+    const f32 rate = w.has_travel ? clampf((travel - w.travel) / std::fmax(dt, 1e-4), -3, 3) : 0;
+    w.travel = travel;
+    w.has_travel = true;
+    f32 N = k * travel + c_damp * rate;
+    N = N > 0 ? N + spec.wheel_mass * kG : 0;
+    w.load = N;
+    w.contact = N > 0;
+    w.hub = converted::at(hub, i);
+    converted::at(normal, i) = up;
+    converted::at(patch, i) = converted::at(hub, i) - up * r;
+  }
+
+  // ---- steering: equilibrium of hand torque + assist against the aligning torque
+  struct Front { f32 pf, pl, N, muN, kappa; };
+  Front fronts[2];
+  int nf = 0;
+  for (int i = 0; i < 4; ++i) {
+    if (!converted::at(spec.wheels, i).front) continue;
+    WheelState& w = converted::at(w_, i);
+    const Vec3 pv = point_velocity(converted::at(patch, i));
+    if (w.load_f < 0) w.load_f = mq * kG;
+    w.load_f += (std::fmax(0.0, w.load) - w.load_f) * std::fmin(1.0, dt / 0.1);
+    const f32 N = w.load_f;
+    converted::at(fronts, nf++) = {converted::wide::dot(pv, forward), converted::wide::dot(pv, left), N, spec.friction * kAsphaltMu * kern::math::pow(clampf(N / (mq * kG), 0.2, 3), -kLoadSensitivity) * N,
+                    w.kappa};
+  }
+  auto align_at = [&](f32 d) {
+    f32 M = 0;
+    std::array<f32, 2> tf;
+    for (int i = 0; i < nf; ++i) {
+      const Front& f = converted::at(fronts, i);
+      const f32 ca = kern::math::cos(d), sa = kern::math::sin(d), vx = f.pf * ca + f.pl * sa, vy = -f.pf * sa + f.pl * ca, ta = vy / std::fmax(std::fabs(vx), kVReg);
+      tyre(f.kappa, ta, f.muN, tf);
+      M += (kCasterTrail + kPneumaticTrail * std::fmax(0.0, 1 - std::fabs(ta) / (kTrailCollapse * kAlphaPeak))) * tf[1] + f.N * kSteerJacking * kern::math::sin(d);
+    }
+    return M;
+  };
+  f32 steer_eq = 0;
+  if (nf && (std::fabs(stick) > 1e-3 || speed > 0.5)) {
+    const f32 T = stick * steer_torque_at(spec, speed), L = spec.steer_lock;
+    const int n = 40;
+    auto f = [&](f32 d) { return T - align_at(d); };
+    f32 prev_d = -L, prev = f(-L);
+    bool found = false;
+    f32 best = 0;
+    if (prev < 0) { best = -L; found = true; }
+    for (int i = 1; i <= n; ++i) {
+      const f32 d = -L + 2 * L * static_cast<f32>(i) / n, fd = f(d);
+      if (fd == 0 || sign0(fd) != sign0(prev)) {
+        f32 lo = prev_d, hi = d, flo = prev;
+        for (int it = 0; it < 12; ++it) {
+          const f32 m = (lo + hi) / 2, fm = f(m);
+          if (sign0(fm) == sign0(flo)) { lo = m; flo = fm; } else hi = m;
+        }
+        const f32 root = (lo + hi) / 2;
+        if (!found || std::fabs(root - steer_) < std::fabs(best - steer_)) best = root;
+        found = true;
+      }
+      prev_d = d;
+      prev = fd;
+    }
+    steer_eq = found ? best : (prev > 0 ? L : -L);
+  }
+  steer_eq_f_ += (steer_eq - steer_eq_f_) * std::fmin(1.0, dt / (spec.steer_lag * (1 + speed / spec.steer_damp_speed)));
+  steer_ += clampf(steer_eq_f_ - steer_, -rack, rack);
+
+  // ---- tyres
+  for (int i = 0; i < 4; ++i) {
+    WheelState& w = converted::at(w_, i);
+    const bool front = converted::at(spec.wheels, i).front;
+    const f32 N = w.load;
+    const f32 mu = spec.friction * kAsphaltMu * kern::math::pow(clampf(N / (mq * kG), 0.2, 3), -kLoadSensitivity), muN = mu * N;
+    if (front) world.set_wheel_steering(converted::at(rig_, i).joint, steer_);
+    const f32 sa_ = front ? world.wheel_steering(converted::at(rig_, i).joint) : 0, ca = kern::math::cos(sa_), sa = kern::math::sin(sa_);
+    const Vec3 n = converted::at(normal, i);
+    Vec3 fw = forward * ca + left * sa;
+    fw = converted::wide::normalize(fw - n * converted::wide::dot(fw, n));
+    const Vec3 lw = converted::wide::cross(n, fw);
+    const Vec3 pv = point_velocity(converted::at(patch, i));
+    const f32 vx = converted::wide::dot(pv, fw), vy = converted::wide::dot(pv, lw), V = std::fmax(std::fabs(vx), kVReg), tan_a = vy / V;
+    const f32 drive_t = front ? spec.torque_front : spec.torque_rear, share = drive_t / drive_sum;
+    f32 brake_t = (mode == brake ? spec.brake * std::fabs(pedal) : 0) + (drive_t > 0 && mode == coast ? spec.coast : 0) + spec.wheel_mass * 0.15;
+    if (handbrake && !front) brake_t = std::fmax(brake_t, spec.handbrake);
+    f32 om = w.omega, fx_sum = 0, fy_sum = 0;
+    std::array<f32, 2> tf, tf2;
+    for (int sub = 0; sub < kTyreSubsteps; ++sub) {
+      const f32 kap = (om * r - vx) / V;
+      f32 Td = 0;
+      if (drive_t > 0 && (mode == drive || mode == reverse)) {
+        const f32 dir = mode == drive ? 1.0 : -1.0, lim = mode == drive ? max_speed : max_reverse;
+        Td = dir * std::fabs(pedal) * std::fmin(drive_t * (dir < 0 ? 0.7 : 1.0), spec.power * share / std::fmax(4 / r, std::fabs(om)));
+        if (dir * om * r > lim) Td = 0;
+        const f32 ks = dir * kap;
+        if (ks > kTcsSlip) Td *= clampf(1 - (ks - kTcsSlip) / 0.12, 0, 1);
+      }
+      f32 Tb = brake_t;
+      const f32 sgn = sign0(om != 0 ? om : vx);
+      if (mode == brake && sgn * kap < -kAbsSlip) Tb *= clampf(1 - (-sgn * kap - kAbsSlip) / 0.12, 0.12, 1);
+      tyre(kap, tan_a, muN, tf);
+      const f32 fx0 = tf[0];
+      tyre(kap + 0.02 / V * r, tan_a, muN, tf2);
+      const f32 J = -(tf2[0] - fx0) / 0.02 * r;
+      f32 wn = om + h * (Td - fx0 * r) / (I - h * std::fmin(0.0, J));
+      const f32 db = h * Tb / I;
+      wn = std::fabs(wn) <= db ? 0 : wn - sign0(wn) * db;
+      om = wn;
+      tyre((om * r - vx) / V, tan_a, muN, tf);
+      fx_sum += tf[0];
+      fy_sum += tf[1];
+    }
+    w.omega = om;
+    w.angle = kern::math::mod(w.angle + om * dt, 2 * kPi);
+    f32 fx = fx_sum / kTyreSubsteps, fy = fy_sum / kTyreSubsteps;
+    const f32 lim_y = mq * std::fabs(vy) / dt + 60;
+    if (fx * vx < 0 && std::fabs(om * r) < std::fabs(vx)) {
+      const f32 lim_x = mq * std::fabs(vx) / dt + 60;
+      fx = clampf(fx, -lim_x, lim_x);
+    }
+    fy = clampf(fy, -lim_y, lim_y);
+    fx -= spec.rolling_resistance * N * tanh_bp(vx * 2);
+    w.fx = fx;
+    w.fy = fy;
+    w.kappa = (om * r - vx) / V;
+    w.alpha = kern::math::atan(tan_a);
+    // the tyre's force on the wheel at the contact patch; the joints carry it into the chassis
+    if (N > 0) push(world, body, q, st.position, fw * fx + lw * fy, converted::at(patch, i), i);
+  }
+  if (spec.drag_area > 0 && speed > 0.5) push(world, body, q, st.position, st.velocity * (-0.5 * 1.2 * spec.drag_area * speed), st.position, -1);
+  if (pedal != 0 || input.steer != 0 || handbrake || speed > 0.05) world.set_awake(body, true);
+  vf_ = vf;
 }
 CarInput ai_drive(Vec3 position, Vec3 forward, f32 vf, Vec3 target, f32 target_speed) {
   CarInput in;
@@ -935,6 +1126,8 @@ inline bool World::joint_valid(const physics::Joint& joint) const { const std::v
 inline void World::apply_force_to_center(const physics::Body& body, const Vec3& force) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.apply_force_to_center", {converted::value_of(*this), converted::value_of(body), converted::value_of(force)}); }
 inline void World::apply_force(const physics::Body& body, const Vec3& force, const Vec3& point) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.apply_force", {converted::value_of(*this), converted::value_of(body), converted::value_of(force), converted::value_of(point)}); }
 inline physics::Pose World::pose(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.pose", {converted::value_of(*this), converted::value_of(body)}); physics::Pose kern_result = converted::quiet<physics::Pose>(); converted::take_as<physics::Pose>(kern_result, kern_out[0]); return kern_result; }
+inline void World::set_wheel_steering(const physics::Joint& joint, const double& target) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.set_wheel_steering", {converted::value_of(*this), converted::value_of(joint), converted::value_of(target)}); }
+inline double World::wheel_steering(const physics::Joint& joint) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.wheel_steering", {converted::value_of(*this), converted::value_of(joint)}); double kern_result = converted::quiet<double>(); converted::take_as<double>(kern_result, kern_out[0]); return kern_result; }
 inline Vec3 World::linear_velocity(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.linear_velocity", {converted::value_of(*this), converted::value_of(body)}); Vec3 kern_result = converted::quiet<Vec3>(); converted::take_as<Vec3>(kern_result, kern_out[0]); return kern_result; }
 inline Vec3 World::angular_velocity(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.angular_velocity", {converted::value_of(*this), converted::value_of(body)}); Vec3 kern_result = converted::quiet<Vec3>(); converted::take_as<Vec3>(kern_result, kern_out[0]); return kern_result; }
 struct Out_Car_ensure_rig { Car Self; bool Result; };
@@ -944,6 +1137,28 @@ struct Out_Car_ensure_rig { Car Self; bool Result; };
 
 SC_TEST(converted_car_cpp) {
   converted::Blueprint bp("car_cpp");
+  {  // tyre
+    converted::Tally tally("tyre");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] std::array<double, 2> a3) { converted::counted([&] { return converted_car_cpp::tyre(std::move(a0), std::move(a1), std::move(a2), a3); }); return a3; };
+    for (int i = 0; tally.more(i); ++i) {
+      double a0 = draw.number();
+      double a1 = draw.number();
+      double a2 = draw.number();
+      std::array<double, 2> a3 = converted::draw_array<std::array<double, 2>>([&]() -> double { return draw.number(); });
+      const std::vector<converted::Value> given = {arg(a3), arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
   {  // steer_torque_at
     converted::Tally tally("steer_torque_at");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -1163,6 +1378,29 @@ SC_TEST(converted_car_cpp) {
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       const auto made = run(std::move(a0), a1, std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6), std::move(a7));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Car::step
+    converted::Tally tally("Car_step");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Car a0, [[maybe_unused]] World& a1, [[maybe_unused]] physics::Body a2, [[maybe_unused]] double a3, [[maybe_unused]] CarInput a4) { converted::counted([&] { return a0.step(a1, std::move(a2), std::move(a3), a4); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      Car a0 = draw_Car(draw);
+      World& a1 = *converted::engine_object<World>(1 + draw.below(6));
+      physics::Body a2 = draw_kern__physics__Body(draw);
+      double a3 = draw.number();
+      CarInput a4 = draw_CarInput(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a4), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), a1, std::move(a2), std::move(a3), std::move(a4));
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
