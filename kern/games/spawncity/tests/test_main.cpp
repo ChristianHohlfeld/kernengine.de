@@ -12,6 +12,7 @@
 
 #include "blueprint_native.h"
 #include "cost.h"
+#include "rule_blueprint.h"
 #include "rules.h"
 #include "test_util.h"
 

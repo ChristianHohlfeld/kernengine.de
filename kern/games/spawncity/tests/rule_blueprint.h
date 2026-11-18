@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "../src/rules.h"
+#include "kern/core/json.h"
 #include "kern/logic/engine_api.h"
 #include "kern/logic/engine_host.h"
 #include "kern/logic/logic.h"
@@ -41,6 +42,32 @@ inline bool test_engine(kern::logic::EngineStandIn& kept, kern::logic::EngineObj
   kern::logic::call_engine(objects, function, in, out);   // (a call that fails leaves the zeros, on every side alike)
   return true;
 }
+
+}  // namespace sc
+
+namespace sc::rules {
+/// The Blueprint of the level's actor `actor`, read from the level file's text (false: no such actor, or it
+/// has none - `error` says why). The game itself reads the level as a whole (Game::build_level); only the
+/// tests ask for one actor's Blueprint.
+inline bool actor_graph(std::string_view actor, kern::logic::Graph& out, std::string& error) {
+  kern::json::Value doc;
+  std::string why;
+  if (!kern::json::parse(level_text(), doc, &why)) {
+    error = "the level file: " + why;
+    return false;
+  }
+  for (const kern::json::Value& a : doc["actors"].items()) {
+    if (a["name"].as_string() != actor) continue;
+    const kern::json::Value& graph = a["components"]["logic"];  // (an actor's Blueprint is one of its components)
+    if (!graph.is_object()) break;
+    return kern::logic::graph_from_json(graph, out, &error);
+  }
+  error = "the level has no actor \"" + std::string(actor) + "\" with a Blueprint";
+  return false;
+}
+}  // namespace sc::rules
+
+namespace sc {
 
 /// The Blueprint of an actor of the level, read once for all the tests (null: the level has none of
 /// that name, and `error` says so).
