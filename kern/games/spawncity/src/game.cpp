@@ -273,8 +273,8 @@ bool Game::start(kern::Engine& e) {
     if (!lamps::bind(*logic)) return kern::fail("the level's Blueprint \"Lamps\" is missing or has errors");
     if (!gaps::bind_sirens(*logic)) return kern::fail("the level's Blueprint \"Sirens\" is missing or has errors");
     if (!controls::bind(*logic)) return kern::fail("the level's Blueprint \"Controls\" is missing or has errors");
-    // every setting at the table's default (the page replays the player's own with "set")
-    if (!bind_settings(*logic) || !ui_.settings.take_table()) return kern::fail("the level's Blueprint \"Settings\" is missing, has errors or not one row per setting");
+    if (!bind_settings(*logic, ui_.settings_table)) return kern::fail("the level's Blueprint \"Settings\" is missing, has errors or not one row per setting");
+    ui_.settings = Settings(ui_.settings_table);  // every setting at the table's default (the page replays the player's own with "set")
     if (!Jetpack::bind(*logic)) return kern::fail("the level's Blueprint \"Jetpack\" is missing or has errors");
     if (!TrafficRules::bind(*logic)) return kern::fail("the level's Blueprint \"Traffic\" is missing or has errors");
     life_->rules.take_laws();

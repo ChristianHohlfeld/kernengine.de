@@ -1290,7 +1290,7 @@ bool Game::ctl_command(const std::string& cmd, std::string& out) {
   }
   if (starts("scheme ")) {
     // xbox_control_mode.mjs: CLASSIC / AIM (the setting pad.aimScheme)
-    ui_.settings.set(Opt::pad_aim_scheme, cmd == "scheme aim" ? 1.0f : 0.0f);
+    ui_.settings.set(ui_.settings_table, Opt::pad_aim_scheme, cmd == "scheme aim" ? 1.0f : 0.0f);
     out = cmd == "scheme aim" ? "aim" : "classic";
     return true;
   }

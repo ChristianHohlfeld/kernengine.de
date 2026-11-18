@@ -95,7 +95,7 @@ void Game::net_world_rules() {
   MpLocal& m = *mp_;
   if (!net_.active()) {
     // out of the session: our own switches again
-    if (m.world_saved) { for (u32 i = 0; i < std::size(kWorldRules); ++i) st.set(kWorldRules[i], m.world_own[i]); m.world_saved = false; }
+    if (m.world_saved) { for (u32 i = 0; i < std::size(kWorldRules); ++i) st.set(ui_.settings_table, kWorldRules[i], m.world_own[i]); m.world_saved = false; }
     return;
   }
   if (net_.hosting()) {
@@ -109,7 +109,7 @@ void Game::net_world_rules() {
   if (!m.world_saved) { for (u32 i = 0; i < std::size(kWorldRules); ++i) m.world_own[i] = st.get(kWorldRules[i]); m.world_saved = true; }
   for (u32 i = 0; i < std::size(kWorldRules); ++i) {
     const f32 v = (mask >> i) & 1u ? 1.0f : 0.0f;
-    if (st.get(kWorldRules[i]) != v) st.set(kWorldRules[i], v);
+    if (st.get(kWorldRules[i]) != v) st.set(ui_.settings_table, kWorldRules[i], v);
   }
 }
 
@@ -117,7 +117,7 @@ std::string Game::world_rules_json() const {
   std::string o = net_.active() && !net_.hosting() ? ",\"worldLocked\":true,\"worldRules\":{" : ",\"worldLocked\":false,\"worldRules\":{";
   bool first = true;
   for (Opt w : kWorldRules) {
-    const std::string& key = ui_.settings.spec(w).key;  // "world.people": the name after "world."
+    const std::string& key = opt_spec(ui_.settings_table, w).key;  // "world.people": the name after "world."
     o += first ? "\"" : ",\"";
     for (std::size_t c = 6; c < key.size(); ++c) o += key[c];
     o += ui_.settings.on(w) ? "\":true" : "\":false";
@@ -279,7 +279,7 @@ void Game::update_net(f32 dt) {
   }
   if (m.ff_rule != net_.friendly_fire()) {
     m.ff_rule = net_.friendly_fire();
-    ui_.settings.set(Opt::world_friendly_fire, m.ff_rule ? 1.0f : 0.0f);
+    ui_.settings.set(ui_.settings_table, Opt::world_friendly_fire, m.ff_rule ? 1.0f : 0.0f);
     m.ff_setting = m.ff_rule;
   }
   net_.update(time_, dt, world_placed_ ? my_state() : net::PlayerState{}, world_placed_);  // no pose before the world stands
