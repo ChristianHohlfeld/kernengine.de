@@ -5,9 +5,14 @@
 
 #include <cmath>
 #include <cstdio>
+#include <set>
 #include <string>
 #include <vector>
 
+#include <sys/wait.h>
+#include <unistd.h>
+
+#include "kern/core/jobs.h"
 #include "kern/logic/engine_api.h"
 #include "kern/logic/engine_host.h"
 #include "kern/logic/logic.h"
@@ -115,30 +120,117 @@ inline std::string native_play_on_engine(const kern::logic::Graph& graph, const 
   return text;
 }
 
-/// The functions `runs` played on the engine itself three times in one process: in the interpreter through
-/// the host's door, as the compiled class that calls the engine's functions itself, and through the door
-/// again. What the door gives the same both times - what the host was told after a run, each variable after
-/// it - the class gives the same, character by character; each difference is a line of what this returns.
-/// What the door does not give the same twice depends on more than the Blueprint: on the clock, or on what
-/// the engine keeps between calls (the number of the next job). It cannot be compared and is named in
-/// `unrepeatable` (each once). (The class plays between the two: what only ever grows - the clock, a
-/// count - and is the same both times through the door was the same for the class.)
-inline std::string native_compare_on_engine(const kern::logic::Graph& graph, const std::string& name, const std::vector<std::string>& runs, std::string& unrepeatable, std::string& problem) {
-  const auto door = native_rows_on_engine(graph, name, runs, false, problem);
-  const auto itself = native_rows_on_engine(graph, name, runs, true, problem);
-  const auto again = native_rows_on_engine(graph, name, runs, false, problem);
+/// The rows of native_rows_on_engine, played in a process of its own that starts as this one stands (fork): so
+/// every play begins from the same state of the engine - what it keeps between calls (the number of the next
+/// job, its jobs, its last error ...) is what it was before the first play, whatever the plays before did.
+inline std::vector<std::vector<std::string>> native_rows_on_engine_apart(const kern::logic::Graph& graph, const std::string& name, const std::vector<std::string>& runs, bool as_class, std::string& problem) {
+  std::fflush(nullptr);
+  int pipe_ends[2];
+  if (pipe(pipe_ends) != 0) { problem = "no pipe for a play of " + name; return {}; }
+  const pid_t child = fork();
+  if (child < 0) { problem = "no process for a play of " + name; return {}; }
+  if (child == 0) {
+    close(pipe_ends[0]);
+    std::string trouble;
+    const std::vector<std::vector<std::string>> rows = native_rows_on_engine(graph, name, runs, as_class, trouble);
+    std::string text;
+    auto put = [&](const std::string& t) { text += std::to_string(t.size()) + ":" + t; };
+    put(trouble);
+    text += std::to_string(rows.size()) + ":";
+    for (const std::vector<std::string>& row : rows) {
+      text += std::to_string(row.size()) + ":";
+      for (const std::string& cell : row) put(cell);
+    }
+    for (std::size_t at = 0; at < text.size();) {
+      const ssize_t n = write(pipe_ends[1], text.data() + at, text.size() - at);
+      if (n <= 0) _exit(3);
+      at += static_cast<std::size_t>(n);
+    }
+    close(pipe_ends[1]);
+    std::fflush(nullptr);
+    _exit(0);
+  }
+  close(pipe_ends[1]);
+  std::string text;
+  char buffer[65536];
+  for (ssize_t n; (n = read(pipe_ends[0], buffer, sizeof buffer)) != 0;) {
+    if (n < 0) break;
+    text.append(buffer, static_cast<std::size_t>(n));
+  }
+  close(pipe_ends[0]);
+  int status = 0;
+  waitpid(child, &status, 0);
+  if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+    problem = "the play of " + name + " ended " + (WIFEXITED(status) ? "with " + std::to_string(WEXITSTATUS(status)) : "by signal " + std::to_string(WTERMSIG(status)));
+    return {};
+  }
+  std::size_t at = 0;
+  bool torn = false;
+  auto number = [&]() -> std::size_t {
+    const std::size_t colon = text.find(':', at);
+    if (colon == std::string::npos) { torn = true; return 0; }
+    const std::size_t n = std::stoul(text.substr(at, colon - at));
+    at = colon + 1;
+    return n;
+  };
+  auto get = [&]() -> std::string {
+    const std::size_t n = number();
+    if (torn || at + n > text.size()) { torn = true; return {}; }
+    at += n;
+    return text.substr(at - n, n);
+  };
+  const std::string trouble = get();
+  if (problem.empty()) problem = trouble;
+  std::vector<std::vector<std::string>> rows(number());
+  for (std::vector<std::string>& row : rows) {
+    row.resize(torn ? 0 : number());
+    for (std::string& cell : row) cell = get();
+  }
+  if (torn || at != text.size()) { problem = "the play of " + name + " did not say all it gave"; return {}; }
+  return rows;
+}
+
+/// The variables of a Blueprint that hold what a clock gave (EngineFunction::clock - now_ms, wall_ms): set by a
+/// node one of whose inputs comes, wire by wire, from a node of such a function.
+inline std::set<std::string> native_clocked_variables(const kern::logic::Graph& graph) {
+  std::set<kern::u32> clocked;
+  for (const kern::logic::Node& n : graph.nodes)
+    if (const kern::logic::EngineFunction* f = kern::logic::engine_function(n.type); f && f->clock) clocked.insert(n.id);
+  for (bool grew = true; grew;) {
+    grew = false;
+    for (const kern::logic::Link& l : graph.links)
+      if (l.in != "exec" && clocked.count(l.from) && clocked.insert(l.to).second) grew = true;
+  }
+  std::set<std::string> variables;
+  for (const kern::logic::Node& n : graph.nodes)
+    if (clocked.count(n.id) && n.type != "var.get" && !n.param("variable").empty() && n.param("scope").empty()) variables.insert(n.param("variable"));
+  return variables;
+}
+
+/// The functions `runs` played on the engine itself three times, each in a process of its own that starts from the
+/// same state of the engine (native_rows_on_engine_apart): in the interpreter through the host's door, as the
+/// compiled class that calls the engine's functions itself, and through the door again. The engine's jobs run on
+/// this thread, in pump (kern::jobs::set_threads): when one runs is fixed by the calls alone. So every play gives
+/// the same, character by character - what the host was told after a run, each variable after it; each difference
+/// is a line of what this returns, a difference between the two plays through the door as well. Only what a clock
+/// gave is not the same twice: the variables a node of a function that reads a clock sets (EngineFunction::clock)
+/// are not compared and are named in `clocks`.
+inline std::string native_compare_on_engine(const kern::logic::Graph& graph, const std::string& name, const std::vector<std::string>& runs, std::string& clocks, std::string& problem) {
+  kern::jobs::set_threads(false);
+  const auto door = native_rows_on_engine_apart(graph, name, runs, false, problem);
+  const auto itself = native_rows_on_engine_apart(graph, name, runs, true, problem);
+  const auto again = native_rows_on_engine_apart(graph, name, runs, false, problem);
+  if (!problem.empty()) return {};
+  const std::set<std::string> clocked = native_clocked_variables(graph);
+  for (const std::string& v : clocked) clocks += " " + v;
   std::string differs;
-  if (door.size() != itself.size() || door.size() != again.size()) return "the three plays have not the same runs\n";
-  std::vector<bool> named(door.empty() ? 0 : door[0].size(), false);
+  if (door.size() != runs.size() || door.size() != itself.size() || door.size() != again.size()) return "the three plays have not the same runs\n";
   for (std::size_t r = 0; r < door.size(); ++r) {
-    if (door[r].size() != itself[r].size() || door[r].size() != again[r].size() || door[r].size() != named.size()) return "the three plays have not the same variables\n";
+    if (door[r].size() != itself[r].size() || door[r].size() != again[r].size() || door[r].size() != graph.variables.size() + 1) return "the three plays have not the same variables\n";
     for (std::size_t k = 0; k < door[r].size(); ++k) {
-      if (door[r][k] != again[r][k]) {   // (named once: a variable by its name, what the host was told by the run)
-        if (k == 0 || !named[k]) unrepeatable += " " + (k == 0 ? runs[r] + "(told)" : door[r][k].substr(0, door[r][k].find('=')));
-        named[k] = true;
-      } else if (itself[r][k] != door[r][k]) {
-        differs += "after " + runs[r] + ": " + itself[r][k] + "\n     through the door: " + door[r][k] + "\n";
-      }
+      if (k > 0 && clocked.count(graph.variables[k - 1].name)) continue;
+      if (door[r][k] != again[r][k]) differs += "after " + runs[r] + ", through the door: " + door[r][k] + "\n     through the door again: " + again[r][k] + "\n";
+      if (itself[r][k] != door[r][k]) differs += "after " + runs[r] + ": " + itself[r][k] + "\n     through the door: " + door[r][k] + "\n";
     }
   }
   return differs;

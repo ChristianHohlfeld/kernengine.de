@@ -11,6 +11,11 @@
 #include <type_traits>
 #include <utility>
 
+/// KERN_CLOCK before a function of the engine that reads a clock: what it gives changes by itself, from one
+/// call to the next with nothing else changed. Its node says so (tools/engine_api.py: EngineFunction::clock) -
+/// a test that plays a program twice does not expect it to give the same twice.
+#define KERN_CLOCK
+
 namespace kern {
 
 using u8 = std::uint8_t;
@@ -35,10 +40,10 @@ enum class LogLevel : i32 { debug = 0, info = 1, warn = 2, error = 3 };
 void log(LogLevel level, const char* format, ...) __attribute__((format(printf, 2, 3)));
 
 /// Monotonic milliseconds (performance.now() in the browser).
-f64 now_ms();
+KERN_CLOCK f64 now_ms();
 /// The wall clock: whole milliseconds since 1970-01-01 00:00 UTC (Date.now() in the browser) - a time
 /// several machines agree on (a shared round, a time of day); for measuring durations, now_ms.
-f64 wall_ms();
+KERN_CLOCK f64 wall_ms();
 
 template <class T>
 constexpr T min_of(T a, T b) { return b < a ? b : a; }

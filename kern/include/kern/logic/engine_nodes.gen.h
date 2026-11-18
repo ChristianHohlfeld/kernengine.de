@@ -2699,7 +2699,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.jobs.cancel", {to_value(id)}, {});
   }
-  /// Runs queued jobs on this thread for about `budget_ms` when nobody else does (no threads, no web workers). Call once per frame.
+  /// Runs queued jobs on this thread for about `budget_ms` when nobody else does (no threads, no web workers) - at least one, if one waits. Call once per frame.
   void engine_jobs_pump(Float budget_ms) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
@@ -2737,6 +2737,25 @@ template <class Core> struct EngineNodesOf : Core {
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<Bool>(*kern_o, kern_r);
     }
     return from_value<Bool>(this->kern_engine("engine.jobs.external", {}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
+  }
+  /// Native: the jobs run on worker threads (on, the default) or here, in pump, one after another in the order they came - as on a page without workers. The results are the same; off, when a job runs is fixed by the program's calls alone (a test that plays a program twice sees the same twice). Off waits for the jobs the threads are running. (On the web there are no threads: always off.)
+  void engine_jobs_set_threads(Bool on) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<bool>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::from(*kern_o, on, kern_a0);
+      kern::jobs::set_threads(std::move(kern_a0));
+      return;
+    }
+    this->kern_engine("engine.jobs.set_threads", {to_value(on)}, {});
+  }
+  Bool engine_jobs_threads() const {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      decltype(auto) kern_r = kern::jobs::threads();
+      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<Bool>(*kern_o, kern_r);
+    }
+    return from_value<Bool>(this->kern_engine("engine.jobs.threads", {}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
   }
   /// ---- host interface (kern/web/jobs.mjs) ---- Queued jobs not yet handed out, as one buffer: u32 count, then per job u32 id, u32 kind, u32 length, bytes. The jobs count as running until kern_job_done.
   List<Int> engine_jobs_take_queued() const {

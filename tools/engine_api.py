@@ -85,7 +85,7 @@ def table_text(api, functions):
             return "{" + ", ".join(out) + "}"
         lines.append(f"      {{{c_text(f['type'])}, {c_text(f['cpp'])}, {c_text(f['label'])}, {c_text(f['category'])}, {c_text(f['help'])}, {'true' if f['value'] else 'false'},")
         lines.append(f"       {pins(f['ins'])},")
-        lines.append(f"       {pins(f['outs'])}" + (", true" if f.get("place") else "") + "},")
+        lines.append(f"       {pins(f['outs'])}" + (f", {'true' if f.get('place') else 'false'}, true" if f.get("clock") else ", true" if f.get("place") else "") + "},")
     lines += ["  };", "  return all;", "}", "", "}  // namespace kern::logic", ""]
     return "\n".join(lines)
 
