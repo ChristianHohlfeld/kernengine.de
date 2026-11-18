@@ -5,6 +5,7 @@
 #   mag.sh spiel origin/work-f1 [filter]                            Spiel-Suite (run_tests.sh, ohne neue Konvertierung)
 #   mag.sh konvert origin/work-k 8                                  nur die Konvertierung des ganzen Spiels mit genau so vielen Kernen
 #   mag.sh voll origin/work                                         Konvertierung + Spiel-Suite + Engine-Suite (nur der Koordinator)
+#   mag.sh vergleich origin/work-<paket> src/a.cpp src/b.cpp        Probe UND Vergleich Bit für Bit der Tests dieser Quelltexte (Stellvertreter und Engine selbst)
 #   mag.sh alle origin/mag/ergebnis-<voller-lauf>                   jeder Vergleichstest einzeln (Stellvertreter und Engine selbst): ALLE Abweichungen in einem Lauf
 # Der Stand muss gepusht sein. Wartet, bis mag fertig ist, und legt die Protokolle nach $S/mag/<name>/ (when, *.tail.txt, *.log.xz, texts/).
 # Gibt when und das Ende jedes Protokolls aus. Ein Auftrag dauert: Probe wenige Minuten, Suiten 10-30 Minuten.

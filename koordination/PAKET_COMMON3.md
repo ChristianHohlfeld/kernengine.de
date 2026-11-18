@@ -162,3 +162,19 @@ Du bist der **Nachfolger** auf deinem Paket in einer neuen Sitzung. Was bleibt: 
 5. Rückkanal: du kannst dem Koordinator mit SendMessage an `main` schreiben – nur für eine Entscheidung, die dich wirklich aufhält. Sonst Stand-Datei.
 6. Alles aus „Nachtrag 17:45“ und „Nachtrag 18:10“ gilt weiter (Worktree besteht schon; sparsam: Warten in Stücken von 4 Minuten, keine großen Ausgaben, keine Arbeit
    auf Verdacht; Sperren für lokale Compiler; nie main/work pushen; keine weiteren Agenten).
+
+## Nachtrag 22:25 – „vergleich“: Bit für Bit in Minuten; mag ist überbucht
+1. **Eine Probe beweist nichts über Werte** („geschrieben und verglichen“ heißt dort nur: der Test übersetzt). Die erste ausgeführte Spiel-Suite hat das gezeigt
+   (stand/KOORDINATOR.md 21:25). Darum gibt es jetzt **`$S/mag.sh vergleich origin/work-<paket> src/a.cpp [src/b.cpp …]`**: der Konverter über diese Quelltexte
+   (wie `probe`, auf dem Level des letzten gültigen vollen Laufs), danach werden ihre Tests gebaut und laufen **jeder für sich, gegen den Stellvertreter und gegen
+   die Engine selbst** (`SC_ENGINE=real`); ein Abbruch oder Hänger (über 20 min) hält die anderen nicht auf. Ergebnis nach `./mag.sh holen <name>` in
+   `$S/mag/<name>/`: `when` (convert rc, bau rc, alle rc + Summenzeile), `alle.txt` / `alle-real.txt` (je Test ok / FAIL / ABBRUCH / ZEIT), `alle-abweichungen.txt`,
+   `alle-real-abweichungen.txt` (jede „calls differ“-Zeile), `alle-cost.txt`, `einzeln.tar.xz` (jede Ausgabe ganz), `convert.log.xz`, `texts/`.
+   **Ein Fix an einer Abweichung ist erst belegt, wenn `vergleich` über die betroffenen Quelltexte in beiden Durchgängen keine Abweichung mehr nennt.**
+   Der Beweis für `work` bleibt der volle Lauf des Koordinators.
+2. **mag ist überbucht** (22:15: zehn Aufträge, ~100 Threads auf 56 – alles rechnet doppelt so lang). Darum ab jetzt: **keine Probe über alle Quelltexte**
+   (das zeigt der volle Lauf des Koordinators); proben und vergleichen nur über die Quelltexte, die deine Änderung betrifft (bis ~6 Dateien). Höchstens **ein**
+   eigener Auftrag zugleich je Agent; eine überholte Probe nicht durch eine zweite daneben ersetzen, sondern die laufende abwarten oder gebündelt neu ablegen.
+3. Läufe von Agenten können abbrechen (Server-Neustart, Ende des eigenen Kontingents): **nach jedem abgeschlossenen Schritt committen und pushen** und die
+   eigene Stand-Datei nachführen; die Übergabe-Datei (`uebergabe/<paket>.md`) früh schreiben und fortschreiben, nicht erst am Ende.
+

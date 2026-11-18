@@ -1,4 +1,9 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 22:25 **Neu: `./mag.sh vergleich origin/work-<paket> src/a.cpp …` – Probe UND Vergleich Bit für Bit in Minuten** (PAKET_COMMON3.md, Nachtrag 22:25 – bitte
+  lesen): eine Probe belegt keine Werte; ein Fix an einer Abweichung ist erst belegt, wenn `vergleich` in beiden Durchgängen (Stellvertreter, Engine selbst) keine
+  Abweichung mehr nennt. **mag ist überbucht: keine Probe über alle Quelltexte mehr, höchstens ein eigener Auftrag zugleich je Agent.** Nach jedem Schritt
+  committen/pushen (Läufe brechen ab). Chris, 22:16: „Just decide and do it“ → gestartet: **k** (neuer Auftrag: Regeln des Konverters, die die Suite rot machen –
+  Gruppen 4–7 und was „alle“ zeigt; PAKET3_k.md Nachtrag 22:25) und **d, Nachfolger 3** (Platz der Engine beweisen und zu Ende bringen; PAKET3_d.md Nachtrag 22:25).
 - 21:50 **Entscheidungen E4–E6 für p** (PAKET3_p.md, Nachtrag 21:50): Formel mit ganzzahligen Ein-/Ausgängen JA (Eigenschaft steht bei der Formel-Funktion,
   Beweis in allen drei Stufen an den Rändern, Fixpunkt); Weitergabe beim Anhängen JA; `at_known` zurückgestellt; p darf den Aufrufweg an einen Actor
   (func_call_on, Runtime::call_on, Instance::call) ändern – Text und Bedeutung unverändert, nach E2.1/E2.2; Zeit-Test ohne Ausnahmeliste, erst als Bericht.

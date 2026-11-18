@@ -33,3 +33,18 @@ wenn du fertig bist – es berührt engine_api.py (HeightSampler/RoadOptions wä
 Neuer Bedarf an der Engine aus g1 (allgemein, nicht SpawnCity): `Mixer::bus()` gibt `BusSettings&` (ein Platz der Engine nach deiner Regel? – prüfe, ob dein
 Erkenner ihn nimmt: Rumpf, Eingang `Bus`; heute „keine weiteren Eingänge“) und `TextureDesc::rgba` (Zeiger auf Daten in einer Struktur der Engine). Sag in
 `$S/stand/d.md`, was davon dein Entwurf trägt und was nicht.
+
+## Nachtrag 22:25 – Nachfolger 3 für d: „Platz der Engine“ zu Ende bringen und beweisen
+Stand: uebergabe/d.md, Abschnitt B „Stand der 7 Schritte“; stand/d.md. Zweig work-d = 2250736 (Schritt 3 fertig, nur Syntax geprüft; Schritt 4 gebaut, nie
+instanziiert; Schritt 5 teilweise – Palette fehlt; Schritt 6/7 offen; keine Engine-Suite, kein CI-Lauf). Der Fix für Zeiger-Eingänge (690ea4f) ist schon in
+work-zusammen (8844531a) – zuerst `git merge origin/work-zusammen`.
+1. **Erst beweisen, was gebaut ist, dann weiterbauen:** Place/Ref/Field instanziieren (Engine-Test je Baustein, der Fall mit jedem Knoten, der native Fall),
+   Interpreter = JIT = Klasse für Lesen, Ändern am Platz, Zurückschreiben, Freigabe dazwischen (Generation), Platz ohne Objekt (Null des Typs). Engine-Suite:
+   `$S/mag.sh engine origin/work-d [filter]` (gezielt mit Filter, die ganze Suite einmal je abgeschlossenem Schritt), CI: `gh workflow run ci.yml --ref work-d`.
+2. Dann Schritt 5 fertig (Palette in logic_edit.cpp, check()), Schritt 6 (Doku blueprint_cpp.md), Schritt 7 (Stellvertreter im Test, Regel des Konverters – mit t1
+   abstimmen: TestWriter gehört t1/t2; Beleg mit `$S/mag.sh vergleich …`, siehe PAKET_COMMON3.md Nachtrag 22:25).
+3. Offene Frage des Vorgängers (`list_append` auf einem Platz reserviert genau Länge + n; ein C++-insert wächst je nach Bibliothek anders): erst feststellen, was
+   der Vergleich davon sieht (Werte nie; die `cost:`-Zeile zählt Anforderungen). Mit Befund als „ENTSCHEIDUNG NÖTIG“ melden, nicht selbst festlegen.
+4. Nach jedem bewiesenen Schritt: Commit, Push, stand/d.md und uebergabe/d.md nachführen; „BEREIT ZUM MERGEN“ erst für Bewiesenes (Engine-Suite auf mag rc=0 +
+   CI grün), Nachricht an main. Paket c (Callbacks) baut danach auf deinem engine_api.py auf – Änderungen dort in stand/d.md vermerken.
+

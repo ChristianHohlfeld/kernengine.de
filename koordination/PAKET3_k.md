@@ -45,3 +45,27 @@ neu: `konvert` mit 8 und mit 40 Kernen byteweise gleich (Level, tests/converted;
 `work` (der Koordinator nennt dir den Ergebnis-Zweig) ist keine Funktion verloren – was mehr geschrieben ist, listest du; (4) jede Zeile
 „was written and waits now“ ist ein Befund am Inhalt: mit Einheit, Funktion, Grund nach `$S/stand/k.md` unter „BEFUND FÜR <paket der Datei>“; (5) Dauer vorher/nachher.
 Greift die Sicherung (ein Gesamtstand kehrt wieder), ist das ein Befund mit Namen, kein vorgesehener Ausgang. Monotonie wird nicht erzwungen.
+
+## Nachtrag 22:25 – NEUER AUFTRAG für k: die Regeln des Konverters, die die Spiel-Suite rot machen
+Der Ablauf (oben) ist erledigt und bewiesen und steht in work-zusammen. Der Zweig work-k / Worktree /home/claude/w-k dient jetzt diesem Auftrag:
+**Jede Abweichung der Spiel-Suite, bei der Interpreter = Klasse ≠ Quelltext ist – also eine Regel des Konverters (oder eine Absenkung) falsch übersetzt –, finden,
+allgemein beheben und Bit für Bit belegen.** Nicht dein Gebiet: der Test-Schreiber (TestWriter: t1, t2), Stellvertreter/Engine-Knoten (d), Leistung (p).
+1. Zuerst: `git merge origin/work-zusammen` (8844531a oder neuer; work-k ist darin enthalten). Lies PAKET_COMMON3.md ganz (alle Nachträge, v. a. 21:10 und
+   22:25), stand/KOORDINATOR.md (oberste Einträge), stand/t1.md „SUITE 203000“.
+2. Arbeitsliste, in dieser Reihenfolge:
+   - Gruppe 4: `flak_cell` 201/255 (combat_rules.cpp:239) – `snprintf("%lld", cy)` mit großem i64 (7626388851792824174): der Blueprint schreibt eine andere Zahl.
+     Int ist exakt bis 2^53 – wie führt die Sprache ein i64 (Int64)? Die Regel für `%lld`/`%llu`/`%ld` muss den ganzen Bereich tragen.
+   - Gruppe 5: `Car_new` 300/300 (car.h/car.cpp): in einer Liste von {Vec3, Vec3, Zahl} gibt der Quelltext 8, der Blueprint 0.
+   - Gruppe 6: `CityStream_feed_terrain` 4/38, `CityStream_upload` 35/300 (t1s neue Anzeige nennt die erste abweichende Stelle – work-t1 e0e6c2ad).
+   - Gruppe 7: `Drone_step` (drone.cpp): eine ganze Zahl im Zustand 20268 (Quelltext) gegen 85804 (Klasse).
+   - Danach: was der Lauf „alle“ zeigt (`ergebnis-work-zusammen-voll-203000-750-alle-212005-5593`, sobald fertig: `./mag.sh holen <name>`; `alle-abweichungen.txt`,
+     `einzeln.tar.xz`) – die Tests, die im ersten Lauf nie drankamen (u. a. alle `converted_Game__*`). t1 wertet ihn aus („SUITE 203000 – ALLE“ in stand/t1.md) und
+     nennt je Gruppe das Gebiet; nimm, was „Regel des Konverters“ heißt. Ist eine Abweichung in Wahrheit ein Fehler des Tests: „BEFUND FÜR t1“ in stand/k.md und
+     Nachricht an main; eines Stellvertreters/Engine-Knotens: „BEFUND FÜR d“.
+3. Je Abweichung: Kleinstfall (eine kleine Funktion im erlaubten C++, die dieselbe Abweichung zeigt), die Regel in tools/cpp_to_blueprint.py finden, **allgemein**
+   beheben (keine Sonderregel, keine Namensliste, keine Toleranz, kein Cache), Beleg: `$S/mag.sh vergleich origin/work-k <betroffene Quelltexte>` nennt in beiden
+   Durchgängen keine Abweichung mehr für diese Funktion – und keine neue. Braucht es eine Absenkung der Quelle: nur mit grünem Differenztest (tests/lowered,
+   tools/source_diff.py); die 22 unveränderten Web-Dateien, die Firmware und Box3D bleiben, wie sie sind.
+4. tools/cpp_to_blueprint.py teilst du mit t1/t2 (TestWriter) – kleine Commits, oft `git merge origin/work-zusammen`; nach jedem belegten Fix: Commit, Push,
+   stand/k.md nachführen („BEREIT ZUM MERGEN: <commit> – Beleg <auftrag>“), Nachricht an main. Der Koordinator mischt ein und rechnet `voll`.
+
