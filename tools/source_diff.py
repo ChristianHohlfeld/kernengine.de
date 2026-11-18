@@ -181,6 +181,7 @@ class Version:
         self.functions = []
         self.records = {}       # qualified name (without anonymous namespaces) -> the definition
         self.record_ids = {}    # id -> qualified name
+        self.hidden = set()     # the qualified names of what a class keeps to itself (declared private or protected in it)
         self.enums = {}         # qualified name -> the definition (of the whole namespace: what the test may draw)
         self.variables = []     # (qualified name, node) - the variables of the source file's namespaces
         self.decl_by_id = {}
@@ -192,7 +193,9 @@ class Version:
     def text(self, file):
         f = os.path.abspath(file)
         if f not in self.texts:
-            self.texts[f] = open(f, encoding="utf-8").read()
+            # (each byte a character: where the compiler says something stands, it counts bytes - and a text of the
+            # program holds more than ASCII: "🚗", "ä")
+            self.texts[f] = open(f, "rb").read().decode("latin-1")
         return self.texts[f]
 
     def mine(self, node):
@@ -206,8 +209,18 @@ class Version:
             for c in kids(n):
                 self._ids(c, scope + [n.get("name") or "(anonymous)"])
         elif k in ("CXXRecordDecl", "ClassTemplateDecl") and n.get("name"):
+            if n.get("parentDeclContextId") in self.record_ids:
+                # (a class of a class, defined after it - `struct CityStream::Tile { ... };`: it stands in that class)
+                scope = self.record_ids[n["parentDeclContextId"]].split("::")
             q = "::".join(s for s in scope + [n["name"]] if s != "(anonymous)")
             self.record_ids[n["id"]] = q
+            # (what the class keeps to itself: the classes and enums it declares where no one else may name them)
+            access = "private" if n.get("tagUsed") == "class" else "public"
+            for c in kids(n):
+                if c.get("kind") == "AccessSpecDecl":
+                    access = c.get("access", access)
+                elif c.get("kind") in ("CXXRecordDecl", "EnumDecl") and c.get("name") and not c.get("isImplicit") and (access != "public" or q in self.hidden):
+                    self.hidden.add(q + "::" + c["name"])
             for c in kids(n):
                 self._ids(c, scope + [n["name"]])
 
@@ -218,6 +231,9 @@ class Version:
             for c in kids(n):
                 self._visit(c, scope + [n.get("name") or "(anonymous)"], None)
         elif k == "CXXRecordDecl" and n.get("name"):
+            if owner is None and n.get("parentDeclContextId") in self.record_ids:
+                scope = self.record_ids[n["parentDeclContextId"]].split("::")   # (see _ids)
+                q = lambda name: "::".join(s for s in scope + [name] if s != "(anonymous)")
             if n.get("completeDefinition") and not n.get("isImplicit"):
                 self.records.setdefault(q(n["name"]), (n, scope))
             for c in kids(n):
@@ -261,19 +277,27 @@ class Version:
 
     @staticmethod
     def _unify(pattern, instance, names):
-        """The types the template's parameters are in an instance: the pattern's type matched with the instance's."""
+        """The types the template's parameters are in an instance: the pattern's type matched with the instance's.
+        (The compiler spells one type in more than one way - `std::vector<Scorch> &`, `const sc::Marks::Scorch &`:
+        the same name at the end, more or less of what it stands in before it. The fullest spelling is the type.)"""
         parts = re.split(r"(?<![\w])(" + "|".join(re.escape(nm) for nm in names) + r")(?![\w])", re.sub(r"\s+", " ", pattern))
-        rx, met = "", set()
+        rx, met = "", {}
         for k, part in enumerate(parts):
             if k % 2 == 0:
                 rx += re.escape(part)
             else:
-                rx += f"(?P={part})" if part in met else f"(?P<{part}>.+?)"
-                met.add(part)
+                met.setdefault(part, []).append(f"p{k}")
+                rx += f"(?P<p{k}>.+?)"
         m = re.fullmatch(rx, re.sub(r"\s+", " ", instance))
         if not m:
             raise Stop(f"the instance {instance} of the template {pattern}: its types are not found")
-        return {nm: m.group(nm) for nm in names}
+        out = {}
+        for nm in names:
+            spelled = sorted({m.group(g) for g in met.get(nm, [])}, key=len)
+            if not spelled or any(a != spelled[-1] and not spelled[-1].endswith("::" + a) for a in spelled):
+                raise Stop(f"the instance {instance} of the template {pattern}: its types are not found")
+            out[nm] = spelled[-1]
+        return out
 
     # ---- what the file keeps ----
     def actor_of(self, node):
@@ -303,6 +327,11 @@ class Version:
         that way): the test does not repeat that - its copies of the functions would take the program's place."""
         init = kids(node)[-1] if node.get("init") and kids(node) else None
         if init is None:
+            return False
+        # (a variable something of the file reads is no registration, whatever computes it: `const Vec3 kGrey =
+        # kern::hex_color(0x8a857c);` is a constant, and the functions that read it need it)
+        refers = lambda root: any(x.get("kind") == "DeclRefExpr" and (x.get("referencedDecl") or {}).get("id") == node.get("id") for x in walk(root))
+        if any(refers(f.body) for f in self.functions) or any(v is not node and refers(v) for _, v, _ in self.variables):
             return False
         for x in walk(init):
             if x.get("kind") == "CallExpr":
@@ -367,8 +396,11 @@ class Version:
         edits = {f: [] for f in self.files}
         for f in self.functions:
             self._guard(f.body, edits[f.file], f.file, 0)
+        # (a registration is there for what its initializer does: nothing of the file reads it - a constant the
+        # functions read stays, also where a function works it out when the program starts)
+        read = {(x.get("referencedDecl") or {}).get("id") for f in self.functions for x in walk(f.body) if x.get("kind") == "DeclRefExpr"}
         for q, n, _ in self.variables:
-            if self.registration(n):
+            if self.registration(n) and n["id"] not in read:
                 a, b = n["_at"]
                 if "expansionLoc" in (n.get("range") or {}).get("begin", {}):
                     b = self.invocation_end(self.cpp, a)   # (written by a macro: the whole invocation)
@@ -552,8 +584,8 @@ class Version:
         def head(n):
             """`v.data()` / `s.data` -> v / s."""
             n = C.bare(n)
-            while n.get("kind") in ("ImplicitCastExpr", "ParenExpr") and kids(n):
-                n = C.bare(kids(n)[0])
+            while n.get("kind") in ("ImplicitCastExpr", "ParenExpr") and n.get("castKind") != "ArrayToPointerDecay" and kids(n):
+                n = C.bare(kids(n)[0])   # (an array handed as a pointer stays: it is the list)
             if n.get("kind") == "CXXMemberCallExpr" and kids(n) and kids(n)[0].get("name") == "data":
                 return kids(kids(n)[0])[0]
             if n.get("kind") == "MemberExpr" and n.get("name") == "data" and kids(n) and re.match(r"(const )?kern::Span<", plain(C.qtype(kids(n)[0]))):
@@ -565,12 +597,23 @@ class Version:
             va, vb = kids(b)[0]["_at"]
             out.append((a0, b0, f"::sc::lowered::value_place({raw[va:vb]})", (a0, 2, 0)))
             return
-        if b.get("kind") == "BinaryOperator" and b.get("opcode") == "+" and len(kids(b)) == 2 and head(kids(b)[0]) is not None:
-            h = head(kids(b)[0])
-            ha, hb = h["_at"]
-            ka, kb = kids(b)[1]["_at"]
-            out.append((a0, b0, f"::sc::lowered::at_place({raw[ha:hb]}, {raw[ka:kb]})", (a0, 2, 0)))
-            return
+        if b.get("kind") == "BinaryOperator" and b.get("opcode") == "+" and len(kids(b)) == 2:
+            # `v.data() + k`, and with more added (`s.data + h + w * 4`, read from the left: the place first, then
+            # everything added to it)
+            first = b
+            while first.get("kind") == "BinaryOperator" and first.get("opcode") == "+" and len(kids(first)) == 2 and head(kids(first)[0]) is None:
+                first = C.bare(kids(first)[0])
+                while first.get("kind") == "ParenExpr" and kids(first):
+                    first = C.bare(kids(first)[0])
+            if first.get("kind") == "BinaryOperator" and first.get("opcode") == "+" and len(kids(first)) == 2:
+                h = head(kids(first)[0])
+                ha, hb = h["_at"]
+                _, pb = kids(first)[0]["_at"]
+                _, kb = b["_at"]
+                plus = re.match(r"\s*\+", raw[pb:kb])
+                if plus and "(" not in raw[b["_at"][0]:ha]:   # (no bracket opened before the place)
+                    out.append((a0, b0, f"::sc::lowered::at_place({raw[ha:hb]}, {raw[pb + plus.end():kb].strip()})", (a0, 2, 0)))
+                    return
         h = head(x)
         if h is not None:
             ha, hb = h["_at"]
@@ -664,7 +707,10 @@ class Module:
             same_place = [n for n in news if place(n) == place(o)]
             want = o.name if not o.template else o.name + "_" + "_".join(SHORT.get(plain(t), None) or "?" for t in o.template[1].values())
             named = [n for n in same_place if n.name == want and not n.template]
+            # (of two methods that differ in `const` alone - `T& all()`, `const T& all() const` - each has its own)
+            const = lambda f: bool(re.search(r"\)\s*const\b", (f.node.get("type") or {}).get("qualType", "")))
             exact = [n for n in named if n.param_types() == o.param_types()]
+            exact = [n for n in exact if const(n) == const(o)] or exact
             if exact:
                 out.append((o, exact[0], {}))
                 continue
@@ -788,11 +834,14 @@ class Writer:
             for var in users.get(o.node["id"], ()):
                 if var.split("::")[-1] not in new_state and var not in mapped:
                     raise Stop(f"{o.label()} uses the variable {var} of the file, which the new {n.label()} neither has nor is handed")
+        if not tested and not covered:
+            # (every function the old had stands in the new as it was - the new only has more: nothing to compare)
+            return None, tested, covered, [f"    the same: {o.label()}" for o, _, _ in pairs]
         self.check_fields()
         text = self.unit(tested)
         os.makedirs(self.out_dir, exist_ok=True)
         path = os.path.join(self.out_dir, f"test_{m.stem}_lowered.cpp")
-        open(path, "w").write(text)
+        open(path, "w", encoding="latin-1").write(text)   # (the bytes of the sources as they are: see Version.text)
         for o, n, e in tested:
             report.append(f"    compared: {o.label()}  ->  {n.label()}" + (f"  (the state: {', '.join(f'{f} = {v}' for x in e.values() for f, v in x.items())})" if e else ""))
         for o, n, e in pairs:
@@ -809,7 +858,11 @@ class Writer:
             if not m.old.mine(rec):
                 continue
             name = q.split("::")[-1]
-            other = next((r for nq, (r, _) in m.new.records.items() if nq.split("::")[-1] == name and m.new.mine(r)), None)
+            # (the class of the same full name; where the new has none such, the one of the same name at another place -
+            # two classes each call an inner one `Snap`: each is compared with its own)
+            other = m.new.records.get(q, (None, None))[0]
+            if other is None or not m.new.mine(other):
+                other = next((r for nq, (r, _) in m.new.records.items() if nq.split("::")[-1] == name and m.new.mine(r) and nq not in m.old.records), None)
             if other is None:
                 continue
             a = [c.get("name") for c in kids(rec) if c.get("kind") == "FieldDecl"]
@@ -857,6 +910,8 @@ class Writer:
             for q, e in v.enums.items():
                 if q.endswith(")") or not e.get("name"):
                     continue
+                if not v.mine(e) and any(q == h or q.startswith(h + "::") for h in v.hidden):
+                    continue   # (an enum a class of another file keeps to itself: the test neither names nor draws it)
                 t = f"::{self.ns[v.side]}::{q}" if v.mine(e) else f"::{q}"
                 values = [c.get("name") for c in kids(e) if c.get("kind") == "EnumConstantDecl"]
                 if values and t not in enums:
@@ -999,7 +1054,10 @@ def main(argv):
                     print(f"{os.path.basename(src)}: unchanged since {args.base}")
                     continue
                 path, tested, covered, report = Writer(m, args.test).write()
-                print(f"{os.path.basename(src)}: {len(tested)} functions compared, {len(covered)} compared through their callers -> {path}")
+                if path is None:
+                    print(f"{os.path.basename(src)}: every function it had is unchanged since {args.base} (the new text only has more) - no test")
+                else:
+                    print(f"{os.path.basename(src)}: {len(tested)} functions compared, {len(covered)} compared through their callers -> {path}")
                 print("\n".join(report))
             except Stop as s:
                 failed = True
