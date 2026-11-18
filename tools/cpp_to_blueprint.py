@@ -1552,6 +1552,11 @@ class Unit:
         """The Blueprint type of a C++ type."""
         if raw.strip() in ("const char *", "const char *const"):
             return "Text"
+        if re.fullmatch(r"const char \*\s*(?:const\s*)?(?:\[\d*\]\s*)+", raw.strip()):
+            # (an array of texts of the program - `const char* const kNames[] = {"A", "B"}`: a list of texts;
+            # said here, where the type still says that what its entries point at is not changed)
+            inner = re.sub(r"\[\d*\]\s*$", "", raw.strip(), count=1).strip()
+            return f"List<{self.element(self.btype(inner), self.entries(inner))}>"
         if self.object_of(raw):
             return "Int"
         t = self.clean(raw)
