@@ -1,4 +1,14 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 23:25 **work-zusammen = 5a445af8** (+ t2 19b96a95: rund 100 der 118 wartenden Funktionen bekommen ihren Test; + k fa3dc97d: u64-Schlüssel einer Map).
+  **Der volle Lauf ist neu abgelegt: `work-zusammen-voll-232247-24031`** (der von 23:13 lief 8 min und ist abgebrochen – ohne t2 hätte er die Game-Dateien nicht gezeigt).
+  · t2 ist beendet (Lauf zu Ende). Sein Vergleich `work-t2-vergleich-223555-30482` über sieben Game-Quelltexte: convert rc=0, bau rc=0, 50 ok / 7 FAIL / 2 ABBRUCH –
+    Abweichungen der Blueprints, die vorher kein Test erreichte. **Neues Paket g** (PAKET3_g.md): Regeln des Konverters für die Game-Dateien; k behält die anderen.
+  · **Entscheidung E11 (t2):** `-Wno-missing-field-initializers` beim Übersetzen der Tests ist keine Toleranz – ein ausgelassenes Feld einer Aggregat-Initialisierung
+    ist in C++ festgelegt (Wert-Initialisierung), in Quelle und Test dasselbe; die Warnung sagt nichts über Werte.
+  · **Entscheidung E12 (t2, Graph):** ein `logic::Graph` in einem Ergebnis (vehicle_actor → Actor mit optional<Graph>; audio_init/Level) wird im Test über seine
+    Serialisierung verglichen (der Text ist der Wert). Bis das gebaut ist, warten die zwei Funktionen ehrlich mit ihrem Grund; Reihenfolge: nach der grünen Suite (t1).
+  · Reste von t2 → t1: lamps `Field::Spot` (3 Funktionen, „cannot convert vector<Spot>“), Beleg für sscanf/scan_c auf mag (game_toss), Graph (E12).
+  · **BEFUND FÜR d (von t2):** gaps_guided_sounds – `set_pcm` bekommt im Blueprint die ganze Liste statt einer Zahl.
 - 23:17 **Der volle Lauf rechnet: `work-zusammen-voll-230430-15353` auf aec5ded8, Start 23:13:36** (mit t1, k 20cb5259, d Array-Fix, p Teil 1). Das Budget
   der Warteschlange steht jetzt in der Datei `cap` auf mag/auftrag (84: voller Lauf + eine Engine-Suite + ein Vergleich) – Vergleiche warten, bis sie passen.
   · **Entscheidung E10 (p):** der Wert an einem Eingang vom Typ „Liste fester Länge“ wird als `Fixed<T, N>{…}` geschrieben (wie bei Feldern; Bedeutung und Graph
