@@ -11261,8 +11261,10 @@ class TestWriter:
             for x in walk_source(d):
                 for i in (x.get("referencedDecl", {}).get("id"), x.get("referencedMemberDecl")):
                     e = tree.decl.get(i) if i else None
-                    if e is not None and i not in out and (i in u.engine_calls or u.api().declared_only(e)):
-                        out[i] = e
+                    # (by the declaration's own address: a dump may name it by another one - Tree.join_dumps -, and
+                    # it is one function, with one stand-in)
+                    if e is not None and e["id"] not in out and (e["id"] in u.engine_calls or u.api().declared_only(e)):
+                        out[e["id"]] = e
         return out
 
     def guard_or_none(self, d):
