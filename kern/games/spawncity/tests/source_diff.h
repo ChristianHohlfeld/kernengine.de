@@ -32,6 +32,7 @@
 
 #include "converted.h"
 #include "kern/core/fields.h"
+#include "kern/core/json.h"
 
 namespace sc::lowered {
 
@@ -96,6 +97,17 @@ template <class T> void draw(Draw& d, T& x) {
   else if constexpr (std::is_floating_point_v<U>) x = static_cast<U>(d.number());
   else if constexpr (is_vec<U>) std::apply([&](auto&... c) { ((c = static_cast<f32>(d.number())), ...); }, components(x));
   else if constexpr (std::is_same_v<U, std::string>) x = d.word();
+  else if constexpr (std::is_same_v<U, kern::json::Value>) {
+    // (a value of JSON: null, a flag, a number, a text - or a list or an object of a few of them)
+    switch (d.below(6)) {
+      case 0: x = kern::json::Value(); break;
+      case 1: x = kern::json::Value(d.flag()); break;
+      case 2: x = kern::json::Value(d.number()); break;
+      case 3: x = kern::json::Value(d.word()); break;
+      case 4: x = kern::json::Value::array(); for (u32 n = d.below(3); n > 0; --n) x.push(kern::json::Value(d.number())); break;
+      default: x = kern::json::Value::object(); for (u32 n = d.below(3); n > 0; --n) x.set(d.word(), kern::json::Value(d.number())); break;
+    }
+  }
   else if constexpr (is_vector<U>::value) {
     using E = typename U::value_type;
     if constexpr (std::is_same_v<E, bool>) {
@@ -241,7 +253,17 @@ template <class T> kern::logic::Value as_value(const T& x);
 template <class A, class B> bool same(const A& a, const B& b) {
   using X = std::remove_cv_t<A>;
   using Y = std::remove_cv_t<B>;
-  if constexpr (std::is_same_v<X, kern::logic::Value> && !std::is_same_v<Y, kern::logic::Value>) {
+  if constexpr (std::is_same_v<X, kern::json::Value> && std::is_same_v<Y, kern::json::Value>) {
+    // (a value of JSON, by what it says of itself - its numbers bit for bit)
+    if (a.type() != b.type() || a.as_bool() != b.as_bool() || !same(a.as_number(), b.as_number())) return false;
+    if (a.is_string() && a.as_string() != b.as_string()) return false;
+    if (a.items().size() != b.items().size() || a.members().size() != b.members().size()) return false;
+    for (std::size_t k = 0; k < a.items().size(); ++k)
+      if (!same(a.items()[k], b.items()[k])) return false;
+    for (std::size_t k = 0; k < a.members().size(); ++k)
+      if (a.members()[k].first != b.members()[k].first || !same(a.members()[k].second, b.members()[k].second)) return false;
+    return true;
+  } else if constexpr (std::is_same_v<X, kern::logic::Value> && !std::is_same_v<Y, kern::logic::Value>) {
     return converted::same_value(a, as_value(b));   // (a value of the Blueprint and the struct the new one holds)
   } else if constexpr (std::is_same_v<X, kern::logic::Value> && std::is_same_v<Y, kern::logic::Value>) {
     return converted::same_value(a, b);

@@ -424,6 +424,12 @@ class Version:
         edits = {f: [] for f in self.files}
         for f in self.functions:
             self._guard(f.body, edits[f.file], f.file, 0)
+            # (and what a constructor makes its fields with: `puffs_(pool)` is a list of `pool` entries)
+            for c in kids(f.node):
+                if c.get("kind") == "CXXCtorInitializer":
+                    for x in kids(c):
+                        if os.path.abspath(x.get("_file") or "?") == f.file and x.get("_at", (None, None))[0] is not None:
+                            self._guard(x, edits[f.file], f.file, 0)
         for q, n, _ in self.variables:
             if self.registration(n):
                 a, b = n["_at"]
@@ -729,7 +735,8 @@ class Module:
         self.src = src
         self.stem = os.path.splitext(os.path.basename(src))[0]
         header = os.path.splitext(src)[0] + ".h"
-        self.header = header if os.path.exists(header) else None
+        # (a header of the game without a source file of its own - its inline functions - is the file itself)
+        self.header = header if os.path.exists(header) and os.path.abspath(header) != os.path.abspath(src) else None
         top = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, check=True).stdout.strip()
         rel = lambda p: os.path.relpath(os.path.abspath(p), top)
         def old_text(p):
@@ -902,7 +909,9 @@ class Module:
           - the old's last parameter, a place it writes what it gives (`T&`, `T*`), is what the new returns;
         and the new may be handed the state of the file besides (extra). [(step, old places, new places)] and the extra;
         None: n is no such counterpart of o."""
-        ot, nt = [t for _, t, _ in o.params], [t for _, t, _ in n.params]
+        ot = [re.sub(r"^(\s*(?:const\s+)?)(.+?)(\s*[&*]?\s*)$", lambda mm: mm.group(1) + self.new_type(mm.group(2), self.old) + mm.group(3), t) for _, t, _ in o.params]
+        # (the new's types with the game's aliases resolved: `Bytes32&` is `std::array<u8, 32>&`)
+        nt = [re.sub(r"^(\s*(?:const\s+)?)(.+?)(\s*&?\s*)$", lambda mm: mm.group(1) + self.new_type(mm.group(2)) + mm.group(3), t) for _, t, _ in n.params]
         integral = lambda t: canon(t).replace("const ", "").strip() in INTEGRAL | {"unsigned char", "unsigned short", "short", "signed char", "long long", "unsigned long long"}
         is_value = lambda t: re.sub(r"\s|const|&", "", plain(t)) in ("kern::logic::Value", "logic::Value")
         new_ret = self.new_type(n.ret)
@@ -968,10 +977,10 @@ class Module:
         same_ret = returned or self.bare_type(o.ret) == self.bare_type(n.ret) or is_value(o.ret)
         return (plan, extra) if same_ret else None
 
-    def new_type(self, t):
-        """A type of the new text with its alias (a typedef, a using of the game) resolved."""
+    def new_type(self, t, v=None):
+        """A type of the new text (or of v) with its alias (a typedef, a using of the game) resolved."""
         name = plain(t).strip()
-        for q, a in self.new.aliases.items():
+        for q, a in (v or self.new).aliases.items():
             if q == name or q.endswith("::" + name):
                 return (a.get("type") or {}).get("desugaredQualType") or (a.get("type") or {}).get("qualType") or t
         return t
@@ -1055,6 +1064,7 @@ class Writer:
         self.out_dir = out_dir
         self.lines = []
         self.engine_enums = set()   # (the enums of the engine the test draws: Writer.reached finds them)
+        self.moved = {}             # (variables of the file that became fields of a class: Writer.write)
     def name_of(self, v, q, node):
         """How the test names a class, an enum or a type of the game (q: its qualified name) on the side of v: one of the
         changed files in that side's namespace; another of the old program in the old program's (sc_base_<commit>), of
@@ -1152,10 +1162,27 @@ class Writer:
             if name not in old_state and name not in bound:
                 raise Stop(f"the new text keeps a variable of the file the old did not have: {name}")
         users = m.old.users()
+        # (a variable of the file that became a field of a class of the file: `g_laws` -> `TrafficRules::laws_` - by its
+        # name without the prefix g_, with or without the trailing _ of a member)
+        self.moved = {}
+        for q, _ in m.old.state():
+            name = q.split("::")[-1]
+            if name in new_state:
+                continue
+            base = name[2:] if name.startswith("g_") else name
+            for nq, (rec, _) in m.new.records.items():
+                if not m.new.mine(rec):
+                    continue
+                fields = [c.get("name") for c in kids(rec) if c.get("kind") == "FieldDecl"]
+                old_rec = next((r for oq, (r, _) in m.old.records.items() if oq.split("::")[-1] == nq.split("::")[-1] and m.old.mine(r)), None)
+                old_fields = [c.get("name") for c in kids(old_rec) if c.get("kind") == "FieldDecl"] if old_rec else []
+                for f in (base, base + "_"):
+                    if f in fields and f not in old_fields:
+                        self.moved[q] = (nq.split("::")[-1], f)
         for o, n, extra in tested:
             mapped = {v for e in extra.values() for v in e.values()}
             for var in users.get(o.node["id"], ()):
-                if var.split("::")[-1] not in new_state and var not in mapped:
+                if var.split("::")[-1] not in new_state and var not in mapped and not (n.method and not n.static and self.moved.get(var, ("",))[0] == (n.owner or "").split("::")[-1]):
                     raise Stop(f"{o.label()} uses the variable {var} of the file, which the new {n.label()} neither has nor is handed")
         self.check_fields(tested)
         text = self.unit(tested)
@@ -1169,6 +1196,8 @@ class Writer:
                 report.append(f"    the same: {o.label()}")
         for label, through in covered.items():
             report.append(f"    gone, compared through its callers: {label}  <-  {', '.join(through)}")
+        for q_old, _ in self.implicit_inits():
+            report.append(f"    compared: {q_old.split('::')[-1]}() - the compiler's constructor (the values its fields are written with changed)")
         for o, n, actor, _ in m.bindings:
             report.append(f"    the binding: {o.label()}  ->  {n.label()}  (the actor {actor}: every call compared runs through it)")
         for o in m.binding_gets:
@@ -1195,7 +1224,7 @@ class Writer:
             if other is None:
                 continue
             a = [c.get("name") for c in kids(rec) if c.get("kind") == "FieldDecl"]
-            b = [c.get("name") for c in kids(other) if c.get("kind") == "FieldDecl"]
+            b = [c.get("name") for c in kids(other) if c.get("kind") == "FieldDecl" and (name, c.get("name")) not in set(self.moved.values())]
             if a != b:
                 raise Stop(f"the class {name} has other fields in the new text ({', '.join(a)} / {', '.join(b)}): the test cannot carry its values")
 
@@ -1218,6 +1247,7 @@ class Writer:
             f = o if v.side == "old" else n
             types += [t for _, t, d in f.params for t in (t, d)] + [f.ret] + ([f.owner] if f.owner else [])
         types += [t for _, node in v.state() for t in ((node.get("type") or {}).get("qualType", ""), C.qtype(node))]
+        types += [q for pair in self.implicit_inits() for q in pair]
         out, seen, todo = [], set(), list(types)
         while todo:
             t = todo.pop()
@@ -1289,6 +1319,8 @@ class Writer:
         written = set()
         for v in (m.old, m.new):
             for t, fields in self.reached(v, tested):
+                if v.side == "new":
+                    fields = [f for f in fields if (t.split("::")[-1], f) not in set(self.moved.values())]
                 if t in written:
                     continue
                 written.add(t)
@@ -1346,6 +1378,8 @@ class Writer:
             world = False
         for o, n, extra in tested:
             out += self.case(o, n, extra, world)
+        for q_old, q_new in self.implicit_inits():
+            out += self.init_case(q_old, q_new)
         if world:
             for v in (m.old, m.new):
                 for q, _ in v.actors():
@@ -1354,6 +1388,34 @@ class Writer:
                 out.append(f"  {self.call(o, 'old', 'nullptr')};   // (the test's logic is gone with it)")
         out += ["}", f"}}  // namespace {m.namespace}", ""]
         return "\n".join(out)
+
+    def implicit_inits(self):
+        """The classes of the changed files that the compiler makes with the values their fields are written with, where
+        those changed (`f32 hp = kHeliHp` -> `f32 hp = 0`): the compiler's constructor of the class is a function that
+        changed - [(old class, new class)] of those that have one without parameters and no written one."""
+        m = self.m
+        out = []
+        for q, (rec, _) in m.old.records.items():
+            if not m.old.mine(rec) or rec.get("tagUsed") == "union":
+                continue
+            other = next(((nq, r) for nq, (r, _) in m.new.records.items() if nq == q and m.new.mine(r)), None)
+            if other is None:
+                continue
+            ofields = [norm(m.old.decl_text(c)) for c in kids(rec) if c.get("kind") == "FieldDecl"]
+            nfields = [norm(m.new.decl_text(c)) for c in kids(other[1]) if c.get("kind") == "FieldDecl"]
+            written = any(c.get("kind") == "CXXConstructorDecl" and not c.get("isImplicit") for r in (rec, other[1]) for c in kids(r))
+            if ofields != nfields and not written and [c.get("name") for c in kids(rec) if c.get("kind") == "FieldDecl"] == [c.get("name") for c in kids(other[1]) if c.get("kind") == "FieldDecl"]:
+                out.append((q, other[0]))
+        return out
+
+    def init_case(self, q_old, q_new):
+        """The comparison of the compiler's constructors of a class: what each makes, bit for bit."""
+        label = f"{q_old.split('::')[-1]}::{q_old.split('::')[-1]}() (the compiler's, with the values its fields are written with)"
+        return [f"  {{  // {label}", f"    ::sc::lowered::Tally tally({C.text_literal(label)});", "    for (int call = 0; tally.more(call); ++call) {",
+                f"      std::optional<::{self.ns['old']}::{q_old}> o_obj;", f"      std::optional<::{self.ns['new']}::{q_new}> n_obj;",
+                "      long old_asks = 0, new_asks = 0;", "      const bool old_defined = ::sc::lowered::run([&] { o_obj.emplace(); }, old_asks);",
+                "      const bool new_defined = ::sc::lowered::run([&] { n_obj.emplace(); }, new_asks);", "      ::sc::lowered::Differs differs;",
+                '      differs.check("the object it makes", o_obj, n_obj);', "      tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);", "    }", "  }"]
 
     @staticmethod
     def logic_param(t):
@@ -1392,6 +1454,17 @@ class Writer:
             # (as the converted tests make an object: half the time as its constructor makes it - its parts fit together -,
             # half the time field by field)
             body += [f"{ot} o_self{{}};", "if (draw.flag()) ::sc::lowered::draw(draw, o_self);", f"{nt} n_self{{}};", "::sc::lowered::carry(o_self, n_self);"]
+            for var, (cls, field) in self.moved.items():
+                if cls == n.owner.split("::")[-1]:
+                    body.append(f"::sc::lowered::carry(::{self.ns['old']}::{var}, n_self.{field});   // (the variable of the file, now a field)")
+        if o.static and n.method and not n.static and n.kind != "CXXConstructorDecl":
+            # (a function of the class that became one of its objects: the object holds what the file held - the
+            # variables that became its fields; the rest of it as drawn)
+            nt = f"::{self.ns['new']}::{n.owner}"
+            body += [f"{nt} n_self{{}};", "if (draw.flag()) ::sc::lowered::draw(draw, n_self);"]
+            for var, (cls, field) in self.moved.items():
+                if cls == n.owner.split("::")[-1]:
+                    body.append(f"::sc::lowered::carry(::{self.ns['old']}::{var}, n_self.{field});   // (the variable of the file, now a field)")
         if o.kind == "CXXConstructorDecl":
             body += [f"std::optional<::{self.ns['old']}::{o.owner}> o_obj;", f"std::optional<::{self.ns['new']}::{n.owner}> n_obj;"]
         # the arguments
@@ -1447,7 +1520,7 @@ class Writer:
             elif step == "entries":
                 # (the old is handed the place of the first entry of the list the new is handed - and its length)
                 el = re.sub(r"^\s*const\s+", "", re.sub(r"\*\s*$", "", ot)).strip()
-                arr = re.search(r"std::array<.+,\s*(\d+)>", canon(pt))
+                arr = re.search(r"std::array<.+,\s*(\d+)>", canon(m.new_type(re.sub(r"^\s*const\s+|\s*&\s*$", "", pt))))
                 held = f"std::array<{el}, {arr.group(1)}>" if arr else f"std::vector<{el}>"
                 body += [f"::sc::lowered::Arg<{held}> o{i};", f"::sc::lowered::Arg<{nt}> n{j};", f"::sc::lowered::draw_pair(draw, o{i}, n{j});",
                          f"const ::sc::lowered::Placed o{i}_placed(o{i}.v.data(), o{i}.v.size());"]
@@ -1526,6 +1599,10 @@ class Writer:
             body.append(f'differs.check("what it gives (the old in its last parameter, the new as what it returns)", {returned}, *n_r);')
         if o.method and not o.static and o.kind != "CXXConstructorDecl":
             body.append('differs.check("its object", o_self, n_self);')
+        if n.method and not n.static and n.kind != "CXXConstructorDecl":
+            for var, (cls, field) in self.moved.items():
+                if cls == n.owner.split("::")[-1]:
+                    body.append(f'differs.check("the variable {var.split("::")[-1]} (now the field {field})", ::{self.ns["old"]}::{var}, n_self.{field});')
         if o.kind == "CXXConstructorDecl":
             body.append('differs.check("the object it makes", o_obj, n_obj);')
         for what, a, b in compares:
