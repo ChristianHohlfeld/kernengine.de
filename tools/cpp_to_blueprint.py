@@ -11797,8 +11797,11 @@ class TestWriter:
             os.makedirs(os.environ["TEST_KEEP"], exist_ok=True)
             n = len([x for x in os.listdir(os.environ["TEST_KEEP"]) if x.startswith(f"test_{stem}.")])
             shutil.copy(path, os.path.join(os.environ["TEST_KEEP"], f"test_{stem}.{n}.cpp"))
+        import time as _t
+        _t0 = _t.time()
         r = subprocess.run([os.environ.get("CXX", "g++"), "-std=c++20", "-fsyntax-only", "-ffp-contract=off", "-fno-exceptions", "-fno-rtti", "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter",
                             *self.flags, "-I" + os.path.join(ROOT, "kern", "tests"), path], capture_output=True, text=True)
+        TIMES.append(_t.time() - _t0)
         errors = []
         if r.returncode != 0:
             # a complaint counts for the line of the test it is about: its own, or the one it was "required from"
@@ -12072,6 +12075,9 @@ def state_classes(world, surveys):
     return out
 
 
+TIMES = []
+
+
 def convert_unit(job):
     """One Blueprint: the functions of its files, converted as far as they are, and - with a test directory
     - its test written. What main needs of it, as plain values (a process of its own does this for every
@@ -12079,6 +12085,11 @@ def convert_unit(job):
     themselves. `part`: the job - the Blueprint, or one of its parts (World.parts)."""
     part, source, files, namespace, flags, world, test = job
     name = world.parts.get(part, part)
+    import time as _t
+    _T = [_t.time()]; _log = []
+    def _mark(what):
+        now = _t.time(); _log.append(f"{what}={now - _T[0]:.1f}"); _T[0] = now
+    TIMES.clear()
     NODES.update(world.nodes)
     said = io.StringIO()
     keep, sys.stderr = sys.stderr, said
@@ -12090,6 +12101,7 @@ def convert_unit(job):
             path = os.path.join(scratch, part.replace("/", "_") + ".cpp")
             open(path, "w").write("".join(f'#include "{os.path.abspath(f)}"\n' for f in files) or "\n")
         tree = Tree(path, namespace, flags, world.spaces)
+        _mark("tree")
         main_file = os.path.abspath(source or files[0])
         # its functions, in the order they stand in: those of a header first (a source file's Blueprint has
         # the functions of its header that need the source file), then the source file's
@@ -12120,6 +12132,7 @@ def convert_unit(job):
             for f in unit.functions.values():   # (and what those call of it)
                 if f not in unit.all and not f.lifted and f.decl["id"] in unit.function_names:
                     unit.all.append(f)
+            _mark("emit")
             held = (unit.names - world.taken) | set(unit.type_line)
             clash = {n for f in unit.order for n in getattr(f, "local_names", ()) if n in held}
             if clash - reserved:
@@ -12131,13 +12144,16 @@ def convert_unit(job):
             writer = TestWriter(unit, os.path.relpath(os.path.dirname(main_file), test), flags)
             writer.path = main_file
             writer.test_dir = test
+            TIMES.clear()
             unit.test = writer.write()
+            _mark(f"test[{len(TIMES)}c,{sum(TIMES):.1f}s]")
             more = {f.decl["id"]: f"its test cannot compare it yet ({why})" for f, why in unit.test[1] if why != "it gives nothing" and f.decl["id"] not in barred}
             if not more:
                 break
             barred.update(more)
         # what the tests of other files need of this one to hold the source of its functions they call
         exports = writer.exports() if writer is not None else ({}, {})
+        _mark("exports")
     finally:
         sys.stderr = keep
         if scratch:
@@ -12150,7 +12166,7 @@ def convert_unit(job):
             "said": [f"    {f.cpp} ({f.lines}): " + ("written" if f.text else "a name for a place - written where it is called" if f.place else f.wait) for f in fs],
             "table": {f.key: unit.entry_of(f) for f in unit.functions.values() if not f.lifted and f.key}, "written": len(unit.order),
             "parts": (variables, functions, members), "types": types, "uses": unit.uses(), "missing": sorted(unit.missing), "asked": sorted(unit.asked), "state": unit.state_used,
-            "test": (unit.test[0], [(f.cpp, why) for f, why in unit.test[1]]), "exports": exports, "errors": said.getvalue()}
+            "test": (unit.test[0], [(f.cpp, why) for f, why in unit.test[1]]), "exports": exports, "errors": said.getvalue() + f"time: {part} pid={os.getpid()} " + " ".join(_log) + "\n"}
 
 
 def apply_to_level(level, folder, blueprints, prune=False):
@@ -12435,6 +12451,9 @@ def main(argv):
         return False
 
     # ---- the Blueprints, each after those it calls ----
+    import time as _t
+    _start = _t.time()
+    print(f"time: plan done", flush=True)
     tables, exports, results, done, running, cut_calls = {}, {}, {}, set(), {}, set()
     while len(done) < len(deps):
         ready = sorted(u for u in deps if u not in done and u not in running.values() and all(d in done or (u, d) in cut_calls for d in deps[u]))
@@ -12473,6 +12492,8 @@ def main(argv):
                 deps[u].add(d)
                 again = True
             if again:
+                sys.stderr.write(r["errors"][r["errors"].rfind("time:"):])
+                print(f"time: at {_t.time() - _start:.0f}s {u} again", flush=True)
                 continue
             done.add(u)
             results[u] = r
@@ -12486,6 +12507,7 @@ def main(argv):
                     done.discard(v)
                     print(f"{v} is converted again: what it calls of {u} is written now", flush=True)
             sys.stderr.write(r["errors"])
+            print(f"time: at {_t.time() - _start:.0f}s {u} done, running {len(running)}", flush=True)
             print(f"{u:28} {r['done']:4} / {r['total']:4} functions   {r['done_lines']:6} / {r['total_lines']:6} lines" + ("" if u in program else "   (what the program calls of it)"), flush=True)
             if os.environ.get("FUNCTIONS"):
                 for line in r["said"]:
