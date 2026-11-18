@@ -4,6 +4,13 @@ Zweig work-p, letzter Commit 133bb742 (gepusht; origin/work-zusammen 8844531a ei
 IN ARBEIT / WARTET AUF mag: `work-p-engine-212302-7164` (a–c, 7aacebf), `work-p-engine-221509-17831` + `work-p-probe-221512-17868` (E2.1, 2416329).
 Entscheidungen 21:50 (PAKET3_p.md) umgesetzt: E2.1 (95ada08, 2416329), E2.2 (e7538f1), Zeit-Test (133bb74). Offen: E3-A (Aufrufweg), Beweise.
 
+## BEREIT ZUM MERGEN (Teil 1: Messwerkzeug + 3a–c) – Stand 7aacebfb
+- Commits: f50c07d (Messwerkzeug), 16c059c (math_compare/bits_of/whole/To<Whole>/Exact), 7aacebf (Engine-Fall formula_bits_edges); Merge-Basis 8874e79.
+- Beweis: mag `work-p-engine-212302-7164` engine auf 7aacebf: rc=0 (197 ok, blueprint_native_test ok: 54 Blueprints, 14102 Aufrufe; game_native_test ok).
+  Lokal $S/p/eq.cpp: 1.737.120 Vergleiche alt/neu, 0 verschieden. Text der Klassen unverändert (nur Header), daher keine Spiel-Suite nötig außer dem vollen Lauf.
+- Messung: Tabelle „Früher“ unten (qr encode 28× → 14×, rng 21× → 13×, sha256 22× → 14×; Float-Fälle unverändert).
+(Der Stand danach – E2.1/E2.2/Zeit-Test bis 133bb74 – wartet auf work-p-engine-221509-17831 / work-p-probe-221512-17868 und einen `vergleich`.)
+
 ## Nach Nachtrag 21:50
 - **E2.1** Formel ganzer Zahlen: `whole` steht in der Funktions-Tabelle (formula.cpp `Fn::whole`, band…mul32), `Formula::whole()` (Wurzel eine solche
   Funktion, jeder Eingang nur Argument einer solchen). Schreiber: `[](Int a) -> Int` + Ints ohne kern::to, wenn jeder Eingang ein Draht von einem Int ist.

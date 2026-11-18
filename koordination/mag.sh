@@ -6,6 +6,7 @@
 #   mag.sh konvert origin/work-k 8                                  nur die Konvertierung des ganzen Spiels mit genau so vielen Kernen
 #   mag.sh voll origin/work                                         Konvertierung + Spiel-Suite + Engine-Suite (nur der Koordinator)
 #   mag.sh vergleich origin/work-<paket> src/a.cpp src/b.cpp        Probe UND Vergleich Bit für Bit der Tests dieser Quelltexte (Stellvertreter und Engine selbst)
+#   mag.sh abbrechen <name> [tests]                                 den EIGENEN Auftrag beenden (er schreibt sein Protokoll und räumt auf); "tests": nur Hänger
 #   mag.sh alle origin/mag/ergebnis-<voller-lauf>                   jeder Vergleichstest einzeln (Stellvertreter und Engine selbst): ALLE Abweichungen in einem Lauf
 # Der Stand muss gepusht sein. Wartet, bis mag fertig ist, und legt die Protokolle nach $S/mag/<name>/ (when, *.tail.txt, *.log.xz, texts/).
 # Gibt when und das Ende jedes Protokolls aus. Ein Auftrag dauert: Probe wenige Minuten, Suiten 10-30 Minuten.
@@ -54,7 +55,16 @@ if [ "$1" = stand ]; then
     else echo "wartet  $n  ($(git -C "$K" show "origin/mag/auftrag:jobs/$n" | head -1 | cut -c1-70))"; fi
   done; exit 0
 fi
-[ $# -ge 2 ] || { sed -n '2,12p' "$0"; exit 2; }
+if [ "${1:-}" = abbrechen ] && [ $# -ge 2 ]; then   # abbrechen <name> [tests]: den eigenen Auftrag beenden ("tests": nur Testläufe über 20 Minuten)
+  ( flock 9; cd "$S/magjob" || exit 1
+    for try in 1 2 3 4 5 6; do
+      git pull -q --rebase origin mag/auftrag 2>/dev/null
+      mkdir -p abbruch; echo "${3:-alles}" > "abbruch/$2"; git add "abbruch/$2"; git commit -q -m "Abbruch $2 (${3:-alles})" 2>/dev/null
+      git push -q origin mag/auftrag 2>/dev/null && exit 0; sleep $(( 5 + RANDOM % 6 ))
+    done; exit 1 ) 9> "$S/magjob.lock" && echo "Abbruch von $2 abgelegt (${3:-alles}) – der Auftrag schreibt sein Protokoll und endet" || echo "Abbruch nicht abgelegt"
+  exit 0
+fi
+[ $# -ge 2 ] || { sed -n '2,14p' "$0"; exit 2; }
 name="$(echo "$2" | sed 's|.*/||; s/[^A-Za-z0-9-]/-/g')-$1-$(date +%H%M%S)-$$"
 (
   flock 9

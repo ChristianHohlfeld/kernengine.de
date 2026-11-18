@@ -732,3 +732,22 @@ mag rechnet unabhängig weiter (der volle Lauf `work-voll-162644-5528` seit 17:3
   Rändern, Fixpunkt); Weitergabe beim Anhängen JA; `at_known` zurückgestellt; Aufrufweg an einen Actor darf p ändern (Text/Bedeutung unverändert); Zeit-Test ohne
   Ausnahmeliste, bis dahin Bericht. Gemessen von p: Ganzzahl-Fälle 10–18× langsamer als das C++, Ursache Float-Grenze der Formel (Projektion 25,1 → 2,8 ns, C++ 1,85 ns).
 
+### 16.15 Stand 22:35 – mag-Warteschlange mit Budget und Abbruch, p Teil 1 in work-zusammen, Quote 42 %
+- **Quote 22:31: 42 %** (17:56: 36 %). Fünf Agenten laufen: t1, t2, k, d (Nachfolger 3), p (Nachfolger, 22:33). Bei diesem Verbrauch bleiben mit fünf Agenten grob elf Stunden.
+- **mag war überbucht, weil die Schleife nach jedem Ersetzen (neue lauf2.sh) ihre laufenden Aufträge nicht mehr zählte** – nach drei Fassungen an einem Abend ~120 Threads
+  auf 56. **lauf2.sh 43cc7e0b:** jeder angenommene Auftrag steht in `.lauf/<name>` (Bedarf, Nummer seiner Schale; übersteht das Ersetzen), Aufträge älterer Fassungen
+  zählen über ihre Prozesse; Budget `CAP = N·5/4` (70): voll 56, alle 37, vergleich 14, sonst 9; volle Läufe zuerst, dann vergleich/alle, dann der Rest; der erste,
+  der nicht passt, hält die nach ihm auf. **Abbruch:** Datei `abbruch/<name>` auf mag/auftrag (`./mag.sh abbrechen <name> [tests]`): jeder Prozess im Ordner des
+  Auftrags endet (seine Schale, git, xz, tar nicht – er schreibt sein Protokoll, pusht, räumt auf); „tests“ beendet nur Testläufe über 20 Minuten. Die Funktionen
+  stehen in lauf2.sh zwischen `# >>> warteschlange` und `# <<<` und sind vor dem Push lokal mit Stellvertreter-Aufträgen durchgespielt (/tmp/wstest.sh-Muster:
+  Funktionen herausschneiden, `run_job` ersetzen) – **eine fehlerhafte lauf2.sh beendet die Schleife auf mag, und nur Chris kann sie dort neu starten: vor jedem
+  Push `bash -n` und die Probe.**
+- **work-zusammen = e9eec025** = 8844531a + Merge work-p 7aacebfb (p Teil 1: Messwerkzeug, Straffung ohne Textänderung, Engine-Fall formula_bits_edges; Beleg
+  `work-p-engine-212302-7164` rc=0, vom Koordinator nachgesehen). p (Vorgänger) endete 22:25 – gebaut, unbewiesen auf work-p: E2.1 (qr 14× → 5×, rng 13× → 1,7×),
+  E2.2 (settings_escape 9,7× → 7,7×), Zeit-Test `--check 1.10` auf Bestzeiten (25 von 29 Fällen darüber: nur Bericht). Nachfolger: beweisen, dann +,−,×, Aufrufweg, Rest.
+- **k:** G4 und G7 behoben (2a6ef5b3, Beleg läuft); Car_new ist ein Befund für t1 (unbestimmtes Mitglied im Quelltext); E3-C (Firmware: Felder fester Länge als
+  `List`) ist ein Befund für k.
+- **Offen bei Redaktionsschluss:** Ergebnis von „alle“ (Hänger beendet, sollte folgen), `work-zusammen-engine-213241-11183`, `work-zusammen-vergleich-222045-20677`
+  (erster Lauf der Auftragsart – ansehen, ob sie sauber durchläuft), `work-k-vergleich-222911-25281`. Nächster voller Lauf, sobald t1 (Fehler 1+2, Testrahmen) und k
+  (G4, G7) belegt und eingemischt sind; danach `grundlage` im Zweig mag/auftrag auf den neuen gültigen Lauf setzen.
+
