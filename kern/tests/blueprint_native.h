@@ -43,6 +43,10 @@ struct Case {
   /// native_play_on_engine): the interpreter through the host's door, the class by the calls it makes
   /// itself (kern/logic/engine_direct.h) - the same, value for value.
   std::vector<std::string> on_engine = {};
+  /// Functions without inputs whose calls need no object of the engine, played on the engine itself in the
+  /// compiled test (native_show.h, native_compare_on_engine): through the host's door, as the class calling the
+  /// engine itself, through the door again - the class gives what the door gives the same twice.
+  std::vector<std::string> on_engine_free = {};
   /// The libraries it uses, with those they use (each a case of its own before it): the
   /// Blueprints of its project.
   std::vector<std::pair<std::string, logic::Graph>> libraries = {};
@@ -1541,6 +1545,10 @@ inline std::vector<Case> cases() {
     // ... and its calls on objects of the engine once more on the engine itself: there the class calls every
     // function itself, typed, and does what the interpreter does through the door.
     for (const char* run : engine_case::kRunsOnObjects) c.on_engine.push_back(run);
+    // ... and the others, the free functions, in the compiled test itself: what one of them gives may depend on
+    // more than the case (the clock, the engine's jobs) - the class is compared where the door gives the same twice.
+    for (const char* run : engine_case::kRuns)
+      if (std::find(c.on_engine.begin(), c.on_engine.end(), run) == c.on_engine.end()) c.on_engine_free.push_back(run);
   }
   // The tier cases a compiler runs as they stand: their events are handlers of the class, the
   // runtime is the same for every tier.
@@ -1732,7 +1740,7 @@ inline bool write_file(const std::string& path, const std::string& text) {
 inline bool emit(const std::string& dir, const std::vector<Case>& all, std::string* error) {
   std::string main = "// written by kern_tests --emit-native: the calls of the native Blueprint test\n"
                      "#include <cstdio>\n#include <fstream>\n#include <limits>\n#include <sstream>\n#include <string>\n\n#include \"logic_cases.h\"\n#include \"native_show.h\"\n";
-  std::string runs, expected, on_engine, on_engine_runs;
+  std::string runs, expected, on_engine, on_engine_runs, on_engine_free_runs;
   for (const Case& c : all) {
     std::string text, glue, why;
     if (!logic::native_ready(c.graph, &why) || !logic::to_cpp(c.graph, c.name, text, &why) || !logic::native_glue(c.graph, c.name, glue, &why, logic::library(), {}, c.blueprints())) {
@@ -1775,6 +1783,16 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
                         "    if (!kern::json::parse(kGraph_" + c.name + ", stored) || !kern::logic::graph_from_json(stored, graph)) problem = \"the graph was not read\";\n"
                         "    on_engine += native_play_on_engine(graph, \"" + c.name + "\", {" + list + "}, true, problem);\n"
                         "    if (!problem.empty()) { std::printf(\"FAIL " + c.name + " on the engine itself: %s\\n\", problem.c_str()); ++failures; }\n  }\n";
+    }
+    if (!c.on_engine_free.empty()) {
+      std::string list;
+      for (const std::string& run : c.on_engine_free) list += (list.empty() ? "\"" : ", \"") + run + "\"";
+      on_engine_free_runs += "  {\n    kern::logic::Graph graph;\n    kern::json::Value stored;\n    std::string problem, unrepeatable;\n"
+                             "    if (!kern::json::parse(kGraph_" + c.name + ", stored) || !kern::logic::graph_from_json(stored, graph)) problem = \"the graph was not read\";\n"
+                             "    const std::string apart = problem.empty() ? native_compare_on_engine(graph, \"" + c.name + "\", {" + list + "}, unrepeatable, problem) : std::string();\n"
+                             "    if (!problem.empty()) { std::printf(\"FAIL " + c.name + " on the engine itself: %s\\n\", problem.c_str()); ++failures; }\n"
+                             "    if (!apart.empty()) { std::printf(\"FAIL " + c.name + " on the engine itself, the class calling the engine itself:\\n     %s\", apart.c_str()); ++failures; }\n"
+                             "    if (!unrepeatable.empty()) std::printf(\"     " + c.name + " on the engine itself - not the same twice through the door, so not compared:%s\\n\", unrepeatable.c_str());\n  }\n";
     }
     std::string body = "static const char kGraph_" + c.name + "[] =";
     for (std::size_t at = 0; at < stored.size(); at += 8192) body += "\n    R\"KGRAPH(" + stored.substr(at, 8192) + ")KGRAPH\"";
@@ -1929,6 +1947,8 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
             "  {\n    if (argc < 3) { std::fprintf(stderr, \"blueprint_native_test: the interpreter's answers on the engine itself are missing (blueprint_native_on_engine.txt)\\n\"); return 2; }\n"
             "    std::ifstream engine_in(argv[2]);\n    std::stringstream engine_want;\n    engine_want << engine_in.rdbuf();\n    std::string on_engine;\n" + on_engine_runs +
             "    failures += differs(on_engine, engine_want.str(), \"the class calling the engine itself\");\n  }\n";
+  if (!on_engine_free_runs.empty())
+    main += "  // ... and the free functions, three times here: through the door, as the class, through the door again\n" + on_engine_free_runs;
   main += "  std::printf(\"%s blueprint_native_test (" + std::to_string(count) + " Blueprints as their C++, " + std::to_string(calls) +
           " calls on the class and by name through logic::Instance)\\n\", failures ? \"FAIL\" : \"ok  \");\n  return failures ? 1 : 0;\n}\n";
   if (!write_file(dir + "/blueprint_native_main.cpp", main) || !write_file(dir + "/blueprint_native_expected.txt", expected) ||
