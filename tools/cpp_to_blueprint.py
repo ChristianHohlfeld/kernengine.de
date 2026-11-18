@@ -109,6 +109,32 @@ ROOT = os.environ.get("KERN_ROOT") or os.path.dirname(os.path.dirname(os.path.ab
 class Wait(Exception):
     """What keeps a function C++ for now: something the notation has no place for yet."""
 
+    def __init__(self, *a):
+        import sys, traceback
+        st = traceback.extract_stack()[:-1]
+        lines = [str(f.lineno) for f in st if f.filename.endswith("cpp_to_blueprint.py")][-14:]
+        where = ""
+        try:
+            fr = sys._getframe(1)
+            for depth in range(12):
+                loc = fr.f_locals
+                tree = getattr(loc.get("self"), "tree", None)
+                node = next((loc[k] for k in ("b", "n", "s", "v") if isinstance(loc.get(k), dict) and loc[k].get("kind")), None)
+                if tree is not None and node is not None:
+                    try:
+                        src = tree.source(node)
+                    except Exception:
+                        src = None
+                    if src:
+                        where = "  [" + " ".join(src.split())[:160] + "]"
+                        break
+                fr = fr.f_back
+                if fr is None:
+                    break
+        except Exception:
+            pass
+        Exception.__init__(self, *(((str(a[0]) + where + "  @" + ">".join(lines)),) + a[1:] if a else a))
+
 
 # ---- the notation's words ------------------------------------------------------------------------
 CPP_WORDS = set("""alignas alignof and and_eq asm auto bitand bitor bool break case catch char char8_t char16_t char32_t class compl concept const consteval constexpr
