@@ -9107,7 +9107,16 @@ class Api:
             self.shape(bt)
         words = d["name"].replace("_", " ").title()
         return {"type": self.type_of(d), "cpp": qualified, "label": words, "category": "Engine: " + self.home(d).split("::")[-1].replace("kern", "Engine"),
-                "help": u.comment_of(d), "value": value, "ins": ins, "outs": outs, "params": params, "decl": d, "counts": counts, "per": per}
+                "help": u.comment_of(d), "value": value, "ins": ins, "outs": outs, "params": params, "decl": d, "counts": counts, "per": per,
+                "clock": self.reads_clock(d)}
+
+    def reads_clock(self, d):
+        """Does the declaration say that the function reads a clock (`KERN_CLOCK f64 now_ms();`, kern/core/base.h)?"""
+        text = self.tree.text(d.get("_file", ""))
+        a = d.get("_at", (None, None))[0]
+        if a is None or not text:
+            return False
+        return re.match(r"\s*KERN_CLOCK\b", text[text.rfind("\n", 0, a) + 1:]) is not None
 
     def written_list(self, p, after):
         """A parameter that is a pointer to numbers the function writes through, with their count beside it -

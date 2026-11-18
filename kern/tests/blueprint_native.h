@@ -1545,8 +1545,8 @@ inline std::vector<Case> cases() {
     // ... and its calls on objects of the engine once more on the engine itself: there the class calls every
     // function itself, typed, and does what the interpreter does through the door.
     for (const char* run : engine_case::kRunsOnObjects) c.on_engine.push_back(run);
-    // ... and the others, the free functions, in the compiled test itself: what one of them gives may depend on
-    // more than the case (the clock, the engine's jobs) - the class is compared where the door gives the same twice.
+    // ... and the others, the free functions, in the compiled test itself: three plays, each from the same state
+    // of the engine; only what a clock gave is not compared (native_show.h, native_compare_on_engine).
     for (const char* run : engine_case::kRuns)
       if (std::find(c.on_engine.begin(), c.on_engine.end(), run) == c.on_engine.end()) c.on_engine_free.push_back(run);
   }
@@ -1787,12 +1787,12 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
     if (!c.on_engine_free.empty()) {
       std::string list;
       for (const std::string& run : c.on_engine_free) list += (list.empty() ? "\"" : ", \"") + run + "\"";
-      on_engine_free_runs += "  {\n    kern::logic::Graph graph;\n    kern::json::Value stored;\n    std::string problem, unrepeatable;\n"
+      on_engine_free_runs += "  {\n    kern::logic::Graph graph;\n    kern::json::Value stored;\n    std::string problem, clocks;\n"
                              "    if (!kern::json::parse(kGraph_" + c.name + ", stored) || !kern::logic::graph_from_json(stored, graph)) problem = \"the graph was not read\";\n"
-                             "    const std::string apart = problem.empty() ? native_compare_on_engine(graph, \"" + c.name + "\", {" + list + "}, unrepeatable, problem) : std::string();\n"
+                             "    const std::string apart = problem.empty() ? native_compare_on_engine(graph, \"" + c.name + "\", {" + list + "}, clocks, problem) : std::string();\n"
                              "    if (!problem.empty()) { std::printf(\"FAIL " + c.name + " on the engine itself: %s\\n\", problem.c_str()); ++failures; }\n"
                              "    if (!apart.empty()) { std::printf(\"FAIL " + c.name + " on the engine itself, the class calling the engine itself:\\n     %s\", apart.c_str()); ++failures; }\n"
-                             "    if (!unrepeatable.empty()) std::printf(\"     " + c.name + " on the engine itself - not the same twice through the door, so not compared:%s\\n\", unrepeatable.c_str());\n  }\n";
+                             "    if (!clocks.empty()) std::printf(\"     " + c.name + " on the engine itself - what a clock gave (EngineFunction::clock), not compared:%s\\n\", clocks.c_str());\n  }\n";
     }
     std::string body = "static const char kGraph_" + c.name + "[] =";
     for (std::size_t at = 0; at < stored.size(); at += 8192) body += "\n    R\"KGRAPH(" + stored.substr(at, 8192) + ")KGRAPH\"";
