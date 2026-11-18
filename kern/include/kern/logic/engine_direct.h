@@ -25,6 +25,7 @@
 // (kern/logic/engine_nodes.gen.h).
 #pragma once
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -395,5 +396,316 @@ template <class Tag, class R> class Given {
   direct::Hold<R> hold_;
   Value held_;
 };
+
+
+// ---- places of the engine (kern/docs/blueprint_cpp.md, "Plätze der Engine") ----
+// A function of the engine that gives a reference to something its object holds and only looks it up
+// (`std::vector<ShotEvent>& shots() { return shots_; }`) is a place: its node binds it once - in the class
+// `auto& r = world->shots();` - and the nodes that name a place work on it there. Place<P, B> is the node's
+// output: the handle, and the address of what the engine holds (P::C) while the object of the handle is the
+// one it was (EngineObjects::generation) - else it is looked up again, as the door looks it up every time; a
+// handle of no object tells the host "<function>@get" as the door does, reads the Blueprint's defaults and
+// writes into an entry of its own. Without the engine's objects (a test with a stand-in) each naming of the
+// place reads it through the door ("<function>@get") into a copy of its own, and each change sets it back
+// ("<function>@set") - what the interpreter does.
+// What a place names is a Ref: the engine's C++ value there (`kern_at`), or an entry of its own of the
+// Blueprint's type (`kern_own`: beside a list, where the engine holds nothing, the copy of the door). Reading
+// it makes the Blueprint's value of the engine's (Direct<Tag>::make), a change puts it there (Direct::from):
+// a 32-bit number of the engine is a Float only where it is read, as C++ reads the f32 field.
+
+template <class T> struct ListTag : std::false_type {};
+template <class T> struct ListTag<List<T>> : std::true_type { using item = T; };
+
+/// A copy of a place read through the door: set back through it after every change.
+struct PlaceDoor {
+  virtual ~PlaceDoor() = default;
+  virtual void wrote() = 0;
+};
+
+template <class Tag, class C, class B> struct RefCore {
+  using kern_tag = Tag;
+  C* kern_at = nullptr;
+  B* kern_own = nullptr;
+  EngineObjects* kern_o = nullptr;
+  std::shared_ptr<PlaceDoor> kern_door;
+  std::shared_ptr<void> kern_keep;  // (the entry of its own: as long as the place is named)
+
+  B kern_read() const { return kern_own ? *kern_own : Direct<Tag>::template make<B>(*kern_o, *kern_at); }
+  void kern_write(const B& b) const {
+    if (kern_own) *kern_own = b;
+    else Direct<Tag>::from(*kern_o, b, *kern_at);
+    if (kern_door) kern_door->wrote();
+  }
+  /// The same place one step on: a field (its member of C and of B), or an entry of a list.
+  template <class T, class CF, class BF> RefCore<T, CF, BF> kern_step(CF C::*c, BF B::*b) const {
+    return {kern_own ? nullptr : &(kern_at->*c), kern_own ? &(kern_own->*b) : nullptr, kern_o, kern_door, kern_keep};
+  }
+  std::size_t kern_count() const { return kern_own ? kern_own->size() : kern_at->size(); }
+};
+
+template <class Tag, class C, class B> struct Ref;
+
+/// A place's fields by their names (a struct of the engine: engine_nodes.gen.h writes S::Fields).
+template <class D, class Tag, class C, class B> struct FieldsOf {
+  explicit FieldsOf(D*) {}
+};
+template <class D, class S, class C, class B> struct FieldsOf<D, Struct<S>, C, B> : S::template Fields<D, C, B> {
+  explicit FieldsOf(D* d) : S::template Fields<D, C, B>(d) {}
+};
+
+/// What a place is named for: read (the Blueprint's value), set, added to, its entries and its length -
+/// each on what stands there now (D::ref()).
+template <class D, class Tag, class C, class B> struct PlaceOps {
+  operator B() const { return self().ref().kern_read(); }
+  /// A Set: what is set (the Blueprint's value, as the interpreter's Set gives it).
+  template <class X> B operator=(const X& x) const {
+    B b(x);
+    self().ref().kern_write(b);
+    return b;
+  }
+  template <class X> B operator+=(const X& x) const {
+    const auto r = self().ref();
+    B b = r.kern_read();
+    b += x;
+    r.kern_write(b);
+    return b;
+  }
+  template <class X> B operator-=(const X& x) const {
+    const auto r = self().ref();
+    B b = r.kern_read();
+    b -= x;
+    r.kern_write(b);
+    return b;
+  }
+  /// An entry (a list): beside the list an entry of its own with the defaults, of which nothing is kept.
+  template <class I>
+    requires ListTag<Tag>::value
+  auto operator[](const I& index) const {
+    using T = typename ListTag<Tag>::item;
+    using CI = typename C::value_type;
+    using BI = typename B::value_type;
+    const RefCore<Tag, C, B> r = self().ref();
+    const i64 i = static_cast<i64>(index);
+    if (i >= 0 && static_cast<std::size_t>(i) < r.kern_count())
+      return Ref<T, CI, BI>(RefCore<T, CI, BI>{r.kern_own ? nullptr : &(*r.kern_at)[static_cast<std::size_t>(i)], r.kern_own ? &(*r.kern_own)[static_cast<std::size_t>(i)] : nullptr, r.kern_o, r.kern_door, r.kern_keep});
+    auto own = std::make_shared<BI>();
+    BI* at = own.get();
+    return Ref<T, CI, BI>(RefCore<T, CI, BI>{nullptr, at, r.kern_o, r.kern_door, std::move(own)});
+  }
+
+ private:
+  const D& self() const { return static_cast<const D&>(*this); }
+};
+
+/// What a place names, as it is named once (an expression of the class).
+template <class Tag, class C, class B> struct Ref : RefCore<Tag, C, B>, PlaceOps<Ref<Tag, C, B>, Tag, C, B>, FieldsOf<Ref<Tag, C, B>, Tag, C, B> {
+  explicit Ref(RefCore<Tag, C, B> r) : RefCore<Tag, C, B>(std::move(r)), FieldsOf<Ref, Tag, C, B>(this) {}
+  Ref(const Ref& r) : RefCore<Tag, C, B>(r), FieldsOf<Ref, Tag, C, B>(this) {}
+  using PlaceOps<Ref, Tag, C, B>::operator=;
+  B operator=(const Ref& r) const { return PlaceOps<Ref, Tag, C, B>::operator=(r.kern_read()); }
+  RefCore<Tag, C, B> ref() const { return *this; }
+};
+
+/// A field of a place, by its name: the same place one step on, looked at when it is named.
+template <class D, class Tag, class C, class B, class CF, class BF, CF C::*Cm, BF B::*Bm>
+struct Field : PlaceOps<Field<D, Tag, C, B, CF, BF, Cm, Bm>, Tag, CF, BF>, FieldsOf<Field<D, Tag, C, B, CF, BF, Cm, Bm>, Tag, CF, BF> {
+  explicit Field(D* d) : FieldsOf<Field, Tag, CF, BF>(this), kern_parent(d) {}
+  Field(const Field&) = delete;
+  using PlaceOps<Field, Tag, CF, BF>::operator=;
+  BF operator=(const Field& f) const { return PlaceOps<Field, Tag, CF, BF>::operator=(BF(f)); }
+  RefCore<Tag, CF, BF> ref() const { return kern_parent->ref().template kern_step<Tag>(Cm, Bm); }
+
+ private:
+  D* kern_parent;
+};
+
+/// The output of a node of the engine that binds a place of the engine (P: engine_nodes.gen.h - the object's
+/// class, C, Tag, the input of the handle, at(object) and the names "<function>@get", "<function>@set").
+template <class P, class B> struct Place : PlaceOps<Place<P, B>, typename P::Tag, typename P::C, B>, FieldsOf<Place<P, B>, typename P::Tag, typename P::C, B> {
+  using Tag = typename P::Tag;
+  using C = typename P::C;
+  Place() : FieldsOf<Place, Tag, C, B>(this) {}
+  Place(const Place& p) : FieldsOf<Place, Tag, C, B>(this), kern_world(p.kern_world), kern_handle(p.kern_handle), kern_at(p.kern_at), kern_generation(p.kern_generation) {}
+  Place& operator=(const Place& p) {
+    kern_world = p.kern_world, kern_handle = p.kern_handle, kern_at = p.kern_at, kern_generation = p.kern_generation;
+    return *this;
+  }
+  using PlaceOps<Place, Tag, C, B>::operator=;
+
+  /// The node ran: the place of the object of `handle` (what the engine holds there: `at`, null where the
+  /// class has not the engine's objects or the handle names no object).
+  void kern_bind(const BlueprintWorld& world, i64 handle, C* at) {
+    kern_world = &world;
+    kern_handle = handle;
+    kern_at = at;
+    kern_generation = at && world.engine ? world.engine->generation() : 0;
+  }
+  /// What stands there now.
+  RefCore<Tag, C, B> ref() const {
+    RefCore<Tag, C, B> r;
+    Host* const host = kern_world ? kern_world->host : nullptr;
+    if (EngineObjects* const o = kern_world ? kern_world->engine : nullptr) {
+      r.kern_o = o;
+      if (!kern_at || kern_generation != o->generation()) {
+        // (the object of the handle may not be the one it was: looked up again, as the door does)
+        o->begin_call();
+        typename P::Object* const self = object_of<typename P::Object>(*o, kern_handle, P::pin);
+        kern_at = self ? &P::at(*self) : nullptr;
+        kern_generation = o->generation();
+        if (!self) {
+          if (host) host->engine_failed(P::get);
+          return none(r);
+        }
+      }
+      r.kern_at = kern_at;
+      return r;
+    }
+    struct Door final : PlaceDoor {
+      Host* host = nullptr;
+      i64 handle = 0;
+      B b{};
+      void wrote() override {
+        std::vector<Value> none;
+        host->engine(P::set, {Value::integer(handle), to_value(b)}, none);
+      }
+    };
+    std::vector<Value> out{Value::zero(pin_type_of<B>())};
+    if (!host || !host->engine(P::get, {Value::integer(kern_handle)}, out)) return none(r);
+    auto door = std::make_shared<Door>();
+    door->host = host;
+    door->handle = kern_handle;
+    door->b = from_value<B>(out[0].converted(pin_type_of<B>()));
+    r.kern_own = &door->b;
+    r.kern_door = door;
+    return r;
+  }
+
+ private:
+  static RefCore<Tag, C, B> none(RefCore<Tag, C, B>& r) {
+    auto own = std::make_shared<B>();
+    r.kern_at = nullptr;
+    r.kern_own = own.get();
+    r.kern_keep = std::move(own);
+    return r;
+  }
+  const BlueprintWorld* kern_world = nullptr;
+  i64 kern_handle = 0;
+  mutable C* kern_at = nullptr;
+  mutable u64 kern_generation = 0;
+};
+
+
+/// Something that names a place of the engine (a Place, a Ref, a Field of one).
+template <class X> concept NamesPlace = requires(const X& x) { x.ref().kern_count(); };
+
+/// The steps of a list at a place of the engine: on the engine's list itself (an item made into the engine's
+/// type first, Direct::from), or on the entry of its own where the place has one - what logic::list does on a
+/// Blueprint's list; through the door the list is set back after.
+template <class P, class I> i64 list_add(const P& p, const I& item) {
+  const auto r = p.ref();
+  using R = decltype(r);
+  using BI = typename std::remove_pointer_t<decltype(R::kern_own)>::value_type;
+  i64 at;
+  if (r.kern_own) {
+    at = logic::list::add(*r.kern_own, BI(item));
+  } else {
+    using CI = typename std::remove_pointer_t<decltype(R::kern_at)>::value_type;
+    auto c = blank<CI>();
+    Direct<typename ListTag<typename R::kern_tag>::item>::from(*r.kern_o, BI(item), c);
+    at = logic::list::add(*r.kern_at, std::move(c));
+  }
+  if (r.kern_door) r.kern_door->wrote();
+  return at;
+}
+template <class P, class I> void list_insert(const P& p, i64 index, const I& item) {
+  const auto r = p.ref();
+  using R = decltype(r);
+  using BI = typename std::remove_pointer_t<decltype(R::kern_own)>::value_type;
+  if (r.kern_own) {
+    logic::list::insert(*r.kern_own, index, BI(item));
+  } else {
+    using CI = typename std::remove_pointer_t<decltype(R::kern_at)>::value_type;
+    auto c = blank<CI>();
+    Direct<typename ListTag<typename R::kern_tag>::item>::from(*r.kern_o, BI(item), c);
+    logic::list::insert(*r.kern_at, index, std::move(c));
+  }
+  if (r.kern_door) r.kern_door->wrote();
+}
+template <class P> void list_remove_at(const P& p, i64 index) {
+  const auto r = p.ref();
+  if (r.kern_own) logic::list::remove_at(*r.kern_own, index);
+  else logic::list::remove_at(*r.kern_at, index);
+  if (r.kern_door) r.kern_door->wrote();
+}
+/// (an item equals one of the engine's where the Blueprint's value of that one equals it - as the interpreter
+/// compares them)
+template <class P, class I> bool list_remove(const P& p, const I& item) {
+  const auto r = p.ref();
+  using R = decltype(r);
+  using BI = typename std::remove_pointer_t<decltype(R::kern_own)>::value_type;
+  bool removed;
+  if (r.kern_own) {
+    removed = logic::list::remove(*r.kern_own, BI(item));
+  } else {
+    const BI b(item);
+    auto& items = *r.kern_at;
+    std::size_t kept = 0;
+    for (std::size_t k = 0; k < items.size(); ++k) {
+      if (Direct<typename ListTag<typename R::kern_tag>::item>::template make<BI>(*r.kern_o, items[k]) == b) continue;
+      if (kept != k) items[kept] = std::move(items[k]);
+      ++kept;
+    }
+    removed = kept != items.size();
+    items.resize(kept);
+  }
+  if (r.kern_door) r.kern_door->wrote();
+  return removed;
+}
+template <class P> void list_clear(const P& p) {
+  const auto r = p.ref();
+  if (r.kern_own) r.kern_own->clear();
+  else r.kern_at->clear();
+  if (r.kern_door) r.kern_door->wrote();
+}
+template <class P, class I> void list_resize(const P& p, i64 length, const I& value) {
+  const auto r = p.ref();
+  using R = decltype(r);
+  using BI = typename std::remove_pointer_t<decltype(R::kern_own)>::value_type;
+  if (r.kern_own) {
+    logic::list::resize(*r.kern_own, length, BI(value));
+  } else {
+    using CI = typename std::remove_pointer_t<decltype(R::kern_at)>::value_type;
+    auto c = blank<CI>();
+    Direct<typename ListTag<typename R::kern_tag>::item>::from(*r.kern_o, BI(value), c);
+    logic::list::resize(*r.kern_at, length, c);
+  }
+  if (r.kern_door) r.kern_door->wrote();
+}
+template <class P, class BI> void list_append(const P& p, logic::Items<BI> items) {
+  const auto r = p.ref();
+  using R = decltype(r);
+  if (r.kern_own) {
+    logic::list::insert_items(*r.kern_own, static_cast<i64>(r.kern_own->size()), items.first, items.count);
+  } else {
+    using CI = typename std::remove_pointer_t<decltype(R::kern_at)>::value_type;
+    // (at the end, in one request for memory - what insert of a range does - each item made into the engine's)
+    auto& list = *r.kern_at;
+    list.reserve(list.size() + items.count);
+    for (std::size_t k = 0; k < items.count; ++k) {
+      auto c = blank<CI>();
+      Direct<typename ListTag<typename R::kern_tag>::item>::from(*r.kern_o, items.first[k], c);
+      list.push_back(std::move(c));
+    }
+  }
+  if (r.kern_door) r.kern_door->wrote();
+}
+/// Take: what is there, and the Blueprint's zero of its type there.
+template <class P> auto take(const P& p) {
+  const auto r = p.ref();
+  using B = std::remove_pointer_t<decltype(decltype(r)::kern_own)>;
+  B was = r.kern_read();
+  r.kern_write(B{});
+  return was;
+}
 
 }  // namespace kern::logic::engine_values

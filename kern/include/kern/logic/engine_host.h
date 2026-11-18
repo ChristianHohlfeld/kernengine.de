@@ -124,6 +124,10 @@ class EngineObjects {
 
   /// Why the last call failed.
   std::string error;
+  /// How often a handle has stopped naming the object it named (release, clear, an object put at a handle):
+  /// what a Blueprint's class holds of an object - a place of the engine (engine_values::Place) - is still
+  /// that object while this is the same, and is looked up again by its handle when it is not.
+  u64 generation() const { return generation_; }
 
  private:
   struct Entry {
@@ -140,6 +144,7 @@ class EngineObjects {
   std::vector<i64> order_;  // (the handles in the order their objects came)
   std::unordered_map<const void*, std::vector<std::pair<Kind, i64>>> by_object_;
   i64 next_ = 1;
+  u64 generation_ = 0;
   Missing missing_ = nullptr;
   std::unordered_set<std::string> texts_;
   std::vector<std::shared_ptr<void>> held_;

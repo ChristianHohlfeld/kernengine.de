@@ -310,6 +310,16 @@ struct BlueprintCore : logic::PureNodes {
   template <class T> static void list_clear(List<T>& list) { logic::list::clear(list); }
   /// (in one go: what std::vector does in one request for memory - resize, insert of a range, reserve)
   template <class T> static void list_resize(List<T>& list, Int length, const std::type_identity_t<T>& value) { logic::list::resize(list, length, value); }
+  // (the same steps on a place of the engine - the list the engine holds: logic::engine_values::list_add ...)
+  template <logic::engine_values::NamesPlace P> static Int list_length(const P& place) { return static_cast<i64>(place.ref().kern_count()); }
+  template <logic::engine_values::NamesPlace P, class I> static void list_add(const P& place, const I& item) { logic::engine_values::list_add(place, item); }
+  template <class N, logic::engine_values::NamesPlace P, class I> static void list_add(N& n, const P& place, const I& item) { n.index = logic::engine_values::list_add(place, item); }
+  template <logic::engine_values::NamesPlace P, class I> static void list_insert(const P& place, Int index, const I& item) { logic::engine_values::list_insert(place, index, item); }
+  template <logic::engine_values::NamesPlace P> static void list_remove_at(const P& place, Int index) { logic::engine_values::list_remove_at(place, index); }
+  template <logic::engine_values::NamesPlace P, class I> static void list_remove(const P& place, const I& item) { logic::engine_values::list_remove(place, item); }
+  template <class N, logic::engine_values::NamesPlace P, class I> static void list_remove(N& n, const P& place, const I& item) { n.removed = logic::engine_values::list_remove(place, item); }
+  template <logic::engine_values::NamesPlace P> static void list_clear(const P& place) { logic::engine_values::list_clear(place); }
+  template <logic::engine_values::NamesPlace P, class I> static void list_resize(const P& place, Int length, const I& value) { logic::engine_values::list_resize(place, length, value); }
   // ---- maps and sets ----
   // What they do is logic::map and logic::set (nodes.h) - on the same container the interpreter's
   // nodes use. The values take any map or set - its keys' and values' types are their settings,
@@ -372,6 +382,10 @@ struct BlueprintCore : logic::PureNodes {
       return before;
     });
   }
+  template <logic::engine_values::NamesPlace P, class L> static void list_append(const P& place, const L& items) {
+    using BI = typename std::remove_pointer_t<decltype(decltype(place.ref())::kern_own)>::value_type;
+    logic::engine_values::list_append(place, logic::Items<BI>(items));
+  }
   template <class T> static void list_append(List<T>& list, std::type_identity_t<logic::Items<T>> items) {
     logic::list::insert_items(list, static_cast<i64>(list.size()), items.first, items.count);
   }
@@ -403,8 +417,15 @@ struct BlueprintCore : logic::PureNodes {
   // Get, Set and Add are C++'s own (Heat, Heat = value, Heat += value). A Take gives what
   // stands at a place and leaves the zero of its type there - std::exchange(place, {}): a list,
   // a text is handed on, not copied.
-  template <class T> static void var_take(T& place) { place = T{}; }
-  template <class N, class T> static void var_take(N& n, T& place) { n.value = std::exchange(place, T{}); }
+  template <class T>
+    requires(!logic::engine_values::NamesPlace<T>)
+  static void var_take(T& place) { place = T{}; }
+  template <class N, class T>
+    requires(!logic::engine_values::NamesPlace<T>)
+  static void var_take(N& n, T& place) { n.value = std::exchange(place, T{}); }
+  // (a place of the engine: logic::engine_values::take)
+  template <logic::engine_values::NamesPlace P> static void var_take(const P& place) { logic::engine_values::take(place); }
+  template <class N, logic::engine_values::NamesPlace P> static void var_take(N& n, const P& place) { n.value = logic::engine_values::take(place); }
 
   // ---- text ----
   // The text nodes on a Blueprint's Text: read where the characters are - a text is copied only

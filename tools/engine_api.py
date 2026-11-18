@@ -592,7 +592,7 @@ class Calls:
         gives."""
         api, EV = self.api, self.EV
         plain = {"Bool": "Bool", "Int": "Int", "Float": "Float", "Vector": "Vector", "Text": "const Text&", "Int64": "Int64"}
-        need, bodies, headers = set(), [], set()
+        need, bodies, headers, places = set(), [], set(), []
 
         def typed(bt):
             if bt in plain:
@@ -649,6 +649,31 @@ class Calls:
             # a step: what it gives goes to the node's member (n.result ...), when the text reads it
             direct, _ = self.direct(f, need, "unread", lambda given: f"{{ {failed} return; }}")
             function(f"{head}void {name}({', '.join(params)})", direct + ["return;"], [f"{door};"])
+            if f.get("place"):
+                # a place of the engine: the node binds it - its member n.result is the place (ev::Place), `auto& r =
+                # object->f();` once; through the door the function is called as it is there, and the place is read
+                # and set through it after (<node>@get, <node>@set)
+                pin, _, q = f["ins"][0]
+                m, out = f["decl"]["name"], f["outs"][0]
+                places.append([f"struct P_{name} {{",
+                               f"  using Object = {q};",
+                               f"  using C = std::remove_reference_t<decltype(std::declval<{q}&>().{m}())>;",
+                               f"  using Tag = {self.dtag(out[1], need)};",
+                               f"  static constexpr const char* pin = {c_text(pin)};",
+                               f"  static constexpr const char* get = {c_text(f['type'] + '@get')};",
+                               f"  static constexpr const char* set = {c_text(f['type'] + '@set')};",
+                               f"  static C& at(Object& o) {{ return o.{m}(); }}",
+                               "};"])
+                lines.append(f"  /// The place {f['cpp']} gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.")
+                lines.append(f"  template <class B> using {name}_place = {EV}Place<engine_direct::P_{name}, B>;")
+                handle = f"static_cast<::kern::i64>({pin})"
+                function(f"template <class KernNode> void {name}(KernNode& kern_n, {', '.join(params)})",
+                         ["kern_o->begin_call();", f"auto* const kern_self = {EV}object_of<{q}>(*kern_o, {handle}, {c_text(pin)});",
+                          f"kern_n.{out[0]}.kern_bind(this->kern_world, {handle}, kern_self ? &engine_direct::P_{name}::at(*kern_self) : nullptr);",
+                          f"if (!kern_self) {failed}", "return;"],
+                         [f"{door};", f"kern_n.{out[0]}.kern_bind(this->kern_world, {handle}, nullptr);"])
+                bodies += lines
+                continue
             if f["outs"]:
                 order = [o for o, _, _ in f["outs"]]
 
@@ -672,7 +697,9 @@ class Calls:
                 "// The engine's enums and structs a pin names, between the type a Blueprint's class holds and the engine's",
                 "// (engine_values::Direct): an enum's values in the order of the Blueprint's enum; a struct field by field -",
                 "// the Blueprint's struct has the engine's fields in their order.",
-                "namespace engine_direct {", "namespace ev = engine_values;", "", *self.direct_types_text(need), "", "}  // namespace engine_direct", "",
+                "namespace engine_direct {", "namespace ev = engine_values;", "", *self.direct_types_text(need), "",
+                "// The places of the engine (engine_values::Place): the object's class, what it holds there, how it is reached.",
+                *[x for p in places for x in p], "", "}  // namespace engine_direct", "",
                 "template <class Core> struct EngineNodesOf : Core {",
                 "  using Bool = bool;", "  using Int = logic::Whole;", "  using Float = f64;", "  using Vector = Vec3;", "  using Text = logic::Text;", "  using Int64 = logic::Int64;",
                 "  template <class T> using List = logic::List<T>;", "",
@@ -699,6 +726,11 @@ class Calls:
                       f"  template <class B> static B make(EngineObjects& o, const {q}& x) {{ B b{{" + ", ".join(f"ev::made<{tg}>(o, x.{c})" for (_, _, _, c), tg in zip(fields, tags)) + "}; " +
                       (f"[[maybe_unused]] const auto& [{bound}] = b; " if fields else "") + "return b; }",
                       f"  template <class C> static void pass(EngineObjects& o, const C& x) {{ " + " ".join(f"ev::Direct<{tg}>::pass(o, x.{c});" for (_, _, _, c), tg in zip(fields, tags)) + " }",
+                      # (a place of the engine that is such a struct, or an entry of one: its fields by their names - ev::Field)
+                      "  template <class D, class C, class B> struct Fields {",
+                      *[f"    ev::Field<D, {tg}, C, B, decltype({q}::{c}), decltype(B::{n}), &{q}::{c}, &B::{n}> {n};" for (n, _, _, c), tg in zip(fields, tags)],
+                      "    explicit Fields(D* kern_d)" + (" : " + ", ".join(f"{n}(kern_d)" for n, _, _, _ in fields) if fields else "") + " { (void)kern_d; }",
+                      "  };",
                       "};"]
         return lines
 

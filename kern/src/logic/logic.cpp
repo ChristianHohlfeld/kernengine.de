@@ -2885,9 +2885,9 @@ bool Instance::bound_now(const Spot& s, std::string& function, std::vector<Value
   const std::size_t o = f && !f->value ? 1 : 0;  // (the output "result": a step's first after "then")
   function = e.def->type;
   t = o < e.out.size() ? TypeRef{e.out[o].type, e.out[o].of} : TypeRef{};
-  // (what the node was given when it ran - none before it ran: the place is not bound, and the engine
-  // says so as it says it of a handle of no object)
-  in = o < e.outputs.size() && e.outputs[o].type == PinType::structure && e.outputs[o].rows ? *e.outputs[o].rows : std::vector<Value>();
+  // (what the node was given when it ran - before it ran the place is bound to no object: the handle 0, and
+  // the engine says so as it says it of a handle of no object; check() sees to it that it ran)
+  in = o < e.outputs.size() && e.outputs[o].type == PinType::structure && e.outputs[o].rows ? *e.outputs[o].rows : std::vector<Value>{Value::integer(0)};
   std::vector<Value> out{zero_of(t, graph_)};
   const bool ok = rt_.host().engine(function + "@get", in, out);
   now = ok && !out.empty() ? std::move(out[0]) : zero_of(t, graph_);

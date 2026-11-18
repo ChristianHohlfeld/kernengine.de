@@ -18,6 +18,7 @@
 #include <unordered_map>
 
 #include "kern/logic/logic.h"
+#include "kern/logic/engine_api.h"
 #include "kern/logic/nodes.h"
 
 namespace kern::logic {
@@ -1164,6 +1165,11 @@ struct Writer {
   /// input of its function (logic::ref_key).
   std::string place_text(int x, int c, const std::string& prefix = {}) {
     std::string r = at(x).node->param(prefix + "variable");
+    if (prefix.empty() && !at(x).node->param("bound").empty()) {
+      // (a place of the engine: the output of the node that bound it - n12.result)
+      const EngineFunction* f = bound_function(s.g, *at(x).node);
+      r = "n" + at(x).node->param("bound") + "." + (f ? f->outputs[0].id : "result");
+    }
     std::vector<std::string> steps;
     if ((prefix.empty() && !names_place(*at(x).def)) || !path_steps(at(x).node->param(prefix + "path"), steps)) return r;
     std::size_t entry = 0;
@@ -1690,6 +1696,17 @@ struct Writer {
     const std::string base = x.def->memory && !x.event ? "kern::Node<" + id + ">" : std::string();
     if (x.def->type == "func.call") return x.node->param("function") + "Result n" + id + ";";
     if (member_fields(x).empty()) return base + " n" + id + ";";
+    if (const EngineFunction* f = engine_function(x.def->type); f && f->place) {
+      // (a place of the engine: its output is the place the node binds - engine_values::Place)
+      std::string type = x.def->type;
+      std::replace(type.begin(), type.end(), '.', '_');
+      std::string r;
+      for (int k : member_fields(x)) {
+        const PinDef& p = x.out[static_cast<std::size_t>(k)];
+        r += p.id == f->outputs[0].id ? type + "_place<" + cpp_type(TypeRef{p.type, p.of}) + "> " + p.id + " = {}; " : fields(x.out, {k}, g);
+      }
+      return "struct " + (base.empty() ? std::string() : ": " + base + " ") + "{ " + r + "} n" + id + ";";
+    }
     return "struct " + (base.empty() ? std::string() : ": " + base + " ") + "{ " + fields(x.out, member_fields(x), g) + "} n" + id + ";";
   }
   void doc(int ind, const std::string& help) {
@@ -2859,7 +2876,26 @@ struct Reader {
   /// everywhere a variable of the Blueprint.
   /// What a name is where the text stands: a local variable or an input of the function whose
   /// body it is, or a variable of the Blueprint (Graph::Root).
+  /// `name` is "n<id>.<output>" of a node already read that binds a place of the engine (EngineFunction::place):
+  /// its id, and in `out` the place (Graph::root_of, Root::bound). 0: it is none.
+  u32 bound_named(const std::string& name, Variable* out = nullptr) const {
+    const std::size_t dot = name.find('.');
+    const u32 id = dot == std::string::npos ? 0 : numbered(name.substr(0, dot), "n");
+    auto it = id ? declared.find(id) : declared.end();
+    if (it == declared.end()) return 0;
+    const EngineFunction* f = engine_function(made[static_cast<std::size_t>(it->second)].def->type);
+    if (!f || !f->place || name.substr(dot + 1) != f->outputs[0].id) return 0;
+    if (out) *out = Variable{name, f->outputs[0].type, {}, {}, f->outputs[0].of ? f->outputs[0].of : ""};
+    return id;
+  }
+  /// The same where the text stands: n<id> . <output> (then `name` is that).
+  u32 bound_ahead(std::string& name, std::size_t q = 0) const {
+    if (peek(q).kind != Tok::id || !is(".", q + 1) || peek(q + 2).kind != Tok::id) return 0;
+    name = peek(q).s + "." + peek(q + 2).s;
+    return bound_named(name);
+  }
   Graph::Root root_here(const std::string& name, Variable& out) const {
+    if (bound_named(name, &out)) return Graph::Root::bound;
     if (const FunctionPin* l = scope.function ? scope.function->local(name) : nullptr) {
       out = Variable{l->name, l->type, l->value, {}, l->of, l->count};
       return Graph::Root::local;
@@ -2880,6 +2916,7 @@ struct Reader {
   }
   /// The settings of a node that names it (a local variable or an input: with its function as "scope").
   std::vector<std::pair<std::string, std::string>> naming(const std::string& variable) const {
+    if (const u32 id = bound_named(variable)) return {{"bound", std::to_string(id)}};
     std::vector<std::pair<std::string, std::string>> r{{"variable", variable}};
     if (scope.function && (scope.function->local(variable) || scope.function->input(variable))) r.push_back({"scope", scope.function->name});
     return r;
@@ -2959,6 +2996,15 @@ struct Reader {
       if (is("*", q) && peek(q + 1).kind == Tok::id && peek(q + 1).s == "this" && is(",", q + 2)) q += 3;          // (the object its function runs on: runs_function)
       for (std::size_t k = 0; k < variables; ++k, q += 2) {
         Variable named;
+        if (std::string var; names_place(*def) && bound_ahead(var, q)) {
+          // (a place of the engine: n12.result and what follows it)
+          names.push_back(var);
+          const std::size_t name = q + 2;
+          q += 3;
+          if (!path_ahead(q, path) || !place_fits(var, path, p + name, false)) return -1;
+          --q;
+          continue;
+        }
         if (peek(q).kind != Tok::id || !variable_here(peek(q).s, named)) {
           fail(p + q, fname + " changes a variable: that variable is its first value - " + fname + "(Variable, ...) - not " + shown(peek(q)));
           return -1;
@@ -2979,7 +3025,8 @@ struct Reader {
       if (pd.kind == ParamDef::Kind::path) {
         if (!path.empty()) params.push_back({pd.key, path});
       } else if (pd.kind != ParamDef::Kind::scope) {
-        params.push_back({pd.key, pd.kind == ParamDef::Kind::variable ? names[v_at++] : given[g_at++]});
+        if (pd.kind == ParamDef::Kind::variable && bound_named(names[v_at])) params.push_back({"bound", std::to_string(bound_named(names[v_at++]))});
+        else params.push_back({pd.key, pd.kind == ParamDef::Kind::variable ? names[v_at++] : given[g_at++]});
       } else if (scope.function && !names.empty() && (scope.function->local(names.front()) || scope.function->input(names.front()))) {
         params.push_back({pd.key, scope.function->name});
       }
@@ -3168,6 +3215,14 @@ struct Reader {
     for (const ParamDef& pd : m.def->params) {
       if (pd.kind != ParamDef::Kind::variable) continue;
       const std::string name = m.node.param(pd.key);
+      if (const std::string bound = m.node.param("bound"); name.empty() && !bound.empty()) {
+        // (a place of the engine: n12.result and what follows it)
+        std::string var;
+        if (!a.more() || std::to_string(bound_ahead(var)) != bound) return fail(p, node_name(m.def->type) + ": the place n" + bound + " bound expected, not " + shown(peek()));
+        p += 3;
+        if (!place_rest(node)) return false;
+        continue;
+      }
       if (!a.more() || peek().kind != Tok::id || peek().s != name) return fail(p, node_name(m.def->type) + ": the variable " + name + " expected, not " + shown(peek()));
       ++p;
       if (names_place(*m.def) && !place_rest(node)) return false;
@@ -3232,6 +3287,20 @@ struct Reader {
       }
       if (accept("formula")) return formula(s.tok);
       fail(p, "kern::to<Type>(value) or kern::formula(...) expected, not kern::" + (peek().kind == Tok::id ? peek().s : shown(peek())));
+      return s;
+    }
+    if (std::string var; bound_ahead(var)) {
+      // (a place of the engine, read where it stands: n12.result[i].to)
+      p += 3;
+      std::size_t q = 0;
+      std::string path;
+      if (!path_ahead(q, path) || !place_fits(var, path, p - 1, false)) return s;
+      std::vector<std::pair<std::string, std::string>> params = naming(var);
+      if (!path.empty()) params.push_back({"path", path});
+      const int node = make("var.get", s.tok, std::move(params));
+      if (node < 0 || !place_rest(node)) return s;
+      s.node = node;
+      s.root = true;
       return s;
     }
     if (const u32 id = numbered(t.s, "n")) {
@@ -3709,6 +3778,16 @@ struct Reader {
       scope.first = false;
       return gone();
     }
+    if (std::string var; bound_ahead(var)) {
+      // a place of the engine: n12.result[i].to = value;   n12.result.Score += value;
+      p += 3;
+      const int node = place_step(var, at);
+      if (node < 0) return {};
+      enter(in, node, "", at);
+      const Src s = value();
+      if (failed() || !bind(node, data_inputs(node).front(), s) || !expect(";")) return {};
+      return {out(node, 0)};
+    }
     // n<id>.value = (Variable = value);   a Set / Add whose result is read
     if (numbered(t.s, "n") && is(".", 1) && is("=", 3) && is("(", 4)) {
       const u32 id = numbered(t.s, "n");
@@ -3716,8 +3795,9 @@ struct Reader {
       p += 5;
       const std::size_t name = p;
       std::string var;
-      if (!word(var, "a variable")) return {};
-      if (Variable named; !variable_here(var, named)) { fail(name, "\"" + var + "\" is no variable: n<id>.value = (Variable = value); keeps what a Set gave"); return {}; }
+      if (bound_ahead(var)) p += 3;  // (a place of the engine: n12.result[i].to)
+      else if (!word(var, "a variable")) return {};
+      else if (Variable named; !variable_here(var, named)) { fail(name, "\"" + var + "\" is no variable: n<id>.value = (Variable = value); keeps what a Set gave"); return {}; }
       const int node = place_step(var, at);  // n<id>.value = (Variable = value);   ... (Place.Field = value);
       if (node < 0 || !declare(id, node, at)) return {};
       enter(in, node, "", at);
