@@ -26,7 +26,7 @@ int failures = 0, checks = 0;
 
 // The allocator says every piece of memory it is asked for (cost.h): with the sanitizers, their
 // allocator through its hook; without them, operator new itself.
-#if defined(__SANITIZE_ADDRESS__)
+#if defined(SC_ASAN)
 // (the sanitizers' own interface - sanitizer/allocator_interface.h, where a compiler brings that header)
 extern "C" int __sanitizer_install_malloc_and_free_hooks(void (*asked)(const volatile void*, std::size_t), void (*given_back)(const volatile void*));
 // (and what it gives is zeroed: what C++ leaves open in an object that nothing sets is then the zero the
