@@ -1080,7 +1080,10 @@ inline std::vector<Value> samples(PinType t, std::size_t count = 0) {
       for (Vec3 v : {Vec3{0, 0, 0}, Vec3{1, 0, 0}, Vec3{0, -2, 0}, Vec3{1.5f, 2.5f, -3.5f}, Vec3{1000, 0.001f, 7}}) r.push_back(Value::vector(v));
       break;
     case PinType::text:
-      for (const char* v : {"", "a", "Kern", "hello world", "a \"b\" \\ c\n\ttab", "\xC3\xA4\xE2\x82\xAC"}) r.push_back(Value::text(v));
+      // (and texts C reads numbers from: signs, exponents, hexadecimal, inf and nan, what is beyond the ends)
+      for (const char* v : {"", "a", "Kern", "hello world", "a \"b\" \\ c\n\ttab", "\xC3\xA4\xE2\x82\xAC", " -12.5e3x 7", "0x1Fp-2,0b101 -0", "nan(0x7f) inf 99999999999999999999",
+                            "x=1.5%017,3 4"})
+        r.push_back(Value::text(v));
       break;
     case PinType::actor:
       for (logic::ActorRef v : {0u, 1u, 42u}) r.push_back(Value::actor(v));

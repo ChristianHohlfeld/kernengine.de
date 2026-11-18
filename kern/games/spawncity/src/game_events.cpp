@@ -295,9 +295,10 @@ void Game::update_scores(f32 dt) {
   const f32 now = world_->sim_time();
   const i32 stars = wanted::stars();
   auto pop = [&](const std::string& t) { if (!t.empty()) { C.pop = t; C.pop_at = now; } };
-  auto award = [&](i32 pts, const char* label) {
+  // (a label of none - an award without a word on the screen - is the empty one)
+  auto award = [&](i32 pts, std::string_view label) {
     C.chaos.award(pts, now);
-    if (label) pop(C.chaos.combo > 1 ? std::string(label) + "  x" + std::to_string(C.chaos.combo) : std::string(label));
+    if (!label.empty()) pop(C.chaos.combo > 1 ? std::string(label) + "  x" + std::to_string(C.chaos.combo) : std::string(label));
   };
   std::vector<People::Death> deaths;
   people_.take_deaths(deaths);
@@ -320,10 +321,10 @@ void Game::update_scores(f32 dt) {
         award(enemy_spec(t).score, t == EnemyType::cop ? "TAKEDOWN!" : t == EnemyType::swat ? "SWAT DOWN!" : "HEAVY DOWN!!");
         break;
       }
-      case People::Kind::soldier: award(40, nullptr); break;
+      case People::Kind::soldier: award(40, {}); break;
       case People::Kind::citizen:
       case People::Kind::officer:
-        award(40, nullptr);
+        award(40, {});
         pop(C.fun.apply(FunEvent::world_kill_person, now, stars));
         break;
     }

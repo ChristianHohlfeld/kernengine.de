@@ -173,11 +173,12 @@ f32 follow_phase(f32 mine, f32 authority) {
 }
 
 bool parse_time(const char* text, f32& phase) {
-  while (*text == ' ') ++text;
-  if (!*text) return false;
+  std::size_t at = 0;  // (where the reading stands)
+  while (text[at] == ' ') ++at;
+  if (!text[at]) return false;
   char* end = nullptr;
-  const f64 a = std::strtod(text, &end);
-  if (end == text) return false;
+  const f64 a = std::strtod(text + at, &end);
+  if (end == text + at) return false;
   if (*end == ':') {
     const f64 m = std::strtod(end + 1, &end);
     if (a < 0 || a > 24 || m < 0 || m >= 60) return false;

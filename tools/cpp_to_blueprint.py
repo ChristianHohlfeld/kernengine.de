@@ -191,6 +191,59 @@ def f32_decimal(x):
     return f
 
 
+# What sscanf reads with a format, as Scan Text has it (logic::scan::plan, nodes.h): the C type each value
+# it gives is written into and the Blueprint type of the value - None: a format Scan Text does not know.
+SCAN_WIDE = ("l", "q", "j", "z", "t")
+
+
+# C's functions that read a number from a C string: (what they read, how many arguments) - text_parse_*
+C_PARSE = {"atof": ("double", 1), "strtod": ("double", 2), "strtof": ("float", 2), "atoi": ("int", 1), "atol": ("long", 1), "atoll": ("long", 1), "strtol": ("long", 3),
+           "strtoll": ("long", 3), "strtoul": ("unsigned", 3), "strtoull": ("unsigned", 3)}
+# (the C types of 32 bits and less a whole number is cut to)
+NARROW_WHOLE = ("int", "unsigned int", "short", "unsigned short", "signed char", "unsigned char", "char")
+
+
+def scan_plan(fmt):
+    out, at = [], 0
+    while at < len(fmt):
+        if fmt[at] != "%":
+            at += 1
+            continue
+        m = re.match(r"%(\*?)(\d*)(hh|h|ll|l|q|L|j|z|t)?([diuoxXbnfFeEgGaAs%]|\[)", fmt[at:])
+        if not m:
+            return None
+        at += m.end()
+        suppress, size, conv = m.group(1) == "*", m.group(3) or "", m.group(4)
+        size = {"hh": "H", "ll": "q", "L": "q" if conv in "diuoxXbn" else "L"}.get(size, size)
+        if conv == "[":
+            if size:
+                return None
+            if at < len(fmt) and fmt[at] == "^":
+                at += 1
+            if at < len(fmt) and fmt[at] in "]-":
+                at += 1
+            close = fmt.find("]", at)
+            if close < 0:
+                return None
+            at = close + 1
+        if conv in "fFeEgGaA" and size not in ("", "l"):
+            return None
+        if conv == "s" and size:
+            return None
+        if suppress or conv == "%":
+            continue
+        width = int(m.group(2)) if m.group(2) else 0
+        if conv in "fFeEgGaA":
+            out.append(("double" if size == "l" else "float", "Float", width))
+        elif conv in "s[":
+            out.append(("char[]", "Text", width))
+        else:
+            signed = conv in "din"
+            c = {"H": "signed char" if signed else "unsigned char", "h": "short" if signed else "unsigned short", "": "int" if signed else "unsigned int"}.get(size)
+            out.append((c, "Int", width) if c else ("long" if signed else "unsigned long", "Int64", width))
+    return out if len(out) <= 16 else None
+
+
 def text_literal(s):
     out = []
     for ch in (s if isinstance(s, bytes) else s.encode("utf-8")):
@@ -2567,6 +2620,15 @@ class Const:
                 return t + "{" + ", ".join(self.literal(c, it) for c in args) + "}"
             if k == "CXXStdInitializerListExpr":
                 return self.literal(kids(n)[0], t)
+            if k == "StringLiteral" and it == "Int":
+                # `constexpr char kDigits[] = "0123";` - an array of characters: its bytes and the zero after them
+                # (as many as the array has), each as a char holds it (signed: from -128)
+                raw = c_string(n["value"])
+                m = re.search(r"\[(\d+)\]", qtype(n))
+                size = int(m.group(1)) if m else len(raw) + 1
+                held = list(raw[:size]) + [0] * max(0, size - len(raw))
+                signed = not re.search(r"\bunsigned\b", qtype(n))
+                return t + "{" + ", ".join(str(x - 256 if signed and x >= 128 else x) for x in held) + "}"
             raise Wait(f"a list constant written as {k}")
         raise Wait(f"a constant of type {t}")
 
@@ -2624,6 +2686,7 @@ class Emit:
         self.result_struct = None
         self.homes = {}       # decl id of an iterator (or of what insert() gave) -> the list it goes through
         self.pointers = {}    # decl id of a parameter that is a pointer into a list -> (the list's input, the place's input, the entries' type)
+        self.text_ptrs = {}   # decl id of a local pointer into a text (char* end of strtod) -> {"text": the text, "at": the Int of its place}
         self.assigned_ids = set()   # (the variables the body changes - see assigned)
         self.keyed_vars = {}  # decl id of a name for an entry of a map or a set (a loop's variable, `auto& [k, v]`) -> (the map or set, its place)
         self.serial = 0       # the number of the statement being written (see `slot`)
@@ -3043,6 +3106,8 @@ class Emit:
                     return   # (read as a text)
                 if above.get("kind") == "CallExpr" and callee_name(above) == "snprintf" and len(kids(above)) > 1 and kids(above)[1] is up:
                     return   # (written by snprintf)
+                if above.get("kind") == "CallExpr" and callee_name(above) == "sscanf" and any(x is up for x in kids(above)[3:]):
+                    return   # (a word sscanf reads into it)
                 ok = False
                 return
             for c in kids(n):
@@ -3841,6 +3906,10 @@ class Emit:
                 if alias is not None:
                     out += self.take_pre() + alias
                     continue
+                end_pointer = self.text_pointer_local(v)
+                if end_pointer is not None:
+                    out += end_pointer
+                    continue
                 if v.get("id") in self.named_places:
                     # (a name for a place: written out where it is used - what making the place does, a new row of a map, is done here)
                     if any(x.get("kind") == "CXXOperatorCallExpr" and self.is_slot(x) for x in walk(kids(v)[-1])):
@@ -4086,6 +4155,367 @@ class Emit:
 
     def reads(self, n):
         return {x.get("referencedDecl", {}).get("id") for x in walk(n) if x.get("kind") == "DeclRefExpr"}
+
+    # ---- texts as std::string and std::string_view read them ----
+    TEXT_FIND = {"find": 0, "rfind": -1, "find_first_of": 0, "find_last_of": -1, "find_first_not_of": 0, "find_last_not_of": -1}
+
+    @staticmethod
+    def given(x):
+        """Is this argument written in the call (not the default of the declaration)?"""
+        return x is not None and bare(x).get("kind") != "CXXDefaultArgExpr"
+
+    def text_or_char(self, x):
+        """A text an argument is: a text - or one character, a char (a character written out is a text written out)."""
+        b = self.unwrap(x)
+        if b.get("kind") == "CharacterLiteral":
+            return text_literal(bytes([int(b["value"]) & 0xFF]))
+        return self.text_piece(x)
+
+    def text_member(self, b, base, name, a):
+        """A value std::string or std::string_view gives (find, rfind, find_*_of, substr, starts_with, ends_with,
+        at, front, back, compare as a sign): (text, type) - None: not one of these. A place in a text is an
+        Int; npos is -1, as a size_t is held read with its sign."""
+        if name in self.TEXT_FIND:
+            # (what, from = 0 or npos) - the form with a count of the characters of a const char* has a third
+            if not 1 <= len(a) <= 2:
+                raise Wait(f"text: {name}() of so many characters of a const char*")
+            frm = self.ex(a[1], "Int") if len(a) == 2 and self.given(a[1]) else str(self.TEXT_FIND[name])
+            return f"text_{name}({self.ex(base, 'Text')}, {self.text_or_char(a[0])}, {frm})", "Int"
+        if name == "substr" and len(a) <= 2:
+            at = self.ex(a[0], "Int") if a and self.given(a[0]) else "0"
+            count = self.ex(a[1], "Int") if len(a) == 2 and self.given(a[1]) else "-1"
+            return f"text_sub({self.ex(base, 'Text')}, {at}, {count})", "Text"
+        if name in ("starts_with", "ends_with") and len(a) == 1:
+            return f"text_{name}({self.ex(base, 'Text')}, {self.text_or_char(a[0])})", "Bool"
+        if name == "at" and len(a) == 1:
+            return self.char_of(self.ex(base, "Text"), self.ex(a[0], "Int"), qtype(b)), "Int"
+        if name == "front" and not a:
+            return self.char_of(self.ex(base, "Text"), "0", qtype(b)), "Int"
+        if name == "back" and not a:
+            t = self.ex(base, "Text")
+            return self.char_of(t, self.whole_math("-", f"text_length({t})", "1"), qtype(b)), "Int"
+        if name == "compare":
+            raise Wait("the value of compare() of a text other than against 0 (C++ says only its sign)")
+        return None
+
+    # ---- C strings: a text at a place (s.c_str() + k), read as C reads it ----
+    def char_pointer(self, n):
+        """Is this a pointer to characters (char*, const char*)?"""
+        return re.fullmatch(r"(?:const\s+)?char\s*\*(?:\s*const)?", self.u.clean(qtype(n)).strip()) is not None
+
+    def stable_text(self, n):
+        """A text a C string is read from, named where it stands - one that is no place is held in a local first
+        (it is read several times: it stays the same)."""
+        got = self.spot(n)
+        if got is not None and got[1] == "Text":
+            return got[0]
+        b = self.unwrap(n)
+        if b.get("kind") == "DeclRefExpr" and b.get("referencedDecl", {}).get("id") in self.names and self.types.get(b["referencedDecl"]["id"]) == "Text":
+            return self.names[b["referencedDecl"]["id"]]
+        if b.get("kind") == "StringLiteral":
+            return self.ex(b, "Text")
+        held = self.temp("text", "Text")
+        self.hoist([f"{held} = {self.ex(n, 'Text')};"])
+        return held
+
+    def c_text(self, n):
+        """A C string at a place of a text: (the text, the place) - `s.c_str() + k`, `s.data()` of a std::string, a
+        pointer into a text (`end` that strtod set), a const char*, a text written out, a text buffer."""
+        b = self.unwrap(n)
+        while b.get("kind") == "ParenExpr" and kids(b):
+            b = self.unwrap(kids(b)[0])
+        k = b.get("kind")
+        if k == "BinaryOperator" and b.get("opcode") in ("+", "-") and self.char_pointer(kids(b)[0]) and not self.char_pointer(kids(b)[1]):
+            text, at = self.c_text(kids(b)[0])
+            return text, self.whole_math(b["opcode"], at, self.ex(kids(b)[1], "Int"))
+        if k == "CXXMemberCallExpr" and callee(b).get("name") in ("c_str", "data") and len(kids(b)) == 1 and kids(callee(b)):
+            base = kids(callee(b))[0]
+            if "string_view" in self.u.clean(qtype(base)):
+                raise Wait("the characters of a std::string_view as a C string (C reads on past the view's end, to a zero)")
+            return self.stable_text(base), "0"
+        if k == "DeclRefExpr" and b.get("referencedDecl", {}).get("id") in self.text_ptrs:
+            held = self.text_ptrs[b["referencedDecl"]["id"]]
+            if held["text"] is None:
+                raise Wait("a pointer into a text read before it points into one")
+            return held["text"], held["at"]
+        if self.tp_or_none(b) == "Text":
+            return self.stable_text(b), "0"
+        raise Wait("a C string that is no text at a place")
+
+    def is_c_text(self, n):
+        """Does `n` name a C string at a place of a text (c_text) - without writing anything?"""
+        b = self.unwrap(n)
+        while b.get("kind") == "ParenExpr" and kids(b):
+            b = self.unwrap(kids(b)[0])
+        k = b.get("kind")
+        if not self.char_pointer(b):
+            return False
+        if k == "BinaryOperator" and b.get("opcode") in ("+", "-") and len(kids(b)) == 2:
+            return self.is_c_text(kids(b)[0]) and not self.char_pointer(kids(b)[1])
+        if k == "CXXMemberCallExpr":
+            return callee(b).get("name") in ("c_str", "data") and len(kids(b)) == 1
+        if k == "DeclRefExpr":
+            i = b.get("referencedDecl", {}).get("id")
+            return i in self.text_ptrs or self.types.get(i) == "Text"
+        return False
+
+    def text_of_bytes(self, ptr, count):
+        """`reinterpret_cast<const char*>(bytes.data) + at` and a count: Text of Bytes of that list at that place -
+        None: the characters are no bytes of a list."""
+        b = self.unwrap(ptr)
+        while b.get("kind") == "ParenExpr" and kids(b):
+            b = self.unwrap(kids(b)[0])
+        steps = []
+        while b.get("kind") == "BinaryOperator" and b.get("opcode") in ("+", "-") and len(kids(b)) == 2 and self.char_pointer(kids(b)[0]):
+            steps.append((b["opcode"], kids(b)[1]))
+            b = self.unwrap(kids(b)[0])
+            while b.get("kind") == "ParenExpr" and kids(b):
+                b = self.unwrap(kids(b)[0])
+        if b.get("kind") not in ("CXXReinterpretCastExpr", "CStyleCastExpr") or not kids(b) or not self.char_pointer(b):
+            return None
+        inner = kids(b)[0]
+        if not re.fullmatch(r"(?:unsigned\s+char|signed\s+char|char|std::byte)\s*\*", self.u.clean(qtype(inner)).strip()):
+            return None   # (a pointer to bytes: clean has taken its const away)
+        try:
+            lst, at = self.place(inner)
+        except Wait:
+            return None
+        if self.tp(lst) != "List<Int>":
+            return None
+        for op, k in reversed(steps):
+            at = self.whole_math(op, at, self.ex(k, "Int"))
+        return f"text_of_bytes({self.place_arg(lst, 'List<Int>', 'const', [])}, {at}, {self.ex(count, 'Int')})"
+
+    def text_range(self, first, last):
+        """`text.begin(), text.end()` of one text (std::string, std::string_view): the text - None: no such range."""
+        ends = []
+        for x, want in ((first, ("begin", "cbegin")), (last, ("end", "cend"))):
+            b = self.unwrap(x)
+            while b.get("kind") in ("CXXConstructExpr", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr") and len(kids(b)) == 1:
+                b = self.unwrap(kids(b)[0])
+            if b.get("kind") != "CXXMemberCallExpr" or callee(b).get("name") not in want or len(kids(b)) != 1 or not kids(callee(b)):
+                return None
+            base = kids(callee(b))[0]
+            if self.tp_or_none(base) != "Text" or any(y.get("kind") not in ("DeclRefExpr", "MemberExpr", "ImplicitCastExpr", "CXXThisExpr", "ParenExpr") for y in walk(base)):
+                return None
+            ends.append(base)
+        # (one text: both ends name the same place - a variable, a field, an entry - as the notation writes it)
+        a, b = self.ex(ends[0], "Text"), self.ex(ends[1], "Text")
+        if a != b or not re.fullmatch(r"[\w.\[\]]+", a):
+            return None
+        return a
+
+    def text_pointer_local(self, v):
+        """`char* end = nullptr;` - a pointer into a text that C's strtod / strtol set (`&end`): a place in that
+        text (an Int, named like it), the text the call read. Every use of it is a C string at that place, a
+        character read there, or its place compared or subtracted - None: `v` is no such pointer."""
+        if not re.fullmatch(r"(?:const\s+)?char\s*\*", self.u.clean(qtype(v)).strip()):
+            return None
+        init = kids(v)[-1] if kids(v) and v.get("init") else None
+        if init is not None and not self.nothing(init):
+            return None
+        set_by = [x for x in walk(self.f.decl) if x.get("kind") == "CallExpr" and callee_name(x) in C_PARSE and len(kids(x)) >= 3
+                  and self.unwrap(kids(x)[2]).get("kind") == "UnaryOperator" and self.unwrap(kids(x)[2]).get("opcode") == "&"
+                  and self.refers(kids(self.unwrap(kids(x)[2]))[0], v["id"])]
+        if not set_by:
+            return None
+        name = self.local(v, "Int")
+        del self.names[v["id"]]
+        self.text_ptrs[v["id"]] = {"text": None, "at": name}
+        return [f"{name} = 0;"]
+
+    def end_into(self, end, text, place):
+        """`&end` of strtod: the pointer `end` is the place `place` of `text` from here on."""
+        e = self.unwrap(end)
+        target = self.unwrap(kids(e)[0]) if e.get("kind") == "UnaryOperator" and e.get("opcode") == "&" and kids(e) else {}
+        i = target.get("referencedDecl", {}).get("id") if target.get("kind") == "DeclRefExpr" else None
+        if i not in self.text_ptrs:
+            raise Wait("an end pointer of strtod that is no local pointer into the text")
+        held = self.text_ptrs[i]
+        if held["text"] is not None and held["text"] != text:
+            raise Wait("a pointer into a text that points into another")
+        held["text"] = text
+        self.hoist([f"{held['at']} = {place};"])
+
+    def text_pointer_value(self, b):
+        """What a C string at a place gives, as a value - a character read there (*p, p[i]), two places of a text
+        compared or subtracted, the text from the place on (a C string handed on as a text) - None: `b` is
+        none of these."""
+        k = b.get("kind")
+        order = None   # (two texts in their order: a < b as C++ writes it - with C++20's <=>, or the operator itself)
+        if k == "BinaryOperator" and b.get("opcode") in ("<", ">", "<=", ">=") and len(kids(b)) == 2:
+            x = self.unwrap(kids(b)[0])
+            if x.get("kind") == "CXXOperatorCallExpr" and callee_name(x) == "operator<=>" and len(kids(x)) == 3:
+                order = (b["opcode"], kids(x)[1], kids(x)[2])
+        if k == "CXXOperatorCallExpr" and callee_name(b) in ("operator<", "operator>", "operator<=", "operator>=") and len(kids(b)) == 3:
+            order = (callee_name(b)[8:], kids(b)[1], kids(b)[2])
+        if k == "BinaryOperator" and b.get("opcode") in COMPARE and len(kids(b)) == 2:
+            # a.compare(b) against 0: C++ says its sign - the order of the two texts (== and < of them)
+            x, zero = self.unwrap(kids(b)[0]), self.unwrap(kids(b)[1])
+            if (x.get("kind") == "CXXMemberCallExpr" and callee(x).get("name") == "compare" and len(kids(x)) == 2 and kids(callee(x))
+                    and self.tp_or_none(kids(callee(x))[0]) == "Text" and zero.get("kind") == "IntegerLiteral" and int(zero.get("value", "1")) == 0):
+                op = b["opcode"]
+                p, q = self.ex(kids(callee(x))[0], "Text"), self.text_or_char(kids(x)[1])
+                if op in ("==", "!="):
+                    same = f"text_equal({p}, {q})"
+                    return (same if op == "==" else f"logic_not({same})"), "Bool"
+                return {"<": f"text_less({p}, {q})", ">": f"text_less({q}, {p})", "<=": f"logic_not(text_less({q}, {p}))", ">=": f"logic_not(text_less({p}, {q}))"}[op], "Bool"
+        if order is not None and self.tp_or_none(order[1]) == "Text" and self.tp_or_none(order[2]) == "Text":
+            op, x, y = order
+            p, q = self.ex(x, "Text"), self.ex(y, "Text")
+            return {"<": f"text_less({p}, {q})", ">": f"text_less({q}, {p})", "<=": f"logic_not(text_less({q}, {p}))", ">=": f"logic_not(text_less({p}, {q}))"}[op], "Bool"
+        if k == "UnaryOperator" and b.get("opcode") == "*" and kids(b) and self.is_c_text(kids(b)[0]):
+            text, at = self.c_text(kids(b)[0])
+            return self.char_of(text, at, qtype(b)), "Int"
+        if k == "ArraySubscriptExpr" and len(kids(b)) == 2 and self.is_c_text(kids(b)[0]) and not self.text_buffer_of(kids(b)[0]):
+            text, at = self.c_text(kids(b)[0])
+            return self.char_of(text, self.whole_math("+", at, self.ex(kids(b)[1], "Int")), qtype(b)), "Int"
+        if k == "BinaryOperator" and len(kids(b)) == 2 and self.char_pointer(kids(b)[0]) and self.char_pointer(kids(b)[1]):
+            x, y = kids(b)
+            if not (self.is_c_text(x) and self.is_c_text(y)):
+                return None
+            (tx, ax), (ty, ay) = self.c_text(x), self.c_text(y)
+            if tx != ty:
+                raise Wait("places of two texts compared (pointers into different texts)")
+            op = b["opcode"]
+            if op == "-":
+                return self.whole_math("-", ax, ay), "Int"
+            if op in COMPARE:
+                return f'math_compare<"{op}">({self.cast("Float", ax)}, {self.cast("Float", ay)})', "Bool"
+            return None
+        if k == "BinaryOperator" and b.get("opcode") in ("+", "-") and self.is_c_text(b):
+            text, at = self.c_text(b)
+            return f"text_sub({text}, {at}, -1)", "Text"
+        if k == "DeclRefExpr" and b.get("referencedDecl", {}).get("id") in self.text_ptrs:
+            text, at = self.c_text(b)
+            return f"text_sub({text}, {at}, -1)", "Text"
+        if k in CAST and kids(b) and self.is64(b):
+            # a whole number C read as a 64-bit pattern (an i64, a u64): its 64 bits, as C gives them
+            inner = self.unwrap(kids(b)[-1])
+            if inner.get("kind") == "CallExpr" and callee_name(inner) in C_PARSE and C_PARSE[callee_name(inner)][0] in ("long", "unsigned") and not self.own(callee(inner).get("referencedDecl", {}).get("id")):
+                return self.parsed(inner, callee_name(inner), kids(inner)[1:], bits=True)
+        if k in CAST and kids(b) and self.ctype(b) in NARROW_WHOLE:
+            # a whole number C read cut to 32 bits or less: of its 64 bits (exact, as C cuts them)
+            inner = self.unwrap(kids(b)[-1])
+            if inner.get("kind") == "CallExpr" and callee_name(inner) in C_PARSE and C_PARSE[callee_name(inner)][0] in ("long", "unsigned") and not self.own(callee(inner).get("referencedDecl", {}).get("id")):
+                bits = self.parsed(inner, callee_name(inner), kids(inner)[1:], bits=True)[0]
+                return self.narrow(f"int64_low({bits})", "unsigned int", self.ctype(b), None), "Int"
+        return None
+
+    def parsed(self, b, name, a, bits=False):
+        """atof, atoi, strtod, strtol ... of a C string at a place: Parse Float / Parse Int there - its value as
+        the C type of the call holds it (`bits`: the 64 bits of a whole number), and where C's end pointer
+        (`&end`) stands after it."""
+        kind = C_PARSE[name][0]
+        text, at = self.c_text(a[0])
+        if kind in ("double", "float"):
+            call = f"text_parse_float{'32' if kind == 'float' else ''}({text}, {at})"
+        else:
+            base = self.ex(a[2], "Int") if len(a) == 3 else "10"
+            call = f"text_parse_{'uint' if kind == 'unsigned' else 'int'}({text}, {at}, {base})"
+        if len(a) >= 2 and not self.nothing(a[1]):
+            self.end_into(a[1], text, f"{call}.end")
+        if kind in ("double", "float"):
+            return f"{call}.value", "Float"
+        if bits:
+            return f"{call}.value", "Int64"
+        if kind == "int":   # (atoi: the long strtol reads, cut to an int)
+            return self.narrow(f"int64_low({call}.value)", "unsigned int", "int", None), "Int"
+        return f"int64_to_int({call}.value)", "Int"   # (a long: its bits read with their sign, as a Blueprint holds every long)
+
+    def scanned(self, a, used=True):
+        """sscanf(s, "%f %d", &x, &y): Scan Text at the place the C string stands - one step, after it the
+        variables it writes get the values it read (each what it had where the scan does not reach it).
+        Gives the count, as sscanf does."""
+        text, at = self.c_text(a[0])
+        f = self.unwrap(a[1])
+        while f.get("kind") in CAST and kids(f):
+            f = self.unwrap(kids(f)[-1])
+        if f.get("kind") != "StringLiteral":
+            raise Wait("a format of sscanf that is not written out (Scan Text has its format as a setting)")
+        raw = c_string(f["value"])
+        fmt = raw.decode("latin-1") if isinstance(raw, bytes) else raw
+        plan = scan_plan(fmt)
+        if plan is None:
+            raise Wait("a format Scan Text does not know (d i u o x b f e g a s [ n %, widths, *, hh h l ll j z t)")
+        targets = a[2:]
+        if len(targets) != len(plan):
+            raise Wait("a format of sscanf whose conversions are not its values")
+        befores, stores = [], []
+        for (c, t, width), x in zip(plan, targets):
+            e = self.unwrap(x)
+            if t == "Text":
+                n = self.text_buffer_of(x)
+                d = e
+                while d.get("kind") in ("ImplicitCastExpr", "ParenExpr") and kids(d):
+                    d = kids(d)[0]
+                if n is None or d.get("kind") != "DeclRefExpr":
+                    raise Wait("a word sscanf reads into something else than a buffer of characters")
+                if not 0 < width < n:
+                    raise Wait("a word sscanf reads with no width that fits its buffer (it may run past it)")
+                name = self.names[d["referencedDecl"]["id"]]
+                befores.append(name)
+                stores.append((None, name))
+                continue
+            if not (e.get("kind") == "UnaryOperator" and e.get("opcode") == "&" and kids(e)):
+                raise Wait("a value sscanf writes through something else than the address of a place")
+            place = kids(e)[0]
+            have = self.u.clean(qtype(place)).replace("const ", "").strip()
+            have = {"whole64u": "unsigned long", "whole64s": "long", "long long": "long", "unsigned long long": "unsigned long"}.get(have, have)
+            if have != c and not (c == "char" and have in ("signed char", "char")):
+                raise Wait(f"a value sscanf writes into a {have} where its format says {c}")
+            if t == "Int64" and self.tp(place) == "Int":
+                # (a long long the program counts with - not a bit pattern: its 64 bits as an Int holds them)
+                befores.append(f"int64_of_int({self.ex(place, 'Int')})")
+                stores.append((place, "Int64>Int"))
+                continue
+            if self.tp(place) != t:
+                raise Wait(f"a value sscanf writes as {t} into a {self.tp(place)}")
+            befores.append(self.ex(place, t))
+            stores.append((place, t))
+        if not used and not plan:
+            self.hoist(self.take_pre() + [f"text_scan<{text_literal(raw)}>({', '.join([text, at])});"])
+            return "0"
+        node = self.u.next_node
+        self.u.next_node += 1
+        fields = ["Int count = 0;"] + [f"{t} v{k} = {ZERO[t]};" for k, (_, t, _) in enumerate(plan)]
+        self.u.members.append(f"  struct {{ {' '.join(fields)} }} n{node};")
+        lines = self.take_pre() + [f"text_scan<{text_literal(raw)}>({', '.join([f'n{node}', text, at] + befores)});"]
+        for k, (place, t) in enumerate(stores):
+            if place is None:
+                lines.append(f"{t} = n{node}.v{k};")
+            elif t == "Int64>Int":
+                lines += self.store(place, self.typed(f"int64_to_int(n{node}.v{k})", "Int"))
+            else:
+                lines += self.store(place, self.typed(f"n{node}.v{k}", t))
+        self.hoist(lines)
+        return f"n{node}.count"
+
+    def text_step(self, base, name, a):
+        """A std::string changed where it stands (clear, push_back, pop_back, append, insert, erase, replace, assign):
+        the text the step makes, set at its place (Insert, Erase, Replace Text - the text handed on, changed there)."""
+        t = self.ex(base, "Text")
+        given = [x for x in a if self.given(x)]
+        if name == "clear" and not given:
+            return self.store(base, lambda _t: '""')
+        if name == "push_back" and len(a) == 1:
+            return self.store(base, lambda _t: f'text_append({t}, {self.text_or_char(a[0])}, "")')
+        if name == "reserve" and len(a) == 1 and self.given(a[0]):
+            return self.store(base, lambda _t: f"text_reserve({t}, {self.ex(a[0], 'Int')})")
+        if name == "pop_back" and not a:
+            return self.store(base, lambda _t: f"text_erase({t}, {self.whole_math('-', f'text_length({t})', '1')}, 1)")
+        if name in ("append", "assign") and len(a) == 1 and self.tp_or_none(a[0]) == "Text":
+            value = f'text_append({t}, {self.ex(a[0], "Text")}, "")' if name == "append" else self.ex(a[0], "Text")
+            return self.store(base, lambda _t: value)
+        if name == "insert" and len(a) == 2 and self.numeric(a[0]) and self.tp_or_none(a[1]) == "Text":
+            return self.store(base, lambda _t: f"text_insert({t}, {self.ex(a[0], 'Int')}, {self.ex(a[1], 'Text')})")
+        if name == "erase" and len(a) == 2 and all(self.numeric(x) or not self.given(x) for x in a):
+            at = self.ex(a[0], "Int") if self.given(a[0]) else "0"
+            count = self.ex(a[1], "Int") if self.given(a[1]) else "-1"
+            return self.store(base, lambda _t: f"text_erase({t}, {at}, {count})")
+        if name == "replace" and len(a) == 3 and self.numeric(a[0]) and self.numeric(a[1]) and self.tp_or_none(a[2]) == "Text":
+            return self.store(base, lambda _t: f"text_replace({t}, {self.ex(a[0], 'Int')}, {self.ex(a[1], 'Int')}, {self.ex(a[2], 'Text')})")
+        raise Wait(f"text: {name}() as a step")
 
     def char_of(self, text, index, raw):
         """The byte of a text at an index as the C++ type `raw` holds it: a char (signed here, as on every
@@ -4453,6 +4883,9 @@ class Emit:
                 return self.formatted(n)
             if name == "fprintf" and len(kids(n)) >= 3 and re.search(r"\bstderr\b", self.tree.source(kids(n)[1])):
                 return self.logged(n)
+            if name == "sscanf" and len(kids(n)) >= 3 and not self.own(ref.get("id")):
+                self.scanned(kids(n)[1:], used=False)   # (what it gives - the count - nobody reads)
+                return self.take_pre()
             d = self.engine_decl(ref.get("id"))
             if d is not None:
                 return self.engine(d, None, kids(n)[1:])[0]
@@ -4571,7 +5004,14 @@ class Emit:
                     return before + [f"list_remove_at({lv}, kern::to<Int>(kern::formula([](Float n) -> Float {{ return n - 1.0; }}, kern::to<Float>(list_length<{it}>({lv})))));"] + after
                 if name == "reserve":   # (room for that many entries: one request for memory, as in C++)
                     return before + [f"list_reserve({lv}, {self.ex(args[0], 'Int')});"] + after
+                if name == "insert" and len(args) == 3 and it == "Int" and self.text_range(args[1], args[2]) is not None:
+                    # bytes.insert(at, text.begin(), text.end()): the bytes of the text there (Insert Text Bytes)
+                    text = self.text_range(args[1], args[2])
+                    _, at = self.place(args[0])
+                    return before + self.take_pre() + [f"list_insert_text({lv}, {at}, {text});"] + after
                 return before + self.list_step(name, base, lv, it, args) + after
+            if base is not None and not self.is_this(base) and self.tp_or_none(base) == "Text":
+                return self.text_step(base, name, kids(n)[1:])
             raise Wait(f"call: {name}() of an object")
         raise Wait(f"a statement: {k}")
 
@@ -6532,6 +6972,9 @@ class Emit:
         k = b.get("kind")
         if k == "_Text":
             return b["_text"], b["_type"]
+        got = self.text_pointer_value(b)
+        if got is not None:
+            return got
         e = self.keyed_entry(b) or (self.keyed_entry(self.entry_of(b)) if self.entry_of(b) is not None else None)
         if e is not None:   # an entry of a set: its key; of a map: its key and value are read each by itself
             if self.keyed(e[0])[0] == "set":
@@ -6622,6 +7065,9 @@ class Emit:
         if k == "DeclRefExpr":
             ref = b.get("referencedDecl", {})
             i = ref.get("id")
+            if ref.get("name") == "npos" and (re.search(r"\bbasic_string(?:_view)?\b|\bstring(?:_view)?\b|size_type", qtype(b) + " " + qtype(ref))
+                                             or (b.get("type", {}).get("desugaredQualType") or ref.get("type", {}).get("desugaredQualType") or "").replace("const ", "").strip() == "unsigned long"):
+                return "-1", "Int"   # (no place in a text: npos, a size_t read with its sign)
             if i in self.names:
                 return self.names[i], self.types[i]
             if i in self.pointers:
@@ -6757,6 +7203,8 @@ class Emit:
         if k == "ConditionalOperator":
             c, x, y = kids(b)
             t = self.tp(b)
+            if re.fullmatch(r"(?:const\s+)?char\s*\[\d+\]", self.u.clean(qtype(b)).strip()):
+                t = "Text"   # (c ? "EIN" : "AUS" - two texts written out of one length: a text, as each of them)
             if t is None:
                 raise Wait("a choice between nothing")
             cond = self.bx(c)
@@ -6901,6 +7349,10 @@ class Emit:
         """An expression of numbers as the text of a formula over `leaves`."""
         b = bare(n)
         k = b.get("kind")
+        if k == "BinaryOperator" and b.get("opcode") == "-" and len(kids(b)) == 2 and self.char_pointer(kids(b)[0]) and self.char_pointer(kids(b)[1]):
+            return self.leaf(None, leaves, self.ex(b, "Float"))   # (end - s.c_str(): how far apart two places of a text are - a value of its own)
+        if (k == "UnaryOperator" and b.get("opcode") == "*" and kids(b) and self.is_c_text(kids(b)[0])) or (k == "ArraySubscriptExpr" and len(kids(b)) == 2 and self.is_c_text(kids(b)[0])):
+            return self.leaf(None, leaves, self.ex(b, "Float"))   # (a character of a C string at a place: read there)
         if self.is64(b):   # (a 64-bit bit pattern in a computation with numbers: the number it is)
             text, have = self.value(b)
             return self.leaf(None, leaves, self.from64(text, self.ctype(b), "double", "Float") if have == self.whole64() else self.conv(text, have, "Float"))
@@ -7395,12 +7847,18 @@ class Emit:
                 c = self.ctype(a[0])
                 fmt = {"int": "%d", "short": "%d", "signed char": "%d", "char": "%d", "unsigned int": "%u", "unsigned short": "%u", "unsigned char": "%u",
                        "long": "%lld", "long long": "%lld", "unsigned long": "%llu", "unsigned long long": "%llu", "float": "%f", "double": "%f"}.get(c)
+                if c in ("whole64u", "whole64s"):   # (a u64, an i64: the decimal of its bits)
+                    return f"int64_text{'' if c == 'whole64u' else '_signed'}({self.ex(a[0], 'Int64')})", "Text"
                 if fmt is None:
                     raise Wait(f"std::to_string of a {c}")
                 return f'text_format<"{fmt}">(-1, {self.ex(a[0], "Float" if fmt == "%f" else "Int")})', "Text"
             if name == "bit_cast" and len(a) == 1:
                 return self.bit_cast(b, a[0])
-            if name in ("snprintf", "printf", "sprintf", "to_string", "strtod", "atof", "atoi", "strcmp", "strlen", "strncmp", "strchr", "strstr"):
+            if name in C_PARSE and len(a) == C_PARSE[name][1]:
+                return self.parsed(b, name, a)
+            if name == "sscanf" and len(a) >= 2:
+                return self.scanned(a), "Int"
+            if name in ("snprintf", "printf", "sprintf", "to_string", "strcmp", "strlen", "strncmp", "strchr", "strstr"):
                 raise Wait("text formatting and parsing (snprintf, to_string, atof ...)")
             if name in ("find", "find_if", "find_if_not") and len(a) == 3 and self.is_iter(b):
                 return self.first_match(name, a), "Int"
@@ -7591,6 +8049,18 @@ class Emit:
                 return '""', "Text"
             if len(a) == 1 and self.tp(a[0]) == "Text":
                 return self.ex(a[0], "Text"), "Text"
+            if len(a) == 2 and self.numeric(a[0]) and re.sub(r"^const\s+", "", self.u.clean(self.ctype(a[1]))).strip() in ("char", "signed char", "unsigned char"):
+                # (count, character): the character so many times (Repeat Text)
+                return f"text_repeat({self.text_or_char(a[1])}, {self.ex(a[0], 'Int')})", "Text"
+            if len(a) == 2 and self.numeric(a[1]):
+                # (characters, count): so many characters from a place - of a text (a C string at a place), or of a
+                # list of bytes read as characters (reinterpret_cast<const char*>(bytes.data()) + at)
+                got = self.text_of_bytes(a[0], a[1])
+                if got is not None:
+                    return got, "Text"
+                if self.is_c_text(a[0]):
+                    text, at = self.c_text(a[0])
+                    return f"text_sub({text}, {at}, {self.ex(a[1], 'Int')})", "Text"
             raise Wait("a text made of something else")
         if t in u.struct_fields:
             fields = u.struct_fields[t]
@@ -7676,6 +8146,9 @@ class Emit:
                 made = self.temp("made", t)
                 self.hoist([f"{made} = {t}{{}};", f"list_resize({made}, {self.ex(a[0], 'Int')}, {self.ex(a[1], it) if len(a) == 2 else u.zero(it)});"])
                 return made, t
+            if len(a) == 2 and t == "List<Int>" and self.text_range(a[0], a[1]) is not None:
+                # std::vector<u8>(text.begin(), text.end()): the bytes of the text (Bytes of Text)
+                return f"text_bytes({self.text_range(a[0], a[1])})", t
             if len(a) == 2:
                 # std::vector<T>(first, last): the entries of a list from one place to another
                 (s0, first), (s1, last) = self.place(a[0]), self.place(a[1])
@@ -7762,6 +8235,9 @@ class Emit:
                 return f"list_get<{it}>({lst}, kern::to<Int>(kern::formula([](Float n) -> Float {{ return n - 1.0; }}, kern::to<Float>(list_length<{it}>({lst})))))", it
             raise Wait(f"list: {name}()")
         if bt == "Text":
+            got = self.text_member(b, base, name, a)
+            if got is not None:
+                return got
             if name in ("size", "length") and not a:
                 return f"text_length({self.ex(base, 'Text')})", "Int"
             if name == "empty" and not a:
@@ -8868,10 +9344,32 @@ class TestWriter:
         d = self.tree.records.get(q)
         return d is not None and any(self.actor_blueprint(b.get("type", {}).get("qualType", "")) for b in d.get("bases", []) or [])
 
+    said = ()
+
+    @staticmethod
+    def said_words(d):
+        """The words a function itself says (the texts written out in it that a text it is given may begin with or be:
+        "settings reset", "gps ", "on") - its texts are drawn from them too, with numbers and words after them, so that
+        what it does with a text is compared, not only what it does with one it does not know."""
+        out = []
+        for x in walk(d):
+            if x.get("kind") != "StringLiteral":
+                continue
+            raw = c_string(x["value"])
+            if not raw or len(raw) > 32 or any(ch < 32 or ch > 126 for ch in raw) or any(ch in b'%"{}\\[]' for ch in raw):
+                continue
+            w = raw.decode("ascii")
+            if w not in out:
+                out.append(w)
+        return tuple(out[:32])
+
+    def said_list(self):
+        return "{" + ", ".join(text_literal(w.encode("ascii")) for w in self.said) + "}"
+
     def draw(self, raw):
         c = self.u.clean(raw)
         if raw.replace(" ", "") in ("constchar*", "constchar*const"):
-            return "draw.c_word()"
+            return f"draw.said_c_word({self.said_list()})" if self.said else "draw.c_word()"
         q = self.u.object_of(raw)
         if q:   # (an object of the engine: one of a few the test keeps, by its handle)
             one = f"converted::engine_object<{self.object_name(q)}>(1 + draw.below(6))"
@@ -8899,9 +9397,10 @@ class TestWriter:
         if m:   # (a view of a list, handed to a function: the list)
             return self.draw("std::vector<" + re.sub(r"^const\s+", "", m.group(1)) + ">")
         if self.spell(raw) == "std::string":
-            return "draw.word()"
+            return f"draw.said_word({self.said_list()})" if self.said else "draw.word()"
         if self.spell(raw) == "std::string_view":
-            return "std::string_view(draw.c_word())"   # (the drawn words live as long as the test)
+            # (the drawn words live as long as the test)
+            return f"std::string_view(draw.said_c_word({self.said_list()}))" if self.said else "std::string_view(draw.c_word())"
         m = re.match(r"std::array<(.+),\s*(\d+)U?L?L?>$", c)
         if m:
             inner = template_args(c)[0]
@@ -10352,6 +10851,7 @@ class TestWriter:
                     names.append("a0")
                 first = len(names)
                 held_lists = []   # (the lists the source gets a pointer into: the list and the place - Unit.pointed)
+                self.said = self.said_words(d)
                 for p in params:
                     if self.u.is_logic(qtype(p)):
                         continue   # (the logic the actors' Blueprints run in: the source's own - no input of the Blueprint)
@@ -10381,6 +10881,7 @@ class TestWriter:
                     if not types[-1].startswith("const ") and not types[-1].endswith("&"):
                         moved.add(f"a{len(names)}")
                     names.append(f"a{len(names)}")
+                self.said = ()
                 if held_lists:
                     self.pointed = True
                     decl_lines.append("converted_pointed_lists = {" + ", ".join(f"{{reinterpret_cast<const unsigned char*>({x}.data()), reinterpret_cast<const unsigned char*>({x}.data() + {x}.size())}}" for x in held_lists) + "};")

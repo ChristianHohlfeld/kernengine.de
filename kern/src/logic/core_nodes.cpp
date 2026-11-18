@@ -933,6 +933,31 @@ void add_lists(Library& lib) {
     lib.add(std::move(d));
   }
   {
+    // Insert Text Bytes: the bytes of a text (0 .. 255) into a list of whole numbers (logic::texts::insert_bytes)
+    NodeDef d = step("list.insert_text", "Insert Text Bytes",
+                     "Puts the bytes of a text - each a whole number 0 to 255 - in front of the item at the index of a list of whole numbers, in their order and in one go "
+                     "(0: at the start; past the end: at the end): what inserting a text's range into a std::vector<u8> does.",
+                     "bytes text string utf8 append insert array", {data("index", "Index", PinType::integer, 0), data("text", "Text", PinType::text, "")}, {});
+    d.title = [](const NodeDef&, const Node& n) { return "Insert Text Bytes into " + place_title(n); };
+    d.problem = [needs_list](const Node& n, const Graph& g) {
+      const std::string why = needs_list(n, g);
+      if (!why.empty()) return why;
+      Variable named;
+      const Variable* v = g.place_of(n, named) ? &named : nullptr;
+      if (v && v->type != PinType::integer_list) return "needs a list of whole numbers: \"" + v->name + "\" is " + std::string(pin_type_name(v->type));
+      return std::string();
+    };
+    d.run = [on_list](Context& c) {
+      const i64 index = c.in_int("index");
+      const std::string text = c.in_text("text");
+      on_list(c, [&](Value& v) {
+        if (v.type == PinType::integer_list) texts::insert_bytes(v.template edit<i64>(), index, text);
+      });
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
+  {
     NodeDef d = step("list.reserve", "Reserve",
                      "Makes room for that many items in a list variable: nothing one can read changes - the list then grows that far without asking for memory again.",
                      "capacity room memory array", {data("count", "Count", PinType::integer, 0)}, {});
@@ -1829,6 +1854,139 @@ void add_math(Library& lib) {
       }
       c.out(std::size_t{0}, Value::text(format::text_of(fmt, args.data(), args.size(), c.in(std::size_t{0}).as_int())));
       return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    // What std::string and std::string_view do (texts, nodes.h): a place in a text is an Int; where C++
+    // gives npos - no place - the Int is -1, and a place handed in reads -1 as npos ("to the end").
+    const PinDef text = data("result", "", K::text);
+    struct Find { const char* type; const char* label; i64 (*f)(std::string, std::string, i64); i64 from; const char* help; const char* keywords; };
+    for (const Find& x : {Find{"text.find", "Find Text", &P::text_find, 0, "Where Search first stands in Text, from From on (std::string::find) - -1: nowhere",
+                               "find index search position string indexof"},
+                          Find{"text.rfind", "Find Last Text", &P::text_rfind, -1, "Where Search last begins in Text, at From or before (-1: anywhere - std::string::rfind) - -1: nowhere",
+                               "rfind last index search position string lastindexof"},
+                          Find{"text.find_first_of", "Find First Of", &P::text_find_first_of, 0, "The first place from From on with one of the characters of Set (std::string::find_first_of) - -1: none",
+                               "find first of any character set string"},
+                          Find{"text.find_last_of", "Find Last Of", &P::text_find_last_of, -1, "The last place at From or before with one of the characters of Set (std::string::find_last_of) - -1: none",
+                               "find last of any character set string"},
+                          Find{"text.find_first_not_of", "Find First Not Of", &P::text_find_first_not_of, 0,
+                               "The first place from From on with a character that is not in Set (std::string::find_first_not_of) - -1: none", "find first not of skip trim character set string"},
+                          Find{"text.find_last_not_of", "Find Last Not Of", &P::text_find_last_not_of, -1,
+                               "The last place at From or before with a character that is not in Set (std::string::find_last_not_of) - -1: none", "find last not of trim character set string"}}) {
+      const bool set = std::string(x.type).find("_of") != std::string::npos;
+      lib.add(pure(x.type, x.label, "Text", {data("a", "Text", K::text, ""), data("b", set ? "Set" : "Search", K::text, ""), data("from", "From", K::integer, static_cast<f64>(x.from))}, integer,
+                   of(x.f), x.help, x.keywords));
+    }
+    lib.add(pure("text.sub", "Sub Text", "Text", {data("a", "Text", K::text, ""), data("at", "At", K::integer, 0), data("count", "Count", K::integer, -1)}, text, of(&P::text_sub),
+                 "Count characters of Text from At on (-1 or beyond the end: to the end - std::string::substr); At beyond the end: no text", "substr substring slice part mid left right"));
+    lib.add(pure("text.starts_with", "Starts With", "Text", {data("a", "Text", K::text, ""), data("b", "Start", K::text, "")}, boolean, of(&P::text_starts_with),
+                 "Does Text begin with Start (std::string::starts_with)", "prefix begins string"));
+    lib.add(pure("text.ends_with", "Ends With", "Text", {data("a", "Text", K::text, ""), data("b", "End", K::text, "")}, boolean, of(&P::text_ends_with),
+                 "Does Text end with End (std::string::ends_with)", "suffix string"));
+    lib.add(pure("text.less", "Text Less", "Text", {data("a", "A", K::text, ""), data("b", "B", K::text, "")}, boolean, of(&P::text_less),
+                 "Does A come before B - byte by byte, as unsigned characters, a shorter text before a longer one it begins (std::string's <)", "< compare order sort string"));
+    lib.add(pure("text.insert", "Insert Text", "Text", {data("a", "Text", K::text, ""), data("at", "At", K::integer, 0), data("b", "Insert", K::text, "")}, text, of(&P::text_insert),
+                 "Text with Insert put in at At (std::string::insert); At beyond the end: Text as it is", "insert put string"));
+    lib.add(pure("text.erase", "Erase Text", "Text", {data("a", "Text", K::text, ""), data("at", "At", K::integer, 0), data("count", "Count", K::integer, -1)}, text, of(&P::text_erase),
+                 "Text without Count characters from At on (-1: to the end - std::string::erase); At beyond the end: Text as it is", "erase remove delete cut string"));
+    lib.add(pure("text.replace", "Replace Text", "Text",
+                 {data("a", "Text", K::text, ""), data("at", "At", K::integer, 0), data("count", "Count", K::integer, 0), data("b", "With", K::text, "")}, text, of(&P::text_replace),
+                 "Text with Count characters from At on replaced by With (std::string::replace); At beyond the end: Text as it is", "replace string"));
+    lib.add(pure("text.repeat", "Repeat Text", "Text", {data("a", "Text", K::text, "*"), data("count", "Count", K::integer, 3)}, text, of(&P::text_repeat),
+                 "Text so many times, one after the other (std::string(count, c) of a character); Count 0 or less: no text", "repeat times fill padding string"));
+    lib.add(pure("text.bytes", "Bytes of Text", "Text", {data("a", "Text", K::text, "")}, data("result", "", K::integer_list), of(&P::text_bytes),
+                 "The bytes of the text, each a whole number 0 to 255 (a std::vector<u8> of its range)", "bytes chars utf8 encode array"));
+    lib.add(pure("text.reserve", "Reserve Text", "Text", {data("a", "Text", K::text, ""), data("count", "Count", K::integer, 0)}, text, of(&P::text_reserve),
+                 "The text as it is - in a Blueprint's class with room for Count characters, so that what is appended to it fits (std::string::reserve)",
+                 "reserve capacity room string"));
+    lib.add(pure("text.of_bytes", "Text of Bytes", "Text", {data("bytes", "Bytes", K::integer_list), data("at", "At", K::integer, 0), data("count", "Count", K::integer, 0)}, text,
+                 of(&P::text_of_bytes), "Count bytes of the list from At on as a text, each cut to 8 bits (beyond the list: up to its end)",
+                 "bytes chars string decode utf8 buffer"));
+    // Numbers read from a text at a place, as C reads them (scan, nodes.h): Value, and End - the place just
+    // after what was read (nothing read: At itself, as C's end pointer)
+    struct Parse { const char* type; const char* label; bool whole; P::ParsedFloat (*real)(std::string, i64); P::ParsedWhole (*integral)(std::string, i64, i64); const char* help; const char* keywords; };
+    for (const Parse& x : {Parse{"text.parse_float", "Parse Float", false, &P::text_parse_float, nullptr, "The number at At of Text, as C's strtod reads it (atof)", "strtod atof parse number float double read"},
+                           Parse{"text.parse_float32", "Parse Float 32", false, &P::text_parse_float32, nullptr, "The number at At of Text as a 32-bit float, as C's strtof reads it",
+                                 "strtof parse number float single read"},
+                           Parse{"text.parse_int", "Parse Int", true, nullptr, &P::text_parse_int,
+                                 "The whole number at At of Text, as C's strtoll reads it in Base (0: by its prefix - 0x, 0b, 0) - its 64 bits (atoi, atol, strtol)", "strtol strtoll atoi atol parse integer read"},
+                           Parse{"text.parse_uint", "Parse Int Unsigned", true, nullptr, &P::text_parse_uint,
+                                 "The whole number at At of Text, as C's strtoull reads it in Base (0: by its prefix - 0x, 0b, 0) - its 64 bits (strtoul)", "strtoul strtoull parse unsigned integer read"}}) {
+      NodeDef d = make(x.type, x.label, "Text", NodeKind::pure, x.help);
+      d.inputs = {data("a", "Text", K::text, ""), data("at", "At", K::integer, 0)};
+      if (x.whole) d.inputs.push_back(data("base", "Base", K::integer, 10));
+      d.outputs = {data("value", "Value", x.whole ? K::int64 : K::number), data("end", "End", K::integer)};
+      d.keywords = x.keywords;
+      const Parse p = x;
+      d.run = [p](Context& c) {
+        if (p.whole) {
+          const P::ParsedWhole r = p.integral(c.in(std::size_t{0}).as_text(), c.in(std::size_t{1}).as_int(), c.in(std::size_t{2}).as_int());
+          c.out("value", Value::int64(r.value.bits));
+          c.out("end", Value::integer(r.end));
+        } else {
+          const P::ParsedFloat r = p.real(c.in(std::size_t{0}).as_text(), c.in(std::size_t{1}).as_int());
+          c.out("value", Value::number(r.value));
+          c.out("end", Value::integer(r.end));
+        }
+        return kStop;
+      };
+      lib.add(std::move(d));
+    }
+  }
+  {
+    // Scan Text: what sscanf reads with a format (scan, nodes.h) - Count, what sscanf gives, and a value
+    // for each conversion; the inputs Before hold what was there before, which stays where the scan
+    // does not reach (as a variable sscanf did not write keeps its value)
+    NodeDef d = make("text.scan", "Scan Text", "Text", NodeKind::action,
+                     "Reads Text from At on as C's sscanf reads it with a format: %d %i %u %o %x %b take whole numbers (l ll: 64 bits), %f %e %g %a a float (l: a double), %s and "
+                     "%[set] a word, %n how many characters were read; a width, * (read, not given). Count: how many values were read (-1: the text ended before the first).");
+    d.params = {param("format", "Format", ParamDef::Kind::text, "%d")};
+    d.inputs = {exec_in(), data("a", "Text", K::text, ""), data("at", "At", K::integer, 0)};
+    d.outputs = {exec_out(), data("count", "Count", K::integer)};
+    d.keywords = "scan sscanf scanf parse read numbers words format";
+    auto pin_of = [](scan::Kind k) { return k == scan::Kind::whole ? K::integer : k == scan::Kind::whole64 ? K::int64 : k == scan::Kind::number ? K::number : K::text; };
+    d.shape = [pin_of](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>& out) {
+      scan::Plan plan;
+      if (!scan::plan(n.param("format", "%d"), &plan, nullptr)) return;
+      for (std::size_t k = 0; k < plan.count; ++k) {
+        const PinType t = pin_of(plan.kinds[k]);
+        in.push_back(data("p" + std::to_string(k), "Before " + std::to_string(k), t, t == K::text ? json::Value("") : t == K::int64 ? json::Value("0") : json::Value(0.0)));
+        out.push_back(data("v" + std::to_string(k), std::to_string(k), t));
+      }
+    };
+    d.title = [](const NodeDef&, const Node& n) {
+      const std::string f = n.param("format", "%d");
+      return "Scan \"" + (f.size() > 30 ? f.substr(0, 29) + "..." : f) + "\"";
+    };
+    d.problem = [](const Node& n, const Graph&) {
+      const char* why = "";
+      return scan::plan(n.param("format", "%d"), nullptr, &why) ? std::string() : std::string("the format: ") + why;
+    };
+    d.run = [](Context& c) {
+      const std::string fmt = c.param("format", "%d");
+      scan::Plan plan;
+      if (!scan::plan(fmt, &plan, nullptr)) plan = {};
+      scan::Slot slots[scan::kMostSlots];
+      for (std::size_t k = 0; k < plan.count; ++k) {
+        scan::Slot& s = slots[k];
+        s.kind = plan.kinds[k];
+        const Value v = c.in("p" + std::to_string(k));
+        if (s.kind == scan::Kind::whole) s.whole = v.as_int();
+        else if (s.kind == scan::Kind::whole64) s.bits = v.type == PinType::int64 ? static_cast<u64>(v.i) : 0;
+        else if (s.kind == scan::Kind::number) s.number = v.as_number();
+        else s.text = v.as_text();
+      }
+      const std::string a = c.in_text("a");
+      const i64 count = scan::run(scan::c_string(a, c.in_int("at")), fmt, slots, plan.count);
+      c.out("count", Value::integer(count));
+      for (std::size_t k = 0; k < plan.count; ++k) {
+        const scan::Slot& s = slots[k];
+        const std::string pin = "v" + std::to_string(k);
+        c.out(pin, s.kind == scan::Kind::whole ? Value::integer(s.whole) : s.kind == scan::Kind::whole64 ? Value::int64(s.bits) : s.kind == scan::Kind::number ? Value::number(s.number)
+                                                                                                                                 : Value::text(s.text));
+      }
+      return 0;
     };
     lib.add(std::move(d));
   }

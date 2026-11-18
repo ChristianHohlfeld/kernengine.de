@@ -326,6 +326,23 @@ struct Draw {
     return words[below(8)];
   }
   std::string word() { return c_word(); }
+  /// A word of the texts a function says itself (what it compares a text it is given with: "settings reset",
+  /// "gps ") with a tail after it - nothing, numbers as C reads them, a word, the end of a range -, now and
+  /// then one of the plain words: what the function does with a text it knows is compared too.
+  std::string said_word(std::initializer_list<const char*> said) {
+    static const char* const tails[] = {"", "", " ", "1", " 1", " 0", " -2.5", " 0x1F", " 7 8 9", " 1.5 -3", ";a b", " 1e3 2", " x", " 99999999999", " nan", "  3:30",
+                                        " a 1;b 2", " -0", " 52.5 13.4 Berlin", " 255 0 1"};
+    if (said.size() == 0 || below(4) == 0) return word();
+    std::string w = said.begin()[below(static_cast<u32>(said.size()))];
+    w += tails[below(static_cast<u32>(sizeof tails / sizeof *tails))];
+    return w;
+  }
+  /// (one as a C string: kept as long as the test runs)
+  const char* said_c_word(std::initializer_list<const char*> said) {
+    static std::deque<std::string> kept;
+    kept.push_back(said_word(said));
+    return kept.back().c_str();
+  }
 };
 
 /// A list of up to four drawn entries; one of numbers is, one time in five, a long one (a function that

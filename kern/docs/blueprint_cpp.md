@@ -917,6 +917,86 @@ Text Kurz = text_format<"%s">(3, name);                          // höchstens 3
   Abweichung von glibc: `%#g`, wo glibc gegen den C-Standard eine Null zu wenig schreibt.)
 - Ein Format, das der Knoten nicht kennt, ist ein Fehler des Graphen, mit Grund.
 
+### Texte lesen
+
+Was `std::string` und `std::string_view` über ihre Zeichen sagen, sagt je ein Knoten – mit derselben
+Antwort, Zeichen für Zeichen (`logic::texts`, `nodes.h`). Ein Platz in einem Text ist ein `Int`; wo
+C++ `npos` gibt (ein `size_t`, der kein Platz ist), ist es **−1** – der `size_t`, mit Vorzeichen
+gelesen, wie ein Blueprint jeden `size_t` hält –, und ein Platz, der hineingeht, wird ebenso gelesen
+(−1: `npos`, „bis zum Ende“).
+
+```cpp
+Int Leer = text_find(Befehl, " ", 0);                 // cmd.find(' ')
+Bool Ist = math_compare<"==">(kern::to<Float>(text_rfind(Befehl, "set ", 0)), 0.0);   // cmd.rfind("set ", 0) == 0
+Text Rest = text_sub(Befehl, 4, -1);                  // cmd.substr(4)
+Befehl = text_erase(std::move(Befehl), 0, 3);         // cmd.erase(0, 3) – am Platz, ohne Kopie
+```
+
+| Knoten | C++ | gibt |
+|---|---|---|
+| Find Text, Find Last Text | `find(b, from)`, `rfind(b, from)` | den Platz oder −1 |
+| Find First Of, Find Last Of, Find First Not Of, Find Last Not Of | `find_first_of(set, from)` … | den Platz oder −1 |
+| Sub Text | `substr(at, count)` | die Zeichen (count −1 oder über das Ende: bis zum Ende) |
+| Starts With, Ends With | `starts_with(b)`, `ends_with(b)` | Bool |
+| Text Less | `a < b` | Bool – Byte für Byte als `unsigned char`, wie `std::string` ordnet |
+| Insert Text, Erase Text, Replace Text | `insert(at, b)`, `erase(at, count)`, `replace(at, count, b)` | den geänderten Text |
+| Repeat Text | `std::string(count, c)` | den Text so oft hintereinander (höchstens 2^24 Zeichen) |
+| Reserve Text | `reserve(count)` | den Text, wie er ist – in der Klasse mit Platz für Count Zeichen (höchstens 2^24) |
+| Text of Bytes | `std::string(reinterpret_cast<const char*>(bytes) + at, count)` | Count Bytes einer Liste ab At, jedes auf 8 Bit geschnitten |
+| Bytes of Text | `std::vector<u8>(text.begin(), text.end())` | die Bytes des Texts als `List<Int>`, je 0 bis 255 |
+| Insert Text Bytes (Schritt) | `bytes.insert(bytes.begin() + at, text.begin(), text.end())` | die Bytes des Texts in eine Liste ganzer Zahlen, wo sie steht, in einem Zug |
+
+- **Wo C++ wirft** (`at` hinter dem Ende bei `substr`, `insert`, `erase`, `replace`: `std::out_of_range`,
+  was ein Programm ohne Ausnahmen beendet), gibt Sub Text den leeren Text, die drei anderen den Text,
+  wie er ist – in jeder Stufe gleich.
+- **Kosten wie in C++:** Die Knoten lesen die Zeichen, wo sie stehen; Sub Text macht einen Text aus
+  einem Teil (wie `substr`: eine Kopie seiner Zeichen). Insert, Erase und Replace ändern den Text, den
+  sie bekommen – reicht der Text ihn mit `std::move` weiter, ändern sie ihn am Platz, ohne Kopie. (Ein
+  Teil eines `std::string_view` ist in C++ keine Kopie, im Blueprint schon: ein Text hält seine
+  Zeichen – bis 15 Zeichen ohne Anforderung von Speicher, wie `std::string`.) Ebenso Append: Ein Text,
+  den der Text mit `std::move` weiterreicht und der seine Zeichen hält, bekommt das Angehängte an seinem
+  Platz – `Log = text_append(std::move(Log), x, "")` kostet, was `log += x` kostet; mit Reserve Text vorher
+  ohne neue Anforderung.
+- `compare()` sagt in C++ nur sein Vorzeichen fest zu – der Konverter schreibt es nicht, `==` und `<`
+  schon.
+
+### Zahlen und Wörter aus einem Text
+
+**Parse Float**, **Parse Float 32**, **Parse Int**, **Parse Int Unsigned** lesen eine Zahl an einem
+Platz eines Texts, wie C sie liest: `strtod`, `strtof`, `strtoll`, `strtoull` (und mit ihnen `atof`,
+`atoi`, `atol`, `strtol`, `strtoul` – `long` hat 64 Bit). **Scan Text** liest wie `sscanf`:
+
+```cpp
+ParsedFloat Z = text_parse_float(Befehl, 6);          // std::strtod(cmd.c_str() + 6, &end): Z.value, Z.end
+Int N = int64_to_int(text_parse_int(Befehl, 7, 10).value);   // std::atol(cmd.c_str() + 7)
+text_scan<"%lf %lf %95[^\n]">(n12, Befehl, 6, Lat, Lon, Name);   // sscanf(cmd.c_str() + 6, …, &lat, &lon, name)
+Lat = n12.v0;  Lon = n12.v1;  Name = n12.v2;          // n12.count: was sscanf gibt
+```
+
+- **Der Text als C-String an einem Platz** (`s.c_str() + at`): von `at` bis zu seinem ersten Null-Byte;
+  ein `at` hinter dem Text (oder unter 0 – in C ein Zeiger ins Nichts) liest einen leeren.
+- **End** ist der Platz direkt hinter dem Gelesenen – nichts gelesen: `at` selbst, wie Cs `end`-Zeiger
+  der ist, den der Aufruf bekam. Die ganzen Zahlen geben ihre 64 Bit als `Int64` (jenseits des Bereichs
+  das Ende des Bereichs wie C, unsigned mit `-` davor das Zweierkomplement); Base 0 liest das Präfix
+  (`0x`, `0b`, `0`).
+- **Scan Text:** Das Format ist die Einstellung; jede Umwandlung, die einen Wert gibt, hat einen Ausgang
+  (`v0` …) und einen Eingang **Before** mit dem, was dort vorher stand – es bleibt, wo der Scan nicht
+  hinkommt (wie die Variable, in die `sscanf` nicht schrieb). `%d %i %u %o %x %X %b` geben ganze Zahlen
+  (`hh h` und ohne: 8, 16, 32 Bit als Int – wie C sie abschneidet; `l ll j z t q L`: 64 Bit als Int64),
+  `%f %e %g %a` (`F E G A`) eine Zahl (ohne: ein `float`, `l`: ein `double`), `%s` und `%[…]` ein Wort,
+  `%n` die gelesenen Zeichen; Breiten, `*` (gelesen, nicht gegeben), `%%`; ein Leerzeichen im Format
+  liest jede Folge von Leerzeichen. **Count**: wie viele Werte gelesen wurden, −1, wenn der Text vor dem
+  ersten endete. Was das Format nicht hat (`%c`, `%m`, `%Lf`, `$`), ist ein Fehler des Graphen, mit Grund.
+- **Zeichen für Zeichen wie glibc** (2.39, im Modus von C23, mit dem C++ übersetzt: `0b` vor einer
+  binären Zahl; C-Locale): dieselben Zeichen gelesen, derselbe Wert, dieselbe Anzahl – `logic::scan`
+  geht den Weg von glibcs Scanner Schritt für Schritt (`"100ergs"` mit `%f`: 100, das `e` ist gelesen;
+  `"0x"` mit `%f`: kein Wert; `%x` von `"0xg"`: 0). Den Wert einer endlichen Zahl rechnet die
+  C-Bibliothek aus den gelesenen Zeichen (korrekt gerundet – auf jeder Maschine derselbe);
+  unendlich, NaN und die Nutzlast einer NaN (`"nan(0x7f)"`) rechnet der Knoten selbst, wie glibc.
+  Gegen glibc geprüft mit 12 Millionen Eingaben und Formaten, ohne eine Abweichung.
+- In der Klasse fordern die Knoten keinen Speicher an (eine Zahl von mehr als 255 Zeichen ausgenommen);
+  Scan Text macht einen Text nur für ein Wort, das es liest – eines bis 15 Zeichen ohne Anforderung.
+
 ### Referenz-Eingänge
 
 Ein Eingang einer Funktion ist ein **Wert** – der Wert, den er beim Aufruf hatte – oder eine

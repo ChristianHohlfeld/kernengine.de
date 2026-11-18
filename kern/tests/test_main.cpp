@@ -3347,6 +3347,98 @@ TEST(game_logic_graphs_drive_the_world) {
   CHECK(!props.empty());  // the door's moves (a body-less actor) replicate as transform changes
 }
 
+// Parse Float / Parse Int / Scan Text read as C reads (logic::scan, nodes.h): against the C library of
+// the machine the tests run on - glibc - on texts made of the pieces numbers are made of. (%b, C23's
+// binary, is read the same way; the sanitizer's interceptor of sscanf does not know it, so it is not here.)
+TEST(logic_scan_like_c) {
+  u64 st = 88172645463325252ull;
+  auto rnd = [&] {
+    st ^= st << 13;
+    st ^= st >> 7;
+    st ^= st << 17;
+    return st;
+  };
+  static const char* const bits[] = {"0", "1", "9", "00", "0x", "0X", "x", "e", "E", "p", "+", "-", ".", " ", "\t", "\n", "a", "f", "b", "B", "inf", "INF", "infinity", "nan", "NaN",
+                                     "(", ")", "(12)", "(0x7f)", "_", ",", "123456789", "4294967296", "18446744073709551616", "9223372036854775808", "1e308", "1e-330",
+                                     "0x1p-1074", "2.5", "z", "%", "08", "0b101", "1.2.3", "0x.", "0x1.8p3", "3e+", "1e-45", "3.4028235e38", "A-B"};
+  static const char* const formats[] = {"%f", "%lf", "%d", "%i", "%u", "%x", "%o", "%lld", "%llu", "%hhd", "%hu", "%f %f", "%d %d %d", "%f%s", "%lf,%lf", "%3f%15s", "%2d%d",
+                                        "look set %f %f", "x%f", "%15s %f", " %31s %f %f %f %f", "%lf %lf %95[^\n]", "%15[a-z]%n%d", "%*d %d", "%%%d", "%llu %llu",
+                                        "%4[^,],%15s", "%i%n", "%2x%15s", "%1f%15s", "%e%g", "%a", "%zd %jd %td", "%15[]a]%15s", "%15[^]]%15s"};
+  std::size_t checked = 0, differ = 0;
+  for (int round = 0; round < 20000; ++round) {
+    std::string in;
+    for (int i = static_cast<int>(rnd() % 7); i > 0; --i) in += bits[rnd() % (sizeof bits / sizeof *bits)];
+    char* end = nullptr;
+    const f64 d = std::strtod(in.c_str(), &end);
+    const logic::scan::Real r = logic::scan::real(in, false);
+    differ += std::memcmp(&d, &r.value, 8) != 0 || static_cast<std::size_t>(end - in.c_str()) != r.end;
+    const f64 f = std::strtof(in.c_str(), &end);
+    const logic::scan::Real rf = logic::scan::real(in, true);
+    differ += std::memcmp(&f, &rf.value, 8) != 0 || static_cast<std::size_t>(end - in.c_str()) != rf.end;
+    for (int base : {0, 2, 10, 16, 36}) {
+      const long long l = std::strtoll(in.c_str(), &end, base);
+      const logic::scan::Whole w = logic::scan::whole(in, base, true);
+      differ += static_cast<u64>(l) != w.bits || static_cast<std::size_t>(end - in.c_str()) != w.end;
+      const unsigned long long u = std::strtoull(in.c_str(), &end, base);
+      const logic::scan::Whole wu = logic::scan::whole(in, base, false);
+      differ += u != wu.bits || static_cast<std::size_t>(end - in.c_str()) != wu.end;
+    }
+    checked += 12;
+    // sscanf: every value C writes (each starts as 0, a word as "mark") against the slots
+    const char* fmt = formats[rnd() % (sizeof formats / sizeof *formats)];
+    logic::scan::Plan plan;
+    CHECK(logic::scan::plan(fmt, &plan, nullptr));
+    std::vector<logic::scan::Spec> specs;
+    for (std::size_t at = 0; fmt[at];) {
+      if (fmt[at++] != '%') continue;
+      logic::scan::Spec sp;
+      logic::scan::read_spec(fmt, at, sp, nullptr);
+      if (logic::scan::gives(sp)) specs.push_back(sp);
+    }
+    union Held {
+      int i;
+      unsigned u;
+      long long q;
+      double d;
+      float f;
+      signed char c;
+      short h;
+      char s[128];
+    };
+    std::vector<Held> c(16);
+    for (Held& h : c) std::memset(&h, 0, sizeof h);
+    std::vector<logic::scan::Slot> slots(plan.count);
+    for (std::size_t k = 0; k < plan.count; ++k) {
+      slots[k].kind = plan.kinds[k];
+      if (plan.kinds[k] == logic::scan::Kind::text) slots[k].text = "mark", std::strcpy(c[k].s, "mark");
+    }
+    const int got = std::sscanf(in.c_str(), fmt, &c[0], &c[1], &c[2], &c[3], &c[4], &c[5], &c[6], &c[7], &c[8], &c[9], &c[10], &c[11], &c[12], &c[13], &c[14], &c[15]);
+    bool same = got == logic::scan::run(in, fmt, slots.data(), slots.size());
+    for (std::size_t k = 0; k < plan.count && same; ++k) {
+      const logic::scan::Spec& sp = specs[k];
+      const bool is_signed = sp.conv == 'd' || sp.conv == 'i' || sp.conv == 'n';
+      switch (plan.kinds[k]) {
+        case logic::scan::Kind::number: {
+          const f64 v = sp.size == 'l' ? c[k].d : static_cast<f64>(c[k].f);
+          same = std::memcmp(&v, &slots[k].number, 8) == 0;
+          break;
+        }
+        case logic::scan::Kind::text: same = slots[k].text == c[k].s; break;
+        case logic::scan::Kind::whole64: same = static_cast<u64>(c[k].q) == slots[k].bits; break;
+        case logic::scan::Kind::whole:
+          same = (sp.size == 'H'   ? (is_signed ? static_cast<i64>(c[k].c) : static_cast<i64>(static_cast<u8>(c[k].c)))
+                  : sp.size == 'h' ? (is_signed ? static_cast<i64>(c[k].h) : static_cast<i64>(static_cast<u16>(c[k].h)))
+                                   : (is_signed ? static_cast<i64>(c[k].i) : static_cast<i64>(c[k].u))) == slots[k].whole;
+          break;
+      }
+    }
+    if (!same && differ < 5) std::printf("scan: \"%s\" with \"%s\" reads otherwise than sscanf\n", in.c_str(), fmt);
+    differ += !same;
+    ++checked;
+  }
+  CHECK(checked > 200000 && differ == 0);
+}
+
 TEST(logic_tier_cases_interpreter) {
   for (const logic_cases::Case& c : logic_cases::cases()) {
     logic_cases::Host host;
@@ -3382,6 +3474,55 @@ TEST(logic_tier_cases_interpreter) {
       // the last Go: value 1, no text - as snprintf writes it ("%s" of three bytes at most: "abc")
       char want[64];
       std::snprintf(want, sizeof want, "%02d:%06.3f|%s|%5.1f|%x|%c|100%%%s", 1, 1.0, "", 1.0, 1, 65, "abc");
+      CHECK(inst->get("Shown").as_text() == want);
+    }
+    if (std::string(c.name) == "text_scan") {
+      // what std::string and the C library give for the same texts
+      const std::string hello = "hello world";
+      float f = 0;
+      long long q = 0;
+      char word[32] = "x", rest[96] = "y";
+      const int n = std::sscanf(" 2.5 -7 word rest of it", "%f %lld %31s %95[^\n]", &f, &q, word, rest);
+      int five = 5;
+      const int none = std::sscanf("", "x%d", &five);
+      char* end = nullptr;
+      const char* number = "x 1e-3y";
+      const double d = std::strtod(number + 1, &end);
+      std::string replaced = hello;
+      replaced.replace(0, 5, "HELLO");
+      std::string inserted = "ac";
+      inserted.insert(1, "b");
+      std::string erased = "settings reset";
+      erased.erase(8);
+      char want[512];
+      std::snprintf(want, sizeof want, "%d|%d|%d|%d|%d|%d|%d|%s|%s|%s|%s|%.17g|%d|%.9g|%d %.9g %d %s|%s|%d|%d", static_cast<int>(hello.find("o", 5)), static_cast<int>(hello.rfind("o")),
+                    static_cast<int>(std::string("key=value;x").find_first_of("=;", 4)), static_cast<int>(std::string("trim   ").find_last_not_of(" ")),
+                    static_cast<int>(std::strtoll("  -0x1Fz", nullptr, 0)), static_cast<int>(std::string("a/b/c").find_last_of("/", 2)),
+                    static_cast<int>(std::string("  x").find_first_not_of(" ")), hello.substr(6).c_str(), replaced.c_str(), inserted.c_str(), erased.c_str(), d,
+                    static_cast<int>(end - number), static_cast<double>(std::strtof("0.1", nullptr)), n, static_cast<double>(f), static_cast<int>(q), word, rest,
+                    static_cast<int>(static_cast<u32>(std::strtoull("-1", nullptr, 10))), none);
+      {
+        char w[8] = "", set[16] = "";
+        signed char hh = 0;
+        unsigned short hu = 0;
+        unsigned long long llu = 0;
+        unsigned x = 0, o = 0;
+        int nread = 0, i = 0;
+        float g = 0;
+        const int got = std::sscanf("  name -129 70000 18446744073709551615 0x1Fg 9 a b,0b101 1.25%017 rest", " %7s %hhd %hu %llu %x%n %*d %15[^,],%i %3f%%%o", w, &hh, &hu, &llu, &x, &nread,
+                                    set, &i, &g, &o);
+        char more[256];
+        std::snprintf(more, sizeof more, "|%s %d %d %d %d %s %d %.9g %d|%llu", w, hh, hu, x, nread, set, i, static_cast<double>(g), got, llu);
+        std::strncat(want, more, sizeof want - std::strlen(want) - 1);
+      }
+      {
+        // the bytes of "A\u00e4" put in after the first of [1, 2], "hi" appended; three of them from the second on
+        // as a text; "r" three times; and the three flags of Starts With, Ends With, Text Less
+        const std::string bytes = "[1, 65, 195, 164, 2, 104, 105]";
+        const std::string part = std::string("rrr") + "\x41\xc3\xa4" + "|111" + bytes;
+        std::strncat(want, part.c_str(), sizeof want - std::strlen(want) - 1);
+      }
+      if (inst->get("Shown").as_text() != want) std::printf("text_scan: %s\n    want: %s\n", inst->get("Shown").as_text().c_str(), want);
       CHECK(inst->get("Shown").as_text() == want);
     }
     if (std::string(c.name) == "while_nested") {

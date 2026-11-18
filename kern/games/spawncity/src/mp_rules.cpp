@@ -502,9 +502,14 @@ Vec2 safe_mobile_marker_point(Vec2 p, f32 w, f32 h, bool mobile) {
 
 std::string format_distance(f32 m) {
   char b[32];
-  if (m >= 1000) {
-    std::snprintf(b, sizeof b, m >= 10000 ? "%.0f km" : "%.1f km", m / 1000);
-    for (char* c = b; *c; ++c) if (*c == '.') *c = ',';
+  if (m >= 10000) {
+    std::snprintf(b, sizeof b, "%.0f km", m / 1000);
+  } else if (m >= 1000) {
+    std::snprintf(b, sizeof b, "%.1f km", m / 1000);
+    // the decimal comma (a number with one decimal has one point)
+    std::string s = b;
+    s.replace(s.find('.'), 1, ",");
+    return s;
   } else {
     std::snprintf(b, sizeof b, "%.0f m", std::fmax(10.0f, std::round(m / 10) * 10));
   }
