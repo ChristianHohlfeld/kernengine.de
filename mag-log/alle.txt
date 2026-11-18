@@ -1,0 +1,15 @@
+ok   converted_city_stream
+ok   converted_common
+ok   converted_destruction
+ok   converted_engine_geo_mesh_data
+ok   converted_engine_geo_roads
+ok   converted_engine_math_math
+ok   converted_engine_physics_physics
+ok   converted_mvt
+ok   converted_terrain
+ok   converted_tiles
+ABBRUCH converted_city_stream_cpp (rc=1): SUMMARY: AddressSanitizer: 84101927 byte(s) leaked in 307720 allocation(s). 
+ABBRUCH converted_city_stream (rc=1): SUMMARY: AddressSanitizer: 82246490 byte(s) leaked in 300503 allocation(s). 
+ABBRUCH converted_destruction_cpp (rc=1): SUMMARY: AddressSanitizer: 19876038 byte(s) leaked in 76441 allocation(s). 
+ABBRUCH converted_destruction (rc=1): SUMMARY: AddressSanitizer: 19652615 byte(s) leaked in 75517 allocation(s). 
+--- 10 ok, 0 FAIL, 4 ABBRUCH, 0 ZEIT, von 12 Tests; cost: 15, note: 10
