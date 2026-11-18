@@ -828,6 +828,39 @@ inline const std::vector<Case>& cases() {
         "links":[[1,"then",2,"exec"],[3,"result",2,"value"],[4,"value",3,"list"],[5,"value",3,"other"],[2,"then",6,"exec"],[7,"result",6,"value"],[8,"value",7,"list"],
           [9,"list",7,"other"],[10,"then",11,"exec"],[10,"value",12,"a"],[12,"result",11,"item"],[11,"then",13,"exec"],[3,"result",13,"value"],
           [14,"then",15,"exec"],[16,"result",15,"value"],[17,"value",16,"list"],[15,"then",18,"exec"],[19,"result",18,"value"],[8,"value",19,"list"],[20,"list",19,"other"]]})"},
+      // Lists Equal of structs: field by field, through a struct, a list of numbers and a list of structs in
+      // each item (the == of two std::vector of a struct whose == compares its fields). The same lists; one
+      // that differs only in a number of a struct in a list in an item, only in a field's struct, or is
+      // shorter; and a list whose items hold a NaN deep inside (Go adds one): it does not equal itself.
+      {"lists_equal_structs",
+       R"({"structs":[{"name":"Step","fields":[{"name":"Label","type":"text","value":"s"},{"name":"Cost","type":"float","value":1.5}]},)"
+       R"({"name":"Job","fields":[{"name":"Name","type":"text","value":"job"},{"name":"Now","type":"struct","of":"Step","value":{"Label":"s","Cost":1.5}},)"
+       R"({"name":"Costs","type":"float_list","value":[]},{"name":"Plan","type":"struct_list","of":"Step","value":[]}]}],"variables":[)"
+       R"({"name":"A","type":"struct_list","of":"Job","value":[{"Name":"a","Now":{"Label":"x","Cost":1},"Costs":[1,2],"Plan":[{"Label":"p","Cost":3},{"Label":"q","Cost":4}]},)"
+       R"({"Name":"b","Now":{"Label":"y","Cost":0.25},"Costs":[],"Plan":[]}]},)"
+       R"({"name":"B","type":"struct_list","of":"Job","value":[{"Name":"a","Now":{"Label":"x","Cost":1},"Costs":[1,2],"Plan":[{"Label":"p","Cost":3},{"Label":"q","Cost":4}]},)"
+       R"({"Name":"b","Now":{"Label":"y","Cost":0.25},"Costs":[],"Plan":[]}]},)"
+       R"({"name":"C","type":"struct_list","of":"Job","value":[{"Name":"a","Now":{"Label":"x","Cost":1},"Costs":[1,2],"Plan":[{"Label":"p","Cost":3},{"Label":"q","Cost":4.5}]},)"
+       R"({"Name":"b","Now":{"Label":"y","Cost":0.25},"Costs":[],"Plan":[]}]},)"
+       R"({"name":"D","type":"struct_list","of":"Job","value":[{"Name":"a","Now":{"Label":"x","Cost":1},"Costs":[1,2],"Plan":[{"Label":"p","Cost":3},{"Label":"q","Cost":4}]}]},)"
+       R"({"name":"E","type":"struct_list","of":"Job","value":[{"Name":"a","Now":{"Label":"x","Cost":1},"Costs":[1,2],"Plan":[{"Label":"p","Cost":3},{"Label":"q","Cost":4}]},)"
+       R"({"Name":"b","Now":{"Label":"y","Cost":0.5},"Costs":[],"Plan":[]}]},)"
+       R"({"name":"N","type":"struct_list","of":"Job","value":[]},{"name":"Same","type":"bool","value":false},{"name":"Deep","type":"bool","value":true},)"
+       R"({"name":"Short","type":"bool","value":true},{"name":"Field","type":"bool","value":true},{"name":"NanSelf","type":"bool","value":true}],)"
+       R"("nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.set","params":{"variable":"Same"}},{"id":3,"type":"list.equal","params":{"type":"Job"}},)"
+       R"({"id":4,"type":"var.get","params":{"variable":"A"}},{"id":5,"type":"var.get","params":{"variable":"B"}},{"id":6,"type":"var.set","params":{"variable":"Deep"}},)"
+       R"({"id":7,"type":"list.equal","params":{"type":"Job"}},{"id":8,"type":"var.get","params":{"variable":"C"}},{"id":9,"type":"var.set","params":{"variable":"Short"}},)"
+       R"({"id":10,"type":"list.equal","params":{"type":"Job"}},{"id":11,"type":"var.get","params":{"variable":"D"}},{"id":12,"type":"var.set","params":{"variable":"Field"}},)"
+       R"({"id":13,"type":"list.equal","params":{"type":"Job"}},{"id":14,"type":"var.get","params":{"variable":"E"}},)"
+       R"({"id":20,"type":"event.custom","params":{"name":"Go"}},{"id":21,"type":"list.add","params":{"variable":"N"}},)"
+       R"({"id":22,"type":"struct.make","params":{"struct":"Job"},"values":{"Name":"n"}},{"id":23,"type":"struct.make","params":{"struct":"Step"},"values":{"Label":"nan"}},)"
+       R"({"id":24,"type":"math.sub"},{"id":25,"type":"math.mul","values":{"a":1e300,"b":1e300}},{"id":26,"type":"var.set","params":{"variable":"NanSelf"}},)"
+       R"({"id":27,"type":"list.equal","params":{"type":"Job"}},{"id":28,"type":"var.get","params":{"variable":"N"}}],)"
+       R"("links":[[1,"then",2,"exec"],[3,"result",2,"value"],[4,"value",3,"list"],[5,"value",3,"other"],[2,"then",6,"exec"],[7,"result",6,"value"],)"
+       R"([4,"value",7,"list"],[8,"value",7,"other"],[6,"then",9,"exec"],[10,"result",9,"value"],[4,"value",10,"list"],[11,"value",10,"other"],)"
+       R"([9,"then",12,"exec"],[13,"result",12,"value"],[4,"value",13,"list"],[14,"value",13,"other"],[20,"then",21,"exec"],[22,"value",21,"item"],)"
+       R"([23,"value",22,"Now"],[24,"result",23,"Cost"],[25,"result",24,"a"],[25,"result",24,"b"],[21,"then",26,"exec"],[27,"result",26,"value"],)"
+       R"([28,"value",27,"list"],[28,"value",27,"other"]]})"},
       // Maps and sets: in the order their keys came. Int, Text, enum, Int64 and Bool keys; values that
       // are Floats, Texts, lists and structs; every node of both; a value of a map as a place
       // (Cells[i].Count += 1, a list in it, one beside the map); taking out from the middle of the
