@@ -1247,6 +1247,63 @@ selbst“).
   vergleicht, gibt jeder Seite eigene Objekte, gleich aufgesetzt: Ein Handle, das sie noch nicht
   kennt, nennt ein Objekt, wie C++ es ohne Argumente macht (`engine_make_default`).
 
+### Plätze der Engine
+
+Gibt eine Methode eines Objekts der Engine eine Referenz ohne `const` auf etwas, das das Objekt hält, und
+schlägt sie es nur nach – ihr Rumpf ist genau `return feld_;` (`std::vector<ShotEvent>& shots() { return
+shots_; }`; `tools/engine_api.py` prüft das am Baum, nicht am Namen), keine weiteren Eingänge, und was sie gibt,
+ist selbst kein Objekt der Engine –, dann ist ihr Knoten ein **Platz der Engine** (`EngineFunction::place`, in
+der Liste `place`), keine Kopie. Jede andere Funktion, die `T&` gibt, bleibt ein Knoten, der eine Kopie gibt.
+
+```cpp
+void Shoot() {
+  engine_game_world_shots(n12, World);   // auto& shots = world->shots();  - einmal gebunden
+  list_add(n12.result, Shot);             // shots.push_back(shot);
+  n12.result[0].to = Vector{0.0, 0.0, 1.0};  // shots[0].to = {0, 0, 1};
+  Count = list_length<game_ShotEvent>(n12.result);  // shots.size()
+}
+struct { engine_game_world_shots_place<List<game_ShotEvent>> result = {}; } n12;
+```
+
+- **Der Platz ist der Ausgang des Knotens.** Läuft der Knoten, bindet er den Platz (in C++: `auto& r = f();`,
+  ein Aufruf). Die Knoten von Plätzen – Get, Set, Add to, Take, die Schritte einer Liste, auch mit Weg
+  (`n12.result[i].to`) – nennen ihn statt einer Variablen: Einstellung `bound` = Id des Knotens (statt
+  `variable`), der Weg wie gehabt. Sein Member ist immer `<knoten>_place<Typ> result = {};`
+  (`engine_values::Place`), auch wo ihn niemand nennt. Der Editor bietet diese Knoten auf einem Platz der Engine
+  an wie auf einer Variablen („Places of the Engine“).
+- **Regeln (check).** Vom Platz geht kein Draht (ein Draht wäre ein Schnappschuss; die Klasse liest, was jetzt
+  dort steht). Der bindende Knoten liegt auf jedem Weg zu jedem Knoten, der den Platz nennt, in derselben Kette
+  – ein Platz gilt, solange in C++ die Referenz gälte: im Lauf der Funktion, in dem der Knoten lief; über ein
+  Warten (ein latenter Knoten) oder einen anderen Einstieg hinweg nicht. Ein Platz ist kein Referenz-Argument
+  eines Aufrufs. „Gehaltener Eintrag bleibt“ gilt wie für Variablen; ein Eintrag neben der Liste ist ein eigener
+  mit den Defaults, von dem nichts bleibt.
+- **Interpreter und JIT (durch die Tür).** Der Knoten ruft seine Funktion durch die Tür (aufgezeichnet, wie
+  jeder Aufruf) und hält im Ausgang die Eingänge, mit denen er band. Jedes Nennen liest durch die Tür
+  `<funktion>@get` (`engine.game_world.shots@get`), jede Änderung liest so und setzt danach `<funktion>@set`
+  (`kern/src/<Teil>/engine_calls.gen.cpp`, aus derselben Tabelle). Scheitert `@get` (das Handle nennt kein
+  Objekt mehr), erfährt es der Host, gelesen wird die Null des Typs, geschrieben wird ins Leere. Der JIT
+  übernimmt einen Graphen mit Plätzen nicht; er läuft im Interpreter.
+- **Klasse (direkt, typisiert, ohne Kopie).** Binden ist ein Nachschlagen: das Handle und die Adresse dessen,
+  was die Engine hält (`P::C`, z. B. `std::vector<kern::game::ShotEvent>`). Jedes Nennen arbeitet dort: ein
+  Feld eines Eintrags wird gelesen, wie C++ es liest (ein 32-Bit-Feld der Engine wird erst beim Lesen eine
+  64-Bit-Zahl und beim Schreiben zurück), `list_add` hängt an die Liste der Engine an, `list_length` zählt ohne
+  zu lesen – kein `logic::Value`, keine Kopie: Nennen fordert keinen Speicher an, wo C++ keinen anfordert.
+  `logic::EngineObjects` zählt die Freigaben (`generation()`): Ist seit dem Binden ein Objekt geendet, schlägt
+  die Klasse das Handle neu nach, wie die Tür es jedes Mal tut – sie schreibt nie auf einen toten Zeiger und
+  sagt dem Host dasselbe wie die Tür (`<funktion>@get`), liest die Null des Typs, schreibt ins Leere. Ohne
+  Objekte der Engine (ein Test mit dem Stellvertreter) liest dieselbe Klasse durch die Tür (`@get`) in eine
+  eigene Kopie und setzt jede Änderung zurück (`@set`) – was der Interpreter tut.
+- **Stellvertreter.** `logic::EngineStandIn` hält je Funktion und Eingängen, was hinter dem Platz steht
+  (anfangs aus der Form des Ausgangs, wie jede Antwort); `@get` gibt es, `@set` setzt es – beides sind keine
+  Aufrufe, die er aufzeichnet (die Quelle ruft `shots()` einmal und schreibt dann in den Speicher).
+- **Geprüft:** der native Fall „EnginePlaces“ (`kern/tests/blueprint_native.h`: Felder, Einträge, Listen in
+  Einträgen, 32-Bit-Felder, die Schritte einer Liste, neben der Liste, Freigabe während gebunden, ein Platz ohne
+  Objekt) gegen den Stellvertreter und auf der Engine selbst – der Interpreter durch die Tür, die Klasse direkt,
+  jede Variable und alles, was der Host erfährt, gleich; im Fall „Engine“ jeder Platz der Tabelle;
+  `engine_places_class_names_the_engines_list` vergleicht die Liste der Engine mit dem, was C++ mit
+  `BuildingBuilder::chunks()` tut, Bit für Bit, und zählt die Speicheranforderungen; der Fall mit jedem Knoten
+  hat einen Platz (`kern/tests/test_main.cpp`).
+
 ### Formeln
 
 Eine Formel ist der Ausdruck selbst, als Lambda über ihre Eingänge. Operatoren, die in C++ etwas
