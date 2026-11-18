@@ -15,7 +15,5 @@ namespace sc::rules {
 
 /// The level file's text.
 std::string_view level_text();
-/// The Blueprint of the level's actor `actor` (false: no such actor, or it has none - `error` says why).
-bool actor_graph(std::string_view actor, kern::logic::Graph& out, std::string& error);
 
 }  // namespace sc::rules

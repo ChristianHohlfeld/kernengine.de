@@ -33,6 +33,9 @@ class Marks {
   struct Scorch { Vec2 c; f32 r = 0; u32 seed = 0; };
   struct WallMark { Vec3 c; Vec2 n, d; f32 size = 0, level = 0; u32 seed = 0; bool breach = false; u64 cell = 0; };
   struct Chunk { kern::physics::Body body; Vec3 half; f32 until = 0; };
+  // A ring of at most `cap` items, the oldest gives way: one function per type of item.
+  static void ring_put_Scorch(std::vector<Scorch>& v, u32& cursor, u32 cap, const Scorch& item);
+  static void ring_put_WallMark(std::vector<WallMark>& v, u32& cursor, u32 cap, const WallMark& item);
   void rebuild(const CityStream& city);
   void add_soot(Vec3 at, f32 r, const std::vector<CityStream::Wall>& walls, const Terrain& t, Rng& rng);
   void add_breach(Vec3 at, f32 r, f32 strength, const std::vector<CityStream::Wall>& walls, const Terrain& t, kern::physics::World& w, Rng& rng, f32 now);

@@ -294,6 +294,13 @@ struct BlueprintCore : logic::PureNodes {
     return -1;
   }
   template <class T> static Bool list_contains(logic::Items<T> list, const std::type_identity_t<T>& item) { return list_find<T>(list, item) >= 0; }
+  /// Lists Equal: as many items, and each equal to the one at its place (the == of two std::vector).
+  template <class T> static Bool list_equal(logic::Items<T> list, logic::Items<T> other) {
+    if (list.size() != other.size()) return false;
+    for (std::size_t k = 0; k < list.size(); ++k)
+      if (!(list.first[k] == other.first[k])) return false;
+    return true;
+  }
   template <class T> static void list_add(List<T>& list, std::type_identity_t<T> item) { logic::list::add(list, std::move(item)); }
   template <class N, class T> static void list_add(N& n, List<T>& list, std::type_identity_t<T> item) { n.index = logic::list::add(list, std::move(item)); }
   template <class T> static void list_insert(List<T>& list, Int index, std::type_identity_t<T> item) { logic::list::insert(list, index, std::move(item)); }

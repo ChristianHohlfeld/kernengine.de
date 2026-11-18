@@ -113,6 +113,11 @@ f32 blast_damage(f32 damage);
 // RespawnRadiusMin and RespawnRadiusMax.
 extern f64 kSpawnProtectMs, kRegenDelayMs, kRegenTickMs, kRespawnCooldownMs;
 extern f32 kRegenHpPerS, kRespawnRadiusMin, kRespawnRadiusMax;
+/// The Blueprint's SpawnProtectMs, BallotMs and VoiceRadius as they stand in it, read at every call: for
+/// code that keeps no state of the game (the session, net_session.cpp).
+f64 spawn_protect_ms();
+f64 ballot_ms();
+f32 voice_radius();
 
 /// What the authority decides for a damage request (authorityHit).
 enum class HitVerdict : u8 { applied, unknown_player, friendly_fire_off, protected_target, already_down };

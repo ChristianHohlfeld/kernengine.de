@@ -159,6 +159,27 @@ MATH = {"sqrt": "sqrt", "sqrtf": "sqrt", "fabs": "abs", "fabsf": "abs", "abs": "
         "copysign": "copysign", "copysignf": "copysign", "remainder": "remainder", "remainderf": "remainder"}
 
 
+# The functions of a formula whose number only the engine's own mathematics says (kern::math: sin, cos, tan ... as
+# every machine computes them the same) - each with how many arguments it takes. A constant of the program
+# computed with one of them is the number the engine gives for it (engine_formula).
+ENGINE_MATH = {"sin": 1, "cos": 1, "tan": 1, "asin": 1, "acos": 1, "atan": 1, "atan2": 2, "exp": 1, "log": 1, "pow": 2}
+_FORMULAS = {}
+
+
+def engine_formula(text):
+    """What a formula without inputs gives, computed by the engine (tools/blueprint_cpp.sh --formula): the bits
+    of the number a Blueprint has for it, in every tier and on every machine."""
+    if text not in _FORMULAS:
+        r = subprocess.run([os.path.join(ROOT, "tools", "blueprint_cpp.sh"), "--formula", text], capture_output=True, text=True)
+        try:
+            _FORMULAS[text] = float.fromhex(r.stdout.strip()) if r.returncode == 0 else None
+        except ValueError:
+            _FORMULAS[text] = None
+    if _FORMULAS[text] is None:
+        raise Wait(f"a constant the engine's formula does not compute: {text}")
+    return _FORMULAS[text]
+
+
 VECTOR_FUNCTIONS = ("length", "dot", "cross", "distance", "normalize", "lerp", "length_sq", "distance_sq", "finite", "min_of", "max_of", "clamp", "hex_color", "vmin", "vmax")
 MORE_MATH = ("hypot", "clampf", "lerp", "sign0", "hash_u32", "ldexp", "ldexpf", "tanh", "tanhf", "sinh", "sinhf", "cosh", "coshf", "asinh", "asinhf", "log2", "log2f", "log10", "log10f", "cbrt", "cbrtf")
 
@@ -1317,6 +1338,13 @@ class Unit:
         t = re.sub(r"\b(const|volatile|struct|class|enum)\b", " ", t).replace("&&", " ").replace("&", " ").replace("(anonymous namespace)::", "")
         return re.sub(r"(?<![\w:])(?:kern::|std::)?(f32|f64|i8|i16|i32|i64|u8|u16|u32|u64|uint64_t|int64_t|uint8_t|uint16_t|uint32_t|int8_t|int16_t|int32_t|usize|Vec2|Vec3|Vec4|Quat|Mat4|size_t)\b", lambda m: ALIAS[m.group(1)], t)
 
+    def scope_for(self, d):
+        """Where the names of a function's declaration are looked up (find_type): in its class for a method -
+        also one defined outside it (`void Field::rebuild(const std::vector<Spot>& spots)`: Spot is
+        Field::Spot, as C++ looks a name up after the class is named) -, else in its namespace."""
+        owner = self.tree.owner.get(d["id"])
+        return owner + "::" if owner else self.tree.scope_of.get(d["id"])
+
     def find_type(self, t):
         """The program's record or enum a type name means (its qualified name), or None."""
         if self.lookup_scope and not t.startswith("::"):
@@ -2192,7 +2220,7 @@ class Unit:
             if d["id"] in getattr(self, "barred", {}):
                 raise Wait(self.barred[d["id"]])
             outer, self.local_scope = self.local_scope, self.tree.local_scope(d)
-            looked, self.lookup_scope = self.lookup_scope, self.tree.scope_of.get(d["id"])
+            looked, self.lookup_scope = self.lookup_scope, self.scope_for(d)
             try:
                 Emit(self, f).run()
             finally:
@@ -2250,7 +2278,7 @@ class Unit:
                 # the types it takes and gives are this Blueprint's too now: as this file's compiler sees them
                 # (they are the same types - a type is converted the same wherever it is seen)
                 seen = []
-                looked, self.lookup_scope = self.lookup_scope, self.tree.scope_of.get(d["id"])
+                looked, self.lookup_scope = self.lookup_scope, self.scope_for(d)
                 try:
                     if f.self_type is not None:
                         mine = self.struct(self.tree.owner.get(d["id"]))
@@ -2480,6 +2508,10 @@ class Const:
                 return min(args)
             if name in ("max", "max_of", "fmax"):
                 return max(args)
+            # (sin, cos, tan ... : the number the language's own function gives - the engine computes it, with its
+            # own mathematics, the same on every machine: what a Blueprint calling the function has)
+            if MATH.get(name) in ENGINE_MATH and len(args) == ENGINE_MATH[MATH[name]] and all(math.isfinite(a) for a in args):
+                return engine_formula(f"{MATH[name]}({', '.join(repr(float(a)) for a in args)})")
             raise Wait(f"a constant computed with {name}()")
         if k == "CXXDefaultInitExpr" or k == "ImplicitValueInitExpr" or k == "CXXScalarValueInitExpr":
             return 0.0
@@ -4200,8 +4232,13 @@ class Emit:
             return self.for_loop(s), False
         if k == "WhileStmt":
             c = kids(s)
+            declared = []
+            if s.get("hasVar") and len(c) > 2 and c[0].get("kind") == "DeclStmt":
+                # `while (auto m = next()) ...` - what the condition declares is made anew before every test of it
+                declared = self.block([c[0]])
+                c = c[1:]
             cond = self.bx(c[0])
-            cond_pre = self.take_pre()
+            cond_pre = declared + self.take_pre()
             loop = self.enter_loop(c[-1])
             body = self.loop_body(loop, [c[-1]])
             return self.loop_lines(cond, cond_pre, body, loop), False
@@ -5706,6 +5743,8 @@ class Emit:
                 break
         if self.nothing(b):
             return bt + "{}"
+        if b.get("kind") == "MemberExpr" and b.get("name") == "data" and kids(b) and re.match(r"(?:const\s+)?(?:kern::)?Span<", self.ctype(kids(b)[0])) and self.tp_or_none(kids(b)[0]) == bt:
+            return self.ex(kids(b)[0], bt)   # (the data of a view of a list - kern::Span - is the list the view is)
         if b.get("kind") == "UnaryOperator" and b.get("opcode") == "&":
             return f'list_make<{it}, "1">({self.ex(kids(b)[0], it)})'
         raw = bare(a)
@@ -6529,6 +6568,70 @@ class Emit:
             raise Wait(f"algorithm: std::find of a {it}")
         return self.bx({"kind": "BinaryOperator", "opcode": "==", "type": {"qualType": "bool"}, "inner": [x, y]})
 
+    def memberwise(self, cpp, seen=()):
+        """Does C++'s == of the type `cpp` say what the language's == of its value says - a struct's: every field
+        equal to that field of the other, in their order, each as its own type compares (a number as a number: a NaN
+        equals nothing)? Numbers, flags, values of an enum, texts held as texts (std::string, not a pointer),
+        vectors, lists of such (std::vector: as many, each equal), and a struct of the program whose == compares
+        each of its fields once, in the order they are declared, with && - written so, or `= default` - and nothing else."""
+        t = re.sub(r"^const\s+", "", self.u.clean(cpp)).strip()
+        if t in NUMBER or t in W64 or t == "kern::Vec3" or (t in TEXT and "*" not in t):
+            return True
+        m = re.match(r"std::vector<(.+)>$", t)
+        if m:
+            return self.memberwise(template_args(t)[0], seen)
+        q = self.u.find_type(t)
+        if q in self.tree.enums:
+            return True
+        if q not in self.tree.records or q in seen:
+            return False
+        rec = self.tree.records[q]
+        if rec.get("bases"):
+            return False
+        fields = [c for c in kids(rec) if c.get("kind") == "FieldDecl"]
+        ops = [c for c in kids(rec) if c.get("kind") == "CXXMethodDecl" and c.get("name") == "operator=="]
+        ops += [f for c in kids(rec) if c.get("kind") == "FriendDecl" for f in kids(c) if f.get("kind") == "FunctionDecl" and f.get("name") == "operator=="]
+        if len(ops) != 1 or not fields or not all(self.memberwise(qtype(f), seen + (q,)) for f in fields):
+            return False
+        op = ops[0]
+        if op.get("explicitlyDefaulted") == "default":
+            return True
+        params = [c for c in kids(op) if c.get("kind") == "ParmVarDecl"]
+        body = next((c for c in kids(self.tree.body.get(op["id"], op)) if c.get("kind") == "CompoundStmt"), None)
+        if op.get("kind") != "CXXMethodDecl" or len(params) != 1 or body is None or len(kids(body)) != 1 or kids(body)[0].get("kind") != "ReturnStmt":
+            return False
+        names = []
+        def side(n, mine):
+            # (a field of the object itself - this->f - or of the one it is given - o.f)
+            b = self.unwrap(n)
+            while b.get("kind") == "ImplicitCastExpr" and kids(b):   # (the same on both sides: what reads or promotes the field)
+                b = self.unwrap(kids(b)[-1])
+            if b.get("kind") != "MemberExpr" or not kids(b):
+                return None
+            base = self.unwrap(kids(b)[0])
+            if mine and base.get("kind") == "CXXThisExpr" or not mine and base.get("kind") == "DeclRefExpr" and base.get("referencedDecl", {}).get("id") == params[0]["id"]:
+                return b.get("name")
+            return None
+        def walk_and(n):
+            b = self.unwrap(n)
+            while b.get("kind") == "ImplicitCastExpr" and kids(b):
+                b = self.unwrap(kids(b)[-1])
+            if b.get("kind") == "BinaryOperator" and b.get("opcode") == "&&":
+                return walk_and(kids(b)[0]) and walk_and(kids(b)[1])
+            if b.get("kind") == "BinaryOperator" and b.get("opcode") == "==":
+                x, y = kids(b)
+            elif b.get("kind") == "CXXOperatorCallExpr" and callee_name(b) == "operator==" and len(kids(b)) == 3:
+                x, y = kids(b)[1], kids(b)[2]
+            else:
+                return False
+            a, o = side(x, True), side(y, False)
+            if a is None or a != o:
+                return False
+            names.append(a)
+            return True
+        ret = kids(kids(body)[0])
+        return len(ret) == 1 and walk_and(ret[0]) and names == [f.get("name") for f in fields]
+
     def sorted_list(self, name, a):
         """std::stable_sort(v.begin(), v.end()[, before]): Sort List - the list put in order where it stands,
         stably, as std::stable_sort does: by the function it is given (a lambda that takes two entries and
@@ -6649,23 +6752,27 @@ class Emit:
             return got[0]
         pre1, holds1 = self.lazily(test)
         pre2, holds2 = self.lazily(test)
-        node = self.u.next_node
-        self.u.next_node += 1
-        self.u.members.append(f"  struct {{ {it} value = {self.u.zero(it)}; }} n{node};")
+        def taken():
+            """A Take of its own (each step of the Blueprint is one node): the member that holds what it gives."""
+            node = self.u.next_node
+            self.u.next_node += 1
+            self.u.members.append(f"  struct {{ {it} value = {self.u.zero(it)}; }} n{node};")
+            return f"n{node}"
         more = f'math_compare<"<">({self.cast("Float", at)}, {self.cast("Float", end)})'
+        n_first, n_held, n_other, n_back = taken(), taken(), taken(), taken()
         def back(i):
-            return [f"var_take(n{node}, {rest}[{i}]);", f"{lv}[{self.whole_math('+', kept, i)}] = n{node}.value;"]
+            return [f"var_take({n_back}, {rest}[{i}]);", f"{lv}[{self.whole_math('+', kept, i)}] = {n_back}.value;"]
         return before + lines + [
             f"{at} = {first};", f"{end} = {last};", f"{go} = {more};",
             f"while (loop({go})) {{", *["  " + ln for ln in pre1], f"  if ({holds1}) {{", f"    {at} += 1;", f"    {go} = {more};", "  } else {", f"    {go} = false;", "  }", "}",
             f"if ({more}) {{",
             f"  {rest} = {lt}{{}};",
             f"  list_reserve({rest}, {self.whole_math('-', end, at)});",
-            f"  var_take(n{node}, {lv}[{at}]);", f"  list_add({rest}, n{node}.value);",
+            f"  var_take({n_first}, {lv}[{at}]);", f"  list_add({rest}, {n_first}.value);",
             f"  {kept} = {at};", f"  {at} += 1;",
             f"  while (loop({more})) {{", *["    " + ln for ln in pre2],
-            f"    if ({holds2}) {{", f"      var_take(n{node}, {lv}[{at}]);", f"      {lv}[{kept}] = n{node}.value;", f"      {kept} += 1;",
-            "    } else {", f"      var_take(n{node}, {lv}[{at}]);", f"      list_add({rest}, n{node}.value);", "    }",
+            f"    if ({holds2}) {{", f"      var_take({n_held}, {lv}[{at}]);", f"      {lv}[{kept}] = {n_held}.value;", f"      {kept} += 1;",
+            "    } else {", f"      var_take({n_other}, {lv}[{at}]);", f"      list_add({rest}, {n_other}.value);", "    }",
             f"    {at} += 1;", "  }",
             *["  " + ln for ln in self.count_loop("0", self.whole_math("-", f"list_length<{it}>({rest})", "1"), back)],
             "}"] + after
@@ -8487,6 +8594,15 @@ class Emit:
                 return (r if name == "operator==" else f"logic_not({r})"), "Bool"
         if len(ops) == 2 and self.tp(ops[1]) == "Text" and name in ("operator==", "operator!=") and t0 == "Text":
             pass
+        if t0 and t0.startswith("List<") and name in ("operator==", "operator!=") and len(ops) == 2 and self.tp(ops[1]) == t0 and not self.own(ref.get("id")):
+            # a == b of two std::vector of one type: Lists Equal - as many items, each equal to the one at its
+            # place. (Items that are numbers, flags, texts or values of an enum: their == is the language's; what
+            # the == of a class of the program says is that class's own matter.)
+            it = t0[5:-1]
+            cpp = re.match(r"std::vector<(.+)>$", self.u.clean(qtype(ops[0])))
+            if it in ("Int", "Float", "Bool", "Text", "Int64") or it in self.u.enum_values or (it in self.u.struct_fields and cpp and self.memberwise(template_args(cpp.group(0))[0])):
+                r = f"list_equal<{it}>({self.ex(ops[0], t0)}, {self.ex(ops[1], t0)})"
+                return (r if name == "operator==" else f"logic_not({r})"), "Bool"
         raise Wait(f"the operator {name[8:]} of {t0}")
 
     def owned_object(self, n):
@@ -9055,7 +9171,7 @@ class Api:
         """The node of a declared function of the engine: a dict - or Wait, when its types have no place. (Its
         types' names are looked up as C++ looks them up where it is declared: `Shape` in kern::game is
         kern::game::Shape, also where kern::physics has a Shape of its own.)"""
-        looked, self.u.lookup_scope = self.u.lookup_scope, self.tree.scope_of.get(d["id"]) or self.u.lookup_scope
+        looked, self.u.lookup_scope = self.u.lookup_scope, self.u.scope_for(d) or self.u.lookup_scope
         try:
             return self.function1(d)
         finally:
@@ -11625,10 +11741,13 @@ class TestWriter:
             if v.get("name") and self.actor_blueprint(qtype(v)) and self.inside(v, [tree.records[q] for q in sorted(G.records)]) is None:
                 bindings.append("::".join(classes_of(tree.scope_of.get(first["id"], "")) + [v["name"]]))
         bindings += [name for p in G.foreign.values() for name in p.get("actors", ())]
+        looked = u.lookup_scope
         for f in u.order:
             d = f.decl
             if f.lifted:
                 continue   # (a local function: in the source of the function it stands in, compared with it)
+            # (the types it takes are looked up where its declaration stands, as the converter read them: in its class)
+            u.lookup_scope = u.scope_for(d)
             owner = tree.owner.get(d["id"])
             free = G.freed.get(d["id"], (None,))[0]
             if free:
@@ -11796,6 +11915,7 @@ class TestWriter:
                 + (f", &vars, {'true' if f.mutates else 'false'}" if f.state else "") + ");",
                 "    }",
                 "  }"])))
+        u.lookup_scope = looked
         if not cases:
             return None, skipped
         system, own = ["#include <cfenv>", "#include <cmath>", "#include <cstdio>", "#include <string>", "#include <type_traits>", "#include <vector>"], []
