@@ -9,6 +9,9 @@
 #   konvert <git-ref> <kerne>          nur die Konvertierung des ganzen Spiels mit genau so vielen Kernen (Ergebnis wie voll, Commit 1)
 #   engine <git-ref> [filter]           nur die Engine-Suite
 #   spiel <git-ref> [filter]            nur die Spiel-Suite (ohne neue Konvertierung)
+#   vergleich <git-ref> <quellen…>      wie probe, und danach der Vergleich Bit für Bit: die Tests dieser Quelltexte werden gebaut und laufen jeder für sich,
+#                                       gegen den Stellvertreter und gegen die Engine selbst (Level: das des letzten gültigen vollen Laufs, Datei "grundlage").
+#                                       Ergebnis wie bei "alle" (mag-log/alle.txt …) und convert.log, texts/. Beleg für diese Einheiten - der Beweis bleibt "voll".
 #   alle <git-ref>                      die Vergleichstests der Spiel-Suite einzeln: jeder Test tests/converted/test_<einheit>.cpp in seinem eigenen
 #                                       Lauf, einmal gegen den Stellvertreter und einmal gegen die Engine selbst (SC_ENGINE=real) - ein Abbruch oder
 #                                       Fehlschlag hält die anderen nicht auf. <git-ref> hat Level und Tests (z. B. origin/mag/ergebnis-<voller lauf>).
@@ -49,7 +52,7 @@ run_job() {  # name
   ( flock 7; [ -d "$J/.spiegel.git" ] || git clone -q --mirror "$REPO" "$J/.spiegel.git"; git -C "$J/.spiegel.git" fetch -q --prune origin ) 7> "$J/.spiegel.lock"
   git clone -q "$J/.spiegel.git" "$W" 2>/dev/null && cd "$W" && git remote set-url origin "$REPO" && git checkout -q --detach "$ref" 2>/dev/null || { echo "$name: Stand $ref nicht gefunden"; return; }
   local SHA; SHA="$(git rev-parse --short HEAD)"
-  jobs=$(( N / 6 )); [ "$kind" = voll ] && jobs=$(( N * 2 / 3 )); [ "$kind" = alle ] && jobs=$(( N * 2 / 3 ))
+  jobs=$(( N / 6 )); [ "$kind" = voll ] && jobs=$(( N * 2 / 3 )); [ "$kind" = alle ] && jobs=$(( N * 2 / 3 )); [ "$kind" = vergleich ] && jobs=$(( N / 4 ))
   export KERN_JOBS="$jobs" TMPDIR="$W/tmp" SC_TEST_OUT="$W/tmp/sc-tests"; mkdir -p "$TMPDIR" mag-log
   echo "$name: $kind auf $SHA ($ref), $jobs Kerne, Start $(date '+%F %T')" > mag-log/when
   echo "werkzeuge: clang=${CLANGXX:-FEHLT} ($("${CLANGXX:-false}" --version 2>/dev/null | head -1)) c++=$(command -v c++ || echo FEHLT) ($(c++ --version 2>/dev/null | head -1)) python=$(python3 --version 2>&1) PATH=$PATH" >> mag-log/when
@@ -86,31 +89,17 @@ run_job() {  # name
     engine) ( time kern/tests/run.sh $rest ) > mag-log/engine.log 2>&1; echo "engine rc=$? $(date '+%T')" >> mag-log/when ;;
     alle)
       find mag-log -type f ! -name when -delete 2>/dev/null; rm -rf mag-zwischen   # (was der Stand selbst an Protokollen mitbringt, gehört nicht zu diesem Auftrag)
-      # (bauen: run_tests.sh mit einem Filter, auf den kein Test passt - das Programm steht danach in $SC_TEST_OUT)
-      ( time kern/games/spawncity/tests/run_tests.sh __kein_test_heisst_so__ ) > mag-log/bau.log 2>&1; echo "bau rc=$? $(date '+%T')" >> mag-log/when
-      if [ -x "$SC_TEST_OUT/spawncity_tests" ]; then
-        mkdir -p "$W/tmp/einzeln" "$W/tmp/einzeln-real"
-        ( cd kern/games/spawncity/tests/converted && ls test_*.cpp | sed 's/^test_/converted_/; s/\.cpp$//' ) > "$W/tmp/namen.txt"
-        export T="$SC_TEST_OUT/spawncity_tests" E="$W/tmp"
-        # (der Filter des Programms ist ein Teil des Namens: "converted_car" trifft auch converted_car_cpp - der läuft dann zweimal, das Ergebnis ist dasselbe)
-        xargs -P "$KERN_JOBS" -I{} bash -c '"$T" "{}" > "$E/einzeln/{}.txt" 2>&1; echo "{} rc=$?" >> "$E/einzeln.rc"; SC_ENGINE=real "$T" "{}" > "$E/einzeln-real/{}.txt" 2>&1; echo "{} rc=$?" >> "$E/einzeln-real.rc"' < "$W/tmp/namen.txt"
-        for m in einzeln einzeln-real; do
-          o=mag-log/alle.txt; [ "$m" = einzeln-real ] && o=mag-log/alle-real.txt
-          { grep -hE '^(ok|FAIL) ' "$W/tmp/$m"/*.txt | sort -u
-            sort "$W/tmp/$m.rc" | while read -r n rc; do
-              case "$rc" in rc=0|rc=1) ;; *) echo "ABBRUCH $n ($rc): $(grep -hE 'ERROR: AddressSanitizer|runtime error|Assertion|terminate|Segmentation' "$W/tmp/$m/$n.txt" | head -1 | cut -c1-200)" ;; esac
-            done
-            echo "--- $(grep -hE '^ok ' "$W/tmp/$m"/*.txt | sort -u | wc -l) ok, $(grep -hE '^FAIL ' "$W/tmp/$m"/*.txt | sort -u | wc -l) FAIL, $(grep -cvE ' rc=[01]$' "$W/tmp/$m.rc") ABBRUCH, von $(wc -l < "$W/tmp/namen.txt") Tests; cost: $(grep -hE '^  cost:' "$W/tmp/$m"/*.txt | sort -u | wc -l), note: $(grep -hE '^  note:' "$W/tmp/$m"/*.txt | sort -u | wc -l)"
-          } > "$o"
-          grep -hE 'check failed|calls differ' "$W/tmp/$m"/*.txt | sed -E 's#^.*converted\.h:[0-9]+: ##' | sort -u > "${o%.txt}-abweichungen.txt"
-          grep -hE '^  cost:' "$W/tmp/$m"/*.txt | sort -u > "${o%.txt}-cost.txt"
-        done
-        tar -C "$W/tmp" -cf - einzeln einzeln-real | xz -6 -T0 > mag-log/einzeln.tar.xz
-        bad=$(( $(grep -cvE ' rc=0$' "$W/tmp/einzeln.rc") + $(grep -cvE ' rc=0$' "$W/tmp/einzeln-real.rc") ))
-        echo "alle rc=$([ "$bad" = 0 ] && echo 0 || echo 1) $(date '+%T') ($(tail -1 mag-log/alle.txt); real: $(tail -1 mag-log/alle-real.txt))" >> mag-log/when
-      else
-        echo "alle rc=2 $(date '+%T') (das Testprogramm ist nicht gebaut: bau.log)" >> mag-log/when
-      fi ;;
+      einzeln ;;
+    vergleich)   # vergleich <git-ref> <quellen…>: der Konverter über diese Quelltexte UND der Vergleich Bit für Bit ihrer Tests, jeder Test in seinem eigenen Lauf
+      find mag-log -type f ! -name when -delete 2>/dev/null; rm -rf mag-zwischen
+      # (Grundlage: das Level des letzten gültigen vollen Laufs - die Datei "grundlage" im Auftragszweig nennt seinen Zweig; dort stehen die Blueprints der
+      # anderen Einheiten, wie der Konverter sie zuletzt schrieb. Die Tests dieses Auftrags sind allein die der genannten Quelltexte.)
+      local base; base="$(cat "$A/grundlage" 2>/dev/null)"
+      if [ -n "$base" ] && git fetch -q origin "$base" 2>/dev/null && git checkout -q FETCH_HEAD -- kern/games/spawncity/level/spawncity.klevel; then
+        echo "grundlage: $base $(git rev-parse --short=8 FETCH_HEAD)" >> mag-log/when; else echo "grundlage: keine (das Level des Stands)" >> mag-log/when; fi
+      ( cd kern/games/spawncity && rm -rf tests/converted && time FUNCTIONS=1 TEST_ERRORS=1 $conv --level level/spawncity.klevel --test tests/converted --texts "$W/mag-log/texts" -- $rest ) > mag-log/convert.log 2>&1
+      echo "convert rc=$? $(date '+%T')" >> mag-log/when
+      if ls kern/games/spawncity/tests/converted/test_*.cpp > /dev/null 2>&1; then einzeln; else echo "alle rc=2 $(date '+%T') (die Konvertierung schrieb keinen Test)" >> mag-log/when; fi ;;
     spiel)  ( time kern/games/spawncity/tests/run_tests.sh $rest ) > mag-log/suite.log 2>&1; echo "suite rc=$? $(date '+%T')" >> mag-log/when ;;
     *) echo "unbekannte Art $kind" >> mag-log/when ;;
   esac
@@ -118,6 +107,39 @@ run_job() {  # name
   xz -9 -T0 mag-log/*.log 2>/dev/null; git add -f mag-log
   $G commit -q -m "mag: Protokolle von $name auf $SHA"; git push -q origin "mag/ergebnis-$name" || echo "$name: Push fehlgeschlagen"
   cd "$A"; rm -rf "$W"; echo "$(date '+%F %T') $name fertig"
+}
+# (jeder Vergleichstest aus tests/converted in seinem eigenen Lauf - gegen den Stellvertreter und gegen die Engine selbst, höchstens 20 Minuten je Lauf; ein
+# Abbruch, ein Fehlschlag oder ein Hänger hält die anderen nicht auf. Schreibt mag-log/alle.txt, alle-real.txt, *-abweichungen.txt, *-cost.txt, einzeln.tar.xz
+# und die Ergebniszeile in mag-log/when. Liest $W, $SC_TEST_OUT, $KERN_JOBS des Auftrags.)
+einzeln() {
+  # (bauen: run_tests.sh mit einem Filter, auf den kein Test passt - das Programm steht danach in $SC_TEST_OUT)
+  ( time kern/games/spawncity/tests/run_tests.sh __kein_test_heisst_so__ ) > mag-log/bau.log 2>&1; echo "bau rc=$? $(date '+%T')" >> mag-log/when
+  if [ ! -x "$SC_TEST_OUT/spawncity_tests" ]; then echo "alle rc=2 $(date '+%T') (das Testprogramm ist nicht gebaut: bau.log)" >> mag-log/when; return; fi
+  mkdir -p "$W/tmp/einzeln" "$W/tmp/einzeln-real"
+  ( cd kern/games/spawncity/tests/converted && ls test_*.cpp | sed 's/^test_/converted_/; s/\.cpp$//' ) > "$W/tmp/namen.txt"
+  export T="$SC_TEST_OUT/spawncity_tests" E="$W/tmp"
+  # (der Filter des Programms ist ein Teil des Namens: "converted_car" trifft auch converted_car_cpp - der läuft dann zweimal, das Ergebnis ist dasselbe)
+  xargs -P "$KERN_JOBS" -I{} bash -c 'timeout -k 10 1200 "$T" "{}" > "$E/einzeln/{}.txt" 2>&1; echo "{} rc=$?" >> "$E/einzeln.rc"; SC_ENGINE=real timeout -k 10 1200 "$T" "{}" > "$E/einzeln-real/{}.txt" 2>&1; echo "{} rc=$?" >> "$E/einzeln-real.rc"' < "$W/tmp/namen.txt"
+  local m o n rc bad=0
+  for m in einzeln einzeln-real; do
+    o=mag-log/alle.txt; [ "$m" = einzeln-real ] && o=mag-log/alle-real.txt
+    : > "$W/tmp/$m.ab"
+    # (zu Ende gelaufen ist ein Lauf, der seine Summenzeile "N tests, M checks" schreibt - ASan endet wie ein Fehlschlag mit 1)
+    sort "$W/tmp/$m.rc" | while read -r n rc; do
+      case "$rc" in
+        rc=124|rc=137) echo "ZEIT $n: läuft länger als 20 Minuten" >> "$W/tmp/$m.ab" ;;
+        *) grep -qE '[0-9]+ tests?, [0-9]+ checks?' "$W/tmp/$m/$n.txt" || echo "ABBRUCH $n ($rc): $(grep -hE 'ERROR: AddressSanitizer|runtime error|Assertion|terminate|Segmentation|SUMMARY' "$W/tmp/$m/$n.txt" | head -2 | tr '\n' ' ' | cut -c1-260)" >> "$W/tmp/$m.ab" ;;
+      esac
+    done
+    { grep -hE '^(ok|FAIL) ' "$W/tmp/$m"/*.txt | sort -u; cat "$W/tmp/$m.ab"
+      echo "--- $(grep -hE '^ok ' "$W/tmp/$m"/*.txt | sort -u | wc -l) ok, $(grep -hE '^FAIL ' "$W/tmp/$m"/*.txt | sort -u | wc -l) FAIL, $(grep -c '^ABBRUCH' "$W/tmp/$m.ab") ABBRUCH, $(grep -c '^ZEIT' "$W/tmp/$m.ab") ZEIT, von $(wc -l < "$W/tmp/namen.txt") Tests; cost: $(grep -hE '^  cost:' "$W/tmp/$m"/*.txt | sort -u | wc -l), note: $(grep -hE '^  note:' "$W/tmp/$m"/*.txt | sort -u | wc -l)"
+    } > "$o"
+    grep -hE 'check failed|calls differ' "$W/tmp/$m"/*.txt | sed -E 's#^.*converted\.h:[0-9]+: ##' | sort -u > "${o%.txt}-abweichungen.txt"
+    grep -hE '^  cost:' "$W/tmp/$m"/*.txt | sort -u > "${o%.txt}-cost.txt"
+    bad=$(( bad + $(grep -cvE ' rc=0$' "$W/tmp/$m.rc") + $(wc -l < "$W/tmp/$m.ab") ))
+  done
+  tar -C "$W/tmp" -cf - einzeln einzeln-real | xz -6 -T0 > mag-log/einzeln.tar.xz
+  echo "alle rc=$([ "$bad" = 0 ] && echo 0 || echo 1) $(date '+%T') ($(tail -1 mag-log/alle.txt); real: $(tail -1 mag-log/alle-real.txt))" >> mag-log/when
 }
 while [ ! -e "$A/STOP" ]; do
   git -C "$A" pull -q --ff-only origin mag/auftrag 2>/dev/null || true
