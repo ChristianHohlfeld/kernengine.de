@@ -1,0 +1,80 @@
+    WorldArt::set_mesh (11): written
+world_marks                     1 /    1 functions        1 /      1 lines
+    Marks::stats (1): a name for a place - written where it is called
+world_marks_cpp                13 /   15 functions      341 /    376 lines
+    ragged (1): written
+    Marks::ring_put_Scorch (5): written
+    Marks::ring_put_WallMark (5): written
+    Marks::clear (14): written
+    Marks::blast (22): written
+    Marks::add_soot (32): written
+    Marks::add_breach (44): written
+    Marks::spawn_rubble (33): written
+    fh (1): written
+    facade_glass (24): written
+    Marks::bullet (23): written
+    Marks::update (13): algorithm: std::remove_if with a function value that is no lambda
+    Marks::prune_walls (22): algorithm: std::remove_if with a function value that is no lambda
+    Marks::rebuild (112): written
+    Marks::draw (25): written
+world_traffic                   1 /    1 functions        1 /      1 lines
+    TrafficRules::junctions (1): a name for a place - written where it is called
+world_traffic_cpp               8 /    9 functions      166 /    308 lines
+    cell (1): written
+    TrafficRules::rebuild (142): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: missing initializer for member ‘converted_world_traffic_cpp::TrafficRules::Arm::pole’ [-Werror=missing-field-initializers])
+    TrafficRules::near (12): written
+    TrafficRules::bind (1): written
+    TrafficRules::take_laws (8): written
+    TrafficRules::light (6): written
+    TrafficRules::pursuit (32): written
+    TrafficRules::gap_speed (20): written
+    TrafficRules::limit (86): written
+
+1632 of 1844 functions of the program are written as Blueprints (18813 of 30978 lines), and 28 of the engine's headers that they call: 156 Blueprints - 70 of source files, 1 of states, 85 of headers and of shapes
+1589 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in; 5 give nothing
+
+what the others wait for: functions (lines)
+    33 (  1682)   the engine's now_ms() (its node is another one in the engine: its pins differ)
+    24 (  1308)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘Game’ has not been declared - that went with Renderer: no matching function for call to ‘take(kern::Span<converted_Game__game_look_cpp::Mesh*>&, const sc::converted::Value&)’)
+    11 (  1063)   it calls Game::ctl_strike_confirm(), which waits
+     4 (   364)   an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
+     7 (   359)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_gaps_cpp::net::Session’ has no member named ‘send_fx’ - that went with send_fx: ‘kUnreliable’ was not declared in this scope; did you mean ‘converted_Game__game_gaps_cpp::net::net_session_cpp_local::kUnreliable’?)
+     4 (   331)   the engine's shots() (its node is another one in the engine: its pins differ)
+     7 (   307)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_townsync_cpp::net::Session’ has no member named ‘town_to_host’ - that went with town_to_host: ‘kReliable’ was not declared in this scope; did you mean ‘converted_Game__game_townsync_cpp::net::net_session_cpp_local::kReliable’?)
+     1 (   306)   a vector constant written as CallExpr
+     5 (   273)   it calls Game::damage_car(), which waits
+     2 (   269)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘safe_mobile_marker_point’ is not a member of ‘converted_Game__game_net_cpp::mp’; did you mean ‘sc::mp::safe_mobile_marker_point’? - that went with safe_mobile_marker_point: ‘g_rules’ is not a member of ‘converted_Game__game_net_cpp::mp::mp_rules_cpp_local’; did you mean ‘converted_Game__game_net_cpp::mp::Game__mp_rules_cpp_local::g_rules’?)
+     4 (   269)   a pointer
+     5 (   268)   the end of a Car runs its destructor ~Car(), which is not written yet
+     4 (   259)   it calls Game::hit_scan(), which waits
+     3 (   240)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: missing initializer for member ‘converted_world_traffic_cpp::TrafficRules::Arm::pole’ [-Werror=missing-field-initializers])
+     3 (   235)   the end of a Ragdolls runs its destructor ~Ragdolls(), which is not written yet
+     1 (   225)   it calls Game::hit_remotes(), which waits
+     5 (   195)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_net_cpp::net::Session’ has no member named ‘send_fx’ - that went with send_fx: ‘kUnreliable’ was not declared in this scope; did you mean ‘converted_Game__game_net_cpp::net::net_session_cpp_local::kUnreliable’?)
+     1 (   171)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_destruction_sync_cpp::net::Session’ has no member named ‘destroy_to_host’ - that went with destroy_to_host: ‘kReliable’ was not declared in this scope; did you mean ‘converted_Game__game_destruction_sync_cpp::net::net_session_cpp_local::kReliable’?)
+     5 (   170)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_townsync_cpp::net::Session’ has no member named ‘town_to_all’ - that went with town_to_all: ‘kReliable’ was not declared in this scope; did you mean ‘converted_Game__game_townsync_cpp::net::net_session_cpp_local::kReliable’?)
+     3 (   168)   a member of Int is set
+     5 (   159)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_seats_cpp::net::Session’ has no member named ‘seat_request’ - that went with seat_request: ‘kReliable’ was not declared in this scope; did you mean ‘converted_Game__game_seats_cpp::net::net_session_cpp_local::kReliable’?)
+     1 (   158)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘const struct converted_Game__game_controls_cpp::combat::Fun’ has no member named ‘multiplier’ - that went with multiplier: ‘g_fun’ is not a member of ‘converted_Game__game_controls_cpp::combat::combat_rules_cpp_local’; did you mean ‘converted_Game__game_controls_cpp::combat::Game__combat_rules_cpp_local::g_fun’?)
+     2 (   145)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_net_cpp::net::Session’ has no member named ‘color_of’ - that went with assign_colors: ‘g_rules’ is not a member of ‘converted_Game__game_net_cpp::mp::mp_rules_cpp_local’; did you mean ‘converted_Game__game_net_cpp::mp::Game__mp_rules_cpp_local::g_rules’?)
+     1 (   142)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_toss_cpp::net::Session’ has no member named ‘send_toss’ - that went with send_toss: ‘kUnreliable’ was not declared in this scope; did you mean ‘converted_Game__game_toss_cpp::net::net_session_cpp_local::kUnreliable’?)
+     1 (   142)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_vr_cpp::net::Session’ has no member named ‘send_fx’ - that went with send_fx: ‘kUnreliable’ was not declared in this scope; did you mean ‘converted_Game__game_vr_cpp::net::net_session_cpp_local::kUnreliable’?)
+     2 (   127)   it calls Game::explosion(), which waits
+     2 (   122)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_military_cpp::CombatArt’ has no member named ‘flak’ - that went with kOlive: redefinition of ‘const sc::converted::wide::Vec3 converted_Game__game_military_cpp::combat_art_cpp_local::kOlive’)
+     1 (   120)   a function value (lambda / std::function) of another shape: a lambda with auto inputs
+     1 (   117)   build_water_chunk_at(): it names a place: where it is called, the place stands - here the call could not be written so
+     1 (   111)   it calls register_node(), which waits
+     2 (   109)   a reference to something it changes
+     2 (   104)   it calls Game::melee_hit(), which waits
+     1 (   104)   algorithm: std::find_if in a list that is no place of the function
+     1 (   103)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_projsync_cpp::net::Session’ has no member named ‘send_proj’ - that went with send_proj: ‘kUnreliable’ was not declared in this scope; did you mean ‘converted_Game__game_projsync_cpp::net::net_session_cpp_local::kUnreliable’?)
+     1 (    99)   an object of the engine as a local that is not made by a constructor of it
+     1 (    89)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_events_cpp::combat::Chaos’ has no member named ‘award’ - that went with g_sandbox: redefinition of ‘converted_Game__game_events_cpp::rules::Blueprint converted_Game__game_events_cpp::combat::Game__combat_rules_cpp_local::g_military’)
+     2 (    86)   it calls GeoProjector::init(), which waits
+     2 (    83)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: invalid use of incomplete type ‘struct converted_Game__game_look_cpp::Renderer’ - that went with Renderer: no matching function for call to ‘take(kern::Span<converted_Game__game_look_cpp::Mesh*>&, const sc::converted::Value&)’)
+     1 (    81)   it calls Game::step_heli(), which waits
+     1 (    81)   it calls Game::damage_player_vehicle(), which waits
+
+real	22m42,919s
+user	348m54,038s
+sys	17m7,562s
