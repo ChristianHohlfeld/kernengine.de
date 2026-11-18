@@ -543,6 +543,16 @@ Commits seit `main`). Drei Festlegungen, damit er nicht wieder verrutscht:
 3. **Eine Datei, ein Auftrag.** Zwei Pakete haben dieselben Stellen zweimal verschieden
    umgeschrieben (`settings`, `update_scores`, `toss_`). Aufträge werden nach Dateien des Spiels
    geschnitten, nicht nach Gründen des Konverters; der Konverter bekommt nur, was allgemein ist.
+4. **Wo C++ die Reihenfolge offen lässt (Entscheidung E9, 18.11.2026),** gilt die Bedeutung, die der
+   Compiler des Spiels (clang, emscripten) der Quelle gibt – so rechnete auch das Original in JS: von
+   links. Die Absenkung benennt die Werte in dieser Reihenfolge vor dem Aufruf; ihr Differenztest wird
+   mit clang gebaut (unter GCC kann er nicht gleich sein und sagt nichts über das Spiel).
+   - `destruction.cpp`, `Destruction::fracture`: `launch(at, {s.len * rng.range(..), 0.45f, band * rng.range(..)},
+     s.yaw, tint(0.18f))` und `launch({rng.range(..), rng.range(..), ..}, {rng.range(3, 7), ..}, rng.unit() * 6.28f,
+     tint(0.25f))` – die Argumente eines Aufrufs sind unbestimmt geordnet ([expr.call]/8); clang zieht aus `rng`
+     von links (Größe, Gierwinkel, dann die Farbe), GCC von rechts (die Farbe zuerst). In `launch` dazu
+     `rng.range(2, 8) + 8 * I * rng.range(0.2f, 1)`: die Operanden von `+` sind ungeordnet ([intro.execution]/10).
+     Differenztest `tests/lowered/test_destruction_lowered.cpp` (Paar `Destruction::fracture`).
 
 Der Vergleich gegen die Engine selbst (nicht nur gegen ihren Stellvertreter) läuft seit 15.11. im
 Test mit (`SC_ENGINE=real`).
