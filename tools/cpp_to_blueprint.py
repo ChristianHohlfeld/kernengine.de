@@ -10383,6 +10383,8 @@ class TestWriter:
                     continue   # (what it takes the test has no values of: a function that calls it is not compared)
                 # (a constructor that needs no arguments - none, or a default for each - is the one C++ makes it by)
                 made = made or (f.get("role") == "make" and all(kids(p) for p in kids(f["decl"]) if p.get("kind") == "ParmVarDecl"))
+                if "  " + a in decls:
+                    continue   # (the one function, which the source and a piece of another file name by two declarations of it)
                 decls.append("  " + a)
                 defs.append((("object", q), b))
             if any(f.get("role") in ("make", "release") for f in by_class.get(q, [])) and not made:
@@ -10412,6 +10414,10 @@ class TestWriter:
             # (the stand-ins of the objects it is handed, declared before it: its header may stand before theirs -
             # `bool upsert(Renderer&, …)` in mesh_data.h, which declares Renderer only)
             named = sorted({self.object_name(q) for q in (u.object_of(qtype(p)) for p in kids(d) if p.get("kind") == "ParmVarDecl") if q in tree.records})
+            twin = next((x for x in self.free_stand_ins.values() if x[1] == head + b + tail), None)
+            if twin is not None and any(key[0] == "engine" and text == twin[1] for key, text in defs):
+                self.free_stand_ins[d["id"]] = twin   # (the one function, named by two declarations of it: said once)
+                continue
             chunks.append((tree.place(d), ("engine", d["id"]), "".join(f"struct {n}; " for n in named) + head + a + tail))
             defs.append((("engine", d["id"]), head + b + tail))
             pairs.append(("::" + tree.scope_of.get(d["id"], "") + d["name"], "::".join(spaces + [d["name"]])))
@@ -10422,6 +10428,149 @@ class TestWriter:
             for key, text in defs:
                 sys.stderr.write(f"{key}: {text}\n")
         return chunks, defs
+
+    def forward_chunks(self, pairs, G):
+        """The classes the source declares before it defines them (`class LifeArt;` in a header, for a class
+        that names it by a reference or a pointer): declared in the test where the source declares them - under
+        the name the test holds the class by (its own text, the piece of another file, a stand-in of the
+        engine's). [(place, key, text)]; a class the test does not hold is not declared."""
+        tree = self.tree
+        held = {}
+        for absolute, local, *_ in pairs:
+            held.setdefault(absolute, local)
+        for piece in G.foreign.values():
+            if piece["kind"] == "record":
+                for absolute, local, *_ in piece.get("pairs", ()):
+                    held.setdefault(absolute, local)
+        out, said = [], set()
+        for d in tree.decl.values():
+            if d.get("kind") != "CXXRecordDecl" or d.get("completeDefinition") or d.get("isImplicit") or not d.get("name"):
+                continue
+            a, b = d.get("_at", (None, None))
+            if a is None or b is None or not d.get("_file"):
+                continue
+            scope = tree.scope_of.get(d["id"], "")
+            parts = [x for x in scope.strip(":").split("::") if x]
+            if any("::".join(parts[:i + 1]) in tree.records or "::".join(parts[:i + 1]) in tree.declared for i in range(len(parts))) or self.in_function(d):
+                continue   # (declared in a class, in a function: that text has it)
+            raw = tree.text(d["_file"])
+            if not re.fullmatch(r"(?:class|struct)\s+" + re.escape(d["name"]), raw[a:b].strip()) or not raw[b:b + 64].lstrip().startswith(";"):
+                continue   # (not a declaration of its own: `struct Hit* next;`, a friend)
+            name = held.get(tree.absolute(scope + d["name"]))
+            if name is None or (name, tree.place(d)) in said:
+                continue
+            said.add((name, tree.place(d)))
+            spaces = name.split("::")
+            out.append((tree.place(d), ("forward", d["id"]), "".join(f"namespace {c} {{ " for c in spaces[:-1]) + f"struct {spaces[-1]};" + " }" * (len(spaces) - 1)))
+        return out
+
+    # ---- using-directives: `using namespace combat;` ----
+    DIRECTIVE = re.compile(r"\busing\s+namespace\s+((?:::)?\w+(?:\s*::\s*\w+)*)\s*;")
+    SPACE_NAMED = re.compile(r"\bnamespace\s+(\w+)\s*=\s*((?:::)?\w+(?:\s*::\s*\w+)*)\s*;")   # (namespace prim = kern::primitives;)
+
+    def known_spaces(self):
+        """The namespaces of the program and the engine this file's tree has, by their full names ('combat',
+        'kern::game')."""
+        if getattr(self, "spaces_known", None) is None:
+            self.spaces_known = {self.tree.scope_of.get(d["id"], "") + d["name"] for d in self.tree.decl.values() if d.get("kind") == "NamespaceDecl" and d.get("name")}
+        return self.spaces_known
+
+    def real_space(self, q):
+        """Is this a namespace that is the engine's own in a test too (its logic, its functions of numbers) -
+        or the engine's namespace itself, whose names stand at the top of the test?"""
+        return q == ENGINE or any(q == ENGINE + "::" + x or q.startswith(ENGINE + "::" + x + "::") for x in ("logic", "math"))
+
+    def space_of_directive(self, d):
+        """The namespace a using-directive of the tree names, by its full name - None: none of the program's or
+        the engine's (the standard library's)."""
+        named = d.get("nominatedNamespace") or {}
+        o = self.tree.decl.get(named.get("id"))
+        if o is not None and o.get("kind") == "NamespaceDecl" and o.get("name"):
+            return self.tree.scope_of.get(o["id"], "") + o["name"]
+        # (named by an address this tree does not have - another opening of the namespace: the one of that name)
+        found = [q for q in self.known_spaces() if q.split("::")[-1] == named.get("name")]
+        return found[0] if len(found) == 1 else None
+
+    def space_written(self, name):
+        """The namespace a using-directive in a text names as it is written there ('combat', 'kern::game',
+        '::sc::net') - by its full name, or None (as space_of_directive)."""
+        name = re.sub(r"\s+", "", name).lstrip(":")
+        if name.startswith(self.tree.namespace + "::"):
+            name = name[len(self.tree.namespace) + 2:]
+        known = self.known_spaces()
+        if name in known:
+            return name
+        found = [q for q in known if q.endswith("::" + name)]   # (written from inside a namespace: `game` in kern)
+        return found[0] if len(found) == 1 else None
+
+    def directives_of(self, file, before=None):
+        """The using-directives of a file that stand in a namespace (not in a function), in their order - those
+        before the byte `before`: [(the scope each stands in, the namespace it names)]. A source that names
+        what stands in `combat` without that name has `using namespace combat;` before it; the test's source
+        needs it as well, for its own namespace of that name."""
+        out = []
+        for d in self.tree.decl.values():
+            if d.get("kind") != "UsingDirectiveDecl" or d.get("isImplicit") or os.path.abspath(d.get("_file") or "?") != os.path.abspath(file):
+                continue
+            a = d.get("_at", (None, None))[0]
+            if a is None or (before is not None and a >= before):
+                continue
+            q = self.space_of_directive(d)
+            if q is not None:
+                out.append((a, d, self.tree.scope_of.get(d["id"], ""), q))
+        out.sort(key=lambda x: x[0])
+        return [(d, scope, q) for _, d, scope, q in out]
+
+    def directive_text(self, scope, q, ns):
+        """A using-directive as the test says it: of the test's namespace of that name (which is there, if only
+        empty), where the source says it. "": nothing to say - the names of that namespace stand at the top
+        of the test."""
+        if self.real_space(q):
+            return "" if q == ENGINE else self.in_classes(scope, f"using namespace ::{q};")
+        names = self.classes_of(q + "::")
+        if not names:
+            return ""
+        return "".join(f"namespace {c} {{ " for c in names) + "}" * len(names) + " " + self.in_classes(scope, f"using namespace ::{ns}::{'::'.join(names)};")
+
+    def directive_chunks(self, ns):
+        """The using-directives of the translation unit's files, each where it stands: [(place, key, text)]."""
+        out = []
+        for file in sorted({d.get("_file") for d in self.tree.decl.values() if d.get("kind") == "UsingDirectiveDecl" and d.get("_file")}):
+            for d, scope, q in self.directives_of(file):
+                text = self.directive_text(scope, q, ns)
+                if text:
+                    out.append((self.tree.place(d), ("directive", d["id"]), text))
+        return out
+
+    def directives_said(self, code):
+        """A using-directive in a function's text (`using namespace kern::game;` in its body) names the test's
+        namespace of that name - and so does another name the function gives a namespace (`namespace prim =
+        kern::primitives;`)."""
+        def said(m):
+            q = self.space_written(m.group(1))
+            if q is None or self.real_space(q):
+                return m.group(0)
+            return f"using namespace {'::'.join(self.classes_of(q + '::'))};"
+        def named(m):
+            q = self.space_written(m.group(2))
+            if q is None or self.real_space(q):
+                return m.group(0)
+            return f"namespace {m.group(1)} = {'::'.join(self.classes_of(q + '::'))};"
+        return self.SPACE_NAMED.sub(named, self.DIRECTIVE.sub(said, code))
+
+    def spaces_named(self, texts):
+        """The test's namespaces the using-directives in `texts` name (and those the texts give another name),
+        declared: one that holds nothing of the test's source is there all the same (as it is in the source)."""
+        out = []
+        for text in texts:
+            for part in self.code_and_rest(text)[::2]:
+                for name in [m.group(1) for m in self.DIRECTIVE.finditer(part)] + [m.group(2) for m in self.SPACE_NAMED.finditer(part)]:
+                    q = self.space_written(name)
+                    names = self.classes_of(q + "::") if q is not None and not self.real_space(q) else []
+                    line = "".join(f"namespace {c} {{ " for c in names) + "}" * len(names)
+                    if names and line not in out:
+                        out.append(line)
+        return out
 
     # ---- the test ----
     def chain(self, d, decls):
@@ -10462,6 +10611,8 @@ class TestWriter:
         logic = re.compile(r"(?<![\w:.>])(?:::)?(?:" + ENGINE + r"::)?logic::")
         def own(code):
             return logic.sub(f"::{ENGINE}::logic::", code)
+        own_logic = own
+        own = lambda code: own_logic(self.directives_said(code))   # (a using-directive in a function: the test's namespace)
         if not table:
             return lambda text: self.in_code(text, own)
         pattern = re.compile(r"(?<![\w:])(?:::)?(" + "|".join(re.escape(k) for k in sorted(table, key=len, reverse=True)) + r")\b")
@@ -10887,6 +11038,13 @@ class TestWriter:
                     continue
                 if q in tree.enums:
                     want_enum(q)
+        def want_comparisons(d):
+            """How a class compiled along compares its values (operator==, operator<) goes with it: the standard
+            library calls it where the source says std::find, std::sort or == of two lists - no call of it
+            stands in the tree of the source then."""
+            compared = self.comparisons_of(d)
+            for i in compared:
+                want_function(i)
         for i in roots:
             want_function(i)
         for q in classes:
@@ -10895,6 +11053,8 @@ class TestWriter:
             kind, d = todo.pop()
             scan_record(d) if kind == "record" else scan(d)
             scan_text(d)
+            if kind == "record":
+                want_comparisons(d)
         G.records.difference_update(G.objects)
         # (a class or an enum declared in a class that is compiled along stands in that class's text - not for
         # itself as well, as one in a class the Blueprint does not have would: in the namespace of its name)
@@ -10904,6 +11064,35 @@ class TestWriter:
         G.records = {q for q in G.records if not held_by_record(q, tree.records[q])}
         G.enums = {q for q in G.enums if not held_by_record(q, tree.enums[q])}
         return G
+
+    COMPARISONS = ("operator==", "operator!=", "operator<", "operator>", "operator<=", "operator>=", "operator<=>")
+
+    def comparisons_of(self, d):
+        """The comparisons of the class `d` and of the classes declared in it: its own (methods), and those
+        the program declares for it beside it (`bool operator==(const A&, const A&)`) - their ids."""
+        tree = self.tree
+        if getattr(self, "free_comparisons", None) is None:
+            self.free_comparisons = [f for f in tree.decl.values() if f.get("kind") == "FunctionDecl" and f.get("name") in self.COMPARISONS and not f.get("isImplicit")]
+        out, inner = [], [d]
+        while inner:
+            r = inner.pop()
+            for c in kids(r):
+                if c.get("kind") == "CXXMethodDecl" and c.get("name") in self.COMPARISONS and not c.get("isImplicit"):
+                    out.append(c["id"])
+                elif c.get("kind") == "CXXRecordDecl" and c.get("completeDefinition"):
+                    inner.append(c)
+            q = r.get("_q")
+            for f in self.free_comparisons if q else ():
+                for p in kids(f):
+                    if p.get("kind") != "ParmVarDecl":
+                        continue
+                    try:
+                        if self.u.find_type(self.u.clean(qtype(p))) == q:
+                            out.append(f["id"])
+                            break
+                    except Wait:
+                        continue
+        return out
 
     # ---- the pieces of the test's source ----
     def freed_text(self, d, freed, edits=None, local=None):
@@ -11140,6 +11329,7 @@ class TestWriter:
             piece["local"] = own(d if mine is None else mine)   # (its text and names stand in the namespace `within` then)
             piece["spaces"] = re.findall(r"\bnamespace\s+(\w+)\s*=\s*(?:::)?([\w:]+)\s*;", tree.text(d["_file"]))
             piece["usings"] = self.usings_in([d["_file"]])
+            piece["directives"] = [(scope, q) for _, scope, q in self.directives_of(d["_file"], d["_at"][0])]   # (the using-directives before it)
             out.append((tree.place(d), self.ident(d), piece))
         for d in [*G.functions.values(), *G.templates.values()]:
             before = chain(d)
@@ -11563,6 +11753,7 @@ class TestWriter:
             if piece["kind"] == "engine":
                 pairs += [tuple(x) for x in piece.get("pairs", ())]
                 object_defs.append((("foreign", place), piece["stand_in"][1]))
+        forward_chunks = self.forward_chunks(pairs, G) + self.directive_chunks(ns)
         rename = self.renamer(pairs)
         wide = lambda text: rename(self.widen(text))
         # the pieces of other files: named as there - a file's own names first, see `exports`
@@ -11584,12 +11775,12 @@ class TestWriter:
             return key[0] == "record" or (key[0] == "foreign" and G.foreign[key[1]]["kind"] == "record")
 
         # all of it in the order of the translation unit: what a piece uses stands before it there
-        source = sorted([*enum_chunks, *[(tree.place(tree.records[q]), ("record", q), None) for q in top], *const_chunks, *fn_chunks, *alias_chunks, *object_chunks, *foreign_chunks], key=lambda c: c[0])
+        source = sorted([*enum_chunks, *[(tree.place(tree.records[q]), ("record", q), None) for q in top], *const_chunks, *fn_chunks, *alias_chunks, *object_chunks, *foreign_chunks, *forward_chunks], key=lambda c: c[0])
 
         # (the names the files of the translation unit give what stands in a namespace: before the pieces that use them)
         tu_usings = self.usings_in([self.path, *[f for f in list(self.tree.texts) if self.u.world.program(f)]])
         # (the macros for values the pieces name: before them all)
-        said_words = set()
+        said_words, said_texts = set(), []
         for _, key, text in source:
             if text is None and key[0] == "record":
                 d = tree.records[key[1]]
@@ -11598,6 +11789,7 @@ class TestWriter:
                 p = G.foreign[key[1]]
                 text = p.get("text") or "".join(part for part, _, _ in p.get("segments", ()))
             said_words.update(re.findall(r"[A-Za-z_]\w*", text or ""))
+            said_texts.append(text or "")
         macros = self.macros_in([self.path, *[f for f in list(self.tree.texts) if self.u.world.program(f)]], said_words)
 
         def assemble(dropped):
@@ -11616,7 +11808,7 @@ class TestWriter:
                 *system, *own, '#include "../converted.h"', *[f"#ifndef {n}\n#define {n} {self.widen(v)}\n#endif" for n, v in macros], "",
                 f"namespace {ns} {{", f"namespace converted = ::{tree.namespace}::converted;",
                 "using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;",
-                WIDE_PRELUDE, *([POINTED_PRELUDE] if self.pointed else []), *usings, "",
+                WIDE_PRELUDE, *([POINTED_PRELUDE] if self.pointed else []), *usings, *self.spaces_named(said_texts), "",
                 f"// ---- {os.path.basename(self.path)} and what it uses, as it stands ----",
                 '#pragma GCC diagnostic push', '#pragma GCC diagnostic ignored "-Wunused-function"', '#pragma GCC diagnostic ignored "-Wunused-const-variable"',
                 '#pragma GCC diagnostic ignored "-Wunused-variable"', '#pragma GCC diagnostic ignored "-Wnarrowing"', '#pragma GCC diagnostic ignored "-Wunused-but-set-variable"',
@@ -11624,14 +11816,18 @@ class TestWriter:
             for _, key, text in source:
                 if key in dropped:
                     continue
+                if key[0] in ("forward", "directive"):   # (a class declared before it is defined, a using-directive: by the test's names, as they stand)
+                    add(key, text)
+                    continue
                 if key[0] == "foreign":
                     piece = G.foreign[key[1]]
                     there = wide_of(piece)   # (a piece of another file alone stands in its namespace: its text says so - see `items`)
                     if piece["kind"] == "engine":
                         add(key, wide(piece["stand_in"][0]))
                         continue
+                    directives = "".join(t + " " for t in (self.directive_text(scope, q, ns) for scope, q in piece.get("directives", ())) if t)
                     if piece["kind"] != "record":
-                        add(key, self.with_usings(there(piece["text"]), piece.get("usings", ()), there, () if piece["kind"] not in ("enum", "alias") else set(re.findall(r"\b(?:enum\s+(?:class\s+|struct\s+)?|using\s+)(\w+)", piece["text"])),
+                        add(key, directives + self.with_usings(there(piece["text"]), piece.get("usings", ()), there, () if piece["kind"] not in ("enum", "alias") else set(re.findall(r"\b(?:enum\s+(?:class\s+|struct\s+)?|using\s+)(\w+)", piece["text"])),
                                                   [a for a, _ in piece.get("pairs", ())]))
                         continue
                     text, inner, lines_ = "", [], 0
@@ -11642,7 +11838,7 @@ class TestWriter:
                             if place is not None:
                                 inner.append((text.count("\n"), text.count("\n") + part.count("\n"), ("member", place)))
                             text += part
-                    first = add(key, piece["head"] + re.sub(r"^\s*class\b", "struct", there(text)) + ";" + piece["tail"])
+                    first = add(key, directives + piece["head"] + re.sub(r"^\s*class\b", "struct", there(text)) + ";" + piece["tail"])
                     where.extend((first + x, first + y, k) for x, y, k in inner)
                     continue
                 if key[0] != "record":
@@ -11706,6 +11902,7 @@ class TestWriter:
             return "\n".join(lines), where
 
         dropped, why = set(unconverted), {}
+        roots = {}   # (the name of a piece that went -> the piece whose complaint it went for, and that complaint: see `rooted`)
         for _ in range(400):
             text, where = assemble(dropped)
             if not any(key not in dropped for key, _ in cases):
@@ -11753,6 +11950,7 @@ class TestWriter:
                 return key[0] != "case" and not any(re.search(rf"\b{re.escape(n)}\b", message) for n in failing if n != mine)
             for key, message in found.items():
                 if only_cases or (key[0] != "case" and (min(first for first, last, k in where if k == key) == early or own_complaint(key, message))):
+                    message = self.rooted(roots, named_by(key) or self.foreign_name(G, key), key[0] != "case", message)
                     dropped.add(key)
                     why[key] = message
                     if key[0] == "function":
@@ -11784,6 +11982,28 @@ class TestWriter:
         if not any(key not in dropped for key, _ in cases):
             return None, skipped
         return text, skipped
+
+    @staticmethod
+    def foreign_name(G, key):
+        """The name of a piece of another file (a function, a method, a class, a constant), or None."""
+        piece = G.foreign.get(key[1]) if key[0] == "foreign" else None
+        if piece is None:
+            return None
+        if piece.get("pairs"):
+            return piece["pairs"][0][1].split("::")[-1]
+        m = re.search(r"(?:\b\w+\s*::\s*)+(\w+)\s*\(", piece.get("text") or "")
+        return m.group(1) if m else None
+
+    @staticmethod
+    def rooted(roots, name, keeps, message):
+        """A complaint with what it follows from. A piece that does not compile goes, and what names it does not
+        compile then either: its complaint (`Session` has no member named `town_to_host`) is not why it is not
+        compared - the complaint the first piece went for is. `roots` remembers for every piece that went
+        (`keeps`: it has a name other pieces use) the first of that chain."""
+        root = next(((n, r) for n, r in roots.items() if n != name and re.search(r"(?<!\w)" + re.escape(n) + r"(?!\w)", message)), None)
+        if name and keeps:
+            roots.setdefault(name, root[1] if root else (name, message))
+        return message if root is None else f"{message} - that went with {root[1][0]}: {root[1][1]}"
 
     def compiles(self, text, stem):
         """What the compiler complains of in the test: [(line, complaint)], empty when it compiles."""
