@@ -131,7 +131,7 @@ struct People {
   /// A citizen put somewhere in plain sight (a driver who gets out of his car); the caller sets
   /// his pavement route (lane, seg, along, side, off) and what he does.
   
-  
+  Person& at(i32 i) { return converted::at(people_, static_cast<std::size_t>(i)); }
   
   /// A free step along `dir` that does not go through walls (tries turned directions).
   
@@ -169,7 +169,7 @@ struct People {
   /// by a car and getting up again (the person waits until stand_up()).
   struct Fall { i32 index; Vec3 push; bool car; bool alive; };
   void take_falls(std::vector<Fall>& out) { out.insert(out.end(), falls_.begin(), falls_.end()); falls_.clear(); }
-  
+  void stand_up(i32 i, Vec3 feet, f32 yaw) { Person& p = at(i); p.pos = feet; p.yaw = yaw; p.knocked_until = 0; }
   /// MP client: the citizens are the host's (puppets eased to his snapshots, no own spawning).
   void set_puppets(bool on) { if (on != puppets_) { puppets_ = on; for (Person& p : people_) if (p.kind == Kind::citizen) p.state = State::gone; } }
   bool puppets() const { return puppets_; }
@@ -574,6 +574,28 @@ SC_TEST(converted_people) {
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
+    }
+  }
+  {  // People::stand_up
+    converted::Tally tally("People_stand_up");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] int a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3) { converted::counted([&] { return a0.stand_up(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      People a0 = draw_People(draw);
+      int a1 = static_cast<int>(draw.whole());
+      Vec3 a2 = draw.vector();
+      double a3 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // People::set_puppets

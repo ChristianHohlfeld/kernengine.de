@@ -39,8 +39,11 @@ namespace nostr { Bytes32 sha256(std::string_view text); }
 namespace nostr { bool public_key(const Bytes32& secret, Bytes32& out); }
 namespace nostr { bool sign(const Bytes32& secret, const Bytes32& message, const Bytes32& aux, std::array<u8, 64>& sig); }
 namespace nostr { bool verify(const Bytes32& pubkey, const Bytes32& message, const std::array<u8, 64>& sig); }
+namespace nostr { std::string hex(const Bytes32& data); }
+namespace nostr { std::string hex(const std::array<u8, 64>& data); }
 namespace nostr { bool from_hex(std::string_view s, Bytes32& out); }
 namespace nostr { std::string escape(std::string_view s); }
+namespace nostr { bool event_json(const Bytes32& secret, const Bytes32& aux, i64 created_at, u32 kind, std::string_view tags, std::string_view content, std::string& out); }
 namespace nostr { constexpr u32 kK[64] = {
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74,
     0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d,
@@ -306,6 +309,21 @@ namespace nostr { bool verify(const Bytes32& pubkey, const Bytes32& message, con
   if (!affine(add_pt(mul_pt(G(), s), ep), x, y)) return false;
   return (y.w[0] & 1) == 0 && cmp(x, r) == 0;
 } }
+namespace nostr { constexpr char kHexDigits[] = "0123456789abcdef"; }
+namespace nostr { void hex_of(std::string& o, u8 byte) {
+  o += converted::at(kHexDigits, byte >> 4);
+  o += converted::at(kHexDigits, byte & 15);
+} }
+namespace nostr { std::string hex(const Bytes32& data) {
+  std::string o;
+  for (u8 byte : data) hex_of(o, byte);
+  return o;
+} }
+namespace nostr { std::string hex(const std::array<u8, 64>& data) {
+  std::string o;
+  for (u8 byte : data) hex_of(o, byte);
+  return o;
+} }
 namespace nostr { bool from_hex(std::string_view s, Bytes32& out) {
   const std::size_t n = out.size();
   if (s.size() != converted::times(2, n)) return false;
@@ -334,6 +352,21 @@ namespace nostr { std::string escape(std::string_view s) {
     }
   }
   return o;
+} }
+namespace nostr { bool event_json(const Bytes32& secret, const Bytes32& aux, i64 created_at, u32 kind, std::string_view tags, std::string_view content, std::string& out) {
+  Bytes32 pk;
+  if (!public_key(secret, pk)) return false;
+  const std::string pkh = hex(pk), body = escape(content);
+  char head[96];
+  std::snprintf(head, sizeof head, "[0,\"%s\",%lld,%u,", pkh.c_str(), static_cast<long long>(created_at), kind);
+  const std::string ser = std::string(head) + std::string(tags) + ",\"" + body + "\"]";
+  const Bytes32 id = sha256(ser);
+  std::array<u8, 64> sig;
+  if (!sign(secret, id, aux, sig)) return false;
+  char num[64];
+  std::snprintf(num, sizeof num, ",\"created_at\":%lld,\"kind\":%u,\"tags\":", static_cast<long long>(created_at), kind);
+  out = "{\"id\":\"" + hex(id) + "\",\"pubkey\":\"" + pkh + "\"" + num + std::string(tags) + ",\"content\":\"" + body + "\",\"sig\":\"" + hex(sig) + "\"}";
+  return true;
 } }
 #undef private
 #undef protected
@@ -412,6 +445,10 @@ struct Out_the_sign { bool Result; std::array<unsigned char, 64> sig; };
 [[maybe_unused]] static bool same(const Out_the_sign& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.sig, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_the_sign& s) { return defined(s.Result) && defined(s.sig); }
 [[maybe_unused]] static std::string text(const Out_the_sign& s) { return std::string("{") + text(s.Result) + ", " + text(s.sig) + "}"; }
+struct Out_event_json { bool Result; std::string out; };
+[[maybe_unused]] static bool same(const Out_event_json& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.out, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_event_json& s) { return defined(s.Result) && defined(s.out); }
+[[maybe_unused]] static std::string text(const Out_event_json& s) { return std::string("{") + text(s.Result) + ", " + text(s.out) + "}"; }
 
 SC_TEST(converted_nostr_cpp) {
   converted::Blueprint bp("nostr_cpp");
@@ -1077,6 +1114,64 @@ SC_TEST(converted_nostr_cpp) {
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
+  {  // hex_of
+    converted::Tally tally("hex_of");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::string a0, [[maybe_unused]] unsigned char a1) { converted::counted([&] { return converted_nostr_cpp::nostr::hex_of(a0, std::move(a1)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      std::string a0 = draw.word();
+      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // hex
+    converted::Tally tally("hex");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::array<unsigned char, 32> a0) { return converted::counted([&] { return converted_nostr_cpp::nostr::hex(a0); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      std::array<unsigned char, 32> a0 = converted::draw_array<std::array<unsigned char, 32>>([&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // hex
+    converted::Tally tally("hex_2");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::array<unsigned char, 64> a0) { return converted::counted([&] { return converted_nostr_cpp::nostr::hex(a0); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      std::array<unsigned char, 64> a0 = converted::draw_array<std::array<unsigned char, 64>>([&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
   {  // escape
     converted::Tally tally("escape");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -1094,6 +1189,31 @@ SC_TEST(converted_nostr_cpp) {
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // event_json
+    converted::Tally tally("event_json");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::array<unsigned char, 32> a0, [[maybe_unused]] std::array<unsigned char, 32> a1, [[maybe_unused]] i64 a2, [[maybe_unused]] unsigned int a3, [[maybe_unused]] std::string_view a4, [[maybe_unused]] std::string_view a5, [[maybe_unused]] std::string a6) { auto r = converted::counted([&] { return converted_nostr_cpp::nostr::event_json(a0, a1, std::move(a2), std::move(a3), std::move(a4), std::move(a5), a6); }); return Out_event_json{std::move(r), std::move(a6)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      std::array<unsigned char, 32> a0 = converted::draw_array<std::array<unsigned char, 32>>([&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      std::array<unsigned char, 32> a1 = converted::draw_array<std::array<unsigned char, 32>>([&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      i64 a2 = static_cast<i64>(draw.bits());
+      unsigned int a3 = static_cast<unsigned int>(draw.below(40));
+      std::string_view a4 = std::string_view(draw.c_word());
+      std::string_view a5 = std::string_view(draw.c_word());
+      std::string a6 = draw.word();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a6), arg(converted::shaped<converted::Whole>(a2)), arg(a3), arg(a4), arg(a5)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
 }

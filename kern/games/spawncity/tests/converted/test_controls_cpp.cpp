@@ -1564,8 +1564,8 @@ SC_TEST(converted_controls_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] const char* a0, [[maybe_unused]] const char* a1, [[maybe_unused]] bool a2) { return converted::counted([&] { return converted_controls_cpp::controls::hint_line(a0, a1, std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const char* a0 = draw.c_word();
-      const char* a1 = draw.c_word();
+      const char* a0 = draw.said_c_word({"HintLine"});
+      const char* a1 = draw.said_c_word({"HintLine"});
       bool a2 = draw.flag();
       const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;

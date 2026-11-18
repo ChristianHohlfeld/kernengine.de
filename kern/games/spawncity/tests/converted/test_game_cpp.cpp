@@ -47,18 +47,6 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Value : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct PinDef : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct NodeDef : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
-struct Library : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
 enum class Key : u8 {
   unknown = 0,
   a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
@@ -68,6 +56,11 @@ enum class Key : u8 {
 };
 enum class Mode : u8 { foot, drone, car, jet, parachute };
 const char* mode_name(Mode m);
+Vec3 car_color(u32 i) {
+  static const Vec3 c[] = {{0.62, 0.05, 0.04}, {0.08, 0.16, 0.42}, {0.85, 0.85, 0.86}, {0.06, 0.06, 0.07}, {0.45, 0.47, 0.5},
+                           {0.12, 0.32, 0.18}, {0.9, 0.62, 0.08}, {0.3, 0.5, 0.75}, {0.55, 0.36, 0.22}, {0.7, 0.7, 0.66}};
+  return converted::at(c, converted::rem(i, (converted::quot(std::size_t{120}, std::size_t{12}))));
+}
 std::string json_escape(const std::string& s) {
   std::string o;
   for (char c : s) {
@@ -94,6 +87,25 @@ const char* mode_name(Mode m) {
 
 SC_TEST(converted_game_cpp) {
   converted::Blueprint bp("game_cpp");
+  {  // car_color
+    converted::Tally tally("car_color");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_game_cpp::car_color(std::move(a0)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
   {  // json_escape
     converted::Tally tally("json_escape");
     converted::Draw draw;   // (every function its own arguments, the same in every run)

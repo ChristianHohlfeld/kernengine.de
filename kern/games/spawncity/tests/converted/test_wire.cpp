@@ -58,6 +58,7 @@ namespace wire { struct I8 { i8 v = 0; }; }
 namespace wire { struct U16 { u16 v = 0; }; }
 namespace wire { struct I16 { i16 v = 0; }; }
 namespace wire { struct U32 { u32 v = 0; }; }
+namespace wire { struct I32 { i32 v = 0; }; }
 namespace wire { struct U64 { u64 v = 0; }; }
 namespace wire { struct I64 { i64 v = 0; }; }
 namespace wire { struct F32 { f32 v = 0; }; }
@@ -80,6 +81,10 @@ namespace wire { inline void put_i16(std::vector<u8>& b, i16 v) {
 } }
 namespace wire { inline void put_u32(std::vector<u8>& b, u32 v) {
   const std::array<u8, 4> x = std::bit_cast<std::array<u8, 4>>(U32{v});
+  b.insert(b.end(), x.begin(), x.end());
+} }
+namespace wire { inline void put_i32(std::vector<u8>& b, i32 v) {
+  const std::array<u8, 4> x = std::bit_cast<std::array<u8, 4>>(I32{v});
   b.insert(b.end(), x.begin(), x.end());
 } }
 namespace wire { inline void put_u64(std::vector<u8>& b, u64 v) {
@@ -144,6 +149,13 @@ namespace wire { struct Reader {
   u32 get_u32(const std::vector<u8>& b) {
     if (converted::plus(at, 4) > b.size()) { ok = false; return 0; }
     U32 x;
+    std::memcpy(&x, b.data() + at, sizeof x);
+    converted::plus_to(at, 4);
+    return x.v;
+  }
+  i32 get_i32(const std::vector<u8>& b) {
+    if (converted::plus(at, 4) > b.size()) { ok = false; return 0; }
+    I32 x;
     std::memcpy(&x, b.data() + at, sizeof x);
     converted::plus_to(at, 4);
     return x.v;
@@ -251,6 +263,10 @@ struct Out_Reader_get_u32 { wire::Reader Self; unsigned int Result; };
 [[maybe_unused]] static bool same(const Out_Reader_get_u32& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_Reader_get_u32& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Reader_get_u32& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
+struct Out_Reader_get_i32 { wire::Reader Self; int Result; };
+[[maybe_unused]] static bool same(const Out_Reader_get_i32& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_Reader_get_i32& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_Reader_get_i32& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Reader_get_u64 { wire::Reader Self; u64 Result; };
 [[maybe_unused]] static bool same(const Out_Reader_get_u64& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(converted::shaped<converted::Whole>(want.Result), (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_Reader_get_u64& s) { return defined(s.Self) && defined(s.Result); }
@@ -388,6 +404,26 @@ SC_TEST(converted_wire) {
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // put_i32
+    converted::Tally tally("put_i32");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] int a1) { converted::counted([&] { return converted_wire::wire::put_i32(a0, std::move(a1)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      int a1 = static_cast<int>(draw.whole());
       const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
@@ -625,6 +661,26 @@ SC_TEST(converted_wire) {
     converted::Tally tally("Reader_get_u32");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] wire::Reader a0, [[maybe_unused]] std::vector<unsigned char> a1) { auto r = converted::counted([&] { return a0.get_u32(a1); }); return Out_Reader_get_u32{std::move(a0), std::move(r)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      wire::Reader a0 = draw_wire__Reader(draw);
+      std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
+    }
+  }
+  {  // Reader::get_i32
+    converted::Tally tally("Reader_get_i32");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] wire::Reader a0, [[maybe_unused]] std::vector<unsigned char> a1) { auto r = converted::counted([&] { return a0.get_i32(a1); }); return Out_Reader_get_i32{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       wire::Reader a0 = draw_wire__Reader(draw);
       std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
