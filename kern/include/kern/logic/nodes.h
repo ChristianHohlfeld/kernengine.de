@@ -2600,10 +2600,24 @@ inline f64 tween_step(f64* m, f64 now, std::string_view ease, bool first, bool& 
 /// Switch on Int with `cases` cases: the exec output (the case, or `cases` for Default).
 inline int switch_int(int cases, i64 selection) { return selection >= 0 && selection < cases ? static_cast<int>(selection) : cases; }
 /// Switch on Text: the exec output (the case that equals the selection, or the count for Default).
+/// (the cases as setting_cases has them - each piece between commas without the blanks around it,
+/// empty ones left out -, read where they stand: no list of them is made)
 inline int switch_text(std::string_view cases, std::string_view selection) {
-  const std::vector<std::string> list = setting_cases(cases);
-  for (std::size_t i = 0; i < list.size(); ++i) if (list[i] == selection) return static_cast<int>(i);
-  return static_cast<int>(list.size());
+  int index = 0, found = -1;
+  std::size_t from = 0;
+  while (from <= cases.size()) {
+    std::size_t to = cases.find(',', from);
+    if (to == std::string_view::npos) to = cases.size();
+    std::string_view one = cases.substr(from, to - from);
+    while (!one.empty() && one.front() == ' ') one.remove_prefix(1);
+    while (!one.empty() && one.back() == ' ') one.remove_suffix(1);
+    if (!one.empty()) {
+      if (found < 0 && one == selection) found = index;
+      ++index;
+    }
+    from = to + 1;
+  }
+  return found >= 0 ? found : index;
 }
 }  // namespace flow
 
