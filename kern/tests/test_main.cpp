@@ -6522,6 +6522,8 @@ struct EnginePlaces : kern::Blueprint {
   Int Gone = 0;
   Int GoneLength = 0;
   List<GeoChunk> GoneChunks = List<GeoChunk>{};
+  Int AppendedLength = 0;
+  List<GeoChunk> Appended = List<GeoChunk>{};
 
   // ---- functions ----
   void Bind() {
@@ -6559,6 +6561,15 @@ struct EnginePlaces : kern::Blueprint {
     Removed = n4.removed;
   }
 
+  void Append() {
+    engine_building_builder_chunks(n10, Builder);
+    engine_building_builder_chunks(n11, Builder);
+    list_append(n10.result, Chunks);
+    list_add(n10.result, First);
+    AppendedLength = list_length<GeoChunk>(n11.result);
+    Appended = n11.result;
+  }
+
   void Release() {
     engine_building_builder_chunks(n8, Builder);
     Before = n8.result[0].x;
@@ -6587,6 +6598,8 @@ struct EnginePlaces : kern::Blueprint {
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n7;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n8;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n9;
+  struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n10;
+  struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n11;
 };
 
 }  // namespace engine_place_probe
@@ -6607,7 +6620,7 @@ inline std::string shown(const EnginePlaces& p) {
   const auto put = [&](const char* name, const auto& v) { s += std::string(name) + "=" + logic::engine_shown(logic::to_value(v)) + "\n"; };
   put("Builder", p.Builder), put("Length", p.Length), put("At", p.At), put("X", p.X), put("Items", p.Items), put("P0", p.P0), put("Beside", p.Beside), put("Set", p.Set);
   put("Chunks", p.Chunks), put("LengthAfter", p.LengthAfter), put("Removed", p.Removed), put("First", p.First), put("Before", p.Before), put("Gone", p.Gone);
-  put("GoneLength", p.GoneLength), put("GoneChunks", p.GoneChunks);
+  put("GoneLength", p.GoneLength), put("GoneChunks", p.GoneChunks), put("AppendedLength", p.AppendedLength), put("Appended", p.Appended);
   return s;
 }
 }  // namespace engine_place_probe
@@ -6839,6 +6852,7 @@ TEST(engine_places_class_names_the_engines_list) {
   c[0].x += 3;
   c[1].mesh.positions = {static_cast<f32>(0.3333333333333333), 4.0f};
   c[1].mesh.positions[1] = static_cast<f32>(0.1);
+  const std::vector<GeoChunk> chunks = c;
   const GeoChunk first = c[0];
   c.insert(c.begin(), first);
   c.erase(c.begin() + 1);
@@ -6870,6 +6884,13 @@ TEST(engine_places_class_names_the_engines_list) {
   CHECK(asked == 0 && static_cast<i64>(x) == c[0].x && static_cast<i64>(length) == 1 && held && held->chunks()[0].items == 11);
   b.engine_building_builder_chunks(b.n7, b.Builder);
   b.n7.result[0].items = 11;
+  // a list appended at the place, then an item added; read through a second place on the same list - what C++'s insert
+  // of a range and push_back do (the library grows the list)
+  c[0].items = 11;
+  c.insert(c.end(), chunks.begin(), chunks.end());
+  c.push_back(first);
+  for (EnginePlaces* p : {&a, &b}) p->Append();
+  CHECK(held && same(held->chunks(), c) && a.AppendedLength == 4 && shown(a) == shown(b));
   // the object ends while its place is bound: the class does not write where it was, and says what the door says
   itself.told.clear(), door.told.clear();
   for (EnginePlaces* p : {&a, &b}) {

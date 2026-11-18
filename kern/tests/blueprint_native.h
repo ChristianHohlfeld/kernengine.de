@@ -1315,7 +1315,7 @@ inline std::vector<Value> numbers(std::initializer_list<f64> v) {
 // Places of the engine (kern/docs/blueprint_cpp.md, "Plätze der Engine"): a function of the engine that gives a
 // reference to what its object holds (kern::BuildingBuilder::chunks) - its node binds the place once in a run, the
 // nodes of places name it there: read whole, an entry, a field of an entry, a list in it; set, added to, the steps
-// of a list; one beside the list. Then the object ends while the place is bound (Release), and a place is bound on
+// of a list; one beside the list; a list appended, read through a second place on the same list. Then the object ends while the place is bound (Release), and a place is bound on
 // a handle of no object (Read): each naming tells the host "<function>@get", reads the zero of its type and
 // writes into nothing - in every tier the same.
 inline const char* kEnginePlaces = R"kn(
@@ -1357,6 +1357,8 @@ struct EnginePlaces : kern::Blueprint {
   Int Gone = 0;
   Int GoneLength = 0;
   List<GeoChunk> GoneChunks = List<GeoChunk>{};
+  Int AppendedLength = 0;
+  List<GeoChunk> Appended = List<GeoChunk>{};
 
   // ---- functions ----
   void Bind() {
@@ -1394,6 +1396,15 @@ struct EnginePlaces : kern::Blueprint {
     Removed = n4.removed;
   }
 
+  void Append() {
+    engine_building_builder_chunks(n10, Builder);
+    engine_building_builder_chunks(n11, Builder);
+    list_append(n10.result, Chunks);
+    list_add(n10.result, First);
+    AppendedLength = list_length<GeoChunk>(n11.result);
+    Appended = n11.result;
+  }
+
   void Release() {
     engine_building_builder_chunks(n8, Builder);
     Before = n8.result[0].x;
@@ -1422,6 +1433,8 @@ struct EnginePlaces : kern::Blueprint {
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n7;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n8;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n9;
+  struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n10;
+  struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n11;
 };
 )kn";
 
@@ -1670,7 +1683,7 @@ inline std::vector<Case> cases() {
     // itself - there the class names the engine's list where it stands, typed, and does what the interpreter does
     // through the door ("<function>@get", "<function>@set").
     Case& c = read("EnginePlaces", kEnginePlaces);
-    for (const char* run : {"Bind", "Change", "Release", "Read"}) {
+    for (const char* run : {"Bind", "Change", "Append", "Release", "Read"}) {
       c.calls.push_back({run, {}});
       c.on_engine.push_back(run);
     }

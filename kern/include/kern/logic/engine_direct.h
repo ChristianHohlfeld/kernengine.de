@@ -688,14 +688,13 @@ template <class P, class BI> void list_append(const P& p, logic::Items<BI> items
     logic::list::insert_items(*r.kern_own, static_cast<i64>(r.kern_own->size()), items.first, items.count);
   } else {
     using CI = typename std::remove_pointer_t<decltype(R::kern_at)>::value_type;
-    // (at the end, in one request for memory - what insert of a range does - each item made into the engine's)
+    // (at the end, as insert of a range puts them there - the library grows the list as it grows it for the
+    // insert of the source and for a Blueprint's list, logic::list::insert_items -, then each item made into the
+    // engine's where it stands)
     auto& list = *r.kern_at;
-    list.reserve(list.size() + items.count);
-    for (std::size_t k = 0; k < items.count; ++k) {
-      auto c = blank<CI>();
-      Direct<typename ListTag<typename R::kern_tag>::item>::from(*r.kern_o, items.first[k], c);
-      list.push_back(std::move(c));
-    }
+    const std::size_t at = list.size();
+    list.insert(list.end(), items.count, blank<CI>());
+    for (std::size_t k = 0; k < items.count; ++k) Direct<typename ListTag<typename R::kern_tag>::item>::from(*r.kern_o, items.first[k], list[at + k]);
   }
   if (r.kern_door) r.kern_door->wrote();
 }
