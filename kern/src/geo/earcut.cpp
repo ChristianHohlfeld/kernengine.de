@@ -450,7 +450,8 @@ Earcut::Node* Earcut::split_polygon(Node* a, Node* b) {
   return b2;
 }
 
-void Earcut::triangulate(const f64* xy, u32 vertex_count, const u32* hole_starts, u32 hole_count, std::vector<u32>& out) {
+void Earcut::triangulate(const f64* xy, Count<2> vertices, const u32* hole_starts, u32 hole_count, std::vector<u32>& out) {
+  const u32 vertex_count = vertices;
   used_ = 0;
   const bool has_holes = hole_count > 0;
   const u32 outer_len = has_holes ? hole_starts[0] : vertex_count;
@@ -475,7 +476,8 @@ void Earcut::triangulate(const f64* xy, u32 vertex_count, const u32* hole_starts
   earcut_linked(outer, out, min_x, min_y, inv_size, 0);
 }
 
-f64 Earcut::deviation(const f64* xy, u32 vertex_count, const u32* hole_starts, u32 hole_count, const u32* t, u32 index_count) {
+f64 Earcut::deviation(const f64* xy, Count<2> vertices, const u32* hole_starts, u32 hole_count, const u32* t, u32 index_count) {
+  const u32 vertex_count = vertices;
   const u32 outer_len = hole_count ? hole_starts[0] : vertex_count;
   f64 polygon_area = std::fabs(signed_area(xy, 0, outer_len));
   for (u32 i = 0; i < hole_count; ++i) {
