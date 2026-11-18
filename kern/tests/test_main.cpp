@@ -6329,7 +6329,7 @@ struct Probe : kern::Blueprint {
   KERN_ENUM(game_Shape, box, sphere, cylinder, cone, capsule, plane, torus, ramp, mesh);
   KERN_ENUM(physics_Surface, none, cloth, tpu, floor_);
   KERN_STRUCT(Quat) { Float x = 0.0; Float y = 0.0; Float z = 0.0; Float w = 1.0; };
-  KERN_STRUCT(Mat4) { Fixed<Float, 16> m = List<Float>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}; };
+  KERN_STRUCT(Mat4) { Fixed<Float, 16> m = Fixed<Float, 16>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}; };
   KERN_STRUCT(Sphere) { Vector center = Vector{0.0, 0.0, 0.0}; Float radius = -1.0; };
   KERN_STRUCT(MeshData) { List<Float> positions = List<Float>{}; List<Float> normals = List<Float>{}; List<Float> colors = List<Float>{}; List<Float> uvs = List<Float>{}; List<Float> extra = List<Float>{}; Int extra_size = 0; List<Int> indices = List<Int>{}; };
   KERN_STRUCT(audio_PlayParams) { Float volume = 1.0; Float pitch = 1.0; Float pan = 0.0; Bool the_loop = false; audio_Bus bus = audio_Bus::sfx; Float fade_in = 0.0; Float start = 0.0; Int priority = 0; Bool spatial = false; Vector position = Vector{0.0, 0.0, 0.0}; Vector velocity = Vector{0.0, 0.0, 0.0}; Float min_distance = 1.0; Float max_distance = 50.0; audio_Rolloff rolloff = audio_Rolloff::inverse; Float spread = 0.0; Float doppler = 1.0; };

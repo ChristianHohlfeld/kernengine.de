@@ -462,11 +462,13 @@ class Calls:
         def give(pin, bt, value):
             given.append(pin)
             tg = self.dtag(bt, need)
-            return f"{EV}Direct<{tg}>::to({O}, {value}, kern_n.{pin});" if mode == "read" else f"{EV}Direct<{tg}>::pass({O}, {value});"
+            if mode != "read":
+                return f"{EV}Direct<{tg}>::pass({O}, {value});"
+            return f"kern_n.{pin} = {EV}Direct<{tg}>::template make<std::remove_cvref_t<decltype(kern_n.{pin})>>({O}, {value});"
 
         def give_handle(pin, handle):
             given.append(pin)
-            return f"{EV}handle_to({handle}, kern_n.{pin});" if mode == "read" else f"(void){handle};"
+            return f"kern_n.{pin} = {EV}handle_as<std::remove_cvref_t<decltype(kern_n.{pin})>>({handle});" if mode == "read" else f"(void){handle};"
         lines = ["kern_o->begin_call();"]
         if role == "release":
             q = f["class"]
@@ -574,7 +576,7 @@ class Calls:
             h = h or (self.u.object_of(ret) if bt == "Int" else None)   # (one it gives owned - std::unique_ptr<Transport>: its handle)
             handle = f"{EV}handle_of<{self.kinds(h)}>({O}, std::forward<decltype(kern_r)>(kern_r))" if h else None
             if mode == "value":
-                lines += [f"{EV}handle_to({handle}, kern_out);" if h else f"{EV}Direct<{self.dtag(bt, need)}>::to({O}, kern_r, kern_out);"]
+                lines += [f"return {EV}handle_as<Int>({handle});" if h else f"return {EV}Direct<{self.dtag(bt, need)}>::template make<kern_T>({O}, kern_r);"]
             elif mode == "given":
                 self.dtag(bt, need)
             elif h:
@@ -632,9 +634,7 @@ class Calls:
                 if typed(bt):
                     T = typed(bt)
                     direct, _ = self.direct(f, need, "value", lambda given: f"{{ {failed} return {T}{{}}; }}")
-                    at = next(k for k, x in enumerate(direct) if "kern_out" in x)   # (the result is declared where it is given)
-                    direct.insert(at, f"{T} kern_out{{}};")
-                    function(f"{head}{T} {name}({', '.join(params)}) const", direct + ["return kern_out;"],
+                    function(f"{head}{T} {name}({', '.join(params)}) const", [x.replace("kern_T", T) for x in direct],
                              [f"return from_value<{T}>({door}[0].converted(pin_type_of<{T}>()));"])
                 else:
                     direct, returned = self.direct(f, need, "given", lambda given: f"{{ {failed} return kern_G(*kern_o); }}")
@@ -696,7 +696,8 @@ class Calls:
             parts = lambda way, order: " ".join(f"ev::Direct<{tg}>::{way}(o, {order(f'f{k}', f'x.{c}')});" for k, ((_, _, _, c), tg) in enumerate(zip(fields, tags)))
             lines += [f"struct S_{bt} {{",
                       f"  template <class B> static void from(EngineObjects& o, const B& b, {q}& x) {{ " + (f"const auto& [{bound}] = b; " if fields else "") + parts("from", lambda b, x: f"{b}, {x}") + " }",
-                      f"  template <class B> static void to(EngineObjects& o, const {q}& x, B& b) {{ " + (f"auto& [{bound}] = b; " if fields else "") + parts("to", lambda b, x: f"{x}, {b}") + " }",
+                      f"  template <class B> static B make(EngineObjects& o, const {q}& x) {{ B b{{" + ", ".join(f"ev::made<{tg}>(o, x.{c})" for (_, _, _, c), tg in zip(fields, tags)) + "}; " +
+                      (f"[[maybe_unused]] const auto& [{bound}] = b; " if fields else "") + "return b; }",
                       f"  template <class C> static void pass(EngineObjects& o, const C& x) {{ " + " ".join(f"ev::Direct<{tg}>::pass(o, x.{c});" for (_, _, _, c), tg in zip(fields, tags)) + " }",
                       "};"]
         return lines

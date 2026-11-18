@@ -39,17 +39,31 @@ namespace kern::logic::engine_values {
 
 /// A value of the Blueprint type `Tag` (the tags of engine_host.h) between the C++ type B a
 /// Blueprint's class holds it as and the C++ type C the engine's function takes or gives:
-/// `from(objects, b, c)` what the function is given, `to(objects, c, b)` what it gave - and
+/// `from(objects, b, c)` what the function is given, `make<B>(objects, c)` what it gave - and
 /// `pass(objects, c)` what it gave where the Blueprint reads it nowhere: nothing is made of it, but an
 /// object of the engine in it has its handle from then on, as it has behind the door.
 template <class Tag> struct Direct;
+
+/// What the engine gave for one field of a struct, as the type the field has (the struct is made of
+/// its fields as they come - none is made first with its default and then set).
+template <class Tag, class C> struct Made {
+  EngineObjects& o;
+  const C& c;
+  /// (Not a list written out in braces: a List is made as the list it is.)
+  template <class F>
+    requires(!detail::is_initializer_list<F>)
+  operator F() const {
+    return Direct<Tag>::template make<F>(o, c);
+  }
+};
+template <class Tag, class C> Made<Tag, C> made(EngineObjects& o, const C& c) { return {o, c}; }
 
 template <> struct Direct<Bool> {
   template <class C> static void from(EngineObjects&, bool b, C& c) {
     static_assert(std::is_same_v<C, bool>, "a Bool pin of something else than a bool");
     c = b;
   }
-  template <class B> static void to(EngineObjects&, bool c, B& b) { b = c; }
+  template <class B> static B make(EngineObjects&, bool c) { return B(c); }
   static void pass(EngineObjects&, bool) {}
 };
 /// (A whole number - or a pointer to an object of the engine: its handle; or an object of the engine a
@@ -69,16 +83,16 @@ template <> struct Direct<Int> {
       else c = static_cast<C>(v);
     }
   }
-  template <class C, class B> static void to(EngineObjects& o, const C& c, B& b) {
+  template <class B, class C> static B make(EngineObjects& o, const C& c) {
     static_assert(std::is_same_v<B, Whole> || std::is_same_v<B, i64>, "an Int pin the class holds as something else than an Int");
     if constexpr (std::is_pointer_v<C>) {
-      b = B(normal(c ? o.adopt(*c) : 0));
+      return B(normal(c ? o.adopt(*c) : 0));
     } else if constexpr (std::is_class_v<C> && !is_count<C>) {
-      b = B(normal(o.own(std::make_unique<C>(c))));
+      return B(normal(o.own(std::make_unique<C>(c))));
     } else {
       static_assert((std::is_integral_v<C> && !std::is_same_v<C, bool>) || std::is_enum_v<C> || is_count<C>, "an Int pin of something else than a whole number");
-      if constexpr (is_count<C>) b = B(normal(static_cast<i64>(static_cast<u32>(c))));
-      else b = B(normal(static_cast<i64>(c)));
+      if constexpr (is_count<C>) return B(normal(static_cast<i64>(static_cast<u32>(c))));
+      else return B(normal(static_cast<i64>(c)));
     }
   }
   template <class C> static void pass(EngineObjects& o, const C& c) {
@@ -94,9 +108,10 @@ template <> struct Direct<Float> {
     static_assert(std::is_floating_point_v<C>, "a Float pin of something else than a number");
     c = static_cast<C>(b);
   }
-  template <class C> static void to(EngineObjects&, const C& c, f64& b) {
+  template <class B, class C> static B make(EngineObjects&, const C& c) {
     static_assert(std::is_floating_point_v<C>, "a Float pin of something else than a number");
-    b = static_cast<f64>(c);
+    static_assert(std::is_same_v<B, f64>, "a Float pin the class holds as something else than a Float");
+    return static_cast<f64>(c);
   }
   template <class C> static void pass(EngineObjects&, const C&) {}
 };
@@ -106,10 +121,11 @@ template <> struct Direct<Vector> {
     if constexpr (std::is_same_v<C, Vec3>) c = b;
     else c = Vec2(b.x, b.y);
   }
-  template <class C> static void to(EngineObjects&, const C& c, Vec3& b) {
+  template <class B, class C> static B make(EngineObjects&, const C& c) {
     static_assert(std::is_same_v<C, Vec3> || std::is_same_v<C, Vec2>, "a Vector pin of something else than a vector");
-    if constexpr (std::is_same_v<C, Vec3>) b = c;
-    else b = Vec3(c.x, c.y, 0);
+    static_assert(std::is_same_v<B, Vec3>, "a Vector pin the class holds as something else than a Vector");
+    if constexpr (std::is_same_v<C, Vec3>) return c;
+    else return Vec3(c.x, c.y, 0);
   }
   template <class C> static void pass(EngineObjects&, const C&) {}
 };
@@ -119,9 +135,10 @@ template <> struct Direct<Text> {
     if constexpr (std::is_same_v<C, const char*>) c = o.text(b.str());   // (a field that points at a text: one that stays)
     else c = b.view();
   }
-  template <class C> static void to(EngineObjects&, const C& c, logic::Text& b) {
-    if constexpr (std::is_pointer_v<C>) b = logic::Text(c ? std::string(c) : std::string());
-    else b = logic::Text(std::string(c));
+  template <class B, class C> static B make(EngineObjects&, const C& c) {
+    static_assert(std::is_same_v<B, logic::Text>, "a Text pin the class holds as something else than a Text");
+    if constexpr (std::is_pointer_v<std::decay_t<C>>) return logic::Text(c ? std::string(c) : std::string());
+    else return logic::Text(std::string(c));
   }
   template <class C> static void pass(EngineObjects&, const C&) {}
 };
@@ -130,9 +147,10 @@ template <> struct Direct<Int64> {
     static_assert(std::is_integral_v<C> && sizeof(C) == 8, "an Int64 pin of something else than 64 bits");
     c = static_cast<C>(b.bits);
   }
-  template <class C> static void to(EngineObjects&, const C& c, logic::Int64& b) {
+  template <class B, class C> static B make(EngineObjects&, const C& c) {
     static_assert(std::is_integral_v<C> && sizeof(C) == 8, "an Int64 pin of something else than 64 bits");
-    b = logic::Int64(static_cast<u64>(c));
+    static_assert(std::is_same_v<B, logic::Int64>, "an Int64 pin the class holds as something else than an Int64");
+    return logic::Int64(static_cast<u64>(c));
   }
   template <class C> static void pass(EngineObjects&, const C&) {}
 };
@@ -146,7 +164,7 @@ template <class E> struct Direct<Enum<E>> {
     const i64 k = static_cast<i64>(b);
     c = E::values[k >= 0 && static_cast<u64>(k) < count ? static_cast<std::size_t>(k) : 0];
   }
-  template <class C, class B> static void to(EngineObjects&, const C& c, B& b) {
+  template <class B, class C> static B make(EngineObjects&, const C& c) {
     static_assert(std::is_same_v<C, typename E::type>, "an enum pin of another enum");
     static_assert(std::is_enum_v<B>, "an enum pin the class holds as something else than an enum");
     static_assert(detail::enum_count<B>() == count, "an enum of the Blueprint that has not the values of the engine's enum");
@@ -156,15 +174,15 @@ template <class E> struct Direct<Enum<E>> {
         at = k;
         break;
       }
-    b = static_cast<B>(static_cast<i64>(at));
+    return static_cast<B>(static_cast<i64>(at));
   }
   template <class C> static void pass(EngineObjects&, const C&) {}
 };
-/// A struct: S has `from(objects, b, engine's&)` and `to(objects, engine's, b&)`, field by field
-/// (written by tools/engine_api.py: the Blueprint's struct has the engine's fields in their order).
+/// A struct: S has `from(objects, b, engine's&)`, `make<B>(objects, engine's)` and `pass`, field by
+/// field (written by tools/engine_api.py: the Blueprint's struct has the engine's fields in their order).
 template <class S> struct Direct<Struct<S>> {
   template <class B, class C> static void from(EngineObjects& o, const B& b, C& c) { S::from(o, b, c); }
-  template <class C, class B> static void to(EngineObjects& o, const C& c, B& b) { S::to(o, c, b); }
+  template <class B, class C> static B make(EngineObjects& o, const C& c) { return S::template make<B>(o, c); }
   template <class C> static void pass(EngineObjects& o, const C& c) { S::pass(o, c); }
 };
 template <class X, class Y> struct Direct<Pair<X, Y>> {
@@ -173,10 +191,10 @@ template <class X, class Y> struct Direct<Pair<X, Y>> {
     Direct<X>::from(o, first, c.first);
     Direct<Y>::from(o, second, c.second);
   }
-  template <class C, class B> static void to(EngineObjects& o, const C& c, B& b) {
-    auto& [first, second] = b;
-    Direct<X>::to(o, c.first, first);
-    Direct<Y>::to(o, c.second, second);
+  template <class B, class C> static B make(EngineObjects& o, const C& c) {
+    B b{made<X>(o, c.first), made<Y>(o, c.second)};
+    [[maybe_unused]] const auto& [first, second] = b;   // (a struct of these two fields, and no more)
+    return b;
   }
   template <class C> static void pass(EngineObjects& o, const C& c) {
     Direct<X>::pass(o, c.first);
@@ -230,17 +248,27 @@ template <class T> struct Direct<List<T>> {
       }
     }
   }
-  template <class C, class B> static void to(EngineObjects& o, const C& c, B& b) {
+  /// (A list of a fixed length keeps its length: what the engine gave beyond it is made and nobody reads it.)
+  template <class B, class C> static B make(EngineObjects& o, const C& c) {
     using L = ListOf<C>;
     static_assert(L::is, "a list pin of something else than a list");
+    B b{};
     std::size_t k = 0;
-    if constexpr (direct::is_fixed<B>) b = B{};
-    else b.clear();
+    const auto put = [&](const auto& x) {
+      if constexpr (direct::is_fixed<B>) {
+        if (k < b.size()) b.items[k] = Direct<T>::template make<typename B::Item>(o, x);
+        else (void)Direct<T>::template make<typename B::Item>(o, x);
+      } else {
+        b.push_back(Direct<T>::template make<typename B::Item>(o, x));
+      }
+      ++k;
+    };
     if constexpr (L::maybe) {
-      if (c) put(o, *c, b, k);
+      if (c) put(*c);
     } else {
-      for (const auto& x : c) put(o, x, b, k);
+      for (const auto& x : c) put(x);
     }
+    return b;
   }
   template <class C> static void pass(EngineObjects& o, const C& c) {
     using L = ListOf<C>;
@@ -251,24 +279,6 @@ template <class T> struct Direct<List<T>> {
       for (const auto& x : c) Direct<T>::pass(o, x);
     }
   }
-
- private:
-  /// One entry the engine gave, as entry `k` of the class's list (a list of a fixed length keeps its
-  /// length: what the engine gave beyond it is made into an entry nobody reads).
-  template <class X, class B> static void put(EngineObjects& o, const X& x, B& b, std::size_t& k) {
-    if constexpr (direct::is_fixed<B>) {
-      if (k < b.size()) {
-        Direct<T>::to(o, x, b.items[k]);
-      } else {
-        typename B::Item beyond{};
-        Direct<T>::to(o, x, beyond);
-      }
-    } else {
-      b.emplace_back();
-      Direct<T>::to(o, x, b.back());
-    }
-    ++k;
-  }
 };
 /// A list inside a list: in the Blueprint a struct whose one field is the inner list.
 template <class L> struct Direct<Row<L>> {
@@ -276,9 +286,10 @@ template <class L> struct Direct<Row<L>> {
     const auto& [inner] = b;
     Direct<L>::from(o, inner, c);
   }
-  template <class C, class B> static void to(EngineObjects& o, const C& c, B& b) {
-    auto& [inner] = b;
-    Direct<L>::to(o, c, inner);
+  template <class B, class C> static B make(EngineObjects& o, const C& c) {
+    B b{made<L>(o, c)};
+    [[maybe_unused]] const auto& [inner] = b;   // (a struct of this one field)
+    return b;
   }
   template <class C> static void pass(EngineObjects& o, const C& c) { Direct<L>::pass(o, c); }
 };
@@ -343,7 +354,7 @@ class String {
 /// An output of a call that failed before it was given: the zero of its type (a struct: its defaults).
 template <class B> void none(B& b) { b = B{}; }
 /// An object of the engine a function gave, as the Int the class holds: its handle.
-template <class B> void handle_to(i64 handle, B& b) { b = B(normal(handle)); }
+template <class B> B handle_as(i64 handle) { return B(normal(handle)); }
 
 namespace direct {
 template <class R> struct Hold {   // what a function gave by value: kept here
@@ -375,9 +386,8 @@ template <class Tag, class R> class Given {
     requires(!detail::is_initializer_list<T>)
   operator T() const {
     if (!objects_) return from_value<T>(held_);
-    T b{};
-    if (const auto* c = hold_.get()) Direct<Tag>::to(*objects_, *c, b);
-    return b;
+    if (const auto* c = hold_.get()) return Direct<Tag>::template make<T>(*objects_, *c);
+    return T{};
   }
 
  private:
