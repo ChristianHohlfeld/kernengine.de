@@ -101,8 +101,10 @@ cancel_job() {
 # Annahme: volle Läufe zuerst, dann "vergleich" und "alle", dann der Rest - je in der Reihenfolge des Eintreffens. Angenommen wird nur, was ins Budget an
 # Kernen passt; der erste, der nicht passt, hält die nach ihm auf - so verhungert kein großer Auftrag hinter vielen kleinen.
 annehmen() {
-  local f name kind k u prio
+  local f name kind k u prio cap
   for f in "$A"/abbruch/*; do [ -f "$f" ] && cancel_job "$(basename "$f")"; done
+  # (das Budget lässt sich über die Datei "cap" auf dem Zweig stellen, ohne die Schleife zu ersetzen - eine Zahl; fehlt sie, gilt CAP)
+  cap=""; [ -f "$A/cap" ] && cap="$(head -1 "$A/cap" | tr -cd '0-9')"; [ -n "$cap" ] || cap="$CAP"
   u="$(used)"
   for prio in voll "vergleich alle" rest; do
     for name in $(ls -tr "$A/jobs" 2>/dev/null); do
@@ -114,9 +116,9 @@ annehmen() {
         *) case " $prio " in *" $kind "*) ;; *) continue ;; esac ;;
       esac
       k="$(need "$kind")"
-      if [ "$u" -gt 0 ] && [ $(( u + k )) -gt "$CAP" ]; then return 0; fi
+      if [ "$u" -gt 0 ] && [ $(( u + k )) -gt "$cap" ]; then return 0; fi
       touch "$A/.done/$name"; echo "$k" > "$A/.lauf/$name"; u=$(( u + k ))
-      echo "$(date '+%F %T') $name: $(head -1 "$f") ($u von $CAP Kernen belegt)"
+      echo "$(date '+%F %T') $name: $(head -1 "$f") ($u von $cap Kernen belegt)"
       run_job "$name" 8>&- &
     done
   done
