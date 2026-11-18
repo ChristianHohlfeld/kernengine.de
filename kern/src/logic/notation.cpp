@@ -2374,7 +2374,8 @@ struct Reader {
       }
       v = list.type == PinType::structure_list ? Value::structures(std::move(structs)) : Value::from_json(items, list.type);
       if (list.count && !count) {
-        // (a value on its way through a pin is a list: only a place is declared with a length)
+        // (a value on its way through a pin is a list: only a place is declared with a length - and an
+        // input whose type has one, Reader::bind)
         fail(at, "a list of a fixed length is what a place is declared as - a value written out is " + cpp_type(TypeRef{list.type, list.of}) + "{...}");
         return true;
       }
@@ -3157,6 +3158,8 @@ struct Reader {
     Value v = src.value;
     if (v.type == PinType::integer && pin.type == PinType::number) v = Value::number(static_cast<f64>(v.i));
     // (a list of a fixed length says its length: the input's - Fixed<fc_PT1, 3>{...} for a field of three)
+    if (src.count && !pin.count)
+      return fail(src.tok, "a list of a fixed length is what a place is declared as - a value written out is " + cpp_type(TypeRef{v.type, src.of}) + "{...}");
     if (src.count && src.count != pin.count)
       return fail(src.tok, "\"" + pin.id + "\" of " + node_name(m.def->type) + " is " + cpp_type(TypeRef{pin.type, pin.of, pin.count}) + ", this is " +
                                cpp_type(TypeRef{v.type, src.of, src.count}));
