@@ -15,7 +15,6 @@
   CASE(mvt_read_geometry, "Bytes, Listen", 1) \
   CASE(wire_put_u32, "Bytes, Liste", 1)       \
   CASE(wire_get_u32, "Bytes, Struktur", 1)    \
-  CASE(seats_claim, "Liste v. Strukt.", 1)    \
   CASE(settings_escape, "Text", 1)            \
   CASE(settings_num, "Float->Text", 0)        \
   CASE(common_wrap_pi, "Float, Schleife", 0)  \

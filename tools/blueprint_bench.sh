@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# The time a Blueprint's class takes against the C++ it was converted from (BLUEPRINTS.md, "Der Weg ab
+# hier": every building block costs in the class what the C++ it stands for costs).
+#
+#   tools/blueprint_bench.sh <level.klevel> [rounds] [case ...]
+#
+# Writes the classes of the measured Blueprints (tools/blueprint_cpp.sh --classes), builds
+# kern/games/spawncity/tests/bench/ in the game's release build (clang, -O3 -flto=thin -DNDEBUG
+# -ffp-contract=off -fno-exceptions -fno-rtti, as kern/build.sh) and runs it: per case the time per
+# call of the source and of the class and their ratio (bench.cpp).
+set -euo pipefail
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+[ $# -ge 1 ] || { echo "usage: tools/blueprint_bench.sh <level.klevel> [rounds] [case ...]" >&2; exit 2; }
+level="$1"; shift
+cxx="${BENCH_CXX:-clang++-18}"
+dir="${TMPDIR:-/tmp}/kern-blueprint-bench/$$"
+mkdir -p "$dir"
+trap 'rm -rf "$dir"' EXIT
+bench="$root/kern/games/spawncity/tests/bench"
+# (the actors whose Blueprints are measured - the libraries they use come with them)
+"$root/tools/blueprint_cpp.sh" --classes "$level" "$dir/classes.h" \
+  qr_code_cpp nostr_cpp mvt_cpp lamps_cpp perf_cpp settings_cpp combat_audio_cpp jet_seats_cpp wire person_hit common tiles >&2
+flags=(-std=c++20 -O3 -flto=thin -DNDEBUG -ffp-contract=off -fno-exceptions -fno-rtti -w -I"$root/kern/include" -I"$dir")
+for f in "$bench"/*.cpp; do
+  "$cxx" "${flags[@]}" -c "$f" -o "$dir/$(basename "$f").o" &
+  [ "$(jobs -r | wc -l)" -lt "${KERN_JOBS:-1}" ] || wait -n
+done
+for f in "$root"/kern/third_party/musl_math/src/*.c; do  # (the language's own sin, cos, exp ..., as kern/build.sh)
+  "${BENCH_CC:-clang-18}" -std=c17 -O3 -flto=thin -ffp-contract=off -fno-math-errno -w -c "$f" -o "$dir/musl_$(basename "$f").o" &
+  [ "$(jobs -r | wc -l)" -lt "${KERN_JOBS:-1}" ] || wait -n
+done
+wait
+"$cxx" "${flags[@]}" "$dir"/*.o -lm -o "$dir/bench"
+# (the measurement takes the machine alone: run it under the locks of the other heavy work)
+${BENCH_RUN:-} "$dir/bench" "$@"

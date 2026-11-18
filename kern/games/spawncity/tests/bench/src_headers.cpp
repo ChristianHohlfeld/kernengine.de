@@ -75,7 +75,7 @@ bench::u64 src_person_hit() {
     const sc::Vec3 feet{static_cast<f32>(p[0] / 4), static_cast<f32>(p[1] / 4), 0}, from{static_cast<f32>(p[4]), static_cast<f32>(p[5]), static_cast<f32>(p[6] / 4 + 1)};
     const sc::Vec3 seg{static_cast<f32>((p[0] / 4 - p[4]) * 2 + p[7] / 8), static_cast<f32>((p[1] / 4 - p[5]) * 2 + p[8] / 8), static_cast<f32>(p[9] / 8)};
     f32 t = 0;
-    const sc::person_hit::BodyPart part = sc::person_hit::hit(feet, static_cast<f32>(p[2]), static_cast<f32>(p[3] + 4), from, seg, t);
+    const sc::BodyPart part = sc::person_hit::hit(feet, static_cast<f32>(p[2]), static_cast<f32>(p[3] + 4), from, seg, t);
     h = bench::fold_number(bench::fold(h, static_cast<bench::u64>(part)), t);
   }
   return h;
