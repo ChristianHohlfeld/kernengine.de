@@ -1,0 +1,80 @@
+    CityStream::upload (15): written
+    CityStream::begin_roads (17): a member of Int is set
+    CityStream::relay (13): it calls CityStream::begin_roads(), which waits
+    CityStream::update_collision (54): written
+    CityStream::build_near (19): written
+    CityStream::building_shape (50): written
+    CityStream::damage_building (30): written
+    CityStream::damage_list (6): written
+    CityStream::damage_of (6): written
+    CityStream::merge_damage (44): written
+    CityStream::clear_damage (16): written
+    CityStream::begin_cells (22): written
+    CityStream::finish_cells (44): written
+    CityStream::work (117): a switch case that falls through
+    CityStream::update (85): it calls CityStream::request_around(), which waits
+    CityStream::step_time (4): written
+    CityStream::walls_near (32): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    CityStream::building_at (18): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    CityStream::street_point (19): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a ImplicitCastExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    CityStream::buildings_near (13): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    CityStream::ready_tiles (6): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    CityStream::areas_near (13): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    CityStream::recollide (5): written
+    CityStream::exclude_building (13): written
+    CityStream::exclusion_done (1): written
+interiors_cpp                  27 /   29 functions      592 /    680 lines
+    rgb (1): written
+    signed_area (5): written
+    clean (10): written
+    pip (8): written
+    seg_dist (5): written
+    ring_dist (5): written
+    offset_ring (16): written
+    hash_key (5): written
+    h01 (1): written
+    vtri (4): written
+    vquad (1): written
+    ctri (6): written
+    cquad (4): written
+    wall (6): written
+    slab (20): written
+    box (11): written
+    find_core (39): written
+    door_gap (16): written
+    Interiors::doors_of (20): written
+    Interiors::build (306): written
+    Interiors::clear (8): written
+    Interiors::release (4): written
+    Interiors::activate (44): written
+    Interiors::inside (6): written
+    Interiors::level_at (8): written
+    Interiors::update (55): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    Interiors::draw (33): it calls LifeArt::box(), which waits
+    Interiors::hud (8): written
+    Interiors::command (25): written
+
+344 of 374 functions of the program are written as Blueprints (3626 of 4403 lines), and 17 of the engine's headers that they call: 27 Blueprints - 8 of source files, 0 of states, 19 of headers and of shapes
+337 functions of the Blueprints are compared with their source, bit for bit, by the tests in /dev/shm/spawncity-jobs-chris/work-f1-probe-153945-13875/pt/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+     8 (   157)   its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+     1 (   117)   a switch case that falls through
+     1 (   117)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: loop variable ‘<structured bindings>’ creates a copy from type ‘const std::pair<int, int>’ [-Werror=range-loop-construct])
+     4 (   111)   a member of Int is set
+     1 (    85)   it calls CityStream::request_around(), which waits
+     1 (    81)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘build_water_chunk’ was not declared in this scope)
+     1 (    33)   it calls LifeArt::box(), which waits
+     1 (    28)   emplace() of a list of what ends (objects of the engine, values that hold them)
+     1 (    19)   its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a ImplicitCastExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+     1 (    13)   it calls CityStream::begin_roads(), which waits
+     1 (     7)   an object of the engine (HeightSampler) given back by value (C++ moves it to the caller)
+     4 (     4)   put() is defined in another file
+     2 (     2)   find() is defined in another file
+     1 (     1)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no declaration matches ‘void converted_facades_cpp::Facades::frame_uniforms(converted_facades_cpp::UniformCache&, const converted_facades_cpp::Renderer&)’)
+     1 (     1)   kill_pet() is defined in another file
+     1 (     1)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no declaration matches ‘void converted_water_look_cpp::WaterLook::frame_uniforms(converted_water_look_cpp::UniformCache&, const converted_water_look_cpp::Renderer&)’)
+
+real	3m48,603s
+user	10m15,292s
+sys	0m38,347s
