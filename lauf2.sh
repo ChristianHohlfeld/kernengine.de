@@ -18,6 +18,15 @@ A="$(cd "$(dirname "$0")" && pwd)"; J=~/spawncity-jobs; REPO=https://github.com/
 N="$(nproc)"; SLOTS="${SLOTS:-6}"; mkdir -p "$J" "$A/.done"
 me="$(sha256sum "$0" | cut -c1-16)"
 G="git -c user.name=mag -c user.email=mag@localhost"
+# clang++: der Konverter liest die Quelltexte mit clang (CLANGXX). Gesucht wird, was da ist - nichts wird installiert.
+find_clang() {
+  local c
+  for c in "${CLANGXX:-}" clang++ clang++-20 clang++-19 clang++-18 clang++-17 clang++-16 /usr/lib/llvm-*/bin/clang++ "$HOME"/.local/bin/clang++ \
+           "$HOME"/*/bin/clang++ "$HOME"/*/*/bin/clang++ /opt/*/bin/clang++ /usr/local/*/bin/clang++; do
+    [ -n "$c" ] && command -v "$c" >/dev/null 2>&1 && { command -v "$c"; return; }
+  done
+}
+CLANGXX="$(find_clang)"; export CLANGXX
 run_job() {  # name
   local name="$1" kind ref rest W jobs
   read -r kind ref rest < "$A/jobs/$name"
@@ -27,6 +36,7 @@ run_job() {  # name
   jobs="$N"; [ "$kind" = voll ] || jobs=$(( N / SLOTS ))
   export KERN_JOBS="$jobs" TMPDIR="$W/tmp" SC_TEST_OUT="$W/tmp/sc-tests"; mkdir -p "$TMPDIR" mag-log
   echo "$name: $kind auf $SHA ($ref), $jobs Kerne, Start $(date '+%F %T')" > mag-log/when
+  echo "werkzeuge: clang=${CLANGXX:-FEHLT} ($("${CLANGXX:-false}" --version 2>/dev/null | head -1)) c++=$(command -v c++ || echo FEHLT) ($(c++ --version 2>/dev/null | head -1)) python=$(python3 --version 2>&1) PATH=$PATH" >> mag-log/when
   git checkout -q -B "mag/ergebnis-$name"; git add -f mag-log; $G commit -q -m "mag: $name gestartet ($kind auf $SHA)"; git push -q origin "mag/ergebnis-$name" 2>/dev/null
   local conv="python3 ../../../tools/cpp_to_blueprint.py --convert sc --program firmware=fc,hwcontract -I../../include -I../../third_party/box3d/include -Isrc"
   case "$kind" in
