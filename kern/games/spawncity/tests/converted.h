@@ -1442,6 +1442,7 @@ struct Tally {
   int compared = 0, outside = 0, wrong = 0, class_only = 0;
   int costlier = 0;                  // calls in which the class asked for memory more often than the source
   int refused = 0;                   // calls not compared: the engine itself refused a call of the source (real_engine)
+  std::string first_refused;         // (the first such call of the source: said in the note)
   long most_class = 0, with_source = 0;  // (the one with the most: how often the class, how often the source)
   double slowest = 0;
   std::chrono::steady_clock::time_point began = std::chrono::steady_clock::now();
@@ -1475,7 +1476,11 @@ struct Tally {
     // zeros of a call that did not happen, not what C++ says - nothing to compare; drawn again (the twenty
     // compared calls a function needs stay twenty). (A call refused on a side of the Blueprint only is in
     // its record of the engine's calls: that differs from the source's - see engine_same.)
-    if (g_engine_refused > 0) { ++outside; ++refused; return; }
+    if (g_engine_refused > 0) {
+      ++outside;
+      if (++refused == 1) first_refused = g_engine_refused_first;
+      return;
+    }
     if (state && !(set_state(*bp.native, *state) && set_state(*bp.interp, *state))) {
       ++compared;
       if (++wrong <= 3) std::printf("  %s(%s): the Blueprint's variables do not take the values of the source's object (%s)\n", function, describe().c_str(), g_untaken);
@@ -1566,7 +1571,8 @@ struct Tally {
       std::printf("  note: %s: %d of %d calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to %.0f ms - is not run in the interpreter)\n",
                   function, class_only, compared, slowest * 1000);
     if (refused > 0)
-      std::printf("  note: %s: %d calls drawn again - the engine itself refused a call the source made (%d compared)\n", function, refused, compared);
+      std::printf("  note: %s: %d calls drawn again - the engine itself refused a call the source made (%d compared; the first: %s)\n", function, refused, compared,
+                  first_refused.c_str());
     SC_CHECK(wrong == 0, "%s: %d of %d calls differ", function, wrong, compared);
     if (costlier > 0)
       std::printf("  cost: %s: in %d of %d calls the class asks for memory more often than the source (up to %ld times instead of %ld)\n", function, costlier, compared, most_class, with_source);
