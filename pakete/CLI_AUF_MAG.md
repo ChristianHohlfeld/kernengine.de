@@ -5,7 +5,8 @@ Arbeitsspeicher (`/dev/shm/spawncity-diff-$USER`, sonst `~/spawncity-diff`). Kei
 Daneben läuft `~/spawncity-auftrag/lauf2.sh` (die Warteschlange der anderen Agenten) – nicht anfassen, nicht beenden.
 Falls du diesen Auftrag über Grok Bot schon begonnen hast (`~/spawncity-diff`): mach dort weiter, nach diesen Regeln.
 
-Repo `ChristianHohlfeld/kernengine.de`, Branch `mag/differenztest` von `origin/work`. Nur auf diesen Branch pushen (nie main/work, kein Force-Push).
+Repo `ChristianHohlfeld/kernengine.de`, Branch `mag/differenztest` von `origin/work-r` (dort steht schon das zusammengeführte Werkzeug: tools/source_diff.py und tests/source_diff.h aus work-f2 und work-f1).
+Ein Vorgänger hat begonnen: lies `pakete/UEBERGABE_r.md` (auf diesem Branch mag/auftrag) zuerst – Umfang (76 Einheiten), erste Befunde je Datei, die sieben fehlenden allgemeinen Regeln des Werkzeugs und die offene Grundsatzfrage (alter Text gegen heutige fremde Header). Listen und Aufrufskript: `pakete/r/`. Nur auf diesen Branch pushen (nie main/work, kein Force-Push).
 Commit-Nachrichten deutsch. `clang++` heißt hier `clang++-18` (`export CLANGXX=clang++-18`).
 
 Lies zuerst, ganz: in `kern/games/spawncity/BLUEPRINTS.md` den Abschnitt „Der Weg ab hier“ mit „Kursprüfung 18.11.2026“ (bindend), den Kopf von
