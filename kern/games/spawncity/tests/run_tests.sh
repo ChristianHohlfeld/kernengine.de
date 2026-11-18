@@ -40,26 +40,60 @@ for d in core physics geo gfx scene audio net logic game; do while IFS= read -r 
 sources+=("$kern/tests/gl_stub.cpp")
 # Every game source that does not need GameWorld (not main.cpp, nothing that includes game.h).
 for f in "$game"/src/*.cpp; do [ "$(basename "$f")" = main.cpp ] || grep -q '#include "game.h"' "$f" || sources+=("$f"); done
-while IFS= read -r f; do sources+=("$f"); done < <(find "$here" -name 'test_*.cpp' | sort)
+# The tests - but the differential tests of a lowering (tests/lowered): those are a program of their own,
+# built with clang (below).
+lowered=()
+while IFS= read -r f; do case "$f" in "$here"/lowered/*) lowered+=("$f") ;; *) sources+=("$f") ;; esac; done < <(find "$here" -name 'test_*.cpp' | sort)
 flags=(-std=c++20 "${build[@]}" -ffp-contract=off -fno-exceptions -fno-rtti
        -Wall -Wextra -Wno-unused-parameter -I"$kern/include" -I"$kern/third_party/box3d/include" -I"$game/src" -I"$kern/tests")
 # Header changes rebuild what includes them (the cache key includes every header's content): a header
 # of the engine or the game everything, a header of the tests only the tests.
 key="$({ printf '%s ' "${flags[@]}"; find "$kern/include" "$game" -path "$here" -prune -o \( -name '*.h' -o -name '*.hpp' \) -print | sort | xargs cat; } | sha256sum | cut -c1-12)"
 test_key="$({ printf '%s ' "$key"; find "$here" -name '*.h' -o -name '*.hpp' | sort | xargs cat; } | sha256sum | cut -c1-12)"
-export cxx out key test_key here
-object_of() { case "$1" in "$here"/*) k="$test_key" ;; *) k="$key" ;; esac; echo "$out/obj/$(echo "$1" | sed "s|/|_|g")-$k-$(sha256sum "$1" | cut -c1-12).o"; }
+export out key test_key here
+# (objects of each compiler in a folder of their own: obj for cxx, obj-clang for the differential tests)
+object_of() { case "$1" in "$here"/*) k="$test_key" ;; *) k="$key" ;; esac; echo "$out/obj$2/$(echo "$1" | sed "s|/|_|g")-$k-$(sha256sum "$1" | cut -c1-12).o"; }
 export -f object_of
-printf '%s\n' "${sources[@]}" | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c '
-  src="$1"; shift
-  o="$(object_of "$src")"
-  [ -f "$o" ] || "$cxx" "$@" -c "$src" -o "$o"' _ {} "${flags[@]}"
+# compile_all <compiler> <folder suffix> <sources...>: every source once (cached), in parallel
+compile_all() {
+  local with="$1" tag="$2"; shift 2
+  mkdir -p "$out/obj$tag"
+  printf '%s\n' "$@" | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c '
+    with="$1"; tag="$2"; src="$3"; shift 3
+    o="$(object_of "$src" "$tag")"
+    [ -f "$o" ] || "$with" "$@" -c "$src" -o "$o"' _ "$with" "$tag" {} "${flags[@]}"
+}
+compile_all "$cxx" "" "${sources[@]}"
 cpp_objects=()
-for f in "${sources[@]}"; do cpp_objects+=("$(object_of "$f")"); done
+for f in "${sources[@]}"; do cpp_objects+=("$(object_of "$f" "")"); done
 "$cxx" "${link[@]}" "${cpp_objects[@]}" "${objects[@]}" -lm -o "$out/spawncity_tests"
 # (every test runs, whatever an earlier one gave - see test_main.cpp; the run's result is that of all of it)
 rc=0
 "$out/spawncity_tests" "$@" || rc=1
+# The differential tests of a lowering (tests/lowered: the source before and after, value for value) with
+# clang - the compiler that builds the game (emscripten): where C++ leaves the order open (two arguments of a
+# call that draw from the same generator, [expr.call]/8), the lowering keeps the meaning of the game's
+# compiler (decision E9), and only under it can its differential test be green. With them, what they need
+# of the game and of Kern, built by clang too - the same sources as above, test_main.cpp for the frame.
+# No clang: the run fails (nothing is skipped).
+if [ "${#lowered[@]}" -gt 0 ]; then
+  # (CLANGXX, else clang++, else the newest clang++-<version> on the PATH)
+  clangxx="${CLANGXX:-}"
+  if [ -z "$clangxx" ]; then
+    if command -v clang++ >/dev/null; then clangxx=clang++
+    else clangxx="$(compgen -c clang++- | grep -E '^clang\+\+-[0-9]+$' | sort -t- -k2 -n | tail -1 || true)"; fi
+  fi
+  if [ -z "$clangxx" ] || ! command -v "$clangxx" >/dev/null; then echo "FAIL tests/lowered: no clang (CLANGXX, clang++, clang++-<version>) - the differential tests are built with clang"; exit 1; fi
+  echo "tests/lowered: built with $clangxx"
+  low_sources=()
+  for f in "${sources[@]}"; do case "$f" in "$here"/test_*.cpp) [ "$f" = "$here/test_main.cpp" ] && low_sources+=("$f") ;; "$here"/converted/*) ;; *) low_sources+=("$f") ;; esac; done
+  low_sources+=("${lowered[@]}")
+  compile_all "$clangxx" "-clang" "${low_sources[@]}"
+  low_objects=()
+  for f in "${low_sources[@]}"; do low_objects+=("$(object_of "$f" "-clang")"); done
+  "$clangxx" "${link[@]}" "${low_objects[@]}" "${objects[@]}" -lm -o "$out/spawncity_lowered"
+  "$out/spawncity_lowered" "$@" || rc=1
+fi
 # The converted functions once more against the engine itself: the source and its Blueprint (interpreter,
 # class) call the real functions of the engine's nodes, each side with objects of its own, set up alike
 # for every call - the description of every node they call has to fit the real function (rule_blueprint.h).
