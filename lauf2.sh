@@ -14,6 +14,10 @@
 # Bis zu $SLOTS Aufträge laufen zugleich (ein "voll" allein mit allen Kernen). Pusht nie auf main/work, erzwingt
 # nichts, installiert nichts; jeder Auftrag rechnet im Arbeitsspeicher (/dev/shm/spawncity-jobs-<nutzer>/<name>, sonst ~/spawncity-jobs/<name>) und räumt den Ordner danach weg.
 # Die Schleife ersetzt sich selbst, wenn diese Datei auf dem Branch neuer ist.
+# Fassung 18.11., 18:10: (1) "probe" gibt dem Konverter eine Kopie des Levels mit (--level): ohne sie wartete jede Funktion, die den Blueprint
+# eines Regel-Actors ruft, mit "... which the level does not have" - ein Artefakt der Probe. (2) "voll": die Engine-Suite rechnet von Anfang an
+# neben der Konvertierung (sie prüft kern/, nicht das Level), und Level und Tests werden gleich nach der Konvertierung gepusht (Commit "... Level
+# und Tests der Blueprints", dazu mag-zwischen/ mit when und convert.log) - die Suiten folgen; mag-log/ kommt wie bisher am Ende.
 set -u
 A="$(cd "$(dirname "$0")" && pwd)"; J=~/spawncity-jobs
 # Im Arbeitsspeicher rechnen, wo es geht (/dev/shm: Klon, Zwischendateien, Objekte - nichts davon geht über die Platte).
@@ -49,13 +53,19 @@ run_job() {  # name
   local conv="python3 ../../../tools/cpp_to_blueprint.py --convert sc --program firmware=fc,hwcontract -I../../include -I../../third_party/box3d/include -Isrc"
   case "$kind" in
     voll)
+      # (die Engine-Suite hängt nicht an der Konvertierung: sie rechnet von Anfang an daneben, mit einem Drittel der Kerne, in ihrem eigenen Ordner $TMPDIR/kern-tests)
+      ( ( time KERN_JOBS=$(( N / 3 )) kern/tests/run.sh ) > mag-log/engine.log 2>&1; echo "engine rc=$? $(date '+%T')" > "$W/tmp/engine.when" ) &
+      local engine_pid=$!
       ( cd kern/games/spawncity && rm -rf tests/converted && time FUNCTIONS=1 $conv --level level/spawncity.klevel --test tests/converted -- \
           $(cd kern/games/spawncity 2>/dev/null; ls src/*.cpp | grep -v "level_data.cpp\|level_blueprints.cpp\|main.cpp") ) > mag-log/convert.log 2>&1
       echo "convert rc=$? $(date '+%T')" >> mag-log/when
-      ( time kern/games/spawncity/tests/run_tests.sh ) > mag-log/suite.log 2>&1; echo "suite rc=$? $(date '+%T')" >> mag-log/when
-      ( time kern/tests/run.sh ) > mag-log/engine.log 2>&1; echo "engine rc=$? $(date '+%T')" >> mag-log/when
+      # (Level und Tests sofort, mit dem Protokoll der Konvertierung in mag-zwischen/ - nicht in mag-log/: ein Auftrag gilt als fertig, sobald mag-log zweimal geschrieben ist)
       git add kern/games/spawncity/level/spawncity.klevel kern/games/spawncity/tests/converted
-      $G commit -q -m "mag: $name auf $SHA – Level und Tests der Blueprints" || true ;;
+      $G commit -q -m "mag: $name auf $SHA – Level und Tests der Blueprints" || true
+      mkdir -p mag-zwischen && cp mag-log/when mag-zwischen/when && tail -80 mag-log/convert.log > mag-zwischen/convert.tail.txt && xz -9 -T0 -c mag-log/convert.log > mag-zwischen/convert.log.xz
+      git add -f mag-zwischen && $G commit -q -m "mag: $name auf $SHA – Zwischenstand nach der Konvertierung (die Suiten rechnen noch)" && git push -q origin "mag/ergebnis-$name" 2>/dev/null
+      ( time kern/games/spawncity/tests/run_tests.sh ) > mag-log/suite.log 2>&1; echo "suite rc=$? $(date '+%T')" >> mag-log/when
+      wait "$engine_pid"; cat "$W/tmp/engine.when" >> mag-log/when 2>/dev/null || echo "engine rc=? (kein Ergebnis) $(date '+%T')" >> mag-log/when ;;
     konvert)   # konvert <git-ref> <kerne>: nur die Konvertierung des ganzen Spiels, mit genau so vielen Kernen
       export KERN_JOBS="${rest%% *}"; echo "kerne: $KERN_JOBS" >> mag-log/when
       ( cd kern/games/spawncity && rm -rf tests/converted && time FUNCTIONS=1 $conv --level level/spawncity.klevel --test tests/converted -- \
@@ -65,7 +75,8 @@ run_job() {  # name
       $G commit -q -m "mag: $name auf $SHA – Level und Tests der Blueprints ($KERN_JOBS Kerne)" || true ;;
     probe)
       mkdir -p "$W/pt/converted" && cp kern/games/spawncity/tests/*.h "$W/pt/"   # (der Test-Schreiber sucht <test>/../converted.h)
-      ( cd kern/games/spawncity && time FUNCTIONS=1 TEST_ERRORS=1 $conv --test "$W/pt/converted" --texts "$W/mag-log/texts" -- $rest ) > mag-log/convert.log 2>&1
+      cp kern/games/spawncity/level/spawncity.klevel "$W/pt/l.klevel"            # (eine Kopie des Levels: die Regel-Blueprints, die das Programm ruft, stehen dort)
+      ( cd kern/games/spawncity && time FUNCTIONS=1 TEST_ERRORS=1 $conv --level "$W/pt/l.klevel" --test "$W/pt/converted" --texts "$W/mag-log/texts" -- $rest ) > mag-log/convert.log 2>&1
       echo "convert rc=$? $(date '+%T')" >> mag-log/when ;;
     engine) ( time kern/tests/run.sh $rest ) > mag-log/engine.log 2>&1; echo "engine rc=$? $(date '+%T')" >> mag-log/when ;;
     spiel)  ( time kern/games/spawncity/tests/run_tests.sh $rest ) > mag-log/suite.log 2>&1; echo "suite rc=$? $(date '+%T')" >> mag-log/when ;;
