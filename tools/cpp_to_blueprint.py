@@ -13608,12 +13608,12 @@ def main(argv):
     gave = collections.defaultdict(list)    # a Blueprint -> what it has given (its table, its exports), each once
     version = {}                            # a Blueprint -> which of those it gives now (an index into gave)
     met, rounds, took = {}, 0, {}   # (met: a state -> the round that began from it)
-    # A function that was written and waits now (what is given only grows - see below) goes against the rounds: what it
-    # waits for may come from what it gave itself. When the rounds go round (the same state twice), such a function of a
-    # Blueprint that goes round waits for good, with the reason it waited for (World.bars) - from then on its Blueprint
-    # is given that, and what it gives no longer turns on it: every time the rounds go round, more wait for good, and
-    # there are only so many functions. Rounds that do not go round never come to this: what they write stays as it was.
-    fell = collections.defaultdict(dict)    # a Blueprint -> its functions that were written and wait now: key -> (the round, why)
+    # When the rounds go round (the same state twice), what turns in them is what one Blueprint gives taking from what
+    # another gives: a function written in one round and waiting in the next, or waiting with another reason each time. Such a
+    # function of a Blueprint that goes round waits for good from then on (World.bars), with the reason it gave first in those
+    # rounds and the Blueprint it went round with; its Blueprint is given that, and what it gives no longer turns on it. Each
+    # time the rounds go round more wait for good - there are only so many functions -, so the rounds end. Rounds that do not
+    # go round never come to this: what they write stays as it was.
     held = {}                               # a Blueprint -> its functions that wait for good: key -> why
     visited = collections.defaultdict(list) # a Blueprint -> (the round, the version it gave then), round by round
 
@@ -13645,7 +13645,6 @@ def main(argv):
                     exported = [k for da, db in zip(ea, eb) if isinstance(da, dict) and isinstance(db, dict)
                                 for k in sorted(set(da) | set(db), key=str) if da.get(k) != db.get(k)]
                     print(f"goes round: {u}: " + "; ".join(moved[:6]) + (f"; exports differ: {', '.join(map(str, exported[:6]))}" if exported else ("" if moved else "; exports differ")), flush=True)
-            # (of those that fell in the rounds that went round - since the round that began from this state)
             for u in sorted(new):
                 # (what it gave in the rounds that went round: of two versions one after the other, what differs - the values)
                 ring = [v for at, v in visited[u] if at >= met[state]]
@@ -13659,13 +13658,26 @@ def main(argv):
                             for k in sorted(set(da) | set(db), key=str):
                                 if da.get(k) != db.get(k):
                                     print(f"goes round: {u}: v{a} -> v{b}: exports[{i}] {k}: {repr(da.get(k))[:900]} -> {repr(db.get(k))[:900]}", flush=True)
-            more = {u: {k: why for k, (at, why) in sorted(fell[u].items()) if at >= met[state] and k not in held.get(u, {})} for u in sorted(new)}
-            if any(more.values()):
-                for u, ks in more.items():
-                    if ks:
-                        held.setdefault(u, {}).update(ks)
-                        for k, why in ks.items():
-                            print(f"{u}: {tables[u][k]['cpp'] if k in tables.get(u, {}) else k}() waits for good - the rounds went round ({why})", flush=True)
+            # What turns in the rounds that went round and waits in one of them waits for good (World.bars), with the
+            # reason it gave first there - a function written in one round and waiting in the next, or one that waits in
+            # each with another reason (what it names first changes with what the others give): each its own, the same
+            # whatever the order in which the round's jobs are done.
+            more = {}
+            for u in sorted(new):
+                ring = [v for at, v in visited[u] if at >= met[state]]
+                tabs = [gave[u][v][0] for v in ring]
+                for k in sorted(set().union(*tabs)):
+                    if k in held.get(u, {}):
+                        continue
+                    outcomes = [(t[k]["wait"] if k in t else "absent") for t in tabs]
+                    waits = [w for w in outcomes if w and w != "absent"]
+                    if len(set(outcomes)) > 1 and waits:
+                        more.setdefault(u, {})[k] = f"{waits[0]} (it went round with {u})"
+            if more:
+                for u, ks in sorted(more.items()):
+                    held.setdefault(u, {}).update(ks)
+                    for k, why in ks.items():
+                        print(f"{u}: {tables[u][k]['cpp'] if k in tables.get(u, {}) else k}() waits for good - the rounds went round: {why}", flush=True)
                 continue
             raise SystemExit("these Blueprints give, round after round, what they gave before (what one writes takes from the other what "
                              "it writes): " + ", ".join(sorted(new)))
@@ -13687,7 +13699,6 @@ def main(argv):
             for k, e in sorted(r["table"].items()):
                 if k in tables.get(u, {}) and not tables[u][k]["wait"] and e["wait"]:
                     print(f"{u}: {e['cpp']}() was written and waits now ({e['wait']})", flush=True)
-                    fell[u][k] = (rounds, e["wait"])
             given[u] = asks[u]
             results[u] = r
             tables[u], exports[u] = r["table"], r["exports"]
