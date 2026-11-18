@@ -1,0 +1,6 @@
+Paket „t2“. Lies zuerst $S/PAKET_COMMON3.md (S=/tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad) ganz und was es nennt. Sperre: heavy2.lock. Zweig work-t2, Worktree /home/claude/w-t2.
+
+Du bist der eine Besitzer des Test-Schreibers (TestWriter in tools/cpp_to_blueprint.py, tests/converted.h) für die Gründe: „its source does not compile with a Blueprint's numbers yet: …“ (alle Arten: not declared in this scope, has no member named, has not been declared, does not name a type, non-class type, no declaration matches, incomplete type, no match for operator, names kern::primitives), „a method of a class that is not written“, „the class Graph is not written“. Jeder Fall ist ein Fehler dessen, was der Test aus dem Quelltext mitnimmt – finde je Art die allgemeine Ursache (nicht je Funktion flicken). Stimme dich mit t1 nicht ab; ihr arbeitet an verschiedenen Gründen im selben Bereich – halte deine Änderungen lokal (kleine, eigene Funktionen), damit das Zusammenführen sauber bleibt. Ändere keine Spiel-Quelle.
+
+Deine Liste: grep -E "does not compile|is not written\)|a method of a class" $S/f9_roots.txt (Grundursachen) und $S/f9_waiting.txt (alles Wartende, auch Folgefehler).
+Ziel: in deinen Dateien wartet nichts mehr – jede Funktion geschrieben UND im Test verglichen.

@@ -1,0 +1,250 @@
+Arondight45_StateControl	StateController::debug (1): a name for a place - written where it is called
+Arondight45_StateControl	StateRuntime::inner (1): a name for a place - written where it is called
+Arondight45_StateControl	StateRuntime::state_controller (1): a name for a place - written where it is called
+Arondight45_FirmwareRuntime	FirmwareRuntime::state_runtime (1): a name for a place - written where it is called
+Arondight45_FirmwareRuntime	FirmwareRuntime::receiver_snapshot (1): a name for a place - written where it is called
+Arondight45_FirmwareRuntime	FirmwareRuntime::navigation_snapshot (1): a name for a place - written where it is called
+car	Car::spec (1): a name for a place - written where it is called
+car	Car::wheel (1): a name for a place - written where it is called
+city_stream	CityStream::projector (1): a name for a place - written where it is called
+city_stream	CityStream::lanes (1): a name for a place - written where it is called
+city_stream	CityStream::terrain (1): a name for a place - written where it is called
+city_stream	CityStream::stats (1): a name for a place - written where it is called
+destruction	Destruction::stats (1): a name for a place - written where it is called
+drone	Drone::telemetry (1): a name for a place - written where it is called
+drone	Drone::params (1): a name for a place - written where it is called
+engine_geo_mesh_data	MeshData::push_extra (1): list: insert() of a range between two lists
+engine_logic_logic	Instance::name (1): the state of its object: the struct Instance (its field var_types_: a map or set of the standard library (the program's are kern::Map, kern::Set: in the order the keys came))
+engine_logic_logic	Instance::graph (1): the state of its object: the struct Instance (its field var_types_: a map or set of the standard library (the program's are kern::Map, kern::Set: in the order the keys came))
+engine_logic_logic	Instance::disabled (1): the state of its object: the struct Instance (its field var_types_: a map or set of the standard library (the program's are kern::Map, kern::Set: in the order the keys came))
+engine_logic_logic	Instance::tier (1): the state of its object: the struct Instance (its field var_types_: a map or set of the standard library (the program's are kern::Map, kern::Set: in the order the keys came))
+engine_logic_logic	Runtime::instances (1): the state of its object: the struct Runtime (its field blueprints: a function value (std::function: the language has no function values))
+engine_geo_roads	GeoProjector::init (7): the engine's fail() (it has no node: a variadic function)
+equipment	FlightLog::flights (1): a name for a place - written where it is called
+facades_cpp	Facades::frame_uniforms (1): the type kern::Renderer is only declared here (its definition is in another file)
+Game/game	Game::net (1): a name for a place - written where it is called
+Game/game	Game::city (1): a name for a place - written where it is called
+Game/game	Game::windows (1): a name for a place - written where it is called
+Game/game	Game::water_look (1): a name for a place - written where it is called
+game_life_cpp	make_sounds (101): the type std::array
+gaps_rules	SmokeField::puffs (1): a name for a place - written where it is called
+interiors	Interiors::plan (1): a name for a place - written where it is called
+jet	Jet::telemetry (1): a name for a place - written where it is called
+jet	Jet::spec (1): a name for a place - written where it is called
+jet_seats	Table::rows (1): a name for a place - written where it is called
+lamps	Field::all (1): a name for a place - written where it is called
+life	Life::ragdolls (1): a name for a place - written where it is called
+life	Life::cows (1): a name for a place - written where it is called
+life	Life::flocks (1): a name for a place - written where it is called
+life	Life::birds (1): a name for a place - written where it is called
+life	Life::trees (1): a name for a place - written where it is called
+life	Life::pets (1): a name for a place - written where it is called
+life	Life::cat_attack (1): a name for a place - written where it is called
+life	Life::chain (1): a name for a place - written where it is called
+life	Life::pet_anchors (1): a name for a place - written where it is called
+life	Life::voices (1): a name for a place - written where it is called
+life	Life::loose_birds (1): a name for a place - written where it is called
+mp_rules	Scoreboard::rows (1): a name for a place - written where it is called
+mp_rules	PingBoard::all (1): a name for a place - written where it is called
+mvt	Decoder::tile (1): a name for a place - written where it is called
+mvt	Writer::bytes (1): a name for a place - written where it is called
+mvt_cpp	Decoder::step (30): a reference to something it changes
+mvt_cpp	Writer::end_layer (21): a pointer
+nostr_cpp	P (1): a name for a place - written where it is called
+nostr_cpp	N (1): a name for a place - written where it is called
+nostr_cpp	G (1): a name for a place - written where it is called
+net_session	Session::push (1): data handed to the engine in another shape
+net_session	Session::seats (1): a name for a place - written where it is called
+net_session	Session::remotes (1): a name for a place - written where it is called
+net_session	Session::scores (1): a name for a place - written where it is called
+net_session	Session::vote_text (1): a name for a place - written where it is called
+people	People::at (1): a name for a place - written where it is called
+people	People::all (1): a name for a place - written where it is called
+ragdoll	Ragdolls::colors (1): a name for a place - written where it is called
+car_cpp	tyre (12): a constant computed with tan()
+rules_cpp	actor_graph (16): an object of the engine as a local that is not made by a constructor of it
+terrain	Terrain::stats (1): a name for a place - written where it is called
+touch_play	TouchPlay::fires (1): a name for a place - written where it is called
+touch_play	TouchPlay::buttons (1): a name for a place - written where it is called
+tiles_cpp	clip_pass (10): list: swap()
+touch_play_cpp	TouchPlay::pointer (169): a pointer
+terrain_cpp	Terrain::sampler (7): an object of the engine (HeightSampler) given back by value (C++ moves it to the caller)
+terrain_cpp	Terrain::remove_tints (7): list: erase()
+terrain_cpp	Terrain::set_craters (13): the operator == of List<Terrain_CraterRec>
+terrain_cpp	Terrain::build_render_tile (91): the type value_type
+water_look_cpp	WaterLook::frame_uniforms (1): the type kern::Renderer is only declared here (its definition is in another file)
+weapons	spec (1): a name for a place - written where it is called
+city_jobs_cpp	run_buildings (29): a reference to something it changes
+city_jobs_cpp	buildings_input (14): a place in a list of another shape
+city_stream_cpp	CityStream::building (1): a name for a place - written where it is called
+city_stream_cpp	CityStream::area (1): a name for a place - written where it is called
+city_stream_cpp	CityStream::start (12): list: erase()
+city_stream_cpp	CityStream::clear (16): list: erase()
+city_stream_cpp	CityStream::remove (32): list: erase()
+city_stream_cpp	CityStream::request_around (28): an owned value that holds objects of the engine, replaced where it is no place
+city_stream_cpp	CityStream::furniture (6): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+city_stream_cpp	CityStream::ready_at (14): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+city_stream_cpp	CityStream::finish_features (61): a member of Int is set
+city_stream_cpp	CityStream::begin_roads (17): a member of Int is set
+city_stream_cpp	CityStream::begin_cells (22): a place in a list of another shape
+city_stream_cpp	CityStream::work (110): CityStream::work() calls itself (a Blueprint's function does not)
+city_stream_cpp	CityStream::walls_near (32): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+city_stream_cpp	CityStream::building_at (18): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+city_stream_cpp	CityStream::street_point (19): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a ImplicitCastExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+city_stream_cpp	CityStream::buildings_near (13): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+city_stream_cpp	CityStream::ready_tiles (6): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+city_stream_cpp	CityStream::areas_near (13): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+destruction_cpp	Destruction::blast (44): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+game_destruction_sync_cpp	has (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no match for ‘operator==’ (operand types are ‘const converted_game_destruction_sync_cpp::Terrain::CraterRec’ and ‘const converted_game_destruction_sync_cpp::Terrain::CraterRec’))
+lamps_cpp	Field::rebuild (16): a member of Int
+life_cpp	Life::update (11): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+life_cpp	Life::rebuild_herds (74): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+life_cpp	Life::update_cows (123): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+life_cpp	Life::update_pigeons (144): a pointer
+life_cpp	Life::update_trees (35): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+life_cpp	Life::update_joggers (76): a pointer
+net_session_cpp	Session::to_host (4): state outside a function (a variable of the file: a library keeps nothing)
+net_session_cpp	Session::dispatch (143): state outside a function (a variable of the file: a library keeps nothing)
+net_session_cpp	Session::deliver (120): the operator == of List<Int>
+net_session_cpp	Session::update (92): an expression: DeclStmt
+interiors_cpp	Interiors::build (306): a vector constant written as CallExpr
+interiors_cpp	Interiors::update (55): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+interiors_cpp	Interiors::draw (33): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no declaration matches ‘void converted_interiors_cpp::Interiors::draw(converted_interiors_cpp::LifeArt&, sc::converted::wide::f32, sc::converted::wide::Vec3) const’)
+world_marks	Marks::stats (1): a name for a place - written where it is called
+world_marks_cpp	Marks::blast (22): call: ring_put()
+world_marks_cpp	Marks::add_soot (32): call: ring_put()
+world_marks_cpp	Marks::add_breach (44): call: ring_put()
+world_marks_cpp	Marks::bullet (23): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+world_marks_cpp	Marks::update (13): list: erase()
+world_marks_cpp	Marks::prune_walls (22): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+world_traffic	TrafficRules::junctions (1): a name for a place - written where it is called
+Game/game_destruction_sync_cpp	Game::dsync_reset_epoch (6): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘dsync_send_full’ was not declared in this scope)
+Game/game_destruction_sync_cpp	Game::dsync_send_full (25): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_destruction_sync_cpp::net::Session’ has no member named ‘destroy_to_all’)
+world_traffic_cpp	TrafficRules::rebuild (138): a pointer
+world_traffic_cpp	TrafficRules::limit (86): a call of MustStop on the Blueprint of the actor Traffic: its pin light is a int, and the call gives a Int64 (a call on an actor's Blueprint gives and takes flags, whole and decimal numbers, vectors, texts, enum values, structs of them and lists)
+game_cpp	game (4): the state of the Blueprint Game (its one object is that Blueprint, no value)
+Game/game_projsync_cpp	Game::projsync_update (103): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_projsync_cpp::net::Session’ has no member named ‘send_proj’)
+Game/game_details_cpp	Game::details_hud (8): its test cannot compare it yet (the test has no values of the variables of Game: sfx_id_ids (the test has no values of ))
+Game/game_details_cpp	sfx_id (7): its test cannot compare it yet (the test has no values of the variables of Game: sfx_id_ids (the test has no values of ))
+Game/game_details_cpp	Game::combat_audio_init (15): its test cannot compare it yet (the test has no values of the variables of Game: sfx_id_ids (the test has no values of ))
+Game/game_details_cpp	Game::combat_sfx (6): its test cannot compare it yet (the test has no values of the variables of Game: sfx_id_ids (the test has no values of ))
+Game/game_barricades_cpp	Game::gaps_barricade_doors (18): an iterator whose list is not known where it is used
+Game/game_barricades_cpp	Game::gaps_repair_offer (12): an iterator whose list is not known where it is used
+Game/game_lamps_cpp	Game::gaps_lamps_place (19): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+Game/game_townsync_cpp	Game::townsync_car_hit (5): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_townsync_cpp::net::Session’ has no member named ‘town_to_host’)
+Game/game_townsync_cpp	Game::townsync_plank (5): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_townsync_cpp::net::Session’ has no member named ‘town_to_all’)
+Game/game_townsync_cpp	Game::town_mark (8): call: ring_put()
+Game/game_townsync_cpp	Game::townsync_send_full (19): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+Game/game_townsync_cpp	Game::townsync_reset (10): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_townsync_cpp::net::Session’ has no member named ‘town_to_host’)
+Game/game_look_cpp	Game::look_begin (33): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘look_apply_tier’ was not declared in this scope)
+Game/game_look_cpp	Game::look_lap (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘Game’ has not been declared)
+Game/game_look_cpp	Game::view_zoom (8): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘Game’ has not been declared)
+Game/game_look_cpp	Game::look_people_budget (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘Game’ has not been declared)
+Game/game_look_cpp	Game::look_apply_tier (27): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: invalid use of incomplete type ‘struct converted_Game__game_look_cpp::Renderer’)
+Game/game_look_cpp	Game::look_camera (23): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘Game’ has not been declared)
+Game/game_look_cpp	Game::look_blast (8): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘Game’ has not been declared)
+Game/game_look_cpp	Game::look_lighting (158): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_look_cpp::GameWorld’ has no member named ‘level’)
+Game/game_look_cpp	Game::look_draw (63): a list made of more than 16 values
+Game/game_look_cpp	Game::look_vr_hud (56): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: invalid use of incomplete type ‘struct converted_Game__game_look_cpp::Renderer’)
+Game/game_look_cpp	Game::look_view_models (150): a pointer
+Game/game_look_cpp	Game::look_hud_json (16): a pointer
+Game/game_swarm_cpp	Game::swarm_apply_hit (49): its test cannot compare it yet (the test has no values of the variables of Game: sfx_id_ids (the test has no values of ))
+Game/game_swarm_cpp	Game::swarm_draw_vehicles (11): a Car made by a constructor
+Game/game_toss_cpp	Game::toss_update (142): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_toss_cpp::net::Session’ has no member named ‘send_toss’)
+Game/game_vehicle_damage_cpp	Game::car_bullet (10): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_townsync_cpp::net::Session’ has no member named ‘town_to_host’)
+Game/game_vehicle_damage_cpp	Game::blast_cars (29): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_townsync_cpp::net::Session’ has no member named ‘town_to_host’)
+Game/game_worldsync_cpp	Game::worldsync_update (472): the struct List (its field g: a pointer)
+Game/game_life_cpp	Game::life_draw (11): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no declaration matches ‘void converted_interiors_cpp::Interiors::draw(converted_interiors_cpp::LifeArt&, sc::converted::wide::f32, sc::converted::wide::Vec3) const’)
+Game/game_life_cpp	Game::life_draw_people (21): its test cannot compare it yet (the test has no values of the variables of Game: life_draw_ragdolls_bones (the test has no values of ))
+Game/game_life_cpp	Game::life_hides_person (3): its test cannot compare it yet (the test has no values of the variables of Game: life_draw_ragdolls_bones (the test has no values of ))
+Game/game_life_cpp	Game::life_shot (6): its test cannot compare it yet (the test has no values of the variables of Game: life_draw_ragdolls_bones (the test has no values of ))
+Game/game_life_cpp	Game::life_punch (4): its test cannot compare it yet (the test has no values of the variables of Game: life_draw_ragdolls_bones (the test has no values of ))
+Game/game_life_cpp	Game::life_net_fx (11): its test cannot compare it yet (the test has no values of the variables of Game: life_draw_ragdolls_bones (the test has no values of ))
+Game/game_life_cpp	Game::life_hud (48): its test cannot compare it yet (the test has no values of the variables of Game: life_draw_ragdolls_bones (the test has no values of ))
+Game/game_life_cpp	Game::life_draw_ragdolls (8): its test cannot compare it yet (the test has no values of the variables of Game: life_draw_ragdolls_bones (the test has no values of ))
+Game/game_traffic_far_cpp	Game::traffic_far_switch (33): an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
+Game/game_traffic_far_cpp	Game::traffic_far_step (55): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a ImplicitCastExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+Game/game_traffic_cpp	Game::traffic_rules (26): a pointer
+Game/game_traffic_cpp	Game::update_traffic_world (99): list: erase()
+Game/game_traffic_cpp	Game::step_tow (140): a pointer
+Game/game_traffic_cpp	Game::traffic_json (22): a pointer
+Game/game_world_cpp	Game::update_world (39): list: erase()
+Game/game_world_cpp	Game::step_world (35): a pointer
+Game/game_world_cpp	Game::world_bullet (3): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+Game/game_world_cpp	Game::world_blast (18): call: ring_put()
+Game/game_world_cpp	Game::world_command (76): a pointer
+Game/game_foot_rounds_cpp	Game::grenade_bounce (21): its test cannot compare it yet (the test has no values of the variables of Game: sfx_id_ids (the test has no values of ))
+Game/game_foot_rounds_cpp	Game::foot_round_step (100): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘draw_state_Game’ was not declared in this scope; did you mean ‘draw_seats__Table’?)
+Game/game_foot_rounds_cpp	Game::rocket_laser_dot (15): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘draw_state_Game’ was not declared in this scope; did you mean ‘draw_seats__Table’?)
+Game/game_foot_rounds_cpp	Game::foot_rounds_update (60): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘draw_state_Game’ was not declared in this scope; did you mean ‘draw_seats__Table’?)
+Game/game_foot_rounds_cpp	Game::melee_hit (46): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘draw_state_Game’ was not declared in this scope; did you mean ‘draw_seats__Table’?)
+Game/game_foot_rounds_cpp	Game::melee_attack (61): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘draw_state_Game’ was not declared in this scope; did you mean ‘draw_seats__Table’?)
+Game/game_military_cpp	Game::combat_shot (36): its test cannot compare it yet (the test has no values of the variables of Game: sfx_id_ids (the test has no values of ))
+Game/game_military_cpp	Game::combat_blast (50): its test cannot compare it yet (the test has no values of the variables of Game: sfx_id_ids (the test has no values of ))
+Game/game_military_cpp	Game::spawn_heli (18): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘kHeliHp’ was not declared in this scope)
+Game/game_military_cpp	Game::spawn_tank (40): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘kTankHp’ was not declared in this scope)
+Game/game_military_cpp	Game::spawn_squad (25): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘kMaxSoldiers’ was not declared in this scope)
+Game/game_military_cpp	Game::step_heli (69): its test cannot compare it yet (the test has no values of the variables of Game: sfx_id_ids (the test has no values of ))
+Game/game_military_cpp	Game::update_flak (101): list: swap()
+Game/game_military_cpp	Game::launch_jets (15): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘kJetSpan’ was not declared in this scope)
+Game/game_gaps_cpp	Game::gaps_update (155): its test cannot compare it yet (the test has no values of the variables of Game: sfx_id_ids (the test has no values of ))
+Game/game_gaps_cpp	Game::gaps_sirens (58): tuple / variant
+Game/game_gaps_cpp	Game::gaps_jet_audio (57): a pointer
+Game/game_gaps_cpp	Game::gaps_hud (30): an iterator whose list is not known where it is used
+Game/game_guided_cpp	Game::guided_target_at (26): a pointer
+Game/game_events_cpp	Game::update_fighters_back (80): an assignment to CXXMemberCallExpr
+Game/game_events_cpp	Game::update_scores (89): its test cannot compare it yet (the test has no values of the variables of Game: sfx_id_ids (the test has no values of ))
+Game/game_events_cpp	Game::update_race (11): a pointer
+Game/game_events_cpp	Game::update_combat (24): its test cannot compare it yet (the test has no values of the variables of Game: sfx_id_ids (the test has no values of ))
+Game/game_events_cpp	Game::draw_events (71): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘EnemySpec’ does not name a type)
+Game/game_events_cpp	Game::combat_hud (35): a pointer
+Game/game_net_cpp	Game::net_world_rules (23): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_net_cpp::net::Session’ has no member named ‘set_world_rules’; did you mean ‘world_rules’?)
+Game/game_net_cpp	Game::rebase_origin (25): list: erase()
+Game/game_net_cpp	Game::update_net (196): an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
+Game/game_net_cpp	Game::draw_remote_people (76): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_net_cpp::net::Session’ has no member named ‘color_of’)
+Game/game_net_cpp	Game::draw_remote_vehicles (55): a Car made by a constructor
+Game/game_net_cpp	Game::mp_hud_json (133): the type std::reverse_iterator
+Game/game_net_cpp	Game::bigmap_json (69): a pointer
+Game/game_town_cpp	Game::handle_shots (80): a reference to something it changes
+Game/game_town_cpp	Game::damage_car (26): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_townsync_cpp::net::Session’ has no member named ‘town_to_host’)
+Game/game_town_cpp	Game::wreck_car (32): its test cannot compare it yet (the test has no values of the variables of Game: sfx_id_ids (the test has no values of ))
+Game/game_town_cpp	Game::explosion (45): its test cannot compare it yet (the test has no values of the variables of Game: sfx_id_ids (the test has no values of ))
+Game/game_town_cpp	Game::spawn_police_unit (54): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a ImplicitCastExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+Game/game_town_cpp	Game::drive_police (120): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a ImplicitCastExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+Game/game_town_cpp	Game::update_lamps (4): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+Game/game_town_cpp	Game::minimap_json (72): the struct Feat (its field pts: a pointer)
+Game/game_ui_cpp	Game::ui_move_world (7): list: erase()
+Game/game_ui_cpp	Game::ui_draw_gps (70): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: it names kern::primitives, which the test does not hold)
+Game/game_ui_cpp	Game::ui_mix_audio (17): an assignment to CXXMemberCallExpr
+Game/game_controls_cpp	Game::ctl_strike_start (13): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘kStrikeCooldownS’ was not declared in this scope)
+Game/game_controls_cpp	Game::ctl_strike_confirm (49): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘draw_state_Game’ was not declared in this scope; did you mean ‘draw_seats__Table’?)
+Game/game_controls_cpp	Game::ctl_screen_ray (18): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘draw_state_Game’ was not declared in this scope; did you mean ‘draw_seats__Table’?)
+Game/game_controls_cpp	Game::foot_input (191): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: request for member ‘scan_at’ in ‘converted_Game__game_controls_cpp::g_aim’, which is of non-class type ‘int’)
+Game/game_controls_cpp	Game::ctl_assist (65): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: request for member ‘scan_at’ in ‘converted_Game__game_controls_cpp::g_aim’, which is of non-class type ‘int’)
+Game/game_controls_cpp	Game::ctl_view_json (158): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘Fun’ does not name a type)
+Game/game_controls_cpp	Game::car_input (42): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘State_Game’ was not declared in this scope)
+Game/game_controls_cpp	Game::parachute_input (23): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘State_Game’ was not declared in this scope)
+Game/game_controls_cpp	Game::ctl_camera (16): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘State_Game’ does not name a type)
+Game/game_controls_cpp	Game::set_touch_frame (6): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘State_Game’ was not declared in this scope)
+Game/game_controls_cpp	Game::touch (5): a pointer
+Game/game_controls_cpp	Game::update_touch_layout (42): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘kStrikeCooldownS’ was not declared in this scope)
+Game/game_controls_cpp	Game::touch_view_json (13): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘State_Game’ does not name a type)
+Game/game_controls_cpp	Game::ctl_hud_json (33): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘ctl_view_json’ was not declared in this scope; did you mean ‘ctl_hud_json’?)
+Game/game_cpp	register_node (18): an object of the engine (NodeDef) copied or moved as a whole
+Game/game_cpp	Game::Game (1): a Drone made by a constructor that is defined in another file
+Game/game_cpp	Game::build_level (99): an object of the engine as a local that is not made by a constructor of it
+Game/game_cpp	Game::clear_spot (39): a Game_Spot where a Int is needed
+Game/game_cpp	Game::fixed_step (34): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a ImplicitCastExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+Game/game_cpp	Game::drive_traffic (86): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a ImplicitCastExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+Game/game_cpp	Game::traffic_advance (26): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a ImplicitCastExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+Game/game_cpp	Game::manage_traffic (98): an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
+Game/game_cpp	Game::update (87): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘look_apply_tier’ was not declared in this scope)
+Game/game_cpp	Game::update_camera (149): a break in the middle of a switch case
+Game/game_cpp	Game::draw_vehicles (27): a Car made by a constructor
+Game/game_cpp	Game::audio_init (11): its test cannot compare it yet (the test has no values of the variables of Game: sfx_id_ids (the test has no values of ))
+Game/game_cpp	Game::update_sound (38): tuple / variant
+Game/game_cpp	Game::hud_json (136): its test cannot compare it yet (the test has no values of the variables of Game: life_draw_ragdolls_bones (the test has no values of ))
+Game/game_vr_cpp	Game::vr_comfort (88): a member of Int is set
+Game/game_weapons_cpp	Game::aim_ray (6): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘draw_state_Game’ was not declared in this scope; did you mean ‘draw_seats__Table’?)
+Game/game_weapons_cpp	Game::hit_scan (86): its test cannot compare it yet (the test has no values of the variables of Game: sfx_id_ids (the test has no values of ))
+Game/game_weapons_cpp	Game::jet_attack (49): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘draw_state_Game’ was not declared in this scope; did you mean ‘draw_seats__Table’?)

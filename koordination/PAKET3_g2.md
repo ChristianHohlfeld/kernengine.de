@@ -1,0 +1,6 @@
+Paket „g2“. Lies zuerst $S/PAKET_COMMON3.md (S=/tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad) ganz und was es nennt. Sperre: heavy2.lock. Zweig work-g2, Worktree /home/claude/w-g2.
+
+Deine Dateien des Spiels (nur diese änderst du): src/game_life.cpp, game_military.cpp, game_town.cpp, game_townsync.cpp, game_events.cpp, game_foot_rounds.cpp, game_weapons.cpp, game_world.cpp, game_worldsync.cpp, game_swarm.cpp, game_net.cpp, game_traffic.cpp, game_traffic_far.cpp, game_vehicle_damage.cpp, game_destruction_sync.cpp, game_projsync.cpp, game_toss.cpp (game.h nur für Deklarationen dieser Dateien – stimme dich nicht ab, ändere dort nur Zeilen deiner Dateien). Gründe im Quelltext: absenken mit Differenztest oder allgemeine Fähigkeit. „its test cannot compare it yet“ gehört t1/t2.
+
+Deine Liste: grep -E "^Game/game_(life|military|town|townsync|events|foot_rounds|weapons|world|worldsync|swarm|net|traffic|traffic_far|vehicle_damage|destruction_sync|projsync|toss)_cpp|^game_life_cpp|^game_destruction_sync_cpp" $S/f9_roots.txt (Grundursachen) und $S/f9_waiting.txt (alles Wartende, auch Folgefehler).
+Ziel: in deinen Dateien wartet nichts mehr – jede Funktion geschrieben UND im Test verglichen.

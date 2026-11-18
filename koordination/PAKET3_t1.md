@@ -1,0 +1,6 @@
+Paket „t1“. Lies zuerst $S/PAKET_COMMON3.md (S=/tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad) ganz und was es nennt. Sperre: heavy3.lock. Zweig work-t1, Worktree /home/claude/w-t1.
+
+Du bist der eine Besitzer des Test-Schreibers (TestWriter in tools/cpp_to_blueprint.py, tests/converted.h) für die Gründe: „the test has no values of the variables of Game: …“ (24), „it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (… at nowhere in the source)“ (26, auch in der Firmware-Einheit Arondight45_* – die Firmware-Quelle bleibt unverändert, der Test muss sie fassen) und „C++ leaves open what that gives outside the range …“. Allgemein lösen: gezählt wird nur, was C++ festlegt; der Test prüft genau den Bereich, den die Funktion bedient – keine Lücke, kein Ausnehmen. Ändere keine Spiel-Quelle (wenn nur eine Absenkung hilft: im Bericht mit Datei und Stelle nennen).
+
+Deine Liste: grep -E "the test has no values|written by a macro|C\+\+ leaves open" $S/f9_roots.txt (Grundursachen) und $S/f9_waiting.txt (alles Wartende, auch Folgefehler).
+Ziel: in deinen Dateien wartet nichts mehr – jede Funktion geschrieben UND im Test verglichen.

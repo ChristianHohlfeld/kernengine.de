@@ -1,0 +1,6 @@
+Paket „f2“. Lies zuerst $S/PAKET_COMMON3.md (S=/tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad) ganz und was es nennt. Sperre: heavy2.lock. Zweig work-f2, Worktree /home/claude/w-f2.
+
+Deine Dateien des Spiels (nur diese änderst du): src/life.*, people.*, touch_play.*, world_traffic.*, world_marks.*, net_session.*, nostr.*, car.*, lamps.*, destruction.*, rules.cpp, drone.h, jet.h, jet_seats.h, mp_rules.h, equipment.h, gaps_rules.h, ragdoll.h, weapons.h. Größte Brocken: TouchPlay::pointer (169, Zeiger), Life::update_pigeons (144), update_joggers (76), Session::dispatch (143, Zustand der Datei), Session::deliver (120, operator== von Listen – allgemeine Fähigkeit: Listen gleichen Typs vergleichen, in jeder Stufe), Session::update (92), TrafficRules::rebuild (138), TrafficRules::limit (86: Pin light ist int, der Aufruf gibt Int64), make_sounds gehört g2 nicht dir, Marks::* (ring_put). „its test cannot compare it yet“ gehört t1/t2.
+
+Deine Liste: grep -E "^(life|people|touch_play|world_traffic|world_marks|net_session|nostr|car|lamps|destruction|rules_cpp|drone|jet|jet_seats|mp_rules|equipment|gaps_rules|ragdoll|weapons)" $S/f9_roots.txt (Grundursachen) und $S/f9_waiting.txt (alles Wartende, auch Folgefehler).
+Ziel: in deinen Dateien wartet nichts mehr – jede Funktion geschrieben UND im Test verglichen.

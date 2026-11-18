@@ -1,0 +1,4 @@
+9ce8133 game_worldsync.cpp --base 1cef614  Game::worldsync_update: List::g (Game*) → net::Session& an flush/entry
+1380806 game_town.cpp --base 9ce8133  Game::minimap_json: Feat::pts (Zeiger) → tile+index; je Merkmal ein city_.features(tile) mehr (Suche in der Map, kein Speicher)
+ef21598 game_traffic_far.cpp(+game.h) --base 1380806  Game::traffic_make_near(TrafficCar&, size_t) → (size_t); traffic_far_switch
+ffa277f game_net.cpp(+game.h, game_net.h) --base ef21598  Game::mp_ unique_ptr<MpLocal> → MpLocal + bool mp_made_ (alle !mp_ → !mp_made_); update_net u. a.

@@ -1,0 +1,504 @@
+# Übergabe: SpawnCity auf Kern – vollständige Konvertierung in Blueprints
+
+Stand: Mittwoch, 18.11.2026, ca. 17:30 Uhr (Europe/Berlin). Geschrieben vom Koordinator der Sitzung
+`session_01K2YidUPFTJShcS1fG6cZzJ` für den Koordinator der nächsten Sitzung. Diese Datei und der Ordner,
+in dem sie liegt (Branch `koordination` im Repo), sind **alles**, was die neue Sitzung von der alten hat –
+der Arbeitsordner der alten Sitzung (Scratchpad, lokale Worktrees, laufende Agenten) ist weg.
+
+**Lies diese Datei ganz. Dann die Dateien, die Abschnitt 13 nennt. Erst dann handle.**
+Antworte Chris auf Deutsch. Keine Aufwandsschätzungen in Entwickler-Tagen. Seine E-Mail-Adresse ist privat.
+
+---
+
+## 1. Das Ziel (unverändert, nicht verhandelbar)
+
+Repo `ChristianHohlfeld/kernengine.de`. SpawnCity auf der Engine „Kern“ (`kern/games/spawncity`) ist der
+vollständige, exakte Drop-in-Ersatz für spawncity.de (das JavaScript-Original).
+
+**Das ganze Spiel wird Blueprints**, erzeugt von `tools/cpp_to_blueprint.py` aus C++, das dem erlaubten
+Teilsatz genügt. Blueprint und C++-Teilsatz sind dasselbe in zwei Schreibweisen, in beide Richtungen, in
+Echtzeit im Editor (Kern Studio), nativ exportierbar als C++ mit voller Leistung. Am Ende ist das Projekt
+ein Level + Blueprints + Daten; `kern/games/spawncity/src/` ist leer und wird gelöscht.
+
+Chris, wörtlich (bindend):
+- „die idee war c++ subset interchangeable realtime als blueprint und native alles exportierbar in c++,
+  full performance. dazu wollten wir die subset constraints der c++ codes mit script umwandelbar machen
+  damit wir generisch blueprints aus constraint conformem cpp haben.“
+- „blueprint == c++ , auf constraintbasis für beide: nur die erlaubten constraints aus c++ sind gestattet“
+- „warum, wir wollten doch generieren, nicht händisch alles umschreiben oder?!?“ – Blueprints werden
+  **generiert**, nie von Hand gebaut oder geändert.
+- „kein caching.“ · „Konsequent nicht hacky.“ · „No excuses, keine Sonderregelung“ · „All the way.“
+- „Sei streng im Ansatz, sauber und der Umsetzung, schnell im finalisieren.“
+- „immer zwischenschritte regelmäßig pushen. wichtig.“
+- „Melden bringt mir nichts. Exaktheit und voll durchlaufen schon.“
+- „Konsistenz bei rechnen ist wichtiger als perfekte Abbildungen aller Operationen.“
+- Vergleich **Bit für Bit, ohne Toleranz**. Kein Schummeln in Tests. Kein Bridge von „Funktionsaufrufen“
+  aus einem Blueprint in C++ des Programms.
+- 15.11.: „Vollständige Konvertierung und Prüfung. Vollständiger Umfang. Nicht ausweichen. Gesamtziel voll
+  erreichen.“ – „Wenn du dafür Blueprint, Engine oder Subset erweitern musst, tu es.“ – „Ziel ist immer
+  noch die vollständige Echtzeit-Interoperabilität zwischen Blueprint und C++ Subset.“
+- 18.11.: „All. WE need all.“ · „Do 100“ · „vollständig, ungekürzt und ohne Shortcuts …, sauber und final“
+  · „Wir dürfen doch keinen Fehler machen. 100% clean. Nichts skippen.“
+
+**Fertig heißt** (vorher wird nicht „fertig“ gemeldet):
+1. Jede Funktion des Programms ist als Blueprint geschrieben (zuletzt gezählt: 1.876 Funktionen, 31.096 Zeilen).
+2. Jede ist im Test Bit für Bit mit ihrem Quelltext verglichen – Interpreter und Klasse, gegen den
+   Stellvertreter der Engine **und** gegen die echte Engine (`SC_ENGINE=real`). Nichts „wartet“.
+3. Jede Umschreibung der Spiel-Quelle seit `main` hat einen grünen Differenztest (alt gegen neu, Bit für
+   Bit, nie öfter Speicher).
+4. Die exportierte Klasse jedes Blueprints ist so schnell wie das C++, aus dem er kommt (Zeit ist Teil des
+   Beweises).
+5. Das Spiel läuft aus den Blueprints (Stufe 5: jede Datei umgeschaltet, ihr C++ gelöscht), `src/` leer.
+6. Alle CI-Jobs grün (native, native-spawncity, build, e2e, input, determinism) – auf `work`, dann auf `main`.
+7. Squash nach `main`, CI grün, Deploy, Changelog-Eintrag, `BLUEPRINTS.md` aktuell.
+
+---
+
+## 2. Feste Regeln
+
+- **Box3D nie tunen.** Physik nach Erin Cattos Doku (`kern/docs/physics.md`).
+- **Nicht ändern:** die Firmware (`kern/games/spawncity/firmware` – mit dem echten Fluggerät geteilt; der
+  Konverter nimmt sie, wie sie ist); die 22 Web-Dateien mit „Unchanged from the original SpawnCity“
+  (Ausnahme: `web/view/changelog_menu.mjs` bekommt Changelog-Einträge); „Gewalt und Passanten“ bleiben, wie
+  sie sind; TON/MUSIK/RESET-Knöpfe bleiben; „ente muss neutral bleiben“. Runden/XP/Teilen/öffentliche
+  Freundes-Lobby/Missionen sind zurückgenommen – **nicht wieder einbauen**.
+- **Nichts von SpawnCity wandert in die Engine.** Engine, Sprache, Werkzeuge bekommen nur, was allgemein ist
+  und jedem Spiel dient.
+- **Kein Zwischenspeicher** im Konverter zwischen Läufen (und keine Caches im Spiel als Ausweg).
+- Blockierte Hosts/Rechte nicht umgehen. GitHub nur über `gh` (GraphQL ist gesperrt: REST über `gh api`).
+- **Git:** Agenten pushen nur auf eigene Zweige (`work-<paket>`). Nur der Koordinator pusht auf `work`.
+  Niemand pusht auf `main`, außer beim Abschluss (Abschnitt 12). Kein Force-Push, nie.
+  Commit-Nachrichten deutsch; am Ende die Attributionszeilen, die die jeweilige Sitzung vorgibt.
+- **Deploy nur bei grüner CI.** Achtung: in `.github/workflows/ci.yml` hängt `deploy` nur an `build` und
+  läuft nur auf `main` – also vor jedem Push auf `main` selbst sicherstellen, dass native,
+  native-spawncity, e2e, input und determinism auf genau diesem Stand grün sind.
+- **Changelog** je Level-/Engine-Update, das live geht: in
+  `kern/games/spawncity/web/view/changelog_menu.mjs` direkt nach `export const CHANGELOG=Object.freeze([`
+  einfügen, Format `  {date:"2026-11-18",time:"HH:MM",title:"…",items:[\n    "…",\n  ]},` – Datum und
+  Berliner Zeit aus dem Zeit-Werkzeug der Sitzung, nicht geraten.
+- **mag** (Chris' Server, 2× Xeon E5-2680 v4 = 56 Threads, 387 GB RAM): SpawnCity hat Vorrang, RAM ist egal
+  (Chris, 18.11.). Keine systemweiten Installationen, MAG-Stack nicht anfassen, nur eigene Zweige pushen.
+
+---
+
+## 3. Das Konzept (der Plan steht in `kern/games/spawncity/BLUEPRINTS.md` – ganz lesen)
+
+- Die Sprache der Blueprints ist der erlaubte Teil von C++. Jeder Baustein hat einen Knoten, bedeutet in
+  jeder Stufe dasselbe (Interpreter, JIT, die eigene C++-Klasse = nativer Export) und kostet in der Klasse,
+  was das C++ kostet, das er darstellt.
+- Für jede Stelle des Spiels, die der Konverter nicht schreiben kann, gibt es **genau zwei Antworten**:
+  (a) die Sprache bekommt den Baustein – allgemein, in jeder Stufe, mit Knoten, Schreibweise, Regeln
+  (`check`), Doku, Engine-Tests, nativem Fall, Editor; oder (b) die Stelle wird in erlaubtes C++ **gleicher
+  Kosten und bitgenau gleichen Verhaltens** umgeschrieben („Absenkung“) – **mit Differenztest als Beweis**.
+  Eine Form, die Gestalt oder Kosten ändert, ist keine von beiden.
+- **Die Abbildung:** Klasse mit Feldern → Struktur; Methode → Funktion mit Referenz auf ihr Objekt;
+  **`Game` (ein Objekt, ~40 Dateien `game_*.cpp`) → EIN Blueprint**: Felder = Variablen, Methoden =
+  Funktionen (Teile `Game/<datei>`); Quelldatei/Header → je ein Blueprint, ohne Zustand eine Bibliothek;
+  Zeiger als Parameter → Referenz; Zeiger auf Engine-Objekt → Handle; `std::vector` → Liste; Map/Set;
+  `u64`/`i64` als Bitmuster → `Int64`; Funktion der Engine → Knoten der Engine (815+ Knoten, erzeugt von
+  `tools/engine_api.py` – nach Änderungen an Engine-Headern neu laufen lassen).
+- **Zahlen: die Sprache rechnet in 64 Bit. Kein Float32.** Das Maß ist spawncity.de (JavaScript, 64 Bit),
+  nicht der C++-Port (f32). Der Vergleichstest bindet den Blueprint an den Quelltext *in den Zahlen der
+  Sprache* (der Test übersetzt den Quelltext mit `f32 = double`); an der Grenze zu noch nicht
+  umgeschaltetem C++ gehen einzelne Zahlen hinüber (`rules::decimal` hinein, `static_cast<f32>` heraus).
+  Beim Umschalten rechnet eine Datei, was das Original rechnet. (Am 15.11. wurde ein Float32-Typ erwogen –
+  **verworfen**, steht so in der Kursprüfung.)
+- **Stufen:** 0–3 erledigt; 4 = der Konverter schreibt alles (läuft); 5 = Umschalten (Mechanismus gebaut,
+  erste Datei `qr_code` auf Zweig, unbewiesen); 6 = das Projekt lädt im Editor, Export ist das Drop-in.
+- **Es gibt zu jeder Zeit genau eine Quelle:** bis eine Datei umschaltet, ihr C++ (der Blueprint daneben ist
+  erzeugt und durch den Vergleichstest gebunden); danach der Blueprint im Level.
+
+### Kursprüfung 18.11.2026 (steht in BLUEPRINTS.md, bindend)
+1. Zahlen bleiben 64 Bit. 2. Eine Umschreibung gilt nur mit Differenztest (`tools/source_diff.py`,
+`tests/lowered/`), auch rückwirkend für alles seit `main`. 3. **Eine Datei, ein Auftrag** – Pakete sind nach
+Dateien des Spiels geschnitten; der Konverter bekommt nur Allgemeines. (Anlass: in der Runde vom 15.11.
+haben mehrere Agenten dieselben Stellen doppelt und verschieden umgeschrieben, und ein „Richtungswechsel“
+wurde verkündet, der keiner war – der Plan erlaubte (a)/(b) seit dem 13.11.)
+
+---
+
+## 4. Entscheidungen dieser Sitzung (18.11.) – alle bindend, bis Chris anders entscheidet
+
+1. **Kein Float32** (s. o.).
+2. **Differenztest in der Form „zwei Bauten“:** jede Seite ist das ganze Programm in ihrem Stand – alter
+   Baum aus `--base`, neuer Baum von heute, derselbe Treiber gegen beide übersetzt, verglichen werden
+   Byteströme (Rückgabe, Parameter, Objekt – auch `Game` –, Zustand der Datei, Zahl der
+   Speicheranforderungen). Grund: `Game` liegt in game.h und ~40 Dateien, gleichnamige anonyme Helfer
+   stoßen zusammen, alter Text übersetzt nicht gegen neue Header. Besitzer des Werkzeugs: die Claude CLI
+   auf mag (Zweig `mag/differenztest`). Bis es steht, werden Absenkungen in Game-Dateien nur vorbereitet
+   (eigene Commits „Absenkung <datei>: …“, `--base` notiert), **nicht gemergt**.
+3. **Stufe 5, die Form des Umschaltens:** Das Spiel nimmt die Typen der Klasse – **ein Typ je Struktur**,
+   keine Umwandlung von Strukturen/Listen je Aufruf; erzeugter Header mit den Klassen unter festen Namen
+   (Namensraum `blueprints`, aus demselben Generator wie `level_blueprints.cpp`), ein einmal gebundenes
+   Objekt je Klasse (`bind_blueprint<T>`), direkter typisierter Aufruf, kein Aufruf beim Namen.
+   Umgeschaltete Blueprints liegen im Level-Ordner „Program“; der Konverter verwirft/schreibt nur „Source“.
+   Das Spiel setzt `Runtime::budget` wie der Test (`rules::kLoopBudget`). Der Konverter erzeugt den Header
+   selbst, wenn das Level einen Ordner „Program“ hat (keine neue Pflicht-Option in Skripten).
+4. **Leistungsregel:** Eine umgeschaltete Datei wird erst gemergt, wenn ihre Klasse so schnell ist wie ihr
+   C++. (Befund: `qr_code` als Klasse rund 17× langsamer – Paket p.) Zeit wird Teil des Beweises (Test).
+5. **Platz der Engine:** Eine Funktion der Engine, die eine nicht-const Referenz gibt (z. B.
+   `GameWorld::shots()`), ist ein Platz, keine Kopie. Der Platz ist der **Ausgang des Engine-Knotens**
+   („bound“, einmal gebunden wie `auto& r = f();`); die bestehenden Platz-/Listen-Knoten arbeiten darauf.
+   Auflagen: nur für Funktionen, die der Generator am Baum als Nachschlagen ohne Wirkung erkennt
+   (`return <Feld>;`); gebunden nur innerhalb des Funktionslaufs (nicht über Warten/Events; `check()` macht
+   das zum Fehler, wo es feststeht); endet das Objekt hinter dem Handle, gilt „ungebunden“ (kein toter
+   Zeiger); der Stellvertreter im Test hält die Liste als Zustand; der Editor bietet die Knoten an.
+   Das Spiel senkt diese Stellen **nicht** ab.
+6. **Rückrufe der Engine in das Programm** (HeightSampler, `std::function`-Felder): allgemeine Fähigkeit
+   „die Engine ruft eine Funktion eines Blueprints“ – erst Entwurf, Bau nach Bestätigung (Paket c).
+   `begin_roads, relay, update, finish_features, fail, go_offline` (city_stream) und `Terrain::sampler`
+   bleiben bis dahin unverändert.
+7. **Konverter-Ablauf:** erst eindeutig (dasselbe Ergebnis bei jeder Kernzahl), dann parallel (Paket k).
+   Befund: heute hängt das Ergebnis vom zeitlichen Ablauf ab (in f9 fiel `Game/game_look_cpp` von 7/13 auf
+   0/13). Ein Rückfall „war geschrieben, wartet jetzt“ ist ein Fehler am Inhalt und wird gemeldet.
+8. **`Lists Equal` für Listen von Strukturen** allgemein (Paket f2), soweit C++ dort `==` festlegt.
+9. **settings** in der Form des Piloten (`SettingsTable` als Zustand, den das Spiel hält) – die bewiesene;
+   `toss_` bleibt ein Wert; `update_scores` nimmt die Beschriftung als Sicht (`std::string_view`).
+10. **Kontingent:** Agenten laufen als **Opus 5.5, mittlere Stufe**; der Koordinator überwacht. Agenten
+    schreiben ihren Stand in Dateien und melden nur Entscheidungsbedarf, „bereit zum Mergen“ mit Beweis,
+    Befunde für andere. Die Strenge der Beweise wird nicht gesenkt – sie rechnet mag.
+
+---
+
+## 5. Stand der Zahlen
+
+| | 14.11. (f8, im Repo) | 18.11. (f9, abgebrochen) |
+|---|---|---|
+| Funktionen geschrieben | 1.368 / 1.817 (75 %) | 1.577 / 1.876 (84 %) |
+| Zeilen geschrieben | 11.996 / 30.741 (39 %) | 16.136 / 31.096 (52 %) |
+| Bit für Bit verglichen | 1.324 | noch nicht gemessen |
+
+- f9 lief lokal auf `5dcd9eb`, schrieb alle Funktionslisten, brach aber beim Einlesen ins Level ab. Drei
+  Fehler dahinter sind behoben und auf `work`: `955503b` (ganze Zahl im Vergleich zweier Textplätze),
+  `52a9275` (Eintrag einer Liste in einer Liste, dem eine Liste zugewiesen wird), `3b355c4` (Leser: lokale
+  Map/Set). **Seit dem 14.11. gibt es keinen vollständigen, gültigen Lauf.** Level und `tests/converted` im
+  Repo sind von f8 und passen nicht zu den Quellen auf `work` – darum ist native-spawncity rot.
+- f9: 358 Funktionen warten, 250 Grundursachen; ~100 davon im Test-Schreiber („its test cannot compare it
+  yet“). Listen: `f9_roots.txt`, `f9_waiting.txt`, `f9_convert.log.xz` (in diesem Ordner).
+- Gesamtfortschritt, geschätzt (keine Messung): ~65 %.
+
+---
+
+## 6. Zweige (alles gepusht; nichts liegt nur lokal)
+
+- `main` @ `fb6cf4c` (14.11., 10:32) – live. Seitdem nichts.
+- `work` @ `90b5ab8` – der Integrationszweig. Enthält: alle fünf Zweige vom 15.11. (gamestate, text,
+  places2, values, pilot), `work-engine3` (Verteiler auf die echte Engine, `SC_ENGINE=real`), `work-d`
+  (direkte Engine-Aufrufe in der Klasse, `engine_direct.h`), die Kursprüfung in BLUEPRINTS.md, die drei
+  Korrekturen oben, „Insert Text Bytes“ nur für Listen ganzer Zahlen.
+- CI auf `work`: Lauf `44335902766` auf `3b355c4`: determinism, native, build, input, e2e **grün**,
+  native-spawncity **rot** (erwartet, s. o.). Lauf `44341582015` auf `90b5ab8` lief bei Übergabe noch –
+  prüfen: `gh run view 44341582015 --json jobs --jq '.jobs[]|"\(.name)=\(.conclusion)"'`.
+  CI starten: `gh workflow run ci.yml --ref <zweig>` (ein Dispatch wird von späteren Pushes nicht
+  abgebrochen; die PR-Läufe von PR #4 `work→main`, Entwurf, schon).
+- Paket-Zweige, **noch nicht in `work`** (Stand bei Übergabe; der genaue letzte Commit steht je Paket in
+  `uebergabe/<paket>.md` bzw. `git log origin/work..origin/work-<paket>`):
+  `work-g1`, `work-g2`, `work-f1`, `work-f2`, `work-t1`, `work-t2`, `work-k`, `work-p`, `work-s5`,
+  `work-d` (Folgeauftrag „Platz der Engine“, falls schon etwas gepusht ist), `work-c` (falls angelegt),
+  `work-r` (Werkzeug-Stand für den Differenztest; weitergeführt auf `mag/differenztest`),
+  `work-k-zeit` (nur Zeitmessung, **nicht mergen**).
+- mag: `mag/auftrag` (Skript + Warteschlange), `mag/ergebnis-<name>` (ein Zweig je Auftrag),
+  `mag/differenztest` (CLI auf mag), `mag/schlusslauf-1` (**wertlos**, Lauf ohne Compiler – nicht
+  verwenden), `mag/ergebnis` (alter Prüfer vom 15.11.).
+- **Falle:** der Klon holt per Vorgabe nur bestimmte Zweige. Einmal ausführen:
+  `git config --add remote.origin.fetch '+refs/heads/mag/*:refs/remotes/origin/mag/*'` und
+  `git config --add remote.origin.fetch '+refs/heads/work-*:refs/remotes/origin/work-*'` und
+  `git config --add remote.origin.fetch '+refs/heads/koordination:refs/remotes/origin/koordination'`
+  (oder `git ls-remote origin 'refs/heads/mag/*'` benutzen). Ohne das sieht man die mag-Zweige nicht – so
+  ist am 18.11. eine Stunde lang ein blinder Wächter gelaufen.
+
+---
+
+## 7. mag: die Rechenmaschine (läuft unabhängig von jeder Sitzung)
+
+- Auf mag läuft `~/spawncity-auftrag/lauf2.sh` (Branch `mag/auftrag`, Datei `lauf2.sh` – Kopf lesen). Die
+  Schleife holt alle 20 s den Branch; jede Datei `jobs/<name>` ist ein Auftrag (erste Zeile):
+  - `voll <ref>` – Konvertierung des ganzen Spiels + Spiel-Suite + Engine-Suite; Ergebnis-Zweig: Commit 1 =
+    Level und `tests/converted`, Commit 2 = Protokolle (`mag-log/`).
+  - `konvert <ref> <kerne>` – nur die Konvertierung, mit genau so vielen Kernen (für den Beweis von Paket k).
+  - `probe <ref> <quelle…>` – Konverter über diese Quelltexte (Pfade relativ zu `kern/games/spawncity`,
+    bei Game-Teilen `src/game.cpp` dazu; mit `TEST_ERRORS=1`, `converted.h` neben dem Testordner).
+  - `engine <ref> [filter]` – Engine-Suite (`kern/tests/run.sh`, samt nativer Stufe).
+  - `spiel <ref> [filter]` – Spiel-Suite (`run_tests.sh`, auch `tests/lowered`), ohne neue Konvertierung.
+  Ergebnis: Zweig `mag/ergebnis-<name>`, schon beim Start mit `mag-log/when` (so sieht man, dass gerechnet
+  wird); am Ende `when` mit `… rc=N`, `*.tail.txt`, `*.log.xz`, bei Proben `texts/`.
+- Stand der Schleife: rechnet im Arbeitsspeicher (`/dev/shm`), hält einen Spiegel des Repos, bis zu 14
+  Aufträge zugleich, ersetzt sich selbst bei einer neuen Fassung, ohne etwas anzuhalten; `clang++` heißt
+  dort `clang++-18` (das Skript sucht ihn). Die Fassung mit 14 Plätzen/Spiegel (`fe843e4`) greift, sobald
+  die Aufträge fertig sind, die bei ihrem Push liefen – prüfen, ob sie greift (Starts mehrerer Aufträge im
+  Sekundenabstand; `when` nennt die Werkzeuge). Greift sie nicht oder steht die Schleife: Chris bitten, in
+  der Shell von mag auszuführen:
+  `pkill -f 'spawncity-auftrag/lauf' ; cd ~/spawncity-auftrag && git pull -q && nohup bash ~/spawncity-auftrag/lauf2.sh > ~/spawncity-auftrag4.log 2>&1 &`
+- **Einen Auftrag ablegen:** `mag.sh` in diesem Ordner (Pfad `S` oben in der Datei an das neue Scratchpad
+  anpassen; es braucht einen Worktree des Branches `mag/auftrag` unter `$S/magjob` und den Klon unter
+  `/home/claude/kw` – siehe Abschnitt 11). Der Stand muss gepusht sein – mag rechnet, was auf GitHub steht.
+- Bei Übergabe eingereiht bzw. laufend: `work-voll-162644-5528` = **voller Lauf auf `origin/work`** (zum
+  Zeitpunkt seines Starts; enthält die drei Korrekturen, wenn er nach 16:48 anlief) – **dieses Ergebnis
+  zuerst ansehen** (Abschnitt 10, Schritt 1). Dazu viele Proben der Pakete; `work-voll-153849-12713` ist
+  ein abgebrochener Lauf (nicht verwenden).
+- Dauer: eine Probe über drei Dateien ~4 Minuten; die Konvertierung des ganzen Spiels ~1 Stunde (die
+  Game-Teile laufen nacheinander – das behebt Paket k); Spiel-Suite ~5 Minuten, Engine-Suite ~27 Minuten.
+- **Claude CLI auf mag** (Opus 5.5, automatischer Modus, Ordner `~/spawncity-diff`): hat den Auftrag
+  `pakete/CLI_AUF_MAG.md` auf `mag/auftrag` (rückwirkender Differenztest + Werkzeug in der Form „zwei
+  Bauten“); schreibt `BERICHT.md` und `ABWEICHUNGEN.md` auf `mag/differenztest`. Sie ist von hier nicht
+  direkt erreichbar: Nachrichten gehen über Chris (eine Zeile, die er dort eintippt) oder über die Datei im
+  Branch. Ihr Login läuft am 20.11. ab (`/login`). Sie zählt vermutlich auf dasselbe Kontingent.
+
+Lokal (Cloud-Sitzung): 2 Kerne, 8 GB – nur Syntax je Datei, kleine Proben (≤ 3 Quelltexte, `KERN_JOBS=1`),
+keine Suiten. `final.sh` (in diesem Ordner) ist der lokale volle Lauf als Notweg (~2 Stunden).
+
+---
+
+## 8. Die Pakete (eine Datei, ein Auftrag)
+
+Aufträge: `PAKET_COMMON3.md` (gemeinsam, mit allen Nachträgen – **jeder Agent liest es ganz**) und
+`PAKET3_<paket>.md`. Übergaben der Agenten: `uebergabe/<paket>.md` – **vor jedem Neustart eines Pakets
+lesen**; kurze Stände: `stand/<paket>.md`. In den Aufträgen steht der alte Scratchpad-Pfad als `S` – beim
+Neustart auf den neuen Ordner umschreiben (Abschnitt 11).
+
+| Paket | Besitz | Stand bei Übergabe (Näheres: `uebergabe/<paket>.md`) |
+|---|---|---|
+| **g1** | `game.cpp, game_controls, game_look, game_ui, game_details, game_vr, game_guided, game_gaps, game_barricades, game_lamps` | allgemeine Konverter-Regeln gepusht; Absenkungen nur vorbereiten (Entscheidung 2); echte Gründe zeigt nur eine Probe über **alle** `src/game*.cpp` |
+| **g2** | `game_life, game_military, game_town, game_townsync, game_events, game_foot_rounds, game_weapons, game_world, game_worldsync, game_swarm, game_net, game_traffic, game_traffic_far, game_vehicle_damage, game_destruction_sync, game_projsync, game_toss` | Konverter-Regeln + drei Absenkungen (notiert in `g2/absenkungen.txt`); die Engine-Listen (`shots()` …) warten auf Paket d |
+| **f1** | `city_stream, city_jobs, tiles, mvt, interiors, facades, terrain, water_look`, Engine-Header `engine_geo_*`/`engine_logic_logic` (nur Allgemeines) | Absenkungen des Vorgängers; deren Differenztests übersetzten nicht, neu erzeugt – **grün noch nicht bewiesen**; Rückrufe warten auf Paket c |
+| **f2** | `life, people, touch_play, world_traffic, world_marks, net_session, nostr, car, lamps, destruction, rules.cpp`, kleine Header | `==` zweier Listen (Sprache), Namen in Methoden wie C++, `update_pigeons` abgesenkt mit grünem Differenztest; lokal: car 15/15, nostr 41/41, net_session 33/33; offen: `Lists Equal` für Strukturen |
+| **t1** | Test-Schreiber: „no values of the variables of Game“, „written by a macro … at nowhere“, „C++ leaves open …“ | drei Gründe an der Wurzel behoben, doppelte Engine-Stellvertreter in Teil-Läufen behoben; Nachweis im Vergleich braucht den vollen Lauf |
+| **t2** | Test-Schreiber: „its source does not compile with a Blueprint's numbers yet“ (alle Arten), „a method of a class that is not written“ | braucht eine Probe über alle Quelltexte (auf mag eingereiht) |
+| **d** | `tools/engine_api.py`, Engine-Knoten | Teil 1 fertig, bewiesen, **in `work`**. Folgeauftrag „Platz der Engine“: Entwurf bestätigt (Entscheidung 5), Bau begonnen |
+| **k** | Ablauf des Konverters (`main`, `convert_unit`, `job_of`) | Entwurf gepusht (Runden mit eingefrorenem Stand, Fixpunkt); Beweis offen: `konvert` mit 8 und 40 Kernen byteweise gleich, keine Funktion verloren |
+| **p** | Leistung der exportierten Klasse (`tools/blueprint_cpp.cpp`, `notation.cpp`, `nodes.h` …) | gerade begonnen; soll zuerst die Ursachenliste liefern |
+| **s5** | Stufe 5, Mechanismus des Umschaltens | Mechanismus gebaut, `qr_code` umgeschaltet auf `work-s5` – **unbewiesen** (Suiten auf mag) und 17× langsamer; **angehalten** bis p die Ursachen kennt; offen: Konverter liest Typen/Aufrufe einer Blueprint-Klasse aus dem Level |
+| **c** | Rückrufe der Engine | nur Entwurf angefordert; **angehalten** |
+| **r** | rückwirkender Differenztest, `tools/source_diff.py` | bei der CLI auf mag (`mag/differenztest`); 117 Dateien / 76 Einheiten; bei Übergabe kein einziger Test grün |
+
+Konflikte, die beim Zusammenführen kommen: „break mitten im switch-Fall“ steht doppelt (g2 `54f8e9d`, g1
+`81d7455`) – **eine** Fassung behalten, die mit dem saubereren Beweis; `tools/source_diff.py` und
+`tests/source_diff.h`: die Fassung von `mag/differenztest` gewinnt (sonst work-r/work-f2 vor work-f1).
+
+---
+
+## 9. Offene Befunde und Risiken (ehrlich)
+
+1. **Leistung der Klasse (17×)** – das größte offene Risiko. Bisher zählten die Tests nur
+   Speicheranforderungen, nicht Zeit. Ohne Behebung darf nicht umgeschaltet werden. Umfang unbekannt, bis
+   die Ursachenliste da ist.
+2. **Kein gültiger voller Lauf seit dem 14.11.** – jede Zahl seit f9 ist aus Proben. Erst der nächste volle
+   Lauf zeigt, was die fünf Zweige vom 15.11. und die Korrekturen wirklich bringen, ob V's Korrektur
+   (Zustand von Game im Test; leerer `unique_ptr`/`optional` gibt den Aufruf auf) hält, und ob der
+   Vergleich gegen die echte Engine (`SC_ENGINE=real`, in CI nie gelaufen) Abweichungen findet.
+   Bekannt: ein Aufruf, der auf beiden Seiten fehlschlägt, gibt beiderseits Nullen und gilt als gleich –
+   prüfen, ob das zu viel durchwinkt.
+3. **Der Konverter ist ablaufabhängig** (Paket k) – bis das behoben ist, können zwei Läufe desselben Stands
+   Verschiedenes schreiben. Zahlen aus Läufen mit verschiedener Kernzahl nicht blind vergleichen.
+4. **Rückwirkender Differenztest**: groß (76 Einheiten), Werkzeug wird gerade umgebaut. Bewusste
+   Verhaltensänderungen seit `main` (entfernte Caches in terrain u. a.) listet die CLI – Chris entscheidet
+   nicht-triviale Fälle.
+5. **64 Bit beim Umschalten:** bestehende Tests einer umgeschalteten Datei können andere Werte sehen als im
+   f32-Port. Nie einen Test weich machen – Stelle mit beiden Werten dem Koordinator, bei echter
+   Entscheidung Chris. e2e/Determinismus müssen grün bleiben; das Maß ist spawncity.de.
+6. Weiter offen aus dem 15.11.: Destruktoren mit Rumpf (`~Ragdolls() { clear(); }`), JSON als Typ der
+   Sprache (`actor_graph`, `build_level`), `clear()` einer `std::vector` von Endendem (Reihenfolge lässt
+   C++ offen), `std::initializer_list` als Argument, `app`-Knoten nicht in den Spieltests gebunden,
+   `Runtime::instances` (std::function-Feld), Dateien mit nur deklarierten Engine-Typen
+   (`kern::Renderer`). Jeder davon braucht Antwort (a) oder (b) – „wartet“ ist kein Endzustand.
+7. **Kontingent:** am 18.11. um 17:08 waren 31 % des Wochenlimits verbraucht (Reset war 13:00). Am 15.11.
+   hat das Limit alle Agenten drei Tage gestoppt. Chris nach einer Stunde nach der Prozentzahl fragen und
+   die Zahl der Agenten danach richten (bei ~8 %/h auf vier zurück: t1, t2, k, p).
+
+---
+
+## 10. Reihenfolge bis 100 % (so weitermachen)
+
+**Schritt 1 – Bestandsaufnahme (vor allem anderen):**
+`git fetch`; CI-Lauf `44341582015` ansehen; den vollen Lauf auf mag ansehen
+(`git ls-remote origin 'refs/heads/mag/ergebnis-work-voll-*'`, `git show <zweig>:mag-log/when`). Ist
+`convert rc=0` und nennt `convert.log` Funktionen: Summenzeilen lesen (neue Zahlen!), `suite`/`engine` rc
+und Tails lesen. Ist die Konvertierung gültig: Commit 1 des Ergebnis-Zweigs (Level + `tests/converted`) per
+`git cherry-pick` nach `work` – **nur wenn der Lauf auf dem Stand lief, der heute `work` ist** (sonst neuen
+`voll origin/work` einreihen) –, pushen, CI starten. Ziel: native-spawncity grün oder eine Liste echter
+Abweichungen (jede ist ein Fehler, der behoben wird – nie ausnehmen).
+
+**Schritt 2 – Agenten neu starten** (Opus 5.5, mittlere Stufe; nach Kontingent, in dieser Rangfolge):
+t1, t2, k, p (kritischer Pfad) → g1, g2, f1, f2 → d (Platz der Engine) → c (nach bestätigtem Entwurf) → s5
+(wenn p die Ursachen kennt). Jeder als „Nachfolger“ auf seinem Zweig: liest `PAKET_COMMON3.md`,
+`PAKET3_<paket>.md`, `uebergabe/<paket>.md`, `git log origin/work..origin/work-<paket>`.
+
+**Schritt 3 – Zusammenführen, Runde für Runde.** Ein Zweig kommt nach `work`, wenn: (1) der Agent „bereit“
+meldet **mit Beweis** (mag-Lauf oder CI, Zahlen); (2) er nur seine Dateien berührt hat
+(`git diff --stat origin/work...origin/work-<paket>`); (3) jede Quelländerung ihren **grünen** Differenztest
+hat; (4) neue Knoten in Engine-Test, nativem Fall, „Fall mit jedem Knoten“, Palette und Doku stehen;
+(5) `python3 tools/engine_api.py` keine Abweichung zu den eingecheckten `.gen`-Dateien ergibt;
+(6) alle Spiel-Quellen übersetzen (Syntax). Danach: `voll origin/work` auf mag, Ergebnis nach `work`, CI.
+Wiederholen, bis `convert.log` keine wartende Funktion mehr nennt und jede verglichen ist.
+
+**Schritt 4 – Leistung:** Ursachenliste von p prüfen, Behebung freigeben, Zeit-Test in die Suiten.
+
+**Schritt 5 – Sprach-/Engine-Erweiterungen fertig:** Platz der Engine (d), Rückrufe (c), dazu die Punkte
+aus 9.6. Jede nach bestätigtem Entwurf.
+
+**Schritt 6 – Rückwirkender Differenztest vollständig grün** (CLI auf mag); Abweichungen beheben oder Chris
+vorlegen. Die vorbereiteten Absenkungen der Game-Dateien damit beweisen und mergen.
+
+**Schritt 7 – Umschalten (Stufe 5):** Datei für Datei, Blätter zuerst; je Datei: C++ gelöscht, ihre Tests
+prüfen den Blueprint, Klasse so schnell wie das C++, Suiten grün. Am Ende `Game`. Dann Stufe 6 (offene
+Kästchen in BLUEPRINTS.md), `src/` leer.
+
+**Schritt 8 – Abschluss:** Abschnitt 12.
+
+Nach jedem Schritt: `BLUEPRINTS.md` (Stand-Absatz) nachführen, pushen.
+
+---
+
+## 11. Die neue Sitzung aufsetzen (konkret)
+
+1. Das Repo `ChristianHohlfeld/kernengine.de` muss der Sitzung angehängt sein (Schreibzugriff). Klon nach
+   `/home/claude/kw` (so nennen ihn die Aufträge), Zweig `work`. Fetch-Regeln aus Abschnitt 6 setzen.
+2. `git fetch origin koordination` und den Ordner `koordination/` in das Scratchpad der neuen Sitzung
+   kopieren – das ist das neue `S`. In `PAKET_COMMON3.md`, `PAKET3_*.md`, `mag.sh`, `final.sh` den alten
+   Pfad `/tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad` durch das neue `S`
+   ersetzen (`grep -rl` + `sed`). Ordner `uebergabe/`, `stand/`, `mag/` dort belassen bzw. anlegen.
+3. Worktree für die Warteschlange: `git -C /home/claude/kw worktree add $S/magjob origin/mag/auftrag` und
+   dort `git checkout -B mag/auftrag origin/mag/auftrag` (mag.sh pusht von dort). Test:
+   `$S/mag.sh probe origin/work src/settings.cpp src/game.cpp` (ein paar Minuten).
+4. Agenten-Worktrees gibt es nicht mehr: ein Nachfolger legt `/home/claude/w-<paket>` neu an –
+   `git worktree add /home/claude/w-<paket> -B work-<paket> origin/work-<paket>` (der Zweig besteht schon;
+   **nicht** von `origin/work` neu abzweigen). Das im Startauftrag jedes Agenten ausdrücklich sagen
+   (der „Nachtrag 16:20 – Nachfolger“ in PAKET_COMMON3.md geht von einem bestehenden Worktree aus).
+5. Werkzeuge lokal: `clang++` 18, `g++` 13, `python3`, `gh`. Keine Paketinstallation nötig.
+6. Diese Datei nach Schritt 1 aus Abschnitt 10 mit dem neuen Stand fortschreiben (Branch `koordination`),
+   damit eine weitere Übergabe jederzeit möglich ist.
+
+---
+
+## 12. Abschluss (erst wenn Abschnitt 1 „Fertig heißt“ 1–6 erfüllt ist)
+
+1. Auf `work`: alle CI-Jobs grün auf genau dem Stand (Dispatch, Ergebnis abwarten).
+2. `BLUEPRINTS.md` aktuell; Changelog-Eintrag (Format Abschnitt 2, Berliner Zeit aus dem Zeit-Werkzeug).
+3. Squash von `work` nach `main` (ein Commit, kein Force-Push), pushen; CI auf `main` abwarten – `deploy`
+   läuft nur bei grünem `build`; die anderen Jobs trotzdem prüfen. Live prüfen.
+4. `work` danach per Merge-Commit mit `main` verbinden (kein Force-Push), weiterarbeiten wie gehabt.
+
+---
+
+## 13. Was in diesem Ordner liegt (und in welcher Reihenfolge lesen)
+
+1. `UEBERGABE.md` – diese Datei.
+2. Im Repo, Zweig `work`: `kern/games/spawncity/BLUEPRINTS.md` (**ganz**; der Plan, die Abbildung, die
+   Kursprüfung), `kern/docs/blueprint_cpp.md` (die Sprache), Kopf von `tools/cpp_to_blueprint.py`,
+   `tools/source_diff.py`, `tools/engine_api.py`.
+3. `ANSATZ.md` (der Ansatz in Chris' Worten, 14.11. – gilt weiter; die dort genannte „Schreibphase ohne
+   Prüfläufe“ ist überholt: geprüft wird jetzt laufend auf mag), `FORK_RULES.md`, `BRIEFING.md` (ältere
+   Regeln für Agenten; wo sie `PAKET_COMMON3.md` widersprechen, gilt `PAKET_COMMON3.md`).
+4. `PAKET_COMMON3.md` + `PAKET3_*.md` – die Aufträge. `UEBERGABE_AGENT.txt` – der Wortlaut, mit dem die
+   Agenten zur Übergabe aufgefordert wurden.
+5. `uebergabe/*.md` – die Übergaben der Agenten (je Paket; die wichtigste Quelle für den Neustart).
+   `stand/*.md` – kurze Stände.
+6. `f9_roots.txt`, `f9_waiting.txt`, `f9_convert.log.xz` – der letzte Lauf mit vollständigen Listen.
+7. `mag.sh`, `final.sh`, `pilot/` (Messprotokolle des Piloten vom 15.11.), `g1/`, `g2/` (Notizen zu
+   Absenkungen), `s5/` (Benchmark für Paket p, falls geliefert), `k/`, `r/`.
+
+---
+
+## 14. Was Chris in den neuen Chat schreibt (Vorschlag)
+
+> Du übernimmst als Koordinator das Projekt SpawnCity auf Kern. Repo ChristianHohlfeld/kernengine.de
+> (anhängen, Schreibzugriff). Hol den Branch `koordination`, lies `koordination/UEBERGABE.md` ganz und alles,
+> was Abschnitt 13 nennt, dann mach genau bei Abschnitt 10, Schritt 1 weiter. Agenten als Opus 5.5 auf
+> mittlerer Stufe, du überwachst. Vollständig, sauber, nichts überspringen. Antworte auf Deutsch.
+
+---
+
+## 15. Letzte Meldungen der Agenten bei der Übergabe (18.11., 17:15) – ergänzt Abschnitt 8
+
+Letzte Commits (alles gepusht): `work-g1 7d1d656`, `work-g2 ffa277f`, `work-f1 3903052`, `work-f2 687b163`,
+`work-t1 c7c49ed`, `work-t2 a546621`, `work-k e5f2bf1`, `work-p 04f1a57`, `work-s5 e749453`,
+`work-d 30f63e4` (= in `work`; vom Folgeauftrag „Platz der Engine“ war bei Übergabe nichts gepusht – Stand und
+bestätigter Entwurf mit Auflagen in `uebergabe/d.md`), `work-c`: kein Commit (nur Entwurf, `uebergabe/c.md`),
+`work-r fde4b9f`.
+
+**Wichtig – fast nichts davon ist durch einen Lauf bewiesen.** mag hat von 15:39 bis 16:52 keinen Auftrag
+gerechnet (alte Schleife, blockiert durch einen vollen Lauf); die Agenten haben lokal mit Teil-Proben
+gearbeitet. „Geschrieben und verglichen“ in einer Probe heißt nur: der Test übersetzt und der Konverter meldet
+die Funktion nicht als unvergleichbar. **Bit für Bit geprüft wird erst in der Spiel-Suite.** Bewiesen im
+strengen Sinn sind nur: Paket d Teil 1 (CI), der Differenztest `life` (f2: 1 Paar, 300 Aufrufe, Basis
+`955503b`; alle 7 Tests in `tests/lowered` auf work-f2 grün, 128 Checks) und die 32 Paare des Piloten.
+
+### Entscheidungen, die der neue Koordinator als Erstes treffen muss
+
+**(E1) Paket p – die Hauptursache der 17× (65–70 % der Zeit): Rechnen mit ganzen Zahlen läuft in der Klasse
+über double** (jeder Operand umgewandelt, `bits_of`, `whole`, `normal`; `kern::to<Int>(double)` wird nicht
+eingebettet; `gf_mul` allein 48 %). Weitere Ursachen: `math_compare` vergleicht den Operator zur Laufzeit als
+Text (~7,5 % – mit `if constexpr` bitgleich behebbar), Schleifenwächter und Schleifenzustand im Speicher (ein
+paar Prozent), Indexprüfung (~0,5 %). Nur qr encode ist profiliert (Float, Strukturen, Text, Maps, Int64 noch
+nicht). Der Agent nennt zwei bitgleiche Wege: (i) der Generator leitet am Graphen den Wertebereich her;
+(ii) ein geprüfter Weg über i64, der auf double zurückfällt, sobald ein Zwischenwert ±2^53 verlässt.
+*Empfehlung des scheidenden Koordinators (nicht mehr geprüft – erst lesen, dann entscheiden):* (ii) zuerst,
+**innerhalb der Umsetzung der Knoten** (`nodes.h`/Generator), ohne die Bedeutung zu ändern: die Sprache legt
+fest „ganze Zahlen exakt bis 2^53, sonst wie double“; ein i64-Pfad mit Bereichsprüfung von Operanden und
+Ergebnis rechnet in diesem Bereich **dasselbe Bit für Bit** und fällt sonst auf die heutige Formel zurück –
+das ist eine schnellere Ausführung derselben Bedeutung, kein neuer Zahlentyp (kein Verstoß gegen „64 Bit,
+kein Float32“). Prüfen, ob das wirklich Schreibweise/Leser berührt (der Agent meint ja; wenn die Bedeutung
+gleich bleibt, sollte der Text gleich bleiben können). (i) danach, wo die Prüfung selbst noch kostet.
+Beweis: Engine-Suite samt nativer Stufe bitgleich, Messung je Funktion, dann der Zeit-Test.
+Das Messwerkzeug über 20–30 Funktionen ist noch nicht gebaut; `tools/blueprint_cpp.sh --classes` auf work-p
+ist ungetestet und berührt dieselbe Datei wie work-s5 (von Hand zusammenführen).
+
+**(E2) Paket c – Entwurf „Rückruf der Engine“** (`uebergabe/c.md`, ganz lesen): `Callback<R(A…)>` = Funktion +
+höchstens ein gebundener Platz (const-Referenz); nur die Engine ruft ihn; er darf nur eine Funktion nennen, die
+nichts vom Blueprint braucht (`static` in der Klasse → Wiedereintritt ist nur Lesen, Jobs sind threadfest);
+Knoten „Make Callback“, Text `callback<&Lib::fn>(platz)`; Klasse: Thunk + `void*` (Kosten wie heute);
+Interpreter/JIT: Trampolin auf `Runtime::call_static`; Lebensdauer an das Engine-Objekt/den Aufruf gebunden.
+Der Entwurf ist **noch nicht bestätigt**. Drei Fragen des Agenten: (1) `register_node` in game.cpp (das
+Programm meldet einen Knoten auf „logic.tick“ an, der `fixed_step` ruft) – Absenkung in game.cpp (Paket g1)
+oder Regel des Konverters? *Empfehlung:* im Blueprint ist das ein Event-Handler des Blueprints Game
+(`event_tick`); wählen, was ohne Sonderregel auskommt – eine allgemeine Konverter-Regel nur, wenn „ein Programm
+meldet einen Tick-Handler an“ eine Form ist, die jedes Spiel so schreibt; sonst Absenkung mit Differenztest.
+(2) Jobs (`KERN_JOB`, drei Anmeldungen: `run_tile`, `run_buildings`, `dem_grid_job`): statische Erklärung
+`KERN_JOB(kind, &Lib::fn);` in einer Bibliothek – *Empfehlung:* bestätigen, mit dem Nachweis, dass Klasse
+(Threads) und Interpreter (`pump` auf dem Frame-Thread) dasselbe Ergebnis geben (Determinismus-Job!).
+(3) Berührung mit Paket d in `engine_api.py` (HeightSampler/RoadOptions wären keine Handles mehr) –
+nacheinander bauen: erst d fertig, dann c.
+
+**(E3) Paket k** – vor dem Mergen: Zweig auf `origin/work` nachziehen (9 Commits zurück); Beweis abwarten:
+die Aufträge `work-k-konvert-165842-30470` (8 Kerne) und `work-k-konvert-165847-30555` (40 Kerne) sind auf mag
+eingereiht → erste Commits der beiden Ergebnis-Zweige byteweise vergleichen; gegen einen gültigen Basislauf:
+keine Funktion verloren. Jede Zeile „was written and waits now“ ist ein Befund am Inhalt → an das Paket der
+Datei. Der Lauf endet nur sicher, solange die Umwandlung monoton ist (nicht erzwungen, s. `uebergabe/k.md`).
+
+### Befunde aus den Übergaben, die über ein Paket hinausgehen
+- **t1:** „verglichen“ in Proben ≠ ausgeführt (s. o.). Fünf Proben wurden wegen des Sitzungswechsels abgebrochen
+  (lamps/townsync/world, swarm/military, gaps/events, weapons/foot_rounds, city_stream+terrain).
+- **t2:** `struct AimTarget {…} g_aim;` stand im Test doppelt, g++ machte `g_aim` zu `int` (Ursache der
+  f9-Meldung bei `Game::foot_input`, `ctl_assist`; gleiches Muster `g_view`) – behoben in `a546621`, im
+  Konverter noch nicht durch einen Lauf bestätigt. `json::Value::is_object/items` warten jetzt ehrlich
+  (Engine-Objekt) – hängt an „JSON als Typ der Sprache“ (9.6). Seine Probe über alle 77 Quelltexte
+  (`work-t2-probe-163129-9216`) läuft auf dem Stand **vor** seinen Änderungen; danach eine zweite auf `a546621`.
+- **g1:** Absenkung `game_gaps.cpp` (`gaps_sirens`, `gaps_jet_audio`; `--base b13f80a`, in `g1/absenkungen.txt`)
+  – nur Syntax geprüft. Bedarf an der Engine: `Mixer::set_bus`, `TextureDesc::rgba`; offene Fragen zu
+  `register_node` und `build_level` (s. E2 und 9.6). Mehrere „Wurzeln“ in f9 erben nur den Grund einer
+  gerufenen Funktion.
+- **g2:** vier Absenkungen, je ein Commit, nur Syntax geprüft (`g2/absenkungen.txt`): `worldsync_update`,
+  `minimap_json` (ruft je Merkmal einmal mehr `city_.features(tile)` – **beim Beweis auf die Zeit achten**;
+  wenn das die Kosten ändert, ist es keine zulässige Absenkung), `traffic_make_near`, `mp_` als Wert mit Merker
+  `mp_made_` statt `unique_ptr`. Ursache nicht gefunden für „a pointer“ (`traffic_rules, step_world,
+  world_command, bigmap_json`) und „list: erase()“ (`update_world, rebase_origin`) – zeigt nur die Probe über
+  alle Game-Dateien (`work-g2-probe-164700-20497`, Ergebnis-Zweig selbst abholen). Wartet auf d (`shots()`)
+  und f2 (`ring_put` in world_marks hält `town_mark`, `world_blast` auf).
+- **f1:** `0b58333` bewiesen per lokaler Probe (mvt 30/30); `3903052` Zwischenstand: sieben Konverter-Regeln
+  (fünf per Probe bestätigt, zwei ungeprüft), terrain.cpp `const auto&`. Die Differenztests des Vorgängers
+  übersetzten **nie**; neu erzeugt; nur mvt, tiles, city_jobs übersetzen nachweislich; **keiner ist gelaufen**.
+  facades/water_look brauchen keinen Test (nur ein `#include` kam dazu). Nächster Schritt:
+  `mag.sh spiel origin/work-f1 lowered`, dann Probe über alle acht Quelltexte.
+- **f2:** `687b163` ist Zwischenstand (Lists Equal für Strukturen: Prüfung im Konverter `Emit.memberwise`,
+  Engine-Test, Doku) – Syntax von `test_main.cpp` ungeprüft, Probe von terrain.cpp fehlt.
+- **s5:** nach dem Einmischen von `origin/work` (mit Paket d) müssen Spiel- und Engine-Suite auf `e749453`
+  laufen; die eingereihten Aufträge laufen noch auf `59716b8`. Der Konverter-Lauf mit den neuen Teilen
+  (Ordner „Program“, Header vor dem Lesen) fehlt. Die Löschung von qr_code steht im Engine-Commit `a12bc2c`.
+- **Auf `work` fehlt nichts mehr für den Leser:** `3b355c4` (lokale Map/Set) ist drin – die Notiz in t1s
+  Übergabe dazu ist überholt.
+
+### mag bei Übergabe
+17:16: zehn Ergebnis-Zweige; sechs Aufträge liefen (darunter Suiten, ~30 Minuten), ~35 warteten; die neue
+Fassung der Schleife (`fe843e4`: 14 zugleich, Spiegel) greift danach. Viele wartende Proben sind von Agenten,
+die es nicht mehr gibt – ihre Ergebnisse sind trotzdem brauchbar (Zweig `mag/ergebnis-<name>`, Name beginnt mit
+dem Paket-Zweig). CI-Lauf `44341582015` (work `90b5ab8`): determinism und native grün, Rest lief noch.

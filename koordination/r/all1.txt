@@ -1,0 +1,28 @@
+blueprint_call.h: no test - number(f32) of blueprint_call.h has no counterpart in the new text (and others than its own file may call it)
+car.cpp: no test - an entry by a pointer (car.cpp:17): the test cannot say whether it is there
+city_jobs.cpp: no test - tile_input(const TileKey &, f64, f64, const u8 *, std::size_t) of city_jobs.cpp has no counterpart in the new text (and others than its own file may call it)
+city_stream.cpp: no test - CityStream::tile(const TileKey &) of city_stream.cpp has no counterpart in the new text (and others than its own file may call it)
+combat_art.cpp: 1 functions compared, 0 compared through their callers -> /tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad/r/out/test_combat_art_lowered.cpp
+combat_audio.cpp: no test - an entry by a pointer (combat_audio.cpp:180): the test cannot say whether it is there
+combat_detail.cpp: no test - the actor of g_rules: its name is not written where it is made
+combat_rules.cpp: no test - the actor of g_military: its name is not written where it is made
+common.h: no test - Rng::Rng(u32) of common.h has no counterpart in the new text (and others than its own file may call it)
+controls.cpp: no test - the actor of g_rules: its name is not written where it is made
+destruction.cpp: 3 functions compared, 0 compared through their callers -> /tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad/r/out/test_destruction_lowered.cpp
+drone.cpp: no test - Drone::~Drone() of drone.cpp has no counterpart in the new text (and others than its own file may call it)
+equipment.cpp: no test - the actor of g_jetpack: its name is not written where it is made
+facades.cpp: 1 functions compared, 0 compared through their callers -> /tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad/r/out/test_facades_lowered.cpp
+game.cpp: no test - the class Game has other fields in the new text (pad, dsync_, toss_test_, toss_, projsync_, proj_serial_, townsync_, puppet_world_, world_send_clock_, people_send_clock_, world_send_real_, world_tick_, world_sent_, world_got_, world_heard_at_, cars_were_, car_seen_, people_acc_, car_net_, car_puppet_, car_line_, car_rest_q_, world_parts_, cows_acc_, pets_acc_, flocks_acc_, host
+game_audio_web.cpp: 1 functions compared, 0 compared through their callers -> /tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad/r/out/test_game_audio_web_lowered.cpp
+game_barricades.cpp: 3 functions compared, 0 compared through their callers -> /tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad/r/out/test_game_barricades_lowered.cpp
+game_combat.h: every function it had is unchanged since origin/main (the new text only has more) - no test
+game_controls.cpp: 12 functions compared, 0 compared through their callers -> /tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad/r/out/test_game_controls_lowered.cpp
+game_destruction_sync.cpp: no test - Game::dsync() of game_destruction_sync.cpp has no counterpart in the new text (and others than its own file may call it)
+game_details.cpp: no test - - written by a macro (game_details.cpp:60)
+game_equipment.cpp: no test - Game::ui_render_music(f32 *, u32) of game_equipment.cpp has no counterpart in the new text (and others than its own file may call it)
+game_events.cpp: 4 functions compared, 0 compared through their callers -> /tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad/r/out/test_game_events_lowered.cpp
+game_foot_rounds.cpp: 3 functions compared, 0 compared through their callers -> /tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad/r/out/test_game_foot_rounds_lowered.cpp
+game_gaps.cpp: 5 functions compared, 0 compared through their callers -> /tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad/r/out/test_game_gaps_lowered.cpp
+game_lamps.cpp: 4 functions compared, 0 compared through their callers -> /tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad/r/out/test_game_lamps_lowered.cpp
+game_life.cpp: no test - make_sounds(kern::audio::Mixer &, kern::audio::ClipId *) is gone, and nothing compared calls it
+game_look.cpp: no test - Game::look_view_models(f32) uses the variable sc::g_vm_arms of the file, which the new Game::look_view_models(f32) neither has nor is handed

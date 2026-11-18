@@ -1,0 +1,9 @@
+Benchmark qr_code (Paket s5, 18.11.2026) – für Paket p
+Quelle:  bench_old.cpp + old_qr.cpp/qr_code.h (das C++ von 955503b), bench_new.cpp (die Klasse qr_code_cpp aus level_blueprints.h)
+Aufruf:  ./run.sh [<worktree>]   (schreibt level_blueprints.h aus dem Level des Worktrees neu, baut beide mit -O2 -ffp-contract=off wie das Spiel)
+Messung: 2000 Aufrufe encode("https://kernengine.de/kern/games/spawncity/web/index.html?mp=join&room=lobby&net=public") -> Version 5 (37x37);
+         die Klasse mit dem Schleifenwächter wie im Spiel (counters, Grenze 2e9: je Durchlauf ein Vergleich und ein Zählen).
+         Prüfsumme über die Module (1022) gleich in beiden.
+Zahlen (diese Maschine, 2 Kerne, g++ 13):
+  C++        36–47 µs je Aufruf
+  Klasse    730–830 µs je Aufruf   (~17x)
