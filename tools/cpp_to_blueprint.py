@@ -394,8 +394,11 @@ def bound_type(v):
 
 
 def kids(n):
-    """The parts of a node (without the comments and attributes that stand with a declaration)."""
-    return [c for c in n.get("inner", []) or [] if isinstance(c, dict) and c.get("kind") and not c["kind"].endswith("Comment") and not c["kind"].endswith("Attr")]
+    """The parts of a node (without the comments and attributes that stand with a declaration). An array written
+    out with fewer values than it has entries (`f32 a[20] = {x, 2}`): the compiler's tree names what fills the
+    rest first, under "array_filler", and the values written after it - the values are the parts."""
+    inner = n.get("inner") or (n.get("array_filler") or [])[1:]
+    return [c for c in inner if isinstance(c, dict) and c.get("kind") and not c["kind"].endswith("Comment") and not c["kind"].endswith("Attr")]
 
 
 # A 64-bit whole number the program spells u64, i64, uint64_t or int64_t is a bit pattern: in a Blueprint
@@ -4131,8 +4134,14 @@ class Emit:
                 elif init is not None:
                     # (an array written out: its place - declared with its length - is set to what is written)
                     said = self.written_array(init, self.types[v['id']]) if name in self.lengths else None
-                    text = self.made_list(said[0], self.types[v['id']]) if said else self.ex(init, self.types[v['id']])
-                    out += self.take_pre() + [f"{name} = {text};"]
+                    if said and len(said[0]) > 16:
+                        # (more than a Make List takes: every entry set where it stands - those it does not write
+                        # zero, as C++ makes them: also when the place was used before, in an earlier pass of a loop)
+                        vals = said[0] + [self.u.zero(self.types[v['id']][5:-1])] * (said[1] - len(said[0]))
+                        out += self.take_pre() + [f"{name}[{i}] = {x};" for i, x in enumerate(vals)]
+                    else:
+                        text = self.made_list(said[0], self.types[v['id']]) if said else self.ex(init, self.types[v['id']])
+                        out += self.take_pre() + [f"{name} = {text};"]
                     c = self.ctype(v)
                     if ITERATOR.match(c):
                         self.note_home(v["id"], init)
@@ -4857,11 +4866,25 @@ class Emit:
                     break
             if not closed and (labels, stmts) is not (cases[-1][0], cases[-1][1]) and cases[-1] is not None and labels is not cases[-1][0]:
                 raise Wait("a switch case that falls through")
-            for x in body_stmts:
-                self.no_switch_break(x)
             ends = self.ends(body_stmts)
             all_end = all_end and ends
             out_cases.append((labels, body_stmts, ends))
+        # A break in the middle of a case leaves the switch from there: a flag it sets, and what follows it in the
+        # case runs only while the flag is not set - as a loop's break (enter_loop, block_of). A continue in the
+        # switch is the loop's around it.
+        left = None
+        if any(self.switch_break(x) for _, stmts, _ in out_cases for x in stmts):
+            left = {"stop": self.temp("left", "Bool"), "skip": self.loops[-1]["skip"] if self.loops else None}
+            self.loops.append(left)
+        try:
+            lines, ends = self.switch_cases(sel, st, out_cases, all_end)
+        finally:
+            if left:
+                self.loops.pop()
+        return ([f"{left['stop']} = false;"] if left else []) + lines, ends
+
+    def switch_cases(self, sel, st, out_cases, all_end):
+        """The lines of a switch whose cases are known ([labels], statements, whether it always returns)."""
         has_default = any(None in labels for labels, _, _ in out_cases)
         if st in self.u.enum_values:
             value = self.ex(sel, st)
@@ -4922,14 +4945,14 @@ class Emit:
             lines.append("}")
         return lines, all_end and has_default
 
-    def no_switch_break(self, n):
+    def switch_break(self, n):
+        """Is there a break of the switch itself in this statement of one of its cases?"""
         k = n.get("kind")
         if k == "BreakStmt":
-            raise Wait("a break in the middle of a switch case")
+            return True
         if k in ("ForStmt", "WhileStmt", "DoStmt", "CXXForRangeStmt", "SwitchStmt", "LambdaExpr"):
-            return
-        for c in kids(n):
-            self.no_switch_break(c)
+            return False
+        return any(self.switch_break(c) for c in kids(n))
 
     # ---- statements that change something ----
     def effect(self, s):
