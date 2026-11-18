@@ -45,11 +45,12 @@ struct Vec4 {
   
   
   
-  
+  constexpr bool operator==(const Vec4& o) const { return x == o.x && y == o.y && z == o.z && w == o.w; }
 };
+struct Renderer;
 namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
 namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
-namespace physics { struct Body { u64 id = 0; }; }
+namespace physics { struct Body { u64 id = 0; bool operator==(const Body& o) const { return id == o.id; } }; }
 struct World : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -70,6 +71,7 @@ struct GeoProjector {
 
 };
 enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
+struct Renderer;
 struct Renderer : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -78,7 +80,7 @@ namespace mvt { namespace Value { enum class Kind : u8 { none, string, number, b
 constexpr i32 kTileZoom = 14;
 struct TileKey {
   i32 z = kTileZoom, x = 0, y = 0;
-  
+  bool operator==(const TileKey& o) const { return z == o.z && x == o.x && y == o.y; }
   
 };
 enum class RoadClass : u8 { motorway, trunk, primary, secondary, tertiary, minor, service, track, path, pedestrian, river, canal, stream };

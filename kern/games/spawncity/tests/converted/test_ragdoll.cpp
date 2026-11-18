@@ -145,8 +145,8 @@ struct Mat4 {
 };
 namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
 namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
-namespace physics { struct Body { u64 id = 0; }; }
-namespace physics { struct Joint { u64 id = 0; }; }
+namespace physics { struct Body { u64 id = 0; bool operator==(const Body& o) const { return id == o.id; } }; }
+namespace physics { struct Joint { u64 id = 0; bool operator==(const Joint& o) const { return id == o.id; } }; }
 namespace physics { struct Pose {
   Vec3 position;
   Quat rotation;

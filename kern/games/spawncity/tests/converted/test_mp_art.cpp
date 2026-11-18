@@ -34,9 +34,11 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+struct Renderer;
 namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
 namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
 namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
+struct Renderer;
 struct Renderer : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };

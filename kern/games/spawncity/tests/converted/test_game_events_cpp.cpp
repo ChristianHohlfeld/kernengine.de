@@ -98,6 +98,7 @@ namespace People { struct Person {
 namespace People { enum class HurtBy : u8 { round, blow, vehicle, kLast = vehicle }; }
 namespace PoliceUnit { enum class State : u8 { pursuit, stopping, engage, back, leave, abandoned, wreck }; }
 namespace Game { enum class BlastBy : u8 { other, weapon, missile }; }
+namespace combat { } using namespace ::converted_game_events_cpp::combat;
 using P = People::Person;
 f32 dist2d(Vec3 a, Vec3 b) { return hypot_bp(a.x - b.x, a.y - b.y); }
 f32 approach_angle(f32 cur, f32 target, f32 max_step) { return cur + clampf(wrap_pi(target - cur), -max_step, max_step); }

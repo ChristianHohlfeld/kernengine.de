@@ -36,8 +36,8 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #define protected public
 namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
 namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
-namespace physics { struct Body { u64 id = 0; }; }
-namespace physics { struct Joint { u64 id = 0; }; }
+namespace physics { struct Body { u64 id = 0; bool operator==(const Body& o) const { return id == o.id; } }; }
+namespace physics { struct Joint { u64 id = 0; bool operator==(const Joint& o) const { return id == o.id; } }; }
 struct World : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };

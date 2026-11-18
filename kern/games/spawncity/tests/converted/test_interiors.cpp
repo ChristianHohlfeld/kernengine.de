@@ -61,13 +61,15 @@ struct MeshData {
   /// Borrowed MeshInput view (geometry only; material etc. stay default).
   
 };
+struct Renderer;
 enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
+struct Renderer;
 struct Renderer : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
 namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
-namespace physics { struct Body { u64 id = 0; }; }
+namespace physics { struct Body { u64 id = 0; bool operator==(const Body& o) const { return id == o.id; } }; }
 struct World : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };

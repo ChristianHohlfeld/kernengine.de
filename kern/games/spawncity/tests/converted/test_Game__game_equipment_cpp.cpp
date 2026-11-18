@@ -41,10 +41,10 @@ constexpr f32 kPi = 3.14159265358979323846;
 struct Vec4 {
   f32 x = 0, y = 0, z = 0, w = 0;
   constexpr Vec4() = default;
+  constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}
   
   
-  
-  
+  constexpr bool operator==(const Vec4& o) const { return x == o.x && y == o.y && z == o.z && w == o.w; }
 };
 struct Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
@@ -70,7 +70,7 @@ struct Mat4 {
   
   
   
-  
+  Vec3 translation() const { return {m[12], m[13], m[14]}; }
   
 
 
@@ -165,6 +165,7 @@ struct Camera {
   bool has_projection = false;
   Mat4 projection = Mat4{};
 };
+struct Bvh;
 constexpr u32 kMaxPointLights = 16;
 enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
 struct Mesh : converted::EngineObject {
@@ -194,20 +195,35 @@ struct MeshData {
   /// Borrowed MeshInput view (geometry only; material etc. stay default).
   
 };
+struct Renderer;
 struct HeightSampler : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
 namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
 namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
-namespace physics { struct Body { u64 id = 0; }; }
-namespace physics { struct Shape { u64 id = 0; }; }
-namespace physics { struct Joint { u64 id = 0; }; }
+namespace physics { struct Body { u64 id = 0; bool operator==(const Body& o) const { return id == o.id; } }; }
+namespace physics { struct Shape { u64 id = 0; bool operator==(const Shape& o) const { return id == o.id; } }; }
+namespace physics { struct Joint { u64 id = 0; bool operator==(const Joint& o) const { return id == o.id; } }; }
 namespace physics { struct Pose {
   Vec3 position;
   Quat rotation;
 }; }
+namespace physics { struct QueryFilter {
+  u64 mask_bits = ~0ull, category_bits = ~0ull;
+  QueryFilter() = default;
+  QueryFilter(u64 mask, u64 category = ~0ull) : mask_bits(mask), category_bits(category) {}
+}; }
+namespace physics { struct RayHit {
+  bool hit = false;
+  Shape shape;
+  Body body;
+  Vec3 point, normal;
+  f32 fraction = 0;
+}; }
 struct World : converted::EngineObject {
   using converted::EngineObject::EngineObject;
+  physics::RayHit cast_ray(const Vec3& origin, const Vec3& translation, const physics::QueryFilter& filter = {}, const physics::Body& ignore = {}) const;
 };
 struct MouseGrab : converted::EngineObject {
   using converted::EngineObject::EngineObject;
@@ -215,6 +231,8 @@ struct MouseGrab : converted::EngineObject {
 struct CharacterMover : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+constexpr f32 kDeg = kPi / 180.0;
+inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
 struct Rng {
   // Plain state: `Rng{seed}` starts at that seed, an Rng of its own starts at the default one. A
   // seed must not be 0 (xorshift would stay there) - a seed that is computed goes through seeded().
@@ -236,6 +254,21 @@ struct Rng {
 
 
 };
+struct RayResult {
+  bool hit = false;
+  f32 distance = 0;
+  Vec3 point, normal{0, 0, 1};
+};
+inline RayResult cast(const World& w, Vec3 origin, Vec3 dir, f32 max_len, physics::Body self, u64 mask = ~0ull) {
+  const physics::RayHit h = w.cast_ray(origin, dir * max_len, mask, self);
+  RayResult r;
+  if (!h.hit) return r;
+  r.hit = true;
+  r.distance = h.fraction * max_len;
+  r.point = h.point;
+  r.normal = h.normal;
+  return r;
+}
 struct CarSpec {
   const char* kind = "car";
   Vec3 half{1.78, 0.82, 0.36};
@@ -328,6 +361,7 @@ struct Car {
 struct KeyIndex : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+namespace detail { namespace KeyIndex_types { static constexpr std::size_t npos = static_cast<std::size_t>(-1); } }
 struct BuildingBuilder : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -373,6 +407,7 @@ enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
 struct AmbientOcclusionPass : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct Renderer;
 struct ShaderExtension : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -383,10 +418,11 @@ struct Renderer : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 namespace mvt { enum class GeomType : u8 { unknown = 0, point = 1, line = 2, polygon = 3 }; }
+namespace mvt { namespace Value { enum class Kind : u8 { none, string, number, boolean }; } }
 constexpr i32 kTileZoom = 14;
 struct TileKey {
   i32 z = kTileZoom, x = 0, y = 0;
-  
+  bool operator==(const TileKey& o) const { return z == o.z && x == o.x && y == o.y; }
   
 };
 enum class RoadClass : u8 { motorway, trunk, primary, secondary, tertiary, minor, service, track, path, pedestrian, river, canal, stream };
@@ -471,11 +507,11 @@ struct Terrain {
   std::vector<Vec4> needs;
 
   // ---- heights (one truth for physics, rendering, walkers, cars) ----
-  
+  f32 elevation(f32 x, f32 y) const;
   /// Height of a 5 m node: elevation + craters, water basins carved (terrainNodeHeightAt).
-  
+  f32 node_height(f32 x, f32 y) const;
   /// The static ground surface at (x, y): the node heights on the SW-NE triangles.
-  
+  f32 height(f32 x, f32 y) const;
   
   /// Where a building stands: the lowest ground along its outline (buildingGroundBase).
   
@@ -486,7 +522,7 @@ struct Terrain {
   /// A waterway line `width` wide; `speed` m/s current along it (river 1.6, canal 0.5, else 1.1).
   
   
-    // open water here (not under a bridge)
+  bool water_at(f32 x, f32 y) const;  // open water here (not under a bridge)
   
   
   /// Ground surface kind for tyres etc. (groundSurfaceAt): 0 ground, 1 water, 2 soil (crater).
@@ -524,7 +560,7 @@ struct Terrain {
 
   
   /// One crater as it goes over the network (destruction sync: game_destruction_sync.cpp).
-  struct CraterRec { f32 x = 0, y = 0, r = 0, depth = 0; };
+  struct CraterRec { f32 x = 0, y = 0, r = 0, depth = 0; bool operator==(const CraterRec& o) const { return x == o.x && y == o.y && r == o.r && depth == o.depth; } };
   
   /// The host's craters, in his order: only what differs is dug or filled (its tiles rebuilt).
   
@@ -565,9 +601,9 @@ struct Terrain {
   struct CorridorSet { u64 owner = 0; Vec4 bounds, box; converted::wide::Map<u64, std::vector<CorridorSeg>> grid; };
   std::vector<std::unique_ptr<CorridorSet>> corridors_;
   /// The place in corridors_ of the map tile's set whose square holds the point, or -1.
+  i32 corridor_set(f32 x, f32 y) const;
   
-  
-  
+  f32 road_level(f32 x, f32 y, f32 h) const;
   struct Tint { u64 owner; Vec4 box; Vec3 lin; std::vector<std::vector<Vec2>> rings; };
   struct Image { TileKey key; std::vector<f32> albedo; bool requested = false, failed = false; };  // 64 x 64 linear rgb
   converted::wide::Map<u64, Image> images_;
@@ -579,13 +615,13 @@ struct Terrain {
 
   
   
+  Vec4 interior(const Grid& g) const;
   
   
+  f32 grid_at(const Grid& g, f32 x, f32 y) const;
+  bool water_cell(i32 cx, i32 cy) const;
   
-  
-  
-  
-  
+  bool on_bridge(f32 x, f32 y) const;
   
   
   
@@ -624,6 +660,7 @@ struct Terrain {
   std::vector<Vec4> changes_;
   TerrainStats stats_;
 };
+f32 crater_profile(f32 r, f32 radius, f32 depth, f32 rim);
 struct Lane {
   std::vector<Vec2> points;
   f32 width = 6;
@@ -665,7 +702,7 @@ struct CityStream {
   
   /// No map service: the procedural stand-in town around the origin.
   
-  
+  bool offline() const { return offline_; }
   
   /// True once the tile under the player is built (or the stand-in town is).
   
@@ -675,7 +712,7 @@ struct CityStream {
   /// A point on a drivable street within `radius` of `near` (heading along the street).
   
   /// Ground height: the terrain's static surface (elevation, water basins, craters).
-  
+  f32 ground_height(f32 x, f32 y) const { return terrain_.height(x, y); }
   /// The ground (elevation tiles, water, craters, ground tiles): terrain.h.
   
   
@@ -993,6 +1030,7 @@ namespace logic { enum class PinType : u8 {
   boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
   map, set, count
 }; }
+struct EngineValue;
 struct EngineValue : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -1011,6 +1049,7 @@ struct Formula : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
+struct Context;
 namespace logic { enum class NodeKind : u8 { event, action, pure, flow }; }
 struct Library : converted::EngineObject {
   using converted::EngineObject::EngineObject;
@@ -2147,7 +2186,7 @@ struct Drone {
   /// One fixed physics step of `h` seconds: runs the firmware ticks and applies the forces for the
   /// coming Box3D step. Call it once per fixed step (after the previous step, before the next).
   
-  
+  const DroneTelemetry& telemetry() const { return tele_; }
   
   
   /// Rotor angle (radians) for drawing the props.
@@ -2189,17 +2228,17 @@ struct Jetpack {
   
   // The Blueprint's variables Acc, AirAccel, MaxClimb, Gravity, FallSafe and IgnitionDamp.
   
-  
+  static f32 air_accel();
   
   
   
   /// vz is scaled by this at ignition (a falling player is caught: `jump.vz *= .35`).
-  
+  static f32 ignition_damp();
   /// The second JUMP press in the air: ignition (false without fuel).
-  
+  bool ignite(f32 vz);
   /// One frame. `airborne`, vertical speed, height of the feet above what is below, jump held.
   /// Returns the upward acceleration of the thrust this frame (0 = not burning).
-  
+  f32 update(f32 dt, f32 now, bool airborne, f32 vz, f32 height, bool hold);
   f32 fuel = 1;
   bool thrusting = false, used = false;
   u32 ignitions = 0;
@@ -2212,9 +2251,15 @@ struct Jetpack {
     u32 ignitions = 0;
     f64 burst_left = 0, ground_since = -1, last_thrust = -99;
   };
-  
-  
+  Pack pack() const;
+  void take(const Pack& p);
   f32 burst_left_ = 0, ground_since_ = -1, last_thrust_ = -99;
+};
+struct FlightSample {
+  f32 t = 0;            // simulation time
+  Vec3 pos, vel;
+  f32 agl = -1, volts = 0;
+  bool armed = false;
 };
 struct Flight {
   u32 id = 0;
@@ -2226,17 +2271,17 @@ struct FlightLog {
  public:
   static constexpr u32 kMaxFlights = 50, kMaxPath = 600, kMaxEvents = 120;
   static constexpr f32 kPathInterval = 0.5;
-  
+  void observe(const FlightSample& s, const char* disarm_reason = "FC_DISARM");
   /// Ends a running flight (drone stowed, crash, reset).
-  
-  
+  void finish(const char* reason);
+  void network(const std::string& stage, f32 t);
   const std::vector<Flight>& flights() const { return flights_; }  // newest first
   bool flying() const { return active_; }
   u32 serial() const { return serial_; }  // counts finished flights and events
-  
+  std::string json() const;
 
  private:
-  
+  void record(const FlightSample& s, bool force);
   std::vector<Flight> flights_;
   struct Event { f32 t; std::string stage; };
   std::vector<Event> events_;
@@ -2257,21 +2302,21 @@ struct MusicSynth {
       {"8-BIT RADIO", "Chiptune", 144, 41},
       {"NACHTSCHICHT", "Techno", 132, 53},
   };
-  
+  static i32 station_count();
 
   void init(u32 rate);
   /// The programme to play (kMenu, a station index, or -2 = silence) and its level 0..1.
-  
+  void select(i32 programme, f32 level);
   /// Adds `frames` stereo frames into `out` (interleaved).
-  
-  
-  
+  void render_add(std::vector<f32>& out, u32 frames);
+  i32 programme() const { return programme_; }
+  f32 level() const { return gain_; }
   f32 peak = 0;  // of the last block (tests)
 
  private:
   struct Voice { f32 phase = 0, freq = 0, env = 0, decay = 0.9995, amp = 0, phase2 = 0; };
-  
-  
+  void step();
+  f32 next_sample(f32& right);
   u32 rate_ = 0;
   i32 programme_ = -2, want_ = -2;
   f32 gain_ = 0, target_ = 0, fade_ = 1;  // fade: 1 = the current programme fully in
@@ -2321,10 +2366,34 @@ namespace audio { enum class Bus : u8 { master = 0, music, sfx, ambience, ui, vo
 namespace audio { enum class Rolloff : u8 { inverse = 0, linear, exponential }; }
 namespace audio { using ClipId = u32; }
 namespace audio { using VoiceId = u64; }
+namespace audio { struct PlayParams {
+  f32 volume = 1;       // linear gain
+  f32 pitch = 1;        // playback-rate factor (0.05 .. 8)
+  f32 pan = 0;          // -1 left .. 1 right (2D voices)
+  bool loop = false;
+  Bus bus = Bus::sfx;
+  f32 fade_in = 0;      // seconds
+  f32 start = 0;        // start offset in seconds
+  i32 priority = 0;     // higher keeps playing when voices run out
+  // 3D
+  bool spatial = false;
+  Vec3 position, velocity;
+  f32 min_distance = 1;   // full volume inside
+  f32 max_distance = 50;  // silent (linear) / clamp distance (inverse, exponential)
+  Rolloff rolloff = Rolloff::inverse;
+  f32 spread = 0;         // 0 point source .. 1 fully enveloping (no panning)
+  f32 doppler = 1;        // 0 disables the Doppler shift for this voice
+}; }
 struct Mixer : converted::EngineObject {
   using converted::EngineObject::EngineObject;
   unsigned int sample_rate() const;
   unsigned int adopt_clip(const std::vector<double>& samples, const unsigned int& channels, const std::string& name, const bool& loopable = false) const;
+  bool ready() const;
+  u64 play(const unsigned int& clip, const audio::PlayParams& params) const;
+  void stop(const unsigned long& voice, const double& fade = 0) const;
+  bool playing(const unsigned long& voice) const;
+  void set_volume(const unsigned long& voice, const double& volume, const double& ramp = 0.03) const;
+  void set_position(const unsigned long& voice, const Vec3& position, const Vec3& velocity = {}) const;
 };
 enum class Opt : u8 {
   // mouse_settings.mjs
@@ -2348,9 +2417,29 @@ enum class Opt : u8 {
   vr_arms, vr_level, vr_tunnel, vr_smooth_turn,
   count
 };
+struct OptSpec {
+  std::string key;      // command / storage key
+  std::string section;  // menu section: maus, drohne, fuss, auto, kamera, ton, welt
+  std::string label;    // menu label (German)
+  std::string help;     // one line (settings_help.mjs)
+  f32 min, max, step, def;
+  bool toggle;
+  bool live;            // false: a WORLD kind the game does not have yet (shown as "bald")
+};
+struct Option {
+  std::string key, section, label, help;
+  f64 min = 0, max = 0, step = 0, def = 0;
+  bool toggle = false, live = false;
+};
+struct SettingsTable {
+  std::vector<Option> rows;
+  std::vector<OptSpec> specs;
+};
 struct Settings {
  public:
-  /// Every setting at its default (as the table bound at this moment has it).
+  /// Every setting at 0 (as an empty table has it).
+  Settings() = default;
+  /// Every setting at its default (as the table has it).
   
   f32 get(Opt o) const { return converted::at(v_, static_cast<u32>(o)); }
   bool on(Opt o) const { return get(o) > 0.5; }
@@ -2366,11 +2455,12 @@ struct Settings {
   
 
  private:
-  f32 v_[static_cast<u32>(Opt::count)];
+  f32 v_[static_cast<u32>(Opt::count)] = {};
   u32 version_ = 1;
 };
 struct UiState {
   Settings settings;
+  SettingsTable settings_table;  // the table of the settings (the level's Blueprint "Settings", bind_settings)
   u32 applied = 0;          // settings version the game last applied
   bool paused = false;      // a menu is open (title, pause, settings): no input, no simulation
   bool audio_paused = false;
@@ -2683,6 +2773,8 @@ namespace lamps { struct Field {
   
   /// setState: only ever worse. Returns true when it changed; remembers it for re-placement.
   
+  /// Lamp i (one of all()) gets the state, remembered for re-placement - set_state once worse() has said yes.
+  
   /// The lit head nearest along the segment a -> b within 0.38 m (onTracer), or -1.
   
   struct BlastHit { i32 lamp; u8 state; Vec2 dir; f32 speed; };
@@ -2778,6 +2870,32 @@ namespace game { struct PlayInput {
 }; }
 namespace game { enum class SimMode : u8 { none, simulate, play, replica }; }
 namespace game { enum class GameStatus : u8 { inactive, playing, won, lost }; }
+namespace game { struct Hud {
+  GameStatus status = GameStatus::inactive;
+  std::string title, message;
+  f32 message_age = 0;            // seconds since the message appeared
+  f32 score = 0;
+  u32 pickups = 0, pickups_total = 0;
+  f32 elapsed = 0, remaining = -1; // remaining < 0: no time limit
+  f32 speed = 0;                  // m/s of the player
+  f32 boost = -1;                 // 0..1, < 0: the controller has no boost
+  bool boosting = false;          // the player's boost or lift thrusters fire
+  bool interior = false;          // the low interior view is on
+  f32 best = 0;                   // best finishing time of this session (0 = none)
+  // soldier (first-person shooter) state of the local player
+  bool soldier = false;
+  f32 health = -1, max_health = 100, armor = 0;  // health < 0: no health
+  i32 ammo = -1, magazine = 0, reserve = 0;      // ammo < 0: no weapon
+  f32 reload = -1;                // 0..1 while reloading
+  f32 spread = 0;                 // current spread in degrees (crosshair size)
+  f32 hit_age = 99;               // seconds since our last hit (hit marker)
+  bool hit_head = false, hit_kill = false;
+  f32 damage_age = 99;            // seconds since we took damage (vignette)
+  f32 damage_yaw = 0;             // direction the damage came from, relative to the view (degrees)
+  f32 respawn_in = -1;            // seconds until respawn while dead
+  bool aiming = false;
+  f32 fov = 60;                   // current vertical field of view (degrees)
+}; }
 namespace game { struct ShotEvent {
   Vec3 from, to;
   ActorId shooter = 0, hit = 0;
@@ -2788,7 +2906,16 @@ namespace game { struct ShotEvent {
 struct GameWorld : converted::EngineObject {
   using converted::EngineObject::EngineObject;
   bool actor_alive(const unsigned int& id) const;
+  game::Hud hud() const;
+  World& physics() const;
+  Vec3 actor_velocity(const unsigned int& id) const;
   double sim_time() const;
+  bool set_actor_velocity(const unsigned int& id, const Vec3& velocity) const;
+  void shake_camera(const double& amount) const;
+  bool push_actor(const unsigned int& id, const Vec3& amount, const bool& impulse) const;
+  double camera_yaw() const;
+  bool actor_matrix(const unsigned int& id, Mat4& out) const;
+  physics::Body actor_body(const unsigned int& actor) const;
 };
 struct GapsState {
   // police_sirens.mjs: one voice for the nearest cruiser, one for the nearest police drone; each is
@@ -2871,6 +2998,7 @@ struct GapsState {
   std::vector<SniperRound> sniper_rounds;
   Part rocket_part;
 };
+struct LifeArt;
 struct Interiors {
  public:
   struct Door { Vec2 c, d, n; };  // centre on the facade, along the wall, outward normal
@@ -3515,6 +3643,7 @@ namespace mp { struct VoiceCapture {
   std::vector<std::vector<u8>> frames_;
   f64 phase_ = 0;
 }; }
+namespace mp { namespace Turn { enum class Dir : u8 { none, left, right, u_turn }; } }
 namespace mp { struct Ping { u8 owner = 0; Vec3 p; u32 color = 0; f64 at_ms = 0; }; }
 namespace mp { struct PingBoard {
  public:
@@ -3580,9 +3709,12 @@ namespace net { enum class ClientState : i8 {
 }; }
 struct Client : converted::EngineObject {
   using converted::EngineObject::EngineObject;
+  bool connected() const;
 };
 struct Server : converted::EngineObject {
   using converted::EngineObject::EngineObject;
+  int connected_clients() const;
+  bool running() const;
 };
 namespace net { enum class PacketType : u8 { request = 1, denied, challenge, response, keepalive, payload, disconnect }; }
 namespace seats { constexpr u8 kNone = 253; }
@@ -3612,6 +3744,17 @@ namespace seats { struct Table {
 namespace net { enum class PlayerMode : u8 { foot, drone, car, jet, parachute }; }
 namespace net { constexpr u8 kHost = 255; }
 namespace net { constexpr u8 kNobody = 254; }
+namespace net { enum PlayerFlag : u16 {
+  kDead = 1, kArmed = 2, kBus = 4, kGearDown = 8, kPoliceCar = 16,
+  kDroneOut = 32,     // the drone is out (drone_* holds it unless it is the active body)
+  kJetOut = 64,       // the jet is placed (jet_* holds it unless it is the active body)
+  kProtected = 128,   // spawn protection
+  kTalking = 256,     // the microphone is live
+  kCockpit = 512,
+  kJetpack = 1024,    // the jetpack burns (jetpack_audio.mjs: the others hear it in 3-D; game_equipment.cpp)
+  kPassenger = 2048,  // rides in a mate's jet (jet_mode.mjs passenger): not drawn on foot
+  kSeated = 4096,     // a car's passenger: seated in the mate's car (drawn and hit there, his weapon out)
+}; }
 namespace net { struct PlayerState {
   u8 slot = 0;
   PlayerMode mode = PlayerMode::foot;
@@ -3685,9 +3828,9 @@ namespace net { struct Session {
   
   
   
+  bool active() const { return role_ != Role::none; }
   
-  
-  
+  bool connected() const;
   /// lan_vs.mjs getAuthorityId: a client whose host is gone (the connection dropped, or the host
   /// silent for 6 s after we were in). The session then goes on under the successor.
   
@@ -3765,7 +3908,7 @@ namespace net { struct Session {
   /// A spawn anchor from the host for this (joining) player.
   
 
-  
+  std::vector<Remote>& remotes() { return remotes_; }
   
   /// The place of the player in `slot` among remotes(), -1: no such player here.
   
@@ -3787,7 +3930,7 @@ namespace net { struct Session {
   /// The vote everybody sees: text, and whether our answer is missing.
   
   
-  
+  std::string status() const;
   
   /// How often this client asked the host to let it in (1: it got in at the first try).
   
@@ -3976,6 +4119,9 @@ struct Marks {
   struct Scorch { Vec2 c; f32 r = 0; u32 seed = 0; };
   struct WallMark { Vec3 c; Vec2 n, d; f32 size = 0, level = 0; u32 seed = 0; bool breach = false; u64 cell = 0; };
   struct Chunk { physics::Body body; Vec3 half; f32 until = 0; };
+  // A ring of at most `cap` items, the oldest gives way: one function per type of item.
+  
+  
   
   
   
@@ -4015,8 +4161,10 @@ struct TrafficRules {
   };
 
   /// Binds the rules to the logic the level's Blueprints run in (the game once its world has started,
-  /// tests the one they run) - the Blueprint of the actor "Traffic", found by its name at every call -
-  /// and takes its distances and times. True: the actor has a Blueprint that runs there.
+  /// tests the one they run) - the Blueprint of the actor "Traffic", found by its name at every call.
+  /// True: the actor has a Blueprint that runs there.
+  
+  /// Takes the distances and times of the bound Blueprint (zeros where none runs).
   
   
   u64 built_from = ~0ull;
@@ -4050,6 +4198,9 @@ struct TrafficRules {
 
  private:
   struct Blocked { f32 since = -1, next_honk = 0, wait_since = -1; };
+  /// The distances and times of the Blueprint (take_laws).
+  struct Laws { f32 ahead_min = 0, ahead_max = 0, stop_line = 0, first_come = 0, claim_s = 0, patience_s = 0; };
+  Laws laws_;
   std::vector<Junction> junctions_;
   converted::wide::Map<u64, std::vector<i32>> grid_;
   converted::wide::Map<i32, Blocked> blocked_;
@@ -4183,9 +4334,11 @@ enum class Key : u8 {
 };
 struct Input : converted::EngineObject {
   using converted::EngineObject::EngineObject;
+  bool pressed(const Key& k) const;
 };
 struct Engine : converted::EngineObject {
   using converted::EngineObject::EngineObject;
+  Input& input() const;
 };
 struct App : converted::EngineObject {
   using converted::EngineObject::EngineObject;
@@ -4688,7 +4841,7 @@ struct TouchPlay {
   /// Car: pinch factor since the last call (1 = none; < 1 closer).
   
   
-  
+  bool take_pressed(const std::string& id);
   /// A click on the page's copy of a button (mouse, keyboard focus): the same press as a finger.
   
   
@@ -4781,8 +4934,9 @@ struct PadState {
   u32 buttons = 0, pressed = 0;                         // bit = standard button index
   bool active = false;                                  // used this frame (device arbitration)
   
-  
+  bool hit(int b) const { return pressed & (converted::shl(1u, b)); }
 };
+enum PadButtonIndex { kPadA = 0, kPadB, kPadX, kPadY, kPadLB, kPadRB, kPadLT, kPadRT, kPadView, kPadMenu, kPadL3, kPadR3, kPadUp, kPadDown, kPadLeft, kPadRight };
 struct TrafficCar {
   game::ActorId actor = 0;
   std::unique_ptr<Car> car;
@@ -4871,9 +5025,9 @@ struct Game {
   
   
   
+  physics::Body body(game::ActorId a) const { return converted::present(world_)->actor_body(a); }
   
-  
-  
+  Mat4 matrix_of(game::ActorId a) const;
   
   
 
@@ -4931,8 +5085,7 @@ struct Game {
   
   
   i32 toss_test_ = -1;
-  
-  std::unique_ptr<TossState> toss_;
+  TossState toss_;
   // every round in flight replicated (game_projsync.cpp): ours streamed, the mates' drawn on their track
   
   
@@ -4990,7 +5143,7 @@ struct Game {
   
   
   
-  
+    // u is units_[unit]
   
   
   
@@ -5181,12 +5334,12 @@ struct Game {
   
   // equipment (game_equipment.cpp)
   void ui_audio_init();
-  
-  
-  
-  
-  
-  
+  void ui_jetpack(f32 dt);
+  void ui_equipment(f32 dt);
+  void ui_radio(i32 dir);
+  void ui_mix_equipment(f32 dt);
+  void ui_render_music(std::vector<f32>& out, u32 frames);
+  bool ui_equipment_command(const std::string& cmd, std::string& out);
   std::string ui_equipment_json();
 
   // performance and the look (game_look.cpp): frame times, automatic quality, camera shake,
@@ -5476,7 +5629,7 @@ struct Game {
   // the original's sound on the page (game_audio_web.cpp): events and state for web/audio.mjs
   bool web_audio_ = false;
   std::string osfx_;
-  
+  void osfx(const char* fn, Vec3 at, f32 a = 0, f32 b = 0, f32 c = 0);
   bool shot_flesh_ = false;  // hit_scan's last round struck a person or a player
   
   
@@ -5491,6 +5644,738 @@ struct Game {
   LookState look_;
   std::unique_ptr<GameLife> glife_;  // M3 life (last: destroyed before world_)
 };
+namespace nostr { using Bytes32 = std::array<u8, 32>; }
+namespace nostr { Bytes32 sha256(const std::vector<u8>& data); }
+namespace nostr { Bytes32 sha256(std::string_view text); }
+namespace nostr { bool public_key(const Bytes32& secret, Bytes32& out); }
+namespace nostr { bool sign(const Bytes32& secret, const Bytes32& message, const Bytes32& aux, std::array<u8, 64>& sig); }
+namespace nostr { bool verify(const Bytes32& pubkey, const Bytes32& message, const std::array<u8, 64>& sig); }
+namespace nostr { std::string hex(const Bytes32& data); }
+namespace nostr { std::string hex(const std::array<u8, 64>& data); }
+namespace nostr { bool from_hex(std::string_view s, Bytes32& out); }
+namespace nostr { std::string escape(std::string_view s); }
+namespace nostr { bool event_json(const Bytes32& secret, const Bytes32& aux, i64 created_at, u32 kind, std::string_view tags, std::string_view content, std::string& out); }
+std::string FlightLog::json() const {
+  std::string o = "{\"flights\":[";
+  char b[256];
+  for (std::size_t i = 0; i < flights_.size(); converted::pre_inc(i)) {
+    const Flight& f = converted::at(flights_, i);
+    std::snprintf(b, sizeof b, "%s{\"id\":%u,\"start\":%.2f,\"duration\":%.2f,\"distance\":%.1f,\"maxSpeed\":%.2f,\"maxAgl\":%.2f,\"maxAlt\":%.2f,\"voltsStart\":%.2f,\"voltsEnd\":%.2f,\"voltsMin\":%.2f,\"reason\":\"%s\",\"path\":[",
+                  i ? "," : "", f.id, static_cast<double>(f.start), static_cast<double>(f.duration), static_cast<double>(f.distance), static_cast<double>(f.max_speed), static_cast<double>(f.max_agl), static_cast<double>(f.max_alt), static_cast<double>(f.volts_start), static_cast<double>(f.volts_end), static_cast<double>(f.volts_min), f.reason.c_str());
+    o += b;
+    for (std::size_t k = 0; k < f.path.size(); converted::pre_inc(k)) {
+      std::snprintf(b, sizeof b, "%s[%.1f,%.1f,%.1f]", k ? "," : "", static_cast<double>(converted::at(f.path, k).x), static_cast<double>(converted::at(f.path, k).y), static_cast<double>(converted::at(f.path, k).z));
+      o += b;
+    }
+    o += "]}";
+  }
+  o += "],\"events\":[";
+  for (std::size_t i = 0; i < events_.size(); converted::pre_inc(i)) {
+    std::string stage;
+    for (char c : converted::at(events_, i).stage) stage += (c == '"' || c == '\\') ? '\'' : (static_cast<unsigned char>(c) < 0x20 ? ' ' : c);
+    std::snprintf(b, sizeof b, "%s{\"t\":%.1f,\"stage\":\"", i ? "," : "", static_cast<double>(converted::at(events_, i).t));
+    o += b + stage + "\"}";
+  }
+  return o + "]}";
+}
+namespace nostr { bool from_hex(std::string_view s, Bytes32& out) {
+  const std::size_t n = out.size();
+  if (s.size() != converted::times(2, n)) return false;
+  auto v = [](char c) { return c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1; };
+  for (std::size_t i = 0; i < n; converted::pre_inc(i)) {
+    const int a = v(converted::at(s, converted::times(2, i))), b = v(converted::at(s, converted::plus(converted::times(2, i), 1)));
+    if (a < 0 || b < 0) return false;
+    converted::at(out, i) = static_cast<u8>(a * 16 + b);
+  }
+  return true;
+} }
+namespace nostr { namespace nostr_cpp_local { constexpr u32 kK[64] = {
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74,
+    0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d,
+    0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e,
+    0x92722c85, 0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5,
+    0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2}; } }
+namespace nostr { namespace nostr_cpp_local { inline u32 rotr(u32 x, u32 n) { return (converted::shr(x, n)) | (converted::shl(x, (32 - n))); } } }
+namespace nostr { namespace nostr_cpp_local { void block(std::array<u32, 8>& h, const std::array<u8, 64>& p) {
+  u32 w[64];
+  for (int i = 0; i < 16; ++i) converted::at(w, i) = (u32{converted::at(p, 4 * i)} << 24) | (u32{converted::at(p, 4 * i + 1)} << 16) | (u32{converted::at(p, 4 * i + 2)} << 8) | converted::at(p, 4 * i + 3);
+  for (int i = 16; i < 64; ++i) {
+    const u32 s0 = rotr(converted::at(w, i - 15), 7) ^ rotr(converted::at(w, i - 15), 18) ^ (converted::at(w, i - 15) >> 3), s1 = rotr(converted::at(w, i - 2), 17) ^ rotr(converted::at(w, i - 2), 19) ^ (converted::at(w, i - 2) >> 10);
+    converted::at(w, i) = converted::at(w, i - 16) + s0 + converted::at(w, i - 7) + s1;
+  }
+  u32 a = h[0], b = h[1], c = h[2], d = h[3], e = h[4], f = h[5], g = h[6], k = h[7];
+  for (int i = 0; i < 64; ++i) {
+    const u32 t1 = k + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + ((e & f) ^ (~e & g)) + converted::at(kK, i) + converted::at(w, i);
+    const u32 t2 = (rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) + ((a & b) ^ (a & c) ^ (b & c));
+    k = g; g = f; f = e; e = d + t1; d = c; c = b; b = a; a = t1 + t2;
+  }
+  h[0] += a; h[1] += b; h[2] += c; h[3] += d; h[4] += e; h[5] += f; h[6] += g; h[7] += k;
+} } }
+namespace nostr { namespace nostr_cpp_local { struct Hasher {
+  std::array<u32, 8> h = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
+  std::array<u8, 64> chunk = {};
+  u32 filled = 0;
+  u64 length = 0;
+}; } }
+namespace nostr { namespace nostr_cpp_local { void push(Hasher& s, u8 byte) {
+  converted::at(s.chunk, s.filled) = byte;
+  s.filled += 1;
+  converted::plus_bits_to(s.length, 1);
+  if (s.filled == 64) {
+    block(s.h, s.chunk);
+    s.filled = 0;
+  }
+} } }
+namespace nostr { namespace nostr_cpp_local { Bytes32 finish(Hasher& s) {
+  const u64 bits = converted::times_bits(s.length, 8);
+  push(s, 0x80);
+  while (s.filled != 56) push(s, 0);
+  for (int b = 7; b >= 0; --b) push(s, static_cast<u8>(converted::shr_bits(bits, (8 * b))));
+  Bytes32 out;
+  for (int k = 0; k < 8; ++k) for (int b = 0; b < 4; ++b) converted::at(out, 4 * k + b) = static_cast<u8>(converted::shr(converted::at(s.h, k), (24 - 8 * b)));
+  return out;
+} } }
+namespace nostr { Bytes32 sha256(const std::vector<u8>& data) { using nostr::nostr_cpp_local::Hasher;
+  Hasher s;
+  for (u8 byte : data) nostr::nostr_cpp_local::push(s, byte);
+  return nostr::nostr_cpp_local::finish(s);
+} }
+namespace nostr { Bytes32 sha256(std::string_view text) { using nostr::nostr_cpp_local::Hasher;
+  Hasher s;
+  for (char c : text) nostr::nostr_cpp_local::push(s, static_cast<u8>(c));
+  return nostr::nostr_cpp_local::finish(s);
+} }
+namespace nostr { namespace nostr_cpp_local { struct U256 { u32 w[8] = {}; }; } }
+namespace nostr { namespace nostr_cpp_local { U256 from_be(const Bytes32& b) {
+  U256 r;
+  for (int i = 0; i < 8; ++i) converted::at(r.w, 7 - i) = (u32{converted::at(b, 4 * i)} << 24) | (u32{converted::at(b, 4 * i + 1)} << 16) | (u32{converted::at(b, 4 * i + 2)} << 8) | converted::at(b, 4 * i + 3);
+  return r;
+} } }
+namespace nostr { namespace nostr_cpp_local { Bytes32 to_be(const U256& a) {
+  Bytes32 b;
+  for (int i = 0; i < 8; ++i) for (int k = 0; k < 4; ++k) converted::at(b, 4 * i + k) = static_cast<u8>(converted::shr(converted::at(a.w, 7 - i), (24 - 8 * k)));
+  return b;
+} } }
+namespace nostr { namespace nostr_cpp_local { Bytes32 half(const std::array<u8, 64>& sig, int which) {
+  Bytes32 b;
+  for (int i = 0; i < 32; ++i) converted::at(b, i) = converted::at(sig, 32 * which + i);
+  return b;
+} } }
+namespace nostr { namespace nostr_cpp_local { int cmp(const U256& a, const U256& b) {
+  for (int i = 7; i >= 0; --i) if (converted::at(a.w, i) != converted::at(b.w, i)) return converted::at(a.w, i) < converted::at(b.w, i) ? -1 : 1;
+  return 0;
+} } }
+namespace nostr { namespace nostr_cpp_local { bool is_zero(const U256& a) { for (u32 x : a.w) if (x) return false; return true; } } }
+namespace nostr { namespace nostr_cpp_local { u32 add(U256& r, const U256& a, const U256& b) {
+  u64 c = 0;
+  for (int i = 0; i < 8; ++i) { converted::plus_bits_to(c, converted::plus_bits(u64{converted::at(a.w, i)}, converted::at(b.w, i))); converted::at(r.w, i) = static_cast<u32>(c); converted::shr_bits_to(c, 32); }
+  return static_cast<u32>(c);
+} } }
+namespace nostr { namespace nostr_cpp_local { u32 sub(U256& r, const U256& a, const U256& b) {
+  i64 c = 0;
+  for (int i = 0; i < 8; ++i) { converted::plus_bits_to(c, converted::minus_bits(static_cast<i64>(converted::at(a.w, i)), converted::at(b.w, i))); converted::at(r.w, i) = static_cast<u32>(c); converted::shr_bits_to(c, 32); }
+  return c < 0 ? 1 : 0;
+} } }
+namespace nostr { namespace nostr_cpp_local { U256 addm(const U256& a, const U256& b, const U256& m) {
+  U256 r;
+  const u32 carry = add(r, a, b);
+  if (carry || cmp(r, m) >= 0) sub(r, r, m);
+  return r;
+} } }
+namespace nostr { namespace nostr_cpp_local { U256 subm(const U256& a, const U256& b, const U256& m) {
+  U256 r;
+  if (sub(r, a, b)) add(r, r, m);
+  return r;
+} } }
+namespace nostr { namespace nostr_cpp_local { U256 mulm(const U256& a, const U256& b, const U256& m) {
+  U256 r;
+  for (int i = 255; i >= 0; --i) {
+    r = addm(r, r, m);
+    if ((converted::shr(converted::at(b.w, i / 32), (i % 32))) & 1) r = addm(r, a, m);
+  }
+  return r;
+} } }
+namespace nostr { namespace nostr_cpp_local { U256 powm(const U256& a, const U256& e, const U256& m) {
+  U256 r;
+  r.w[0] = 1;
+  for (int i = 255; i >= 0; --i) {
+    r = mulm(r, r, m);
+    if ((converted::shr(converted::at(e.w, i / 32), (i % 32))) & 1) r = mulm(r, a, m);
+  }
+  return r;
+} } }
+namespace nostr { namespace nostr_cpp_local { U256 reduce(const U256& a, const U256& m) {  // a < 2m for the moduli here
+  U256 r = a;
+  if (cmp(r, m) >= 0) sub(r, r, m);
+  return r;
+} } }
+namespace nostr { namespace nostr_cpp_local { constexpr U256 kP{{0xFFFFFC2F, 0xFFFFFFFE, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF}}; } }
+namespace nostr { namespace nostr_cpp_local { constexpr U256 kN{{0xD0364141, 0xBFD25E8C, 0xAF48A03B, 0xBAAEDCE6, 0xFFFFFFFE, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF}}; } }
+namespace nostr { namespace nostr_cpp_local { const U256& P() { return kP; } } }
+namespace nostr { namespace nostr_cpp_local { const U256& N() { return kN; } } }
+namespace nostr { namespace nostr_cpp_local { struct Pt { U256 x, y, z; }; } }
+namespace nostr { namespace nostr_cpp_local { constexpr Pt kG{{{0x16F81798, 0x59F2815B, 0x2DCE28D9, 0x029BFCDB, 0xCE870B07, 0x55A06295, 0xF9DCBBAC, 0x79BE667E}}, {{0xFB10D4B8, 0x9C47D08F, 0xA6855419, 0xFD17B448, 0x0E1108A8, 0x5DA4FBFC, 0x26A3C465, 0x483ADA77}}, {{1}}}; } }
+namespace nostr { namespace nostr_cpp_local { const Pt& G() { return kG; } } }
+namespace nostr { namespace nostr_cpp_local { U256 fm(const U256& a, const U256& b) { return mulm(a, b, P()); } } }
+namespace nostr { namespace nostr_cpp_local { U256 fa(const U256& a, const U256& b) { return addm(a, b, P()); } } }
+namespace nostr { namespace nostr_cpp_local { U256 fs(const U256& a, const U256& b) { return subm(a, b, P()); } } }
+namespace nostr { namespace nostr_cpp_local { Pt dbl(const Pt& a) {
+  if (is_zero(a.z) || is_zero(a.y)) return Pt{};
+  const U256 y2 = fm(a.y, a.y);
+  const U256 s = fm(fa(fa(a.x, a.x), fa(a.x, a.x)), y2);  // 4 X Y^2
+  const U256 x2 = fm(a.x, a.x);
+  const U256 m = fa(fa(x2, x2), x2);                       // 3 X^2
+  Pt r;
+  r.x = fs(fm(m, m), fa(s, s));
+  const U256 y4 = fm(y2, y2);
+  U256 y4_8 = fa(y4, y4);
+  y4_8 = fa(y4_8, y4_8);
+  y4_8 = fa(y4_8, y4_8);
+  r.y = fs(fm(m, fs(s, r.x)), y4_8);
+  r.z = fm(fa(a.y, a.y), a.z);
+  return r;
+} } }
+namespace nostr { namespace nostr_cpp_local { Pt add_pt(const Pt& a, const Pt& b) {
+  if (is_zero(a.z)) return b;
+  if (is_zero(b.z)) return a;
+  const U256 z1z1 = fm(a.z, a.z), z2z2 = fm(b.z, b.z);
+  const U256 u1 = fm(a.x, z2z2), u2 = fm(b.x, z1z1);
+  const U256 s1 = fm(a.y, fm(b.z, z2z2)), s2 = fm(b.y, fm(a.z, z1z1));
+  if (cmp(u1, u2) == 0) return cmp(s1, s2) == 0 ? dbl(a) : Pt{};
+  const U256 h = fs(u2, u1), r = fs(s2, s1);
+  const U256 h2 = fm(h, h), h3 = fm(h2, h), u1h2 = fm(u1, h2);
+  Pt o;
+  o.x = fs(fs(fm(r, r), h3), fa(u1h2, u1h2));
+  o.y = fs(fm(r, fs(u1h2, o.x)), fm(s1, h3));
+  o.z = fm(h, fm(a.z, b.z));
+  return o;
+} } }
+namespace nostr { namespace nostr_cpp_local { Pt mul_pt(const Pt& p, const U256& k) {
+  Pt r;
+  for (int i = 255; i >= 0; --i) {
+    r = dbl(r);
+    if ((converted::shr(converted::at(k.w, i / 32), (i % 32))) & 1) r = add_pt(r, p);
+  }
+  return r;
+} } }
+namespace nostr { namespace nostr_cpp_local { bool affine(const Pt& p, U256& x, U256& y) {
+  if (is_zero(p.z)) return false;
+  U256 e;
+  sub(e, P(), U256{{2}});
+  const U256 zi = powm(p.z, e, P()), zi2 = fm(zi, zi);
+  x = fm(p.x, zi2);
+  y = fm(p.y, fm(zi2, zi));
+  return true;
+} } }
+namespace nostr { namespace nostr_cpp_local { bool lift_x(const U256& x, Pt& out) {
+  if (cmp(x, P()) >= 0) return false;
+  U256 seven;
+  seven.w[0] = 7;
+  const U256 c = fa(fm(fm(x, x), x), seven);
+  U256 e;  // (p + 1) / 4
+  add(e, P(), U256{{1}});
+  for (int i = 0; i < 8; ++i) converted::at(e.w, i) = (converted::at(e.w, i) >> 2) | (i < 7 ? converted::at(e.w, i + 1) << 30 : 0);
+  U256 y = powm(c, e, P());
+  if (cmp(fm(y, y), c) != 0) return false;
+  if (y.w[0] & 1) y = fs(U256{}, y);
+  out.x = x;
+  out.y = y;
+  out.z = U256{{1}};
+  return true;
+} } }
+namespace nostr { namespace nostr_cpp_local { Bytes32 tagged(std::string_view tag, const std::vector<u8>& msg) {
+  const Bytes32 t = sha256(tag);
+  std::vector<u8> buf(t.begin(), t.end());
+  buf.insert(buf.end(), t.begin(), t.end());
+  buf.insert(buf.end(), msg.begin(), msg.end());
+  return sha256(buf);
+} } }
+namespace nostr { namespace nostr_cpp_local { void append(std::vector<u8>& v, const Bytes32& b) { v.insert(v.end(), b.begin(), b.end()); } } }
+namespace nostr { bool public_key(const Bytes32& secret, Bytes32& out) { using nostr::nostr_cpp_local::U256;
+  const U256 d = nostr::nostr_cpp_local::from_be(secret);
+  if (nostr::nostr_cpp_local::is_zero(d) || nostr::nostr_cpp_local::cmp(d, nostr::nostr_cpp_local::N()) >= 0) return false;
+  U256 x, y;
+  if (!nostr::nostr_cpp_local::affine(nostr::nostr_cpp_local::mul_pt(nostr::nostr_cpp_local::G(), d), x, y)) return false;
+  out = nostr::nostr_cpp_local::to_be(x);
+  return true;
+} }
+namespace nostr { bool sign(const Bytes32& secret, const Bytes32& message, const Bytes32& aux, std::array<u8, 64>& sig) { using nostr::nostr_cpp_local::U256;
+  U256 d = nostr::nostr_cpp_local::from_be(secret);
+  if (nostr::nostr_cpp_local::is_zero(d) || nostr::nostr_cpp_local::cmp(d, nostr::nostr_cpp_local::N()) >= 0) return false;
+  U256 px, py;
+  if (!nostr::nostr_cpp_local::affine(nostr::nostr_cpp_local::mul_pt(nostr::nostr_cpp_local::G(), d), px, py)) return false;
+  if (py.w[0] & 1) d = nostr::nostr_cpp_local::subm(U256{}, d, nostr::nostr_cpp_local::N());
+  const Bytes32 pxb = nostr::nostr_cpp_local::to_be(px), db = nostr::nostr_cpp_local::to_be(d);
+  const Bytes32 ah = nostr::nostr_cpp_local::tagged("BIP0340/aux", std::vector<u8>(aux.begin(), aux.end()));
+  std::vector<u8> m;
+  for (int i = 0; i < 32; ++i) m.push_back(converted::at(db, i) ^ converted::at(ah, i));
+  nostr::nostr_cpp_local::append(m, pxb);
+  nostr::nostr_cpp_local::append(m, message);
+  const Bytes32 rand = nostr::nostr_cpp_local::tagged("BIP0340/nonce", m);
+  U256 k = nostr::nostr_cpp_local::reduce(nostr::nostr_cpp_local::from_be(rand), nostr::nostr_cpp_local::N());
+  if (nostr::nostr_cpp_local::is_zero(k)) return false;
+  U256 rx, ry;
+  if (!nostr::nostr_cpp_local::affine(nostr::nostr_cpp_local::mul_pt(nostr::nostr_cpp_local::G(), k), rx, ry)) return false;
+  if (ry.w[0] & 1) k = nostr::nostr_cpp_local::subm(U256{}, k, nostr::nostr_cpp_local::N());
+  const Bytes32 rxb = nostr::nostr_cpp_local::to_be(rx);
+  std::vector<u8> c;
+  nostr::nostr_cpp_local::append(c, rxb);
+  nostr::nostr_cpp_local::append(c, pxb);
+  nostr::nostr_cpp_local::append(c, message);
+  const U256 e = nostr::nostr_cpp_local::reduce(nostr::nostr_cpp_local::from_be(nostr::nostr_cpp_local::tagged("BIP0340/challenge", c)), nostr::nostr_cpp_local::N());
+  const U256 s = nostr::nostr_cpp_local::addm(k, nostr::nostr_cpp_local::mulm(e, d, nostr::nostr_cpp_local::N()), nostr::nostr_cpp_local::N());
+  const Bytes32 sb = nostr::nostr_cpp_local::to_be(s);
+  for (int i = 0; i < 32; ++i) {
+    converted::at(sig, i) = converted::at(rxb, i);
+    converted::at(sig, 32 + i) = converted::at(sb, i);
+  }
+  return verify(pxb, message, sig);
+} }
+namespace nostr { bool verify(const Bytes32& pubkey, const Bytes32& message, const std::array<u8, 64>& sig) { using nostr::nostr_cpp_local::Pt; using nostr::nostr_cpp_local::U256;
+  Pt p;
+  if (!nostr::nostr_cpp_local::lift_x(nostr::nostr_cpp_local::from_be(pubkey), p)) return false;
+  const Bytes32 rb = nostr::nostr_cpp_local::half(sig, 0);
+  const U256 r = nostr::nostr_cpp_local::from_be(rb), s = nostr::nostr_cpp_local::from_be(nostr::nostr_cpp_local::half(sig, 1));
+  if (nostr::nostr_cpp_local::cmp(r, nostr::nostr_cpp_local::P()) >= 0 || nostr::nostr_cpp_local::cmp(s, nostr::nostr_cpp_local::N()) >= 0) return false;
+  std::vector<u8> c;
+  nostr::nostr_cpp_local::append(c, rb);
+  nostr::nostr_cpp_local::append(c, pubkey);
+  nostr::nostr_cpp_local::append(c, message);
+  const U256 e = nostr::nostr_cpp_local::reduce(nostr::nostr_cpp_local::from_be(nostr::nostr_cpp_local::tagged("BIP0340/challenge", c)), nostr::nostr_cpp_local::N());
+  // R = sG - eP
+  Pt ep = nostr::nostr_cpp_local::mul_pt(p, e);
+  ep.y = nostr::nostr_cpp_local::fs(U256{}, ep.y);
+  U256 x, y;
+  if (!nostr::nostr_cpp_local::affine(nostr::nostr_cpp_local::add_pt(nostr::nostr_cpp_local::mul_pt(nostr::nostr_cpp_local::G(), s), ep), x, y)) return false;
+  return (y.w[0] & 1) == 0 && nostr::nostr_cpp_local::cmp(x, r) == 0;
+} }
+namespace nostr { namespace nostr_cpp_local { constexpr char kHexDigits[] = "0123456789abcdef"; } }
+namespace nostr { namespace nostr_cpp_local { void hex_of(std::string& o, u8 byte) {
+  o += converted::at(kHexDigits, byte >> 4);
+  o += converted::at(kHexDigits, byte & 15);
+} } }
+namespace nostr { std::string hex(const Bytes32& data) {
+  std::string o;
+  for (u8 byte : data) nostr::nostr_cpp_local::hex_of(o, byte);
+  return o;
+} }
+namespace nostr { std::string hex(const std::array<u8, 64>& data) {
+  std::string o;
+  for (u8 byte : data) nostr::nostr_cpp_local::hex_of(o, byte);
+  return o;
+} }
+namespace nostr { std::string escape(std::string_view s) {
+  std::string o;
+  for (char c : s) {
+    switch (c) {
+      case '\n': o += "\\n"; break;
+      case '"': o += "\\\""; break;
+      case '\\': o += "\\\\"; break;
+      case '\r': o += "\\r"; break;
+      case '\t': o += "\\t"; break;
+      case '\b': o += "\\b"; break;
+      case '\f': o += "\\f"; break;
+      default:
+        if (static_cast<unsigned char>(c) < 0x20) { char b[8]; std::snprintf(b, sizeof b, "\\u%04x", c); o += b; }
+        else o += c;
+    }
+  }
+  return o;
+} }
+namespace nostr { bool event_json(const Bytes32& secret, const Bytes32& aux, i64 created_at, u32 kind, std::string_view tags, std::string_view content, std::string& out) {
+  Bytes32 pk;
+  if (!public_key(secret, pk)) return false;
+  const std::string pkh = hex(pk), body = escape(content);
+  char head[96];
+  std::snprintf(head, sizeof head, "[0,\"%s\",%lld,%u,", pkh.c_str(), static_cast<long long>(created_at), kind);
+  const std::string ser = std::string(head) + std::string(tags) + ",\"" + body + "\"]";
+  const Bytes32 id = sha256(ser);
+  std::array<u8, 64> sig;
+  if (!sign(secret, id, aux, sig)) return false;
+  char num[64];
+  std::snprintf(num, sizeof num, ",\"created_at\":%lld,\"kind\":%u,\"tags\":", static_cast<long long>(created_at), kind);
+  out = "{\"id\":\"" + hex(id) + "\",\"pubkey\":\"" + pkh + "\"" + num + std::string(tags) + ",\"content\":\"" + body + "\",\"sig\":\"" + hex(sig) + "\"}";
+  return true;
+} }
+namespace equipment_cpp_local { enum Genre { synthwave, house, lofi, chip, techno }; }
+namespace equipment_cpp_local { struct Prog { Genre genre; f32 bpm; u32 seed; i32 root; bool minor; }; }
+namespace equipment_cpp_local { Prog prog_of(i32 p) {
+  if (p == MusicSynth::kMenu) return {chip, 140, 7, 57, true};  // the title: 8 bits, A minor
+  const MusicSynth::Station& s = converted::at(MusicSynth::kStations, p);
+  const Genre g = static_cast<Genre>(converted::among({0, 1, 2, 3, 4}, p % 5));
+  return {g, s.bpm, s.seed, g == house ? 53 : g == lofi ? 55 : g == techno ? 50 : 52, g != house};
+} }
+namespace equipment_cpp_local { f32 midi(f32 n) { return 440.0 * kern::math::pow(2.0, (n - 69) / 12); } }
+namespace equipment_cpp_local { constexpr i32 kMinorProg[4] = {0, 8, 3, 10}; }
+namespace equipment_cpp_local { constexpr i32 kMajorProg[4] = {0, 7, 9, 5}; }
+namespace equipment_cpp_local { constexpr i32 kMinorScale[7] = {0, 2, 3, 5, 7, 8, 10}; }
+namespace equipment_cpp_local { constexpr i32 kMajorScale[7] = {0, 2, 4, 5, 7, 9, 11}; }
+void MusicSynth::step() { using equipment_cpp_local::Prog;
+  const Prog p = equipment_cpp_local::prog_of(programme_);
+  const u32 pos = step_ % 16, bar = step_ / 16;
+  auto rnd = [&]() { rng_ = rng_ * 1664525u + 1013904223u; return static_cast<f32>(rng_ >> 8) / 16777216.0; };
+  const i32 chord = converted::at((p.minor ? equipment_cpp_local::kMinorProg : equipment_cpp_local::kMajorProg), bar % 4);
+  const f32 rate = static_cast<f32>(rate_);
+  auto decay = [&](f32 tau) { return kern::math::exp(-1.0 / (tau * rate)); };
+  // drums
+  bool kick = false, snare = pos == 4 || pos == 12, hat = false;
+  switch (p.genre) {
+    case equipment_cpp_local::house: case equipment_cpp_local::techno: kick = pos % 4 == 0; hat = p.genre == equipment_cpp_local::house ? pos % 4 == 2 : true; break;
+    case equipment_cpp_local::synthwave: kick = pos == 0 || pos == 8 || pos == 10; hat = pos % 2 == 0; break;
+    case equipment_cpp_local::lofi: kick = pos == 0 || pos == 7 || pos == 10; hat = pos % 2 == 0 && rnd() < 0.8; break;
+    case equipment_cpp_local::chip: kick = pos % 8 == 0 || pos == 14; hat = pos % 2 == 1; break;
+  }
+  if (p.genre == equipment_cpp_local::techno) snare = pos == 4 || pos == 12 ? rnd() < 0.5 : false;
+  if (kick) { kick_.env = 1; kick_.phase = 0; kick_.decay = decay(0.16); }
+  if (snare) { snare_.env = 1; snare_.decay = decay(p.genre == equipment_cpp_local::lofi ? 0.09 : 0.12); }
+  if (hat) { hat_.env = p.genre == equipment_cpp_local::techno && pos % 2 ? 0.5 : 1; hat_.decay = decay(p.genre == equipment_cpp_local::techno ? 0.03 : 0.045); }
+  // bass on the chord root
+  const bool bass_hit = p.genre == equipment_cpp_local::house ? pos % 4 == 2 : p.genre == equipment_cpp_local::techno ? pos % 2 == 1 : p.genre == equipment_cpp_local::lofi ? (pos == 0 || pos == 10) : pos % 2 == 0;
+  if (bass_hit) { bass_.freq = equipment_cpp_local::midi(static_cast<f32>(p.root - 12 + chord)); bass_.env = 1; bass_.decay = decay(p.genre == equipment_cpp_local::lofi ? 0.5 : 0.18); }
+  // lead: an arpeggio through the scale above the chord
+  const f32 lead_prob = p.genre == equipment_cpp_local::chip ? 0.85 : p.genre == equipment_cpp_local::synthwave ? 0.55 : p.genre == equipment_cpp_local::lofi ? 0.3 : 0.25;
+  if ((pos % 2 == 0 || p.genre == equipment_cpp_local::chip) && rnd() < lead_prob) {
+    const i32 deg = static_cast<i32>(converted::fits<int>(rnd() * 7)) % 7, oct = rnd() < 0.3 ? 12 : 0;
+    lead_.freq = equipment_cpp_local::midi(static_cast<f32>(p.root + 12 + chord + (p.minor ? converted::at(equipment_cpp_local::kMinorScale, deg) : converted::at(equipment_cpp_local::kMajorScale, deg)) + oct));
+    lead_.env = 1;
+    lead_.decay = decay(p.genre == equipment_cpp_local::chip ? 0.09 : 0.22);
+  }
+  // pad: the chord, a new one every bar
+  if (pos == 0 && p.genre != equipment_cpp_local::chip && p.genre != equipment_cpp_local::techno) {
+    const i32 third = p.minor ? 3 : 4;
+    const i32 tones[3] = {0, third, 7};
+    for (int i = 0; i < 3; ++i) { converted::at(pad_, i).freq = equipment_cpp_local::midi(static_cast<f32>(p.root + chord + converted::at(tones, i))); converted::at(pad_, i).env = 1; converted::at(pad_, i).decay = decay(1.6); }
+  }
+  ++step_;
+}
+f32 MusicSynth::next_sample(f32& right) { using equipment_cpp_local::Prog;
+  const Prog p = equipment_cpp_local::prog_of(programme_);
+  const f32 inv = 1.0 / static_cast<f32>(rate_);
+  auto noise = [&]() { rng_ = rng_ * 1664525u + 1013904223u; return static_cast<f32>(static_cast<i32>(rng_)) / 2147483648.0; };
+  f32 s = 0;
+  // kick: a sine dropping from 150 to 45 Hz
+  if (kick_.env > 1e-4) {
+    const f32 f = 45 + 105 * kick_.env * kick_.env;
+    kick_.phase += f * inv;
+    s += kern::math::sin(kick_.phase * 6.2831853) * kick_.env * 0.9;
+    kick_.env *= kick_.decay;
+  }
+  if (snare_.env > 1e-4) { s += noise() * snare_.env * 0.32; snare_.env *= snare_.decay; }
+  if (hat_.env > 1e-4) {
+    const f32 n = noise();
+    s += (n - hat_.phase) * hat_.env * 0.12;  // first difference: a crude high-pass
+    hat_.phase = n;
+    hat_.env *= hat_.decay;
+  }
+  if (bass_.env > 1e-4) {
+    bass_.phase += bass_.freq * inv;
+    bass_.phase -= std::floor(bass_.phase);
+    const f32 raw = p.genre == equipment_cpp_local::chip ? (bass_.phase < 0.5 ? 4 * bass_.phase - 1 : 3 - 4 * bass_.phase)  // triangle
+                                    : 2 * bass_.phase - 1;                                              // saw
+    bass_lp_ += (raw - bass_lp_) * (p.genre == equipment_cpp_local::lofi ? 0.04 : 0.12);
+    s += bass_lp_ * bass_.env * 0.45;
+    bass_.env *= bass_.decay;
+  }
+  f32 lead = 0;
+  if (lead_.env > 1e-4) {
+    lead_.phase += lead_.freq * inv;
+    lead_.phase -= std::floor(lead_.phase);
+    const f32 duty = p.genre == equipment_cpp_local::chip ? 0.25 : 0.5;
+    const f32 sq = lead_.phase < duty ? 1.0 : -1.0;
+    const f32 tri = lead_.phase < 0.5 ? 4 * lead_.phase - 1 : 3 - 4 * lead_.phase;
+    lead = (p.genre == equipment_cpp_local::chip || p.genre == equipment_cpp_local::synthwave ? sq * 0.6 + tri * 0.4 : tri) * lead_.env * 0.16;
+    lead_.env *= lead_.decay;
+  }
+  f32 pad = 0;
+  for (Voice& v : pad_) {
+    if (v.env < 1e-4) continue;
+    v.phase += v.freq * inv;
+    v.phase2 += v.freq * 1.006 * inv;  // detuned twin
+    v.phase -= std::floor(v.phase);
+    v.phase2 -= std::floor(v.phase2);
+    pad += ((2 * v.phase - 1) + (2 * v.phase2 - 1)) * v.env * 0.035;
+    v.env *= v.decay;
+  }
+  lp_ += (pad - lp_) * (p.genre == equipment_cpp_local::lofi ? 0.03 : 0.08);
+  // A dotted-eighth echo on the lead (synthwave, title), wider in stereo.
+  const u32 echo_len = std::min<u32>(converted::quot(std::size_t{96000}, std::size_t{4}), static_cast<u32>(samples_per_step_ * 3));
+  f32 echo = 0;
+  if (echo_len > 0) {
+    converted::rem_to(echo_at_, echo_len);
+    echo = converted::at(echo_, echo_at_);
+    converted::at(echo_, echo_at_) = lead + echo * 0.38;
+    ++echo_at_;
+  }
+  const f32 mono = s + lp_;
+  right = mono + lead * 0.9 + echo * 0.5;
+  return mono + lead + echo * 0.3;
+}
+void MusicSynth::render_add(std::vector<f32>& out, u32 frames) { using equipment_cpp_local::Prog;
+  peak = 0;
+  if (!rate_) return;
+  for (u32 i = 0; i < frames; ++i) {
+    // Crossfade: a different programme fades the current one out (0.4 s), then starts.
+    if (want_ != programme_) {
+      fade_ -= 1.0 / (0.4 * static_cast<f32>(rate_));
+      if (fade_ <= 0 || programme_ == -2) {
+        programme_ = want_;
+        fade_ = 0;
+        step_ = 0;
+        until_step_ = 0;
+        if (programme_ != -2) {
+          const Prog p = equipment_cpp_local::prog_of(programme_);
+          rng_ = p.seed * 2654435761u + 1;
+          samples_per_step_ = std::max<u32>(1, static_cast<u32>(converted::fits<unsigned int>(static_cast<f32>(rate_) * 60 / p.bpm / 4)));
+        }
+        kick_ = snare_ = hat_ = bass_ = lead_ = Voice{};
+        for (Voice& v : pad_) v = Voice{};
+      }
+    } else if (fade_ < 1) fade_ = std::fmin(1.0, fade_ + 1.0 / (0.6 * static_cast<f32>(rate_)));
+    gain_ += (target_ - gain_) * 0.0005;
+    if (programme_ == -2 || gain_ < 1e-4) continue;
+    if (until_step_ == 0) { step(); until_step_ = samples_per_step_; }
+    --until_step_;
+    f32 r = 0;
+    const f32 l = next_sample(r);
+    const f32 g = gain_ * fade_ * 0.7;
+    converted::at(out, 2 * i) += l * g;
+    converted::at(out, 2 * i + 1) += r * g;
+    peak = std::fmax(peak, std::fabs(l * g));
+  }
+}
+using game::ActorId; Mat4 Game::matrix_of(ActorId a) const {
+  Mat4 m;
+  converted::present(world_)->actor_matrix(a, m);
+  return m;
+}
+void MusicSynth::select(i32 programme, f32 level) {
+  want_ = programme;
+  target_ = clampf(level, 0, 1);
+}
+namespace terrain_cpp_local { u64 key2(i32 i, i32 j) { return (converted::shl_bits(static_cast<u64>(static_cast<u32>(i)), 32)) | static_cast<u32>(j); } }
+f32 crater_profile(f32 r, f32 radius, f32 depth, f32 rim) {
+  const f32 bowl = radius * 0.5;
+  if (r < bowl) return -depth * (1 - (r / bowl) * (r / bowl));
+  if (r >= radius) return 0;
+  const f32 x = (r - bowl) / (radius - bowl), k = (x - 0.12) / 0.14;
+  return rim * kern::math::exp(-(k * k)) * (1 - x);
+}
+namespace terrain_cpp_local { Vec4 interior_of(f32 x0, f32 y0, f32 span, f32 margin) { return {x0 + margin, y0 + margin, x0 + span - margin, y0 + span - margin}; } }
+Vec4 Terrain::interior(const Grid& g) const {
+  return terrain_cpp_local::interior_of(g.x0, g.y0, g.step * static_cast<f32>(g.n > 0 ? g.n - 1 : 0), kDemMargin);
+}
+f32 Terrain::grid_at(const Grid& g, f32 x, f32 y) const {
+  if (g.n < 2) return 0;
+  const f32 lim = static_cast<f32>(g.n) - 1.001;
+  const f32 fx = clampf((x - g.x0) / g.step, 0, lim), fy = clampf((y - g.y0) / g.step, 0, lim);
+  const u32 i = static_cast<u32>(converted::fits<unsigned int>(fx)), j = static_cast<u32>(converted::fits<unsigned int>(fy));
+  const f32 tx = fx - i, ty = fy - j;
+  const std::size_t at = converted::plus(converted::times(static_cast<std::size_t>(j), g.n), i);
+  return (converted::at(g.h, at) * (1 - tx) + converted::at(g.h, converted::plus(at, 1)) * tx) * (1 - ty) + (converted::at(g.h, converted::plus(at, g.n)) * (1 - tx) + converted::at(g.h, converted::plus(converted::plus(at, g.n), 1)) * tx) * ty;
+}
+f32 Terrain::elevation(f32 x, f32 y) const {
+  if (!grid_ready_) return 0.0;
+  // the window that knows the place (its interior); else any that holds it; else the player's,
+  // held at its edge (far ground nobody stands on: the horizon)
+  auto in = [&](const Vec4& r) { return x >= r.x && y >= r.y && x <= r.z && y <= r.w; };
+  if (side_.empty() || in(interior(grid_))) return grid_at(grid_, x, y) - ref_height_;
+  for (const Grid& g : side_) if (in(interior(g))) return grid_at(g, x, y) - ref_height_;
+  if (in(terrain_cpp_local::interior_of(grid_.x0, grid_.y0, grid_.step * static_cast<f32>(grid_.n - 1), 0))) return grid_at(grid_, x, y) - ref_height_;
+  for (const Grid& g : side_) if (in(terrain_cpp_local::interior_of(g.x0, g.y0, g.step * static_cast<f32>(g.n - 1), 0))) return grid_at(g, x, y) - ref_height_;
+  return grid_at(grid_, x, y) - ref_height_;
+}
+namespace terrain_cpp_local { constexpr f32 kRoadGrid = 24, kRoadBlend = 4.5; }
+namespace terrain_cpp_local { u64 road_key(i32 ix, i32 iy) { return (converted::shl_bits(static_cast<u64>(static_cast<u32>(ix)), 32)) | static_cast<u32>(iy); } }
+i32 Terrain::corridor_set(f32 x, f32 y) const {
+  // the map tile whose square holds the point (the squares tile the plane: west / south edge in - one at most)
+  for (std::size_t i = 0; i < corridors_.size(); converted::pre_inc(i)) {
+    const CorridorSet& s = *converted::present(converted::at(corridors_, i));
+    if (x >= s.bounds.x && x < s.bounds.z && y >= s.bounds.y && y < s.bounds.w) return static_cast<i32>(i);
+  }
+  return -1;
+}
+f32 Terrain::road_level(f32 x, f32 y, f32 h) const {
+  // terrain_craters.mjs roadLevel: every corridor covering the point contributes (weighted), so
+  // junctions blend smoothly, no steps
+  const i32 at = corridors_.empty() ? -1 : corridor_set(x, y);
+  if (at < 0) return h;
+  const CorridorSet& set = *converted::present(converted::at(corridors_, static_cast<std::size_t>(at)));
+  const auto it = set.grid.find(terrain_cpp_local::road_key(static_cast<i32>(converted::fits<int>(std::floor(x / terrain_cpp_local::kRoadGrid))), static_cast<i32>(converted::fits<int>(std::floor(y / terrain_cpp_local::kRoadGrid)))));
+  if (it == set.grid.end()) return h;
+  f32 best = 0, sw = 0, sh = 0;
+  for (const CorridorSeg& s : it->second) {
+    const f32 t = clampf(((x - s.ax) * s.dx + (y - s.ay) * s.dy) / s.l2, 0, 1);
+    const f32 px = s.ax + s.dx * t, py = s.ay + s.dy * t, d = hypot_bp(x - px, y - py);
+    const f32 w = d <= s.half ? 1 : d >= s.half + terrain_cpp_local::kRoadBlend ? 0 : 1 - (d - s.half) / terrain_cpp_local::kRoadBlend;
+    if (w <= 0) continue;
+    const f32 ws = w * w * (3 - 2 * w);
+    sw += ws;
+    sh += ws * (s.ha + (s.hb - s.ha) * t);
+    best = std::fmax(best, w);
+  }
+  if (sw <= 0) return h;
+  return h + (sh / sw - h) * (best * best * (3 - 2 * best));
+}
+f32 Terrain::node_height(f32 x, f32 y) const {
+  const f32 e = elevation(x, y);
+  f32 h = road_level(x, y, e);
+  for (const Crater& c : craters_) {
+    const f32 dx = x - c.c.x, dy = y - c.c.y;
+    if (std::fabs(dx) >= c.r || std::fabs(dy) >= c.r) continue;
+    const f32 r = kern::math::sqrt(dx * dx + dy * dy);
+    if (r < c.r) h += crater_profile(r, c.r, c.depth, c.rim);
+  }
+  if (!water_.empty() && water_at(x, y)) return std::fmin(h, e - kWaterBed);
+  return h;
+}
+f32 Terrain::height(f32 x, f32 y) const {
+  // terrain_surface.mjs triangleHeightAt: the SW-NE diagonal of every 5 m cell.
+  const f32 x0 = std::floor(x / kStep) * kStep, y0 = std::floor(y / kStep) * kStep;
+  const f32 u = (x - x0) / kStep, v = (y - y0) / kStep;
+  const f32 a = node_height(x0, y0), d = node_height(x0 + kStep, y0 + kStep);
+  return u >= v ? a + (node_height(x0 + kStep, y0) - a) * (u - v) + (d - a) * v : a + (node_height(x0, y0 + kStep) - a) * (v - u) + (d - a) * u;
+}
+bool Terrain::water_cell(i32 cx, i32 cy) const {
+  // the 256 bits of the cell's 64 m block
+  auto it = water_.find(terrain_cpp_local::key2(cx >> 4, cy >> 4));
+  if (it == water_.end()) return false;
+  const u32 idx = static_cast<u32>((cy & 15) * 16 + (cx & 15));
+  return (converted::shr_bits(converted::at(it->second.bits, idx >> 6), (idx & 63))) & 1u;
+}
+bool Terrain::on_bridge(f32 x, f32 y) const {
+  for (const Bridge& b : bridges_) {
+    const f32 dx = x - b.c.x, dy = y - b.c.y;
+    if (std::fabs(dx) > b.hl + b.hw || std::fabs(dy) > b.hl + b.hw) continue;
+    const f32 c = kern::math::cos(b.yaw), s = kern::math::sin(b.yaw), u = dx * c + dy * s, v = -dx * s + dy * c;
+    if (std::fabs(u) <= b.hl && std::fabs(v) <= b.hw) return true;
+  }
+  return false;
+}
+bool Terrain::water_at(f32 x, f32 y) const {
+  if (water_.empty()) return false;
+  if (!water_cell(static_cast<i32>(converted::fits<int>(std::floor(x / kWaterCell))), static_cast<i32>(converted::fits<int>(std::floor(y / kWaterCell))))) return false;
+  return bridges_.empty() || !on_bridge(x, y);
+}
+void FlightLog::observe(const FlightSample& s, const char* disarm_reason) {
+  if (s.armed && !active_) {
+    cur_ = Flight{};
+    cur_.id = next_id_++;
+    cur_.start = s.t;
+    cur_.volts_start = cur_.volts_end = cur_.volts_min = s.volts;
+    cur_.max_alt = s.pos.z;
+    active_ = true;
+    have_last_ = false;
+    last_path_ = -1e9;
+    record(s, true);
+    return;
+  }
+  if (!active_) return;
+  if (s.t + 1e-4 < last_t_) { finish("SIM_RESET"); return; }
+  record(s, false);
+  if (!s.armed) finish(disarm_reason);
+}
+void FlightLog::record(const FlightSample& s, bool force) {
+  if (have_last_) {
+    const f32 step = converted::wide::length(s.pos - last_);
+    if (step < 20) cur_.distance += step;  // a teleport is no flight
+  }
+  last_ = s.pos;
+  have_last_ = true;
+  last_t_ = s.t;
+  cur_.duration = s.t - cur_.start;
+  cur_.max_speed = std::fmax(cur_.max_speed, converted::wide::length(s.vel));
+  if (s.agl >= 0) cur_.max_agl = std::fmax(cur_.max_agl, s.agl);
+  cur_.max_alt = std::fmax(cur_.max_alt, s.pos.z);
+  cur_.volts_end = s.volts;
+  cur_.volts_min = std::fmin(cur_.volts_min, s.volts);
+  if ((force || s.t - last_path_ >= kPathInterval) && cur_.path.size() < kMaxPath) {
+    last_path_ = s.t;
+    cur_.path.push_back({s.pos.x, s.pos.y, s.agl});
+  }
+}
+void FlightLog::finish(const char* reason) {
+  if (!active_) return;
+  active_ = false;
+  cur_.reason = reason;
+  flights_.insert(flights_.begin(), cur_);
+  if (flights_.size() > kMaxFlights) flights_.resize(converted::count(kMaxFlights));
+  ++serial_;
+}
+namespace net { bool Session::connected() const {
+  if (role_ == Role::host) return server_ && converted::present(server_)->running();
+  return client_ && converted::present(client_)->connected() && have_origin_;
+} }
+namespace net { std::string Session::status() const {
+  if (role_ == Role::none) return "";
+  char b[96];
+  if (role_ == Role::host) std::snprintf(b, sizeof b, "Host - %d Spieler", 1 + (server_ ? converted::present(server_)->connected_clients() : 0));
+  else std::snprintf(b, sizeof b, "%s - %zu weitere Spieler", connected() ? "Verbunden" : "Verbinde ...", remotes_.size());
+  return b;
+} }
+void FlightLog::network(const std::string& stage, f32 t) {
+  events_.insert(events_.begin(), Event{t, stage});
+  if (events_.size() > kMaxEvents) events_.resize(converted::count(kMaxEvents));
+  ++serial_;
+}
+bool TouchPlay::take_pressed(const std::string& id) {
+  auto it = std::find(pressed_.begin(), pressed_.end(), id);
+  if (it == pressed_.end()) return false;
+  converted::erase(pressed_, it);
+  return true;
+}
+void Game::osfx(const char* fn, Vec3 at, f32 a, f32 b, f32 c) {
+  if (!web_audio_ || osfx_.size() > 256 * 1024) return;  // nobody drains it: never grow without bound
+  char buf[192];
+  std::snprintf(buf, sizeof buf, "%s[\"%s\",%.2f,%.2f,%.2f,%.5g,%.5g,%.5g]", osfx_.empty() ? "" : ",", fn, static_cast<double>(at.x), static_cast<double>(at.y), static_cast<double>(at.z), static_cast<double>(a), static_cast<double>(b), static_cast<double>(c));
+  osfx_ += buf;
+}
+i32 MusicSynth::station_count() { return static_cast<i32>(converted::quot(sizeof kStations, sizeof kStations[0])); }
+namespace rules { inline f64 decimal(f32 x) {
+  const f64 d = static_cast<f64>(x);
+  const f64 a = std::fabs(d);
+  if (!(a >= 1e-9 && a < 1e7) || d == std::trunc(d)) return d;
+  f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
+  for (f64 m = a; m < 1; m *= 10) scale *= 10;
+  for (f64 m = a; m >= 10; m /= 10) scale /= 10;
+  for (int digits = 1; digits <= 9; ++digits, scale *= 10) {
+    const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
+    if (static_cast<f32>(c) == x) return c;
+  }
+  return d;
+} }
+namespace rules { struct Blueprint : ::kern::logic::ActorBlueprint {
+  using ActorBlueprint::ActorBlueprint;
+}; }
+namespace equipment_cpp_local { rules::Blueprint g_jetpack{"Jetpack"}; }
+bool Jetpack::ignite(f32 vz) {
+  (void)vz;
+  Pack p;
+  bool lit = false;
+  equipment_cpp_local::g_jetpack.call("Ignite", std::tie(p, lit), pack());
+  take(p);
+  return lit;
+}
+Jetpack::Pack Jetpack::pack() const {
+  return {rules::decimal(fuel), thrusting, used, ignitions, rules::decimal(burst_left_), rules::decimal(ground_since_), rules::decimal(last_thrust_)};
+}
+void Jetpack::take(const Pack& p) {
+  fuel = static_cast<f32>(p.fuel);
+  thrusting = p.thrusting;
+  used = p.used;
+  ignitions = p.ignitions;
+  burst_left_ = static_cast<f32>(p.burst_left);
+  ground_since_ = static_cast<f32>(p.ground_since);
+  last_thrust_ = static_cast<f32>(p.last_thrust);
+}
+f32 Jetpack::ignition_damp() { return static_cast<f32>(equipment_cpp_local::g_jetpack.get<f64>("IgnitionDamp")); }
+f32 Jetpack::update(f32 dt, f32 now, bool airborne, f32 vz, f32 height, bool hold) {
+  Pack p;
+  f64 thrust = 0;
+  equipment_cpp_local::g_jetpack.call("Update", std::tie(p, thrust), pack(), rules::decimal(dt), rules::decimal(now), airborne, rules::decimal(vz), rules::decimal(height), hold);
+  take(p);
+  return static_cast<f32>(thrust);
+}
+f32 Jetpack::air_accel() { return static_cast<f32>(equipment_cpp_local::g_jetpack.get<f64>("AirAccel")); }
 void MusicSynth::init(u32 rate) { rate_ = rate; }
 using audio::SynthPatch; std::vector<f32> render_loop(std::initializer_list<SynthPatch> layers, u32 rate, f32 seconds, f32 peak = 0.8) {
   std::vector<f32> out(converted::count(static_cast<std::size_t>(converted::fits<unsigned long>(seconds * static_cast<f32>(rate)))), 0.0);
@@ -5615,6 +6500,212 @@ using audio::SynthPatch; using audio::Wave; void Game::ui_audio_init() {
     pulse.volume = 0.2;
     ui_.crickets_clip = m.adopt_clip(render_loop({cricket, pulse}, rate, 4, 0.35), 1, "spawncity:crickets", true);
   }
+}
+void drive_loop(Mixer& m, audio::VoiceId& v, audio::ClipId clip, f32 volume, audio::Bus bus, bool spatial = false, Vec3 at = {}) {
+  if (!clip) return;
+  if (volume < 0.002) {
+    if (v) { m.stop(v, 0.3); v = 0; }
+    return;
+  }
+  if (!v || !m.playing(v)) {
+    audio::PlayParams p;
+    p.loop = true;
+    p.volume = volume;
+    p.bus = bus;
+    p.fade_in = 0.4;
+    p.spatial = spatial;
+    p.position = at;
+    p.min_distance = 2;
+    p.max_distance = 80;
+    v = m.play(clip, p);
+    return;
+  }
+  m.set_volume(v, volume, 0.2);
+  if (spatial) m.set_position(v, at);
+}
+void Game::ui_jetpack(f32 dt) {
+  // Jetpack (WORLD option): JUMP again in the air ignites it, holding JUMP keeps it burning.
+  Jetpack& j = ui_.jetpack;
+  const bool on = ui_.settings.on(Opt::world_jetpack) && mode_ == Mode::foot && converted::present(world_)->actor_alive(soldier_) && converted::present(world_)->hud().health > 0;
+  const bool jump = play_in_.jump;
+  const bool pressed = jump && !ui_.jump_was;
+  ui_.jump_was = jump;
+  if (!on) { j.thrusting = false; return; }
+  const Vec3 pos = matrix_of(soldier_).translation();
+  const RayResult below = cast(converted::present(world_)->physics(), pos, {0, 0, -1}, 80, body(soldier_));
+  const f32 height = (below.hit ? below.distance : 80) - 0.73;
+  Vec3 v = converted::present(world_)->actor_velocity(soldier_);
+  const bool airborne = height > 0.15;
+  const f32 now = converted::present(world_)->sim_time();
+  if ((pressed || ui_.jet_pending) && airborne && j.ignite(v.z)) {
+    ui_.jet_pending = false;
+    if (v.z < 0) { v.z *= Jetpack::ignition_damp(); converted::present(world_)->set_actor_velocity(soldier_, v); }
+    if (mixer_.ready() && ui_.whoomp_clip) {
+      audio::PlayParams p;
+      p.volume = 0.8;
+      p.bus = audio::Bus::sfx;
+      mixer_.play(ui_.whoomp_clip, p);
+    }
+    converted::present(world_)->shake_camera(0.12);
+    osfx("jetpack.ignition", pos);  // jetpack_audio.mjs: "arondight:player-jetpack"
+  }
+  const f32 acc = j.update(dt, now, airborne, v.z, height, jump);
+  ui_.jet_acc = acc;
+  if (acc > 0) {
+    converted::present(world_)->push_actor(soldier_, {0, 0, acc * dt * 75}, true);  // GameWorld's character mass: 75 kg
+    // Strong air control while it burns (JET_AIR_ACCEL 14 m/s^2 towards the stick).
+    const f32 yaw = converted::present(world_)->camera_yaw() * kDeg;
+    const Vec2 f{kern::math::cos(yaw), kern::math::sin(yaw)}, r{kern::math::sin(yaw), -kern::math::cos(yaw)};
+    const Vec2 want = (f * play_in_.move_y + r * play_in_.move_x) * 8.1;
+    v = converted::present(world_)->actor_velocity(soldier_);
+    Vec2 dv{want.x - v.x, want.y - v.y};
+    const f32 l = hypot_bp(dv.x, dv.y), cap = Jetpack::air_accel() * dt;
+    if (l > cap) dv = dv * (cap / l);
+    if (l > 1e-3) converted::present(world_)->set_actor_velocity(soldier_, {v.x + dv.x, v.y + dv.y, v.z});
+  }
+}
+void Game::ui_equipment(f32 dt) {
+  // Flight logbook: every drone flight from ARM to DISARM.
+  if (drone_out_) {
+    const DroneTelemetry& t = drone_.telemetry();
+    FlightSample s;
+    s.t = converted::present(world_)->sim_time();
+    s.pos = matrix_of(drone_actor_).translation();
+    s.vel = converted::present(world_)->actor_velocity(drone_actor_);
+    s.agl = t.agl;
+    s.volts = t.battery_v;
+    s.armed = t.armed;
+    ui_.log.observe(s, t.fault ? "FC_FAULT" : "FC_DISARM");
+  } else if (ui_.log.flying()) ui_.log.finish(drone_hp_ <= 0 ? "DRONE_DESTROYED" : "DRONE_STOWED");
+  if (net_.active() && net_.status() != ui_.net_status) {
+    ui_.net_status = net_.status();
+    ui_.log.network(ui_.net_status, converted::present(world_)->sim_time());
+  }
+  // Car radio: in a car it comes on (the title music fades out under it); N / B or D-pad right / left
+  // switch, with one RADIO AUS slot between the last and the first station.
+  const bool in_car = mode_ == Mode::car && !ui_.paused;
+  if (in_car && engine_ && !web_audio_) {  // on the page with the original's sound, car_radio.mjs itself (game_audio_web.cpp)
+    // car_radio.mjs: N / B, the pad's D-pad right / left (padTick; D-pad right pings as well, pad_actions.mjs)
+    const bool next = engine_->input().pressed(Key::n) || pad.hit(kPadRight) || pad_touch_.take_pressed("radio");
+    const bool prev = engine_->input().pressed(Key::b) || pad.hit(kPadLeft);
+    if (next || prev) ui_radio(next ? 1 : -1);
+  }
+  ui_.banner_age += dt;
+  // Impacts of the player's car (immersive_soundscape.mjs: dv >= 1.8 m/s).
+  if (mode_ == Mode::car && car_index_ >= 0 && !ui_.paused) {
+    const Vec3 v = converted::present(world_)->actor_velocity(converted::at(cars_, car_index_).actor);
+    if (ui_.car_vel_valid) {
+      const f32 dv = converted::wide::length(v - ui_.car_vel) - 9.81 * dt * 1.5;
+      if (dv > 1.8) osfx("world-physics-impact", matrix_of(converted::at(cars_, car_index_).actor).translation(), dv);
+      if (dv > 1.8 && mixer_.ready() && ui_.thump_clip) {
+        audio::PlayParams p;
+        p.volume = clampf(0.25 + dv * 0.06, 0.3, 1);
+        p.pitch = clampf(1.2 - dv * 0.03, 0.6, 1.2);
+        p.bus = audio::Bus::sfx;
+        mixer_.play(ui_.thump_clip, p);
+        ++ui_.thumps;
+        converted::present(world_)->shake_camera(clampf((dv - 2.5) / 14, 0, 0.7));
+      }
+    }
+    ui_.car_vel = v;
+    ui_.car_vel_valid = true;
+  } else ui_.car_vel_valid = false;
+}
+void Game::ui_radio(i32 dir) {
+  const i32 n = MusicSynth::station_count();
+  if (!ui_.radio_on) { ui_.radio_on = true; ui_.station = dir > 0 ? 0 : n - 1; }
+  else if ((dir > 0 && ui_.station == n - 1) || (dir < 0 && ui_.station == 0)) ui_.radio_on = false;
+  else ui_.station = converted::rem((ui_.station + dir + n), n);
+  if (ui_.radio_on) {
+    // car_radio.mjs showBanner(`📻 ${s.name}`, `${index+1}/${n} · city`) - here the station's genre
+    ui_.banner = std::string("\U0001F4FB ") + converted::at(MusicSynth::kStations, ui_.station).name;
+    char b[96];
+    std::snprintf(b, sizeof b, "%d/%d \u00B7 %s", ui_.station + 1, n, converted::at(MusicSynth::kStations, ui_.station).genre);
+    ui_.banner_sub = b;
+  } else { ui_.banner = "\U0001F4FB RADIO AUS"; ui_.banner_sub.clear(); }
+  ui_.banner_age = 0;
+}
+void Game::ui_mix_equipment(f32 dt) {
+  (void)dt;
+  Mixer& m = mixer_;
+  const Settings& st = ui_.settings;
+  // Jetpack roar: level and colour follow the thrust.
+  const bool burn = ui_.jetpack.thrusting && !ui_.paused;
+  drive_loop(m, ui_.jet_voice, ui_.jet_clip, burn ? 0.75 : 0.0, audio::Bus::sfx, true, matrix_of(soldier_).translation() - Vec3{0, 0, 0.6});
+  // Other players' jetpacks roar in 3-D at their position (jetpack_audio.mjs).
+  {
+    const auto& rs = net_.remotes();
+    for (std::size_t i = 0; i < 8; converted::pre_inc(i)) {
+      const bool on = i < rs.size() && (converted::at(rs, i).state.flags & net::kJetpack) && !ui_.paused;
+      drive_loop(m, converted::at(ui_.remote_jet_voice, i), ui_.jet_clip, on ? 0.7 : 0.0, audio::Bus::sfx, true, on ? converted::at(rs, i).shown - Vec3{0, 0, 0.6} : Vec3{});
+    }
+  }
+  // City bed: quieter high up, birds by day, crickets at night (ambience bus = the AMBIENT slider).
+  const f32 high = clampf(1 - (cam_.eye.z - city_.ground_height(cam_.eye.x, cam_.eye.y)) / 150, 0.15, 1);
+  const bool live = world_placed_ && !ui_.paused;
+  drive_loop(m, ui_.city_voice, ui_.city_clip, live ? 0.32 * high * (city_.offline() ? 0.7 : 1.0) : 0.0, audio::Bus::ambience);
+  drive_loop(m, ui_.birds_voice, ui_.birds_clip, live ? 0.28 * high * (1 - night_) : 0.0, audio::Bus::ambience);
+  drive_loop(m, ui_.crickets_voice, ui_.crickets_clip, live ? 0.22 * high * night_ : 0.0, audio::Bus::ambience);
+  // Music: in the menus the title music (never a gameplay track), in a car the radio.
+  const f32 vol = st.get(Opt::music_volume) / 100;
+  if (!st.on(Opt::music_on) || !st.on(Opt::audio_on)) ui_.music.select(-2, 0);
+  else if (mode_ == Mode::car && !ui_.paused && ui_.radio_on) ui_.music.select(ui_.station, std::fmax(0.55, vol) * 0.85);  // car_radio.mjs HEADROOM .85
+  else if (ui_.paused && vol > 0) ui_.music.select(MusicSynth::kMenu, vol * 0.45);  // music_player.mjs MUSIC_HEADROOM .45
+  else ui_.music.select(-2, 0);
+}
+void Game::ui_render_music(std::vector<f32>& out, u32 frames) { ui_.music.render_add(out, frames); }
+bool Game::ui_equipment_command(const std::string& cmd, std::string& out) {
+  if (cmd == "logbook") { out = ui_.log.json(); return true; }
+  if (cmd.rfind("nostr event ", 0) == 0) {
+    // suggestion_box.mjs: "nostr event <created_at> <secret hex> <aux hex> <tags json> <content>" -> the signed event.
+    std::string rest = cmd.substr(12), part[4];
+    for (std::string& p : part) {
+      const std::size_t sp = rest.find(' ');
+      if (sp == std::string::npos) { out = "usage: nostr event <created_at> <secret> <aux> <tags> <content>"; return true; }
+      p = rest.substr(0, sp);
+      rest = rest.substr(converted::plus(sp, 1));
+    }
+    nostr::Bytes32 sk{}, aux{};
+    if (!nostr::from_hex(part[1], sk) || !nostr::from_hex(part[2], aux) || part[3].empty() || part[3].front() != '[') { out = "bad key or tags"; return true; }
+    if (!nostr::event_json(sk, aux, std::atoll(part[0].c_str()), 30078, part[3], rest, out)) out = "sign failed";
+    return true;
+  }
+  if (cmd.rfind("radio", 0) == 0) {
+    const std::string a = cmd.size() > 6 ? cmd.substr(6) : "next";
+    if (a == "next") ui_radio(1);
+    else if (a == "prev") ui_radio(-1);
+    else if (a == "off") { ui_.radio_on = false; ui_.banner = "\U0001F4FB RADIO AUS"; ui_.banner_sub.clear(); ui_.banner_age = 0; }
+    else if (a == "toggle") {
+      // car_radio.mjs toggleOff (the radio button held 550 ms): off, or back on at the station
+      ui_.radio_on = !ui_.radio_on;
+      if (ui_.radio_on) ui_radio(0);
+      else { ui_.banner = "\U0001F4FB RADIO AUS"; ui_.banner_sub.clear(); ui_.banner_age = 0; }
+    }
+    else if (a == "on") { ui_.radio_on = true; ui_radio(0); }
+    out = ui_.radio_on ? converted::at(MusicSynth::kStations, ui_.station).name : "off";
+    return true;
+  }
+  if (cmd == "music") {
+    char b[96];
+    std::snprintf(b, sizeof b, "{\"programme\":%d,\"level\":%.3f,\"peak\":%.3f}", ui_.music.programme(), static_cast<double>(ui_.music.level()), static_cast<double>(ui_.music.peak));
+    out = b;
+    return true;
+  }
+  if (cmd == "jetpack") {
+    char b[128];
+    std::snprintf(b, sizeof b, "{\"fuel\":%.2f,\"thrusting\":%s,\"ignitions\":%u}", static_cast<double>(ui_.jetpack.fuel), ui_.jetpack.thrusting ? "true" : "false", ui_.jetpack.ignitions);
+    out = b;
+    return true;
+  }
+  if (cmd == "jetpack burn") {
+    // Tests: jump and ignite at once (as two presses of JUMP).
+    if (mode_ != Mode::foot) { out = "not on foot"; return true; }
+    converted::present(world_)->push_actor(soldier_, {0, 0, 3.6 * 75}, true);
+    ui_.jet_pending = true;
+    out = "ok";
+    return true;
+  }
+  return false;
 }
 std::string Game::ui_equipment_json() {
   std::string s;
@@ -6352,6 +7443,21 @@ namespace physics { using converted::arg; using converted::same; using converted
 [[maybe_unused]] static bool defined(const Marks& s) { return defined(s.scorches_) && defined(s.soots_) && defined(s.breaches_) && defined(s.cracks_) && defined(s.crack_cursor_) && defined(s.rubble_) && defined(s.scorch_cursor_) && defined(s.soot_cursor_) && defined(s.breach_cursor_) && defined(s.rubble_cursor_) && defined(s.near_) && defined(converted::array_list(s.ground_mesh_)) && defined(s.wall_mesh_) && defined(s.dirty_) && defined(s.damage_seen_) && defined(s.stats_) && defined(converted::array_list(s.ground_data_)) && defined(s.wall_data_) && defined(s.struck_); }
 [[maybe_unused]] static std::string text(const Marks& s) { return std::string("{") + text(s.scorches_) + ", " + text(s.soots_) + ", " + text(s.breaches_) + ", " + text(s.cracks_) + ", " + text(s.crack_cursor_) + ", " + text(s.rubble_) + ", " + text(s.scorch_cursor_) + ", " + text(s.soot_cursor_) + ", " + text(s.breach_cursor_) + ", " + text(s.rubble_cursor_) + ", " + text(s.near_) + ", " + text(converted::array_list(s.ground_mesh_)) + ", " + text(s.wall_mesh_) + ", " + text(s.dirty_) + ", " + text(s.damage_seen_) + ", " + text(s.stats_) + ", " + text(converted::array_list(s.ground_data_)) + ", " + text(s.wall_data_) + ", " + text(s.struck_) + "}"; }
 [[maybe_unused]] static void take(Marks& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 19) return; converted::take_as<std::vector<Marks::Scorch>>(s.scorches_, (*v.rows)[0]); converted::take_as<std::vector<Marks::WallMark>>(s.soots_, (*v.rows)[1]); converted::take_as<std::vector<Marks::WallMark>>(s.breaches_, (*v.rows)[2]); converted::take_as<std::vector<Marks::WallMark>>(s.cracks_, (*v.rows)[3]); converted::take_as<unsigned int>(s.crack_cursor_, (*v.rows)[4]); converted::take_as<std::vector<Marks::Chunk>>(s.rubble_, (*v.rows)[5]); converted::take_as<unsigned int>(s.scorch_cursor_, (*v.rows)[6]); converted::take_as<unsigned int>(s.soot_cursor_, (*v.rows)[7]); converted::take_as<unsigned int>(s.breach_cursor_, (*v.rows)[8]); converted::take_as<unsigned int>(s.rubble_cursor_, (*v.rows)[9]); converted::take_as<std::vector<CityStream::Wall>>(s.near_, (*v.rows)[10]); { std::vector<unsigned int> items; converted::take_as<std::vector<unsigned int>>(items, (*v.rows)[11]); converted::array_from(s.ground_mesh_, items); } converted::take_as<unsigned int>(s.wall_mesh_, (*v.rows)[12]); converted::take_as<bool>(s.dirty_, (*v.rows)[13]); converted::take_as<unsigned int>(s.damage_seen_, (*v.rows)[14]); converted::take_as<Marks::Stats>(s.stats_, (*v.rows)[15]); { std::vector<MeshData> items; converted::take_as<std::vector<MeshData>>(items, (*v.rows)[16]); converted::array_from(s.ground_data_, items); } converted::take_as<MeshData>(s.wall_data_, (*v.rows)[17]); converted::take_as<bool>(s.struck_, (*v.rows)[18]); }
+[[maybe_unused]] static TrafficRules::Laws draw_TrafficRules__Laws(converted::Draw& draw) {
+  TrafficRules::Laws s{};
+  s.ahead_min = draw.number();
+  s.ahead_max = draw.number();
+  s.stop_line = draw.number();
+  s.first_come = draw.number();
+  s.claim_s = draw.number();
+  s.patience_s = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const TrafficRules::Laws& s) { return converted::Value::structure({arg(s.ahead_min), arg(s.ahead_max), arg(s.stop_line), arg(s.first_come), arg(s.claim_s), arg(s.patience_s)}); }
+[[maybe_unused]] static bool same(const TrafficRules::Laws& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.ahead_min, (*got.rows)[0]) && same(want.ahead_max, (*got.rows)[1]) && same(want.stop_line, (*got.rows)[2]) && same(want.first_come, (*got.rows)[3]) && same(want.claim_s, (*got.rows)[4]) && same(want.patience_s, (*got.rows)[5]); }
+[[maybe_unused]] static bool defined(const TrafficRules::Laws& s) { return defined(s.ahead_min) && defined(s.ahead_max) && defined(s.stop_line) && defined(s.first_come) && defined(s.claim_s) && defined(s.patience_s); }
+[[maybe_unused]] static std::string text(const TrafficRules::Laws& s) { return std::string("{") + text(s.ahead_min) + ", " + text(s.ahead_max) + ", " + text(s.stop_line) + ", " + text(s.first_come) + ", " + text(s.claim_s) + ", " + text(s.patience_s) + "}"; }
+[[maybe_unused]] static void take(TrafficRules::Laws& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<double>(s.ahead_min, (*v.rows)[0]); converted::take_as<double>(s.ahead_max, (*v.rows)[1]); converted::take_as<double>(s.stop_line, (*v.rows)[2]); converted::take_as<double>(s.first_come, (*v.rows)[3]); converted::take_as<double>(s.claim_s, (*v.rows)[4]); converted::take_as<double>(s.patience_s, (*v.rows)[5]); }
 [[maybe_unused]] static TrafficRules::Arm draw_TrafficRules__Arm(converted::Draw& draw) {
   TrafficRules::Arm s{};
   s.dir = draw.vector2();
@@ -6398,16 +7504,17 @@ namespace physics { using converted::arg; using converted::same; using converted
   TrafficRules s{};
   s.built_from = static_cast<u64>(draw.bits());
   s.lights_time = draw.number();
+  s.laws_ = draw_TrafficRules__Laws(draw);
   s.junctions_ = draw_list(draw, [&]() -> TrafficRules::Junction { return draw_TrafficRules__Junction(draw); });
   s.grid_ = converted::draw_map<converted::wide::Map<u64, std::vector<int>>>(draw, [&]() -> u64 { return static_cast<u64>(draw.bits()); }, [&]() -> std::vector<int> { return draw_list(draw, [&]() -> int { return static_cast<int>(draw.whole()); }); });
   s.blocked_ = converted::draw_map<converted::wide::Map<int, TrafficRules::Blocked>>(draw, [&]() -> int { return static_cast<int>(draw.whole()); }, [&]() -> TrafficRules::Blocked { return draw_TrafficRules__Blocked(draw); });
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const TrafficRules& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.built_from)), arg(s.lights_time), arg(s.junctions_), arg(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_)), arg(s.blocked_)}); }
-[[maybe_unused]] static bool same(const TrafficRules& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(converted::shaped<converted::Whole>(want.built_from), (*got.rows)[0]) && same(want.lights_time, (*got.rows)[1]) && same(want.junctions_, (*got.rows)[2]) && same(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(want.grid_), (*got.rows)[3]) && same(want.blocked_, (*got.rows)[4]); }
-[[maybe_unused]] static bool defined(const TrafficRules& s) { return defined(converted::shaped<converted::Whole>(s.built_from)) && defined(s.lights_time) && defined(s.junctions_) && defined(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_)) && defined(s.blocked_); }
-[[maybe_unused]] static std::string text(const TrafficRules& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.built_from)) + ", " + text(s.lights_time) + ", " + text(s.junctions_) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_)) + ", " + text(s.blocked_) + "}"; }
-[[maybe_unused]] static void take(TrafficRules& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<converted::Whole>(s.built_from, (*v.rows)[0]); converted::take_as<double>(s.lights_time, (*v.rows)[1]); converted::take_as<std::vector<TrafficRules::Junction>>(s.junctions_, (*v.rows)[2]); converted::take_as<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_, (*v.rows)[3]); converted::take_as<converted::wide::Map<int, TrafficRules::Blocked>>(s.blocked_, (*v.rows)[4]); }
+[[maybe_unused]] static converted::Value arg(const TrafficRules& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.built_from)), arg(s.lights_time), arg(s.laws_), arg(s.junctions_), arg(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_)), arg(s.blocked_)}); }
+[[maybe_unused]] static bool same(const TrafficRules& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(converted::shaped<converted::Whole>(want.built_from), (*got.rows)[0]) && same(want.lights_time, (*got.rows)[1]) && same(want.laws_, (*got.rows)[2]) && same(want.junctions_, (*got.rows)[3]) && same(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(want.grid_), (*got.rows)[4]) && same(want.blocked_, (*got.rows)[5]); }
+[[maybe_unused]] static bool defined(const TrafficRules& s) { return defined(converted::shaped<converted::Whole>(s.built_from)) && defined(s.lights_time) && defined(s.laws_) && defined(s.junctions_) && defined(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_)) && defined(s.blocked_); }
+[[maybe_unused]] static std::string text(const TrafficRules& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.built_from)) + ", " + text(s.lights_time) + ", " + text(s.laws_) + ", " + text(s.junctions_) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_)) + ", " + text(s.blocked_) + "}"; }
+[[maybe_unused]] static void take(TrafficRules& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<converted::Whole>(s.built_from, (*v.rows)[0]); converted::take_as<double>(s.lights_time, (*v.rows)[1]); converted::take_as<TrafficRules::Laws>(s.laws_, (*v.rows)[2]); converted::take_as<std::vector<TrafficRules::Junction>>(s.junctions_, (*v.rows)[3]); converted::take_as<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_, (*v.rows)[4]); converted::take_as<converted::wide::Map<int, TrafficRules::Blocked>>(s.blocked_, (*v.rows)[5]); }
 [[maybe_unused]] static TrafficRules::View draw_TrafficRules__View(converted::Draw& draw) {
   TrafficRules::View s{};
   s.junction = static_cast<int>(draw.whole());
@@ -6943,6 +8050,7 @@ namespace game { using converted::arg; using converted::same; using converted::d
 [[maybe_unused]] static std::string text(const WaterLook& s) { return std::string("{") + text(s.time) + ", " + text(s.u_time_) + "}"; }
 [[maybe_unused]] static void take(WaterLook& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<double>(s.time, (*v.rows)[0]); converted::take_as<unsigned int>(s.u_time_, (*v.rows)[1]); }
 [[maybe_unused]] static Vec4 draw_kern__Vec4(converted::Draw& draw) {
+  if (draw.flag()) return Vec4(draw.number(), draw.number(), draw.number(), draw.number());
   Vec4 s{};
   s.x = draw.number();
   s.y = draw.number();
@@ -10076,6 +11184,55 @@ namespace mp { using converted::arg; using converted::same; using converted::def
 [[maybe_unused]] static bool defined(const SoundFx& s) { return defined(s.mixer_) && defined(s.rotor_) && defined(s.prop_wash_) && defined(s.engine_) && defined(s.turbine_) && defined(s.roar_) && defined(s.wind_) && defined(s.siren_); }
 [[maybe_unused]] static std::string text(const SoundFx& s) { return std::string("{") + text(s.mixer_) + ", " + text(s.rotor_) + ", " + text(s.prop_wash_) + ", " + text(s.engine_) + ", " + text(s.turbine_) + ", " + text(s.roar_) + ", " + text(s.wind_) + ", " + text(s.siren_) + "}"; }
 [[maybe_unused]] static void take(SoundFx& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 8) return; converted::take_as<Mixer*>(s.mixer_, (*v.rows)[0]); converted::take_as<SoundFx::Loop>(s.rotor_, (*v.rows)[1]); converted::take_as<SoundFx::Loop>(s.prop_wash_, (*v.rows)[2]); converted::take_as<SoundFx::Loop>(s.engine_, (*v.rows)[3]); converted::take_as<SoundFx::Loop>(s.turbine_, (*v.rows)[4]); converted::take_as<SoundFx::Loop>(s.roar_, (*v.rows)[5]); converted::take_as<SoundFx::Loop>(s.wind_, (*v.rows)[6]); converted::take_as<SoundFx::Loop>(s.siren_, (*v.rows)[7]); }
+[[maybe_unused]] static Option draw_Option(converted::Draw& draw) {
+  Option s{};
+  s.key = draw.word();
+  s.section = draw.word();
+  s.label = draw.word();
+  s.help = draw.word();
+  s.min = draw.number();
+  s.max = draw.number();
+  s.step = draw.number();
+  s.def = draw.number();
+  s.toggle = draw.flag();
+  s.live = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Option& s) { return converted::Value::structure({arg(s.key), arg(s.section), arg(s.label), arg(s.help), arg(s.min), arg(s.max), arg(s.step), arg(s.def), arg(s.toggle), arg(s.live)}); }
+[[maybe_unused]] static bool same(const Option& want, const converted::Value& got) { return got.rows && got.rows->size() == 10 && same(want.key, (*got.rows)[0]) && same(want.section, (*got.rows)[1]) && same(want.label, (*got.rows)[2]) && same(want.help, (*got.rows)[3]) && same(want.min, (*got.rows)[4]) && same(want.max, (*got.rows)[5]) && same(want.step, (*got.rows)[6]) && same(want.def, (*got.rows)[7]) && same(want.toggle, (*got.rows)[8]) && same(want.live, (*got.rows)[9]); }
+[[maybe_unused]] static bool defined(const Option& s) { return defined(s.key) && defined(s.section) && defined(s.label) && defined(s.help) && defined(s.min) && defined(s.max) && defined(s.step) && defined(s.def) && defined(s.toggle) && defined(s.live); }
+[[maybe_unused]] static std::string text(const Option& s) { return std::string("{") + text(s.key) + ", " + text(s.section) + ", " + text(s.label) + ", " + text(s.help) + ", " + text(s.min) + ", " + text(s.max) + ", " + text(s.step) + ", " + text(s.def) + ", " + text(s.toggle) + ", " + text(s.live) + "}"; }
+[[maybe_unused]] static void take(Option& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 10) return; converted::take_as<std::string>(s.key, (*v.rows)[0]); converted::take_as<std::string>(s.section, (*v.rows)[1]); converted::take_as<std::string>(s.label, (*v.rows)[2]); converted::take_as<std::string>(s.help, (*v.rows)[3]); converted::take_as<double>(s.min, (*v.rows)[4]); converted::take_as<double>(s.max, (*v.rows)[5]); converted::take_as<double>(s.step, (*v.rows)[6]); converted::take_as<double>(s.def, (*v.rows)[7]); converted::take_as<bool>(s.toggle, (*v.rows)[8]); converted::take_as<bool>(s.live, (*v.rows)[9]); }
+[[maybe_unused]] static OptSpec draw_OptSpec(converted::Draw& draw) {
+  OptSpec s{};
+  s.key = draw.word();
+  s.section = draw.word();
+  s.label = draw.word();
+  s.help = draw.word();
+  s.min = draw.number();
+  s.max = draw.number();
+  s.step = draw.number();
+  s.def = draw.number();
+  s.toggle = draw.flag();
+  s.live = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const OptSpec& s) { return converted::Value::structure({arg(s.key), arg(s.section), arg(s.label), arg(s.help), arg(s.min), arg(s.max), arg(s.step), arg(s.def), arg(s.toggle), arg(s.live)}); }
+[[maybe_unused]] static bool same(const OptSpec& want, const converted::Value& got) { return got.rows && got.rows->size() == 10 && same(want.key, (*got.rows)[0]) && same(want.section, (*got.rows)[1]) && same(want.label, (*got.rows)[2]) && same(want.help, (*got.rows)[3]) && same(want.min, (*got.rows)[4]) && same(want.max, (*got.rows)[5]) && same(want.step, (*got.rows)[6]) && same(want.def, (*got.rows)[7]) && same(want.toggle, (*got.rows)[8]) && same(want.live, (*got.rows)[9]); }
+[[maybe_unused]] static bool defined(const OptSpec& s) { return defined(s.key) && defined(s.section) && defined(s.label) && defined(s.help) && defined(s.min) && defined(s.max) && defined(s.step) && defined(s.def) && defined(s.toggle) && defined(s.live); }
+[[maybe_unused]] static std::string text(const OptSpec& s) { return std::string("{") + text(s.key) + ", " + text(s.section) + ", " + text(s.label) + ", " + text(s.help) + ", " + text(s.min) + ", " + text(s.max) + ", " + text(s.step) + ", " + text(s.def) + ", " + text(s.toggle) + ", " + text(s.live) + "}"; }
+[[maybe_unused]] static void take(OptSpec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 10) return; converted::take_as<std::string>(s.key, (*v.rows)[0]); converted::take_as<std::string>(s.section, (*v.rows)[1]); converted::take_as<std::string>(s.label, (*v.rows)[2]); converted::take_as<std::string>(s.help, (*v.rows)[3]); converted::take_as<double>(s.min, (*v.rows)[4]); converted::take_as<double>(s.max, (*v.rows)[5]); converted::take_as<double>(s.step, (*v.rows)[6]); converted::take_as<double>(s.def, (*v.rows)[7]); converted::take_as<bool>(s.toggle, (*v.rows)[8]); converted::take_as<bool>(s.live, (*v.rows)[9]); }
+[[maybe_unused]] static SettingsTable draw_SettingsTable(converted::Draw& draw) {
+  SettingsTable s{};
+  s.rows = draw_list(draw, [&]() -> Option { return draw_Option(draw); });
+  s.specs = draw_list(draw, [&]() -> OptSpec { return draw_OptSpec(draw); });
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const SettingsTable& s) { return converted::Value::structure({arg(s.rows), arg(s.specs)}); }
+[[maybe_unused]] static bool same(const SettingsTable& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.rows, (*got.rows)[0]) && same(want.specs, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const SettingsTable& s) { return defined(s.rows) && defined(s.specs); }
+[[maybe_unused]] static std::string text(const SettingsTable& s) { return std::string("{") + text(s.rows) + ", " + text(s.specs) + "}"; }
+[[maybe_unused]] static void take(SettingsTable& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<std::vector<Option>>(s.rows, (*v.rows)[0]); converted::take_as<std::vector<OptSpec>>(s.specs, (*v.rows)[1]); }
 [[maybe_unused]] static Settings draw_Settings(converted::Draw& draw) {
   Settings s{};
   converted::fill_array(s.v_, [&]() -> double { return draw.number(); });
@@ -10232,6 +11389,7 @@ namespace mp { using converted::arg; using converted::same; using converted::def
 [[maybe_unused]] static UiState draw_UiState(converted::Draw& draw) {
   UiState s{};
   s.settings = draw_Settings(draw);
+  s.settings_table = draw_SettingsTable(draw);
   s.applied = static_cast<unsigned int>(draw.below(40));
   s.paused = draw.flag();
   s.audio_paused = draw.flag();
@@ -10288,11 +11446,11 @@ namespace mp { using converted::arg; using converted::same; using converted::def
   s.thumps = static_cast<unsigned int>(draw.below(40));
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const UiState& s) { return converted::Value::structure({arg(s.settings), arg(s.applied), arg(s.paused), arg(s.audio_paused), arg(s.resets), arg(s.drone_seen), arg(s.head_yaw_before), arg(s.head_pitch_before), arg(s.assists), arg(s.grid_mesh), arg(s.collider_mesh), arg(s.grid_at), arg(s.collider_clock), arg(s.world_military), arg(s.world_zombies), arg(s.gps), arg(s.moves), arg(s.place), arg(s.gps_cam_eye), arg(s.gps_cam_look), arg(s.puck_acc), arg(s.puck_ring), arg(s.puck_dot), arg(s.puck_wedge), arg(s.trail_mesh), arg(s.trail), arg(s.trail_dirty), arg(s.trail_upload), arg(s.gps_cam_init), arg(s.jetpack), arg(s.jump_was), arg(s.jet_pending), arg(s.jet_acc), arg(converted::shaped<std::vector<converted::Whole>>(converted::array_list(s.remote_jet_voice))), arg(s.jet_voice), arg(s.city_voice), arg(s.birds_voice), arg(s.crickets_voice), arg(s.jet_clip), arg(s.whoomp_clip), arg(s.thump_clip), arg(s.city_clip), arg(s.birds_clip), arg(s.crickets_clip), arg(s.log), arg(s.net_status), arg(s.music), arg(s.station), arg(s.radio_on), arg(s.banner), arg(s.banner_sub), arg(s.banner_age), arg(s.car_vel), arg(s.car_vel_valid), arg(s.thumps)}); }
-[[maybe_unused]] static bool same(const UiState& want, const converted::Value& got) { return got.rows && got.rows->size() == 55 && same(want.settings, (*got.rows)[0]) && same(want.applied, (*got.rows)[1]) && same(want.paused, (*got.rows)[2]) && same(want.audio_paused, (*got.rows)[3]) && same(want.resets, (*got.rows)[4]) && same(want.drone_seen, (*got.rows)[5]) && same(want.head_yaw_before, (*got.rows)[6]) && same(want.head_pitch_before, (*got.rows)[7]) && same(want.assists, (*got.rows)[8]) && same(want.grid_mesh, (*got.rows)[9]) && same(want.collider_mesh, (*got.rows)[10]) && same(want.grid_at, (*got.rows)[11]) && same(want.collider_clock, (*got.rows)[12]) && same(want.world_military, (*got.rows)[13]) && same(want.world_zombies, (*got.rows)[14]) && same(want.gps, (*got.rows)[15]) && same(want.moves, (*got.rows)[16]) && same(want.place, (*got.rows)[17]) && same(want.gps_cam_eye, (*got.rows)[18]) && same(want.gps_cam_look, (*got.rows)[19]) && same(want.puck_acc, (*got.rows)[20]) && same(want.puck_ring, (*got.rows)[21]) && same(want.puck_dot, (*got.rows)[22]) && same(want.puck_wedge, (*got.rows)[23]) && same(want.trail_mesh, (*got.rows)[24]) && same(want.trail, (*got.rows)[25]) && same(want.trail_dirty, (*got.rows)[26]) && same(want.trail_upload, (*got.rows)[27]) && same(want.gps_cam_init, (*got.rows)[28]) && same(want.jetpack, (*got.rows)[29]) && same(want.jump_was, (*got.rows)[30]) && same(want.jet_pending, (*got.rows)[31]) && same(want.jet_acc, (*got.rows)[32]) && same(converted::shaped<std::vector<converted::Whole>>(converted::array_list(want.remote_jet_voice)), (*got.rows)[33]) && same(want.jet_voice, (*got.rows)[34]) && same(want.city_voice, (*got.rows)[35]) && same(want.birds_voice, (*got.rows)[36]) && same(want.crickets_voice, (*got.rows)[37]) && same(want.jet_clip, (*got.rows)[38]) && same(want.whoomp_clip, (*got.rows)[39]) && same(want.thump_clip, (*got.rows)[40]) && same(want.city_clip, (*got.rows)[41]) && same(want.birds_clip, (*got.rows)[42]) && same(want.crickets_clip, (*got.rows)[43]) && same(want.log, (*got.rows)[44]) && same(want.net_status, (*got.rows)[45]) && same(want.music, (*got.rows)[46]) && same(want.station, (*got.rows)[47]) && same(want.radio_on, (*got.rows)[48]) && same(want.banner, (*got.rows)[49]) && same(want.banner_sub, (*got.rows)[50]) && same(want.banner_age, (*got.rows)[51]) && same(want.car_vel, (*got.rows)[52]) && same(want.car_vel_valid, (*got.rows)[53]) && same(want.thumps, (*got.rows)[54]); }
-[[maybe_unused]] static bool defined(const UiState& s) { return defined(s.settings) && defined(s.applied) && defined(s.paused) && defined(s.audio_paused) && defined(s.resets) && defined(s.drone_seen) && defined(s.head_yaw_before) && defined(s.head_pitch_before) && defined(s.assists) && defined(s.grid_mesh) && defined(s.collider_mesh) && defined(s.grid_at) && defined(s.collider_clock) && defined(s.world_military) && defined(s.world_zombies) && defined(s.gps) && defined(s.moves) && defined(s.place) && defined(s.gps_cam_eye) && defined(s.gps_cam_look) && defined(s.puck_acc) && defined(s.puck_ring) && defined(s.puck_dot) && defined(s.puck_wedge) && defined(s.trail_mesh) && defined(s.trail) && defined(s.trail_dirty) && defined(s.trail_upload) && defined(s.gps_cam_init) && defined(s.jetpack) && defined(s.jump_was) && defined(s.jet_pending) && defined(s.jet_acc) && defined(converted::shaped<std::vector<converted::Whole>>(converted::array_list(s.remote_jet_voice))) && defined(s.jet_voice) && defined(s.city_voice) && defined(s.birds_voice) && defined(s.crickets_voice) && defined(s.jet_clip) && defined(s.whoomp_clip) && defined(s.thump_clip) && defined(s.city_clip) && defined(s.birds_clip) && defined(s.crickets_clip) && defined(s.log) && defined(s.net_status) && defined(s.music) && defined(s.station) && defined(s.radio_on) && defined(s.banner) && defined(s.banner_sub) && defined(s.banner_age) && defined(s.car_vel) && defined(s.car_vel_valid) && defined(s.thumps); }
-[[maybe_unused]] static std::string text(const UiState& s) { return std::string("{") + text(s.settings) + ", " + text(s.applied) + ", " + text(s.paused) + ", " + text(s.audio_paused) + ", " + text(s.resets) + ", " + text(s.drone_seen) + ", " + text(s.head_yaw_before) + ", " + text(s.head_pitch_before) + ", " + text(s.assists) + ", " + text(s.grid_mesh) + ", " + text(s.collider_mesh) + ", " + text(s.grid_at) + ", " + text(s.collider_clock) + ", " + text(s.world_military) + ", " + text(s.world_zombies) + ", " + text(s.gps) + ", " + text(s.moves) + ", " + text(s.place) + ", " + text(s.gps_cam_eye) + ", " + text(s.gps_cam_look) + ", " + text(s.puck_acc) + ", " + text(s.puck_ring) + ", " + text(s.puck_dot) + ", " + text(s.puck_wedge) + ", " + text(s.trail_mesh) + ", " + text(s.trail) + ", " + text(s.trail_dirty) + ", " + text(s.trail_upload) + ", " + text(s.gps_cam_init) + ", " + text(s.jetpack) + ", " + text(s.jump_was) + ", " + text(s.jet_pending) + ", " + text(s.jet_acc) + ", " + text(converted::shaped<std::vector<converted::Whole>>(converted::array_list(s.remote_jet_voice))) + ", " + text(s.jet_voice) + ", " + text(s.city_voice) + ", " + text(s.birds_voice) + ", " + text(s.crickets_voice) + ", " + text(s.jet_clip) + ", " + text(s.whoomp_clip) + ", " + text(s.thump_clip) + ", " + text(s.city_clip) + ", " + text(s.birds_clip) + ", " + text(s.crickets_clip) + ", " + text(s.log) + ", " + text(s.net_status) + ", " + text(s.music) + ", " + text(s.station) + ", " + text(s.radio_on) + ", " + text(s.banner) + ", " + text(s.banner_sub) + ", " + text(s.banner_age) + ", " + text(s.car_vel) + ", " + text(s.car_vel_valid) + ", " + text(s.thumps) + "}"; }
-[[maybe_unused]] static void take(UiState& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 55) return; converted::take_as<Settings>(s.settings, (*v.rows)[0]); converted::take_as<unsigned int>(s.applied, (*v.rows)[1]); converted::take_as<bool>(s.paused, (*v.rows)[2]); converted::take_as<bool>(s.audio_paused, (*v.rows)[3]); converted::take_as<unsigned int>(s.resets, (*v.rows)[4]); converted::take_as<bool>(s.drone_seen, (*v.rows)[5]); converted::take_as<double>(s.head_yaw_before, (*v.rows)[6]); converted::take_as<double>(s.head_pitch_before, (*v.rows)[7]); converted::take_as<unsigned int>(s.assists, (*v.rows)[8]); converted::take_as<unsigned int>(s.grid_mesh, (*v.rows)[9]); converted::take_as<unsigned int>(s.collider_mesh, (*v.rows)[10]); converted::take_as<Vec3>(s.grid_at, (*v.rows)[11]); converted::take_as<double>(s.collider_clock, (*v.rows)[12]); converted::take_as<int>(s.world_military, (*v.rows)[13]); converted::take_as<int>(s.world_zombies, (*v.rows)[14]); converted::take_as<GpsLive>(s.gps, (*v.rows)[15]); converted::take_as<unsigned int>(s.moves, (*v.rows)[16]); converted::take_as<std::string>(s.place, (*v.rows)[17]); converted::take_as<Vec3>(s.gps_cam_eye, (*v.rows)[18]); converted::take_as<Vec3>(s.gps_cam_look, (*v.rows)[19]); converted::take_as<unsigned int>(s.puck_acc, (*v.rows)[20]); converted::take_as<unsigned int>(s.puck_ring, (*v.rows)[21]); converted::take_as<unsigned int>(s.puck_dot, (*v.rows)[22]); converted::take_as<unsigned int>(s.puck_wedge, (*v.rows)[23]); converted::take_as<unsigned int>(s.trail_mesh, (*v.rows)[24]); converted::take_as<std::vector<Vec2>>(s.trail, (*v.rows)[25]); converted::take_as<bool>(s.trail_dirty, (*v.rows)[26]); converted::take_as<double>(s.trail_upload, (*v.rows)[27]); converted::take_as<bool>(s.gps_cam_init, (*v.rows)[28]); converted::take_as<Jetpack>(s.jetpack, (*v.rows)[29]); converted::take_as<bool>(s.jump_was, (*v.rows)[30]); converted::take_as<bool>(s.jet_pending, (*v.rows)[31]); converted::take_as<double>(s.jet_acc, (*v.rows)[32]); { std::vector<u64> items; converted::take_as<std::vector<converted::Whole>>(items, (*v.rows)[33]); converted::array_from(s.remote_jet_voice, items); } converted::take_as<unsigned long>(s.jet_voice, (*v.rows)[34]); converted::take_as<unsigned long>(s.city_voice, (*v.rows)[35]); converted::take_as<unsigned long>(s.birds_voice, (*v.rows)[36]); converted::take_as<unsigned long>(s.crickets_voice, (*v.rows)[37]); converted::take_as<unsigned int>(s.jet_clip, (*v.rows)[38]); converted::take_as<unsigned int>(s.whoomp_clip, (*v.rows)[39]); converted::take_as<unsigned int>(s.thump_clip, (*v.rows)[40]); converted::take_as<unsigned int>(s.city_clip, (*v.rows)[41]); converted::take_as<unsigned int>(s.birds_clip, (*v.rows)[42]); converted::take_as<unsigned int>(s.crickets_clip, (*v.rows)[43]); converted::take_as<FlightLog>(s.log, (*v.rows)[44]); converted::take_as<std::string>(s.net_status, (*v.rows)[45]); converted::take_as<MusicSynth>(s.music, (*v.rows)[46]); converted::take_as<int>(s.station, (*v.rows)[47]); converted::take_as<bool>(s.radio_on, (*v.rows)[48]); converted::take_as<std::string>(s.banner, (*v.rows)[49]); converted::take_as<std::string>(s.banner_sub, (*v.rows)[50]); converted::take_as<double>(s.banner_age, (*v.rows)[51]); converted::take_as<Vec3>(s.car_vel, (*v.rows)[52]); converted::take_as<bool>(s.car_vel_valid, (*v.rows)[53]); converted::take_as<unsigned int>(s.thumps, (*v.rows)[54]); }
+[[maybe_unused]] static converted::Value arg(const UiState& s) { return converted::Value::structure({arg(s.settings), arg(s.settings_table), arg(s.applied), arg(s.paused), arg(s.audio_paused), arg(s.resets), arg(s.drone_seen), arg(s.head_yaw_before), arg(s.head_pitch_before), arg(s.assists), arg(s.grid_mesh), arg(s.collider_mesh), arg(s.grid_at), arg(s.collider_clock), arg(s.world_military), arg(s.world_zombies), arg(s.gps), arg(s.moves), arg(s.place), arg(s.gps_cam_eye), arg(s.gps_cam_look), arg(s.puck_acc), arg(s.puck_ring), arg(s.puck_dot), arg(s.puck_wedge), arg(s.trail_mesh), arg(s.trail), arg(s.trail_dirty), arg(s.trail_upload), arg(s.gps_cam_init), arg(s.jetpack), arg(s.jump_was), arg(s.jet_pending), arg(s.jet_acc), arg(converted::shaped<std::vector<converted::Whole>>(converted::array_list(s.remote_jet_voice))), arg(s.jet_voice), arg(s.city_voice), arg(s.birds_voice), arg(s.crickets_voice), arg(s.jet_clip), arg(s.whoomp_clip), arg(s.thump_clip), arg(s.city_clip), arg(s.birds_clip), arg(s.crickets_clip), arg(s.log), arg(s.net_status), arg(s.music), arg(s.station), arg(s.radio_on), arg(s.banner), arg(s.banner_sub), arg(s.banner_age), arg(s.car_vel), arg(s.car_vel_valid), arg(s.thumps)}); }
+[[maybe_unused]] static bool same(const UiState& want, const converted::Value& got) { return got.rows && got.rows->size() == 56 && same(want.settings, (*got.rows)[0]) && same(want.settings_table, (*got.rows)[1]) && same(want.applied, (*got.rows)[2]) && same(want.paused, (*got.rows)[3]) && same(want.audio_paused, (*got.rows)[4]) && same(want.resets, (*got.rows)[5]) && same(want.drone_seen, (*got.rows)[6]) && same(want.head_yaw_before, (*got.rows)[7]) && same(want.head_pitch_before, (*got.rows)[8]) && same(want.assists, (*got.rows)[9]) && same(want.grid_mesh, (*got.rows)[10]) && same(want.collider_mesh, (*got.rows)[11]) && same(want.grid_at, (*got.rows)[12]) && same(want.collider_clock, (*got.rows)[13]) && same(want.world_military, (*got.rows)[14]) && same(want.world_zombies, (*got.rows)[15]) && same(want.gps, (*got.rows)[16]) && same(want.moves, (*got.rows)[17]) && same(want.place, (*got.rows)[18]) && same(want.gps_cam_eye, (*got.rows)[19]) && same(want.gps_cam_look, (*got.rows)[20]) && same(want.puck_acc, (*got.rows)[21]) && same(want.puck_ring, (*got.rows)[22]) && same(want.puck_dot, (*got.rows)[23]) && same(want.puck_wedge, (*got.rows)[24]) && same(want.trail_mesh, (*got.rows)[25]) && same(want.trail, (*got.rows)[26]) && same(want.trail_dirty, (*got.rows)[27]) && same(want.trail_upload, (*got.rows)[28]) && same(want.gps_cam_init, (*got.rows)[29]) && same(want.jetpack, (*got.rows)[30]) && same(want.jump_was, (*got.rows)[31]) && same(want.jet_pending, (*got.rows)[32]) && same(want.jet_acc, (*got.rows)[33]) && same(converted::shaped<std::vector<converted::Whole>>(converted::array_list(want.remote_jet_voice)), (*got.rows)[34]) && same(want.jet_voice, (*got.rows)[35]) && same(want.city_voice, (*got.rows)[36]) && same(want.birds_voice, (*got.rows)[37]) && same(want.crickets_voice, (*got.rows)[38]) && same(want.jet_clip, (*got.rows)[39]) && same(want.whoomp_clip, (*got.rows)[40]) && same(want.thump_clip, (*got.rows)[41]) && same(want.city_clip, (*got.rows)[42]) && same(want.birds_clip, (*got.rows)[43]) && same(want.crickets_clip, (*got.rows)[44]) && same(want.log, (*got.rows)[45]) && same(want.net_status, (*got.rows)[46]) && same(want.music, (*got.rows)[47]) && same(want.station, (*got.rows)[48]) && same(want.radio_on, (*got.rows)[49]) && same(want.banner, (*got.rows)[50]) && same(want.banner_sub, (*got.rows)[51]) && same(want.banner_age, (*got.rows)[52]) && same(want.car_vel, (*got.rows)[53]) && same(want.car_vel_valid, (*got.rows)[54]) && same(want.thumps, (*got.rows)[55]); }
+[[maybe_unused]] static bool defined(const UiState& s) { return defined(s.settings) && defined(s.settings_table) && defined(s.applied) && defined(s.paused) && defined(s.audio_paused) && defined(s.resets) && defined(s.drone_seen) && defined(s.head_yaw_before) && defined(s.head_pitch_before) && defined(s.assists) && defined(s.grid_mesh) && defined(s.collider_mesh) && defined(s.grid_at) && defined(s.collider_clock) && defined(s.world_military) && defined(s.world_zombies) && defined(s.gps) && defined(s.moves) && defined(s.place) && defined(s.gps_cam_eye) && defined(s.gps_cam_look) && defined(s.puck_acc) && defined(s.puck_ring) && defined(s.puck_dot) && defined(s.puck_wedge) && defined(s.trail_mesh) && defined(s.trail) && defined(s.trail_dirty) && defined(s.trail_upload) && defined(s.gps_cam_init) && defined(s.jetpack) && defined(s.jump_was) && defined(s.jet_pending) && defined(s.jet_acc) && defined(converted::shaped<std::vector<converted::Whole>>(converted::array_list(s.remote_jet_voice))) && defined(s.jet_voice) && defined(s.city_voice) && defined(s.birds_voice) && defined(s.crickets_voice) && defined(s.jet_clip) && defined(s.whoomp_clip) && defined(s.thump_clip) && defined(s.city_clip) && defined(s.birds_clip) && defined(s.crickets_clip) && defined(s.log) && defined(s.net_status) && defined(s.music) && defined(s.station) && defined(s.radio_on) && defined(s.banner) && defined(s.banner_sub) && defined(s.banner_age) && defined(s.car_vel) && defined(s.car_vel_valid) && defined(s.thumps); }
+[[maybe_unused]] static std::string text(const UiState& s) { return std::string("{") + text(s.settings) + ", " + text(s.settings_table) + ", " + text(s.applied) + ", " + text(s.paused) + ", " + text(s.audio_paused) + ", " + text(s.resets) + ", " + text(s.drone_seen) + ", " + text(s.head_yaw_before) + ", " + text(s.head_pitch_before) + ", " + text(s.assists) + ", " + text(s.grid_mesh) + ", " + text(s.collider_mesh) + ", " + text(s.grid_at) + ", " + text(s.collider_clock) + ", " + text(s.world_military) + ", " + text(s.world_zombies) + ", " + text(s.gps) + ", " + text(s.moves) + ", " + text(s.place) + ", " + text(s.gps_cam_eye) + ", " + text(s.gps_cam_look) + ", " + text(s.puck_acc) + ", " + text(s.puck_ring) + ", " + text(s.puck_dot) + ", " + text(s.puck_wedge) + ", " + text(s.trail_mesh) + ", " + text(s.trail) + ", " + text(s.trail_dirty) + ", " + text(s.trail_upload) + ", " + text(s.gps_cam_init) + ", " + text(s.jetpack) + ", " + text(s.jump_was) + ", " + text(s.jet_pending) + ", " + text(s.jet_acc) + ", " + text(converted::shaped<std::vector<converted::Whole>>(converted::array_list(s.remote_jet_voice))) + ", " + text(s.jet_voice) + ", " + text(s.city_voice) + ", " + text(s.birds_voice) + ", " + text(s.crickets_voice) + ", " + text(s.jet_clip) + ", " + text(s.whoomp_clip) + ", " + text(s.thump_clip) + ", " + text(s.city_clip) + ", " + text(s.birds_clip) + ", " + text(s.crickets_clip) + ", " + text(s.log) + ", " + text(s.net_status) + ", " + text(s.music) + ", " + text(s.station) + ", " + text(s.radio_on) + ", " + text(s.banner) + ", " + text(s.banner_sub) + ", " + text(s.banner_age) + ", " + text(s.car_vel) + ", " + text(s.car_vel_valid) + ", " + text(s.thumps) + "}"; }
+[[maybe_unused]] static void take(UiState& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 56) return; converted::take_as<Settings>(s.settings, (*v.rows)[0]); converted::take_as<SettingsTable>(s.settings_table, (*v.rows)[1]); converted::take_as<unsigned int>(s.applied, (*v.rows)[2]); converted::take_as<bool>(s.paused, (*v.rows)[3]); converted::take_as<bool>(s.audio_paused, (*v.rows)[4]); converted::take_as<unsigned int>(s.resets, (*v.rows)[5]); converted::take_as<bool>(s.drone_seen, (*v.rows)[6]); converted::take_as<double>(s.head_yaw_before, (*v.rows)[7]); converted::take_as<double>(s.head_pitch_before, (*v.rows)[8]); converted::take_as<unsigned int>(s.assists, (*v.rows)[9]); converted::take_as<unsigned int>(s.grid_mesh, (*v.rows)[10]); converted::take_as<unsigned int>(s.collider_mesh, (*v.rows)[11]); converted::take_as<Vec3>(s.grid_at, (*v.rows)[12]); converted::take_as<double>(s.collider_clock, (*v.rows)[13]); converted::take_as<int>(s.world_military, (*v.rows)[14]); converted::take_as<int>(s.world_zombies, (*v.rows)[15]); converted::take_as<GpsLive>(s.gps, (*v.rows)[16]); converted::take_as<unsigned int>(s.moves, (*v.rows)[17]); converted::take_as<std::string>(s.place, (*v.rows)[18]); converted::take_as<Vec3>(s.gps_cam_eye, (*v.rows)[19]); converted::take_as<Vec3>(s.gps_cam_look, (*v.rows)[20]); converted::take_as<unsigned int>(s.puck_acc, (*v.rows)[21]); converted::take_as<unsigned int>(s.puck_ring, (*v.rows)[22]); converted::take_as<unsigned int>(s.puck_dot, (*v.rows)[23]); converted::take_as<unsigned int>(s.puck_wedge, (*v.rows)[24]); converted::take_as<unsigned int>(s.trail_mesh, (*v.rows)[25]); converted::take_as<std::vector<Vec2>>(s.trail, (*v.rows)[26]); converted::take_as<bool>(s.trail_dirty, (*v.rows)[27]); converted::take_as<double>(s.trail_upload, (*v.rows)[28]); converted::take_as<bool>(s.gps_cam_init, (*v.rows)[29]); converted::take_as<Jetpack>(s.jetpack, (*v.rows)[30]); converted::take_as<bool>(s.jump_was, (*v.rows)[31]); converted::take_as<bool>(s.jet_pending, (*v.rows)[32]); converted::take_as<double>(s.jet_acc, (*v.rows)[33]); { std::vector<u64> items; converted::take_as<std::vector<converted::Whole>>(items, (*v.rows)[34]); converted::array_from(s.remote_jet_voice, items); } converted::take_as<unsigned long>(s.jet_voice, (*v.rows)[35]); converted::take_as<unsigned long>(s.city_voice, (*v.rows)[36]); converted::take_as<unsigned long>(s.birds_voice, (*v.rows)[37]); converted::take_as<unsigned long>(s.crickets_voice, (*v.rows)[38]); converted::take_as<unsigned int>(s.jet_clip, (*v.rows)[39]); converted::take_as<unsigned int>(s.whoomp_clip, (*v.rows)[40]); converted::take_as<unsigned int>(s.thump_clip, (*v.rows)[41]); converted::take_as<unsigned int>(s.city_clip, (*v.rows)[42]); converted::take_as<unsigned int>(s.birds_clip, (*v.rows)[43]); converted::take_as<unsigned int>(s.crickets_clip, (*v.rows)[44]); converted::take_as<FlightLog>(s.log, (*v.rows)[45]); converted::take_as<std::string>(s.net_status, (*v.rows)[46]); converted::take_as<MusicSynth>(s.music, (*v.rows)[47]); converted::take_as<int>(s.station, (*v.rows)[48]); converted::take_as<bool>(s.radio_on, (*v.rows)[49]); converted::take_as<std::string>(s.banner, (*v.rows)[50]); converted::take_as<std::string>(s.banner_sub, (*v.rows)[51]); converted::take_as<double>(s.banner_age, (*v.rows)[52]); converted::take_as<Vec3>(s.car_vel, (*v.rows)[53]); converted::take_as<bool>(s.car_vel_valid, (*v.rows)[54]); converted::take_as<unsigned int>(s.thumps, (*v.rows)[55]); }
 [[maybe_unused]] static perf::Meter draw_perf__Meter(converted::Draw& draw) {
   perf::Meter s{};
   s.start_ = draw.number();
@@ -11125,7 +12283,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   s->pad = draw_PadState(draw);
   s->dsync_ = converted::draw_maybe<std::unique_ptr<DestroySync>>(draw, [&]() -> DestroySync { return draw_DestroySync(draw); });
   s->toss_test_ = static_cast<int>(draw.whole());
-  s->toss_ = converted::draw_maybe<std::unique_ptr<TossState>>(draw, [&]() -> TossState { return draw_TossState(draw); });
+  s->toss_ = draw_TossState(draw);
   s->projsync_ = converted::draw_maybe<std::unique_ptr<ProjSync>>(draw, [&]() -> ProjSync { return draw_ProjSync(draw); });
   s->proj_serial_ = static_cast<unsigned int>(draw.below(40));
   s->townsync_ = converted::draw_maybe<std::unique_ptr<TownSync>>(draw, [&]() -> TownSync { return draw_TownSync(draw); });
@@ -11369,6 +12527,106 @@ struct State_Game { const Game* s; };
 [[maybe_unused]] static bool same(const State_Game& w, const converted::Value& got) { return got.rows && got.rows->size() == 240 && same(w.s->pad, (*got.rows)[0]) && same(w.s->dsync_, (*got.rows)[1]) && same(w.s->toss_test_, (*got.rows)[2]) && same(w.s->toss_, (*got.rows)[3]) && same(w.s->projsync_, (*got.rows)[4]) && same(w.s->proj_serial_, (*got.rows)[5]) && same(w.s->townsync_, (*got.rows)[6]) && same(w.s->puppet_world_, (*got.rows)[7]) && same(w.s->world_send_clock_, (*got.rows)[8]) && same(w.s->people_send_clock_, (*got.rows)[9]) && same(w.s->world_send_real_, (*got.rows)[10]) && same(w.s->world_tick_, (*got.rows)[11]) && same(w.s->world_sent_, (*got.rows)[12]) && same(w.s->world_got_, (*got.rows)[13]) && same(w.s->world_heard_at_, (*got.rows)[14]) && same(w.s->car_seen_, (*got.rows)[15]) && same(w.s->people_acc_, (*got.rows)[16]) && same(w.s->car_net_, (*got.rows)[17]) && same(w.s->car_line_, (*got.rows)[18]) && same(w.s->car_rest_q_, (*got.rows)[19]) && same(w.s->world_parts_, (*got.rows)[20]) && same(w.s->cows_acc_, (*got.rows)[21]) && same(w.s->pets_acc_, (*got.rows)[22]) && same(w.s->flocks_acc_, (*got.rows)[23]) && same(w.s->host_epoch_off_, (*got.rows)[24]) && same(w.s->host_epoch_ok_, (*got.rows)[25]) && same(w.s->world_clock_, (*got.rows)[26]) && same(w.s->world_clock_ok_, (*got.rows)[27]) && same(w.s->car_lent_, (*got.rows)[28]) && same(w.s->car_lent_at_, (*got.rows)[29]) && same(w.s->swarms_, (*got.rows)[30]) && same(w.s->swarm_clock_, (*got.rows)[31]) && same(w.s->swarm_serial_, (*got.rows)[32]) && same(w.s->swarm_sent_, (*got.rows)[33]) && same(w.s->swarm_fallen_, (*got.rows)[34]) && same(w.s->swarm_cruiser_, (*got.rows)[35]) && same(w.s->life_, (*got.rows)[36]) && same(w.s->laser_finger_, (*got.rows)[37]) && same(w.s->laser_pinned_, (*got.rows)[38]) && same(w.s->laser_valid_, (*got.rows)[39]) && same(w.s->laser_fx_, (*got.rows)[40]) && same(w.s->laser_fy_, (*got.rows)[41]) && same(w.s->laser_pin_, (*got.rows)[42]) && same(w.s->laser_dot_, (*got.rows)[43]) && same(w.s->visual_blasts_, (*got.rows)[44]) && same(converted::array_list(w.s->bounce_fx_), (*got.rows)[45]) && same(w.s->bounce_fx_next_, (*got.rows)[46]) && same(w.s->gaps_, (*got.rows)[47]) && same(w.s->engine_, (*got.rows)[48]) && same(w.s->vr_, (*got.rows)[49]) && same(converted::array_list(w.s->vr_hands_), (*got.rows)[50]) && same(w.s->vr_snap_armed_, (*got.rows)[51]) && same(w.s->vr_arms_, (*got.rows)[52]) && same(w.s->vr_both_clicks_, (*got.rows)[53]) && same(w.s->vr_wpn_armed_, (*got.rows)[54]) && same(w.s->vr_fire_was_, (*got.rows)[55]) && same(converted::array_list(w.s->vr_pulse_), (*got.rows)[56]) && same(w.s->vr_tunnel_mesh_, (*got.rows)[57]) && same(w.s->vr_tunnel_tex_, (*got.rows)[58]) && same(w.s->vr_tunnel_, (*got.rows)[59]) && same(w.s->vr_prev_f_, (*got.rows)[60]) && same(w.s->vr_prev_up_, (*got.rows)[61]) && same(w.s->vr_prev_eye_, (*got.rows)[62]) && same(w.s->vr_prev_v_, (*got.rows)[63]) && same(w.s->vr_prev_ok_, (*got.rows)[64]) && same(w.s->vr_menu_open_, (*got.rows)[65]) && same(w.s->vr_menu_trigger_, (*got.rows)[66]) && same(w.s->vr_menu_valid_, (*got.rows)[67]) && same(w.s->vr_menu_hover_, (*got.rows)[68]) && same(w.s->vr_menu_hover_was_, (*got.rows)[69]) && same(w.s->vr_menu_page_, (*got.rows)[70]) && same(w.s->vr_menu_sel_, (*got.rows)[71]) && same(w.s->vr_menu_stick_used_, (*got.rows)[72]) && same(w.s->vr_menu_stick_armed_, (*got.rows)[73]) && same(w.s->vr_y_fired_, (*got.rows)[74]) && same(w.s->vr_near_vehicle_, (*got.rows)[75]) && same(w.s->vr_y_held_, (*got.rows)[76]) && same(w.s->vr_cam_request_, (*got.rows)[77]) && same(w.s->vr_scoped_, (*got.rows)[78]) && same(w.s->vr_menu_c_, (*got.rows)[79]) && same(w.s->vr_menu_r_, (*got.rows)[80]) && same(w.s->vr_menu_u_, (*got.rows)[81]) && same(w.s->vr_menu_n_, (*got.rows)[82]) && same(w.s->vr_menu_w_, (*got.rows)[83]) && same(w.s->vr_menu_h_, (*got.rows)[84]) && same(w.s->vr_action_, (*got.rows)[85]) && same(w.s->vr_scope_tex_, (*got.rows)[86]) && same(w.s->vr_scope_mesh_, (*got.rows)[87]) && same(w.s->vr_hud_tex_, (*got.rows)[88]) && same(w.s->vr_hud_mesh_, (*got.rows)[89]) && same(w.s->windows_, (*got.rows)[90]) && same(w.s->water_look_, (*got.rows)[91]) && same(w.s->world_, (*got.rows)[92]) && same(w.s->city_, (*got.rows)[93]) && same(w.s->art_, (*got.rows)[94]) && same(w.s->soldier_, (*got.rows)[95]) && same(w.s->drone_actor_, (*got.rows)[96]) && same(w.s->jet_actor_, (*got.rows)[97]) && same(w.s->chute_actor_, (*got.rows)[98]) && same(w.s->drone_, (*got.rows)[99]) && same(w.s->jet_, (*got.rows)[100]) && same(w.s->cars_, (*got.rows)[101]) && same(w.s->mode_, (*got.rows)[102]) && same(w.s->car_index_, (*got.rows)[103]) && same(w.s->focus_prev_, (*got.rows)[104]) && same(w.s->focus_prev_valid_, (*got.rows)[105]) && same(w.s->jet_flown_, (*got.rows)[106]) && same(w.s->jet_v_valid_, (*got.rows)[107]) && same(w.s->jet_v_ctrl_, (*got.rows)[108]) && same(w.s->drone_out_, (*got.rows)[109]) && same(w.s->jet_placed_, (*got.rows)[110]) && same(w.s->world_placed_, (*got.rows)[111]) && same(w.s->chute_open_, (*got.rows)[112]) && same(w.s->chute_time_, (*got.rows)[113]) && same(w.s->chute_steer_, (*got.rows)[114]) && same(w.s->sticks_, (*got.rows)[115]) && same(w.s->jet_in_, (*got.rows)[116]) && same(w.s->landing_, (*got.rows)[117]) && same(w.s->landing_still_, (*got.rows)[118]) && same(w.s->height_held_, (*got.rows)[119]) && same(w.s->drone_cam_, (*got.rows)[120]) && same(w.s->car_cockpit_, (*got.rows)[121]) && same(w.s->jet_cockpit_, (*got.rows)[122]) && same(w.s->fpv_tilt_deg_, (*got.rows)[123]) && same(w.s->fpv_fov_deg_, (*got.rows)[124]) && same(w.s->spawn_, (*got.rows)[125]) && same(w.s->cam_, (*got.rows)[126]) && same(w.s->cam_valid_, (*got.rows)[127]) && same(w.s->cam_anchor_, (*got.rows)[128]) && same(w.s->cam_vel_, (*got.rows)[129]) && same(w.s->cam_heading_, (*got.rows)[130]) && same(w.s->rig_init_, (*got.rows)[131]) && same(w.s->head_yaw_, (*got.rows)[132]) && same(w.s->head_pitch_, (*got.rows)[133]) && same(w.s->sensitivity_, (*got.rows)[134]) && same(w.s->dpr_, (*got.rows)[135]) && same(w.s->soldier_controller_, (*got.rows)[136]) && same(w.s->pad_touch_, (*got.rows)[137]) && same(w.s->ctl_, (*got.rows)[138]) && same(w.s->touch_mode_, (*got.rows)[139]) && same(w.s->frame_w_, (*got.rows)[140]) && same(w.s->frame_h_, (*got.rows)[141]) && same(w.s->play_in_, (*got.rows)[142]) && same(w.s->people_, (*got.rows)[143]) && same(w.s->people_art_, (*got.rows)[144]) && same(w.s->combat_art_, (*got.rows)[145]) && same(w.s->destruction_, (*got.rows)[146]) && same(w.s->combat_, (*got.rows)[147]) && same(w.s->guided_, (*got.rows)[148]) && same(w.s->guided_last_, (*got.rows)[149]) && same(w.s->guided_lock_, (*got.rows)[150]) && same(w.s->guided_mark_, (*got.rows)[151]) && same(w.s->guided_mark_at_, (*got.rows)[152]) && same(w.s->guided_mark_time_, (*got.rows)[153]) && same(w.s->guided_marked_, (*got.rows)[154]) && same(w.s->car_last_hp_, (*got.rows)[155]) && same(w.s->car_burn_seen_, (*got.rows)[156]) && same(converted::array_list(w.s->pd_crit_), (*got.rows)[157]) && same(w.s->drone_crit_, (*got.rows)[158]) && same(w.s->ballot_, (*got.rows)[159]) && same(w.s->ballot_serial_, (*got.rows)[160]) && same(w.s->bullet_pushes_, (*got.rows)[161]) && same(w.s->crit_blasts_, (*got.rows)[162]) && same(converted::array_list(w.s->sfx_cursor_), (*got.rows)[163]) && same(w.s->combat_audio_ready_, (*got.rows)[164]) && same(w.s->roads_, (*got.rows)[165]) && same(w.s->units_, (*got.rows)[166]) && same(converted::array_list(w.s->pdrones_), (*got.rows)[167]) && same(w.s->last_known_, (*got.rows)[168]) && same(w.s->last_contact_, (*got.rows)[169]) && same(w.s->next_drone_wave_, (*got.rows)[170]) && same(w.s->emp_ready_at_, (*got.rows)[171]) && same(w.s->last_drone_shot_, (*got.rows)[172]) && same(w.s->last_player_hit_, (*got.rows)[173]) && same(w.s->drone_serial_, (*got.rows)[174]) && same(w.s->drone_wave_live_, (*got.rows)[175]) && same(w.s->projectiles_, (*got.rows)[176]) && same(w.s->foot_weapon_, (*got.rows)[177]) && same(converted::array_list(w.s->ammo_mag_), (*got.rows)[178]) && same(converted::array_list(w.s->ammo_reserve_), (*got.rows)[179]) && same(w.s->grenades_, (*got.rows)[180]) && same(w.s->drone_weapon_, (*got.rows)[181]) && same(w.s->jet_rocket_side_, (*got.rows)[182]) && same(w.s->jacked_at_, (*got.rows)[183]) && same(w.s->jet_cam_off_, (*got.rows)[184]) && same(w.s->next_attack_, (*got.rows)[185]) && same(w.s->next_grenade_, (*got.rows)[186]) && same(w.s->next_drone_fire_, (*got.rows)[187]) && same(w.s->next_jet_gun_, (*got.rows)[188]) && same(w.s->next_jet_missile_, (*got.rows)[189]) && same(w.s->next_jet_bomb_, (*got.rows)[190]) && same(w.s->trigger_was_, (*got.rows)[191]) && same(w.s->explosions_, (*got.rows)[192]) && same(w.s->net_, (*got.rows)[193]) && same(w.s->remote_car_, (*got.rows)[194]) && same(w.s->remote_bus_, (*got.rows)[195]) && same(w.s->rebased_, (*got.rows)[196]) && same(w.s->mp_, (*got.rows)[197]) && same(w.s->lamps_, (*got.rows)[198]) && same(w.s->substeps_, (*got.rows)[199]) && same(w.s->ground_changes_, (*got.rows)[200]) && same(w.s->night_, (*got.rows)[201]) && same(w.s->show_lamps_, (*got.rows)[202]) && same(w.s->star_since_, (*got.rows)[203]) && same(w.s->last_wave_, (*got.rows)[204]) && same(w.s->last_cop_shot_, (*got.rows)[205]) && same(w.s->drone_hp_, (*got.rows)[206]) && same(w.s->jet_hp_, (*got.rows)[207]) && same(w.s->last_stars_, (*got.rows)[208]) && same(w.s->player_dead_, (*got.rows)[209]) && same(w.s->died_at_, (*got.rows)[210]) && same(w.s->died_feet_, (*got.rows)[211]) && same(w.s->respawn_rule_, (*got.rows)[212]) && same(w.s->reset_revive_, (*got.rows)[213]) && same(w.s->spawn_guard_, (*got.rows)[214]) && same(w.s->spawn_guard_until_, (*got.rows)[215]) && same(w.s->spawn_guard_ready_at_, (*got.rows)[216]) && same(w.s->hint_, (*got.rows)[217]) && same(w.s->toast_, (*got.rows)[218]) && same(w.s->toast_age_, (*got.rows)[219]) && same(w.s->time_, (*got.rows)[220]) && same(w.s->fps_, (*got.rows)[221]) && same(converted::shaped<converted::Whole>(w.s->steps_), (*got.rows)[222]) && same(w.s->rng_, (*got.rows)[223]) && same(w.s->spawn_checked_, (*got.rows)[224]) && same(w.s->mixer_, (*got.rows)[225]) && same(w.s->bank_, (*got.rows)[226]) && same(w.s->game_audio_, (*got.rows)[227]) && same(w.s->fx_, (*got.rows)[228]) && same(w.s->audio_out_, (*got.rows)[229]) && same(w.s->web_audio_, (*got.rows)[230]) && same(w.s->osfx_, (*got.rows)[231]) && same(w.s->shot_flesh_, (*got.rows)[232]) && same(w.s->lon_, (*got.rows)[233]) && same(w.s->lat_, (*got.rows)[234]) && same(w.s->start_mode_, (*got.rows)[235]) && same(w.s->mobile_, (*got.rows)[236]) && same(w.s->ui_, (*got.rows)[237]) && same(w.s->look_, (*got.rows)[238]) && same(w.s->glife_, (*got.rows)[239]); }
 [[maybe_unused]] static bool defined(const State_Game& w) { return defined(w.s->pad) && defined(w.s->dsync_) && defined(w.s->toss_test_) && defined(w.s->toss_) && defined(w.s->projsync_) && defined(w.s->proj_serial_) && defined(w.s->townsync_) && defined(w.s->puppet_world_) && defined(w.s->world_send_clock_) && defined(w.s->people_send_clock_) && defined(w.s->world_send_real_) && defined(w.s->world_tick_) && defined(w.s->world_sent_) && defined(w.s->world_got_) && defined(w.s->world_heard_at_) && defined(w.s->car_seen_) && defined(w.s->people_acc_) && defined(w.s->car_net_) && defined(w.s->car_line_) && defined(w.s->car_rest_q_) && defined(w.s->world_parts_) && defined(w.s->cows_acc_) && defined(w.s->pets_acc_) && defined(w.s->flocks_acc_) && defined(w.s->host_epoch_off_) && defined(w.s->host_epoch_ok_) && defined(w.s->world_clock_) && defined(w.s->world_clock_ok_) && defined(w.s->car_lent_) && defined(w.s->car_lent_at_) && defined(w.s->swarms_) && defined(w.s->swarm_clock_) && defined(w.s->swarm_serial_) && defined(w.s->swarm_sent_) && defined(w.s->swarm_fallen_) && defined(w.s->swarm_cruiser_) && defined(w.s->life_) && defined(w.s->laser_finger_) && defined(w.s->laser_pinned_) && defined(w.s->laser_valid_) && defined(w.s->laser_fx_) && defined(w.s->laser_fy_) && defined(w.s->laser_pin_) && defined(w.s->laser_dot_) && defined(w.s->visual_blasts_) && defined(converted::array_list(w.s->bounce_fx_)) && defined(w.s->bounce_fx_next_) && defined(w.s->gaps_) && defined(w.s->engine_) && defined(w.s->vr_) && defined(converted::array_list(w.s->vr_hands_)) && defined(w.s->vr_snap_armed_) && defined(w.s->vr_arms_) && defined(w.s->vr_both_clicks_) && defined(w.s->vr_wpn_armed_) && defined(w.s->vr_fire_was_) && defined(converted::array_list(w.s->vr_pulse_)) && defined(w.s->vr_tunnel_mesh_) && defined(w.s->vr_tunnel_tex_) && defined(w.s->vr_tunnel_) && defined(w.s->vr_prev_f_) && defined(w.s->vr_prev_up_) && defined(w.s->vr_prev_eye_) && defined(w.s->vr_prev_v_) && defined(w.s->vr_prev_ok_) && defined(w.s->vr_menu_open_) && defined(w.s->vr_menu_trigger_) && defined(w.s->vr_menu_valid_) && defined(w.s->vr_menu_hover_) && defined(w.s->vr_menu_hover_was_) && defined(w.s->vr_menu_page_) && defined(w.s->vr_menu_sel_) && defined(w.s->vr_menu_stick_used_) && defined(w.s->vr_menu_stick_armed_) && defined(w.s->vr_y_fired_) && defined(w.s->vr_near_vehicle_) && defined(w.s->vr_y_held_) && defined(w.s->vr_cam_request_) && defined(w.s->vr_scoped_) && defined(w.s->vr_menu_c_) && defined(w.s->vr_menu_r_) && defined(w.s->vr_menu_u_) && defined(w.s->vr_menu_n_) && defined(w.s->vr_menu_w_) && defined(w.s->vr_menu_h_) && defined(w.s->vr_action_) && defined(w.s->vr_scope_tex_) && defined(w.s->vr_scope_mesh_) && defined(w.s->vr_hud_tex_) && defined(w.s->vr_hud_mesh_) && defined(w.s->windows_) && defined(w.s->water_look_) && defined(w.s->world_) && defined(w.s->city_) && defined(w.s->art_) && defined(w.s->soldier_) && defined(w.s->drone_actor_) && defined(w.s->jet_actor_) && defined(w.s->chute_actor_) && defined(w.s->drone_) && defined(w.s->jet_) && defined(w.s->cars_) && defined(w.s->mode_) && defined(w.s->car_index_) && defined(w.s->focus_prev_) && defined(w.s->focus_prev_valid_) && defined(w.s->jet_flown_) && defined(w.s->jet_v_valid_) && defined(w.s->jet_v_ctrl_) && defined(w.s->drone_out_) && defined(w.s->jet_placed_) && defined(w.s->world_placed_) && defined(w.s->chute_open_) && defined(w.s->chute_time_) && defined(w.s->chute_steer_) && defined(w.s->sticks_) && defined(w.s->jet_in_) && defined(w.s->landing_) && defined(w.s->landing_still_) && defined(w.s->height_held_) && defined(w.s->drone_cam_) && defined(w.s->car_cockpit_) && defined(w.s->jet_cockpit_) && defined(w.s->fpv_tilt_deg_) && defined(w.s->fpv_fov_deg_) && defined(w.s->spawn_) && defined(w.s->cam_) && defined(w.s->cam_valid_) && defined(w.s->cam_anchor_) && defined(w.s->cam_vel_) && defined(w.s->cam_heading_) && defined(w.s->rig_init_) && defined(w.s->head_yaw_) && defined(w.s->head_pitch_) && defined(w.s->sensitivity_) && defined(w.s->dpr_) && defined(w.s->soldier_controller_) && defined(w.s->pad_touch_) && defined(w.s->ctl_) && defined(w.s->touch_mode_) && defined(w.s->frame_w_) && defined(w.s->frame_h_) && defined(w.s->play_in_) && defined(w.s->people_) && defined(w.s->people_art_) && defined(w.s->combat_art_) && defined(w.s->destruction_) && defined(w.s->combat_) && defined(w.s->guided_) && defined(w.s->guided_last_) && defined(w.s->guided_lock_) && defined(w.s->guided_mark_) && defined(w.s->guided_mark_at_) && defined(w.s->guided_mark_time_) && defined(w.s->guided_marked_) && defined(w.s->car_last_hp_) && defined(w.s->car_burn_seen_) && defined(converted::array_list(w.s->pd_crit_)) && defined(w.s->drone_crit_) && defined(w.s->ballot_) && defined(w.s->ballot_serial_) && defined(w.s->bullet_pushes_) && defined(w.s->crit_blasts_) && defined(converted::array_list(w.s->sfx_cursor_)) && defined(w.s->combat_audio_ready_) && defined(w.s->roads_) && defined(w.s->units_) && defined(converted::array_list(w.s->pdrones_)) && defined(w.s->last_known_) && defined(w.s->last_contact_) && defined(w.s->next_drone_wave_) && defined(w.s->emp_ready_at_) && defined(w.s->last_drone_shot_) && defined(w.s->last_player_hit_) && defined(w.s->drone_serial_) && defined(w.s->drone_wave_live_) && defined(w.s->projectiles_) && defined(w.s->foot_weapon_) && defined(converted::array_list(w.s->ammo_mag_)) && defined(converted::array_list(w.s->ammo_reserve_)) && defined(w.s->grenades_) && defined(w.s->drone_weapon_) && defined(w.s->jet_rocket_side_) && defined(w.s->jacked_at_) && defined(w.s->jet_cam_off_) && defined(w.s->next_attack_) && defined(w.s->next_grenade_) && defined(w.s->next_drone_fire_) && defined(w.s->next_jet_gun_) && defined(w.s->next_jet_missile_) && defined(w.s->next_jet_bomb_) && defined(w.s->trigger_was_) && defined(w.s->explosions_) && defined(w.s->net_) && defined(w.s->remote_car_) && defined(w.s->remote_bus_) && defined(w.s->rebased_) && defined(w.s->mp_) && defined(w.s->lamps_) && defined(w.s->substeps_) && defined(w.s->ground_changes_) && defined(w.s->night_) && defined(w.s->show_lamps_) && defined(w.s->star_since_) && defined(w.s->last_wave_) && defined(w.s->last_cop_shot_) && defined(w.s->drone_hp_) && defined(w.s->jet_hp_) && defined(w.s->last_stars_) && defined(w.s->player_dead_) && defined(w.s->died_at_) && defined(w.s->died_feet_) && defined(w.s->respawn_rule_) && defined(w.s->reset_revive_) && defined(w.s->spawn_guard_) && defined(w.s->spawn_guard_until_) && defined(w.s->spawn_guard_ready_at_) && defined(w.s->hint_) && defined(w.s->toast_) && defined(w.s->toast_age_) && defined(w.s->time_) && defined(w.s->fps_) && defined(converted::shaped<converted::Whole>(w.s->steps_)) && defined(w.s->rng_) && defined(w.s->spawn_checked_) && defined(w.s->mixer_) && defined(w.s->bank_) && defined(w.s->game_audio_) && defined(w.s->fx_) && defined(w.s->audio_out_) && defined(w.s->web_audio_) && defined(w.s->osfx_) && defined(w.s->shot_flesh_) && defined(w.s->lon_) && defined(w.s->lat_) && defined(w.s->start_mode_) && defined(w.s->mobile_) && defined(w.s->ui_) && defined(w.s->look_) && defined(w.s->glife_); }
 [[maybe_unused]] static std::string text(const State_Game& w) { return std::string("{") + "pad = " + text(w.s->pad) + ", " + "dsync_ = " + text(w.s->dsync_) + ", " + "toss_test_ = " + text(w.s->toss_test_) + ", " + "toss_ = " + text(w.s->toss_) + ", " + "projsync_ = " + text(w.s->projsync_) + ", " + "proj_serial_ = " + text(w.s->proj_serial_) + ", " + "townsync_ = " + text(w.s->townsync_) + ", " + "puppet_world_ = " + text(w.s->puppet_world_) + ", " + "world_send_clock_ = " + text(w.s->world_send_clock_) + ", " + "people_send_clock_ = " + text(w.s->people_send_clock_) + ", " + "world_send_real_ = " + text(w.s->world_send_real_) + ", " + "world_tick_ = " + text(w.s->world_tick_) + ", " + "world_sent_ = " + text(w.s->world_sent_) + ", " + "world_got_ = " + text(w.s->world_got_) + ", " + "world_heard_at_ = " + text(w.s->world_heard_at_) + ", " + "car_seen_ = " + text(w.s->car_seen_) + ", " + "people_acc_ = " + text(w.s->people_acc_) + ", " + "car_net_ = " + text(w.s->car_net_) + ", " + "car_line_ = " + text(w.s->car_line_) + ", " + "car_rest_q_ = " + text(w.s->car_rest_q_) + ", " + "world_parts_ = " + text(w.s->world_parts_) + ", " + "cows_acc_ = " + text(w.s->cows_acc_) + ", " + "pets_acc_ = " + text(w.s->pets_acc_) + ", " + "flocks_acc_ = " + text(w.s->flocks_acc_) + ", " + "host_epoch_off_ = " + text(w.s->host_epoch_off_) + ", " + "host_epoch_ok_ = " + text(w.s->host_epoch_ok_) + ", " + "world_clock_ = " + text(w.s->world_clock_) + ", " + "world_clock_ok_ = " + text(w.s->world_clock_ok_) + ", " + "car_lent_ = " + text(w.s->car_lent_) + ", " + "car_lent_at_ = " + text(w.s->car_lent_at_) + ", " + "swarms_ = " + text(w.s->swarms_) + ", " + "swarm_clock_ = " + text(w.s->swarm_clock_) + ", " + "swarm_serial_ = " + text(w.s->swarm_serial_) + ", " + "swarm_sent_ = " + text(w.s->swarm_sent_) + ", " + "swarm_fallen_ = " + text(w.s->swarm_fallen_) + ", " + "swarm_cruiser_ = " + text(w.s->swarm_cruiser_) + ", " + "life_ = " + text(w.s->life_) + ", " + "laser_finger_ = " + text(w.s->laser_finger_) + ", " + "laser_pinned_ = " + text(w.s->laser_pinned_) + ", " + "laser_valid_ = " + text(w.s->laser_valid_) + ", " + "laser_fx_ = " + text(w.s->laser_fx_) + ", " + "laser_fy_ = " + text(w.s->laser_fy_) + ", " + "laser_pin_ = " + text(w.s->laser_pin_) + ", " + "laser_dot_ = " + text(w.s->laser_dot_) + ", " + "visual_blasts_ = " + text(w.s->visual_blasts_) + ", " + "bounce_fx_ = " + text(converted::array_list(w.s->bounce_fx_)) + ", " + "bounce_fx_next_ = " + text(w.s->bounce_fx_next_) + ", " + "gaps_ = " + text(w.s->gaps_) + ", " + "engine_ = " + text(w.s->engine_) + ", " + "vr_ = " + text(w.s->vr_) + ", " + "vr_hands_ = " + text(converted::array_list(w.s->vr_hands_)) + ", " + "vr_snap_armed_ = " + text(w.s->vr_snap_armed_) + ", " + "vr_arms_ = " + text(w.s->vr_arms_) + ", " + "vr_both_clicks_ = " + text(w.s->vr_both_clicks_) + ", " + "vr_wpn_armed_ = " + text(w.s->vr_wpn_armed_) + ", " + "vr_fire_was_ = " + text(w.s->vr_fire_was_) + ", " + "vr_pulse_ = " + text(converted::array_list(w.s->vr_pulse_)) + ", " + "vr_tunnel_mesh_ = " + text(w.s->vr_tunnel_mesh_) + ", " + "vr_tunnel_tex_ = " + text(w.s->vr_tunnel_tex_) + ", " + "vr_tunnel_ = " + text(w.s->vr_tunnel_) + ", " + "vr_prev_f_ = " + text(w.s->vr_prev_f_) + ", " + "vr_prev_up_ = " + text(w.s->vr_prev_up_) + ", " + "vr_prev_eye_ = " + text(w.s->vr_prev_eye_) + ", " + "vr_prev_v_ = " + text(w.s->vr_prev_v_) + ", " + "vr_prev_ok_ = " + text(w.s->vr_prev_ok_) + ", " + "vr_menu_open_ = " + text(w.s->vr_menu_open_) + ", " + "vr_menu_trigger_ = " + text(w.s->vr_menu_trigger_) + ", " + "vr_menu_valid_ = " + text(w.s->vr_menu_valid_) + ", " + "vr_menu_hover_ = " + text(w.s->vr_menu_hover_) + ", " + "vr_menu_hover_was_ = " + text(w.s->vr_menu_hover_was_) + ", " + "vr_menu_page_ = " + text(w.s->vr_menu_page_) + ", " + "vr_menu_sel_ = " + text(w.s->vr_menu_sel_) + ", " + "vr_menu_stick_used_ = " + text(w.s->vr_menu_stick_used_) + ", " + "vr_menu_stick_armed_ = " + text(w.s->vr_menu_stick_armed_) + ", " + "vr_y_fired_ = " + text(w.s->vr_y_fired_) + ", " + "vr_near_vehicle_ = " + text(w.s->vr_near_vehicle_) + ", " + "vr_y_held_ = " + text(w.s->vr_y_held_) + ", " + "vr_cam_request_ = " + text(w.s->vr_cam_request_) + ", " + "vr_scoped_ = " + text(w.s->vr_scoped_) + ", " + "vr_menu_c_ = " + text(w.s->vr_menu_c_) + ", " + "vr_menu_r_ = " + text(w.s->vr_menu_r_) + ", " + "vr_menu_u_ = " + text(w.s->vr_menu_u_) + ", " + "vr_menu_n_ = " + text(w.s->vr_menu_n_) + ", " + "vr_menu_w_ = " + text(w.s->vr_menu_w_) + ", " + "vr_menu_h_ = " + text(w.s->vr_menu_h_) + ", " + "vr_action_ = " + text(w.s->vr_action_) + ", " + "vr_scope_tex_ = " + text(w.s->vr_scope_tex_) + ", " + "vr_scope_mesh_ = " + text(w.s->vr_scope_mesh_) + ", " + "vr_hud_tex_ = " + text(w.s->vr_hud_tex_) + ", " + "vr_hud_mesh_ = " + text(w.s->vr_hud_mesh_) + ", " + "windows_ = " + text(w.s->windows_) + ", " + "water_look_ = " + text(w.s->water_look_) + ", " + "world_ = " + text(w.s->world_) + ", " + "city_ = " + text(w.s->city_) + ", " + "art_ = " + text(w.s->art_) + ", " + "soldier_ = " + text(w.s->soldier_) + ", " + "drone_actor_ = " + text(w.s->drone_actor_) + ", " + "jet_actor_ = " + text(w.s->jet_actor_) + ", " + "chute_actor_ = " + text(w.s->chute_actor_) + ", " + "drone_ = " + text(w.s->drone_) + ", " + "jet_ = " + text(w.s->jet_) + ", " + "cars_ = " + text(w.s->cars_) + ", " + "mode_ = " + text(w.s->mode_) + ", " + "car_index_ = " + text(w.s->car_index_) + ", " + "focus_prev_ = " + text(w.s->focus_prev_) + ", " + "focus_prev_valid_ = " + text(w.s->focus_prev_valid_) + ", " + "jet_flown_ = " + text(w.s->jet_flown_) + ", " + "jet_v_valid_ = " + text(w.s->jet_v_valid_) + ", " + "jet_v_ctrl_ = " + text(w.s->jet_v_ctrl_) + ", " + "drone_out_ = " + text(w.s->drone_out_) + ", " + "jet_placed_ = " + text(w.s->jet_placed_) + ", " + "world_placed_ = " + text(w.s->world_placed_) + ", " + "chute_open_ = " + text(w.s->chute_open_) + ", " + "chute_time_ = " + text(w.s->chute_time_) + ", " + "chute_steer_ = " + text(w.s->chute_steer_) + ", " + "sticks_ = " + text(w.s->sticks_) + ", " + "jet_in_ = " + text(w.s->jet_in_) + ", " + "landing_ = " + text(w.s->landing_) + ", " + "landing_still_ = " + text(w.s->landing_still_) + ", " + "height_held_ = " + text(w.s->height_held_) + ", " + "drone_cam_ = " + text(w.s->drone_cam_) + ", " + "car_cockpit_ = " + text(w.s->car_cockpit_) + ", " + "jet_cockpit_ = " + text(w.s->jet_cockpit_) + ", " + "fpv_tilt_deg_ = " + text(w.s->fpv_tilt_deg_) + ", " + "fpv_fov_deg_ = " + text(w.s->fpv_fov_deg_) + ", " + "spawn_ = " + text(w.s->spawn_) + ", " + "cam_ = " + text(w.s->cam_) + ", " + "cam_valid_ = " + text(w.s->cam_valid_) + ", " + "cam_anchor_ = " + text(w.s->cam_anchor_) + ", " + "cam_vel_ = " + text(w.s->cam_vel_) + ", " + "cam_heading_ = " + text(w.s->cam_heading_) + ", " + "rig_init_ = " + text(w.s->rig_init_) + ", " + "head_yaw_ = " + text(w.s->head_yaw_) + ", " + "head_pitch_ = " + text(w.s->head_pitch_) + ", " + "sensitivity_ = " + text(w.s->sensitivity_) + ", " + "dpr_ = " + text(w.s->dpr_) + ", " + "soldier_controller_ = " + text(w.s->soldier_controller_) + ", " + "pad_touch_ = " + text(w.s->pad_touch_) + ", " + "ctl_ = " + text(w.s->ctl_) + ", " + "touch_mode_ = " + text(w.s->touch_mode_) + ", " + "frame_w_ = " + text(w.s->frame_w_) + ", " + "frame_h_ = " + text(w.s->frame_h_) + ", " + "play_in_ = " + text(w.s->play_in_) + ", " + "people_ = " + text(w.s->people_) + ", " + "people_art_ = " + text(w.s->people_art_) + ", " + "combat_art_ = " + text(w.s->combat_art_) + ", " + "destruction_ = " + text(w.s->destruction_) + ", " + "combat_ = " + text(w.s->combat_) + ", " + "guided_ = " + text(w.s->guided_) + ", " + "guided_last_ = " + text(w.s->guided_last_) + ", " + "guided_lock_ = " + text(w.s->guided_lock_) + ", " + "guided_mark_ = " + text(w.s->guided_mark_) + ", " + "guided_mark_at_ = " + text(w.s->guided_mark_at_) + ", " + "guided_mark_time_ = " + text(w.s->guided_mark_time_) + ", " + "guided_marked_ = " + text(w.s->guided_marked_) + ", " + "car_last_hp_ = " + text(w.s->car_last_hp_) + ", " + "car_burn_seen_ = " + text(w.s->car_burn_seen_) + ", " + "pd_crit_ = " + text(converted::array_list(w.s->pd_crit_)) + ", " + "drone_crit_ = " + text(w.s->drone_crit_) + ", " + "ballot_ = " + text(w.s->ballot_) + ", " + "ballot_serial_ = " + text(w.s->ballot_serial_) + ", " + "bullet_pushes_ = " + text(w.s->bullet_pushes_) + ", " + "crit_blasts_ = " + text(w.s->crit_blasts_) + ", " + "sfx_cursor_ = " + text(converted::array_list(w.s->sfx_cursor_)) + ", " + "combat_audio_ready_ = " + text(w.s->combat_audio_ready_) + ", " + "roads_ = " + text(w.s->roads_) + ", " + "units_ = " + text(w.s->units_) + ", " + "pdrones_ = " + text(converted::array_list(w.s->pdrones_)) + ", " + "last_known_ = " + text(w.s->last_known_) + ", " + "last_contact_ = " + text(w.s->last_contact_) + ", " + "next_drone_wave_ = " + text(w.s->next_drone_wave_) + ", " + "emp_ready_at_ = " + text(w.s->emp_ready_at_) + ", " + "last_drone_shot_ = " + text(w.s->last_drone_shot_) + ", " + "last_player_hit_ = " + text(w.s->last_player_hit_) + ", " + "drone_serial_ = " + text(w.s->drone_serial_) + ", " + "drone_wave_live_ = " + text(w.s->drone_wave_live_) + ", " + "projectiles_ = " + text(w.s->projectiles_) + ", " + "foot_weapon_ = " + text(w.s->foot_weapon_) + ", " + "ammo_mag_ = " + text(converted::array_list(w.s->ammo_mag_)) + ", " + "ammo_reserve_ = " + text(converted::array_list(w.s->ammo_reserve_)) + ", " + "grenades_ = " + text(w.s->grenades_) + ", " + "drone_weapon_ = " + text(w.s->drone_weapon_) + ", " + "jet_rocket_side_ = " + text(w.s->jet_rocket_side_) + ", " + "jacked_at_ = " + text(w.s->jacked_at_) + ", " + "jet_cam_off_ = " + text(w.s->jet_cam_off_) + ", " + "next_attack_ = " + text(w.s->next_attack_) + ", " + "next_grenade_ = " + text(w.s->next_grenade_) + ", " + "next_drone_fire_ = " + text(w.s->next_drone_fire_) + ", " + "next_jet_gun_ = " + text(w.s->next_jet_gun_) + ", " + "next_jet_missile_ = " + text(w.s->next_jet_missile_) + ", " + "next_jet_bomb_ = " + text(w.s->next_jet_bomb_) + ", " + "trigger_was_ = " + text(w.s->trigger_was_) + ", " + "explosions_ = " + text(w.s->explosions_) + ", " + "net_ = " + text(w.s->net_) + ", " + "remote_car_ = " + text(w.s->remote_car_) + ", " + "remote_bus_ = " + text(w.s->remote_bus_) + ", " + "rebased_ = " + text(w.s->rebased_) + ", " + "mp_ = " + text(w.s->mp_) + ", " + "lamps_ = " + text(w.s->lamps_) + ", " + "substeps_ = " + text(w.s->substeps_) + ", " + "ground_changes_ = " + text(w.s->ground_changes_) + ", " + "night_ = " + text(w.s->night_) + ", " + "show_lamps_ = " + text(w.s->show_lamps_) + ", " + "star_since_ = " + text(w.s->star_since_) + ", " + "last_wave_ = " + text(w.s->last_wave_) + ", " + "last_cop_shot_ = " + text(w.s->last_cop_shot_) + ", " + "drone_hp_ = " + text(w.s->drone_hp_) + ", " + "jet_hp_ = " + text(w.s->jet_hp_) + ", " + "last_stars_ = " + text(w.s->last_stars_) + ", " + "player_dead_ = " + text(w.s->player_dead_) + ", " + "died_at_ = " + text(w.s->died_at_) + ", " + "died_feet_ = " + text(w.s->died_feet_) + ", " + "respawn_rule_ = " + text(w.s->respawn_rule_) + ", " + "reset_revive_ = " + text(w.s->reset_revive_) + ", " + "spawn_guard_ = " + text(w.s->spawn_guard_) + ", " + "spawn_guard_until_ = " + text(w.s->spawn_guard_until_) + ", " + "spawn_guard_ready_at_ = " + text(w.s->spawn_guard_ready_at_) + ", " + "hint_ = " + text(w.s->hint_) + ", " + "toast_ = " + text(w.s->toast_) + ", " + "toast_age_ = " + text(w.s->toast_age_) + ", " + "time_ = " + text(w.s->time_) + ", " + "fps_ = " + text(w.s->fps_) + ", " + "steps_ = " + text(converted::shaped<converted::Whole>(w.s->steps_)) + ", " + "rng_ = " + text(w.s->rng_) + ", " + "spawn_checked_ = " + text(w.s->spawn_checked_) + ", " + "mixer_ = " + text(w.s->mixer_) + ", " + "bank_ = " + text(w.s->bank_) + ", " + "game_audio_ = " + text(w.s->game_audio_) + ", " + "fx_ = " + text(w.s->fx_) + ", " + "audio_out_ = " + text(w.s->audio_out_) + ", " + "web_audio_ = " + text(w.s->web_audio_) + ", " + "osfx_ = " + text(w.s->osfx_) + ", " + "shot_flesh_ = " + text(w.s->shot_flesh_) + ", " + "lon_ = " + text(w.s->lon_) + ", " + "lat_ = " + text(w.s->lat_) + ", " + "start_mode_ = " + text(w.s->start_mode_) + ", " + "mobile_ = " + text(w.s->mobile_) + ", " + "ui_ = " + text(w.s->ui_) + ", " + "look_ = " + text(w.s->look_) + ", " + "glife_ = " + text(w.s->glife_) + "}"; }
+[[maybe_unused]] static audio::PlayParams draw_kern__audio__PlayParams(converted::Draw& draw) {
+  audio::PlayParams s{};
+  s.volume = draw.number();
+  s.pitch = draw.number();
+  s.pan = draw.number();
+  s.loop = draw.flag();
+  s.bus = static_cast<audio::Bus>(draw.below(7));
+  s.fade_in = draw.number();
+  s.start = draw.number();
+  s.priority = static_cast<int>(draw.whole());
+  s.spatial = draw.flag();
+  s.position = draw.vector();
+  s.velocity = draw.vector();
+  s.min_distance = draw.number();
+  s.max_distance = draw.number();
+  s.rolloff = static_cast<audio::Rolloff>(draw.below(3));
+  s.spread = draw.number();
+  s.doppler = draw.number();
+  return s;
+}
+namespace audio { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const audio::PlayParams& s) { return converted::Value::structure({arg(s.volume), arg(s.pitch), arg(s.pan), arg(s.loop), arg(s.bus), arg(s.fade_in), arg(s.start), arg(s.priority), arg(s.spatial), arg(s.position), arg(s.velocity), arg(s.min_distance), arg(s.max_distance), arg(s.rolloff), arg(s.spread), arg(s.doppler)}); }
+[[maybe_unused]] static bool same(const audio::PlayParams& want, const converted::Value& got) { return got.rows && got.rows->size() == 16 && same(want.volume, (*got.rows)[0]) && same(want.pitch, (*got.rows)[1]) && same(want.pan, (*got.rows)[2]) && same(want.loop, (*got.rows)[3]) && same(want.bus, (*got.rows)[4]) && same(want.fade_in, (*got.rows)[5]) && same(want.start, (*got.rows)[6]) && same(want.priority, (*got.rows)[7]) && same(want.spatial, (*got.rows)[8]) && same(want.position, (*got.rows)[9]) && same(want.velocity, (*got.rows)[10]) && same(want.min_distance, (*got.rows)[11]) && same(want.max_distance, (*got.rows)[12]) && same(want.rolloff, (*got.rows)[13]) && same(want.spread, (*got.rows)[14]) && same(want.doppler, (*got.rows)[15]); }
+[[maybe_unused]] static bool defined(const audio::PlayParams& s) { return defined(s.volume) && defined(s.pitch) && defined(s.pan) && defined(s.loop) && defined(s.bus) && defined(s.fade_in) && defined(s.start) && defined(s.priority) && defined(s.spatial) && defined(s.position) && defined(s.velocity) && defined(s.min_distance) && defined(s.max_distance) && defined(s.rolloff) && defined(s.spread) && defined(s.doppler); }
+[[maybe_unused]] static std::string text(const audio::PlayParams& s) { return std::string("{") + text(s.volume) + ", " + text(s.pitch) + ", " + text(s.pan) + ", " + text(s.loop) + ", " + text(s.bus) + ", " + text(s.fade_in) + ", " + text(s.start) + ", " + text(s.priority) + ", " + text(s.spatial) + ", " + text(s.position) + ", " + text(s.velocity) + ", " + text(s.min_distance) + ", " + text(s.max_distance) + ", " + text(s.rolloff) + ", " + text(s.spread) + ", " + text(s.doppler) + "}"; }
+[[maybe_unused]] static void take(audio::PlayParams& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 16) return; converted::take_as<double>(s.volume, (*v.rows)[0]); converted::take_as<double>(s.pitch, (*v.rows)[1]); converted::take_as<double>(s.pan, (*v.rows)[2]); converted::take_as<bool>(s.loop, (*v.rows)[3]); converted::take_as<audio::Bus>(s.bus, (*v.rows)[4]); converted::take_as<double>(s.fade_in, (*v.rows)[5]); converted::take_as<double>(s.start, (*v.rows)[6]); converted::take_as<int>(s.priority, (*v.rows)[7]); converted::take_as<bool>(s.spatial, (*v.rows)[8]); converted::take_as<Vec3>(s.position, (*v.rows)[9]); converted::take_as<Vec3>(s.velocity, (*v.rows)[10]); converted::take_as<double>(s.min_distance, (*v.rows)[11]); converted::take_as<double>(s.max_distance, (*v.rows)[12]); converted::take_as<audio::Rolloff>(s.rolloff, (*v.rows)[13]); converted::take_as<double>(s.spread, (*v.rows)[14]); converted::take_as<double>(s.doppler, (*v.rows)[15]); }
+}
+[[maybe_unused]] static game::Hud draw_kern__game__Hud(converted::Draw& draw) {
+  game::Hud s{};
+  s.status = static_cast<game::GameStatus>(draw.below(4));
+  s.title = draw.word();
+  s.message = draw.word();
+  s.message_age = draw.number();
+  s.score = draw.number();
+  s.pickups = static_cast<unsigned int>(draw.below(40));
+  s.pickups_total = static_cast<unsigned int>(draw.below(40));
+  s.elapsed = draw.number();
+  s.remaining = draw.number();
+  s.speed = draw.number();
+  s.boost = draw.number();
+  s.boosting = draw.flag();
+  s.interior = draw.flag();
+  s.best = draw.number();
+  s.soldier = draw.flag();
+  s.health = draw.number();
+  s.max_health = draw.number();
+  s.armor = draw.number();
+  s.ammo = static_cast<int>(draw.whole());
+  s.magazine = static_cast<int>(draw.whole());
+  s.reserve = static_cast<int>(draw.whole());
+  s.reload = draw.number();
+  s.spread = draw.number();
+  s.hit_age = draw.number();
+  s.hit_head = draw.flag();
+  s.hit_kill = draw.flag();
+  s.damage_age = draw.number();
+  s.damage_yaw = draw.number();
+  s.respawn_in = draw.number();
+  s.aiming = draw.flag();
+  s.fov = draw.number();
+  return s;
+}
+namespace game { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const game::Hud& s) { return converted::Value::structure({arg(s.status), arg(s.title), arg(s.message), arg(s.message_age), arg(s.score), arg(s.pickups), arg(s.pickups_total), arg(s.elapsed), arg(s.remaining), arg(s.speed), arg(s.boost), arg(s.boosting), arg(s.interior), arg(s.best), arg(s.soldier), arg(s.health), arg(s.max_health), arg(s.armor), arg(s.ammo), arg(s.magazine), arg(s.reserve), arg(s.reload), arg(s.spread), arg(s.hit_age), arg(s.hit_head), arg(s.hit_kill), arg(s.damage_age), arg(s.damage_yaw), arg(s.respawn_in), arg(s.aiming), arg(s.fov)}); }
+[[maybe_unused]] static bool same(const game::Hud& want, const converted::Value& got) { return got.rows && got.rows->size() == 31 && same(want.status, (*got.rows)[0]) && same(want.title, (*got.rows)[1]) && same(want.message, (*got.rows)[2]) && same(want.message_age, (*got.rows)[3]) && same(want.score, (*got.rows)[4]) && same(want.pickups, (*got.rows)[5]) && same(want.pickups_total, (*got.rows)[6]) && same(want.elapsed, (*got.rows)[7]) && same(want.remaining, (*got.rows)[8]) && same(want.speed, (*got.rows)[9]) && same(want.boost, (*got.rows)[10]) && same(want.boosting, (*got.rows)[11]) && same(want.interior, (*got.rows)[12]) && same(want.best, (*got.rows)[13]) && same(want.soldier, (*got.rows)[14]) && same(want.health, (*got.rows)[15]) && same(want.max_health, (*got.rows)[16]) && same(want.armor, (*got.rows)[17]) && same(want.ammo, (*got.rows)[18]) && same(want.magazine, (*got.rows)[19]) && same(want.reserve, (*got.rows)[20]) && same(want.reload, (*got.rows)[21]) && same(want.spread, (*got.rows)[22]) && same(want.hit_age, (*got.rows)[23]) && same(want.hit_head, (*got.rows)[24]) && same(want.hit_kill, (*got.rows)[25]) && same(want.damage_age, (*got.rows)[26]) && same(want.damage_yaw, (*got.rows)[27]) && same(want.respawn_in, (*got.rows)[28]) && same(want.aiming, (*got.rows)[29]) && same(want.fov, (*got.rows)[30]); }
+[[maybe_unused]] static bool defined(const game::Hud& s) { return defined(s.status) && defined(s.title) && defined(s.message) && defined(s.message_age) && defined(s.score) && defined(s.pickups) && defined(s.pickups_total) && defined(s.elapsed) && defined(s.remaining) && defined(s.speed) && defined(s.boost) && defined(s.boosting) && defined(s.interior) && defined(s.best) && defined(s.soldier) && defined(s.health) && defined(s.max_health) && defined(s.armor) && defined(s.ammo) && defined(s.magazine) && defined(s.reserve) && defined(s.reload) && defined(s.spread) && defined(s.hit_age) && defined(s.hit_head) && defined(s.hit_kill) && defined(s.damage_age) && defined(s.damage_yaw) && defined(s.respawn_in) && defined(s.aiming) && defined(s.fov); }
+[[maybe_unused]] static std::string text(const game::Hud& s) { return std::string("{") + text(s.status) + ", " + text(s.title) + ", " + text(s.message) + ", " + text(s.message_age) + ", " + text(s.score) + ", " + text(s.pickups) + ", " + text(s.pickups_total) + ", " + text(s.elapsed) + ", " + text(s.remaining) + ", " + text(s.speed) + ", " + text(s.boost) + ", " + text(s.boosting) + ", " + text(s.interior) + ", " + text(s.best) + ", " + text(s.soldier) + ", " + text(s.health) + ", " + text(s.max_health) + ", " + text(s.armor) + ", " + text(s.ammo) + ", " + text(s.magazine) + ", " + text(s.reserve) + ", " + text(s.reload) + ", " + text(s.spread) + ", " + text(s.hit_age) + ", " + text(s.hit_head) + ", " + text(s.hit_kill) + ", " + text(s.damage_age) + ", " + text(s.damage_yaw) + ", " + text(s.respawn_in) + ", " + text(s.aiming) + ", " + text(s.fov) + "}"; }
+[[maybe_unused]] static void take(game::Hud& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 31) return; converted::take_as<game::GameStatus>(s.status, (*v.rows)[0]); converted::take_as<std::string>(s.title, (*v.rows)[1]); converted::take_as<std::string>(s.message, (*v.rows)[2]); converted::take_as<double>(s.message_age, (*v.rows)[3]); converted::take_as<double>(s.score, (*v.rows)[4]); converted::take_as<unsigned int>(s.pickups, (*v.rows)[5]); converted::take_as<unsigned int>(s.pickups_total, (*v.rows)[6]); converted::take_as<double>(s.elapsed, (*v.rows)[7]); converted::take_as<double>(s.remaining, (*v.rows)[8]); converted::take_as<double>(s.speed, (*v.rows)[9]); converted::take_as<double>(s.boost, (*v.rows)[10]); converted::take_as<bool>(s.boosting, (*v.rows)[11]); converted::take_as<bool>(s.interior, (*v.rows)[12]); converted::take_as<double>(s.best, (*v.rows)[13]); converted::take_as<bool>(s.soldier, (*v.rows)[14]); converted::take_as<double>(s.health, (*v.rows)[15]); converted::take_as<double>(s.max_health, (*v.rows)[16]); converted::take_as<double>(s.armor, (*v.rows)[17]); converted::take_as<int>(s.ammo, (*v.rows)[18]); converted::take_as<int>(s.magazine, (*v.rows)[19]); converted::take_as<int>(s.reserve, (*v.rows)[20]); converted::take_as<double>(s.reload, (*v.rows)[21]); converted::take_as<double>(s.spread, (*v.rows)[22]); converted::take_as<double>(s.hit_age, (*v.rows)[23]); converted::take_as<bool>(s.hit_head, (*v.rows)[24]); converted::take_as<bool>(s.hit_kill, (*v.rows)[25]); converted::take_as<double>(s.damage_age, (*v.rows)[26]); converted::take_as<double>(s.damage_yaw, (*v.rows)[27]); converted::take_as<double>(s.respawn_in, (*v.rows)[28]); converted::take_as<bool>(s.aiming, (*v.rows)[29]); converted::take_as<double>(s.fov, (*v.rows)[30]); }
+}
+[[maybe_unused]] static physics::QueryFilter draw_kern__physics__QueryFilter(converted::Draw& draw) {
+  if (draw.flag()) return physics::QueryFilter(static_cast<u64>(draw.bits()), static_cast<u64>(draw.bits()));
+  physics::QueryFilter s{};
+  s.mask_bits = static_cast<u64>(draw.bits());
+  s.category_bits = static_cast<u64>(draw.bits());
+  return s;
+}
+namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const physics::QueryFilter& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.mask_bits)), arg(converted::shaped<converted::Whole>(s.category_bits))}); }
+[[maybe_unused]] static bool same(const physics::QueryFilter& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(converted::shaped<converted::Whole>(want.mask_bits), (*got.rows)[0]) && same(converted::shaped<converted::Whole>(want.category_bits), (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const physics::QueryFilter& s) { return defined(converted::shaped<converted::Whole>(s.mask_bits)) && defined(converted::shaped<converted::Whole>(s.category_bits)); }
+[[maybe_unused]] static std::string text(const physics::QueryFilter& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.mask_bits)) + ", " + text(converted::shaped<converted::Whole>(s.category_bits)) + "}"; }
+[[maybe_unused]] static void take(physics::QueryFilter& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<converted::Whole>(s.mask_bits, (*v.rows)[0]); converted::take_as<converted::Whole>(s.category_bits, (*v.rows)[1]); }
+}
+[[maybe_unused]] static physics::RayHit draw_kern__physics__RayHit(converted::Draw& draw) {
+  physics::RayHit s{};
+  s.hit = draw.flag();
+  s.shape = draw_kern__physics__Shape(draw);
+  s.body = draw_kern__physics__Body(draw);
+  s.point = draw.vector();
+  s.normal = draw.vector();
+  s.fraction = draw.number();
+  return s;
+}
+namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const physics::RayHit& s) { return converted::Value::structure({arg(s.hit), arg(s.shape), arg(s.body), arg(s.point), arg(s.normal), arg(s.fraction)}); }
+[[maybe_unused]] static bool same(const physics::RayHit& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.hit, (*got.rows)[0]) && same(want.shape, (*got.rows)[1]) && same(want.body, (*got.rows)[2]) && same(want.point, (*got.rows)[3]) && same(want.normal, (*got.rows)[4]) && same(want.fraction, (*got.rows)[5]); }
+[[maybe_unused]] static bool defined(const physics::RayHit& s) { return defined(s.hit) && defined(s.shape) && defined(s.body) && defined(s.point) && defined(s.normal) && defined(s.fraction); }
+[[maybe_unused]] static std::string text(const physics::RayHit& s) { return std::string("{") + text(s.hit) + ", " + text(s.shape) + ", " + text(s.body) + ", " + text(s.point) + ", " + text(s.normal) + ", " + text(s.fraction) + "}"; }
+[[maybe_unused]] static void take(physics::RayHit& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<bool>(s.hit, (*v.rows)[0]); converted::take_as<physics::Shape>(s.shape, (*v.rows)[1]); converted::take_as<physics::Body>(s.body, (*v.rows)[2]); converted::take_as<Vec3>(s.point, (*v.rows)[3]); converted::take_as<Vec3>(s.normal, (*v.rows)[4]); converted::take_as<double>(s.fraction, (*v.rows)[5]); }
+}
 [[maybe_unused]] static audio::SynthPatch draw_kern__audio__SynthPatch(converted::Draw& draw) {
   audio::SynthPatch s{};
   s.wave = static_cast<audio::Wave>(draw.below(7));
@@ -11407,21 +12665,51 @@ namespace audio { using converted::arg; using converted::same; using converted::
 [[maybe_unused]] static std::string text(const audio::SynthPatch& s) { return std::string("{") + text(s.wave) + ", " + text(s.volume) + ", " + text(s.attack) + ", " + text(s.sustain) + ", " + text(s.punch) + ", " + text(s.release) + ", " + text(s.frequency) + ", " + text(s.slide) + ", " + text(s.slide_accel) + ", " + text(s.min_frequency) + ", " + text(s.vibrato_depth) + ", " + text(s.vibrato_rate) + ", " + text(s.arp_ratio) + ", " + text(s.arp_time) + ", " + text(s.duty) + ", " + text(s.duty_sweep) + ", " + text(s.fm_ratio) + ", " + text(s.fm_depth) + ", " + text(s.lowpass) + ", " + text(s.lowpass_sweep) + ", " + text(s.resonance) + ", " + text(s.highpass) + ", " + text(s.tremolo_depth) + ", " + text(s.tremolo_rate) + ", " + text(s.repeat) + ", " + text(s.bitcrush) + ", " + text(s.seed) + "}"; }
 [[maybe_unused]] static void take(audio::SynthPatch& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 27) return; converted::take_as<audio::Wave>(s.wave, (*v.rows)[0]); converted::take_as<double>(s.volume, (*v.rows)[1]); converted::take_as<double>(s.attack, (*v.rows)[2]); converted::take_as<double>(s.sustain, (*v.rows)[3]); converted::take_as<double>(s.punch, (*v.rows)[4]); converted::take_as<double>(s.release, (*v.rows)[5]); converted::take_as<double>(s.frequency, (*v.rows)[6]); converted::take_as<double>(s.slide, (*v.rows)[7]); converted::take_as<double>(s.slide_accel, (*v.rows)[8]); converted::take_as<double>(s.min_frequency, (*v.rows)[9]); converted::take_as<double>(s.vibrato_depth, (*v.rows)[10]); converted::take_as<double>(s.vibrato_rate, (*v.rows)[11]); converted::take_as<double>(s.arp_ratio, (*v.rows)[12]); converted::take_as<double>(s.arp_time, (*v.rows)[13]); converted::take_as<double>(s.duty, (*v.rows)[14]); converted::take_as<double>(s.duty_sweep, (*v.rows)[15]); converted::take_as<double>(s.fm_ratio, (*v.rows)[16]); converted::take_as<double>(s.fm_depth, (*v.rows)[17]); converted::take_as<double>(s.lowpass, (*v.rows)[18]); converted::take_as<double>(s.lowpass_sweep, (*v.rows)[19]); converted::take_as<double>(s.resonance, (*v.rows)[20]); converted::take_as<double>(s.highpass, (*v.rows)[21]); converted::take_as<double>(s.tremolo_depth, (*v.rows)[22]); converted::take_as<double>(s.tremolo_rate, (*v.rows)[23]); converted::take_as<double>(s.repeat, (*v.rows)[24]); converted::take_as<double>(s.bitcrush, (*v.rows)[25]); converted::take_as<unsigned int>(s.seed, (*v.rows)[26]); }
 }
+inline Input& Engine::input() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.engine.input", {converted::value_of(*this)}); Input& kern_result = *converted::engine_object<Input>(kern_out[0].as_int()); return kern_result; }
+inline bool Input::pressed(const Key& k) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.input.pressed", {converted::value_of(*this), converted::value_of(k)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline unsigned int Mixer::sample_rate() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.mixer.sample_rate", {converted::value_of(*this)}); unsigned int kern_result = converted::quiet<unsigned int>(); converted::take_as<unsigned int>(kern_result, kern_out[0]); return kern_result; }
 inline unsigned int Mixer::adopt_clip(const std::vector<double>& samples, const unsigned int& channels, const std::string& name, const bool& loopable) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.mixer.adopt_clip", {converted::value_of(*this), converted::value_of(samples), converted::value_of(channels), converted::value_of(name), converted::value_of(loopable)}); unsigned int kern_result = converted::quiet<unsigned int>(); converted::take_as<unsigned int>(kern_result, kern_out[0]); return kern_result; }
+inline bool Mixer::ready() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.mixer.ready", {converted::value_of(*this)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline u64 Mixer::play(const unsigned int& clip, const audio::PlayParams& params) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.mixer.play", {converted::value_of(*this), converted::value_of(clip), converted::value_of(params)}); u64 kern_result = converted::quiet<u64>(); converted::take_as<converted::Whole>(kern_result, kern_out[0]); return kern_result; }
+inline void Mixer::stop(const unsigned long& voice, const double& fade) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.mixer.stop", {converted::value_of(*this), converted::value_of(voice), converted::value_of(fade)}); }
+inline bool Mixer::playing(const unsigned long& voice) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.mixer.playing", {converted::value_of(*this), converted::value_of(voice)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline void Mixer::set_volume(const unsigned long& voice, const double& volume, const double& ramp) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.mixer.set_volume", {converted::value_of(*this), converted::value_of(voice), converted::value_of(volume), converted::value_of(ramp)}); }
+inline void Mixer::set_position(const unsigned long& voice, const Vec3& position, const Vec3& velocity) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.mixer.set_position", {converted::value_of(*this), converted::value_of(voice), converted::value_of(position), converted::value_of(velocity)}); }
 inline bool GameWorld::actor_alive(const unsigned int& id) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.actor_alive", {converted::value_of(*this), converted::value_of(id)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline game::Hud GameWorld::hud() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.hud", {converted::value_of(*this)}); game::Hud kern_result = converted::quiet<game::Hud>(); converted::take_as<game::Hud>(kern_result, kern_out[0]); return kern_result; }
+inline World& GameWorld::physics() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.physics", {converted::value_of(*this)}); World& kern_result = *converted::engine_object<World>(kern_out[0].as_int()); return kern_result; }
+inline Vec3 GameWorld::actor_velocity(const unsigned int& id) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.actor_velocity", {converted::value_of(*this), converted::value_of(id)}); Vec3 kern_result = converted::quiet<Vec3>(); converted::take_as<Vec3>(kern_result, kern_out[0]); return kern_result; }
 inline double GameWorld::sim_time() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.sim_time", {converted::value_of(*this)}); double kern_result = converted::quiet<double>(); converted::take_as<double>(kern_result, kern_out[0]); return kern_result; }
+inline bool GameWorld::set_actor_velocity(const unsigned int& id, const Vec3& velocity) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.set_actor_velocity", {converted::value_of(*this), converted::value_of(id), converted::value_of(velocity)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline void GameWorld::shake_camera(const double& amount) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.shake_camera", {converted::value_of(*this), converted::value_of(amount)}); }
+inline bool GameWorld::push_actor(const unsigned int& id, const Vec3& amount, const bool& impulse) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.push_actor", {converted::value_of(*this), converted::value_of(id), converted::value_of(amount), converted::value_of(impulse)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline double GameWorld::camera_yaw() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.camera_yaw", {converted::value_of(*this)}); double kern_result = converted::quiet<double>(); converted::take_as<double>(kern_result, kern_out[0]); return kern_result; }
+inline bool GameWorld::actor_matrix(const unsigned int& id, Mat4& out) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.actor_matrix", {converted::value_of(*this), converted::value_of(id), converted::value_of(out)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); converted::take_as<Mat4>(out, kern_out[1]); return kern_result; }
+inline physics::Body GameWorld::actor_body(const unsigned int& actor) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.actor_body", {converted::value_of(*this), converted::value_of(actor)}); physics::Body kern_result = converted::quiet<physics::Body>(); converted::take_as<physics::Body>(kern_result, kern_out[0]); return kern_result; }
+inline bool Client::connected() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.client.connected", {converted::value_of(*this)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline int Server::connected_clients() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.connected_clients", {converted::value_of(*this)}); int kern_result = converted::quiet<int>(); converted::take_as<int>(kern_result, kern_out[0]); return kern_result; }
+inline bool Server::running() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.running", {converted::value_of(*this)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline physics::RayHit World::cast_ray(const Vec3& origin, const Vec3& translation, const physics::QueryFilter& filter, const physics::Body& ignore) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.cast_ray", {converted::value_of(*this), converted::value_of(origin), converted::value_of(translation), converted::value_of(filter), converted::value_of(ignore)}); physics::RayHit kern_result = converted::quiet<physics::RayHit>(); converted::take_as<physics::RayHit>(kern_result, kern_out[0]); return kern_result; }
 namespace audio { inline void mix_into(std::vector<double>& dst, const std::vector<double>& src, const double& offset_seconds, const unsigned int& rate, const double& gain) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.audio.mix_into", {converted::value_of(dst), converted::value_of(src), converted::value_of(offset_seconds), converted::value_of(rate), converted::value_of(gain)}); converted::take_as<std::vector<double>>(dst, kern_out[0]); } }
 namespace audio { inline std::vector<double> synthesize(const audio::SynthPatch& patch, const unsigned int& rate) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.audio.synthesize", {converted::value_of(patch), converted::value_of(rate)}); std::vector<double> kern_result = converted::quiet<std::vector<double>>(); converted::take_as<std::vector<double>>(kern_result, kern_out[0]); return kern_result; } }
 namespace audio { inline void normalize(std::vector<double>& samples, const double& peak) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.audio.normalize", {converted::value_of(samples), converted::value_of(peak)}); converted::take_as<std::vector<double>>(samples, kern_out[0]); } }
 namespace audio { inline void make_seamless(std::vector<double>& samples, const unsigned int& rate, const double& crossfade) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.audio.make_seamless", {converted::value_of(samples), converted::value_of(rate), converted::value_of(crossfade)}); converted::take_as<std::vector<double>>(samples, kern_out[0]); } }
+struct Out_ui_render_music { State_Game State; std::vector<double> out; };
+[[maybe_unused]] static bool same(const Out_ui_render_music& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.State, (*got.rows)[0]) && same(want.out, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_ui_render_music& s) { return defined(s.State) && defined(s.out); }
+[[maybe_unused]] static std::string text(const Out_ui_render_music& s) { return std::string("{") + text(s.State) + ", " + text(s.out) + "}"; }
+struct Out_ui_equipment_command { State_Game State; bool Result; std::string out; };
+[[maybe_unused]] static bool same(const Out_ui_equipment_command& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.State, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]) && same(want.out, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const Out_ui_equipment_command& s) { return defined(s.State) && defined(s.Result) && defined(s.out); }
+[[maybe_unused]] static std::string text(const Out_ui_equipment_command& s) { return std::string("{") + text(s.State) + ", " + text(s.Result) + ", " + text(s.out) + "}"; }
 struct Out_ui_equipment_json { State_Game State; std::string Result; };
 [[maybe_unused]] static bool same(const Out_ui_equipment_json& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.State, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_ui_equipment_json& s) { return defined(s.State) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_ui_equipment_json& s) { return std::string("{") + text(s.State) + ", " + text(s.Result) + "}"; }
 
 SC_TEST(converted_Game__game_equipment_cpp) {
-  converted::Blueprint bp("Game");
+  converted::Blueprint bp("Game", {"Jetpack"});
+  equipment_cpp_local::g_jetpack.bind(bp.source_logic());
   {  // Game::ui_audio_init
     converted::Tally tally("ui_audio_init");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -11441,6 +12729,140 @@ SC_TEST(converted_Game__game_equipment_cpp) {
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {}, &vars, true);
+    }
+  }
+  {  // Game::ui_jetpack
+    converted::Tally tally("ui_jetpack");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    std::unique_ptr<Game> s;   // (the object of the state: drawn for every call)
+    const auto run = [&]([[maybe_unused]] double a0) { converted::counted([&] { return s->ui_jetpack(std::move(a0)); }); return State_Game{s.get()}; };
+    for (int i = 0; tally.more(i); ++i) {
+      s = draw_state_Game(draw);
+      double a0 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Variables vars = variables_Game(*s);   // (and the variables of its state)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {}, &vars, true);
+    }
+  }
+  {  // Game::ui_radio
+    converted::Tally tally("ui_radio");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    std::unique_ptr<Game> s;   // (the object of the state: drawn for every call)
+    const auto run = [&]([[maybe_unused]] int a0) { converted::counted([&] { return s->ui_radio(std::move(a0)); }); return State_Game{s.get()}; };
+    for (int i = 0; tally.more(i); ++i) {
+      s = draw_state_Game(draw);
+      int a0 = static_cast<int>(draw.whole());
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Variables vars = variables_Game(*s);   // (and the variables of its state)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {}, &vars, true);
+    }
+  }
+  {  // Game::ui_equipment
+    converted::Tally tally("ui_equipment");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    std::unique_ptr<Game> s;   // (the object of the state: drawn for every call)
+    const auto run = [&]([[maybe_unused]] double a0) { converted::counted([&] { return s->ui_equipment(std::move(a0)); }); return State_Game{s.get()}; };
+    for (int i = 0; tally.more(i); ++i) {
+      s = draw_state_Game(draw);
+      double a0 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Variables vars = variables_Game(*s);   // (and the variables of its state)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {}, &vars, true);
+    }
+  }
+  {  // Game::ui_mix_equipment
+    converted::Tally tally("ui_mix_equipment");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    std::unique_ptr<Game> s;   // (the object of the state: drawn for every call)
+    const auto run = [&]([[maybe_unused]] double a0) { converted::counted([&] { return s->ui_mix_equipment(std::move(a0)); }); return State_Game{s.get()}; };
+    for (int i = 0; tally.more(i); ++i) {
+      s = draw_state_Game(draw);
+      double a0 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Variables vars = variables_Game(*s);   // (and the variables of its state)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {}, &vars, true);
+    }
+  }
+  {  // Game::ui_render_music
+    converted::Tally tally("ui_render_music");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    std::unique_ptr<Game> s;   // (the object of the state: drawn for every call)
+    const auto run = [&]([[maybe_unused]] std::vector<double> a0, [[maybe_unused]] unsigned int a1) { converted::counted([&] { return s->ui_render_music(a0, std::move(a1)); }); return Out_ui_render_music{State_Game{s.get()}, std::move(a0)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      s = draw_state_Game(draw);
+      std::vector<double> a0 = draw_list(draw, [&]() -> double { return draw.number(); });
+      unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Variables vars = variables_Game(*s);   // (and the variables of its state)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0}, &vars, true);
+    }
+  }
+  {  // Game::ui_equipment_command
+    converted::Tally tally("ui_equipment_command");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    std::unique_ptr<Game> s;   // (the object of the state: drawn for every call)
+    const auto run = [&]([[maybe_unused]] std::string a0, [[maybe_unused]] std::string a1) { auto r = converted::counted([&] { return s->ui_equipment_command(a0, a1); }); return Out_ui_equipment_command{State_Game{s.get()}, std::move(r), std::move(a1)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      s = draw_state_Game(draw);
+      std::string a0 = draw.said_word({"logbook", "nostr event ", "bad key or tags", "sign failed", "radio", "next", "prev", "off", "toggle", "on", "music", "jetpack", "true", "false", "jetpack burn", "not on foot", "ok"});
+      std::string a1 = draw.said_word({"logbook", "nostr event ", "bad key or tags", "sign failed", "radio", "next", "prev", "off", "toggle", "on", "music", "jetpack", "true", "false", "jetpack burn", "not on foot", "ok"});
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Variables vars = variables_Game(*s);   // (and the variables of its state)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {2, 0, 1}, &vars, true);
     }
   }
   {  // Game::ui_equipment_json

@@ -36,7 +36,6 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-double now_ms();
 constexpr f32 kPi = 3.14159265358979323846;
 struct Vec4 {
   f32 x = 0, y = 0, z = 0, w = 0;
@@ -44,7 +43,7 @@ struct Vec4 {
   constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}
   
   
-  
+  constexpr bool operator==(const Vec4& o) const { return x == o.x && y == o.y && z == o.z && w == o.w; }
 };
 struct Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
@@ -165,6 +164,7 @@ struct Camera {
   bool has_projection = false;
   Mat4 projection = Mat4{};
 };
+struct Bvh;
 constexpr u32 kMaxMaterialParams = 8;
 enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
 struct Material {
@@ -213,6 +213,7 @@ struct MeshData {
   /// Borrowed MeshInput view (geometry only; material etc. stay default).
   
 };
+struct Renderer;
 struct HeightSampler : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -255,6 +256,7 @@ struct BloomPass : converted::EngineObject {
 struct AmbientOcclusionPass : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct Renderer;
 struct ShaderExtension : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -274,6 +276,7 @@ namespace logic { enum class PinType : u8 {
   boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
   map, set, count
 }; }
+struct EngineValue;
 struct EngineValue : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -289,6 +292,7 @@ struct FunctionPin : converted::EngineObject {
 struct Formula : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct Context;
 struct Library : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -393,7 +397,6 @@ namespace PoliceUnit { enum class State : u8 { pursuit, stopping, engage, back, 
 namespace primitives { MeshData box(const Vec3& size, const Vec3& color = {1, 1, 1}); }
 namespace primitives { MeshData cylinder(const double& radius, const double& height, const unsigned int& segments = 20, const Vec3& color = {1, 1, 1}); }
 namespace primitives { void append(MeshData& dst, const MeshData& src, const Mat4& m); }
-f64 clock_ms() { return now_ms(); }
 Vec3 srgb(u32 hex) { return {static_cast<f32>((hex >> 16) & 255) / 255, static_cast<f32>((hex >> 8) & 255) / 255, static_cast<f32>(hex & 255) / 255}; }
 void box(MeshData& m, Vec3 size, u32 color, Vec3 at, const Mat4& extra = Mat4{}) { primitives::append(m, primitives::box(size, srgb(color)), extra * Mat4::translate(at)); }
 void cyl(MeshData& m, f32 r, f32 len, u32 color, Vec3 at, u32 seg = 14, const Mat4& extra = Mat4{}) {
@@ -600,7 +603,6 @@ Mat4 euler(f32 x, f32 y, f32 z) {
 [[maybe_unused]] static bool defined(const Camera& s) { return defined(s.eye) && defined(s.target) && defined(s.up) && defined(s.fov) && defined(s.near) && defined(s.far) && defined(s.orthographic) && defined(s.ortho_height) && defined(s.has_projection) && defined(s.projection); }
 [[maybe_unused]] static std::string text(const Camera& s) { return std::string("{") + text(s.eye) + ", " + text(s.target) + ", " + text(s.up) + ", " + text(s.fov) + ", " + text(s.near) + ", " + text(s.far) + ", " + text(s.orthographic) + ", " + text(s.ortho_height) + ", " + text(s.has_projection) + ", " + text(s.projection) + "}"; }
 [[maybe_unused]] static void take(Camera& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 10) return; converted::take_as<Vec3>(s.eye, (*v.rows)[0]); converted::take_as<Vec3>(s.target, (*v.rows)[1]); converted::take_as<Vec3>(s.up, (*v.rows)[2]); converted::take_as<double>(s.fov, (*v.rows)[3]); converted::take_as<double>(s.near, (*v.rows)[4]); converted::take_as<double>(s.far, (*v.rows)[5]); converted::take_as<bool>(s.orthographic, (*v.rows)[6]); converted::take_as<double>(s.ortho_height, (*v.rows)[7]); converted::take_as<bool>(s.has_projection, (*v.rows)[8]); converted::take_as<Mat4>(s.projection, (*v.rows)[9]); }
-inline double now_ms() { const std::vector<converted::Value> kern_out = converted::engine_call("engine.now_ms", {}); double kern_result = converted::quiet<double>(); converted::take_as<double>(kern_result, kern_out[0]); return kern_result; }
 namespace primitives { inline void append(MeshData& dst, const MeshData& src, const Mat4& m) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.append", {converted::value_of(dst), converted::value_of(src), converted::value_of(m)}); converted::take_as<MeshData>(dst, kern_out[0]); } }
 namespace primitives { inline MeshData box(const Vec3& size, const Vec3& color) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.box", {converted::value_of(size), converted::value_of(color)}); MeshData kern_result = converted::quiet<MeshData>(); converted::take_as<MeshData>(kern_result, kern_out[0]); return kern_result; } }
 namespace primitives { inline MeshData cylinder(const double& radius, const double& height, const unsigned int& segments, const Vec3& color) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.cylinder", {converted::value_of(radius), converted::value_of(height), converted::value_of(segments), converted::value_of(color)}); MeshData kern_result = converted::quiet<MeshData>(); converted::take_as<MeshData>(kern_result, kern_out[0]); return kern_result; } }
@@ -619,24 +621,6 @@ struct Out_knife { MeshData m; MeshData g; };
 
 SC_TEST(converted_game_look_cpp) {
   converted::Blueprint bp("game_look_cpp");
-  {  // clock_ms
-    converted::Tally tally("clock_ms");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted::counted([&] { return converted_game_look_cpp::clock_ms(); }); };
-    for (int i = 0; tally.more(i); ++i) {
-      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
   {  // srgb
     converted::Tally tally("srgb");
     converted::Draw draw;   // (every function its own arguments, the same in every run)

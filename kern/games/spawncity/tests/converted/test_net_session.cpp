@@ -138,6 +138,7 @@ namespace logic { enum class PinType : u8 {
   boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
   map, set, count
 }; }
+struct EngineValue;
 struct EngineValue : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -155,6 +156,7 @@ struct Formula : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
+struct Context;
 struct Library : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -359,7 +361,7 @@ namespace net { struct Session {
   u8 self_slot() const { return self_slot_; }
 
   // ---- host page ----
-  
+  void push(u64 from, Span<const u8> bytes) { transport_.push_incoming({from}, bytes.data, static_cast<int>(bytes.size)); }
   bool take(u64& to, std::vector<u8>& bytes) { net::Address a; const bool ok = transport_.take_outgoing(a, bytes); to = a.id; return ok; }
 
   /// Per frame: networking; `me` is this player's state (sent at 30 Hz).
@@ -1103,6 +1105,27 @@ SC_TEST(converted_net_session) {
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::push
+    converted::Tally tally("Session_push");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session a0, [[maybe_unused]] u64 a1, [[maybe_unused]] converted::wide::Span<const unsigned char> a2) { converted::counted([&] { return a0.push(std::move(a1), a2); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      u64 a1 = static_cast<u64>(draw.bits());
+      converted::wide::Span<const unsigned char> a2 = converted::kept_span(draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); }));
+      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(converted::shaped<converted::Whole>(a1))};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
