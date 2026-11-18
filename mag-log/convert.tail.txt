@@ -1,0 +1,23 @@
+round 1: 59 Blueprints
+round 2: 21 Blueprints
+round 3: 30 Blueprints
+round 4: 4 Blueprints
+round 5: 2 Blueprints
+round 6: 5 Blueprints
+round 7: 2 Blueprints
+round 8: 1 Blueprints
+round 9: 30 Blueprints
+round 10: 30 Blueprints
+Game/game_look_cpp: Game::look_blast() was written and waits now (its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘Game’ has not been declared - that went with Renderer: no matching function for call to ‘take(kern::Span<converted_Game__game_look_cpp::Mesh*>&, const sc::converted::Value&)’))
+Game/game_look_cpp: Game::look_camera() was written and waits now (its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘Game’ has not been declared - that went with Renderer: no matching function for call to ‘take(kern::Span<converted_Game__game_look_cpp::Mesh*>&, const sc::converted::Value&)’))
+Game/game_look_cpp: Game::look_hud_json() was written and waits now (its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘Game’ has not been declared - that went with Renderer: no matching function for call to ‘take(kern::Span<converted_Game__game_look_cpp::Mesh*>&, const sc::converted::Value&)’))
+Game/game_look_cpp: Game::look_apply_tier() was written and waits now (its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: invalid use of incomplete type ‘struct converted_Game__game_look_cpp::Renderer’ - that went with Renderer: no matching function for call to ‘take(kern::Span<converted_Game__game_look_cpp::Mesh*>&, const sc::converted::Value&)’))
+Game/game_look_cpp: Game::look_people_budget() was written and waits now (its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘Game’ has not been declared - that went with Renderer: no matching function for call to ‘take(kern::Span<converted_Game__game_look_cpp::Mesh*>&, const sc::converted::Value&)’))
+Game/game_look_cpp: Game::view_zoom() was written and waits now (its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘Game’ has not been declared - that went with Renderer: no matching function for call to ‘take(kern::Span<converted_Game__game_look_cpp::Mesh*>&, const sc::converted::Value&)’))
+Game/game_world_cpp: Game::world_bullet() was written and waits now (its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_world_cpp::Marks’ has no member named ‘bullet’ - that went with kCracks: redefinition of ‘constexpr const kern::u32 converted_Game__game_world_cpp::world_marks_cpp_local::kScorches’))
+round 11: 30 Blueprints
+Game/game_lamps_cpp: Game::gaps_lamps_draw() was written and waits now (its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘Game’ has not been declared - that went with Renderer: no matching function for call to ‘take(kern::Span<converted_Game__game_look_cpp::Mesh*>&, const sc::converted::Value&)’))
+Game/game_life_cpp: Game::life_draw() was written and waits now (its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘Game’ has not been declared - that went with Renderer: no matching function for call to ‘take(kern::Span<converted_Game__game_look_cpp::Mesh*>&, const sc::converted::Value&)’))
+round 12: 30 Blueprints
+round 13: 30 Blueprints
+round 14: 30 Blueprints
