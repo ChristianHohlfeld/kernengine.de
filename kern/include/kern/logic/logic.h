@@ -850,8 +850,9 @@ class Host {
   /// a host without a world names none - unless it is one that names actors of its own (a test's: the
   /// instances of a runtime by name, for Call on Actor and Get Variable on Actor).
   virtual ActorRef find_actor(std::string_view name);
-  /// A function of the engine, by the name of its node - what the engine's nodes do in every tier
-  /// (kern/logic/engine_api.h). `in`: the node's inputs in their order; `out`: its outputs, given as
+  /// A function of the engine, by the name of its node - what the engine's nodes do in the
+  /// interpreter, with the JIT, and in a Blueprint's class that has no objects of the engine
+  /// (kern/logic/engine_api.h; see engine_objects below). `in`: the node's inputs in their order; `out`: its outputs, given as
   /// their zeros. False: this host has no such function (the outputs stay as they are).
   virtual bool engine(std::string_view function, const std::vector<Value>& in, std::vector<Value>& out);
   /// The objects of the engine behind that door (kern/logic/engine_host.h), where the host lets a

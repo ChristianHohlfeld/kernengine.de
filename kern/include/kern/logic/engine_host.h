@@ -2,7 +2,10 @@
 //
 // A node of the engine (kern/logic/engine_api.h) reaches the engine through logic::Host::engine. This
 // is what a host gives it there: the real function, called with the node's inputs and giving back
-// what it gives - in every tier the same, since every tier calls through that door.
+// what it gives - for the interpreter and the JIT, and for a Blueprint's class whose host keeps the
+// engine's objects to itself. A class whose host gives it these objects (Host::engine_objects) calls
+// the same function on them itself, typed (kern/logic/engine_direct.h): the same objects behind the
+// same handles, the same result.
 //
 //   - `EngineObjects` are the objects of the engine a Blueprint holds handles of (a handle is a whole
 //     number, 0 is none): those it made (<class>.make - owned here until <class>.release, or until

@@ -26,13 +26,16 @@ every game, not for one:
     has in a Blueprint - the namespaces it stands in are part of it (physics_Pose; see
     type_name_of in tools/cpp_to_blueprint.py).
 
-Every tier calls them through one door, logic::Host::engine(function, in, out): the game binds the
-engine there, a test a stand-in.
+The interpreter and the JIT call them through one door, logic::Host::engine(function, in, out): the game
+binds the engine there, a test a stand-in. A Blueprint's class calls the function of the engine itself, typed
+(kern/logic/engine_direct.h: no value is packed, nothing is looked up by a name), where its host gives it the
+engine's objects - and through the door where it does not. Both are written here, from the same functions.
 
 This tool reads the headers with the compiler's own parser (as tools/cpp_to_blueprint.py does - it
 shares its types) and writes
   kern/src/logic/engine_api.gen.cpp           the table of the functions and their pins
-  kern/include/kern/logic/engine_nodes.gen.h  the functions of a Blueprint's class
+  kern/include/kern/logic/engine_nodes.gen.h  the functions of a Blueprint's class: each the call of the real function
+                                              on the class's own C++ types, and the call through the door
   kern/tests/engine_case.gen.h                the test's Blueprint that calls every one of them
   kern/src/<component>/engine_calls.gen.cpp   the call of every node on the real function (kern/logic/engine_host.h):
                                               its inputs made into what the C++ function takes, what it gives and
