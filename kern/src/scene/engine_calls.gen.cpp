@@ -42,8 +42,8 @@ bool c0(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
   ev::take<ev::Int>(o, in, 4, a3);
   auto a4 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Int>(o, in, 5, a4);
-  if (ev::room(a1) > a0.size()) { o.error = "the list positions has fewer entries than vertex_count says"; return false; }
-  if (ev::room(a3) > a2.size()) { o.error = "the list indices has fewer entries than index_count says"; return false; }
+  if (ev::numbers(a1) > a0.size()) { o.error = "the list positions has fewer entries than vertex_count says"; return false; }
+  if (ev::numbers(a3) > a2.size()) { o.error = "the list indices has fewer entries than index_count says"; return false; }
   self->build(a0.empty() ? nullptr : a0.data(), std::move(a1), a2.empty() ? nullptr : a2.data(), std::move(a3), std::move(a4));
   return true;
 }

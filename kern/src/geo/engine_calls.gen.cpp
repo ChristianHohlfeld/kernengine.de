@@ -57,7 +57,7 @@ bool c0(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
   ev::take<ev::Int>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<kern::BuildingOptions const&>>();
   ev::take<ev::Struct<S_BuildingOptions>>(o, in, 3, a2);
-  if (ev::room(a1) > a0.size()) { o.error = "the list stream has fewer entries than length says"; return false; }
+  if (ev::numbers(a1) > a0.size()) { o.error = "the list stream has fewer entries than length says"; return false; }
   decltype(auto) r = self->begin(a0.empty() ? nullptr : a0.data(), std::move(a1), a2);
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -185,7 +185,7 @@ bool c11(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   ev::take<ev::List<ev::Vector>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Int>(o, in, 2, a1);
-  if (ev::room(a1) > a0.size()) { o.error = "the list points has fewer entries than count says"; return false; }
+  if (ev::numbers(a1) > a0.size()) { o.error = "the list points has fewer entries than count says"; return false; }
   self->ring(a0.empty() ? nullptr : a0.data(), std::move(a1));
   return true;
 }
@@ -223,7 +223,7 @@ bool c15(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   ev::take<ev::List<ev::Float>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Int>(o, in, 1, a1);
-  if (ev::room(a1) > a0.size()) { o.error = "the list xy has fewer entries than count says"; return false; }
+  if (ev::numbers(a1) > a0.size()) { o.error = "the list xy has fewer entries than count says"; return false; }
   decltype(auto) r = kern::ring_area(a0.empty() ? nullptr : a0.data(), std::move(a1));
   ev::give<ev::Float>(o, out, 0, r);
   return true;
@@ -235,7 +235,7 @@ bool c16(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   if (!self) return false;
   std::vector<double> a0;
   ev::take<ev::List<ev::Float>>(o, in, 1, a0);
-  auto a1 = ev::blank<std::remove_cvref_t<unsigned int>>();
+  auto a1 = ev::blank<std::remove_cvref_t<kern::Count<2u>>>();
   ev::take<ev::Int>(o, in, 2, a1);
   std::vector<unsigned int> a2;
   ev::take<ev::List<ev::Int>>(o, in, 3, a2);
@@ -243,8 +243,8 @@ bool c16(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   ev::take<ev::Int>(o, in, 4, a3);
   auto a4 = ev::blank<std::remove_cvref_t<std::vector<unsigned int, std::allocator<unsigned int> >&>>();
   ev::take<ev::List<ev::Int>>(o, in, 5, a4);
-  if (ev::room(a1) > a0.size()) { o.error = "the list xy has fewer entries than vertex_count says"; return false; }
-  if (ev::room(a3) > a2.size()) { o.error = "the list hole_starts has fewer entries than hole_count says"; return false; }
+  if (ev::numbers(a1) > a0.size()) { o.error = "the list xy has fewer entries than vertex_count says"; return false; }
+  if (ev::numbers(a3) > a2.size()) { o.error = "the list hole_starts has fewer entries than hole_count says"; return false; }
   self->triangulate(a0.empty() ? nullptr : a0.data(), std::move(a1), a2.empty() ? nullptr : a2.data(), std::move(a3), a4);
   ev::give<ev::List<ev::Int>>(o, out, 0, a4);
   return true;
@@ -254,7 +254,7 @@ bool c16(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 bool c17(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   std::vector<double> a0;
   ev::take<ev::List<ev::Float>>(o, in, 0, a0);
-  auto a1 = ev::blank<std::remove_cvref_t<unsigned int>>();
+  auto a1 = ev::blank<std::remove_cvref_t<kern::Count<2u>>>();
   ev::take<ev::Int>(o, in, 1, a1);
   std::vector<unsigned int> a2;
   ev::take<ev::List<ev::Int>>(o, in, 2, a2);
@@ -264,9 +264,9 @@ bool c17(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   ev::take<ev::List<ev::Int>>(o, in, 4, a4);
   auto a5 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Int>(o, in, 5, a5);
-  if (ev::room(a1) > a0.size()) { o.error = "the list xy has fewer entries than vertex_count says"; return false; }
-  if (ev::room(a3) > a2.size()) { o.error = "the list hole_starts has fewer entries than hole_count says"; return false; }
-  if (ev::room(a5) > a4.size()) { o.error = "the list triangles has fewer entries than index_count says"; return false; }
+  if (ev::numbers(a1) > a0.size()) { o.error = "the list xy has fewer entries than vertex_count says"; return false; }
+  if (ev::numbers(a3) > a2.size()) { o.error = "the list hole_starts has fewer entries than hole_count says"; return false; }
+  if (ev::numbers(a5) > a4.size()) { o.error = "the list triangles has fewer entries than index_count says"; return false; }
   decltype(auto) r = kern::Earcut::deviation(a0.empty() ? nullptr : a0.data(), std::move(a1), a2.empty() ? nullptr : a2.data(), std::move(a3), a4.empty() ? nullptr : a4.data(), std::move(a5));
   ev::give<ev::Float>(o, out, 0, r);
   return true;
@@ -464,7 +464,7 @@ bool c31(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   if (!a2) return false;
   kern::HeightSampler* a3 = ev::object<kern::HeightSampler>(o, in, 4, "heights");
   if (!a3) return false;
-  if (ev::room(a1) > a0.size()) { o.error = "the list stream has fewer entries than length says"; return false; }
+  if (ev::numbers(a1) > a0.size()) { o.error = "the list stream has fewer entries than length says"; return false; }
   decltype(auto) r = self->begin(a0.empty() ? nullptr : a0.data(), std::move(a1), *a2, *a3);
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -550,7 +550,7 @@ bool c38(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   ev::take<ev::Int>(o, in, 5, a4);
   auto a5 = ev::blank<std::remove_cvref_t<int>>();
   ev::take<ev::Int>(o, in, 6, a5);
-  if (ev::room(a1) > a0.size()) { o.error = "the list points has fewer entries than count says"; return false; }
+  if (ev::numbers(a1) > a0.size()) { o.error = "the list points has fewer entries than count says"; return false; }
   self->road(a0.empty() ? nullptr : a0.data(), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5));
   return true;
 }
