@@ -7,7 +7,8 @@
 #include <string>
 #include <type_traits>
 #include <vector>
-#include <sstream>
+#include <climits>
+#include <cstdlib>
 #include "../../src/game.h"
 #include "../converted.h"
 
@@ -128,6 +129,7 @@ struct Car {
   
   
 };
+namespace detail { namespace KeyIndex { static constexpr std::size_t npos = static_cast<std::size_t>(-1); } }
 struct Value : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -182,7 +184,69 @@ struct TrafficCar {
   Vec3 last_velocity;
 };
 namespace PoliceUnit { enum class State : u8 { pursuit, stopping, engage, back, leave, abandoned, wreck }; }
-bool is_bus(const TrafficCar& c) { return c.car->spec().radius > 0.4; }
+bool is_bus(const TrafficCar& c) { return converted::present(c.car)->spec().radius > 0.4; }
+constexpr const char* kSpaces = " \t\n\v\f\r";
+bool read_word(const std::string& s, std::size_t& at, bool& good, std::string& w) {
+  if (!good) return false;
+  const std::size_t from = s.find_first_not_of(kSpaces, at);
+  if (from == std::string::npos) {
+    good = false;
+    return false;
+  }
+  const std::size_t to = s.find_first_of(kSpaces, from);
+  w = s.substr(from, to == std::string::npos ? std::string::npos : converted::minus(to, from));
+  at = to == std::string::npos ? s.size() : to;
+  return true;
+}
+std::size_t next_at(const std::string& s, std::size_t at) { return s.find_first_not_of(kSpaces, at); }
+bool number_at(const std::string& s, std::size_t from, std::size_t& at, long long& x) {
+  char* end = nullptr;
+  x = std::strtoll(s.c_str() + from, &end, 10);
+  if (end == s.c_str() + from) return false;
+  at = static_cast<std::size_t>(end - s.c_str());
+  return true;
+}
+bool read_int(const std::string& s, std::size_t& at, bool& good, int& v) {
+  if (!good) return false;
+  const std::size_t from = next_at(s, at);
+  long long x = 0;
+  if (from == std::string::npos) {
+    good = false;  // (nothing left: v stays)
+  } else if (!number_at(s, from, at, x)) {
+    v = 0;
+    good = false;
+  } else if (x > INT_MAX || x < INT_MIN) {
+    v = x > INT_MAX ? INT_MAX : INT_MIN;
+    good = false;
+  } else {
+    v = static_cast<int>(x);
+  }
+  return good;
+}
+bool read_u32(const std::string& s, std::size_t& at, bool& good, u32& v) {
+  if (!good) return false;
+  const std::size_t from = next_at(s, at);
+  long long x = 0;
+  if (from == std::string::npos) {
+    good = false;
+    return false;
+  }
+  if (!number_at(s, from, at, x)) {
+    v = 0;
+    good = false;
+    return false;
+  }
+  // (unsigned: a - in front gives the two's complement of the number; beyond 2^32 - 1 it is the end)
+  const bool minus = x < 0;
+  const unsigned long long m = minus ? converted::minus(0ull, static_cast<unsigned long long>(x)) : static_cast<unsigned long long>(x);
+  if (m > UINT_MAX) {
+    v = UINT_MAX;
+    good = false;
+    return false;
+  }
+  v = minus ? 0u - static_cast<u32>(m) : static_cast<u32>(m);
+  return true;
+}
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
@@ -384,6 +448,22 @@ namespace physics { using converted::arg; using converted::same; using converted
 [[maybe_unused]] static bool defined(const TrafficCar& s) { return defined(s.actor) && defined(s.car) && defined(s.color) && defined(s.placed) && defined(s.driver) && defined(s.lane) && defined(s.index) && defined(s.dir) && defined(s.target_speed) && defined(s.want) && defined(s.ahead) && defined(s.peak_up) && defined(s.peak_lift) && defined(s.far) && defined(s.far_speed) && defined(converted::shaped<std::vector<converted::Whole>>(s.solid_masks)) && defined(s.input) && defined(s.police) && defined(s.unit) && defined(s.hp) && defined(s.burn_until) && defined(s.wreck_at) && defined(s.wreck) && defined(s.hit_by_player) && defined(s.last_velocity); }
 [[maybe_unused]] static std::string text(const TrafficCar& s) { return std::string("{") + text(s.actor) + ", " + text(s.car) + ", " + text(s.color) + ", " + text(s.placed) + ", " + text(s.driver) + ", " + text(s.lane) + ", " + text(s.index) + ", " + text(s.dir) + ", " + text(s.target_speed) + ", " + text(s.want) + ", " + text(s.ahead) + ", " + text(s.peak_up) + ", " + text(s.peak_lift) + ", " + text(s.far) + ", " + text(s.far_speed) + ", " + text(converted::shaped<std::vector<converted::Whole>>(s.solid_masks)) + ", " + text(s.input) + ", " + text(s.police) + ", " + text(s.unit) + ", " + text(s.hp) + ", " + text(s.burn_until) + ", " + text(s.wreck_at) + ", " + text(s.wreck) + ", " + text(s.hit_by_player) + ", " + text(s.last_velocity) + "}"; }
 [[maybe_unused]] static void take(TrafficCar& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 25) return; converted::take_as<unsigned int>(s.actor, (*v.rows)[0]); converted::take_as<std::unique_ptr<Car>>(s.car, (*v.rows)[1]); converted::take_as<Vec3>(s.color, (*v.rows)[2]); converted::take_as<bool>(s.placed, (*v.rows)[3]); converted::take_as<bool>(s.driver, (*v.rows)[4]); converted::take_as<int>(s.lane, (*v.rows)[5]); converted::take_as<int>(s.index, (*v.rows)[6]); converted::take_as<int>(s.dir, (*v.rows)[7]); converted::take_as<double>(s.target_speed, (*v.rows)[8]); converted::take_as<double>(s.want, (*v.rows)[9]); converted::take_as<int>(s.ahead, (*v.rows)[10]); converted::take_as<double>(s.peak_up, (*v.rows)[11]); converted::take_as<double>(s.peak_lift, (*v.rows)[12]); converted::take_as<bool>(s.far, (*v.rows)[13]); converted::take_as<double>(s.far_speed, (*v.rows)[14]); converted::take_as<std::vector<converted::Whole>>(s.solid_masks, (*v.rows)[15]); converted::take_as<CarInput>(s.input, (*v.rows)[16]); converted::take_as<bool>(s.police, (*v.rows)[17]); converted::take_as<int>(s.unit, (*v.rows)[18]); converted::take_as<double>(s.hp, (*v.rows)[19]); converted::take_as<double>(s.burn_until, (*v.rows)[20]); converted::take_as<double>(s.wreck_at, (*v.rows)[21]); converted::take_as<bool>(s.wreck, (*v.rows)[22]); converted::take_as<bool>(s.hit_by_player, (*v.rows)[23]); converted::take_as<Vec3>(s.last_velocity, (*v.rows)[24]); }
+struct Out_read_word { bool Result; unsigned long at; bool good; std::string w; };
+[[maybe_unused]] static bool same(const Out_read_word& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.Result, (*got.rows)[0]) && same(want.at, (*got.rows)[1]) && same(want.good, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
+[[maybe_unused]] static bool defined(const Out_read_word& s) { return defined(s.Result) && defined(s.at) && defined(s.good) && defined(s.w); }
+[[maybe_unused]] static std::string text(const Out_read_word& s) { return std::string("{") + text(s.Result) + ", " + text(s.at) + ", " + text(s.good) + ", " + text(s.w) + "}"; }
+struct Out_number_at { bool Result; unsigned long at; long long x; };
+[[maybe_unused]] static bool same(const Out_number_at& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Result, (*got.rows)[0]) && same(want.at, (*got.rows)[1]) && same(want.x, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const Out_number_at& s) { return defined(s.Result) && defined(s.at) && defined(s.x); }
+[[maybe_unused]] static std::string text(const Out_number_at& s) { return std::string("{") + text(s.Result) + ", " + text(s.at) + ", " + text(s.x) + "}"; }
+struct Out_read_int { bool Result; unsigned long at; bool good; int v; };
+[[maybe_unused]] static bool same(const Out_read_int& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.Result, (*got.rows)[0]) && same(want.at, (*got.rows)[1]) && same(want.good, (*got.rows)[2]) && same(want.v, (*got.rows)[3]); }
+[[maybe_unused]] static bool defined(const Out_read_int& s) { return defined(s.Result) && defined(s.at) && defined(s.good) && defined(s.v); }
+[[maybe_unused]] static std::string text(const Out_read_int& s) { return std::string("{") + text(s.Result) + ", " + text(s.at) + ", " + text(s.good) + ", " + text(s.v) + "}"; }
+struct Out_read_u32 { bool Result; unsigned long at; bool good; unsigned int v; };
+[[maybe_unused]] static bool same(const Out_read_u32& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.Result, (*got.rows)[0]) && same(want.at, (*got.rows)[1]) && same(want.good, (*got.rows)[2]) && same(want.v, (*got.rows)[3]); }
+[[maybe_unused]] static bool defined(const Out_read_u32& s) { return defined(s.Result) && defined(s.at) && defined(s.good) && defined(s.v); }
+[[maybe_unused]] static std::string text(const Out_read_u32& s) { return std::string("{") + text(s.Result) + ", " + text(s.at) + ", " + text(s.good) + ", " + text(s.v) + "}"; }
 
 SC_TEST(converted_game_details_cpp) {
   converted::Blueprint bp("game_details_cpp");
@@ -404,6 +484,114 @@ SC_TEST(converted_game_details_cpp) {
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // read_word
+    converted::Tally tally("read_word");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::string a0, [[maybe_unused]] unsigned long a1, [[maybe_unused]] bool a2, [[maybe_unused]] std::string a3) { auto r = converted::counted([&] { return converted_game_details_cpp::read_word(a0, a1, a2, a3); }); return Out_read_word{std::move(r), std::move(a1), std::move(a2), std::move(a3)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      std::string a0 = draw.word();
+      unsigned long a1 = static_cast<unsigned long>(draw.below(40));
+      bool a2 = draw.flag();
+      std::string a3 = draw.word();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1, 2, 3});
+    }
+  }
+  {  // next_at
+    converted::Tally tally("next_at");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::string a0, [[maybe_unused]] unsigned long a1) { return converted::counted([&] { return converted_game_details_cpp::next_at(a0, std::move(a1)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      std::string a0 = draw.word();
+      unsigned long a1 = static_cast<unsigned long>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // number_at
+    converted::Tally tally("number_at");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::string a0, [[maybe_unused]] unsigned long a1, [[maybe_unused]] unsigned long a2, [[maybe_unused]] long long a3) { auto r = converted::counted([&] { return converted_game_details_cpp::number_at(a0, std::move(a1), a2, a3); }); return Out_number_at{std::move(r), std::move(a2), std::move(a3)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      std::string a0 = draw.word();
+      unsigned long a1 = static_cast<unsigned long>(draw.below(40));
+      unsigned long a2 = static_cast<unsigned long>(draw.below(40));
+      long long a3 = static_cast<long long>(draw.whole());
+      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a3), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1, 2});
+    }
+  }
+  {  // read_int
+    converted::Tally tally("read_int");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::string a0, [[maybe_unused]] unsigned long a1, [[maybe_unused]] bool a2, [[maybe_unused]] int a3) { auto r = converted::counted([&] { return converted_game_details_cpp::read_int(a0, a1, a2, a3); }); return Out_read_int{std::move(r), std::move(a1), std::move(a2), std::move(a3)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      std::string a0 = draw.word();
+      unsigned long a1 = static_cast<unsigned long>(draw.below(40));
+      bool a2 = draw.flag();
+      int a3 = static_cast<int>(draw.whole());
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1, 2, 3});
+    }
+  }
+  {  // read_u32
+    converted::Tally tally("read_u32");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::string a0, [[maybe_unused]] unsigned long a1, [[maybe_unused]] bool a2, [[maybe_unused]] unsigned int a3) { auto r = converted::counted([&] { return converted_game_details_cpp::read_u32(a0, a1, a2, a3); }); return Out_read_u32{std::move(r), std::move(a1), std::move(a2), std::move(a3)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      std::string a0 = draw.word();
+      unsigned long a1 = static_cast<unsigned long>(draw.below(40));
+      bool a2 = draw.flag();
+      unsigned int a3 = static_cast<unsigned int>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1, 2, 3});
     }
   }
 }

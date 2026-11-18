@@ -36,6 +36,97 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #define private public
 #define protected public
 namespace json { enum class Type : u8 { null, boolean, number, string, array, object }; }
+namespace logic { enum class PinType : u8 {
+  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
+  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
+  map, set, count
+}; }
+namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
+enum class Opt : u8 {
+  // mouse_settings.mjs
+  mouse_sensitivity, mouse_invert_y,
+  // drone (control_semantics.mjs DEFAULT_PHONE_SETTINGS)
+  drone_left_fineness, drone_right_fineness, drone_invert_yaw, drone_invert_roll, drone_invert_pitch, drone_max_speed_kmh, drone_hover_agl,
+  // on foot (first_person_control_settings.mjs)
+  foot_move_fineness, foot_look_fineness, foot_look_h, foot_look_v, foot_deadzone, foot_invert_move_h, foot_invert_look_h, foot_invert_look_v,
+  // car (vehicle_control_settings.mjs)
+  car_steering, car_throttle, car_max_kmh, car_reverse_kmh, car_cam_distance, car_cam_height,
+  // camera (camera_settings.mjs, stereo_sbs.mjs)
+  cam_fpv_tilt, cam_fov, cam_third_distance, cam_stereo,
+  // audio (audio_settings.mjs)
+  audio_on, audio_drone, audio_shots, audio_fx, audio_steps, audio_vehicle, audio_ambient, music_on, music_volume,
+  // world options (world_options.mjs)
+  world_people, world_traffic, world_dogs, world_cats, world_birds, world_zombies, world_police, world_military, world_flak, world_jetpack,
+  world_friendly_fire, world_terrain, world_guided, world_always_day,
+  // view and helpers (settings_help.mjs: worldGrid, worldKeepLook, worldMinimapAxisLock, box3dColliderDebug; aim assist)
+  foot_aim_assist, pad_aim_scheme, view_grid, view_keep_look, view_minimap_north, debug_colliders,
+  // VR (game_vr.cpp): the locomotion - 0 the sticks, 1 the arms
+  vr_arms, vr_level, vr_tunnel, vr_smooth_turn,
+  count
+};
+struct OptSpec {
+  std::string key;      // command / storage key
+  std::string section;  // menu section: maus, drohne, fuss, auto, kamera, ton, welt
+  std::string label;    // menu label (German)
+  std::string help;     // one line (settings_help.mjs)
+  f32 min, max, step, def;
+  bool toggle;
+  bool live;            // false: a WORLD kind the game does not have yet (shown as "bald")
+};
+struct Option {
+  std::string key, section, label, help;
+  f64 min = 0, max = 0, step = 0, def = 0;
+  bool toggle = false, live = false;
+};
+struct SettingsTable {
+  std::vector<Option> rows;
+  std::vector<OptSpec> specs;
+};
+bool bind_settings(::kern::logic::Runtime& logic, SettingsTable& table);
+const OptSpec& opt_spec(const SettingsTable& table, Opt o);
+bool find_opt(const SettingsTable& table, std::string_view key, Opt& out);
+struct Settings {
+ public:
+  /// Every setting at 0 (as an empty table has it).
+  Settings() = default;
+  /// Every setting at its default (as the table has it).
+  explicit Settings(const SettingsTable& table);
+  
+  
+  /// Clamped and snapped to the step; false for an unknown key or a non-number.
+  bool set(const SettingsTable& table, std::string_view key, std::string_view value);
+  void set(const SettingsTable& table, Opt o, f32 value);
+  void reset_section(const SettingsTable& table, std::string_view section);  // "" = everything
+  /// Increases on every change (the game re-applies what depends on the settings).
+  
+  /// {"key":value,...}
+  std::string values_json(const SettingsTable& table) const;
+  /// [{"key":..,"section":..,"label":..,"help":..,"min":..,"max":..,"step":..,"def":..,"toggle":..,"live":..,"value":..},...]
+  std::string schema_json(const SettingsTable& table) const;
+
+ private:
+  f32 v_[static_cast<u32>(Opt::count)] = {};
+  u32 version_ = 1;
+};
+namespace rules { inline f64 decimal(f32 x) {
+  const f64 d = static_cast<f64>(x);
+  const f64 a = std::fabs(d);
+  if (!(a >= 1e-9 && a < 1e7) || d == std::trunc(d)) return d;
+  f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
+  for (f64 m = a; m < 1; m *= 10) scale *= 10;
+  for (f64 m = a; m >= 10; m /= 10) scale /= 10;
+  for (int digits = 1; digits <= 9; ++digits, scale *= 10) {
+    const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
+    if (static_cast<f32>(c) == x) return c;
+  }
+  return d;
+} }
+namespace rules { struct Blueprint : ::kern::logic::ActorBlueprint {
+  using ActorBlueprint::ActorBlueprint;
+}; }
+rules::Blueprint g_rules{"Settings"};
+const OptSpec kNone = {"", "", "", "", 0, 0, 0, 0, false, false};
+constexpr u32 kCount = static_cast<u32>(Opt::count);
 void escape_into(std::string& out, std::string_view s) {
   for (char c : s) {
     if (c == '"' || c == '\\') { out += '\\'; out += c; }
@@ -48,13 +139,167 @@ std::string num(f32 v) {
   std::snprintf(b, sizeof b, "%g", static_cast<double>(v));
   return b;
 }
+bool bind_settings(::kern::logic::Runtime& logic, SettingsTable& table) {
+  const bool runs = g_rules.bind(logic);
+  table.specs.clear();
+  table.rows = g_rules.get<std::vector<Option>>("Options");
+  if (!runs || table.rows.size() != kCount) {
+    table.rows.clear();
+    return false;
+  }
+  for (const Option& t : table.rows)
+    table.specs.push_back({t.key, t.section, t.label, t.help, static_cast<f32>(t.min), static_cast<f32>(t.max), static_cast<f32>(t.step), static_cast<f32>(t.def),
+                       t.toggle, t.live});
+  return true;
+}
+const OptSpec& opt_spec(const SettingsTable& table, Opt o) {
+  return static_cast<u32>(o) < table.specs.size() ? converted::at(table.specs, static_cast<u32>(o)) : kNone;
+}
+bool find_opt(const SettingsTable& table, std::string_view key, Opt& out) {
+  for (u32 i = 0; i < table.specs.size(); ++i)
+    if (key == converted::at(table.specs, i).key) { out = static_cast<Opt>(converted::among({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60}, i)); return true; }
+  return false;
+}
+Settings::Settings(const SettingsTable& table) {
+  for (u32 i = 0; i < kCount; ++i) converted::at(v_, i) = opt_spec(table, static_cast<Opt>(converted::among({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60}, i))).def;
+}
+void Settings::set(const SettingsTable& table, Opt o, f32 value) {
+  const u32 i = static_cast<u32>(o);
+  if (i >= table.rows.size() || !std::isfinite(value)) return;
+  const f32 v = static_cast<f32>(g_rules.number("Snap", converted::at(table.rows, i), rules::decimal(value)));
+  if (v != converted::at(v_, i)) { converted::at(v_, i) = v; ++version_; }
+}
+bool Settings::set(const SettingsTable& table, std::string_view key, std::string_view value) {
+  Opt o;
+  if (!find_opt(table, key, o)) return false;
+  bool known = false;
+  f64 word = 0;
+  g_rules.call("Word", std::tie(known, word), value);
+  if (known) {
+    set(table, o, static_cast<f32>(word));
+    return true;
+  }
+  const std::string text(value);
+  char* end = nullptr;
+  const double d = std::strtod(text.c_str(), &end);
+  if (end == text.c_str()) return false;
+  set(table, o, static_cast<f32>(d));
+  return true;
+}
+void Settings::reset_section(const SettingsTable& table, std::string_view section) {
+  for (u32 i = 0; i < table.rows.size(); ++i)
+    if (g_rules.flag("InSection", converted::at(table.rows, i), section)) set(table, static_cast<Opt>(converted::among({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60}, i)), converted::at(table.specs, i).def);
+}
+std::string Settings::values_json(const SettingsTable& table) const {
+  std::string o = "{";
+  for (u32 i = 0; i < table.specs.size(); ++i) {
+    if (i) o += ',';
+    o += '"';
+    o += converted::at(table.specs, i).key;
+    o += "\":";
+    o += num(converted::at(v_, i));
+  }
+  return o + "}";
+}
+std::string Settings::schema_json(const SettingsTable& table) const {
+  std::string o = "[";
+  for (u32 i = 0; i < table.specs.size(); ++i) {
+    const OptSpec& s = converted::at(table.specs, i);
+    if (i) o += ',';
+    o += "{\"key\":\"";
+    escape_into(o, s.key);
+    o += "\",\"section\":\"";
+    escape_into(o, s.section);
+    o += "\",\"label\":\"";
+    escape_into(o, s.label);
+    o += "\",\"help\":\"";
+    escape_into(o, s.help);
+    o += "\",\"min\":" + num(s.min) + ",\"max\":" + num(s.max) + ",\"step\":" + num(s.step) + ",\"def\":" + num(s.def);
+    o += std::string(",\"toggle\":") + (s.toggle ? "true" : "false") + ",\"live\":" + (s.live ? "true" : "false") + ",\"value\":" + num(converted::at(v_, i)) + "}";
+  }
+  return o + "]";
+}
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
 
+[[maybe_unused]] static Option draw_Option(converted::Draw& draw) {
+  Option s{};
+  s.key = draw.said_word({"Options"});
+  s.section = draw.said_word({"Options"});
+  s.label = draw.said_word({"Options"});
+  s.help = draw.said_word({"Options"});
+  s.min = draw.number();
+  s.max = draw.number();
+  s.step = draw.number();
+  s.def = draw.number();
+  s.toggle = draw.flag();
+  s.live = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Option& s) { return converted::Value::structure({arg(s.key), arg(s.section), arg(s.label), arg(s.help), arg(s.min), arg(s.max), arg(s.step), arg(s.def), arg(s.toggle), arg(s.live)}); }
+[[maybe_unused]] static bool same(const Option& want, const converted::Value& got) { return got.rows && got.rows->size() == 10 && same(want.key, (*got.rows)[0]) && same(want.section, (*got.rows)[1]) && same(want.label, (*got.rows)[2]) && same(want.help, (*got.rows)[3]) && same(want.min, (*got.rows)[4]) && same(want.max, (*got.rows)[5]) && same(want.step, (*got.rows)[6]) && same(want.def, (*got.rows)[7]) && same(want.toggle, (*got.rows)[8]) && same(want.live, (*got.rows)[9]); }
+[[maybe_unused]] static bool defined(const Option& s) { return defined(s.key) && defined(s.section) && defined(s.label) && defined(s.help) && defined(s.min) && defined(s.max) && defined(s.step) && defined(s.def) && defined(s.toggle) && defined(s.live); }
+[[maybe_unused]] static std::string text(const Option& s) { return std::string("{") + text(s.key) + ", " + text(s.section) + ", " + text(s.label) + ", " + text(s.help) + ", " + text(s.min) + ", " + text(s.max) + ", " + text(s.step) + ", " + text(s.def) + ", " + text(s.toggle) + ", " + text(s.live) + "}"; }
+[[maybe_unused]] static void take(Option& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 10) return; converted::take_as<std::string>(s.key, (*v.rows)[0]); converted::take_as<std::string>(s.section, (*v.rows)[1]); converted::take_as<std::string>(s.label, (*v.rows)[2]); converted::take_as<std::string>(s.help, (*v.rows)[3]); converted::take_as<double>(s.min, (*v.rows)[4]); converted::take_as<double>(s.max, (*v.rows)[5]); converted::take_as<double>(s.step, (*v.rows)[6]); converted::take_as<double>(s.def, (*v.rows)[7]); converted::take_as<bool>(s.toggle, (*v.rows)[8]); converted::take_as<bool>(s.live, (*v.rows)[9]); }
+[[maybe_unused]] static OptSpec draw_OptSpec(converted::Draw& draw) {
+  OptSpec s{};
+  s.key = draw.said_word({"Options"});
+  s.section = draw.said_word({"Options"});
+  s.label = draw.said_word({"Options"});
+  s.help = draw.said_word({"Options"});
+  s.min = draw.number();
+  s.max = draw.number();
+  s.step = draw.number();
+  s.def = draw.number();
+  s.toggle = draw.flag();
+  s.live = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const OptSpec& s) { return converted::Value::structure({arg(s.key), arg(s.section), arg(s.label), arg(s.help), arg(s.min), arg(s.max), arg(s.step), arg(s.def), arg(s.toggle), arg(s.live)}); }
+[[maybe_unused]] static bool same(const OptSpec& want, const converted::Value& got) { return got.rows && got.rows->size() == 10 && same(want.key, (*got.rows)[0]) && same(want.section, (*got.rows)[1]) && same(want.label, (*got.rows)[2]) && same(want.help, (*got.rows)[3]) && same(want.min, (*got.rows)[4]) && same(want.max, (*got.rows)[5]) && same(want.step, (*got.rows)[6]) && same(want.def, (*got.rows)[7]) && same(want.toggle, (*got.rows)[8]) && same(want.live, (*got.rows)[9]); }
+[[maybe_unused]] static bool defined(const OptSpec& s) { return defined(s.key) && defined(s.section) && defined(s.label) && defined(s.help) && defined(s.min) && defined(s.max) && defined(s.step) && defined(s.def) && defined(s.toggle) && defined(s.live); }
+[[maybe_unused]] static std::string text(const OptSpec& s) { return std::string("{") + text(s.key) + ", " + text(s.section) + ", " + text(s.label) + ", " + text(s.help) + ", " + text(s.min) + ", " + text(s.max) + ", " + text(s.step) + ", " + text(s.def) + ", " + text(s.toggle) + ", " + text(s.live) + "}"; }
+[[maybe_unused]] static void take(OptSpec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 10) return; converted::take_as<std::string>(s.key, (*v.rows)[0]); converted::take_as<std::string>(s.section, (*v.rows)[1]); converted::take_as<std::string>(s.label, (*v.rows)[2]); converted::take_as<std::string>(s.help, (*v.rows)[3]); converted::take_as<double>(s.min, (*v.rows)[4]); converted::take_as<double>(s.max, (*v.rows)[5]); converted::take_as<double>(s.step, (*v.rows)[6]); converted::take_as<double>(s.def, (*v.rows)[7]); converted::take_as<bool>(s.toggle, (*v.rows)[8]); converted::take_as<bool>(s.live, (*v.rows)[9]); }
+[[maybe_unused]] static SettingsTable draw_SettingsTable(converted::Draw& draw) {
+  SettingsTable s{};
+  s.rows = draw_list(draw, [&]() -> Option { return draw_Option(draw); });
+  s.specs = draw_list(draw, [&]() -> OptSpec { return draw_OptSpec(draw); });
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const SettingsTable& s) { return converted::Value::structure({arg(s.rows), arg(s.specs)}); }
+[[maybe_unused]] static bool same(const SettingsTable& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.rows, (*got.rows)[0]) && same(want.specs, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const SettingsTable& s) { return defined(s.rows) && defined(s.specs); }
+[[maybe_unused]] static std::string text(const SettingsTable& s) { return std::string("{") + text(s.rows) + ", " + text(s.specs) + "}"; }
+[[maybe_unused]] static void take(SettingsTable& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<std::vector<Option>>(s.rows, (*v.rows)[0]); converted::take_as<std::vector<OptSpec>>(s.specs, (*v.rows)[1]); }
+[[maybe_unused]] static Settings draw_Settings(converted::Draw& draw) {
+  if (draw.flag()) return Settings(draw_SettingsTable(draw));
+  Settings s{};
+  converted::fill_array(s.v_, [&]() -> double { return draw.number(); });
+  s.version_ = static_cast<unsigned int>(draw.below(40));
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Settings& s) { return converted::Value::structure({arg(converted::array_list(s.v_)), arg(s.version_)}); }
+[[maybe_unused]] static bool same(const Settings& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(converted::array_list(want.v_), (*got.rows)[0]) && same(want.version_, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Settings& s) { return defined(converted::array_list(s.v_)) && defined(s.version_); }
+[[maybe_unused]] static std::string text(const Settings& s) { return std::string("{") + text(converted::array_list(s.v_)) + ", " + text(s.version_) + "}"; }
+[[maybe_unused]] static void take(Settings& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[0]); converted::array_from(s.v_, items); } converted::take_as<unsigned int>(s.version_, (*v.rows)[1]); }
+struct Out_bind_settings { bool Result; SettingsTable table; };
+[[maybe_unused]] static bool same(const Out_bind_settings& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.table, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_bind_settings& s) { return defined(s.Result) && defined(s.table); }
+[[maybe_unused]] static std::string text(const Out_bind_settings& s) { return std::string("{") + text(s.Result) + ", " + text(s.table) + "}"; }
+struct Out_find_opt { bool Result; Opt out; };
+[[maybe_unused]] static bool same(const Out_find_opt& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.out, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_find_opt& s) { return defined(s.Result) && defined(s.out); }
+[[maybe_unused]] static std::string text(const Out_find_opt& s) { return std::string("{") + text(s.Result) + ", " + text(s.out) + "}"; }
+struct Out_Settings_set_2 { Settings Self; bool Result; };
+[[maybe_unused]] static bool same(const Out_Settings_set_2& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_Settings_set_2& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_Settings_set_2& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 
 SC_TEST(converted_settings_cpp) {
-  converted::Blueprint bp("settings_cpp");
+  converted::Blueprint bp("settings_cpp", {"Settings"});
+  g_rules.bind(bp.source_logic());
   {  // escape_into
     converted::Tally tally("escape_into");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -88,6 +333,190 @@ SC_TEST(converted_settings_cpp) {
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // bind_settings
+    converted::Tally tally("bind_settings");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] SettingsTable a0) { auto r = converted::counted([&] { return converted_settings_cpp::bind_settings(bp.source_logic(), a0); }); return Out_bind_settings{std::move(r), std::move(a0)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      SettingsTable a0 = draw_SettingsTable(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
+    }
+  }
+  {  // opt_spec
+    converted::Tally tally("opt_spec");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] SettingsTable a0, [[maybe_unused]] Opt a1) { return converted::counted([&] { return converted_settings_cpp::opt_spec(a0, std::move(a1)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      SettingsTable a0 = draw_SettingsTable(draw);
+      Opt a1 = static_cast<Opt>(draw.below(61));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // find_opt
+    converted::Tally tally("find_opt");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] SettingsTable a0, [[maybe_unused]] std::string_view a1, [[maybe_unused]] Opt a2) { auto r = converted::counted([&] { return converted_settings_cpp::find_opt(a0, std::move(a1), a2); }); return Out_find_opt{std::move(r), std::move(a2)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      SettingsTable a0 = draw_SettingsTable(draw);
+      std::string_view a1 = std::string_view(draw.c_word());
+      Opt a2 = static_cast<Opt>(draw.below(61));
+      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
+    }
+  }
+  {  // Settings::Settings
+    converted::Tally tally("Settings_new");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] SettingsTable a0) { return converted::counted([&] { return Settings(a0); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      SettingsTable a0 = draw_SettingsTable(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Settings::set
+    converted::Tally tally("Settings_set");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Settings a0, [[maybe_unused]] SettingsTable a1, [[maybe_unused]] Opt a2, [[maybe_unused]] double a3) { converted::counted([&] { return a0.set(a1, std::move(a2), std::move(a3)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      Settings a0 = draw_Settings(draw);
+      SettingsTable a1 = draw_SettingsTable(draw);
+      Opt a2 = static_cast<Opt>(draw.below(61));
+      double a3 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Settings::set
+    converted::Tally tally("Settings_set_2");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Settings a0, [[maybe_unused]] SettingsTable a1, [[maybe_unused]] std::string_view a2, [[maybe_unused]] std::string_view a3) { auto r = converted::counted([&] { return a0.set(a1, std::move(a2), std::move(a3)); }); return Out_Settings_set_2{std::move(a0), std::move(r)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      Settings a0 = draw_Settings(draw);
+      SettingsTable a1 = draw_SettingsTable(draw);
+      std::string_view a2 = std::string_view(draw.said_c_word({"Word"}));
+      std::string_view a3 = std::string_view(draw.said_c_word({"Word"}));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
+    }
+  }
+  {  // Settings::reset_section
+    converted::Tally tally("Settings_reset_section");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Settings a0, [[maybe_unused]] SettingsTable a1, [[maybe_unused]] std::string_view a2) { converted::counted([&] { return a0.reset_section(a1, std::move(a2)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      Settings a0 = draw_Settings(draw);
+      SettingsTable a1 = draw_SettingsTable(draw);
+      std::string_view a2 = std::string_view(draw.said_c_word({"InSection"}));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Settings::values_json
+    converted::Tally tally("Settings_values_json");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Settings a0, [[maybe_unused]] SettingsTable a1) { return converted::counted([&] { return a0.values_json(a1); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      Settings a0 = draw_Settings(draw);
+      SettingsTable a1 = draw_SettingsTable(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Settings::schema_json
+    converted::Tally tally("Settings_schema_json");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Settings a0, [[maybe_unused]] SettingsTable a1) { return converted::counted([&] { return a0.schema_json(a1); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      Settings a0 = draw_Settings(draw);
+      SettingsTable a1 = draw_SettingsTable(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

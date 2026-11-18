@@ -35,6 +35,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
 namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
 inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
 namespace json { enum class Type : u8 { null, boolean, number, string, array, object }; }
@@ -132,7 +133,7 @@ struct MusicSynth {
   /// The programme to play (kMenu, a station index, or -2 = silence) and its level 0..1.
   void select(i32 programme, f32 level);
   /// Adds `frames` stereo frames into `out` (interleaved).
-  
+  void render_add(std::vector<f32>& out, u32 frames);
   
   
   f32 peak = 0;  // of the last block (tests)
@@ -140,7 +141,7 @@ struct MusicSynth {
  private:
   struct Voice { f32 phase = 0, freq = 0, env = 0, decay = 0.9995, amp = 0, phase2 = 0; };
   void step();
-  
+  f32 next_sample(f32& right);
   u32 rate_ = 0;
   i32 programme_ = -2, want_ = -2;
   f32 gain_ = 0, target_ = 0, fade_ = 1;  // fade: 1 = the current programme fully in
@@ -331,6 +332,101 @@ void MusicSynth::step() {
   }
   ++step_;
 }
+f32 MusicSynth::next_sample(f32& right) {
+  const Prog p = prog_of(programme_);
+  const f32 inv = 1.0 / static_cast<f32>(rate_);
+  auto noise = [&]() { rng_ = rng_ * 1664525u + 1013904223u; return static_cast<f32>(static_cast<i32>(rng_)) / 2147483648.0; };
+  f32 s = 0;
+  // kick: a sine dropping from 150 to 45 Hz
+  if (kick_.env > 1e-4) {
+    const f32 f = 45 + 105 * kick_.env * kick_.env;
+    kick_.phase += f * inv;
+    s += kern::math::sin(kick_.phase * 6.2831853) * kick_.env * 0.9;
+    kick_.env *= kick_.decay;
+  }
+  if (snare_.env > 1e-4) { s += noise() * snare_.env * 0.32; snare_.env *= snare_.decay; }
+  if (hat_.env > 1e-4) {
+    const f32 n = noise();
+    s += (n - hat_.phase) * hat_.env * 0.12;  // first difference: a crude high-pass
+    hat_.phase = n;
+    hat_.env *= hat_.decay;
+  }
+  if (bass_.env > 1e-4) {
+    bass_.phase += bass_.freq * inv;
+    bass_.phase -= std::floor(bass_.phase);
+    const f32 raw = p.genre == chip ? (bass_.phase < 0.5 ? 4 * bass_.phase - 1 : 3 - 4 * bass_.phase)  // triangle
+                                    : 2 * bass_.phase - 1;                                              // saw
+    bass_lp_ += (raw - bass_lp_) * (p.genre == lofi ? 0.04 : 0.12);
+    s += bass_lp_ * bass_.env * 0.45;
+    bass_.env *= bass_.decay;
+  }
+  f32 lead = 0;
+  if (lead_.env > 1e-4) {
+    lead_.phase += lead_.freq * inv;
+    lead_.phase -= std::floor(lead_.phase);
+    const f32 duty = p.genre == chip ? 0.25 : 0.5;
+    const f32 sq = lead_.phase < duty ? 1.0 : -1.0;
+    const f32 tri = lead_.phase < 0.5 ? 4 * lead_.phase - 1 : 3 - 4 * lead_.phase;
+    lead = (p.genre == chip || p.genre == synthwave ? sq * 0.6 + tri * 0.4 : tri) * lead_.env * 0.16;
+    lead_.env *= lead_.decay;
+  }
+  f32 pad = 0;
+  for (Voice& v : pad_) {
+    if (v.env < 1e-4) continue;
+    v.phase += v.freq * inv;
+    v.phase2 += v.freq * 1.006 * inv;  // detuned twin
+    v.phase -= std::floor(v.phase);
+    v.phase2 -= std::floor(v.phase2);
+    pad += ((2 * v.phase - 1) + (2 * v.phase2 - 1)) * v.env * 0.035;
+    v.env *= v.decay;
+  }
+  lp_ += (pad - lp_) * (p.genre == lofi ? 0.03 : 0.08);
+  // A dotted-eighth echo on the lead (synthwave, title), wider in stereo.
+  const u32 echo_len = std::min<u32>(converted::quot(std::size_t{96000}, std::size_t{4}), static_cast<u32>(samples_per_step_ * 3));
+  f32 echo = 0;
+  if (echo_len > 0) {
+    converted::rem_to(echo_at_, echo_len);
+    echo = converted::at(echo_, echo_at_);
+    converted::at(echo_, echo_at_) = lead + echo * 0.38;
+    ++echo_at_;
+  }
+  const f32 mono = s + lp_;
+  right = mono + lead * 0.9 + echo * 0.5;
+  return mono + lead + echo * 0.3;
+}
+void MusicSynth::render_add(std::vector<f32>& out, u32 frames) {
+  peak = 0;
+  if (!rate_) return;
+  for (u32 i = 0; i < frames; ++i) {
+    // Crossfade: a different programme fades the current one out (0.4 s), then starts.
+    if (want_ != programme_) {
+      fade_ -= 1.0 / (0.4 * static_cast<f32>(rate_));
+      if (fade_ <= 0 || programme_ == -2) {
+        programme_ = want_;
+        fade_ = 0;
+        step_ = 0;
+        until_step_ = 0;
+        if (programme_ != -2) {
+          const Prog p = prog_of(programme_);
+          rng_ = p.seed * 2654435761u + 1;
+          samples_per_step_ = std::max<u32>(1, static_cast<u32>(converted::fits<unsigned int>(static_cast<f32>(rate_) * 60 / p.bpm / 4)));
+        }
+        kick_ = snare_ = hat_ = bass_ = lead_ = Voice{};
+        for (Voice& v : pad_) v = Voice{};
+      }
+    } else if (fade_ < 1) fade_ = std::fmin(1.0, fade_ + 1.0 / (0.6 * static_cast<f32>(rate_)));
+    gain_ += (target_ - gain_) * 0.0005;
+    if (programme_ == -2 || gain_ < 1e-4) continue;
+    if (until_step_ == 0) { step(); until_step_ = samples_per_step_; }
+    --until_step_;
+    f32 r = 0;
+    const f32 l = next_sample(r);
+    const f32 g = gain_ * fade_ * 0.7;
+    converted::at(out, 2 * i) += l * g;
+    converted::at(out, 2 * i + 1) += r * g;
+    peak = std::fmax(peak, std::fabs(l * g));
+  }
+}
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
@@ -501,6 +597,14 @@ struct Out_Jetpack_update { Jetpack Self; double Result; };
 [[maybe_unused]] static bool same(const Out_Jetpack_update& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_Jetpack_update& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Jetpack_update& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
+struct Out_MusicSynth_next_sample { MusicSynth Self; double Result; double right; };
+[[maybe_unused]] static bool same(const Out_MusicSynth_next_sample& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]) && same(want.right, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const Out_MusicSynth_next_sample& s) { return defined(s.Self) && defined(s.Result) && defined(s.right); }
+[[maybe_unused]] static std::string text(const Out_MusicSynth_next_sample& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + ", " + text(s.right) + "}"; }
+struct Out_MusicSynth_render_add { MusicSynth Self; std::vector<double> out; };
+[[maybe_unused]] static bool same(const Out_MusicSynth_render_add& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.out, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_MusicSynth_render_add& s) { return defined(s.Self) && defined(s.out); }
+[[maybe_unused]] static std::string text(const Out_MusicSynth_render_add& s) { return std::string("{") + text(s.Self) + ", " + text(s.out) + "}"; }
 
 SC_TEST(converted_equipment_cpp) {
   converted::Blueprint bp("equipment_cpp", {"Jetpack"});
@@ -763,7 +867,7 @@ SC_TEST(converted_equipment_cpp) {
     for (int i = 0; tally.more(i); ++i) {
       FlightLog a0 = draw_FlightLog(draw);
       FlightSample a1 = draw_FlightSample(draw);
-      const char* a2 = draw.c_word();
+      const char* a2 = draw.said_c_word({"FC_DISARM", "SIM_RESET"});
       const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
@@ -931,6 +1035,47 @@ SC_TEST(converted_equipment_cpp) {
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // MusicSynth::next_sample
+    converted::Tally tally("MusicSynth_next_sample");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] MusicSynth a0, [[maybe_unused]] double a1) { auto r = converted::counted([&] { return a0.next_sample(a1); }); return Out_MusicSynth_next_sample{std::move(a0), std::move(r), std::move(a1)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      MusicSynth a0 = draw_MusicSynth(draw);
+      double a1 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0, 2});
+    }
+  }
+  {  // MusicSynth::render_add
+    converted::Tally tally("MusicSynth_render_add");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] MusicSynth a0, [[maybe_unused]] std::vector<double> a1, [[maybe_unused]] unsigned int a2) { converted::counted([&] { return a0.render_add(a1, std::move(a2)); }); return Out_MusicSynth_render_add{std::move(a0), std::move(a1)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      MusicSynth a0 = draw_MusicSynth(draw);
+      std::vector<double> a1 = draw_list(draw, [&]() -> double { return draw.number(); });
+      unsigned int a2 = static_cast<unsigned int>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
 }

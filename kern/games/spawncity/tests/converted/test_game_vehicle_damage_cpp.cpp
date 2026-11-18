@@ -182,7 +182,7 @@ struct TrafficCar {
   Vec3 last_velocity;
 };
 namespace PoliceUnit { enum class State : u8 { pursuit, stopping, engage, back, leave, abandoned, wreck }; }
-bool is_bus(const TrafficCar& c) { return c.car->spec().radius > 0.4; }
+bool is_bus(const TrafficCar& c) { return converted::present(c.car)->spec().radius > 0.4; }
 #undef private
 #undef protected
 #pragma GCC diagnostic pop

@@ -433,7 +433,7 @@ namespace combat { using converted::arg; using converted::same; using converted:
 }
 [[maybe_unused]] static combat::EnemySpec draw_combat__EnemySpec(converted::Draw& draw) {
   combat::EnemySpec s{};
-  s.name = draw.word();
+  s.name = draw.said_word({"EnemyHitChance"});
   s.hp = draw.number();
   s.speed = draw.number();
   s.range = draw.number();
