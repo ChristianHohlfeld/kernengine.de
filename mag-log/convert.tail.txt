@@ -1,0 +1,80 @@
+    Session::successor (7): written
+    Session::set_origin (10): written
+    Session::origin (6): written
+    Session::remote_index (4): written
+    Session::roster (7): written
+    Session::color_of (8): assign_colors() is defined in another file
+    Session::index_of (7): written
+    Session::protected_now (4): written
+    Session::focus_of (7): written
+    Session::hp_of (7): written
+    Session::refused (4): written
+    Session::to_client (4): written
+    Session::to_all (6): written
+    Session::to_host (4): claim() is defined in another file
+    Session::send_fx (5): it calls Session::to_host(), which waits
+    Session::send_swarm (13): it calls Session::to_host(), which waits
+    Session::swarm_part (27): written
+    Session::town_to_host (3): written
+    Session::town_to_all (3): written
+    Session::town_to (3): written
+    Session::send_world (3): written
+    Session::send_world_to (3): written
+    Session::send_proj (9): written
+    Session::send_toss (9): written
+    Session::destroy_to_host (3): written
+    Session::destroy_to_all (3): written
+    Session::destroy_to (3): written
+    Session::send_swarm_hit (5): it calls Session::to_host(), which waits
+    Session::request_hit (5): it calls Session::to_host(), which waits
+    Session::report_death (8): it calls Session::to_host(), which waits
+    Session::report_respawn (1): it calls Session::to_host(), which waits
+    Session::send_ping (9): it calls Session::to_host(), which waits
+    Session::send_voice (9): it calls Session::to_host(), which waits
+    Session::propose_rule (8): it calls Session::to_host(), which waits
+    Session::vote (10): it calls Session::to_host(), which waits
+    Session::judge (17): judge_hit() is defined in another file
+    Session::send_scores (6): written
+    Session::send_rules (6): written
+    Session::set_world_rules (7): written
+    Session::send_anchor (13): group_spawn_center() is defined in another file
+    Session::begin_ballot (14): create_ballot() is defined in another file
+    Session::finish_ballot (10): written
+    Session::seat_request (10): claim() is defined in another file
+    Session::judge_seat (4): claim() is defined in another file
+    Session::send_seats (8): written
+    Session::dispatch (145): claim() is defined in another file
+    Session::deliver (120): ensure() is defined in another file
+    Session::on_pose (29): ensure() is defined in another file
+    Session::update (92): ensure() is defined in another file
+    Session::status (7): written
+
+278 of 328 functions of the program are written as Blueprints (1494 of 3286 lines), and 5 of the engine's headers that they call: 24 Blueprints - 3 of source files, 0 of states, 21 of headers and of shapes
+249 functions of the Blueprints are compared with their source, bit for bit, by the tests in /dev/shm/spawncity-jobs-chris/work-f2-probe-161624-26126/pt/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+     6 (   577)   it calls CityStream::ground_height(), which waits
+     4 (   255)   ensure() is defined in another file
+     2 (   178)   it calls Life::kill_runner(), which waits
+     1 (   170)   clearance_pad_axis() is defined in another file
+     4 (   163)   claim() is defined in another file
+     1 (    74)   areas_near() is defined in another file
+     2 (    73)   it calls Life::blocked(), which waits
+    10 (    73)   it calls Session::to_host(), which waits
+     2 (    62)   spawn() is defined in another file
+     2 (    40)   it calls Life::spot_near(), which waits
+     1 (    35)   furniture() is defined in another file
+     1 (    25)   clear() is defined in another file
+     1 (    17)   judge_hit() is defined in another file
+     1 (    14)   create_ballot() is defined in another file
+     1 (    13)   group_spawn_center() is defined in another file
+     1 (     8)   assign_colors() is defined in another file
+     1 (     6)   water_at() is defined in another file
+     5 (     5)   input() is defined in another file
+     2 (     2)   find() is defined in another file
+     1 (     1)   height() is defined in another file
+     1 (     1)   elevation() is defined in another file
+
+real	3m15,837s
+user	7m57,471s
+sys	0m28,213s
