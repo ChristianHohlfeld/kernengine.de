@@ -323,6 +323,11 @@ void on1(Actor actor, Float value, Text text) {
   `std::vector` (`a != b` ist `logic_not(list_equal<Int>(a, b))`). Verglichen wird wie bei Contains
   und Find Item: Zahlen nach ihrem Wert (ein NaN gleicht nichts), Strukturen Feld für Feld. Gelesen
   wird, wo die Listen stehen – der Vergleich kopiert nichts; eine Liste fester Länge passt wie jede.
+  Eine Liste von Strukturen schreibt der Konverter so, wenn das `==` der Struktur in C++ dasselbe sagt:
+  `= default`, oder von Hand jedes Feld genau einmal, in der Reihenfolge der Deklaration, mit `&&`
+  verbunden (`return x == o.x && y == o.y;`), und jedes Feld selbst so vergleichbar (Zahlen, Flags,
+  Aufzählungen, Texte als `std::string`, Vektoren, Listen und Strukturen davon). Ein anderes `==` ist
+  das eigene der Struktur und wartet.
 - **Ordnen.** Sort List bringt eine Liste an ihrem Platz in eine Reihenfolge, stabil (gleiche Einträge
   behalten ihre): `list_sort<nullptr>(Scores);` nach der eigenen Ordnung der Einträge (Zahlen, ganze
   Zahlen, Flags, Texte, Werte von Aufzählungen, Int64 nach den Bits als `u64`), oder

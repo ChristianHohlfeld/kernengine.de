@@ -6546,6 +6546,70 @@ class Emit:
             raise Wait(f"algorithm: std::find of a {it}")
         return self.bx({"kind": "BinaryOperator", "opcode": "==", "type": {"qualType": "bool"}, "inner": [x, y]})
 
+    def memberwise(self, cpp, seen=()):
+        """Does C++'s == of the type `cpp` say what the language's == of its value says - a struct's: every field
+        equal to that field of the other, in their order, each as its own type compares (a number as a number: a NaN
+        equals nothing)? Numbers, flags, values of an enum, texts held as texts (std::string, not a pointer),
+        vectors, lists of such (std::vector: as many, each equal), and a struct of the program whose == compares
+        each of its fields once, in the order they are declared, with && - written so, or `= default` - and nothing else."""
+        t = re.sub(r"^const\s+", "", self.u.clean(cpp)).strip()
+        if t in NUMBER or t in W64 or t == "kern::Vec3" or (t in TEXT and "*" not in t):
+            return True
+        m = re.match(r"std::vector<(.+)>$", t)
+        if m:
+            return self.memberwise(template_args(t)[0], seen)
+        q = self.u.find_type(t)
+        if q in self.tree.enums:
+            return True
+        if q not in self.tree.records or q in seen:
+            return False
+        rec = self.tree.records[q]
+        if rec.get("bases"):
+            return False
+        fields = [c for c in kids(rec) if c.get("kind") == "FieldDecl"]
+        ops = [c for c in kids(rec) if c.get("kind") == "CXXMethodDecl" and c.get("name") == "operator=="]
+        ops += [f for c in kids(rec) if c.get("kind") == "FriendDecl" for f in kids(c) if f.get("kind") == "FunctionDecl" and f.get("name") == "operator=="]
+        if len(ops) != 1 or not fields or not all(self.memberwise(qtype(f), seen + (q,)) for f in fields):
+            return False
+        op = ops[0]
+        if op.get("explicitlyDefaulted") == "default":
+            return True
+        params = [c for c in kids(op) if c.get("kind") == "ParmVarDecl"]
+        body = next((c for c in kids(self.tree.body.get(op["id"], op)) if c.get("kind") == "CompoundStmt"), None)
+        if op.get("kind") != "CXXMethodDecl" or len(params) != 1 or body is None or len(kids(body)) != 1 or kids(body)[0].get("kind") != "ReturnStmt":
+            return False
+        names = []
+        def side(n, mine):
+            # (a field of the object itself - this->f - or of the one it is given - o.f)
+            b = self.unwrap(n)
+            while b.get("kind") == "ImplicitCastExpr" and kids(b):   # (the same on both sides: what reads or promotes the field)
+                b = self.unwrap(kids(b)[-1])
+            if b.get("kind") != "MemberExpr" or not kids(b):
+                return None
+            base = self.unwrap(kids(b)[0])
+            if mine and base.get("kind") == "CXXThisExpr" or not mine and base.get("kind") == "DeclRefExpr" and base.get("referencedDecl", {}).get("id") == params[0]["id"]:
+                return b.get("name")
+            return None
+        def walk_and(n):
+            b = self.unwrap(n)
+            while b.get("kind") == "ImplicitCastExpr" and kids(b):
+                b = self.unwrap(kids(b)[-1])
+            if b.get("kind") == "BinaryOperator" and b.get("opcode") == "&&":
+                return walk_and(kids(b)[0]) and walk_and(kids(b)[1])
+            if b.get("kind") == "BinaryOperator" and b.get("opcode") == "==":
+                x, y = kids(b)
+            elif b.get("kind") == "CXXOperatorCallExpr" and callee_name(b) == "operator==" and len(kids(b)) == 3:
+                x, y = kids(b)[1], kids(b)[2]
+            else:
+                return False
+            a, o = side(x, True), side(y, False)
+            if a is None or a != o:
+                return False
+            names.append(a)
+            return True
+        ret = kids(kids(body)[0])
+        return len(ret) == 1 and walk_and(ret[0]) and names == [f.get("name") for f in fields]
+
     def sorted_list(self, name, a):
         """std::stable_sort(v.begin(), v.end()[, before]): Sort List - the list put in order where it stands,
         stably, as std::stable_sort does: by the function it is given (a lambda that takes two entries and
@@ -8513,7 +8577,8 @@ class Emit:
             # place. (Items that are numbers, flags, texts or values of an enum: their == is the language's; what
             # the == of a class of the program says is that class's own matter.)
             it = t0[5:-1]
-            if it in ("Int", "Float", "Bool", "Text", "Int64") or it in self.u.enum_values:
+            cpp = re.match(r"std::vector<(.+)>$", self.u.clean(qtype(ops[0])))
+            if it in ("Int", "Float", "Bool", "Text", "Int64") or it in self.u.enum_values or (it in self.u.struct_fields and cpp and self.memberwise(template_args(cpp.group(0))[0])):
                 r = f"list_equal<{it}>({self.ex(ops[0], t0)}, {self.ex(ops[1], t0)})"
                 return (r if name == "operator==" else f"logic_not({r})"), "Bool"
         raise Wait(f"the operator {name[8:]} of {t0}")

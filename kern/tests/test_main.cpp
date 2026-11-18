@@ -4787,6 +4787,16 @@ TEST(logic_text_of_the_program) {
   CHECK(B::list_find<Text>(names, "z") == 2 && B::list_contains<Text>(names, kName) && B::list_get<Text>(names, 7) == "");
   CHECK(B::list_equal<Text>(names, names) && B::list_equal<Text>(names, kern::List<Text>{"x", kName, "z"}) && !B::list_equal<Text>(names, kern::List<Text>{"x", kName}) &&
         !B::list_equal<Text>(names, kern::List<Text>{"x", kName, "y"}) && B::list_equal<Text>(kern::List<Text>{}, kern::List<Text>{}));
+  // Lists Equal of structs: field by field, as C++'s == of a struct that compares each of its fields - a NaN in
+  // one equals nothing, not even itself; in the class and in the interpreter the same
+  {
+    const kern::List<B::Spec> specs{B::Spec{kName, 2.0}, B::Spec{"x", 3.0}}, nan_specs{B::Spec{kName, std::nan("")}};
+    CHECK(B::list_equal<B::Spec>(specs, kern::List<B::Spec>{B::Spec{kName, 2.0}, B::Spec{"x", 3.0}}) && !B::list_equal<B::Spec>(specs, kern::List<B::Spec>{B::Spec{kName, 2.0}, B::Spec{"x", 3.5}}) &&
+          !B::list_equal<B::Spec>(specs, kern::List<B::Spec>{B::Spec{kName, 2.0}, B::Spec{"y", 3.0}}) && !B::list_equal<B::Spec>(nan_specs, nan_specs));
+    const logic::Value a = logic::to_value(specs), same = logic::to_value(kern::List<B::Spec>{B::Spec{kName, 2.0}, B::Spec{"x", 3.0}}), n = logic::to_value(nan_specs);
+    CHECK(logic::list::equal(a.items<logic::Value>(), same.items<logic::Value>()) && !logic::list::equal(n.items<logic::Value>(), n.items<logic::Value>()) &&
+          !logic::list::equal(a.items<logic::Value>(), logic::to_value(kern::List<B::Spec>{B::Spec{kName, 2.0}, B::Spec{"x", 3.5}}).items<logic::Value>()));
+  }
   const logic::Value v = logic::to_value(names);
   CHECK(v.type == logic::PinType::text_list && v.size() == 3 && v.item(1).as_text() == kName);
   const kern::List<Text> back = logic::from_value<kern::List<Text>>(v);
