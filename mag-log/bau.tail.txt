@@ -1,0 +1,80 @@
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp: In lambda function:
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:174:25: warning: missing initializer for member ‘sc_old_world_traffic::sc::TrafficRules::Arm::pole’ [-Wmissing-field-initializers]
+  174 |         n.arms.push_back({dir, l.width});
+      |         ~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp: In member function ‘void sc_old_world_traffic::sc::TrafficRules::rebuild(const std::vector<sc::Lane>&)’:
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:222:70: warning: missing initializer for member ‘sc_old_world_traffic::sc::TrafficRules::Arm::pole’ [-Wmissing-field-initializers]
+  222 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g->width});
+      |                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp: In lambda function:
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:610:25: warning: missing initializer for member ‘sc_new_world_traffic::sc::TrafficRules::Arm::pole’ [-Wmissing-field-initializers]
+  610 |         n.arms.push_back({dir, l.width});
+      |         ~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp: In member function ‘void sc_new_world_traffic::sc::TrafficRules::rebuild(const std::vector<sc::Lane>&)’:
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:659:70: warning: missing initializer for member ‘sc_new_world_traffic::sc::TrafficRules::Arm::pole’ [-Wmissing-field-initializers]
+  659 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g.width});
+      |                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/converted/test_terrain.cpp: In function ‘void converted_terrain::converted_terrain()’:
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/converted/test_terrain.cpp:627:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+  627 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/converted/test_terrain.cpp:646:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+  646 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/converted/test_terrain.cpp:668:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+  668 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/converted/test_terrain.cpp:687:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+  687 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/converted/test_terrain.cpp:707:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+  707 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/converted/test_terrain.cpp:727:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+  727 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/converted/test_Game__game_cpp.cpp: In function ‘void converted_Game__game_cpp::converted_Game__game_cpp()’:
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/converted/test_Game__game_cpp.cpp:11501:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+11501 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/converted/test_Game__game_cpp.cpp:11522:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+11522 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/converted/test_Game__game_cpp.cpp:11543:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+11543 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/converted/test_Game__game_cpp.cpp:11565:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+11565 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/converted/test_Game__game.cpp: In function ‘void converted_Game__game::converted_Game__game()’:
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/converted/test_Game__game.cpp:11401:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+11401 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/converted/test_Game__game.cpp:11423:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+11423 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/converted/test_Game__game.cpp:11445:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+11445 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/converted/test_Game__game.cpp:11467:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+11467 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/converted/test_Game__game.cpp:11488:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+11488 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/converted/test_Game__game_weapons_cpp.cpp: In function ‘void converted_Game__game_weapons_cpp::converted_Game__game_weapons_cpp()’:
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/converted/test_Game__game_weapons_cpp.cpp:11467:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+11467 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/converted/test_Game__game_weapons_cpp.cpp:11489:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+11489 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-231118-18156/kern/games/spawncity/tests/converted/test_Game__game_weapons_cpp.cpp:11511:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+11511 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+0 tests, 0 checks, 0 failures
+
+real	6m18,542s
+user	53m21,261s
+sys	1m54,361s
