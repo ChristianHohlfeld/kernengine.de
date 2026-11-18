@@ -1,0 +1,10 @@
+FAIL converted_net_session
+FAIL converted_net_session_cpp
+ok   converted_common
+ok   converted_engine_math_math
+ok   converted_engine_physics_physics
+ok   converted_jet_seats
+ok   converted_mp_rules
+ok   converted_net_session_cpp
+ok   converted_wire
+--- 7 ok, 2 FAIL, 0 ABBRUCH, 0 LECK, 0 ZEIT, von 8 Tests; cost: 38, note: 37

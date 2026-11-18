@@ -1,0 +1,7 @@
+  cost: config: in 300 of 300 calls the class asks for memory more often than the source (up to 3 times instead of 1)
+  cost: Session_refused: in 60 of 300 calls the class asks for memory more often than the source (up to 2 times instead of 0)
+  cost: Session_swarm_part: in 248 of 255 calls the class asks for memory more often than the source (up to 4 times instead of 2)
+  cost: Session_swarm_part: in 273 of 280 calls the class asks for memory more often than the source (up to 6 times instead of 3)
+  cost: unpack: in 1 of 212 calls the class asks for memory more often than the source (up to 4 times instead of 0)
+  cost: unpack: in 1 of 300 calls the class asks for memory more often than the source (up to 4 times instead of 0)
+  cost: unpack_swarm: in 1 of 300 calls the class asks for memory more often than the source (up to 4 times instead of 0)
