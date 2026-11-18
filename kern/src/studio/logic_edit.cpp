@@ -7,6 +7,7 @@
 
 #include "internal.h"
 #include "kern/audio/synth.h"
+#include "kern/logic/engine_api.h"
 #include "kern/studio/studio.h"
 
 namespace kern::studio {
@@ -928,13 +929,18 @@ json::Value Studio::logic_palette(const json::Value& c) const {
   }
   // The nodes of a variable: of the Blueprint's, and of each function's local variables (those
   // name their function, the setting "scope").
-  auto variable_nodes = [&](const logic::Variable& v, const std::string& scope) {
-    using Params = std::vector<std::pair<std::string, std::string>>;
+  using Params = std::vector<std::pair<std::string, std::string>>;
+  // (`naming`: how its nodes name it - the variable, or a place of the engine: {"bound", id})
+  auto variable_nodes = [&](const logic::Variable& v, const std::string& scope, const Params& naming, const std::string& kind) {
     auto with = [&](Params p) {
+      if (!p.empty() && p.front().first == "variable") { p.erase(p.begin()); p.insert(p.begin(), naming.begin(), naming.end()); }
       if (!scope.empty()) p.push_back({"scope", scope});
       return p;
     };
-    const std::string category = scope.empty() ? std::string("Variables") : "Local Variables of " + scope;
+    auto name = [&](logic::Node& n) {
+      for (const auto& [k, x] : naming) n.set_param(k, x);
+    };
+    const std::string category = !kind.empty() ? kind : scope.empty() ? std::string("Variables") : "Local Variables of " + scope;
     const std::string what = scope.empty() ? v.name : "the local variable " + v.name + " of " + scope;
     consider({"Get " + v.name, category, "Reads " + what, "var.get", with({{"variable", v.name}})});
     if (v.constant) return;  // (a constant is read: nothing changes it)
@@ -947,26 +953,26 @@ json::Value Studio::logic_palette(const json::Value& c) const {
       for (const logic::StructField& f : s->fields) {
         logic::Node named;
         named.type = "var.set";
-        named.set_param("variable", v.name);
+        name(named);
         named.set_param("path", "." + f.name);
-        consider({lib.title(named), scope.empty() ? std::string("Structures") : category, "Changes the field " + f.name + " of " + what, named.type, with({{"variable", v.name}, {"path", "." + f.name}})});
+        consider({lib.title(named), scope.empty() && kind.empty() ? std::string("Structures") : category, "Changes the field " + f.name + " of " + what, named.type, with({{"variable", v.name}, {"path", "." + f.name}})});
       }
     if (logic::is_keyed(v.type)) {
       // a map variable: the Set of the value at a place (Cells[index]) -, and the steps of a map or a set that change it
       if (v.type == logic::PinType::map) {
         logic::Node named;
         named.type = "var.set";
-        named.set_param("variable", v.name);
+        name(named);
         named.set_param("path", "[]");
-        consider({lib.title(named), scope.empty() ? std::string("Maps") : category, "Replaces the value of one entry of " + what + " by its place (beside the map: nothing)", named.type, with({{"variable", v.name}, {"path", "[]"}})});
+        consider({lib.title(named), scope.empty() && kind.empty() ? std::string("Maps") : category, "Replaces the value of one entry of " + what + " by its place (beside the map: nothing)", named.type, with({{"variable", v.name}, {"path", "[]"}})});
       }
       const std::string prefix = v.type == logic::PinType::map ? "map." : "set.";
       for (const auto& d : lib.all()) {
         if (!variable_step(*d) || d->type.rfind(prefix, 0) != 0) continue;
         logic::Node named;
         named.type = d->type;
-        named.set_param("variable", v.name);
-        consider({lib.title(named), scope.empty() ? std::string(v.type == logic::PinType::map ? "Maps" : "Sets") : category, d->help, d->type, with({{"variable", v.name}})});
+        name(named);
+        consider({lib.title(named), scope.empty() && kind.empty() ? std::string(v.type == logic::PinType::map ? "Maps" : "Sets") : category, d->help, d->type, with({{"variable", v.name}})});
       }
       return;
     }
@@ -975,9 +981,9 @@ json::Value Studio::logic_palette(const json::Value& c) const {
     {
       logic::Node named;
       named.type = "var.set";
-      named.set_param("variable", v.name);
+      name(named);
       named.set_param("path", "[]");
-      consider({lib.title(named), scope.empty() ? std::string("Lists") : category, "Replaces one entry of " + what + " (beside the list: nothing)", named.type, with({{"variable", v.name}, {"path", "[]"}})});
+      consider({lib.title(named), scope.empty() && kind.empty() ? std::string("Lists") : category, "Replaces one entry of " + what + " (beside the list: nothing)", named.type, with({{"variable", v.name}, {"path", "[]"}})});
     }
     // (a list of a fixed length: its entries are set - no step changes its length; Copy Bytes writes the
     // bytes of its numbers where they stand, and only a list of numbers has those)
@@ -989,13 +995,26 @@ json::Value Studio::logic_palette(const json::Value& c) const {
       if (d->type == "list.insert_text" && v.type != logic::PinType::integer_list) continue;   // (the bytes of a text go into whole numbers)
       logic::Node named;
       named.type = d->type;
-      named.set_param("variable", v.name);
-      consider({lib.title(named), scope.empty() ? std::string("Lists") : category, d->help, d->type, with({{"variable", v.name}})});
+      name(named);
+      consider({lib.title(named), scope.empty() && kind.empty() ? std::string("Lists") : category, d->help, d->type, with({{"variable", v.name}})});
     }
   };
-  for (const logic::Variable& v : g->variables) variable_nodes(v, {});
+  for (const logic::Variable& v : g->variables) variable_nodes(v, {}, {{"variable", v.name}}, {});
   for (const logic::Function& f : g->functions)
-    for (const logic::FunctionPin& l : f.locals) variable_nodes(logic::Variable{l.name, l.type, l.value, {}, l.of, l.count}, f.name);
+    for (const logic::FunctionPin& l : f.locals) variable_nodes(logic::Variable{l.name, l.type, l.value, {}, l.of, l.count}, f.name, {{"variable", l.name}}, {});
+  // The nodes of a place of the engine (kern/docs/blueprint_cpp.md, "Plätze der Engine"): of each node of the graph
+  // that binds one, as of a variable - its nodes name the node ("bound").
+  for (const logic::Node& n : g->nodes) {
+    const logic::EngineFunction* f = logic::engine_function(n.type);
+    if (!f || !f->place) continue;
+    logic::Node named;
+    named.type = "var.get";
+    named.set_param("bound", std::to_string(n.id));
+    logic::Variable v;
+    if (g->root_of(named, v) != logic::Graph::Root::bound) continue;
+    v.name = lib.title(named);
+    variable_nodes(v, {}, {{"bound", std::to_string(n.id)}}, "Places of the Engine");
+  }
   for (const logic::EnumType& e : g->enums)
     for (const auto& d : lib.all()) {
       if (!enum_node(*d)) continue;

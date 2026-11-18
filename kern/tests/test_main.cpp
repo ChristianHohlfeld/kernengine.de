@@ -11318,6 +11318,31 @@ TEST(studio_logic_functions) {
   CHECK(f.s->state()["logic"]["functions"].size() == 1);
 }
 
+TEST(studio_logic_places_of_the_engine) {
+  // A place of the engine in the editor: the action menu offers the nodes of places on it as on a variable - its
+  // Get, its Set, an entry's Set and the steps of a list, each naming the node that binds it ("bound").
+  StudioFixture f;
+  CHECK(f.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
+  auto cmd = [&](std::initializer_list<std::pair<const char*, json::Value>> fields) {
+    json::Value c = json::Value::object();
+    for (const auto& [k, v] : fields) c.set(k, v);
+    return f.s->command(c);
+  };
+  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Level : kern::Blueprint {\n  Int Count = 0;\n\n  void Note() {\n    engine_game_world_events(n2, 1);\n    list_add(n2.result, \"x\");\n"
+                                                "    Count = list_length<Text>(n2.result);\n  }\n\n  struct { engine_game_world_events_place<List<Text>> result = {}; } n2;\n};\n"}})["ok"].as_bool());
+  const json::Value pal = cmd({{"cmd", "logicPalette"}, {"query", "n2"}});
+  bool get = false, set = false, entry = false, add = false;
+  for (const json::Value& e : pal["items"].items()) {
+    if (e["category"].as_string() != "Places of the Engine" || e["params"]["bound"].as_string() != "2" || e["params"].has("variable")) continue;
+    get = get || (e["type"].as_string() == "var.get" && e["label"].as_string() == "Get n2");
+    set = set || (e["type"].as_string() == "var.set" && !e["params"].has("path"));
+    entry = entry || (e["type"].as_string() == "var.set" && e["params"]["path"].as_string() == "[]");
+    add = add || e["type"].as_string() == "list.add";
+  }
+  CHECK(get && set && entry && add);
+}
+
 TEST(studio_logic_local_variables) {
   // A function's local variables with the editor's commands: made, named, typed, offered as nodes.
   StudioFixture f;
