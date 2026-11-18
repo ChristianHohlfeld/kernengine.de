@@ -1,0 +1,80 @@
+    Game::ctl_screen_ray (18): written
+    Game::ctl_grenade (47): take_pressed() is defined in another file
+    Game::foot_input (191): look_curve_strength() is defined in another file
+    Game::ctl_assist (65): aim_ellipse() is defined in another file
+    Game::ctl_view_json (158): project_screen() is defined in another file
+    Game::ctl_touch_shot (29): hit_scan() is defined in another file
+    Game::drone_input (116): step() is defined in another file
+    Game::car_input (42): held() is defined in another file
+    Game::jet_input (62): step() is defined in another file
+    Game::parachute_input (23): step() is defined in another file
+    Game::ctl_camera (16): written
+    Game::set_touch_frame (6): set_frame() is defined in another file
+    Game::touch (5): it calls Devices::touch_down(), which waits
+    Game::update_touch_layout (42): gaps_boardable() is defined in another file
+    Game::touch_view_json (13): view_json() is defined in another file
+    Game::ctl_hud_json (33): hint_line() is defined in another file
+    Game::ctl_command (136): it calls Devices::touch_down(), which waits
+Game/game_look_cpp              0 /   13 functions        0 /    619 lines
+    Game::look_begin (33): reset() is defined in another file
+    Game::look_lap (1): lap() is defined in another file
+    Game::view_zoom (8): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘Game’ has not been declared)
+    Game::look_people_budget (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘Game’ has not been declared)
+    Game::look_apply_tier (27): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: invalid use of incomplete type ‘struct converted_Game__game_look_cpp::Renderer’)
+    Game::look_camera (23): apply() is defined in another file
+    Game::look_blast (8): add() is defined in another file
+    Game::look_lighting (158): day_lighting() is defined in another file
+    Game::look_draw (63): update() is defined in another file
+    Game::look_vr_hud (56): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: invalid use of incomplete type ‘struct converted_Game__game_look_cpp::Renderer’)
+    Game::look_view_models (150): a pointer
+    Game::look_hud_json (16): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘Game’ has not been declared)
+    Game::look_command (75): parse_time() is defined in another file
+
+415 of 557 functions of the program are written as Blueprints (2257 of 7912 lines), and 15 of the engine's headers that they call: 66 Blueprints - 8 of source files, 1 of states, 57 of headers and of shapes
+367 functions of the Blueprints are compared with their source, bit for bit, by the tests in /dev/shm/spawncity-jobs-chris/work-g1-probe-153933-13361/pt/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+    10 (   441)   it calls CityStream::ground_height(), which waits
+     3 (   409)   it calls Devices::touch_down(), which waits
+     4 (   296)   step() is defined in another file
+     1 (   191)   look_curve_strength() is defined in another file
+     2 (   191)   a pointer
+     2 (   185)   stars() is defined in another file
+     5 (   167)   osfx() is defined in another file
+     2 (   161)   Game::show_soldier() of the Blueprint Game is not written
+     3 (   159)   send_fx() is defined in another file
+     1 (   158)   project_screen() is defined in another file
+     1 (   158)   day_lighting() is defined in another file
+     1 (   136)   Game::vr_menu_json() of the Blueprint Game is not written
+     3 (   121)   reset() is defined in another file
+     1 (   115)   ui_equipment_command() is defined in another file
+     3 (   113)   gaps_riding() is defined in another file
+     1 (   111)   it calls register_node(), which waits
+     2 (   104)   cooldown() is defined in another file
+     1 (   103)   it calls Game::gaps_hud(), which waits
+     1 (    99)   an object of the engine as a local that is not made by a constructor of it
+     1 (    98)   it calls Game::focus_position(), which waits
+     1 (    88)   a member of Int is set
+     1 (    86)   detach() is defined in another file
+     2 (    83)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: invalid use of incomplete type ‘struct converted_Game__game_look_cpp::Renderer’)
+     1 (    82)   cycle_foot_weapon() is defined in another file
+     3 (    80)   Game::player_position() of the Blueprint Game is not written
+     1 (    75)   unit_hash() is defined in another file
+     1 (    75)   parse_time() is defined in another file
+     2 (    72)   update() is defined in another file
+     2 (    69)   it calls Game::clear_spot(), which waits
+     1 (    65)   aim_ellipse() is defined in another file
+     1 (    65)   horn_low() is defined in another file
+     2 (    62)   it calls Devices::key(), which waits
+     1 (    60)   detonation_at() is defined in another file
+     1 (    52)   inside() is defined in another file
+     1 (    52)   Game::guided_press() of the Blueprint Game is not written
+     1 (    51)   worse() is defined in another file
+     1 (    47)   take_pressed() is defined in another file
+     2 (    44)   near() is defined in another file
+     1 (    42)   held() is defined in another file
+     1 (    42)   gaps_boardable() is defined in another file
+
+real	26m28,085s
+user	45m24,005s
+sys	2m26,235s
