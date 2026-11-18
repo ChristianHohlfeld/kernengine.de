@@ -367,8 +367,11 @@ class Version:
         edits = {f: [] for f in self.files}
         for f in self.functions:
             self._guard(f.body, edits[f.file], f.file, 0)
+        # (a registration is there for what its initializer does: nothing of the file reads it - a constant the
+        # functions read stays, also where a function works it out when the program starts)
+        read = {(x.get("referencedDecl") or {}).get("id") for f in self.functions for x in walk(f.body) if x.get("kind") == "DeclRefExpr"}
         for q, n, _ in self.variables:
-            if self.registration(n):
+            if self.registration(n) and n["id"] not in read:
                 a, b = n["_at"]
                 if "expansionLoc" in (n.get("range") or {}).get("begin", {}):
                     b = self.invocation_end(self.cpp, a)   # (written by a macro: the whole invocation)
@@ -552,8 +555,8 @@ class Version:
         def head(n):
             """`v.data()` / `s.data` -> v / s."""
             n = C.bare(n)
-            while n.get("kind") in ("ImplicitCastExpr", "ParenExpr") and kids(n):
-                n = C.bare(kids(n)[0])
+            while n.get("kind") in ("ImplicitCastExpr", "ParenExpr") and n.get("castKind") != "ArrayToPointerDecay" and kids(n):
+                n = C.bare(kids(n)[0])   # (an array handed as a pointer stays: it is the list)
             if n.get("kind") == "CXXMemberCallExpr" and kids(n) and kids(n)[0].get("name") == "data":
                 return kids(kids(n)[0])[0]
             if n.get("kind") == "MemberExpr" and n.get("name") == "data" and kids(n) and re.match(r"(const )?kern::Span<", plain(C.qtype(kids(n)[0]))):
@@ -565,12 +568,23 @@ class Version:
             va, vb = kids(b)[0]["_at"]
             out.append((a0, b0, f"::sc::lowered::value_place({raw[va:vb]})", (a0, 2, 0)))
             return
-        if b.get("kind") == "BinaryOperator" and b.get("opcode") == "+" and len(kids(b)) == 2 and head(kids(b)[0]) is not None:
-            h = head(kids(b)[0])
-            ha, hb = h["_at"]
-            ka, kb = kids(b)[1]["_at"]
-            out.append((a0, b0, f"::sc::lowered::at_place({raw[ha:hb]}, {raw[ka:kb]})", (a0, 2, 0)))
-            return
+        if b.get("kind") == "BinaryOperator" and b.get("opcode") == "+" and len(kids(b)) == 2:
+            # `v.data() + k`, and with more added (`s.data + h + w * 4`, read from the left: the place first, then
+            # everything added to it)
+            first = b
+            while first.get("kind") == "BinaryOperator" and first.get("opcode") == "+" and len(kids(first)) == 2 and head(kids(first)[0]) is None:
+                first = C.bare(kids(first)[0])
+                while first.get("kind") == "ParenExpr" and kids(first):
+                    first = C.bare(kids(first)[0])
+            if first.get("kind") == "BinaryOperator" and first.get("opcode") == "+" and len(kids(first)) == 2:
+                h = head(kids(first)[0])
+                ha, hb = h["_at"]
+                _, pb = kids(first)[0]["_at"]
+                _, kb = b["_at"]
+                plus = re.match(r"\s*\+", raw[pb:kb])
+                if plus and "(" not in raw[b["_at"][0]:ha]:   # (no bracket opened before the place)
+                    out.append((a0, b0, f"::sc::lowered::at_place({raw[ha:hb]}, {raw[pb + plus.end():kb].strip()})", (a0, 2, 0)))
+                    return
         h = head(x)
         if h is not None:
             ha, hb = h["_at"]

@@ -83,6 +83,25 @@ bool mat_near(const Mat4& a, const Mat4& b, f32 eps = 1e-5f) {
 // ---------------------------------------------------------------------------
 // math
 
+TEST(base_fail) {
+  // fail() fills its message in (printf); fail_text() says a message as it stands - a % is a % there.
+  // Both give false and leave the message for last_error().
+  CHECK(!fail("%d of %d", 2, 3) && std::string(last_error()) == "2 of 3");
+  CHECK(!fail_text("100% of it, as it stands: %d %s") && std::string(last_error()) == "100% of it, as it stands: %d %s");
+  GeoProjector proj;
+  CHECK(!proj.init(0, 90) && std::string(last_error()) == "invalid projection origin");
+  CHECK(proj.init(9.17, 47.66) && proj.lon0 == 9.17 && proj.lat0 == 47.66);
+  FootprintStream footprints;
+  const Vec2 square[] = {{0, 0}, {4, 0}, {4, 4}, {0, 4}};
+  footprints.begin(7, 0, 10);
+  footprints.ring(square, 4);
+  CHECK(footprints.values().size() == footprints.size() && footprints.values().data() == footprints.data() && footprints.values()[0] == 1);
+  RoadStream roads;
+  roads.road(square, 4, 6, true, 0);
+  CHECK(roads.values().size() == roads.size() && roads.values().data() == roads.data() && roads.values()[0] == 1);
+  clear_error();
+}
+
 TEST(math_matrices) {
   const Mat4 t = Mat4::translate({1, 2, 3}), s = Mat4::scale({2, 3, 4});
   const Quat q = Quat::axis_angle({0, 0, 1}, kPi / 2);
@@ -5029,6 +5048,19 @@ TEST(logic_maps_and_sets) {
       const logic::Value big = inst->get("Big");
       CHECK(big.size() == 2 && static_cast<u64>(big.keyed().key_at(0).i) == ~u64{0} && static_cast<u64>(big.keyed().key_at(1).i) == 0x20000000000001ull && big.keyed().value_at(1).as_text() == "far");
     }
+  }
+  {
+    // a function's local variable is a map or a set as well: the text that writes it is read again
+    logic::Graph g, back;
+    std::string error, text, twice;
+    CHECK(read("  struct TallyResult { Int count = 0; };\n  TallyResult Tally(Int key = 0) {\n    Map<Int, Float> By = Map<Int, Float>{{1, 0.5}};\n    Set<Int64> Met = Set<Int64>{};\n"
+               "    map_set(By, key, 2.0);\n    set_add(Met, Int64{0x7});\n    return {map_length<Int, Float>(By)};\n  }\n",
+               g, error));
+    if (!error.empty()) std::printf("%s\n", error.c_str());
+    CHECK(g.function("Tally") && g.function("Tally")->locals.size() == 2 && g.function("Tally")->local("By")->type == logic::PinType::map && g.function("Tally")->local("Met")->type == logic::PinType::set);
+    CHECK(logic::to_cpp(g, "B", text, &error, logic::library(), false) && text.find("    Set<Int64> Met = Set<Int64>{};\n") != std::string::npos);
+    CHECK(logic::from_cpp(text, back, nullptr, &error) && logic::to_cpp(back, "B", twice, &error, logic::library(), false) && twice == text);
+    if (!error.empty()) std::printf("%s\n", error.c_str());
   }
   {
     // a map's value at its place: what stands there, and beside the map an entry of its own

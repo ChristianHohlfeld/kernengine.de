@@ -1148,8 +1148,7 @@ void Terrain::build_render_tile(i32 level, i32 ti, i32 tj) {
       const i32 ia = i0 + di * k, ja = j0 + dj * k, ib = ia + di, jb = ja + dj;
       const u32 top_a = static_cast<u32>(ja * n + ia), top_b = static_cast<u32>(jb * n + ib);
       const u32 base = m.vertex_count();
-      for (i32 end = 0; end < 2; ++end) {  // (the edge's two ends: a, then b)
-        const u32 v = end == 0 ? top_a : top_b;
+      for (u32 v : {top_a, top_b}) {
         const Vec3 p{m.positions[v * 3], m.positions[v * 3 + 1], m.positions[v * 3 + 2] - drop};
         m.push(p, {0, 0, 1}, kGround, {p.x * 0.1f, p.y * 0.1f});
       }

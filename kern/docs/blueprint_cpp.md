@@ -318,6 +318,14 @@ void on1(Actor actor, Float value, Text text) {
   waren), `list_reserve(Scores, 64);` (Platz vorhalten: Nichts, was man lesen kann, ändert sich –
   die Liste wächst danach so weit, ohne noch einmal Speicher anzufordern). Eine Schleife aus
   einzelnen Add wächst mehrmals; darum gibt es diese Schritte.
+  Der Konverter schreibt damit auch `v.insert(v.end(), erster, letzter)` eines *Teils* einer anderen
+  Liste (auch durch einen Zeiger mit einer Anzahl dahinter, `values, values + n`): Set Length um so
+  viele Einträge – die eine Anforderung, die `insert` in C++ macht –, dann jeder neue Eintrag an
+  seinem Platz gesetzt; die Quelle wird gelesen, wo sie steht.
+- **Eine Liste in Klammern, über die eine Schleife läuft** (`for (u32 v : {a, b})`), ist im
+  Blueprint eine lokale Liste fester Länge (`Fixed<Int, 2>`): Sie liegt, wo sie steht, wie das Array,
+  das C++ daraus macht – nichts wird angefordert. Ihre Werte werden einmal, in ihrer Reihenfolge,
+  ausgerechnet.
 - **Ordnen.** Sort List bringt eine Liste an ihrem Platz in eine Reihenfolge, stabil (gleiche Einträge
   behalten ihre): `list_sort<nullptr>(Scores);` nach der eigenen Ordnung der Einträge (Zahlen, ganze
   Zahlen, Flags, Texte, Werte von Aufzählungen, Int64 nach den Bits als `u64`), oder
@@ -1182,6 +1190,11 @@ die Engine selbst.
   (`kern::Count<Per>`, kern/core/base.h – die ganze Zahl, die er hält) schreibt 2 × frames Zahlen;
   die Tabelle sagt es (`EnginePin::per`), der Stellvertreter gibt so viele, der Aufruf im Test nimmt
   so viele.
+- **Eine variadische Funktion und ein Zeiger ohne Anzahl haben keinen Knoten** – die Engine hat
+  daneben die Form, die einen hat: `kern::fail_text(message)` neben `fail(format, …)` (die Meldung,
+  wie sie dasteht; ein Schritt – er setzt die Meldung und gibt `false`, darum `return
+  fail_text("…");`), `FootprintStream::values()` und `RoadStream::values()` neben `data()` /
+  `size()` (der Strom als Liste seiner Zahlen).
 - **Der Knoten auf der Engine selbst** (`kern/logic/engine_host.h`): `logic::call_engine(objects,
   function, in, out)` ruft die echte Funktion eines Knotens – `tools/engine_api.py` schreibt jeden
   Aufruf aus den Headern (`kern/src/<Teil>/engine_calls.gen.cpp`, ein Teil der Engine je Datei: ein

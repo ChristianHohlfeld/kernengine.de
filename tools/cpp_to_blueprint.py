@@ -2206,7 +2206,9 @@ class Unit:
             f.wait = str(w)
             if os.environ.get("WHY") and re.search(os.environ["WHY"], f.cpp):
                 # (to look at: where in this tool the reason was found - its last steps, innermost first)
-                f.wait += " [" + " < ".join(f"{t.name}:{t.lineno}" for t in reversed(traceback.extract_tb(w.__traceback__)[-10:])) + "]"
+                at = (getattr(Emit, "looked_at", None) or {}).get("_at", (None, None))[0]
+                line = f"line {self.tree.text(f.file).count(chr(10), 0, at) + 1} of the source; " if at is not None and f.file else ""
+                f.wait += " [" + line + " < ".join(f"{t.name}:{t.lineno}" for t in reversed(traceback.extract_tb(w.__traceback__)[-10:])) + "]"
             # (what it had begun to declare stays known - a function written on the way may use it; the
             # Blueprint's text has only the declarations its functions use: see text)
             raise
@@ -2909,6 +2911,18 @@ class Emit:
         if d.get("variadic"):
             raise Wait("a variadic function")
         ret = qtype(d).split("(")[0].strip()
+        if UNSPELLED.search(ret) and not ret.endswith("&") and "*" not in ret:
+            # a value of a type the compiler names only as the library does (a lambda that returns an entry of a
+            # list gives a `value_type`): what its return gives says what that is - the same type in every return
+            def returns(n):
+                for c in kids(n):
+                    if c.get("kind") == "ReturnStmt" and kids(c):
+                        yield c
+                    elif c.get("kind") != "LambdaExpr":
+                        yield from returns(c)
+            given = next(returns(d), None)
+            if given is not None and qtype(kids(given)[0]) and not UNSPELLED.search(qtype(kids(given)[0])):
+                ret = qtype(kids(given)[0]).strip()
         f.value = u.btype(ret) if d.get("kind") != "CXXConstructorDecl" else None
         if u.state is not None and (self.tree.owner.get(d["id"]) == u.state or function_key(self.tree, d) in u.world.state_functions):
             # a method of the state the Blueprint is: its fields are the Blueprint's variables - no object is
@@ -4008,6 +4022,7 @@ class Emit:
         """The lines of one statement, and whether the path ends there."""
         saved, self.pre = self.pre, []
         self.serial += 1
+        Emit.looked_at = s   # (WHY: the statement a reason was found in)
         try:
             lines, ends = self.stmt1(s)
             return self.pre + lines, ends
@@ -4766,8 +4781,23 @@ class Emit:
             got = self.spot(src)
         finally:
             held, self.frozen = self.frozen, None
+        braced = self.unwrap(src)
         if got is not None and got[1] == lt:
             place = got[0]
+        elif not keyed and braced.get("kind") == "CXXStdInitializerListExpr" and kids(braced) and self.unwrap(kids(braced)[0]).get("kind") == "InitListExpr" \
+                and 0 < len(kids(self.unwrap(kids(braced)[0]))) <= 16:
+            # for (T x : {a, b, c}): the values in braces are a list of that fixed length, which lies where it
+            # stands (as the array C++ makes of them: nothing is asked for) - each worked out once, in their order
+            del self.pre[mark:]
+            vals = []
+            held = []
+            for x in kids(self.unwrap(kids(braced)[0])):
+                pre, text = self.lazily(lambda: self.ex(x, it))
+                item = self.temp("item", it)
+                held += pre + [f"{item} = {text};"]
+                vals.append(item)
+            place = self.temp("items", lt, len(vals))
+            held.append(f"{place} = {self.made_list(vals, lt)};")
         else:
             del self.pre[mark:]
             place = self.temp("list", lt)
