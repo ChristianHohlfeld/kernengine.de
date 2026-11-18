@@ -1575,6 +1575,8 @@ class Unit:
         m = re.match(r"std::array<(.+), (\d+)[uUlL]*>$", t) or re.match(r"(.+?)\s*\[(\d*)\]((?:\s*\[\d*\])*)$", t)   # (its length as the compiler writes it: 12UL)
         if m and m.lastindex == 3 and m.group(3):
             return f"List<{self.entry(m.group(1) + m.group(3))}>"
+        if m and re.fullmatch(r"char\s*\*", m.group(1).strip()) and re.match(r"\s*const\s+char\b", raw):
+            return "List<Text>"   # (an array of texts written out: const char* names[4] - each entry a text, as a const char* is)
         if m:
             return f"List<{self.entry(m.group(1))}>"
         if t.startswith("std::unique_ptr<") or t.startswith("std::optional<"):
