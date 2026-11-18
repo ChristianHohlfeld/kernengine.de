@@ -1268,6 +1268,22 @@ der Konverter schreibt `std::remainder` und `remainderf` damit.
 Zurückgelesen wird der Lambda-Rumpf als Formel, in ihrer einen kanonischen Schreibweise
 (`Formula::text()`).
 
+**Formel ganzer Zahlen.** `band`, `bor`, `bxor`, `shl`, `shr`, `wrap32`, `wrap32s` und `mul32` geben für
+jede Zahl eine ganze Zahl und nehmen ihre Argumente als ganze Zahlen (zur 0 hin abgeschnitten) – das steht
+bei jeder dieser Funktionen in der Tabelle der Formel-Funktionen (formula.cpp, `whole`), nirgends sonst.
+Eine Formel, deren Wurzel eine solche Funktion ist und die jeden Eingang nur als Argument einer solchen
+Funktion liest (`Formula::whole()`), und deren Eingänge alle Drähte von einem Int sind, steht mit Int-Eingängen
+und einem Int da, die Ints so, wie sie sind (ohne `kern::to<Float>`):
+`Seed = kern::to<Int>(kern::formula([](Int s) -> Int { return kern::math::bxor(s, kern::math::wrap32(kern::math::shl(s, 13.0))); }, Seed));`
+Der Graph ist derselbe (der Draht vom Int in den Float-Eingang der Formel), und in jeder Stufe derselbe
+Wert: Interpreter und JIT rechnen wie bei jeder Formel über das double; die Klasse reicht die ganze Zahl
+weiter (`kern::math::Exact`) – ihre Bits sind die des doubles, das sie ist (genau, solange sie in ±2^53
+liegt, sonst über dieses double), und ihr Int ist `normal` von ihr, also `whole` ihres doubles. Zahlen im
+Ausdruck sind wie sonst `double`-Literale (`13.0`; `band(a, 0.5)` nimmt 0). Ist ein Eingang ein Float, eine
+geschriebene Zahl oder liest die Formel einen Eingang anders (`a + 1`, `a < b`), ist sie eine Formel über
+Floats wie oben. Der Leser lehnt `[](Int …) -> Int` für eine Formel ab, die das nicht hergibt, ebenso
+gemischte Eingänge, eine geschriebene Zahl oder ein `kern::to` an einem ihrer Eingänge.
+
 ## Wo was steht
 
 **Parameter oder Member.** Die Werte eines Events oder einer Funktion sind in ihrem eigenen Rumpf
