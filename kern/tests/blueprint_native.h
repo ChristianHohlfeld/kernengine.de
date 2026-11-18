@@ -39,6 +39,14 @@ struct Case {
   /// type, also none the function's inputs have, and fewer than it has inputs. The class is given
   /// them as the engine gives them (logic::native_arg).
   std::vector<Call> outside = {};
+  /// Functions without inputs that are called once more on the engine itself (native_show.h,
+  /// native_play_on_engine): the interpreter through the host's door, the class by the calls it makes
+  /// itself (kern/logic/engine_direct.h) - the same, value for value.
+  std::vector<std::string> on_engine = {};
+  /// Functions without inputs whose calls need no object of the engine, played on the engine itself in the
+  /// compiled test (native_show.h, native_compare_on_engine): through the host's door, as the class calling the
+  /// engine itself, through the door again - the class gives what the door gives the same twice.
+  std::vector<std::string> on_engine_free = {};
   /// The libraries it uses, with those they use (each a case of its own before it): the
   /// Blueprints of its project.
   std::vector<std::pair<std::string, logic::Graph>> libraries = {};
@@ -1534,6 +1542,13 @@ inline std::vector<Case> cases() {
     // the host's stand-in - what each gives is in a variable of the Blueprint.
     Case& c = read("Engine", engine_case::kEngine);
     for (const char* run : engine_case::kRuns) c.calls.push_back({run, {}});
+    // ... and its calls on objects of the engine once more on the engine itself: there the class calls every
+    // function itself, typed, and does what the interpreter does through the door.
+    for (const char* run : engine_case::kRunsOnObjects) c.on_engine.push_back(run);
+    // ... and the others, the free functions, in the compiled test itself: what one of them gives may depend on
+    // more than the case (the clock, the engine's jobs) - the class is compared where the door gives the same twice.
+    for (const char* run : engine_case::kRuns)
+      if (std::find(c.on_engine.begin(), c.on_engine.end(), run) == c.on_engine.end()) c.on_engine_free.push_back(run);
   }
   // The tier cases a compiler runs as they stand: their events are handlers of the class, the
   // runtime is the same for every tier.
@@ -1720,11 +1735,12 @@ inline bool write_file(const std::string& path, const std::string& text) {
 }
 
 /// Writes <dir>/bp_<Name>.h (the Blueprint's text, as it is, and its glue), blueprint_native_main.cpp
-/// (the calls) and blueprint_native_expected.txt (the interpreter's answers).
+/// (the calls), blueprint_native_expected.txt (the interpreter's answers) and, where a case is played
+/// on the engine itself, blueprint_native_on_engine.txt (the interpreter's answers there).
 inline bool emit(const std::string& dir, const std::vector<Case>& all, std::string* error) {
   std::string main = "// written by kern_tests --emit-native: the calls of the native Blueprint test\n"
                      "#include <cstdio>\n#include <fstream>\n#include <limits>\n#include <sstream>\n#include <string>\n\n#include \"logic_cases.h\"\n#include \"native_show.h\"\n";
-  std::string runs, expected;
+  std::string runs, expected, on_engine, on_engine_runs, on_engine_free_runs;
   for (const Case& c : all) {
     std::string text, glue, why;
     if (!logic::native_ready(c.graph, &why) || !logic::to_cpp(c.graph, c.name, text, &why) || !logic::native_glue(c.graph, c.name, glue, &why, logic::library(), {}, c.blueprints())) {
@@ -1754,6 +1770,30 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
       return false;
     }
     main += "#include \"bp_" + c.name + ".h\"\n";
+    if (!c.on_engine.empty()) {
+      std::string problem;
+      on_engine += native_play_on_engine(c.graph, c.name, c.on_engine, false, problem);
+      if (!problem.empty()) {
+        if (error) *error = c.name + " on the engine itself: " + problem;
+        return false;
+      }
+      std::string list;
+      for (const std::string& run : c.on_engine) list += (list.empty() ? "\"" : ", \"") + run + "\"";
+      on_engine_runs += "  {\n    kern::logic::Graph graph;\n    kern::json::Value stored;\n    std::string problem;\n"
+                        "    if (!kern::json::parse(kGraph_" + c.name + ", stored) || !kern::logic::graph_from_json(stored, graph)) problem = \"the graph was not read\";\n"
+                        "    on_engine += native_play_on_engine(graph, \"" + c.name + "\", {" + list + "}, true, problem);\n"
+                        "    if (!problem.empty()) { std::printf(\"FAIL " + c.name + " on the engine itself: %s\\n\", problem.c_str()); ++failures; }\n  }\n";
+    }
+    if (!c.on_engine_free.empty()) {
+      std::string list;
+      for (const std::string& run : c.on_engine_free) list += (list.empty() ? "\"" : ", \"") + run + "\"";
+      on_engine_free_runs += "  {\n    kern::logic::Graph graph;\n    kern::json::Value stored;\n    std::string problem, unrepeatable;\n"
+                             "    if (!kern::json::parse(kGraph_" + c.name + ", stored) || !kern::logic::graph_from_json(stored, graph)) problem = \"the graph was not read\";\n"
+                             "    const std::string apart = problem.empty() ? native_compare_on_engine(graph, \"" + c.name + "\", {" + list + "}, unrepeatable, problem) : std::string();\n"
+                             "    if (!problem.empty()) { std::printf(\"FAIL " + c.name + " on the engine itself: %s\\n\", problem.c_str()); ++failures; }\n"
+                             "    if (!apart.empty()) { std::printf(\"FAIL " + c.name + " on the engine itself, the class calling the engine itself:\\n     %s\", apart.c_str()); ++failures; }\n"
+                             "    if (!unrepeatable.empty()) std::printf(\"     " + c.name + " on the engine itself - not the same twice through the door, so not compared:%s\\n\", unrepeatable.c_str());\n  }\n";
+    }
     std::string body = "static const char kGraph_" + c.name + "[] =";
     for (std::size_t at = 0; at < stored.size(); at += 8192) body += "\n    R\"KGRAPH(" + stored.substr(at, 8192) + ")KGRAPH\"";
     if (c.scenario) {
@@ -1873,7 +1913,8 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
     }
     runs += body + "}\n\n";
   }
-  main += "\ntemplate <class T> static std::string show(const T& v) { return native_show(kern::logic::to_value(v)); }\n\n"
+  main += "\n// (the engine is linked in with its app runtime, which needs a factory)\nkern::App* kern_create_app() { return nullptr; }\n"
+          "\ntemplate <class T> static std::string show(const T& v) { return native_show(kern::logic::to_value(v)); }\n\n"
           "// A call by name that reached its function: the class's glue says when the function begins and when it has\n"
           "// returned (logic::native_probe) - once each, the begin first. (A function that calls one of another\n"
           "// Blueprint by name: that call begins and returns inside it.)\n"
@@ -1887,7 +1928,7 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
           "    const std::string x = a < got.size() ? got.substr(a, ae == std::string::npos ? ae : ae - a) : \"(nothing)\", y = b < expected.size() ? expected.substr(b, be == std::string::npos ? be : be - b) : \"(nothing)\";\n"
           "    if (x != y) { std::printf(\"FAIL %s: %s\\n     the interpreter: %s\\n\", what, x.c_str(), y.c_str()); ++shown; }\n"
           "    a = ae == std::string::npos ? got.size() : ae + 1;\n    b = be == std::string::npos ? expected.size() : be + 1;\n  }\n  return 1;\n}\n\n" + runs;
-  main += "int main(int argc, char** argv) {\n  if (argc < 2) { std::fprintf(stderr, \"usage: blueprint_native_test <blueprint_native_expected.txt>\\n\"); return 2; }\n"
+  main += "int main(int argc, char** argv) {\n  if (argc < 2) { std::fprintf(stderr, \"usage: blueprint_native_test <blueprint_native_expected.txt> [<blueprint_native_on_engine.txt>]\\n\"); return 2; }\n"
           "  std::ifstream in(argv[1]);\n  std::stringstream want;\n  want << in.rdbuf();\n  std::string got, hosted;\n"
           "  kern::logic::native_probe = [](bool begins) {\n    g_running += begins ? 1 : -1;\n    g_out_of_turn += g_running < 0 ? 1 : 0;\n    ++(begins ? g_begun : g_returned);\n  };\n";
   std::size_t count = 0, calls = 0;
@@ -1901,9 +1942,17 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
           "  failures += differs(hosted, expected, \"its class behind logic::Instance\");\n"
           "  if (g_begun < g_named || g_returned != g_begun || g_running != 0 || g_out_of_turn || g_named == 0) {\n"
           "    std::printf(\"FAIL the glue says when a function runs: %ld calls by name, begun %ld, returned %ld, %ld out of turn\\n\", g_named, g_begun, g_returned, g_out_of_turn);\n    ++failures;\n  }\n";
+  if (!on_engine_runs.empty())
+    main += "  // the cases played on the engine itself: the class calls the engine's functions itself (kern/logic/engine_direct.h)\n"
+            "  {\n    if (argc < 3) { std::fprintf(stderr, \"blueprint_native_test: the interpreter's answers on the engine itself are missing (blueprint_native_on_engine.txt)\\n\"); return 2; }\n"
+            "    std::ifstream engine_in(argv[2]);\n    std::stringstream engine_want;\n    engine_want << engine_in.rdbuf();\n    std::string on_engine;\n" + on_engine_runs +
+            "    failures += differs(on_engine, engine_want.str(), \"the class calling the engine itself\");\n  }\n";
+  if (!on_engine_free_runs.empty())
+    main += "  // ... and the free functions, three times here: through the door, as the class, through the door again\n" + on_engine_free_runs;
   main += "  std::printf(\"%s blueprint_native_test (" + std::to_string(count) + " Blueprints as their C++, " + std::to_string(calls) +
           " calls on the class and by name through logic::Instance)\\n\", failures ? \"FAIL\" : \"ok  \");\n  return failures ? 1 : 0;\n}\n";
-  if (!write_file(dir + "/blueprint_native_main.cpp", main) || !write_file(dir + "/blueprint_native_expected.txt", expected)) {
+  if (!write_file(dir + "/blueprint_native_main.cpp", main) || !write_file(dir + "/blueprint_native_expected.txt", expected) ||
+      (!on_engine.empty() && !write_file(dir + "/blueprint_native_on_engine.txt", on_engine))) {
     if (error) *error = "cannot write into " + dir;
     return false;
   }
