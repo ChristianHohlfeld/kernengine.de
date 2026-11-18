@@ -1299,6 +1299,7 @@ struct Tally {
   const char* function;
   int compared = 0, outside = 0, wrong = 0, class_only = 0;
   int costlier = 0;                  // calls in which the class asked for memory more often than the source
+  int refused = 0;                   // compared calls in which the engine itself refused a call (real_engine: zeros on every side)
   long most_class = 0, with_source = 0;  // (the one with the most: how often the class, how often the source)
   double slowest = 0;
   std::chrono::steady_clock::time_point began = std::chrono::steady_clock::now();
@@ -1384,6 +1385,7 @@ struct Tally {
       slowest = std::max(slowest, took);
     }
     ++compared;
+    if (g_engine_refused > 0) ++refused;
     if (class_asks > source_asks) {
       if (++costlier == 1 && cost::tracing) {
         // (SC_COST_WHERE names this function: from where the source and the class asked, in the first such call)
@@ -1405,6 +1407,8 @@ struct Tally {
     if (class_only > 0)
       std::printf("  note: %s: %d of %d calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to %.0f ms - is not run in the interpreter)\n",
                   function, class_only, compared, slowest * 1000);
+    if (refused > 0)
+      std::printf("  note: %s: in %d of %d compared calls the engine refused a call (it gave zeros on every side)\n", function, refused, compared);
     SC_CHECK(wrong == 0, "%s: %d of %d calls differ", function, wrong, compared);
     if (costlier > 0)
       std::printf("  cost: %s: in %d of %d calls the class asks for memory more often than the source (up to %ld times instead of %ld)\n", function, costlier, compared, most_class, with_source);
@@ -1720,6 +1724,7 @@ struct Watch {
     std::feclearexcept(FE_ALL_EXCEPT);
     g_open = false;
     g_open_reads = 0;
+    g_engine_refused = 0;
     g_source_engine.calls.clear();
     if (real_engine()) fresh_engine(g_source_objects);
   }

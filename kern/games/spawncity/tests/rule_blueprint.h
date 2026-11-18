@@ -32,13 +32,16 @@ inline void fresh_engine(kern::logic::EngineObjects& objects) {
   objects.clear();
   objects.on_missing(kern::logic::engine_make_default);
 }
+/// How many calls of the engine itself (real_engine) were refused since the call being compared began - on
+/// any side (converted::Watch sets it to zero; Tally counts the compared calls in which it is not).
+inline long g_engine_refused = 0;
 /// One call of the engine on one side: written down in `kept`, answered by the stand-in or the engine.
 inline bool test_engine(kern::logic::EngineStandIn& kept, kern::logic::EngineObjects& objects, std::string_view function, const std::vector<kern::logic::Value>& in,
                         std::vector<kern::logic::Value>& out) {
   if (!real_engine()) return kept.engine(function, in, out);
   if (!kern::logic::engine_function(function)) return false;
   kept.calls.push_back(kern::logic::engine_call_shown(function, in));
-  kern::logic::call_engine(objects, function, in, out);   // (a call that fails leaves the zeros, on every side alike)
+  if (!kern::logic::call_engine(objects, function, in, out)) ++g_engine_refused;   // (a call that fails leaves the zeros, on every side alike)
   return true;
 }
 
