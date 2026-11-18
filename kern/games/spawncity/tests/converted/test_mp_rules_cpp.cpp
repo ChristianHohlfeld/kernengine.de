@@ -157,6 +157,8 @@ namespace mp { struct NavTimeline {
   std::vector<Snap> snaps_;
 }; }
 namespace mp { u32 hash_id(const std::string& id); }
+namespace mp { std::vector<u32> assign_colors(const std::vector<std::string>& sorted_ids); }
+namespace mp { u32 color_of(const std::string& id); }
 namespace mp { enum class Zone : u8 { torso, head, legs }; }
 namespace mp { enum class Weapon : u8 { other, smg, glock, sniper, fists, knife, launcher, rocket, grenade, drone_gun, drone_rocket, jet_gun, jet_missile, jet_bomb, explosion }; }
 namespace mp { std::string weapon_label(Weapon w); }
@@ -245,6 +247,7 @@ namespace mp { struct MapEdge { Vec2 p; bool offmap = false; f32 rotation_deg = 
 namespace mp { MapEdge locate_map_peer(Vec2 p, f32 width, f32 height, f32 inset_x = 16, f32 inset_top = 16, f32 inset_bottom = 30); }
 namespace mp { Vec2 safe_mobile_marker_point(Vec2 p, f32 width, f32 height, bool mobile); }
 namespace mp { std::string bearing_arrow(f32 bearing); }
+namespace mp { std::string format_distance(f32 m); }
 namespace mp { struct Ping { u8 owner = 0; Vec3 p; u32 color = 0; f64 at_ms = 0; }; }
 namespace mp { struct PingBoard {
  public:
@@ -385,6 +388,17 @@ namespace mp { u32 hash_id(const std::string& id) {
   u32 h = 2166136261u;
   for (unsigned char c : id) { h ^= c; h *= 16777619u; }
   return h;
+} }
+namespace mp { std::vector<u32> assign_colors(const std::vector<std::string>& ids) {
+  std::vector<u32> numbers;  // (each id's hash: a whole number the Blueprint takes as it is)
+  for (const std::string& id : ids) numbers.push_back(hash_id(id));
+  std::vector<u32> out;
+  g_rules.call("ColorSlots", std::tie(out), numbers);
+  return out;
+} }
+namespace mp { u32 color_of(const std::string& id) {
+  const std::vector<u32> one = assign_colors({id});
+  return one.empty() ? 0 : converted::at(one, 0);
 } }
 namespace mp { std::string weapon_label(Weapon w) {
   std::string out;
@@ -678,6 +692,21 @@ namespace mp { Vec2 safe_mobile_marker_point(Vec2 p, f32 w, f32 h, bool mobile) 
   f64 x = 0, y = 0;
   g_rules.call("SafeMobileMarkerPoint", std::tie(x, y), rules::decimal(p.x), rules::decimal(p.y), rules::decimal(w), rules::decimal(h), mobile);
   return {static_cast<f32>(x), static_cast<f32>(y)};
+} }
+namespace mp { std::string format_distance(f32 m) {
+  char b[32];
+  if (m >= 10000) {
+    std::snprintf(b, sizeof b, "%.0f km", static_cast<double>(m / 1000));
+  } else if (m >= 1000) {
+    std::snprintf(b, sizeof b, "%.1f km", static_cast<double>(m / 1000));
+    // the decimal comma (a number with one decimal has one point)
+    std::string s = b;
+    s.replace(s.find('.'), 1, ",");
+    return s;
+  } else {
+    std::snprintf(b, sizeof b, "%.0f m", static_cast<double>(std::fmax(10.0, std::round(m / 10) * 10)));
+  }
+  return b;
 } }
 namespace mp { bool PingBoard::toggle(u8 owner, Vec3 p, u32 color, f64 now) {
   for (const Ping& q : pings_)
@@ -1183,6 +1212,44 @@ SC_TEST(converted_mp_rules_cpp) {
     converted::Tally tally("hash_id");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] std::string a0) { return converted::counted([&] { return converted_mp_rules_cpp::mp::hash_id(a0); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      std::string a0 = draw.word();
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // assign_colors
+    converted::Tally tally("assign_colors");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<std::string> a0) { return converted::counted([&] { return converted_mp_rules_cpp::mp::assign_colors(a0); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      std::vector<std::string> a0 = draw_list(draw, [&]() -> std::string { return draw.said_word({"ColorSlots"}); });
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // color_of
+    converted::Tally tally("color_of");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::string a0) { return converted::counted([&] { return converted_mp_rules_cpp::mp::color_of(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       std::string a0 = draw.word();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1941,6 +2008,25 @@ SC_TEST(converted_mp_rules_cpp) {
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // format_distance
+    converted::Tally tally("format_distance");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_mp_rules_cpp::mp::format_distance(std::move(a0)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      double a0 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

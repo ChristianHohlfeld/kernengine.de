@@ -81,6 +81,25 @@ namespace mvt { struct Tile {
   /// The layer of that name: its index in `layers` (-1 when the tile has none).
   i32 layer(std::string_view name) const;
 }; }
+namespace mvt { struct Piece {
+  std::size_t at = 0, end = 0;
+}; }
+namespace mvt { struct Decoder {
+ public:
+  void begin(Span<const u8> bytes, std::size_t at, const std::vector<std::string>& wanted = {});
+  /// Decodes for about `budget_ms` (0 = to the end). True when finished (check failed()).
+  
+  
+  
+  
+
+ private:
+  std::vector<Piece> layers_;
+  std::vector<Piece> features_;
+  std::size_t layer_ = 0, feature_ = 0;
+  bool layer_open_ = false, done_ = true, failed_ = false;
+  Tile tile_;
+}; }
 namespace mvt { f64 ring_area(const std::vector<Vec2>& ring); }
 namespace mvt { struct Writer {
  public:
@@ -126,13 +145,13 @@ namespace mvt { struct Reader {
     converted::plus_bits_to(p, static_cast<std::size_t>(n));
     return r;
   }
-  
-
-
-
-
-
-
+  std::string_view text(Span<const u8> bytes) {
+    const u64 n = varint(bytes);
+    if (!ok || n > static_cast<u64>(converted::minus(end, p))) { ok = false; return {}; }
+    std::string_view s(reinterpret_cast<const char*>(bytes.data) + p, static_cast<std::size_t>(n));
+    converted::plus_bits_to(p, static_cast<std::size_t>(n));
+    return s;
+  }
   void skip(Span<const u8> bytes, u32 wire) {
     switch (wire) {
       case 0: varint(bytes); break;
@@ -159,6 +178,24 @@ namespace mvt { struct Reader {
   }
 }; }
 namespace mvt { i64 zigzag(u64 v) { return static_cast<i64>(converted::shr_bits(v, 1)) ^ -static_cast<i64>(v & 1); } }
+namespace mvt { Value read_value(Span<const u8> bytes, Reader r) {
+  Value v;
+  while (r.more()) {
+    const u64 key = r.varint(bytes);
+    const u32 field = static_cast<u32>(converted::shr_bits(key, 3)), wire = static_cast<u32>(key & 7);
+    switch (field) {
+      case 1: v.kind = Value::Kind::string; v.s = std::string(r.text(bytes)); break;
+      case 2: v.kind = Value::Kind::number; v.n = r.fixed32(bytes); break;
+      case 3: v.kind = Value::Kind::number; v.n = r.fixed64(bytes); break;
+      case 4: v.kind = Value::Kind::number; v.n = static_cast<f64>(static_cast<i64>(r.varint(bytes))); break;
+      case 5: v.kind = Value::Kind::number; v.n = static_cast<f64>(r.varint(bytes)); break;
+      case 6: v.kind = Value::Kind::number; v.n = static_cast<f64>(zigzag(r.varint(bytes))); break;
+      case 7: v.kind = Value::Kind::boolean; v.b = r.varint(bytes) != 0; break;
+      default: r.skip(bytes, wire);
+    }
+  }
+  return v;
+} }
 namespace mvt { void read_geometry(Span<const u8> bytes, Reader r, GeomType type, std::vector<std::vector<Vec2>>& parts) {
   i64 x = 0, y = 0;
   bool open = false;  // the part the points go into is the last of `parts`
@@ -210,6 +247,21 @@ namespace mvt { bool wanted_layer(const std::string& name, const std::vector<std
     if (w == name) return true;
   return false;
 } }
+namespace mvt { bool open_layer(Span<const u8> bytes, Reader lr, Layer& layer, std::vector<Piece>& features) {
+  while (lr.more()) {
+    const u64 k = lr.varint(bytes);
+    const u32 field = static_cast<u32>(converted::shr_bits(k, 3)), wire = static_cast<u32>(k & 7);
+    switch (field) {
+      case 1: layer.name = std::string(lr.text(bytes)); break;
+      case 2: { const Reader f = lr.sub(bytes); features.push_back({f.p, f.end}); break; }
+      case 3: layer.keys.emplace_back(lr.text(bytes)); break;
+      case 4: layer.values.push_back(read_value(bytes, lr.sub(bytes))); break;
+      case 5: layer.extent = static_cast<u32>(lr.varint(bytes)); break;
+      default: lr.skip(bytes, wire);
+    }
+  }
+  return lr.ok;
+} }
 namespace mvt { bool read_feature(Span<const u8> bytes, Reader fr, Feature& f) {
   Reader geometry;
   bool has_geometry = false;
@@ -232,6 +284,31 @@ namespace mvt { bool read_feature(Span<const u8> bytes, Reader fr, Feature& f) {
   if (has_geometry) read_geometry(bytes, geometry, f.type, f.parts);
   return true;
 } }
+namespace mvt { void Decoder::begin(Span<const u8> bytes, std::size_t at, const std::vector<std::string>& wanted) {
+  layers_.clear();
+  features_.clear();
+  tile_.layers.clear();
+  layer_ = feature_ = 0;
+  layer_open_ = false;
+  done_ = false;
+  failed_ = false;
+  Reader tile{at < bytes.size ? at : bytes.size, bytes.size};
+  while (tile.more()) {
+    const u64 key = tile.varint(bytes);
+    if ((converted::shr_bits(key, 3)) != 3 || (key & 7) != 2) { tile.skip(bytes, static_cast<u32>(key & 7)); continue; }
+    const Reader lr = tile.sub(bytes);
+    // Peek at the name to skip unwanted layers without decoding them.
+    std::string name;
+    Reader peek = lr;
+    while (peek.more()) {
+      const u64 k = peek.varint(bytes);
+      if ((converted::shr_bits(k, 3)) == 1 && (k & 7) == 2) { name = std::string(peek.text(bytes)); break; }
+      peek.skip(bytes, static_cast<u32>(k & 7));
+    }
+    if (wanted_layer(name, wanted)) layers_.push_back({lr.p, lr.end});
+  }
+  if (!tile.ok) { failed_ = true; done_ = true; }
+} }
 namespace mvt { void put_varint(std::vector<u8>& o, u64 v) {
   while (v >= 0x80) { o.push_back(static_cast<u8>(v | 0x80)); converted::shr_bits_to(v, 7); }
   o.push_back(static_cast<u8>(v));
@@ -241,6 +318,11 @@ namespace mvt { void put_bytes(std::vector<u8>& o, u32 field, const std::vector<
   put_key(o, field, 2);
   put_varint(o, data.size());
   o.insert(o.end(), data.begin(), data.end());
+} }
+namespace mvt { void put_bytes(std::vector<u8>& o, u32 field, std::string_view text) {
+  put_key(o, field, 2);
+  put_varint(o, text.size());
+  o.insert(o.end(), text.begin(), text.end());
 } }
 namespace mvt { u64 zz(i64 v) { return (converted::shl_bits(static_cast<u64>(v), 1)) ^ static_cast<u64>(converted::shr_bits(v, 63)); } }
 namespace mvt { void Writer::begin_layer(const std::string& name, u32 extent) {
@@ -366,6 +448,38 @@ namespace mvt { using converted::arg; using converted::same; using converted::de
 [[maybe_unused]] static std::string text(const mvt::Tile& s) { return std::string("{") + text(s.layers) + "}"; }
 [[maybe_unused]] static void take(mvt::Tile& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<std::vector<mvt::Layer>>(s.layers, (*v.rows)[0]); }
 }
+[[maybe_unused]] static mvt::Piece draw_mvt__Piece(converted::Draw& draw) {
+  mvt::Piece s{};
+  s.at = static_cast<unsigned long>(draw.below(40));
+  s.end = static_cast<unsigned long>(draw.below(40));
+  return s;
+}
+namespace mvt { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const mvt::Piece& s) { return converted::Value::structure({arg(s.at), arg(s.end)}); }
+[[maybe_unused]] static bool same(const mvt::Piece& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.at, (*got.rows)[0]) && same(want.end, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const mvt::Piece& s) { return defined(s.at) && defined(s.end); }
+[[maybe_unused]] static std::string text(const mvt::Piece& s) { return std::string("{") + text(s.at) + ", " + text(s.end) + "}"; }
+[[maybe_unused]] static void take(mvt::Piece& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<unsigned long>(s.at, (*v.rows)[0]); converted::take_as<unsigned long>(s.end, (*v.rows)[1]); }
+}
+[[maybe_unused]] static mvt::Decoder draw_mvt__Decoder(converted::Draw& draw) {
+  mvt::Decoder s{};
+  s.layers_ = draw_list(draw, [&]() -> mvt::Piece { return draw_mvt__Piece(draw); });
+  s.features_ = draw_list(draw, [&]() -> mvt::Piece { return draw_mvt__Piece(draw); });
+  s.layer_ = static_cast<unsigned long>(draw.below(40));
+  s.feature_ = static_cast<unsigned long>(draw.below(40));
+  s.layer_open_ = draw.flag();
+  s.done_ = draw.flag();
+  s.failed_ = draw.flag();
+  s.tile_ = draw_mvt__Tile(draw);
+  return s;
+}
+namespace mvt { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const mvt::Decoder& s) { return converted::Value::structure({arg(s.layers_), arg(s.features_), arg(s.layer_), arg(s.feature_), arg(s.layer_open_), arg(s.done_), arg(s.failed_), arg(s.tile_)}); }
+[[maybe_unused]] static bool same(const mvt::Decoder& want, const converted::Value& got) { return got.rows && got.rows->size() == 8 && same(want.layers_, (*got.rows)[0]) && same(want.features_, (*got.rows)[1]) && same(want.layer_, (*got.rows)[2]) && same(want.feature_, (*got.rows)[3]) && same(want.layer_open_, (*got.rows)[4]) && same(want.done_, (*got.rows)[5]) && same(want.failed_, (*got.rows)[6]) && same(want.tile_, (*got.rows)[7]); }
+[[maybe_unused]] static bool defined(const mvt::Decoder& s) { return defined(s.layers_) && defined(s.features_) && defined(s.layer_) && defined(s.feature_) && defined(s.layer_open_) && defined(s.done_) && defined(s.failed_) && defined(s.tile_); }
+[[maybe_unused]] static std::string text(const mvt::Decoder& s) { return std::string("{") + text(s.layers_) + ", " + text(s.features_) + ", " + text(s.layer_) + ", " + text(s.feature_) + ", " + text(s.layer_open_) + ", " + text(s.done_) + ", " + text(s.failed_) + ", " + text(s.tile_) + "}"; }
+[[maybe_unused]] static void take(mvt::Decoder& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 8) return; converted::take_as<std::vector<mvt::Piece>>(s.layers_, (*v.rows)[0]); converted::take_as<std::vector<mvt::Piece>>(s.features_, (*v.rows)[1]); converted::take_as<unsigned long>(s.layer_, (*v.rows)[2]); converted::take_as<unsigned long>(s.feature_, (*v.rows)[3]); converted::take_as<bool>(s.layer_open_, (*v.rows)[4]); converted::take_as<bool>(s.done_, (*v.rows)[5]); converted::take_as<bool>(s.failed_, (*v.rows)[6]); converted::take_as<mvt::Tile>(s.tile_, (*v.rows)[7]); }
+}
 [[maybe_unused]] static mvt::Writer::PendingLayer draw_mvt__Writer__PendingLayer(converted::Draw& draw) {
   mvt::Writer::PendingLayer s{};
   s.name = draw.word();
@@ -404,6 +518,10 @@ struct Out_Reader_sub { mvt::Reader Self; mvt::Reader Result; };
 [[maybe_unused]] static bool same(const Out_Reader_sub& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_Reader_sub& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Reader_sub& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
+struct Out_Reader_text { mvt::Reader Self; std::string_view Result; };
+[[maybe_unused]] static bool same(const Out_Reader_text& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_Reader_text& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_Reader_text& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Reader_fixed64 { mvt::Reader Self; double Result; };
 [[maybe_unused]] static bool same(const Out_Reader_fixed64& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_Reader_fixed64& s) { return defined(s.Self) && defined(s.Result); }
@@ -412,6 +530,10 @@ struct Out_Reader_fixed32 { mvt::Reader Self; double Result; };
 [[maybe_unused]] static bool same(const Out_Reader_fixed32& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_Reader_fixed32& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Reader_fixed32& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
+struct Out_open_layer { bool Result; mvt::Layer layer; std::vector<mvt::Piece> features; };
+[[maybe_unused]] static bool same(const Out_open_layer& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Result, (*got.rows)[0]) && same(want.layer, (*got.rows)[1]) && same(want.features, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const Out_open_layer& s) { return defined(s.Result) && defined(s.layer) && defined(s.features); }
+[[maybe_unused]] static std::string text(const Out_open_layer& s) { return std::string("{") + text(s.Result) + ", " + text(s.layer) + ", " + text(s.features) + "}"; }
 struct Out_read_feature { bool Result; mvt::Feature f; };
 [[maybe_unused]] static bool same(const Out_read_feature& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.f, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_read_feature& s) { return defined(s.Result) && defined(s.f); }
@@ -462,6 +584,26 @@ SC_TEST(converted_mvt_cpp) {
     converted::Tally tally("Reader_sub");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] mvt::Reader a0, [[maybe_unused]] converted::wide::Span<const unsigned char> a1) { auto r = converted::counted([&] { return a0.sub(a1); }); return Out_Reader_sub{std::move(a0), std::move(r)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      mvt::Reader a0 = draw_mvt__Reader(draw);
+      converted::wide::Span<const unsigned char> a1 = converted::kept_span(draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); }));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
+    }
+  }
+  {  // Reader::text
+    converted::Tally tally("Reader_text");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] mvt::Reader a0, [[maybe_unused]] converted::wide::Span<const unsigned char> a1) { auto r = converted::counted([&] { return a0.text(a1); }); return Out_Reader_text{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       mvt::Reader a0 = draw_mvt__Reader(draw);
       converted::wide::Span<const unsigned char> a1 = converted::kept_span(draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); }));
@@ -578,6 +720,26 @@ SC_TEST(converted_mvt_cpp) {
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
+  {  // read_value
+    converted::Tally tally("read_value");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] converted::wide::Span<const unsigned char> a0, [[maybe_unused]] mvt::Reader a1) { return converted::counted([&] { return converted_mvt_cpp::mvt::read_value(a0, std::move(a1)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      converted::wide::Span<const unsigned char> a0 = converted::kept_span(draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); }));
+      mvt::Reader a1 = draw_mvt__Reader(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
   {  // read_geometry
     converted::Tally tally("read_geometry");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -587,7 +749,7 @@ SC_TEST(converted_mvt_cpp) {
       mvt::Reader a1 = draw_mvt__Reader(draw);
       mvt::GeomType a2 = static_cast<mvt::GeomType>(draw.below(4));
       std::vector<std::vector<Vec2>> a3 = draw_list(draw, [&]() -> std::vector<Vec2> { return draw_list(draw, [&]() -> Vec2 { return draw.vector2(); }); });
-      const std::vector<converted::Value> given = {arg(a3), arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const std::vector<converted::Value> given = {arg(a0), arg(a3), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
@@ -723,6 +885,28 @@ SC_TEST(converted_mvt_cpp) {
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
+  {  // open_layer
+    converted::Tally tally("open_layer");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] converted::wide::Span<const unsigned char> a0, [[maybe_unused]] mvt::Reader a1, [[maybe_unused]] mvt::Layer a2, [[maybe_unused]] std::vector<mvt::Piece> a3) { auto r = converted::counted([&] { return converted_mvt_cpp::mvt::open_layer(a0, std::move(a1), a2, a3); }); return Out_open_layer{std::move(r), std::move(a2), std::move(a3)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      converted::wide::Span<const unsigned char> a0 = converted::kept_span(draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); }));
+      mvt::Reader a1 = draw_mvt__Reader(draw);
+      mvt::Layer a2 = draw_mvt__Layer(draw);
+      std::vector<mvt::Piece> a3 = draw_list(draw, [&]() -> mvt::Piece { return draw_mvt__Piece(draw); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a3), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1, 2});
+    }
+  }
   {  // read_feature
     converted::Tally tally("read_feature");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -731,7 +915,7 @@ SC_TEST(converted_mvt_cpp) {
       converted::wide::Span<const unsigned char> a0 = converted::kept_span(draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); }));
       mvt::Reader a1 = draw_mvt__Reader(draw);
       mvt::Feature a2 = draw_mvt__Feature(draw);
-      const std::vector<converted::Value> given = {arg(a2), arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
@@ -742,6 +926,28 @@ SC_TEST(converted_mvt_cpp) {
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
+    }
+  }
+  {  // Decoder::begin
+    converted::Tally tally("Decoder_begin");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] mvt::Decoder a0, [[maybe_unused]] converted::wide::Span<const unsigned char> a1, [[maybe_unused]] unsigned long a2, [[maybe_unused]] std::vector<std::string> a3) { converted::counted([&] { return a0.begin(a1, std::move(a2), a3); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      mvt::Decoder a0 = draw_mvt__Decoder(draw);
+      converted::wide::Span<const unsigned char> a1 = converted::kept_span(draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); }));
+      unsigned long a2 = static_cast<unsigned long>(draw.below(40));
+      std::vector<std::string> a3 = draw_list(draw, [&]() -> std::string { return draw.word(); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a3), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // put_varint
@@ -794,6 +1000,27 @@ SC_TEST(converted_mvt_cpp) {
       unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       std::vector<unsigned char> a2 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // put_bytes
+    converted::Tally tally("put_bytes_2");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] std::string_view a2) { converted::counted([&] { return converted_mvt_cpp::mvt::put_bytes(a0, std::move(a1), std::move(a2)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      std::string_view a2 = std::string_view(draw.c_word());
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;

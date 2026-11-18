@@ -41,7 +41,7 @@ struct KeyIndex : converted::EngineObject {
 struct Vec4 {
   f32 x = 0, y = 0, z = 0, w = 0;
   constexpr Vec4() = default;
-  
+  constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}
   
   
   
@@ -57,11 +57,11 @@ struct Quat {
 
 
 
-  
-
-
-
-
+  Vec3 rotate(Vec3 v) const {
+    const Vec3 q{x, y, z};
+    const Vec3 t = cross(q, v) * 2.0;
+    return v + t * w + cross(q, t);
+  }
 };
 enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
 struct Mesh : converted::EngineObject {
@@ -126,6 +126,7 @@ struct Renderer : converted::EngineObject {
 };
 namespace physics { enum class BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 }; }
 namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
+namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
 namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
 namespace physics { struct Body { u64 id = 0; }; }
 namespace physics { struct Shape { u64 id = 0; }; }
@@ -159,6 +160,8 @@ inline f32 wrap_pi(f32 a) {
   while (a < -kPi) a += 2 * kPi;
   return a;
 }
+inline Quat conj(Quat q) { return {-q.x, -q.y, -q.z, q.w}; }
+inline Vec3 to_local(Quat q, Vec3 v) { return conj(q).rotate(v); }
 struct Rng {
   // Plain state: `Rng{seed}` starts at that seed, an Rng of its own starts at the default one. A
   // seed must not be 0 (xorshift would stay there) - a seed that is computed goes through seeded().
@@ -169,7 +172,7 @@ struct Rng {
   
   u32 next() { s ^= s << 13; s ^= s >> 17; s ^= s << 5; return s; }
   f32 unit() { return static_cast<f32>(next() >> 8) * (1.0 / 16777216.0); }
-  
+  f32 range(f32 a, f32 b) { return a + (b - a) * unit(); }
   /// Standard normal (Box-Muller), as SpawnCity's sensor noise.
   
 
@@ -196,6 +199,7 @@ inline RayResult cast(const World& w, Vec3 origin, Vec3 dir, f32 max_len, physic
   return r;
 }
 namespace mvt { enum class GeomType : u8 { unknown = 0, point = 1, line = 2, polygon = 3 }; }
+namespace mvt { namespace Value { enum class Kind : u8 { none, string, number, boolean }; } }
 constexpr i32 kTileZoom = 14;
 struct TileKey {
   i32 z = kTileZoom, x = 0, y = 0;
@@ -283,11 +287,11 @@ struct Terrain {
   std::vector<Vec4> needs;
 
   // ---- heights (one truth for physics, rendering, walkers, cars) ----
-  
+  f32 elevation(f32 x, f32 y) const;
   /// Height of a 5 m node: elevation + craters, water basins carved (terrainNodeHeightAt).
-  
+  f32 node_height(f32 x, f32 y) const;
   /// The static ground surface at (x, y): the node heights on the SW-NE triangles.
-  
+  f32 height(f32 x, f32 y) const;
   
   /// Where a building stands: the lowest ground along its outline (buildingGroundBase).
   
@@ -298,7 +302,7 @@ struct Terrain {
   /// A waterway line `width` wide; `speed` m/s current along it (river 1.6, canal 0.5, else 1.1).
   
   
-    // open water here (not under a bridge)
+  bool water_at(f32 x, f32 y) const;  // open water here (not under a bridge)
   
   
   /// Ground surface kind for tyres etc. (groundSurfaceAt): 0 ground, 1 water, 2 soil (crater).
@@ -377,9 +381,9 @@ struct Terrain {
   struct CorridorSet { u64 owner = 0; Vec4 bounds, box; converted::wide::Map<u64, std::vector<CorridorSeg>> grid; };
   std::vector<std::unique_ptr<CorridorSet>> corridors_;
   /// The place in corridors_ of the map tile's set whose square holds the point, or -1.
+  i32 corridor_set(f32 x, f32 y) const;
   
-  
-  
+  f32 road_level(f32 x, f32 y, f32 h) const;
   struct Tint { u64 owner; Vec4 box; Vec3 lin; std::vector<std::vector<Vec2>> rings; };
   struct Image { TileKey key; std::vector<f32> albedo; bool requested = false, failed = false; };  // 64 x 64 linear rgb
   converted::wide::Map<u64, Image> images_;
@@ -391,13 +395,13 @@ struct Terrain {
 
   
   
+  Vec4 interior(const Grid& g) const;
   
   
+  f32 grid_at(const Grid& g, f32 x, f32 y) const;
+  bool water_cell(i32 cx, i32 cy) const;
   
-  
-  
-  
-  
+  bool on_bridge(f32 x, f32 y) const;
   
   
   
@@ -436,6 +440,7 @@ struct Terrain {
   std::vector<Vec4> changes_;
   TerrainStats stats_;
 };
+f32 crater_profile(f32 r, f32 radius, f32 depth, f32 rim);
 struct Lane {
   std::vector<Vec2> points;
   f32 width = 6;
@@ -487,7 +492,7 @@ struct CityStream {
   /// A point on a drivable street within `radius` of `near` (heading along the street).
   
   /// Ground height: the terrain's static surface (elevation, water basins, craters).
-  
+  f32 ground_height(f32 x, f32 y) const { return terrain_.height(x, y); }
   /// The ground (elevation tiles, water, craters, ground tiles): terrain.h.
   
   
@@ -727,6 +732,7 @@ namespace spawn { struct Viewer {
   f32 far = 1500;
   bool local = false;          // the presented camera (frustum sphere test as well as the cone)
 }; }
+namespace spawn { bool can_spawn(const std::vector<Viewer>& viewers, Vec3 point, f32 far_entry, f32 height); }
 namespace wanted { enum class Crime : u8 { person, person_hit, player, car, bus, police_drone, police_officer, police_car, carjacking, bird }; }
 struct VehicleView {
   Vec3 position, velocity;
@@ -808,7 +814,7 @@ struct People {
   
   
   /// Walks, flees, spawns and retires people around the focus; knocks people down under vehicles.
-  
+  void update(f32 dt, f32 now, const PeopleView& view, const CityStream& city, Rng& rng);
   /// What the spawn gate (PeopleView::spawn_viewers) said in the last update: arrivals it
   /// allowed, arrivals it denied.
   
@@ -834,7 +840,7 @@ struct People {
   /// A citizen put somewhere in plain sight (a driver who gets out of his car); the caller sets
   /// his pavement route (lane, seg, along, side, off) and what he does.
   i32 add_citizen(Vec3 at, f32 yaw, u32 seed);
-  
+  Person& at(i32 i) { return converted::at(people_, static_cast<std::size_t>(i)); }
   
   /// A free step along `dir` that does not go through walls (tries turned directions).
   bool free_move(const World& w, Person& p, Vec2 dir, f32 step, bool keep);
@@ -844,13 +850,13 @@ struct People {
   /// A scripted person (soldier, zombie, enemy) at `at`; returns its index.
   i32 add_scripted(Kind k, Vec3 at, f32 yaw, f32 hp, u32 seed, Vec3 shirt, Vec3 pants, Vec3 skin, u8 role);
   /// Damage to person `i` from somewhere else (a mate's round on our zombie): down at 0.
-  
-
-
-
-
-
-
+  void hurt(i32 i, f32 damage, Vec3 from_dir, bool by_player, f32 now) {
+    Person& p = at(i);
+    if (p.state == State::down || p.state == State::gone) return;
+    p.hp -= damage;
+    p.hurt_at = now;
+    if (p.hp <= 0) kill(i, from_dir, by_player, now, false);
+  }
   
   /// MP: what our rounds and blows did to a mate's unit (Person::remote) since the last call: the
   /// damage by the unit's own rule (an officer 25 a counted hit, the others damage x 3 on the head) -
@@ -889,7 +895,7 @@ struct People {
   
 
  private:
-  
+  void spawn(const PeopleView& view, const CityStream& city, Rng& rng, f32 now);
   void walk(Person& p, f32 dt, f32 now, const PeopleView& view, const CityStream& city, Rng& rng);
   /// Person `i` (its place in people_) down for good.
   void kill(i32 i, Vec3 from_dir, bool by_player, f32 now, bool hit_by_car);
@@ -959,8 +965,141 @@ namespace person_hit { inline BodyPart hit(Vec3 feet, f32 yaw, f32 speed, Vec3 f
   t_out = bt;
   return best;
 } }
+namespace terrain_cpp_local { u64 key2(i32 i, i32 j) { return (converted::shl_bits(static_cast<u64>(static_cast<u32>(i)), 32)) | static_cast<u32>(j); } }
+f32 crater_profile(f32 r, f32 radius, f32 depth, f32 rim) {
+  const f32 bowl = radius * 0.5;
+  if (r < bowl) return -depth * (1 - (r / bowl) * (r / bowl));
+  if (r >= radius) return 0;
+  const f32 x = (r - bowl) / (radius - bowl), k = (x - 0.12) / 0.14;
+  return rim * kern::math::exp(-(k * k)) * (1 - x);
+}
+namespace terrain_cpp_local { Vec4 interior_of(f32 x0, f32 y0, f32 span, f32 margin) { return {x0 + margin, y0 + margin, x0 + span - margin, y0 + span - margin}; } }
+Vec4 Terrain::interior(const Grid& g) const {
+  return terrain_cpp_local::interior_of(g.x0, g.y0, g.step * static_cast<f32>(g.n > 0 ? g.n - 1 : 0), kDemMargin);
+}
+f32 Terrain::grid_at(const Grid& g, f32 x, f32 y) const {
+  if (g.n < 2) return 0;
+  const f32 lim = static_cast<f32>(g.n) - 1.001;
+  const f32 fx = clampf((x - g.x0) / g.step, 0, lim), fy = clampf((y - g.y0) / g.step, 0, lim);
+  const u32 i = static_cast<u32>(converted::fits<unsigned int>(fx)), j = static_cast<u32>(converted::fits<unsigned int>(fy));
+  const f32 tx = fx - i, ty = fy - j;
+  const std::size_t at = converted::plus(converted::times(static_cast<std::size_t>(j), g.n), i);
+  return (converted::at(g.h, at) * (1 - tx) + converted::at(g.h, converted::plus(at, 1)) * tx) * (1 - ty) + (converted::at(g.h, converted::plus(at, g.n)) * (1 - tx) + converted::at(g.h, converted::plus(converted::plus(at, g.n), 1)) * tx) * ty;
+}
+f32 Terrain::elevation(f32 x, f32 y) const {
+  if (!grid_ready_) return 0.0;
+  // the window that knows the place (its interior); else any that holds it; else the player's,
+  // held at its edge (far ground nobody stands on: the horizon)
+  auto in = [&](const Vec4& r) { return x >= r.x && y >= r.y && x <= r.z && y <= r.w; };
+  if (side_.empty() || in(interior(grid_))) return grid_at(grid_, x, y) - ref_height_;
+  for (const Grid& g : side_) if (in(interior(g))) return grid_at(g, x, y) - ref_height_;
+  if (in(terrain_cpp_local::interior_of(grid_.x0, grid_.y0, grid_.step * static_cast<f32>(grid_.n - 1), 0))) return grid_at(grid_, x, y) - ref_height_;
+  for (const Grid& g : side_) if (in(terrain_cpp_local::interior_of(g.x0, g.y0, g.step * static_cast<f32>(g.n - 1), 0))) return grid_at(g, x, y) - ref_height_;
+  return grid_at(grid_, x, y) - ref_height_;
+}
+namespace terrain_cpp_local { constexpr f32 kRoadGrid = 24, kRoadBlend = 4.5; }
+namespace terrain_cpp_local { u64 road_key(i32 ix, i32 iy) { return (converted::shl_bits(static_cast<u64>(static_cast<u32>(ix)), 32)) | static_cast<u32>(iy); } }
+i32 Terrain::corridor_set(f32 x, f32 y) const {
+  // the map tile whose square holds the point (the squares tile the plane: west / south edge in - one at most)
+  for (std::size_t i = 0; i < corridors_.size(); converted::pre_inc(i)) {
+    const CorridorSet& s = *converted::present(converted::at(corridors_, i));
+    if (x >= s.bounds.x && x < s.bounds.z && y >= s.bounds.y && y < s.bounds.w) return static_cast<i32>(i);
+  }
+  return -1;
+}
+f32 Terrain::road_level(f32 x, f32 y, f32 h) const {
+  // terrain_craters.mjs roadLevel: every corridor covering the point contributes (weighted), so
+  // junctions blend smoothly, no steps
+  const i32 at = corridors_.empty() ? -1 : corridor_set(x, y);
+  if (at < 0) return h;
+  const CorridorSet& set = *converted::present(converted::at(corridors_, static_cast<std::size_t>(at)));
+  const auto it = set.grid.find(terrain_cpp_local::road_key(static_cast<i32>(converted::fits<int>(std::floor(x / terrain_cpp_local::kRoadGrid))), static_cast<i32>(converted::fits<int>(std::floor(y / terrain_cpp_local::kRoadGrid)))));
+  if (it == set.grid.end()) return h;
+  f32 best = 0, sw = 0, sh = 0;
+  for (const CorridorSeg& s : it->second) {
+    const f32 t = clampf(((x - s.ax) * s.dx + (y - s.ay) * s.dy) / s.l2, 0, 1);
+    const f32 px = s.ax + s.dx * t, py = s.ay + s.dy * t, d = hypot_bp(x - px, y - py);
+    const f32 w = d <= s.half ? 1 : d >= s.half + terrain_cpp_local::kRoadBlend ? 0 : 1 - (d - s.half) / terrain_cpp_local::kRoadBlend;
+    if (w <= 0) continue;
+    const f32 ws = w * w * (3 - 2 * w);
+    sw += ws;
+    sh += ws * (s.ha + (s.hb - s.ha) * t);
+    best = std::fmax(best, w);
+  }
+  if (sw <= 0) return h;
+  return h + (sh / sw - h) * (best * best * (3 - 2 * best));
+}
+f32 Terrain::node_height(f32 x, f32 y) const {
+  const f32 e = elevation(x, y);
+  f32 h = road_level(x, y, e);
+  for (const Crater& c : craters_) {
+    const f32 dx = x - c.c.x, dy = y - c.c.y;
+    if (std::fabs(dx) >= c.r || std::fabs(dy) >= c.r) continue;
+    const f32 r = kern::math::sqrt(dx * dx + dy * dy);
+    if (r < c.r) h += crater_profile(r, c.r, c.depth, c.rim);
+  }
+  if (!water_.empty() && water_at(x, y)) return std::fmin(h, e - kWaterBed);
+  return h;
+}
+f32 Terrain::height(f32 x, f32 y) const {
+  // terrain_surface.mjs triangleHeightAt: the SW-NE diagonal of every 5 m cell.
+  const f32 x0 = std::floor(x / kStep) * kStep, y0 = std::floor(y / kStep) * kStep;
+  const f32 u = (x - x0) / kStep, v = (y - y0) / kStep;
+  const f32 a = node_height(x0, y0), d = node_height(x0 + kStep, y0 + kStep);
+  return u >= v ? a + (node_height(x0 + kStep, y0) - a) * (u - v) + (d - a) * v : a + (node_height(x0, y0 + kStep) - a) * (v - u) + (d - a) * u;
+}
+bool Terrain::water_cell(i32 cx, i32 cy) const {
+  // the 256 bits of the cell's 64 m block
+  auto it = water_.find(terrain_cpp_local::key2(cx >> 4, cy >> 4));
+  if (it == water_.end()) return false;
+  const u32 idx = static_cast<u32>((cy & 15) * 16 + (cx & 15));
+  return (converted::shr_bits(converted::at(it->second.bits, idx >> 6), (idx & 63))) & 1u;
+}
+bool Terrain::on_bridge(f32 x, f32 y) const {
+  for (const Bridge& b : bridges_) {
+    const f32 dx = x - b.c.x, dy = y - b.c.y;
+    if (std::fabs(dx) > b.hl + b.hw || std::fabs(dy) > b.hl + b.hw) continue;
+    const f32 c = kern::math::cos(b.yaw), s = kern::math::sin(b.yaw), u = dx * c + dy * s, v = -dx * s + dy * c;
+    if (std::fabs(u) <= b.hl && std::fabs(v) <= b.hw) return true;
+  }
+  return false;
+}
+bool Terrain::water_at(f32 x, f32 y) const {
+  if (water_.empty()) return false;
+  if (!water_cell(static_cast<i32>(converted::fits<int>(std::floor(x / kWaterCell))), static_cast<i32>(converted::fits<int>(std::floor(y / kWaterCell))))) return false;
+  return bridges_.empty() || !on_bridge(x, y);
+}
+namespace rules { inline f64 decimal(f32 x) {
+  const f64 d = static_cast<f64>(x);
+  const f64 a = std::fabs(d);
+  if (!(a >= 1e-9 && a < 1e7) || d == std::trunc(d)) return d;
+  f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
+  for (f64 m = a; m < 1; m *= 10) scale *= 10;
+  for (f64 m = a; m >= 10; m /= 10) scale /= 10;
+  for (int digits = 1; digits <= 9; ++digits, scale *= 10) {
+    const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
+    if (static_cast<f32>(c) == x) return c;
+  }
+  return d;
+} }
+namespace rules { struct Blueprint : ::kern::logic::ActorBlueprint {
+  using ActorBlueprint::ActorBlueprint;
+}; }
+namespace spawn { namespace spawn_guard_cpp_local { rules::Blueprint g_rules{"SpawnGuard"}; } }
+namespace spawn { namespace spawn_guard_cpp_local { struct Looker {
+  Vec3 eye, forward;
+  f64 half_angle = 0, far = 0;
+  bool local = false;
+}; } }
+namespace spawn { namespace spawn_guard_cpp_local { Looker looker_of(const Viewer& v) { return {v.eye, v.forward, rules::decimal(v.half_angle), rules::decimal(v.far), v.local}; } } }
+namespace spawn { bool can_spawn(const std::vector<Viewer>& viewers, Vec3 point, f32 far_entry, f32 height) { using spawn::spawn_guard_cpp_local::Looker;
+  std::vector<Looker> lookers;
+  for (const Viewer& v : viewers) lookers.push_back(spawn::spawn_guard_cpp_local::looker_of(v));
+  return spawn::spawn_guard_cpp_local::g_rules.flag("CanSpawn", lookers, point, rules::decimal(far_entry), rules::decimal(height));
+} }
 constexpr f32 kPavement = 1.6;
 constexpr f32 kWitness = 45;
+constexpr f32 kBodySeconds = 25;
 constexpr f32 kCapsuleR = 0.32;
 const Vec3 kShirts[] = {{0.62, 0.12, 0.1}, {0.16, 0.28, 0.55}, {0.85, 0.82, 0.74}, {0.2, 0.42, 0.25}, {0.9, 0.62, 0.15},
                         {0.35, 0.35, 0.38}, {0.55, 0.3, 0.55}, {0.1, 0.1, 0.12}, {0.75, 0.45, 0.4}, {0.3, 0.6, 0.7}};
@@ -1119,6 +1258,79 @@ void People::apply_snapshot(const std::vector<NetPerson>& list, f32 now) {
     if (converted::at(seen, i) || p.kind != Kind::citizen || p.net < 0) continue;
     if (p.state == State::down || now < p.knocked_until) continue;  // a body / a ragdoll stays its time
     p.state = State::gone;
+  }
+}
+void People::spawn(const PeopleView& view, const CityStream& city, Rng& rng, f32 now) {
+  if (puppets_) return;  // MP client: the host's citizens
+  const std::vector<Lane>& lanes = city.lanes();
+  if (lanes.empty()) return;
+  u32 alive = count(Kind::citizen, false);
+  const f32 near = alive < budget_ / 2 ? 12.0 : 70.0;  // the first fill may start close by
+  for (int made = 0, attempt = 0; alive < budget_ && made < 6 && attempt < 40; ++attempt) {
+    Person p;
+    p.lane = static_cast<i32>(converted::rem(rng.next(), lanes.size()));
+    const Lane& L = converted::at(lanes, p.lane);
+    if (!L.alive || L.points.size() < 2) continue;
+    p.seg = static_cast<i32>(converted::rem(rng.next(), (converted::minus(L.points.size(), 1))));
+    const Vec2 a = converted::at(L.points, p.seg), b = converted::at(L.points, p.seg + 1);
+    const f32 len = hypot_bp(b.x - a.x, b.y - a.y);
+    if (len < 3) continue;
+    // world_procedural_population.mjs seedRouteAgents: the people of a street are the street's -
+    // one in every 9 m slot of a pavement, its id from the street's own geometry, the segment, the
+    // slot and the side: every machine in a round has the same person in the same place (and a
+    // death there is a death here, "npc-death")
+    const u32 slots = std::max(1u, static_cast<u32>(converted::fits<unsigned int>(len / 9)));
+    const u32 slot = static_cast<u32>(converted::rem(rng.next(), slots));
+    p.along = (static_cast<f32>(slot) + 0.5) * len / static_cast<f32>(slots);
+    p.side = rng.unit() < 0.5 ? 1.0 : -1.0;
+    const u32 street = static_cast<u32>(std::lround(converted::front(L.points).x)) * 73856093u ^ static_cast<u32>(std::lround(converted::front(L.points).y)) * 19349663u ^
+                       static_cast<u32>(std::lround(converted::back(L.points).x)) * 83492791u ^ static_cast<u32>(std::lround(converted::back(L.points).y)) * 2971215073u;
+    const u32 id = (street ^ (static_cast<u32>(p.seg) * 2654435761u) ^ (slot * 40503u) ^ (p.side > 0 ? 0x9e3779b9u : 0u)) | 1u;
+    bool taken = false;
+    for (const Person& o : people_) taken = taken || (o.state != State::gone && o.seed == id);
+    if (taken) continue;
+    p.dir = (id >> 5) & 1 ? 1 : -1;
+    p.off = L.width * 0.5 + kPavement;
+    Vec3 at;
+    f32 heading;
+    route_point(p, lanes, at, heading);
+    // around a player: ours, or (MP host) one of the others - near none of them, far from none
+    const f32 d = near_any(view, at);
+    const Vec3 around = view.foci.empty() || (converted::rem(attempt, (converted::plus(view.foci.size(), 1)))) == 0 ? view.focus : converted::at(view.foci, converted::minus(converted::rem(attempt, (converted::plus(view.foci.size(), 1))), 1));
+    if (d < near || dist2d(at, around) > show_) continue;
+    if (inside_building(*view.physics, at, city.ground_height(at.x, at.y))) {
+      p.side = -p.side;  // the other pavement, else closer to the kerb
+      route_point(p, lanes, at, heading);
+      if (inside_building(*view.physics, at, city.ground_height(at.x, at.y))) {
+        p.off = L.width * 0.5 + 0.5;
+        route_point(p, lanes, at, heading);
+        if (inside_building(*view.physics, at, city.ground_height(at.x, at.y))) continue;
+      }
+    }
+    if (view.spawn_watched) {  // nobody may see them appear
+      // (whether buildings hide the point is the Blueprint's own question to the world)
+      const bool unseen = spawn::can_spawn(view.spawn_viewers, at, view.spawn_far_entry, view.spawn_height);
+      ++(unseen ? spawns_allowed_ : spawns_denied_);
+      if (!unseen) continue;
+    }
+    const u32 seed = id;
+    p.seed = seed;
+    p.pos = at;
+    p.yaw = heading;
+    p.speed = 1.0 + static_cast<f32>((seed >> 7) % 66) / 100;  // 1.00 .. 1.65 m/s
+    p.fitness = 0.75 + static_cast<f32>((seed >> 11) % 51) / 100;
+    p.shirt = converted::at(kShirts, (seed >> 3) % 10);
+    p.pants = converted::at(kPants, (seed >> 9) % 6);
+    p.skin = converted::at(kSkins, (seed >> 13) % 5);
+    p.phase = rng.range(0, 6.28);
+    p.state = State::walk;
+    bool placed = false;
+    for (Person& slot : people_)
+      if (slot.state == State::gone) { slot = p; placed = true; break; }
+    if (!placed) people_.push_back(p);
+    ++alive;
+    ++made;
+    (void)now;
   }
 }
 void People::frighten(Vec3 at, f32 radius, f32 now, f32 strength) {
@@ -1397,6 +1609,70 @@ void People::walk(Person& p, f32 dt, f32 now, const PeopleView& view, const City
     p.yaw = approach_angle(p.yaw, kern::math::atan2(to.y, to.x), dt * 4.5);
   }
 }
+void People::update(f32 dt, f32 now, const PeopleView& view, const CityStream& city, Rng& rng) {
+  spawns_allowed_ = spawns_denied_ = 0;
+  if (!view.physics) return;
+  if (dt <= 0) return;
+  for (std::size_t i = 0; i < people_.size(); converted::pre_inc(i)) {
+    Person& p = converted::at(people_, i);
+    if (p.state == State::gone) continue;
+    if (p.state == State::down) {
+      if (now - p.down_at > kBodySeconds || near_any(view, p.pos) > hide_) p.state = State::gone;
+      continue;
+    }
+    if (now < p.knocked_until) continue;  // lying on the street as a ragdoll (M3 life)
+    if (p.kind == Kind::citizen && puppets_ && p.net >= 0) {
+      // the host's citizen: where he is by now - his snapshot's place walked on at his pace and
+      // heading for the time since it was taken (no stop-and-go between snapshots) - eased to
+      const f32 age = clampf(now - p.net_at, 0, 0.8);
+      const Vec3 want = p.net_to + Vec3{kern::math::cos(p.yaw), kern::math::sin(p.yaw), 0} * (p.v * age);
+      const Vec3 d = want - p.pos;
+      const f32 k = std::fmin(1.0, dt * 10);
+      p.pos.x += d.x * k;
+      p.pos.y += d.y * k;
+    } else if (p.kind == Kind::citizen) {
+      if (near_any(view, p.pos) > hide_) { p.state = State::gone; continue; }
+      if (p.state != State::fight) walk(p, dt, now, view, city, rng);
+    }
+    p.phase += p.v * dt * 3.4;
+    // On the terrain (terrain.h): everybody stands on the ground's surface.
+    p.pos.z = city.ground_height(p.pos.x, p.pos.y);
+    if (p.remote) continue;  // a mate's unit stands where he has it: nothing here throws it
+    // Vehicles: knocked down by anything driving into them (SpawnCity: person-hit / person).
+    for (const VehicleView& v : view.vehicles) {
+      if (v.airborne) {
+        // A drone or jet sweeping low over people scatters them.
+        const f32 agl = v.position.z;
+        if (p.kind == Kind::citizen && p.state != State::flee && agl < 14 && dist2d(v.position, p.pos) < 14 && converted::wide::length(v.velocity) > 2)
+          frighten(p.pos, 6, now, 1);
+        continue;
+      }
+      const f32 speed = hypot_bp(v.velocity.x, v.velocity.y);
+      if (speed < 2.2 || dist2d(v.position, p.pos) > 8) continue;  // people_impacts.mjs MIN_SPEED
+      const Vec3 local = to_local(v.rotation, p.pos - v.position);
+      if (std::fabs(local.x) > v.half.x + 0.32 || std::fabs(local.y) > v.half.y + 0.32) continue;  // people_impacts.mjs PAD
+      const f32 damage = std::fmin(260.0, std::fmax(6.0, (speed - 1.5) * 8.5));  // people_impacts.mjs
+      p.hp -= damage;
+      if (p.hp <= 0) kill(static_cast<i32>(i), v.velocity, v.player, now, true);
+      else {
+        // Thrown aside as a ragdoll that gets up again (people_impacts.mjs: the car's momentum,
+        // sideways 1.4 + 0.12 v, up 1.2 + 0.16 v, at most 15 m/s).
+        const f32 sd = local.y >= 0 ? 1.0 : -1.0;
+        Vec3 push = Vec3{v.velocity.x, v.velocity.y, 0} * 1.05 + v.rotation.rotate({0, sd, 0}) * (1.4 + speed * 0.12) + Vec3{0, 0, 1.2 + speed * 0.16};
+        const f32 pl = converted::wide::length(push);
+        if (pl > 15) push = push * (15 / pl);
+        falls_.push_back({static_cast<i32>(i), push, true, true});
+        p.knocked_until = now + 6;
+        p.v = 0;
+        if (v.player && p.kind == Kind::citizen && puppets_ && p.net >= 0) hurts_.push_back({static_cast<u8>(p.net), p.seed, damage, HurtBy::vehicle, push});  // the host's citizen under our car
+        if (v.player && p.kind == Kind::citizen) reports_.push_back({wanted::Crime::person_hit, p.pos, true});
+        if (p.kind == Kind::citizen) frighten(p.pos, 8, now, 1.4);
+      }
+      break;
+    }
+  }
+  spawn(view, city, rng, now);
+}
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
@@ -1457,19 +1733,6 @@ void People::walk(Person& p, f32 dt, f32 now, const PeopleView& view, const City
 [[maybe_unused]] static bool defined(const People::Person& s) { return defined(s.kind) && defined(s.state) && defined(s.pos) && defined(s.yaw) && defined(s.speed) && defined(s.v) && defined(s.hp) && defined(s.phase) && defined(s.shirt) && defined(s.pants) && defined(s.skin) && defined(s.lane) && defined(s.seg) && defined(s.dir) && defined(s.along) && defined(s.side) && defined(s.off) && defined(s.flee_until) && defined(s.burst_until) && defined(s.flee_speed) && defined(s.hands_up_until) && defined(s.shaken_until) && defined(s.wait_until) && defined(s.flee_dir) && defined(s.fitness) && defined(s.down_at) && defined(s.fall_dir) && defined(s.unit) && defined(s.aiming) && defined(s.aim_pitch) && defined(s.held) && defined(s.hands) && defined(s.hand_l) && defined(s.hand_r) && defined(s.punch) && defined(s.seed) && defined(s.provoked_at) && defined(s.fight_until) && defined(s.last_attack) && defined(s.provoked_hit) && defined(s.role) && defined(s.knocked_until) && defined(s.hurt_at) && defined(s.remote) && defined(s.net) && defined(s.net_to) && defined(s.net_at); }
 [[maybe_unused]] static std::string text(const People::Person& s) { return std::string("{") + text(s.kind) + ", " + text(s.state) + ", " + text(s.pos) + ", " + text(s.yaw) + ", " + text(s.speed) + ", " + text(s.v) + ", " + text(s.hp) + ", " + text(s.phase) + ", " + text(s.shirt) + ", " + text(s.pants) + ", " + text(s.skin) + ", " + text(s.lane) + ", " + text(s.seg) + ", " + text(s.dir) + ", " + text(s.along) + ", " + text(s.side) + ", " + text(s.off) + ", " + text(s.flee_until) + ", " + text(s.burst_until) + ", " + text(s.flee_speed) + ", " + text(s.hands_up_until) + ", " + text(s.shaken_until) + ", " + text(s.wait_until) + ", " + text(s.flee_dir) + ", " + text(s.fitness) + ", " + text(s.down_at) + ", " + text(s.fall_dir) + ", " + text(s.unit) + ", " + text(s.aiming) + ", " + text(s.aim_pitch) + ", " + text(s.held) + ", " + text(s.hands) + ", " + text(s.hand_l) + ", " + text(s.hand_r) + ", " + text(s.punch) + ", " + text(s.seed) + ", " + text(s.provoked_at) + ", " + text(s.fight_until) + ", " + text(s.last_attack) + ", " + text(s.provoked_hit) + ", " + text(s.role) + ", " + text(s.knocked_until) + ", " + text(s.hurt_at) + ", " + text(s.remote) + ", " + text(s.net) + ", " + text(s.net_to) + ", " + text(s.net_at) + "}"; }
 [[maybe_unused]] static void take(People::Person& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 47) return; converted::take_as<People::Kind>(s.kind, (*v.rows)[0]); converted::take_as<People::State>(s.state, (*v.rows)[1]); converted::take_as<Vec3>(s.pos, (*v.rows)[2]); converted::take_as<double>(s.yaw, (*v.rows)[3]); converted::take_as<double>(s.speed, (*v.rows)[4]); converted::take_as<double>(s.v, (*v.rows)[5]); converted::take_as<double>(s.hp, (*v.rows)[6]); converted::take_as<double>(s.phase, (*v.rows)[7]); converted::take_as<Vec3>(s.shirt, (*v.rows)[8]); converted::take_as<Vec3>(s.pants, (*v.rows)[9]); converted::take_as<Vec3>(s.skin, (*v.rows)[10]); converted::take_as<int>(s.lane, (*v.rows)[11]); converted::take_as<int>(s.seg, (*v.rows)[12]); converted::take_as<int>(s.dir, (*v.rows)[13]); converted::take_as<double>(s.along, (*v.rows)[14]); converted::take_as<double>(s.side, (*v.rows)[15]); converted::take_as<double>(s.off, (*v.rows)[16]); converted::take_as<double>(s.flee_until, (*v.rows)[17]); converted::take_as<double>(s.burst_until, (*v.rows)[18]); converted::take_as<double>(s.flee_speed, (*v.rows)[19]); converted::take_as<double>(s.hands_up_until, (*v.rows)[20]); converted::take_as<double>(s.shaken_until, (*v.rows)[21]); converted::take_as<double>(s.wait_until, (*v.rows)[22]); converted::take_as<Vec2>(s.flee_dir, (*v.rows)[23]); converted::take_as<double>(s.fitness, (*v.rows)[24]); converted::take_as<double>(s.down_at, (*v.rows)[25]); converted::take_as<Vec3>(s.fall_dir, (*v.rows)[26]); converted::take_as<int>(s.unit, (*v.rows)[27]); converted::take_as<bool>(s.aiming, (*v.rows)[28]); converted::take_as<double>(s.aim_pitch, (*v.rows)[29]); converted::take_as<int>(s.held, (*v.rows)[30]); converted::take_as<bool>(s.hands, (*v.rows)[31]); converted::take_as<Vec3>(s.hand_l, (*v.rows)[32]); converted::take_as<Vec3>(s.hand_r, (*v.rows)[33]); converted::take_as<unsigned char>(s.punch, (*v.rows)[34]); converted::take_as<unsigned int>(s.seed, (*v.rows)[35]); converted::take_as<double>(s.provoked_at, (*v.rows)[36]); converted::take_as<double>(s.fight_until, (*v.rows)[37]); converted::take_as<double>(s.last_attack, (*v.rows)[38]); converted::take_as<bool>(s.provoked_hit, (*v.rows)[39]); converted::take_as<unsigned char>(s.role, (*v.rows)[40]); converted::take_as<double>(s.knocked_until, (*v.rows)[41]); converted::take_as<double>(s.hurt_at, (*v.rows)[42]); converted::take_as<bool>(s.remote, (*v.rows)[43]); converted::take_as<int>(s.net, (*v.rows)[44]); converted::take_as<Vec3>(s.net_to, (*v.rows)[45]); converted::take_as<double>(s.net_at, (*v.rows)[46]); }
-[[maybe_unused]] static Lane draw_Lane(converted::Draw& draw) {
-  Lane s{};
-  s.points = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
-  s.width = draw.number();
-  s.tile = static_cast<u64>(draw.bits());
-  s.alive = draw.flag();
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const Lane& s) { return converted::Value::structure({arg(s.points), arg(s.width), arg(converted::shaped<converted::Whole>(s.tile)), arg(s.alive)}); }
-[[maybe_unused]] static bool same(const Lane& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.points, (*got.rows)[0]) && same(want.width, (*got.rows)[1]) && same(converted::shaped<converted::Whole>(want.tile), (*got.rows)[2]) && same(want.alive, (*got.rows)[3]); }
-[[maybe_unused]] static bool defined(const Lane& s) { return defined(s.points) && defined(s.width) && defined(converted::shaped<converted::Whole>(s.tile)) && defined(s.alive); }
-[[maybe_unused]] static std::string text(const Lane& s) { return std::string("{") + text(s.points) + ", " + text(s.width) + ", " + text(converted::shaped<converted::Whole>(s.tile)) + ", " + text(s.alive) + "}"; }
-[[maybe_unused]] static void take(Lane& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<std::vector<Vec2>>(s.points, (*v.rows)[0]); converted::take_as<double>(s.width, (*v.rows)[1]); converted::take_as<converted::Whole>(s.tile, (*v.rows)[2]); converted::take_as<bool>(s.alive, (*v.rows)[3]); }
 [[maybe_unused]] static CrimeReport draw_CrimeReport(converted::Draw& draw) {
   CrimeReport s{};
   s.crime = static_cast<wanted::Crime>(draw.below(10));
@@ -1556,6 +1819,19 @@ void People::walk(Person& p, f32 dt, f32 now, const PeopleView& view, const City
 [[maybe_unused]] static bool defined(const People& s) { return defined(s.people_) && defined(s.reports_) && defined(s.deaths_) && defined(s.falls_) && defined(s.remote_hits_) && defined(s.hurts_) && defined(s.last_head_) && defined(s.puppets_) && defined(s.budget_) && defined(s.serial_) && defined(s.spawns_allowed_) && defined(s.spawns_denied_) && defined(s.show_) && defined(s.hide_); }
 [[maybe_unused]] static std::string text(const People& s) { return std::string("{") + text(s.people_) + ", " + text(s.reports_) + ", " + text(s.deaths_) + ", " + text(s.falls_) + ", " + text(s.remote_hits_) + ", " + text(s.hurts_) + ", " + text(s.last_head_) + ", " + text(s.puppets_) + ", " + text(s.budget_) + ", " + text(s.serial_) + ", " + text(s.spawns_allowed_) + ", " + text(s.spawns_denied_) + ", " + text(s.show_) + ", " + text(s.hide_) + "}"; }
 [[maybe_unused]] static void take(People& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 14) return; converted::take_as<std::vector<People::Person>>(s.people_, (*v.rows)[0]); converted::take_as<std::vector<CrimeReport>>(s.reports_, (*v.rows)[1]); converted::take_as<std::vector<People::Death>>(s.deaths_, (*v.rows)[2]); converted::take_as<std::vector<People::Fall>>(s.falls_, (*v.rows)[3]); converted::take_as<std::vector<People::RemoteHit>>(s.remote_hits_, (*v.rows)[4]); converted::take_as<std::vector<People::Hurt>>(s.hurts_, (*v.rows)[5]); converted::take_as<bool>(s.last_head_, (*v.rows)[6]); converted::take_as<bool>(s.puppets_, (*v.rows)[7]); converted::take_as<unsigned int>(s.budget_, (*v.rows)[8]); converted::take_as<unsigned int>(s.serial_, (*v.rows)[9]); converted::take_as<unsigned int>(s.spawns_allowed_, (*v.rows)[10]); converted::take_as<unsigned int>(s.spawns_denied_, (*v.rows)[11]); converted::take_as<double>(s.show_, (*v.rows)[12]); converted::take_as<double>(s.hide_, (*v.rows)[13]); }
+[[maybe_unused]] static Lane draw_Lane(converted::Draw& draw) {
+  Lane s{};
+  s.points = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+  s.width = draw.number();
+  s.tile = static_cast<u64>(draw.bits());
+  s.alive = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Lane& s) { return converted::Value::structure({arg(s.points), arg(s.width), arg(converted::shaped<converted::Whole>(s.tile)), arg(s.alive)}); }
+[[maybe_unused]] static bool same(const Lane& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.points, (*got.rows)[0]) && same(want.width, (*got.rows)[1]) && same(converted::shaped<converted::Whole>(want.tile), (*got.rows)[2]) && same(want.alive, (*got.rows)[3]); }
+[[maybe_unused]] static bool defined(const Lane& s) { return defined(s.points) && defined(s.width) && defined(converted::shaped<converted::Whole>(s.tile)) && defined(s.alive); }
+[[maybe_unused]] static std::string text(const Lane& s) { return std::string("{") + text(s.points) + ", " + text(s.width) + ", " + text(converted::shaped<converted::Whole>(s.tile)) + ", " + text(s.alive) + "}"; }
+[[maybe_unused]] static void take(Lane& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<std::vector<Vec2>>(s.points, (*v.rows)[0]); converted::take_as<double>(s.width, (*v.rows)[1]); converted::take_as<converted::Whole>(s.tile, (*v.rows)[2]); converted::take_as<bool>(s.alive, (*v.rows)[3]); }
 [[maybe_unused]] static spawn::Viewer draw_spawn__Viewer(converted::Draw& draw) {
   spawn::Viewer s{};
   s.eye = draw.vector();
@@ -1639,6 +1915,7 @@ namespace spawn { using converted::arg; using converted::same; using converted::
 [[maybe_unused]] static std::string text(const People::NetPerson& s) { return std::string("{") + text(s.idx) + ", " + text(s.state) + ", " + text(s.flags) + ", " + text(s.seed) + ", " + text(s.pos) + ", " + text(s.yaw) + ", " + text(s.v) + ", " + text(s.at) + "}"; }
 [[maybe_unused]] static void take(People::NetPerson& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 8) return; converted::take_as<unsigned char>(s.idx, (*v.rows)[0]); converted::take_as<unsigned char>(s.state, (*v.rows)[1]); converted::take_as<unsigned char>(s.flags, (*v.rows)[2]); converted::take_as<unsigned int>(s.seed, (*v.rows)[3]); converted::take_as<Vec3>(s.pos, (*v.rows)[4]); converted::take_as<double>(s.yaw, (*v.rows)[5]); converted::take_as<double>(s.v, (*v.rows)[6]); converted::take_as<double>(s.at, (*v.rows)[7]); }
 [[maybe_unused]] static Vec4 draw_kern__Vec4(converted::Draw& draw) {
+  if (draw.flag()) return Vec4(draw.number(), draw.number(), draw.number(), draw.number());
   Vec4 s{};
   s.x = draw.number();
   s.y = draw.number();
@@ -2226,6 +2503,10 @@ struct Out_People_add_scripted { People Self; int Result; };
 [[maybe_unused]] static bool same(const Out_People_add_scripted& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_People_add_scripted& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_People_add_scripted& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
+struct Out_People_spawn { People Self; Rng rng; };
+[[maybe_unused]] static bool same(const Out_People_spawn& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.rng, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_People_spawn& s) { return defined(s.Self) && defined(s.rng); }
+[[maybe_unused]] static std::string text(const Out_People_spawn& s) { return std::string("{") + text(s.Self) + ", " + text(s.rng) + "}"; }
 struct Out_People_shot { People Self; int Result; Vec3 to; };
 [[maybe_unused]] static bool same(const Out_People_shot& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]) && same(want.to, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const Out_People_shot& s) { return defined(s.Self) && defined(s.Result) && defined(s.to); }
@@ -2234,9 +2515,14 @@ struct Out_People_walk { People Self; People::Person p; Rng rng; };
 [[maybe_unused]] static bool same(const Out_People_walk& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Self, (*got.rows)[0]) && same(want.p, (*got.rows)[1]) && same(want.rng, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const Out_People_walk& s) { return defined(s.Self) && defined(s.p) && defined(s.rng); }
 [[maybe_unused]] static std::string text(const Out_People_walk& s) { return std::string("{") + text(s.Self) + ", " + text(s.p) + ", " + text(s.rng) + "}"; }
+struct Out_People_update { People Self; Rng rng; };
+[[maybe_unused]] static bool same(const Out_People_update& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.rng, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_People_update& s) { return defined(s.Self) && defined(s.rng); }
+[[maybe_unused]] static std::string text(const Out_People_update& s) { return std::string("{") + text(s.Self) + ", " + text(s.rng) + "}"; }
 
 SC_TEST(converted_people_cpp) {
-  converted::Blueprint bp("people_cpp");
+  converted::Blueprint bp("people_cpp", {"SpawnGuard"});
+  spawn::spawn_guard_cpp_local::g_rules.bind(bp.source_logic());
   {  // dist2d
     converted::Tally tally("dist2d");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -2251,6 +2537,97 @@ SC_TEST(converted_people_cpp) {
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // People::witnessed
+    converted::Tally tally("People_witnessed");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] Vec3 a1) { return converted::counted([&] { return a0.witnessed(std::move(a1)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      People a0 = draw_People(draw);
+      Vec3 a1 = draw.vector();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // People::frighten
+    converted::Tally tally("People_frighten");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { converted::counted([&] { return a0.frighten(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      People a0 = draw_People(draw);
+      Vec3 a1 = draw.vector();
+      double a2 = draw.number();
+      double a3 = draw.number();
+      double a4 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // People::kill
+    converted::Tally tally("People_kill");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] int a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] bool a3, [[maybe_unused]] double a4, [[maybe_unused]] bool a5) { converted::counted([&] { return a0.kill(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      People a0 = draw_People(draw);
+      int a1 = static_cast<int>(draw.whole());
+      Vec3 a2 = draw.vector();
+      bool a3 = draw.flag();
+      double a4 = draw.number();
+      bool a5 = draw.flag();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // People::hurt
+    converted::Tally tally("People_hurt");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] int a1, [[maybe_unused]] double a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] bool a4, [[maybe_unused]] double a5) { converted::counted([&] { return a0.hurt(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      People a0 = draw_People(draw);
+      int a1 = static_cast<int>(draw.whole());
+      double a2 = draw.number();
+      Vec3 a3 = draw.vector();
+      bool a4 = draw.flag();
+      double a5 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5));
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -2438,26 +2815,6 @@ SC_TEST(converted_people_cpp) {
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
-  {  // People::witnessed
-    converted::Tally tally("People_witnessed");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] Vec3 a1) { return converted::counted([&] { return a0.witnessed(std::move(a1)); }); };
-    for (int i = 0; tally.more(i); ++i) {
-      People a0 = draw_People(draw);
-      Vec3 a1 = draw.vector();
-      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
   {  // near_any
     converted::Tally tally("near_any");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -2497,53 +2854,6 @@ SC_TEST(converted_people_cpp) {
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
-  {  // People::frighten
-    converted::Tally tally("People_frighten");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { converted::counted([&] { return a0.frighten(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return a0; };
-    for (int i = 0; tally.more(i); ++i) {
-      People a0 = draw_People(draw);
-      Vec3 a1 = draw.vector();
-      double a2 = draw.number();
-      double a3 = draw.number();
-      double a4 = draw.number();
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // People::kill
-    converted::Tally tally("People_kill");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] int a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] bool a3, [[maybe_unused]] double a4, [[maybe_unused]] bool a5) { converted::counted([&] { return a0.kill(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); return a0; };
-    for (int i = 0; tally.more(i); ++i) {
-      People a0 = draw_People(draw);
-      int a1 = static_cast<int>(draw.whole());
-      Vec3 a2 = draw.vector();
-      bool a3 = draw.flag();
-      double a4 = draw.number();
-      bool a5 = draw.flag();
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5));
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
   {  // People::apply_snapshot
     converted::Tally tally("People_apply_snapshot");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -2563,6 +2873,29 @@ SC_TEST(converted_people_cpp) {
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // People::spawn
+    converted::Tally tally("People_spawn");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] PeopleView a1, [[maybe_unused]] CityStream a2, [[maybe_unused]] Rng a3, [[maybe_unused]] double a4) { converted::counted([&] { return a0.spawn(a1, a2, a3, std::move(a4)); }); return Out_People_spawn{std::move(a0), std::move(a3)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      People a0 = draw_People(draw);
+      PeopleView a1 = draw_PeopleView(draw);
+      CityStream a2 = draw_CityStream(draw);
+      Rng a3 = draw_Rng(draw);
+      double a4 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
   {  // People::mate_hurt
@@ -2663,6 +2996,30 @@ SC_TEST(converted_people_cpp) {
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1, 2});
+    }
+  }
+  {  // People::update
+    converted::Tally tally("People_update");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] PeopleView a3, [[maybe_unused]] CityStream a4, [[maybe_unused]] Rng a5) { converted::counted([&] { return a0.update(std::move(a1), std::move(a2), a3, a4, a5); }); return Out_People_update{std::move(a0), std::move(a5)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      People a0 = draw_People(draw);
+      double a1 = draw.number();
+      double a2 = draw.number();
+      PeopleView a3 = draw_PeopleView(draw);
+      CityStream a4 = draw_CityStream(draw);
+      Rng a5 = draw_Rng(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a3), arg(a4), arg(a5), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
 }
