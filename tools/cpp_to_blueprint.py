@@ -13588,6 +13588,7 @@ def main(argv):
                 for place, piece in pieces.items():
                     w.pieces.setdefault(place, piece)
         w.wanted = None if u in program else set(wanted[u])
+        w.bars = dict(held.get(u, {}))   # (what waits for good: see `held`)
         return (u, sources.get(part_of.get(u, u)), files_, namespace, flags, w, test)
 
     # ---- the Blueprints, each after those it calls ----
@@ -13606,13 +13607,20 @@ def main(argv):
     given = {}                              # a Blueprint -> what it was given when it was converted last
     gave = collections.defaultdict(list)    # a Blueprint -> what it has given (its table, its exports), each once
     version = {}                            # a Blueprint -> which of those it gives now (an index into gave)
-    met, rounds, took = set(), 0, {}
+    met, rounds, took = {}, 0, {}   # (met: a state -> the round that began from it)
+    # A function that was written and waits now (what is given only grows - see below) goes against the rounds: what it
+    # waits for may come from what it gave itself. When the rounds go round (the same state twice), such a function of a
+    # Blueprint that goes round waits for good, with the reason it waited for (World.bars) - from then on its Blueprint
+    # is given that, and what it gives no longer turns on it: every time the rounds go round, more wait for good, and
+    # there are only so many functions. Rounds that do not go round never come to this: what they write stays as it was.
+    fell = collections.defaultdict(dict)    # a Blueprint -> its functions that were written and wait now: key -> (the round, why)
+    held = {}                               # a Blueprint -> its functions that wait for good: key -> why
 
     def asked_of(u, needs):
         """What a Blueprint is given, told by what it is made of: its files, the functions to write, and which
         of what they gave the Blueprints it may call give now."""
         return (tuple(sorted(unit_files[u])), None if u in program else tuple(sorted(wanted[u])),
-                tuple((d, version.get(d)) for d in sorted(needs[u])))
+                tuple((d, version.get(d)) for d in sorted(needs[u])), tuple(sorted(held.get(u, {}).items())))
 
     while True:
         needs = {u: need_of(u) for u in deps}
@@ -13636,9 +13644,18 @@ def main(argv):
                     exported = [k for da, db in zip(ea, eb) if isinstance(da, dict) and isinstance(db, dict)
                                 for k in sorted(set(da) | set(db), key=str) if da.get(k) != db.get(k)]
                     print(f"goes round: {u}: " + "; ".join(moved[:6]) + (f"; exports differ: {', '.join(map(str, exported[:6]))}" if exported else ("" if moved else "; exports differ")), flush=True)
+            # (of those that fell in the rounds that went round - since the round that began from this state)
+            more = {u: {k: why for k, (at, why) in sorted(fell[u].items()) if at >= met[state] and k not in held.get(u, {})} for u in sorted(new)}
+            if any(more.values()):
+                for u, ks in more.items():
+                    if ks:
+                        held.setdefault(u, {}).update(ks)
+                        for k, why in ks.items():
+                            print(f"{u}: {tables[u][k]['cpp'] if k in tables.get(u, {}) else k}() waits for good - the rounds went round ({why})", flush=True)
+                continue
             raise SystemExit("these Blueprints give, round after round, what they gave before (what one writes takes from the other what "
                              "it writes): " + ", ".join(sorted(new)))
-        met.add(state)
+        met[state] = rounds + 1
         now = sorted(u for u in new if all(d not in new or u in needs[d] for d in needs[u]))
         rounds += 1
         print(f"round {rounds}: {len(now)} Blueprints", flush=True)
@@ -13656,6 +13673,7 @@ def main(argv):
             for k, e in sorted(r["table"].items()):
                 if k in tables.get(u, {}) and not tables[u][k]["wait"] and e["wait"]:
                     print(f"{u}: {e['cpp']}() was written and waits now ({e['wait']})", flush=True)
+                    fell[u][k] = (rounds, e["wait"])
             given[u] = asks[u]
             results[u] = r
             tables[u], exports[u] = r["table"], r["exports"]
