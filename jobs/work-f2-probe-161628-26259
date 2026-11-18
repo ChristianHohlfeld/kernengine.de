@@ -1,0 +1,1 @@
+probe origin/work-f2 src/lamps.cpp src/destruction.cpp src/people.cpp src/nostr.cpp
