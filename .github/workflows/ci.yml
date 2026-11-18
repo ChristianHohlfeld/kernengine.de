@@ -41,7 +41,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: SpawnCity native tests (ASan/UBSan)
-        run: CXX=g++ CC=gcc kern/games/spawncity/tests/run_tests.sh
+        run: CXX=clang++ CC=clang kern/games/spawncity/tests/run_tests.sh   # the game compiler, clang (decision E13; ubuntu-24.04 brings clang 18)
 
   # Bit-identical everywhere (docs/lehrer.md, determinism): the Lehrer built with Apple clang on
   # ARM must step the duck exactly as GCC on x86 and WebAssembly do (the golden hashes).
