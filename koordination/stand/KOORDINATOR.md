@@ -1,4 +1,13 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 20:35 **Stand:**
+  · `work-zusammen-voll-195003-886` (c432166): wieder `convert rc=1`, derselbe Lesefehler („pad“ von Controls_DeviceInput). Ursache genauer: die Erklärung steht
+    in der **Bibliothek** `controls_cpp`; Game benutzt sie und hat die Variable `pad` – gebunden steht die Erklärung im Graphen von Game. Der erste Fix (nur für
+    Teile eines Blueprints) griff daneben. **Zweiter Fix 8874e79** (work-zusammen): die Erklärungen werden am Ende des Laufs einmal für das ganze Programm festgelegt.
+  · **Lokal nachgewiesen, dass danach nichts weiter im Weg steht:** `$S/lesen.py <worktree> <texts>` liest die Texte eines vollen Laufs (`mag-zwischen/texts`) wie
+    der Konverter ins Level (44 s). Mit der berichtigten Erklärung (`pad_2`) nimmt das Level **alle 156 Texte** des Laufs an. Lesefehler lassen sich so in unter
+    einer Minute prüfen statt in einem Lauf auf mag.
+  · Neuer voller Lauf: **`work-zusammen-voll-203000-750`** (auf 8874e79, 20:30). Basislauf `work-voll-162644-5528` ist fertig: convert rc=1 (19:01), suite rc=1,
+    engine rc=1 – wie vorhergesagt ohne gültiges Level.
 - 19:50 **Stand:**
   · Voller Lauf der Zusammenführung `work-zusammen-voll-185405-1226` (auf 9931aea): **Konvertierung in 27 min** (15 Runden, 37 Kerne) – geschrieben
     **1.660 / 1.878 Funktionen (88,4 %), 18.926 / 31.103 Zeilen (60,8 %)** (f9: 1.577 / 1.876, 16.136 / 31.096); 101 Funktionen „its test cannot compare it yet“,

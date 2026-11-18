@@ -655,3 +655,11 @@ mag rechnet unabhängig weiter (der volle Lauf `work-voll-162644-5528` seit 17:3
 - Fix `c432166` auf work-zusammen (Konverter, `settled_extern` beim Zusammensetzen der Teile). Neuer voller Lauf `work-zusammen-voll-195003-886` (19:50).
   **Vorgehen bleibt:** `convert rc=0` → Spiel-Suite lesen → grün (oder nur benannt rot wie auf `work`) → work-zusammen samt „Level und Tests“ nach `work`, CI.
   Weiterer Lesefehler → Texte liegen jetzt in `mag-zwischen/texts` (lauf2.sh 9d621c4).
+
+### 16.10 Stand 20:35 – Lesefehler verstanden, lokales Werkzeug zum Einlesen
+- Der Lesefehler „pad“ kam aus einer **Bibliothek** (controls_cpp erklärt Controls_DeviceInput; Game benutzt sie und hat die Variable `pad`). Fix **8874e79**
+  (work-zusammen, Konverter `main`: jede KERN_EXTERN-Erklärung einmal für das ganze Programm, `settled_extern`). c432166 (nur Teile) bleibt als Teil davon.
+- **`koordination/lesen.py`**: liest die Texte eines vollen Laufs (`mag-zwischen/texts`, seit lauf2.sh 9d621c4) lokal ins Level, in der Reihenfolge der Bibliotheken –
+  44 s statt eines Laufs. Mit der berichtigten Erklärung nimmt das Level alle 156 Texte des Laufs 195003 an: hinter diesem Lesefehler liegt auf diesem Stand kein weiterer.
+- Läuft: `work-zusammen-voll-203000-750` (8874e79). Erwartet: `convert rc=0` gegen 20:55, Spiel-Suite gegen 21:15 – die erste Bit-für-Bit-Suite seit dem 14.11.
+- Basislauf `work-voll-162644-5528` (90b5ab8): convert rc=1, suite rc=1, engine rc=1 (R129, vor dem Fix von d) – nur noch als Liste für 90b5ab8 brauchbar.
