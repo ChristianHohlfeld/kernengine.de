@@ -57,7 +57,10 @@ with: the Blueprint's whole number, as above.)
 A map is the list of its rows - structs of a key (`first`) and what it holds (`second`) -, a set
 the list of its keys, in the order the keys were put in (std::map and std::set: in the order of
 the keys). An iterator into a map, a set or a list is the place it stands at, a whole number; the
-end is the list's length. `auto [a, b] = value;` gives names to the parts of a value: where they
+end is the list's length; one that goes through a list from its end (rbegin() ... rend()) is the place
+it holds, as C++ defines it: the list's length at first, 0 at the end, the entry it names the one before
+that place. `it = v.erase(it)` takes the entry out and leaves the iterator where it stood; `a.swap(b)` of
+two lists hands each what the other held (three Takes and Sets, nothing copied). `auto [a, b] = value;` gives names to the parts of a value: where they
 stand, the part is written out.
 
 An object of the engine is a handle in a Blueprint (0: none). One a value holds as a field (a
@@ -138,6 +141,10 @@ KEYED = re.compile(r"std::(unordered_)?(multi)?(map|set)<")
 # kern::Map, kern::Set (kern/core/map.h): the language's Map and Set - values under keys, keys, in the order the keys came
 KEYED_KERN = re.compile(r"kern::(Map|Set)<")
 ITERATOR = re.compile(r"std::__detail::_Node_(?:const_)?iterator(?:_base)?<|std::_Rb_tree_(?:const_)?iterator<|__gnu_cxx::__normal_iterator<")
+# An iterator that goes through a list from its end (v.rbegin() ... v.rend()) holds, as C++ defines it, a place of
+# the list and names the entry before it: that place is what it is here - rbegin() the list's length, rend() 0,
+# a step forward one place down.
+REVERSE_ITERATOR = re.compile(r"std::reverse_iterator<__gnu_cxx::__normal_iterator<")
 UNSIGNED = {"unsigned char", "unsigned short", "unsigned int", "unsigned long", "unsigned long long"}
 # An unsigned 64-bit whole number is, in a Blueprint, the whole number its bits are read with a sign
 # (2^64 - 1 is -1): what C++ adds, subtracts and multiplies around 2^64 comes out the same, exactly,
@@ -1529,7 +1536,7 @@ class Unit:
             return "Vector"
         if t == "void":
             return None
-        if ITERATOR.match(t):
+        if ITERATOR.match(t) or REVERSE_ITERATOR.match(t):
             return "Int"
         if t == "std::_Bit_reference":
             return "Bool"   # (std::vector<bool>'s entry where it stands: in a List<Bool> a place like any other - see member_call, for_each)
@@ -4134,7 +4141,7 @@ class Emit:
                     text = self.made_list(said[0], self.types[v['id']]) if said else self.ex(init, self.types[v['id']])
                     out += self.take_pre() + [f"{name} = {text};"]
                     c = self.ctype(v)
-                    if ITERATOR.match(c):
+                    if ITERATOR.match(c) or REVERSE_ITERATOR.match(c):
                         self.note_home(v["id"], init)
                     elif c.startswith("std::pair<") and ITERATOR.match(template_args(c)[0]):
                         self.note_home(v["id"], init, of_pair=True)
@@ -4985,12 +4992,13 @@ class Emit:
         if k == "CXXOperatorCallExpr":
             name = callee_name(n)
             ops = kids(n)[1:]
-            if ops and self.is_iter(ops[0]) and name in ("operator++", "operator--", "operator+=", "operator-="):
+            if ops and (self.is_iter(ops[0]) or self.is_reverse_iter(ops[0])) and name in ("operator++", "operator--", "operator+=", "operator-="):
                 by = "1" if name[-1] != "=" else self.ex(ops[1], "Int")
-                if name == "operator++" and self.plain_variable(ops[0]):
+                back = self.is_reverse_iter(ops[0])   # (forward for it is down the list)
+                if name == "operator++" and self.plain_variable(ops[0]) and not back:
                     return [f"{self.lvalue(ops[0])} += 1;"]
-                return self.store(ops[0], lambda t: self.whole_math("+" if name in ("operator++", "operator+=") else "-", self.ex(ops[0], "Int"), by))
-            if ops and self.is_iter(ops[0]) and name == "operator=":
+                return self.store(ops[0], lambda t: self.whole_math("+" if (name in ("operator++", "operator+=")) != back else "-", self.ex(ops[0], "Int"), by))
+            if ops and (self.is_iter(ops[0]) or self.is_reverse_iter(ops[0])) and name == "operator=":
                 target = self.unwrap(ops[0])
                 if target.get("kind") == "DeclRefExpr":
                     self.note_home(target.get("referencedDecl", {}).get("id"), ops[1])
@@ -5825,6 +5833,10 @@ class Emit:
     def is_iter(self, n):
         return ITERATOR.match(self.ctype(n)) is not None
 
+    def is_reverse_iter(self, n):
+        """An iterator through a list from its end (REVERSE_ITERATOR): the place it holds, the entry before it."""
+        return REVERSE_ITERATOR.match(self.ctype(n)) is not None
+
     def rows(self, n):
         """(the map's or set's type, its type's settings - "K, V" or "K" -, a key's type, a value's - None in a set)."""
         lt = self.tp(n)
@@ -5912,7 +5924,8 @@ class Emit:
     def iter_node(self, n):
         """An iterator's expression without what only converts it (an iterator made a const_iterator)."""
         b = self.unwrap(n)
-        while b.get("kind") in ("CXXConstructExpr", "CXXFunctionalCastExpr", "CXXStaticCastExpr") and len(kids(b)) == 1 and self.is_iter(kids(b)[0]):
+        while (b.get("kind") in ("CXXConstructExpr", "CXXFunctionalCastExpr", "CXXStaticCastExpr") and len(kids(b)) == 1
+               and (self.is_iter(kids(b)[0]) if not self.is_reverse_iter(b) else self.is_reverse_iter(kids(b)[0]))):
             b = self.unwrap(kids(b)[0])
         return b
 
@@ -5924,6 +5937,10 @@ class Emit:
             if self.keyed(home):   # (an entry of a map or a set: its key and value - keyed_entry)
                 return {"kind": "_Entry", "_keyed": (home, kids(b)[1]), "type": {"qualType": "int"}, "_bt": "Entry"}
             return self.entry(home, kids(b)[1], self.tp(home)[5:-1])
+        if b.get("kind") == "CXXOperatorCallExpr" and not b.get("_op") and callee_name(b) in ("operator->", "operator*") and len(kids(b)) == 2 and self.is_reverse_iter(kids(b)[1]):
+            # (through a list from its end: the entry before the place the iterator holds)
+            home = self.home(kids(b)[1])
+            return self.entry(home, self.whole_math("-", self.ex(kids(b)[1], "Int"), "1"), self.tp(home)[5:-1])
         return None
 
     def home(self, n):
@@ -5939,6 +5956,8 @@ class Emit:
             m = callee(b)
             base = kids(m)[0] if kids(m) else None
             if base is not None and not self.is_this(base) and m.get("name") in ("begin", "cbegin", "end", "cend", "find", "erase", "insert", "lower_bound", "upper_bound") and (self.tp_or_none(base) or "").startswith(("List<", "Map<", "Set<")):
+                return base
+            if base is not None and not self.is_this(base) and m.get("name") in ("rbegin", "crbegin", "rend", "crend") and (self.tp_or_none(base) or "").startswith("List<"):
                 return base
         if k == "MemberExpr" and b.get("name") == "first" and kids(b):   # (what insert() and emplace() give: the place and whether the key was new)
             x = self.unwrap(kids(b)[0])
@@ -6322,6 +6341,14 @@ class Emit:
                 f"  list_resize({lv}, {self.whole_math('+', kept, '1')}, {self.u.zero(it)});",
                 "}"]
 
+    def entry_removed(self, base, lv, at):
+        """v.erase(place): the entry at that place goes, the ones after it move down."""
+        h = self.entry_life(self.ctype(base))
+        if h is not None:   # (the entry taken out ends)
+            held = self.temp("at", "Int")
+            return [f"{held} = {at};", *self.ended_entry(h, f"{lv}[{held}]"), f"list_remove_at({lv}, {held});"]
+        return [f"list_remove_at({lv}, {at});"]
+
     def list_step(self, name, base, lv, it, args):
         """A call that changes a list (erase, insert, resize, assign) as the steps the language has."""
         length = f"kern::to<Float>(list_length<{it}>({lv}))"
@@ -6329,11 +6356,7 @@ class Emit:
             lst, at = self.place(args[0])
             if not self.same_list(lst, base):
                 raise Wait("list: erase() at a place of another list")
-            h = self.entry_life(self.ctype(base))
-            if h is not None:   # (the entry taken out ends: the ones after it move down)
-                held = self.temp("at", "Int")
-                return [f"{held} = {at};", *self.ended_entry(h, f"{lv}[{held}]"), f"list_remove_at({lv}, {held});"]
-            return [f"list_remove_at({lv}, {at});"]
+            return self.entry_removed(base, lv, at)
         if name == "erase" and len(args) == 2:
             inner = self.unwrap(args[0])
             while inner.get("kind") in ("CXXConstructExpr",) and len(kids(inner)) == 1:
@@ -6409,7 +6432,25 @@ class Emit:
             # the loop C++ runs, nothing asked for
             fill, last = self.temp("fill", it), self.temp("last", "Int")
             return [f"{fill} = {self.ex(args[0], it)};", f"{last} = {self.whole_math('-', f'list_length<{it}>({lv})', '1')};"] + self.count_loop("0", last, lambda i: [f"{lv}[{i}] = {fill};"])
+        if name == "swap" and len(args) == 1 and self.tp_or_none(args[0]) == f"List<{it}>":
+            return self.swapped_lists(lv, args[0], f"List<{it}>")
         raise Wait(f"list: {name}()")
+
+    def swapped_lists(self, lv, other, lt):
+        """a.swap(b) of two lists: each holds what the other held, and nothing is copied or asked for - as C++
+        exchanges what the two hold. Three steps that hand a list on: a Take at each place, and a Set of each
+        with what the other gave (the first through a variable of the function, read once)."""
+        got = self.spot(other)
+        if got is None or got[1] != lt or not self.writable(got[0]):
+            raise Wait("list: swap() with what is no place")
+        if re.sub(r"\s+", "", got[0]) == re.sub(r"\s+", "", lv):
+            return []   # (a list swapped with itself stays)
+        first, second = self.u.next_node, self.u.next_node + 1
+        self.u.next_node += 2
+        for node in (first, second):
+            self.u.members.append(f"  struct {{ {lt} value = {self.u.zero(lt)}; }} n{node};")
+        held = self.temp("swapped", lt)
+        return [f"var_take(n{first}, {lv});", f"{held} = n{first}.value;", f"var_take(n{second}, {got[0]});", f"{lv} = n{second}.value;", f"{got[0]} = {held};"]
 
     # ---- algorithms over a range of a list (<algorithm>): a loop over its places ----
     def range_of(self, name, first, last):
@@ -8376,6 +8417,28 @@ class Emit:
             return self.value(self.held_by(b))
         if ops and not b.get("_op") and name in ("operator->", "operator*") and len(ops) == 1 and self.u.object_of(qtype(ops[0])):
             return self.ex(ops[0], "Int"), "Int"   # (an owned object of the engine: its handle)
+        if ops and not b.get("_op") and self.is_reverse_iter(ops[0]):
+            # an iterator through a list from its end is the place it holds (REVERSE_ITERATOR): later for it is
+            # a lower place
+            if name in ("operator*", "operator->") and len(ops) == 1:
+                return self.value(self.entry_of(b))
+            if name in ("operator==", "operator!=") and len(ops) == 2:
+                same = f'math_compare<"==">({self.cast("Float", self.ex(ops[0], "Int"))}, {self.cast("Float", self.ex(ops[1], "Int"))})'
+                return (same if name == "operator==" else f"logic_not({same})"), "Bool"
+            if name in ("operator<", "operator>", "operator<=", "operator>=") and len(ops) == 2:
+                return f'math_compare<"{name[8:]}">({self.cast("Float", self.ex(ops[1], "Int"))}, {self.cast("Float", self.ex(ops[0], "Int"))})', "Bool"
+            if name in ("operator+", "operator-") and len(ops) == 2:
+                if self.is_reverse_iter(ops[1]):   # (how far one is behind the other)
+                    return self.whole_math("-", self.ex(ops[1], "Int"), self.ex(ops[0], "Int")), "Int"
+                return self.whole_math("-" if name[-1] == "+" else "+", self.ex(ops[0], "Int"), self.ex(ops[1], "Int")), "Int"
+            if name in ("operator++", "operator--"):
+                var = self.stepped_place(ops[0])
+                if len(ops) == 2:   # (it++: what it was before)
+                    old = self.temp("was", "Int")
+                    self.hoist([f"{old} = {var};"] + self.effect(b))
+                    return old, "Int"
+                self.hoist(self.effect(b))
+                return var, "Int"
         if ops and not b.get("_op") and self.is_iter(ops[0]):
             # an iterator is the place it stands at
             if name in ("operator*", "operator->") and len(ops) == 1:
@@ -8749,6 +8812,9 @@ class Emit:
         if bt.startswith("List<") and name in ("begin", "cbegin", "end", "cend") and not a and self.is_iter(b):
             # an iterator is the place it stands at: the first entry's is 0, the end the list's length
             return ("0" if "begin" in name else f"list_length<{bt[5:-1]}>({self.ex(base, bt)})"), "Int"
+        if bt.startswith("List<") and name in ("rbegin", "crbegin", "rend", "crend") and not a and self.is_reverse_iter(b):
+            # through the list from its end: it begins holding the place behind the last entry and ends holding the first
+            return (f"list_length<{bt[5:-1]}>({self.ex(base, bt)})" if "begin" in name else "0"), "Int"
         if bt.startswith(("Map<", "Set<")):
             got = self.keyed_call(b, base, name, a)
             if got is not None:
@@ -8772,6 +8838,17 @@ class Emit:
                 return f"list_get<{it}>({lst}, 0)", it
             if name == "back" and not a:
                 return f"list_get<{it}>({lst}, kern::to<Int>(kern::formula([](Float n) -> Float {{ return n - 1.0; }}, kern::to<Float>(list_length<{it}>({lst})))))", it
+            if name == "erase" and len(a) == 1 and self.is_iter(b):
+                # `it = v.erase(it)`: the entry goes, and what erase gives is the place it stood at - where the
+                # entry after it stands now (an iterator is the place it stands at). The place is held before
+                # the entry goes; the step is the one of the statement `v.erase(it);`.
+                at_list, at = self.place(a[0])
+                if not self.same_list(at_list, base):
+                    raise Wait("list: erase() at a place of another list")
+                before, lv, after = self.variable_of(base, bt)
+                held = self.temp("at", "Int")
+                self.hoist(before + [f"{held} = {at};"] + self.entry_removed(base, lv, held) + after)
+                return held, "Int"
             raise Wait(f"list: {name}()")
         if bt == "Text":
             got = self.text_member(b, base, name, a)
