@@ -43,8 +43,10 @@ in the notation, function by function:
     neither rewrites nor drops such a Blueprint (a run over the whole program drops, of its own folder,
     what it does not write any more). The program's C++ calls it as its class: --classes names the
     header the build writes their classes into (tools/blueprint_cpp, the same tool, from the same
-    level) and their folder - it is written from the level before the sources are read, as the build
-    writes it;
+    level) and their folder (default: level_blueprints.h=Program, as build.sh writes it). Where the
+    level has Blueprints in that folder, the run writes the header from the level into a folder of its
+    own before it reads the sources, and that folder comes first on the include path; a test includes it
+    by its name (TestWriter: a header that is not in the sources' folder is the build's);
 
 How the Blueprint computes is the Blueprint language's own arithmetic: numbers are 64-bit and
 whole numbers exact, a division by zero gives 0, a vector's components are 32-bit. It is the same
@@ -1172,6 +1174,9 @@ def is_nothing(n):
     return b.get("kind") in ("CXXNullPtrLiteralExpr", "GNUNullExpr") or re.sub(r"^const\s+", "", (b.get("type") or {}).get("qualType", "")) in ("std::nullopt_t", "std::nullptr_t", "nullptr_t")
 
 
+# The header of the Blueprints the program calls as their classes, and their folder in the level, as the build
+# writes it (build.sh: tools/blueprint_cpp.sh <level> <out.cpp> <out.h> <folder>; --classes says other ones).
+CLASSES = ["level_blueprints.h", "Program"]
 SHAPES = "shapes"   # the library of the types the converter makes of the notation's own (a row of a list of lists, a pair)
 
 
@@ -11540,6 +11545,8 @@ class TestWriter:
                     system.append(f"#include <{m.group(2)}>")
             elif m.group(2).startswith("kern/"):
                 own.append(f'#include "{m.group(2)}"')
+            elif m.group(2) == os.path.basename(CLASSES[0]):
+                own.append(f'#include "{m.group(2)}"')   # (the build's header of the Blueprints' classes: by its name, on the include path)
             else:
                 own.append(f'#include "{self.source_dir}/{m.group(2)}"')
         # of the file's own `using` lines only those of the standard library: the program's names are the test's own here
@@ -12287,7 +12294,8 @@ def main(argv):
     mode, namespace = argv[1], argv[2]
     cut = argv.index("--")
     opts, files = argv[3:cut], argv[cut + 1:]
-    level = folder = test = texts = classes = None
+    level = folder = test = texts = None
+    classes = tuple(CLASSES)
     flags, more = [], []
     i = 0
     while i < len(opts):
@@ -12317,18 +12325,25 @@ def main(argv):
     # (a run over the whole program: what it does not write any more goes - of its own folder; a Blueprint of
     # another folder is a source of its own, and the run leaves it as it is)
     whole = len(files) > 20
-    if classes:
+    CLASSES[:] = classes   # (the tests include the header by its name: TestWriter)
+    if classes[1] == folder:
+        raise SystemExit(f"--classes {classes[0]}={classes[1]}: that is the folder this run writes - the Blueprints the program calls as their classes stand in another")
+    if level and any(a.get("folder") == classes[1] for a in json.load(open(level, encoding="utf-8")).get("actors", [])):
         # The Blueprints the program calls as their classes: their header, as the build writes it (from the level,
-        # by tools/blueprint_cpp) - the sources that call them include it, and the compiler reads them with it.
-        if not level:
-            raise SystemExit("--classes needs the level (--level): the header is written from it")
-        if classes[1] == folder:
-            raise SystemExit(f"--classes {classes[0]}={classes[1]}: that is the folder this run writes - the Blueprints the program calls as their classes stand in another")
-        scratch = tempfile.mkdtemp(prefix="kern-cpp-to-blueprint-classes-", dir=os.environ.get("TMPDIR") or None)
-        r = subprocess.run([os.path.join(ROOT, "tools", "blueprint_cpp.sh"), level, os.path.join(scratch, "classes.cpp"), classes[0], classes[1]], capture_output=True, text=True)
-        shutil.rmtree(scratch, ignore_errors=True)
+        # by tools/blueprint_cpp) - the sources that call them include it, and the compiler reads them with it. It
+        # is written for this run, into a folder of its own that comes first on the include path (nothing is kept
+        # between runs). One the build left in a folder of the sources is found before it (#include "..." looks
+        # beside the file first): it has to be the same.
+        made = tempfile.mkdtemp(prefix="kern-cpp-to-blueprint-classes-", dir=os.environ.get("TMPDIR") or None)
+        header = os.path.join(made, os.path.basename(classes[0]))
+        r = subprocess.run([os.path.join(ROOT, "tools", "blueprint_cpp.sh"), level, os.path.join(made, "classes.cpp"), header, classes[1]], capture_output=True, text=True)
         if r.returncode != 0:
             raise SystemExit(f"the header {classes[0]} of the Blueprints the program calls as their classes is not to be had (tools/blueprint_cpp.sh): " + (r.stderr or r.stdout).strip()[:2000])
+        for d in sorted({os.path.dirname(os.path.abspath(f)) for f in files}):
+            left = os.path.join(d, os.path.basename(classes[0]))
+            if os.path.exists(left) and open(left, encoding="utf-8").read() != open(header, encoding="utf-8").read():
+                raise SystemExit(f"{left} was written from another state of the level than {level} (the build writes it again)")
+        flags.insert(0, "-I" + made)
     workers = max(1, min(len(files), int(os.environ.get("KERN_JOBS") or os.cpu_count() or 1)))
     import concurrent.futures
     # the names of the engine's nodes: the engine's own tool says them
