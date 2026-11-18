@@ -528,7 +528,7 @@ class Game {
   void traffic_far_switch();
   void traffic_far_step(TrafficCar& c, std::size_t i, f32 h);
   void traffic_make_far(TrafficCar& c);
-  bool traffic_make_near(TrafficCar& c, std::size_t i);
+  bool traffic_make_near(std::size_t i);
   void traffic_solid(TrafficCar& c);
   /// Where a car stands at rest on the ground at (x, y) heading `yaw`: every wheel on the ground at
   /// its ride height - the chassis pitched and rolled with the ground under its wheels.
