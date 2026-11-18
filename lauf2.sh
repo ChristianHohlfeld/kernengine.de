@@ -57,7 +57,7 @@ run_job() {  # name
     konvert)   # konvert <git-ref> <kerne>: nur die Konvertierung des ganzen Spiels, mit genau so vielen Kernen
       export KERN_JOBS="${rest%% *}"; echo "kerne: $KERN_JOBS" >> mag-log/when
       ( cd kern/games/spawncity && rm -rf tests/converted && time FUNCTIONS=1 $conv --level level/spawncity.klevel --test tests/converted -- \
-          $(ls kern/games/spawncity/src/*.cpp | sed 's|kern/games/spawncity/||' | grep -v "level_data.cpp\|level_blueprints.cpp\|main.cpp") ) > mag-log/convert.log 2>&1
+          $(ls src/*.cpp | grep -v "level_data.cpp\|level_blueprints.cpp\|main.cpp") ) > mag-log/convert.log 2>&1
       echo "convert rc=$? $(date '+%T')" >> mag-log/when
       git add kern/games/spawncity/level/spawncity.klevel kern/games/spawncity/tests/converted
       $G commit -q -m "mag: $name auf $SHA – Level und Tests der Blueprints ($KERN_JOBS Kerne)" || true ;;
