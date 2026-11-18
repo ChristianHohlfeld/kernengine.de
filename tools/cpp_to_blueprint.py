@@ -4300,6 +4300,8 @@ class Emit:
     def cast(t, text):
         """`kern::to<T>(text)`: a conversion - of a conversion with the value in between (Value Int, Value
         Float: one conversion is one pin's)."""
+        if t == "Float" and re.fullmatch(r"-?\d+", text):   # (a whole number written out: the Float itself)
+            return flit(float(text))
         m = re.match(r"kern::to<(Float|Int|Bool)>\(", text)
         if m:
             depth = 0
@@ -4554,7 +4556,7 @@ class Emit:
             if op == "-":
                 return self.whole_math("-", ax, ay), "Int"
             if op in COMPARE:
-                return f'math_compare<"{op}">({self.cast("Float", ax)}, {self.cast("Float", ay)})', "Bool"
+                return f'math_compare<"{op}">({self.conv(ax, "Int", "Float")}, {self.conv(ay, "Int", "Float")})', "Bool"
             return None
         if k == "BinaryOperator" and b.get("opcode") in ("+", "-") and self.is_c_text(b):
             text, at = self.c_text(b)
