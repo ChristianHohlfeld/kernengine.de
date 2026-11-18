@@ -1043,9 +1043,7 @@ std::string Game::minimap_json() {
   if (!world_placed_) return "{}";
   const Vec3 me = focus_position();
   const f32 range = 420;  // the expanded map shows up to 380 m from the subject
-  // (a feature names its outline where it stands: its tile, and its place in the tile's roads (not
-  // poly), buildings ('b') or areas)
-  struct Feat { char kind; bool poly; u64 tile; u32 index; f32 d; };
+  struct Feat { char kind; bool poly; const std::vector<Vec2>* pts; f32 d; };
   std::vector<Feat> feats;
   std::vector<u64> tiles;
   city_.ready_tiles(tiles);
@@ -1061,23 +1059,19 @@ std::string Game::minimap_json() {
   };
   for (u64 tile : tiles) {
     const MapFeatures& f = city_.features(tile);
-    for (std::size_t i = 0; i < f.roads.size(); ++i) {
-      const MapFeatures::Road& r = f.roads[i];
-      if (r.points.size() >= 2) feats.push_back({road_is_water(r.cls) ? 'w' : 'r', false, tile, static_cast<u32>(i), dist(r.points)});
-    }
-    for (std::size_t i = 0; i < f.areas.size(); ++i) {
-      const MapFeatures::Area& a = f.areas[i];
+    for (const auto& r : f.roads)
+      if (r.points.size() >= 2) feats.push_back({road_is_water(r.cls) ? 'w' : 'r', false, &r.points, dist(r.points)});
+    for (const auto& a : f.areas) {
       if (a.rings.empty() || a.rings[0].size() < 3) continue;
       const char k = a.kind == AreaKind::water ? 'w' : (a.kind == AreaKind::sand ? 0 : 'g');
-      if (k) feats.push_back({k, true, tile, static_cast<u32>(i), dist(a.rings[0])});
+      if (k) feats.push_back({k, true, &a.rings[0], dist(a.rings[0])});
     }
     // buildings: a house is under 300 m across - one far corner rules it out before the outline
-    for (std::size_t i = 0; i < f.buildings.size(); ++i) {
-      const MapFeatures::Building& b = f.buildings[i];
+    for (const auto& b : f.buildings) {
       if (b.rings.empty() || b.rings[0].size() < 3) continue;
       const Vec2 q = b.rings[0][0];
       if (std::fabs(q.x - me.x) > range + 300 || std::fabs(q.y - me.y) > range + 300) continue;
-      feats.push_back({'b', true, tile, static_cast<u32>(i), dist(b.rings[0])});
+      feats.push_back({'b', true, &b.rings[0], dist(b.rings[0])});
     }
   }
   std::erase_if(feats, [&](const Feat& f) { return f.d > range; });
@@ -1099,22 +1093,16 @@ std::string Game::minimap_json() {
   std::snprintf(b, sizeof b, "{\"me\":[%.1f,%.1f,%.1f],\"bearing\":%.2f,\"look\":%.2f,\"mode\":\"%s\",\"f\":[", me.x, me.y, me.z - city_.ground_height(me.x, me.y),
                 compass(fwd.x, fwd.y), compass(look.x, look.y), mode_name(mode_));
   o += b;
-  // every path thinned to <= 28 points
-  auto put = [&](const std::vector<Vec2>& p) {
+  for (std::size_t i = 0; i < feats.size(); ++i) {
+    const Feat& f = feats[i];
+    const std::vector<Vec2>& p = *f.pts;
     const std::size_t step = std::max<std::size_t>(1, (p.size() + 27) / 28);
+    std::snprintf(b, sizeof b, "%s[\"%c%s\"", i ? "," : "", f.kind, f.poly ? "p" : "");
+    o += b;
     for (std::size_t k = 0; k < p.size(); k += step) {
       std::snprintf(b, sizeof b, ",%.1f,%.1f", p[k].x - me.x, p[k].y - me.y);
       o += b;
     }
-  };
-  for (std::size_t i = 0; i < feats.size(); ++i) {
-    const Feat& f = feats[i];
-    std::snprintf(b, sizeof b, "%s[\"%c%s\"", i ? "," : "", f.kind, f.poly ? "p" : "");
-    o += b;
-    const MapFeatures& fs = city_.features(f.tile);
-    if (!f.poly) put(fs.roads[f.index].points);
-    else if (f.kind == 'b') put(fs.buildings[f.index].rings[0]);
-    else put(fs.areas[f.index].rings[0]);
     o += "]";
   }
   return o + "]}";
