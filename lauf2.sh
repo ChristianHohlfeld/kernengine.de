@@ -198,8 +198,24 @@ einzeln() {
   mkdir -p "$W/tmp/einzeln" "$W/tmp/einzeln-real"
   ( cd kern/games/spawncity/tests/converted && ls test_*.cpp | sed 's/^test_/converted_/; s/\.cpp$//' ) > "$W/tmp/namen.txt"
   export T="$SC_TEST_OUT/spawncity_tests" E="$W/tmp"
+  # (lauf.sh <name>: ein Test in seinem eigenen Lauf, gegen den Stellvertreter und gegen die Engine selbst, je höchstens 20 Minuten. Die Ausgabe geht über ein
+  # Terminal (script): so schreibt das Programm zeilenweise - endet es hart (LeakSanitizer endet mit _exit; ein Abbruch), fehlt am Ende nichts. Ohne das ging
+  # bei jedem solchen Ende der letzte Puffer verloren: die FAIL-Zeile, die Summenzeile, Abweichungen.)
+  cat > "$W/tmp/lauf.sh" <<'LAUF'
+n="$1"
+one() {  # one <ordner> [SC_ENGINE=real]
+  local rc
+  if command -v script > /dev/null 2>&1; then
+    env $2 script -qec "timeout -k 10 ${HANG:-1200} '$T' '$n'" /dev/null < /dev/null 2>&1 | tr -d '\r' > "$E/$1/$n.txt"; rc=${PIPESTATUS[0]}
+  else
+    env $2 timeout -k 10 "${HANG:-1200}" "$T" "$n" > "$E/$1/$n.txt" 2>&1; rc=$?
+  fi
+  echo "$n rc=$rc" >> "$E/$1.rc"
+}
+one einzeln ""; one einzeln-real SC_ENGINE=real
+LAUF
   # (der Filter des Programms ist ein Teil des Namens: "converted_car" trifft auch converted_car_cpp - der läuft dann zweimal, das Ergebnis ist dasselbe)
-  xargs -P "$KERN_JOBS" -I{} bash -c 'timeout -k 10 1200 "$T" "{}" > "$E/einzeln/{}.txt" 2>&1; echo "{} rc=$?" >> "$E/einzeln.rc"; SC_ENGINE=real timeout -k 10 1200 "$T" "{}" > "$E/einzeln-real/{}.txt" 2>&1; echo "{} rc=$?" >> "$E/einzeln-real.rc"' < "$W/tmp/namen.txt"
+  xargs -P "$KERN_JOBS" -I{} bash "$W/tmp/lauf.sh" {} < "$W/tmp/namen.txt"
   local m o n rc bad=0
   for m in einzeln einzeln-real; do
     o=mag-log/alle.txt; [ "$m" = einzeln-real ] && o=mag-log/alle-real.txt
@@ -208,11 +224,15 @@ einzeln() {
     sort "$W/tmp/$m.rc" | while read -r n rc; do
       case "$rc" in
         rc=124|rc=137) echo "ZEIT $n: läuft länger als 20 Minuten" >> "$W/tmp/$m.ab" ;;
-        *) grep -qE '[0-9]+ tests?, [0-9]+ checks?' "$W/tmp/$m/$n.txt" || echo "ABBRUCH $n ($rc): $(grep -hE 'ERROR: AddressSanitizer|runtime error|Assertion|terminate|Segmentation|SUMMARY' "$W/tmp/$m/$n.txt" | head -2 | tr '\n' ' ' | cut -c1-260)" >> "$W/tmp/$m.ab" ;;
+        *) if ! grep -qE '[0-9]+ tests?, [0-9]+ checks?' "$W/tmp/$m/$n.txt"; then
+             echo "ABBRUCH $n ($rc): $(grep -hE 'ERROR: AddressSanitizer|runtime error|Assertion|terminate|Segmentation|SUMMARY' "$W/tmp/$m/$n.txt" | head -2 | tr '\n' ' ' | cut -c1-260)" >> "$W/tmp/$m.ab"
+           elif grep -q 'ERROR: LeakSanitizer' "$W/tmp/$m/$n.txt"; then   # (zu Ende gelaufen, aber Speicher blieb liegen: der Lauf endet mit 1, die Suite wäre rot)
+             echo "LECK $n: $(grep -h 'SUMMARY' "$W/tmp/$m/$n.txt" | head -1 | cut -c1-160)" >> "$W/tmp/$m.ab"
+           fi ;;
       esac
     done
     { grep -hE '^(ok|FAIL) ' "$W/tmp/$m"/*.txt | sort -u; cat "$W/tmp/$m.ab"
-      echo "--- $(grep -hE '^ok ' "$W/tmp/$m"/*.txt | sort -u | wc -l) ok, $(grep -hE '^FAIL ' "$W/tmp/$m"/*.txt | sort -u | wc -l) FAIL, $(grep -c '^ABBRUCH' "$W/tmp/$m.ab") ABBRUCH, $(grep -c '^ZEIT' "$W/tmp/$m.ab") ZEIT, von $(wc -l < "$W/tmp/namen.txt") Tests; cost: $(grep -hE '^  cost:' "$W/tmp/$m"/*.txt | sort -u | wc -l), note: $(grep -hE '^  note:' "$W/tmp/$m"/*.txt | sort -u | wc -l)"
+      echo "--- $(grep -hE '^ok ' "$W/tmp/$m"/*.txt | sort -u | wc -l) ok, $(grep -hE '^FAIL ' "$W/tmp/$m"/*.txt | sort -u | wc -l) FAIL, $(grep -c '^ABBRUCH' "$W/tmp/$m.ab") ABBRUCH, $(grep -c '^LECK' "$W/tmp/$m.ab") LECK, $(grep -c '^ZEIT' "$W/tmp/$m.ab") ZEIT, von $(wc -l < "$W/tmp/namen.txt") Tests; cost: $(grep -hE '^  cost:' "$W/tmp/$m"/*.txt | sort -u | wc -l), note: $(grep -hE '^  note:' "$W/tmp/$m"/*.txt | sort -u | wc -l)"
     } > "$o"
     grep -hE 'check failed|calls differ' "$W/tmp/$m"/*.txt | sed -E 's#^.*converted\.h:[0-9]+: ##' | sort -u > "${o%.txt}-abweichungen.txt"
     grep -hE '^  cost:' "$W/tmp/$m"/*.txt | sort -u > "${o%.txt}-cost.txt"
