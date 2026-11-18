@@ -11661,7 +11661,9 @@ class TestWriter:
                 return
             other = G.foreign[same]
             far, near = (other, piece) if other["reach"] >= piece["reach"] else (piece, other)
-            merged = {**far, **{k: [*far.get(k, ()), *(x for x in near.get(k, ()) if x not in far.get(k, ()))] for k in ("names", "pairs", "actors")}}   # (what both name of it)
+            # (what both name of it, in one order: the test hands the piece on as it took it, and the tests that take
+            # it from each other must come to the same piece - whichever of them had which first)
+            merged = {**far, **{k: sorted({repr(x): x for x in [*far.get(k, ()), *near.get(k, ())]}.values(), key=repr) for k in ("names", "pairs", "actors")}}
             if far is other:
                 G.foreign[same] = merged
             else:
