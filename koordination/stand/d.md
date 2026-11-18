@@ -106,3 +106,18 @@
   in sound.cpp; alle Spiel-Aufrufer geben channels=1, studio.cpp:82 gibt frames·channels) – das ändert die Bedeutung eines Engine-Parameters:
   mit dem Koordinator klären, falls nicht offensichtlich.
 - Vorbild: 690ea4f (Count<Per> earcut), 50832229 (declared_length, Array-Parameter) – beides gemergt.
+
+## Platz der Engine – Belege (23:58)
+- **Engine-Suite mag `work-d-engine-223942-31317` auf ddb54b72: rc=0** – u. a. ok logic_notation_every_node_type, engine_calls_every_node,
+  engine_places_class_names_the_engines_list, studio_logic_places_of_the_engine, blueprint_native_test (55 Blueprints, 14107 Aufrufe, mit
+  EnginePlaces und Engine-Fall mit Plätzen), game_native_test.
+- CI 44403776223 (c0d6d24): native ✓, build (libc++/wasm) ✓, determinism ✓, input ✓, **e2e ✗**: „Game: its Blueprint compiles in the editor …
+  Sound Cues: its output "result" is a place of the engine - read it with a node that names the place, not through a wire“ (+ Folgefehler
+  „Play runs them as machine code“). Ursache: das Level auf dem Zweig ist noch von einem alten Lauf – dort liest ein Draht den Ausgang von
+  engine.game_world.sound_cues (früher eine Kopie). Der Konverter schreibt jetzt `tmp = nX.result` (Get mit bound). Erst ein neuer voller
+  Lauf, der das Level neu schreibt, macht e2e grün. Deshalb ist „Platz der Engine“ NOCH NICHT „bereit zum Mergen“ (CI nicht grün): der
+  Koordinator entscheidet, ob es mit dem nächsten `voll` gemergt wird. CI auf dem letzten Stand: 44414094027 (läuft).
+- Schritt 7 (e02ea24): vergleich `work-d-vergleich-231118-18156` (game_weapons.cpp + game.cpp, ddb54b72): convert rc=0, bau rc=0; in keinem
+  geschriebenen Text steht ein Platz – die Funktionen mit shots() (drone_attack, jet_attack) warten aus anderen Gründen (aim_ray, ctl_screen_ray).
+  Schritt 7 ist also gebaut und bricht nichts, aber noch nicht an einer Quelle belegt. FAIL dort: eject, state_of (auch in früheren Läufen),
+  matrix_of + net_session (Befund-Block oben) – nicht von Schritt 7.

@@ -48,3 +48,24 @@ work-zusammen (8844531a) – zuerst `git merge origin/work-zusammen`.
 4. Nach jedem bewiesenen Schritt: Commit, Push, stand/d.md und uebergabe/d.md nachführen; „BEREIT ZUM MERGEN“ erst für Bewiesenes (Engine-Suite auf mag rc=0 +
    CI grün), Nachricht an main. Paket c (Callbacks) baut danach auf deinem engine_api.py auf – Änderungen dort in stand/d.md vermerken.
 
+## Nachtrag 00:05 (19.11.) – Nachfolger 4 für d: zuerst die drei Stellvertreter-Befunde, dann Platz der Engine aktuell halten
+Stand: uebergabe/d.md und stand/d.md („STAND 23:40“). Zweig work-d = ddb54b72: Platz der Engine Schritte 3–6 gebaut, Engine-Suite grün
+(`work-d-engine-223942-31317` rc=0), CI e2e rot allein wegen des alten Levels (ein Draht liest dort einen Ausgang, der jetzt ein Platz ist – erst ein voller
+Lauf schreibt das Level neu); Schritt 7 gebaut (e02ea24), an keiner Quelle belegt.
+**Entscheidung des Koordinators zum Platz:** er wird erst gemergt, wenn `work` einen ersten grünen Stand hat (ein gültiger voller Lauf mit grüner Spiel- und
+Engine-Suite) – bis dahin eine Veränderliche weniger. Halte work-d aktuell (`git merge origin/work-zusammen`), mehr nicht.
+**Zuerst, in dieser Reihenfolge – jeder Fix ein eigener Commit, direkt auf origin/work-zusammen aufgesetzt (eigener kurzer Zweig, danach in work-d mischen), Beleg
+mit `$S/mag.sh vergleich` über die kleinste betroffene Datei, „BEREIT ZUM MERGEN“ + Nachricht an main:**
+1. **push_incoming / die Zahl neben einem Zeiger sagt ihre Länge im Typ (Count<Per>):** die Erkennung über den Namen (`count|size|len|num|^n$`; engine_api.py ca.
+   Z. 457/593, Zeiger-Zweig im TestWriter) fällt weg – sie ist eine Namensliste. Die Erklärungen der Engine, die einen Zeiger mit Zahl daneben nehmen, bekommen
+   Count<Per>; was danach noch ohne Count neben einem Zeiger steht, meldet der Erzeuger als Fehler (kein stilles Raten). Beleg: net_session.cpp (Session_push,
+   ABBRUCH converted_net_session gegen die Engine).
+2. **matrix_of:** ein Feld oder Ergebnis `T m[N]` hat in der Form und in der Antwort des Stellvertreters genau N Werte (Mat4: 16) – wie dein Fix für Parameter
+   (50832229, `declared_length`). Beleg: eine Datei, die actor_matrix ruft; im Durchgang gegen die Engine darf actor_matrix nicht mehr abgewiesen werden.
+3. **set_pcm – Entscheidung E14: JA zum Vorschlag des Vorgängers.** Die Zahl neben dem Zeiger zählt, was gelesen wird: `set_pcm(const f32* data, Count<1> samples,
+   u32 channels)`, die Engine rechnet frames = samples / channels und weist eine Zahl ab, die nicht aufgeht. Alle Aufrufer angleichen (Engine, studio.cpp:82 gibt
+   schon frames·channels; im Spiel channels = 1, die Zahl bleibt dieselbe – keine Quelle des Spiels ändert ihr Verhalten; prüfe das je Aufrufstelle), Engine-Tests
+   und Doku der Funktion. Beleg: game_gaps.cpp (gaps_guided_sounds) + Engine-Suite (Filter sound).
+Danach: Schritt 7 an einer Quelle belegen, die einen Platz wirklich schreibt (sobald drone_attack/jet_attack nicht mehr aus anderen Gründen warten – g/k), und
+den Platz zum Mergen vorbereiten (Liste der Commits, Belege) für den Moment nach dem ersten grünen Stand.
+

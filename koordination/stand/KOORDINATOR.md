@@ -1,4 +1,8 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 00:05 **d (Nachfolger 3) ist beendet.** Platz der Engine: Schritte 3–6 gebaut, Engine-Suite grün (`work-d-engine-223942-31317` rc=0), CI e2e rot allein wegen des
+  alten Levels; Schritt 7 gebaut, unbelegt. **Entscheidung:** der Platz wird erst nach dem ersten grünen Stand in `work` gemergt. **Entscheidung E14 (set_pcm):**
+  die Zahl neben dem Zeiger zählt die Samples (`Count<1> samples`), die Engine rechnet frames = samples / channels. Nachfolger 4 gestartet: zuerst die drei
+  Stellvertreter-Befunde (Count im Typ statt Namensregel; `T m[N]` in Antwort/Form; set_pcm) – PAKET3_d.md, Nachtrag 00:05.
 - 00:00 **work-zusammen = e4aa2e8d** (+ g c4d4544b: eine Schleife, deren Grenze die Engine fragt, ist keine Zählschleife – Beleg `work-g1-vergleich-232903-26675`;
   + k c32f607b: der Ablauf nennt, was im Kreis geht). **k ist beendet** (Lauf zu Ende; offen bei k: 12e3da24 zurück nach ps Fix, 90ecf01f zurück nach clang,
   Liste seiner Dateien – Nachfolger, sobald ein gültiger Lauf eine Liste gibt). **g übernimmt das Pendeln ganz** (Ursache combat_hud/g_fun + der Ablauf darf nicht pendeln).

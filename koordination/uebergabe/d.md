@@ -199,6 +199,15 @@ Arbeitsweise (Nachtrag 17:10 in PAKET_COMMON3.md): Stand nach $S/stand/d.md, Nac
 - Nächstes: Ergebnis des vergleich lesen (ob die Funktionen mit shots() jetzt „written“ und in beiden Durchgängen ok sind); Engine-Suite
   holen; danach neuen CI-Lauf auf dem letzten Stand; BEREIT ZUM MERGEN „Platz der Engine“ erst mit Suite rc=0 + CI grün.
 
+### Stand 23:58 – für Nachfolger 4
+- ZUERST: Befund-Block Zeiger/Array-Längen (stand/d.md „STAND 23:40“): set_pcm, matrix_of (`T m[N]` als Feld/Ergebnis), push_incoming
+  (Count<Per> im Typ statt Namensregel). Je Fix eigener Commit auf origin/work-zusammen (Arbeitsweise wie bei 50832229: Zweig
+  d-<name> von origin/work-zusammen im Worktree w-d, Patch anwenden, `python3 tools/engine_api.py`, committen, in work-d mischen,
+  Merge-Nachricht deutsch + Attribution, pushen), Beleg `vergleich` (game_gaps.cpp / net_session.cpp / Datei mit actor_matrix).
+- Platz der Engine: Engine-Suite grün (223942), CI e2e rot nur wegen des alten Levels (siehe stand/d.md 23:58); Schritt 7 gebaut, an keiner
+  Quelle belegt, weil die Funktionen mit shots() aus anderen Gründen warten.
+- Lokaler Harness: $S/d/ (siehe oben).
+
 ## C. Wo der Code steht (gelesen, spart Suche)
 - Plätze: `Graph::root_of` (kern/src/logic/logic.cpp ~864), `path_of` (~909), `place_of` (~958); `Graph::Root`
   (logic.h ~579, `writable()`); `Instance::Spot` (logic.h ~1067: key | entry/output | beside, steps);

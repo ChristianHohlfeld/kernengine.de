@@ -1,6 +1,6 @@
 # Stand Paket p (Leistung der exportierten Klasse) – 18.11.2026, 23:05
 
-Zweig work-p, letzter Commit a53ce271 (gepusht; dazu Switch on Text ohne Liste, alt/neu lokal gleich über 121 Paare).
+Zweig work-p, letzter Commit 3802a41d (gepusht; aede1c3e: format_arg(const char*) – CI 44407872390 war rot: g++ fand text_format("abcdef") mehrdeutig nach 25a7318f; behoben, alle 43 Engine-Fälle als Klasse mit g++ übersetzt; dazu Switch on Text ohne Liste, alt/neu lokal gleich über 121 Paare).
 - BEWIESEN: E2.1 Schritt 1 (bis 2416329): mag `work-p-engine-221509-17831` engine rc=0 (197 ok, blueprint_native_test 55 Blueprints/14102 Aufrufe,
   game_native_test ok). Probe `work-p-probe-221512-17868` (alle Quelltexte, vor der 22:25-Regel) abgebrochen – überholt durch den Kopf.
 - LÄUFT: `work-p-vergleich-230429-15316` (gestartet 23:14 auf 8a028f9c: E2.1, E2.2, E2.1 Schritt 2, Fix text_format, E3-A) über qr_code, settings,
@@ -13,7 +13,7 @@ engine_physics_physics, nostr_cpp, qr_code, qr_code_cpp, settings, settings_cpp.
 E3-A Wirkung: cost-Zeilen controls_cpp 44 → 10, combat_rules_cpp 69 → 11 (vorher: $S/t1/suite203000_cost_note.txt). Was bleibt, sind Aufrufe mit
 Struktur-Argumenten/-Ergebnissen (z. B. WorldLook_add: controls_Look als logic::Value – Felder im Vektor des Value), nicht der Aufrufweg.
 Fix text_format: hier NICHT belegt – der Stand enthält ks Umgehung 12e3da24 (Text in eigener Variable); belegt lokal mit ASan (alter Header UAF,
-neuer sauber) und durch den Engine-Fall format_text_of_value. Laufend: `work-p-engine-232958-27563` (engine auf 6c7b9c5f).
+neuer sauber) und durch den Engine-Fall format_text_of_value. Laufend: `work-p-engine-235817-5081` (engine auf 3802a41d; 232958-27563 abgebrochen, überholt), CI 44416542751.
 
 ## E10 (Fixed-Literal am Eingang, genehmigt 23:2x) + Leser-Fix E2.1 – gebaut (Commit vor 6c7b9c5f), lokal geprüft, UNBEWIESEN
 - PinDef::count (typed_pin, Funktions-Pins); Schreiber literal_of mit TypeRef → `struct_make<fc_Filters>(Fixed<fc_PT1, 3>{…}, …)`; Leser lehnt falsche Länge ab.

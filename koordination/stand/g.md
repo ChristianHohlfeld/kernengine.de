@@ -24,3 +24,12 @@ game.h:170 `BodyState state_of(ActorId a) const { return read_body(world_->physi
 Nach E9 gilt clang (= Blueprint). Weg nach E9: Absenkung (physics() vorher benennen) mit Differenztest unter clang – für Game::state_of
 braucht der Differenztest ein Game-Objekt. Vorschlag: die Tests tests/converted ebenfalls mit clang bauen (allgemein, wie tests/lowered) –
 dann gilt in jedem Vergleich die Bedeutung des Compilers des Spiels, ohne Absenkung je Stelle. Bis zur Antwort: nicht angefasst.
+
+## In Arbeit (00:00): Pendeln des Ablaufs (Auftrag des Koordinators)
+(2) Entwurf, gebaut, unbelegt: 082acc7d – erst wenn der Ablauf zum selben Zustand zurückkommt (heute: Abbruch), warten die
+Funktionen der kreisenden Blueprints, die in den Runden des Kreises „was written and waits now“ waren, für immer (World.bars, mit
+ihrem Grund; asked_of nennt es), dann weiter. Läufe, die heute konvergieren, erreichen die Stelle nie → kein Byte anders.
+Grenze: kreisen nur die Stücke (exports) ohne solche Funktion – im Lauf 232247 gab es „waits now“ nur einmal (Runde 10), danach
+kreisten 30 Einheiten weiter –, bleibt der Abbruch; das klärt (1).
+(1) Ursache: Probe work-zusammen-probe-235554-4594 (game_events, combat_rules, game.cpp auf work-zusammen); Diagnose-Lauf des
+Koordinators work-zusammen-konvert-235338-1934 („goes round … exports differ“).
