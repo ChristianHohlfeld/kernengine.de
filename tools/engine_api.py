@@ -87,61 +87,6 @@ def table_text(api, functions):
     return "\n".join(lines)
 
 
-def class_text(api, functions):
-    """The functions of a Blueprint's class: each hands its inputs to the host and takes what it gives."""
-    plain = {"Bool": "Bool", "Int": "Int", "Float": "Float", "Vector": "Vector", "Text": "const Text&", "Int64": "Int64"}
-    lines = ["// The engine's functions as a Blueprint's class calls them (written by tools/engine_api.py from the",
-             "// engine's headers - see kern/logic/engine_api.h; not edited by hand). Included by kern/logic/blueprint.h.",
-             "#pragma once", "", "#include <initializer_list>", "#include <string_view>", "#include <type_traits>", "#include <vector>", "", '#include "kern/logic/nodes.h"', "",
-             "namespace kern::logic {", "",
-             "template <class Core> struct EngineNodesOf : Core {",
-             "  using Bool = bool;", "  using Int = logic::Whole;", "  using Float = f64;", "  using Vector = Vec3;", "  using Text = logic::Text;", "  using Int64 = logic::Int64;",
-             "  template <class T> using List = logic::List<T>;", "",
-             "  /// One call of the engine: the inputs as values to the host, what it gives as values back (zeros where it has no such function).",
-             "  std::vector<Value> kern_engine(std::string_view function, const std::vector<Value>& in, std::initializer_list<PinType> outputs) const {",
-             "    std::vector<Value> out;", "    for (PinType t : outputs) out.push_back(Value::zero(t));",
-             "    if (this->kern_world.host) this->kern_world.host->engine(function, in, out);", "    return out;", "  }", ""]
-    for f in functions:
-        name = f["type"].replace(".", "_")
-        templates, params, values = [], [], []
-        for name_, bt, _ in f["ins"]:
-            if bt in plain:
-                params.append(f"{plain[bt]} {name_}")
-            elif bt.startswith("List<") and bt[5:-1] in plain:
-                params.append(f"const List<{bt[5:-1]}>& {name_}")
-            else:
-                templates.append(f"class T{len(templates) + 1}")
-                params.append(f"const T{len(templates)}& {name_}")
-            values.append(f"to_value({name_})")
-        zeros = ", ".join(f"PinType::{api.pin(bt)[0]}" for _, bt, _ in f["outs"])
-        call = f"this->kern_engine({c_text(f['type'])}, {{{', '.join(values)}}}, {{{zeros}}})"
-
-        def typed(bt):
-            if bt in plain:
-                return bt
-            if bt.startswith("List<") and bt[5:-1] in plain:
-                return bt
-            return None
-        if f["help"]:
-            lines.append(f"  /// {f['help']}")
-        if f["value"]:
-            bt = f["outs"][0][1]
-            head = (f"  template <{', '.join(templates)}> " if templates else "  ")
-            if typed(bt):
-                lines.append(f"{head}{typed(bt)} {name}({', '.join(params)}) const {{ return from_value<{typed(bt)}>({call}[0].converted(pin_type_of<{typed(bt)}>())); }}")
-            else:
-                lines.append(f"{head}EngineValue {name}({', '.join(params)}) const {{ return {{{call}[0]}}; }}")
-            continue
-        # a step: what it gives goes to the node's member (n.result ...), when the text reads it
-        head = f"  template <{', '.join(templates)}> " if templates else "  "
-        lines.append(f"{head}void {name}({', '.join(params)}) {{ {call}; }}")
-        if f["outs"]:
-            takes = " ".join(f"kern_n.{o} = from_value<std::remove_cvref_t<decltype(kern_n.{o})>>(kern_out[{i}]);" for i, (o, _, _) in enumerate(f["outs"]))
-            lines.append(f"  template <{', '.join(['class KernNode'] + templates)}> void {name}({', '.join(['KernNode& kern_n'] + params)}) {{ const std::vector<Value> kern_out = {call}; {takes} }}")
-    lines += ["};", "", "}  // namespace kern::logic", ""]
-    return "\n".join(lines)
-
-
 def case_text(api, functions):
     """The test's Blueprint: every function of the engine called once, what it gives kept in a variable."""
     u = api.u
@@ -292,26 +237,27 @@ class Calls:
         self.struct_q = {name: q for q, name in self.u.structs.items() if name}
 
     # ---- the Blueprint type of a pin as a tag (engine_values) ----
-    def tag(self, bt, need):
+    def tag(self, bt, need, ev="ev::", types=""):
+        """`ev`, `types`: how the file the tag stands in names engine_values and the tool's own types (E_, S_)."""
         u = self.u
         if bt in SCALAR_TAG:
-            return "ev::" + SCALAR_TAG[bt]
+            return ev + SCALAR_TAG[bt]
         if bt.startswith("List<"):
-            return f"ev::List<{self.tag(bt[5:-1], need)}>"
+            return f"{ev}List<{self.tag(bt[5:-1], need, ev, types)}>"
         if bt in u.enum_values:
             need.add(("enum", bt))
-            return f"ev::Enum<E_{bt}>"
+            return f"{ev}Enum<{types}E_{bt}>"
         if bt in u.rows:
-            return f"ev::Row<{self.tag(u.rows[bt], need)}>"
+            return f"{ev}Row<{self.tag(u.rows[bt], need, ev, types)}>"
         q = self.struct_q.get(bt)
         if isinstance(q, tuple) and q[0] == "pair":
-            return f"ev::Pair<{self.tag(q[1], need)}, {self.tag(q[2], need)}>"
+            return f"{ev}Pair<{self.tag(q[1], need, ev, types)}, {self.tag(q[2], need, ev, types)}>"
         if isinstance(q, str):
             if ("struct", bt) not in need:
                 need.add(("struct", bt))
                 for _, ft, _, _ in u.struct_fields[bt]:
-                    self.tag(ft, need)
-            return f"ev::Struct<S_{bt}>"
+                    self.tag(ft, need, ev, types)
+            return f"{ev}Struct<{types}S_{bt}>"
         raise SystemExit(f"engine_api.py: no tag for the Blueprint type {bt}")
 
     def bases(self, q):
@@ -330,8 +276,9 @@ class Calls:
     def kinds(self, q):
         return ", ".join([q, *self.bases(q)])
 
-    def types_text(self, need):
-        u, lines, defs = self.u, [], []
+    def enums_text(self, need):
+        """The enums of the engine a pin names: their values in the order of the Blueprint's enum."""
+        lines = []
         for kind, bt in sorted(need):
             if kind == "enum":
                 q = self.enum_q[bt]
@@ -341,6 +288,10 @@ class Calls:
                         seen.add(x)
                         values.append(f"{q}::{n}")
                 lines.append(f"struct E_{bt} {{ using type = {q}; static constexpr type values[] = {{{', '.join(values)}}}; }};")
+        return lines
+
+    def types_text(self, need):
+        u, lines, defs = self.u, self.enums_text(need), []
         for kind, bt in sorted(need):
             if kind == "struct":
                 q = self.struct_q[bt]
@@ -353,6 +304,18 @@ class Calls:
                 defs.append(f"void S_{bt}::from(EngineObjects& o, const Value& v, {q}& x) {{ {body} }}")
         return lines + defs
 
+    def ptypes(self, f):
+        """The types of the C++ function's parameters, as the compiler has them (from its mangled name), each
+        whole number of a platform's width by the name the declaration gives it (fixed_width)."""
+        d = f["decl"]
+        mangled = d.get("mangledName")
+        ptypes = parameters_of(self.names[mangled]) if mangled else []
+        declared = [x.get("type", {}).get("qualType", "") for x in d.get("inner", []) or [] if x.get("kind") == "ParmVarDecl"]
+        if len(declared) == len(ptypes):
+            ptypes = [fixed_width(P, t, self.tree.aliases) for P, t in zip(ptypes, declared)]
+        assert len(ptypes) == len(f["params"]), (f["type"], ptypes, f["params"])
+        return ptypes
+
     def body(self, f, need):
         """The lines of the call of a node: its inputs made into the arguments, the call, its outputs."""
         d, role, tree = f["decl"], f.get("role"), self.tree
@@ -361,12 +324,8 @@ class Calls:
             return [f"if (!o.release<{q}>(in.empty() ? 0 : in[0].as_int())) {{",
                     f"  o.error = \"the handle names no {q.split('::')[-1]} that was made\";", "  return false;", "}", "return true;"]
         mangled = d.get("mangledName")
-        ptypes = parameters_of(self.names[mangled]) if mangled else []
-        declared = [x.get("type", {}).get("qualType", "") for x in d.get("inner", []) or [] if x.get("kind") == "ParmVarDecl"]
-        if len(declared) == len(ptypes):
-            ptypes = [fixed_width(P, t, tree.aliases) for P, t in zip(ptypes, declared)]
+        ptypes = self.ptypes(f)
         params = f["params"]
-        assert len(ptypes) == len(params), (f["type"], ptypes, params)
         in_at = {name: k for k, (name, _, _) in enumerate(f["ins"])}
         out_at = {name: k for k, (name, _, _) in enumerate(f["outs"])}
         pin = {name: (bt, h) for name, bt, h in f["ins"]}
@@ -465,6 +424,267 @@ class Calls:
                 after.insert(0, f"ev::give<{self.tag(bt, need)}>(o, out, 0, r);")
         return lines + after + ["return true;"]
 
+    # ---- the class: every node as a function of a Blueprint's class (kern/logic/engine_direct.h) ----
+    EV, TY = "::kern::logic::engine_values::", "::kern::logic::engine_direct::"
+
+    def dtag(self, bt, need):
+        return self.tag(bt, need, self.EV, self.TY)
+
+    def direct(self, f, need, mode, fail):
+        """The lines of the call of a node by a Blueprint's class itself: the same steps in the same order as
+        `body` writes them for the door, on the C++ types of the class instead of values. `mode`: "value" (a
+        value node whose pin the class holds as a C++ type of the language - the function returns it), "given"
+        (a value node of a struct, an enum or a list of them: it returns what the function gave, read as the
+        Blueprint's type where it is used), "read" (a step whose outputs go to the node's member kern_n) or
+        "unread" (a step nobody reads the outputs of). `fail(given)`: what a call that fails does, when the
+        outputs `given` have been given already."""
+        d, role, tree, EV = f["decl"], f.get("role"), self.tree, self.EV
+        O = "*kern_o"
+        i64 = "static_cast<::kern::i64>"
+        given = []
+
+        def give(pin, bt, value):
+            given.append(pin)
+            tg = self.dtag(bt, need)
+            return f"{EV}Direct<{tg}>::to({O}, {value}, kern_n.{pin});" if mode == "read" else f"{EV}Direct<{tg}>::pass({O}, {value});"
+
+        def give_handle(pin, handle):
+            given.append(pin)
+            return f"{EV}handle_to({handle}, kern_n.{pin});" if mode == "read" else f"(void){handle};"
+        lines = ["kern_o->begin_call();"]
+        if role == "release":
+            q = f["class"]
+            name0 = f["ins"][0][0]
+            return lines + [f'if (!kern_o->release<{q}>({i64}({name0}))) {{ kern_o->error = "the handle names no {q.split("::")[-1]} that was made"; {fail(given)} }}'], None
+        mangled = d.get("mangledName")
+        ptypes = self.ptypes(f)
+        params = f["params"]
+        in_at = {name: k for k, (name, _, _) in enumerate(f["ins"])}
+        pin = {name: (bt, h) for name, bt, h in f["ins"]}
+        outs = {name: (bt, h) for name, bt, h in f["outs"]}
+        later, after, args, declared = [], [], [], []
+        method = role is None and d.get("kind") == "CXXMethodDecl" and d.get("storageClass") != "static"
+        obj = ""
+        if method:
+            owner = tree.owner[d["id"]]
+            name0, bt0, h0 = f["ins"][0]
+            if h0:
+                lines += [f'auto* const kern_self = {EV}object_of<{owner}>({O}, {i64}({name0}), "{name0}");', f"if (!kern_self) {fail(given)}"]
+                obj = "kern_self->"
+            else:
+                lines += [f"auto kern_self = {EV}blank<{owner}>();", f"{EV}Direct<{self.dtag(bt0, need)}>::from({O}, {name0}, kern_self);"]
+                obj = "kern_self."
+                if "self" in outs:
+                    after.append(lambda: give("self", outs["self"][0], "kern_self"))
+        arg_of = {pin_in: f"kern_a{i}" for i, (pin_in, _) in enumerate(params) if pin_in is not None}
+        for i, ((pin_in, pin_out), P) in enumerate(zip(params, ptypes)):
+            a = f"kern_a{i}"
+            declared.append(f"std::declval<{P}>()")
+            pointer = P.endswith("*")
+            ref = P.endswith("&") and not P.endswith("&&")
+            reads = bool(re.search(r"\bconst\s*&$", P)) and pin_out is None   # (handed over as it stands, where it can be)
+            if pin_in is None and pin_out in f.get("counts", {}):
+                x = P[:-1].strip()
+                per = f.get("per", {}).get(pin_out, 1)
+                later += [f"{EV}Written<{x}> {a}({EV}room({arg_of[f['counts'][pin_out]]}) * {per});"]
+                args.append(f"{a}.data()")
+                after.append(lambda a=a, pin_out=pin_out: f'if (!{a}.kept({O}, "{pin_out}")) {fail(given)}')
+                after.append(lambda a=a, pin_out=pin_out: give(pin_out, outs[pin_out][0], f"{a}.room"))
+                continue
+            if pin_in is None:   # (what it reports if it is asked to: here it is asked)
+                x = P[:-1].strip()
+                later.append(f"auto {a} = {EV}blank<{x}>();")
+                args.append(f"&{a}")
+                after.append(lambda a=a, pin_out=pin_out: give(pin_out, outs[pin_out][0], a))
+                continue
+            bt, h = pin[pin_in]
+            if h:
+                if pointer:
+                    lines += [f'{h}* const {a} = {EV}maybe_of<{h}>({O}, {i64}({pin_in}), "{pin_in}");', f"if (!kern_o->error.empty()) {fail(given)}"]
+                    args.append(a)
+                else:
+                    lines += [f'{h}* const {a} = {EV}object_of<{h}>({O}, {i64}({pin_in}), "{pin_in}");', f"if (!{a}) {fail(given)}"]
+                    args.append(f"*{a}")
+                continue
+            tg = self.dtag(bt, need)
+            if P in ("char const*", "char const* const"):
+                lines.append(f"const {EV}Chars {a}({pin_in});")
+                args.append(f"{a}.c_str()")
+            elif re.match(r"std::basic_string_view<char\b", P):
+                lines.append(f"const std::string_view {a} = {pin_in}.view();")
+                args.append(a)
+            elif bt == "Text" and reads and re.match(r"std::basic_string<char\b", P):
+                lines.append(f"const {EV}String {a}({pin_in});")
+                args.append(f"{a}.get()")
+            elif pointer:
+                x = re.sub(r"\s*\bconst$", "", P[:-1].strip())
+                lines.append(f"decltype(auto) {a} = {EV}taken<{tg}, std::vector<{x}>>({O}, {pin_in});")
+                args.append(f"{a}.empty() ? nullptr : {a}.data()")
+                nxt = params[i + 1][0] if i + 1 < len(params) else None
+                if nxt is not None and re.search(r"count|size|len|num|^n$", nxt) and pin.get(nxt, ("", None))[0] == "Int":
+                    # (the first of as many as the count beside it says: no more than the list has - the engine reads them)
+                    later.append(f'if ({EV}room(kern_a{i + 1}) > {a}.size()) {{ kern_o->error = "the list {pin_in} has fewer entries than {nxt} says"; {fail(given)} }}')
+            elif re.match(r"kern::Span<", re.sub(r"\s*\bconst\s*&$|\s*&$", "", P)):
+                span = re.sub(r"\s*\bconst\s*&$|\s*&$", "", P)
+                item = c2b.template_args(span)[0].strip()
+                x = re.sub(r"\s*\bconst$", "", item)
+                if item != x:   # (a view of entries it only reads)
+                    lines.append(f"decltype(auto) {a} = {EV}taken<{tg}, std::vector<{x}>>({O}, {pin_in});")
+                else:
+                    lines += [f"std::vector<{x}> {a};", f"{EV}Direct<{tg}>::from({O}, {pin_in}, {a});"]
+                args.append(f"{span}({a}.data(), {a}.size())")
+            elif reads:
+                lines.append(f"decltype(auto) {a} = {EV}taken<{tg}, std::remove_cvref_t<{P}>>({O}, {pin_in});")
+                args.append(a)
+            else:
+                lines += [f"auto {a} = {EV}blank<std::remove_cvref_t<{P}>>();", f"{EV}Direct<{tg}>::from({O}, {pin_in}, {a});"]
+                args.append(a if ref else f"std::move({a})")   # (a value it takes: handed over, as nothing reads it after)
+                if pin_out is not None:
+                    after.append(lambda a=a, pin_out=pin_out: give(pin_out, outs[pin_out][0], a))
+        lines += later
+        if role == "make":
+            q = f["class"]
+            made = f"new {q}({', '.join(args)})" if mangled else f"new {q}()"
+            handle = f"kern_o->own<{self.kinds(q)}>(std::unique_ptr<{q}>({made}))"
+            return lines + [give_handle("result", handle)], None
+        call = f"{obj}{d['name']}({', '.join(args)})" if method else f"{f['cpp']}({', '.join(args)})"
+        returned = (f"std::declval<{tree.owner[d['id']]}&>().{d['name']}" if method else f["cpp"]) + f"({', '.join(declared)})"
+        ret = c2b.qtype(d).split("(")[0].strip()
+        if ret == "void":
+            lines.append(call + ";")
+        else:
+            lines.append(f"decltype(auto) kern_r = {call};")
+            bt, h = outs["result"]
+            h = h or (self.u.object_of(ret) if bt == "Int" else None)   # (one it gives owned - std::unique_ptr<Transport>: its handle)
+            handle = f"{EV}handle_of<{self.kinds(h)}>({O}, std::forward<decltype(kern_r)>(kern_r))" if h else None
+            if mode == "value":
+                lines += [f"{EV}handle_to({handle}, kern_out);" if h else f"{EV}Direct<{self.dtag(bt, need)}>::to({O}, kern_r, kern_out);"]
+            elif mode == "given":
+                self.dtag(bt, need)
+            elif h:
+                lines.append(give_handle("result", handle))
+            else:
+                lines.append(give("result", bt, "kern_r"))
+        lines += [x() for x in after]
+        return lines, returned
+
+    def class_text(self):
+        """The functions of a Blueprint's class: each calls the function of the engine itself where the host
+        gives the class the engine's objects - and else hands its inputs to the host's door and takes what it
+        gives."""
+        api, EV = self.api, self.EV
+        plain = {"Bool": "Bool", "Int": "Int", "Float": "Float", "Vector": "Vector", "Text": "const Text&", "Int64": "Int64"}
+        need, bodies, headers = set(), [], set()
+
+        def typed(bt):
+            if bt in plain:
+                return bt
+            if bt.startswith("List<") and bt[5:-1] in plain:
+                return bt
+            return None
+        for f in self.functions:
+            headers.add(re.sub(r"^.*/include/", "", self.file_of(f)))
+            name, node = f["type"].replace(".", "_"), c_text(f["type"])
+            templates, params, values = [], [], []
+            for name_, bt, _ in f["ins"]:
+                if bt in plain:
+                    params.append(f"{plain[bt]} {name_}")
+                elif bt.startswith("List<") and bt[5:-1] in plain:
+                    params.append(f"const List<{bt[5:-1]}>& {name_}")
+                else:
+                    templates.append(f"class T{len(templates) + 1}")
+                    params.append(f"const T{len(templates)}& {name_}")
+                values.append(f"to_value({name_})")
+            zeros = ", ".join(f"PinType::{api.pin(bt)[0]}" for _, bt, _ in f["outs"])
+            door = f"this->kern_engine({node}, {{{', '.join(values)}}}, {{{zeros}}})"
+            failed = f"this->kern_engine_failed({node});"
+            lines = []
+
+            def function(head, direct, through, start=()):
+                lines.append(f"  {head} {{")
+                lines.extend("    " + x for x in start)
+                lines.append("    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {")
+                lines.extend("      " + x for x in direct)
+                lines.append("    }")
+                lines.extend("    " + x for x in through)
+                lines.append("  }")
+            if f["help"]:
+                lines.append(f"  /// {f['help']}")
+            head = f"template <{', '.join(templates)}> " if templates else ""
+            if f["value"]:
+                bt = f["outs"][0][1]
+                if typed(bt):
+                    T = typed(bt)
+                    direct, _ = self.direct(f, need, "value", lambda given: f"{{ {failed} return {T}{{}}; }}")
+                    at = next(k for k, x in enumerate(direct) if "kern_out" in x)   # (the result is declared where it is given)
+                    direct.insert(at, f"{T} kern_out{{}};")
+                    function(f"{head}{T} {name}({', '.join(params)}) const", direct + ["return kern_out;"],
+                             [f"return from_value<{T}>({door}[0].converted(pin_type_of<{T}>()));"])
+                else:
+                    direct, returned = self.direct(f, need, "given", lambda given: f"{{ {failed} return kern_G(*kern_o); }}")
+                    # (what it returns is named before the function: a function whose return type the compiler works
+                    # out is made where it is first used - in the class, before the class's glue says how its
+                    # structs are held as values)
+                    lines.append(f"  using kern_given_{name} = {EV}Given<{self.dtag(bt, need)}, decltype({returned})>;")
+                    function(f"{head}kern_given_{name} {name}({', '.join(params)}) const", direct + ["return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));"],
+                             [f"return kern_G({door}[0]);"], [f"using kern_G = kern_given_{name};"])
+                bodies += lines
+                continue
+            # a step: what it gives goes to the node's member (n.result ...), when the text reads it
+            direct, _ = self.direct(f, need, "unread", lambda given: f"{{ {failed} return; }}")
+            function(f"{head}void {name}({', '.join(params)})", direct + ["return;"], [f"{door};"])
+            if f["outs"]:
+                order = [o for o, _, _ in f["outs"]]
+
+                def fail(given):
+                    return "{ " + " ".join(f"{EV}none(kern_n.{o});" for o in order if o not in given) + f" {failed} return; }}"
+                direct, _ = self.direct(f, need, "read", fail)
+                takes = [f"kern_n.{o} = from_value<std::remove_cvref_t<decltype(kern_n.{o})>>(kern_out[{i}]);" for i, o in enumerate(order)]
+                function(f"template <{', '.join(['class KernNode'] + templates)}> void {name}({', '.join(['KernNode& kern_n'] + params)})", direct + ["return;"],
+                         [f"const std::vector<Value> kern_out = {door};", *takes])
+            bodies += lines
+        text = ["// The engine's functions as a Blueprint's class calls them (written by tools/engine_api.py from the",
+                "// engine's headers - see kern/logic/engine_api.h; not edited by hand). Included by kern/logic/blueprint.h.",
+                "//",
+                "// Each calls the function of the engine itself, typed, where the host gives the class the engine's objects",
+                "// (BlueprintWorld::engine - kern/logic/engine_direct.h), and else hands its inputs as values to the host's",
+                "// door (logic::Host::engine). Both do the same; the calls behind the door are written from the same table",
+                "// (src/<component>/engine_calls.gen.cpp).",
+                "#pragma once", "", "#include <initializer_list>", "#include <memory>", "#include <string_view>", "#include <type_traits>", "#include <utility>", "#include <vector>", "",
+                *[f'#include "{h}"' for h in sorted(headers)], '#include "kern/logic/engine_direct.h"', '#include "kern/logic/nodes.h"', "",
+                "namespace kern::logic {", "",
+                "// The engine's enums and structs a pin names, between the type a Blueprint's class holds and the engine's",
+                "// (engine_values::Direct): an enum's values in the order of the Blueprint's enum; a struct field by field -",
+                "// the Blueprint's struct has the engine's fields in their order.",
+                "namespace engine_direct {", "namespace ev = engine_values;", "", *self.direct_types_text(need), "", "}  // namespace engine_direct", "",
+                "template <class Core> struct EngineNodesOf : Core {",
+                "  using Bool = bool;", "  using Int = logic::Whole;", "  using Float = f64;", "  using Vector = Vec3;", "  using Text = logic::Text;", "  using Int64 = logic::Int64;",
+                "  template <class T> using List = logic::List<T>;", "",
+                "  /// One call of the engine through the host's door: the inputs as values to the host, what it gives as values back (zeros where it has no such function).",
+                "  std::vector<Value> kern_engine(std::string_view function, const std::vector<Value>& in, std::initializer_list<PinType> outputs) const {",
+                "    std::vector<Value> out;", "    for (PinType t : outputs) out.push_back(Value::zero(t));",
+                "    if (this->kern_world.host) this->kern_world.host->engine(function, in, out);", "    return out;", "  }",
+                "  /// A call of the engine the class made itself failed (EngineObjects::error says why): the host is told, as its door tells it.",
+                "  void kern_engine_failed(std::string_view function) const {", "    if (this->kern_world.host) this->kern_world.host->engine_failed(function);", "  }", "",
+                *bodies, "};", "", "}  // namespace kern::logic", ""]
+        return "\n".join(text)
+
+    def direct_types_text(self, need):
+        u, lines = self.u, self.enums_text(need)
+        names = [bt for kind, bt in sorted(need) if kind == "struct"]
+        lines += [f"struct S_{bt};" for bt in names]
+        for bt in names:
+            q, fields = self.struct_q[bt], u.struct_fields[bt]
+            tags = [self.tag(ft, set()) for _, ft, _, _ in fields]
+            bound = ", ".join(f"f{k}" for k in range(len(fields)))
+            parts = lambda way, order: " ".join(f"ev::Direct<{tg}>::{way}(o, {order(f'f{k}', f'x.{c}')});" for k, ((_, _, _, c), tg) in enumerate(zip(fields, tags)))
+            lines += [f"struct S_{bt} {{",
+                      f"  template <class B> static void from(EngineObjects& o, const B& b, {q}& x) {{ " + (f"const auto& [{bound}] = b; " if fields else "") + parts("from", lambda b, x: f"{b}, {x}") + " }",
+                      f"  template <class B> static void to(EngineObjects& o, const {q}& x, B& b) {{ " + (f"auto& [{bound}] = b; " if fields else "") + parts("to", lambda b, x: f"{x}, {b}") + " }",
+                      f"  template <class C> static void pass(EngineObjects& o, const C& x) {{ " + " ".join(f"ev::Direct<{tg}>::pass(o, x.{c});" for (_, _, _, c), tg in zip(fields, tags)) + " }",
+                      "};"]
+        return lines
+
     def file_of(self, f):
         d = f["decl"]
         if f.get("role") in ("make", "release"):
@@ -545,8 +765,9 @@ def main(argv):
         print()
         for name, why in waiting:
             print(f"no node: {name}: {why}")
-    for rel, text in (("src/logic/engine_api.gen.cpp", table_text(api, functions)), ("include/kern/logic/engine_nodes.gen.h", class_text(api, functions)),
-                      ("tests/engine_case.gen.h", case_text(api, functions)), *Calls(api, functions).texts().items()):
+    calls = Calls(api, functions)
+    for rel, text in (("src/logic/engine_api.gen.cpp", table_text(api, functions)), ("include/kern/logic/engine_nodes.gen.h", calls.class_text()),
+                      ("tests/engine_case.gen.h", case_text(api, functions)), *calls.texts().items()):
         path = os.path.join(KERN, rel)
         if "--list" not in argv and (not os.path.exists(path) or open(path).read() != text):
             open(path, "w").write(text)

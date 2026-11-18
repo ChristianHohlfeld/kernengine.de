@@ -130,7 +130,7 @@ class Text {
   /// "abc": a text the program holds for good - a literal, a constant of the program. It is not
   /// copied, so it must stay where it is. A buffer that is written to (char b[64]) is refused
   /// here: its characters go into a std::string or a std::string_view, and those are copied.
-  template <std::size_t N> constexpr Text(const char (&written)[N]) : written_(written, N - 1) {}  // NOLINT (implicit: a text written out is a Text)
+  template <std::size_t N> constexpr Text(const char (&written)[N]) : written_(written, N - 1), ended_(true) {}  // NOLINT (implicit: a text written out is a Text)
   template <std::size_t N> Text(char (&)[N]) = delete;
   Text(std::string made) : made_(std::move(made)), holds_(true) {}                                // NOLINT (implicit: a text made while running)
   explicit Text(std::string_view copied) : made_(copied), holds_(true) {}
@@ -141,11 +141,11 @@ class Text {
     t.written_ = held;
     return t;
   }
-  Text(const Text& o) : holds_(o.holds_) {
+  Text(const Text& o) : holds_(o.holds_), ended_(o.ended_) {
     if (holds_) new (&made_) std::string(o.made_);
     else new (&written_) std::string_view(o.written_);
   }
-  Text(Text&& o) noexcept : holds_(o.holds_) {
+  Text(Text&& o) noexcept : holds_(o.holds_), ended_(o.ended_) {
     if (holds_) new (&made_) std::string(std::move(o.made_));
     else new (&written_) std::string_view(o.written_);
   }
@@ -153,14 +153,14 @@ class Text {
     if (this == &o) return *this;
     if (holds_ && o.holds_) made_ = o.made_;  // (into the characters it has: std::string's own assignment)
     else if (o.holds_) hold(std::string(o.made_));
-    else refer(o.written_);
+    else refer(o.written_, o.ended_);
     return *this;
   }
   Text& operator=(Text&& o) noexcept {
     if (this == &o) return *this;
     if (holds_ && o.holds_) made_ = std::move(o.made_);
     else if (o.holds_) hold(std::move(o.made_));
-    else refer(o.written_);
+    else refer(o.written_, o.ended_);
     return *this;
   }
   constexpr ~Text() {
@@ -173,6 +173,13 @@ class Text {
   constexpr bool empty() const { return view().empty(); }
   /// Does it hold its characters (a text made while running), or refer to the program's?
   constexpr bool holds() const { return holds_; }
+  /// Its characters where they stand, if a 0 ends them there - a text written out in the program
+  /// ("abc"), or one made while running: what a function that takes a `const char*` reads, without
+  /// a copy. Null: nothing ends them where they are (the name of an enum's value, no text).
+  const char* ended() const { return holds_ ? made_.c_str() : ended_ ? written_.data() : nullptr; }
+  /// The std::string it holds (a text made while running), or null: what a function that takes a
+  /// `const std::string&` reads, without a copy.
+  const std::string* made() const { return holds_ ? &made_ : nullptr; }
   /// Its characters as a std::string of their own (a copy), and handed on without one where it holds them.
   std::string str() const& { return std::string(view()); }
   std::string str() && { return holds_ ? std::move(made_) : std::string(written_); }
@@ -184,15 +191,17 @@ class Text {
     if (holds_) made_ = std::move(made);
     else new (&made_) std::string(std::move(made)), holds_ = true;
   }
-  void refer(std::string_view written) {
+  void refer(std::string_view written, bool ended) {
     if (holds_) made_.~basic_string(), holds_ = false;
     new (&written_) std::string_view(written);
+    ended_ = ended;
   }
   union {
     std::string_view written_;  // a text of the program: its characters there
     std::string made_;          // a text made while running: its characters here
   };
   bool holds_ = false;
+  bool ended_ = false;  // (a text of the program that was written out: a 0 stands behind its characters)
 };
 
 /// What a list of a Blueprint's class holds of an item: the item - every entry of a list is an

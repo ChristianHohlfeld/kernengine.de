@@ -854,6 +854,15 @@ class Host {
   /// (kern/logic/engine_api.h). `in`: the node's inputs in their order; `out`: its outputs, given as
   /// their zeros. False: this host has no such function (the outputs stay as they are).
   virtual bool engine(std::string_view function, const std::vector<Value>& in, std::vector<Value>& out);
+  /// The objects of the engine behind that door (kern/logic/engine_host.h), where the host lets a
+  /// Blueprint's class call the engine's functions on them itself: typed, without the door
+  /// (kern/logic/engine_direct.h - what it does then is what `engine` does with the same call). Null:
+  /// this host has none, or wants every call at its door (a test that writes the calls down) - the
+  /// class calls `engine`.
+  virtual class EngineObjects* engine_objects();
+  /// A call a Blueprint's class made on those objects itself failed (EngineObjects::error says why):
+  /// what `engine` does with a call that fails.
+  virtual void engine_failed(std::string_view function);
   /// Native code: the host compiles the WebAssembly module of an instance (asynchronously)
   /// and calls jit_ready(id, function) when it is linked. False: no compiler here (interpreter).
   virtual bool jit_compile(const std::vector<u8>& module, i32 id);
@@ -966,6 +975,9 @@ struct BlueprintWorld {
   class Instance* instance = nullptr;
   ActorRef self = 0;
   i32* counters = nullptr;  // the runtime's shared counters ([3] loop passes this step, [1] their limit)
+  /// The host's objects of the engine (Host::engine_objects): the class calls the engine's functions
+  /// on them itself. Null: through the host's door (Host::engine).
+  class EngineObjects* engine = nullptr;
 };
 class NativeBlueprint {
  public:
