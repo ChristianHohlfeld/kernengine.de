@@ -38,3 +38,25 @@ Je Datei: Zahl der Paare, grün?; jede Abweichung; was am Werkzeug dazukam; was 
 
 ## Aufräumen am Ende
 `rm -rf /dev/shm/spawncity-diff-$USER ~/spawncity-diff`
+
+## Nachtrag 16:40 (Koordinator) – die Grundsatzfrage ist entschieden: zwei Bauten statt zwei Namensräume
+Die offene Frage aus `pakete/UEBERGABE_r.md` (alter Text gegen heutige fremde Header) und ein zweiter Befund (Paket g1: Methoden von `Game` liegen
+in ~40 Dateien, die Klasse in game.h; gleichnamige anonyme Helfer verschiedener Dateien stoßen in einem Namensraum zusammen) haben dieselbe
+saubere Lösung – baue sie als die allgemeine Form des Werkzeugs, du bist ab jetzt der eine Besitzer von `tools/source_diff.py` und
+`kern/games/spawncity/tests/source_diff.h`:
+- **Jede Seite ist das ganze Programm in ihrem Stand.** Die alte Seite wird aus dem ganzen Quellbaum des Ausgangs-Commits übersetzt
+  (`git worktree`/`git archive` von `--base`), die neue aus dem heutigen Baum – zwei getrennte Bauten (zwei Programme oder zwei Bibliotheken),
+  keine gemeinsamen Namensräume, keine gemischten Header.
+- Der Treiber je Funktionspaar ist derselbe Text, einmal gegen jeden Bau übersetzt: er würfelt Zustand und Argumente aus demselben Keim
+  (dieselben Ziehungen wie die konvertierten Tests, `source_diff.h`), ruft die Funktion und schreibt alles Verglichene als Bytes heraus
+  (Rückgabe, jeder veränderbare Parameter, das Objekt – auch `Game` –, der Zustand der Datei, die Zahl der Speicheranforderungen, die Marke
+  „C++ lässt offen“). Verglichen werden die beiden Byteströme, Aufruf für Aufruf. Wo sich die Gestalt eines Typs zwischen alt und neu geändert
+  hat (ein Feld wurde zum Parameter, eine Dateivariable zum Feld einer Struktur), ordnet die Paarregel die Teile einander zu – wie bisher: eine
+  Regel, keine Namensliste.
+- Was die Funktion von der Engine ruft, geht auf beiden Seiten an dieselbe Engine im selben Stand (die Engine von heute; hat sich eine
+  Engine-Funktion seit `--base` geändert, die der alte Text ruft, ist das eine Abweichung, die du in `ABWEICHUNGEN.md` nennst).
+- Die bisherigen Tests in `tests/lowered` (settings, city_jobs und die von Paket f1: mvt, tiles, terrain, city_stream, interiors, facades,
+  water_look auf `origin/work-f1`) müssen in der neuen Form dasselbe beweisen.
+- Andere Agenten (g1, g2, f1, f2) schreiben weiter Quellen um; ihr Beweis läuft dann über dein Werkzeug mit `--base` = Commit vor ihrer
+  Änderung. Halte den Aufruf einfach und dokumentiere ihn im Kopf von `tools/source_diff.py`; pushe das Werkzeug früh auf `mag/differenztest`,
+  auch bevor alle 76 Einheiten durch sind – sag es in `BERICHT.md`, sobald die Game-Dateien damit gehen.
