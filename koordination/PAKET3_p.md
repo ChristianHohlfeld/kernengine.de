@@ -54,3 +54,31 @@ Melde dich beim Koordinator (SendMessage an main) mit der Ursachenliste nach Sch
    in deinen Bericht. `tools/blueprint_cpp.sh --classes` (04f1a57) ist ungetestet und berührt dieselbe Datei wie work-s5 (d5132bc): prüfe es, halte es klein.
 6. **Beweis:** Engine-Suite samt nativer Stufe und Spiel-Suite auf mag (zur roten Engine-Suite auf `work` siehe PAKET_COMMON3.md, Nachtrag 17:45, Punkt 9),
    Messung vorher/nachher je Funktion; danach der Zeit-Test (Schritt 5 des Auftrags) – begründete Schwelle, CI-tauglich.
+
+## Nachtrag 21:50 – Entscheidungen des Koordinators zu ps Fragen (stand/p.md „ENTSCHEIDUNG NÖTIG (E2)“ und „(E3)“)
+**E4 – Schreibweise (ps E2):**
+- **E2.1 Formel mit ganzzahligen Ein-/Ausgängen: JA.** `kern::formula([](Int s) -> Int { … }, self.s)`. Bedingungen:
+  1. Welche Formel-Funktion aus ganzen Zahlen exakt eine ganze Zahl macht, steht EINMAL bei der Funktion selbst (ihre Erklärung/Tabelle der Formel-Funktionen);
+     Schreiber, Leser und Klasse leiten daraus ab. Keine Liste von Namen im Schreiber.
+  2. Bedeutung in jeder Stufe unverändert, bewiesen: Engine-Test, der für jede solche Funktion Interpreter, JIT und Klasse an den Rändern vergleicht
+     (0, ±1, 2^31, 2^32, 2^53 und darüber, negative, Schiebeweiten ≥ 32/64) – auch mit Int-Eingängen außerhalb des 32-Bit-Bereichs; dazu der Fixpunkt
+     to_cpp → from_cpp → to_cpp und ein Text, den der Leser ablehnen muss (`-> Int` bei einem Ausdruck, der das nicht hergibt).
+  3. Zahlliterale im Ausdruck und gemischte Eingänge (Int und Float) sind in blueprint_cpp.md „Formeln“ beschrieben; ein Float-Eingang macht die Formel zur
+     Float-Formel wie heute.
+  4. +, −, × zwischen Ints (geprüfter Weg) erst als zweiter Schritt, nachdem der erste bewiesen und gemessen ist.
+- **E2.2 Weitergabe beim Anhängen (`o = text_append(std::move(o), x, "")`): JA** – unter denselben Bedingungen, unter denen hands_over heute weitergibt
+  (niemand liest den alten Wert danach); Fixpunkt und Engine-Test, Messung settings_escape vorher/nachher.
+- **E2.3 Index am Graphen bewiesen (`at_known`): ZURÜCKGESTELLT.** Neue Schreibweise mit Beweispflicht im Leser (er müsste die Behauptung am Graphen
+  nachprüfen und sonst ablehnen) bei 10–30 %. Nach E2.1/E2.2 neu messen; nur wenn Listen-Schleifen dann noch über der Schwelle liegen, als eigener Entwurf.
+**E5 – Speicher (ps E3):**
+- **A (Aufruf an einen Actor, ~74 von 93): JA,** p darf den Aufrufweg ändern (`blueprint.h func_call_on`, `Runtime::call_on`, `Instance::call` in
+  logic.cpp/logic.h): Text der Klasse unverändert, Bedeutung in jeder Stufe unverändert; Reihenfolge NACH E2.1/E2.2. Beweis: Engine-Suite auf mag und CI,
+  und die `cost:`-Zeilen dieser Funktionen sind in der Spiel-Suite weg. (d ist beendet; sein Zwischenstand berührt blueprint.h an anderer Stelle – vor dem
+  Bauen origin/work-zusammen holen.)
+- **B (Listen wachsen anders): BEFUND FÜR t1** – t1 prüft, ob die 1–2 Anforderungen im Test beim Umwandeln der Argumente entstehen (gemeldet).
+- **C (Firmware Arondight45_*):** Firmware bleibt unverändert; Ursache lesen und melden, dann entscheiden.
+**E6 – Zeit-Test:** bauen (`tools/blueprint_bench.sh --check <schwelle>`). Aber: (1) keine Liste „bekannt über der Schwelle“, die der Test zum Bestehen
+heranzieht – solange Fälle darüber liegen, ist der Test rot und läuft als Bericht auf mag, nicht als CI-Pflicht; in die CI kommt er, wenn kein Fall mehr
+darüber liegt. Die offenen Fälle mit Ursache stehen in stand/p.md. (2) Rauschen: prüfe, ob das Verhältnis der KLEINSTEN Zeiten (beste von N Runden, beide
+Seiten im Wechsel gemessen) stabiler ist als der Median – Rauschen macht nur langsamer; ist es das, die Schwelle daran so eng wie möglich begründen.
+

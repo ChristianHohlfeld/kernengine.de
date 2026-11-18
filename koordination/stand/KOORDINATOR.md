@@ -1,4 +1,11 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 21:50 **Entscheidungen E4–E6 für p** (PAKET3_p.md, Nachtrag 21:50): Formel mit ganzzahligen Ein-/Ausgängen JA (Eigenschaft steht bei der Formel-Funktion,
+  Beweis in allen drei Stufen an den Rändern, Fixpunkt); Weitergabe beim Anhängen JA; `at_known` zurückgestellt; p darf den Aufrufweg an einen Actor
+  (func_call_on, Runtime::call_on, Instance::call) ändern – Text und Bedeutung unverändert, nach E2.1/E2.2; Zeit-Test ohne Ausnahmeliste, erst als Bericht.
+  **BEFUND FÜR t1** (von p, E3-B): `cost:`-Zeilen mit 1–2 Anforderungen (combat_art put/beam, city_jobs put_*/read_*, destruction, city_stream) – entstehen sie im
+  Test beim Umwandeln der Argumente (Mat4/Struktur aus Value)? CombatArt_put fügt wie die Quelle ein.
+  · Stand 21:46: `work-zusammen-probe-213256-11283` convert rc=0 (city_stream, destruction auf 8844531a). t1: Fehler 1+2 gebaut (13464b5f), Anzeige der ersten
+    abweichenden Stelle (e0e6c2ad), Proben laufen. t2: sscanf über converted::scan_c (06989d83). „alle“ rechnet noch.
 - 21:35 **work-zusammen = 8844531a** (8874e79 + ds Fix für Zeiger-Eingänge, work-d 690ea4f): die Zahl neben einem Zeiger-Eingang sagt in ihrem Typ, wie viele
   Zahlen jedes Gezählte ist (`kern::Count<Per>`, wie bei Ausgängen); earcut.triangulate/deviation nehmen `Count<2> vertex_count`; Tür und Klasse prüfen mit
   `ev::numbers()`; der Stellvertreter des Quelltexts zeichnet Per · Zahl Werte auf (`count_per`). Erzeuger ohne Unterschied (818 Knoten), keine Teile von

@@ -70,3 +70,39 @@ die neuen cost:-Zeilen („instead of 0“, $S/t1/suite203000_cost_note.txt), En
 10. Aufruf an einen Actor über die Laufzeit (`func_call_on`, Values) – JetSeats; Architektur, hier nicht gemessen.
 11. Float-Fälle (Vektor, Quat, Bibliothek): 1,0–1,5× – Rest ist 64 statt 32 Bit (gewollt) und Ursache 5; kein eigener Befund.
 Nicht gemessen: `flow_switch_text` baut je Aufruf `std::vector<std::string>` der Fälle (blueprint.h `setting_cases`) – Kandidat für d.
+
+## ENTSCHEIDUNG NÖTIG (E2) – Entwurf zur Schreibweise (nach Nachtrag 17:50, Punkt 4; Messzahlen nach a–c oben)
+Nach a–c bleibt bei Ganzzahl-Fällen 10–18× (qr 14×, sha256 14×, rng 13×), fast ganz an der Float-Grenze der Formel (Ursache 1).
+**E2.1 Formel mit ganzzahligen Ein-/Ausgängen.** Text: `kern::to<Int>(kern::formula([](Int s) -> Int { return kern::math::bxor(s, kern::math::wrap32(kern::math::shl(s, 13.0))); }, self.s))`
+  – der Writer schreibt `Int` statt `Float` für einen Eingang, an dem ein Int hängt, und `-> Int`, wenn das Ergebnis in einen Int-Eingang geht UND der Ausdruck
+  nur aus band/bor/bxor/shl/shr/wrap32/wrap32s/mul32, Zahlliteralen und Eingängen besteht (Regel am Ausdruck, keine Namensliste).
+  Bedeutung in jeder Stufe: unverändert – Interpreter/JIT rechnen wie heute in double. In der Klasse: Eingang `Int x` geht als `Exact{x}` hinein
+  (bits_of(Exact) = bits_of(double(x)) für jedes x, schon bewiesen: eq.cpp + formula_bits_edges), Ergebnis `Exact r` → `Int(r.v)` = normal(r) = whole(double(r))
+  (Beweis wie in To<Whole>::from). Für jeden Wert dasselbe, weil jede dieser Funktionen schon heute ein ganzzahliges double liefert.
+  Gemessen (Projektion $S/p/proj.cpp, Rng::next): heute 25,1 ns → 2,8 ns, C++ 1,85 ns. Erwartung: Ganzzahl-Fälle von 10–18× auf ~1,5–2×.
+  Kosten: Writer (Formel-Typ je Eingang aus den Drahttypen), Leser (from_cpp liest `Int`-Parameter und `-> Int` zurück, Fixpunkt-Tests),
+  `kern::formula`-Überladung, Doku blueprint_cpp.md „Formeln“; kein neuer Knoten, keine Graph-/Editor-Änderung, Konverter unberührt (Graph gleich).
+  +, −, × zwischen Ints im Ausdruck: nur mit geprüftem Weg (exakt solange |·| ≤ 2^53, sonst double) – als zweiter Schritt.
+**E2.2 Weitergabe beim Anhängen (Ursache 8):** hands_over (notation.cpp ~1381) auch für einen reinen Knoten, dessen Ergebnis die Variable setzt, die er als
+  ersten Eingang liest: `o = text_append(std::move(o), x, "")` (gibt es im Text schon; der Leser kennt std::move). settings_escape ~9× → erwartet ~2×. Graph gleich.
+**E2.3 Index am Graphen bewiesen (Ursache 6):** For Each / For 0..length−1 über dieselbe Liste ohne Längenänderung im Rumpf → Zugriff ohne Platz-daneben-Prüfung,
+  im Text sichtbar (etwa `ring.at_known(i)`). Bringt laut Versuch 10–30 % bei Listen-Schleifen. Kleiner als E2.1 – nur wenn gewünscht.
+Frage: E2.1 bauen (ja/nein)? E2.2? E2.3?
+
+## ENTSCHEIDUNG NÖTIG (E3) – cost: „instead of 0“ (Suite work-zusammen-voll-203000-750, $S/t1/suite203000_cost_note.txt), Ursachen
+- **A, ~74 von 93: Aufruf an einen Actor** – controls_cpp (42), combat_rules_cpp (26), combat_detail_cpp (6): die Funktion der _cpp-Klasse ist
+  `func_call_on<"Controls_Smoothstep01">(actor_find("Controls"), …)` (Konverter-Entscheidung: Funktionen des Regel-Actors). Speicher: blueprint.h `func_call_on`
+  (vector args + vector results), `Runtime::call_on` (logic.cpp ~3017: results aus from_json, vector got), dahinter Instance::call. Null Anforderungen bräuchte einen
+  Aufrufweg ohne std::vector<Value> (Puffer fester Größe / Aufruf der Klasse direkt, wenn das Ziel eine Klasse ist) – in kern/src/logic/logic.cpp und Runtime-API,
+  außerhalb meiner Dateiliste. Frage: darf p Runtime::call_on/Instance::call (logic.cpp, logic.h) dafür ändern?
+- **B: Listen wachsen anders** (combat_art_cpp put/beam, city_jobs_cpp put_*/read_*, destruction_cpp, city_stream_cpp): Bytes als List<Int>, Anhängen je Element
+  statt eines Einfügens/resize – je Fall 1–2 Anforderungen. Noch nicht zugeordnet. Gelesen: CombatArt_put fügt wie die Quelle ein
+  (list_insert_list → insert_items = vector::insert eines Bereichs; list_make ist ein Fixed auf dem Stapel) – die 2 Anforderungen kommen nicht aus diesen Knoten;
+  zu prüfen mit t1, ob sie im Test beim Umwandeln der Argumente (Mat4/Struktur aus Value) entstehen. BEFUND FÜR t1.
+- **C: Runtime_new/reset der Firmware-Einheiten** (Arondight45_*) – Firmware ist nicht zu ändern; Ursache noch nicht gelesen.
+
+## Zeit-Test (Schritt 5) – Entwurf
+`tools/blueprint_bench.sh` mit `--check <schwelle>`: Ende ≠ 0, wenn für einen Fall der MEDIAN des Verhältnisses über 15 Runden über der Schwelle liegt.
+Schwelle 1,5: das Rauschen dieser Maschine (geteilt) lag bei unveränderten Fällen zwischen zwei Läufen bei bis zu ±0,4 (wrap_pi 1,30/1,56/1,85,
+lamps_near 2,24/1,65/3,02 bei gleichem Code) – mit 1,0 wäre der Test rot ohne Grund. Vorschlag CI: zwei Läufe, rot nur wenn beide über 1,5; je Fall eine
+Liste „bekannt über der Schwelle, mit Ursache“ bis E2 entschieden ist (heute 13 Fälle). Läuft ohne Engine (nur Klassen + musl), ~1 min Bau.
