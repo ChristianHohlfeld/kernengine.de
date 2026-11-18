@@ -770,11 +770,12 @@ struct Lists : kern::Blueprint {
     return {Total, list_length<Text>(Names), n20.index};
   }
 
-  struct AtResult { Float score = 0.0; Text name = ""; Int count = 0; Bool flag = false; Vector point = Vector{0.0, 0.0, 0.0}; Actor member = Actor{0}; Int where = 0; Bool has = false; };
-  /// Get Item of every type (beyond the list: its zero), Find and Contains.
+  struct AtResult { Float score = 0.0; Text name = ""; Int count = 0; Bool flag = false; Vector point = Vector{0.0, 0.0, 0.0}; Actor member = Actor{0}; Int where = 0; Bool has = false; Bool same = false; Bool shorter = false; };
+  /// Get Item of every type (beyond the list: its zero), Find, Contains and Lists Equal.
   KERN_PURE AtResult At(Int index = 0, Text name = "a") {
     return {list_get<Float>(Scores, index), list_get<Text>(Names, index), list_get<Int>(Counts, index), list_get<Bool>(Flags, index), list_get<Vector>(Points, index),
-            list_get<Actor>(Team, index), list_find<Text>(Names, name), list_contains<Text>(Names, name)};
+            list_get<Actor>(Team, index), list_find<Text>(Names, name), list_contains<Text>(Names, name), list_equal<Text>(Names, list_make<Text, "3">(name, "b", "a")),
+            list_equal<Float>(Scores, list_make<Float, "1">(1.0))};
   }
 
   struct FillResult { List<Int> counts = List<Int>{}; List<Bool> flags = List<Bool>{}; List<Vector> points = List<Vector>{}; List<Actor> team = List<Actor>{}; };
@@ -871,13 +872,14 @@ struct Enums : kern::Blueprint {
             enum_equal<Mode>(enum_from_index<Mode>(index).value, enum_from_name<Mode>(name).value)};
   }
 
-  struct TakeResult { Mode picked = Mode::Closing; List<Mode> all = List<Mode>{}; Int count = 0; Bool has = false; Mode third = Mode::Closed; };
+  struct TakeResult { Mode picked = Mode::Closing; List<Mode> all = List<Mode>{}; Int count = 0; Bool has = false; Mode third = Mode::Closed; Bool same = false; Bool all_of_them = false; };
   /// A function takes an enum's value and a list of them (with defaults) and gives them back;
   /// Select and the list nodes in the enum's type.
   TakeResult Take(Mode want = Mode::Open, List<Mode> some = List<Mode>{Mode::Closing, Mode::Open}, Bool pick = true) {
     Wanted = want;
     Seen = some;
-    return {logic_select<Mode>(pick, want, list_get<Mode>(some, 0)), enum_values<Mode>(), list_length<Mode>(some), list_contains<Mode>(some, want), list_get<Mode>(list_make<Mode, "2">(want, Mode::Opening), 2)};
+    return {logic_select<Mode>(pick, want, list_get<Mode>(some, 0)), enum_values<Mode>(), list_length<Mode>(some), list_contains<Mode>(some, want), list_get<Mode>(list_make<Mode, "2">(want, Mode::Opening), 2),
+            list_equal<Mode>(Seen, some), list_equal<Mode>(some, enum_values<Mode>())};
   }
 
   struct WalkResult { Text names = ""; Int last = 0; };
@@ -942,7 +944,7 @@ struct Structs : kern::Blueprint {
             struct_make<Aim>(vector_scale(at, damage), 2), struct_make<Solo>(damage)};
   }
 
-  struct TakeResult { Text name = ""; Kind type = Kind::Melee; Int count = 0; Bool has = false; Int at = 0; Weapon first = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{0}, List<Kind>{Kind::Magic}}; Aim beyond = Aim{Vector{0.0, 0.0, 1.0}, 3}; Float only = 0.0; };
+  struct TakeResult { Text name = ""; Kind type = Kind::Melee; Int count = 0; Bool has = false; Int at = 0; Weapon first = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{0}, List<Kind>{Kind::Magic}}; Aim beyond = Aim{Vector{0.0, 0.0, 1.0}, 3}; Float only = 0.0; Bool same = false; Bool one = false; };
   /// A function takes a struct and a list of them (with defaults); Break; the list nodes of a
   /// struct's type - an item from beyond the list is the struct's default.
   TakeResult Take(Weapon w = Weapon{"Club", Kind::Melee, 7.5, List<Float>{}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{0}, List<Kind>{}}, List<Weapon> more = List<Weapon>{}, Solo one = Solo{2.5}) {
@@ -950,7 +952,7 @@ struct Structs : kern::Blueprint {
     Rack = more;
     One = one;
     return {struct_break<Weapon>(w).Name, struct_break<Weapon>(w).Type, list_length<Weapon>(more), list_contains<Weapon>(more, w), list_find<Weapon>(more, w), list_get<Weapon>(more, 0),
-            struct_break<Weapon>(list_get<Weapon>(more, 5)).Sight, struct_break<Solo>(One).Only};
+            struct_break<Weapon>(list_get<Weapon>(more, 5)).Sight, struct_break<Solo>(One).Only, list_equal<Weapon>(Rack, more), list_equal<Weapon>(more, list_make<Weapon, "1">(w))};
   }
 
   struct LookupResult { Bool found = false; Text name = ""; Int at = 0; Float damage = 0.0; Bool byKind = false; Int kindAt = 0; Int strong = 0; };

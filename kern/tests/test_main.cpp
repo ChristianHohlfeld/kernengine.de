@@ -3473,6 +3473,12 @@ TEST(logic_tier_cases_interpreter) {
             scores.item(scores.size() - 2).field(0)->as_text() == "x");
       CHECK(shown.size() > 2 && shown[0] == 'y' && shown.find("[1, 1, 2, 3.5]") != std::string::npos && inst->get("Names").as_text() == "[a, b, c]");
     }
+    if (std::string(c.name) == "lists_equal") {
+      // A and B the same until Go adds to B; the texts against a list made on the spot (the same, then another
+      // last item); an empty list against an input nothing is wired to
+      CHECK(inst->get("Same").as_bool() && !inst->get("After").as_bool() && inst->get("SameWords").as_bool() && !inst->get("Other").as_bool() && inst->get("Empty").as_bool());
+      CHECK(inst->get("B").as_text() == "[1, 2, 3, 0, 2, 4, 5, 5, 1]");
+    }
     if (std::string(c.name) == "text_format") {
       // the last Go: value 1, no text - as snprintf writes it ("%s" of three bytes at most: "abc")
       char want[64];
@@ -4779,6 +4785,8 @@ TEST(logic_text_of_the_program) {
   // as values of the interpreter and back; a list of texts; everything prints
   const kern::List<Text> names{"x", kName, "z"};
   CHECK(B::list_find<Text>(names, "z") == 2 && B::list_contains<Text>(names, kName) && B::list_get<Text>(names, 7) == "");
+  CHECK(B::list_equal<Text>(names, names) && B::list_equal<Text>(names, kern::List<Text>{"x", kName, "z"}) && !B::list_equal<Text>(names, kern::List<Text>{"x", kName}) &&
+        !B::list_equal<Text>(names, kern::List<Text>{"x", kName, "y"}) && B::list_equal<Text>(kern::List<Text>{}, kern::List<Text>{}));
   const logic::Value v = logic::to_value(names);
   CHECK(v.type == logic::PinType::text_list && v.size() == 3 && v.item(1).as_text() == kName);
   const kern::List<Text> back = logic::from_value<kern::List<Text>>(v);

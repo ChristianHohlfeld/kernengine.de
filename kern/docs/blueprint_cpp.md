@@ -318,6 +318,11 @@ void on1(Actor actor, Float value, Text text) {
   waren), `list_reserve(Scores, 64);` (Platz vorhalten: Nichts, was man lesen kann, ändert sich –
   die Liste wächst danach so weit, ohne noch einmal Speicher anzufordern). Eine Schleife aus
   einzelnen Add wächst mehrmals; darum gibt es diese Schritte.
+- **Vergleichen.** Lists Equal sagt, ob zwei Listen eines Typs dasselbe halten: gleich viele Einträge,
+  und jeder gleich dem an seiner Stelle – `list_equal<Int>(Members, Roster)`, in C++ das `==` zweier
+  `std::vector` (`a != b` ist `logic_not(list_equal<Int>(a, b))`). Verglichen wird wie bei Contains
+  und Find Item: Zahlen nach ihrem Wert (ein NaN gleicht nichts), Strukturen Feld für Feld. Gelesen
+  wird, wo die Listen stehen – der Vergleich kopiert nichts; eine Liste fester Länge passt wie jede.
 - **Ordnen.** Sort List bringt eine Liste an ihrem Platz in eine Reihenfolge, stabil (gleiche Einträge
   behalten ihre): `list_sort<nullptr>(Scores);` nach der eigenen Ordnung der Einträge (Zahlen, ganze
   Zahlen, Flags, Texte, Werte von Aufzählungen, Int64 nach den Bits als `u64`), oder
