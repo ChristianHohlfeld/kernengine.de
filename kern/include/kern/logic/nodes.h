@@ -470,19 +470,10 @@ template <class T, std::size_t N> struct Held<Fixed<T, N>> : Held<List<T>> {
 };
 }  // namespace detail
 template <class T> T from_value(const Value& v) { return detail::Held<T>::from(v); }
-/// What a function of the engine gives where a Blueprint's own type stands - one of its structs or
-/// enums, or a list of them: the value, read as that type where it is used (engine_nodes.gen.h).
 namespace detail {
 template <class T> inline constexpr bool is_initializer_list = false;
 template <class T> inline constexpr bool is_initializer_list<std::initializer_list<T>> = true;
 }  // namespace detail
-struct EngineValue {
-  Value v;
-  /// (Not a list written out in braces: a List is assigned as the list it is.)
-  template <class T>
-    requires(!detail::is_initializer_list<T>)
-  operator T() const { return from_value<T>(v); }
-};
 template <class T> constexpr PinType pin_type_of() { return detail::Held<T>::type; }
 /// Is `v` a value of the C++ type T as a Blueprint holds it (logic::is_value_of: of that pin
 /// type, an enum's value one of its values, a struct with a value of its type for every field)?

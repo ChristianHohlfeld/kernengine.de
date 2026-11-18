@@ -88,11 +88,16 @@ def table_text(api, functions):
 
 
 def case_text(api, functions):
-    """The test's Blueprint: every function of the engine called once, what it gives kept in a variable."""
+    """The test's Blueprint: every function of the engine called once, what it gives kept in a variable. The
+    functions called on an object of the engine (a method of one, its release) and those that make one without
+    inputs stand in the functions Run<n>, all others in Free<n>: a test plays the first on the engine itself -
+    with no object behind the handle 0 each of those calls fails before the engine is asked, and an object is
+    made as C++ makes it without arguments; what a free function gives may depend on what the test does not
+    hold (the clock, the threads of the jobs), and its inputs here are zeros nobody chose."""
     u = api.u
     plain = {"Bool": "false", "Int": "0", "Float": "0.0", "Vector": "Vector{0.0, 0.0, 0.0}", "Text": '""', "Int64": "Int64{0x0}"}
     zero = lambda bt: plain[bt] if bt in plain else u.zero(bt)
-    variables, members, bodies, inputs = [], [], [], {}
+    variables, members, bodies, free, inputs = [], [], [], [], {}
 
     def value(bt):
         if bt in plain:
@@ -121,7 +126,10 @@ def case_text(api, functions):
             for j, (o, bt, _) in enumerate(f["outs"]):
                 variables.append(f"  {bt} R{k}_{j} = {zero(bt)};")
                 lines.append(f"R{k}_{j} = n{node}.{o};")
-        bodies.append(lines)
+        d = f["decl"]
+        method = f.get("role") is None and d.get("kind") == "CXXMethodDecl" and d.get("storageClass") != "static"
+        on_object = (method and bool(f["ins"]) and f["ins"][0][2] is not None) or f.get("role") == "release" or (f.get("role") == "make" and not f["ins"])
+        (bodies if on_object else free).append(lines)
     word = re.compile(r"[A-Za-z_]\w*")
     used = set(word.findall("\n".join(variables + members)))
     keep, changed = [False] * len(u.types), True
@@ -133,16 +141,21 @@ def case_text(api, functions):
                 keep[i] = changed = True
                 used.update(word.findall(line))
     out = ["struct Engine : kern::Blueprint {", *[line for i, line in enumerate(u.types) if keep[i]], "", *variables, ""]
-    runs, per = [], 40
-    for a in range(0, len(bodies), per):
-        runs.append(f"Run{a // per + 1}")
-        out += [f"  void {runs[-1]}() {{", *["    " + ln for body in bodies[a:a + per] for ln in body], "  }", ""]
+    runs, on_objects, per = [], [], 40
+    for name, group in (("Run", bodies), ("Free", free)):
+        for a in range(0, len(group), per):
+            runs.append(f"{name}{a // per + 1}")
+            out += [f"  void {runs[-1]}() {{", *["    " + ln for body in group[a:a + per] for ln in body], "  }", ""]
+        if name == "Run":
+            on_objects = list(runs)
     out += [*members, "};"]
     text = "\n".join(out) + "\n"
     return ("// The engine's nodes in a test: a Blueprint that calls every function of the engine once and keeps what it\n"
             "// gives (written by tools/engine_api.py - see kern/logic/engine_api.h; not edited by hand).\n#pragma once\n\n"
             "namespace engine_case {\n\ninline const char* kEngine = R\"kn(\n" + text + ")kn\";\n\n"
-            "inline const char* const kRuns[] = {" + ", ".join(c_text(r) for r in runs) + "};\n\n}  // namespace engine_case\n")
+            "inline const char* const kRuns[] = {" + ", ".join(c_text(r) for r in runs) + "};\n"
+            "// (those whose calls are on objects of the engine: played once more on the engine itself)\n"
+            "inline const char* const kRunsOnObjects[] = {" + ", ".join(c_text(r) for r in on_objects) + "};\n\n}  // namespace engine_case\n")
 
 
 # ---- the calls: every node on the real function (kern/logic/engine_host.h) ----

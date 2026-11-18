@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "kern/logic/engine_api.h"
+#include "kern/logic/engine_host.h"
 #include "kern/logic/logic.h"
 
 inline std::string native_show(const kern::logic::Value& v) {
@@ -56,3 +57,49 @@ struct NativeTestHost : kern::logic::Host {
     return state;
   }
 };
+
+/// The host of a case played on the engine itself: its engine is the engine - the real function of every
+/// node (kern/logic/engine_host.h), on objects of its own. `direct`: it gives a Blueprint's class these
+/// objects, and the class calls the engine's functions on them itself (kern/logic/engine_direct.h); else
+/// every call comes through its door. It counts the calls that came through the door and keeps what it
+/// was told of calls that failed, in their order.
+struct NativeEngineHost : NativeTestHost {
+  kern::logic::EngineObjects objects;
+  bool direct = false;
+  long door = 0;
+  std::string told;
+  bool engine(std::string_view function, const std::vector<kern::logic::Value>& in, std::vector<kern::logic::Value>& out) override {
+    ++door;
+    if (kern::logic::call_engine(objects, function, in, out)) return true;
+    engine_failed(function);
+    return false;
+  }
+  kern::logic::EngineObjects* engine_objects() override { return direct ? &objects : nullptr; }
+  void engine_failed(std::string_view function) override { told += " !" + std::string(function) + ": " + objects.error; }
+};
+
+/// The functions `runs` of a Blueprint (no inputs), called on the engine itself: after each, what the host
+/// was told of calls that failed and every variable of the Blueprint. `as_class`: the Blueprint runs as its
+/// compiled class, which calls the engine's functions itself - else in the interpreter, through the host's
+/// door. The two texts are the same, character by character. `problem`: it did not run that way.
+inline std::string native_play_on_engine(const kern::logic::Graph& graph, const std::string& name, const std::vector<std::string>& runs, bool as_class, std::string& problem) {
+  NativeEngineHost host;
+  host.direct = as_class;
+  kern::logic::Runtime rt(host);
+  rt.jit = false;
+  rt.native = as_class;
+  kern::logic::Instance* inst = rt.add(graph, 0, name);
+  rt.begin();
+  if ((std::string(inst->tier()) == "native C++") != as_class) problem = name + " runs in the " + inst->tier();
+  std::string text = "== " + name + " on the engine itself\n";
+  for (const std::string& run : runs) {
+    std::vector<kern::logic::Value> results;
+    host.told.clear();
+    text += run + (inst->call(run, {}, results) ? " ->" : " (no call) ->") + host.told + " |";
+    for (const kern::logic::Variable& v : graph.variables) text += " " + v.name + "=" + native_show(inst->get(v.name));
+    text += "\n";
+  }
+  if (problem.empty() && as_class && host.door != 0) problem = "the class of " + name + " called the engine through the host's door " + std::to_string(host.door) + " times";
+  if (problem.empty() && !as_class && host.door == 0) problem = "the interpreter did not call the engine through the host's door";
+  return text;
+}

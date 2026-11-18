@@ -359,9 +359,9 @@ template <class R> struct Hold<R&> {   // ... by reference: where the engine has
 }  // namespace direct
 
 /// What a function of the engine gave where a Blueprint's own type stands - one of its structs or
-/// enums, or a list of them: read as that type where it is used (as logic::EngineValue is for a value
-/// from the door - and it is that one, where the class called through the door). `R` is what the C++
-/// function returns, `Tag` the Blueprint type of the pin.
+/// enums, or a list of them: read as that type where it is used. Where the class called through the
+/// door, it holds the value the host gave instead. `R` is what the C++ function returns, `Tag` the
+/// Blueprint type of the pin.
 template <class Tag, class R> class Given {
  public:
   /// Through the door: the value the host gave.
