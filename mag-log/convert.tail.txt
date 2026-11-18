@@ -1,0 +1,80 @@
+    pole_radius (1): a variable of the Blueprint of the actor Lamps, which the level does not have
+    cell_key (1): written
+    Field::place_road (26): written
+    Field::rebuild (16): written
+    Field::reground (4): it calls CityStream::ground_height(), which waits
+    Field::near (15): written
+    Field::set_state (6): it calls worse(), which waits
+    Field::set (5): written
+    Field::broken_list (5): written
+    Field::merge_broken (8): it calls worse(), which waits
+    Field::shot (15): a call on the Blueprint of the actor Lamps, which the level does not have
+    Field::blast (15): a call on the Blueprint of the actor Lamps, which the level does not have
+    Field::car (13): a call on the Blueprint of the actor Lamps, which the level does not have
+destruction_cpp                 7 /   11 functions      145 /    246 lines
+    norm2 (4): written
+    Destruction::merge_points (11): written
+    Destruction::blast (44): buildings_near() is defined in another file
+    Destruction::collapse (8): written
+    Destruction::tear (66): written
+    Destruction::fracture (39): written
+    Destruction::spawn (13): written
+    Destruction::free_torn (4): written
+    Destruction::update (41): it calls CityStream::ground_height(), which waits
+    Destruction::draw (7): put() is defined in another file
+    Destruction::reset (9): clear_damage() is defined in another file
+terrain                         8 /    9 functions       11 /     12 lines
+    Terrain::settled (1): written
+    Terrain::has_dem (1): written
+    Terrain::water_level (1): elevation() is defined in another file
+    Terrain::deformed (4): written
+    Terrain::crater_count (1): written
+    CraterRec::operator== (1): written
+    Terrain::take_changes (1): written
+    Terrain::stats (1): a name for a place - written where it is called
+    terrarium_height (1): written
+tiles                           2 /    2 functions        2 /      2 lines
+    TileKey::operator== (1): written
+    TileKey::hash (1): written
+people_cpp                     20 /   22 functions      438 /    575 lines
+    People::hurt (7): written
+    dist2d (1): written
+    approach_angle (1): written
+    inside_building (5): written
+    People::route_point (13): written
+    People::free_move (15): written
+    People::add_officer (17): written
+    People::add_citizen (17): written
+    People::add_scripted (17): written
+    People::count (6): written
+    People::witnessed (5): written
+    near_any (5): written
+    People::dress (8): written
+    People::apply_snapshot (45): written
+    People::spawn (73): it calls CityStream::ground_height(), which waits
+    People::frighten (24): written
+    People::kill (22): written
+    People::mate_hurt (18): written
+    People::shot (78): written
+    People::blast (27): written
+    People::walk (107): written
+    People::update (64): it calls CityStream::ground_height(), which waits
+
+153 of 170 functions of the program are written as Blueprints (1134 of 1442 lines), and 8 of the engine's headers that they call: 22 Blueprints - 4 of source files, 0 of states, 18 of headers and of shapes
+143 functions of the Blueprints are compared with their source, bit for bit, by the tests in /dev/shm/spawncity-jobs-chris/work-f2-probe-161628-26259/pt/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+     4 (   182)   it calls CityStream::ground_height(), which waits
+     4 (    48)   a call on the Blueprint of the actor Lamps, which the level does not have
+     1 (    44)   buildings_near() is defined in another file
+     2 (    14)   it calls worse(), which waits
+     1 (     9)   clear_damage() is defined in another file
+     1 (     7)   put() is defined in another file
+     1 (     1)   height() is defined in another file
+     1 (     1)   the Blueprint of the actor Lamps, which the level does not have
+     1 (     1)   a variable of the Blueprint of the actor Lamps, which the level does not have
+     1 (     1)   elevation() is defined in another file
+
+real	2m34,490s
+user	7m38,835s
+sys	0m28,116s
