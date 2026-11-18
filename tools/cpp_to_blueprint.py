@@ -5964,7 +5964,7 @@ class Emit:
             if b.get("kind") == "MemberExpr" and (self.is_this(kids(b)[0]) or not b.get("isArrow")):
                 b = self.unwrap(kids(b)[0])
                 continue
-            if b.get("kind") == "MemberExpr" and b.get("isArrow") and kids(b) and self.is_box(kids(b)[0]):
+            if b.get("kind") == "MemberExpr" and b.get("isArrow") and kids(b) and (self.is_box(kids(b)[0]) or self.box(kids(b)[0]) is not None):
                 b = self.unwrap(kids(b)[0])   # (p->list: the list in what an owned value holds - its one entry)
                 continue
             if self.box(b) is not None:   # (*p: what an owned value holds - named as p is)
