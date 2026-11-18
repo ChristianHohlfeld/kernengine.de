@@ -1,0 +1,6 @@
+compared >= 20 || long_calls | body: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | eject: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | hide_soldier: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | matrix_of: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | state_of: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | step_parachute: only 0 calls could be compared (in 6000 the source left the numbers)
