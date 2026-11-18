@@ -591,3 +591,27 @@ Rate mit neun laufenden Agenten zeigt erst die nächste Zahl (erbeten für ~18:4
 3. Mergen nach Abschnitt 10, Schritt 3 (sechs Bedingungen) – zuerst der Fix von d (F1), dann k, dann t1/t2, dann g/f; danach `voll origin/work`.
 4. Entwurf „Events des Programms / build_level“ (Stufe 6) anfordern, sobald g1 die Beschreibung geliefert hat; c starten, sobald d fertig ist; s5, sobald p die
    Ursachen behoben hat.
+
+### 16.6 Stopp der Agenten (18.11., ~17:50)
+Alle neun Agenten wurden etwa zehn Minuten nach dem Start von der Nutzerseite gestoppt (zeitgleich mit einer unterbrochenen Antwort des Koordinators um
+17:49/17:50) – **kein Bericht kommt mehr von ihnen; neu gestartet wird nur auf Chris' Wort.** Entscheidung Chris 17:56 zur Frage, die Läufe vom Mergen zu
+entkoppeln: **„wir lassen wie gehabt“** – die Regeln aus Abschnitt 2/10 gelten unverändert (Beweis vor jedem Merge, Absenkung nur mit grünem Differenztest).
+Was die Agenten bis dahin gepusht haben (alles auf GitHub, Arbeitsbäume sauber – außer p):
+- **d** `5367e14`: Fix für F1 als eigener Commit **`6f62201`** (Eltern: `work` 90b5ab8, enthält nur den Fix). Ursache laut stand/d.md: die Jobs des Falls liefen
+  auf Worker-Threads, das Ergebnis von take_queued hing vom Ablauf ab; `take_queued`/`done` nativ ohne Sperre. Lösung: `jobs::set_threads(false)` (zwei neue
+  Knoten), Sperren, jedes Spiel per fork vom selben Zustand, Uhren aus der Tabelle (`KERN_CLOCK`), jede andere Abweichung ist ein FAIL. **Beweis läuft noch:**
+  mag `work-d-engine-174905-11207`, `work-d-engine-174911-11261`, CI `44351625418` – vor dem Übernehmen ansehen. Antworten zu `Mixer::bus`/`TextureDesc::rgba`:
+  der Entwurf trägt beide nicht (stand/d.md, „C“).
+- **t1** `77d96e1`: origin/work eingemischt; **Lücke gefunden und geschlossen (unbewiesen):** im Durchgang gegen die echte Engine (`SC_ENGINE=real`) zählte ein
+  Aufruf, den die Tür abweist (Handle 0 = „kein Objekt“), als verglichen und gleich (stand/t1.md, „E“). Probe über alle Quelltexte: `work-t1-probe-174058-4177`.
+- **t2** `965b490`: origin/work eingemischt; Probe `work-t2-probe-163129-9216` lief noch.
+- **k** `3dd3338`: origin/work eingemischt; vier `konvert`-Läufe auf mag (e5f2bf1: 8/40 Kerne; 3dd3338: `work-k-konvert-174058-4191`, `-174111-4316`).
+- **g1** `8522b2f`, **g2** `2362cf1`: origin/work eingemischt; die Proben über alle game*.cpp liefen noch (auf dem Stand davor).
+- **f1** `172d40b`: origin/work und `mag/differenztest` eingemischt, Differenztests neu erzeugt (mvt 2, tiles 3, terrain 3, city_stream 3, interiors 1,
+  city_jobs 23+4); mag: `work-f1-spiel-174450-8421` (lowered), `work-f1-probe-174453-8472`.
+- **f2** `139fbcf`: test_main.cpp übersetzt wieder, Stufen-Fall `lists_equal_structs`; mag `work-f2-engine-174611-9407`. **Befund für den Koordinator:** die
+  Auftragsart `probe` ruft den Konverter ohne `--level` – jede Funktion, die den Blueprint eines Regel-Actors ruft, wartet dort mit „the Blueprint of the actor X,
+  which the level does not have“ (Artefakt der Probe). Vorschlag: `--level level/spawncity.klevel` im Zweig `probe` von lauf2.sh. Noch nicht umgesetzt.
+- **p** `04f1a57` unverändert; **ungepushte Arbeit** (logic.h, notation.cpp, tools/blueprint_cpp.cpp, tests/bench/) liegt im Worktree `/home/claude/w-p` und als
+  Sicherung in `koordination/p/unterbrochen_1750/` (Patch + bench) – ungeprüft, mitten in der Änderung.
+mag rechnet unabhängig weiter (der volle Lauf `work-voll-162644-5528` seit 17:38:59).
