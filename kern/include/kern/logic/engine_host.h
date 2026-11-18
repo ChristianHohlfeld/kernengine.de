@@ -2,7 +2,10 @@
 //
 // A node of the engine (kern/logic/engine_api.h) reaches the engine through logic::Host::engine. This
 // is what a host gives it there: the real function, called with the node's inputs and giving back
-// what it gives - in every tier the same, since every tier calls through that door.
+// what it gives - for the interpreter and the JIT, and for a Blueprint's class whose host keeps the
+// engine's objects to itself. A class whose host gives it these objects (Host::engine_objects) calls
+// the same function on them itself, typed (kern/logic/engine_direct.h): the same objects behind the
+// same handles, the same result.
 //
 //   - `EngineObjects` are the objects of the engine a Blueprint holds handles of (a handle is a whole
 //     number, 0 is none): those it made (<class>.make - owned here until <class>.release, or until
@@ -113,6 +116,11 @@ class EngineObjects {
     return r;
   }
   void let_go() { held_.clear(); }
+  /// A call begins: nothing has failed yet, and what the call before was given to look at is let go.
+  void begin_call() {
+    error.clear();
+    let_go();
+  }
 
   /// Why the last call failed.
   std::string error;
@@ -469,20 +477,25 @@ template <class Tag, class C> void give(EngineObjects& o, std::vector<Value>& ou
   if (k < out.size()) out[k] = Conv<Tag>::to(o, c);
 }
 
-/// The object of the handle at input `k` as a T, or null - then the call fails, saying which input.
-template <class T> T* object(EngineObjects& o, const std::vector<Value>& in, std::size_t k, const char* pin) {
-  T* p = k < in.size() ? o.get<T>(in[k].as_int()) : nullptr;
+/// The object of a handle as a T, or null - then the call fails, saying which input it was.
+template <class T> T* object_of(EngineObjects& o, i64 handle, const char* pin) {
+  T* p = o.get<T>(handle);
   if (!p) o.error = std::string("no object of the engine of its class at the input ") + pin;
   return p;
+}
+/// The same where the function takes a pointer: null for the handle 0; a handle of no such object
+/// fails the call (o.error says which input).
+template <class T> T* maybe_of(EngineObjects& o, i64 handle, const char* pin) {
+  return handle == 0 ? nullptr : object_of<T>(o, handle, pin);
+}
+/// The object of the handle at input `k` as a T, or null - then the call fails, saying which input.
+template <class T> T* object(EngineObjects& o, const std::vector<Value>& in, std::size_t k, const char* pin) {
+  return object_of<T>(o, k < in.size() ? in[k].as_int() : 0, pin);
 }
 /// The object of the handle at input `k` as a T where the function takes a pointer: null for the handle
 /// 0; a handle of no such object fails the call (o.error says which input).
 template <class T> T* maybe(EngineObjects& o, const std::vector<Value>& in, std::size_t k, const char* pin) {
-  const i64 h = k < in.size() ? in[k].as_int() : 0;
-  if (h == 0) return nullptr;
-  T* p = o.get<T>(h);
-  if (!p) o.error = std::string("no object of the engine of its class at the input ") + pin;
-  return p;
+  return maybe_of<T>(o, k < in.size() ? in[k].as_int() : 0, pin);
 }
 /// The room a count says (none for less than nothing).
 template <class C> std::size_t room(const C& c) {

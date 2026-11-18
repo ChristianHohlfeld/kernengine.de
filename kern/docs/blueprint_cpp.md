@@ -1157,10 +1157,42 @@ Was nur die Engine kann – ein Strahl durch die Physik, ein Mesh zeichnen, eine
 ein Knoten (`tools/engine_api.py` liest die Header der Engine und schreibt die Tabelle
 `kern/src/logic/engine_api.gen.cpp`, die Funktionen der Klasse `engine_nodes.gen.h` und den Fall
 `kern/tests/engine_case.gen.h`, der jeden Knoten einmal aufruft): `kern::physics::World::cast_ray`
-ist `engine.world.cast_ray`, im Text `engine_world_cast_ray(world, from, to …)`. Jede Stufe ruft
-ihn durch eine Tür, `logic::Host::engine`; ein Test bindet dort den Stellvertreter
+ist `engine.world.cast_ray`, im Text `engine_world_cast_ray(world, from, to …)`. Interpreter und
+JIT rufen ihn durch eine Tür, `logic::Host::engine`; ein Test bindet dort den Stellvertreter
 `logic::EngineStandIn`, der aus der Form jedes Ausgangs antwortet – gleich in jeder Stufe – oder
-die Engine selbst.
+die Engine selbst. Die Klasse ruft die Funktion der Engine selbst (unten: „In der Klasse der Aufruf
+selbst“).
+
+- **In der Klasse der Aufruf selbst** (`kern/logic/engine_direct.h`): Gibt der Host der Klasse die
+  Objekte der Engine (`Host::engine_objects`, in der Klasse `kern_world.engine` – der Host eines
+  Spiels, `GameWorld`, tut das), dann ist `engine_world_cast_ray(World, From, To, Filter, 0)` der
+  Aufruf `objects.get<physics::World>(World)->cast_ray(From, To, filter, {})`: typisiert, ohne
+  `logic::Value`, ohne Liste von Werten, ohne Namen. Jeder Eingang wird aus dem C++-Typ, den er in
+  der Klasse hat, was die C++-Funktion nimmt – eine Zahl die Zahl, eine Struktur des Blueprints die
+  der Engine Feld für Feld (der Reihe nach: die Struktur des Blueprints hat die Felder der Engine,
+  sonst übersetzt die Klasse nicht), ein Enum der Wert an derselben Stelle –, und was die Funktion
+  gibt, wird ebenso der Typ der Klasse. Was die Klasse schon als den Typ hält, den die Funktion
+  nimmt, wird übergeben, wie es dasteht: ein `Float`, wo sie `f64` nimmt, ein `Vector` als `Vec3`,
+  eine `List<Vector>` als `std::vector<Vec3>` (auch als Zeiger mit Anzahl), ein Text, der im
+  Programm ausgeschrieben ist oder beim Lauf entstand, als `const char*`, `std::string_view` oder
+  `const std::string&` – ohne Kopie. Ein Handle wird einmal nachgeschlagen, in denselben
+  `EngineObjects`, die die Tür benutzt: ein Objekt, ein Handle, wer auch fragt. Wo die Funktion
+  der Engine keinen Speicher anfordert, fordert der Aufruf keinen an.
+  Er tut, was die Tür mit demselben Aufruf tut, Bit für Bit – auch wo ein Aufruf scheitert (ein
+  Handle ohne Objekt der Klasse: der Host erfährt es, `Host::engine_failed`, die Ausgänge sind
+  ihre Nullen; eine Struktur ihre Defaults) und wo niemand einen Ausgang liest (ein Objekt der
+  Engine darin hat sein Handle trotzdem). Hat der Host keine Objekte oder gibt er sie nicht (ein
+  Test, der die Aufrufe mitschreibt; der Stellvertreter), ruft dieselbe Klasse durch die Tür.
+  `tools/engine_api.py` schreibt beides aus derselben Tabelle: die Aufrufe hinter der Tür
+  (`kern/src/<Teil>/engine_calls.gen.cpp`) und die Funktionen der Klasse (`engine_nodes.gen.h`);
+  `engine_values::Direct<…>` sagt je Typ des Blueprints, was `engine_values::Conv<…>` der Tür über
+  einen Wert sagt. Geprüft: der native Fall „Engine“ spielt seine Aufrufe auf Objekten ein
+  weiteres Mal auf der Engine selbst – der Interpreter durch die Tür, die Klasse direkt, jede
+  Variable gleich, und die Klasse nicht ein Mal durch die Tür (`kern/tests/blueprint_native.h`,
+  `native_show.h`); `engine_calls_class_calls_the_engine_itself` vergleicht dieselbe Klasse mit und
+  ohne Objekte und mit C++ selbst, `engine_calls_class_asks_for_no_memory` zählt die
+  Speicheranforderungen (`kern/tests/test_main.cpp`). Ein Build, der Klassen bindet, bindet die
+  Teile der Engine, deren Funktionen sie rufen (ein Knoten, den keine Klasse ruft, braucht nichts).
 
 - **Eine Methode eines Objekts der Engine ist ihr Knoten** (ein Objekt mit einem Leben für sich:
   eine Klasse – die Physik, der Renderer, der Mixer –, eine Struktur, die nicht kopiert werden kann
