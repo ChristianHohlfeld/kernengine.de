@@ -13114,8 +13114,8 @@ def convert_unit(job):
 
 
 def settled_extern(text, shape, whole):
-    """The declaration of a function of an actor's Blueprint (KERN_EXTERN_AS ...) for a Blueprint of several parts: its
-    inputs as the actor's Blueprint names them - but none called as something of the whole Blueprint (`whole`: its
+    """The declaration of a function of an actor's Blueprint (KERN_EXTERN_AS ...), settled for the whole program: its
+    inputs as the actor's Blueprint names them - but none called as something a Blueprint of the program has (`whole`:
     variables, functions, types) or as an input before it. `shape`: the head of the declaration and the inputs (type,
     the actor's name, default) - None for any other text, which stays."""
     if shape is None:
@@ -13500,20 +13500,27 @@ def main(argv):
     pool.shutdown()
 
     # ---- the parts of a Blueprint of several files: one Blueprint ----
+    # What a function of an actor's Blueprint looks like (KERN_EXTERN) is said where it is called, with its inputs as the
+    # actor names them. An input of a function is not called as a variable or a function of the Blueprint that holds the
+    # declaration - and that is not only the Blueprint that says it: a part of a Blueprint of several files knows its own
+    # names only, and a library's declaration is held by every Blueprint that uses the library (Game has the variable `pad`,
+    # the library controls_cpp the input `pad` of Controls' DeviceInput: the level was not read). So the declarations are
+    # settled here, once for the program: an input is called as the actor calls it unless something of a Blueprint of the
+    # program is called so (then with a number) - the same wherever the declaration stands. A call gives its values in their
+    # order, by no name.
+    everywhere = set()
+    for r in results.values():
+        everywhere.update(r.get("names", ()))
+        for lines in r["state"].values():
+            everywhere.update(re.sub(r"\s*=.*", "", line).split()[-1] for line in lines if line.strip() and not line.strip().startswith("///"))
+    for r in results.values():
+        if r.get("externs"):
+            variables, functions_, members_ = r["parts"]
+            r["parts"] = (variables, [settled_extern(t, r["externs"].get(t), everywhere) for t in functions_], members_)
     blue = {u: r for u, r in results.items() if u not in world.parts}
     for blueprint in sorted(set(world.parts.values())):
         mine = sorted((p for p in results if world.parts.get(p) == blueprint), key=lambda p: world.part_numbers[p])
         state, constants, said_by, texts_, members, types_, uses_ = {}, [], {}, [], [], {}, set()
-        # What the whole Blueprint calls something: what each of its parts has in the end, and its variables. A part knows its
-        # own names only - an input of a function of an actor's Blueprint (KERN_EXTERN) is named there as the actor names it,
-        # and may be the name of a variable another part declares (Game's `pad`, the input `pad` of Controls' DeviceInput). An
-        # input of a function is not called as a variable or a function of the Blueprint: the declaration is settled here, for
-        # the whole Blueprint, from the actor's names - the same in every part (a call gives its values in their order, by no name).
-        whole = set()
-        for p in mine:
-            whole.update(results[p].get("names", ()))
-            for lines in results[p]["state"].values():
-                whole.update(re.sub(r"\s*=.*", "", line).split()[-1] for line in lines if line.strip() and not line.strip().startswith("///"))
         for p in mine:
             r = results[p]
             for at, lines in r["state"].items():
@@ -13536,7 +13543,6 @@ def main(argv):
                     constants += block
                 block = []
             # (what a function of an actor's Blueprint looks like: once, also where several parts call it)
-            functions_ = [settled_extern(t, r.get("externs", {}).get(t), whole) for t in functions_]
             texts_ += [t for t in functions_ if not ("KERN_EXTERN" in t and t in texts_)]
             members += members_
             types_.update(r["types"])
