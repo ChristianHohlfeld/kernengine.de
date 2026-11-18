@@ -1,0 +1,80 @@
+       |          ^~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-002703-13260/kern/games/spawncity/src/level_blueprints.cpp:39319:9: warning: unused variable 'count' [-Wunused-variable]
+ 39319 |     Int count = 0;
+       |         ^~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-002703-13260/kern/games/spawncity/src/level_blueprints.cpp:39320:9: warning: unused variable 'at_5' [-Wunused-variable]
+ 39320 |     Int at_5 = 0;
+       |         ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-002703-13260/kern/games/spawncity/src/level_blueprints.cpp:39321:9: warning: unused variable 'end_4' [-Wunused-variable]
+ 39321 |     Int end_4 = 0;
+       |         ^~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-002703-13260/kern/games/spawncity/src/level_blueprints.cpp:46720:10: warning: unused variable 'running' [-Wunused-variable]
+ 46720 |     Bool running = false;
+       |          ^~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-002703-13260/kern/games/spawncity/src/level_blueprints.cpp:46723:10: warning: unused variable 'connected' [-Wunused-variable]
+ 46723 |     Bool connected = false;
+       |          ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-002703-13260/kern/games/spawncity/src/level_blueprints.cpp:46754:10: warning: unused variable 'connected' [-Wunused-variable]
+ 46754 |     Bool connected = false;
+       |          ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-002703-13260/kern/games/spawncity/src/level_blueprints.cpp:46796:10: warning: unused variable 'client_connected' [-Wunused-variable]
+ 46796 |     Bool client_connected = false;
+       |          ^~~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-002703-13260/kern/games/spawncity/src/level_blueprints.cpp:46962:9: warning: unused variable 'max_clients' [-Wunused-variable]
+ 46962 |     Int max_clients = 0;
+       |         ^~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-002703-13260/kern/games/spawncity/src/level_blueprints.cpp:46965:10: warning: unused variable 'client_connected' [-Wunused-variable]
+ 46965 |     Bool client_connected = false;
+       |          ^~~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-002703-13260/kern/games/spawncity/src/level_blueprints.cpp:47038:10: warning: unused variable 'connected' [-Wunused-variable]
+ 47038 |     Bool connected = false;
+       |          ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-002703-13260/kern/games/spawncity/src/level_blueprints.cpp:47041:10: warning: unused variable 'send' [-Wunused-variable]
+ 47041 |     Bool send = false;
+       |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-002703-13260/kern/games/spawncity/src/level_blueprints.cpp:47086:10: warning: unused variable 'connected' [-Wunused-variable]
+ 47086 |     Bool connected = false;
+       |          ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-002703-13260/kern/games/spawncity/src/level_blueprints.cpp:47089:10: warning: variable 'send' set but not used [-Wunused-but-set-variable]
+ 47089 |     Bool send = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-002703-13260/kern/games/spawncity/src/level_blueprints.cpp:47108:10: warning: unused variable 'connected' [-Wunused-variable]
+ 47108 |     Bool connected = false;
+       |          ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-002703-13260/kern/games/spawncity/src/level_blueprints.cpp:47111:10: warning: variable 'send' set but not used [-Wunused-but-set-variable]
+ 47111 |     Bool send = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-002703-13260/kern/games/spawncity/src/level_blueprints.cpp:47130:10: warning: unused variable 'connected' [-Wunused-variable]
+ 47130 |     Bool connected = false;
+       |          ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-002703-13260/kern/games/spawncity/src/level_blueprints.cpp:47133:10: warning: variable 'send' set but not used [-Wunused-but-set-variable]
+ 47133 |     Bool send = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-002703-13260/kern/games/spawncity/src/level_blueprints.cpp:47227:9: warning: unused variable 'connected_clients' [-Wunused-variable]
+ 47227 |     Int connected_clients = 0;
+       |         ^~~~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-002703-13260/kern/games/spawncity/tests/converted/test_net_session_cpp.cpp:1725:21: warning: unused variable 'draw' [-Wunused-variable]
+ 1725 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+2 warnings generated.
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-002703-13260/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:174:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  174 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-002703-13260/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:222:85: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  222 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g->width});
+      |                                                                                     ^
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-002703-13260/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:610:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  610 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-002703-13260/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:659:84: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  659 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g.width});
+      |                                                                                    ^
+2 warnings generated.
+4 warnings generated.
+1 warning generated.
+23 warnings generated.
+0 tests, 0 checks, 0 failures
+
+real	4m8,162s
+user	30m3,635s
+sys	0m46,513s

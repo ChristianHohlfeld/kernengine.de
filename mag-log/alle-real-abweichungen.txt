@@ -1,0 +1,3 @@
+compared >= 20 || long_calls | Session_connected: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | Session_join: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | Session_stop: only 0 calls could be compared (in 6000 the source left the numbers)
