@@ -1285,7 +1285,7 @@ void Terrain::build_water_chunk(i32 ci, i32 cj, bool detail) {
         f32 d = 0;
         Vec2 fl{};
         i32 n = 0;
-        for (const auto [di, dj] : {std::pair<i32, i32>{0, 0}, {-1, 0}, {0, -1}, {-1, -1}}) {
+        for (const auto& [di, dj] : {std::pair<i32, i32>{0, 0}, {-1, 0}, {0, -1}, {-1, -1}}) {
           const i32 i = a + di + B, j = b + dj + B;
           if (!water[static_cast<std::size_t>(j) * W + i]) continue;
           d += at(i, j);

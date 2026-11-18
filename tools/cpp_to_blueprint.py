@@ -694,17 +694,25 @@ class Tree:
         namespace does not give it (the runs agree on the addresses of their nodes, but not always on every one:
         fc::FirmwareRuntime::step calls hwcontract::decode_icm42688_registers) - the one function of that name and
         type there is: under that address too."""
+        # (the same for a constant of a namespace - `kern::kMaxExtensionAttributes`: the one variable of that name and
+        # type that stands outside every class and function)
         by_sig = collections.defaultdict(list)
         for d in self.decl.values():
             if d.get("kind") in ("FunctionDecl", "CXXMethodDecl") and d.get("name"):
                 by_sig[(d["kind"], d["name"], qtype(d))].append(d)
-        missing = {}
+            elif d.get("kind") == "VarDecl" and d.get("name") and d["id"] not in self.owner and self.scope_of.get(d["id"], "").rstrip(":") not in self.records:   # (no local yet: see take_locals)
+                by_sig[(d["kind"], d["name"], qtype(d))].append(d)
+        missing, here = {}, set()
         for dumps in [self.dumps, *[ds for _, ds in self.more], self.engine]:
             for o in dumps:
                 for n in walk(o):
+                    if n.get("kind") == "VarDecl" and n.get("id"):
+                        here.add(n["id"])   # (a variable a dump declares - a local one too: it is no other's)
                     r = n.get("referencedDecl")
-                    if r and r.get("id") and r.get("kind") in ("FunctionDecl", "CXXMethodDecl") and r["id"] not in self.decl and r.get("name"):
+                    if r and r.get("id") and r.get("kind") in ("FunctionDecl", "CXXMethodDecl", "VarDecl") and r["id"] not in self.decl and r.get("name"):
                         missing[r["id"]] = (r["kind"], r["name"], qtype(r))
+        for rid in here:
+            missing.pop(rid, None)
         for rid, sig in missing.items():
             same = {self.body.get(d["id"], d)["id"]: d for d in by_sig.get(sig, ())}
             if len(same) == 1:
@@ -3229,6 +3237,23 @@ class Emit:
                 i = self.root(t)
                 if i is not None:
                     out.add(i)
+        # (a reference the body declares to a part of another variable - `i32& v = corner[at];` -: what changes
+        # through it changes that variable)
+        named = {}
+        for n in walk(body):
+            if n.get("kind") == "VarDecl" and n.get("init") and kids(n):
+                raw = qtype(n)
+                if raw.rstrip().endswith("&") and not raw.rstrip().endswith("&&") and not re.search(r"\bconst\b", raw):
+                    i = self.root(kids(n)[-1])
+                    if i is not None and i != n["id"]:
+                        named[n["id"]] = i
+        grew = True
+        while grew:
+            grew = False
+            for v, i in named.items():
+                if v in out and i not in out:
+                    out.add(i)
+                    grew = True
         return out
 
     # ---- text formatted into a buffer ----
@@ -3949,7 +3974,9 @@ class Emit:
         ones after it down, so the one taken out is the one that ends -; clear() of a kern::Map or kern::Set
         ends its entries from the last to the first (kern/core/map.h); push_back(std::move(x)) and
         emplace_back(std::move(x)) take x into the list - it is empty where it was (a Take), nothing is copied
-        and nothing ends."""
+        and nothing ends; emplace(key, std::move(x)) and try_emplace(key, std::move(x)) of a kern::Map take x into
+        the key's new entry - only where the key is new: where it is there, nothing changes and x keeps what it
+        holds (kern/core/map.h try_emplace)."""
         base = kids(callee(n))[0] if kids(callee(n)) else {}
         c = self.u.clean(re.sub(r"\*\s*(const)?\s*$", "", qtype(base)))
         args = [x for x in kids(n)[1:] if x.get("kind") != "CXXDefaultArgExpr"]
@@ -3957,12 +3984,18 @@ class Emit:
             return name == "pop_back" or len(args) == 1
         if name == "clear":
             return bool(KEYED_KERN.match(c))
+        if name in ("emplace", "try_emplace") and len(args) == 2 and KEYED_KERN.match(c):
+            return self.moved_value(args[1])
         if name in ("push_back", "emplace_back") and len(args) == 1:
-            a = self.unwrap(args[0])
-            while a.get("kind") in ("MaterializeTemporaryExpr", "ImplicitCastExpr") and len(kids(a)) == 1:
-                a = self.unwrap(kids(a)[0])
-            return a.get("kind") == "CallExpr" and callee_name(a) == "move" and len(kids(a)) == 2
+            return self.moved_value(args[0])
         return False
+
+    def moved_value(self, n):
+        """Is this argument std::move(x) - a value handed on, empty where it was?"""
+        a = self.unwrap(n)
+        while a.get("kind") in ("MaterializeTemporaryExpr", "ImplicitCastExpr") and len(kids(a)) == 1:
+            a = self.unwrap(kids(a)[0])
+        return a.get("kind") == "CallExpr" and callee_name(a) == "move" and len(kids(a)) == 2
 
     def ended_entry(self, h, place):
         """The steps that end an entry of a list or map at `place` as C++ ends it (h: what ends with it)."""
@@ -3979,7 +4012,7 @@ class Emit:
         """The steps that end every entry of a list or map at `lv`, from the last to the first."""
         count, at = self.temp("count", "Int"), self.temp("at", "Int")
         last = self.whole_math("-", count, "1")
-        return [f"{count} = kern::to<Int>({kind}_length<{row}>({lv}));",
+        return [f"{count} = {kind}_length<{row}>({lv});",   # (Length gives an Int)
                 *self.count_loop("0", last, lambda i: [f"{at} = {self.whole_math('-', last, i)};", *self.ended_entry(h, f"{lv}[{at}]")])]
 
     def block_of(self, stmts):
@@ -4001,6 +4034,13 @@ class Emit:
                     out += [f"if ({self.going()}) {{", *["  " + ln for ln in rest], "}"]
                 break
         return out, False
+
+    def continues(self, s):
+        """Does a statement end with continue - in a switch in a loop, a case that goes on with the loop's next round
+        (it falls through to no other case)?"""
+        while s.get("kind") == "CompoundStmt" and kids(s):
+            s = kids(s)[-1]
+        return s.get("kind") == "ContinueStmt"
 
     def ends(self, stmts):
         """Does a list of statements always return?"""
@@ -4886,7 +4926,7 @@ class Emit:
                     closed = True
                     break
                 body_stmts.append(x)
-                if self.ends([x]):
+                if self.ends([x]) or self.continues(x):
                     closed = True
                     break
             if not closed and (labels, stmts) is not (cases[-1][0], cases[-1][1]) and cases[-1] is not None and labels is not cases[-1][0]:
@@ -6106,6 +6146,14 @@ class Emit:
                     raise Wait(f"{name}() of a map with other arguments")
             key = self.temp("key", kt)
             lines = [f"{key} = {self.ex(key_node, kt)};"]
+            if kind == "map" and value is not None and name in ("emplace", "try_emplace") and self.entry_life(self.ctype(base)) is not None:
+                # a value that ends something, moved in (entries_change): taken only where the key is new - where it
+                # is there, nothing changes and what was to be moved in keeps what it holds (kern::Map::try_emplace)
+                steps, text = self.lazily(value)
+                before, lv, after = self.variable_of(base, lt)
+                n = self.keyed_node()
+                return (lines + before + [f"map_add({n}, {lv}, {key});", f"if ({n}.added) {{", *["  " + x for x in steps], f"  {lv}[{n}.index] = {text};", "}"] + after,
+                        f"{n}.index", f"{n}.added")
             held = None
             if kind == "map" and value is not None:
                 held = self.temp("value", vt)
@@ -6164,10 +6212,10 @@ class Emit:
             for n in walk(self.f.decl):
                 if n.get("kind") == "DeclRefExpr" and n.get("referencedDecl", {}).get("id") in names:
                     whole = {"kind": "DeclRefExpr", "referencedDecl": {"id": d["id"], "kind": "VarDecl", "name": d.get("name", "")}, "type": d.get("type", {})}
-                    was = n.get("type", {})
+                    was, where = n.get("type", {}), self.where_of(n)
                     part = names[n["referencedDecl"]["id"]]
                     n.clear()
-                    n.update({"kind": "MemberExpr", "name": part, "isArrow": False, "type": was, "inner": [whole]})
+                    n.update({"kind": "MemberExpr", "name": part, "isArrow": False, "type": was, "inner": [whole], **where})
             return
         lt = self.u.rows.get(bt, bt)
         if lt.startswith("List<") and self.u.fixed(re.sub(r"&", "", qtype(d))) == len(binds):
@@ -6177,9 +6225,9 @@ class Emit:
                 if n.get("kind") == "DeclRefExpr" and n.get("referencedDecl", {}).get("id") in ids:
                     whole = {"kind": "DeclRefExpr", "referencedDecl": {"id": d["id"], "kind": "VarDecl", "name": d.get("name", "")}, "type": d.get("type", {}), "_bt": bt}
                     at = {"kind": "IntegerLiteral", "value": str(ids[n["referencedDecl"]["id"]]), "type": {"qualType": "int"}}
-                    was = n.get("type", {})
+                    was, where = n.get("type", {}), self.where_of(n)
                     n.clear()
-                    n.update({"kind": "ArraySubscriptExpr", "type": was, "_bt": lt[5:-1], "inner": [whole, at]})
+                    n.update({"kind": "ArraySubscriptExpr", "type": was, "_bt": lt[5:-1], "inner": [whole, at], **where})
             return
         if fields is None or len(fields) != len(binds) or any(f[3] is None for f in fields):
             raise Wait("names for the parts of something that is not a struct")
@@ -6188,9 +6236,15 @@ class Emit:
             if n.get("kind") == "DeclRefExpr" and n.get("referencedDecl", {}).get("id") in ids:
                 f, ft = fields[ids[n["referencedDecl"]["id"]]][3], fields[ids[n["referencedDecl"]["id"]]][1]
                 whole = {"kind": "DeclRefExpr", "referencedDecl": {"id": d["id"], "kind": "VarDecl", "name": d.get("name", "")}, "type": d.get("type", {}), "_bt": bt}
-                was = n.get("type", {})
+                was, where = n.get("type", {}), self.where_of(n)
                 n.clear()
-                n.update({"kind": "MemberExpr", "name": f, "isArrow": False, "type": was, "_bt": ft, "inner": [whole]})
+                n.update({"kind": "MemberExpr", "name": f, "isArrow": False, "type": was, "_bt": ft, "inner": [whole], **where})
+
+    @staticmethod
+    def where_of(n):
+        """Where a node stands in the source (a part written out for a name of it - `t` of `auto& [k, t]` - stands where
+        the name does: the test's source changes it there, see Writer.guard)."""
+        return {k: n[k] for k in ("range", "loc", "_at", "_file") if k in n}
 
     @staticmethod
     def init_of(v):
@@ -7146,7 +7200,10 @@ class Emit:
         t = self.unwrap(target)
         k = t.get("kind")
         if k == "DeclRefExpr":
-            return [f"{self.lvalue(t)} = {value(self.tp(t))};"]
+            name, held = self.lvalue(t), self.held_type(t)
+            if held in self.u.rows:   # (a list inside a list a reference names - `for (auto& ring : rings)`: its field items)
+                return [f"{name}.items = {value(self.u.rows[held])};"]
+            return [f"{name} = {value(self.tp(t))};"]
         got = self.spot(t)
         if got is not None and self.writable(got[0]):   # a place of the notation: set where it stands
             return [f"{got[0]} = {value(got[1])};"]
