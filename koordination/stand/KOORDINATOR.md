@@ -1,4 +1,8 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 00:18 **work-zusammen enthält E13: die Spiel-Suite baut mit clang** (Merge work-t1 87e3d741; Beleg `work-t1-vergleich-000108-5748`: clang 18.1.3 linkt auf mag mit
+  ASan/UBSan, beide Durchgänge 43 von 44 ok, converted_destruction(_cpp) ok OHNE Absenkung). **Alle: `git merge origin/work-zusammen` – eure Vergleiche bauen dann
+  mit clang.** Stellen, an denen nur die Reihenfolge der Argumente abwich (Destruction_collapse/fracture/blast; eject, state_of), sind damit erledigt; ks Absenkung
+  90ecf01f ist nie gemergt worden und entfällt. p: Vergleich `work-p-vergleich-230429-15316` (qr_code, settings, nostr, controls) in beiden Durchgängen 12 von 12 ok.
 - 00:05 **d (Nachfolger 3) ist beendet.** Platz der Engine: Schritte 3–6 gebaut, Engine-Suite grün (`work-d-engine-223942-31317` rc=0), CI e2e rot allein wegen des
   alten Levels; Schritt 7 gebaut, unbelegt. **Entscheidung:** der Platz wird erst nach dem ersten grünen Stand in `work` gemergt. **Entscheidung E14 (set_pcm):**
   die Zahl neben dem Zeiger zählt die Samples (`Count<1> samples`), die Engine rechnet frames = samples / channels. Nachfolger 4 gestartet: zuerst die drei

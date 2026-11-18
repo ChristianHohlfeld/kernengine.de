@@ -121,3 +121,13 @@
   geschriebenen Text steht ein Platz – die Funktionen mit shots() (drone_attack, jet_attack) warten aus anderen Gründen (aim_ray, ctl_screen_ray).
   Schritt 7 ist also gebaut und bricht nichts, aber noch nicht an einer Quelle belegt. FAIL dort: eject, state_of (auch in früheren Läufen),
   matrix_of + net_session (Befund-Block oben) – nicht von Schritt 7.
+
+## Nachfolger 4 (ab 00:05, 19.11.) – Befund-Block Zeiger/Array-Längen
+- Zweig **work-d-count** (auf work-zusammen e4aa2e8d), zwei Commits (E14 und Count hängen zusammen: ohne Count im Typ prüft niemand
+  `samples`, und mit der Typ-Regel meldet der Erzeuger set_pcm/create_clip, solange dort `u32 frames` steht):
+  - **0c6840cc** E14: `set_pcm(id, const f32* data, Count<1> samples, channels, rate)`, ebenso `Mixer::create_clip`; frames = samples/channels,
+    Rest ≠ 0 abgewiesen; Studio::sound_pcm gibt frames·channels; Spiel unverändert (channels = 1). Engine-Test + Doku.
+  - **f384bdfd** Count im Typ: Namensregel weg (engine_api.py ×2, TestWriter), count_per nur Count<Per>; Api.unsaid_count meldet jede ganze Zahl
+    ohne Count neben einem Daten-Zeiger, engine_api.py hält an. 30 Erklärungen umgestellt (net/geo/scene/gfx/audio/game). Generator reproduziert.
+  - Syntax lokal: g++ -Werror über 41 betroffene Dateien + test_main.cpp ✓; py_compile ✓.
+- Beleg läuft: mag `work-d-count-vergleich-000943-8780` (net_session.cpp + game_gaps.cpp); Engine-Suite (Filter) folgt.
