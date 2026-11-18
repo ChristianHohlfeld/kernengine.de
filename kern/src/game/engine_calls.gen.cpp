@@ -2146,6 +2146,7 @@ bool c170(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   ev::take<ev::Int>(o, in, 1, a0);
   std::vector<float> a1;
   ev::take<ev::List<ev::Float>>(o, in, 2, a1);
+  if (a1.size() < 14) { o.error = "the list joints has fewer than 14 entries"; return false; }
   decltype(auto) r = self->set_walker_pose(std::move(a0), a1.empty() ? nullptr : a1.data());
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -2159,6 +2160,7 @@ bool c171(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   ev::take<ev::Int>(o, in, 1, a0);
   std::vector<float> a1;
   ev::take<ev::List<ev::Float>>(o, in, 2, a1);
+  if (a1.size() < 14) { o.error = "the list action has fewer than 14 entries"; return false; }
   decltype(auto) r = self->set_walker_action(std::move(a0), a1.empty() ? nullptr : a1.data());
   ev::give<ev::Bool>(o, out, 0, r);
   return true;

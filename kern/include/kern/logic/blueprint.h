@@ -738,7 +738,15 @@ struct BlueprintCore : logic::PureNodes {
   template <Setting Cases> static int flow_switch_text(const Text& selection) { return logic::flow::switch_text(Cases.view(), selection); }
 
   // ---- values with a setting ----
-  template <Setting Op> static Bool math_compare(Float a, Float b) { return compare(Op.view(), a, b); }
+  // (the operator is known when the class is compiled: the same expressions as compare, chosen then)
+  template <Setting Op> static Bool math_compare(Float a, Float b) {
+    if constexpr (Op.view() == "==") return std::fabs(a - b) <= 1e-9;
+    else if constexpr (Op.view() == "!=") return std::fabs(a - b) > 1e-9;
+    else if constexpr (Op.view() == "<") return a < b;
+    else if constexpr (Op.view() == "<=") return a <= b;
+    else if constexpr (Op.view() == ">") return a > b;
+    else return a >= b;
+  }
   /// The setting "Type" of a generic node is the type itself: logic_select<Float>, value_reroute<List<Text>>.
   template <class T> static T logic_select(Bool pick, std::type_identity_t<T> a, std::type_identity_t<T> b) { return pick ? a : b; }
   template <class T> static T value_reroute(std::type_identity_t<T> in) { return in; }

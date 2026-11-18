@@ -120,10 +120,9 @@ bool convertible(PinType from, PinType to);
 /// the interpreter and in a Blueprint's C++. Int's ends are 2^63 - 1 and its negative: the same
 /// distance from 0, so every Int can be written down in C++ (-2^63 is no literal there).
 inline i64 whole(f64 v) {
+  if (std::fabs(v) < 9223372036854775808.0) [[likely]] return static_cast<i64>(v);  // (one test for what is inside; not a number fails it)
   if (!std::isfinite(v)) return 0;
-  if (v >= 9223372036854775808.0) return std::numeric_limits<i64>::max();
-  if (v <= -9223372036854775808.0) return -std::numeric_limits<i64>::max();
-  return static_cast<i64>(v);
+  return v > 0 ? std::numeric_limits<i64>::max() : -std::numeric_limits<i64>::max();
 }
 
 /// A whole number as a Blueprint holds it. Every number of a Blueprint is a double underneath
@@ -1052,8 +1051,11 @@ inline void native_call(bool begins) {
 /// `space`: the namespace the class stands in (the glue is written into it too), empty: none.
 /// `all`: the Blueprints of the project, for a Blueprint that uses libraries - it is registered
 /// under the hash of the one graph it is with them (logic::link), as Runtime::add looks it up.
+/// `held_only`: only how the class's structs are held as values (detail::Held) - what its text
+/// needs to compile in a program that calls the class directly, without registering it
+/// (tools/blueprint_cpp --classes).
 bool native_glue(const Graph& g, const std::string& name, std::string& out, std::string* error = nullptr, const Library& lib = library(), std::string_view space = {},
-                 const Blueprints& all = {});
+                 const Blueprints& all = {}, bool held_only = false);
 
 struct NodeState {           // per node instance: Do Once, Gate, Flip Flop, loops, latent waits
   f64 time = 0, a = 0, b = 0;

@@ -1016,6 +1016,13 @@ def enum_numbers(enum_decl):
     return out
 
 
+def declared_length(tree, parm):
+    """A parameter declared as an array of a fixed length (`const f32 inertia[6]`): that length - the function reads
+    so many through the pointer it is (the type says only the pointer: the declaration says the length) -, else None."""
+    m = re.search(r"\[\s*(\d+)\s*\]\s*$", tree.source(parm).strip()) if parm.get("kind") == "ParmVarDecl" else None
+    return int(m.group(1)) if m else None
+
+
 def count_per(t):
     """kern::Count<Per> - a count beside a pointer the engine writes numbers through, each thing it counts
     `Per` numbers (kern/core/base.h): Per. A whole number that counts what it writes: 1. Else None."""
@@ -11002,7 +11009,10 @@ class TestWriter:
                 after = ps[i + 1] if i + 1 < len(ps) else None
                 per = count_per(self.u.clean(qtype(after))) if after is not None else None   # (Count<Per>: Per numbers each)
                 counted = per is not None and re.search(r"count|size|len|num|^n$", after.get("name", ""))
-                data = f"std::vector<{inner}>({name}, {name} + {per} * static_cast<std::size_t>({after['name']}))" if counted else f"({name} ? std::vector<{inner}>{{*{name}}} : std::vector<{inner}>{{}})"
+                fixed = declared_length(self.tree, p)   # (an array of a fixed length: so many)
+                data = (f"std::vector<{inner}>({name}, {name} + {per} * static_cast<std::size_t>({after['name']}))" if counted else
+                        f"({name} ? std::vector<{inner}>({name}, {name} + {fixed}) : std::vector<{inner}>{{}})" if fixed else
+                        f"({name} ? std::vector<{inner}>{{*{name}}} : std::vector<{inner}>{{}})")
                 params.append((f"const {inner}* {name}", default))
                 values.append(f"converted::value_of({self.wrap(data, f'std::vector<{inner}>')})")
             elif re.match(r"(?:kern::)?Span<", self.u.clean(raw)):

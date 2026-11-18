@@ -389,6 +389,7 @@ class Calls:
                     f"  o.error = \"the handle names no {q.split('::')[-1]} that was made\";", "  return false;", "}", "return true;"]
         mangled = d.get("mangledName")
         ptypes = self.ptypes(f)
+        parms = [p for p in c2b.kids(d) if p.get("kind") == "ParmVarDecl"]   # (their declarations: an array's length)
         params = f["params"]
         in_at = {name: k for k, (name, _, _) in enumerate(f["ins"])}
         out_at = {name: k for k, (name, _, _) in enumerate(f["outs"])}
@@ -453,6 +454,9 @@ class Calls:
                 x = re.sub(r"\s*\bconst$", "", P[:-1].strip())
                 lines += [f"std::vector<{x}> {a};", f"ev::take<{tg}>(o, in, {k}, {a});"]
                 args.append(f"{a}.empty() ? nullptr : {a}.data()")
+                fixed = c2b.declared_length(tree, parms[i]) if i < len(parms) else None
+                if fixed:   # (an array of a fixed length: the engine reads so many)
+                    later.append(f'if ({a}.size() < {fixed}) {{ o.error = "the list {pin_in} has fewer than {fixed} entries"; return false; }}')
                 nxt = params[i + 1][0] if i + 1 < len(params) else None
                 if nxt is not None and re.search(r"count|size|len|num|^n$", nxt) and pin.get(nxt, ("", None))[0] == "Int":
                     # (the first of as many as the count beside it says - Count<Per>: Per numbers each -: no more than the list has - the engine reads them)
@@ -524,6 +528,7 @@ class Calls:
             return lines + [f'if (!kern_o->release<{q}>({i64}({name0}))) {{ kern_o->error = "the handle names no {q.split("::")[-1]} that was made"; {fail(given)} }}'], None
         mangled = d.get("mangledName")
         ptypes = self.ptypes(f)
+        parms = [p for p in c2b.kids(d) if p.get("kind") == "ParmVarDecl"]   # (their declarations: an array's length)
         params = f["params"]
         in_at = {name: k for k, (name, _, _) in enumerate(f["ins"])}
         pin = {name: (bt, h) for name, bt, h in f["ins"]}
@@ -586,6 +591,9 @@ class Calls:
                 x = re.sub(r"\s*\bconst$", "", P[:-1].strip())
                 lines.append(f"decltype(auto) {a} = {EV}taken<{tg}, std::vector<{x}>>({O}, {pin_in});")
                 args.append(f"{a}.empty() ? nullptr : {a}.data()")
+                fixed = c2b.declared_length(tree, parms[i]) if i < len(parms) else None
+                if fixed:   # (an array of a fixed length: the engine reads so many)
+                    later.append(f'if ({a}.size() < {fixed}) {{ kern_o->error = "the list {pin_in} has fewer than {fixed} entries"; {fail(given)} }}')
                 nxt = params[i + 1][0] if i + 1 < len(params) else None
                 if nxt is not None and re.search(r"count|size|len|num|^n$", nxt) and pin.get(nxt, ("", None))[0] == "Int":
                     # (the first of as many as the count beside it says - Count<Per>: Per numbers each -: no more than the list has - the engine reads them)

@@ -4840,7 +4840,8 @@ bool native_ready(const Graph& g, std::string* why, const Library& lib) {
   return true;
 }
 
-bool native_glue(const Graph& g, const std::string& name, std::string& out, std::string* error, const Library& lib, std::string_view space, const Blueprints& all) {
+bool native_glue(const Graph& g, const std::string& name, std::string& out, std::string* error, const Library& lib, std::string_view space, const Blueprints& all,
+                 bool held_only) {
   // (the class from anywhere: ::Name, or ::space::Name)
   const std::string rooted = "::" + (space.empty() ? std::string() : std::string(space) + "::") + name;
   std::string why;
@@ -4938,6 +4939,10 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
   if (!structs.empty())
     structs = (space.empty() ? std::string() : "}  // namespace " + std::string(space) + "\n") + "namespace kern::logic::detail {\n" + structs + "}  // namespace kern::logic::detail\n" +
               (space.empty() ? std::string() : "namespace " + std::string(space) + " {\n");
+  if (held_only) {
+    out = structs;
+    return true;
+  }
   char hash[40];
   // (a Blueprint that uses libraries is registered as what runs: the one graph it is with them)
   Graph whole;

@@ -7360,6 +7360,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
       decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, joints);
+      if (kern_a1.size() < 14) { kern_o->error = "the list joints has fewer than 14 entries"; { this->kern_engine_failed("engine.game_world.set_walker_pose"); return; } }
       decltype(auto) kern_r = kern_self->set_walker_pose(std::move(kern_a0), kern_a1.empty() ? nullptr : kern_a1.data());
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
@@ -7374,6 +7375,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
       decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, joints);
+      if (kern_a1.size() < 14) { kern_o->error = "the list joints has fewer than 14 entries"; { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.game_world.set_walker_pose"); return; } }
       decltype(auto) kern_r = kern_self->set_walker_pose(std::move(kern_a0), kern_a1.empty() ? nullptr : kern_a1.data());
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
@@ -7389,6 +7391,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
       decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, action);
+      if (kern_a1.size() < 14) { kern_o->error = "the list action has fewer than 14 entries"; { this->kern_engine_failed("engine.game_world.set_walker_action"); return; } }
       decltype(auto) kern_r = kern_self->set_walker_action(std::move(kern_a0), kern_a1.empty() ? nullptr : kern_a1.data());
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
@@ -7403,6 +7406,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
       decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, action);
+      if (kern_a1.size() < 14) { kern_o->error = "the list action has fewer than 14 entries"; { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.game_world.set_walker_action"); return; } }
       decltype(auto) kern_r = kern_self->set_walker_action(std::move(kern_a0), kern_a1.empty() ? nullptr : kern_a1.data());
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
@@ -13806,6 +13810,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, center, kern_a2);
       decltype(auto) kern_a3 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, inertia);
+      if (kern_a3.size() < 6) { kern_o->error = "the list inertia has fewer than 6 entries"; { this->kern_engine_failed("engine.world.set_mass_data"); return; } }
       kern_self->set_mass_data(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2), kern_a3.empty() ? nullptr : kern_a3.data());
       return;
     }
