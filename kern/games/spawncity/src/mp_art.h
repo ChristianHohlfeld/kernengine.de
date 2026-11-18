@@ -32,6 +32,9 @@ class MpArt {
   struct Part { u32 id = 0; std::vector<f32> transforms, tints; };
   bool make(kern::Renderer& r, Part& p, const kern::MeshData& mesh, const kern::Material& m);
   void put(Part& p, const kern::Mat4& m, Vec3 tint);
+  /// A part's instances: none at the start of a frame (begin), handed to the renderer at its end (end).
+  static void clear(Part& p);
+  void upload(Part& p);
   kern::Renderer* r_ = nullptr;
   Part post_, gem_, ring_, tracer_, flash_, canopy_, led_, shield_;
 };

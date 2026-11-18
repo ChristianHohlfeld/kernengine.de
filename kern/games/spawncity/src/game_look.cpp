@@ -37,10 +37,10 @@ void glow_cyl(MeshData& m, f32 r, f32 len, Vec3 hdr, Vec3 at) { prim::append(m, 
 // Glow colours: linear HDR (above 1 the bloom picks them up), like the MeshBasicMaterial glows.
 constexpr Vec3 kGlowRed{3.2f, 0.12f, 0.12f}, kGlowAmber{3.0f, 1.25f, 0.1f}, kGlowOrange{3.0f, 0.9f, 0.18f};
 
-bool g_vm_arms = true;  // false: the VR set (the controller is the hand: no forearm, no sleeve)
-/// A gloved forearm and sleeve reaching back from a grip at `grip` (viewmodel_arms.mjs).
-void arm(MeshData& m, Vec3 grip, f32 side) {
-  if (!g_vm_arms) return;
+/// A gloved forearm and sleeve reaching back from a grip at `grip` (viewmodel_arms.mjs). `arms`
+/// false: the VR set (the controller is the hand: no forearm, no sleeve).
+void arm(MeshData& m, Vec3 grip, f32 side, bool arms) {
+  if (!arms) return;
   const Mat4 tilt = Mat4::translate(grip) * Mat4::trs({}, Quat::axis_angle({1, 0, 0}, -0.12f), {1, 1, 1});
   box(m, {0.075f, 0.08f, 0.1f}, 0x1d232c, {0, 0, 0.0f}, tilt);                 // glove
   cyl(m, 0.04f, 0.3f, 0xc58c66, {side * 0.012f, -0.03f, 0.2f}, 10, tilt);      // forearm
@@ -49,7 +49,7 @@ void arm(MeshData& m, Vec3 grip, f32 side) {
 }
 
 /// BOOMSTICK 40 mm (weapon_models.mjs buildBoomstick): drum launcher with hazard stripes.
-void boomstick(MeshData& m, MeshData& g) {
+void boomstick(MeshData& m, MeshData& g, bool arms) {
   box(m, {0.17f, 0.125f, 0.32f}, 0x4a5a3a, {0, 0.012f, -0.1f});     // body (profile -0.06 .. 0.26)
   box(m, {0.1f, 0.2f, 0.1f}, 0x8a5a3b, {0, -0.155f, -0.095f});      // wooden grip
   box(m, {0.13f, 0.12f, 0.24f}, 0x1d2024, {0, -0.02f, 0.18f});      // stock
@@ -66,14 +66,14 @@ void boomstick(MeshData& m, MeshData& g) {
   box(m, {0.04f, 0.06f, 0.03f}, 0x121316, {0, 0.1f, -0.32f});
   glow_cyl(g, 0.064f, 0.012f, kGlowOrange, {0, 0.03f, -0.842f});    // glowing muzzle ring
   glow_box(g, {0.02f, 0.04f, 0.02f}, kGlowOrange, {0, 0.16f, -0.3f});
-  arm(m, {0, -0.15f, -0.095f}, 1);
+  arm(m, {0, -0.15f, -0.095f}, 1, arms);
 }
 
 /// ROCKET LAUNCHER (Kern, after buildRocketLauncher): a compact olive shoulder tube - flared
 /// venturi behind, a shroud and the dark bore in front, two bands, an optic on top with its lens,
 /// the laser module with the red lens beside the tube, pistol and fore grip. Shorter than before
 /// (0.95 m instead of 1.13 m) and held lower and further right: it frames the view, not fills it.
-void rocket_launcher(MeshData& m, MeshData& g) {
+void rocket_launcher(MeshData& m, MeshData& g, bool arms) {
   constexpr u32 olive = 0x3e4a30, dark = 0x15181b, band = 0x262d1e, steel = 0x7d848b;
   cyl(m, 0.058f, 0.76f, olive, {0, 0.03f, -0.27f}, 20);              // main tube (+.11 .. -.65)
   cyl(m, 0.071f, 0.08f, dark, {0, 0.03f, -0.67f}, 20);               // muzzle shroud
@@ -97,17 +97,17 @@ void rocket_launcher(MeshData& m, MeshData& g) {
   box(m, {0.05f, 0.15f, 0.07f}, dark, {0, -0.1f, -0.1f});            // pistol grip
   box(m, {0.012f, 0.045f, 0.09f}, dark, {0, -0.035f, -0.135f});      // trigger guard
   box(m, {0.048f, 0.11f, 0.06f}, dark, {0, -0.075f, -0.4f});         // fore grip
-  arm(m, {0, -0.13f, -0.105f}, 1);
+  arm(m, {0, -0.13f, -0.105f}, 1, arms);
 }
 
 /// FISTS (buildFists): one taped fist with forearm and sleeve; the left one is its mirror.
-void fist(MeshData& m) {
+void fist(MeshData& m, bool arms) {
   box(m, {0.076f, 0.078f, 0.1f}, 0xc58c66, {0, 0.002f, -0.004f});    // fist body
   box(m, {0.09f, 0.05f, 0.04f}, 0xc58c66, {0, 0.012f, -0.045f});     // knuckle ridge
   cyl(m, 0.0405f, 0.018f, 0xe9e4d8, {0, 0.002f, 0.016f}, 10);         // tape band
   box(m, {0.03f, 0.03f, 0.06f}, 0xa9714f, {-0.022f, -0.03f, -0.03f}); // thumb
   cyl(m, 0.038f, 0.05f, 0xe9e4d8, {0, -0.002f, 0.066f}, 10);          // wrist wrap
-  if (!g_vm_arms) return;
+  if (!arms) return;
   const Mat4 back = Mat4::trs({}, Quat::axis_angle({1, 0, 0}, -0.12f), {1, 1, 1});
   cyl(m, 0.043f, 0.3f, 0xc58c66, {0.012f, -0.03f, 0.24f}, 10, back);  // forearm
   cyl(m, 0.06f, 0.16f, 0x2c3440, {0.02f, -0.05f, 0.43f}, 10, back);   // sleeve
@@ -115,8 +115,8 @@ void fist(MeshData& m) {
 }
 
 /// KNIFE (buildKnife): clip-point blade with fuller and guard in the right fist, blade forward-up.
-void knife(MeshData& m, MeshData& g) {
-  fist(m);
+void knife(MeshData& m, MeshData& g, bool arms) {
+  fist(m, arms);
   const f32 s = 1.45f * 1.08f;  // FIST_HAND_SCALE x 1.08
   const Mat4 grip = Mat4::trs({0, 0.01f, -0.02f}, Quat::axis_angle({1, 0, 0}, 0.32f) * Quat::axis_angle({0, 1, 0}, 0.18f) * Quat::axis_angle({0, 0, 1}, -0.5f), {s, s, s});
   box(m, {0.0054f, 0.032f, 0.2f}, 0x6e757b, {0, 0.002f, -0.15f}, grip);   // blade
@@ -150,7 +150,7 @@ int vm_index(weapons::Id id) {
     default: return -1;
   }
 }
-const char* kVmNames[4] = {"BOOMSTICK 40 mm", "ROCKET LAUNCHER", "FISTS", "KNIFE"};
+const char* const kVmNames[4] = {"BOOMSTICK 40 mm", "ROCKET LAUNCHER", "FISTS", "KNIFE"};
 
 /// Camera space (x right, y up, z back) -> world.
 Mat4 camera_frame(const kern::Camera& c) {
@@ -180,7 +180,7 @@ void Game::look_begin(kern::Engine& e, const kern::Frame& f) {
     L.started = true;
     L.gov.reset(mobile_ ? perf::kMobileStart : perf::kDesktopStart, mobile_ ? perf::kMobileMax : perf::kTiers - 1);
     // ?quality=0..4 fixes a level (tests, slow machines); the setting can be changed with "quality".
-    if (e.arg("quality")) {
+    if (e.has_arg("quality")) {
       const f64 q = e.arg_number("quality", -1);
       if (q >= 0 && q < perf::kTiers) L.gov.set_fixed(static_cast<i32>(q));
     }
@@ -234,7 +234,7 @@ void Game::look_apply_tier() {
     L.lights = kern::LightPool(L.pool_size, 96);
   }
   if (engine_) {
-    kern::Renderer& r = engine_->renderer;
+    kern::Renderer& r = engine_->renderer();
     r.set_shadow_filter(q.shadow_filter);
     kern::AoOptions ao;
     // The original has no ambient occlusion (three.js without an AO pass): off on every level.
@@ -291,10 +291,14 @@ void Game::look_blast(Vec3 at, f32 radius) {
 
 void Game::look_lighting(f32 dt) {
   LookState& L = look_;
-  kern::Renderer& r = engine_->renderer;
+  kern::Renderer& r = engine_->renderer();
   const kern::game::WorldSettings& w = world_->level().world;
   // The game's day clock instead of GameWorld's (same sun path and colours; "time" can set it).
-  night_ = look::day_lighting(L.tod, w.sun_azimuth, w.fog_density, w.exposure, r.lighting, r.sky);
+  kern::Lighting lighting = r.lighting();
+  kern::SkyState sky = r.sky();
+  night_ = look::day_lighting(L.tod, w.sun_azimuth, w.fog_density, w.exposure, lighting, sky);
+  r.set_lighting(lighting);
+  r.set_sky(sky);
   windows_.night = night_;
   water_look_.time = static_cast<f32>(world_->sim_time());  // world_water.mjs uTime
   // simulator.mjs: shadowMap.enabled = !presentationSoftwareRaster (no shadows on a software rasterizer)
@@ -369,7 +373,7 @@ void Game::look_lighting(f32 dt) {
           const f32 d = std::hypot(head.x - eye.x, head.y - eye.y);
           if (d <= (L.pool_size >= 10 ? 110.0f : 70.0f)) near.push_back({d, head});
         }
-        std::sort(near.begin(), near.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+        std::stable_sort(near.begin(), near.end(), [](const std::pair<f32, Vec3>& a, const std::pair<f32, Vec3>& b) { return a.first < b.first; });
         L.near_lamps.clear();
         // the original's nearest three; the strongest level (10 lights) takes eight
         const std::size_t keep = L.pool_size >= 10 ? 8 : 3;
@@ -393,7 +397,7 @@ void Game::look_lighting(f32 dt) {
         const f32 d = kern::length(matrix_of(c.actor).translation() - eye);
         if (d < 60) near.push_back({d, static_cast<i32>(i)});
       }
-      std::sort(near.begin(), near.end());
+      std::stable_sort(near.begin(), near.end(), [](const std::pair<f32, i32>& a, const std::pair<f32, i32>& b) { return a.first < b.first || (!(b.first < a.first) && a.second < b.second); });
       for (std::size_t k = 0; k < near.size() && k < 3; ++k) {
         const kern::Mat4 m = matrix_of(cars_[static_cast<std::size_t>(near[k].second)].actor);
         const Vec3 fwd = kern::normalize(Vec3{m.m[0], m.m[1], 0}, {1, 0, 0});
@@ -449,7 +453,7 @@ void Game::look_lighting(f32 dt) {
 
 void Game::look_draw(kern::Engine& e, f32 dt) {
   LookState& L = look_;
-  kern::Renderer& r = e.renderer;
+  kern::Renderer& r = e.renderer();
   // speed_lines.mjs: radial streaks on a plane 0.6 m in front of the eye.
   if (!L.streak_mesh) {
     L.streak_mesh = r.allocate_id();
@@ -499,12 +503,12 @@ void Game::look_draw(kern::Engine& e, f32 dt) {
   // stereo_sbs.mjs: side-by-side cross-eye 3D (KAMERA: 3D NEBENEINANDER, ?sbs=1); the eye base by
   // the view (stereoRig: on foot 6.4 cm, else .013 x focus x the view's width at 1 m, focus car 8,
   // drone 6, jet 40 m, at most 2 m)
-  engine_->stereo = !vr_ && (ui_.settings.on(Opt::cam_stereo) || engine_->arg_number("sbs", 0) > 0);
-  if (engine_->stereo) {
+  engine_->set_stereo(!vr_ && (ui_.settings.on(Opt::cam_stereo) || engine_->arg_number("sbs", 0) > 0));
+  if (engine_->stereo()) {
     const f32 aspect = std::fmax(0.3f, frame_w_ * 0.5f / std::fmax(1.0f, frame_h_)), k = 2 * std::tan(cam_.fov * 0.5f) * aspect;
     const f32 F = mode_ == Mode::jet ? 40.0f : mode_ == Mode::car ? 8.0f : mode_ == Mode::foot ? 4.0f : 6.0f;
-    engine_->stereo_ipd = mode_ == Mode::foot ? 0.064f : std::fmax(0.064f, std::fmin(2.0f, 0.013f * F * k));
-    engine_->stereo_cross = true;
+    engine_->set_stereo_ipd(mode_ == Mode::foot ? 0.064f : std::fmax(0.064f, std::fmin(2.0f, 0.013f * F * k)));
+    engine_->set_stereo_cross(true);
   }
   look_lap(perf::Slot::draw);
   const kern::RenderStats& rs = e.stats();
@@ -514,8 +518,8 @@ void Game::look_draw(kern::Engine& e, f32 dt) {
 void Game::look_vr_hud() {
   // A panel 1.3 m ahead of the head and 0.5 m below it, turned to the eye, levelled to the heading
   // (it stays put under a nod): the page draws it, the game only carries it.
-  kern::Renderer& r = engine_->renderer;
-  const bool on = vr_ && engine_->xr && vr_hud_tex_;
+  kern::Renderer& r = engine_->renderer();
+  const bool on = vr_ && engine_->xr() && vr_hud_tex_;
   if (!on) { if (vr_hud_mesh_) r.set_visible(vr_hud_mesh_, false); return; }
   if (!vr_hud_mesh_) {
     MeshData q;
@@ -525,14 +529,15 @@ void Game::look_vr_hud() {
     q.push({-0.5f, 0, -0.5f}, {0, -1, 0}, {1, 1, 1}, {0, 1});
     q.indices = {0, 2, 1, 0, 3, 2};
     vr_hud_mesh_ = r.allocate_id();
-    kern::MeshInput in = q.as_input(kern::kMaxExtensionAttributes);
-    in.material.unlit = true;
-    in.material.double_sided = true;
-    in.material.cast_shadow = false;
-    in.material.frustum_culled = false;
-    in.material.alpha = kern::AlphaMode::blend;
-    in.texture = vr_hud_tex_;
-    if (!r.upsert(vr_hud_mesh_, in)) { r.release_id(vr_hud_mesh_); vr_hud_mesh_ = 0; return; }
+    kern::MeshLook look;
+    look.material.unlit = true;
+    look.material.double_sided = true;
+    look.material.cast_shadow = false;
+    look.material.frustum_culled = false;
+    look.material.alpha = kern::AlphaMode::blend;
+    look.extra_slot = kern::kMaxExtensionAttributes;
+    look.texture = vr_hud_tex_;
+    if (!kern::upsert(r, vr_hud_mesh_, q, look)) { r.release_id(vr_hud_mesh_); vr_hud_mesh_ = 0; return; }
   }
   // On the left wrist, like a watch (out of the view - raise the arm to read it, Y opens the menu
   // there); without the left controller low in front, where you look down to.
@@ -545,17 +550,17 @@ void Game::look_vr_hud() {
     c = lh.translation() + hy * 0.06f + hz * 0.09f;  // over the back of the wrist
     if (vr_menu_open_) { w = 0.32f; h = 0.24f; c = c + hy * 0.06f; }
     (void)hx;
-    to_eye = kern::normalize(engine_->xr_eye - c, hy);
+    to_eye = kern::normalize(engine_->xr_eye() - c, hy);
     // turned to the eye, upright: the viewer's right is up x the normal towards him
     rt = kern::normalize(kern::cross(Vec3{0, 0, 1}, to_eye), {1, 0, 0});
     up = kern::cross(to_eye, rt);
   } else {
-    Vec3 f = engine_->xr_forward;
+    Vec3 f = engine_->xr_forward();
     f.z = 0;
     f = kern::normalize(f, {1, 0, 0});
     rt = {f.y, -f.x, 0};
-    c = engine_->xr_eye + f * 1.1f - Vec3{0, 0, 0.85f};
-    to_eye = kern::normalize(engine_->xr_eye - c, f * -1.0f);
+    c = engine_->xr_eye() + f * 1.1f - Vec3{0, 0, 0.85f};
+    to_eye = kern::normalize(engine_->xr_eye() - c, f * -1.0f);
     rt = kern::normalize(kern::cross(Vec3{0, 0, 1}, to_eye), rt);
     up = kern::cross(to_eye, rt);
     w = 0.48f; h = 0.36f;
@@ -569,32 +574,32 @@ void Game::look_vr_hud() {
 
 void Game::look_view_models(f32 dt) {
   LookState& L = look_;
-  kern::Renderer& r = engine_->renderer;
+  kern::Renderer& r = engine_->renderer();
   if (!L.vm_built) {
     L.vm_built = true;
     for (int set = 0; set < 2; ++set) {
-      g_vm_arms = set == 0;  // set 1: VR - the weapon alone
+      const bool arms = set == 0;  // set 1: VR - the weapon alone
       for (int i = 0; i < 4; ++i) {
         MeshData body, glow;
         switch (i) {
-          case 0: boomstick(body, glow); break;
-          case 1: rocket_launcher(body, glow); break;
-          case 2: fist(body); break;
-          default: knife(body, glow); break;
+          case 0: boomstick(body, glow, arms); break;
+          case 1: rocket_launcher(body, glow, arms); break;
+          case 2: fist(body, arms); break;
+          default: knife(body, glow, arms); break;
         }
         auto make = [&](const MeshData& d, bool g, u32& id) {
           if (d.positions.empty()) return;
           id = r.allocate_id();
-          kern::MeshInput in = d.as_input(kern::kMaxExtensionAttributes);
-          in.material = vm_material(g, set == 1);
-          in.visible = false;
-          if (!r.upsert(id, in)) { r.release_id(id); id = 0; }
+          kern::MeshLook look;
+          look.material = vm_material(g, set == 1);
+          look.extra_slot = kern::kMaxExtensionAttributes;
+          look.visible = false;
+          if (!kern::upsert(r, id, d, look)) { r.release_id(id); id = 0; }
         };
         make(body, false, set ? L.vm_body_vr[i] : L.vm_body[i]);
         make(glow, true, set ? L.vm_glow_vr[i] : L.vm_glow[i]);
       }
     }
-    g_vm_arms = true;
   }
   Mat4 vr_probe;
   const bool vr_hand = vr_hand_matrix(1, vr_probe);
@@ -791,7 +796,7 @@ bool Game::look_command(const std::string& cmd, std::string& out) {
   }
   if (cmd == "viewmodel") {  // tests: the shown first-person model, where it is relative to the eye
     if (L.vm_shown < 0) { out = "none"; return true; }
-    const kern::Mesh* m = engine_->renderer.mesh(L.vm_body[L.vm_shown]);
+    const kern::Mesh* m = engine_->renderer().mesh(L.vm_body[L.vm_shown]);
     if (!m || m->transforms.size() < 16) { out = "no mesh"; return true; }
     const Vec3 p{m->transforms[12], m->transforms[13], m->transforms[14]};
     const Vec3 f = kern::normalize(cam_.target - cam_.eye, {1, 0, 0});
@@ -801,7 +806,7 @@ bool Game::look_command(const std::string& cmd, std::string& out) {
     return true;
   }
   if (cmd == "lights") {  // tests: the point lights of the last frame
-    const kern::PointLights& pl = engine_->renderer.point_lights();
+    const kern::PointLights& pl = engine_->renderer().point_lights();
     out = "[";
     for (u32 i = 0; i < pl.count; ++i) {
       std::snprintf(b, sizeof b, "%s{\"p\":[%.1f,%.1f,%.1f],\"range\":%.1f,\"i\":%.2f}", i ? "," : "", pl.pos_range[i * 4], pl.pos_range[i * 4 + 1], pl.pos_range[i * 4 + 2],

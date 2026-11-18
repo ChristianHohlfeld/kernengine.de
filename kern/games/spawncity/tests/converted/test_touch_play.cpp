@@ -18,10 +18,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -97,7 +97,7 @@ struct TouchPlay {
   
   
   /// After the game's frame read the fingers: the taps let go in between are gone now.
-  
+  void drop_lifted() { converted::erase(fires_, std::remove_if(fires_.begin(), fires_.end(), [](const TouchFire& f) { return f.lifted; }), fires_.end()); }
   /// Drone altitude pad axis (-1..1, up positive), 0 when released.
   f32 clearance() const { return clearance_; }
   /// Grenade button held: drag up in px since it went down.
@@ -119,7 +119,7 @@ struct TouchPlay {
   
 
   
-  const std::vector<TouchBtn>& buttons() const { return buttons_; }
+  
   TouchMode mode() const { return lay_.mode; }
 
  private:
@@ -134,6 +134,7 @@ struct TouchPlay {
   
   
   bool no_sticks() const { return lay_.aiming || (lay_.mode == TouchMode::drone && lay_.pad_drone); }
+  /// The button under a finger: its place in buttons_, -1 for none.
   
   
   
@@ -308,14 +309,17 @@ SC_TEST(converted_touch_play) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]() { return converted::counted([&] { return TouchPlay{}.right_inset(); }); };
     for (int i = 0; tally.more(i); ++i) {
+      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run();
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // TouchPlay::move
@@ -323,15 +327,18 @@ SC_TEST(converted_touch_play) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.move(); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const TouchPlay a0 = draw_TouchPlay(draw);
+      TouchPlay a0 = draw_TouchPlay(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // TouchPlay::look
@@ -339,15 +346,18 @@ SC_TEST(converted_touch_play) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.look(); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const TouchPlay a0 = draw_TouchPlay(draw);
+      TouchPlay a0 = draw_TouchPlay(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // TouchPlay::move_live
@@ -355,15 +365,18 @@ SC_TEST(converted_touch_play) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.move_live(); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const TouchPlay a0 = draw_TouchPlay(draw);
+      TouchPlay a0 = draw_TouchPlay(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // TouchPlay::look_live
@@ -371,15 +384,18 @@ SC_TEST(converted_touch_play) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.look_live(); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const TouchPlay a0 = draw_TouchPlay(draw);
+      TouchPlay a0 = draw_TouchPlay(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // TouchPlay::look_edge
@@ -387,15 +403,37 @@ SC_TEST(converted_touch_play) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.look_edge(); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const TouchPlay a0 = draw_TouchPlay(draw);
+      TouchPlay a0 = draw_TouchPlay(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // TouchPlay::drop_lifted
+    converted::Tally tally("TouchPlay_drop_lifted");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] TouchPlay a0) { converted::counted([&] { return a0.drop_lifted(); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      TouchPlay a0 = draw_TouchPlay(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // TouchPlay::clearance
@@ -403,15 +441,18 @@ SC_TEST(converted_touch_play) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.clearance(); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const TouchPlay a0 = draw_TouchPlay(draw);
+      TouchPlay a0 = draw_TouchPlay(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // TouchPlay::grenade_drag
@@ -419,15 +460,18 @@ SC_TEST(converted_touch_play) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.grenade_drag(); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const TouchPlay a0 = draw_TouchPlay(draw);
+      TouchPlay a0 = draw_TouchPlay(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // TouchPlay::inject
@@ -435,16 +479,19 @@ SC_TEST(converted_touch_play) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] TouchPlay a0, [[maybe_unused]] std::string a1) { converted::counted([&] { return a0.inject(a1); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
-      const TouchPlay a0 = draw_TouchPlay(draw);
-      const std::string a1 = draw.word();
+      TouchPlay a0 = draw_TouchPlay(draw);
+      std::string a1 = draw.word();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // TouchPlay::any
@@ -452,31 +499,18 @@ SC_TEST(converted_touch_play) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.any(); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const TouchPlay a0 = draw_TouchPlay(draw);
+      TouchPlay a0 = draw_TouchPlay(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
-    }
-  }
-  {  // TouchPlay::buttons
-    converted::Tally tally("TouchPlay_buttons");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.buttons(); }); };
-    for (int i = 0; tally.more(i); ++i) {
-      const TouchPlay a0 = draw_TouchPlay(draw);
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      const auto want = run(a0);
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // TouchPlay::mode
@@ -484,15 +518,18 @@ SC_TEST(converted_touch_play) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.mode(); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const TouchPlay a0 = draw_TouchPlay(draw);
+      TouchPlay a0 = draw_TouchPlay(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // TouchPlay::no_sticks
@@ -500,15 +537,18 @@ SC_TEST(converted_touch_play) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.no_sticks(); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const TouchPlay a0 = draw_TouchPlay(draw);
+      TouchPlay a0 = draw_TouchPlay(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // TouchPlay::add
@@ -516,16 +556,19 @@ SC_TEST(converted_touch_play) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] TouchPlay a0, [[maybe_unused]] TouchBtn a1) { converted::counted([&] { return a0.add(a1); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
-      const TouchPlay a0 = draw_TouchPlay(draw);
-      const TouchBtn a1 = draw_TouchBtn(draw);
+      TouchPlay a0 = draw_TouchPlay(draw);
+      TouchBtn a1 = draw_TouchBtn(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

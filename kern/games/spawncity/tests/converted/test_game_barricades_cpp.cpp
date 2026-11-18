@@ -19,10 +19,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -35,10 +35,6 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Whole64 {
-  u32 high = 0;
-  u32 low = 0;
-};
 struct MeshData {
   std::vector<f32> positions, normals, colors, uvs;
   std::vector<f32> extra;  // optional per-vertex stream (extra_size floats each)
@@ -63,21 +59,13 @@ struct MeshData {
   /// Borrowed MeshInput view (geometry only; material etc. stay default).
   
 };
-enum class Surface : u8 { none, cloth, tpu, floor };
-enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
-enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, count
-};
-enum class Key : u8 {
-  unknown = 0,
-  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
-  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
-  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
-  count
-};
-namespace Fx { enum Kind : u8 { shot, explosion, impact, rocket, cow_death, push, lamp, strike, flyover, mil_tracer, mil_shell, npc_death, melee, kLast = melee }; }
-enum class Kind : u8 { none = 0, car_hit = 1, person_hit = 2, lamps = 3, plank_step = 4, planks = 5, state = 6, ask = 7 };
+namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
+namespace CityStream { namespace Tile { enum class State : u8 { requested, decoding, terrain_wait, building, roads, areas, collision, ready, failed }; } }
+namespace logic { enum class PinType : u8 {
+  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
+  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
+  map, set, count
+}; }
 namespace Interiors { struct Door { Vec2 c, d, n; }; }
 namespace Interiors { struct Core { Vec2 o, u, v; }; }
 namespace Interiors { struct Plan {
@@ -95,6 +83,15 @@ namespace Interiors { struct Plan {
     std::vector<Vec3> lamps;     // ceiling light panels
     u32 furniture = 0;
   }; }
+namespace net { namespace Fx { enum Kind : u8 { shot, explosion, impact, rocket, cow_death, push, lamp, strike, flyover, mil_tracer, mil_shell, npc_death, melee, kLast = melee }; } }
+namespace town { enum class Kind : u8 { none = 0, car_hit = 1, person_hit = 2, lamps = 3, plank_step = 4, planks = 5, state = 6, ask = 7 }; }
+enum class Key : u8 {
+  unknown = 0,
+  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
+  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
+  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
+  count
+};
 i64 building_key(const Interiors::Plan& p) {
   if (p.outer.empty()) return 0;
   return (converted::shl_bits(static_cast<i64>(std::lround(converted::at(p.outer, 0).x * 10)), 32)) ^ (static_cast<i64>(std::lround(converted::at(p.outer, 0).y * 10)) & 0xffffffffll) ^ static_cast<i64>(p.outer.size());
@@ -185,15 +182,18 @@ SC_TEST(converted_game_barricades_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Interiors::Plan a0) { return converted::counted([&] { return converted_game_barricades_cpp::building_key(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Interiors::Plan a0 = draw_Interiors__Plan(draw);
+      Interiors::Plan a0 = draw_Interiors__Plan(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = converted::shaped<converted::Whole>(run(a0));
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = converted::shaped<converted::Whole>(made);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

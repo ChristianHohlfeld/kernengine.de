@@ -1,5 +1,6 @@
 #include "kern/core/base.h"
 
+#include <chrono>
 #include <cstdarg>
 #include <cstdio>
 
@@ -10,7 +11,6 @@ KERN_ENV(now) double kern_env_now();
 KERN_ENV(log) void kern_env_log(int level, const char* text, unsigned length);
 }
 #else
-#include <chrono>
 static double kern_env_now() {
   using namespace std::chrono;
   return duration<double, std::milli>(steady_clock::now().time_since_epoch()).count();
@@ -47,5 +47,11 @@ void log(LogLevel level, const char* format, ...) {
 }
 
 f64 now_ms() { return kern_env_now(); }
+
+f64 wall_ms() {
+  // (the system's clock, in whole milliseconds - as Date.now() gives them)
+  using namespace std::chrono;
+  return static_cast<f64>(duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count());
+}
 
 }  // namespace kern

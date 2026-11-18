@@ -23,10 +23,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -125,6 +125,14 @@ struct Mat4 {
 
 
 
+  /// The same, where nobody asks whether it is one.
+  
+
+
+
+};
+struct Mesh : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
 };
 struct MeshData {
   std::vector<f32> positions, normals, colors, uvs;
@@ -150,13 +158,153 @@ struct MeshData {
   /// Borrowed MeshInput view (geometry only; material etc. stay default).
   
 };
+struct HeightSampler : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
+struct World : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct MouseGrab : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct CharacterMover : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
 constexpr f32 kPi = 3.14159265358979323846;
-enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, count
+struct KeyIndex : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct BuildingBuilder : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct FootprintStream : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct RoadBuilder : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct RoadStream : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Program : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct UniformCache : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct SunShadowMap : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct BloomPass : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct AmbientOcclusionPass : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct ShaderExtension : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Bvh : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Renderer : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Value : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { enum class PinType : u8 {
+  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
+  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
+  map, set, count
+}; }
+struct EngineValue : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Variable : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct StructField : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct FunctionPin : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Formula : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
+struct Library : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Host : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Instance : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Context : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
 };
 namespace GpsLive { enum class Activity : u8 { stand, walk, run, bike, car }; }
 namespace GpsLive { enum class View : u8 { eye, follow, map }; }
+struct Mixer : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Particles : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct LightPool : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct NightWindows : public ShaderExtension {
+  using ShaderExtension::ShaderExtension;
+};
+struct GameWorld : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct BitWriter : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct BitReader : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct WriteStream : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct ReadStream : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct MeasureStream : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Endpoint : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Connection : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Transport : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Simulator : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct LoopbackNetwork : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct HostTransport : public Transport {
+  using Transport::Transport;
+};
+struct Client : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Server : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace seats { enum class Result : u8 { ok, unchanged, invalid, owner_only_pilot, already_seated, seat_occupied, no_pilot, not_occupant }; }
+namespace net { namespace Fx { enum Kind : u8 { shot, explosion, impact, rocket, cow_death, push, lamp, strike, flyover, mil_tracer, mil_shell, npc_death, melee, kLast = melee }; } }
 enum class Key : u8 {
   unknown = 0,
   a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
@@ -164,9 +312,29 @@ enum class Key : u8 {
   left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
   count
 };
+struct Input : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Engine : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct App : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace audio { void make_seamless(std::vector<double>& samples, const unsigned int& rate, const double& crossfade); }
 namespace audio { void normalize(std::vector<double>& samples, const double& peak); }
-enum class Result : u8 { ok, unchanged, invalid, owner_only_pilot, already_seated, seat_occupied, no_pilot, not_occupant };
-namespace Fx { enum Kind : u8 { shot, explosion, impact, rocket, cow_death, push, lamp, strike, flyover, mil_tracer, mil_shell, npc_death, melee, kLast = melee }; }
+struct SoundBank : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct GameAudio : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct InputArbiter : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct TouchControls : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
 struct Biquad {
   f32 b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0, z1 = 0, z2 = 0;
   f32 run(f32 x) { const f32 y = b0 * x + z1; z1 = b1 * x - a1 * y + z2; z2 = b2 * x - a2 * y; return y; }
@@ -183,14 +351,49 @@ struct Biquad {
     return b;
   }
 };
+enum class Osc : u8 { saw, square, triangle, sine };
+struct OscSpec { Osc type; f32 cents; f32 gain; };
+std::vector<f32> siren_loop(u32 rate, f32 f0, std::initializer_list<OscSpec> oscs, bool formant, f32 cutoff) {
+  const f32 secs = std::round(f0 * 2) / f0;  // whole periods of the fundamental
+  std::vector<f32> out(converted::count(static_cast<std::size_t>(converted::fits<unsigned long>(secs * static_cast<f32>(rate)))), 0.0);
+  Biquad peak = Biquad::peaking(1650, 0.9, 7, static_cast<f32>(rate)), lp = Biquad::lowpass(4200, 0.4, static_cast<f32>(rate)),
+         air = Biquad::lowpass(cutoff, 0.5, static_cast<f32>(rate));
+  std::vector<f64> phase(converted::count(oscs.size()), 0.0);
+  for (std::size_t n = 0; n < out.size(); converted::pre_inc(n)) {
+    f32 s = 0;
+    std::size_t k = 0;
+    for (const OscSpec& o : oscs) {
+      const f64 f = f0 * kern::math::pow(2.0, o.cents / 1200.0);
+      converted::at(phase, k) += f / rate;
+      converted::at(phase, k) -= std::floor(converted::at(phase, k));
+      const f32 p = static_cast<f32>(converted::at(phase, k));
+      f32 v = 0;
+      switch (o.type) {
+        case Osc::saw: v = 2 * p - 1; break;
+        case Osc::square: v = p < 0.5 ? 1.0 : -1.0; break;
+        case Osc::triangle: v = 1 - 4 * std::fabs(p - 0.5); break;
+        case Osc::sine: v = kern::math::sin(2 * kPi * p); break;
+      }
+      s += v * o.gain;
+      converted::pre_inc(k);
+    }
+    if (formant) s = peak.run(s);
+    s = lp.run(s);
+    if (cutoff < 4000) s = air.run(s);
+    converted::at(out, n) = s;
+  }
+  audio::make_seamless(out, rate, 0.05);
+  audio::normalize(out, 0.8);
+  return out;
+}
 Mat4 billboard(Vec3 p, Vec3 right, Vec3 up, Vec3 normal, f32 size, f32 rotation) {
   const f32 c = kern::math::cos(rotation), s = kern::math::sin(rotation);
   const Vec3 r = (right * c + up * s) * size, u = (up * c - right * s) * size;
   Mat4 m;
-  converted::at(m.m, 0) = r.x; converted::at(m.m, 1) = r.y; converted::at(m.m, 2) = r.z;
-  converted::at(m.m, 4) = u.x; converted::at(m.m, 5) = u.y; converted::at(m.m, 6) = u.z;
-  converted::at(m.m, 8) = normal.x; converted::at(m.m, 9) = normal.y; converted::at(m.m, 10) = normal.z;
-  converted::at(m.m, 12) = p.x; converted::at(m.m, 13) = p.y; converted::at(m.m, 14) = p.z;
+  m.m[0] = r.x; m.m[1] = r.y; m.m[2] = r.z;
+  m.m[4] = u.x; m.m[5] = u.y; m.m[6] = u.z;
+  m.m[8] = normal.x; m.m[9] = normal.y; m.m[10] = normal.z;
+  m.m[12] = p.x; m.m[13] = p.y; m.m[14] = p.z;
   return m;
 }
 MeshData smoke_disc() {
@@ -254,16 +457,28 @@ std::vector<f32> jet_roar_pcm(u32 rate, f32 cutoff) {
 [[maybe_unused]] static bool defined(const Biquad& s) { return defined(s.b0) && defined(s.b1) && defined(s.b2) && defined(s.a1) && defined(s.a2) && defined(s.z1) && defined(s.z2); }
 [[maybe_unused]] static std::string text(const Biquad& s) { return std::string("{") + text(s.b0) + ", " + text(s.b1) + ", " + text(s.b2) + ", " + text(s.a1) + ", " + text(s.a2) + ", " + text(s.z1) + ", " + text(s.z2) + "}"; }
 [[maybe_unused]] static void take(Biquad& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<double>(s.b0, (*v.rows)[0]); converted::take_as<double>(s.b1, (*v.rows)[1]); converted::take_as<double>(s.b2, (*v.rows)[2]); converted::take_as<double>(s.a1, (*v.rows)[3]); converted::take_as<double>(s.a2, (*v.rows)[4]); converted::take_as<double>(s.z1, (*v.rows)[5]); converted::take_as<double>(s.z2, (*v.rows)[6]); }
-[[maybe_unused]] static Mat4 draw_kern__Mat4(converted::Draw& draw) {
-  Mat4 s{};
-  for (auto& e : s.m) e = draw.number();
+[[maybe_unused]] static OscSpec draw_OscSpec(converted::Draw& draw) {
+  OscSpec s{};
+  s.type = static_cast<Osc>(draw.below(4));
+  s.cents = draw.number();
+  s.gain = draw.number();
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const Mat4& s) { return converted::Value::structure({arg(std::vector<double>(std::begin(s.m), std::end(s.m)))}); }
-[[maybe_unused]] static bool same(const Mat4& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(std::vector<double>(std::begin(want.m), std::end(want.m)), (*got.rows)[0]); }
-[[maybe_unused]] static bool defined(const Mat4& s) { return defined(std::vector<double>(std::begin(s.m), std::end(s.m))); }
-[[maybe_unused]] static std::string text(const Mat4& s) { return std::string("{") + text(std::vector<double>(std::begin(s.m), std::end(s.m))) + "}"; }
-[[maybe_unused]] static void take(Mat4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[0]); for (std::size_t k = 0; k < items.size() && k < std::size(s.m); ++k) s.m[k] = items[k]; } }
+[[maybe_unused]] static converted::Value arg(const OscSpec& s) { return converted::Value::structure({arg(s.type), arg(s.cents), arg(s.gain)}); }
+[[maybe_unused]] static bool same(const OscSpec& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.type, (*got.rows)[0]) && same(want.cents, (*got.rows)[1]) && same(want.gain, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const OscSpec& s) { return defined(s.type) && defined(s.cents) && defined(s.gain); }
+[[maybe_unused]] static std::string text(const OscSpec& s) { return std::string("{") + text(s.type) + ", " + text(s.cents) + ", " + text(s.gain) + "}"; }
+[[maybe_unused]] static void take(OscSpec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<Osc>(s.type, (*v.rows)[0]); converted::take_as<double>(s.cents, (*v.rows)[1]); converted::take_as<double>(s.gain, (*v.rows)[2]); }
+[[maybe_unused]] static Mat4 draw_kern__Mat4(converted::Draw& draw) {
+  Mat4 s{};
+  converted::fill_array(s.m, [&]() -> double { return draw.number(); });
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Mat4& s) { return converted::Value::structure({arg(converted::array_list(s.m))}); }
+[[maybe_unused]] static bool same(const Mat4& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::array_list(want.m), (*got.rows)[0]); }
+[[maybe_unused]] static bool defined(const Mat4& s) { return defined(converted::array_list(s.m)); }
+[[maybe_unused]] static std::string text(const Mat4& s) { return std::string("{") + text(converted::array_list(s.m)) + "}"; }
+[[maybe_unused]] static void take(Mat4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[0]); converted::array_from(s.m, items); } }
 [[maybe_unused]] static MeshData draw_kern__MeshData(converted::Draw& draw) {
   MeshData s{};
   s.positions = draw_list(draw, [&]() -> double { return draw.number(); });
@@ -280,7 +495,8 @@ std::vector<f32> jet_roar_pcm(u32 rate, f32 cutoff) {
 [[maybe_unused]] static bool defined(const MeshData& s) { return defined(s.positions) && defined(s.normals) && defined(s.colors) && defined(s.uvs) && defined(s.extra) && defined(s.extra_size) && defined(s.indices); }
 [[maybe_unused]] static std::string text(const MeshData& s) { return std::string("{") + text(s.positions) + ", " + text(s.normals) + ", " + text(s.colors) + ", " + text(s.uvs) + ", " + text(s.extra) + ", " + text(s.extra_size) + ", " + text(s.indices) + "}"; }
 [[maybe_unused]] static void take(MeshData& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<std::vector<double>>(s.positions, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.normals, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.colors, (*v.rows)[2]); converted::take_as<std::vector<double>>(s.uvs, (*v.rows)[3]); converted::take_as<std::vector<double>>(s.extra, (*v.rows)[4]); converted::take_as<unsigned int>(s.extra_size, (*v.rows)[5]); converted::take_as<std::vector<unsigned int>>(s.indices, (*v.rows)[6]); }
-namespace audio { inline void normalize(std::vector<double>& samples, const double& peak) { const std::vector<converted::Value> out = converted::engine_call("engine.audio.normalize", {arg(samples), arg(peak)}); converted::take_as<std::vector<double>>(samples, out[0]); } }
+namespace audio { inline void make_seamless(std::vector<double>& samples, const unsigned int& rate, const double& crossfade) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.audio.make_seamless", {converted::value_of(samples), converted::value_of(rate), converted::value_of(crossfade)}); converted::take_as<std::vector<double>>(samples, kern_out[0]); } }
+namespace audio { inline void normalize(std::vector<double>& samples, const double& peak) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.audio.normalize", {converted::value_of(samples), converted::value_of(peak)}); converted::take_as<std::vector<double>>(samples, kern_out[0]); } }
 struct Out_Biquad_run { Biquad Self; double Result; };
 [[maybe_unused]] static bool same(const Out_Biquad_run& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_Biquad_run& s) { return defined(s.Self) && defined(s.Result); }
@@ -291,18 +507,21 @@ SC_TEST(converted_game_gaps_cpp) {
   {  // Biquad::run
     converted::Tally tally("Biquad_run");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Biquad a0, [[maybe_unused]] double a1) { const auto r = converted::counted([&] { return a0.run(std::move(a1)); }); return Out_Biquad_run{a0, r}; };
+    const auto run = [&]([[maybe_unused]] Biquad a0, [[maybe_unused]] double a1) { auto r = converted::counted([&] { return a0.run(std::move(a1)); }); return Out_Biquad_run{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
-      const Biquad a0 = draw_Biquad(draw);
-      const double a1 = draw.number();
+      Biquad a0 = draw_Biquad(draw);
+      double a1 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {1, 0});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
     }
   }
   {  // Biquad::lowpass
@@ -310,17 +529,20 @@ SC_TEST(converted_game_gaps_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return Biquad::lowpass(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const double a0 = draw.number();
-      const double a1 = draw.number();
-      const double a2 = draw.number();
+      double a0 = draw.number();
+      double a1 = draw.number();
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Biquad::peaking
@@ -328,18 +550,44 @@ SC_TEST(converted_game_gaps_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return converted::counted([&] { return Biquad::peaking(std::move(a0), std::move(a1), std::move(a2), std::move(a3)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const double a0 = draw.number();
-      const double a1 = draw.number();
-      const double a2 = draw.number();
-      const double a3 = draw.number();
+      double a0 = draw.number();
+      double a1 = draw.number();
+      double a2 = draw.number();
+      double a3 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // siren_loop
+    converted::Tally tally("siren_loop");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] double a1, [[maybe_unused]] std::vector<OscSpec> a2, [[maybe_unused]] bool a3, [[maybe_unused]] double a4) { return converted::listed(a2, [&](std::initializer_list<OscSpec> l2) { return converted::counted([&] { return converted_game_gaps_cpp::siren_loop(std::move(a0), std::move(a1), l2, std::move(a3), std::move(a4)); }); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      double a1 = draw.number();
+      std::vector<OscSpec> a2 = converted::draw_few(draw, [&]() -> OscSpec { return draw_OscSpec(draw); });
+      bool a3 = draw.flag();
+      double a4 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // billboard
@@ -347,20 +595,23 @@ SC_TEST(converted_game_gaps_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { return converted::counted([&] { return converted_game_gaps_cpp::billboard(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Vec3 a0 = draw.vector();
-      const Vec3 a1 = draw.vector();
-      const Vec3 a2 = draw.vector();
-      const Vec3 a3 = draw.vector();
-      const double a4 = draw.number();
-      const double a5 = draw.number();
+      Vec3 a0 = draw.vector();
+      Vec3 a1 = draw.vector();
+      Vec3 a2 = draw.vector();
+      Vec3 a3 = draw.vector();
+      double a4 = draw.number();
+      double a5 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3, a4, a5);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // smoke_disc
@@ -368,14 +619,17 @@ SC_TEST(converted_game_gaps_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]() { return converted::counted([&] { return converted_game_gaps_cpp::smoke_disc(); }); };
     for (int i = 0; tally.more(i); ++i) {
+      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run();
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // jet_roar_pcm
@@ -383,16 +637,19 @@ SC_TEST(converted_game_gaps_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_game_gaps_cpp::jet_roar_pcm(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
-      const double a1 = draw.number();
+      unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      double a1 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

@@ -547,7 +547,8 @@ void Mixer::mix_voice(Voice& v, u32 frames) {
   v.gain_r = target_r;
 }
 
-void Mixer::render(f32* out, u32 frames) {
+void Mixer::render(f32* out, Count<2> count) {
+  const u32 frames = count;
   if (!out) return;
   if (!rate_) { std::memset(out, 0, static_cast<std::size_t>(frames) * 2 * sizeof(f32)); return; }
   for (Meter& m : stats_.buses) m = Meter{};

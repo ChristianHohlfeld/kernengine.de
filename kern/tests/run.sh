@@ -54,8 +54,13 @@ if [ $# -eq 0 ]; then
   nat="$out/native_gen"
   rm -rf "$nat" && mkdir -p "$nat"
   "$out/kern_tests" --emit-native "$nat"
-  "$cxx" "${flags[@]}" -I"$nat" "$nat/blueprint_native_main.cpp" "${core[@]}" "$out"/musl_math/*.o -lm -o "$out/blueprint_native_test"
-  "$out/blueprint_native_test" "$nat/blueprint_native_expected.txt"
+  # (linked with the whole engine: a class calls the functions of the engine's nodes itself - the case
+  # "Engine" has every one of them, and is played once more on the engine itself, against the interpreter
+  # that calls them through the host's door)
+  engine=()
+  for f in "${cpp_objects[@]}"; do case "$f" in *test_main.cpp.o) ;; *) engine+=("$f") ;; esac; done
+  "$cxx" "${flags[@]}" -I"$nat" "$nat/blueprint_native_main.cpp" "${engine[@]}" "${objects[@]}" -lm -o "$out/blueprint_native_test"
+  "$out/blueprint_native_test" "$nat/blueprint_native_expected.txt" "$nat/blueprint_native_on_engine.txt"
   # The Blueprints of a game as classes: the levels of game_cases.h, written as level files; their
   # Blueprints as C++ by the tool a game's build uses (tools/blueprint_cpp), compiled and linked
   # with the engine. Every scenario, played in the interpreter and as those classes, is the same.
@@ -65,8 +70,6 @@ if [ $# -eq 0 ]; then
   shapes="$out/obj/$(echo "$root/src/game/logic_node_shapes.cpp" | sed "s|/|_|g").o"
   "$cxx" "${flags[@]}" -w "$root/../tools/blueprint_cpp.cpp" "$shapes" "${core[@]}" "$out"/musl_math/*.o -lm -o "$out/blueprint_cpp"
   for level in "$gam"/*.klevel; do "$out/blueprint_cpp" "$level" "${level%.klevel}_blueprints.cpp"; done
-  engine=()
-  for f in "${cpp_objects[@]}"; do case "$f" in *test_main.cpp.o) ;; *) engine+=("$f") ;; esac; done
   "$cxx" "${flags[@]}" "$here/game_native_test.cpp" "$gam"/*_blueprints.cpp "${engine[@]}" "${objects[@]}" -lm -o "$out/game_native_test"
   "$out/game_native_test" "$gam"
 fi

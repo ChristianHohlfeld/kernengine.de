@@ -27,12 +27,13 @@
 #pragma once
 
 #include <algorithm>
-#include <unordered_map>
 #include <vector>
 
 #include "city_stream.h"
 #include "combat_art.h"
 #include "common.h"
+
+#include "kern/core/map.h"
 
 namespace sc {
 
@@ -55,7 +56,11 @@ class Destruction {
   /// Destruction sync: the structural points left per building (seed) - only ever fewer. The
   /// points a blast here took (since the last call), and those another machine reports.
   std::vector<std::pair<u32, f32>> take_points_log() { return std::move(points_log_); }
-  void points_list(std::vector<std::pair<u32, f32>>& out) const { out.assign(points_.begin(), points_.end()); std::sort(out.begin(), out.end()); }
+  void points_list(std::vector<std::pair<u32, f32>>& out) const {
+    out.clear();
+    for (const auto& [seed, hp] : points_) out.emplace_back(seed, hp);
+    std::stable_sort(out.begin(), out.end(), [](const std::pair<u32, f32>& a, const std::pair<u32, f32>& b) { return a.first < b.first || (!(b.first < a.first) && a.second < b.second); });
+  }
   bool merge_points(const std::vector<std::pair<u32, f32>>& list, bool log);
 
  private:
@@ -79,7 +84,7 @@ class Destruction {
   void free_torn(Torn& t);
 
   kern::Renderer* r_ = nullptr;
-  std::unordered_map<u32, f32> points_;  // structural points left, by building seed
+  kern::Map<u32, f32> points_;  // structural points left, by building seed
   std::vector<std::pair<u32, f32>> points_log_;
   std::vector<Piece> pieces_;
   std::vector<Torn> torn_;

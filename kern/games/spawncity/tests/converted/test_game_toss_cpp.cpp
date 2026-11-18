@@ -8,10 +8,10 @@
 #include <type_traits>
 #include <vector>
 #include <algorithm>
-#include <cstring>
 #include "../../src/game.h"
 #include "../../src/game_life.h"
 #include "../../src/mp_rules.h"
+#include "../../src/wire.h"
 #include "../converted.h"
 
 namespace converted_game_toss_cpp {
@@ -21,10 +21,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -37,6 +37,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
 enum class Key : u8 {
   unknown = 0,
   a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
@@ -44,7 +45,9 @@ enum class Key : u8 {
   left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
   count
 };
+i16 q16(f32 v) { return static_cast<i16>(std::lround(clampf(v, -1, 1) * 32767)); }
 f32 uq16(i16 v) { return static_cast<f32>(v) / 32767; }
+i16 cms(f32 v) { return static_cast<i16>(std::lround(clampf(v * 100, -32000, 32000))); }
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
@@ -52,20 +55,61 @@ f32 uq16(i16 v) { return static_cast<f32>(v) / 32767; }
 
 SC_TEST(converted_game_toss_cpp) {
   converted::Blueprint bp("game_toss_cpp");
+  {  // q16
+    converted::Tally tally("q16");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_game_toss_cpp::q16(std::move(a0)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      double a0 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
   {  // uq16
     converted::Tally tally("uq16");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] short a0) { return converted::counted([&] { return converted_game_toss_cpp::uq16(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const short a0 = static_cast<short>(draw.whole());
+      short a0 = static_cast<short>(draw.whole());
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // cms
+    converted::Tally tally("cms");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_game_toss_cpp::cms(std::move(a0)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      double a0 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

@@ -31,10 +31,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -48,12 +48,16 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #define private public
 #define protected public
 struct Value : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
 };
-struct TextureAsset : converted::EngineObject {
+struct PinDef : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
 };
-struct SoundAsset : converted::EngineObject {
+struct NodeDef : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
 };
-struct MotionAsset : converted::EngineObject {
+struct Library : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
 };
 enum class Key : u8 {
   unknown = 0,
@@ -64,6 +68,15 @@ enum class Key : u8 {
 };
 enum class Mode : u8 { foot, drone, car, jet, parachute };
 const char* mode_name(Mode m);
+std::string json_escape(const std::string& s) {
+  std::string o;
+  for (char c : s) {
+    if (c == '"' || c == '\\') o += '\\';
+    if (static_cast<unsigned char>(c) < 0x20) continue;
+    o += c;
+  }
+  return o;
+}
 const char* mode_name(Mode m) {
   switch (m) {
     case Mode::foot: return "foot";
@@ -81,20 +94,42 @@ const char* mode_name(Mode m) {
 
 SC_TEST(converted_game_cpp) {
   converted::Blueprint bp("game_cpp");
+  {  // json_escape
+    converted::Tally tally("json_escape");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::string a0) { return converted::counted([&] { return converted_game_cpp::json_escape(a0); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      std::string a0 = draw.word();
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
   {  // mode_name
     converted::Tally tally("mode_name");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Mode a0) { return converted::counted([&] { return converted_game_cpp::mode_name(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Mode a0 = static_cast<Mode>(draw.below(5));
+      Mode a0 = static_cast<Mode>(draw.below(5));
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

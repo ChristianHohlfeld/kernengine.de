@@ -42,30 +42,28 @@ void Game::select_foot_weapon(Id id) {
   }
   foot_weapon_ = id;
   const weapons::Spec& s = weapons::spec(id);
-  using kern::json::Value;
-  auto set = [&](const char* key, Value v) { world_->set_property(soldier_, std::string("components.weapon.") + key, v); };
   // The view model: Kern's kinds; launchers look like the shotgun, melee like the pistol (the
   // game fires those itself, so Kern's trigger is kept off while they are in hand).
   const char* kind = id == Id::smg ? "rifle" : id == Id::sniper ? "sniper" : (id == Id::grenade_launcher || id == Id::rocket) ? "shotgun" : "pistol";
-  set("kind", Value(kind));
+  world_->set_property_text(soldier_, "components.weapon.kind", kind);
   if (hitscan_on_foot(id)) {
-    set("damage", Value(static_cast<f64>(s.damage)));
-    set("fireRate", Value(60000.0 / static_cast<f64>(s.interval_ms)));
-    set("automatic", Value(id == Id::smg));
-    set("range", Value(static_cast<f64>(s.range_m)));
-    set("headshot", Value(3.0));  // VS zones: head x3
+    world_->set_property_number(soldier_, "components.weapon.damage", static_cast<f64>(s.damage));
+    world_->set_property_number(soldier_, "components.weapon.fireRate", 60000.0 / static_cast<f64>(s.interval_ms));
+    world_->set_property_flag(soldier_, "components.weapon.automatic", id == Id::smg);
+    world_->set_property_number(soldier_, "components.weapon.range", static_cast<f64>(s.range_m));
+    world_->set_property_number(soldier_, "components.weapon.headshot", 3.0);  // VS zones: head x3
     for (const Loadout& l : kFoot)
-      if (l.id == id) set("magazine", Value(static_cast<f64>(l.magazine)));
-    set("fireSound", Value(id == Id::smg ? "sc:shot0" : id == Id::sniper ? "builtin:sniper" : "sc:pistol0"));
-    set("pellets", Value(1.0));
+      if (l.id == id) world_->set_property_number(soldier_, "components.weapon.magazine", static_cast<f64>(l.magazine));
+    world_->set_property_text(soldier_, "components.weapon.fireSound", id == Id::smg ? "sc:shot0" : id == Id::sniper ? "builtin:sniper" : "sc:pistol0");
+    world_->set_property_number(soldier_, "components.weapon.pellets", 1.0);
     // first_person_controller_v5.mjs ADS: x 1.45 for the guns, the sniper's scope x 8 (true
     // magnification through tan; Kern zooms by tan(fov / 2) / tan(aimFov / 2) from the 59 deg view)
-    set("aimFov", Value(id == Id::sniper ? 8.09 : 42.6));
+    world_->set_property_number(soldier_, "components.weapon.aimFov", id == Id::sniper ? 8.09 : 42.6);
     // the original's rounds go exactly through the crosshair / the finger: no cone, no bloom, no
     // view kick beyond the camera's own shot impulse (fps_control_math.mjs addFpsShotImpulse)
-    set("spread", Value(0.0));
-    set("aimSpread", Value(0.0));
-    set("recoil", Value(0.0));
+    world_->set_property_number(soldier_, "components.weapon.spread", 0.0);
+    world_->set_property_number(soldier_, "components.weapon.aimSpread", 0.0);
+    world_->set_property_number(soldier_, "components.weapon.recoil", 0.0);
     if (world_->soldier_state(soldier_, st)) {
       st.ammo = ammo_mag_[static_cast<u8>(id)];
       st.reserve = ammo_reserve_[static_cast<u8>(id)];
@@ -92,7 +90,7 @@ bool Game::game_weapon_in_hand() const { return mode_ == Mode::foot && !hitscan_
 
 Vec3 Game::aim_ray(Vec3& dir) const {
   // touch: the shot goes through the finger (foot_touch_controller.mjs fireAt, game_controls.cpp)
-  if (ctl_.aim_point || (engine_ && engine_->xr)) { Vec3 from; ctl_screen_ray(ctl_.aim_x, ctl_.aim_y, from, dir); return from; }
+  if (ctl_.aim_point || (engine_ && engine_->xr())) { Vec3 from; ctl_screen_ray(ctl_.aim_x, ctl_.aim_y, from, dir); return from; }
   dir = kern::normalize(cam_.target - cam_.eye, {1, 0, 0});
   return cam_.eye;
 }
@@ -121,7 +119,7 @@ bool Game::hit_scan(Vec3 from, Vec3 dir, f32 range, f32 damage, bool by_player, 
       if (d.hp <= 0) {
         osfx("wanted_police_drones.down", d.pos);
         explosion(d.pos, 3, 40, by_player);
-        if (by_player) wanted_.report(wanted::Crime::police_drone, true);
+        if (by_player) wanted::report(wanted::Crime::police_drone, true);
         d.active = false;
         d.destroyed_until = now + 9;
       }

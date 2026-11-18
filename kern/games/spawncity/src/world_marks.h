@@ -24,8 +24,9 @@ class Marks {
   void blast(Vec3 at, f32 r, f32 strength, CityStream& city, kern::physics::World& w, Rng& rng, f32 now, bool craters = true);
   /// A bullet that hit `p` (world): on a window pane of a building it cracks the glass.
   bool bullet(Vec3 p, const CityStream& city, Rng& rng);
-  void update(f32 now, kern::physics::World& w);
-  void draw(WorldArt& art, kern::physics::World& w, f32 now);
+  /// `city`: the town the blasts and bullets were in (marks go with the walls they sit on).
+  void update(f32 now, const CityStream& city, kern::physics::World& w);
+  void draw(WorldArt& art, const CityStream& city, kern::physics::World& w, f32 now);
   const Stats& stats() const { return stats_; }
 
  private:
@@ -36,7 +37,7 @@ class Marks {
   void add_soot(Vec3 at, f32 r, const std::vector<CityStream::Wall>& walls, const Terrain& t, Rng& rng);
   void add_breach(Vec3 at, f32 r, f32 strength, const std::vector<CityStream::Wall>& walls, const Terrain& t, kern::physics::World& w, Rng& rng, f32 now);
   void spawn_rubble(Vec3 at, Vec2 n, i32 count, kern::physics::World& w, Rng& rng, f32 now);
-  void prune_walls();  // marks whose wall is gone (a floor blown off, a house down) go with it
+  void prune_walls(const CityStream& city);  // marks whose wall is gone (a floor blown off, a house down) go with it
 
   std::vector<Scorch> scorches_;
   std::vector<WallMark> soots_, breaches_, cracks_;
@@ -49,7 +50,7 @@ class Marks {
   u32 damage_seen_ = 0;  // CityStream::damage_serial at the last prune
   Stats stats_;
   kern::MeshData ground_data_[3], wall_data_;  // scorches: the char, then two fading rims
-  const CityStream* city_ = nullptr;
+  bool struck_ = false;  // a blast or a bullet was here: there may be marks to prune and to draw
 };
 
 }  // namespace sc

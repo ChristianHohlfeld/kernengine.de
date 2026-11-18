@@ -34,6 +34,24 @@ struct MeshData {
   MeshInput as_input(u32 extra_slot = 0) const;
 };
 
+class Renderer;
+
+/// How a MeshData is drawn: what a MeshInput holds besides its streams.
+struct MeshLook {
+  Material material;
+  u32 extra_slot = 0;   // the extension stream `extra` goes to (kMaxExtensionAttributes: none)
+  u32 texture = 0;      // GPU texture handle (0 = none)
+  bool visible = true;
+  u32 layers = 1;       // view layers this mesh belongs to (RenderParams::layers)
+  bool pick_bvh = true; // false: no picking BVH (MeshInput::pick_bvh)
+};
+
+/// Creates or replaces mesh `id` of `renderer` from `mesh` as it stands, drawn as `look` says, with
+/// its instances: `transforms` 16 floats each (none: one identity), `tints` rgba each (none: white).
+/// The same as Renderer::upsert with mesh.as_input(look.extra_slot) and the look's fields: the mesh
+/// is read where it is, nothing of it is copied but what the renderer keeps.
+bool upsert(Renderer& renderer, u32 id, const MeshData& mesh, const MeshLook& look, Span<const f32> transforms = {}, Span<const f32> tints = {});
+
 struct WeldStats {
   u32 source_vertices = 0, unique_vertices = 0;
   std::size_t bytes_before = 0, bytes_after = 0;

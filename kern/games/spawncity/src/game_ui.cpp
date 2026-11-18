@@ -20,11 +20,12 @@ bool Game::ui_command(const std::string& cmd, std::string& out) {
   auto starts = [&](const char* p) { return cmd.rfind(p, 0) == 0; };
   if (ui_equipment_command(cmd, out)) return true;
   Settings& st = ui_.settings;
-  if (cmd == "settings" || cmd == "settings schema") { out = st.schema_json(); return true; }
-  if (cmd == "settings values") { out = st.values_json(); return true; }
+  const SettingsTable& table = ui_.settings_table;
+  if (cmd == "settings" || cmd == "settings schema") { out = st.schema_json(table); return true; }
+  if (cmd == "settings values") { out = st.values_json(table); return true; }
   if (starts("settings reset")) {
-    st.reset_section(cmd.size() > 15 ? cmd.substr(15) : std::string());
-    out = st.values_json();
+    st.reset_section(table, cmd.size() > 15 ? cmd.substr(15) : std::string());
+    out = st.values_json(table);
     return true;
   }
   if (starts("set ")) {
@@ -39,8 +40,8 @@ bool Game::ui_command(const std::string& cmd, std::string& out) {
       const std::size_t sp = pair.find(' ');
       Opt o;
       // in a session the host's WORLD switches apply: a client cannot change them
-      if (sp != std::string::npos && find_opt(std::string_view(pair).substr(0, sp), o) && world_rule_locked(o)) ++locked;
-      else if (sp != std::string::npos && st.set(std::string_view(pair).substr(0, sp), std::string_view(pair).substr(sp + 1))) ++ok;
+      if (sp != std::string::npos && find_opt(table, std::string_view(pair).substr(0, sp), o) && world_rule_locked(o)) ++locked;
+      else if (sp != std::string::npos && st.set(table, std::string_view(pair).substr(0, sp), std::string_view(pair).substr(sp + 1))) ++ok;
       else if (!pair.empty()) ++bad;
       at = end + 1;
     }
@@ -49,7 +50,7 @@ bool Game::ui_command(const std::string& cmd, std::string& out) {
   }
   if (starts("get ")) {
     Opt o;
-    if (!find_opt(cmd.substr(4), o)) { out = "unknown setting"; return true; }
+    if (!find_opt(table, cmd.substr(4), o)) { out = "unknown setting"; return true; }
     char b[32];
     std::snprintf(b, sizeof b, "%g", static_cast<double>(st.get(o)));
     out = b;
@@ -151,13 +152,13 @@ void Game::ui_gps_update(f32 dt) {
     world_->teleport(soldier_, {p.x, p.y, city_.ground_height(p.x, p.y) + 0.73f});
     world_->set_actor_velocity(soldier_, {});
   }
-  wanted_.clear();
+  wanted::clear();
   world_->heal(soldier_, 1000);
 }
 
 // The position puck and the track line on the ground (gps_live_mode.mjs ensureScene / pushTrailPoint).
 void Game::ui_draw_gps(f32 dt) {
-  kern::Renderer& r = engine_->renderer;
+  kern::Renderer& r = engine_->renderer();
   if (!ui_.puck_acc) {
     namespace prim = kern::primitives;
     auto make = [&](u32& id, const kern::MeshData& m, Vec3 color, f32 alpha) {
@@ -168,10 +169,10 @@ void Game::ui_draw_gps(f32 dt) {
       mat.alpha = alpha < 1 ? kern::AlphaMode::blend : kern::AlphaMode::opaque;
       mat.double_sided = true;
       id = r.allocate_id();
-      kern::MeshInput in = m.as_input();
-      in.material = mat;
-      in.visible = false;
-      if (!r.upsert(id, in)) { r.release_id(id); id = 0; }
+      kern::MeshLook look;
+      look.material = mat;
+      look.visible = false;
+      if (!kern::upsert(r, id, m, look)) { r.release_id(id); id = 0; }
     };
     const Vec3 blue{0.26f, 0.52f, 0.96f};  // 0x4285f4
     make(ui_.puck_acc, prim::cylinder(1, 0.01f, 40), blue, 0.16f);
@@ -214,13 +215,13 @@ void Game::ui_draw_gps(f32 dt) {
       for (std::size_t i = 1; i < ui_.trail.size(); ++i) {
         for (const Vec2& q : {ui_.trail[i - 1], ui_.trail[i]}) line.push({q.x, q.y, city_.ground_height(q.x, q.y) + 0.12f}, {0, 0, 1}, blue, {0, 0});
       }
-      kern::MeshInput in = line.as_input();
-      in.material.lines = true;
-      in.material.unlit = true;
-      in.material.cast_shadow = false;
-      in.material.frustum_culled = false;
-      in.visible = true;
-      if (!r.upsert(ui_.trail_mesh, in)) { r.release_id(ui_.trail_mesh); ui_.trail_mesh = 0; }
+      kern::MeshLook look;
+      look.material.lines = true;
+      look.material.unlit = true;
+      look.material.cast_shadow = false;
+      look.material.frustum_culled = false;
+      look.visible = true;
+      if (!kern::upsert(r, ui_.trail_mesh, line, look)) { r.release_id(ui_.trail_mesh); ui_.trail_mesh = 0; }
     }
   }
   if (ui_.trail_mesh && !g.active()) r.set_visible(ui_.trail_mesh, false);
@@ -230,23 +231,24 @@ void Game::ui_draw_gps(f32 dt) {
 // settings_help.mjs worldGrid (1 m reference grid around the player) and box3dColliderDebug (Box3D's
 // collision shapes as wire frames). Visual only.
 void Game::ui_draw_helpers() {
-  kern::Renderer& r = engine_->renderer;
+  kern::Renderer& r = engine_->renderer();
   const Settings& st = ui_.settings;
-  auto line_mesh = [&](u32& id, const std::vector<f32>& pos, const std::vector<f32>* col, Vec3 color) {
+  // (colored: every point has its colour in col; else all are `color`)
+  auto line_mesh = [&](u32& id, const std::vector<f32>& pos, bool colored, const std::vector<f32>& col, Vec3 color) {
     if (!id) id = r.allocate_id();
     kern::MeshData m;
     for (std::size_t i = 0; i + 2 < pos.size(); i += 3) {
-      const Vec3 c = col ? Vec3{(*col)[i], (*col)[i + 1], (*col)[i + 2]} : color;
+      const Vec3 c = colored ? Vec3{col[i], col[i + 1], col[i + 2]} : color;
       m.push({pos[i], pos[i + 1], pos[i + 2]}, {0, 0, 1}, c, {0, 0});
     }
-    kern::MeshInput in = m.as_input();
-    in.material.lines = true;
-    in.material.unlit = true;
-    in.material.cast_shadow = false;
-    in.material.frustum_culled = false;
-    in.material.linear_colors = col != nullptr;
-    in.visible = !pos.empty();
-    if (!r.upsert(id, in)) { r.release_id(id); id = 0; }
+    kern::MeshLook look;
+    look.material.lines = true;
+    look.material.unlit = true;
+    look.material.cast_shadow = false;
+    look.material.frustum_culled = false;
+    look.material.linear_colors = colored;
+    look.visible = !pos.empty();
+    if (!kern::upsert(r, id, m, look)) { r.release_id(id); id = 0; }
   };
   const bool grid = st.on(Opt::view_grid) && world_placed_;
   if (grid) {
@@ -263,7 +265,7 @@ void Game::ui_draw_helpers() {
           p.insert(p.end(), {cx + o, cy + a, city_.ground_height(cx + o, cy + a) + 0.03f, cx + o, cy + b, city_.ground_height(cx + o, cy + b) + 0.03f});
         }
       }
-      line_mesh(ui_.grid_mesh, p, nullptr, {0.55f, 0.85f, 1.0f});
+      line_mesh(ui_.grid_mesh, p, false, {}, {0.55f, 0.85f, 1.0f});
     }
   } else if (ui_.grid_mesh) { r.set_visible(ui_.grid_mesh, false); ui_.grid_at = {1e9f, 1e9f, 0}; }
   if (st.on(Opt::debug_colliders) && world_placed_) {
@@ -271,7 +273,7 @@ void Game::ui_draw_helpers() {
     if (static_cast<int>(ui_.collider_clock) % 6 == 0) {  // ten times a second is plenty
       std::vector<f32> pos, col;
       world_->debug_lines(true, false, false, pos, col);
-      line_mesh(ui_.collider_mesh, pos, &col, {});
+      line_mesh(ui_.collider_mesh, pos, true, col, {});
     }
   } else if (ui_.collider_mesh) r.set_visible(ui_.collider_mesh, false);
 }
@@ -358,8 +360,8 @@ void Game::ui_apply_settings() {
   Settings& st = ui_.settings;
   if (ui_.applied == 0 && engine_) {
     // Start parameters (?mouse=, ?fpvtilt=) are settings too.
-    if (engine_->arg("mouse")) st.set(Opt::mouse_sensitivity, static_cast<f32>(engine_->arg_number("mouse", 100)));
-    if (engine_->arg("fpvtilt")) st.set(Opt::cam_fpv_tilt, static_cast<f32>(engine_->arg_number("fpvtilt", -15)));
+    if (engine_->has_arg("mouse")) st.set(ui_.settings_table, Opt::mouse_sensitivity, static_cast<f32>(engine_->arg_number("mouse", 100)));
+    if (engine_->has_arg("fpvtilt")) st.set(ui_.settings_table, Opt::cam_fpv_tilt, static_cast<f32>(engine_->arg_number("fpvtilt", -15)));
   }
   if (ui_.applied == st.version()) return;
   ui_.applied = st.version();
@@ -391,8 +393,8 @@ void Game::ui_update(f32 dt) {
       c.placed = false;
     }
   }
-  if (!st.on(Opt::world_police) && (wanted_.stars() > 0 || !units_.empty())) {
-    wanted_.clear();
+  if (!st.on(Opt::world_police) && (wanted::stars() > 0 || !units_.empty())) {
+    wanted::clear();
     ui_clear_police();
   }
 }
@@ -463,7 +465,7 @@ void Game::ui_reset() {
     mode_ = Mode::foot;
   }
   if (mode_ != Mode::foot) command("mode foot");
-  wanted_.clear();
+  wanted::clear();
   ui_clear_police();
   projectiles_.clear();
   people_.clear();

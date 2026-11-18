@@ -4,10 +4,11 @@
 // street continues across a tile border) are the same node.
 #pragma once
 
-#include <unordered_map>
 #include <vector>
 
 #include "city_stream.h"
+
+#include "kern/core/map.h"
 
 namespace sc {
 
@@ -34,7 +35,7 @@ class RoadGraph {
   };
   i32 node_at(Vec2 p);
   std::vector<Node> nodes_;
-  std::unordered_map<u64, i32> cells_;
+  kern::Map<u64, i32> cells_;
 };
 
 /// A signature of the live lanes: changes when lanes appear or die.

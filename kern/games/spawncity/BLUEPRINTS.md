@@ -526,6 +526,93 @@ der Konverter um die Ersatzform kürzer, alles wird neu gewandelt, verglichen un
 Was unten zu `Whole64`, zu „Maps und Sets sind Listen“ und zu Methoden auf einem Objekt steht,
 beschreibt den Stand davor und wird Schritt für Schritt ersetzt.
 
+**Kursprüfung 18.11.2026.** Der Weg oben gilt unverändert; geprüft gegen den ganzen Verlauf (313
+Commits seit `main`). Drei Festlegungen, damit er nicht wieder verrutscht:
+
+1. **Die Zahlen der Sprache bleiben 64 Bit** (Stufe 3, „Entschieden“). Ein zweiter Zahlentyp in
+   32 Bit, am 15.11. erwogen, wird nicht gebaut: Das Maß ist spawncity.de, das in 64 Bit rechnet,
+   nicht der C++-Port dazwischen. Der Vergleichstest bindet den Blueprint an den Quelltext in den
+   Zahlen der Sprache; beim Umschalten (Stufe 5) rechnet die Datei, was das Original rechnet.
+2. **Antwort (b) – Umschreiben in den Teilsatz („Absenkung“) – braucht den Beweis, nicht die
+   Begründung.** `tools/source_diff.py` hält die Datei, wie sie vor dem Umschreiben stand, und wie
+   sie jetzt steht, in einem Test (`tests/lowered/`), ruft jedes Paar von Funktionen mit demselben
+   gewürfelten Zustand und vergleicht Bit für Bit – Rückgabe, jeden Parameter, das Objekt, den
+   Zustand der Datei – und zählt, dass die neue Fassung nie öfter Speicher anfordert. Das gilt für
+   jede Umschreibung, auch rückwirkend für die seit `main` (zuerst bewiesen: `settings`,
+   `city_jobs`, 32 Paare). Eine Umschreibung ohne diesen Test wird nicht gemergt.
+3. **Eine Datei, ein Auftrag.** Zwei Pakete haben dieselben Stellen zweimal verschieden
+   umgeschrieben (`settings`, `update_scores`, `toss_`). Aufträge werden nach Dateien des Spiels
+   geschnitten, nicht nach Gründen des Konverters; der Konverter bekommt nur, was allgemein ist.
+
+Der Vergleich gegen die Engine selbst (nicht nur gegen ihren Stellvertreter) läuft seit 15.11. im
+Test mit (`SC_ENGINE=real`).
+
+**Stand 14.11.2026, 23:35 (Schlusslauf auf `work`).** 1.360 von 1.817 Funktionen des Programms
+(11.947 von 30.758 Zeilen) stehen als Blueprints im Level – 155 Blueprints (70 von Quelldateien,
+`Game` als ein Zustand, 84 von Headern und Formen); 1.316 Funktionen vergleicht der Test Bit für Bit
+mit ihrem Quelltext, jede einmal. Dazu kamen seit 17:00:
+- **Ende eines Spiels:** End Play (`event.end`, `KERN_EVENT(onN, event_end)`), einmal, wenn das Spiel
+  endet oder der Actor die Welt verlässt; was das eine Objekt des Programms von der Engine hält, gibt
+  es dort frei (in umgekehrter Reihenfolge der Felder, wie der Destruktor des Compilers).
+- **Regel-Blueprints beim Namen:** `ActorBlueprint` hält keinen Zeiger mehr, sondern die Logik, in
+  der es läuft, und findet den Actor bei jedem Aufruf beim Namen (`Host::find_actor`); C++ und
+  Knoten (Call on Actor, Get Variable on Actor) gehen durch einen Weg in `Runtime`. Neuer Knoten Has
+  Blueprint. Alle Bind-Funktionen des Spiels nehmen die Logik (`Runtime&`).
+- **Bytes:** `std::bit_cast` zwischen einer Zahl und ihren Bits (Bits of Float 32 / Float 32 of Bits,
+  64 Bit über Int64) und zu den Bytes einer Struktur; Copy Bytes (`memcpy` zwischen Listen von Zahlen,
+  am Platz); die Netz-Nachrichten über `wire.h` (eine Struktur je Zahl, ihre Bytes im Layout von C++).
+- **Engine:** Methoden von Engine-Objekten sind ihre Knoten, nicht Funktionen der Header-Blueprints;
+  was die Engine durch einen Zeiger mit einer Anzahl dahinter schreibt, ist eine Ausgabe-Liste
+  (`mixer.render` – offen: `frames` zählt Frames, die Engine schreibt 2 × frames Floats; der
+  Verteiler auf die echte Engine muss das so sagen).
+- **Zeiger:** die Stellen, die mit „a pointer“ warteten, nennen den Platz selbst (Index, Referenz,
+  lokale Funktion mit Referenz); `Mat4::look_at(…, bool& ok)`.
+- **Konverter:** Typnamen wie C++ sie sucht (erst die Klasse und die Namensräume um die
+  Deklaration); Referenzen, deren Typ der Compiler nur mit dem Namen der Bibliothek nennt
+  (`const value_type &`); eine Konversion einer Konversion mit dem Wert dazwischen; Makros für Werte
+  im Test; Dumps über Namensräume verbunden (fc ↔ hwcontract); Methoden-Regeln im Test.
+- **Spiel im Teilsatz:** keine Funktion ruft sich selbst, Abfragen (`const`) ohne Gedächtnis
+  (`Terrain::corridor_set`, `water_cell`), Texte der Regel-Tabellen als `std::string`, die Sender des
+  Radios im Header.
+
+Worauf die anderen warten, nach Zeilen (Schlusslauf): `Terrain::node_height` (39 Funktionen, 1.829
+Zeilen – bis 23:20 an einem Gedächtnis in `corridor_set`, das jetzt weg ist), Text zerlegen
+(`rfind`, `substr`, `strtod` in den Befehlen von `Game`: 1.362), Funktionen von `Game`, deren Test
+die Quelle noch nicht übersetzt (`Game` ist dort nicht deklariert: 523 und Folgen), Aufrufe von
+`Session::to_host` (460), Referenzen auf Einträge, deren Liste sich ändert (456), statische lokale
+Variablen.
+
+**Stand 14.11.2026, 17:00 (auf `work`, geschrieben, Schlusslauf läuft).**
+- **`Game` als Blueprint:** Eine Klasse, von der das Programm genau ein Objekt mit statischer
+  Lebensdauer hält und sonst keins macht (ohne Basisklasse, ohne virtuelle Funktionen), ist der
+  Zustand eines Blueprints (`state_classes`): Felder → Variablen, Methoden → Funktionen ohne
+  `self`. Ihre Methoden stehen in vielen Dateien; jede ist ein Teil (`Game/game_net_cpp`), im Baum
+  ihrer Datei gewandelt, `main` setzt die Teile zu einem `kern::Blueprint` zusammen. Einheiten, die
+  sich gegenseitig rufen, werden neu gewandelt, sobald etwas geschrieben ist, das sie rufen
+  wollten (bis zum Fixpunkt). Der Test eines Teils setzt und vergleicht alle Variablen.
+- **Schritt 5 – Map, Set:** `kern::Map`/`kern::Set` (kern/core/map.h) halten die Reihenfolge, in
+  der die Schlüssel kamen (wie eine Map des JavaScript-Originals), mit einem Index über einen
+  überall gleichen Hash. Das Spiel benutzt sie statt der Container der Standardbibliothek; die
+  Sprache hat sie als Map/Set (Knoten, Plätze `M[i]`, Notation `Map<Int64, List<Int>>`); keine Map
+  als Liste mehr.
+- **Schritt 6 – Int64:** 64 Bit wie u64/i64 von C++, die Knoten wie WebAssemblys i64; `Whole64`
+  und tools/blueprint_whole64.h sind entfernt.
+- **Regel-Blueprints:** Get Variable on Actor (`func_get_on`), Call on Actor mit einem Ausgang als
+  Wert (`number`, `flag`). *(17:00)* Jeder Aufruf des Spiels ist typisiert: Strukturen und Listen
+  sind Werte (`kern::fields_of` nennt die Felder einer einfachen Struktur der Reihe nach); das Spiel
+  hält je Regel-Struct eine Struktur mit den Feldern des Blueprints (32-Bit-Zahlen als die Dezimalzahl,
+  für die sie stehen); der Konverter prüft jeden Pin gegen den Blueprint des Actors. Die Aufrufe mit
+  Listen von Values sind entfernt.
+- **Sort List:** `std::stable_sort` ist Sort List (nach einer reinen Funktion des Blueprints – das
+  Lambda – oder der eigenen Ordnung). Das Spiel ordnet überall stabil, wie das Original
+  (`Array.prototype.sort` ist stabil); `std::sort` wartet, weil es gleiche Einträge offenlässt.
+- **Variablen des Programms:** Eine Variable eines Namensraums des Programms (nicht const) ist eine
+  Variable des Blueprints seines einen Objekts (`Game`), nach ihren Namensräumen benannt; eine
+  Funktion, die keine Methode ist und eine solche Variable teilt (oder eine solche Funktion ruft),
+  ist eine Funktion dieses Blueprints, im Teil ihrer Datei.
+- **Engine-Objekte (Paket L):** make/release als Knoten aus Konstruktoren und Destruktoren; Getter
+  statt öffentlicher Felder (`Engine::renderer()` …).
+
 #### Der Konverter heute
 `tools/cpp_to_blueprint.py` liest die Quellen mit dem Parser des Compilers (clangs Syntaxbaum)
 und schreibt sie in der Schreibweise:

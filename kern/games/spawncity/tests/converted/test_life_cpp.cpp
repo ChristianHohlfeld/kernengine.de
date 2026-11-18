@@ -8,8 +8,8 @@
 #include <type_traits>
 #include <vector>
 #include <algorithm>
-#include <unordered_map>
 #include "../../src/life.h"
+#include "kern/core/map.h"
 #include "../converted.h"
 
 namespace converted_life_cpp {
@@ -19,10 +19,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -35,26 +35,25 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Whole64 {
-  u32 high = 0;
-  u32 low = 0;
+struct KeyIndex : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
 };
 struct Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
+  static Quat axis_angle(Vec3 axis, f32 radians) {
+    const Vec3 a = normalize(axis);
+    const f32 s = kern::math::sin(radians * 0.5);
+    return {a.x * s, a.y * s, a.z * s, kern::math::cos(radians * 0.5)};
+  }
   
 
 
 
-
-  
-
-
-
-  
-
-
-
-
+  Vec3 rotate(Vec3 v) const {
+    const Vec3 q{x, y, z};
+    const Vec3 t = cross(q, v) * 2.0;
+    return v + t * w + cross(q, t);
+  }
 };
 struct Mat4 {
   f32 m[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
@@ -142,25 +141,190 @@ struct Mat4 {
 
 
 
+  /// The same, where nobody asks whether it is one.
+  
+
+
+
+};
+struct Mesh : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct HeightSampler : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct BuildingBuilder : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct FootprintStream : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct RoadBuilder : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct RoadStream : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Program : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct UniformCache : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct SunShadowMap : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
 };
 enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
+struct BloomPass : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
 enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
-enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh };
-enum class Surface : u8 { none, cloth, tpu, floor };
-struct Body { u64 id = 0; bool valid() const { return id != 0; } };
-struct Joint { u64 id = 0; };
-struct Pose {
+struct AmbientOcclusionPass : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct ShaderExtension : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Bvh : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Renderer : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace physics { enum class BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 }; }
+namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
+namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
+namespace physics { struct Body { u64 id = 0; bool valid() const { return id != 0; } }; }
+namespace physics { struct Shape { u64 id = 0; }; }
+namespace physics { struct Joint { u64 id = 0; bool valid() const { return id != 0; } }; }
+namespace physics { struct Pose {
   Vec3 position;
   Quat rotation;
-};
+}; }
+namespace physics { struct BodySettings {
+  BodyType type = BodyType::dynamic;
+  Vec3 position;
+  Quat rotation;
+  Vec3 linear_velocity, angular_velocity;
+  f32 linear_damping = 0, angular_damping = 0, gravity_scale = 1;
+  bool enable_sleep = true, awake = true, enabled = true, bullet = false;
+  u64 user = 0;  // returned by World::body_user
+}; }
+namespace physics { struct ShapeMaterial {
+  f32 density = 1;            // kg/m^3
+  f32 friction = 0.6;
+  f32 restitution = 0;        // 0..1
+  f32 rolling_resistance = 0; // spheres, capsules, hulls (Box3D: a quarter of the inner radius)
+  bool sensor = false;
+  u64 category_bits = 1, mask_bits = ~0ull;
+  i32 group_index = 0;
+  bool contact_events = true, sensor_events = true, hit_events = false;
+  u64 user = 0;               // returned by World::shape_user
+  Surface surface = Surface::none;
+}; }
+namespace physics { struct ShapeSettings {
+  ShapeKind kind = ShapeKind::box;
+  Vec3 center;               // body-local placement of the shape
+  Quat rotation;
+  Vec3 size{1, 1, 1};        // box: full extents
+  f32 radius = 0.5;         // sphere, capsule
+  f32 length = 1;            // capsule: distance between the hemisphere centres, along the shape's Z
+  Span<const Vec3> points;   // hull: points in shape space (4..128 after hull reduction); mesh: vertices
+  Span<const u32> indices;   // mesh: 3 per triangle, counter-clockwise (static bodies only)
+  ShapeMaterial material;
+}; }
+namespace physics { struct JointSettings {
+  JointType type = JointType::revolute;
+  Body body_a, body_b;
+  Pose frame_a, frame_b;         // in body-local space
+  bool collide_connected = false;
+  // springs: revolute, prismatic, distance, spherical, wheel (suspension), parallel
+  bool enable_spring = false;
+  f32 hertz = 0, damping_ratio = 0;
+  // limits: revolute (radians), prismatic and wheel (metres), distance (min/max length), spherical (cone angle = upper)
+  bool enable_limit = false;
+  f32 lower = 0, upper = 0;
+  // motors: revolute and wheel use torque, prismatic and distance use force, spherical uses torque + motor_velocity
+  bool enable_motor = false;
+  f32 motor_speed = 0, max_motor_torque = 0, max_motor_force = 0;
+  Vec3 motor_velocity;
+  f32 length = 1;                // distance joint rest length
+  // weld joint softness (0 hertz = rigid)
+  f32 linear_hertz = 0, angular_hertz = 0, linear_damping_ratio = 1, angular_damping_ratio = 1;
+  // motor joint: velocity drive and spring towards frame alignment
+  Vec3 linear_velocity, angular_velocity;
+  f32 max_velocity_force = 0, max_velocity_torque = 0, max_spring_force = 0, max_spring_torque = 0;
+  // wheel joint steering (Box3D b3WheelJointDef): the wheel turns about the suspension axis towards
+  // `target_steering` (radians) with a spring-damper servo of at most `max_steering_torque`;
+  // without it the wheel is fixed forward
+  bool enable_steering = false, enable_steering_limit = false;
+  f32 steering_hertz = 0, steering_damping_ratio = 0, target_steering = 0, max_steering_torque = 0;
+  f32 steering_lower = 0, steering_upper = 0;
+  // parallel joint
+  f32 max_torque = 0;
+  // Joint softness of the solver (0 = Box3D defaults); keep below half the sub-step rate.
+  f32 constraint_hertz = 0, constraint_damping_ratio = 0;
+  u64 user = 0;
+}; }
+namespace physics { physics::Pose frame_from_axis(const Vec3& anchor, const Vec3& axis, const bool& x_axis); }
 struct World : converted::EngineObject {
-  bool body_valid(const Body& body) const;
-  void destroy_body(const Body& body) const;
+  using converted::EngineObject::EngineObject;
+  physics::Body create_body(const physics::BodySettings& settings) const;
+  physics::Shape create_shape(const physics::Body& body, const physics::ShapeSettings& settings) const;
+  void apply_angular_impulse(const physics::Body& body, const Vec3& impulse) const;
+  void apply_linear_impulse_to_center(const physics::Body& body, const Vec3& impulse) const;
+  bool body_valid(const physics::Body& body) const;
+  void destroy_body(const physics::Body& body) const;
+  physics::Pose pose(const physics::Body& body) const;
+  Vec3 linear_velocity(const physics::Body& body) const;
+  void apply_linear_impulse(const physics::Body& body, const Vec3& impulse, const Vec3& point) const;
+  physics::BodyType body_type(const physics::Body& body) const;
+  double mass(const physics::Body& body) const;
+  physics::Joint create_joint(const physics::JointSettings& settings) const;
+  bool joint_valid(const physics::Joint& joint) const;
+  void destroy_joint(const physics::Joint& joint, const bool& wake_bodies = true) const;
+};
+struct MouseGrab : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct CharacterMover : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
 };
 constexpr f32 kPi = 3.14159265358979323846;
+enum : u64 { kCatWorld = 1, kCatVehicle = 2, kCatDrone = 4, kCatQuery = 8 };
 inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
-enum class GeomType : u8 { unknown = 0, point = 1, line = 2, polygon = 3 };
-namespace Value { enum class Kind : u8 { none, string, number, boolean }; }
+inline f32 wrap_pi(f32 a) {
+  while (a > kPi) a -= 2 * kPi;
+  while (a < -kPi) a += 2 * kPi;
+  return a;
+}
+inline Quat conj(Quat q) { return {-q.x, -q.y, -q.z, q.w}; }
+inline Vec3 to_local(Quat q, Vec3 v) { return conj(q).rotate(v); }
+inline Quat yaw_quat(f32 yaw) { return Quat::axis_angle({0, 0, 1}, yaw); }
+struct Rng {
+  // Plain state: `Rng{seed}` starts at that seed, an Rng of its own starts at the default one. A
+  // seed must not be 0 (xorshift would stay there) - a seed that is computed goes through seeded().
+  u32 s = 0x9e3779b9u;
+  f32 spare_ = 0;           // gaussian(): the second number of a pair, kept for the next call
+  bool has_spare_ = false;
+  /// The generator for a seed that may be 0 (0: the default seed).
+  
+  u32 next() { s ^= s << 13; s ^= s >> 17; s ^= s << 5; return s; }
+  f32 unit() { return static_cast<f32>(next() >> 8) * (1.0 / 16777216.0); }
+  
+  /// Standard normal (Box-Muller), as SpawnCity's sensor noise.
+  
+
+
+
+
+
+
+
+};
+namespace mvt { enum class GeomType : u8 { unknown = 0, point = 1, line = 2, polygon = 3 }; }
+namespace mvt { namespace Value { enum class Kind : u8 { none, string, number, boolean }; } }
 enum class RoadClass : u8 { motorway, trunk, primary, secondary, tertiary, minor, service, track, path, pedestrian, river, canal, stream };
 enum class AreaKind : u8 { water, park, wood, grass, sand, pitch };
 struct Ragdolls {
@@ -174,15 +338,15 @@ struct Ragdolls {
   void init(World& w, bool mobile) { world_ = &w; max_ = mobile ? 6 : 10; }  // MAX_RAGDOLLS
   /// Throws a person standing at `feet` (facing `yaw`) with `velocity` (m/s). `recover`: the person
   /// gets up again when the body has settled. Reuses the oldest body when the pool is full.
-  
+  bool spawn(u64 key, Vec3 feet, f32 yaw, Vec3 velocity, const Colors& colors, bool recover, f32 now);
   
   /// A blast pushes every body in range (world_person_ragdoll: the bodies are in the same world).
-  
-  
-  
+  void blast(Vec3 at, f32 radius, f32 strength);
+  void remove(u64 key);
+  void clear();
   
   /// The pelvis of a body (where it lies), false when there is none.
-  
+  bool where(u64 key, Vec3& pelvis, f32& yaw) const;
   
   
   
@@ -190,8 +354,11 @@ struct Ragdolls {
   /// A bone's body (VR grab: the hand takes the doll by its chest), invalid when there is none.
   
 
-  /// Drawing: every active body's bones as box transforms (unit box scaled to the bone) + tint.
-  struct Draw { Mat4 m; Vec3 tint; bool sphere; u8 bone = 0; const Colors* colors = nullptr; Mat4 pose; };  // pose: the bone's frame (unscaled)
+  /// Drawing: every active body's bones as box transforms (unit box scaled to the bone) + tint,
+  /// and the body the bone is of (its colours: colors(doll)).
+  struct Draw { Mat4 m; Vec3 tint; bool sphere; u8 bone = 0; u32 doll = 0; Mat4 pose; };  // pose: the bone's frame (unscaled)
+  
+  /// The colours of the person a body of draw() is.
   
 
   /// Bone sizes (rest pose, standing at the origin facing +X): centre, half extents (capsule:
@@ -203,22 +370,42 @@ struct Ragdolls {
   struct Doll {
     bool active = false, recover = false, getting_up = false;
     u64 key = 0;
-    Body bodies[kBones];
-    Joint joints[kBones];
-    Pose pose[kBones], from[kBones], stand[kBones];
+    physics::Body bodies[kBones];
+    physics::Joint joints[kBones];
+    physics::Pose pose[kBones], from[kBones], stand[kBones];
     Colors colors;
     f32 born = 0, settled = 0, getup_at = 0, stand_yaw = 0;
     Vec3 stand_feet;
     i32 group = 0;
   };
-  
-  
+  i32 find(u64 key) const;
+  void release(Doll& d);
   
   World* world_ = nullptr;
   std::vector<Doll> dolls_;
   std::vector<Up> ups_;
   u32 max_ = 10, spawned_ = 0;
   i32 group_ = 0;
+};
+struct LifeCar {
+  Vec3 position, velocity;
+  Quat rotation;
+  Vec2 half;        // footprint half extents (body X forward)
+  f32 mass = 1400;
+  i32 car = -1;     // the game's traffic car index (-1: other vehicle)
+  bool player = false, airborne = false, stuck = false, driver = true;
+};
+struct LifeView {
+  const World* physics = nullptr;
+  Vec3 focus, player;   // player: his feet (or vehicle)
+  Vec3 eye;             // the camera (hearing distance)
+  Vec3 head;            // the player's head (the black cat leaps at it)
+  f64 epoch = 0;        // wall clock in seconds (SpawnCity's Date.now(): every machine the same)
+  bool dogs_on = true, cats_on = true;
+  f32 player_speed = 0;
+  bool on_foot = true, people_on = true, birds_on = true;  // WORLD options (world.people, world.birds)
+  std::vector<LifeCar> cars;
+  std::vector<Vec3> mates;  // MP host: where the other players are (herds and flocks there too: one world)
 };
 struct LifeOut {
   enum class Sound : u8 { moo, moo_pain, coo, flap, squawk, thud, stomp, stomp_accent, jingle, horn, horn_bus, scream, scream_f, dog, cat, hiss, yowl, screech, kCount };
@@ -251,7 +438,7 @@ struct Life {
     Quat rot;  // the dead body's orientation
     bool dead = false, walking = false, carried = false;  // carried: picked up / thrown alive (a VR hand)
     f32 carried_still = 0;
-    Body body;  // the dead cow, or the carried one: a 600 kg Box3D body
+    physics::Body body;  // the dead cow, or the carried one: a 600 kg Box3D body
     Vec3 net_to, net_v;        // MP client: where the host has it, and its pace there
     f32 net_at = 0;
     Quat net_rot;
@@ -290,7 +477,7 @@ struct Life {
     Vec2 off;  // where a throw left it, off its round (back to it over some seconds)
     i32 punches = 0;
     Vec3 color;
-    Body body;  // the dead animal
+    physics::Body body;  // the dead animal
     Quat rot;
     Quat net_rot;  // MP client: the host's carried / dead pose
   };
@@ -298,19 +485,19 @@ struct Life {
   struct Voice { Vec3 at; std::string text, mood; f32 until; };
 
   void init(World& w, bool mobile);
-  
+  void clear();
   
 
   /// A bullet from `from` to `to`: cows, birds and joggers. Returns true when something was hit
   /// (`to` shortened to the hit).
-  
+  bool shot(Vec3 from, Vec3& to, f32 damage, f32 now, LifeOut& out, bool melee = false);
   /// Another player's cow died (cows.mjs onFx): the cow there falls the same way.
-  
+  void remote_cow_death(Vec3 at, Vec3 impulse, f32 now, LifeOut& out);
   /// A shot was fired / passed (scares cows and pigeons).
   void heard_shot(Vec3 from, Vec3 to, f32 now);
-  
+  void blast(Vec3 at, f32 radius, f32 now, LifeOut& out);
   /// Street voices (street_voices.mjs): a short spoken line with a bubble, rate-limited.
-  
+  bool shout(Vec3 at, const char* mood, u32 seed, f32 now, f32 hear_distance, LifeOut& out);
   bool honk(Vec3 at, bool bus, u32 source, f32 now, f32 hear_distance, LifeOut& out);
   bool scream(Vec3 at, u32 seed, f32 now, f32 hear_distance, LifeOut& out);
 
@@ -333,10 +520,12 @@ struct Life {
   
   bool provoke_cat(f32 now);  // tests: the black cat charges
   
+  /// The running club (as it was last, when has_chain() says there is none now).
+  
   /// MP client: the running club is the host's (game_worldsync.cpp) - no own chain, his runners
   /// eased to where his snapshots have them; none heard for 1.5 s: gone.
   
-  
+  void apply_joggers(u32 id, const std::array<Vec3, 10>& pos, const std::array<f32, 10>& yaw, const std::array<bool, 10>& alive, u32 n, f32 now, f32 at);
   /// MP client: the animals are the host's too (game_worldsync.cpp): no herds, pets or flocks of
   /// our own; his cows (by key - the same on every machine), dogs and cats (by his index) and
   /// pigeon flocks (by his index) eased to where his snapshots have them. An animal that is a
@@ -357,8 +546,8 @@ struct Life {
   
   /// The host's animals as he has them around us (game_worldsync.cpp), each list whole: what a
   /// list does not name is not there. `at`: when the list was taken, on our clock.
-  
-  
+  void apply_cows(const std::vector<NetCow>& cows, f32 now, f32 at);
+  void apply_pets(const std::vector<NetPet>& pets, u32 pet_count, const std::vector<Vec2>& pet_anchors, f32 now);
   
   /// The neighbourhoods of the dogs and cats: the player's first, then (host) one round every mate
   /// far from it; pet i belongs to anchor i / base.
@@ -366,12 +555,12 @@ struct Life {
   
   /// Thrown things (game_toss.cpp): the body of an animal another player throws, made here so
   /// it flies here too (the host's cow by key / pet by index); invalid when there is none.
-  
-  
+  physics::Body net_carry_cow(u64 key);
+  physics::Body net_carry_pet(u32 index);
   /// A pigeon in another player's hand / let go by him (`key` his and the bird's): drawn here.
-  
+  void net_bird(u64 key, Vec3 at, f32 yaw, Vec3 vel, bool held);
   /// A dog or cat killed on a client: the host's dies too (and every snapshot says so).
-  
+  void net_kill_pet(u32 index, Vec3 dir, f32 now, LifeOut& out) { if (index < pets_.size() && converted::at(pets_, index).dead_at < 0) kill_pet(index, dir, now, out); }
   
   
   
@@ -385,10 +574,10 @@ struct Life {
 
   /// A hand grabs the nearest live animal within `reach` of `at` (a dog, a cat, a cow): it becomes a
   /// Box3D body for as long as it is held and flies; it gets up where it lands. The body, or none.
-  
+  physics::Body grab_animal(Vec3 at, f32 reach);
   /// A pigeon caught by hand (VR): crept up on, the hand slow and right on it - and even then
   /// only every other try, a miss sends the flock up. Returns its id (-1: it got away).
-  
+  i32 catch_pigeon(Vec3 hand, f32 hand_speed, f32 now, Rng& rng);
   /// The animal with this body is in a hand this frame: it does not stand up there (held still).
   
 
@@ -413,8 +602,8 @@ struct Life {
   f32 remote_joggers_at_ = -9;
   struct Meadow { std::vector<std::vector<Vec2>> rings; Vec2 lo, hi, centre; f32 area = 0; u64 key = 0; bool alive = true; };
   
-  
-  
+  Vec2 graze_spot(const Cow& c, i64 k) const;
+  void kill_cow(Cow& c, Vec3 impulse, f32 now, LifeOut& out);
   void scare_cow(Cow& c, Vec2 from, f32 now, f32 secs);
   
   
@@ -424,12 +613,12 @@ struct Life {
   
   
   
-  
+  void kill_pet(u32 i, Vec3 dir, f32 now, LifeOut& out);
   static void pet_params(Pet& p, u32 i);
   
-  
+  void kill_runner(i32 i, Vec3 velocity, f32 now, LifeOut& out);
   Vec3 sample(f32 s, f32& yaw, Vec2& normal) const;
-  
+  void update_voices(f32 dt, f32 now, const LifeView& view, LifeOut& out);
 
   World* world_ = nullptr;
   bool mobile_ = false;
@@ -459,9 +648,191 @@ struct Life {
   std::vector<std::pair<u32, f32>> source_gap_;
   u32 cow_hits_ = 0, bird_hits_ = 0, shouts_ = 0, honks_ = 0;
 };
+void Ragdolls::blast(Vec3 at, f32 radius, f32 strength) {
+  if (!world_) return;
+  for (Doll& d : dolls_) {
+    if (!d.active || d.getting_up) continue;
+    for (u32 b = 0; b < kBones; ++b) {
+      if (!world_->body_valid(converted::at(d.bodies, b)) || world_->body_type(converted::at(d.bodies, b)) != physics::BodyType::dynamic) continue;
+      const Vec3 p = world_->pose(converted::at(d.bodies, b)).position, dir = p - at;
+      const f32 l = converted::wide::length(dir);
+      if (l > radius) continue;
+      const f32 k = strength * (1 - l / radius) * world_->mass(converted::at(d.bodies, b));
+      world_->apply_linear_impulse_to_center(converted::at(d.bodies, b), (l > 1e-3 ? dir * (1 / l) : Vec3{0, 0, 1}) * k + Vec3{0, 0, k * 0.5});
+    }
+  }
+}
+namespace ragdoll_cpp_local { constexpr f32 kFriction = 8; }
+namespace ragdoll_cpp_local { constexpr f32 kNoise = 0.65; }
+namespace ragdoll_cpp_local { struct BoneDef { Vec3 center; Vec3 half; bool capsule; }; }
+namespace ragdoll_cpp_local { const BoneDef kDefs[Ragdolls::kBones] = {
+    {{0, 0, 0.98}, {0.11, 0.17, 0.11}, false},      // pelvis (box)
+    {{0, 0, 1.30}, {0.14, 0.14, 0.24}, true},       // chest
+    {{0, 0, 1.74}, {0.11, 0.11, 0.11}, true},       // head (sphere)
+    {{0, 0.225, 1.35}, {0.05, 0.05, 0.17}, true},  // upper arms
+    {{0, -0.225, 1.35}, {0.05, 0.05, 0.17}, true},
+    {{0, 0.225, 1.065}, {0.045, 0.045, 0.16}, true},  // lower arms
+    {{0, -0.225, 1.065}, {0.045, 0.045, 0.16}, true},
+    {{0, 0.1, 0.715}, {0.07, 0.07, 0.24}, true},   // thighs
+    {{0, -0.1, 0.715}, {0.07, 0.07, 0.24}, true},
+    {{0, 0.1, 0.27}, {0.06, 0.06, 0.24}, true},    // shins
+    {{0, -0.1, 0.27}, {0.06, 0.06, 0.24}, true},
+}; }
+namespace ragdoll_cpp_local { struct JointDef { i32 parent; Vec3 anchor; u8 kind; f32 lo, hi; }; }
+namespace ragdoll_cpp_local { const JointDef kJoints[Ragdolls::kBones] = {
+    {-1, {}, 0, 0, 0},
+    {Ragdolls::pelvis, {0, 0, 1.08}, 0, 0, 0.5},           // waist
+    {Ragdolls::chest, {0, 0, 1.60}, 0, 0, 0.6},            // neck
+    {Ragdolls::chest, {0, 0.225, 1.50}, 0, 0, 1.6},       // shoulders
+    {Ragdolls::chest, {0, -0.225, 1.50}, 0, 0, 1.6},
+    {Ragdolls::upper_arm_l, {0, 0.225, 1.20}, 1, -2.4, 0.05},  // elbows bend forward
+    {Ragdolls::upper_arm_r, {0, -0.225, 1.20}, 1, -2.4, 0.05},
+    {Ragdolls::pelvis, {0, 0.1, 0.94}, 0, 0, 1.2},        // hips
+    {Ragdolls::pelvis, {0, -0.1, 0.94}, 0, 0, 1.2},
+    {Ragdolls::thigh_l, {0, 0.1, 0.49}, 1, -0.05, 2.4},  // knees bend backward
+    {Ragdolls::thigh_r, {0, -0.1, 0.49}, 1, -0.05, 2.4},
+}; }
+namespace ragdoll_cpp_local { f32 hash_noise(u64 seed, u32 i) {
+  u32 x = static_cast<u32>(seed ^ (converted::shr_bits(seed, 32))) + (i + 1) * 0x9e3779b1u;
+  x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16;
+  return static_cast<f32>(x) / 4294967295.0 * 2 - 1;
+} }
+i32 Ragdolls::find(u64 key) const {
+  for (std::size_t i = 0; i < dolls_.size(); converted::pre_inc(i))
+    if (converted::at(dolls_, i).active && converted::at(dolls_, i).key == key) return static_cast<i32>(i);
+  return -1;
+}
+void Ragdolls::release(Doll& d) {
+  if (!world_) return;
+  for (u32 b = 0; b < kBones; ++b) {
+    if (converted::at(d.joints, b).valid() && world_->joint_valid(converted::at(d.joints, b))) world_->destroy_joint(converted::at(d.joints, b), false);
+    converted::at(d.joints, b) = {};
+  }
+  for (u32 b = 0; b < kBones; ++b) {
+    if (converted::at(d.bodies, b).valid() && world_->body_valid(converted::at(d.bodies, b))) world_->destroy_body(converted::at(d.bodies, b));
+    converted::at(d.bodies, b) = {};
+  }
+}
+void Ragdolls::remove(u64 key) {
+  const i32 i = find(key);
+  if (i < 0) return;
+  release(converted::at(dolls_, i));
+  converted::at(dolls_, i).active = false;
+}
+bool Ragdolls::spawn(u64 key, Vec3 feet, f32 yaw, Vec3 velocity, const Colors& colors, bool recover, f32 now) { using ragdoll_cpp_local::BoneDef; using ragdoll_cpp_local::JointDef;
+  if (!world_) return false;
+  remove(key);
+  i32 at = -1;  // (the doll it becomes: its place in dolls_)
+  for (std::size_t i = 0; i < dolls_.size(); converted::pre_inc(i))
+    if (!converted::at(dolls_, i).active) { at = static_cast<i32>(i); break; }
+  if (at < 0 && dolls_.size() < max_) { dolls_.push_back(Doll{}); at = static_cast<i32>(dolls_.size()) - 1; }
+  if (at < 0) {
+    // The pool is full: the oldest goes (one that was going to get up does so right now).
+    std::size_t old = 0;
+    for (std::size_t i = 0; i < dolls_.size(); converted::pre_inc(i))
+      if (converted::at(dolls_, i).born < converted::at(dolls_, old).born) old = i;
+    if (converted::at(dolls_, old).recover) {
+      Vec3 p; f32 y;
+      where(converted::at(dolls_, old).key, p, y);
+      ups_.push_back({converted::at(dolls_, old).key, {p.x, p.y, feet.z}, y});
+    }
+    release(converted::at(dolls_, old));
+    at = static_cast<i32>(old);
+  }
+  Doll& d = converted::at(dolls_, static_cast<std::size_t>(at));
+  d = Doll{};
+  d.active = true;
+  d.key = key;
+  d.recover = recover;
+  d.colors = colors;
+  d.born = now;
+  d.group = -(1 + (group_++ % 30000));  // one negative group per body: its bones never collide with each other
+  ++spawned_;
+  const Quat q = yaw_quat(yaw);
+  for (u32 b = 0; b < kBones; ++b) {
+    const BoneDef& def = converted::at(ragdoll_cpp_local::kDefs, b);
+    physics::BodySettings bs;
+    bs.type = physics::BodyType::dynamic;
+    bs.position = feet + q.rotate(def.center);
+    bs.rotation = q;
+    const f32 boost = b == chest || b == head ? 1.15 : (b == lower_arm_l || b == lower_arm_r || b == shin_l || b == shin_r) ? 1.28 : 1.0;
+    bs.linear_velocity = {velocity.x * boost + ragdoll_cpp_local::hash_noise(key, b * 3) * ragdoll_cpp_local::kNoise, velocity.y * boost + ragdoll_cpp_local::hash_noise(key, b * 3 + 1) * ragdoll_cpp_local::kNoise,
+                          velocity.z * boost + 1.1 + std::fabs(ragdoll_cpp_local::hash_noise(key, b * 3 + 2)) * 0.9};
+    bs.angular_velocity = {ragdoll_cpp_local::hash_noise(key, 40 + b) * 2, ragdoll_cpp_local::hash_noise(key, 60 + b) * 2, ragdoll_cpp_local::hash_noise(key, 80 + b)};
+    bs.linear_damping = 0.05;
+    bs.angular_damping = 0.4;
+    converted::at(d.bodies, b) = world_->create_body(bs);
+    physics::ShapeSettings ss;
+    if (b == head) { ss.kind = physics::ShapeKind::sphere; ss.radius = def.half.x; }
+    else if (def.capsule) { ss.kind = physics::ShapeKind::capsule; ss.radius = def.half.x; ss.length = 2 * (def.half.z - def.half.x); }
+    else { ss.kind = physics::ShapeKind::box; ss.size = def.half * 2.0; }
+    ss.material.density = 1000;  // about water: a 70 kg person
+    ss.material.friction = 0.72;
+    ss.material.restitution = 0.05;
+    ss.material.group_index = d.group;
+    ss.material.category_bits = kCatWorld;
+    world_->create_shape(converted::at(d.bodies, b), ss);
+  }
+  for (u32 b = 1; b < kBones; ++b) {
+    const JointDef& j = converted::at(ragdoll_cpp_local::kJoints, b);
+    physics::JointSettings js;
+    js.body_a = converted::at(d.bodies, j.parent);
+    js.body_b = converted::at(d.bodies, b);
+    const Vec3 la = j.anchor - converted::at(ragdoll_cpp_local::kDefs, j.parent).center, lb = j.anchor - converted::at(ragdoll_cpp_local::kDefs, b).center;
+    if (j.kind == 1) {
+      js.type = physics::JointType::revolute;
+      js.frame_a = physics::frame_from_axis(la, {0, 1, 0}, false);
+      js.frame_b = physics::frame_from_axis(lb, {0, 1, 0}, false);
+      js.enable_limit = true;
+      js.lower = j.lo;
+      js.upper = j.hi;
+      js.enable_motor = true;   // joint friction
+      js.motor_speed = 0;
+      js.max_motor_torque = ragdoll_cpp_local::kFriction * 0.5;
+    } else {
+      js.type = physics::JointType::spherical;
+      // the cone opens along the bone (down from shoulders and hips, up from waist and neck)
+      const Vec3 axis = b == chest || b == head ? Vec3{0, 0, 1} : Vec3{0, 0, -1};
+      js.frame_a = physics::frame_from_axis(la, axis, false);
+      js.frame_b = physics::frame_from_axis(lb, axis, false);
+      js.enable_limit = true;
+      js.upper = j.hi;
+      js.enable_motor = true;
+      js.max_motor_torque = ragdoll_cpp_local::kFriction * 0.5;
+    }
+    converted::at(d.joints, b) = world_->create_joint(js);
+  }
+  for (u32 b = 0; b < kBones; ++b) converted::at(d.pose, b) = world_->pose(converted::at(d.bodies, b));
+  return true;
+}
+bool Ragdolls::where(u64 key, Vec3& p, f32& yaw) const {
+  const i32 i = find(key);
+  if (i < 0) return false;
+  const Doll& d = converted::at(dolls_, i);
+  p = converted::at(d.pose, pelvis).position;
+  const Vec3 up = converted::at(d.pose, chest).position - converted::at(d.pose, pelvis).position;
+  yaw = kern::math::atan2(up.y, up.x);
+  return true;
+}
+void Ragdolls::clear() {
+  for (Doll& d : dolls_) { release(d); d.active = false; }
+  dolls_.clear();
+  ups_.clear();
+}
 constexpr u32 kMaxCows = 40;
+constexpr f32 kMinArea = 1800, kHerdRadius = 420, kPeriod = 24, kWalk = 0.55, kCowMass = 600, kGrazeR = 6;
 const u32 kCoats[5] = {0xf1efe8, 0xf1efe8, 0x8a5a3c, 0x3a2c24, 0xcfa977};
-constexpr f32 kMaxHear = 38, kShoutGap = 1.4, kSourceGap = 6, kHonkGap = 1.2;
+constexpr u32 kRunners = 10;
+constexpr f32 kGap = 1.35, kSpeed = 2.9, kChainLife = 95, kFirst = 60, kEveryMin = 170, kEveryMax = 280, kStreakWindow = 12;
+constexpr f32 kMaxHear = 38, kShoutGap = 1.4, kSourceGap = 6, kHonkGap = 1.2, kBubble = 2.1;
+struct Lines { std::string_view mood; std::string_view lines[6]; u32 n; };
+const Lines kLines[] = {
+    {"bump", {"Hey, pass doch auf!", "Geht's noch?", "Augen auf, Mann!", "Was soll das denn?", "Mann, ey!", "Hast du keine Augen im Kopf?"}, 6},
+    {"angry", {"Na warte!", "Jetzt reicht's mir!", "Willst du \xc3\x84rger?", "Komm her, du Idiot!", "Dir zeig ich's!", "Du hast sie doch nicht alle!"}, 6},
+    {"scared", {"Hilfe!", "Weg hier!", "Der ist verr\xc3\xbc" "ckt!", "Lauf!", "Polizei! Hilfe!"}, 5},
+    {"nearmiss", {"Bist du blind?!", "Langsam, du Irrer!", "Spinnst du?!", "Pass doch auf, du Vollidiot!", "Fahr doch nicht wie ein Henker!"}, 5},
+    {"honked", {"Ja ja, ist ja gut!", "Reg dich ab!", "Hup nicht so!", "Selber!"}, 4},
+};
 f32 hash01(u64 v) {
   v ^= converted::shr_bits(v, 33); converted::times_bits_to(v, 0xff51afd7ed558ccdull); v ^= converted::shr_bits(v, 33); converted::times_bits_to(v, 0xc4ceb9fe1a85ec53ull); v ^= converted::shr_bits(v, 33);
   return static_cast<f32>(converted::shr_bits(v, 40)) / 16777216.0;
@@ -480,7 +851,7 @@ bool in_ring(const std::vector<Vec2>& r, Vec2 p) {
 }
 f32 seg_sphere(Vec3 a, Vec3 b, Vec3 c, f32 r) {
   const Vec3 d = b - a, m = a - c;
-  const f32 A = dot(d, d), B = dot(m, d), C = dot(m, m) - r * r;
+  const f32 A = converted::wide::dot(d, d), B = converted::wide::dot(m, d), C = converted::wide::dot(m, m) - r * r;
   if (A < 1e-9) return -1;
   const f32 disc = B * B - A * C;
   if (disc < 0) return -1;
@@ -520,6 +891,31 @@ void Life::init(World& w, bool mobile) {
   birds_.assign(converted::count(n), {});
   for (u32 i = 0; i < n; ++i) converted::at(birds_, i).seed = static_cast<u32>(converted::fits<unsigned int>(hash01(mix(0xb17d, i)) * 4294967295.0));
 }
+void Life::clear() {
+  for (Pet& p : pets_) {
+    if (p.body.valid() && world_ && world_->body_valid(p.body)) world_->destroy_body(p.body);
+    p.body = {};
+    p.dead_at = -1;
+    p.shown = false;
+  }
+  cat_ = {};
+  pet_anchor_ = {1e9, 1e9};
+  for (Cow& c : cows_)
+    if (c.body.valid() && world_ && world_->body_valid(c.body)) world_->destroy_body(c.body);
+  cows_.clear();
+  dead_cows_.clear();
+  meadows_.clear();
+  herds_for_ = {1e9, 1e9};
+  flocks_.clear();
+  trees_.clear();
+  trees_gone_.clear();
+  tree_serial_ = ~0u;
+  chain_alive_ = false;
+  next_chain_ = -1;
+  streak_n_ = 0;
+  voices_.clear();
+  ragdolls_.clear();
+}
 bool Life::spawn_herd(Vec2 center, f32 radius, u32 n, f32 now) {
   // Tests: a round pasture around `center` with n cows.
   Meadow m;
@@ -549,6 +945,17 @@ bool Life::spawn_herd(Vec2 center, f32 radius, u32 n, f32 now) {
   herds_for_ = center;  // keep this herd until the player moves on
   return true;
 }
+Vec2 Life::graze_spot(const Cow& c, i64 k) const {
+  // A cow grazes around its own patch (GRAZE_R around its home spot): short legs at a cow's pace.
+  const bool fenced = c.meadow >= 0 && c.meadow < static_cast<i32>(meadows_.size());  // (it has a meadow: it stays inside)
+  for (int j = 0; j < 6; ++j) {
+    const u64 h = mix(c.key, converted::plus_bits(converted::times_bits(static_cast<u64>(k), 16), j));
+    const f32 a = hash01(h) * 2 * kPi, r = kern::math::sqrt(hash01(converted::plus_bits(h, 1))) * kGrazeR;
+    const Vec2 p{c.home.x + kern::math::cos(a) * r, c.home.y + kern::math::sin(a) * r};
+    if (!fenced || in_rings(converted::at(meadows_, static_cast<std::size_t>(c.meadow)).rings, p)) return p;
+  }
+  return c.home;
+}
 void Life::scare_cow(Cow& c, Vec2 from, f32 now, f32 secs) {
   if (c.dead) return;
   Vec2 d{c.pos.x - from.x, c.pos.y - from.y};
@@ -556,6 +963,127 @@ void Life::scare_cow(Cow& c, Vec2 from, f32 now, f32 secs) {
   d = l > 1e-3 ? d * (1 / l) : Vec2{1, 0};
   c.flee_v = d * 2.8;
   c.flee_until = now + secs;
+}
+void Life::kill_cow(Cow& c, Vec3 impulse, f32 now, LifeOut& out) {
+  if (c.dead) return;
+  c.dead = true;
+  c.hp = 0;
+  dead_cows_.push_back(c.key);
+  out.cow_deaths.push_back({c.pos, impulse});
+  out.sounds.push_back({LifeOut::Sound::moo_pain, c.pos + Vec3{0, 0, 1.4}, 1, 1.4});
+  // The 600 kg body thrown as a Box3D rigid body (cows.mjs kill: halfExtents .82/.34/.38).
+  physics::BodySettings bs;
+  bs.type = physics::BodyType::dynamic;
+  bs.position = c.pos + Vec3{0, 0, 1.12};
+  bs.rotation = yaw_quat(c.yaw);
+  bs.linear_damping = 0.05;
+  bs.angular_damping = 0.3;
+  c.body = world_->create_body(bs);
+  physics::ShapeSettings ss;
+  ss.kind = physics::ShapeKind::box;
+  ss.size = {1.64, 0.68, 0.76};
+  ss.material.density = kCowMass / (1.64 * 0.68 * 0.76);
+  ss.material.friction = 0.7;
+  ss.material.restitution = 0.05;
+  ss.material.category_bits = kCatWorld;
+  world_->create_shape(c.body, ss);
+  world_->apply_linear_impulse(c.body, impulse, c.pos + Vec3{0, 0, 1.45});
+  (void)now;
+}
+physics::Body Life::grab_animal(Vec3 at, f32 reach) {
+  if (!world_) return {};
+  f32 best = reach;
+  i32 cow = -1, pet = -1;  // (the nearest: its place among the cows or among the pets)
+  for (std::size_t i = 0; i < cows_.size(); converted::pre_inc(i)) {
+    const Cow& c = converted::at(cows_, i);
+    if (c.dead) continue;
+    if (c.carried && c.body.valid() && world_->body_valid(c.body)) {
+      const f32 d = converted::wide::length(world_->pose(c.body).position - at);
+      if (d < best + 0.6) { best = d; cow = static_cast<i32>(i); pet = -1; }
+      continue;
+    }
+    // the hand on its back, its neck or its flank (the body 1.6 m long, 1.45 m high)
+    const Vec3 to_local = at - (c.pos + Vec3{0, 0, 1.1});
+    const f32 d = std::fmax(0.0, converted::wide::length(to_local) - 0.75);
+    if (d < best) { best = d; cow = static_cast<i32>(i); pet = -1; }
+  }
+  for (std::size_t i = 0; i < pets_.size(); converted::pre_inc(i)) {
+    Pet& p = converted::at(pets_, i);
+    if (!p.shown || p.dead_at >= 0) continue;
+    const Vec3 c = p.carried && p.body.valid() && world_->body_valid(p.body) ? world_->pose(p.body).position : p.pos + Vec3{0, 0, 0.3 * p.scale};
+    const f32 d = std::fmax(0.0, converted::wide::length(at - c) - 0.25 * p.scale);
+    if (d < best) { best = d; pet = static_cast<i32>(i); cow = -1; }
+  }
+  if (pet >= 0) {
+    Pet& p = converted::at(pets_, static_cast<std::size_t>(pet));
+    if (p.carried && p.body.valid() && world_->body_valid(p.body)) { p.carried_still = 0; return p.body; }
+    const Species sp = species(static_cast<u32>(pet), epoch_);
+    const f32 sc = sp == Species::dog ? p.scale : p.scale * 0.62;
+    const Vec3 half = Vec3{0.33, 0.13, 0.27} * sc;
+    const f32 mass = (sp == Species::dog ? 22.0 : 4.0) * sc * sc * sc;
+    physics::BodySettings bs;
+    bs.type = physics::BodyType::dynamic;
+    bs.position = {p.pos.x, p.pos.y, p.pos.z + half.z};
+    bs.rotation = yaw_quat(p.yaw);
+    bs.linear_damping = 0.1;
+    bs.angular_damping = 1.5;
+    p.body = world_->create_body(bs);
+    physics::ShapeSettings ss;
+    ss.kind = physics::ShapeKind::box;
+    ss.size = half * 2.0;
+    ss.material.density = mass / (8 * half.x * half.y * half.z);
+    ss.material.friction = 0.7;
+    ss.material.category_bits = kCatWorld;
+    world_->create_shape(p.body, ss);
+    p.rot = bs.rotation;
+    p.carried = true;
+    p.carried_still = 0;
+    return p.body;
+  }
+  if (cow >= 0) {
+    Cow& c = converted::at(cows_, static_cast<std::size_t>(cow));
+    if (c.carried && c.body.valid() && world_->body_valid(c.body)) { c.carried_still = 0; return c.body; }
+    physics::BodySettings bs;
+    bs.type = physics::BodyType::dynamic;
+    bs.position = c.pos + Vec3{0, 0, 1.12};
+    bs.rotation = yaw_quat(c.yaw);
+    bs.linear_damping = 0.05;
+    bs.angular_damping = 0.6;
+    c.body = world_->create_body(bs);
+    physics::ShapeSettings ss;
+    ss.kind = physics::ShapeKind::box;
+    ss.size = {1.64, 0.68, 0.76};
+    ss.material.density = kCowMass / (1.64 * 0.68 * 0.76);
+    ss.material.friction = 0.7;
+    ss.material.restitution = 0.05;
+    ss.material.category_bits = kCatWorld;
+    world_->create_shape(c.body, ss);
+    c.rot = bs.rotation;
+    c.carried = true;
+    c.carried_still = 0;
+    return c.body;
+  }
+  return {};
+}
+i32 Life::catch_pigeon(Vec3 hand, f32 hand_speed, f32 now, Rng& rng) {
+  for (Flock& f : flocks_) {
+    if (f.air) continue;
+    for (std::size_t i = 0; i < f.birds.size(); converted::pre_inc(i)) {
+      const Pigeon& b = converted::at(f.birds, i);
+      if (b.dead_at >= 0 || converted::wide::length(hand - (b.pos + Vec3{0, 0, 0.15})) > 0.24) continue;
+      // a quick hand, or bad luck (one in two): the flock is up and away
+      if (hand_speed > 1.0 || rng.unit() < 0.5) { f.next_flight = now; return -1; }
+      LooseBird lb;
+      lb.id = ++loose_serial_;
+      lb.pos = b.pos + Vec3{0, 0, 0.15};
+      lb.yaw = b.yaw;
+      loose_.push_back(lb);
+      converted::erase(f.birds, f.birds.begin() + static_cast<std::ptrdiff_t>(i));
+      f.next_flight = now + 0.4;  // the others take fright a moment later
+      return lb.id;
+    }
+  }
+  return -1;
 }
 void Life::hold_pigeon(i32 id, Vec3 at, f32 yaw) {
   for (LooseBird& b : loose_)
@@ -581,6 +1109,36 @@ bool Life::provoke_cat(f32 now) {
   cat_.start = now;
   return true;
 }
+void Life::kill_pet(u32 i, Vec3 dir, f32 now, LifeOut& out) {
+  Pet& p = converted::at(pets_, i);
+  if (p.dead_at >= 0) return;
+  const Species sp = species(i, epoch_);
+  p.dead_at = now;
+  out.sounds.push_back({sp == Species::dog ? LifeOut::Sound::dog : LifeOut::Sound::cat, p.pos, 0.8, 1});
+  // the legs give way and the body rolls over onto its side, away from the shot (collapseAnimal)
+  const f32 sc = sp == Species::dog ? p.scale : p.scale * 0.62;
+  const Vec3 half = Vec3{0.33, 0.13, 0.27} * sc;
+  const f32 mass = (sp == Species::dog ? 22.0 : 4.0) * sc * sc * sc;
+  physics::BodySettings bs;
+  bs.type = physics::BodyType::dynamic;
+  bs.position = {p.pos.x, p.pos.y, p.pos.z + half.z};
+  bs.rotation = yaw_quat(p.yaw);
+  bs.linear_damping = 0.9;
+  bs.angular_damping = 2.5;
+  p.body = world_->create_body(bs);
+  physics::ShapeSettings ss;
+  ss.kind = physics::ShapeKind::box;
+  ss.size = half * 2.0;
+  ss.material.density = mass / (8 * half.x * half.y * half.z);
+  ss.material.friction = 0.7;
+  ss.material.category_bits = kCatWorld;
+  world_->create_shape(p.body, ss);
+  const Vec3 f{kern::math::cos(p.yaw), kern::math::sin(p.yaw), 0};
+  const f32 side = dir.x * -f.y + dir.y * f.x >= 0 ? 1.0 : -1.0;
+  const f32 w = 2 * half.y, h = 2 * half.z, I = mass * (w * w + h * h) / 3;
+  world_->apply_angular_impulse(p.body, f * (I * 5 * side));
+  world_->apply_linear_impulse_to_center(p.body, Vec3{dir.x, dir.y, std::fmax(0.0, dir.z)} * mass);
+}
 Vec3 Life::sample(f32 s, f32& yaw, Vec2& normal) const {
   const Chain& c = chain_;
   const f32 L = c.len;
@@ -596,6 +1154,68 @@ Vec3 Life::sample(f32 s, f32& yaw, Vec2& normal) const {
   normal = Vec2{-(b.y - a.y) / sl, (b.x - a.x) / sl} * static_cast<f32>(c.side);
   return {a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, 0};
 }
+void Life::kill_runner(i32 i, Vec3 velocity, f32 now, LifeOut& out) {
+  Runner& r = converted::at(chain_.runners, i);
+  if (!r.alive) return;
+  r.alive = false;
+  Ragdolls::Colors col;
+  col.shirt = rgb(0xd8ff3a);
+  col.pants = rgb(0x1c2a3a);
+  const u32 skins[5] = {0xe0b08c, 0xc48e6c, 0xa87052, 0x7b4a33, 0xd2a27e};
+  col.skin = rgb(converted::at(skins, i % 5));
+  ragdolls_.spawn(converted::plus_bits(converted::times((converted::plus(0x10000000ull, chain_.id)), 16), static_cast<u64>(i)), r.pos, r.yaw_s, velocity, col, false, now);
+  out.bursts.push_back({r.pos + Vec3{0, 0, 1.1}, {0.6, 0.02, 0.02}});
+  if (streak_chain_ != chain_.id || now - streak_at_ > kStreakWindow) { streak_n_ = 0; streak_chain_ = chain_.id; }
+  ++streak_n_;
+  streak_at_ = now;
+  u32 left = 0;
+  for (const Runner& x : chain_.runners) left += x.alive ? 1 : 0;
+  char b[64];
+  if (!left) {
+    std::snprintf(b, sizeof b, "KOMPLETTE LAUFGRUPPE! x%u", streak_n_);
+    out.banner = b;
+    out.banner_for = 2.6;
+    out.sounds.push_back({LifeOut::Sound::jingle, r.pos, 1, 1});
+  } else if (streak_n_ >= 2) {
+    std::snprintf(b, sizeof b, "JOGGER x%u", streak_n_);
+    out.banner = b;
+    out.banner_for = 1.3;
+  }
+}
+void Life::apply_joggers(u32 id, const std::array<Vec3, 10>& pos, const std::array<f32, 10>& yaw, const std::array<bool, 10>& alive, u32 n, f32 now, f32 at) {
+  Chain& c = chain_;
+  if (!chain_alive_ || c.id != id) {
+    c = Chain{};
+    c.id = id;
+    c.born = now;
+    for (u32 i = 0; i < kRunners; ++i) { converted::at(c.runners, i).alive = false; }
+    for (u32 i = 0; i < n && i < kRunners; ++i) { converted::at(c.runners, i).pos = converted::at(c.runners, i).net_to = converted::at(pos, i); converted::at(c.runners, i).yaw = converted::at(c.runners, i).yaw_s = converted::at(yaw, i); converted::at(c.runners, i).alive = converted::at(alive, i); }
+    chain_alive_ = true;
+  }
+  for (u32 i = 0; i < n && i < kRunners; ++i) {
+    Runner& r = converted::at(c.runners, i);
+    if (!converted::at(alive, i)) {
+      if (r.alive) {
+        // down on the host's side: down here too (the doll falls along his heading)
+        Ragdolls::Colors col;
+        col.shirt = rgb(0xd8ff3a);
+        col.pants = rgb(0x1c2a3a);
+        const u32 skins[5] = {0xe0b08c, 0xc48e6c, 0xa87052, 0x7b4a33, 0xd2a27e};
+        col.skin = rgb(converted::at(skins, i % 5));
+        ragdolls_.spawn(converted::plus_bits(converted::times((converted::plus(0x10000000ull, c.id)), 16), static_cast<u64>(i)), r.pos, r.yaw_s, Vec3{kern::math::cos(r.yaw_s), kern::math::sin(r.yaw_s), 0.4} * 2.5, col, false, now);
+      }
+      r.alive = false;
+      continue;
+    }
+    if (!r.alive) continue;  // down here (a hit of ours): stays down
+    // his pace from his last two snapshots (on his clock): the runner goes on between them
+    if (at > r.net_at + 0.02 && r.net_at > 0) { const Vec3 v = (converted::at(pos, i) - r.net_to) * (1.0 / (at - r.net_at)); if (converted::wide::length(v) < 12) r.net_v = v; }
+    r.net_to = converted::at(pos, i);
+    r.net_at = at;
+    r.yaw = converted::at(yaw, i);
+  }
+  remote_joggers_at_ = now;
+}
 void Life::set_remote_animals(bool on) {
   if (on == remote_animals_) return;
   remote_animals_ = on;
@@ -609,6 +1229,237 @@ void Life::set_remote_animals(bool on) {
   herds_for_ = {1e9, 1e9};
   pet_anchor_ = {1e9, 1e9};
 }
+void Life::apply_cows(const std::vector<NetCow>& cows, f32 now, f32 at) {
+  if (!remote_animals_) return;
+  remote_animals_at_ = now;
+  // cows by key: known ones go where he has them, new ones appear, the rest go
+  std::vector<Cow> next;
+  for (const NetCow& n : cows) {
+    auto old = std::find_if(cows_.begin(), cows_.end(), [&](const Cow& x) { return x.key == n.key; });
+    Cow c;
+    if (old != cows_.end()) { c = *old; old->body = {}; }
+    else {
+      c.key = n.key;
+      c.color = rgb(converted::at(kCoats, static_cast<u32>(converted::fits<unsigned int>(hash01(mix(n.key, 7)) * 5)) % 5));
+      c.phase = hash01(n.key) * 6;
+      c.pos = n.pos;
+      c.yaw = n.yaw;
+      c.next_moo = now + 8 + hash01(mix(n.key, 9)) * 30;
+    }
+    const bool mine = c.body.valid() && world_->body_valid(c.body);
+    if (!mine) {
+      if (at > c.net_at + 0.02 && c.net_at > 0) { const Vec3 v = (n.pos - c.net_to) * (1.0 / (at - c.net_at)); c.net_v = converted::wide::length(v) < 15 ? v : Vec3{}; }
+      c.net_at = at;
+      c.net_to = n.pos;
+      c.net_rot = n.rot;
+      c.net_dead = n.dead;
+      c.walking = n.walking;
+      c.carried = n.carried;
+      c.yaw += wrap_pi(n.yaw - c.yaw);
+    }
+    next.push_back(c);
+  }
+  for (Cow& c : cows_) if (c.body.valid() && world_->body_valid(c.body)) world_->destroy_body(c.body);
+  cows_ = std::move(next);
+}
+void Life::apply_pets(const std::vector<NetPet>& pets, u32 pet_count, const std::vector<Vec2>& pet_anchors, f32 now) {
+  if (!remote_animals_) return;
+  remote_animals_at_ = now;
+  // the host's neighbourhoods: the round of every dog and cat is then the same here
+  if (!pet_anchors.empty()) {
+    pet_anchor_ = converted::at(pet_anchors, 0);
+    pet_anchors_ = pet_anchors;
+    pet_base_ = std::max<u32>(1, converted::quot(pet_count, static_cast<u32>(pet_anchors.size())));
+  }
+  // dogs and cats by his index (his count: the species of an index is the same everywhere)
+  if (pets_.size() != pet_count) {  // (a phone host has fewer: his count, each one's round by its index)
+    const std::size_t had = pets_.size();
+    pets_.resize(converted::count(pet_count));
+    for (std::size_t i = had; i < pets_.size(); converted::pre_inc(i)) pet_params(converted::at(pets_, i), converted::rem(static_cast<u32>(i), pet_base_));
+  }
+  pet_net_to_.resize(converted::count(pet_count));
+  pet_net_yaw_.resize(converted::count(pet_count), 0);
+  std::vector<bool> seen(converted::count(pet_count), false);
+  for (const NetPet& n : pets) {
+    if (n.idx >= pet_count) continue;
+    converted::at(seen, n.idx) = true;
+    Pet& p = converted::at(pets_, n.idx);
+    if (p.body.valid() && world_->body_valid(p.body)) continue;  // ours right now
+    converted::at(pet_net_to_, n.idx) = n.pos;
+    converted::at(pet_net_yaw_, n.idx) = n.yaw;
+    p.off = n.off;
+    p.net_rot = n.rot;
+    p.shown = n.shown;
+    p.carried = n.carried;
+    if (n.dead && p.dead_at < 0) p.dead_at = now;
+    if (!n.dead) p.dead_at = -1;
+  }
+  for (u32 i = 0; i < pet_count; ++i)
+    if (!converted::at(seen, i) && !(converted::at(pets_, i).body.valid() && world_->body_valid(converted::at(pets_, i).body))) { converted::at(pets_, i).shown = false; converted::at(pets_, i).has_pose = false; }
+}
+physics::Body Life::net_carry_cow(u64 key) {
+  for (Cow& c : cows_) {
+    if (c.key != key || c.dead) continue;
+    if (c.body.valid() && world_->body_valid(c.body)) return c.body;
+    return grab_animal(c.pos + Vec3{0, 0, 1.1}, 0.05);
+  }
+  return {};
+}
+physics::Body Life::net_carry_pet(u32 index) {
+  if (index >= pets_.size()) return {};
+  Pet& p = converted::at(pets_, index);
+  if (p.dead_at >= 0) return {};
+  if (p.body.valid() && world_->body_valid(p.body)) return p.body;
+  if (!p.shown) { p.shown = true; }
+  return grab_animal(p.pos + Vec3{0, 0, 0.3 * p.scale}, 0.05);
+}
+void Life::net_bird(u64 key, Vec3 at, f32 yaw, Vec3 vel, bool held) {
+  for (LooseBird& b : loose_)
+    if (b.net == key) {
+      if (held) { b.pos = at; b.yaw = yaw; b.held = true; b.flap += 0.9; }
+      else if (b.held) { b.held = false; b.t = 0; b.pos = at; b.vel = vel + Vec3{0, 0, 2.5}; }
+      return;
+    }
+  LooseBird lb;
+  lb.id = -static_cast<i32>(++loose_serial_);
+  lb.net = key;
+  lb.pos = at;
+  lb.yaw = yaw;
+  lb.held = held;
+  if (!held) lb.vel = vel + Vec3{0, 0, 2.5};
+  loose_.push_back(lb);
+}
+bool Life::shot(Vec3 from, Vec3& to, f32 damage, f32 now, LifeOut& out, bool melee) {
+  f32 best = 2;
+  i32 kind = -1, which = -1;
+  // cows: the body as an oriented box
+  for (std::size_t i = 0; i < cows_.size(); converted::pre_inc(i)) {
+    const Cow& c = converted::at(cows_, i);
+    if (c.dead) continue;
+    const Quat q = yaw_quat(c.yaw);
+    const Vec3 a = to_local(q, from - (c.pos + Vec3{0, 0, 1.15})), b = to_local(q, to - (c.pos + Vec3{0, 0, 1.15}));
+    const Vec3 h{0.95, 0.36, 0.42}, d = b - a;
+    f32 t0 = 0, t1 = 1;
+    bool hit = true;
+    for (int k = 0; k < 3 && hit; ++k) {
+      const f32 o = k == 0 ? a.x : k == 1 ? a.y : a.z, dd = k == 0 ? d.x : k == 1 ? d.y : d.z, hh = k == 0 ? h.x : k == 1 ? h.y : h.z;
+      if (std::fabs(dd) < 1e-7) { if (std::fabs(o) > hh) hit = false; continue; }
+      f32 e0 = (-hh - o) / dd, e1 = (hh - o) / dd;
+      if (e0 > e1) std::swap(e0, e1);
+      t0 = std::fmax(t0, e0);
+      t1 = std::fmin(t1, e1);
+      if (t0 > t1) hit = false;
+    }
+    if (hit && t0 < best) { best = t0; kind = 0; which = static_cast<i32>(i); }
+  }
+  for (std::size_t i = 0; i < birds_.size(); converted::pre_inc(i)) {
+    const Bird& b = converted::at(birds_, i);
+    if (now < b.dead_until || now < b.dying_until) continue;
+    const f32 t = seg_sphere(from, to, b.pos, 0.45);
+    if (t >= 0 && t < best) { best = t; kind = 1; which = static_cast<i32>(i); }
+  }
+  // pigeons on the ground and in the air: a small sphere each (kind 4, which = flock * 64 + bird)
+  for (std::size_t fi = 0; fi < flocks_.size(); converted::pre_inc(fi))
+    for (std::size_t bi = 0; bi < converted::at(flocks_, fi).birds.size() && bi < 64; converted::pre_inc(bi)) {
+      const Pigeon& pg = converted::at(converted::at(flocks_, fi).birds, bi);
+      if (pg.dead_at >= 0) continue;
+      const f32 t = seg_sphere(from, to, pg.pos + Vec3{0, 0, 0.15}, 0.2);
+      if (t >= 0 && t < best) { best = t; kind = 4; which = static_cast<i32>(converted::plus(converted::times(fi, 64), bi)); }
+    }
+  if (chain_alive_)
+    for (u32 i = 0; i < kRunners; ++i) {
+      const Runner& r = converted::at(chain_.runners, i);
+      if (!r.alive) continue;
+      for (f32 z : {0.6, 1.15, 1.6}) {
+        const f32 t = seg_sphere(from, to, r.pos + Vec3{0, 0, z}, 0.3);
+        if (t >= 0 && t < best) { best = t; kind = 2; which = static_cast<i32>(i); }
+      }
+    }
+  for (std::size_t i = 0; i < pets_.size(); converted::pre_inc(i)) {
+    const Pet& p = converted::at(pets_, i);
+    if (!p.shown || p.dead_at >= 0) continue;
+    const f32 sc = species(static_cast<u32>(i), epoch_) == Species::dog ? p.scale : p.scale * 0.62;
+    const f32 t = seg_sphere(from, to, p.pos + Vec3{0, 0, 0.38 * sc}, 0.34 * sc);
+    if (t >= 0 && t < best) { best = t; kind = 3; which = static_cast<i32>(i); }
+  }
+  if (kind < 0) return false;
+  to = from + (to - from) * best;
+  Vec3 dir = to - from;
+  const f32 l = std::fmax(1e-4, converted::wide::length(dir));
+  dir = dir * (1 / l);
+  if (kind == 0) {
+    Cow& c = converted::at(cows_, which);
+    if (now - c.last_hit < 0.04) return true;
+    c.last_hit = now;
+    ++cow_hits_;
+    out.sounds.push_back({LifeOut::Sound::thud, to, 0.5, 1});
+    if (melee) damage = 6;  // cows.mjs: a fist does 6
+    c.hp -= damage;
+    if (c.hp <= 0) {
+      const f32 k = std::fmin(4.0, 1 + damage / 120);
+      kill_cow(c, {dir.x * kCowMass * k, dir.y * kCowMass * k, kCowMass * 1.2}, now, out);
+    } else {
+      // a hit rocks the 600 kg animal a step aside, then it bolts
+      c.off = c.off + Vec2{dir.x, dir.y} * (melee ? 0.35 : 0.12);
+      c.flinch_at = now;
+      scare_cow(c, {c.pos.x - dir.x * 3, c.pos.y - dir.y * 3}, now, 5.5);
+      out.sounds.push_back({LifeOut::Sound::moo_pain, c.pos + Vec3{0, 0, 1.4}, 0.9, 1.45});
+    }
+  } else if (kind == 1) {
+    Bird& b = converted::at(birds_, which);
+    ++bird_hits_;
+    b.dying_until = now + 1.1;
+    b.dead_until = now + 14;
+    b.down = false;
+    b.fall_v = {dir.x * 2.2, dir.y * 2.2, -0.4};
+    b.spin = 4 + hash01(mix(b.seed, static_cast<u64>(converted::fits<converted::Whole>(now * 100)))) * 4;
+    {
+      // a shrill cry, its pitch the bird's own and a little random, and the wings beating wildly
+      const f32 h = hash01(mix(b.seed, static_cast<u64>(converted::fits<converted::Whole>(now * 1000))));
+      out.sounds.push_back({LifeOut::Sound::squawk, b.pos, 1.0, 0.8 + 0.5 * hash01(b.seed) + 0.1 * h});
+      out.sounds.push_back({LifeOut::Sound::squawk, b.pos, 0.7, 1.3 + 0.3 * h});
+      out.sounds.push_back({LifeOut::Sound::flap, b.pos, 0.9, 1.2});
+    }
+    out.bursts.push_back({b.pos, {0.8, 0.75, 0.66}});
+  } else if (kind == 4) {
+    // a shot pigeon drops where it was, feathers fly, the rest of the flock takes off
+    Flock& f = converted::at(flocks_, static_cast<std::size_t>(which / 64));
+    Pigeon& pg = converted::at(f.birds, static_cast<std::size_t>(which % 64));
+    pg.dead_at = now;
+    pg.fall_v = {dir.x * 1.6, dir.y * 1.6, f.air ? -0.5 : 1.2};
+    ++bird_hits_;
+    out.sounds.push_back({LifeOut::Sound::squawk, pg.pos, 0.9, 1.05 + 0.35 * hash01(static_cast<u32>(which) * 2654435761u + static_cast<u32>(converted::fits<unsigned int>(now * 100)))});
+    out.sounds.push_back({LifeOut::Sound::coo, pg.pos, 0.6, 1.5});
+    out.sounds.push_back({LifeOut::Sound::flap, pg.pos, 0.8, 1});
+    out.bursts.push_back({pg.pos + Vec3{0, 0, 0.15}, {0.72, 0.74, 0.78}});
+    spook_pigeons(now);
+  } else if (kind == 2) {
+    kill_runner(which, {dir.x * 2.5, dir.y * 2.5, 1.4}, now, out);
+  } else {
+    const u32 i = static_cast<u32>(which);
+    const Species sp = species(i, epoch_);
+    if (sp == Species::black_cat) {
+      // shoot the black cat and it charges (world_procedural_population.mjs killAnimal)
+      if (!cat_.on && provoke_cat(now)) out.sounds.push_back({LifeOut::Sound::hiss, converted::at(pets_, i).pos, 1, 1});
+    } else if (melee) {
+      Pet& p = converted::at(pets_, i);
+      out.sounds.push_back({sp == Species::cat ? LifeOut::Sound::cat : LifeOut::Sound::dog, p.pos, 0.8, 1});
+      if (++p.punches >= (sp == Species::cat ? 2 : 3)) { p.punches = 0; kill_pet(i, dir * 3.0, now, out); }
+    } else {
+      kill_pet(i, dir * 4.0, now, out);
+    }
+  }
+  return true;
+}
+void Life::remote_cow_death(Vec3 at, Vec3 impulse, f32 now, LifeOut& out) {
+  i32 best = -1;
+  f32 bd = 4;
+  for (std::size_t i = 0; i < cows_.size(); converted::pre_inc(i))
+    if (!converted::at(cows_, i).dead && dist2d(converted::at(cows_, i).pos, at) < bd) { bd = dist2d(converted::at(cows_, i).pos, at); best = static_cast<i32>(i); }
+  if (best < 0) return;
+  kill_cow(converted::at(cows_, static_cast<std::size_t>(best)), impulse, now, out);
+  converted::pop_back(out.cow_deaths);  // not sent back
+}
 void Life::heard_shot(Vec3 from, Vec3 to, f32 now) {
   // a shot near the herd startles it (cows.mjs onTracer); pigeons in 40 m fly (pigeons.mjs)
   const f32 len = dist2d(from, to);
@@ -617,6 +1468,85 @@ void Life::heard_shot(Vec3 from, Vec3 to, f32 now) {
     if (!c.dead && dist2d(c.pos, mid) < len / 2 + 12) scare_cow(c, {from.x, from.y}, now, 3);
   for (Flock& f : flocks_)
     if (!f.air && hypot_bp(f.at.x - from.x, f.at.y - from.y) < 40) f.next_flight = std::fmin(f.next_flight, now);
+}
+void Life::blast(Vec3 at, f32 radius, f32 now, LifeOut& out) {
+  const f32 r = std::fmax(4.0, radius);
+  for (Cow& c : cows_) {
+    if (c.dead) continue;
+    const Vec3 d = c.pos - at;
+    const f32 dist = hypot_bp(d.x, d.y);
+    if (dist < r * 0.75) {
+      const f32 k = kCowMass * (7 * (1 - dist / r) + 2) / std::fmax(0.5, dist);
+      kill_cow(c, {d.x * k, d.y * k, kCowMass * 5 * (1 - dist / r) + kCowMass}, now, out);
+    } else if (dist < r * 4) scare_cow(c, {at.x, at.y}, now, 4.5);
+  }
+  for (Flock& f : flocks_)
+    if (!f.air && hypot_bp(f.at.x - at.x, f.at.y - at.y) < 90) f.next_flight = std::fmin(f.next_flight, now);
+  // trees in the blast fall over, away from it, about their foot (nothing left in the air)
+  for (Tree& t : trees_) {
+    if (t.fell_at >= 0) continue;
+    const Vec2 d{t.foot.x - at.x, t.foot.y - at.y};
+    const f32 dist = hypot_bp(d.x, d.y);
+    if (dist > r * 0.9 || std::fabs(t.foot.z - at.z) > r) continue;
+    t.fell_at = now;
+    t.fall_dir = dist > 0.1 ? d * (1 / dist) : Vec2{1, 0};
+    ++trees_down_;
+    out.sounds.push_back({LifeOut::Sound::thud, t.foot + Vec3{0, 0, 1}, 0.8, 0.7});
+    out.bursts.push_back({t.foot + Vec3{0, 0, 2.6}, {0.31, 0.52, 0.34}});
+  }
+  if (chain_alive_) {
+    const f32 R = std::fmax(3.0, radius);
+    for (u32 i = 0; i < kRunners; ++i) {
+      const Runner& rn = converted::at(chain_.runners, i);
+      if (!rn.alive) continue;
+      const Vec3 d = rn.pos - at;
+      const f32 dist = hypot_bp(d.x, d.y);
+      if (dist < R * 0.7) {
+        const f32 k = (1 - dist / R) * 7 / std::fmax(0.3, dist);
+        kill_runner(static_cast<i32>(i), {d.x * k, d.y * k, 4 + 3 * (1 - dist / R)}, now, out);
+      }
+    }
+  }
+  for (Bird& b : birds_) {
+    if (now < b.dead_until || converted::wide::length(b.pos - at) > r) continue;
+    b.dying_until = now + 1.1;
+    b.dead_until = now + 14;
+    b.down = false;
+    b.fall_v = (b.pos - at) * 0.5;
+    b.spin = 6;
+    out.sounds.push_back({LifeOut::Sound::squawk, b.pos, 0.9, 0.9 + 0.4 * hash01(b.seed)});
+  }
+  for (u32 i = 0; i < pets_.size(); ++i) {
+    Pet& p = converted::at(pets_, i);
+    if (!p.shown || p.dead_at >= 0 || (cat_.on && i == 1)) continue;
+    const Vec3 d = p.pos - at;
+    const f32 dist = converted::wide::length(d);
+    if (dist < r) kill_pet(i, (dist > 0.1 ? d * (1 / dist) : Vec3{0, 0, 1}) * (8 * (1 - dist / r)) + Vec3{0, 0, 3}, now, out);
+  }
+  ragdolls_.blast(at, r * 1.2, 6);
+}
+bool Life::shout(Vec3 at, const char* mood, u32 seed, f32 now, f32 d, LifeOut& out) {
+  if (now - last_shout_ < kShoutGap || d > kMaxHear) return false;
+  for (auto& [s, t] : source_gap_)
+    if (s == seed && now - t < kSourceGap) return false;
+  std::size_t pick = 0, i = 0;  // (the lines of this mood: the first ones when there are none for it)
+  for (const Lines& l : kLines) {
+    if (l.mood == mood) pick = i;
+    converted::pre_inc(i);
+  }
+  const Lines& lines = converted::at(kLines, pick);
+  const f32 r = hash01(mix(seed, static_cast<u64>(converted::fits<converted::Whole>(now / 0.997))));
+  const std::string_view line = converted::at(lines.lines, converted::rem(static_cast<u32>(converted::fits<unsigned int>(r * static_cast<f32>(lines.n))), lines.n));
+  last_shout_ = now;
+  source_gap_.push_back({seed, now});
+  if (source_gap_.size() > 32) converted::erase(source_gap_, source_gap_.begin());
+  while (voices_.size() >= 3) converted::erase(voices_, voices_.begin());
+  voices_.push_back({at + Vec3{0, 0, 2.05}, std::string(line), mood, now + kBubble});
+  const f32 vol = std::fmax(0.0, 1 - d / kMaxHear);
+  const f32 k = hash01(seed);
+  if (vol > 0.03) out.speech.push_back({std::string(line), 0.65 + k * 0.8, std::string(mood) == "scared" ? 1.35 : 1.12 + hash01(mix(seed, 5)) * 0.2, std::fmin(1.0, 0.25 + vol * 0.9)});
+  ++shouts_;
+  return true;
 }
 bool Life::honk(Vec3 at, bool bus, u32 source, f32 now, f32 d, LifeOut& out) {
   if (now - last_honk_ < kHonkGap || d > 160) return false;
@@ -634,6 +1564,10 @@ bool Life::scream(Vec3 at, u32 seed, f32 now, f32 d, LifeOut& out) {
   const f32 k = hash01(seed);
   out.sounds.push_back({k > 0.45 ? LifeOut::Sound::scream_f : LifeOut::Sound::scream, at + Vec3{0, 0, 1.6}, 0.9, 0.9 + k * 0.25});
   return true;
+}
+void Life::update_voices(f32 dt, f32 now, const LifeView& view, LifeOut& out) {
+  (void)dt; (void)view; (void)out;
+  converted::erase(voices_, std::remove_if(voices_.begin(), voices_.end(), [&](const Voice& v) { return now > v.until; }), voices_.end());
 }
 #undef private
 #undef protected
@@ -656,26 +1590,30 @@ bool Life::scream(Vec3 at, u32 seed, f32 now, f32 d, LifeOut& out) {
 [[maybe_unused]] static bool defined(const Life::LooseBird& s) { return defined(s.id) && defined(s.pos) && defined(s.vel) && defined(s.yaw) && defined(s.flap) && defined(s.t) && defined(s.held) && defined(converted::shaped<converted::Whole>(s.net)); }
 [[maybe_unused]] static std::string text(const Life::LooseBird& s) { return std::string("{") + text(s.id) + ", " + text(s.pos) + ", " + text(s.vel) + ", " + text(s.yaw) + ", " + text(s.flap) + ", " + text(s.t) + ", " + text(s.held) + ", " + text(converted::shaped<converted::Whole>(s.net)) + "}"; }
 [[maybe_unused]] static void take(Life::LooseBird& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 8) return; converted::take_as<int>(s.id, (*v.rows)[0]); converted::take_as<Vec3>(s.pos, (*v.rows)[1]); converted::take_as<Vec3>(s.vel, (*v.rows)[2]); converted::take_as<double>(s.yaw, (*v.rows)[3]); converted::take_as<double>(s.flap, (*v.rows)[4]); converted::take_as<double>(s.t, (*v.rows)[5]); converted::take_as<bool>(s.held, (*v.rows)[6]); converted::take_as<converted::Whole>(s.net, (*v.rows)[7]); }
-[[maybe_unused]] static Body draw_kern__physics__Body(converted::Draw& draw) {
-  Body s{};
+[[maybe_unused]] static physics::Body draw_kern__physics__Body(converted::Draw& draw) {
+  physics::Body s{};
   s.id = static_cast<u64>(draw.bits());
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const Body& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
-[[maybe_unused]] static bool same(const Body& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
-[[maybe_unused]] static bool defined(const Body& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
-[[maybe_unused]] static std::string text(const Body& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
-[[maybe_unused]] static void take(Body& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
-[[maybe_unused]] static Joint draw_kern__physics__Joint(converted::Draw& draw) {
-  Joint s{};
+namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const physics::Body& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
+[[maybe_unused]] static bool same(const physics::Body& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
+[[maybe_unused]] static bool defined(const physics::Body& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
+[[maybe_unused]] static std::string text(const physics::Body& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
+[[maybe_unused]] static void take(physics::Body& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
+}
+[[maybe_unused]] static physics::Joint draw_kern__physics__Joint(converted::Draw& draw) {
+  physics::Joint s{};
   s.id = static_cast<u64>(draw.bits());
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const Joint& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
-[[maybe_unused]] static bool same(const Joint& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
-[[maybe_unused]] static bool defined(const Joint& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
-[[maybe_unused]] static std::string text(const Joint& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
-[[maybe_unused]] static void take(Joint& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
+namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const physics::Joint& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
+[[maybe_unused]] static bool same(const physics::Joint& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
+[[maybe_unused]] static bool defined(const physics::Joint& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
+[[maybe_unused]] static std::string text(const physics::Joint& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
+[[maybe_unused]] static void take(physics::Joint& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
+}
 [[maybe_unused]] static Quat draw_kern__Quat(converted::Draw& draw) {
   Quat s{};
   s.x = draw.number();
@@ -689,17 +1627,19 @@ bool Life::scream(Vec3 at, u32 seed, f32 now, f32 d, LifeOut& out) {
 [[maybe_unused]] static bool defined(const Quat& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
 [[maybe_unused]] static std::string text(const Quat& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
 [[maybe_unused]] static void take(Quat& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
-[[maybe_unused]] static Pose draw_kern__physics__Pose(converted::Draw& draw) {
-  Pose s{};
+[[maybe_unused]] static physics::Pose draw_kern__physics__Pose(converted::Draw& draw) {
+  physics::Pose s{};
   s.position = draw.vector();
   s.rotation = draw_kern__Quat(draw);
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const Pose& s) { return converted::Value::structure({arg(s.position), arg(s.rotation)}); }
-[[maybe_unused]] static bool same(const Pose& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.position, (*got.rows)[0]) && same(want.rotation, (*got.rows)[1]); }
-[[maybe_unused]] static bool defined(const Pose& s) { return defined(s.position) && defined(s.rotation); }
-[[maybe_unused]] static std::string text(const Pose& s) { return std::string("{") + text(s.position) + ", " + text(s.rotation) + "}"; }
-[[maybe_unused]] static void take(Pose& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<Vec3>(s.position, (*v.rows)[0]); converted::take_as<Quat>(s.rotation, (*v.rows)[1]); }
+namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const physics::Pose& s) { return converted::Value::structure({arg(s.position), arg(s.rotation)}); }
+[[maybe_unused]] static bool same(const physics::Pose& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.position, (*got.rows)[0]) && same(want.rotation, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const physics::Pose& s) { return defined(s.position) && defined(s.rotation); }
+[[maybe_unused]] static std::string text(const physics::Pose& s) { return std::string("{") + text(s.position) + ", " + text(s.rotation) + "}"; }
+[[maybe_unused]] static void take(physics::Pose& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<Vec3>(s.position, (*v.rows)[0]); converted::take_as<Quat>(s.rotation, (*v.rows)[1]); }
+}
 [[maybe_unused]] static Ragdolls::Colors draw_Ragdolls__Colors(converted::Draw& draw) {
   Ragdolls::Colors s{};
   s.shirt = draw.vector();
@@ -721,11 +1661,11 @@ bool Life::scream(Vec3 at, u32 seed, f32 now, f32 d, LifeOut& out) {
   s.recover = draw.flag();
   s.getting_up = draw.flag();
   s.key = static_cast<u64>(draw.bits());
-  for (auto& e : s.bodies) e = draw_kern__physics__Body(draw);
-  for (auto& e : s.joints) e = draw_kern__physics__Joint(draw);
-  for (auto& e : s.pose) e = draw_kern__physics__Pose(draw);
-  for (auto& e : s.from) e = draw_kern__physics__Pose(draw);
-  for (auto& e : s.stand) e = draw_kern__physics__Pose(draw);
+  converted::fill_array(s.bodies, [&]() -> physics::Body { return draw_kern__physics__Body(draw); });
+  converted::fill_array(s.joints, [&]() -> physics::Joint { return draw_kern__physics__Joint(draw); });
+  converted::fill_array(s.pose, [&]() -> physics::Pose { return draw_kern__physics__Pose(draw); });
+  converted::fill_array(s.from, [&]() -> physics::Pose { return draw_kern__physics__Pose(draw); });
+  converted::fill_array(s.stand, [&]() -> physics::Pose { return draw_kern__physics__Pose(draw); });
   s.colors = draw_Ragdolls__Colors(draw);
   s.born = draw.number();
   s.settled = draw.number();
@@ -735,11 +1675,11 @@ bool Life::scream(Vec3 at, u32 seed, f32 now, f32 d, LifeOut& out) {
   s.group = static_cast<int>(draw.whole());
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const Ragdolls::Doll& s) { return converted::Value::structure({arg(s.active), arg(s.recover), arg(s.getting_up), arg(converted::shaped<converted::Whole>(s.key)), arg(std::vector<Body>(std::begin(s.bodies), std::end(s.bodies))), arg(std::vector<Joint>(std::begin(s.joints), std::end(s.joints))), arg(std::vector<Pose>(std::begin(s.pose), std::end(s.pose))), arg(std::vector<Pose>(std::begin(s.from), std::end(s.from))), arg(std::vector<Pose>(std::begin(s.stand), std::end(s.stand))), arg(s.colors), arg(s.born), arg(s.settled), arg(s.getup_at), arg(s.stand_yaw), arg(s.stand_feet), arg(s.group)}); }
-[[maybe_unused]] static bool same(const Ragdolls::Doll& want, const converted::Value& got) { return got.rows && got.rows->size() == 16 && same(want.active, (*got.rows)[0]) && same(want.recover, (*got.rows)[1]) && same(want.getting_up, (*got.rows)[2]) && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[3]) && same(std::vector<Body>(std::begin(want.bodies), std::end(want.bodies)), (*got.rows)[4]) && same(std::vector<Joint>(std::begin(want.joints), std::end(want.joints)), (*got.rows)[5]) && same(std::vector<Pose>(std::begin(want.pose), std::end(want.pose)), (*got.rows)[6]) && same(std::vector<Pose>(std::begin(want.from), std::end(want.from)), (*got.rows)[7]) && same(std::vector<Pose>(std::begin(want.stand), std::end(want.stand)), (*got.rows)[8]) && same(want.colors, (*got.rows)[9]) && same(want.born, (*got.rows)[10]) && same(want.settled, (*got.rows)[11]) && same(want.getup_at, (*got.rows)[12]) && same(want.stand_yaw, (*got.rows)[13]) && same(want.stand_feet, (*got.rows)[14]) && same(want.group, (*got.rows)[15]); }
-[[maybe_unused]] static bool defined(const Ragdolls::Doll& s) { return defined(s.active) && defined(s.recover) && defined(s.getting_up) && defined(converted::shaped<converted::Whole>(s.key)) && defined(std::vector<Body>(std::begin(s.bodies), std::end(s.bodies))) && defined(std::vector<Joint>(std::begin(s.joints), std::end(s.joints))) && defined(std::vector<Pose>(std::begin(s.pose), std::end(s.pose))) && defined(std::vector<Pose>(std::begin(s.from), std::end(s.from))) && defined(std::vector<Pose>(std::begin(s.stand), std::end(s.stand))) && defined(s.colors) && defined(s.born) && defined(s.settled) && defined(s.getup_at) && defined(s.stand_yaw) && defined(s.stand_feet) && defined(s.group); }
-[[maybe_unused]] static std::string text(const Ragdolls::Doll& s) { return std::string("{") + text(s.active) + ", " + text(s.recover) + ", " + text(s.getting_up) + ", " + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(std::vector<Body>(std::begin(s.bodies), std::end(s.bodies))) + ", " + text(std::vector<Joint>(std::begin(s.joints), std::end(s.joints))) + ", " + text(std::vector<Pose>(std::begin(s.pose), std::end(s.pose))) + ", " + text(std::vector<Pose>(std::begin(s.from), std::end(s.from))) + ", " + text(std::vector<Pose>(std::begin(s.stand), std::end(s.stand))) + ", " + text(s.colors) + ", " + text(s.born) + ", " + text(s.settled) + ", " + text(s.getup_at) + ", " + text(s.stand_yaw) + ", " + text(s.stand_feet) + ", " + text(s.group) + "}"; }
-[[maybe_unused]] static void take(Ragdolls::Doll& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 16) return; converted::take_as<bool>(s.active, (*v.rows)[0]); converted::take_as<bool>(s.recover, (*v.rows)[1]); converted::take_as<bool>(s.getting_up, (*v.rows)[2]); converted::take_as<converted::Whole>(s.key, (*v.rows)[3]); { std::vector<Body> items; converted::take_as<std::vector<Body>>(items, (*v.rows)[4]); for (std::size_t k = 0; k < items.size() && k < std::size(s.bodies); ++k) s.bodies[k] = items[k]; } { std::vector<Joint> items; converted::take_as<std::vector<Joint>>(items, (*v.rows)[5]); for (std::size_t k = 0; k < items.size() && k < std::size(s.joints); ++k) s.joints[k] = items[k]; } { std::vector<Pose> items; converted::take_as<std::vector<Pose>>(items, (*v.rows)[6]); for (std::size_t k = 0; k < items.size() && k < std::size(s.pose); ++k) s.pose[k] = items[k]; } { std::vector<Pose> items; converted::take_as<std::vector<Pose>>(items, (*v.rows)[7]); for (std::size_t k = 0; k < items.size() && k < std::size(s.from); ++k) s.from[k] = items[k]; } { std::vector<Pose> items; converted::take_as<std::vector<Pose>>(items, (*v.rows)[8]); for (std::size_t k = 0; k < items.size() && k < std::size(s.stand); ++k) s.stand[k] = items[k]; } converted::take_as<Ragdolls::Colors>(s.colors, (*v.rows)[9]); converted::take_as<double>(s.born, (*v.rows)[10]); converted::take_as<double>(s.settled, (*v.rows)[11]); converted::take_as<double>(s.getup_at, (*v.rows)[12]); converted::take_as<double>(s.stand_yaw, (*v.rows)[13]); converted::take_as<Vec3>(s.stand_feet, (*v.rows)[14]); converted::take_as<int>(s.group, (*v.rows)[15]); }
+[[maybe_unused]] static converted::Value arg(const Ragdolls::Doll& s) { return converted::Value::structure({arg(s.active), arg(s.recover), arg(s.getting_up), arg(converted::shaped<converted::Whole>(s.key)), arg(converted::array_list(s.bodies)), arg(converted::array_list(s.joints)), arg(converted::array_list(s.pose)), arg(converted::array_list(s.from)), arg(converted::array_list(s.stand)), arg(s.colors), arg(s.born), arg(s.settled), arg(s.getup_at), arg(s.stand_yaw), arg(s.stand_feet), arg(s.group)}); }
+[[maybe_unused]] static bool same(const Ragdolls::Doll& want, const converted::Value& got) { return got.rows && got.rows->size() == 16 && same(want.active, (*got.rows)[0]) && same(want.recover, (*got.rows)[1]) && same(want.getting_up, (*got.rows)[2]) && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[3]) && same(converted::array_list(want.bodies), (*got.rows)[4]) && same(converted::array_list(want.joints), (*got.rows)[5]) && same(converted::array_list(want.pose), (*got.rows)[6]) && same(converted::array_list(want.from), (*got.rows)[7]) && same(converted::array_list(want.stand), (*got.rows)[8]) && same(want.colors, (*got.rows)[9]) && same(want.born, (*got.rows)[10]) && same(want.settled, (*got.rows)[11]) && same(want.getup_at, (*got.rows)[12]) && same(want.stand_yaw, (*got.rows)[13]) && same(want.stand_feet, (*got.rows)[14]) && same(want.group, (*got.rows)[15]); }
+[[maybe_unused]] static bool defined(const Ragdolls::Doll& s) { return defined(s.active) && defined(s.recover) && defined(s.getting_up) && defined(converted::shaped<converted::Whole>(s.key)) && defined(converted::array_list(s.bodies)) && defined(converted::array_list(s.joints)) && defined(converted::array_list(s.pose)) && defined(converted::array_list(s.from)) && defined(converted::array_list(s.stand)) && defined(s.colors) && defined(s.born) && defined(s.settled) && defined(s.getup_at) && defined(s.stand_yaw) && defined(s.stand_feet) && defined(s.group); }
+[[maybe_unused]] static std::string text(const Ragdolls::Doll& s) { return std::string("{") + text(s.active) + ", " + text(s.recover) + ", " + text(s.getting_up) + ", " + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(converted::array_list(s.bodies)) + ", " + text(converted::array_list(s.joints)) + ", " + text(converted::array_list(s.pose)) + ", " + text(converted::array_list(s.from)) + ", " + text(converted::array_list(s.stand)) + ", " + text(s.colors) + ", " + text(s.born) + ", " + text(s.settled) + ", " + text(s.getup_at) + ", " + text(s.stand_yaw) + ", " + text(s.stand_feet) + ", " + text(s.group) + "}"; }
+[[maybe_unused]] static void take(Ragdolls::Doll& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 16) return; converted::take_as<bool>(s.active, (*v.rows)[0]); converted::take_as<bool>(s.recover, (*v.rows)[1]); converted::take_as<bool>(s.getting_up, (*v.rows)[2]); converted::take_as<converted::Whole>(s.key, (*v.rows)[3]); { std::vector<physics::Body> items; converted::take_as<std::vector<physics::Body>>(items, (*v.rows)[4]); converted::array_from(s.bodies, items); } { std::vector<physics::Joint> items; converted::take_as<std::vector<physics::Joint>>(items, (*v.rows)[5]); converted::array_from(s.joints, items); } { std::vector<physics::Pose> items; converted::take_as<std::vector<physics::Pose>>(items, (*v.rows)[6]); converted::array_from(s.pose, items); } { std::vector<physics::Pose> items; converted::take_as<std::vector<physics::Pose>>(items, (*v.rows)[7]); converted::array_from(s.from, items); } { std::vector<physics::Pose> items; converted::take_as<std::vector<physics::Pose>>(items, (*v.rows)[8]); converted::array_from(s.stand, items); } converted::take_as<Ragdolls::Colors>(s.colors, (*v.rows)[9]); converted::take_as<double>(s.born, (*v.rows)[10]); converted::take_as<double>(s.settled, (*v.rows)[11]); converted::take_as<double>(s.getup_at, (*v.rows)[12]); converted::take_as<double>(s.stand_yaw, (*v.rows)[13]); converted::take_as<Vec3>(s.stand_feet, (*v.rows)[14]); converted::take_as<int>(s.group, (*v.rows)[15]); }
 [[maybe_unused]] static Ragdolls::Up draw_Ragdolls__Up(converted::Draw& draw) {
   Ragdolls::Up s{};
   s.key = static_cast<u64>(draw.bits());
@@ -816,7 +1756,7 @@ bool Life::scream(Vec3 at, u32 seed, f32 now, f32 d, LifeOut& out) {
 [[maybe_unused]] static bool same(const Life::Cow& want, const converted::Value& got) { return got.rows && got.rows->size() == 25 && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]) && same(want.meadow, (*got.rows)[1]) && same(want.home, (*got.rows)[2]) && same(want.off, (*got.rows)[3]) && same(want.pos, (*got.rows)[4]) && same(want.yaw, (*got.rows)[5]) && same(want.hp, (*got.rows)[6]) && same(want.phase, (*got.rows)[7]) && same(want.next_moo, (*got.rows)[8]) && same(want.flee_until, (*got.rows)[9]) && same(want.flinch_at, (*got.rows)[10]) && same(want.last_hit, (*got.rows)[11]) && same(want.flee_v, (*got.rows)[12]) && same(want.color, (*got.rows)[13]) && same(want.rot, (*got.rows)[14]) && same(want.dead, (*got.rows)[15]) && same(want.walking, (*got.rows)[16]) && same(want.carried, (*got.rows)[17]) && same(want.carried_still, (*got.rows)[18]) && same(want.body, (*got.rows)[19]) && same(want.net_to, (*got.rows)[20]) && same(want.net_v, (*got.rows)[21]) && same(want.net_at, (*got.rows)[22]) && same(want.net_rot, (*got.rows)[23]) && same(want.net_dead, (*got.rows)[24]); }
 [[maybe_unused]] static bool defined(const Life::Cow& s) { return defined(converted::shaped<converted::Whole>(s.key)) && defined(s.meadow) && defined(s.home) && defined(s.off) && defined(s.pos) && defined(s.yaw) && defined(s.hp) && defined(s.phase) && defined(s.next_moo) && defined(s.flee_until) && defined(s.flinch_at) && defined(s.last_hit) && defined(s.flee_v) && defined(s.color) && defined(s.rot) && defined(s.dead) && defined(s.walking) && defined(s.carried) && defined(s.carried_still) && defined(s.body) && defined(s.net_to) && defined(s.net_v) && defined(s.net_at) && defined(s.net_rot) && defined(s.net_dead); }
 [[maybe_unused]] static std::string text(const Life::Cow& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(s.meadow) + ", " + text(s.home) + ", " + text(s.off) + ", " + text(s.pos) + ", " + text(s.yaw) + ", " + text(s.hp) + ", " + text(s.phase) + ", " + text(s.next_moo) + ", " + text(s.flee_until) + ", " + text(s.flinch_at) + ", " + text(s.last_hit) + ", " + text(s.flee_v) + ", " + text(s.color) + ", " + text(s.rot) + ", " + text(s.dead) + ", " + text(s.walking) + ", " + text(s.carried) + ", " + text(s.carried_still) + ", " + text(s.body) + ", " + text(s.net_to) + ", " + text(s.net_v) + ", " + text(s.net_at) + ", " + text(s.net_rot) + ", " + text(s.net_dead) + "}"; }
-[[maybe_unused]] static void take(Life::Cow& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 25) return; converted::take_as<converted::Whole>(s.key, (*v.rows)[0]); converted::take_as<int>(s.meadow, (*v.rows)[1]); converted::take_as<Vec2>(s.home, (*v.rows)[2]); converted::take_as<Vec2>(s.off, (*v.rows)[3]); converted::take_as<Vec3>(s.pos, (*v.rows)[4]); converted::take_as<double>(s.yaw, (*v.rows)[5]); converted::take_as<double>(s.hp, (*v.rows)[6]); converted::take_as<double>(s.phase, (*v.rows)[7]); converted::take_as<double>(s.next_moo, (*v.rows)[8]); converted::take_as<double>(s.flee_until, (*v.rows)[9]); converted::take_as<double>(s.flinch_at, (*v.rows)[10]); converted::take_as<double>(s.last_hit, (*v.rows)[11]); converted::take_as<Vec2>(s.flee_v, (*v.rows)[12]); converted::take_as<Vec3>(s.color, (*v.rows)[13]); converted::take_as<Quat>(s.rot, (*v.rows)[14]); converted::take_as<bool>(s.dead, (*v.rows)[15]); converted::take_as<bool>(s.walking, (*v.rows)[16]); converted::take_as<bool>(s.carried, (*v.rows)[17]); converted::take_as<double>(s.carried_still, (*v.rows)[18]); converted::take_as<Body>(s.body, (*v.rows)[19]); converted::take_as<Vec3>(s.net_to, (*v.rows)[20]); converted::take_as<Vec3>(s.net_v, (*v.rows)[21]); converted::take_as<double>(s.net_at, (*v.rows)[22]); converted::take_as<Quat>(s.net_rot, (*v.rows)[23]); converted::take_as<bool>(s.net_dead, (*v.rows)[24]); }
+[[maybe_unused]] static void take(Life::Cow& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 25) return; converted::take_as<converted::Whole>(s.key, (*v.rows)[0]); converted::take_as<int>(s.meadow, (*v.rows)[1]); converted::take_as<Vec2>(s.home, (*v.rows)[2]); converted::take_as<Vec2>(s.off, (*v.rows)[3]); converted::take_as<Vec3>(s.pos, (*v.rows)[4]); converted::take_as<double>(s.yaw, (*v.rows)[5]); converted::take_as<double>(s.hp, (*v.rows)[6]); converted::take_as<double>(s.phase, (*v.rows)[7]); converted::take_as<double>(s.next_moo, (*v.rows)[8]); converted::take_as<double>(s.flee_until, (*v.rows)[9]); converted::take_as<double>(s.flinch_at, (*v.rows)[10]); converted::take_as<double>(s.last_hit, (*v.rows)[11]); converted::take_as<Vec2>(s.flee_v, (*v.rows)[12]); converted::take_as<Vec3>(s.color, (*v.rows)[13]); converted::take_as<Quat>(s.rot, (*v.rows)[14]); converted::take_as<bool>(s.dead, (*v.rows)[15]); converted::take_as<bool>(s.walking, (*v.rows)[16]); converted::take_as<bool>(s.carried, (*v.rows)[17]); converted::take_as<double>(s.carried_still, (*v.rows)[18]); converted::take_as<physics::Body>(s.body, (*v.rows)[19]); converted::take_as<Vec3>(s.net_to, (*v.rows)[20]); converted::take_as<Vec3>(s.net_v, (*v.rows)[21]); converted::take_as<double>(s.net_at, (*v.rows)[22]); converted::take_as<Quat>(s.net_rot, (*v.rows)[23]); converted::take_as<bool>(s.net_dead, (*v.rows)[24]); }
 [[maybe_unused]] static Life::Pigeon draw_Life__Pigeon(converted::Draw& draw) {
   Life::Pigeon s{};
   s.o = draw.vector2();
@@ -928,7 +1868,7 @@ bool Life::scream(Vec3 at, u32 seed, f32 now, f32 d, LifeOut& out) {
 [[maybe_unused]] static bool same(const Life::Pet& want, const converted::Value& got) { return got.rows && got.rows->size() == 21 && same(want.radius, (*got.rows)[0]) && same(want.omega, (*got.rows)[1]) && same(want.phase, (*got.rows)[2]) && same(want.wobble_omega, (*got.rows)[3]) && same(want.wobble_r, (*got.rows)[4]) && same(want.scale, (*got.rows)[5]) && same(want.pos, (*got.rows)[6]) && same(want.yaw, (*got.rows)[7]) && same(want.gait, (*got.rows)[8]) && same(want.speed, (*got.rows)[9]) && same(want.dead_at, (*got.rows)[10]) && same(want.shown, (*got.rows)[11]) && same(want.has_pose, (*got.rows)[12]) && same(want.carried, (*got.rows)[13]) && same(want.carried_still, (*got.rows)[14]) && same(want.off, (*got.rows)[15]) && same(want.punches, (*got.rows)[16]) && same(want.color, (*got.rows)[17]) && same(want.body, (*got.rows)[18]) && same(want.rot, (*got.rows)[19]) && same(want.net_rot, (*got.rows)[20]); }
 [[maybe_unused]] static bool defined(const Life::Pet& s) { return defined(s.radius) && defined(s.omega) && defined(s.phase) && defined(s.wobble_omega) && defined(s.wobble_r) && defined(s.scale) && defined(s.pos) && defined(s.yaw) && defined(s.gait) && defined(s.speed) && defined(s.dead_at) && defined(s.shown) && defined(s.has_pose) && defined(s.carried) && defined(s.carried_still) && defined(s.off) && defined(s.punches) && defined(s.color) && defined(s.body) && defined(s.rot) && defined(s.net_rot); }
 [[maybe_unused]] static std::string text(const Life::Pet& s) { return std::string("{") + text(s.radius) + ", " + text(s.omega) + ", " + text(s.phase) + ", " + text(s.wobble_omega) + ", " + text(s.wobble_r) + ", " + text(s.scale) + ", " + text(s.pos) + ", " + text(s.yaw) + ", " + text(s.gait) + ", " + text(s.speed) + ", " + text(s.dead_at) + ", " + text(s.shown) + ", " + text(s.has_pose) + ", " + text(s.carried) + ", " + text(s.carried_still) + ", " + text(s.off) + ", " + text(s.punches) + ", " + text(s.color) + ", " + text(s.body) + ", " + text(s.rot) + ", " + text(s.net_rot) + "}"; }
-[[maybe_unused]] static void take(Life::Pet& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 21) return; converted::take_as<double>(s.radius, (*v.rows)[0]); converted::take_as<double>(s.omega, (*v.rows)[1]); converted::take_as<double>(s.phase, (*v.rows)[2]); converted::take_as<double>(s.wobble_omega, (*v.rows)[3]); converted::take_as<double>(s.wobble_r, (*v.rows)[4]); converted::take_as<double>(s.scale, (*v.rows)[5]); converted::take_as<Vec3>(s.pos, (*v.rows)[6]); converted::take_as<double>(s.yaw, (*v.rows)[7]); converted::take_as<double>(s.gait, (*v.rows)[8]); converted::take_as<double>(s.speed, (*v.rows)[9]); converted::take_as<double>(s.dead_at, (*v.rows)[10]); converted::take_as<bool>(s.shown, (*v.rows)[11]); converted::take_as<bool>(s.has_pose, (*v.rows)[12]); converted::take_as<bool>(s.carried, (*v.rows)[13]); converted::take_as<double>(s.carried_still, (*v.rows)[14]); converted::take_as<Vec2>(s.off, (*v.rows)[15]); converted::take_as<int>(s.punches, (*v.rows)[16]); converted::take_as<Vec3>(s.color, (*v.rows)[17]); converted::take_as<Body>(s.body, (*v.rows)[18]); converted::take_as<Quat>(s.rot, (*v.rows)[19]); converted::take_as<Quat>(s.net_rot, (*v.rows)[20]); }
+[[maybe_unused]] static void take(Life::Pet& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 21) return; converted::take_as<double>(s.radius, (*v.rows)[0]); converted::take_as<double>(s.omega, (*v.rows)[1]); converted::take_as<double>(s.phase, (*v.rows)[2]); converted::take_as<double>(s.wobble_omega, (*v.rows)[3]); converted::take_as<double>(s.wobble_r, (*v.rows)[4]); converted::take_as<double>(s.scale, (*v.rows)[5]); converted::take_as<Vec3>(s.pos, (*v.rows)[6]); converted::take_as<double>(s.yaw, (*v.rows)[7]); converted::take_as<double>(s.gait, (*v.rows)[8]); converted::take_as<double>(s.speed, (*v.rows)[9]); converted::take_as<double>(s.dead_at, (*v.rows)[10]); converted::take_as<bool>(s.shown, (*v.rows)[11]); converted::take_as<bool>(s.has_pose, (*v.rows)[12]); converted::take_as<bool>(s.carried, (*v.rows)[13]); converted::take_as<double>(s.carried_still, (*v.rows)[14]); converted::take_as<Vec2>(s.off, (*v.rows)[15]); converted::take_as<int>(s.punches, (*v.rows)[16]); converted::take_as<Vec3>(s.color, (*v.rows)[17]); converted::take_as<physics::Body>(s.body, (*v.rows)[18]); converted::take_as<Quat>(s.rot, (*v.rows)[19]); converted::take_as<Quat>(s.net_rot, (*v.rows)[20]); }
 [[maybe_unused]] static Life::CatAttack draw_Life__CatAttack(converted::Draw& draw) {
   Life::CatAttack s{};
   s.on = draw.flag();
@@ -981,14 +1921,14 @@ bool Life::scream(Vec3 at, u32 seed, f32 now, f32 d, LifeOut& out) {
   s.call = static_cast<int>(draw.whole());
   s.beat = static_cast<int>(draw.whole());
   s.side = static_cast<int>(draw.whole());
-  for (auto& e : s.runners) e = draw_Life__Runner(draw);
+  converted::fill_array(s.runners, [&]() -> Life::Runner { return draw_Life__Runner(draw); });
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const Life::Chain& s) { return converted::Value::structure({arg(s.id), arg(s.path), arg(s.cum), arg(s.len), arg(s.s), arg(s.born), arg(s.next_call), arg(s.next_beat), arg(s.off), arg(s.call), arg(s.beat), arg(s.side), arg(std::vector<Life::Runner>(std::begin(s.runners), std::end(s.runners)))}); }
-[[maybe_unused]] static bool same(const Life::Chain& want, const converted::Value& got) { return got.rows && got.rows->size() == 13 && same(want.id, (*got.rows)[0]) && same(want.path, (*got.rows)[1]) && same(want.cum, (*got.rows)[2]) && same(want.len, (*got.rows)[3]) && same(want.s, (*got.rows)[4]) && same(want.born, (*got.rows)[5]) && same(want.next_call, (*got.rows)[6]) && same(want.next_beat, (*got.rows)[7]) && same(want.off, (*got.rows)[8]) && same(want.call, (*got.rows)[9]) && same(want.beat, (*got.rows)[10]) && same(want.side, (*got.rows)[11]) && same(std::vector<Life::Runner>(std::begin(want.runners), std::end(want.runners)), (*got.rows)[12]); }
-[[maybe_unused]] static bool defined(const Life::Chain& s) { return defined(s.id) && defined(s.path) && defined(s.cum) && defined(s.len) && defined(s.s) && defined(s.born) && defined(s.next_call) && defined(s.next_beat) && defined(s.off) && defined(s.call) && defined(s.beat) && defined(s.side) && defined(std::vector<Life::Runner>(std::begin(s.runners), std::end(s.runners))); }
-[[maybe_unused]] static std::string text(const Life::Chain& s) { return std::string("{") + text(s.id) + ", " + text(s.path) + ", " + text(s.cum) + ", " + text(s.len) + ", " + text(s.s) + ", " + text(s.born) + ", " + text(s.next_call) + ", " + text(s.next_beat) + ", " + text(s.off) + ", " + text(s.call) + ", " + text(s.beat) + ", " + text(s.side) + ", " + text(std::vector<Life::Runner>(std::begin(s.runners), std::end(s.runners))) + "}"; }
-[[maybe_unused]] static void take(Life::Chain& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 13) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<std::vector<Vec2>>(s.path, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.cum, (*v.rows)[2]); converted::take_as<double>(s.len, (*v.rows)[3]); converted::take_as<double>(s.s, (*v.rows)[4]); converted::take_as<double>(s.born, (*v.rows)[5]); converted::take_as<double>(s.next_call, (*v.rows)[6]); converted::take_as<double>(s.next_beat, (*v.rows)[7]); converted::take_as<double>(s.off, (*v.rows)[8]); converted::take_as<int>(s.call, (*v.rows)[9]); converted::take_as<int>(s.beat, (*v.rows)[10]); converted::take_as<int>(s.side, (*v.rows)[11]); { std::vector<Life::Runner> items; converted::take_as<std::vector<Life::Runner>>(items, (*v.rows)[12]); for (std::size_t k = 0; k < items.size() && k < std::size(s.runners); ++k) s.runners[k] = items[k]; } }
+[[maybe_unused]] static converted::Value arg(const Life::Chain& s) { return converted::Value::structure({arg(s.id), arg(s.path), arg(s.cum), arg(s.len), arg(s.s), arg(s.born), arg(s.next_call), arg(s.next_beat), arg(s.off), arg(s.call), arg(s.beat), arg(s.side), arg(converted::array_list(s.runners))}); }
+[[maybe_unused]] static bool same(const Life::Chain& want, const converted::Value& got) { return got.rows && got.rows->size() == 13 && same(want.id, (*got.rows)[0]) && same(want.path, (*got.rows)[1]) && same(want.cum, (*got.rows)[2]) && same(want.len, (*got.rows)[3]) && same(want.s, (*got.rows)[4]) && same(want.born, (*got.rows)[5]) && same(want.next_call, (*got.rows)[6]) && same(want.next_beat, (*got.rows)[7]) && same(want.off, (*got.rows)[8]) && same(want.call, (*got.rows)[9]) && same(want.beat, (*got.rows)[10]) && same(want.side, (*got.rows)[11]) && same(converted::array_list(want.runners), (*got.rows)[12]); }
+[[maybe_unused]] static bool defined(const Life::Chain& s) { return defined(s.id) && defined(s.path) && defined(s.cum) && defined(s.len) && defined(s.s) && defined(s.born) && defined(s.next_call) && defined(s.next_beat) && defined(s.off) && defined(s.call) && defined(s.beat) && defined(s.side) && defined(converted::array_list(s.runners)); }
+[[maybe_unused]] static std::string text(const Life::Chain& s) { return std::string("{") + text(s.id) + ", " + text(s.path) + ", " + text(s.cum) + ", " + text(s.len) + ", " + text(s.s) + ", " + text(s.born) + ", " + text(s.next_call) + ", " + text(s.next_beat) + ", " + text(s.off) + ", " + text(s.call) + ", " + text(s.beat) + ", " + text(s.side) + ", " + text(converted::array_list(s.runners)) + "}"; }
+[[maybe_unused]] static void take(Life::Chain& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 13) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<std::vector<Vec2>>(s.path, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.cum, (*v.rows)[2]); converted::take_as<double>(s.len, (*v.rows)[3]); converted::take_as<double>(s.s, (*v.rows)[4]); converted::take_as<double>(s.born, (*v.rows)[5]); converted::take_as<double>(s.next_call, (*v.rows)[6]); converted::take_as<double>(s.next_beat, (*v.rows)[7]); converted::take_as<double>(s.off, (*v.rows)[8]); converted::take_as<int>(s.call, (*v.rows)[9]); converted::take_as<int>(s.beat, (*v.rows)[10]); converted::take_as<int>(s.side, (*v.rows)[11]); { std::vector<Life::Runner> items; converted::take_as<std::vector<Life::Runner>>(items, (*v.rows)[12]); converted::array_from(s.runners, items); } }
 [[maybe_unused]] static Life::Voice draw_Life__Voice(converted::Draw& draw) {
   Life::Voice s{};
   s.at = draw.vector();
@@ -1139,12 +2079,268 @@ bool Life::scream(Vec3 at, u32 seed, f32 now, f32 d, LifeOut& out) {
 [[maybe_unused]] static bool defined(const LifeOut& s) { return defined(s.sounds) && defined(s.speech) && defined(s.impulses) && defined(s.bursts) && defined(s.banner) && defined(s.banner_for) && defined(s.kill_player) && defined(s.cow_deaths); }
 [[maybe_unused]] static std::string text(const LifeOut& s) { return std::string("{") + text(s.sounds) + ", " + text(s.speech) + ", " + text(s.impulses) + ", " + text(s.bursts) + ", " + text(s.banner) + ", " + text(s.banner_for) + ", " + text(s.kill_player) + ", " + text(s.cow_deaths) + "}"; }
 [[maybe_unused]] static void take(LifeOut& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 8) return; converted::take_as<std::vector<LifeOut::Play>>(s.sounds, (*v.rows)[0]); converted::take_as<std::vector<LifeOut::Say>>(s.speech, (*v.rows)[1]); converted::take_as<std::vector<LifeOut::Impulse>>(s.impulses, (*v.rows)[2]); converted::take_as<std::vector<LifeOut::Burst>>(s.bursts, (*v.rows)[3]); converted::take_as<std::string>(s.banner, (*v.rows)[4]); converted::take_as<double>(s.banner_for, (*v.rows)[5]); converted::take_as<bool>(s.kill_player, (*v.rows)[6]); converted::take_as<std::vector<LifeOut::CowDeath>>(s.cow_deaths, (*v.rows)[7]); }
-inline bool World::body_valid(const Body& body) const { const std::vector<converted::Value> out = converted::engine_call("engine.world.body_valid", {arg(*this), arg(body)}); bool result{}; converted::take_as<bool>(result, out[0]); return result; }
-inline void World::destroy_body(const Body& body) const { const std::vector<converted::Value> out = converted::engine_call("engine.world.destroy_body", {arg(*this), arg(body)}); }
+[[maybe_unused]] static Rng draw_Rng(converted::Draw& draw) {
+  Rng s{};
+  s.s = static_cast<unsigned int>(draw.below(40));
+  s.spare_ = draw.number();
+  s.has_spare_ = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Rng& s) { return converted::Value::structure({arg(s.s), arg(s.spare_), arg(s.has_spare_)}); }
+[[maybe_unused]] static bool same(const Rng& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.s, (*got.rows)[0]) && same(want.spare_, (*got.rows)[1]) && same(want.has_spare_, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const Rng& s) { return defined(s.s) && defined(s.spare_) && defined(s.has_spare_); }
+[[maybe_unused]] static std::string text(const Rng& s) { return std::string("{") + text(s.s) + ", " + text(s.spare_) + ", " + text(s.has_spare_) + "}"; }
+[[maybe_unused]] static void take(Rng& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned int>(s.s, (*v.rows)[0]); converted::take_as<double>(s.spare_, (*v.rows)[1]); converted::take_as<bool>(s.has_spare_, (*v.rows)[2]); }
+[[maybe_unused]] static Life::NetCow draw_Life__NetCow(converted::Draw& draw) {
+  Life::NetCow s{};
+  s.key = static_cast<u64>(draw.bits());
+  s.pos = draw.vector();
+  s.rot = draw_kern__Quat(draw);
+  s.yaw = draw.number();
+  s.dead = draw.flag();
+  s.walking = draw.flag();
+  s.carried = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Life::NetCow& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.key)), arg(s.pos), arg(s.rot), arg(s.yaw), arg(s.dead), arg(s.walking), arg(s.carried)}); }
+[[maybe_unused]] static bool same(const Life::NetCow& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]) && same(want.pos, (*got.rows)[1]) && same(want.rot, (*got.rows)[2]) && same(want.yaw, (*got.rows)[3]) && same(want.dead, (*got.rows)[4]) && same(want.walking, (*got.rows)[5]) && same(want.carried, (*got.rows)[6]); }
+[[maybe_unused]] static bool defined(const Life::NetCow& s) { return defined(converted::shaped<converted::Whole>(s.key)) && defined(s.pos) && defined(s.rot) && defined(s.yaw) && defined(s.dead) && defined(s.walking) && defined(s.carried); }
+[[maybe_unused]] static std::string text(const Life::NetCow& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(s.pos) + ", " + text(s.rot) + ", " + text(s.yaw) + ", " + text(s.dead) + ", " + text(s.walking) + ", " + text(s.carried) + "}"; }
+[[maybe_unused]] static void take(Life::NetCow& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<converted::Whole>(s.key, (*v.rows)[0]); converted::take_as<Vec3>(s.pos, (*v.rows)[1]); converted::take_as<Quat>(s.rot, (*v.rows)[2]); converted::take_as<double>(s.yaw, (*v.rows)[3]); converted::take_as<bool>(s.dead, (*v.rows)[4]); converted::take_as<bool>(s.walking, (*v.rows)[5]); converted::take_as<bool>(s.carried, (*v.rows)[6]); }
+[[maybe_unused]] static Life::NetPet draw_Life__NetPet(converted::Draw& draw) {
+  Life::NetPet s{};
+  s.idx = static_cast<unsigned char>(draw.below(40));
+  s.pos = draw.vector();
+  s.rot = draw_kern__Quat(draw);
+  s.yaw = draw.number();
+  s.speed = draw.number();
+  s.off = draw.vector2();
+  s.shown = draw.flag();
+  s.dead = draw.flag();
+  s.carried = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Life::NetPet& s) { return converted::Value::structure({arg(s.idx), arg(s.pos), arg(s.rot), arg(s.yaw), arg(s.speed), arg(s.off), arg(s.shown), arg(s.dead), arg(s.carried)}); }
+[[maybe_unused]] static bool same(const Life::NetPet& want, const converted::Value& got) { return got.rows && got.rows->size() == 9 && same(want.idx, (*got.rows)[0]) && same(want.pos, (*got.rows)[1]) && same(want.rot, (*got.rows)[2]) && same(want.yaw, (*got.rows)[3]) && same(want.speed, (*got.rows)[4]) && same(want.off, (*got.rows)[5]) && same(want.shown, (*got.rows)[6]) && same(want.dead, (*got.rows)[7]) && same(want.carried, (*got.rows)[8]); }
+[[maybe_unused]] static bool defined(const Life::NetPet& s) { return defined(s.idx) && defined(s.pos) && defined(s.rot) && defined(s.yaw) && defined(s.speed) && defined(s.off) && defined(s.shown) && defined(s.dead) && defined(s.carried); }
+[[maybe_unused]] static std::string text(const Life::NetPet& s) { return std::string("{") + text(s.idx) + ", " + text(s.pos) + ", " + text(s.rot) + ", " + text(s.yaw) + ", " + text(s.speed) + ", " + text(s.off) + ", " + text(s.shown) + ", " + text(s.dead) + ", " + text(s.carried) + "}"; }
+[[maybe_unused]] static void take(Life::NetPet& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 9) return; converted::take_as<unsigned char>(s.idx, (*v.rows)[0]); converted::take_as<Vec3>(s.pos, (*v.rows)[1]); converted::take_as<Quat>(s.rot, (*v.rows)[2]); converted::take_as<double>(s.yaw, (*v.rows)[3]); converted::take_as<double>(s.speed, (*v.rows)[4]); converted::take_as<Vec2>(s.off, (*v.rows)[5]); converted::take_as<bool>(s.shown, (*v.rows)[6]); converted::take_as<bool>(s.dead, (*v.rows)[7]); converted::take_as<bool>(s.carried, (*v.rows)[8]); }
+[[maybe_unused]] static LifeCar draw_LifeCar(converted::Draw& draw) {
+  LifeCar s{};
+  s.position = draw.vector();
+  s.velocity = draw.vector();
+  s.rotation = draw_kern__Quat(draw);
+  s.half = draw.vector2();
+  s.mass = draw.number();
+  s.car = static_cast<int>(draw.whole());
+  s.player = draw.flag();
+  s.airborne = draw.flag();
+  s.stuck = draw.flag();
+  s.driver = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const LifeCar& s) { return converted::Value::structure({arg(s.position), arg(s.velocity), arg(s.rotation), arg(s.half), arg(s.mass), arg(s.car), arg(s.player), arg(s.airborne), arg(s.stuck), arg(s.driver)}); }
+[[maybe_unused]] static bool same(const LifeCar& want, const converted::Value& got) { return got.rows && got.rows->size() == 10 && same(want.position, (*got.rows)[0]) && same(want.velocity, (*got.rows)[1]) && same(want.rotation, (*got.rows)[2]) && same(want.half, (*got.rows)[3]) && same(want.mass, (*got.rows)[4]) && same(want.car, (*got.rows)[5]) && same(want.player, (*got.rows)[6]) && same(want.airborne, (*got.rows)[7]) && same(want.stuck, (*got.rows)[8]) && same(want.driver, (*got.rows)[9]); }
+[[maybe_unused]] static bool defined(const LifeCar& s) { return defined(s.position) && defined(s.velocity) && defined(s.rotation) && defined(s.half) && defined(s.mass) && defined(s.car) && defined(s.player) && defined(s.airborne) && defined(s.stuck) && defined(s.driver); }
+[[maybe_unused]] static std::string text(const LifeCar& s) { return std::string("{") + text(s.position) + ", " + text(s.velocity) + ", " + text(s.rotation) + ", " + text(s.half) + ", " + text(s.mass) + ", " + text(s.car) + ", " + text(s.player) + ", " + text(s.airborne) + ", " + text(s.stuck) + ", " + text(s.driver) + "}"; }
+[[maybe_unused]] static void take(LifeCar& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 10) return; converted::take_as<Vec3>(s.position, (*v.rows)[0]); converted::take_as<Vec3>(s.velocity, (*v.rows)[1]); converted::take_as<Quat>(s.rotation, (*v.rows)[2]); converted::take_as<Vec2>(s.half, (*v.rows)[3]); converted::take_as<double>(s.mass, (*v.rows)[4]); converted::take_as<int>(s.car, (*v.rows)[5]); converted::take_as<bool>(s.player, (*v.rows)[6]); converted::take_as<bool>(s.airborne, (*v.rows)[7]); converted::take_as<bool>(s.stuck, (*v.rows)[8]); converted::take_as<bool>(s.driver, (*v.rows)[9]); }
+[[maybe_unused]] static LifeView draw_LifeView(converted::Draw& draw) {
+  LifeView s{};
+  s.physics = converted::engine_object<World>(1 + draw.below(6));
+  s.focus = draw.vector();
+  s.player = draw.vector();
+  s.eye = draw.vector();
+  s.head = draw.vector();
+  s.epoch = draw.number();
+  s.dogs_on = draw.flag();
+  s.cats_on = draw.flag();
+  s.player_speed = draw.number();
+  s.on_foot = draw.flag();
+  s.people_on = draw.flag();
+  s.birds_on = draw.flag();
+  s.cars = draw_list(draw, [&]() -> LifeCar { return draw_LifeCar(draw); });
+  s.mates = draw_list(draw, [&]() -> Vec3 { return draw.vector(); });
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const LifeView& s) { return converted::Value::structure({arg(s.physics), arg(s.focus), arg(s.player), arg(s.eye), arg(s.head), arg(s.epoch), arg(s.dogs_on), arg(s.cats_on), arg(s.player_speed), arg(s.on_foot), arg(s.people_on), arg(s.birds_on), arg(s.cars), arg(s.mates)}); }
+[[maybe_unused]] static bool same(const LifeView& want, const converted::Value& got) { return got.rows && got.rows->size() == 14 && same(want.physics, (*got.rows)[0]) && same(want.focus, (*got.rows)[1]) && same(want.player, (*got.rows)[2]) && same(want.eye, (*got.rows)[3]) && same(want.head, (*got.rows)[4]) && same(want.epoch, (*got.rows)[5]) && same(want.dogs_on, (*got.rows)[6]) && same(want.cats_on, (*got.rows)[7]) && same(want.player_speed, (*got.rows)[8]) && same(want.on_foot, (*got.rows)[9]) && same(want.people_on, (*got.rows)[10]) && same(want.birds_on, (*got.rows)[11]) && same(want.cars, (*got.rows)[12]) && same(want.mates, (*got.rows)[13]); }
+[[maybe_unused]] static bool defined(const LifeView& s) { return defined(s.physics) && defined(s.focus) && defined(s.player) && defined(s.eye) && defined(s.head) && defined(s.epoch) && defined(s.dogs_on) && defined(s.cats_on) && defined(s.player_speed) && defined(s.on_foot) && defined(s.people_on) && defined(s.birds_on) && defined(s.cars) && defined(s.mates); }
+[[maybe_unused]] static std::string text(const LifeView& s) { return std::string("{") + text(s.physics) + ", " + text(s.focus) + ", " + text(s.player) + ", " + text(s.eye) + ", " + text(s.head) + ", " + text(s.epoch) + ", " + text(s.dogs_on) + ", " + text(s.cats_on) + ", " + text(s.player_speed) + ", " + text(s.on_foot) + ", " + text(s.people_on) + ", " + text(s.birds_on) + ", " + text(s.cars) + ", " + text(s.mates) + "}"; }
+[[maybe_unused]] static void take(LifeView& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 14) return; converted::take_as<const World*>(s.physics, (*v.rows)[0]); converted::take_as<Vec3>(s.focus, (*v.rows)[1]); converted::take_as<Vec3>(s.player, (*v.rows)[2]); converted::take_as<Vec3>(s.eye, (*v.rows)[3]); converted::take_as<Vec3>(s.head, (*v.rows)[4]); converted::take_as<double>(s.epoch, (*v.rows)[5]); converted::take_as<bool>(s.dogs_on, (*v.rows)[6]); converted::take_as<bool>(s.cats_on, (*v.rows)[7]); converted::take_as<double>(s.player_speed, (*v.rows)[8]); converted::take_as<bool>(s.on_foot, (*v.rows)[9]); converted::take_as<bool>(s.people_on, (*v.rows)[10]); converted::take_as<bool>(s.birds_on, (*v.rows)[11]); converted::take_as<std::vector<LifeCar>>(s.cars, (*v.rows)[12]); converted::take_as<std::vector<Vec3>>(s.mates, (*v.rows)[13]); }
+[[maybe_unused]] static physics::BodySettings draw_kern__physics__BodySettings(converted::Draw& draw) {
+  physics::BodySettings s{};
+  s.type = static_cast<physics::BodyType>(draw.below(3));
+  s.position = draw.vector();
+  s.rotation = draw_kern__Quat(draw);
+  s.linear_velocity = draw.vector();
+  s.angular_velocity = draw.vector();
+  s.linear_damping = draw.number();
+  s.angular_damping = draw.number();
+  s.gravity_scale = draw.number();
+  s.enable_sleep = draw.flag();
+  s.awake = draw.flag();
+  s.enabled = draw.flag();
+  s.bullet = draw.flag();
+  s.user = static_cast<u64>(draw.bits());
+  return s;
+}
+namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const physics::BodySettings& s) { return converted::Value::structure({arg(s.type), arg(s.position), arg(s.rotation), arg(s.linear_velocity), arg(s.angular_velocity), arg(s.linear_damping), arg(s.angular_damping), arg(s.gravity_scale), arg(s.enable_sleep), arg(s.awake), arg(s.enabled), arg(s.bullet), arg(converted::shaped<converted::Whole>(s.user))}); }
+[[maybe_unused]] static bool same(const physics::BodySettings& want, const converted::Value& got) { return got.rows && got.rows->size() == 13 && same(want.type, (*got.rows)[0]) && same(want.position, (*got.rows)[1]) && same(want.rotation, (*got.rows)[2]) && same(want.linear_velocity, (*got.rows)[3]) && same(want.angular_velocity, (*got.rows)[4]) && same(want.linear_damping, (*got.rows)[5]) && same(want.angular_damping, (*got.rows)[6]) && same(want.gravity_scale, (*got.rows)[7]) && same(want.enable_sleep, (*got.rows)[8]) && same(want.awake, (*got.rows)[9]) && same(want.enabled, (*got.rows)[10]) && same(want.bullet, (*got.rows)[11]) && same(converted::shaped<converted::Whole>(want.user), (*got.rows)[12]); }
+[[maybe_unused]] static bool defined(const physics::BodySettings& s) { return defined(s.type) && defined(s.position) && defined(s.rotation) && defined(s.linear_velocity) && defined(s.angular_velocity) && defined(s.linear_damping) && defined(s.angular_damping) && defined(s.gravity_scale) && defined(s.enable_sleep) && defined(s.awake) && defined(s.enabled) && defined(s.bullet) && defined(converted::shaped<converted::Whole>(s.user)); }
+[[maybe_unused]] static std::string text(const physics::BodySettings& s) { return std::string("{") + text(s.type) + ", " + text(s.position) + ", " + text(s.rotation) + ", " + text(s.linear_velocity) + ", " + text(s.angular_velocity) + ", " + text(s.linear_damping) + ", " + text(s.angular_damping) + ", " + text(s.gravity_scale) + ", " + text(s.enable_sleep) + ", " + text(s.awake) + ", " + text(s.enabled) + ", " + text(s.bullet) + ", " + text(converted::shaped<converted::Whole>(s.user)) + "}"; }
+[[maybe_unused]] static void take(physics::BodySettings& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 13) return; converted::take_as<physics::BodyType>(s.type, (*v.rows)[0]); converted::take_as<Vec3>(s.position, (*v.rows)[1]); converted::take_as<Quat>(s.rotation, (*v.rows)[2]); converted::take_as<Vec3>(s.linear_velocity, (*v.rows)[3]); converted::take_as<Vec3>(s.angular_velocity, (*v.rows)[4]); converted::take_as<double>(s.linear_damping, (*v.rows)[5]); converted::take_as<double>(s.angular_damping, (*v.rows)[6]); converted::take_as<double>(s.gravity_scale, (*v.rows)[7]); converted::take_as<bool>(s.enable_sleep, (*v.rows)[8]); converted::take_as<bool>(s.awake, (*v.rows)[9]); converted::take_as<bool>(s.enabled, (*v.rows)[10]); converted::take_as<bool>(s.bullet, (*v.rows)[11]); converted::take_as<converted::Whole>(s.user, (*v.rows)[12]); }
+}
+[[maybe_unused]] static physics::ShapeMaterial draw_kern__physics__ShapeMaterial(converted::Draw& draw) {
+  physics::ShapeMaterial s{};
+  s.density = draw.number();
+  s.friction = draw.number();
+  s.restitution = draw.number();
+  s.rolling_resistance = draw.number();
+  s.sensor = draw.flag();
+  s.category_bits = static_cast<u64>(draw.bits());
+  s.mask_bits = static_cast<u64>(draw.bits());
+  s.group_index = static_cast<int>(draw.whole());
+  s.contact_events = draw.flag();
+  s.sensor_events = draw.flag();
+  s.hit_events = draw.flag();
+  s.user = static_cast<u64>(draw.bits());
+  s.surface = static_cast<physics::Surface>(draw.below(4));
+  return s;
+}
+namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const physics::ShapeMaterial& s) { return converted::Value::structure({arg(s.density), arg(s.friction), arg(s.restitution), arg(s.rolling_resistance), arg(s.sensor), arg(converted::shaped<converted::Whole>(s.category_bits)), arg(converted::shaped<converted::Whole>(s.mask_bits)), arg(s.group_index), arg(s.contact_events), arg(s.sensor_events), arg(s.hit_events), arg(converted::shaped<converted::Whole>(s.user)), arg(s.surface)}); }
+[[maybe_unused]] static bool same(const physics::ShapeMaterial& want, const converted::Value& got) { return got.rows && got.rows->size() == 13 && same(want.density, (*got.rows)[0]) && same(want.friction, (*got.rows)[1]) && same(want.restitution, (*got.rows)[2]) && same(want.rolling_resistance, (*got.rows)[3]) && same(want.sensor, (*got.rows)[4]) && same(converted::shaped<converted::Whole>(want.category_bits), (*got.rows)[5]) && same(converted::shaped<converted::Whole>(want.mask_bits), (*got.rows)[6]) && same(want.group_index, (*got.rows)[7]) && same(want.contact_events, (*got.rows)[8]) && same(want.sensor_events, (*got.rows)[9]) && same(want.hit_events, (*got.rows)[10]) && same(converted::shaped<converted::Whole>(want.user), (*got.rows)[11]) && same(want.surface, (*got.rows)[12]); }
+[[maybe_unused]] static bool defined(const physics::ShapeMaterial& s) { return defined(s.density) && defined(s.friction) && defined(s.restitution) && defined(s.rolling_resistance) && defined(s.sensor) && defined(converted::shaped<converted::Whole>(s.category_bits)) && defined(converted::shaped<converted::Whole>(s.mask_bits)) && defined(s.group_index) && defined(s.contact_events) && defined(s.sensor_events) && defined(s.hit_events) && defined(converted::shaped<converted::Whole>(s.user)) && defined(s.surface); }
+[[maybe_unused]] static std::string text(const physics::ShapeMaterial& s) { return std::string("{") + text(s.density) + ", " + text(s.friction) + ", " + text(s.restitution) + ", " + text(s.rolling_resistance) + ", " + text(s.sensor) + ", " + text(converted::shaped<converted::Whole>(s.category_bits)) + ", " + text(converted::shaped<converted::Whole>(s.mask_bits)) + ", " + text(s.group_index) + ", " + text(s.contact_events) + ", " + text(s.sensor_events) + ", " + text(s.hit_events) + ", " + text(converted::shaped<converted::Whole>(s.user)) + ", " + text(s.surface) + "}"; }
+[[maybe_unused]] static void take(physics::ShapeMaterial& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 13) return; converted::take_as<double>(s.density, (*v.rows)[0]); converted::take_as<double>(s.friction, (*v.rows)[1]); converted::take_as<double>(s.restitution, (*v.rows)[2]); converted::take_as<double>(s.rolling_resistance, (*v.rows)[3]); converted::take_as<bool>(s.sensor, (*v.rows)[4]); converted::take_as<converted::Whole>(s.category_bits, (*v.rows)[5]); converted::take_as<converted::Whole>(s.mask_bits, (*v.rows)[6]); converted::take_as<int>(s.group_index, (*v.rows)[7]); converted::take_as<bool>(s.contact_events, (*v.rows)[8]); converted::take_as<bool>(s.sensor_events, (*v.rows)[9]); converted::take_as<bool>(s.hit_events, (*v.rows)[10]); converted::take_as<converted::Whole>(s.user, (*v.rows)[11]); converted::take_as<physics::Surface>(s.surface, (*v.rows)[12]); }
+}
+[[maybe_unused]] static physics::ShapeSettings draw_kern__physics__ShapeSettings(converted::Draw& draw) {
+  physics::ShapeSettings s{};
+  s.kind = static_cast<physics::ShapeKind>(draw.below(5));
+  s.center = draw.vector();
+  s.rotation = draw_kern__Quat(draw);
+  s.size = draw.vector();
+  s.radius = draw.number();
+  s.length = draw.number();
+  static std::deque<std::vector<Vec3>> kept_points;
+  kept_points.push_back(draw_list(draw, [&]() -> Vec3 { return draw.vector(); }));
+  s.points = {kept_points.back().data(), kept_points.back().size()};
+  static std::deque<std::vector<unsigned int>> kept_indices;
+  kept_indices.push_back(draw_list(draw, [&]() -> unsigned int { return static_cast<unsigned int>(draw.below(40)); }));
+  s.indices = {kept_indices.back().data(), kept_indices.back().size()};
+  s.material = draw_kern__physics__ShapeMaterial(draw);
+  return s;
+}
+namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const physics::ShapeSettings& s) { return converted::Value::structure({arg(s.kind), arg(s.center), arg(s.rotation), arg(s.size), arg(s.radius), arg(s.length), arg(std::vector<Vec3>(s.points.begin(), s.points.end())), arg(std::vector<unsigned int>(s.indices.begin(), s.indices.end())), arg(s.material)}); }
+[[maybe_unused]] static bool same(const physics::ShapeSettings& want, const converted::Value& got) { return got.rows && got.rows->size() == 9 && same(want.kind, (*got.rows)[0]) && same(want.center, (*got.rows)[1]) && same(want.rotation, (*got.rows)[2]) && same(want.size, (*got.rows)[3]) && same(want.radius, (*got.rows)[4]) && same(want.length, (*got.rows)[5]) && same(std::vector<Vec3>(want.points.begin(), want.points.end()), (*got.rows)[6]) && same(std::vector<unsigned int>(want.indices.begin(), want.indices.end()), (*got.rows)[7]) && same(want.material, (*got.rows)[8]); }
+[[maybe_unused]] static bool defined(const physics::ShapeSettings& s) { return defined(s.kind) && defined(s.center) && defined(s.rotation) && defined(s.size) && defined(s.radius) && defined(s.length) && defined(std::vector<Vec3>(s.points.begin(), s.points.end())) && defined(std::vector<unsigned int>(s.indices.begin(), s.indices.end())) && defined(s.material); }
+[[maybe_unused]] static std::string text(const physics::ShapeSettings& s) { return std::string("{") + text(s.kind) + ", " + text(s.center) + ", " + text(s.rotation) + ", " + text(s.size) + ", " + text(s.radius) + ", " + text(s.length) + ", " + text(std::vector<Vec3>(s.points.begin(), s.points.end())) + ", " + text(std::vector<unsigned int>(s.indices.begin(), s.indices.end())) + ", " + text(s.material) + "}"; }
+[[maybe_unused]] static void take(physics::ShapeSettings& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 9) return; converted::take_as<physics::ShapeKind>(s.kind, (*v.rows)[0]); converted::take_as<Vec3>(s.center, (*v.rows)[1]); converted::take_as<Quat>(s.rotation, (*v.rows)[2]); converted::take_as<Vec3>(s.size, (*v.rows)[3]); converted::take_as<double>(s.radius, (*v.rows)[4]); converted::take_as<double>(s.length, (*v.rows)[5]); converted::take_as<physics::ShapeMaterial>(s.material, (*v.rows)[8]); }
+}
+[[maybe_unused]] static physics::Shape draw_kern__physics__Shape(converted::Draw& draw) {
+  physics::Shape s{};
+  s.id = static_cast<u64>(draw.bits());
+  return s;
+}
+namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const physics::Shape& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
+[[maybe_unused]] static bool same(const physics::Shape& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
+[[maybe_unused]] static bool defined(const physics::Shape& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
+[[maybe_unused]] static std::string text(const physics::Shape& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
+[[maybe_unused]] static void take(physics::Shape& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
+}
+[[maybe_unused]] static physics::JointSettings draw_kern__physics__JointSettings(converted::Draw& draw) {
+  physics::JointSettings s{};
+  s.type = static_cast<physics::JointType>(draw.below(9));
+  s.body_a = draw_kern__physics__Body(draw);
+  s.body_b = draw_kern__physics__Body(draw);
+  s.frame_a = draw_kern__physics__Pose(draw);
+  s.frame_b = draw_kern__physics__Pose(draw);
+  s.collide_connected = draw.flag();
+  s.enable_spring = draw.flag();
+  s.hertz = draw.number();
+  s.damping_ratio = draw.number();
+  s.enable_limit = draw.flag();
+  s.lower = draw.number();
+  s.upper = draw.number();
+  s.enable_motor = draw.flag();
+  s.motor_speed = draw.number();
+  s.max_motor_torque = draw.number();
+  s.max_motor_force = draw.number();
+  s.motor_velocity = draw.vector();
+  s.length = draw.number();
+  s.linear_hertz = draw.number();
+  s.angular_hertz = draw.number();
+  s.linear_damping_ratio = draw.number();
+  s.angular_damping_ratio = draw.number();
+  s.linear_velocity = draw.vector();
+  s.angular_velocity = draw.vector();
+  s.max_velocity_force = draw.number();
+  s.max_velocity_torque = draw.number();
+  s.max_spring_force = draw.number();
+  s.max_spring_torque = draw.number();
+  s.enable_steering = draw.flag();
+  s.enable_steering_limit = draw.flag();
+  s.steering_hertz = draw.number();
+  s.steering_damping_ratio = draw.number();
+  s.target_steering = draw.number();
+  s.max_steering_torque = draw.number();
+  s.steering_lower = draw.number();
+  s.steering_upper = draw.number();
+  s.max_torque = draw.number();
+  s.constraint_hertz = draw.number();
+  s.constraint_damping_ratio = draw.number();
+  s.user = static_cast<u64>(draw.bits());
+  return s;
+}
+namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const physics::JointSettings& s) { return converted::Value::structure({arg(s.type), arg(s.body_a), arg(s.body_b), arg(s.frame_a), arg(s.frame_b), arg(s.collide_connected), arg(s.enable_spring), arg(s.hertz), arg(s.damping_ratio), arg(s.enable_limit), arg(s.lower), arg(s.upper), arg(s.enable_motor), arg(s.motor_speed), arg(s.max_motor_torque), arg(s.max_motor_force), arg(s.motor_velocity), arg(s.length), arg(s.linear_hertz), arg(s.angular_hertz), arg(s.linear_damping_ratio), arg(s.angular_damping_ratio), arg(s.linear_velocity), arg(s.angular_velocity), arg(s.max_velocity_force), arg(s.max_velocity_torque), arg(s.max_spring_force), arg(s.max_spring_torque), arg(s.enable_steering), arg(s.enable_steering_limit), arg(s.steering_hertz), arg(s.steering_damping_ratio), arg(s.target_steering), arg(s.max_steering_torque), arg(s.steering_lower), arg(s.steering_upper), arg(s.max_torque), arg(s.constraint_hertz), arg(s.constraint_damping_ratio), arg(converted::shaped<converted::Whole>(s.user))}); }
+[[maybe_unused]] static bool same(const physics::JointSettings& want, const converted::Value& got) { return got.rows && got.rows->size() == 40 && same(want.type, (*got.rows)[0]) && same(want.body_a, (*got.rows)[1]) && same(want.body_b, (*got.rows)[2]) && same(want.frame_a, (*got.rows)[3]) && same(want.frame_b, (*got.rows)[4]) && same(want.collide_connected, (*got.rows)[5]) && same(want.enable_spring, (*got.rows)[6]) && same(want.hertz, (*got.rows)[7]) && same(want.damping_ratio, (*got.rows)[8]) && same(want.enable_limit, (*got.rows)[9]) && same(want.lower, (*got.rows)[10]) && same(want.upper, (*got.rows)[11]) && same(want.enable_motor, (*got.rows)[12]) && same(want.motor_speed, (*got.rows)[13]) && same(want.max_motor_torque, (*got.rows)[14]) && same(want.max_motor_force, (*got.rows)[15]) && same(want.motor_velocity, (*got.rows)[16]) && same(want.length, (*got.rows)[17]) && same(want.linear_hertz, (*got.rows)[18]) && same(want.angular_hertz, (*got.rows)[19]) && same(want.linear_damping_ratio, (*got.rows)[20]) && same(want.angular_damping_ratio, (*got.rows)[21]) && same(want.linear_velocity, (*got.rows)[22]) && same(want.angular_velocity, (*got.rows)[23]) && same(want.max_velocity_force, (*got.rows)[24]) && same(want.max_velocity_torque, (*got.rows)[25]) && same(want.max_spring_force, (*got.rows)[26]) && same(want.max_spring_torque, (*got.rows)[27]) && same(want.enable_steering, (*got.rows)[28]) && same(want.enable_steering_limit, (*got.rows)[29]) && same(want.steering_hertz, (*got.rows)[30]) && same(want.steering_damping_ratio, (*got.rows)[31]) && same(want.target_steering, (*got.rows)[32]) && same(want.max_steering_torque, (*got.rows)[33]) && same(want.steering_lower, (*got.rows)[34]) && same(want.steering_upper, (*got.rows)[35]) && same(want.max_torque, (*got.rows)[36]) && same(want.constraint_hertz, (*got.rows)[37]) && same(want.constraint_damping_ratio, (*got.rows)[38]) && same(converted::shaped<converted::Whole>(want.user), (*got.rows)[39]); }
+[[maybe_unused]] static bool defined(const physics::JointSettings& s) { return defined(s.type) && defined(s.body_a) && defined(s.body_b) && defined(s.frame_a) && defined(s.frame_b) && defined(s.collide_connected) && defined(s.enable_spring) && defined(s.hertz) && defined(s.damping_ratio) && defined(s.enable_limit) && defined(s.lower) && defined(s.upper) && defined(s.enable_motor) && defined(s.motor_speed) && defined(s.max_motor_torque) && defined(s.max_motor_force) && defined(s.motor_velocity) && defined(s.length) && defined(s.linear_hertz) && defined(s.angular_hertz) && defined(s.linear_damping_ratio) && defined(s.angular_damping_ratio) && defined(s.linear_velocity) && defined(s.angular_velocity) && defined(s.max_velocity_force) && defined(s.max_velocity_torque) && defined(s.max_spring_force) && defined(s.max_spring_torque) && defined(s.enable_steering) && defined(s.enable_steering_limit) && defined(s.steering_hertz) && defined(s.steering_damping_ratio) && defined(s.target_steering) && defined(s.max_steering_torque) && defined(s.steering_lower) && defined(s.steering_upper) && defined(s.max_torque) && defined(s.constraint_hertz) && defined(s.constraint_damping_ratio) && defined(converted::shaped<converted::Whole>(s.user)); }
+[[maybe_unused]] static std::string text(const physics::JointSettings& s) { return std::string("{") + text(s.type) + ", " + text(s.body_a) + ", " + text(s.body_b) + ", " + text(s.frame_a) + ", " + text(s.frame_b) + ", " + text(s.collide_connected) + ", " + text(s.enable_spring) + ", " + text(s.hertz) + ", " + text(s.damping_ratio) + ", " + text(s.enable_limit) + ", " + text(s.lower) + ", " + text(s.upper) + ", " + text(s.enable_motor) + ", " + text(s.motor_speed) + ", " + text(s.max_motor_torque) + ", " + text(s.max_motor_force) + ", " + text(s.motor_velocity) + ", " + text(s.length) + ", " + text(s.linear_hertz) + ", " + text(s.angular_hertz) + ", " + text(s.linear_damping_ratio) + ", " + text(s.angular_damping_ratio) + ", " + text(s.linear_velocity) + ", " + text(s.angular_velocity) + ", " + text(s.max_velocity_force) + ", " + text(s.max_velocity_torque) + ", " + text(s.max_spring_force) + ", " + text(s.max_spring_torque) + ", " + text(s.enable_steering) + ", " + text(s.enable_steering_limit) + ", " + text(s.steering_hertz) + ", " + text(s.steering_damping_ratio) + ", " + text(s.target_steering) + ", " + text(s.max_steering_torque) + ", " + text(s.steering_lower) + ", " + text(s.steering_upper) + ", " + text(s.max_torque) + ", " + text(s.constraint_hertz) + ", " + text(s.constraint_damping_ratio) + ", " + text(converted::shaped<converted::Whole>(s.user)) + "}"; }
+[[maybe_unused]] static void take(physics::JointSettings& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 40) return; converted::take_as<physics::JointType>(s.type, (*v.rows)[0]); converted::take_as<physics::Body>(s.body_a, (*v.rows)[1]); converted::take_as<physics::Body>(s.body_b, (*v.rows)[2]); converted::take_as<physics::Pose>(s.frame_a, (*v.rows)[3]); converted::take_as<physics::Pose>(s.frame_b, (*v.rows)[4]); converted::take_as<bool>(s.collide_connected, (*v.rows)[5]); converted::take_as<bool>(s.enable_spring, (*v.rows)[6]); converted::take_as<double>(s.hertz, (*v.rows)[7]); converted::take_as<double>(s.damping_ratio, (*v.rows)[8]); converted::take_as<bool>(s.enable_limit, (*v.rows)[9]); converted::take_as<double>(s.lower, (*v.rows)[10]); converted::take_as<double>(s.upper, (*v.rows)[11]); converted::take_as<bool>(s.enable_motor, (*v.rows)[12]); converted::take_as<double>(s.motor_speed, (*v.rows)[13]); converted::take_as<double>(s.max_motor_torque, (*v.rows)[14]); converted::take_as<double>(s.max_motor_force, (*v.rows)[15]); converted::take_as<Vec3>(s.motor_velocity, (*v.rows)[16]); converted::take_as<double>(s.length, (*v.rows)[17]); converted::take_as<double>(s.linear_hertz, (*v.rows)[18]); converted::take_as<double>(s.angular_hertz, (*v.rows)[19]); converted::take_as<double>(s.linear_damping_ratio, (*v.rows)[20]); converted::take_as<double>(s.angular_damping_ratio, (*v.rows)[21]); converted::take_as<Vec3>(s.linear_velocity, (*v.rows)[22]); converted::take_as<Vec3>(s.angular_velocity, (*v.rows)[23]); converted::take_as<double>(s.max_velocity_force, (*v.rows)[24]); converted::take_as<double>(s.max_velocity_torque, (*v.rows)[25]); converted::take_as<double>(s.max_spring_force, (*v.rows)[26]); converted::take_as<double>(s.max_spring_torque, (*v.rows)[27]); converted::take_as<bool>(s.enable_steering, (*v.rows)[28]); converted::take_as<bool>(s.enable_steering_limit, (*v.rows)[29]); converted::take_as<double>(s.steering_hertz, (*v.rows)[30]); converted::take_as<double>(s.steering_damping_ratio, (*v.rows)[31]); converted::take_as<double>(s.target_steering, (*v.rows)[32]); converted::take_as<double>(s.max_steering_torque, (*v.rows)[33]); converted::take_as<double>(s.steering_lower, (*v.rows)[34]); converted::take_as<double>(s.steering_upper, (*v.rows)[35]); converted::take_as<double>(s.max_torque, (*v.rows)[36]); converted::take_as<double>(s.constraint_hertz, (*v.rows)[37]); converted::take_as<double>(s.constraint_damping_ratio, (*v.rows)[38]); converted::take_as<converted::Whole>(s.user, (*v.rows)[39]); }
+}
+inline physics::Body World::create_body(const physics::BodySettings& settings) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.create_body", {converted::value_of(*this), converted::value_of(settings)}); physics::Body kern_result = converted::quiet<physics::Body>(); converted::take_as<physics::Body>(kern_result, kern_out[0]); return kern_result; }
+inline physics::Shape World::create_shape(const physics::Body& body, const physics::ShapeSettings& settings) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.create_shape", {converted::value_of(*this), converted::value_of(body), converted::value_of(settings)}); physics::Shape kern_result = converted::quiet<physics::Shape>(); converted::take_as<physics::Shape>(kern_result, kern_out[0]); return kern_result; }
+inline void World::apply_angular_impulse(const physics::Body& body, const Vec3& impulse) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.apply_angular_impulse", {converted::value_of(*this), converted::value_of(body), converted::value_of(impulse)}); }
+inline void World::apply_linear_impulse_to_center(const physics::Body& body, const Vec3& impulse) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.apply_linear_impulse_to_center", {converted::value_of(*this), converted::value_of(body), converted::value_of(impulse)}); }
+inline bool World::body_valid(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.body_valid", {converted::value_of(*this), converted::value_of(body)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline void World::destroy_body(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.destroy_body", {converted::value_of(*this), converted::value_of(body)}); }
+inline physics::Pose World::pose(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.pose", {converted::value_of(*this), converted::value_of(body)}); physics::Pose kern_result = converted::quiet<physics::Pose>(); converted::take_as<physics::Pose>(kern_result, kern_out[0]); return kern_result; }
+inline Vec3 World::linear_velocity(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.linear_velocity", {converted::value_of(*this), converted::value_of(body)}); Vec3 kern_result = converted::quiet<Vec3>(); converted::take_as<Vec3>(kern_result, kern_out[0]); return kern_result; }
+inline void World::apply_linear_impulse(const physics::Body& body, const Vec3& impulse, const Vec3& point) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.apply_linear_impulse", {converted::value_of(*this), converted::value_of(body), converted::value_of(impulse), converted::value_of(point)}); }
+inline physics::BodyType World::body_type(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.body_type", {converted::value_of(*this), converted::value_of(body)}); physics::BodyType kern_result = converted::quiet<physics::BodyType>(); converted::take_as<physics::BodyType>(kern_result, kern_out[0]); return kern_result; }
+inline double World::mass(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.mass", {converted::value_of(*this), converted::value_of(body)}); double kern_result = converted::quiet<double>(); converted::take_as<double>(kern_result, kern_out[0]); return kern_result; }
+inline physics::Joint World::create_joint(const physics::JointSettings& settings) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.create_joint", {converted::value_of(*this), converted::value_of(settings)}); physics::Joint kern_result = converted::quiet<physics::Joint>(); converted::take_as<physics::Joint>(kern_result, kern_out[0]); return kern_result; }
+inline bool World::joint_valid(const physics::Joint& joint) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.joint_valid", {converted::value_of(*this), converted::value_of(joint)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline void World::destroy_joint(const physics::Joint& joint, const bool& wake_bodies) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.destroy_joint", {converted::value_of(*this), converted::value_of(joint), converted::value_of(wake_bodies)}); }
+namespace physics { inline physics::Pose frame_from_axis(const Vec3& anchor, const Vec3& axis, const bool& x_axis) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.physics.frame_from_axis", {converted::value_of(anchor), converted::value_of(axis), converted::value_of(x_axis)}); physics::Pose kern_result = converted::quiet<physics::Pose>(); converted::take_as<physics::Pose>(kern_result, kern_out[0]); return kern_result; } }
+struct Out_Life_kill_pet { Life Self; LifeOut out; };
+[[maybe_unused]] static bool same(const Out_Life_kill_pet& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.out, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_Life_kill_pet& s) { return defined(s.Self) && defined(s.out); }
+[[maybe_unused]] static std::string text(const Out_Life_kill_pet& s) { return std::string("{") + text(s.Self) + ", " + text(s.out) + "}"; }
+struct Out_Life_net_kill_pet { Life Self; LifeOut out; };
+[[maybe_unused]] static bool same(const Out_Life_net_kill_pet& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.out, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_Life_net_kill_pet& s) { return defined(s.Self) && defined(s.out); }
+[[maybe_unused]] static std::string text(const Out_Life_net_kill_pet& s) { return std::string("{") + text(s.Self) + ", " + text(s.out) + "}"; }
 struct Out_Life_spawn_herd { Life Self; bool Result; };
 [[maybe_unused]] static bool same(const Out_Life_spawn_herd& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_Life_spawn_herd& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Life_spawn_herd& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
+struct Out_Life_kill_cow { Life Self; Life::Cow c; LifeOut out; };
+[[maybe_unused]] static bool same(const Out_Life_kill_cow& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Self, (*got.rows)[0]) && same(want.c, (*got.rows)[1]) && same(want.out, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const Out_Life_kill_cow& s) { return defined(s.Self) && defined(s.c) && defined(s.out); }
+[[maybe_unused]] static std::string text(const Out_Life_kill_cow& s) { return std::string("{") + text(s.Self) + ", " + text(s.c) + ", " + text(s.out) + "}"; }
+struct Out_Life_grab_animal { Life Self; physics::Body Result; };
+[[maybe_unused]] static bool same(const Out_Life_grab_animal& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_Life_grab_animal& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_Life_grab_animal& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
+struct Out_Life_catch_pigeon { Life Self; int Result; Rng rng; };
+[[maybe_unused]] static bool same(const Out_Life_catch_pigeon& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]) && same(want.rng, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const Out_Life_catch_pigeon& s) { return defined(s.Self) && defined(s.Result) && defined(s.rng); }
+[[maybe_unused]] static std::string text(const Out_Life_catch_pigeon& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + ", " + text(s.rng) + "}"; }
 struct Out_Life_provoke_cat { Life Self; bool Result; };
 [[maybe_unused]] static bool same(const Out_Life_provoke_cat& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_Life_provoke_cat& s) { return defined(s.Self) && defined(s.Result); }
@@ -1153,6 +2349,34 @@ struct Out_Life_sample { Vec3 Result; double yaw; Vec2 normal; };
 [[maybe_unused]] static bool same(const Out_Life_sample& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Result, (*got.rows)[0]) && same(want.yaw, (*got.rows)[1]) && same(want.normal, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const Out_Life_sample& s) { return defined(s.Result) && defined(s.yaw) && defined(s.normal); }
 [[maybe_unused]] static std::string text(const Out_Life_sample& s) { return std::string("{") + text(s.Result) + ", " + text(s.yaw) + ", " + text(s.normal) + "}"; }
+struct Out_Life_kill_runner { Life Self; LifeOut out; };
+[[maybe_unused]] static bool same(const Out_Life_kill_runner& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.out, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_Life_kill_runner& s) { return defined(s.Self) && defined(s.out); }
+[[maybe_unused]] static std::string text(const Out_Life_kill_runner& s) { return std::string("{") + text(s.Self) + ", " + text(s.out) + "}"; }
+struct Out_Life_net_carry_cow { Life Self; physics::Body Result; };
+[[maybe_unused]] static bool same(const Out_Life_net_carry_cow& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_Life_net_carry_cow& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_Life_net_carry_cow& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
+struct Out_Life_net_carry_pet { Life Self; physics::Body Result; };
+[[maybe_unused]] static bool same(const Out_Life_net_carry_pet& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_Life_net_carry_pet& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_Life_net_carry_pet& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
+struct Out_Life_shot { Life Self; bool Result; Vec3 to; LifeOut out; };
+[[maybe_unused]] static bool same(const Out_Life_shot& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]) && same(want.to, (*got.rows)[2]) && same(want.out, (*got.rows)[3]); }
+[[maybe_unused]] static bool defined(const Out_Life_shot& s) { return defined(s.Self) && defined(s.Result) && defined(s.to) && defined(s.out); }
+[[maybe_unused]] static std::string text(const Out_Life_shot& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + ", " + text(s.to) + ", " + text(s.out) + "}"; }
+struct Out_Life_remote_cow_death { Life Self; LifeOut out; };
+[[maybe_unused]] static bool same(const Out_Life_remote_cow_death& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.out, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_Life_remote_cow_death& s) { return defined(s.Self) && defined(s.out); }
+[[maybe_unused]] static std::string text(const Out_Life_remote_cow_death& s) { return std::string("{") + text(s.Self) + ", " + text(s.out) + "}"; }
+struct Out_Life_blast { Life Self; LifeOut out; };
+[[maybe_unused]] static bool same(const Out_Life_blast& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.out, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_Life_blast& s) { return defined(s.Self) && defined(s.out); }
+[[maybe_unused]] static std::string text(const Out_Life_blast& s) { return std::string("{") + text(s.Self) + ", " + text(s.out) + "}"; }
+struct Out_Life_shout { Life Self; bool Result; LifeOut out; };
+[[maybe_unused]] static bool same(const Out_Life_shout& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]) && same(want.out, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const Out_Life_shout& s) { return defined(s.Self) && defined(s.Result) && defined(s.out); }
+[[maybe_unused]] static std::string text(const Out_Life_shout& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + ", " + text(s.out) + "}"; }
 struct Out_Life_honk { Life Self; bool Result; LifeOut out; };
 [[maybe_unused]] static bool same(const Out_Life_honk& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]) && same(want.out, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const Out_Life_honk& s) { return defined(s.Self) && defined(s.Result) && defined(s.out); }
@@ -1161,6 +2385,10 @@ struct Out_Life_scream { Life Self; bool Result; LifeOut out; };
 [[maybe_unused]] static bool same(const Out_Life_scream& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]) && same(want.out, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const Out_Life_scream& s) { return defined(s.Self) && defined(s.Result) && defined(s.out); }
 [[maybe_unused]] static std::string text(const Out_Life_scream& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + ", " + text(s.out) + "}"; }
+struct Out_Life_update_voices { Life Self; LifeOut out; };
+[[maybe_unused]] static bool same(const Out_Life_update_voices& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.out, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_Life_update_voices& s) { return defined(s.Self) && defined(s.out); }
+[[maybe_unused]] static std::string text(const Out_Life_update_voices& s) { return std::string("{") + text(s.Self) + ", " + text(s.out) + "}"; }
 
 SC_TEST(converted_life_cpp) {
   converted::Blueprint bp("life_cpp");
@@ -1169,17 +2397,66 @@ SC_TEST(converted_life_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] double a2) { return converted::counted([&] { return a0.species(std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Life a0 = draw_Life(draw);
-      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
-      const double a2 = draw.number();
+      Life a0 = draw_Life(draw);
+      unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Life::kill_pet
+    converted::Tally tally("Life_kill_pet");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] LifeOut a4) { converted::counted([&] { return a0.kill_pet(std::move(a1), std::move(a2), std::move(a3), a4); }); return Out_Life_kill_pet{std::move(a0), std::move(a4)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      Life a0 = draw_Life(draw);
+      unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      Vec3 a2 = draw.vector();
+      double a3 = draw.number();
+      LifeOut a4 = draw_LifeOut(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a4), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
+    }
+  }
+  {  // Life::net_kill_pet
+    converted::Tally tally("Life_net_kill_pet");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] LifeOut a4) { converted::counted([&] { return a0.net_kill_pet(std::move(a1), std::move(a2), std::move(a3), a4); }); return Out_Life_net_kill_pet{std::move(a0), std::move(a4)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      Life a0 = draw_Life(draw);
+      unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      Vec3 a2 = draw.vector();
+      double a3 = draw.number();
+      LifeOut a4 = draw_LifeOut(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a4), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
   {  // hash01
@@ -1187,15 +2464,18 @@ SC_TEST(converted_life_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] u64 a0) { return converted::counted([&] { return converted_life_cpp::hash01(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const u64 a0 = static_cast<u64>(draw.bits());
+      u64 a0 = static_cast<u64>(draw.bits());
+      const std::vector<converted::Value> given = {arg(converted::shaped<converted::Whole>(a0))};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(converted::shaped<converted::Whole>(a0))}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // mix
@@ -1203,16 +2483,19 @@ SC_TEST(converted_life_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] u64 a0, [[maybe_unused]] u64 a1) { return converted::counted([&] { return converted_life_cpp::mix(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const u64 a0 = static_cast<u64>(draw.bits());
-      const u64 a1 = static_cast<u64>(draw.bits());
+      u64 a0 = static_cast<u64>(draw.bits());
+      u64 a1 = static_cast<u64>(draw.bits());
+      const std::vector<converted::Value> given = {arg(converted::shaped<converted::Whole>(a0)), arg(converted::shaped<converted::Whole>(a1))};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = converted::shaped<converted::Whole>(run(a0, a1));
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = converted::shaped<converted::Whole>(made);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(converted::shaped<converted::Whole>(a0)), arg(converted::shaped<converted::Whole>(a1))}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // dist2d
@@ -1220,16 +2503,19 @@ SC_TEST(converted_life_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1) { return converted::counted([&] { return converted_life_cpp::dist2d(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Vec3 a0 = draw.vector();
-      const Vec3 a1 = draw.vector();
+      Vec3 a0 = draw.vector();
+      Vec3 a1 = draw.vector();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // dist2d
@@ -1237,16 +2523,19 @@ SC_TEST(converted_life_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec2 a0, [[maybe_unused]] Vec2 a1) { return converted::counted([&] { return converted_life_cpp::dist2d(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Vec2 a0 = draw.vector2();
-      const Vec2 a1 = draw.vector2();
+      Vec2 a0 = draw.vector2();
+      Vec2 a1 = draw.vector2();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // rgb
@@ -1254,15 +2543,18 @@ SC_TEST(converted_life_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_life_cpp::rgb(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // in_ring
@@ -1270,16 +2562,19 @@ SC_TEST(converted_life_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] Vec2 a1) { return converted::counted([&] { return converted_life_cpp::in_ring(a0, std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
-      const Vec2 a1 = draw.vector2();
+      std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+      Vec2 a1 = draw.vector2();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // seg_sphere
@@ -1287,18 +2582,21 @@ SC_TEST(converted_life_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3) { return converted::counted([&] { return converted_life_cpp::seg_sphere(std::move(a0), std::move(a1), std::move(a2), std::move(a3)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Vec3 a0 = draw.vector();
-      const Vec3 a1 = draw.vector();
-      const Vec3 a2 = draw.vector();
-      const double a3 = draw.number();
+      Vec3 a0 = draw.vector();
+      Vec3 a1 = draw.vector();
+      Vec3 a2 = draw.vector();
+      double a3 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Life::in_rings
@@ -1306,16 +2604,19 @@ SC_TEST(converted_life_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] std::vector<std::vector<Vec2>> a0, [[maybe_unused]] Vec2 a1) { return converted::counted([&] { return Life::in_rings(a0, std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const std::vector<std::vector<Vec2>> a0 = draw_list(draw, [&]() -> std::vector<Vec2> { return draw_list(draw, [&]() -> Vec2 { return draw.vector2(); }); });
-      const Vec2 a1 = draw.vector2();
+      std::vector<std::vector<Vec2>> a0 = draw_list(draw, [&]() -> std::vector<Vec2> { return draw_list(draw, [&]() -> Vec2 { return draw.vector2(); }); });
+      Vec2 a1 = draw.vector2();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Life::ring_area
@@ -1323,15 +2624,18 @@ SC_TEST(converted_life_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0) { return converted::counted([&] { return Life::ring_area(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+      std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Life::pet_params
@@ -1339,16 +2643,19 @@ SC_TEST(converted_life_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Life::Pet a0, [[maybe_unused]] unsigned int a1) { converted::counted([&] { return Life::pet_params(a0, std::move(a1)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
-      const Life::Pet a0 = draw_Life__Pet(draw);
-      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      Life::Pet a0 = draw_Life__Pet(draw);
+      unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Life::init
@@ -1356,37 +2663,83 @@ SC_TEST(converted_life_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] World& a1, [[maybe_unused]] bool a2) { converted::counted([&] { return a0.init(a1, std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
-      const Life a0 = draw_Life(draw);
+      Life a0 = draw_Life(draw);
       World& a1 = *converted::engine_object<World>(1 + draw.below(6));
-      const bool a2 = draw.flag();
+      bool a2 = draw.flag();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), a1, std::move(a2));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Life::clear
+    converted::Tally tally("Life_clear");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Life a0) { converted::counted([&] { return a0.clear(); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      Life a0 = draw_Life(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Life::spawn_herd
     converted::Tally tally("Life_spawn_herd");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2, [[maybe_unused]] unsigned int a3, [[maybe_unused]] double a4) { const auto r = converted::counted([&] { return a0.spawn_herd(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return Out_Life_spawn_herd{a0, r}; };
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2, [[maybe_unused]] unsigned int a3, [[maybe_unused]] double a4) { auto r = converted::counted([&] { return a0.spawn_herd(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return Out_Life_spawn_herd{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
-      const Life a0 = draw_Life(draw);
-      const Vec2 a1 = draw.vector2();
-      const double a2 = draw.number();
-      const unsigned int a3 = static_cast<unsigned int>(draw.below(40));
-      const double a4 = draw.number();
+      Life a0 = draw_Life(draw);
+      Vec2 a1 = draw.vector2();
+      double a2 = draw.number();
+      unsigned int a3 = static_cast<unsigned int>(draw.below(40));
+      double a4 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3, a4);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); }, {1, 0});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
+    }
+  }
+  {  // Life::graze_spot
+    converted::Tally tally("Life_graze_spot");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Life::Cow a1, [[maybe_unused]] i64 a2) { return converted::counted([&] { return a0.graze_spot(a1, std::move(a2)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      Life a0 = draw_Life(draw);
+      Life::Cow a1 = draw_Life__Cow(draw);
+      i64 a2 = static_cast<i64>(draw.bits());
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(converted::shaped<converted::Whole>(a2))};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Life::scare_cow
@@ -1394,18 +2747,88 @@ SC_TEST(converted_life_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Life::Cow a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { converted::counted([&] { return Life{}.scare_cow(a0, std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
-      const Life::Cow a0 = draw_Life__Cow(draw);
-      const Vec2 a1 = draw.vector2();
-      const double a2 = draw.number();
-      const double a3 = draw.number();
+      Life::Cow a0 = draw_Life__Cow(draw);
+      Vec2 a1 = draw.vector2();
+      double a2 = draw.number();
+      double a3 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Life::kill_cow
+    converted::Tally tally("Life_kill_cow");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Life::Cow a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] LifeOut a4) { converted::counted([&] { return a0.kill_cow(a1, std::move(a2), std::move(a3), a4); }); return Out_Life_kill_cow{std::move(a0), std::move(a1), std::move(a4)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      Life a0 = draw_Life(draw);
+      Life::Cow a1 = draw_Life__Cow(draw);
+      Vec3 a2 = draw.vector();
+      double a3 = draw.number();
+      LifeOut a4 = draw_LifeOut(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a4), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1, 2});
+    }
+  }
+  {  // Life::grab_animal
+    converted::Tally tally("Life_grab_animal");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2) { auto r = converted::counted([&] { return a0.grab_animal(std::move(a1), std::move(a2)); }); return Out_Life_grab_animal{std::move(a0), std::move(r)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      Life a0 = draw_Life(draw);
+      Vec3 a1 = draw.vector();
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
+    }
+  }
+  {  // Life::catch_pigeon
+    converted::Tally tally("Life_catch_pigeon");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] Rng a4) { auto r = converted::counted([&] { return a0.catch_pigeon(std::move(a1), std::move(a2), std::move(a3), a4); }); return Out_Life_catch_pigeon{std::move(a0), std::move(r), std::move(a4)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      Life a0 = draw_Life(draw);
+      Vec3 a1 = draw.vector();
+      double a2 = draw.number();
+      double a3 = draw.number();
+      Rng a4 = draw_Rng(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a4), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0, 2});
     }
   }
   {  // Life::hold_pigeon
@@ -1413,18 +2836,21 @@ SC_TEST(converted_life_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] int a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3) { converted::counted([&] { return a0.hold_pigeon(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
-      const Life a0 = draw_Life(draw);
-      const int a1 = static_cast<int>(draw.whole());
-      const Vec3 a2 = draw.vector();
-      const double a3 = draw.number();
+      Life a0 = draw_Life(draw);
+      int a1 = static_cast<int>(draw.whole());
+      Vec3 a2 = draw.vector();
+      double a3 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Life::release_pigeon
@@ -1432,17 +2858,20 @@ SC_TEST(converted_life_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] int a1, [[maybe_unused]] Vec3 a2) { converted::counted([&] { return a0.release_pigeon(std::move(a1), std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
-      const Life a0 = draw_Life(draw);
-      const int a1 = static_cast<int>(draw.whole());
-      const Vec3 a2 = draw.vector();
+      Life a0 = draw_Life(draw);
+      int a1 = static_cast<int>(draw.whole());
+      Vec3 a2 = draw.vector();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Life::spook_pigeons
@@ -1450,52 +2879,110 @@ SC_TEST(converted_life_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] double a1) { converted::counted([&] { return a0.spook_pigeons(std::move(a1)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
-      const Life a0 = draw_Life(draw);
-      const double a1 = draw.number();
+      Life a0 = draw_Life(draw);
+      double a1 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Life::provoke_cat
     converted::Tally tally("Life_provoke_cat");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] double a1) { const auto r = converted::counted([&] { return a0.provoke_cat(std::move(a1)); }); return Out_Life_provoke_cat{a0, r}; };
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] double a1) { auto r = converted::counted([&] { return a0.provoke_cat(std::move(a1)); }); return Out_Life_provoke_cat{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
-      const Life a0 = draw_Life(draw);
-      const double a1 = draw.number();
+      Life a0 = draw_Life(draw);
+      double a1 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {1, 0});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
     }
   }
   {  // Life::sample
     converted::Tally tally("Life_sample");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] Vec2 a3) { const auto r = converted::counted([&] { return a0.sample(std::move(a1), a2, a3); }); return Out_Life_sample{r, a2, a3}; };
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] Vec2 a3) { auto r = converted::counted([&] { return a0.sample(std::move(a1), a2, a3); }); return Out_Life_sample{std::move(r), std::move(a2), std::move(a3)}; };
     for (int i = 0; tally.more(i); ++i) {
-      const Life a0 = draw_Life(draw);
-      const double a1 = draw.number();
-      const double a2 = draw.number();
-      const Vec2 a3 = draw.vector2();
+      Life a0 = draw_Life(draw);
+      double a1 = draw.number();
+      double a2 = draw.number();
+      Vec2 a3 = draw.vector2();
+      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a3), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a2), arg(a3), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); }, {0, 1, 2});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1, 2});
+    }
+  }
+  {  // Life::kill_runner
+    converted::Tally tally("Life_kill_runner");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] int a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] LifeOut a4) { converted::counted([&] { return a0.kill_runner(std::move(a1), std::move(a2), std::move(a3), a4); }); return Out_Life_kill_runner{std::move(a0), std::move(a4)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      Life a0 = draw_Life(draw);
+      int a1 = static_cast<int>(draw.whole());
+      Vec3 a2 = draw.vector();
+      double a3 = draw.number();
+      LifeOut a4 = draw_LifeOut(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a4), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
+    }
+  }
+  {  // Life::apply_joggers
+    converted::Tally tally("Life_apply_joggers");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] std::array<Vec3, 10> a2, [[maybe_unused]] std::array<double, 10> a3, [[maybe_unused]] std::array<bool, 10> a4, [[maybe_unused]] unsigned int a5, [[maybe_unused]] double a6, [[maybe_unused]] double a7) { converted::counted([&] { return a0.apply_joggers(std::move(a1), a2, a3, a4, std::move(a5), std::move(a6), std::move(a7)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      Life a0 = draw_Life(draw);
+      unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      std::array<Vec3, 10> a2 = converted::draw_array<std::array<Vec3, 10>>([&]() -> Vec3 { return draw.vector(); });
+      std::array<double, 10> a3 = converted::draw_array<std::array<double, 10>>([&]() -> double { return draw.number(); });
+      std::array<bool, 10> a4 = converted::draw_array<std::array<bool, 10>>([&]() -> bool { return draw.flag(); });
+      unsigned int a5 = static_cast<unsigned int>(draw.below(40));
+      double a6 = draw.number();
+      double a7 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a3), arg(a4), arg(a1), arg(a5), arg(a6), arg(a7)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6), std::move(a7));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Life::set_remote_animals
@@ -1503,16 +2990,176 @@ SC_TEST(converted_life_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] bool a1) { converted::counted([&] { return a0.set_remote_animals(std::move(a1)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
-      const Life a0 = draw_Life(draw);
-      const bool a1 = draw.flag();
+      Life a0 = draw_Life(draw);
+      bool a1 = draw.flag();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Life::apply_cows
+    converted::Tally tally("Life_apply_cows");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] std::vector<Life::NetCow> a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { converted::counted([&] { return a0.apply_cows(a1, std::move(a2), std::move(a3)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      Life a0 = draw_Life(draw);
+      std::vector<Life::NetCow> a1 = draw_list(draw, [&]() -> Life::NetCow { return draw_Life__NetCow(draw); });
+      double a2 = draw.number();
+      double a3 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Life::apply_pets
+    converted::Tally tally("Life_apply_pets");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] std::vector<Life::NetPet> a1, [[maybe_unused]] unsigned int a2, [[maybe_unused]] std::vector<Vec2> a3, [[maybe_unused]] double a4) { converted::counted([&] { return a0.apply_pets(a1, std::move(a2), a3, std::move(a4)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      Life a0 = draw_Life(draw);
+      std::vector<Life::NetPet> a1 = draw_list(draw, [&]() -> Life::NetPet { return draw_Life__NetPet(draw); });
+      unsigned int a2 = static_cast<unsigned int>(draw.below(40));
+      std::vector<Vec2> a3 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+      double a4 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a3), arg(a2), arg(a4)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Life::net_carry_cow
+    converted::Tally tally("Life_net_carry_cow");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] u64 a1) { auto r = converted::counted([&] { return a0.net_carry_cow(std::move(a1)); }); return Out_Life_net_carry_cow{std::move(a0), std::move(r)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      Life a0 = draw_Life(draw);
+      u64 a1 = static_cast<u64>(draw.bits());
+      const std::vector<converted::Value> given = {arg(a0), arg(converted::shaped<converted::Whole>(a1))};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
+    }
+  }
+  {  // Life::net_carry_pet
+    converted::Tally tally("Life_net_carry_pet");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] unsigned int a1) { auto r = converted::counted([&] { return a0.net_carry_pet(std::move(a1)); }); return Out_Life_net_carry_pet{std::move(a0), std::move(r)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      Life a0 = draw_Life(draw);
+      unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
+    }
+  }
+  {  // Life::net_bird
+    converted::Tally tally("Life_net_bird");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] u64 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] Vec3 a4, [[maybe_unused]] bool a5) { converted::counted([&] { return a0.net_bird(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      Life a0 = draw_Life(draw);
+      u64 a1 = static_cast<u64>(draw.bits());
+      Vec3 a2 = draw.vector();
+      double a3 = draw.number();
+      Vec3 a4 = draw.vector();
+      bool a5 = draw.flag();
+      const std::vector<converted::Value> given = {arg(a0), arg(converted::shaped<converted::Whole>(a1)), arg(a2), arg(a3), arg(a4), arg(a5)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Life::shot
+    converted::Tally tally("Life_shot");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] LifeOut a5, [[maybe_unused]] bool a6) { auto r = converted::counted([&] { return a0.shot(std::move(a1), a2, std::move(a3), std::move(a4), a5, std::move(a6)); }); return Out_Life_shot{std::move(a0), std::move(r), std::move(a2), std::move(a5)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      Life a0 = draw_Life(draw);
+      Vec3 a1 = draw.vector();
+      Vec3 a2 = draw.vector();
+      double a3 = draw.number();
+      double a4 = draw.number();
+      LifeOut a5 = draw_LifeOut(draw);
+      bool a6 = draw.flag();
+      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a5), arg(a1), arg(a3), arg(a4), arg(a6)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0, 2, 3});
+    }
+  }
+  {  // Life::remote_cow_death
+    converted::Tally tally("Life_remote_cow_death");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] LifeOut a4) { converted::counted([&] { return a0.remote_cow_death(std::move(a1), std::move(a2), std::move(a3), a4); }); return Out_Life_remote_cow_death{std::move(a0), std::move(a4)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      Life a0 = draw_Life(draw);
+      Vec3 a1 = draw.vector();
+      Vec3 a2 = draw.vector();
+      double a3 = draw.number();
+      LifeOut a4 = draw_LifeOut(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a4), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
   {  // Life::heard_shot
@@ -1520,61 +3167,141 @@ SC_TEST(converted_life_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3) { converted::counted([&] { return a0.heard_shot(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
-      const Life a0 = draw_Life(draw);
-      const Vec3 a1 = draw.vector();
-      const Vec3 a2 = draw.vector();
-      const double a3 = draw.number();
+      Life a0 = draw_Life(draw);
+      Vec3 a1 = draw.vector();
+      Vec3 a2 = draw.vector();
+      double a3 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Life::blast
+    converted::Tally tally("Life_blast");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] LifeOut a4) { converted::counted([&] { return a0.blast(std::move(a1), std::move(a2), std::move(a3), a4); }); return Out_Life_blast{std::move(a0), std::move(a4)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      Life a0 = draw_Life(draw);
+      Vec3 a1 = draw.vector();
+      double a2 = draw.number();
+      double a3 = draw.number();
+      LifeOut a4 = draw_LifeOut(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a4), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
+    }
+  }
+  {  // Life::shout
+    converted::Tally tally("Life_shout");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] const char* a2, [[maybe_unused]] unsigned int a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5, [[maybe_unused]] LifeOut a6) { auto r = converted::counted([&] { return a0.shout(std::move(a1), a2, std::move(a3), std::move(a4), std::move(a5), a6); }); return Out_Life_shout{std::move(a0), std::move(r), std::move(a6)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      Life a0 = draw_Life(draw);
+      Vec3 a1 = draw.vector();
+      const char* a2 = draw.c_word();
+      unsigned int a3 = static_cast<unsigned int>(draw.below(40));
+      double a4 = draw.number();
+      double a5 = draw.number();
+      LifeOut a6 = draw_LifeOut(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a6), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), a2, std::move(a3), std::move(a4), std::move(a5), std::move(a6));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0, 2});
     }
   }
   {  // Life::honk
     converted::Tally tally("Life_honk");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] bool a2, [[maybe_unused]] unsigned int a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5, [[maybe_unused]] LifeOut a6) { const auto r = converted::counted([&] { return a0.honk(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), a6); }); return Out_Life_honk{a0, r, a6}; };
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] bool a2, [[maybe_unused]] unsigned int a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5, [[maybe_unused]] LifeOut a6) { auto r = converted::counted([&] { return a0.honk(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), a6); }); return Out_Life_honk{std::move(a0), std::move(r), std::move(a6)}; };
     for (int i = 0; tally.more(i); ++i) {
-      const Life a0 = draw_Life(draw);
-      const Vec3 a1 = draw.vector();
-      const bool a2 = draw.flag();
-      const unsigned int a3 = static_cast<unsigned int>(draw.below(40));
-      const double a4 = draw.number();
-      const double a5 = draw.number();
-      const LifeOut a6 = draw_LifeOut(draw);
+      Life a0 = draw_Life(draw);
+      Vec3 a1 = draw.vector();
+      bool a2 = draw.flag();
+      unsigned int a3 = static_cast<unsigned int>(draw.below(40));
+      double a4 = draw.number();
+      double a5 = draw.number();
+      LifeOut a6 = draw_LifeOut(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a6), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3, a4, a5, a6);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a6), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5) + ", " + text(a6); }, {1, 0, 2});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0, 2});
     }
   }
   {  // Life::scream
     converted::Tally tally("Life_scream");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] unsigned int a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] LifeOut a5) { const auto r = converted::counted([&] { return a0.scream(std::move(a1), std::move(a2), std::move(a3), std::move(a4), a5); }); return Out_Life_scream{a0, r, a5}; };
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] unsigned int a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] LifeOut a5) { auto r = converted::counted([&] { return a0.scream(std::move(a1), std::move(a2), std::move(a3), std::move(a4), a5); }); return Out_Life_scream{std::move(a0), std::move(r), std::move(a5)}; };
     for (int i = 0; tally.more(i); ++i) {
-      const Life a0 = draw_Life(draw);
-      const Vec3 a1 = draw.vector();
-      const unsigned int a2 = static_cast<unsigned int>(draw.below(40));
-      const double a3 = draw.number();
-      const double a4 = draw.number();
-      const LifeOut a5 = draw_LifeOut(draw);
+      Life a0 = draw_Life(draw);
+      Vec3 a1 = draw.vector();
+      unsigned int a2 = static_cast<unsigned int>(draw.below(40));
+      double a3 = draw.number();
+      double a4 = draw.number();
+      LifeOut a5 = draw_LifeOut(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a5), arg(a1), arg(a2), arg(a3), arg(a4)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3, a4, a5);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a5), arg(a1), arg(a2), arg(a3), arg(a4)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5); }, {1, 0, 2});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0, 2});
+    }
+  }
+  {  // Life::update_voices
+    converted::Tally tally("Life_update_voices");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Life a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] LifeView a3, [[maybe_unused]] LifeOut a4) { converted::counted([&] { return a0.update_voices(std::move(a1), std::move(a2), a3, a4); }); return Out_Life_update_voices{std::move(a0), std::move(a4)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      Life a0 = draw_Life(draw);
+      double a1 = draw.number();
+      double a2 = draw.number();
+      LifeView a3 = draw_LifeView(draw);
+      LifeOut a4 = draw_LifeOut(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a3), arg(a4), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
 }

@@ -51,7 +51,7 @@ static blueprint_native::Case wanted_case() {
   blueprint_native::Case c;
   c.name = "Wanted";
   std::string error;
-  if (!sc::rules::actor_graph("Wanted", c.graph, &error)) std::printf("the level has no Wanted Blueprint: %s\n", error.c_str());
+  if (!sc::rules::actor_graph("Wanted", c.graph, error)) std::printf("the level has no Wanted Blueprint: %s\n", error.c_str());
   const double numbers[] = {0, 3.9, 4, 8.5, 9, 15, 22, 30, 35, 60, -2, 0.016, 6, 38, 1e6};
   for (const kern::logic::Function& f : c.graph.functions) {
     if (!f.pure) continue;
@@ -98,7 +98,7 @@ static blueprint_native::Case rule_case(const char* actor) {
   blueprint_native::Case c;
   c.name = actor;
   std::string error;
-  if (!sc::rules::actor_graph(actor, c.graph, &error)) std::printf("the level has no %s Blueprint: %s\n", actor, error.c_str());
+  if (!sc::rules::actor_graph(actor, c.graph, error)) std::printf("the level has no %s Blueprint: %s\n", actor, error.c_str());
   for (const kern::logic::Function& f : c.graph.functions) {
     std::vector<std::vector<Value>> samples;
     for (const kern::logic::FunctionPin& p : f.inputs) samples.push_back(blueprint_native::samples(kern::logic::TypeRef{p.type, p.of}, c.graph));

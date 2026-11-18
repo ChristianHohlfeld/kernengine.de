@@ -20,11 +20,11 @@
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
 #include <algorithm>
 #include <cmath>
-#include <cstring>
 
 #include "game.h"
 #include "game_life.h"
 #include "mp_rules.h"
+#include "wire.h"
 
 namespace sc {
 
@@ -33,45 +33,15 @@ constexpr u8 kPerson = 0, kCow = 1, kPet = 2, kBird = 3;
 constexpr u8 kHeld = 1, kDone = 2;
 constexpr f32 kSendEvery = 0.05f, kQuiet = 0.5f;
 
-struct Out {
-  std::vector<u8> b;
-  template <class T> Out& put(T v) { const auto* p = reinterpret_cast<const u8*>(&v); b.insert(b.end(), p, p + sizeof(T)); return *this; }
-};
-struct In {
-  const std::vector<u8>& b;
-  std::size_t at = 0;
-  bool ok = true;
-  template <class T> T get() {
-    T v{};
-    if (at + sizeof(T) > b.size()) { ok = false; return v; }
-    std::memcpy(&v, b.data() + at, sizeof(T));
-    at += sizeof(T);
-    return v;
-  }
-};
 kern::i16 q16(f32 v) { return static_cast<kern::i16>(std::lround(clampf(v, -1, 1) * 32767)); }
 f32 uq16(kern::i16 v) { return static_cast<f32>(v) / 32767; }
 kern::i16 cms(f32 v) { return static_cast<kern::i16>(std::lround(clampf(v * 100, -32000, 32000))); }
 }  // namespace
 
-struct TossState {
-  struct Own { u8 kind = 0; u64 id = 0; i32 local = -1; f32 still = 0, born = 0; u8 done_sent = 0; };
-  struct Remote { u8 from = 0, kind = 0, flags = 0; u64 id = 0; Vec3 p, v; Quat q; f32 at = 0; i32 local = -1; bool released = false; std::shared_ptr<mp::PoseTimeline> line; };
-  std::vector<Own> own;
-  std::vector<Remote> remote;
-  f32 clock = 0;
-  u32 sent = 0, got = 0;
-};
-
-TossState& Game::toss() {
-  if (!toss_) toss_ = std::make_shared<TossState>();
-  return *toss_;
-}
-
 // The hand took something (game_vr.cpp vr_grab): ours to stream until it lies still.
 void Game::toss_own(u8 kind, i32 local, u64 id) {
   if (!net_.active()) return;
-  TossState& t = toss();
+  TossState& t = toss_;
   u64 net_id = id;
   if (kind == kPerson) {
     if (local < 0 || local >= static_cast<i32>(people_.all().size())) return;
@@ -95,7 +65,7 @@ void Game::toss_own_body(kern::physics::Body b) {
 }
 
 void Game::toss_update(f32 dt) {
-  TossState& t = toss();
+  TossState& t = toss_;
   if (!net_.active() || !glife_) { t.own.clear(); t.remote.clear(); (void)net_.take_toss(); return; }
   kern::physics::World& w = world_->physics();
   Life& L = glife_->life;
@@ -144,45 +114,49 @@ void Game::toss_update(f32 dt) {
   t.clock += dt;
   if (t.clock >= kSendEvery && !recs.empty()) {
     t.clock = 0;
-    Out o;
-    o.put(static_cast<u32>(std::lround(static_cast<f64>(now) * 1000)));  // our clock: the others play the track on it
-    o.put(static_cast<u8>(std::min<std::size_t>(recs.size(), 16)));
+    std::vector<u8> o;
+    wire::put_u32(o, static_cast<u32>(std::lround(static_cast<f64>(now) * 1000)));  // our clock: the others play the track on it
+    wire::put_u8(o, static_cast<u8>(std::min<std::size_t>(recs.size(), 16)));
     for (std::size_t i = 0; i < recs.size() && i < 16; ++i) {
       const Rec& r = recs[i];
-      o.put(r.kind).put(r.flags).put(r.id).put(r.p.x).put(r.p.y).put(r.p.z);
-      o.put(q16(r.q.x)).put(q16(r.q.y)).put(q16(r.q.z)).put(q16(r.q.w));
-      o.put(cms(r.v.x)).put(cms(r.v.y)).put(cms(r.v.z));
+      wire::put_u8(o, r.kind);
+      wire::put_u8(o, r.flags);
+      wire::put_u64(o, r.id);
+      wire::put_f32(o, r.p.x); wire::put_f32(o, r.p.y); wire::put_f32(o, r.p.z);
+      wire::put_i16(o, q16(r.q.x)); wire::put_i16(o, q16(r.q.y)); wire::put_i16(o, q16(r.q.z)); wire::put_i16(o, q16(r.q.w));
+      wire::put_i16(o, cms(r.v.x)); wire::put_i16(o, cms(r.v.y)); wire::put_i16(o, cms(r.v.z));
     }
-    net_.send_toss(o.b);
+    net_.send_toss(o);
     ++t.sent;
   }
   t.own.erase(std::remove_if(t.own.begin(), t.own.end(), [](const TossState::Own& o) { return o.done_sent >= 3; }), t.own.end());
 
   // ---- theirs: the newest record of every toss
   for (const net::Session::Blob& m : net_.take_toss()) {
-    In in{m.data};
-    const u32 t_ms = in.get<u32>();
-    const u8 n = in.get<u8>();
+    wire::Reader in;
+    const u32 t_ms = in.get_u32(m.data);
+    const u8 n = in.get_u8(m.data);
     for (u8 k = 0; k < n && in.ok; ++k) {
       TossState::Remote r;
       r.from = m.from;
-      r.kind = in.get<u8>();
-      r.flags = in.get<u8>();
-      r.id = in.get<u64>();
-      r.p.x = in.get<f32>(); r.p.y = in.get<f32>(); r.p.z = in.get<f32>();
+      r.kind = in.get_u8(m.data);
+      r.flags = in.get_u8(m.data);
+      r.id = in.get_u64(m.data);
+      r.p.x = in.get_f32(m.data); r.p.y = in.get_f32(m.data); r.p.z = in.get_f32(m.data);
       Quat q;
-      q.x = uq16(in.get<kern::i16>()); q.y = uq16(in.get<kern::i16>()); q.z = uq16(in.get<kern::i16>()); q.w = uq16(in.get<kern::i16>());
+      q.x = uq16(in.get_i16(m.data)); q.y = uq16(in.get_i16(m.data)); q.z = uq16(in.get_i16(m.data)); q.w = uq16(in.get_i16(m.data));
       const f32 ql = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
       r.q = ql > 1e-6f ? Quat{q.x / ql, q.y / ql, q.z / ql, q.w / ql} : Quat{};
-      r.v.x = in.get<kern::i16>() / 100.0f; r.v.y = in.get<kern::i16>() / 100.0f; r.v.z = in.get<kern::i16>() / 100.0f;
+      r.v.x = in.get_i16(m.data) / 100.0f; r.v.y = in.get_i16(m.data) / 100.0f; r.v.z = in.get_i16(m.data) / 100.0f;
       if (!in.ok || !std::isfinite(r.p.x) || !std::isfinite(r.p.y) || !std::isfinite(r.p.z)) break;
       r.at = now;
       ++t.got;
       auto it = std::find_if(t.remote.begin(), t.remote.end(), [&](const TossState::Remote& q2) { return q2.from == r.from && q2.kind == r.kind && q2.id == r.id; });
       // the track on his clock (mp::PoseTimeline: a jitter buffer behind it, interpolated) - the
       // body here follows the throw as he threw it, not as the packets happened to arrive
-      if (it == t.remote.end()) { r.line = std::make_shared<mp::PoseTimeline>(); r.line->push(r.p, r.q, r.v, true, t_ms, static_cast<f64>(now) * 1000); t.remote.push_back(r); }
-      else { r.local = it->local; r.line = it->line; r.line->push(r.p, r.q, r.v, true, t_ms, static_cast<f64>(now) * 1000); *it = r; }
+      // (a body heard of before keeps its track: handed on to the new record, not copied)
+      if (it == t.remote.end()) { r.line.push(r.p, r.q, r.v, true, t_ms, static_cast<f64>(now) * 1000); t.remote.push_back(std::move(r)); }
+      else { r.local = it->local; r.line = std::move(it->line); r.line.push(r.p, r.q, r.v, true, t_ms, static_cast<f64>(now) * 1000); *it = std::move(r); }
     }
   }
   // ---- theirs: our copy of each body steered onto their track
@@ -190,7 +164,7 @@ void Game::toss_update(f32 dt) {
     const bool live = !(r.flags & kDone) && now - r.at < kQuiet;
     if (r.kind == kBird) {
       Vec3 bp = r.p;
-      if (r.line) { const mp::PoseSample smp = r.line->sample(static_cast<f64>(now) * 1000); if (smp.valid) bp = smp.p; }
+      { const mp::PoseSample smp = r.line.sample(static_cast<f64>(now) * 1000); if (smp.valid) bp = smp.p; }
       L.net_bird(r.id, bp, std::atan2(r.q.rotate({1, 0, 0}).y, r.q.rotate({1, 0, 0}).x), r.v, live && (r.flags & kHeld));
       continue;
     }
@@ -220,7 +194,7 @@ void Game::toss_update(f32 dt) {
     const kern::physics::Pose ps = w.pose(b);
     Vec3 want_p = r.p + r.v * (now - r.at);
     Quat want_q = r.q;
-    if (r.line) { const mp::PoseSample smp = r.line->sample(static_cast<f64>(now) * 1000); if (smp.valid) { want_p = smp.p; want_q = smp.q; } }
+    { const mp::PoseSample smp = r.line.sample(static_cast<f64>(now) * 1000); if (smp.valid) { want_p = smp.p; want_q = smp.q; } }
     const Vec3 off = want_p - ps.position;
     if (kern::length(off) > 6) { w.set_pose(b, {want_p, want_q}); w.set_linear_velocity(b, r.v); continue; }  // too far apart (a hitch): there
     w.set_linear_velocity(b, r.v + off * 10.0f);
@@ -307,7 +281,7 @@ std::string Game::toss_command(const std::string& cmd) {
 }
 
 std::string Game::toss_json() {
-  TossState& t = toss();
+  TossState& t = toss_;
   char b[256];
   u32 ghosts = 0, rounds = 0;
   Vec3 gp;

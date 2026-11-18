@@ -50,7 +50,7 @@ struct SpawnGuardWorld {
     guard.name = "SpawnGuard";
     guard.logic.emplace();
     std::string error;
-    if (!rules::actor_graph("SpawnGuard", *guard.logic, &error)) problems = error;
+    if (!rules::actor_graph("SpawnGuard", *guard.logic, error)) problems = error;
     for (const kern::logic::Issue& i : kern::logic::check(*guard.logic)) problems += (i.error ? "error: " : "warning: ") + i.text + "\n";
     const kern::game::ActorId id = level.add(guard).id;
     if (wall) {
@@ -71,10 +71,10 @@ struct SpawnGuardWorld {
     }
     if (!world->start(level, kern::game::SimMode::simulate)) problems += "the world does not start\n";
     inst = world->logic_runtime() ? world->logic_runtime()->find(id) : nullptr;
-    spawn::bind(inst);
+    if (world->logic_runtime()) spawn::bind(*world->logic_runtime());
   }
   ~SpawnGuardWorld() {
-    spawn::bind(nullptr);
+    spawn::bind(no_logic());
     world.reset();
     renderer.shutdown();
   }
@@ -151,7 +151,7 @@ SC_TEST(gaps_sirens) {
 
 SC_TEST(gaps_smoke) {
   RuleBlueprint bp("Sirens", &gaps::bind_sirens);
-  gaps::SmokeField f(78);
+  gaps::SmokeField f = gaps::SmokeField::of(78);
   const f32 at = f.start("car-1", {0, 0, 1}, 0.92f, 2.45f, 10);
   SC_CHECK(std::fabs(at - 12.45f) < 1e-4f && f.live_puffs() == 1, "first puff at once");
   SC_CHECK(std::fabs(f.start("car-1", {1, 0, 1}, 0.92f, 9, 11) - 12.45f) < 1e-4f, "a running effect keeps its clock");
@@ -191,14 +191,14 @@ SC_TEST(gaps_street_lamps) {
   SC_CHECK(bp.inst && std::string(bp.inst->tier()) == "native C++", "it runs as its C++ class");
   lamps::Field f;
   // a straight 200 m street, 8 m wide: lamps from 17 m on every 34 m, alternating kerbs, 1.15 m out
-  f.place_road({{0, 0}, {200, 0}}, 8, 0, [](f32, f32) { return 2.0f; });
+  f.place_road({{0, 0}, {200, 0}}, 8, 0, 2.0f);
   SC_CHECK(f.all().size() == 6, "lamps %zu", f.all().size());
   const lamps::Lamp& a = f.all()[0];
   SC_CHECK(std::fabs(a.foot.x - 17) < 1e-3f && std::fabs(std::fabs(a.foot.y) - 5.15f) < 1e-3f && a.foot.z == 2, "first lamp %f %f", a.foot.x, a.foot.y);
   SC_CHECK(f.all()[0].foot.y * f.all()[1].foot.y < 0, "alternating sides");
   SC_CHECK(std::fabs(std::fabs(a.head.y) - (5.15f - 1.42f)) < 1e-3f, "the arm reaches over the road");
   // placing the same street again adds nothing (one lamp per 8 m cell)
-  f.place_road({{0, 0}, {200, 0}}, 8, 1, nullptr);
+  f.place_road({{0, 0}, {200, 0}}, 8, 1, 0);
   SC_CHECK(f.all().size() == 6, "dedup");
   // a round through the head
   const Vec3 h{a.head.x, a.head.y, a.foot.z + lamps::kHeadZ};
@@ -215,7 +215,7 @@ SC_TEST(gaps_street_lamps) {
   SC_CHECK(slow.size() == 1 && !slow[0].topple && std::fabs(slow[0].impulse.x + 1350 * 2 * 1.05f) < 1, "stopped %f", slow.empty() ? 0.0f : slow[0].impulse.x);
   // broken lamps stay broken when the street is placed again; RESET puts them back
   f.clear();
-  f.place_road({{0, 0}, {200, 0}}, 8, 0, nullptr);
+  f.place_road({{0, 0}, {200, 0}}, 8, 0, 0);
   SC_CHECK(f.all()[0].state == 1, "remembered");
   f.reset_broken();
   SC_CHECK(f.all()[0].state == 0 && f.broken() == 0, "reset");

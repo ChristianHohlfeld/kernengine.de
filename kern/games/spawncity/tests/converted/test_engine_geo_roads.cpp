@@ -20,10 +20,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -36,21 +36,6 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct RoadStream {
- public:
-  
-  
-
-
-
-
-
-  
-  std::size_t size() const { return data_.size(); }
-
- private:
-  std::vector<f64> data_;
-};
 struct GeoProjector {
   f64 lon0 = 0, lat0 = 0, cos_lat = 1;
   static constexpr f64 kEarthRadius = 6378137.0;
@@ -71,16 +56,6 @@ struct GeoProjector {
 #undef protected
 #pragma GCC diagnostic pop
 
-[[maybe_unused]] static RoadStream draw_kern__RoadStream(converted::Draw& draw) {
-  RoadStream s{};
-  s.data_ = draw_list(draw, [&]() -> double { return draw.number(); });
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const RoadStream& s) { return converted::Value::structure({arg(s.data_)}); }
-[[maybe_unused]] static bool same(const RoadStream& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(want.data_, (*got.rows)[0]); }
-[[maybe_unused]] static bool defined(const RoadStream& s) { return defined(s.data_); }
-[[maybe_unused]] static std::string text(const RoadStream& s) { return std::string("{") + text(s.data_) + "}"; }
-[[maybe_unused]] static void take(RoadStream& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<std::vector<double>>(s.data_, (*v.rows)[0]); }
 [[maybe_unused]] static GeoProjector draw_kern__GeoProjector(converted::Draw& draw) {
   GeoProjector s{};
   s.lon0 = draw.number();
@@ -100,40 +75,27 @@ struct Out_GeoProjector_project { double x; double y; };
 
 SC_TEST(converted_engine_geo_roads) {
   converted::Blueprint bp("engine_geo_roads");
-  {  // RoadStream::size
-    converted::Tally tally("RoadStream_size");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] RoadStream a0) { return converted::counted([&] { return a0.size(); }); };
-    for (int i = 0; tally.more(i); ++i) {
-      const RoadStream a0 = draw_kern__RoadStream(draw);
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      const auto want = run(a0);
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
-    }
-  }
   {  // GeoProjector::project
     converted::Tally tally("GeoProjector_project");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GeoProjector a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { converted::counted([&] { return a0.project(std::move(a1), std::move(a2), a3, a4); }); return Out_GeoProjector_project{a3, a4}; };
+    const auto run = [&]([[maybe_unused]] GeoProjector a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { converted::counted([&] { return a0.project(std::move(a1), std::move(a2), a3, a4); }); return Out_GeoProjector_project{std::move(a3), std::move(a4)}; };
     for (int i = 0; tally.more(i); ++i) {
-      const GeoProjector a0 = draw_kern__GeoProjector(draw);
-      const double a1 = draw.number();
-      const double a2 = draw.number();
-      const double a3 = draw.number();
-      const double a4 = draw.number();
+      GeoProjector a0 = draw_kern__GeoProjector(draw);
+      double a1 = draw.number();
+      double a2 = draw.number();
+      double a3 = draw.number();
+      double a4 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a3), arg(a4), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3, a4);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a3), arg(a4), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); }, {0, 1});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
 }

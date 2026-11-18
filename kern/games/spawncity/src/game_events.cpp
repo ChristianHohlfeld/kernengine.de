@@ -25,7 +25,7 @@ bool alive(const P& p) { return p.state != People::State::down && p.state != Peo
 const Vec3 kZSkin[4] = {{0.54f, 0.6f, 0.47f}, {0.49f, 0.55f, 0.44f}, {0.58f, 0.63f, 0.51f}, {0.44f, 0.49f, 0.4f}};
 const Vec3 kZShirt[4] = {{0.36f, 0.35f, 0.29f}, {0.29f, 0.3f, 0.26f}, {0.42f, 0.36f, 0.29f}, {0.25f, 0.29f, 0.31f}};
 const Vec3 kZPants[4] = {{0.18f, 0.17f, 0.16f}, {0.23f, 0.21f, 0.19f}, {0.15f, 0.16f, 0.18f}, {0.25f, 0.22f, 0.18f}};
-const char* kGateNames[] = {"START / FINISH", "GATE 2", "GATE 3", "HIGH GATE", "GATE 5", "GATE 6", "LOW GATE", "GATE 8"};
+const char* const kGateNames[] = {"START / FINISH", "GATE 2", "GATE 3", "HIGH GATE", "GATE 5", "GATE 6", "LOW GATE", "GATE 8"};
 }  // namespace
 
 // ---------------------------------------------------------------------------------------------
@@ -195,7 +195,7 @@ void Game::update_zombies(f32 dt) {
 void Game::update_enemies(f32 dt) {
   CombatState& C = combat_;
   const f32 now = world_->sim_time();
-  const i32 stars = wanted_.stars();
+  const i32 stars = wanted::stars();
   Vec3 tp, tv;
   bool drone, air;
   const bool have = combat_target(tp, tv, drone, air) && mode_ != Mode::jet;
@@ -206,8 +206,7 @@ void Game::update_enemies(f32 dt) {
     C.no_wanted_since = -1;
     if (have && up < enemy_budget(stars) && now - C.last_spawn > kEnemySpawnS) {
       C.last_spawn = now;
-      EnemyType type;
-      choose_enemy(stars, rng_.unit(), heavies, type);
+      const EnemyType type = choose_enemy(stars, rng_.unit(), heavies);
       for (int k = 0; k < 10; ++k) {
         const f32 a = rng_.range(0, 2 * kPi), d = rng_.range(55, 85);
         const Vec3 p{tp.x + std::cos(a) * d, tp.y + std::sin(a) * d, 0};
@@ -294,11 +293,12 @@ void Game::update_enemies(f32 dt) {
 void Game::update_scores(f32 dt) {
   CombatState& C = combat_;
   const f32 now = world_->sim_time();
-  const i32 stars = wanted_.stars();
+  const i32 stars = wanted::stars();
   auto pop = [&](const std::string& t) { if (!t.empty()) { C.pop = t; C.pop_at = now; } };
-  auto award = [&](i32 pts, const char* label) {
+  // (a label of none - an award without a word on the screen - is the empty one)
+  auto award = [&](i32 pts, std::string_view label) {
     C.chaos.award(pts, now);
-    if (label) pop(C.chaos.combo > 1 ? std::string(label) + "  x" + std::to_string(C.chaos.combo) : std::string(label));
+    if (!label.empty()) pop(C.chaos.combo > 1 ? std::string(label) + "  x" + std::to_string(C.chaos.combo) : std::string(label));
   };
   std::vector<People::Death> deaths;
   people_.take_deaths(deaths);
@@ -321,10 +321,10 @@ void Game::update_scores(f32 dt) {
         award(enemy_spec(t).score, t == EnemyType::cop ? "TAKEDOWN!" : t == EnemyType::swat ? "SWAT DOWN!" : "HEAVY DOWN!!");
         break;
       }
-      case People::Kind::soldier: award(40, nullptr); break;
+      case People::Kind::soldier: award(40, {}); break;
       case People::Kind::citizen:
       case People::Kind::officer:
-        award(40, nullptr);
+        award(40, {});
         pop(C.fun.apply(FunEvent::world_kill_person, now, stars));
         break;
     }
@@ -546,7 +546,7 @@ void Game::combat_hud(std::string& s) {
                 C.military.active ? "on" : C.military.alert_at >= 0 ? "alert" : "off", C.helis.size(), C.tanks.size(), soldiers, flak_alive, C.flak_destroyed,
                 C.flak_hits, C.flak_rounds.size(), C.jets.size(), C.bombs.size(), std::fmax(0.0f, kStrikeCooldownS - (now - C.last_strike)), fighters,
                 C.gangster_shots, C.enemies.size(), C.zombies.active ? "true" : "false", C.zombies.round, C.zombie_ai.size(), C.zombies.points, C.chaos.score,
-                C.chaos.combo, C.chaos.flow, C.fun.score, C.fun.at_risk, C.fun.high_score, C.fun.combo, C.fun.multiplier(now), k.name, k.hint,
+                C.chaos.combo, C.chaos.flow, C.fun.score, C.fun.at_risk, C.fun.high_score, C.fun.combo, C.fun.multiplier(now), k.name.c_str(), k.hint.c_str(),
                 C.fun.contract_progress, k.target, C.fun.contract_complete ? "true" : "false", C.scope ? "true" : "false", C.debris.size(),
                 std::fmax(0.0f, C.drone_ready_at - now));
   s += b;
@@ -579,14 +579,14 @@ bool Game::combat_command(const std::string& cmd, std::string& out) {
   if (starts("heat ")) {
     // Tests: heat to N (witnessed police kills, severity 3 each)
     const f32 n = static_cast<f32>(std::atof(cmd.c_str() + 5));
-    for (int k = 0; k < 200 && wanted_.heat() < n; ++k) wanted_.report(wanted::Crime::police_officer, true);
-    star_since_ = now - wanted::arrival_delay_ms(wanted_.stars()) / 1000;
-    out = std::to_string(wanted_.heat());
+    for (int k = 0; k < 200 && wanted::heat() < n; ++k) wanted::report(wanted::Crime::police_officer, true);
+    star_since_ = now - wanted::arrival_delay_ms(wanted::stars()) / 1000;
+    out = std::to_string(wanted::heat());
     return true;
   }
   if (cmd == "military start") {
     // Tests: five stars at the trigger heat, then the army at once (no hold, no alert)
-    for (int k = 0; k < 200 && wanted_.heat() < kTriggerHeat; ++k) wanted_.report(wanted::Crime::police_officer, true);
+    for (int k = 0; k < 200 && wanted::heat() < kTriggerHeat; ++k) wanted::report(wanted::Crime::police_officer, true);
     C.military.active = true;
     C.military.alert_at = -1;
     C.military.next_reinforce = now + kFirstReinforceS;
@@ -709,7 +709,7 @@ bool Game::combat_command(const std::string& cmd, std::string& out) {
     out = std::string(a == Arms::gun ? "gun" : a == Arms::knife ? "knife" : "fists") + " " + std::to_string(static_cast<int>(bd));
     return true;
   }
-  if (cmd == "contract") { out = C.fun.apply(FunEvent::cycle_contract, now, wanted_.stars()); return true; }
+  if (cmd == "contract") { out = C.fun.apply(FunEvent::cycle_contract, now, wanted::stars()); return true; }
   if (cmd == "combat") { std::string s = "{\"x\":0"; combat_hud(s); out = s + "}"; return true; }
   return false;
 }

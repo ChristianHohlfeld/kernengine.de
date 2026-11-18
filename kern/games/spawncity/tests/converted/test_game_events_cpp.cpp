@@ -19,10 +19,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -42,15 +42,12 @@ inline f32 wrap_pi(f32 a) {
   while (a < -kPi) a += 2 * kPi;
   return a;
 }
-struct State {
-  u32 id = 0;
-  std::string name;
-  f32 x = 0, y = 0;
-  bool initial = false;
-};
-namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; }
-enum class Kind : u8 { shot, pistol, hit, crack, damage, scream, explosion, step, bounce, reward, fail, count };
-enum class Bus : u8 { master = 0, music, sfx, ambience, ui, voice, count };
+namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
+namespace combat_audio { enum class Kind : u8 { shot, pistol, hit, crack, damage, scream, explosion, step, bounce, reward, fail, count }; }
+namespace audio { enum class Bus : u8 { master = 0, music, sfx, ambience, ui, voice, count }; }
+namespace mp { enum class HitVerdict : u8 { applied, unknown_player, friendly_fire_off, protected_target, already_down }; }
+namespace net { namespace Session { enum class Role : u8 { none, host, client }; } }
+namespace WorldLife { namespace TowTruck { enum class State : u8 { to_job, hook, tow, depot }; } }
 enum class Key : u8 {
   unknown = 0,
   a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
@@ -58,9 +55,7 @@ enum class Key : u8 {
   left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
   count
 };
-namespace TouchControls { namespace Finger { enum Kind : u8 { move, look, fire, look_drag, button }; } }
-enum class HitVerdict : u8 { applied, unknown_player, friendly_fire_off, protected_target, already_down };
-namespace Session { enum class Role : u8 { none, host, client }; }
+namespace game { namespace TouchControls { namespace Finger { enum Kind : u8 { move, look, fire, look_drag, button }; } } }
 namespace People { enum class Kind : u8 { citizen, officer, soldier, zombie, enemy }; }
 namespace People { enum class State : u8 { walk, wait, flee, down, gone, officer, fight }; }
 namespace People { struct Person {
@@ -177,16 +172,19 @@ SC_TEST(converted_game_events_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1) { return converted::counted([&] { return converted_game_events_cpp::dist2d(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Vec3 a0 = draw.vector();
-      const Vec3 a1 = draw.vector();
+      Vec3 a0 = draw.vector();
+      Vec3 a1 = draw.vector();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // approach_angle
@@ -194,17 +192,20 @@ SC_TEST(converted_game_events_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_game_events_cpp::approach_angle(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const double a0 = draw.number();
-      const double a1 = draw.number();
-      const double a2 = draw.number();
+      double a0 = draw.number();
+      double a1 = draw.number();
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // alive
@@ -212,15 +213,18 @@ SC_TEST(converted_game_events_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] People::Person a0) { return converted::counted([&] { return converted_game_events_cpp::alive(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const People::Person a0 = draw_People__Person(draw);
+      People::Person a0 = draw_People__Person(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

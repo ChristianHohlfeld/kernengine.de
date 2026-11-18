@@ -2,13 +2,14 @@
 // game_gaps.cpp, the pure rules in gaps_rules.h / spawn_guard.h.
 #pragma once
 
+#include <array>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "gaps_rules.h"
 #include "lamps.h"
+#include "kern/core/map.h"
 #include "kern/audio/audio.h"
 #include "kern/game/runtime.h"
 #include "kern/gfx/renderer.h"
@@ -25,7 +26,7 @@ struct GapsState {
   // wanted_dispatch_guard.mjs: a police drone slot waits (unseen) for its arrival
   f32 pd_due[5] = {-1, -1, -1, -1, -1};
   // world_critical_damage_fx.mjs
-  gaps::SmokeField smoke{78};
+  gaps::SmokeField smoke;  // its pool: gaps_init (MAX_PUFFS)
   struct Part { u32 id = 0; std::vector<f32> transforms, tints; };
   Part disc, ember;
   kern::Renderer* renderer = nullptr;
@@ -52,7 +53,7 @@ struct GapsState {
   u32 jet_voice_count = 0;
   // guided_missile.mjs: smoke trail (160 puffs, 2.6 s), motor voice, ignition bang, lock tone
   struct TrailPuff { Vec3 p; f32 born = -1; };
-  std::vector<TrailPuff> trail = std::vector<TrailPuff>(160);
+  std::array<TrailPuff, 160> trail{};
   u32 trail_cursor = 0;
   struct MotorVoice { f32 born = 0, lit = -1; kern::audio::VoiceId v = 0; bool alive = false; };
   std::vector<MotorVoice> motors;
@@ -66,9 +67,9 @@ struct GapsState {
   // zombie barricades (game_barricades.cpp): planks per door per building, each zombie's way in
   struct DoorView { i32 i = 0; Vec2 c, d, n; i32 planks = 6; f32 floor = 0; i64 key = 0; };
   struct ZombieDoor { bool inside = false, entering = false; Vec2 enter_at; f32 next_plank = 0; };
-  std::unordered_map<i64, std::vector<u8>> planks;
-  std::unordered_map<i64, f32> door_next_break;
-  std::unordered_map<i32, ZombieDoor> zombie_doors;
+  kern::Map<i64, std::vector<u8>> planks;
+  kern::Map<i64, f32> door_next_break;
+  kern::Map<i32, ZombieDoor> zombie_doors;
   u32 planks_broken = 0;
   Part plank_part;
   // jet_mode.mjs passenger (game_seats.cpp)
@@ -90,7 +91,7 @@ struct GapsState {
   bool knife_at_point = false;  // knifeAt(clientX, clientY): the strike goes through the press point
   f32 knife_x = 0, knife_y = 0;
   struct RocketPuff { Vec3 p; f32 born = -1, life = 1, rot = 0; };
-  std::vector<RocketPuff> rocket_smoke = std::vector<RocketPuff>(90);
+  std::array<RocketPuff, 90> rocket_smoke{};
   u32 rocket_cursor = 0, foot_shots = 0;
   struct SniperRound { kern::game::ShotEvent s; f32 due = 0; };
   std::vector<SniperRound> sniper_rounds;

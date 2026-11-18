@@ -2,6 +2,8 @@
 
 #include <cstring>
 
+#include "kern/gfx/renderer.h"
+
 namespace kern {
 
 MeshInput MeshData::as_input(u32 extra_slot) const {
@@ -13,6 +15,18 @@ MeshInput MeshData::as_input(u32 extra_slot) const {
   in.indices = Span<const u32>(indices.data(), indices.size());
   if (!extra.empty() && extra_slot < kMaxExtensionAttributes) in.extension[extra_slot] = Span<const f32>(extra.data(), extra.size());
   return in;
+}
+
+bool upsert(Renderer& renderer, u32 id, const MeshData& mesh, const MeshLook& look, Span<const f32> transforms, Span<const f32> tints) {
+  MeshInput in = mesh.as_input(look.extra_slot);
+  in.material = look.material;
+  in.texture = look.texture;
+  in.visible = look.visible;
+  in.layers = look.layers;
+  in.pick_bvh = look.pick_bvh;
+  in.transforms = transforms;
+  in.tints = tints;
+  return renderer.upsert(id, in);
 }
 
 namespace {

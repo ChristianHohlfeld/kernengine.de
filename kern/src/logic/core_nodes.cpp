@@ -1,6 +1,7 @@
 // Kern Logic: the built-in nodes (events, flow control, variables, state
 // machines, functions, math, logic, vectors, text, debugging). Gameplay nodes live in
 // the game module (src/game/logic_nodes.cpp).
+#include <algorithm>
 #include <cmath>
 #include <type_traits>
 #include <utility>
@@ -96,7 +97,7 @@ ParamDef struct_param() {
 /// check says so). `lists`: a list type may be meant.
 TypeRef setting_type(const Node& n, const Graph& g, bool lists) {
   TypeRef t;
-  if (!type_from_text(n.param("type", "float"), g, t) || (!lists && is_list(t.type))) t = {PinType::number, {}};
+  if (!type_from_text(n.param("type", "float"), g, t) || (!lists && is_list(t.type)) || is_keyed(t.type)) t = {PinType::number, {}};
   return t;
 }
 /// A data pin of a type a Blueprint names (an enum's with the enum, a struct's with the struct).
@@ -106,7 +107,7 @@ PinDef typed_pin(std::string id, std::string label, const TypeRef& t, json::Valu
   return p;
 }
 /// What a pin of type `t` holds when nothing is typed in (a struct: its fields' defaults).
-json::Value zero_json(const TypeRef& t, const Graph& g) { return zero_of(t, g).to_json(g, t.of); }
+json::Value zero_json(const TypeRef& t, const Graph& g) { return zero_of(t, g).to_json(g, t); }
 void retype(PinDef& p, const TypeRef& t, const Graph& g) {
   p.type = t.type;
   p.of = t.of;
@@ -126,6 +127,13 @@ void add_events(Library& lib) {
     NodeDef d = make("event.begin", "Begin Play", "Events", NodeKind::event, "Runs once when play starts (or when the actor is spawned).");
     d.outputs = {exec_out()};
     d.event = "logic.begin";
+    d.color = 0xb4232f;
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = make("event.end", "End Play", "Events", NodeKind::event, "Runs once when play stops (or when the actor is taken out of the world) - after it began.");
+    d.outputs = {exec_out()};
+    d.event = "logic.end";
     d.color = 0xb4232f;
     lib.add(std::move(d));
   }
@@ -467,7 +475,7 @@ void add_variables(Library& lib) {
       const std::vector<i64> at = c.path();
       const Graph& g = c.instance().graph();
       Variable named;
-      const TypeRef type = g.place_of(c.node(), named) ? TypeRef{named.type, named.of} : TypeRef{value.type, {}};
+      const TypeRef type = g.place_of(c.node(), named) ? declared(named) : TypeRef{value.type, {}};  // (a list of a fixed length keeps its length)
       Value now;
       c.instance().change(c.node(), at, [&](Value& v) {
         v = from_outside(value, type, g);
@@ -492,7 +500,7 @@ void add_variables(Library& lib) {
       const std::vector<i64> at = c.path();
       const Graph& g = c.instance().graph();
       Variable named;
-      Value taken = g.place_of(c.node(), named) ? zero_of(TypeRef{named.type, named.of}, g) : Value();
+      Value taken = g.place_of(c.node(), named) ? zero_of(declared(named), g) : Value();
       c.instance().change(c.node(), at, [&](Value& v) { std::swap(taken, v); });
       c.out("value", taken);
       return 0;
@@ -588,6 +596,7 @@ template <class F> void with_items(PinType element, F&& f) {
     case PinType::vector: f(std::type_identity<Vec3>{}); break;
     case PinType::text: f(std::type_identity<std::string>{}); break;
     case PinType::actor: f(std::type_identity<ActorHandle>{}); break;
+    case PinType::int64: f(std::type_identity<Int64>{}); break;
     case PinType::enumeration: f(std::type_identity<i64>{}); break;  // (an enum's value is its place among them)
     case PinType::structure: f(std::type_identity<Value>{}); break;  // (a struct is the value that holds its fields)
     default: break;
@@ -702,8 +711,11 @@ void add_lists(Library& lib) {
   };
   auto needs_list = [](const Node& n, const Graph& g) {
     Variable named;
-      const Variable* v = g.place_of(n, named) ? &named : nullptr;
-    return v && !is_list(v->type) ? "needs a list variable: \"" + v->name + "\" is " + std::string(pin_type_name(v->type)) : std::string();
+    const Variable* v = g.place_of(n, named) ? &named : nullptr;
+    if (v && !is_list(v->type)) return "needs a list variable: \"" + v->name + "\" is " + std::string(pin_type_name(v->type));
+    if (v && v->count)
+      return "\"" + v->name + "\" is a list of a fixed length (" + std::to_string(v->count) + "): its entries are set (" + v->name + "[index] = value) - nothing is added to it or taken out";
+    return std::string();
   };
   // A step on the list variable of the node: `change(items, c)` with the vector of its items.
   // The inputs have been read by then (each exactly once, whatever the variable is).
@@ -722,6 +734,10 @@ void add_lists(Library& lib) {
   // node's own inputs have been read by then; the indices of its path are read here.
   auto on_list = [](Context& c, const std::function<void(Value&)>& change) {
     const std::vector<i64> at = c.path();
+    // (a list of a fixed length keeps its length: the check refuses these steps there - a graph
+    // that runs all the same changes nothing)
+    Variable named;
+    if (c.instance().graph().place_of(c.node(), named) && named.count) return;
     c.instance().change(c.node(), at, [&](Value& v) {
       if (is_list(v.type)) change(v);
     });
@@ -809,6 +825,75 @@ void add_lists(Library& lib) {
     lib.add(std::move(d));
   }
   {
+    // Sort List: in the order a pure function of the Blueprint says (two items -> does the first go
+    // before the second?), or by the items' own order; stable (nodes.h, list::sort)
+    NodeDef d = step("list.sort", "Sort List",
+                     "Puts the items of a list variable in order: by Order, a pure function that takes two items and gives whether the first goes before the second - "
+                     "or, without one, by their own order (numbers, whole numbers, booleans, texts, enum values, Int64 by their bits as a u64). Items that are equal in that order keep theirs.",
+                     "sort order arrange rank array", {}, {});
+    d.params.push_back(param("function", "Order", ParamDef::Kind::function, ""));
+    d.params.back().optional = true;
+    d.title = [](const NodeDef&, const Node& n) { return "Sort " + place_title(n); };
+    d.problem = [needs_list = d.problem](const Node& n, const Graph& g) -> std::string {
+      std::string why = needs_list ? needs_list(n, g) : std::string();
+      if (!why.empty()) return why;
+      Variable named;
+      if (!g.place_of(n, named) || !is_list(named.type)) return {};
+      const PinType e = element_of(named.type);
+      const std::string fn = n.param("function", "");
+      if (fn.empty()) {
+        if (e == PinType::vector || e == PinType::actor || e == PinType::structure) return "a list of " + std::string(pin_type_name(e)) + " has no order of its own: Order names a function that says it";
+        return {};
+      }
+      const Function* f = g.function(fn);
+      if (!f) return "Order: there is no function \"" + fn + "\"";
+      if (!f->pure) return "Order: " + fn + " is to be pure (it is asked again and again while the list is put in order)";
+      // (by value or as a const reference: it reads them where they stand, it changes nothing)
+      auto item = [&](const FunctionPin& in) { return in.type == e && in.of == named.of && (!in.ref || in.constant); };
+      const bool takes = f->inputs.size() == 2 && item(f->inputs[0]) && item(f->inputs[1]);
+      if (!takes || f->outputs.size() != 1 || f->outputs[0].type != PinType::boolean)
+        return "Order: " + fn + " takes two items of the list (by value or as const references) and gives one Bool";
+      return {};
+    };
+    d.run = [](Context& c) {
+      const std::vector<i64> at = c.path();  // (its indices, read once)
+      Value list;
+      c.instance().change(c.node(), at, [&](Value& v) { list = v; });  // (taken out: the order is worked out apart from the place)
+      Variable named;
+      if (!is_list(list.type) || (c.instance().graph().place_of(c.node(), named) && named.count)) return 0;
+      const std::string fn = c.param("function", "");
+      auto before = [&](const Value& a, const Value& b) -> bool {
+        if (!fn.empty()) {
+          std::vector<Value> r;
+          c.instance().call_inside(fn, {a, b}, r);
+          return !r.empty() && r[0].as_bool();
+        }
+        switch (a.type) {
+          case PinType::integer:
+          case PinType::enumeration: return a.i < b.i;
+          case PinType::number: return a.n < b.n;
+          case PinType::boolean: return a.b < b.b;
+          case PinType::text: return a.s < b.s;
+          case PinType::int64: return static_cast<u64>(a.i) < static_cast<u64>(b.i);  // (by the bits as a u64 - logic::Int64's <)
+          default: return false;
+        }
+      };
+      std::vector<std::size_t> order(list.size());
+      for (std::size_t k = 0; k < order.size(); ++k) order[k] = k;
+      std::stable_sort(order.begin(), order.end(), [&](std::size_t i, std::size_t j) { return before(list.item(i), list.item(j)); });
+      Value sorted = list;
+      with_items(element_of(list.type), [&](auto type) {
+        using T = typename decltype(type)::type;
+        const std::vector<T>& from = list.items<T>();
+        std::vector<T>& to = sorted.template edit<T>();
+        for (std::size_t k = 0; k < order.size(); ++k) to[k] = from[order[k]];
+      });
+      c.instance().change(c.node(), at, [&](Value& v) { v = std::move(sorted); });
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
+  {
     NodeDef d = step("list.append", "Append List", "Adds the items of another list at the end of a list variable, in their order and in one go.", "add all extend concat join array",
                      {data("items", "Items", PinType::number_list)}, {});
     d.title = [](const NodeDef&, const Node& n) { return "Append to " + place_title(n); };
@@ -848,6 +933,31 @@ void add_lists(Library& lib) {
     lib.add(std::move(d));
   }
   {
+    // Insert Text Bytes: the bytes of a text (0 .. 255) into a list of whole numbers (logic::texts::insert_bytes)
+    NodeDef d = step("list.insert_text", "Insert Text Bytes",
+                     "Puts the bytes of a text - each a whole number 0 to 255 - in front of the item at the index of a list of whole numbers, in their order and in one go "
+                     "(0: at the start; past the end: at the end): what inserting a text's range into a std::vector<u8> does.",
+                     "bytes text string utf8 append insert array", {data("index", "Index", PinType::integer, 0), data("text", "Text", PinType::text, "")}, {});
+    d.title = [](const NodeDef&, const Node& n) { return "Insert Text Bytes into " + place_title(n); };
+    d.problem = [needs_list](const Node& n, const Graph& g) {
+      const std::string why = needs_list(n, g);
+      if (!why.empty()) return why;
+      Variable named;
+      const Variable* v = g.place_of(n, named) ? &named : nullptr;
+      if (v && v->type != PinType::integer_list) return "needs a list of whole numbers: \"" + v->name + "\" is " + std::string(pin_type_name(v->type));
+      return std::string();
+    };
+    d.run = [on_list](Context& c) {
+      const i64 index = c.in_int("index");
+      const std::string text = c.in_text("text");
+      on_list(c, [&](Value& v) {
+        if (v.type == PinType::integer_list) texts::insert_bytes(v.template edit<i64>(), index, text);
+      });
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
+  {
     NodeDef d = step("list.reserve", "Reserve",
                      "Makes room for that many items in a list variable: nothing one can read changes - the list then grows that far without asking for memory again.",
                      "capacity room memory array", {data("count", "Count", PinType::integer, 0)}, {});
@@ -855,6 +965,71 @@ void add_lists(Library& lib) {
     d.run = [](Context& c) {
       // (a list of the interpreter has no room to make: the step reads its input and goes on)
       (void)c.in_int("count");
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    // Copy Bytes: what std::memcpy between lists of numbers does - the bytes of numbers, in one go
+    // (logic::bytes::copy, nodes.h: the same function for the interpreter and the class).
+    auto code_param = [](const char* key, const char* label) {
+      return param(key, label, ParamDef::Kind::choice, "u8",
+                   {"u8", "u8", "i8", "i8", "u16", "u16", "i16", "i16", "u32", "u32", "i32", "i32", "u64", "u64", "i64", "i64", "f32", "f32", "f64", "f64"});
+    };
+    auto list_of_code = [](bytes::Code c) {
+      return bytes::whole(c) ? PinType::integer_list : bytes::wide(c) ? PinType::int64_list : PinType::number_list;
+    };
+    NodeDef d = make("list.copy_bytes", "Copy Bytes", "Lists", NodeKind::action,
+                     "Writes Count bytes of the numbers of Items, from its item From on, into the list variable from its item At on - each item of a list the "
+                     "number its setting says (u8 i8 u16 i16 u32 i32: an Int; u64 i64: an Int64; f32 f64: a Float), little-endian, as C++ lays them out: what "
+                     "std::memcpy between lists of numbers does, in one go. A byte Items does not have is 0; one beyond the list is not written (it keeps "
+                     "its length); an item some of whose bytes are written keeps the others. Items are read as they were (a list into itself, as memmove).",
+                     "memcpy memmove bytes binary serialize wire buffer float array copy");
+    d.params = {param("variable", "List", ParamDef::Kind::variable), local_of(), path_of(), code_param("code", "Number"), code_param("from_code", "Number of Items")};
+    d.inputs = {exec_in(), data("at", "At", PinType::integer, 0), data("items", "Items", PinType::integer_list), data("from", "From", PinType::integer, 0),
+                data("count", "Count", PinType::integer, 0)};
+    d.outputs = {exec_out()};
+    d.title = [](const NodeDef&, const Node& n) { return "Copy Bytes into " + place_title(n); };
+    d.shape = [list_of_code](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>&) {
+      const bytes::Code of = bytes::code_of(n.param("from_code", "u8"));
+      for (PinDef& p : in)
+        if (p.id == "items" && of != bytes::Code::none && of != bytes::Code::boolean) retype(p, TypeRef{list_of_code(of), ""}, g);
+    };
+    d.problem = [](const Node& n, const Graph& g) -> std::string {
+      const bytes::Code into = bytes::code_of(n.param("code", "u8")), of = bytes::code_of(n.param("from_code", "u8"));
+      if (into == bytes::Code::none || into == bytes::Code::boolean || of == bytes::Code::none || of == bytes::Code::boolean)
+        return "a number is one of u8 i8 u16 i16 u32 i32 u64 i64 f32 f64";
+      Variable named;
+      const Variable* v = g.place_of(n, named) ? &named : nullptr;
+      if (v && !is_list(v->type)) return "needs a list variable: \"" + v->name + "\" is " + std::string(pin_type_name(v->type));
+      if (v && !bytes::suits_list(into, element_of(v->type)))
+        return "\"" + v->name + "\" is a list of " + std::string(pin_type_name(element_of(v->type))) + ": its numbers are not " + n.param("code", "u8") +
+               " (an Int is u8 .. i32; an Int64 u64, i64; a Float f32, f64)";
+      return {};
+    };
+    d.run = [](Context& c) {
+      const i64 at = c.in_int("at");
+      const Value items = c.in("items");
+      const i64 from = c.in_int("from"), count = c.in_int("count");
+      const bytes::Code into = bytes::code_of(c.param("code", "u8")), of = bytes::code_of(c.param("from_code", "u8"));
+      const std::vector<i64> path = c.path();  // (its indices, read after its inputs - as every step on a list)
+      c.instance().change(c.node(), path, [&](Value& v) {
+        if (!is_list(v.type) || !is_list(items.type) || !bytes::suits_list(into, element_of(v.type)) || !bytes::suits_list(of, element_of(items.type))) return;
+        auto numbers = [](PinType element, auto&& f) {
+          if (element == PinType::integer) f(std::type_identity<i64>{});
+          else if (element == PinType::int64) f(std::type_identity<Int64>{});
+          else if (element == PinType::number) f(std::type_identity<f64>{});
+        };
+        numbers(element_of(v.type), [&](auto to_type) {
+          using D = typename decltype(to_type)::type;
+          numbers(element_of(items.type), [&](auto from_type) {
+            using S = typename decltype(from_type)::type;
+            const std::vector<S>& source = items.template items<S>();
+            std::vector<D>& target = v.template edit<D>();
+            bytes::copy(target.data(), target.size(), into, at, source.data(), source.size(), of, from, count);
+          });
+        });
+      });
       return 0;
     };
     lib.add(std::move(d));
@@ -899,6 +1074,262 @@ void add_lists(Library& lib) {
       return c.exec("body");
     };
     lib.add(std::move(d));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// maps and sets
+// ---------------------------------------------------------------------------
+// A map holds values of one type, each under a key of its own, in the order the keys came; a set
+// holds keys in that order (kern/core/map.h). The value nodes read one; the steps change one at
+// a place (a variable, a field, an entry of a list ...). A value of a map is a place by its
+// entry's place in that order (Cells[i]). What they do is in kern/logic/nodes.h (logic::map,
+// logic::set): a Blueprint's C++ calls the same functions on the same container.
+
+namespace {
+ParamDef key_param() {
+  ParamDef p = param("key", "Key", ParamDef::Kind::type, "int");
+  p.keys_only = true;
+  return p;
+}
+ParamDef value_param() {
+  ParamDef p = param("value", "Value", ParamDef::Kind::type, "float");
+  p.with_lists = true;
+  return p;
+}
+/// The keys' type a node's setting "Key" names (an Int when it names none a key can be).
+TypeRef key_setting(const Node& n, const Graph& g) {
+  TypeRef t;
+  if (!type_from_text(n.param("key", "int"), g, t) || !key_type_ok(t.type)) t = {PinType::integer, {}};
+  return t;
+}
+/// The values' type the setting "Value" names (a Float when it names none a value can be).
+TypeRef value_setting(const Node& n, const Graph& g) {
+  TypeRef t;
+  if (!type_from_text(n.param("value", "float"), g, t) || is_keyed(t.type)) t = {PinType::number, {}};
+  return t;
+}
+/// The map or set at a node's place: its type (none: the place is no map or set of `kind`).
+bool keyed_place(const Node& n, const Graph& g, PinType kind, TypeRef& out) {
+  Variable named;
+  if (!g.place_of(n, named) || named.type != kind) return false;
+  out = {named.type, named.of};
+  return true;
+}
+}  // namespace
+
+void add_maps(Library& lib) {
+  // ---- values: generic over the keys' and the values' types (the settings Key, Value) ----
+  auto typed = [](bool of_map) {
+    return [of_map](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
+      const TypeRef key = key_setting(n, g), value = value_setting(n, g);
+      const TypeRef whole = of_map ? TypeRef{PinType::map, keyed_of(key, &value)} : TypeRef{PinType::set, keyed_of(key, nullptr)};
+      for (std::vector<PinDef>* pins : {&in, &out})
+        for (PinDef& p : *pins) {
+          if (p.id == "map" || p.id == "set") { retype(p, whole, g); p.def = json::Value::array(); }
+          if (p.id == "key") retype(p, key, g);
+          if (p.id == "value") retype(p, value, g);
+        }
+    };
+  };
+  auto value_node = [&](const char* type, const char* label, const char* help, const char* keywords, bool of_map, std::vector<PinDef> in, std::vector<PinDef> out) {
+    NodeDef d = make(type, label, of_map ? "Maps" : "Sets", NodeKind::pure, help, keywords);
+    d.params = of_map ? std::vector<ParamDef>{key_param(), value_param()} : std::vector<ParamDef>{key_param()};
+    d.inputs = {data(of_map ? "map" : "set", of_map ? "Map" : "Set", of_map ? PinType::map : PinType::set)};
+    for (PinDef& p : in) d.inputs.push_back(std::move(p));
+    d.outputs = std::move(out);
+    d.shape = typed(of_map);
+    return d;
+  };
+  for (bool of_map : {true, false}) {
+    const std::string kind = of_map ? "map" : "set";
+    {
+      NodeDef d = value_node(of_map ? "map.length" : "set.length", "Length", of_map ? "How many entries the map has." : "How many keys the set has.", "count size number of entries", of_map, {},
+                             {data("length", "Length", PinType::integer)});
+      d.run = [](Context& c) {
+        c.out(std::size_t{0}, Value::integer(static_cast<i64>(c.in(std::size_t{0}).size())));
+        return kStop;
+      };
+      lib.add(std::move(d));
+    }
+    {
+      NodeDef d = value_node(of_map ? "map.contains" : "set.contains", "Has Key", of_map ? "Is there an entry under the key?" : "Is the key in the set?", "contains in has find", of_map,
+                             {data("key", "Key", PinType::integer, 0)}, {data("result", "Result", PinType::boolean)});
+      d.run = [](Context& c) {
+        const Value m = c.in(std::size_t{0});
+        c.out(std::size_t{0}, Value::boolean(map::contains(m.keyed(), key_of(c.in("key")))));
+        return kStop;
+      };
+      lib.add(std::move(d));
+    }
+    {
+      NodeDef d = value_node(of_map ? "map.key_at" : "set.key_at", "Key At",
+                             of_map ? "The key of the entry at the index, in the order the keys came (the first is 0). Beyond the map: the zero of the keys' type."
+                                    : "The key at the index, in the order the keys came (the first is 0). Beyond the set: the zero of the keys' type.",
+                             "key by index entry at", of_map, {data("index", "Index", PinType::integer, 0)}, {data("key", "Key", PinType::integer)});
+      d.run = [](Context& c) {
+        const Value m = c.in(std::size_t{0});
+        const i64 at = c.in_int("index");
+        const PinType key = c.output(0).type;
+        c.out(std::size_t{0}, at >= 0 && static_cast<u64>(at) < m.size() ? key_value(m.keyed().key_at(static_cast<std::size_t>(at)), key) : key_value(MapKey{}, key));
+        return kStop;
+      };
+      lib.add(std::move(d));
+    }
+    if (of_map) {
+      NodeDef d = value_node("map.find", "Find", "The value under the key. Found: is there an entry? (If not: the zero of the values' type, index -1.) Index: the entry's place.", "get lookup value at key",
+                             true, {data("key", "Key", PinType::integer, 0)},
+                             {data("found", "Found", PinType::boolean), data("value", "Value", PinType::number), data("index", "Index", PinType::integer)});
+      d.run = [](Context& c) {
+        const Value m = c.in(std::size_t{0});
+        const i64 at = map::index_of(m.keyed(), key_of(c.in("key")));
+        c.out("found", Value::boolean(at >= 0));
+        c.out("value", at >= 0 ? m.keyed().value_at(static_cast<std::size_t>(at)) : zero_of({c.output(1).type, c.output(1).of}, c.instance().graph()));
+        c.out("index", Value::integer(at));
+        return kStop;
+      };
+      lib.add(std::move(d));
+    } else {
+      NodeDef d = value_node("set.find", "Find Key", "The place of the key in the order the keys came, or -1.", "index of search", false, {data("key", "Key", PinType::integer, 0)},
+                             {data("index", "Index", PinType::integer)});
+      d.run = [](Context& c) {
+        const Value m = c.in(std::size_t{0});
+        c.out(std::size_t{0}, Value::integer(set::index_of(m.keyed(), key_of(c.in("key")))));
+        return kStop;
+      };
+      lib.add(std::move(d));
+    }
+  }
+
+  // ---- steps: they change a map or a set at the node's place (the settings Variable, Path) ----
+  auto of_place = [](PinType kind) {
+    return [kind](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>&) {
+      TypeRef t;
+      if (!keyed_place(n, g, kind, t)) return;
+      for (PinDef& p : in) {
+        if (p.id == "key") retype(p, key_type(t), g);
+        if (p.id == "value") retype(p, value_type(t), g);
+      }
+    };
+  };
+  auto needs = [](PinType kind) {
+    return [kind](const Node& n, const Graph& g) {
+      Variable named;
+      if (g.place_of(n, named) && named.type != kind)
+        return "needs a " + std::string(kind == PinType::map ? "map" : "set") + ": \"" + named.name + "\" is " + type_text({named.type, named.of, named.count});
+      return std::string();
+    };
+  };
+  auto step = [&](PinType kind, const char* type, const char* label, const char* help, const char* keywords, std::vector<PinDef> in, std::vector<PinDef> out) {
+    NodeDef d = make(type, label, kind == PinType::map ? "Maps" : "Sets", NodeKind::action, help, keywords);
+    d.params = {param("variable", kind == PinType::map ? "Map" : "Set", ParamDef::Kind::variable), local_of(), path_of()};
+    d.inputs = {exec_in()};
+    for (PinDef& p : in) d.inputs.push_back(std::move(p));
+    d.outputs = {exec_out()};
+    for (PinDef& p : out) d.outputs.push_back(std::move(p));
+    d.shape = of_place(kind);
+    d.problem = needs(kind);
+    return d;
+  };
+  // The map or set at the node's place, to change it: `change(entries)`. The node's own inputs
+  // have been read by then; the indices of its path are read here.
+  auto on_entries = [](Context& c, PinType kind, const std::function<void(MapEntries&)>& change) {
+    const std::vector<i64> at = c.path();
+    c.instance().change(c.node(), at, [&](Value& v) {
+      if (v.type == kind) change(v.own_entries());
+    });
+  };
+  {
+    NodeDef d = step(PinType::map, "map.set", "Set at Key", "The key gets the value: its entry - or a new one at the end, when there is none. Added: was it new? Index: the entry's place.",
+                     "put insert assign store", {data("key", "Key", PinType::integer, 0), data("value", "Value", PinType::number, 0.0)},
+                     {data("added", "Added", PinType::boolean), data("index", "Index", PinType::integer)});
+    d.title = [](const NodeDef&, const Node& n) { return "Set in " + place_title(n); };
+    d.run = [on_entries](Context& c) {
+      const MapKey key = key_of(c.in("key"));
+      const Value value = c.in("value");
+      on_entries(c, PinType::map, [&](MapEntries& e) {
+        const auto [added, at] = map::set(e, key, value);
+        c.out("added", Value::boolean(added));
+        c.out("index", Value::integer(at));
+      });
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
+  for (bool of_map : {true, false}) {
+    const PinType kind = of_map ? PinType::map : PinType::set;
+    {
+      NodeDef d = step(kind, of_map ? "map.add" : "set.add", "Add Key",
+                       of_map ? "A new entry at the end with the zero of the values' type - unless the key has one. Added: was it new? Index: the entry's place."
+                              : "Puts the key in at the end, unless it is there. Added: was it new? Index: its place.",
+                       "insert put emplace", {data("key", "Key", PinType::integer, 0)}, {data("added", "Added", PinType::boolean), data("index", "Index", PinType::integer)});
+      d.title = [](const NodeDef&, const Node& n) { return "Add to " + place_title(n); };
+      d.run = [on_entries, of_map, kind](Context& c) {
+        const MapKey key = key_of(c.in("key"));
+        on_entries(c, kind, [&](MapEntries& e) {
+          bool added;
+          i64 at;
+          if (of_map) {
+            const auto [fresh, place] = map::add(e, key);
+            added = fresh, at = place;
+            // (the zero of the values' type, as the map is declared - a struct at its defaults)
+            if (fresh) {
+              TypeRef t;
+              if (keyed_place(c.node(), c.instance().graph(), PinType::map, t)) e.value_at(static_cast<std::size_t>(at)) = zero_of(value_type(t), c.instance().graph());
+            }
+          } else {
+            const auto [fresh, place] = map::add(e, key);
+            added = fresh, at = place;
+          }
+          c.out("added", Value::boolean(added));
+          c.out("index", Value::integer(at));
+        });
+        return 0;
+      };
+      lib.add(std::move(d));
+    }
+    {
+      NodeDef d = step(kind, of_map ? "map.remove" : "set.remove", "Remove Key", of_map ? "Takes the key's entry out (the others keep their order). Removed: was there one?" : "Takes the key out (the others keep their order). Removed: was it there?",
+                       "delete erase", {data("key", "Key", PinType::integer, 0)}, {data("removed", "Removed", PinType::boolean)});
+      d.title = [](const NodeDef&, const Node& n) { return "Remove from " + place_title(n); };
+      d.run = [on_entries, kind](Context& c) {
+        const MapKey key = key_of(c.in("key"));
+        on_entries(c, kind, [&](MapEntries& e) { c.out("removed", Value::boolean(map::remove(e, key))); });
+        return 0;
+      };
+      lib.add(std::move(d));
+    }
+    {
+      NodeDef d = step(kind, of_map ? "map.remove_at" : "set.remove_at", "Remove Index", "Takes the entry at the index out (the others keep their order). Beyond it: nothing.", "delete erase",
+                       {data("index", "Index", PinType::integer, 0)}, {});
+      d.title = [](const NodeDef&, const Node& n) { return "Remove from " + place_title(n); };
+      d.run = [on_entries, kind](Context& c) {
+        const i64 at = c.in_int("index");
+        on_entries(c, kind, [&](MapEntries& e) { map::remove_at(e, at); });
+        return 0;
+      };
+      lib.add(std::move(d));
+    }
+    {
+      NodeDef d = step(kind, of_map ? "map.clear" : "set.clear", of_map ? "Clear Map" : "Clear Set", "Takes every entry out.", "empty reset", {}, {});
+      d.title = [](const NodeDef&, const Node& n) { return "Clear " + place_title(n); };
+      d.run = [on_entries, kind](Context& c) {
+        on_entries(c, kind, [&](MapEntries& e) { map::clear(e); });
+        return 0;
+      };
+      lib.add(std::move(d));
+    }
+    {
+      NodeDef d = step(kind, of_map ? "map.reserve" : "set.reserve", "Reserve", "Makes room for that many entries in one go (what is there stays as it is).", "capacity room",
+                       {data("count", "Count", PinType::integer, 0)}, {});
+      d.title = [](const NodeDef&, const Node& n) { return "Reserve " + place_title(n); };
+      d.run = [on_entries, kind](Context& c) {
+        const i64 count = c.in_int("count");
+        on_entries(c, kind, [&](MapEntries& e) { map::reserve(e, count); });
+        return 0;
+      };
+      lib.add(std::move(d));
+    }
   }
 }
 
@@ -1052,8 +1483,11 @@ void add_structs(Library& lib) {
       retype(out[0], {PinType::structure, n.param("struct")}, g);
     };
     d.run = [](Context& c) {
+      const Graph& g = c.instance().graph();
+      const StructType* s = g.structure(c.param("struct"));
       std::vector<Value> fields;
-      for (std::size_t k = 0; k < c.input_count(); ++k) fields.push_back(c.in(k));  // (the fields one after the other, in their order)
+      // (the fields one after the other, in their order - a list of a fixed length at its length)
+      for (std::size_t k = 0; k < c.input_count(); ++k) fields.push_back(s && k < s->fields.size() && s->fields[k].type.count ? fitted(c.in(k), s->fields[k].type, g) : c.in(k));
       c.out(std::size_t{0}, structs::make(std::move(fields)));
       return kStop;
     };
@@ -1075,6 +1509,93 @@ void add_structs(Library& lib) {
       const Graph& g = c.instance().graph();
       if (const StructType* s = of(c.node(), g))
         for (std::size_t k = 0; k < s->fields.size(); ++k) c.out(k, field_of(value, *s, k, g));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  // The bytes of a struct of numbers, in the layout C++ gives it (logic::bytes, nodes.h): what
+  // std::bit_cast and std::memcpy between a struct and bytes see.
+  auto layout_problem = [of](const Node& n, const Graph& g) -> std::string {
+    const bytes::Layout l = bytes::layout(n.param("layout", ""));
+    if (l.error) return std::string("the layout: ") + l.error;
+    const StructType* st = of(n, g);
+    if (!st) return "which struct?";
+    if (st->fields.size() != l.count)
+      return "the layout has " + std::to_string(l.count) + " field(s), " + st->name + " has " + std::to_string(st->fields.size());
+    for (std::size_t k = 0; k < l.count; ++k)
+      if (st->fields[k].type.count || !bytes::suits(l.fields[k].code, st->fields[k].type.type))
+        return "the layout's field " + std::to_string(k + 1) + " does not suit " + st->name + "." + st->fields[k].name +
+               " (a Bool is bool; an Int u8 .. i32; an Int64 u64, i64; a Float f32, f64)";
+    return {};
+  };
+  auto layout_param = [] { return param("layout", "Layout", ParamDef::Kind::text, "4: i32@0"); };
+  {
+    NodeDef d = make("struct.bytes", "Bytes of Struct", "Structures", NodeKind::pure,
+                     "The bytes of a struct of numbers in the layout C++ gives it: \"20: u32@0 u16@4 ...\" - the size, then for each field the number it is "
+                     "(bool u8 i8 u16 i16 u32 i32 u64 i64 f32 f64) and where it begins. Little-endian; a byte no field covers is 0.",
+                     "bit cast memcpy binary bytes serialize wire packet");
+    d.params = {struct_param(), layout_param()};
+    d.inputs = {data("value", "Value", PinType::structure)};
+    d.outputs = {data("bytes", "Bytes", PinType::integer_list)};
+    d.title = [](const NodeDef&, const Node& n) { return "Bytes of " + n.param("struct", "?"); };
+    d.shape = [of](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>&) { retype(in[0], {PinType::structure, n.param("struct")}, g); };
+    d.problem = layout_problem;
+    d.run = [of](Context& c) {
+      const Graph& g = c.instance().graph();
+      const StructType* st = of(c.node(), g);
+      const bytes::Layout l = bytes::layout(c.param("layout", ""));
+      std::vector<i64> out(l.error ? 0 : l.size, 0);
+      if (st && !l.error) {
+        const Value value = c.in(std::size_t{0});
+        for (std::size_t k = 0; k < l.count && k < st->fields.size(); ++k) {
+          const Value f = field_of(value, *st, k, g);
+          const bytes::Field& at = l.fields[k];
+          const PinType t = st->fields[k].type.type;
+          const u64 v = t == PinType::number ? bytes::bits(at.code, f.as_number()) : t == PinType::boolean ? (f.as_bool() ? 1u : 0u)
+                        : t == PinType::int64 ? static_cast<u64>(f.i) : static_cast<u64>(f.as_int());
+          bytes::put(out.data(), at, v);
+        }
+      }
+      c.out(std::size_t{0}, Value::of(std::move(out)));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    NodeDef d = make("struct.of_bytes", "Struct of Bytes", "Structures", NodeKind::pure,
+                     "The struct of numbers whose bytes begin at At in the list, in the layout C++ gives it (as Bytes of Struct). A byte is a number's last 8 bits; "
+                     "where the list has none, it is 0.",
+                     "bit cast memcpy binary bytes deserialize parse wire packet");
+    d.params = {struct_param(), layout_param()};
+    d.inputs = {data("bytes", "Bytes", PinType::integer_list), data("at", "At", PinType::integer, 0)};
+    d.outputs = {data("value", "Value", PinType::structure)};
+    d.title = [](const NodeDef&, const Node& n) { return n.param("struct", "?") + " of Bytes"; };
+    d.shape = [of](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>&, std::vector<PinDef>& out) { retype(out[0], {PinType::structure, n.param("struct")}, g); };
+    d.problem = layout_problem;
+    d.run = [of](Context& c) {
+      const Graph& g = c.instance().graph();
+      const StructType* st = of(c.node(), g);
+      const bytes::Layout l = bytes::layout(c.param("layout", ""));
+      const Value list = c.in(std::size_t{0});
+      const std::vector<i64>& held = list.items<i64>();
+      const i64 from = c.in_int("at");
+      auto byte = [&](u32 i) { return bytes::byte_at(held.data(), held.size(), from, i); };
+      std::vector<Value> fields;
+      if (st) {
+        for (std::size_t k = 0; k < st->fields.size(); ++k) {
+          if (l.error || k >= l.count) {
+            fields.push_back(field_of(Value(), *st, k, g));
+            continue;
+          }
+          const bytes::Field& at = l.fields[k];
+          const u64 v = bytes::take(at, byte);
+          const PinType t = st->fields[k].type.type;
+          fields.push_back(t == PinType::boolean ? Value::boolean(v != 0) : t == PinType::int64 ? Value::int64(v)
+                           : t == PinType::number ? Value::number(at.code == bytes::Code::f32 ? bytes::single_value(static_cast<u32>(v)) : std::bit_cast<f64>(v))
+                           : Value::integer(static_cast<i64>(v)));
+        }
+      }
+      c.out(std::size_t{0}, structs::make(std::move(fields)));
       return kStop;
     };
     lib.add(std::move(d));
@@ -1135,8 +1656,69 @@ void add_math(Library& lib) {
   lib.add(pure("math.mod", "Modulo", "Math", ab(K::number, 0.0, 2.0), number, of(&P::math_mod), "Remainder of A ÷ B", "% remainder"));
   lib.add(pure("math.min", "Min", "Math", ab(K::number), number, of(&P::math_min)));
   lib.add(pure("math.max", "Max", "Math", ab(K::number), number, of(&P::math_max)));
+  {
+    // Int64: 64 bits, as u64 and i64 of C++ hold them - what they mean says the node (nodes.h)
+    const json::Value none("0");
+    auto ab64 = [&] { return std::vector<PinDef>{data("a", "A", K::int64, none), data("b", "B", K::int64, none)}; };
+    auto by = [&] { return std::vector<PinDef>{data("a", "A", K::int64, none), data("by", "By", K::integer, 1)}; };
+    const PinDef int64 = data("result", "", K::int64);
+    struct Two { const char* type; const char* label; Int64 (*f)(Int64, Int64); const char* help; const char* keywords; };
+    for (const Two& t : {Two{"int64.add", "Int64 Add", &P::int64_add, "A + B, round at 2^64", "+ plus u64 i64"},
+                         Two{"int64.sub", "Int64 Subtract", &P::int64_sub, "A - B, round at 2^64", "- minus u64 i64"},
+                         Two{"int64.mul", "Int64 Multiply", &P::int64_mul, "A × B, round at 2^64", "* times u64 i64"},
+                         Two{"int64.div", "Int64 Divide", &P::int64_div, "A ÷ B as i64, toward zero (0 when B is 0)", "/ signed"},
+                         Two{"int64.div_unsigned", "Int64 Divide Unsigned", &P::int64_div_unsigned, "A ÷ B as u64 (0 when B is 0)", "/ unsigned u64"},
+                         Two{"int64.rem", "Int64 Remainder", &P::int64_rem, "What A ÷ B as i64 leaves (0 when B is 0)", "% modulo signed"},
+                         Two{"int64.rem_unsigned", "Int64 Remainder Unsigned", &P::int64_rem_unsigned, "What A ÷ B as u64 leaves (0 when B is 0)", "% modulo unsigned"},
+                         Two{"int64.and", "Int64 And", &P::int64_and, "The bits both have", "& bitwise mask"},
+                         Two{"int64.or", "Int64 Or", &P::int64_or, "The bits either has", "| bitwise"},
+                         Two{"int64.xor", "Int64 Xor", &P::int64_xor, "The bits one of them has", "^ bitwise"}})
+      lib.add(pure(t.type, t.label, "Int64", ab64(), int64, of(t.f), t.help, t.keywords));
+    struct Shift { const char* type; const char* label; Int64 (*f)(Int64, i64); const char* help; };
+    for (const Shift& t : {Shift{"int64.shift_left", "Int64 Shift Left", &P::int64_shift_left, "A << By (By's last 6 bits)"},
+                           Shift{"int64.shift_right", "Int64 Shift Right", &P::int64_shift_right, "A >> By as i64: the sign comes in (By's last 6 bits)"},
+                           Shift{"int64.shift_right_unsigned", "Int64 Shift Right Unsigned", &P::int64_shift_right_unsigned, "A >> By as u64: zeros come in (By's last 6 bits)"},
+                           Shift{"int64.rotate_left", "Int64 Rotate Left", &P::int64_rotate_left, "The bits turned By to the left"},
+                           Shift{"int64.rotate_right", "Int64 Rotate Right", &P::int64_rotate_right, "The bits turned By to the right"}})
+      lib.add(pure(t.type, t.label, "Int64", by(), int64, of(t.f), t.help, "<< >> bits"));
+    lib.add(pure("int64.not", "Int64 Not", "Int64", {data("a", "A", K::int64, none)}, int64, of(&P::int64_not), "Every bit the other way", "~ bitwise invert"));
+    lib.add(pure("int64.equal", "Int64 Equal", "Int64", ab64(), boolean, of(&P::int64_equal), "The same 64 bits?", "== same"));
+    lib.add(pure("int64.less", "Int64 Less", "Int64", ab64(), boolean, of(&P::int64_less), "A < B as i64", "< compare signed"));
+    lib.add(pure("int64.less_unsigned", "Int64 Less Unsigned", "Int64", ab64(), boolean, of(&P::int64_less_unsigned), "A < B as u64", "< compare unsigned"));
+    lib.add(pure("int64.of_int", "Int to Int64", "Int64", {data("a", "Int", K::integer, 0)}, int64, of(&P::int64_of_int), "An Int as an i64's 64 bits", "convert i64 u64"));
+    lib.add(pure("int64.to_int", "Int64 to Int", "Int64", {data("a", "A", K::int64, none)}, integer, of(&P::int64_to_int), "The bits as an i64, as an Int holds it (exact up to 2^53)", "convert"));
+    lib.add(pure("int64.to_int_unsigned", "Int64 to Int Unsigned", "Int64", {data("a", "A", K::int64, none)}, integer, of(&P::int64_to_int_unsigned),
+                 "The bits as a u64, as an Int holds it (exact up to 2^53)", "convert"));
+    lib.add(pure("int64.to_float", "Int64 to Float", "Int64", {data("a", "A", K::int64, none)}, number, of(&P::int64_to_float), "The bits as an i64, as the nearest Float", "convert double"));
+    lib.add(pure("int64.to_float_unsigned", "Int64 to Float Unsigned", "Int64", {data("a", "A", K::int64, none)}, number, of(&P::int64_to_float_unsigned), "The bits as a u64, as the nearest Float",
+                 "convert double"));
+    lib.add(pure("int64.of_float", "Float to Int64", "Int64", {data("a", "Float", K::number, 0.0)}, int64, of(&P::int64_of_float), "Toward zero, as an i64 (no number: 0; beyond: the nearest end)",
+                 "convert truncate"));
+    lib.add(pure("int64.of_float_unsigned", "Float to Int64 Unsigned", "Int64", {data("a", "Float", K::number, 0.0)}, int64, of(&P::int64_of_float_unsigned),
+                 "Toward zero, as a u64 (below 0 or no number: 0; beyond: the largest)", "convert truncate"));
+    lib.add(pure("int64.bits_of_float", "Bits of Float", "Int64", {data("a", "Float", K::number, 0.0)}, int64, of(&P::int64_bits_of_float), "A Float's 64 bits (IEEE 754)", "bit cast double"));
+    lib.add(pure("int64.float_of_bits", "Float of Bits", "Int64", {data("a", "Bits", K::int64, none)}, number, of(&P::int64_float_of_bits), "The Float these 64 bits are (IEEE 754)", "bit cast double"));
+    lib.add(pure("int64.of_halves", "Int64 of Halves", "Int64", {data("high", "High", K::integer, 0), data("low", "Low", K::integer, 0)}, int64, of(&P::int64_of_halves),
+                 "64 bits of two halves of 32 (each Int cut to its last 32 bits)", "make join u32"));
+    lib.add(pure("int64.high", "Int64 High", "Int64", {data("a", "A", K::int64, none)}, integer, of(&P::int64_high), "The upper 32 bits (0 .. 2^32 - 1)", "split u32"));
+    lib.add(pure("int64.low", "Int64 Low", "Int64", {data("a", "A", K::int64, none)}, integer, of(&P::int64_low), "The lower 32 bits (0 .. 2^32 - 1)", "split u32"));
+    lib.add(pure("int64.count_ones", "Int64 Count Ones", "Int64", {data("a", "A", K::int64, none)}, integer, of(&P::int64_count_ones), "How many bits are 1", "popcount"));
+    lib.add(pure("int64.leading_zeros", "Int64 Leading Zeros", "Int64", {data("a", "A", K::int64, none)}, integer, of(&P::int64_leading_zeros), "How many 0 bits come before the first 1 (64: none is)", "clz"));
+    lib.add(pure("int64.trailing_zeros", "Int64 Trailing Zeros", "Int64", {data("a", "A", K::int64, none)}, integer, of(&P::int64_trailing_zeros), "How many 0 bits come after the last 1 (64: none is)", "ctz"));
+    lib.add(pure("int64.text", "Int64 to Text", "Int64", {data("a", "A", K::int64, none)}, data("result", "", K::text), of(&P::int64_text), "The bits as a u64 in decimal", "string"));
+    lib.add(pure("int64.text_signed", "Int64 to Text Signed", "Int64", {data("a", "A", K::int64, none)}, data("result", "", K::text), of(&P::int64_text_signed), "The bits as an i64 in decimal", "string"));
+    lib.add(pure("int64.text_hex", "Int64 to Hex", "Int64", {data("a", "A", K::int64, none)}, data("result", "", K::text), of(&P::int64_text_hex), "The bits in hexadecimal (lower case, no 0x)", "string"));
+    lib.add(pure("int64.of_text", "Text to Int64", "Int64", {data("a", "Text", K::text, "")}, int64, of(&P::int64_of_text), "A whole number written out (decimal, 0x hexadecimal, - in front: two's complement) - 0 if it is none",
+                 "parse string"));
+  }
+  lib.add(pure("math.bits_of_float32", "Bits of Float 32", "Math", {data("a", "Float", K::number, 0.0)}, integer, of(&P::math_bits_of_float32),
+               "The 32 bits of the Float as a 32-bit float (IEEE 754, as std::bit_cast of a float): 0 .. 2^32 - 1", "bit cast single float32 u32"));
+  lib.add(pure("math.float32_of_bits", "Float 32 of Bits", "Math", {data("a", "Bits", K::integer, 0)}, number, of(&P::math_float32_of_bits),
+               "The 32-bit float these 32 bits are (the Int's last 32 bits; IEEE 754, as std::bit_cast to a float)", "bit cast single float32 u32"));
   lib.add(pure("math.clamp", "Clamp", "Math", {data("value", "Value", K::number, 0.0), data("min", "Min", K::number, 0.0), data("max", "Max", K::number, 1.0)}, number, of(&P::math_clamp)));
   lib.add(pure("math.abs", "Absolute", "Math", {data("a", "A", K::number, 0.0)}, number, of(&P::math_abs)));
+  lib.add(pure("math.copysign", "Copy Sign", "Math", {data("a", "Magnitude", K::number, 0.0), data("b", "Sign", K::number, 1.0)}, number, of(&P::math_copysign),
+               "The size of Magnitude with the sign of Sign - also the sign of -0 (Copy Sign of 1 and -0 is -1)", "copysign negative zero minus"));
   lib.add(pure("math.negate", "Negate", "Math", {data("a", "A", K::number, 0.0)}, number, of(&P::math_negate)));
   lib.add(pure("math.lerp", "Lerp", "Math", {data("a", "A", K::number, 0.0), data("b", "B", K::number, 1.0), data("alpha", "Alpha", K::number, 0.5)}, number, of(&P::math_lerp),
                "A + (B - A) × Alpha", "interpolate mix blend"));
@@ -1229,6 +1811,185 @@ void add_math(Library& lib) {
   lib.add(pure("text.equal", "Text Equals", "Text", {data("a", "A", K::text, ""), data("b", "B", K::text, "")}, boolean, of(&P::text_equal)));
   lib.add(pure("text.contains", "Contains", "Text", {data("a", "Text", K::text, ""), data("b", "Search", K::text, "")}, boolean, of(&P::text_contains)));
   lib.add(pure("text.length", "Text Length", "Text", {data("a", "Text", K::text, "")}, integer, of(&P::text_length)));
+  lib.add(pure("text.code_at", "Code At", "Text", {data("a", "Text", K::text, ""), data("index", "Index", K::integer, 0)}, integer, of(&P::text_code_at),
+               "The byte at Index as a number 0 to 255 (beyond the text: 0)", "char character byte ascii index"));
+  lib.add(pure("text.of_code", "Text of Code", "Text", {data("code", "Code", K::integer, 65)}, data("result", "", K::text), of(&P::text_of_code),
+               "A text of one byte: Code cut to 8 bits", "char character byte ascii"));
+  {
+    // Format Text: a format as printf has it, and a value for each of its conversions (nodes.h, format)
+    NodeDef d = make("text.format", "Format Text", "Text", NodeKind::pure,
+                     "A text from a format as C's printf has it: %d %u %x %o %c take an Int, %f %e %g a Float, %s a Text; flags - + space 0 #, width and "
+                     "precision. Character for character what snprintf gives. Most: at most that many bytes of it (less than 0: all).");
+    d.params = {param("format", "Format", ParamDef::Kind::text, "%d")};
+    d.inputs = {data("most", "Most", K::integer, -1)};
+    d.outputs = {data("result", "", K::text)};
+    d.keywords = "format printf sprintf snprintf number to text string";
+    d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>&) {
+      std::vector<format::Arg::Kind> kinds;
+      format::kinds(n.param("format", "%d"), &kinds, nullptr);
+      for (std::size_t k = 0; k < kinds.size(); ++k) {
+        const PinType t = kinds[k] == format::Arg::Kind::number ? K::number : kinds[k] == format::Arg::Kind::text ? K::text : K::integer;
+        in.push_back(data("v" + std::to_string(k), std::to_string(k), t, t == K::text ? json::Value("") : json::Value(0.0)));
+      }
+    };
+    d.title = [](const NodeDef&, const Node& n) {
+      const std::string f = n.param("format", "%d");
+      return "Format \"" + (f.size() > 30 ? f.substr(0, 29) + "..." : f) + "\"";
+    };
+    d.problem = [](const Node& n, const Graph&) {
+      std::string why;
+      return format::kinds(n.param("format", "%d"), nullptr, &why) ? std::string() : "the format: " + why;
+    };
+    d.run = [](Context& c) {
+      const std::string fmt = c.param("format", "%d");
+      std::vector<format::Arg::Kind> kinds;
+      format::kinds(fmt, &kinds, nullptr);
+      std::vector<Value> held;  // (the texts the values are read from stay here while the text is made)
+      held.reserve(kinds.size());
+      std::vector<format::Arg> args;
+      for (std::size_t k = 0; k < kinds.size() && k + 1 < c.input_count(); ++k) {
+        held.push_back(kinds[k] == format::Arg::Kind::text ? Value::text(c.in(k + 1).as_text()) : c.in(k + 1));
+        const Value& v = held.back();
+        args.push_back(kinds[k] == format::Arg::Kind::number ? format::arg(v.as_number()) : kinds[k] == format::Arg::Kind::text ? format::arg(std::string_view(v.s)) : format::arg(v.as_int()));
+      }
+      c.out(std::size_t{0}, Value::text(format::text_of(fmt, args.data(), args.size(), c.in(std::size_t{0}).as_int())));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    // What std::string and std::string_view do (texts, nodes.h): a place in a text is an Int; where C++
+    // gives npos - no place - the Int is -1, and a place handed in reads -1 as npos ("to the end").
+    const PinDef text = data("result", "", K::text);
+    struct Find { const char* type; const char* label; i64 (*f)(std::string, std::string, i64); i64 from; const char* help; const char* keywords; };
+    for (const Find& x : {Find{"text.find", "Find Text", &P::text_find, 0, "Where Search first stands in Text, from From on (std::string::find) - -1: nowhere",
+                               "find index search position string indexof"},
+                          Find{"text.rfind", "Find Last Text", &P::text_rfind, -1, "Where Search last begins in Text, at From or before (-1: anywhere - std::string::rfind) - -1: nowhere",
+                               "rfind last index search position string lastindexof"},
+                          Find{"text.find_first_of", "Find First Of", &P::text_find_first_of, 0, "The first place from From on with one of the characters of Set (std::string::find_first_of) - -1: none",
+                               "find first of any character set string"},
+                          Find{"text.find_last_of", "Find Last Of", &P::text_find_last_of, -1, "The last place at From or before with one of the characters of Set (std::string::find_last_of) - -1: none",
+                               "find last of any character set string"},
+                          Find{"text.find_first_not_of", "Find First Not Of", &P::text_find_first_not_of, 0,
+                               "The first place from From on with a character that is not in Set (std::string::find_first_not_of) - -1: none", "find first not of skip trim character set string"},
+                          Find{"text.find_last_not_of", "Find Last Not Of", &P::text_find_last_not_of, -1,
+                               "The last place at From or before with a character that is not in Set (std::string::find_last_not_of) - -1: none", "find last not of trim character set string"}}) {
+      const bool set = std::string(x.type).find("_of") != std::string::npos;
+      lib.add(pure(x.type, x.label, "Text", {data("a", "Text", K::text, ""), data("b", set ? "Set" : "Search", K::text, ""), data("from", "From", K::integer, static_cast<f64>(x.from))}, integer,
+                   of(x.f), x.help, x.keywords));
+    }
+    lib.add(pure("text.sub", "Sub Text", "Text", {data("a", "Text", K::text, ""), data("at", "At", K::integer, 0), data("count", "Count", K::integer, -1)}, text, of(&P::text_sub),
+                 "Count characters of Text from At on (-1 or beyond the end: to the end - std::string::substr); At beyond the end: no text", "substr substring slice part mid left right"));
+    lib.add(pure("text.starts_with", "Starts With", "Text", {data("a", "Text", K::text, ""), data("b", "Start", K::text, "")}, boolean, of(&P::text_starts_with),
+                 "Does Text begin with Start (std::string::starts_with)", "prefix begins string"));
+    lib.add(pure("text.ends_with", "Ends With", "Text", {data("a", "Text", K::text, ""), data("b", "End", K::text, "")}, boolean, of(&P::text_ends_with),
+                 "Does Text end with End (std::string::ends_with)", "suffix string"));
+    lib.add(pure("text.less", "Text Less", "Text", {data("a", "A", K::text, ""), data("b", "B", K::text, "")}, boolean, of(&P::text_less),
+                 "Does A come before B - byte by byte, as unsigned characters, a shorter text before a longer one it begins (std::string's <)", "< compare order sort string"));
+    lib.add(pure("text.insert", "Insert Text", "Text", {data("a", "Text", K::text, ""), data("at", "At", K::integer, 0), data("b", "Insert", K::text, "")}, text, of(&P::text_insert),
+                 "Text with Insert put in at At (std::string::insert); At beyond the end: Text as it is", "insert put string"));
+    lib.add(pure("text.erase", "Erase Text", "Text", {data("a", "Text", K::text, ""), data("at", "At", K::integer, 0), data("count", "Count", K::integer, -1)}, text, of(&P::text_erase),
+                 "Text without Count characters from At on (-1: to the end - std::string::erase); At beyond the end: Text as it is", "erase remove delete cut string"));
+    lib.add(pure("text.replace", "Replace Text", "Text",
+                 {data("a", "Text", K::text, ""), data("at", "At", K::integer, 0), data("count", "Count", K::integer, 0), data("b", "With", K::text, "")}, text, of(&P::text_replace),
+                 "Text with Count characters from At on replaced by With (std::string::replace); At beyond the end: Text as it is", "replace string"));
+    lib.add(pure("text.repeat", "Repeat Text", "Text", {data("a", "Text", K::text, "*"), data("count", "Count", K::integer, 3)}, text, of(&P::text_repeat),
+                 "Text so many times, one after the other (std::string(count, c) of a character); Count 0 or less: no text", "repeat times fill padding string"));
+    lib.add(pure("text.bytes", "Bytes of Text", "Text", {data("a", "Text", K::text, "")}, data("result", "", K::integer_list), of(&P::text_bytes),
+                 "The bytes of the text, each a whole number 0 to 255 (a std::vector<u8> of its range)", "bytes chars utf8 encode array"));
+    lib.add(pure("text.reserve", "Reserve Text", "Text", {data("a", "Text", K::text, ""), data("count", "Count", K::integer, 0)}, text, of(&P::text_reserve),
+                 "The text as it is - in a Blueprint's class with room for Count characters, so that what is appended to it fits (std::string::reserve)",
+                 "reserve capacity room string"));
+    lib.add(pure("text.of_bytes", "Text of Bytes", "Text", {data("bytes", "Bytes", K::integer_list), data("at", "At", K::integer, 0), data("count", "Count", K::integer, 0)}, text,
+                 of(&P::text_of_bytes), "Count bytes of the list from At on as a text, each cut to 8 bits (beyond the list: up to its end)",
+                 "bytes chars string decode utf8 buffer"));
+    // Numbers read from a text at a place, as C reads them (scan, nodes.h): Value, and End - the place just
+    // after what was read (nothing read: At itself, as C's end pointer)
+    struct Parse { const char* type; const char* label; bool whole; P::ParsedFloat (*real)(std::string, i64); P::ParsedWhole (*integral)(std::string, i64, i64); const char* help; const char* keywords; };
+    for (const Parse& x : {Parse{"text.parse_float", "Parse Float", false, &P::text_parse_float, nullptr, "The number at At of Text, as C's strtod reads it (atof)", "strtod atof parse number float double read"},
+                           Parse{"text.parse_float32", "Parse Float 32", false, &P::text_parse_float32, nullptr, "The number at At of Text as a 32-bit float, as C's strtof reads it",
+                                 "strtof parse number float single read"},
+                           Parse{"text.parse_int", "Parse Int", true, nullptr, &P::text_parse_int,
+                                 "The whole number at At of Text, as C's strtoll reads it in Base (0: by its prefix - 0x, 0b, 0) - its 64 bits (atoi, atol, strtol)", "strtol strtoll atoi atol parse integer read"},
+                           Parse{"text.parse_uint", "Parse Int Unsigned", true, nullptr, &P::text_parse_uint,
+                                 "The whole number at At of Text, as C's strtoull reads it in Base (0: by its prefix - 0x, 0b, 0) - its 64 bits (strtoul)", "strtoul strtoull parse unsigned integer read"}}) {
+      NodeDef d = make(x.type, x.label, "Text", NodeKind::pure, x.help);
+      d.inputs = {data("a", "Text", K::text, ""), data("at", "At", K::integer, 0)};
+      if (x.whole) d.inputs.push_back(data("base", "Base", K::integer, 10));
+      d.outputs = {data("value", "Value", x.whole ? K::int64 : K::number), data("end", "End", K::integer)};
+      d.keywords = x.keywords;
+      const Parse p = x;
+      d.run = [p](Context& c) {
+        if (p.whole) {
+          const P::ParsedWhole r = p.integral(c.in(std::size_t{0}).as_text(), c.in(std::size_t{1}).as_int(), c.in(std::size_t{2}).as_int());
+          c.out("value", Value::int64(r.value.bits));
+          c.out("end", Value::integer(r.end));
+        } else {
+          const P::ParsedFloat r = p.real(c.in(std::size_t{0}).as_text(), c.in(std::size_t{1}).as_int());
+          c.out("value", Value::number(r.value));
+          c.out("end", Value::integer(r.end));
+        }
+        return kStop;
+      };
+      lib.add(std::move(d));
+    }
+  }
+  {
+    // Scan Text: what sscanf reads with a format (scan, nodes.h) - Count, what sscanf gives, and a value
+    // for each conversion; the inputs Before hold what was there before, which stays where the scan
+    // does not reach (as a variable sscanf did not write keeps its value)
+    NodeDef d = make("text.scan", "Scan Text", "Text", NodeKind::action,
+                     "Reads Text from At on as C's sscanf reads it with a format: %d %i %u %o %x %b take whole numbers (l ll: 64 bits), %f %e %g %a a float (l: a double), %s and "
+                     "%[set] a word, %n how many characters were read; a width, * (read, not given). Count: how many values were read (-1: the text ended before the first).");
+    d.params = {param("format", "Format", ParamDef::Kind::text, "%d")};
+    d.inputs = {exec_in(), data("a", "Text", K::text, ""), data("at", "At", K::integer, 0)};
+    d.outputs = {exec_out(), data("count", "Count", K::integer)};
+    d.keywords = "scan sscanf scanf parse read numbers words format";
+    auto pin_of = [](scan::Kind k) { return k == scan::Kind::whole ? K::integer : k == scan::Kind::whole64 ? K::int64 : k == scan::Kind::number ? K::number : K::text; };
+    d.shape = [pin_of](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>& out) {
+      scan::Plan plan;
+      if (!scan::plan(n.param("format", "%d"), &plan, nullptr)) return;
+      for (std::size_t k = 0; k < plan.count; ++k) {
+        const PinType t = pin_of(plan.kinds[k]);
+        in.push_back(data("p" + std::to_string(k), "Before " + std::to_string(k), t, t == K::text ? json::Value("") : t == K::int64 ? json::Value("0") : json::Value(0.0)));
+        out.push_back(data("v" + std::to_string(k), std::to_string(k), t));
+      }
+    };
+    d.title = [](const NodeDef&, const Node& n) {
+      const std::string f = n.param("format", "%d");
+      return "Scan \"" + (f.size() > 30 ? f.substr(0, 29) + "..." : f) + "\"";
+    };
+    d.problem = [](const Node& n, const Graph&) {
+      const char* why = "";
+      return scan::plan(n.param("format", "%d"), nullptr, &why) ? std::string() : std::string("the format: ") + why;
+    };
+    d.run = [](Context& c) {
+      const std::string fmt = c.param("format", "%d");
+      scan::Plan plan;
+      if (!scan::plan(fmt, &plan, nullptr)) plan = {};
+      scan::Slot slots[scan::kMostSlots];
+      for (std::size_t k = 0; k < plan.count; ++k) {
+        scan::Slot& s = slots[k];
+        s.kind = plan.kinds[k];
+        const Value v = c.in("p" + std::to_string(k));
+        if (s.kind == scan::Kind::whole) s.whole = v.as_int();
+        else if (s.kind == scan::Kind::whole64) s.bits = v.type == PinType::int64 ? static_cast<u64>(v.i) : 0;
+        else if (s.kind == scan::Kind::number) s.number = v.as_number();
+        else s.text = v.as_text();
+      }
+      const std::string a = c.in_text("a");
+      const i64 count = scan::run(scan::c_string(a, c.in_int("at")), fmt, slots, plan.count);
+      c.out("count", Value::integer(count));
+      for (std::size_t k = 0; k < plan.count; ++k) {
+        const scan::Slot& s = slots[k];
+        const std::string pin = "v" + std::to_string(k);
+        c.out(pin, s.kind == scan::Kind::whole ? Value::integer(s.whole) : s.kind == scan::Kind::whole64 ? Value::int64(s.bits) : s.kind == scan::Kind::number ? Value::number(s.number)
+                                                                                                                                 : Value::text(s.text));
+      }
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
   // Time.
   lib.add(pure("time.now", "Game Time", "Utilities", {}, data("result", "Seconds", K::number), [](Context& c) { return Value::number(c.host().time()); }, "Seconds since play started", "clock elapsed"));
   {
@@ -1248,7 +2009,7 @@ void add_math(Library& lib) {
 void add_formula(Library& lib) {
   NodeDef d = make("math.formula", "Formula", "Math", NodeKind::pure,
                    "A formula as one node: every name in it becomes an input. Operators + - * / % ^, comparisons (1 when true), && || !, a ? b : c; "
-                   "functions min max clamp abs sign floor ceil round trunc sqrt pow exp log sin cos tan asin acos atan atan2 (radians; rad(), deg()) lerp; "
+                   "functions min max clamp abs sign copysign floor ceil round trunc sqrt pow exp log sin cos tan asin acos atan atan2 (radians; rad(), deg()) lerp remainder; "
                    "whole numbers as a machine has them: band bor bxor shl shr, wrap32 wrap32s mul32 (32 bit); single (the number as a 32-bit float holds it); pi.");
   d.params = {param("formula", "Formula", ParamDef::Kind::text, "a + b")};
   d.outputs = {data("result", "", PinType::number)};
@@ -1344,7 +2105,7 @@ void add_functions(Library& lib) {
       const Function* f = c.instance().graph().function(c.param("function"));
       std::vector<std::pair<std::string, Value>> values;
       if (f)
-        for (const FunctionPin& p : f->outputs) values.emplace_back(p.name, c.in(p.name));
+        for (const FunctionPin& p : f->outputs) values.emplace_back(p.name, p.count ? fitted(c.in(p.name), declared(p), c.instance().graph()) : c.in(p.name));
       c.instance().return_values(c.param("function"), values);
       return kStop;
     };
@@ -1393,6 +2154,38 @@ void add_functions(Library& lib) {
     lib.add(std::move(d));
   }
   {
+    // Get Variable on Actor: what a variable of another actor's Blueprint holds now (its type is the setting Type)
+    NodeDef d = make("func.get_on", "Get Variable on Actor", "Functions", NodeKind::pure,
+                     "What the variable of the name holds in the Blueprint of Target (the Level's when Target is empty), as a value of the type the setting says. Where Target has no such "
+                     "variable of that type: the zero of the type.");
+    d.params = {param("variable", "Variable", ParamDef::Kind::text, ""), type_param(true)};
+    d.inputs = {data("this", "Target", PinType::actor, 0)};
+    d.outputs = {data("value", "Value", PinType::number)};
+    d.shape = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>&, std::vector<PinDef>& out) { retype(out[0], setting_type(n, g, true), g); };
+    d.title = [](const NodeDef&, const Node& n) { return n.param("variable", "?") + " of Actor"; };
+    d.keywords = "get read variable other blueprint actor remote";
+    d.run = [](Context& c) {
+      const TypeRef t{c.output(0).type, c.output(0).of};
+      c.out(std::size_t{0}, c.runtime().get_on(c.instance(), c.param("variable"), c.in_actor("this"), t));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    // Has Blueprint: whether Call on Actor and Get Variable on Actor reach a Blueprint on Target
+    NodeDef d = make("func.has_blueprint", "Has Blueprint", "Functions", NodeKind::pure,
+                     "True when Target (the Level when Target is empty) has a Blueprint that runs: one without errors that has not been stopped. Call on Actor and Get "
+                     "Variable on Actor reach it; where it has none, they give their defaults.");
+    d.inputs = {data("target", "Target", PinType::actor, 0)};
+    d.outputs = {data("result", "Has Blueprint", PinType::boolean)};
+    d.keywords = "has blueprint logic running valid other actor remote bound";
+    d.run = [](Context& c) {
+      c.out(std::size_t{0}, Value::boolean(c.runtime().has_blueprint(c.in_actor("target"))));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
     NodeDef d = make("func.pure", "Function Value", "Functions", NodeKind::pure,
                      "A function as a value: it runs whenever one of its outputs is read. For functions that only compute (no effects on the world).");
     d.params = {param("function", "Function", ParamDef::Kind::function)};
@@ -1418,6 +2211,7 @@ Library& Library::core() {
     add_flow(lib);
     add_variables(lib);
     add_lists(lib);
+    add_maps(lib);
     add_enums(lib);
     add_structs(lib);
     add_math(lib);

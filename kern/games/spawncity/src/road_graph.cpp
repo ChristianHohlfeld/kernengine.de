@@ -3,7 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
-#include <queue>
+#include <utility>
 
 namespace sc {
 
@@ -11,6 +11,40 @@ namespace {
 constexpr f32 kCell = 3.5f;  // vertices closer than this (same grid cell or a neighbour) merge
 u64 cell_key(i32 x, i32 y) { return (static_cast<u64>(static_cast<u32>(x)) << 32) | static_cast<u32>(y); }
 f32 dist(Vec2 a, Vec2 b) { return std::hypot(a.x - b.x, a.y - b.y); }
+
+// The open list of the search: a binary heap of (estimate, node) with the smallest on top, in a
+// list that grows as the one of std::priority_queue<Item, std::vector<Item>, std::greater<Item>>
+// (a push adds one item and sifts it up, a pop puts the last one on top and sifts it down). Every
+// item is ordered against every other - the estimate, then the node, as std::pair's < -, so which
+// one is on top never depends on how the heap lies: the search takes them in the same order as
+// with the library's heap.
+using Item = std::pair<f32, i32>;
+bool before(const Item& x, const Item& y) { return x.first < y.first || (!(y.first < x.first) && x.second < y.second); }
+void heap_push(std::vector<Item>& h, Item x) {
+  std::size_t i = h.size();
+  h.push_back(x);
+  while (i > 0) {
+    const std::size_t up = (i - 1) / 2;
+    if (!before(h[i], h[up])) break;
+    std::swap(h[i], h[up]);
+    i = up;
+  }
+}
+Item heap_pop(std::vector<Item>& h) {
+  const Item top = h[0];
+  h[0] = h.back();
+  h.pop_back();
+  std::size_t i = 0;
+  while (2 * i + 1 < h.size()) {
+    const std::size_t l = 2 * i + 1, r = l + 1;
+    std::size_t m = before(h[l], h[i]) ? l : i;
+    if (r < h.size() && before(h[r], h[m])) m = r;
+    if (m == i) break;
+    std::swap(h[i], h[m]);
+    i = m;
+  }
+  return top;
+}
 }  // namespace
 
 u64 lane_signature(const std::vector<Lane>& lanes) {
@@ -76,14 +110,12 @@ bool RoadGraph::path(Vec2 from, Vec2 to, std::vector<Vec2>& out) const {
   std::vector<f32> g(n, 1e30f);
   std::vector<i32> came(n, -1);
   std::vector<u8> closed(n, 0);
-  using Item = std::pair<f32, i32>;
-  std::priority_queue<Item, std::vector<Item>, std::greater<Item>> open;
+  std::vector<Item> open;
   g[a] = 0;
-  open.push({dist(nodes_[a].p, nodes_[b].p), a});
+  heap_push(open, {dist(nodes_[a].p, nodes_[b].p), a});
   u32 expanded = 0;
   while (!open.empty()) {
-    const i32 cur = open.top().second;
-    open.pop();
+    const i32 cur = heap_pop(open).second;
     if (closed[cur]) continue;
     closed[cur] = 1;
     if (cur == b || ++expanded > 20000) break;
@@ -92,7 +124,7 @@ bool RoadGraph::path(Vec2 from, Vec2 to, std::vector<Vec2>& out) const {
       if (ng < g[nb]) {
         g[nb] = ng;
         came[nb] = cur;
-        open.push({ng + dist(nodes_[nb].p, nodes_[b].p), nb});
+        heap_push(open, {ng + dist(nodes_[nb].p, nodes_[b].p), nb});
       }
     }
   }
@@ -100,7 +132,7 @@ bool RoadGraph::path(Vec2 from, Vec2 to, std::vector<Vec2>& out) const {
   std::vector<Vec2> rev;
   for (i32 c = b; c >= 0; c = c == a ? -1 : came[c]) rev.push_back(nodes_[c].p);
   out.push_back(from);
-  for (auto it = rev.rbegin(); it != rev.rend(); ++it) out.push_back(*it);
+  for (std::size_t k = 0; k < rev.size(); ++k) out.push_back(rev[rev.size() - 1 - k]);  // (from the start on)
   out.push_back(to);
   return true;
 }

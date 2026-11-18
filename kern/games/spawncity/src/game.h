@@ -8,10 +8,8 @@
 // jet (F at the jet; F in the air = ejection seat and parachute). Switching never loads anything.
 #pragma once
 
-#include <map>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "car.h"
@@ -26,9 +24,17 @@
 #include "drone.h"
 #include "game_ui.h"
 #include "game_combat.h"
+#include "game_destruction_sync.h"  // the states of the sessions' syncs: destruction, thrown things, rounds, the town
 #include "game_gaps.h"
+#include "game_life.h"   // GameLife (M3 life, game_life.cpp)
 #include "game_look.h"
+#include "game_net.h"    // MpLocal (game_net.cpp)
+#include "game_projsync.h"
+#include "game_toss.h"
+#include "game_townsync.h"
+#include "game_world.h"  // WorldLife (M3 world, game_world.cpp)
 #include "jet.h"
+#include "kern/core/map.h"
 #include "kern/app/app.h"
 #include "kern/audio/audio.h"
 #include "kern/game/runtime.h"
@@ -49,13 +55,6 @@
 #include "weapons.h"
 
 namespace sc {
-
-struct MpLocal;  // multiplayer presentation state (game_net.cpp)
-struct DestroySync;  // the destruction state in a session (game_destruction_sync.cpp)
-struct TossState;    // thrown things in a session (game_toss.cpp)
-struct ProjSync;     // rounds in flight in a session (game_projsync.cpp)
-struct TownSync;     // the town's lasting state and a client's hits on it in a session (game_townsync.cpp)
-struct MpLocalDelete { void operator()(MpLocal* m) const; };
 
 enum class Mode : u8 { foot, drone, car, jet, parachute };
 const char* mode_name(Mode m);
@@ -131,9 +130,6 @@ struct PoliceDrone {
   u32 shots = 0, serial = 0;
 };
 
-struct WorldLife;  // game_world.h
-struct GameLife;   // game_life.h (M3 life)
-
 class Game {
  public:
   Game();
@@ -154,13 +150,13 @@ class Game {
   std::string hud_json();
   std::string command(const std::string& cmd);
   bool audio_init(u32 rate);
-  const f32* audio_render(u32 frames);
+  const std::vector<f32>& audio_render(u32 frames);
   void key_down_event() { ctl_.dev.key(); }
   /// Mouse movement under the pointer lock (CSS px, clamped per event) and the lock state (game_controls.cpp).
   void mouse_move(f32 dx, f32 dy) { ctl_.mouse.x += dx; ctl_.mouse.y += dy; }
   void pointer_locked(bool locked) { ctl_.locked = locked; }
   /// Microphone samples from the page (only while the mic is on; game_net.cpp).
-  void voice_capture(const f32* samples, u32 count, u32 rate);
+  void voice_capture(kern::Span<const f32> samples, u32 rate);
   /// The lit-windows shader extension (registered with the renderer, driven by GameWorld).
   Facades& windows() { return windows_; }  // the original's facades and lit windows (facades.h)
   WaterLook& water_look() { return water_look_; }  // the original's water shader (water_look.h)
@@ -211,7 +207,6 @@ class Game {
   void drive_traffic(f32 h);
   void manage_traffic();
   // one world in multiplayer (game_worldsync.cpp): the host's traffic and citizens are everybody's
-  struct CarPuppet { Vec3 p, v; Quat q; f32 at = -9; };
   struct WorldParts { u32 t_ms = 0; u64 mask = 0; };  // the parts of the host's list that came (game_worldsync.cpp)
   f64 life_epoch() const;
   void car_body_dynamic(TrafficCar& c);
@@ -221,8 +216,9 @@ class Game {
   void dsync_send_full(i32 to);
   void dsync_reset_epoch();
   std::string dsync_json();
-  DestroySync& dsync();
-  std::shared_ptr<DestroySync> dsync_;
+  /// (made where it is first needed: then dsync_ holds it)
+  void dsync_ready();
+  std::unique_ptr<DestroySync> dsync_;
   // thrown things (game_toss.cpp): what our hand takes flies on every machine
   void toss_update(f32 dt);
   void toss_own(u8 kind, i32 local, u64 id);
@@ -230,13 +226,13 @@ class Game {
   std::string toss_json();
   std::string toss_command(const std::string& cmd);
   i32 toss_test_ = -1;
-  TossState& toss();
-  std::shared_ptr<TossState> toss_;
+  TossState toss_;
   // every round in flight replicated (game_projsync.cpp): ours streamed, the mates' drawn on their track
   void projsync_update(f32 dt);
   void projsync_blast(u8 owner, Vec3 at);
-  ProjSync& projsync();
-  std::shared_ptr<ProjSync> projsync_;
+  /// (made where it is first needed: then projsync_ holds it)
+  void projsync_ready();
+  std::unique_ptr<ProjSync> projsync_;
   u32 proj_serial_ = 0;
   // the town's lasting state and a client's hits on it (game_townsync.cpp, town_sync.h): street
   // lamps, barricade planks and the blasts that left marks are the host's; what a client does to a
@@ -253,8 +249,9 @@ class Game {
   /// done on the host's machine.
   bool town_car_remote(i32 car) const;
   std::string townsync_json();
-  TownSync& townsync();
-  std::shared_ptr<TownSync> townsync_;
+  /// (made where it is first needed: then townsync_ holds it)
+  void townsync_ready();
+  std::unique_ptr<TownSync> townsync_;
   std::string worldsync_list() const;
   bool world_puppet() const;
   std::vector<Vec3> mate_foci() const;
@@ -265,14 +262,12 @@ class Game {
   u32 world_tick_ = 0;  // the host's car snapshots so far (a car at rest sends its whole entry every 20th)
   u32 world_sent_ = 0, world_got_ = 0;
   f32 world_heard_at_ = -99;
-  bool cars_were_ = false;
   std::vector<bool> car_seen_;
   std::vector<People::NetPerson> people_acc_;
   std::vector<i32> car_net_;           // client: the host's index each of our cars plays (-1 none)
-  std::vector<CarPuppet> car_puppet_;
   std::vector<mp::PoseTimeline> car_line_;   // client: the host's poses of each of his cars
   std::vector<Quat> car_rest_q_;             // ... and how each last stood (a car at rest is only named)
-  std::map<u8, WorldParts> world_parts_;
+  kern::Map<u8, WorldParts> world_parts_;
   std::vector<Life::NetCow> cows_acc_;
   std::vector<Life::NetPet> pets_acc_;
   std::vector<Life::NetFlock> flocks_acc_;
@@ -289,7 +284,7 @@ class Game {
   void handle_shots();
   void update_police(f32 dt);
   void spawn_police_unit();
-  void drive_police(PoliceUnit& u, f32 dt);
+  void drive_police(PoliceUnit& u, i32 unit, f32 dt);  // u is units_[unit]
   void step_cop(PoliceUnit& u, PoliceUnit::Cop& c, f32 dt);
   bool player_driving() const { return mode_ == Mode::car || mode_ == Mode::jet || mode_ == Mode::drone; }
   bool line_of_sight(Vec3 a, Vec3 b) const;
@@ -319,7 +314,8 @@ class Game {
   void jet_attack(bool gun, bool missile, bool bomb);
   void draw_projectiles();
   // multiplayer (game_net.cpp; its state lives in MpLocal, see mp_rules.h / net_session.h)
-  MpLocal& mp_local();
+  /// (made where it is first needed: then mp_ holds it)
+  void mp_local_ready();
   // ---- the mates' units (game_swarm.cpp: zombie_nights.mjs zombie-sync, military_response.mjs mil-snap;
   // the police and the sandbox enemies the same way)
   struct RemoteUnit {
@@ -333,7 +329,7 @@ class Game {
     bool fallen = false;  // an officer / enemy who went down: his body lies here, the unit only waits to be dropped
   };
   struct RemoteSwarm { f64 seen = 0; std::vector<RemoteUnit> units; };
-  std::unordered_map<u8, RemoteSwarm> swarms_;
+  kern::Map<u8, RemoteSwarm> swarms_;
   f64 swarm_clock_ = 0;
   u16 swarm_serial_ = 0;
   // ours as last sent: an officer or enemy missing from the next list who lies dead is sent on for
@@ -360,7 +356,7 @@ class Game {
   std::string bigmap_json(f32 cx, f32 cy, f32 range);
   void update_nav();
   bool project_screen(Vec3 p, f32& x, f32& y, f32& depth) const;
-  void mix_voice(f32* out, u32 frames);
+  void mix_voice(std::vector<f32>& out, u32 frames);
   void update_net(f32 dt);
   net::PlayerState my_state() const;
   void rebase_origin(f64 lon, f64 lat);
@@ -452,7 +448,7 @@ class Game {
   f32 traffic_rules(i32 car, Vec3 pos, Vec3 fwd, f32 speed);
   /// The speed the vehicle ahead leaves car `car` (world_traffic.h gap_speed); `limiter`: the car
   /// it is (an index into cars_), or -1.
-  f32 traffic_gap(i32 car, Vec3 pos, Vec3 fwd, i32* limiter = nullptr);
+  f32 traffic_gap(i32 car, Vec3 pos, Vec3 fwd, i32& limiter);
   f32 traffic_lane_distance(const TrafficCar& c) const;  // how far it is off its lane's line (tests)
   void eject_driver(i32 car);
   void update_traffic_world(f32 dt);
@@ -483,7 +479,7 @@ class Game {
   void ui_equipment(f32 dt);
   void ui_radio(i32 dir);
   void ui_mix_equipment(f32 dt);
-  void ui_render_music(f32* out, u32 frames);
+  void ui_render_music(std::vector<f32>& out, u32 frames);
   bool ui_equipment_command(const std::string& cmd, std::string& out);
   std::string ui_equipment_json();
 
@@ -557,6 +553,8 @@ class Game {
   bool gaps_command(const std::string& cmd, std::string& out);
   void gaps_camera(kern::Camera& c);
   bool gaps_can_spawn(Vec3 p, f32 height, f32 far_entry) const;
+  /// Who watches arrivals now (gaps_can_spawn's viewers); false: nobody - anything may appear.
+  bool gaps_spawn_viewers(std::vector<spawn::Viewer>& vs) const;
   bool gaps_vehicle_spawn_ok(i32 car, Vec3 pos, f32 yaw) const;
   bool car_towed(i32 car) const;  // a tow truck has it as its job (game_traffic.cpp)
   bool gaps_drone_due(u32 slot, i32 stars);
@@ -588,7 +586,8 @@ class Game {
   bool gaps_riding() const;
   bool gaps_ride_pose(Vec3& p, Quat& q) const;
   bool gaps_seat_press();
-  i32 gaps_boardable(f32* dist = nullptr) const;
+  i32 gaps_boardable(f32& dist) const;
+  i32 gaps_boardable() const;
   void gaps_leave_ride();
   void gaps_seats_update(f32 dt);
   bool gaps_ride_camera(kern::Camera& c);
@@ -668,8 +667,6 @@ class Game {
   i32 drone_cam_ = 0;        // 0 fpv, 1 follow, 2 third (the page restores the player's last choice; FPV first)
   bool car_cockpit_ = false, jet_cockpit_ = false;
   f32 fpv_tilt_deg_ = -15, fpv_fov_deg_ = 105;
-  f32 jet_pitch_rate_ = 0, jet_roll_rate_ = 0;  // mouse rate commands (tau 25 ms)
-  f32 drone_yaw_rate_ = 0;
   Spot spawn_{};
   kern::Camera cam_;
   bool cam_valid_ = false;
@@ -729,8 +726,7 @@ class Game {
   net::Session net_;
   std::unique_ptr<Car> remote_car_, remote_bus_;
   bool rebased_ = false;
-  u8 my_color_ = 0;
-  std::unique_ptr<MpLocal, MpLocalDelete> mp_;  // pings, feed, voice, big map (game_net.cpp)
+  std::unique_ptr<MpLocal> mp_;  // pings, feed, voice, big map (game_net.h)
   // street lamps and night
   struct Lamp { Vec3 foot; f32 yaw; u32 lane; u8 state = 0; };  // state: street_lamps.mjs 0 lit, 1 dark, 2 down
   std::vector<Lamp> lamps_;
@@ -738,7 +734,7 @@ class Game {
   std::vector<kern::Vec4> ground_changes_;  // where the ground changed this frame (city_stream.h take_ground_changes)
   f32 night_ = 0;
   bool show_lamps_ = true;
-  f32 star_since_ = -1, last_wave_ = -99, last_cop_shot_ = -99, drone_hp_ = 100, jet_hp_ = 400, town_clock_ = 0;  // jet: jet_mode.mjs HP_MAX 400
+  f32 star_since_ = -1, last_wave_ = -99, last_cop_shot_ = -99, drone_hp_ = 100, jet_hp_ = 400;  // jet: jet_mode.mjs HP_MAX 400
   i32 last_stars_ = 0;
   bool player_dead_ = false;
   // vs_combat_presentation.mjs: down until the player asks (R / Enter / Space, pad A / Y, the
@@ -756,8 +752,7 @@ class Game {
   Vec3 spawn_guard_;  // x, y, yaw (deg)
   f32 spawn_guard_until_ = -1, spawn_guard_ready_at_ = -1;
   f32 respawn_wait() const { return player_dead_ && died_at_ >= 0 ? std::fmax(0.0f, kRespawnCooldown - (world_->sim_time() - died_at_)) : -1; }
-  // rules / feedback
-  wanted::Tracker wanted_;
+  // rules / feedback (the wanted level is the "Wanted" Blueprint's: wanted.h)
   std::string hint_, toast_;
   f32 toast_age_ = 99;
   f64 time_ = 0;

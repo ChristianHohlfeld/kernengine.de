@@ -41,14 +41,14 @@ SC_TEST(destruction_floors_collapse_and_reset) {
   city.update({0, 0, 0}, 2);
   city.take_requests();
   const std::vector<u8> bytes = one_house_tile();
-  city.provide(key, bytes.data(), bytes.size());
+  city.provide(key, bytes);
   const f64 give_up = kern::now_ms() + 60000;
   while ((city.stats().t_built < 0 || city.stats().t_collision < 0) && kern::now_ms() < give_up) city.update({0, 0, 0}, 3);
   SC_CHECK(std::fabs(roof(world) - 21) < 0.05f, "the house stands 21 m (%.2f)", roof(world));
   // facade_marks.mjs glassAt / addGlassCrack: rounds on a wall crack its panes, not its piers
   {
     Marks marks;
-    Rng mr(9);
+    Rng mr{9};
     std::vector<CityStream::Wall> walls;
     city.walls_near({0, 0}, 20, walls);
     SC_CHECK(!walls.empty(), "the house has walls");
@@ -68,7 +68,7 @@ SC_TEST(destruction_floors_collapse_and_reset) {
 
   Destruction d;
   d.init(r);
-  Rng rng(5);
+  Rng rng{5};
   // a rocket on the roof (blast 9.5 m, 160): whole floors off, the collider at once
   SC_CHECK(d.blast({0, 0, 22}, 9.5f, 160, false, city, rng) == 1, "one building hit");
   const f32 after = roof(world);

@@ -19,10 +19,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -35,8 +35,13 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-enum class Type : u8 { null, boolean, number, string, array, object };
-namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; }
+namespace json { enum class Type : u8 { null, boolean, number, string, array, object }; }
+namespace logic { enum class PinType : u8 {
+  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
+  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
+  map, set, count
+}; }
+namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
 enum class Opt : u8 {
   // mouse_settings.mjs
   mouse_sensitivity, mouse_invert_y,
@@ -86,15 +91,15 @@ struct Settings {
 
 [[maybe_unused]] static Settings draw_Settings(converted::Draw& draw) {
   Settings s{};
-  for (auto& e : s.v_) e = draw.number();
+  converted::fill_array(s.v_, [&]() -> double { return draw.number(); });
   s.version_ = static_cast<unsigned int>(draw.below(40));
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const Settings& s) { return converted::Value::structure({arg(std::vector<double>(std::begin(s.v_), std::end(s.v_))), arg(s.version_)}); }
-[[maybe_unused]] static bool same(const Settings& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(std::vector<double>(std::begin(want.v_), std::end(want.v_)), (*got.rows)[0]) && same(want.version_, (*got.rows)[1]); }
-[[maybe_unused]] static bool defined(const Settings& s) { return defined(std::vector<double>(std::begin(s.v_), std::end(s.v_))) && defined(s.version_); }
-[[maybe_unused]] static std::string text(const Settings& s) { return std::string("{") + text(std::vector<double>(std::begin(s.v_), std::end(s.v_))) + ", " + text(s.version_) + "}"; }
-[[maybe_unused]] static void take(Settings& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[0]); for (std::size_t k = 0; k < items.size() && k < std::size(s.v_); ++k) s.v_[k] = items[k]; } converted::take_as<unsigned int>(s.version_, (*v.rows)[1]); }
+[[maybe_unused]] static converted::Value arg(const Settings& s) { return converted::Value::structure({arg(converted::array_list(s.v_)), arg(s.version_)}); }
+[[maybe_unused]] static bool same(const Settings& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(converted::array_list(want.v_), (*got.rows)[0]) && same(want.version_, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Settings& s) { return defined(converted::array_list(s.v_)) && defined(s.version_); }
+[[maybe_unused]] static std::string text(const Settings& s) { return std::string("{") + text(converted::array_list(s.v_)) + ", " + text(s.version_) + "}"; }
+[[maybe_unused]] static void take(Settings& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[0]); converted::array_from(s.v_, items); } converted::take_as<unsigned int>(s.version_, (*v.rows)[1]); }
 
 SC_TEST(converted_settings) {
   converted::Blueprint bp("settings");
@@ -103,16 +108,19 @@ SC_TEST(converted_settings) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Settings a0, [[maybe_unused]] Opt a1) { return converted::counted([&] { return a0.get(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Settings a0 = draw_Settings(draw);
-      const Opt a1 = static_cast<Opt>(draw.below(61));
+      Settings a0 = draw_Settings(draw);
+      Opt a1 = static_cast<Opt>(draw.below(61));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Settings::on
@@ -120,16 +128,19 @@ SC_TEST(converted_settings) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Settings a0, [[maybe_unused]] Opt a1) { return converted::counted([&] { return a0.on(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Settings a0 = draw_Settings(draw);
-      const Opt a1 = static_cast<Opt>(draw.below(61));
+      Settings a0 = draw_Settings(draw);
+      Opt a1 = static_cast<Opt>(draw.below(61));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Settings::version
@@ -137,15 +148,18 @@ SC_TEST(converted_settings) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Settings a0) { return converted::counted([&] { return a0.version(); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Settings a0 = draw_Settings(draw);
+      Settings a0 = draw_Settings(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

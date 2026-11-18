@@ -58,7 +58,7 @@ SC_TEST(terrain_dem_tiles) {
   u8 px[4];
   const f64 v = 512.25 + 32768;
   px[0] = static_cast<u8>(static_cast<u32>(v) / 256); px[1] = static_cast<u8>(static_cast<u32>(v) % 256); px[2] = 64;
-  SC_CHECK(std::fabs(terrarium_height(px) - 512.25f) < 0.01f, "terrarium decode %.2f", terrarium_height(px));
+  SC_CHECK(std::fabs(terrarium_height(px[0], px[1], px[2]) - 512.25f) < 0.01f, "terrarium decode %.2f", terrarium_height(px[0], px[1], px[2]));
 
   kern::Renderer r;
   r.init(kern::RendererOptions{});
@@ -78,7 +78,7 @@ SC_TEST(terrain_dem_tiles) {
     if (std::sscanf(req.c_str() + at, "[%d,%d,%d]", &z, &x, &y) != 3) continue;
     const TileKey k{z, x, y};
     const std::vector<u8> tile = ramp_tile(k);
-    t.provide(k, tile.data(), 256, 256);
+    t.provide(k, tile, 256, 256);
   }
   int frames = 0;
   // the elevation grid is built in a job (another thread here): wait for it by the clock
@@ -149,7 +149,7 @@ SC_TEST(terrain_ground_imagery) {
   std::size_t at = 1;
   while ((at = req.find('[', at)) != std::string::npos) {
     int z, x, y;
-    if (std::sscanf(req.c_str() + at, "[%d,%d,%d]", &z, &x, &y) == 3) t.provide_image(TileKey{z, x, y}, px.data(), 256, 256);
+    if (std::sscanf(req.c_str() + at, "[%d,%d,%d]", &z, &x, &y) == 3) t.provide_image(TileKey{z, x, y}, px, 256, 256);
     ++at;
   }
   for (int i = 0; i < 50; ++i) t.update({0, 0, 0}, {0, 0, 0}, 20);

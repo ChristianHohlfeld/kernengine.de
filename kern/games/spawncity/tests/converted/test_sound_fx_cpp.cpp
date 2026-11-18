@@ -18,10 +18,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -34,17 +34,28 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Whole64 {
-  u32 high = 0;
-  u32 low = 0;
+struct Mesh : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
 };
-enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter };
+struct HeightSampler : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
+struct World : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct MouseGrab : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct CharacterMover : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
 inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
-enum class Bus : u8 { master = 0, music, sfx, ambience, ui, voice, count };
-enum class Rolloff : u8 { inverse = 0, linear, exponential };
-using ClipId = u32;
-using VoiceId = u64;
-struct PlayParams {
+namespace audio { enum class Bus : u8 { master = 0, music, sfx, ambience, ui, voice, count }; }
+namespace audio { enum class Rolloff : u8 { inverse = 0, linear, exponential }; }
+namespace audio { using ClipId = u32; }
+namespace audio { using VoiceId = u64; }
+namespace audio { struct PlayParams {
   f32 volume = 1;       // linear gain
   f32 pitch = 1;        // playback-rate factor (0.05 .. 8)
   f32 pan = 0;          // -1 left .. 1 right (2D voices)
@@ -61,11 +72,14 @@ struct PlayParams {
   Rolloff rolloff = Rolloff::inverse;
   f32 spread = 0;         // 0 point source .. 1 fully enveloping (no panning)
   f32 doppler = 1;        // 0 disables the Doppler shift for this voice
-};
+}; }
 struct Mixer : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+  unsigned int sample_rate() const;
+  unsigned int adopt_clip(const std::vector<double>& samples, const unsigned int& channels, const std::string& name, const bool& loopable = false) const;
   void stop(const unsigned long& voice, const double& fade = 0) const;
   bool playing(const unsigned long& voice) const;
-  u64 play(const unsigned int& clip, const PlayParams& params) const;
+  u64 play(const unsigned int& clip, const audio::PlayParams& params) const;
   void set_volume(const unsigned long& voice, const double& volume, const double& ramp = 0.03) const;
   void set_pitch(const unsigned long& voice, const double& pitch) const;
   void set_position(const unsigned long& voice, const Vec3& position, const Vec3& velocity = {}) const;
@@ -83,14 +97,14 @@ struct SoundState {
 };
 struct SoundFx {
  public:
-  
+  bool init(Mixer& mixer);
   void update(const SoundState& s, f32 dt);
   
 
  private:
   struct Loop {
-    ClipId clip = 0;
-    VoiceId voice = 0;
+    audio::ClipId clip = 0;
+    audio::VoiceId voice = 0;
     f32 volume = 0;
   };
   void drive(Loop& l, bool on, Vec3 pos, Vec3 vel, f32 volume, f32 pitch, bool spatial, f32 max_distance);
@@ -98,6 +112,153 @@ struct SoundFx {
   Mixer* mixer_ = nullptr;
   Loop rotor_, prop_wash_, engine_, turbine_, roar_, wind_, siren_;
 };
+namespace audio { enum class Wave : u8 { square, saw, sine, triangle, noise, pink, pulse }; }
+namespace audio { struct SynthPatch {
+  Wave wave = Wave::square;
+  f32 volume = 0.5;
+  // envelope (seconds): attack, sustain (with optional punch), release
+  f32 attack = 0.005, sustain = 0.1, punch = 0, release = 0.2;
+  // pitch
+  f32 frequency = 440;          // Hz at the start
+  f32 slide = 0;                // octaves per second
+  f32 slide_accel = 0;          // octaves per second^2
+  f32 min_frequency = 20;       // the slide stops here
+  f32 vibrato_depth = 0;        // semitones
+  f32 vibrato_rate = 6;         // Hz
+  f32 arp_ratio = 1;            // frequency multiplier after arp_time
+  f32 arp_time = 0;             // seconds, 0 = off
+  f32 duty = 0.5, duty_sweep = 0;  // square / pulse
+  f32 fm_ratio = 0, fm_depth = 0;   // sine FM: modulator ratio and index
+  // filters
+  f32 lowpass = 0;              // Hz, 0 = off
+  f32 lowpass_sweep = 0;        // octaves per second
+  f32 resonance = 0;            // 0..0.95
+  f32 highpass = 0;             // Hz, 0 = off
+  // modulation
+  f32 tremolo_depth = 0, tremolo_rate = 0;
+  f32 repeat = 0;               // seconds: restart the pitch envelope
+  f32 bitcrush = 0;             // 0..1 (sample-and-hold amount)
+  u32 seed = 1;                 // noise
+}; }
+namespace audio { std::vector<double> synthesize(const audio::SynthPatch& patch, const unsigned int& rate); }
+namespace audio { void mix_into(std::vector<double>& dst, const std::vector<double>& src, const double& offset_seconds, const unsigned int& rate, const double& gain = 1); }
+namespace audio { void make_seamless(std::vector<double>& samples, const unsigned int& rate, const double& crossfade); }
+namespace audio { void normalize(std::vector<double>& samples, const double& peak); }
+using audio::SynthPatch; std::vector<f32> loop_of(std::initializer_list<SynthPatch> layers, u32 rate, f32 seconds) {
+  std::vector<f32> out(converted::count(static_cast<std::size_t>(converted::fits<unsigned long>(seconds * rate))), 0.0);
+  for (SynthPatch p : layers) {
+    p.attack = 0.0;
+    p.sustain = seconds + 0.25;
+    p.release = 0.0;
+    audio::mix_into(out, audio::synthesize(p, rate), 0, rate, 1);
+  }
+  out.resize(converted::count(static_cast<std::size_t>(converted::fits<unsigned long>(seconds * rate))));
+  audio::make_seamless(out, rate, 0.12);
+  audio::normalize(out, 0.8);
+  return out;
+}
+using audio::SynthPatch; using audio::Wave; bool SoundFx::init(Mixer& mixer) {
+  mixer_ = &mixer;
+  const u32 rate = mixer.sample_rate();
+  if (!rate) return false;
+  // Drone: motor whine at 140 Hz with its harmonics (saw through a resonant low-pass), the blade
+  // pass at 100 Hz as a tremolo, prop wash as coloured noise.
+  {
+    SynthPatch motor;
+    motor.wave = Wave::saw;
+    motor.frequency = 140;
+    motor.lowpass = 2600;
+    motor.resonance = 0.35;
+    motor.tremolo_depth = 0.45;
+    motor.tremolo_rate = 100;
+    motor.volume = 0.6;
+    SynthPatch harm = motor;
+    harm.wave = Wave::square;
+    harm.frequency = 280;
+    harm.duty = 0.3;
+    harm.volume = 0.18;
+    harm.lowpass = 3800;
+    rotor_.clip = mixer.adopt_clip(loop_of({motor, harm}, rate, 1.0), 1, "spawncity:rotor", true);
+    SynthPatch wash;
+    wash.wave = Wave::pink;
+    wash.lowpass = 1400;
+    wash.highpass = 120;
+    wash.volume = 0.5;
+    wash.seed = 7;
+    prop_wash_.clip = mixer.adopt_clip(loop_of({wash}, rate, 2.0), 1, "spawncity:propwash", true);
+  }
+  // Car: a four-cylinder at idle (firing 30 Hz) with crank harmonics; pitch follows revs.
+  {
+    SynthPatch base;
+    base.wave = Wave::pulse;
+    base.duty = 0.22;
+    base.frequency = 55;
+    base.lowpass = 900;
+    base.resonance = 0.2;
+    base.volume = 0.6;
+    SynthPatch rumble;
+    rumble.wave = Wave::sine;
+    rumble.frequency = 27.5;
+    rumble.volume = 0.45;
+    SynthPatch intake;
+    intake.wave = Wave::noise;
+    intake.lowpass = 600;
+    intake.volume = 0.12;
+    intake.seed = 3;
+    engine_.clip = mixer.adopt_clip(loop_of({base, rumble, intake}, rate, 1.0), 1, "spawncity:engine", true);
+  }
+  // Jet: turbine whine (two inharmonic sines) and the exhaust roar (low-passed pink noise).
+  {
+    SynthPatch whine;
+    whine.wave = Wave::sine;
+    whine.frequency = 1180;
+    whine.vibrato_depth = 0.05;
+    whine.vibrato_rate = 3;
+    whine.volume = 0.35;
+    SynthPatch whine2 = whine;
+    whine2.frequency = 2240;
+    whine2.volume = 0.15;
+    turbine_.clip = mixer.adopt_clip(loop_of({whine, whine2}, rate, 1.0), 1, "spawncity:turbine", true);
+    SynthPatch roar;
+    roar.wave = Wave::pink;
+    roar.lowpass = 700;
+    roar.volume = 0.9;
+    roar.seed = 11;
+    SynthPatch crackle;
+    crackle.wave = Wave::noise;
+    crackle.lowpass = 2400;
+    crackle.highpass = 900;
+    crackle.volume = 0.12;
+    crackle.seed = 13;
+    roar_.clip = mixer.adopt_clip(loop_of({roar, crackle}, rate, 2.0), 1, "spawncity:roar", true);
+  }
+  {
+    SynthPatch air;
+    air.wave = Wave::pink;
+    air.lowpass = 900;
+    air.highpass = 60;
+    air.volume = 0.6;
+    air.seed = 21;
+    wind_.clip = mixer.adopt_clip(loop_of({air}, rate, 3.0), 1, "spawncity:wind", true);
+  }
+  // Police siren: a wail sweeping 650..1450 Hz (two cycles in the 4 s loop) with a little grit.
+  {
+    SynthPatch wail;
+    wail.wave = Wave::triangle;
+    wail.frequency = 970;
+    wail.vibrato_depth = 7;  // semitones: about 650 .. 1450 Hz
+    wail.vibrato_rate = 0.5;
+    wail.lowpass = 3200;
+    wail.volume = 0.7;
+    SynthPatch grit = wail;
+    grit.wave = Wave::square;
+    grit.duty = 0.5;
+    grit.lowpass = 2200;
+    grit.volume = 0.12;
+    siren_.clip = mixer.adopt_clip(loop_of({wail, grit}, rate, 4.0), 1, "spawncity:siren", true);
+  }
+  return rotor_.clip && engine_.clip && turbine_.clip && roar_.clip && wind_.clip;
+}
 void SoundFx::drive(Loop& l, bool on, Vec3 pos, Vec3 vel, f32 volume, f32 pitch, bool spatial, f32 max_distance) {
   if (!mixer_ || !l.clip) return;
   if (!on || volume < 0.002) {
@@ -105,7 +266,7 @@ void SoundFx::drive(Loop& l, bool on, Vec3 pos, Vec3 vel, f32 volume, f32 pitch,
     return;
   }
   if (!l.voice || !mixer_->playing(l.voice)) {
-    PlayParams p;
+    audio::PlayParams p;
     p.loop = true;
     p.volume = volume;
     p.pitch = pitch;
@@ -114,7 +275,7 @@ void SoundFx::drive(Loop& l, bool on, Vec3 pos, Vec3 vel, f32 volume, f32 pitch,
     p.velocity = vel;
     p.min_distance = 3;
     p.max_distance = max_distance;
-    p.bus = Bus::sfx;
+    p.bus = audio::Bus::sfx;
     p.fade_in = 0.1;
     l.voice = mixer_->play(l.clip, p);
     return;
@@ -139,6 +300,44 @@ void SoundFx::update(const SoundState& s, f32 dt) {
 #undef protected
 #pragma GCC diagnostic pop
 
+[[maybe_unused]] static audio::SynthPatch draw_kern__audio__SynthPatch(converted::Draw& draw) {
+  audio::SynthPatch s{};
+  s.wave = static_cast<audio::Wave>(draw.below(7));
+  s.volume = draw.number();
+  s.attack = draw.number();
+  s.sustain = draw.number();
+  s.punch = draw.number();
+  s.release = draw.number();
+  s.frequency = draw.number();
+  s.slide = draw.number();
+  s.slide_accel = draw.number();
+  s.min_frequency = draw.number();
+  s.vibrato_depth = draw.number();
+  s.vibrato_rate = draw.number();
+  s.arp_ratio = draw.number();
+  s.arp_time = draw.number();
+  s.duty = draw.number();
+  s.duty_sweep = draw.number();
+  s.fm_ratio = draw.number();
+  s.fm_depth = draw.number();
+  s.lowpass = draw.number();
+  s.lowpass_sweep = draw.number();
+  s.resonance = draw.number();
+  s.highpass = draw.number();
+  s.tremolo_depth = draw.number();
+  s.tremolo_rate = draw.number();
+  s.repeat = draw.number();
+  s.bitcrush = draw.number();
+  s.seed = static_cast<unsigned int>(draw.below(40));
+  return s;
+}
+namespace audio { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const audio::SynthPatch& s) { return converted::Value::structure({arg(s.wave), arg(s.volume), arg(s.attack), arg(s.sustain), arg(s.punch), arg(s.release), arg(s.frequency), arg(s.slide), arg(s.slide_accel), arg(s.min_frequency), arg(s.vibrato_depth), arg(s.vibrato_rate), arg(s.arp_ratio), arg(s.arp_time), arg(s.duty), arg(s.duty_sweep), arg(s.fm_ratio), arg(s.fm_depth), arg(s.lowpass), arg(s.lowpass_sweep), arg(s.resonance), arg(s.highpass), arg(s.tremolo_depth), arg(s.tremolo_rate), arg(s.repeat), arg(s.bitcrush), arg(s.seed)}); }
+[[maybe_unused]] static bool same(const audio::SynthPatch& want, const converted::Value& got) { return got.rows && got.rows->size() == 27 && same(want.wave, (*got.rows)[0]) && same(want.volume, (*got.rows)[1]) && same(want.attack, (*got.rows)[2]) && same(want.sustain, (*got.rows)[3]) && same(want.punch, (*got.rows)[4]) && same(want.release, (*got.rows)[5]) && same(want.frequency, (*got.rows)[6]) && same(want.slide, (*got.rows)[7]) && same(want.slide_accel, (*got.rows)[8]) && same(want.min_frequency, (*got.rows)[9]) && same(want.vibrato_depth, (*got.rows)[10]) && same(want.vibrato_rate, (*got.rows)[11]) && same(want.arp_ratio, (*got.rows)[12]) && same(want.arp_time, (*got.rows)[13]) && same(want.duty, (*got.rows)[14]) && same(want.duty_sweep, (*got.rows)[15]) && same(want.fm_ratio, (*got.rows)[16]) && same(want.fm_depth, (*got.rows)[17]) && same(want.lowpass, (*got.rows)[18]) && same(want.lowpass_sweep, (*got.rows)[19]) && same(want.resonance, (*got.rows)[20]) && same(want.highpass, (*got.rows)[21]) && same(want.tremolo_depth, (*got.rows)[22]) && same(want.tremolo_rate, (*got.rows)[23]) && same(want.repeat, (*got.rows)[24]) && same(want.bitcrush, (*got.rows)[25]) && same(want.seed, (*got.rows)[26]); }
+[[maybe_unused]] static bool defined(const audio::SynthPatch& s) { return defined(s.wave) && defined(s.volume) && defined(s.attack) && defined(s.sustain) && defined(s.punch) && defined(s.release) && defined(s.frequency) && defined(s.slide) && defined(s.slide_accel) && defined(s.min_frequency) && defined(s.vibrato_depth) && defined(s.vibrato_rate) && defined(s.arp_ratio) && defined(s.arp_time) && defined(s.duty) && defined(s.duty_sweep) && defined(s.fm_ratio) && defined(s.fm_depth) && defined(s.lowpass) && defined(s.lowpass_sweep) && defined(s.resonance) && defined(s.highpass) && defined(s.tremolo_depth) && defined(s.tremolo_rate) && defined(s.repeat) && defined(s.bitcrush) && defined(s.seed); }
+[[maybe_unused]] static std::string text(const audio::SynthPatch& s) { return std::string("{") + text(s.wave) + ", " + text(s.volume) + ", " + text(s.attack) + ", " + text(s.sustain) + ", " + text(s.punch) + ", " + text(s.release) + ", " + text(s.frequency) + ", " + text(s.slide) + ", " + text(s.slide_accel) + ", " + text(s.min_frequency) + ", " + text(s.vibrato_depth) + ", " + text(s.vibrato_rate) + ", " + text(s.arp_ratio) + ", " + text(s.arp_time) + ", " + text(s.duty) + ", " + text(s.duty_sweep) + ", " + text(s.fm_ratio) + ", " + text(s.fm_depth) + ", " + text(s.lowpass) + ", " + text(s.lowpass_sweep) + ", " + text(s.resonance) + ", " + text(s.highpass) + ", " + text(s.tremolo_depth) + ", " + text(s.tremolo_rate) + ", " + text(s.repeat) + ", " + text(s.bitcrush) + ", " + text(s.seed) + "}"; }
+[[maybe_unused]] static void take(audio::SynthPatch& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 27) return; converted::take_as<audio::Wave>(s.wave, (*v.rows)[0]); converted::take_as<double>(s.volume, (*v.rows)[1]); converted::take_as<double>(s.attack, (*v.rows)[2]); converted::take_as<double>(s.sustain, (*v.rows)[3]); converted::take_as<double>(s.punch, (*v.rows)[4]); converted::take_as<double>(s.release, (*v.rows)[5]); converted::take_as<double>(s.frequency, (*v.rows)[6]); converted::take_as<double>(s.slide, (*v.rows)[7]); converted::take_as<double>(s.slide_accel, (*v.rows)[8]); converted::take_as<double>(s.min_frequency, (*v.rows)[9]); converted::take_as<double>(s.vibrato_depth, (*v.rows)[10]); converted::take_as<double>(s.vibrato_rate, (*v.rows)[11]); converted::take_as<double>(s.arp_ratio, (*v.rows)[12]); converted::take_as<double>(s.arp_time, (*v.rows)[13]); converted::take_as<double>(s.duty, (*v.rows)[14]); converted::take_as<double>(s.duty_sweep, (*v.rows)[15]); converted::take_as<double>(s.fm_ratio, (*v.rows)[16]); converted::take_as<double>(s.fm_depth, (*v.rows)[17]); converted::take_as<double>(s.lowpass, (*v.rows)[18]); converted::take_as<double>(s.lowpass_sweep, (*v.rows)[19]); converted::take_as<double>(s.resonance, (*v.rows)[20]); converted::take_as<double>(s.highpass, (*v.rows)[21]); converted::take_as<double>(s.tremolo_depth, (*v.rows)[22]); converted::take_as<double>(s.tremolo_rate, (*v.rows)[23]); converted::take_as<double>(s.repeat, (*v.rows)[24]); converted::take_as<double>(s.bitcrush, (*v.rows)[25]); converted::take_as<unsigned int>(s.seed, (*v.rows)[26]); }
+}
 [[maybe_unused]] static SoundFx::Loop draw_SoundFx__Loop(converted::Draw& draw) {
   SoundFx::Loop s{};
   s.clip = static_cast<unsigned int>(draw.below(40));
@@ -198,13 +397,13 @@ void SoundFx::update(const SoundState& s, f32 dt) {
 [[maybe_unused]] static bool defined(const SoundState& s) { return defined(s.drone) && defined(s.car) && defined(s.jet) && defined(s.siren) && defined(s.wind) && defined(s.drone_mix) && defined(s.vehicle_mix); }
 [[maybe_unused]] static std::string text(const SoundState& s) { return std::string("{") + text(s.drone) + ", " + text(s.car) + ", " + text(s.jet) + ", " + text(s.siren) + ", " + text(s.wind) + ", " + text(s.drone_mix) + ", " + text(s.vehicle_mix) + "}"; }
 [[maybe_unused]] static void take(SoundState& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<EngineSound>(s.drone, (*v.rows)[0]); converted::take_as<EngineSound>(s.car, (*v.rows)[1]); converted::take_as<EngineSound>(s.jet, (*v.rows)[2]); converted::take_as<EngineSound>(s.siren, (*v.rows)[3]); converted::take_as<double>(s.wind, (*v.rows)[4]); converted::take_as<double>(s.drone_mix, (*v.rows)[5]); converted::take_as<double>(s.vehicle_mix, (*v.rows)[6]); }
-[[maybe_unused]] static PlayParams draw_kern__audio__PlayParams(converted::Draw& draw) {
-  PlayParams s{};
+[[maybe_unused]] static audio::PlayParams draw_kern__audio__PlayParams(converted::Draw& draw) {
+  audio::PlayParams s{};
   s.volume = draw.number();
   s.pitch = draw.number();
   s.pan = draw.number();
   s.loop = draw.flag();
-  s.bus = static_cast<Bus>(draw.below(7));
+  s.bus = static_cast<audio::Bus>(draw.below(7));
   s.fade_in = draw.number();
   s.start = draw.number();
   s.priority = static_cast<int>(draw.whole());
@@ -213,22 +412,34 @@ void SoundFx::update(const SoundState& s, f32 dt) {
   s.velocity = draw.vector();
   s.min_distance = draw.number();
   s.max_distance = draw.number();
-  s.rolloff = static_cast<Rolloff>(draw.below(3));
+  s.rolloff = static_cast<audio::Rolloff>(draw.below(3));
   s.spread = draw.number();
   s.doppler = draw.number();
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const PlayParams& s) { return converted::Value::structure({arg(s.volume), arg(s.pitch), arg(s.pan), arg(s.loop), arg(s.bus), arg(s.fade_in), arg(s.start), arg(s.priority), arg(s.spatial), arg(s.position), arg(s.velocity), arg(s.min_distance), arg(s.max_distance), arg(s.rolloff), arg(s.spread), arg(s.doppler)}); }
-[[maybe_unused]] static bool same(const PlayParams& want, const converted::Value& got) { return got.rows && got.rows->size() == 16 && same(want.volume, (*got.rows)[0]) && same(want.pitch, (*got.rows)[1]) && same(want.pan, (*got.rows)[2]) && same(want.loop, (*got.rows)[3]) && same(want.bus, (*got.rows)[4]) && same(want.fade_in, (*got.rows)[5]) && same(want.start, (*got.rows)[6]) && same(want.priority, (*got.rows)[7]) && same(want.spatial, (*got.rows)[8]) && same(want.position, (*got.rows)[9]) && same(want.velocity, (*got.rows)[10]) && same(want.min_distance, (*got.rows)[11]) && same(want.max_distance, (*got.rows)[12]) && same(want.rolloff, (*got.rows)[13]) && same(want.spread, (*got.rows)[14]) && same(want.doppler, (*got.rows)[15]); }
-[[maybe_unused]] static bool defined(const PlayParams& s) { return defined(s.volume) && defined(s.pitch) && defined(s.pan) && defined(s.loop) && defined(s.bus) && defined(s.fade_in) && defined(s.start) && defined(s.priority) && defined(s.spatial) && defined(s.position) && defined(s.velocity) && defined(s.min_distance) && defined(s.max_distance) && defined(s.rolloff) && defined(s.spread) && defined(s.doppler); }
-[[maybe_unused]] static std::string text(const PlayParams& s) { return std::string("{") + text(s.volume) + ", " + text(s.pitch) + ", " + text(s.pan) + ", " + text(s.loop) + ", " + text(s.bus) + ", " + text(s.fade_in) + ", " + text(s.start) + ", " + text(s.priority) + ", " + text(s.spatial) + ", " + text(s.position) + ", " + text(s.velocity) + ", " + text(s.min_distance) + ", " + text(s.max_distance) + ", " + text(s.rolloff) + ", " + text(s.spread) + ", " + text(s.doppler) + "}"; }
-[[maybe_unused]] static void take(PlayParams& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 16) return; converted::take_as<double>(s.volume, (*v.rows)[0]); converted::take_as<double>(s.pitch, (*v.rows)[1]); converted::take_as<double>(s.pan, (*v.rows)[2]); converted::take_as<bool>(s.loop, (*v.rows)[3]); converted::take_as<Bus>(s.bus, (*v.rows)[4]); converted::take_as<double>(s.fade_in, (*v.rows)[5]); converted::take_as<double>(s.start, (*v.rows)[6]); converted::take_as<int>(s.priority, (*v.rows)[7]); converted::take_as<bool>(s.spatial, (*v.rows)[8]); converted::take_as<Vec3>(s.position, (*v.rows)[9]); converted::take_as<Vec3>(s.velocity, (*v.rows)[10]); converted::take_as<double>(s.min_distance, (*v.rows)[11]); converted::take_as<double>(s.max_distance, (*v.rows)[12]); converted::take_as<Rolloff>(s.rolloff, (*v.rows)[13]); converted::take_as<double>(s.spread, (*v.rows)[14]); converted::take_as<double>(s.doppler, (*v.rows)[15]); }
-inline void Mixer::stop(const unsigned long& voice, const double& fade) const { const std::vector<converted::Value> out = converted::engine_call("engine.mixer.stop", {arg(*this), arg(voice), arg(fade)}); }
-inline bool Mixer::playing(const unsigned long& voice) const { const std::vector<converted::Value> out = converted::engine_call("engine.mixer.playing", {arg(*this), arg(voice)}); bool result{}; converted::take_as<bool>(result, out[0]); return result; }
-inline u64 Mixer::play(const unsigned int& clip, const PlayParams& params) const { const std::vector<converted::Value> out = converted::engine_call("engine.mixer.play", {arg(*this), arg(clip), arg(params)}); u64 result{}; converted::take_as<converted::Whole>(result, out[0]); return result; }
-inline void Mixer::set_volume(const unsigned long& voice, const double& volume, const double& ramp) const { const std::vector<converted::Value> out = converted::engine_call("engine.mixer.set_volume", {arg(*this), arg(voice), arg(volume), arg(ramp)}); }
-inline void Mixer::set_pitch(const unsigned long& voice, const double& pitch) const { const std::vector<converted::Value> out = converted::engine_call("engine.mixer.set_pitch", {arg(*this), arg(voice), arg(pitch)}); }
-inline void Mixer::set_position(const unsigned long& voice, const Vec3& position, const Vec3& velocity) const { const std::vector<converted::Value> out = converted::engine_call("engine.mixer.set_position", {arg(*this), arg(voice), arg(position), arg(velocity)}); }
+namespace audio { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const audio::PlayParams& s) { return converted::Value::structure({arg(s.volume), arg(s.pitch), arg(s.pan), arg(s.loop), arg(s.bus), arg(s.fade_in), arg(s.start), arg(s.priority), arg(s.spatial), arg(s.position), arg(s.velocity), arg(s.min_distance), arg(s.max_distance), arg(s.rolloff), arg(s.spread), arg(s.doppler)}); }
+[[maybe_unused]] static bool same(const audio::PlayParams& want, const converted::Value& got) { return got.rows && got.rows->size() == 16 && same(want.volume, (*got.rows)[0]) && same(want.pitch, (*got.rows)[1]) && same(want.pan, (*got.rows)[2]) && same(want.loop, (*got.rows)[3]) && same(want.bus, (*got.rows)[4]) && same(want.fade_in, (*got.rows)[5]) && same(want.start, (*got.rows)[6]) && same(want.priority, (*got.rows)[7]) && same(want.spatial, (*got.rows)[8]) && same(want.position, (*got.rows)[9]) && same(want.velocity, (*got.rows)[10]) && same(want.min_distance, (*got.rows)[11]) && same(want.max_distance, (*got.rows)[12]) && same(want.rolloff, (*got.rows)[13]) && same(want.spread, (*got.rows)[14]) && same(want.doppler, (*got.rows)[15]); }
+[[maybe_unused]] static bool defined(const audio::PlayParams& s) { return defined(s.volume) && defined(s.pitch) && defined(s.pan) && defined(s.loop) && defined(s.bus) && defined(s.fade_in) && defined(s.start) && defined(s.priority) && defined(s.spatial) && defined(s.position) && defined(s.velocity) && defined(s.min_distance) && defined(s.max_distance) && defined(s.rolloff) && defined(s.spread) && defined(s.doppler); }
+[[maybe_unused]] static std::string text(const audio::PlayParams& s) { return std::string("{") + text(s.volume) + ", " + text(s.pitch) + ", " + text(s.pan) + ", " + text(s.loop) + ", " + text(s.bus) + ", " + text(s.fade_in) + ", " + text(s.start) + ", " + text(s.priority) + ", " + text(s.spatial) + ", " + text(s.position) + ", " + text(s.velocity) + ", " + text(s.min_distance) + ", " + text(s.max_distance) + ", " + text(s.rolloff) + ", " + text(s.spread) + ", " + text(s.doppler) + "}"; }
+[[maybe_unused]] static void take(audio::PlayParams& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 16) return; converted::take_as<double>(s.volume, (*v.rows)[0]); converted::take_as<double>(s.pitch, (*v.rows)[1]); converted::take_as<double>(s.pan, (*v.rows)[2]); converted::take_as<bool>(s.loop, (*v.rows)[3]); converted::take_as<audio::Bus>(s.bus, (*v.rows)[4]); converted::take_as<double>(s.fade_in, (*v.rows)[5]); converted::take_as<double>(s.start, (*v.rows)[6]); converted::take_as<int>(s.priority, (*v.rows)[7]); converted::take_as<bool>(s.spatial, (*v.rows)[8]); converted::take_as<Vec3>(s.position, (*v.rows)[9]); converted::take_as<Vec3>(s.velocity, (*v.rows)[10]); converted::take_as<double>(s.min_distance, (*v.rows)[11]); converted::take_as<double>(s.max_distance, (*v.rows)[12]); converted::take_as<audio::Rolloff>(s.rolloff, (*v.rows)[13]); converted::take_as<double>(s.spread, (*v.rows)[14]); converted::take_as<double>(s.doppler, (*v.rows)[15]); }
+}
+inline unsigned int Mixer::sample_rate() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.mixer.sample_rate", {converted::value_of(*this)}); unsigned int kern_result = converted::quiet<unsigned int>(); converted::take_as<unsigned int>(kern_result, kern_out[0]); return kern_result; }
+inline unsigned int Mixer::adopt_clip(const std::vector<double>& samples, const unsigned int& channels, const std::string& name, const bool& loopable) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.mixer.adopt_clip", {converted::value_of(*this), converted::value_of(samples), converted::value_of(channels), converted::value_of(name), converted::value_of(loopable)}); unsigned int kern_result = converted::quiet<unsigned int>(); converted::take_as<unsigned int>(kern_result, kern_out[0]); return kern_result; }
+inline void Mixer::stop(const unsigned long& voice, const double& fade) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.mixer.stop", {converted::value_of(*this), converted::value_of(voice), converted::value_of(fade)}); }
+inline bool Mixer::playing(const unsigned long& voice) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.mixer.playing", {converted::value_of(*this), converted::value_of(voice)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline u64 Mixer::play(const unsigned int& clip, const audio::PlayParams& params) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.mixer.play", {converted::value_of(*this), converted::value_of(clip), converted::value_of(params)}); u64 kern_result = converted::quiet<u64>(); converted::take_as<converted::Whole>(kern_result, kern_out[0]); return kern_result; }
+inline void Mixer::set_volume(const unsigned long& voice, const double& volume, const double& ramp) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.mixer.set_volume", {converted::value_of(*this), converted::value_of(voice), converted::value_of(volume), converted::value_of(ramp)}); }
+inline void Mixer::set_pitch(const unsigned long& voice, const double& pitch) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.mixer.set_pitch", {converted::value_of(*this), converted::value_of(voice), converted::value_of(pitch)}); }
+inline void Mixer::set_position(const unsigned long& voice, const Vec3& position, const Vec3& velocity) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.mixer.set_position", {converted::value_of(*this), converted::value_of(voice), converted::value_of(position), converted::value_of(velocity)}); }
+namespace audio { inline void mix_into(std::vector<double>& dst, const std::vector<double>& src, const double& offset_seconds, const unsigned int& rate, const double& gain) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.audio.mix_into", {converted::value_of(dst), converted::value_of(src), converted::value_of(offset_seconds), converted::value_of(rate), converted::value_of(gain)}); converted::take_as<std::vector<double>>(dst, kern_out[0]); } }
+namespace audio { inline std::vector<double> synthesize(const audio::SynthPatch& patch, const unsigned int& rate) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.audio.synthesize", {converted::value_of(patch), converted::value_of(rate)}); std::vector<double> kern_result = converted::quiet<std::vector<double>>(); converted::take_as<std::vector<double>>(kern_result, kern_out[0]); return kern_result; } }
+namespace audio { inline void make_seamless(std::vector<double>& samples, const unsigned int& rate, const double& crossfade) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.audio.make_seamless", {converted::value_of(samples), converted::value_of(rate), converted::value_of(crossfade)}); converted::take_as<std::vector<double>>(samples, kern_out[0]); } }
+namespace audio { inline void normalize(std::vector<double>& samples, const double& peak) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.audio.normalize", {converted::value_of(samples), converted::value_of(peak)}); converted::take_as<std::vector<double>>(samples, kern_out[0]); } }
+struct Out_SoundFx_init { SoundFx Self; bool Result; };
+[[maybe_unused]] static bool same(const Out_SoundFx_init& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_SoundFx_init& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_SoundFx_init& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_SoundFx_drive { SoundFx Self; SoundFx::Loop l; };
 [[maybe_unused]] static bool same(const Out_SoundFx_drive& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.l, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_SoundFx_drive& s) { return defined(s.Self) && defined(s.l); }
@@ -236,28 +447,72 @@ struct Out_SoundFx_drive { SoundFx Self; SoundFx::Loop l; };
 
 SC_TEST(converted_sound_fx_cpp) {
   converted::Blueprint bp("sound_fx_cpp");
-  {  // SoundFx::drive
-    converted::Tally tally("SoundFx_drive");
+  {  // loop_of
+    converted::Tally tally("loop_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] SoundFx a0, [[maybe_unused]] SoundFx::Loop a1, [[maybe_unused]] bool a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] Vec3 a4, [[maybe_unused]] double a5, [[maybe_unused]] double a6, [[maybe_unused]] bool a7, [[maybe_unused]] double a8) { converted::counted([&] { return a0.drive(a1, std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6), std::move(a7), std::move(a8)); }); return Out_SoundFx_drive{a0, a1}; };
+    const auto run = [&]([[maybe_unused]] std::vector<audio::SynthPatch> a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] double a2) { return converted::listed(a0, [&](std::initializer_list<audio::SynthPatch> l0) { return converted::counted([&] { return converted_sound_fx_cpp::loop_of(l0, std::move(a1), std::move(a2)); }); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const SoundFx a0 = draw_SoundFx(draw);
-      const SoundFx::Loop a1 = draw_SoundFx__Loop(draw);
-      const bool a2 = draw.flag();
-      const Vec3 a3 = draw.vector();
-      const Vec3 a4 = draw.vector();
-      const double a5 = draw.number();
-      const double a6 = draw.number();
-      const bool a7 = draw.flag();
-      const double a8 = draw.number();
+      std::vector<audio::SynthPatch> a0 = converted::draw_few(draw, [&]() -> audio::SynthPatch { return draw_kern__audio__SynthPatch(draw); });
+      unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3, a4, a5, a6, a7, a8);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5), arg(a6), arg(a7), arg(a8)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5) + ", " + text(a6) + ", " + text(a7) + ", " + text(a8); }, {0, 1});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // SoundFx::init
+    converted::Tally tally("SoundFx_init");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] SoundFx a0, [[maybe_unused]] Mixer& a1) { auto r = converted::counted([&] { return a0.init(a1); }); return Out_SoundFx_init{std::move(a0), std::move(r)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      SoundFx a0 = draw_SoundFx(draw);
+      Mixer& a1 = *converted::engine_object<Mixer>(1 + draw.below(6));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), a1);
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
+    }
+  }
+  {  // SoundFx::drive
+    converted::Tally tally("SoundFx_drive");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] SoundFx a0, [[maybe_unused]] SoundFx::Loop a1, [[maybe_unused]] bool a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] Vec3 a4, [[maybe_unused]] double a5, [[maybe_unused]] double a6, [[maybe_unused]] bool a7, [[maybe_unused]] double a8) { converted::counted([&] { return a0.drive(a1, std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6), std::move(a7), std::move(a8)); }); return Out_SoundFx_drive{std::move(a0), std::move(a1)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      SoundFx a0 = draw_SoundFx(draw);
+      SoundFx::Loop a1 = draw_SoundFx__Loop(draw);
+      bool a2 = draw.flag();
+      Vec3 a3 = draw.vector();
+      Vec3 a4 = draw.vector();
+      double a5 = draw.number();
+      double a6 = draw.number();
+      bool a7 = draw.flag();
+      double a8 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5), arg(a6), arg(a7), arg(a8)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6), std::move(a7), std::move(a8));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
   {  // SoundFx::update
@@ -265,17 +520,20 @@ SC_TEST(converted_sound_fx_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] SoundFx a0, [[maybe_unused]] SoundState a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.update(a1, std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
-      const SoundFx a0 = draw_SoundFx(draw);
-      const SoundState a1 = draw_SoundState(draw);
-      const double a2 = draw.number();
+      SoundFx a0 = draw_SoundFx(draw);
+      SoundState a1 = draw_SoundState(draw);
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

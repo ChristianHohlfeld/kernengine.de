@@ -209,14 +209,17 @@ void TouchPlay::apply_dom_rects() {
 
 bool TouchPlay::in_circle(f32 cx, f32 cy, f32 r, f32 x, f32 y) const { return std::hypot(x - cx, y - cy) <= r; }
 
-TouchBtn* TouchPlay::button_at(f32 x, f32 y) {
+i32 TouchPlay::button_at(f32 x, f32 y) const {
   // EMP first (foot_touch_controller.mjs hit-tests it before anything else).
-  for (TouchBtn& b : buttons_)
-    if (b.id == "emp" && x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return &b;
-  for (TouchBtn& b : buttons_) {
-    if (b.round ? in_circle(b.x + b.w / 2, b.y + b.h / 2, b.w / 2, x, y) : (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h)) return &b;
+  for (std::size_t i = 0; i < buttons_.size(); ++i) {
+    const TouchBtn& b = buttons_[i];
+    if (b.id == "emp" && x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return static_cast<i32>(i);
   }
-  return nullptr;
+  for (std::size_t i = 0; i < buttons_.size(); ++i) {
+    const TouchBtn& b = buttons_[i];
+    if (b.round ? in_circle(b.x + b.w / 2, b.y + b.h / 2, b.w / 2, x, y) : (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h)) return static_cast<i32>(i);
+  }
+  return -1;
 }
 
 bool TouchPlay::pointer(u32 type, i32 id, f32 x, f32 y, f64 t_ms) {
@@ -232,13 +235,14 @@ bool TouchPlay::pointer(u32 type, i32 id, f32 x, f32 y, f64 t_ms) {
     f.t0 = f.last_t = t_ms;
     const f32 r = kStick / 2;
     const f32 Lcx = sl_ + r, Lcy = h_ - sb_ - r, Rcx = w_ - sr_ - right_inset() - r, Rcy = h_ - sb_ - r;
-    if (TouchBtn* b = button_at(x, y)) {
+    if (const i32 at = button_at(x, y); at >= 0) {
+      TouchBtn& b = buttons_[static_cast<std::size_t>(at)];
       f.kind = Finger::press;
-      f.button = b->id;
-      b->pressed = true;
-      if (b->on_down) pressed_.push_back(b->id);
-      if (b->id == "clearance") { f.kind = Finger::clearance; clearance_ = controls::clearance_pad_axis(pad_y_ + pad_h_ / 2, y, pad_h_); }
-      if (b->id == "nade") nade_up_ = 0;
+      f.button = b.id;
+      b.pressed = true;
+      if (b.on_down) pressed_.push_back(b.id);
+      if (b.id == "clearance") { f.kind = Finger::clearance; clearance_ = controls::clearance_pad_axis(pad_y_ + pad_h_ / 2, y, pad_h_); }
+      if (b.id == "nade") nade_up_ = 0;
     } else if (lay_.aiming) {
       f.kind = Finger::strike;
     } else if (lay_.alive && !no_sticks() && in_circle(Lcx, Lcy, r, x, y)) {

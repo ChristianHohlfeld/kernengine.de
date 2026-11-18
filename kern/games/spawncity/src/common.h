@@ -76,8 +76,13 @@ inline BodyState read_body(const kern::physics::World& w, kern::physics::Body b)
 
 /// xorshift32: deterministic per seed, the same on every platform.
 struct Rng {
-  u32 s;
-  explicit Rng(u32 seed = 0x9e3779b9u) : s(seed ? seed : 0x9e3779b9u) {}
+  // Plain state: `Rng{seed}` starts at that seed, an Rng of its own starts at the default one. A
+  // seed must not be 0 (xorshift would stay there) - a seed that is computed goes through seeded().
+  u32 s = 0x9e3779b9u;
+  f32 spare_ = 0;           // gaussian(): the second number of a pair, kept for the next call
+  bool has_spare_ = false;
+  /// The generator for a seed that may be 0 (0: the default seed).
+  static Rng seeded(u32 seed) { return Rng{seed ? seed : 0x9e3779b9u}; }
   u32 next() { s ^= s << 13; s ^= s >> 17; s ^= s << 5; return s; }
   f32 unit() { return static_cast<f32>(next() >> 8) * (1.0f / 16777216.0f); }
   f32 range(f32 a, f32 b) { return a + (b - a) * unit(); }
@@ -90,10 +95,6 @@ struct Rng {
     has_spare_ = true;
     return r * std::cos(2 * kPi * v);
   }
-
- private:
-  f32 spare_ = 0;
-  bool has_spare_ = false;
 };
 
 /// Closest hit below/along a ray against the world, ignoring `self` (and sensors).

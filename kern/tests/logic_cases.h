@@ -99,6 +99,61 @@ inline const std::vector<Case>& cases() {
           {"id":6,"type":"var.set","params":{"variable":"H"}},{"id":7,"type":"math.formula","params":{"formula":"ceil(x * 0.7) + (x % 2 == 0 && x != 0) * 100"}}],
         "links":[[1,"then",2,"exec"],[1,"value",3,"value"],[3,"result",2,"value"],[2,"then",4,"exec"],[1,"value",5,"x"],[5,"result",4,"amount"],
           [4,"then",6,"exec"],[1,"value",7,"x"],[7,"result",6,"value"]]})kg"},
+      // The sign of -0 (Copy Sign, the formula's copysign): -Go's value is -0 for 0, and Copy Sign
+      // gives the size of 3 with that sign - -3 in every tier, where Sign of -0 says 0.
+      {"signed_zero",
+       R"kg({"variables":[{"name":"F","type":"float","value":0},{"name":"G","type":"float","value":0},{"name":"Signs","type":"float_list","value":[]}],
+        "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.add","params":{"variable":"G"}},{"id":3,"type":"math.negate"},
+          {"id":4,"type":"math.copysign","values":{"a":3}},{"id":5,"type":"var.set","params":{"variable":"F"}},
+          {"id":6,"type":"math.formula","params":{"formula":"copysign(1, z) * 100 + copysign(value, 1 - value)"}},{"id":7,"type":"list.add","params":{"variable":"Signs"}}],
+        "links":[[1,"then",2,"exec"],[1,"value",3,"a"],[3,"result",4,"b"],[4,"result",2,"amount"],[2,"then",5,"exec"],[3,"result",6,"z"],[1,"value",6,"value"],
+          [6,"result",5,"value"],[5,"then",7,"exec"],[6,"result",7,"item"]]})kg"},
+      // The bits of a float (Bits of Float 32, Float 32 of Bits: std::bit_cast) - of Go's value * 0.1 - 0.25 as a
+      // float, and the float of them again; and End Play, once, when play ends (Runtime::end).
+      {"float_bits_end",
+       R"kg({"variables":[{"name":"Bits","type":"int_list","value":[]},{"name":"Back","type":"float_list","value":[]},{"name":"Ended","type":"int","value":0}],
+        "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"list.add","params":{"variable":"Bits"}},
+          {"id":3,"type":"math.formula","params":{"formula":"value * 0.1 - 0.25"}},{"id":4,"type":"math.bits_of_float32"},
+          {"id":5,"type":"list.add","params":{"variable":"Back"}},{"id":6,"type":"math.float32_of_bits"},
+          {"id":7,"type":"event.end"},{"id":8,"type":"var.set","params":{"variable":"Ended"},"values":{"value":7}}],
+        "links":[[1,"then",2,"exec"],[1,"value",3,"value"],[3,"result",4,"a"],[4,"result",2,"item"],[2,"then",5,"exec"],[4,"result",6,"a"],[6,"result",5,"item"],
+          [7,"then",8,"exec"]]})kg"},
+      // The bytes of a struct (Bytes of Struct, Struct of Bytes): Go's value goes into a struct of
+      // numbers, its bytes into B, and back - from the first byte and from the second (the last byte
+      // missing: 0). Flags is cut to 16 bits, Speed to a float's, Vx is signed.
+      {"bytes",
+       R"kg({"structs":[{"name":"Frame","fields":[{"name":"Magic","type":"int","value":1447121230},{"name":"Seq","type":"int","value":0},{"name":"Vx","type":"int","value":-3},)kg"
+       R"kg({"name":"Flags","type":"int","value":70000},{"name":"On","type":"bool","value":true},{"name":"Speed","type":"float","value":0}]}],)kg"
+       R"kg("variables":[{"name":"B","type":"int_list","value":[]},{"name":"Back","type":"struct","of":"Frame","value":{}},{"name":"Shifted","type":"struct","of":"Frame","value":{}}],)kg"
+       R"kg("nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.set","params":{"variable":"B"}},)kg"
+       R"kg({"id":3,"type":"struct.bytes","params":{"struct":"Frame","layout":"16: u32@0 u16@4 i16@6 u16@8 bool@10 f32@12"}},{"id":4,"type":"struct.make","params":{"struct":"Frame"}},)kg"
+       R"kg({"id":5,"type":"math.formula","params":{"formula":"value * 0.1"}},{"id":6,"type":"math.round"},{"id":7,"type":"var.set","params":{"variable":"Back"}},)kg"
+       R"kg({"id":8,"type":"struct.of_bytes","params":{"struct":"Frame","layout":"16: u32@0 u16@4 i16@6 u16@8 bool@10 f32@12"}},{"id":9,"type":"var.get","params":{"variable":"B"}},)kg"
+       R"kg({"id":10,"type":"var.set","params":{"variable":"Shifted"}},)kg"
+       R"kg({"id":11,"type":"struct.of_bytes","params":{"struct":"Frame","layout":"16: u32@0 u16@4 i16@6 u16@8 bool@10 f32@12"},"values":{"at":1}}],)kg"
+       R"kg("links":[[1,"then",2,"exec"],[4,"value",3,"value"],[3,"bytes",2,"value"],[1,"value",5,"value"],[5,"result",4,"Speed"],[1,"value",6,"a"],[6,"result",4,"Seq"],)kg"
+       R"kg([2,"then",7,"exec"],[9,"value",8,"bytes"],[8,"value",7,"value"],[7,"then",10,"exec"],[9,"value",11,"bytes"],[11,"value",10,"value"]]})kg"},
+      // The bytes of lists of numbers (Copy Bytes, memcpy between them): floats into bytes (not all of
+      // them), bytes into floats from a place Go's value says (beyond the bytes: 0; the last float
+      // written in part keeps its other bytes), a list into itself (as memmove), an Int64 into bytes at
+      // a place beyond the list's end, whole numbers into a list of a fixed length of doubles, floats
+      // into bytes of whole numbers from before the list's start.
+      {"copy_bytes",
+       R"kg({"variables":[{"name":"B","type":"int_list","value":[0,0,0,0,0,0,0,0,0,0,0,0]},{"name":"F","type":"float_list","value":[0.1,-2.5,1e30]},)kg"
+       R"kg({"name":"G","type":"float_list","value":[9,9,9,9]},{"name":"W","type":"int_list","value":[70000,-3,7,65535]},{"name":"L","type":"int64_list","value":[]},)kg"
+       R"kg({"name":"Big","type":"int64","value":"18364758544493064720"},{"name":"Fx","type":"float_list","count":3,"value":[0.5,0.25,-1]}],)kg"
+       R"kg("nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},)kg"
+       R"kg({"id":2,"type":"list.copy_bytes","params":{"variable":"B","code":"u8","from_code":"f32"},"values":{"at":1,"from":0,"count":10}},{"id":3,"type":"var.get","params":{"variable":"F"}},)kg"
+       R"kg({"id":4,"type":"list.copy_bytes","params":{"variable":"G","code":"f32","from_code":"u8"},"values":{"at":0,"count":13}},{"id":5,"type":"math.round"},)kg"
+       R"kg({"id":6,"type":"var.get","params":{"variable":"B"}},)kg"
+       R"kg({"id":7,"type":"list.copy_bytes","params":{"variable":"W","code":"u16","from_code":"u16"},"values":{"at":1,"from":0,"count":5}},{"id":8,"type":"var.get","params":{"variable":"W"}},)kg"
+       R"kg({"id":15,"type":"list.add","params":{"variable":"L"}},{"id":16,"type":"var.get","params":{"variable":"Big"}},)kg"
+       R"kg({"id":9,"type":"list.copy_bytes","params":{"variable":"B","code":"u8","from_code":"i64"},"values":{"from":0,"count":16}},{"id":11,"type":"var.get","params":{"variable":"L"}},)kg"
+       R"kg({"id":12,"type":"list.copy_bytes","params":{"variable":"Fx","code":"f64","from_code":"i32"},"values":{"at":0,"from":1,"count":12}},)kg"
+       R"kg({"id":14,"type":"list.copy_bytes","params":{"variable":"W","code":"i8","from_code":"f32"},"values":{"at":-1,"from":0,"count":4}}],)kg"
+       R"kg("links":[[1,"then",2,"exec"],[3,"value",2,"items"],[2,"then",4,"exec"],[1,"value",5,"a"],[5,"result",4,"from"],[6,"value",4,"items"],)kg"
+       R"kg([4,"then",7,"exec"],[8,"value",7,"items"],[7,"then",15,"exec"],[16,"value",15,"item"],[15,"then",9,"exec"],[5,"result",9,"at"],[11,"value",9,"items"],)kg"
+       R"kg([9,"then",12,"exec"],[8,"value",12,"items"],[12,"then",14,"exec"],[3,"value",14,"items"]]})kg"},
       {"events_and_time",
        R"({"variables":[{"name":"Ticks","type":"int","value":0},{"name":"Elapsed","type":"float","value":0},{"name":"Heard","type":"float","value":0},{"name":"Last","type":"text","value":""}],
         "nodes":[{"id":1,"type":"event.tick"},{"id":2,"type":"var.add","params":{"variable":"Ticks"}},{"id":3,"type":"var.add","params":{"variable":"Elapsed"}},
@@ -377,6 +432,167 @@ inline const std::vector<Case>& cases() {
         {"name":"Outer","inputs":[{"name":"x","type":"float","value":1},
         {"name":"again","type":"bool","value":false}],"outputs":[{"name":"mine","type":"float","value":0}],"locals":[{"name":"Own","type":"float","value":0.25}]},
         {"name":"Join","inputs":[{"name":"a","type":"text","value":"a"}],"outputs":[{"name":"text","type":"text","value":""}],"locals":[{"name":"Total","type":"text","value":"<"}]}]})"},
+      // Lists of a fixed length (Fixed<Float, 3>): a variable, a field of a struct - also of structs
+      // in a fixed list -, an input, an output and a local variable of a function, a reference to
+      // one. Entries are set and read, also beside the list; a list set there as a whole is cut or
+      // filled up (a longer list, a shorter one, Make List, Make Struct, a Take leaves the zeros);
+      // read as a whole it is a list.
+      {"fixed_lists",
+       R"({"structs":[{"name":"Mat","fields":[{"name":"m","type":"float_list","count":4,"value":[1,0,0,1]},{"name":"Name","type":"text","value":"m"}]},
+          {"name":"Rig","fields":[{"name":"Bones","type":"struct_list","of":"Mat","count":2,"value":[{"m":[1,0,0,1],"Name":"a"},{"m":[2,0,0,2],"Name":"b"}]},{"name":"Free","type":"float_list","value":[]}]}],"variables":[
+          {"name":"Axis","type":"float_list","count":3,"value":[1,2,3]},{"name":"Tags","type":"text_list","count":2,"value":["x","y"]},
+          {"name":"Bits","type":"bool_list","count":3,"value":[true,false,true]},{"name":"Now","type":"struct","of":"Mat","value":{"m":[1,0,0,1],"Name":"now"}},
+          {"name":"Body","type":"struct","of":"Rig","value":{"Bones":[{"m":[1,0,0,1],"Name":"a"},{"m":[2,0,0,2],"Name":"b"}],"Free":[]}},
+          {"name":"Any","type":"float_list","value":[9]},{"name":"Shown","type":"text","value":""},{"name":"Sum","type":"float","value":0}],"nodes":[
+          {"id":3,"type":"flow.for","values":{"first":0,"last":2}},{"id":10,"type":"event.custom","params":{"name":"Go"}},
+          {"id":12,"type":"func.call","params":{"function":"Scaled"}},{"id":30,"type":"event.custom","params":{"name":"Open"}},
+          {"id":31,"type":"var.take","params":{"variable":"Axis"}},{"id":34,"type":"flow.for_each","params":{"type":"text"}},
+          {"id":35,"type":"func.entry","params":{"function":"Mul"}},{"id":36,"type":"var.set","params":{"variable":"R","scope":"Mul","path":".m[]"},"values":{"path0":0}},
+          {"id":37,"type":"math.add"},{"id":38,"type":"math.mul"},{"id":39,"type":"var.get","params":{"variable":"a","scope":"Mul","path":".m[]"},"values":{"path0":0}},
+          {"id":40,"type":"var.get","params":{"variable":"b","scope":"Mul","path":".m[]"},"values":{"path0":0}},{"id":41,"type":"math.mul"},
+          {"id":42,"type":"var.get","params":{"variable":"a","scope":"Mul","path":".m[]"},"values":{"path0":1}},
+          {"id":43,"type":"var.get","params":{"variable":"b","scope":"Mul","path":".m[]"},"values":{"path0":2}},
+          {"id":44,"type":"var.set","params":{"variable":"R","scope":"Mul","path":".m[]"},"values":{"path0":1}},{"id":45,"type":"math.add"},{"id":46,"type":"math.mul"},
+          {"id":47,"type":"var.get","params":{"variable":"a","scope":"Mul","path":".m[]"},"values":{"path0":0}},
+          {"id":48,"type":"var.get","params":{"variable":"b","scope":"Mul","path":".m[]"},"values":{"path0":1}},{"id":49,"type":"math.mul"},
+          {"id":50,"type":"var.get","params":{"variable":"a","scope":"Mul","path":".m[]"},"values":{"path0":1}},
+          {"id":51,"type":"var.get","params":{"variable":"b","scope":"Mul","path":".m[]"},"values":{"path0":3}},
+          {"id":52,"type":"var.set","params":{"variable":"R","scope":"Mul","path":".m[]"},"values":{"path0":2}},{"id":53,"type":"math.add"},{"id":54,"type":"math.mul"},
+          {"id":55,"type":"var.get","params":{"variable":"a","scope":"Mul","path":".m[]"},"values":{"path0":2}},
+          {"id":56,"type":"var.get","params":{"variable":"b","scope":"Mul","path":".m[]"},"values":{"path0":0}},{"id":57,"type":"math.mul"},
+          {"id":58,"type":"var.get","params":{"variable":"a","scope":"Mul","path":".m[]"},"values":{"path0":3}},
+          {"id":59,"type":"var.get","params":{"variable":"b","scope":"Mul","path":".m[]"},"values":{"path0":2}},
+          {"id":60,"type":"var.set","params":{"variable":"R","scope":"Mul","path":".m[]"},"values":{"path0":3}},{"id":61,"type":"math.add"},{"id":62,"type":"math.mul"},
+          {"id":63,"type":"var.get","params":{"variable":"a","scope":"Mul","path":".m[]"},"values":{"path0":2}},
+          {"id":64,"type":"var.get","params":{"variable":"b","scope":"Mul","path":".m[]"},"values":{"path0":1}},{"id":65,"type":"math.mul"},
+          {"id":66,"type":"var.get","params":{"variable":"a","scope":"Mul","path":".m[]"},"values":{"path0":3}},
+          {"id":67,"type":"var.get","params":{"variable":"b","scope":"Mul","path":".m[]"},"values":{"path0":3}},
+          {"id":68,"type":"var.set","params":{"variable":"R","scope":"Mul","path":".Name"}},{"id":69,"type":"text.append","values":{"b":"*"}},
+          {"id":70,"type":"var.get","params":{"variable":"a","scope":"Mul","path":".Name"}},{"id":71,"type":"var.get","params":{"variable":"b","scope":"Mul","path":".Name"}},
+          {"id":72,"type":"func.return","params":{"function":"Mul"}},{"id":73,"type":"var.get","params":{"variable":"R","scope":"Mul"}},
+          {"id":74,"type":"func.entry","params":{"function":"Scaled"}},{"id":75,"type":"var.set","params":{"variable":"Made","scope":"Scaled","path":"[]"}},
+          {"id":76,"type":"math.mul"},{"id":77,"type":"list.get","params":{"type":"float"}},{"id":78,"type":"func.return","params":{"function":"Scaled"}},
+          {"id":79,"type":"var.get","params":{"variable":"Made","scope":"Scaled"}},{"id":80,"type":"func.entry","params":{"function":"Bump"}},
+          {"id":81,"type":"var.add","params":{"variable":"axis","scope":"Bump","path":"[]"},"values":{"path0":0}},
+          {"id":82,"type":"var.set","params":{"variable":"axis","scope":"Bump","path":"[]"},"values":{"path0":5,"value":7}},
+          {"id":83,"type":"var.set","params":{"variable":"Axis","path":"[]"}},{"id":84,"type":"var.get","params":{"variable":"Axis"}},
+          {"id":85,"type":"var.set","params":{"variable":"Axis"}},{"id":86,"type":"var.set","params":{"variable":"Any"}},{"id":87,"type":"var.get","params":{"variable":"Axis"}},
+          {"id":88,"type":"list.add","params":{"variable":"Any"}},{"id":89,"type":"var.set","params":{"variable":"Axis"}},{"id":90,"type":"var.get","params":{"variable":"Any"}},
+          {"id":91,"type":"var.set","params":{"variable":"Tags"}},{"id":92,"type":"list.make","params":{"type":"text","count":"1"}},
+          {"id":93,"type":"func.call","params":{"function":"Bump","axis.variable":"Axis"},"values":{"by":0.5}},{"id":94,"type":"var.set","params":{"variable":"Now","path":".m"}},
+          {"id":95,"type":"list.make","params":{"type":"float","count":"4"},"values":{"item1":1,"item2":2,"item3":3}},
+          {"id":96,"type":"var.set","params":{"variable":"Body","path":".Bones[].m[]"},"values":{"path0":1,"path1":3}},
+          {"id":97,"type":"var.set","params":{"variable":"Body","path":".Bones[].Name"},"values":{"value":"hit"}},{"id":98,"type":"var.set","params":{"variable":"Now"}},
+          {"id":99,"type":"func.pure","params":{"function":"Mul","a.variable":"Now","b.variable":"Body","b.path":".Bones[]"},"values":{"b.path0":0}},
+          {"id":100,"type":"var.set","params":{"variable":"Bits","path":"[]"},"values":{"path0":1}},{"id":101,"type":"math.compare","params":{"op":">"},"values":{"b":3}},
+          {"id":102,"type":"var.add","params":{"variable":"Sum"}},{"id":103,"type":"math.add"},{"id":104,"type":"math.add"},
+          {"id":105,"type":"list.length","params":{"type":"float"}},{"id":106,"type":"var.get","params":{"variable":"Axis"}},
+          {"id":107,"type":"list.get","params":{"type":"float"},"values":{"index":3}},{"id":108,"type":"var.get","params":{"variable":"Now","path":".m"}},
+          {"id":109,"type":"list.find","params":{"type":"float"}},{"id":110,"type":"var.get","params":{"variable":"Axis"}},
+          {"id":111,"type":"var.set","params":{"variable":"Shown"}},{"id":112,"type":"text.append"},{"id":113,"type":"var.get","params":{"variable":"Shown"}},
+          {"id":114,"type":"var.get","params":{"variable":"Axis"}},{"id":115,"type":"list.contains","params":{"type":"text"},"values":{"item":""}},
+          {"id":116,"type":"var.get","params":{"variable":"Tags"}},{"id":117,"type":"var.set","params":{"variable":"Any"}},{"id":118,"type":"var.set","params":{"variable":"Body"}},
+          {"id":119,"type":"struct.make","params":{"struct":"Rig"}},{"id":120,"type":"list.make","params":{"type":"Mat","count":"1"}},
+          {"id":121,"type":"var.get","params":{"variable":"Now"}},{"id":122,"type":"var.get","params":{"variable":"Any"}},{"id":123,"type":"var.get","params":{"variable":"Tags"}},
+          {"id":124,"type":"var.set","params":{"variable":"Shown"}},{"id":125,"type":"text.append","values":{"b":"|"}},{"id":126,"type":"var.get","params":{"variable":"Shown"}},
+          {"id":127,"type":"var.set","params":{"variable":"Now","path":".m"}},{"id":128,"type":"var.get","params":{"variable":"Any"}},
+          {"id":129,"type":"var.set","params":{"variable":"Shown"}},{"id":130,"type":"text.append"},{"id":131,"type":"var.get","params":{"variable":"Shown"}},
+          {"id":132,"type":"var.get","params":{"variable":"Bits"}},{"id":133,"type":"var.get","params":{"variable":"Body","path":".Bones[].m"},"values":{"path0":1}}],"links":[
+          [3,"body",75,"exec"],[3,"completed",78,"exec"],[3,"index",75,"path0"],[3,"index",77,"index"],[10,"then",83,"exec"],[10,"value",12,"by"],[10,"value",83,"path0"],
+          [10,"value",83,"value"],[10,"value",88,"item"],[10,"value",92,"item0"],[10,"value",95,"item0"],[10,"value",96,"value"],[10,"value",97,"path0"],[10,"value",101,"a"],
+          [10,"value",109,"item"],[12,"then",85,"exec"],[12,"v",85,"value"],[30,"then",31,"exec"],[31,"then",117,"exec"],[31,"value",117,"value"],[34,"body",124,"exec"],
+          [34,"completed",127,"exec"],[34,"item",125,"c"],[35,"then",36,"exec"],[36,"then",44,"exec"],[37,"result",36,"value"],[38,"result",37,"a"],[39,"value",38,"a"],
+          [40,"value",38,"b"],[41,"result",37,"b"],[42,"value",41,"a"],[43,"value",41,"b"],[44,"then",52,"exec"],[45,"result",44,"value"],[46,"result",45,"a"],[47,"value",46,"a"],
+          [48,"value",46,"b"],[49,"result",45,"b"],[50,"value",49,"a"],[51,"value",49,"b"],[52,"then",60,"exec"],[53,"result",52,"value"],[54,"result",53,"a"],[55,"value",54,"a"],
+          [56,"value",54,"b"],[57,"result",53,"b"],[58,"value",57,"a"],[59,"value",57,"b"],[60,"then",68,"exec"],[61,"result",60,"value"],[62,"result",61,"a"],[63,"value",62,"a"],
+          [64,"value",62,"b"],[65,"result",61,"b"],[66,"value",65,"a"],[67,"value",65,"b"],[68,"then",72,"exec"],[69,"result",68,"value"],[70,"value",69,"a"],[71,"value",69,"c"],
+          [73,"value",72,"out"],[74,"by",76,"b"],[74,"then",3,"exec"],[74,"v",77,"list"],[76,"result",75,"value"],[77,"item",76,"a"],[79,"value",78,"v"],[80,"by",81,"amount"],
+          [80,"then",81,"exec"],[81,"then",82,"exec"],[83,"then",12,"exec"],[84,"value",12,"v"],[85,"then",86,"exec"],[86,"then",88,"exec"],[87,"value",86,"value"],
+          [88,"then",89,"exec"],[89,"then",91,"exec"],[90,"value",89,"value"],[91,"then",93,"exec"],[92,"list",91,"value"],[93,"then",94,"exec"],[94,"then",96,"exec"],
+          [95,"list",94,"value"],[96,"then",97,"exec"],[97,"then",98,"exec"],[98,"then",100,"exec"],[99,"out",98,"value"],[100,"then",102,"exec"],[101,"result",100,"value"],
+          [102,"then",111,"exec"],[103,"result",102,"amount"],[104,"result",103,"a"],[105,"length",104,"a"],[106,"value",105,"list"],[107,"item",104,"b"],[108,"value",107,"list"],
+          [109,"index",103,"b"],[110,"value",109,"list"],[112,"result",111,"value"],[113,"value",112,"a"],[114,"value",112,"b"],[115,"result",112,"c"],[116,"value",115,"list"],
+          [117,"then",118,"exec"],[118,"then",34,"exec"],[119,"value",118,"value"],[120,"list",119,"Bones"],[121,"value",120,"item0"],[122,"value",119,"Free"],
+          [123,"value",34,"list"],[125,"result",124,"value"],[126,"value",125,"a"],[127,"then",129,"exec"],[128,"value",127,"value"],[130,"result",129,"value"],
+          [131,"value",130,"a"],[132,"value",130,"b"],[133,"value",130,"c"]],"functions":[
+          {"name":"Mul","pure":true,"inputs":[{"name":"a","type":"struct","of":"Mat","ref":"const","value":{"m":[1,0,0,1],"Name":"m"}},{"name":"b","type":"struct","of":"Mat","ref":"const","value":{"m":[1,0,0,1],"Name":"m"}}],"outputs":[{"name":"out","type":"struct","of":"Mat","value":{"m":[1,0,0,1],"Name":"m"}}],"locals":[{"name":"R","type":"struct","of":"Mat","value":{"m":[1,0,0,1],"Name":"m"}}]},
+          {"name":"Scaled","inputs":[{"name":"v","type":"float_list","count":3,"value":[1,1,1]},{"name":"by","type":"float","value":2}],"outputs":[{"name":"v","type":"float_list","count":3,"value":[]}],"locals":[{"name":"Made","type":"float_list","count":3,"value":[]}]},
+          {"name":"Bump","inputs":[{"name":"axis","type":"float_list","count":3,"ref":true,"value":[]},{"name":"by","type":"float","value":1}],"outputs":[]}]})"},
+      // Sort List: a list of structs in the order a pure function says (more kills first, then fewer
+      // deaths; equal ones as they stood), numbers and texts by their own order.
+      {"list_sort",
+       R"({"structs":[{"name":"Score","fields":[{"name":"Name","type":"text","value":""},{"name":"Kills","type":"int","value":0},{"name":"Deaths","type":"int","value":0}]}],"variables":[
+          {"name":"Scores","type":"struct_list","of":"Score","value":[]},{"name":"Times","type":"float_list","value":[3.5,1,2,1]},
+          {"name":"Names","type":"text_list","value":["c","a","b"]},{"name":"Shown","type":"text","value":""}],"nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},
+          {"id":2,"type":"func.entry","params":{"function":"Before"}},{"id":3,"type":"func.return","params":{"function":"Before"}},{"id":4,"type":"logic.or"},
+          {"id":5,"type":"math.compare","params":{"op":">"}},{"id":6,"type":"var.get","params":{"variable":"a","scope":"Before","path":".Kills"}},
+          {"id":7,"type":"var.get","params":{"variable":"b","scope":"Before","path":".Kills"}},{"id":8,"type":"logic.and"},{"id":9,"type":"math.compare","params":{"op":"=="}},
+          {"id":10,"type":"var.get","params":{"variable":"a","scope":"Before","path":".Kills"}},
+          {"id":11,"type":"var.get","params":{"variable":"b","scope":"Before","path":".Kills"}},{"id":12,"type":"math.compare","params":{"op":"<"}},
+          {"id":13,"type":"var.get","params":{"variable":"a","scope":"Before","path":".Deaths"}},
+          {"id":14,"type":"var.get","params":{"variable":"b","scope":"Before","path":".Deaths"}},{"id":15,"type":"list.add","params":{"variable":"Scores"}},
+          {"id":16,"type":"struct.make","params":{"struct":"Score"},"values":{"Name":"x","Kills":2,"Deaths":3}},{"id":17,"type":"list.add","params":{"variable":"Scores"}},
+          {"id":18,"type":"struct.make","params":{"struct":"Score"},"values":{"Name":"y","Kills":5,"Deaths":1}},{"id":19,"type":"list.add","params":{"variable":"Scores"}},
+          {"id":20,"type":"struct.make","params":{"struct":"Score"},"values":{"Name":"z","Kills":2,"Deaths":1}},{"id":21,"type":"list.add","params":{"variable":"Scores"}},
+          {"id":22,"type":"struct.make","params":{"struct":"Score"},"values":{"Name":"w","Kills":2,"Deaths":3}},
+          {"id":23,"type":"list.sort","params":{"variable":"Scores","function":"Before"}},{"id":24,"type":"list.sort","params":{"variable":"Times","function":""}},
+          {"id":25,"type":"list.sort","params":{"variable":"Names","function":""}},{"id":26,"type":"var.set","params":{"variable":"Shown"}},{"id":27,"type":"text.append"},
+          {"id":28,"type":"var.get","params":{"variable":"Scores","path":"[].Name"},"values":{"path0":0}},
+          {"id":29,"type":"var.get","params":{"variable":"Scores","path":"[].Name"},"values":{"path0":3}},{"id":30,"type":"var.get","params":{"variable":"Times"}}],"links":[
+          [1,"then",15,"exec"],[2,"then",3,"exec"],[4,"result",3,"before"],[5,"result",4,"a"],[6,"value",5,"a"],[7,"value",5,"b"],[8,"result",4,"b"],[9,"result",8,"a"],
+          [10,"value",9,"a"],[11,"value",9,"b"],[12,"result",8,"b"],[13,"value",12,"a"],[14,"value",12,"b"],[15,"then",17,"exec"],[16,"value",15,"item"],[17,"then",19,"exec"],
+          [18,"value",17,"item"],[19,"then",21,"exec"],[20,"value",19,"item"],[21,"then",23,"exec"],[22,"value",21,"item"],[23,"then",24,"exec"],[24,"then",25,"exec"],
+          [25,"then",26,"exec"],[27,"result",26,"value"],[28,"value",27,"a"],[29,"value",27,"b"],[30,"value",27,"c"]],"functions":[
+          {"name":"Before","pure":true,"inputs":[{"name":"a","type":"struct","of":"Score","value":{"Name":"","Kills":0,"Deaths":0}},{"name":"b","type":"struct","of":"Score","value":{"Name":"","Kills":0,"Deaths":0}}],"outputs":[{"name":"before","type":"bool","value":false}]}]})"},
+      // Format Text: a format as printf has it with Int, Float and Text values - widths, precision,
+      // %x %c %%, the Most input cutting what it gives (snprintf's size).
+      {"text_format",
+       R"({"variables":[{"name":"Shown","type":"text","value":""},{"name":"Time","type":"float","value":0}],"nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},
+          {"id":2,"type":"func.entry","params":{"function":"Clock"}},{"id":3,"type":"func.return","params":{"function":"Clock"}},
+          {"id":4,"type":"text.format","params":{"format":"%02d:%06.3f"},"values":{"most":-1}},{"id":5,"type":"var.set","params":{"variable":"Shown"}},
+          {"id":6,"type":"text.append"},{"id":7,"type":"func.pure","params":{"function":"Clock"}},
+          {"id":8,"type":"text.format","params":{"format":"|%s|%5.1f|%x|%c|100%%"},"values":{"most":-1,"v3":65}},
+          {"id":9,"type":"text.format","params":{"format":"%s"},"values":{"most":3,"v0":"abcdef"}}],"links":[[1,"text",8,"v0"],[1,"then",5,"exec"],[1,"value",7,"m"],
+          [1,"value",7,"s"],[1,"value",8,"v1"],[1,"value",8,"v2"],[2,"m",4,"v0"],[2,"s",4,"v1"],[2,"then",3,"exec"],[4,"result",3,"out"],[6,"result",5,"value"],[7,"out",6,"a"],
+          [8,"result",6,"b"],[9,"result",6,"c"]],"functions":[
+          {"name":"Clock","pure":true,"inputs":[{"name":"m","type":"int","value":0},{"name":"s","type":"float","value":0}],"outputs":[{"name":"out","type":"text","value":""}]}]})"},
+      // Texts as std::string reads them (find, rfind, find_*_of, substr, insert, erase, replace) and numbers
+      // and words read as C reads them (strtod, strtof, strtoll, strtoull, sscanf) - every value made into
+      // one text.
+      {"text_scan",
+       R"({"variables":[{"name":"Shown","type":"text","value":""},{"name":"Bytes","type":"int_list","value":[1,2]}],"nodes":[{"id":1,"type":"event.begin"},
+          {"id":2,"type":"var.set","params":{"variable":"Shown"}},
+          {"id":30,"type":"list.insert_text","params":{"variable":"Bytes"},"values":{"index":1,"text":"A\u00e4"}},{"id":31,"type":"text.bytes","values":{"a":"hi"}},
+          {"id":32,"type":"list.append","params":{"variable":"Bytes"}},{"id":33,"type":"var.get","params":{"variable":"Bytes"}},{"id":34,"type":"text.append"},
+          {"id":35,"type":"text.repeat","values":{"a":"*","count":3}},{"id":36,"type":"text.of_bytes","values":{"at":1,"count":3}},
+          {"id":37,"type":"text.reserve","values":{"a":"r","count":64}},{"id":38,"type":"text.starts_with","values":{"a":"settings reset","b":"settings"}},
+          {"id":39,"type":"text.ends_with","values":{"a":"a.json","b":".json"}},{"id":40,"type":"text.less","values":{"a":"abc","b":"abd"}},
+          {"id":41,"type":"text.format","params":{"format":"|%d%d%d"},"values":{"most":-1}},{"id":42,"type":"text.append"},
+          {"id":3,"type":"text.append"},{"id":4,"type":"text.format","params":{"format":"%d|%d|%d|%d|%d|%d|%d|"},"values":{"most":-1}},
+          {"id":5,"type":"text.find","values":{"a":"hello world","b":"o","from":5}},{"id":6,"type":"text.rfind","values":{"a":"hello world","b":"o","from":-1}},
+          {"id":7,"type":"text.find_first_of","values":{"a":"key=value;x","b":"=;","from":4}},{"id":8,"type":"text.find_last_not_of","values":{"a":"trim   ","b":" ","from":-1}},
+          {"id":9,"type":"text.parse_int","values":{"a":"  -0x1Fz","at":0,"base":0}},{"id":10,"type":"int64.to_int"},
+          {"id":11,"type":"text.find_last_of","values":{"a":"a/b/c","b":"/","from":2}},{"id":12,"type":"text.find_first_not_of","values":{"a":"  x","b":" ","from":0}},
+          {"id":13,"type":"text.format","params":{"format":"%s|%s|%s|%s|%.17g|%d|%.9g|"},"values":{"most":-1}},
+          {"id":14,"type":"text.sub","values":{"a":"hello world","at":6,"count":-1}},{"id":15,"type":"text.replace","values":{"a":"hello world","at":0,"count":5,"b":"HELLO"}},
+          {"id":16,"type":"text.insert","values":{"a":"ac","at":1,"b":"b"}},{"id":17,"type":"text.erase","values":{"a":"settings reset","at":8,"count":-1}},
+          {"id":18,"type":"text.parse_float","values":{"a":"x 1e-3y","at":1}},{"id":19,"type":"text.parse_float32","values":{"a":"0.1","at":0}},
+          {"id":20,"type":"text.format","params":{"format":"%d %.9g %d %s|%s|%d|%d"},"values":{"most":-1}},
+          {"id":21,"type":"text.scan","params":{"format":"%f %lld %s %95[^\n]"},"values":{"a":" 2.5 -7 word rest of it","at":0,"p0":0,"p1":"0","p2":"x","p3":"y"}},
+          {"id":22,"type":"int64.to_int"},{"id":23,"type":"text.parse_uint","values":{"a":"-1","at":0,"base":10}},{"id":24,"type":"int64.low"},
+          {"id":25,"type":"text.scan","params":{"format":"x%d"},"values":{"a":"","at":0,"p0":5}},
+          {"id":26,"type":"text.scan","params":{"format":" %7s %hhd %hu %llu %x%n %*d %[^,],%i %3f%%%o"},
+           "values":{"a":"  name -129 70000 18446744073709551615 0x1Fg 9 a b,0b101 1.25%017 rest","at":0,"p0":"","p1":0,"p2":0,"p3":"0","p4":0,"p5":0,"p6":"","p7":0,"p8":0,"p9":0}},
+          {"id":27,"type":"text.format","params":{"format":"|%s %d %d %d %d %s %d %.9g %d|"},"values":{"most":-1}},{"id":28,"type":"int64.text"},{"id":29,"type":"text.append"}],
+        "links":[[1,"then",21,"exec"],[21,"then",25,"exec"],[25,"then",26,"exec"],[26,"then",30,"exec"],[30,"then",32,"exec"],[32,"then",2,"exec"],[31,"result",32,"items"],
+          [29,"result",34,"a"],[33,"value",36,"bytes"],[35,"result",34,"b"],[36,"result",34,"c"],[37,"result",35,"a"],
+          [38,"result",41,"v0"],[39,"result",41,"v1"],[40,"result",41,"v2"],[42,"result",2,"value"],[34,"result",42,"a"],[41,"result",42,"b"],[33,"value",42,"c"],
+          [26,"v0",27,"v0"],[26,"v1",27,"v1"],[26,"v2",27,"v2"],[26,"v4",27,"v3"],[26,"v5",27,"v4"],[26,"v6",27,"v5"],[26,"v7",27,"v6"],[26,"v8",27,"v7"],[26,"count",27,"v8"],
+          [26,"v3",28,"a"],[3,"result",29,"a"],[27,"result",29,"b"],[28,"result",29,"c"],[4,"result",3,"a"],[13,"result",3,"b"],[20,"result",3,"c"],
+          [5,"result",4,"v0"],[6,"result",4,"v1"],[7,"result",4,"v2"],[8,"result",4,"v3"],[9,"value",10,"a"],[10,"result",4,"v4"],[11,"result",4,"v5"],[12,"result",4,"v6"],
+          [14,"result",13,"v0"],[15,"result",13,"v1"],[16,"result",13,"v2"],[17,"result",13,"v3"],[18,"value",13,"v4"],[18,"end",13,"v5"],[19,"value",13,"v6"],
+          [21,"count",20,"v0"],[21,"v0",20,"v1"],[21,"v1",22,"a"],[22,"result",20,"v2"],[21,"v2",20,"v3"],[21,"v3",20,"v4"],[23,"value",24,"a"],[24,"result",20,"v5"],
+          [25,"count",20,"v6"]]})"},
       // Lists in one go: Set Length cuts and fills (a list of numbers, of booleans, of structs;
       // less than 0), Append and Insert List put a whole list in - at the start, in the middle,
       // past the end, a list into itself -, Reserve changes nothing one can read.
@@ -500,6 +716,159 @@ inline const std::vector<Case>& cases() {
         {"id":74,"type":"func.call","params":{"function":"Forever"}}],"links":[[20,"sum",67,"b"],[20,"then",66,"exec"],[50,"then",51,"exec"],[50,"value",51,"n"],[50,"value",53,"x"],[51,"sum",72,"amount"],[51,"then",72,"exec"],[53,"then",73,"exec"],[53,"value",73,"amount"],[60,"then",74,"exec"],[61,"n",62,"value"],[61,"n",64,"a"],[61,"n",65,"a"],[61,"then",62,"exec"],[62,"then",63,"exec"],[63,"false",66,"exec"],[63,"true",20,"exec"],[64,"result",63,"condition"],[65,"result",20,"n"],[67,"result",66,"sum"],[68,"value",67,"a"],[69,"then",70,"exec"],[70,"then",71,"exec"],[72,"then",53,"exec"]],"functions":[{"name":"Missing","external":true,"inputs":[{"name":"x","type":"float","value":1}],"outputs":[{"name":"value","type":"float","value":2.5}]},
         {"name":"Down","inputs":[{"name":"n","type":"int","value":0}],"outputs":[{"name":"sum","type":"float","value":0}],"locals":[{"name":"Mine","type":"int","value":0}]},
         {"name":"Forever","inputs":[],"outputs":[]}]})"},
+      // Get Variable on Actor and Has Blueprint, on a Blueprint (here its own: the Level's) and on an actor
+      // that has none: a number, a whole number read as a decimal one, a variable it does not have, one of a
+      // type that does not become the one read (a list as a number: the zero), an enum's value and a list
+      // of structs - each as the reader's own type.
+      {"on_actor",
+       R"({"enums":[{"name":"Kind","values":["A","B","C"]}],"structs":[{"name":"Row","fields":[{"name":"Count","type":"int","value":0},{"name":"Tag","type":"text","value":""}]}],)"
+       R"("variables":[{"name":"Speed","type":"float","value":2.5},{"name":"Laps","type":"int","value":3},{"name":"Mode","type":"enum","of":"Kind","value":2},)"
+       R"({"name":"Rows","type":"struct_list","of":"Row","value":[{"Count":4,"Tag":"x"}]},{"name":"Has","type":"bool","value":false},{"name":"HasNone","type":"bool","value":false},)"
+       R"({"name":"RSpeed","type":"float","value":0},{"name":"RLaps","type":"float","value":0},{"name":"RNone","type":"float","value":0},{"name":"RWrong","type":"float","value":0},)"
+       R"({"name":"RMode","type":"enum","of":"Kind","value":0},{"name":"RRows","type":"struct_list","of":"Row","value":[]}],)"
+       R"("nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.set","params":{"variable":"Has"}},{"id":3,"type":"func.has_blueprint","values":{"target":0}},)"
+       R"({"id":4,"type":"var.set","params":{"variable":"HasNone"}},{"id":5,"type":"func.has_blueprint","values":{"target":99}},)"
+       R"({"id":6,"type":"var.set","params":{"variable":"RSpeed"}},{"id":7,"type":"func.get_on","params":{"variable":"Speed","type":"float"},"values":{"this":0}},)"
+       R"({"id":8,"type":"var.set","params":{"variable":"RLaps"}},{"id":9,"type":"func.get_on","params":{"variable":"Laps","type":"float"},"values":{"this":0}},)"
+       R"({"id":10,"type":"var.set","params":{"variable":"RNone"}},{"id":11,"type":"func.get_on","params":{"variable":"Missing","type":"float"},"values":{"this":0}},)"
+       R"({"id":12,"type":"var.set","params":{"variable":"RWrong"}},{"id":13,"type":"func.get_on","params":{"variable":"Rows","type":"float"},"values":{"this":0}},)"
+       R"({"id":14,"type":"var.set","params":{"variable":"RMode"}},{"id":15,"type":"func.get_on","params":{"variable":"Mode","type":"Kind"},"values":{"this":0}},)"
+       R"({"id":16,"type":"var.set","params":{"variable":"RRows"}},{"id":17,"type":"func.get_on","params":{"variable":"Rows","type":"Row_list"},"values":{"this":0}},)"
+       R"({"id":18,"type":"var.add","params":{"variable":"Laps"},"values":{"amount":1}}],)"
+       R"("links":[[1,"then",2,"exec"],[3,"result",2,"value"],[2,"then",4,"exec"],[5,"result",4,"value"],[4,"then",6,"exec"],[7,"value",6,"value"],[6,"then",8,"exec"],)"
+       R"([9,"value",8,"value"],[8,"then",10,"exec"],[11,"value",10,"value"],[10,"then",12,"exec"],[13,"value",12,"value"],[12,"then",14,"exec"],[15,"value",14,"value"],)"
+       R"([14,"then",16,"exec"],[17,"value",16,"value"],[16,"then",18,"exec"]]})"},
+      // Int64: 64 bits as u64 and i64 of C++ - every Int64 node, on values beyond 2^53 (a Float
+      // times 10^17, halves of 32 bits), dividing by 0 and the smallest i64 by -1, shifts by more
+      // than 63 (the amount's last 6 bits), Floats beyond the ends and no number, texts that are
+      // no number; literals on pins and as variables' defaults.
+      {"int64",
+       R"({"variables":[{"name":"R","type":"int64_list","value":[]},{"name":"Bs","type":"bool_list","value":[]},{"name":"Is","type":"int_list","value":[])"
+       R"(},{"name":"Fs","type":"float_list","value":[]},{"name":"Ts","type":"text_list","value":[]},{"name":"Min","type":"int64","value":"9223372036854775808")"
+       R"(},{"name":"MinusOne","type":"int64","value":"18446744073709551615"},{"name":"Zero","type":"int64","value":"0"}],"nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"})"
+       R"(},{"id":2,"type":"math.mul","values":{"b":1e+17}},{"id":3,"type":"int64.of_float"},{"id":4,"type":"math.round"},{"id":5,"type":"math.mul","values":{"b":1000})"
+       R"(},{"id":6,"type":"int64.of_halves","values":{"low":4294967295}},{"id":7,"type":"var.get","params":{"variable":"Min"}},{"id":8,"type":"var.get","params":{"variable":"MinusOne"})"
+       R"(},{"id":9,"type":"var.get","params":{"variable":"Zero"}},{"id":10,"type":"int64.add"},{"id":11,"type":"list.add","params":{"variable":"R"}},{"id":12,"type":"int64.add")"
+       R"(},{"id":13,"type":"list.add","params":{"variable":"R"}},{"id":14,"type":"int64.add"},{"id":15,"type":"list.add","params":{"variable":"R"}},{"id":16,"type":"int64.add")"
+       R"(},{"id":17,"type":"list.add","params":{"variable":"R"}},{"id":18,"type":"int64.sub"},{"id":19,"type":"list.add","params":{"variable":"R"}},{"id":20,"type":"int64.sub")"
+       R"(},{"id":21,"type":"list.add","params":{"variable":"R"}},{"id":22,"type":"int64.sub"},{"id":23,"type":"list.add","params":{"variable":"R"}},{"id":24,"type":"int64.sub")"
+       R"(},{"id":25,"type":"list.add","params":{"variable":"R"}},{"id":26,"type":"int64.mul"},{"id":27,"type":"list.add","params":{"variable":"R"}},{"id":28,"type":"int64.mul")"
+       R"(},{"id":29,"type":"list.add","params":{"variable":"R"}},{"id":30,"type":"int64.mul"},{"id":31,"type":"list.add","params":{"variable":"R"}},{"id":32,"type":"int64.mul")"
+       R"(},{"id":33,"type":"list.add","params":{"variable":"R"}},{"id":34,"type":"int64.div"},{"id":35,"type":"list.add","params":{"variable":"R"}},{"id":36,"type":"int64.div")"
+       R"(},{"id":37,"type":"list.add","params":{"variable":"R"}},{"id":38,"type":"int64.div"},{"id":39,"type":"list.add","params":{"variable":"R"}},{"id":40,"type":"int64.div")"
+       R"(},{"id":41,"type":"list.add","params":{"variable":"R"}},{"id":42,"type":"int64.div_unsigned"},{"id":43,"type":"list.add","params":{"variable":"R"})"
+       R"(},{"id":44,"type":"int64.div_unsigned"},{"id":45,"type":"list.add","params":{"variable":"R"}},{"id":46,"type":"int64.div_unsigned")"
+       R"(},{"id":47,"type":"list.add","params":{"variable":"R"}},{"id":48,"type":"int64.div_unsigned"},{"id":49,"type":"list.add","params":{"variable":"R"}},{"id":50,"type":"int64.rem")"
+       R"(},{"id":51,"type":"list.add","params":{"variable":"R"}},{"id":52,"type":"int64.rem"},{"id":53,"type":"list.add","params":{"variable":"R"}},{"id":54,"type":"int64.rem")"
+       R"(},{"id":55,"type":"list.add","params":{"variable":"R"}},{"id":56,"type":"int64.rem"},{"id":57,"type":"list.add","params":{"variable":"R"}},{"id":58,"type":"int64.rem_unsigned")"
+       R"(},{"id":59,"type":"list.add","params":{"variable":"R"}},{"id":60,"type":"int64.rem_unsigned"},{"id":61,"type":"list.add","params":{"variable":"R"})"
+       R"(},{"id":62,"type":"int64.rem_unsigned"},{"id":63,"type":"list.add","params":{"variable":"R"}},{"id":64,"type":"int64.rem_unsigned")"
+       R"(},{"id":65,"type":"list.add","params":{"variable":"R"}},{"id":66,"type":"int64.and"},{"id":67,"type":"list.add","params":{"variable":"R"}},{"id":68,"type":"int64.and")"
+       R"(},{"id":69,"type":"list.add","params":{"variable":"R"}},{"id":70,"type":"int64.and"},{"id":71,"type":"list.add","params":{"variable":"R"}},{"id":72,"type":"int64.and")"
+       R"(},{"id":73,"type":"list.add","params":{"variable":"R"}},{"id":74,"type":"int64.or"},{"id":75,"type":"list.add","params":{"variable":"R"}},{"id":76,"type":"int64.or")"
+       R"(},{"id":77,"type":"list.add","params":{"variable":"R"}},{"id":78,"type":"int64.or"},{"id":79,"type":"list.add","params":{"variable":"R"}},{"id":80,"type":"int64.or")"
+       R"(},{"id":81,"type":"list.add","params":{"variable":"R"}},{"id":82,"type":"int64.xor"},{"id":83,"type":"list.add","params":{"variable":"R"}},{"id":84,"type":"int64.xor")"
+       R"(},{"id":85,"type":"list.add","params":{"variable":"R"}},{"id":86,"type":"int64.xor"},{"id":87,"type":"list.add","params":{"variable":"R"}},{"id":88,"type":"int64.xor")"
+       R"(},{"id":89,"type":"list.add","params":{"variable":"R"}},{"id":90,"type":"math.add","values":{"b":61}},{"id":91,"type":"int64.shift_left")"
+       R"(},{"id":92,"type":"list.add","params":{"variable":"R"}},{"id":93,"type":"int64.shift_left"},{"id":94,"type":"list.add","params":{"variable":"R"})"
+       R"(},{"id":95,"type":"int64.shift_right"},{"id":96,"type":"list.add","params":{"variable":"R"}},{"id":97,"type":"int64.shift_right")"
+       R"(},{"id":98,"type":"list.add","params":{"variable":"R"}},{"id":99,"type":"int64.shift_right_unsigned"},{"id":100,"type":"list.add","params":{"variable":"R"})"
+       R"(},{"id":101,"type":"int64.shift_right_unsigned"},{"id":102,"type":"list.add","params":{"variable":"R"}},{"id":103,"type":"int64.rotate_left")"
+       R"(},{"id":104,"type":"list.add","params":{"variable":"R"}},{"id":105,"type":"int64.rotate_left"},{"id":106,"type":"list.add","params":{"variable":"R"})"
+       R"(},{"id":107,"type":"int64.rotate_right"},{"id":108,"type":"list.add","params":{"variable":"R"}},{"id":109,"type":"int64.rotate_right")"
+       R"(},{"id":110,"type":"list.add","params":{"variable":"R"}},{"id":111,"type":"int64.not"},{"id":112,"type":"list.add","params":{"variable":"R"}},{"id":113,"type":"int64.equal")"
+       R"(},{"id":114,"type":"list.add","params":{"variable":"Bs"}},{"id":115,"type":"int64.equal"},{"id":116,"type":"list.add","params":{"variable":"Bs"}},{"id":117,"type":"int64.less")"
+       R"(},{"id":118,"type":"list.add","params":{"variable":"Bs"}},{"id":119,"type":"int64.less_unsigned"},{"id":120,"type":"list.add","params":{"variable":"Bs"})"
+       R"(},{"id":121,"type":"int64.less"},{"id":122,"type":"list.add","params":{"variable":"Bs"}},{"id":123,"type":"int64.less_unsigned")"
+       R"(},{"id":124,"type":"list.add","params":{"variable":"Bs"}},{"id":125,"type":"math.sub","values":{"b":3}},{"id":126,"type":"int64.of_int")"
+       R"(},{"id":127,"type":"list.add","params":{"variable":"R"}},{"id":128,"type":"int64.to_int"},{"id":129,"type":"list.add","params":{"variable":"Is"}},{"id":130,"type":"int64.to_int")"
+       R"(},{"id":131,"type":"list.add","params":{"variable":"Is"}},{"id":132,"type":"int64.to_int_unsigned"},{"id":133,"type":"list.add","params":{"variable":"Is"})"
+       R"(},{"id":134,"type":"int64.to_int_unsigned"},{"id":135,"type":"list.add","params":{"variable":"Is"}},{"id":136,"type":"int64.high")"
+       R"(},{"id":137,"type":"list.add","params":{"variable":"Is"}},{"id":138,"type":"int64.low"},{"id":139,"type":"list.add","params":{"variable":"Is"}},{"id":140,"type":"int64.high")"
+       R"(},{"id":141,"type":"list.add","params":{"variable":"Is"}},{"id":142,"type":"int64.count_ones"},{"id":143,"type":"list.add","params":{"variable":"Is"})"
+       R"(},{"id":144,"type":"int64.count_ones"},{"id":145,"type":"list.add","params":{"variable":"Is"}},{"id":146,"type":"int64.leading_zeros")"
+       R"(},{"id":147,"type":"list.add","params":{"variable":"Is"}},{"id":148,"type":"int64.leading_zeros"},{"id":149,"type":"list.add","params":{"variable":"Is"})"
+       R"(},{"id":150,"type":"int64.trailing_zeros"},{"id":151,"type":"list.add","params":{"variable":"Is"}},{"id":152,"type":"int64.trailing_zeros")"
+       R"(},{"id":153,"type":"list.add","params":{"variable":"Is"}},{"id":154,"type":"int64.to_float"},{"id":155,"type":"list.add","params":{"variable":"Fs"})"
+       R"(},{"id":156,"type":"int64.to_float_unsigned"},{"id":157,"type":"list.add","params":{"variable":"Fs"}},{"id":158,"type":"int64.to_float")"
+       R"(},{"id":159,"type":"list.add","params":{"variable":"Fs"}},{"id":160,"type":"int64.float_of_bits"},{"id":161,"type":"list.add","params":{"variable":"Fs"})"
+       R"(},{"id":162,"type":"int64.float_of_bits"},{"id":163,"type":"list.add","params":{"variable":"Fs"}},{"id":164,"type":"int64.of_float","values":{"a":-1e+30})"
+       R"(},{"id":165,"type":"list.add","params":{"variable":"R"}},{"id":166,"type":"int64.of_float","values":{"a":1e+30}},{"id":167,"type":"list.add","params":{"variable":"R"})"
+       R"(},{"id":168,"type":"int64.of_float_unsigned","values":{"a":-5.5}},{"id":169,"type":"list.add","params":{"variable":"R"})"
+       R"(},{"id":170,"type":"int64.of_float_unsigned","values":{"a":1e+30}},{"id":171,"type":"list.add","params":{"variable":"R"})"
+       R"(},{"id":172,"type":"int64.of_float_unsigned","values":{"a":3.75}},{"id":173,"type":"list.add","params":{"variable":"R"}},{"id":174,"type":"int64.bits_of_float","values":{"a":0.1})"
+       R"(},{"id":175,"type":"list.add","params":{"variable":"R"}},{"id":176,"type":"math.sqrt","values":{"a":-1}},{"id":177,"type":"int64.of_float")"
+       R"(},{"id":178,"type":"list.add","params":{"variable":"R"}},{"id":179,"type":"int64.text"},{"id":180,"type":"list.add","params":{"variable":"Ts"}},{"id":181,"type":"int64.text")"
+       R"(},{"id":182,"type":"list.add","params":{"variable":"Ts"}},{"id":183,"type":"int64.text_signed"},{"id":184,"type":"list.add","params":{"variable":"Ts"})"
+       R"(},{"id":185,"type":"int64.text_signed"},{"id":186,"type":"list.add","params":{"variable":"Ts"}},{"id":187,"type":"int64.text_hex")"
+       R"(},{"id":188,"type":"list.add","params":{"variable":"Ts"}},{"id":189,"type":"int64.text_hex"},{"id":190,"type":"list.add","params":{"variable":"Ts"})"
+       R"(},{"id":191,"type":"int64.text_signed"},{"id":192,"type":"int64.of_text"},{"id":193,"type":"list.add","params":{"variable":"R"})"
+       R"(},{"id":194,"type":"int64.of_text","values":{"a":"0x1F"}},{"id":195,"type":"list.add","params":{"variable":"R"}},{"id":196,"type":"int64.of_text","values":{"a":"-5"})"
+       R"(},{"id":197,"type":"list.add","params":{"variable":"R"}},{"id":198,"type":"int64.of_text","values":{"a":"18446744073709551616"})"
+       R"(},{"id":199,"type":"list.add","params":{"variable":"R"}},{"id":200,"type":"int64.of_text","values":{"a":"zz"}},{"id":201,"type":"list.add","params":{"variable":"R"})"
+       R"(},{"id":202,"type":"int64.of_text","values":{"a":""}},{"id":203,"type":"list.add","params":{"variable":"R"}},{"id":204,"type":"int64.of_text","values":{"a":"-0x8000000000000000"})"
+       R"(},{"id":205,"type":"list.add","params":{"variable":"R"}},{"id":206,"type":"int64.add","values":{"a":"18446744073709551615","b":"2"})"
+       R"(},{"id":207,"type":"list.add","params":{"variable":"R"})"
+       R"(},{"id":208,"type":"var.set","params":{"variable":"Zero"}}],"links":[[1,"value",2,"a"],[2,"result",3,"a"],[1,"value",4,"a"],[4,"result",5,"a"],[5,"result",6,"high"],[3,"result",10,"a"],[6,"result",10,"b"],[1,"then",11,"exec"],[10,"result",11,"item"],[3,"result",12,"a"],[9,"value",12,"b"],[11,"then",13,"exec"],[12,"result",13,"item"],[7,"value",14,"a"],[8,"value",14,"b"],[13,"then",15,"exec"],[14,"result",15,"item"],[6,"result",16,"a"],[8,"value",16,"b"],[15,"then",17,"exec"],[16,"result",17,"item"],[3,"result",18,"a"],[6,"result",18,"b"],[17,"then",19,"exec"],[18,"result",19,"item"],[3,"result",20,"a"],[9,"value",20,"b"],[19,"then",21,"exec"],[20,"result",21,"item"],[7,"value",22,"a"],[8,"value",22,"b"],[21,"then",23,"exec"],[22,"result",23,"item"],[6,"result",24,"a"],[8,"value",24,"b"],[23,"then",25,"exec"],[24,"result",25,"item"],[3,"result",26,"a"],[6,"result",26,"b"],[25,"then",27,"exec"],[26,"result",27,"item"],[3,"result",28,"a"],[9,"value",28,"b"],[27,"then",29,"exec"],[28,"result",29,"item"],[7,"value",30,"a"],[8,"value",30,"b"],[29,"then",31,"exec"],[30,"result",31,"item"],[6,"result",32,"a"],[8,"value",32,"b"],[31,"then",33,"exec"],[32,"result",33,"item"],[3,"result",34,"a"],[6,"result",34,"b"],[33,"then",35,"exec"],[34,"result",35,"item"],[3,"result",36,"a"],[9,"value",36,"b"],[35,"then",37,"exec"],[36,"result",37,"item"],[7,"value",38,"a"],[8,"value",38,"b"],[37,"then",39,"exec"],[38,"result",39,"item"],[6,"result",40,"a"],[8,"value",40,"b"],[39,"then",41,"exec"],[40,"result",41,"item"],[3,"result",42,"a"],[6,"result",42,"b"],[41,"then",43,"exec"],[42,"result",43,"item"],[3,"result",44,"a"],[9,"value",44,"b"],[43,"then",45,"exec"],[44,"result",45,"item"],[7,"value",46,"a"],[8,"value",46,"b"],[45,"then",47,"exec"],[46,"result",47,"item"],[6,"result",48,"a"],[8,"value",48,"b"],[47,"then",49,"exec"],[48,"result",49,"item"],[3,"result",50,"a"],[6,"result",50,"b"],[49,"then",51,"exec"],[50,"result",51,"item"],[3,"result",52,"a"],[9,"value",52,"b"],[51,"then",53,"exec"],[52,"result",53,"item"],[7,"value",54,"a"],[8,"value",54,"b"],[53,"then",55,"exec"],[54,"result",55,"item"],[6,"result",56,"a"],[8,"value",56,"b"],[55,"then",57,"exec"],[56,"result",57,"item"],[3,"result",58,"a"],[6,"result",58,"b"],[57,"then",59,"exec"],[58,"result",59,"item"],[3,"result",60,"a"],[9,"value",60,"b"],[59,"then",61,"exec"],[60,"result",61,"item"],[7,"value",62,"a"],[8,"value",62,"b"],[61,"then",63,"exec"],[62,"result",63,"item"],[6,"result",64,"a"],[8,"value",64,"b"],[63,"then",65,"exec"],[64,"result",65,"item"],[3,"result",66,"a"],[6,"result",66,"b"],[65,"then",67,"exec"],[66,"result",67,"item"],[3,"result",68,"a"],[9,"value",68,"b"],[67,"then",69,"exec"],[68,"result",69,"item"],[7,"value",70,"a"],[8,"value",70,"b"],[69,"then",71,"exec"],[70,"result",71,"item"],[6,"result",72,"a"],[8,"value",72,"b"],[71,"then",73,"exec"],[72,"result",73,"item"],[3,"result",74,"a"],[6,"result",74,"b"],[73,"then",75,"exec"],[74,"result",75,"item"],[3,"result",76,"a"],[9,"value",76,"b"],[75,"then",77,"exec"],[76,"result",77,"item"],[7,"value",78,"a"],[8,"value",78,"b"],[77,"then",79,"exec"],[78,"result",79,"item"],[6,"result",80,"a"],[8,"value",80,"b"],[79,"then",81,"exec"],[80,"result",81,"item"],[3,"result",82,"a"],[6,"result",82,"b"],[81,"then",83,"exec"],[82,"result",83,"item"],[3,"result",84,"a"],[9,"value",84,"b"],[83,"then",85,"exec"],[84,"result",85,"item"],[7,"value",86,"a"],[8,"value",86,"b"],[85,"then",87,"exec"],[86,"result",87,"item"],[6,"result",88,"a"],[8,"value",88,"b"],[87,"then",89,"exec"],[88,"result",89,"item"],[4,"result",90,"a"],[6,"result",91,"a"],[90,"result",91,"by"],[89,"then",92,"exec"],[91,"result",92,"item"],[7,"value",93,"a"],[90,"result",93,"by"],[92,"then",94,"exec"],[93,"result",94,"item"],[6,"result",95,"a"],[90,"result",95,"by"],[94,"then",96,"exec"],[95,"result",96,"item"],[7,"value",97,"a"],[90,"result",97,"by"],[96,"then",98,"exec"],[97,"result",98,"item"],[6,"result",99,"a"],[90,"result",99,"by"],[98,"then",100,"exec"],[99,"result",100,"item"],[7,"value",101,"a"],[90,"result",101,"by"],[100,"then",102,"exec"],[101,"result",102,"item"],[6,"result",103,"a"],[90,"result",103,"by"],[102,"then",104,"exec"],[103,"result",104,"item"],[7,"value",105,"a"],[90,"result",105,"by"],[104,"then",106,"exec"],[105,"result",106,"item"],[6,"result",107,"a"],[90,"result",107,"by"],[106,"then",108,"exec"],[107,"result",108,"item"],[7,"value",109,"a"],[90,"result",109,"by"],[108,"then",110,"exec"],[109,"result",110,"item"],[3,"result",111,"a"],[110,"then",112,"exec"],[111,"result",112,"item"],[3,"result",113,"a"],[6,"result",113,"b"],[112,"then",114,"exec"],[113,"result",114,"item"],[9,"value",115,"a"],[9,"value",115,"b"],[114,"then",116,"exec"],[115,"result",116,"item"],[3,"result",117,"a"],[8,"value",117,"b"],[116,"then",118,"exec"],[117,"result",118,"item"],[3,"result",119,"a"],[8,"value",119,"b"],[118,"then",120,"exec"],[119,"result",120,"item"],[7,"value",121,"a"],[9,"value",121,"b"],[120,"then",122,"exec"],[121,"result",122,"item"],[7,"value",123,"a"],[9,"value",123,"b"],[122,"then",124,"exec"],[123,"result",124,"item"],[4,"result",125,"a"],[125,"result",126,"a"],[124,"then",127,"exec"],[126,"result",127,"item"],[3,"result",128,"a"],[127,"then",129,"exec"],[128,"result",129,"item"],[8,"value",130,"a"],[129,"then",131,"exec"],[130,"result",131,"item"],[8,"value",132,"a"],[131,"then",133,"exec"],[132,"result",133,"item"],[3,"result",134,"a"],[133,"then",135,"exec"],[134,"result",135,"item"],[3,"result",136,"a"],[135,"then",137,"exec"],[136,"result",137,"item"],[3,"result",138,"a"],[137,"then",139,"exec"],[138,"result",139,"item"],[8,"value",140,"a"],[139,"then",141,"exec"],[140,"result",141,"item"],[3,"result",142,"a"],[141,"then",143,"exec"],[142,"result",143,"item"],[8,"value",144,"a"],[143,"then",145,"exec"],[144,"result",145,"item"],[9,"value",146,"a"],[145,"then",147,"exec"],[146,"result",147,"item"],[6,"result",148,"a"],[147,"then",149,"exec"],[148,"result",149,"item"],[9,"value",150,"a"],[149,"then",151,"exec"],[150,"result",151,"item"],[7,"value",152,"a"],[151,"then",153,"exec"],[152,"result",153,"item"],[8,"value",154,"a"],[153,"then",155,"exec"],[154,"result",155,"item"],[8,"value",156,"a"],[155,"then",157,"exec"],[156,"result",157,"item"],[3,"result",158,"a"],[157,"then",159,"exec"],[158,"result",159,"item"],[6,"result",160,"a"],[159,"then",161,"exec"],[160,"result",161,"item"],[8,"value",162,"a"],[161,"then",163,"exec"],[162,"result",163,"item"],[163,"then",165,"exec"],[164,"result",165,"item"],[165,"then",167,"exec"],[166,"result",167,"item"],[167,"then",169,"exec"],[168,"result",169,"item"],[169,"then",171,"exec"],[170,"result",171,"item"],[171,"then",173,"exec"],[172,"result",173,"item"],[173,"then",175,"exec"],[174,"result",175,"item"],[176,"result",177,"a"],[175,"then",178,"exec"],[177,"result",178,"item"],[3,"result",179,"a"],[178,"then",180,"exec"],[179,"result",180,"item"],[8,"value",181,"a"],[180,"then",182,"exec"],[181,"result",182,"item"],[8,"value",183,"a"],[182,"then",184,"exec"],[183,"result",184,"item"],[3,"result",185,"a"],[184,"then",186,"exec"],[185,"result",186,"item"],[7,"value",187,"a"],[186,"then",188,"exec"],[187,"result",188,"item"],[6,"result",189,"a"],[188,"then",190,"exec"],[189,"result",190,"item"],[3,"result",191,"a"],[191,"result",192,"a"],[190,"then",193,"exec"],[192,"result",193,"item"],[193,"then",195,"exec"],[194,"result",195,"item"],[195,"then",197,"exec"],[196,"result",197,"item"],[197,"then",199,"exec"],[198,"result",199,"item"],[199,"then",201,"exec"],[200,"result",201,"item"],[201,"then",203,"exec"],[202,"result",203,"item"],[203,"then",205,"exec"],[204,"result",205,"item"],[205,"then",207,"exec"],[206,"result",207,"item"],[207,"then",208,"exec"],[206,"result",208,"value"]]})"},
+      // Maps and sets: in the order their keys came. Int, Text, enum, Int64 and Bool keys; values that
+      // are Floats, Texts, lists and structs; every node of both; a value of a map as a place
+      // (Cells[i].Count += 1, a list in it, one beside the map); taking out from the middle of the
+      // order (Open) and putting a key in again (it goes to the end); dividing by 0 into a value.
+      {"maps",
+       R"({"enums":[{"name":"Kind","values":["A","B","C"]}],"structs":[{"name":"Cell","fields":[{"name":"Count","type":"int","value":0)"
+       R"(},{"name":"Tags","type":"text_list","value":[]}]}],"variables":[{"name":"Scores","type":"map","of":"int>float","value":[[3,1.5],[1,2]])"
+       R"(},{"name":"Cells","type":"map","of":"text>struct:Cell","value":[["x",{"Count":1,"Tags":["p"]}]]},{"name":"Lists","type":"map","of":"enum:Kind>float_list","value":[])"
+       R"(},{"name":"Big","type":"map","of":"int64>text","value":[["18446744073709551615","max"]]},{"name":"Seen","type":"set","of":"int64","value":["5"])"
+       R"(},{"name":"Words","type":"set","of":"text","value":["a","b"]},{"name":"Flags","type":"set","of":"bool","value":[]},{"name":"Out","type":"float_list","value":[])"
+       R"(},{"name":"Ins","type":"int_list","value":[]},{"name":"Bs","type":"bool_list","value":[])"
+       R"(},{"name":"Ks","type":"text_list","value":[]}],"nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"math.round")"
+       R"(},{"id":3,"type":"math.mul","values":{"b":1.5}},{"id":4,"type":"map.set","params":{"variable":"Scores"}},{"id":5,"type":"list.add","params":{"variable":"Bs"})"
+       R"(},{"id":6,"type":"list.add","params":{"variable":"Ins"}},{"id":7,"type":"math.div","values":{"b":0}},{"id":8,"type":"map.set","params":{"variable":"Scores"},"values":{"key":99})"
+       R"(},{"id":9,"type":"map.add","params":{"variable":"Cells"}},{"id":10,"type":"list.add","params":{"variable":"Ins"}},{"id":11,"type":"list.add","params":{"variable":"Bs"})"
+       R"(},{"id":12,"type":"var.add","params":{"variable":"Cells","path":"[].Count"},"values":{"amount":1})"
+       R"(},{"id":13,"type":"list.add","params":{"variable":"Cells","path":"[].Tags"},"values":{"item":"t"}},{"id":14,"type":"math.mod","values":{"b":3}},{"id":15,"type":"math.round")"
+       R"(},{"id":16,"type":"enum.from_index","params":{"enum":"Kind"}},{"id":17,"type":"list.make","params":{"type":"float","count":"2"})"
+       R"(},{"id":18,"type":"map.set","params":{"variable":"Lists"}},{"id":19,"type":"math.add","values":{"b":1000000}},{"id":20,"type":"int64.of_halves","values":{"low":7})"
+       R"(},{"id":21,"type":"map.set","params":{"variable":"Big"},"values":{"value":"v"}},{"id":22,"type":"math.mul","values":{"b":1e+17}},{"id":23,"type":"int64.of_float")"
+       R"(},{"id":24,"type":"set.add","params":{"variable":"Seen"}},{"id":25,"type":"list.add","params":{"variable":"Bs"}},{"id":26,"type":"list.add","params":{"variable":"Ins"})"
+       R"(},{"id":27,"type":"set.add","params":{"variable":"Words"}},{"id":28,"type":"math.compare","params":{"op":">"},"values":{"b":2})"
+       R"(},{"id":29,"type":"set.add","params":{"variable":"Flags"}},{"id":30,"type":"map.reserve","params":{"variable":"Scores"},"values":{"count":8})"
+       R"(},{"id":31,"type":"set.reserve","params":{"variable":"Words"},"values":{"count":4}},{"id":32,"type":"map.length","params":{"key":"int","value":"float"})"
+       R"(},{"id":33,"type":"var.get","params":{"variable":"Scores"}},{"id":34,"type":"list.add","params":{"variable":"Ins"})"
+       R"(},{"id":35,"type":"map.contains","params":{"key":"int","value":"float"},"values":{"key":4}},{"id":36,"type":"var.get","params":{"variable":"Scores"})"
+       R"(},{"id":37,"type":"list.add","params":{"variable":"Bs"}},{"id":38,"type":"map.find","params":{"key":"int","value":"float"}},{"id":39,"type":"var.get","params":{"variable":"Scores"})"
+       R"(},{"id":40,"type":"list.add","params":{"variable":"Bs"}},{"id":41,"type":"list.add","params":{"variable":"Out"}},{"id":42,"type":"list.add","params":{"variable":"Ins"})"
+       R"(},{"id":43,"type":"map.find","params":{"key":"int","value":"float"},"values":{"key":1234}},{"id":44,"type":"var.get","params":{"variable":"Scores"})"
+       R"(},{"id":45,"type":"list.add","params":{"variable":"Bs"}},{"id":46,"type":"list.add","params":{"variable":"Out"}},{"id":47,"type":"list.add","params":{"variable":"Ins"})"
+       R"(},{"id":48,"type":"map.key_at","params":{"key":"text","value":"Cell"},"values":{"index":0}},{"id":49,"type":"var.get","params":{"variable":"Cells"})"
+       R"(},{"id":50,"type":"list.add","params":{"variable":"Ks"}},{"id":51,"type":"map.key_at","params":{"key":"text","value":"Cell"},"values":{"index":99})"
+       R"(},{"id":52,"type":"var.get","params":{"variable":"Cells"}},{"id":53,"type":"list.add","params":{"variable":"Ks"})"
+       R"(},{"id":54,"type":"map.find","params":{"key":"text","value":"Cell"},"values":{"key":"2"}},{"id":55,"type":"var.get","params":{"variable":"Cells"})"
+       R"(},{"id":56,"type":"list.add","params":{"variable":"Bs"}},{"id":57,"type":"struct.break","params":{"struct":"Cell"}},{"id":58,"type":"list.add","params":{"variable":"Ins"})"
+       R"(},{"id":59,"type":"list.length","params":{"type":"text"}},{"id":60,"type":"list.add","params":{"variable":"Ins"})"
+       R"(},{"id":61,"type":"map.find","params":{"key":"Kind","value":"float_list"}},{"id":62,"type":"var.get","params":{"variable":"Lists"})"
+       R"(},{"id":63,"type":"list.length","params":{"type":"float"}},{"id":64,"type":"list.add","params":{"variable":"Ins"})"
+       R"(},{"id":65,"type":"map.key_at","params":{"key":"int64","value":"text"},"values":{"index":1}},{"id":66,"type":"var.get","params":{"variable":"Big"}},{"id":67,"type":"int64.text")"
+       R"(},{"id":68,"type":"list.add","params":{"variable":"Ks"}},{"id":69,"type":"set.length","params":{"key":"int64"}},{"id":70,"type":"var.get","params":{"variable":"Seen"})"
+       R"(},{"id":71,"type":"list.add","params":{"variable":"Ins"}},{"id":72,"type":"set.contains","params":{"key":"text"},"values":{"key":"a"})"
+       R"(},{"id":73,"type":"var.get","params":{"variable":"Words"}},{"id":74,"type":"list.add","params":{"variable":"Bs"})"
+       R"(},{"id":75,"type":"set.contains","params":{"key":"bool"},"values":{"key":true}},{"id":76,"type":"var.get","params":{"variable":"Flags"})"
+       R"(},{"id":77,"type":"list.add","params":{"variable":"Bs"}},{"id":78,"type":"set.key_at","params":{"key":"int64"},"values":{"index":0})"
+       R"(},{"id":79,"type":"var.get","params":{"variable":"Seen"}},{"id":80,"type":"int64.text"},{"id":81,"type":"list.add","params":{"variable":"Ks"})"
+       R"(},{"id":82,"type":"set.find","params":{"key":"text"},"values":{"key":"4"}},{"id":83,"type":"var.get","params":{"variable":"Words"})"
+       R"(},{"id":84,"type":"list.add","params":{"variable":"Ins"}},{"id":85,"type":"var.get","params":{"variable":"Cells","path":"[].Tags"},"values":{"path0":0})"
+       R"(},{"id":86,"type":"list.length","params":{"type":"text"}},{"id":87,"type":"list.add","params":{"variable":"Ins"})"
+       R"(},{"id":88,"type":"var.get","params":{"variable":"Cells","path":"[].Count"},"values":{"path0":50}},{"id":89,"type":"list.add","params":{"variable":"Ins"})"
+       R"(},{"id":90,"type":"event.custom","params":{"name":"Open"}},{"id":91,"type":"map.remove","params":{"variable":"Scores"},"values":{"key":2})"
+       R"(},{"id":92,"type":"list.add","params":{"variable":"Bs"}},{"id":93,"type":"map.remove","params":{"variable":"Scores"},"values":{"key":77})"
+       R"(},{"id":94,"type":"list.add","params":{"variable":"Bs"}},{"id":95,"type":"map.remove_at","params":{"variable":"Cells"},"values":{"index":1})"
+       R"(},{"id":96,"type":"map.remove_at","params":{"variable":"Cells"},"values":{"index":-1})"
+       R"(},{"id":97,"type":"map.remove","params":{"variable":"Big"},"values":{"key":"18446744073709551615"}},{"id":98,"type":"list.add","params":{"variable":"Bs"})"
+       R"(},{"id":99,"type":"set.remove","params":{"variable":"Words"},"values":{"key":"a"}},{"id":100,"type":"list.add","params":{"variable":"Bs"})"
+       R"(},{"id":101,"type":"set.remove_at","params":{"variable":"Seen"},"values":{"index":0}},{"id":102,"type":"set.remove_at","params":{"variable":"Seen"},"values":{"index":40})"
+       R"(},{"id":103,"type":"map.clear","params":{"variable":"Lists"}},{"id":104,"type":"set.clear","params":{"variable":"Flags"})"
+       R"(},{"id":105,"type":"map.set","params":{"variable":"Cells"},"values":{"key":"new"})"
+       R"(},{"id":106,"type":"struct.make","params":{"struct":"Cell"},"values":{"Count":7}}],"links":[[1,"value",2,"a"],[1,"value",3,"a"],[1,"then",4,"exec"],[2,"result",4,"key"],[3,"result",4,"value"],[4,"then",5,"exec"],[4,"added",5,"item"],[5,"then",6,"exec"],[4,"index",6,"item"],[1,"value",7,"a"],[6,"then",8,"exec"],[7,"result",8,"value"],[8,"then",9,"exec"],[2,"result",9,"key"],[9,"then",10,"exec"],[9,"index",10,"item"],[10,"then",11,"exec"],[9,"added",11,"item"],[11,"then",12,"exec"],[9,"index",12,"path0"],[12,"then",13,"exec"],[9,"index",13,"path0"],[2,"result",14,"a"],[14,"result",15,"a"],[15,"result",16,"index"],[1,"value",17,"item0"],[3,"result",17,"item1"],[13,"then",18,"exec"],[16,"value",18,"key"],[17,"list",18,"value"],[2,"result",19,"a"],[19,"result",20,"high"],[18,"then",21,"exec"],[20,"result",21,"key"],[1,"value",22,"a"],[22,"result",23,"a"],[21,"then",24,"exec"],[23,"result",24,"key"],[24,"then",25,"exec"],[24,"added",25,"item"],[25,"then",26,"exec"],[24,"index",26,"item"],[26,"then",27,"exec"],[2,"result",27,"key"],[1,"value",28,"a"],[27,"then",29,"exec"],[28,"result",29,"key"],[29,"then",30,"exec"],[30,"then",31,"exec"],[33,"value",32,"map"],[31,"then",34,"exec"],[32,"length",34,"item"],[36,"value",35,"map"],[34,"then",37,"exec"],[35,"result",37,"item"],[39,"value",38,"map"],[2,"result",38,"key"],[37,"then",40,"exec"],[38,"found",40,"item"],[40,"then",41,"exec"],[38,"value",41,"item"],[41,"then",42,"exec"],[38,"index",42,"item"],[44,"value",43,"map"],[42,"then",45,"exec"],[43,"found",45,"item"],[45,"then",46,"exec"],[43,"value",46,"item"],[46,"then",47,"exec"],[43,"index",47,"item"],[49,"value",48,"map"],[47,"then",50,"exec"],[48,"key",50,"item"],[52,"value",51,"map"],[50,"then",53,"exec"],[51,"key",53,"item"],[55,"value",54,"map"],[53,"then",56,"exec"],[54,"found",56,"item"],[54,"value",57,"value"],[56,"then",58,"exec"],[57,"Count",58,"item"],[57,"Tags",59,"list"],[58,"then",60,"exec"],[59,"length",60,"item"],[62,"value",61,"map"],[16,"value",61,"key"],[61,"value",63,"list"],[60,"then",64,"exec"],[63,"length",64,"item"],[66,"value",65,"map"],[65,"key",67,"a"],[64,"then",68,"exec"],[67,"result",68,"item"],[70,"value",69,"set"],[68,"then",71,"exec"],[69,"length",71,"item"],[73,"value",72,"set"],[71,"then",74,"exec"],[72,"result",74,"item"],[76,"value",75,"set"],[74,"then",77,"exec"],[75,"result",77,"item"],[79,"value",78,"set"],[78,"key",80,"a"],[77,"then",81,"exec"],[80,"result",81,"item"],[83,"value",82,"set"],[81,"then",84,"exec"],[82,"index",84,"item"],[85,"value",86,"list"],[84,"then",87,"exec"],[86,"length",87,"item"],[87,"then",89,"exec"],[88,"value",89,"item"],[90,"then",91,"exec"],[91,"then",92,"exec"],[91,"removed",92,"item"],[92,"then",93,"exec"],[93,"then",94,"exec"],[93,"removed",94,"item"],[94,"then",95,"exec"],[95,"then",96,"exec"],[96,"then",97,"exec"],[97,"then",98,"exec"],[97,"removed",98,"item"],[98,"then",99,"exec"],[99,"then",100,"exec"],[99,"removed",100,"item"],[100,"then",101,"exec"],[101,"then",102,"exec"],[102,"then",103,"exec"],[103,"then",104,"exec"],[104,"then",105,"exec"],[106,"value",105,"value"]]})"},
   };
   return list;
 }
@@ -534,6 +903,7 @@ inline std::string play(kern::logic::Runtime& rt, Host& host, kern::logic::Insta
   for (int i = 0; i < 120; ++i) { host.t += 1.0 / 60; rt.tick(1.0f / 60); }
   rt.call("Go", 0, {{"value", Value::number(1)}});
   for (int i = 0; i < 60; ++i) { host.t += 1.0 / 60; rt.tick(1.0f / 60); }
+  rt.end();   // (End Play)
   std::string out;
   for (const auto& v : inst->graph().variables) out += v.name + "=" + inst->get(v.name).as_text() + "\n";
   for (const auto& m : inst->graph().machines) out += m.name + ":" + inst->state(m.name) + "\n";

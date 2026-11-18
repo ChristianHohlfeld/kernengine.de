@@ -57,7 +57,7 @@ bool screen_ray(const Camera& camera, f32 x, f32 y, f32 width, f32 height, Ray& 
   if (!(width > 0 && height > 0) || !std::isfinite(x) || !std::isfinite(y)) return fail("invalid viewport coordinates");
   if (!camera_valid(camera)) return fail("invalid camera");
   bool ok = false;
-  const Mat4 view = Mat4::look_at(camera.eye, camera.target, camera.up, &ok);
+  const Mat4 view = Mat4::look_at(camera.eye, camera.target, camera.up, ok);
   if (!ok) return fail("degenerate camera direction/up");
   const Mat4 vp = projection_matrix(camera, width / height) * view;
   f64 inv[16];
@@ -382,7 +382,7 @@ so that rotations that feed into the simulation produce the same bits everywhere
 | `trs(t, q, s)` | translation × rotation × scale in one step |
 | `perspective(fov, aspect, near, far)` | perspective; `fov` is the **vertical** field of view in radians |
 | `ortho(l, r, b, t, n, f)` | orthographic projection |
-| `look_at(eye, target, up, &ok)` | view matrix; for a degenerate basis, the identity and `ok = false` |
+| `look_at(eye, target, up[, ok])` | view matrix; for a degenerate basis, the identity (and `ok = false`, a reference) |
 
 Free functions:
 
@@ -455,7 +455,7 @@ The view-projection matrix is obtained as in `screen_ray` (see
 Section 3.1):
 
 ```cpp
-  const Mat4 view = Mat4::look_at(camera.eye, camera.target, camera.up, &ok);
+  const Mat4 view = Mat4::look_at(camera.eye, camera.target, camera.up, ok);
   const Mat4 vp = projection_matrix(camera, width / height) * view;
 ```
 
@@ -465,7 +465,7 @@ test `math_camera` checks that the target lands in the center of the image:
 ```cpp
   const Vec3 eye{10, -5, 4}, target{0, 3, 1};
   bool ok = false;
-  const Mat4 view = Mat4::look_at(eye, target, {0, 0, 1}, &ok);
+  const Mat4 view = Mat4::look_at(eye, target, {0, 0, 1}, ok);
   CHECK(ok);
   const Mat4 vp = Mat4::perspective(1.0f, 1.6f, 0.1f, 500.0f) * view;
   const Vec4 c = vp.transform({target, 1});

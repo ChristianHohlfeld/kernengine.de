@@ -7,7 +7,7 @@
 #include <string>
 #include <type_traits>
 #include <vector>
-#include <functional>
+#include <optional>
 #include "../../src/city_stream.h"
 #include "../../src/common.h"
 #include "kern/geo/mesh_data.h"
@@ -21,10 +21,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -37,10 +37,6 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Whole64 {
-  u32 high = 0;
-  u32 low = 0;
-};
 struct MeshData {
   std::vector<f32> positions, normals, colors, uvs;
   std::vector<f32> extra;  // optional per-vertex stream (extra_size floats each)
@@ -66,16 +62,18 @@ struct MeshData {
   
 };
 enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
-enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
 struct Renderer : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
 };
-enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh };
-enum class Surface : u8 { none, cloth, tpu, floor };
-struct Body { u64 id = 0; };
+namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
+namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { struct Body { u64 id = 0; }; }
 struct World : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
 };
-namespace Value { enum class Kind : u8 { none, string, number, boolean }; }
+namespace mvt { namespace Value { enum class Kind : u8 { none, string, number, boolean }; } }
 enum class RoadClass : u8 { motorway, trunk, primary, secondary, tertiary, minor, service, track, path, pedestrian, river, canal, stream };
+namespace CityStream { namespace Tile { enum class State : u8 { requested, decoding, terrain_wait, building, roads, areas, collision, ready, failed }; } }
 struct Interiors {
  public:
   struct Door { Vec2 c, d, n; };  // centre on the facade, along the wall, outward normal
@@ -108,12 +106,13 @@ struct Interiors {
   
   
   /// "interior" (state), "interior go" (to the nearest building's door), "interior up" (onto
-  /// the next storey's stairs), "interior roof".
+  /// the next storey's stairs), "interior roof". A command that moves the player gives where to
+  /// in `go` (the caller teleports and says "ok", or "not on foot") and leaves `out` as it is.
   
   bool active() const { return active_; }
   
   
-  const Plan& plan() const { return plan_; }
+  
 
  private:
   
@@ -125,7 +124,7 @@ struct Interiors {
   u32 index_ = 0;
   Plan plan_;
   u32 mesh_id_ = 0, glass_id_ = 0;
-  Body body_;
+  physics::Body body_;
   std::vector<f32> door_angle_;
   struct Closed { Vec3 at; f32 yaw; };
   std::vector<Closed> closed_;
@@ -206,16 +205,18 @@ struct Interiors {
 [[maybe_unused]] static bool defined(const Interiors::Plan& s) { return defined(s.outer) && defined(s.inner) && defined(s.holes) && defined(s.inner_holes) && defined(s.doors) && defined(s.levels) && defined(s.base) && defined(s.top) && defined(s.floor_h) && defined(s.area) && defined(s.has_core) && defined(s.roof_access) && defined(s.core) && defined(s.mesh) && defined(s.glass) && defined(s.points) && defined(s.indices) && defined(s.lamps) && defined(s.furniture); }
 [[maybe_unused]] static std::string text(const Interiors::Plan& s) { return std::string("{") + text(s.outer) + ", " + text(s.inner) + ", " + text(s.holes) + ", " + text(s.inner_holes) + ", " + text(s.doors) + ", " + text(s.levels) + ", " + text(s.base) + ", " + text(s.top) + ", " + text(s.floor_h) + ", " + text(s.area) + ", " + text(s.has_core) + ", " + text(s.roof_access) + ", " + text(s.core) + ", " + text(s.mesh) + ", " + text(s.glass) + ", " + text(s.points) + ", " + text(s.indices) + ", " + text(s.lamps) + ", " + text(s.furniture) + "}"; }
 [[maybe_unused]] static void take(Interiors::Plan& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 19) return; converted::take_as<std::vector<Vec2>>(s.outer, (*v.rows)[0]); converted::take_as<std::vector<Vec2>>(s.inner, (*v.rows)[1]); converted::take_as<std::vector<std::vector<Vec2>>>(s.holes, (*v.rows)[2]); converted::take_as<std::vector<std::vector<Vec2>>>(s.inner_holes, (*v.rows)[3]); converted::take_as<std::vector<Interiors::Door>>(s.doors, (*v.rows)[4]); converted::take_as<std::vector<double>>(s.levels, (*v.rows)[5]); converted::take_as<double>(s.base, (*v.rows)[6]); converted::take_as<double>(s.top, (*v.rows)[7]); converted::take_as<double>(s.floor_h, (*v.rows)[8]); converted::take_as<double>(s.area, (*v.rows)[9]); converted::take_as<bool>(s.has_core, (*v.rows)[10]); converted::take_as<bool>(s.roof_access, (*v.rows)[11]); converted::take_as<Interiors::Core>(s.core, (*v.rows)[12]); converted::take_as<MeshData>(s.mesh, (*v.rows)[13]); converted::take_as<MeshData>(s.glass, (*v.rows)[14]); converted::take_as<std::vector<Vec3>>(s.points, (*v.rows)[15]); converted::take_as<std::vector<unsigned int>>(s.indices, (*v.rows)[16]); converted::take_as<std::vector<Vec3>>(s.lamps, (*v.rows)[17]); converted::take_as<unsigned int>(s.furniture, (*v.rows)[18]); }
-[[maybe_unused]] static Body draw_kern__physics__Body(converted::Draw& draw) {
-  Body s{};
+[[maybe_unused]] static physics::Body draw_kern__physics__Body(converted::Draw& draw) {
+  physics::Body s{};
   s.id = static_cast<u64>(draw.bits());
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const Body& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
-[[maybe_unused]] static bool same(const Body& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
-[[maybe_unused]] static bool defined(const Body& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
-[[maybe_unused]] static std::string text(const Body& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
-[[maybe_unused]] static void take(Body& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
+namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const physics::Body& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
+[[maybe_unused]] static bool same(const physics::Body& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
+[[maybe_unused]] static bool defined(const physics::Body& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
+[[maybe_unused]] static std::string text(const physics::Body& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
+[[maybe_unused]] static void take(physics::Body& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
+}
 [[maybe_unused]] static Interiors::Closed draw_Interiors__Closed(converted::Draw& draw) {
   Interiors::Closed s{};
   s.at = draw.vector();
@@ -251,7 +252,7 @@ struct Interiors {
 [[maybe_unused]] static bool same(const Interiors& want, const converted::Value& got) { return got.rows && got.rows->size() == 16 && same(want.r_, (*got.rows)[0]) && same(want.world_, (*got.rows)[1]) && same(want.active_, (*got.rows)[2]) && same(converted::shaped<converted::Whole>(want.tile_), (*got.rows)[3]) && same(want.index_, (*got.rows)[4]) && same(want.plan_, (*got.rows)[5]) && same(want.mesh_id_, (*got.rows)[6]) && same(want.glass_id_, (*got.rows)[7]) && same(want.body_, (*got.rows)[8]) && same(want.door_angle_, (*got.rows)[9]) && same(want.closed_, (*got.rows)[10]) && same(want.next_scan_, (*got.rows)[11]) && same(want.feet_, (*got.rows)[12]) && same(want.entered_, (*got.rows)[13]) && same(want.built_, (*got.rows)[14]) && same(want.was_inside_, (*got.rows)[15]); }
 [[maybe_unused]] static bool defined(const Interiors& s) { return defined(s.r_) && defined(s.world_) && defined(s.active_) && defined(converted::shaped<converted::Whole>(s.tile_)) && defined(s.index_) && defined(s.plan_) && defined(s.mesh_id_) && defined(s.glass_id_) && defined(s.body_) && defined(s.door_angle_) && defined(s.closed_) && defined(s.next_scan_) && defined(s.feet_) && defined(s.entered_) && defined(s.built_) && defined(s.was_inside_); }
 [[maybe_unused]] static std::string text(const Interiors& s) { return std::string("{") + text(s.r_) + ", " + text(s.world_) + ", " + text(s.active_) + ", " + text(converted::shaped<converted::Whole>(s.tile_)) + ", " + text(s.index_) + ", " + text(s.plan_) + ", " + text(s.mesh_id_) + ", " + text(s.glass_id_) + ", " + text(s.body_) + ", " + text(s.door_angle_) + ", " + text(s.closed_) + ", " + text(s.next_scan_) + ", " + text(s.feet_) + ", " + text(s.entered_) + ", " + text(s.built_) + ", " + text(s.was_inside_) + "}"; }
-[[maybe_unused]] static void take(Interiors& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 16) return; converted::take_as<Renderer*>(s.r_, (*v.rows)[0]); converted::take_as<World*>(s.world_, (*v.rows)[1]); converted::take_as<bool>(s.active_, (*v.rows)[2]); converted::take_as<converted::Whole>(s.tile_, (*v.rows)[3]); converted::take_as<unsigned int>(s.index_, (*v.rows)[4]); converted::take_as<Interiors::Plan>(s.plan_, (*v.rows)[5]); converted::take_as<unsigned int>(s.mesh_id_, (*v.rows)[6]); converted::take_as<unsigned int>(s.glass_id_, (*v.rows)[7]); converted::take_as<Body>(s.body_, (*v.rows)[8]); converted::take_as<std::vector<double>>(s.door_angle_, (*v.rows)[9]); converted::take_as<std::vector<Interiors::Closed>>(s.closed_, (*v.rows)[10]); converted::take_as<double>(s.next_scan_, (*v.rows)[11]); converted::take_as<Vec3>(s.feet_, (*v.rows)[12]); converted::take_as<unsigned int>(s.entered_, (*v.rows)[13]); converted::take_as<unsigned int>(s.built_, (*v.rows)[14]); converted::take_as<bool>(s.was_inside_, (*v.rows)[15]); }
+[[maybe_unused]] static void take(Interiors& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 16) return; converted::take_as<Renderer*>(s.r_, (*v.rows)[0]); converted::take_as<World*>(s.world_, (*v.rows)[1]); converted::take_as<bool>(s.active_, (*v.rows)[2]); converted::take_as<converted::Whole>(s.tile_, (*v.rows)[3]); converted::take_as<unsigned int>(s.index_, (*v.rows)[4]); converted::take_as<Interiors::Plan>(s.plan_, (*v.rows)[5]); converted::take_as<unsigned int>(s.mesh_id_, (*v.rows)[6]); converted::take_as<unsigned int>(s.glass_id_, (*v.rows)[7]); converted::take_as<physics::Body>(s.body_, (*v.rows)[8]); converted::take_as<std::vector<double>>(s.door_angle_, (*v.rows)[9]); converted::take_as<std::vector<Interiors::Closed>>(s.closed_, (*v.rows)[10]); converted::take_as<double>(s.next_scan_, (*v.rows)[11]); converted::take_as<Vec3>(s.feet_, (*v.rows)[12]); converted::take_as<unsigned int>(s.entered_, (*v.rows)[13]); converted::take_as<unsigned int>(s.built_, (*v.rows)[14]); converted::take_as<bool>(s.was_inside_, (*v.rows)[15]); }
 
 SC_TEST(converted_interiors) {
   converted::Blueprint bp("interiors");
@@ -260,17 +261,20 @@ SC_TEST(converted_interiors) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Interiors a0, [[maybe_unused]] Renderer& a1, [[maybe_unused]] World& a2) { converted::counted([&] { return a0.init(a1, a2); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
-      const Interiors a0 = draw_Interiors(draw);
+      Interiors a0 = draw_Interiors(draw);
       Renderer& a1 = *converted::engine_object<Renderer>(1 + draw.below(6));
       World& a2 = *converted::engine_object<World>(1 + draw.below(6));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), a1, a2);
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Interiors::active
@@ -278,31 +282,18 @@ SC_TEST(converted_interiors) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Interiors a0) { return converted::counted([&] { return a0.active(); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Interiors a0 = draw_Interiors(draw);
+      Interiors a0 = draw_Interiors(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
-    }
-  }
-  {  // Interiors::plan
-    converted::Tally tally("Interiors_plan");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Interiors a0) { return converted::counted([&] { return a0.plan(); }); };
-    for (int i = 0; tally.more(i); ++i) {
-      const Interiors a0 = draw_Interiors(draw);
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      const auto want = run(a0);
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

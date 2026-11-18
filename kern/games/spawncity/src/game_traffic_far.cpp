@@ -56,8 +56,8 @@ void Game::traffic_make_far(TrafficCar& c) {
   if (!b.valid() || !w.body_valid(b)) { c.far = false; return; }
   if (c.solid_masks.empty()) {
     w.body_masks(b, c.solid_masks);
-    const u64 nothing = kCatQuery;  // (no shape is of this category: found by rays and blasts, touched by nothing)
-    w.set_body_masks(b, kern::Span<const u64>(&nothing, 1));
+    const u64 nothing[1] = {kCatQuery};  // (no shape is of this category: found by rays and blasts, touched by nothing)
+    w.set_body_masks(b, kern::Span<const u64>(nothing, 1));
   }
   if (w.body_type(b) != kern::physics::BodyType::kinematic) w.set_body_type(b, kern::physics::BodyType::kinematic);
   w.set_linear_velocity(b, {});
@@ -174,7 +174,7 @@ void Game::traffic_far_step(TrafficCar& c, std::size_t i, f32 h) {
   want = std::fmin(want, traffic_rules(static_cast<i32>(i), s.position, fwd, c.far_speed));
   {
     i32 limiter = -1;
-    const f32 free_way = traffic_gap(static_cast<i32>(i), s.position, fwd, &limiter);
+    const f32 free_way = traffic_gap(static_cast<i32>(i), s.position, fwd, limiter);
     c.ahead = free_way < 0.6f ? limiter : -1;
     want = std::fmin(want, free_way);
   }

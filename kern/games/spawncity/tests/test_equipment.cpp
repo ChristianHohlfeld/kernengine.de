@@ -76,13 +76,13 @@ SC_TEST(equipment_music) {
   std::vector<f32> buf(2 * 4800);
   m.select(MusicSynth::kMenu, 1);
   f32 peak = 0;
-  for (int i = 0; i < 40; ++i) { std::fill(buf.begin(), buf.end(), 0.0f); m.render_add(buf.data(), 4800); peak = std::fmax(peak, m.peak); }
+  for (int i = 0; i < 40; ++i) { std::fill(buf.begin(), buf.end(), 0.0f); m.render_add(buf, 4800); peak = std::fmax(peak, m.peak); }
   SC_CHECK(peak > 0.05f && peak < 1.2f, "the title music plays (peak %.3f)", peak);
   m.select(2, 1);
-  for (int i = 0; i < 20; ++i) m.render_add(buf.data(), 4800);
+  for (int i = 0; i < 20; ++i) m.render_add(buf, 4800);
   SC_CHECK(m.programme() == 2, "the radio station takes over (%d)", m.programme());
   m.select(-2, 0);
-  for (int i = 0; i < 20; ++i) { std::fill(buf.begin(), buf.end(), 0.0f); m.render_add(buf.data(), 4800); }
+  for (int i = 0; i < 20; ++i) { std::fill(buf.begin(), buf.end(), 0.0f); m.render_add(buf, 4800); }
   SC_CHECK(m.peak == 0, "radio off: silence");
   SC_CHECK(MusicSynth::station_count() == 5, "five stations");
 }

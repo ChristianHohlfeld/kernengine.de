@@ -54,6 +54,7 @@
 #include <vector>
 
 #include "kern/core/base.h"
+#include "kern/core/map.h"
 #include "kern/core/json.h"
 #include "kern/math/math.h"
 
@@ -64,18 +65,26 @@ using ActorRef = u32;  // game actor id (0 = none)
 /// What a pin carries: exec, a value, or a list of values of one type (after the value types, in
 /// their order). `enumeration`: a value of an enum the Blueprint declares, `structure`: a value of
 /// one of its structs - which one says the name beside the type (PinDef::of, Variable::of ...).
+/// `int64`: 64 bits, as a u64 or an i64 of C++ holds them - which of the two it is says the node
+/// that reads them (Compare Int64 <, <u; Int64 Math /s, /u), as in WebAssembly. `map`: values of
+/// one type, each under a key of its own, in the order the keys came; `set`: keys in the order
+/// they came - of what types says the name beside it (keyed_of).
 enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, count
+  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
+  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
+  map, set, count
 };
-constexpr u8 kValueTypes = 8;  // boolean ... structure
+constexpr u8 kValueTypes = 9;  // boolean ... int64
 /// A list type, the type of a list's items (of a value: the type itself), and the list of a type.
-constexpr bool is_list(PinType t) { return t >= PinType::boolean_list && t < PinType::count; }
+constexpr bool is_list(PinType t) { return t >= PinType::boolean_list && t <= PinType::int64_list; }
+/// A map or a set: its entries are found by their keys (kern::Map, kern::Set - kern/core/map.h).
+constexpr bool is_keyed(PinType t) { return t == PinType::map || t == PinType::set; }
 constexpr PinType element_of(PinType t) { return is_list(t) ? static_cast<PinType>(static_cast<u8>(t) - kValueTypes) : t; }
-constexpr PinType list_of(PinType t) { return t >= PinType::boolean && t <= PinType::structure ? static_cast<PinType>(static_cast<u8>(t) + kValueTypes) : t; }
+constexpr PinType list_of(PinType t) { return t >= PinType::boolean && t <= PinType::int64 ? static_cast<PinType>(static_cast<u8>(t) + kValueTypes) : t; }
 /// The names of the pin types, in the order of PinType.
-inline constexpr std::string_view kPinTypeNames[] = {"exec",      "bool",     "int",        "float",       "vector",    "text",      "actor",      "enum",      "struct",
-                                                     "bool_list", "int_list", "float_list", "vector_list", "text_list", "actor_list", "enum_list", "struct_list"};
+inline constexpr std::string_view kPinTypeNames[] = {"exec",      "bool",     "int",        "float",       "vector",    "text",      "actor",      "enum",      "struct",      "int64",
+                                                     "bool_list", "int_list", "float_list", "vector_list", "text_list", "actor_list", "enum_list", "struct_list", "int64_list",
+                                                     "map",       "set"};
 static_assert(sizeof kPinTypeNames / sizeof kPinTypeNames[0] == static_cast<std::size_t>(PinType::count));
 /// "bool", "int", "float", "vector", "text", "actor"; a list: "float_list" ...
 const char* pin_type_name(PinType t);
@@ -143,8 +152,34 @@ struct ActorHandle {
   bool operator==(const ActorHandle&) const = default;
 };
 
+/// The key of an entry of a map or a set, as the interpreter holds it: a whole number (Int, the
+/// place of an enum's value, Bool as 0 or 1) or a text.
+/// (A map holds keys of one type: a whole number or a text, never both.)
+struct MapKey {
+  i64 i = 0;
+  std::string s;
+  bool operator==(const MapKey&) const = default;
+  u64 hash() const { return KeyHash<i64>{}(i) ^ KeyHash<std::string>{}(s); }
+};
+struct Value;
+/// The entries of a map or a set value (a set's values are none).
+using MapEntries = kern::Map<MapKey, Value>;
+
+/// `Int64` in a Blueprint's C++ (and on an Int64 pin): 64 bits, as a u64 or an i64 of C++ holds
+/// them. What they mean says the node that reads them - Int64 Less (signed) or Int64 Less Unsigned,
+/// Int64 Divide or Divide Unsigned -, as in WebAssembly; adding, subtracting and multiplying go
+/// round at 2^64, as in C++. Written out with its bits: Int64{0x1f}.
+struct Int64 {
+  u64 bits = 0;
+  constexpr Int64() = default;
+  constexpr explicit Int64(u64 b) : bits(b) {}
+  friend constexpr bool operator==(Int64 a, Int64 b) { return a.bits == b.bits; }
+  friend constexpr auto operator<=>(Int64 a, Int64 b) { return a.bits <=> b.bits; }  // (Sort List: as u64)
+  u64 hash() const { return KeyHash<u64>{}(bits); }  // (a key of a Map, a Set)
+};
+
 /// The items of a list value: the vector of the list's type holds them (the others are empty).
-using ListItems = std::tuple<std::vector<bool>, std::vector<i64>, std::vector<f64>, std::vector<Vec3>, std::vector<std::string>, std::vector<ActorHandle>>;
+using ListItems = std::tuple<std::vector<bool>, std::vector<i64>, std::vector<f64>, std::vector<Vec3>, std::vector<std::string>, std::vector<ActorHandle>, std::vector<Int64>>;
 /// The list type whose items are T (bool, i64, f64, Vec3, std::string, ActorHandle).
 template <class T> constexpr PinType list_type_of() = delete;
 template <> constexpr PinType list_type_of<bool>() { return PinType::boolean_list; }
@@ -153,6 +188,7 @@ template <> constexpr PinType list_type_of<f64>() { return PinType::number_list;
 template <> constexpr PinType list_type_of<Vec3>() { return PinType::vector_list; }
 template <> constexpr PinType list_type_of<std::string>() { return PinType::text_list; }
 template <> constexpr PinType list_type_of<ActorHandle>() { return PinType::actor_list; }
+template <> constexpr PinType list_type_of<Int64>() { return PinType::int64_list; }
 
 /// A value on a data pin.
 struct Value {
@@ -170,6 +206,9 @@ struct Value {
   /// Shared like a list's items. A struct that holds none (Value::zero) has every field at its
   /// declared default - what a field is, is read through the declaration (logic::field_of).
   std::shared_ptr<const std::vector<Value>> rows;
+  /// A map's or a set's entries, in the order their keys came (none: it is empty). Shared like a
+  /// list's items.
+  std::shared_ptr<const MapEntries> entries;
 
   static Value boolean(bool x) { Value r; r.type = PinType::boolean; r.b = x; return r; }
   static Value integer(i64 x) { Value r; r.type = PinType::integer; r.i = normal(x); return r; }
@@ -177,6 +216,8 @@ struct Value {
   static Value vector(Vec3 x) { Value r; r.type = PinType::vector; r.v = x; return r; }
   static Value text(std::string x) { Value r; r.type = PinType::text; r.s = std::move(x); return r; }
   static Value actor(ActorRef x) { Value r; r.type = PinType::actor; r.a = x; return r; }
+  /// An Int64: its 64 bits (held in `i`, as they are).
+  static Value int64(u64 bits) { Value r; r.type = PinType::int64; r.i = static_cast<i64>(bits); return r; }
   /// A value of an enum: its place among the enum's values (the first is 0).
   static Value enumeration(i64 index) { Value r; r.type = PinType::enumeration; r.i = index < 0 ? 0 : index; return r; }
   /// A list of values of an enum.
@@ -261,7 +302,11 @@ struct Value {
     else if (rows.use_count() > 1) rows = std::make_shared<std::vector<Value>>(*rows);  // (someone else reads these)
     return const_cast<std::vector<Value>&>(*rows);  // (made as a vector, here and in structure())
   }
-  /// How many items a list has (no list: 0).
+  /// The entries of a map or a set (none: empty).
+  const MapEntries& keyed() const;
+  /// The entries of a map or a set, to change them: this value's own.
+  MapEntries& own_entries();
+  /// How many items a list has, how many entries a map or a set (none of these: 0).
   std::size_t size() const;
   /// A list's item as a value (beyond its end, or no list: the zero of the item's type).
   Value item(std::size_t index) const;
@@ -280,6 +325,13 @@ struct Value {
   /// "Damage": 25} -, written with every field; read, a field that is missing has its default.
   json::Value to_json(const struct Graph& g, std::string_view of) const;
   static Value from_json(const json::Value& j, PinType type, const struct Graph& g, std::string_view of);
+  /// The same for what a place is declared as (TypeRef) - how a graph holds a default and a value
+  /// typed into a pin. A list of a fixed length (the place, a field of a struct) has that length:
+  /// read, what JSON does not say is the zero of its entries; written here, it is said up to its
+  /// last entry that is not that zero (logic::said) - a buffer of 24000 zeros is []. (to_json(g, of),
+  /// above, writes a value in full: every entry - what an inspector shows.)
+  static Value from_json(const json::Value& j, const struct TypeRef& declared, const struct Graph& g);
+  json::Value to_json(const struct Graph& g, const struct TypeRef& declared) const;
   bool operator==(const Value& o) const;
 };
 
@@ -313,6 +365,9 @@ struct Variable {
   json::Value value;     // default
   std::string help;
   std::string of = {};   // a value of an enum or a struct (or a list of them): its name
+  /// A list of a fixed length: it always has that many entries (0: a list of any length). See
+  /// TypeRef::count.
+  u32 count = 0;
   /// A constant: what it is, it is - read like a variable, never changed (no Set, no Add, no
   /// step that changes a list, no reference that could). In the Blueprint's C++:
   /// KERN_CONST Float Gravity = 9.81;
@@ -343,11 +398,38 @@ struct EnumType {
 struct TypeRef {
   PinType type = PinType::number;
   std::string of;
+  /// What a place is declared as - a variable, a field of a struct, an input, an output or a
+  /// local variable of a function - can be a list of a fixed length: it always has `count`
+  /// entries (0: a list of any length). In a Blueprint's C++ it is Fixed<Float, 16> - std::array:
+  /// it lies where it stands, no memory is asked for. Its entries are read and set like a list's
+  /// (M.m[i]); nothing changes its length (the steps that would are an error of the graph), and
+  /// what is set there as a whole is cut to its length or filled up with zeros. What flows through
+  /// a pin is a list: a pin has no count.
+  u32 count = 0;
   bool operator==(const TypeRef&) const = default;
 };
+/// The longest list of a fixed length a place can be declared as.
+inline constexpr u32 kLongestFixed = 65536;
 /// Can what comes out of a pin of type `from` go into one of type `to`? (convertible, and two
 /// enums are the same enum, two structs the same struct.)
 bool fits(const TypeRef& from, const TypeRef& to);
+/// A map's and a set's types (TypeRef::of beside PinType::map / set): the keys' and, of a map,
+/// the values' - "int>float", "enum:Mode>struct_list:Weapon", of a set "int". A key is a Bool,
+/// an Int, an Int64, an enum's value or a Text; a value is any type a variable can be but a map or a set.
+TypeRef key_type(const TypeRef& keyed);
+TypeRef value_type(const TypeRef& map);
+/// What TypeRef::of says of a map with these keys and values (`value` null: of a set).
+std::string keyed_of(const TypeRef& key, const TypeRef* value);
+/// The types of the Blueprint (enums and structs) a type names: itself or its items - of a map its
+/// keys and its values, of a set its keys. (Each with the type it has there: Mode, Weapon_list.)
+std::vector<TypeRef> types_named(const TypeRef& t);
+/// The type with the enum or struct `from` called `to` wherever it names it (a map's keys, values).
+TypeRef type_renamed(const TypeRef& t, const std::string& from, const std::string& to);
+/// Can a map's or a set's keys be of this type?
+constexpr bool key_type_ok(PinType t) { return t == PinType::boolean || t == PinType::integer || t == PinType::int64 || t == PinType::enumeration || t == PinType::text; }
+/// The key of an entry as the interpreter holds it, and back (`key`: the keys' type).
+MapKey key_of(const Value& v);
+Value key_value(const MapKey& k, PinType key);
 
 /// A structure a Blueprint declares: a type with named fields, each of a type and with a default.
 /// A field is a value type, an enum of the Blueprint, a struct declared above this one, or a list
@@ -411,6 +493,7 @@ struct FunctionPin {
   PinType type = PinType::number;
   json::Value value;     // default: an input nobody wired, an output no Return node set
   std::string of = {};   // a value of an enum or a struct (or a list of them): its name
+  u32 count = 0;         // a list of a fixed length: that many entries (TypeRef::count)
   /// An input that is a reference: the call gives no value but names a place - a variable, a
   /// field or a list entry in one (logic::ref_key) -, and the function works on that place where
   /// it stands. It changes it (Car& car), or - `constant` - only reads it (const Car& car):
@@ -434,6 +517,10 @@ struct Function {
   /// and calls it on an actor (Call on Actor) - it has no body here. In the Blueprint's C++:
   /// KERN_EXTERN FnResult Fn(Float x = 0.0);
   bool external = false;
+  /// Of a function of another Blueprint: the name that Blueprint has it under, where this one calls it
+  /// by another (empty: the same) - two actors' Blueprints with a function of one name that looks
+  /// different in each: KERN_EXTERN_AS("Update") ZombiesUpdateResult Zombies_Update(...);
+  std::string remote{};
   /// A function of a library the Blueprint uses (Graph::uses): the library's name. This one says
   /// what the function looks like - its name here is "Library::function", as the call writes it
   /// (Random::range(rng, 0.0, 1.0)) - and has no body: the library has it, once. Called
@@ -554,8 +641,22 @@ bool is_value_of(const Value& v, const TypeRef& t, const Graph& g);
 void hold_fields(Value& v, const StructType& s, const Graph& g);
 /// What comes from outside (Instance::set, the arguments of Instance::call) as a value of type
 /// `t`: converted as a wire converts; an enum's value that is none of the enum's is the first; and
-/// what is no struct of that type is the struct's default.
+/// what is no struct of that type is the struct's default. A list of a fixed length
+/// (TypeRef::count) has that length: cut, or filled up with the zero of its entries.
 Value from_outside(const Value& v, const TypeRef& t, const Graph& g);
+/// What a place declared as `t` holds when it is given `v`, a value of its pin type: `v` - with
+/// every list of a fixed length in it (the place itself, the fields of its structs) at its
+/// length, cut or filled up with zeros. (A Set, a Make, a call's input, a function's output.)
+Value fitted(Value v, const TypeRef& t, const Graph& g);
+/// How many entries of a list of a fixed length are said - in JSON and in the text of a graph:
+/// up to its last entry that is not exactly the zero of its entries, bit for bit (-0.0 is said).
+/// What is not said is that zero, as in C++. (No list of a fixed length: all it has.)
+std::size_t said(const Value& list, const TypeRef& declared, const Graph& g);
+/// Is there a list of a fixed length in what `t` declares (itself, or in a field of its struct)?
+bool has_fixed(const TypeRef& t, const Graph& g);
+/// The type a variable, an input, an output or a local variable is declared as.
+inline TypeRef declared(const Variable& v) { return {v.type, v.of, v.count}; }
+inline TypeRef declared(const FunctionPin& p) { return {p.type, p.of, p.count}; }
 /// The structs `s` holds, directly or in its fields' structs (their names) - itself not among them.
 std::vector<std::string> structs_in(const StructType& s, const Graph& g);
 
@@ -570,9 +671,9 @@ std::vector<std::string> structs_in(const StructType& s, const Graph& g);
 ///   operators    + - * / %  ^ (power)       unary - and !
 ///                < <= > >= == !=            1 when true, else 0
 ///                && ||                      a ? b : c
-///   functions    min max clamp(x, lo, hi) abs sign floor ceil round trunc sqrt pow(x, y) exp log
+///   functions    min max clamp(x, lo, hi) abs sign copysign(x, s) floor ceil round trunc sqrt pow(x, y) exp log
 ///                sin cos tan asin acos atan atan2(y, x) - in radians; rad(degrees) deg(radians)
-///                lerp(a, b, t)
+///                lerp(a, b, t) remainder(x, y) (IEEE 754's: x - n * y, n the whole number nearest x / y)
 ///   constants    pi
 /// Dividing by 0 gives 0 (as the Divide node); the root and the logarithm of a negative number
 /// are those of 0 and of nothing (0).
@@ -638,6 +739,8 @@ struct ParamDef {
   bool with_lists = false;  // Kind::type: the list types are among them (not for the type of a list's items)
   bool enums_only = false;  // Kind::type: an enum of the Blueprint and nothing else (the enum nodes' "Enum")
   bool structs_only = false;  // Kind::type: a struct of the Blueprint and nothing else (the struct nodes' "Struct")
+  bool optional = false;      // Kind::function: it may name none (Sort List without an Order: the items' own)
+  bool keys_only = false;     // Kind::type: a type a map's or a set's keys can be (Bool, Int, Int64, an enum, Text)
 };
 /// The types a Kind::type setting can name in the Blueprint `g` - its enums and structs among
 /// them -, in the order they are offered.
@@ -742,10 +845,25 @@ class Host {
   virtual u32 random() = 0;
   /// The game world behind this host (gameplay nodes), or null.
   virtual void* game() { return nullptr; }
-  /// A function of the engine, by the name of its node - what the engine's nodes do in every tier
-  /// (kern/logic/engine_api.h). `in`: the node's inputs in their order; `out`: its outputs, given as
+  /// The actor of this name (Find Actor by Name - in the interpreter, with the JIT and in a Blueprint's
+  /// class alike), or 0: none. A game's host: the actor of its world of that name (GameWorld::find_actor);
+  /// a host without a world names none - unless it is one that names actors of its own (a test's: the
+  /// instances of a runtime by name, for Call on Actor and Get Variable on Actor).
+  virtual ActorRef find_actor(std::string_view name);
+  /// A function of the engine, by the name of its node - what the engine's nodes do in the
+  /// interpreter, with the JIT, and in a Blueprint's class that has no objects of the engine
+  /// (kern/logic/engine_api.h; see engine_objects below). `in`: the node's inputs in their order; `out`: its outputs, given as
   /// their zeros. False: this host has no such function (the outputs stay as they are).
   virtual bool engine(std::string_view function, const std::vector<Value>& in, std::vector<Value>& out);
+  /// The objects of the engine behind that door (kern/logic/engine_host.h), where the host lets a
+  /// Blueprint's class call the engine's functions on them itself: typed, without the door
+  /// (kern/logic/engine_direct.h - what it does then is what `engine` does with the same call). Null:
+  /// this host has none, or wants every call at its door (a test that writes the calls down) - the
+  /// class calls `engine`.
+  virtual class EngineObjects* engine_objects();
+  /// A call a Blueprint's class made on those objects itself failed (EngineObjects::error says why):
+  /// what `engine` does with a call that fails.
+  virtual void engine_failed(std::string_view function);
   /// Native code: the host compiles the WebAssembly module of an instance (asynchronously)
   /// and calls jit_ready(id, function) when it is linked. False: no compiler here (interpreter).
   virtual bool jit_compile(const std::vector<u8>& module, i32 id);
@@ -837,7 +955,8 @@ struct CodeLayout {
   static constexpr int kNodeSlots = 8;   // per node: 4 state + 4 data outputs
   static constexpr int kStack = 512;     // continuation entries (pc, entry): at least; an instance has as
                                          // many as its graph can ever need (Instance::stack_capacity)
-  static constexpr int kStackMost = 1 << 15;  // a graph that could need more is not compiled by the JIT
+  static constexpr int kStackMost = 1 << 17;  // a graph that could need more is not compiled by the JIT (the bound is what it can
+                                              // ever need: every node that leaves something to go on with open in each of 66 nested chains)
 };
 
 /// Compiles an instance's graph to a WebAssembly module (the JIT's input).
@@ -857,6 +976,9 @@ struct BlueprintWorld {
   class Instance* instance = nullptr;
   ActorRef self = 0;
   i32* counters = nullptr;  // the runtime's shared counters ([3] loop passes this step, [1] their limit)
+  /// The host's objects of the engine (Host::engine_objects): the class calls the engine's functions
+  /// on them itself. Null: through the host's door (Host::engine).
+  class EngineObjects* engine = nullptr;
 };
 class NativeBlueprint {
  public:
@@ -1153,6 +1275,7 @@ class Instance {
   bool stopping_ = false;             // the loop guard: disabled when its outermost chain is over
   bool disabled_ = false;
   bool begun_ = false;
+  bool ended_ = false;                // End Play has run (Runtime::end, remove)
 };
 
 /// Event delivered to graphs: type (e.g. "game.overlap"), optional filter
@@ -1177,10 +1300,13 @@ class Runtime {
   /// The Blueprints of the project: where a Blueprint's libraries are found (Graph::uses). A
   /// Blueprint that uses libraries runs as one graph with them (logic::link).
   Blueprints blueprints;
+  /// Takes the actor's Blueprint out - after its End Play.
   void remove(ActorRef self);
   void clear();
   /// Begin Play for instances that have not begun.
   void begin();
+  /// End Play for every instance that has begun and not ended (play stops), in the order they were added.
+  void end();
   /// One fixed step: latent actions, timers, state machine timers, Tick events.
   void tick(f32 dt);
   /// Raises an event (synchronously runs the handlers).
@@ -1194,6 +1320,27 @@ class Runtime {
   /// chains nest: at most 64, then the call is left out and reported), and a Blueprint that is in
   /// the middle of a call of that function has its own values back afterwards.
   void call_on(Instance& caller, std::string_view function, ActorRef target, const std::vector<Value>& args, std::vector<Value>& results);
+  /// Get Variable on Actor: the variable `name` of the Blueprint of `target` as a value of `type` (what
+  /// a variable of that type holds when nothing else is said - its zero - where the target has none:
+  /// no such Blueprint, no such variable, one of a type that does not become `type`).
+  Value get_on(const Instance& caller, std::string_view name, ActorRef target, const TypeRef& type);
+  /// The one way of Call on Actor, whoever calls: a Blueprint's node (call_on above, with the pins it
+  /// declares) and the program's C++ (ActorBlueprint, with its own types) - in every tier. Runs
+  /// `function` of the Blueprint of `target` (0: the Level's) with `args` to its end; `got`: what the
+  /// function gives, as it gives it. False: the call gives nothing - the target has no Blueprint, one
+  /// that does not run (disabled: it has errors or was stopped), none of that function, or calls on
+  /// Blueprints nest more than 64 deep (it is reported, naming `caller`). A Blueprint that is in the
+  /// middle of a call of that function has its own values back afterwards.
+  bool call_on(ActorRef target, std::string_view function, const std::vector<Value>& args, std::vector<Value>& got, std::string_view caller);
+  /// The one way of Get Variable on Actor, whoever reads (get_on above, ActorBlueprint::get): the
+  /// variable `name` of the Blueprint of `target` (0: the Level's) as that Blueprint holds it. False:
+  /// the target has no Blueprint, no such variable, or one whose type does not become `as` (a number
+  /// becomes a number, a value of an enum one of an enum, a struct a struct, a list a list of its kind:
+  /// logic::convertible - which struct and which enum the reader means, it says by its own type).
+  bool get_on(ActorRef target, std::string_view name, PinType as, Value& out);
+  /// Has Blueprint: does `target` (0: the Level) have a Blueprint that runs - one without errors that
+  /// has not been stopped? What Call on Actor and Get Variable on Actor reach when it has one.
+  bool has_blueprint(ActorRef target);
   /// For a Blueprint's class (NativeBlueprint): its node with the id `node` waits `seconds`; then
   /// the runtime runs it again (NativeBlueprint::run with `entry`) - the waits of every tier are
   /// kept and served in one place. cancel_waits: the node's waits are off.
@@ -1236,6 +1383,7 @@ class Runtime {
   };
   enum class Chain : u8 { event, call, call_inside };  // what starts it (run_from)
   void run_from(Instance& inst, int node, int entry, Chain chain = Chain::event);
+  void end_play(Instance& inst);   // (its End Play handlers, once - see end, remove)
   void enter_state(Instance& inst, std::size_t machine, u32 state);
   void check_transitions(Instance& inst, const std::string* event);
   void step_starts();              // a new step: the guard counts from zero

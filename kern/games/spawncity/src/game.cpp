@@ -217,7 +217,7 @@ kern::game::Level Game::build_level() const {
     cap.length = 1.1f;
     rs.colliders.push_back(cap);
     rs.mass.mass = 90;
-    box_inertia(90, {0.6f, 0.6f, 1.7f}, rs.mass.inertia);
+    box_inertia(90, {0.6f, 0.6f, 1.7f}, rs.mass);
     Actor a = vehicle_actor("Parachute", rs, {0, 0, -500}, 0);
     a.body->lock_angular[0] = a.body->lock_angular[1] = a.body->lock_angular[2] = true;
     l.add(a);
@@ -245,7 +245,7 @@ bool Game::start(kern::Engine& e) {
   lon_ = e.arg_number("lon", kKonstanzLon);
   fpv_tilt_deg_ = static_cast<f32>(kern::clamp(e.arg_number("fpvtilt", -15), -15.0, 50.0));
   sensitivity_ = static_cast<f32>(kern::clamp(e.arg_number("mouse", 100), 20.0, 300.0)) / 100;  // mouse_settings.mjs 20..300 %
-  if (const char* s = e.arg("start")) start_mode_ = s;
+  if (e.has_arg("start")) start_mode_ = e.arg("start", "");
 
   register_node();
   const bool coarse = e.arg_number("coarse", mobile_ ? 1 : 0) > 0;
@@ -259,54 +259,32 @@ bool Game::start(kern::Engine& e) {
   soldier_controller_.camera_fov = 59;  // 90 degrees across a 16:9 view (camera_pitch_contract.mjs)
 
   life_ = std::make_unique<WorldLife>();  // M3 world state (game_world.h)
-  world_ = std::make_unique<GameWorld>(e.renderer);  // the night of the facades: game_look.cpp (windows_.night)
+  world_ = std::make_unique<GameWorld>(e.renderer());  // the night of the facades: game_look.cpp (windows_.night)
   if (!world_->start(build_level(), kern::game::SimMode::play)) return kern::fail("level start: %s", kern::last_error());
-  // The rules that are Blueprints of the level's actors: bound to the C++ that still calls them.
+  // The rules that are Blueprints of the level's actors: the C++ that still calls them is bound to the
+  // logic they run in, and finds each by its name at every call (as a Blueprint does).
   {
     kern::logic::Runtime* logic = world_->logic_runtime();
-    kern::logic::Instance* wanted = logic ? logic->find(world_->find_actor("Wanted")) : nullptr;
-    if (!wanted || wanted->disabled()) return kern::fail("the level's Blueprint \"Wanted\" is missing or has errors");
-    wanted::bind(wanted);
-    kern::logic::Instance* combat_detail = logic ? logic->find(world_->find_actor("CombatDetail")) : nullptr;
-    if (!combat_detail || combat_detail->disabled()) return kern::fail("the level's Blueprint \"CombatDetail\" is missing or has errors");
-    detail::bind(combat_detail);
-    kern::logic::Instance* guided_rules = logic ? logic->find(world_->find_actor("Guided")) : nullptr;
-    if (!guided_rules || guided_rules->disabled()) return kern::fail("the level's Blueprint \"Guided\" is missing or has errors");
-    guided::bind(guided_rules);
-    kern::logic::Instance* spawn_guard = logic ? logic->find(world_->find_actor("SpawnGuard")) : nullptr;
-    if (!spawn_guard || spawn_guard->disabled()) return kern::fail("the level's Blueprint \"SpawnGuard\" is missing or has errors");
-    spawn::bind(spawn_guard);
-    kern::logic::Instance* jet_seats = logic ? logic->find(world_->find_actor("JetSeats")) : nullptr;
-    if (!jet_seats || jet_seats->disabled()) return kern::fail("the level's Blueprint \"JetSeats\" is missing or has errors");
-    seats::bind(jet_seats);
-    kern::logic::Instance* lamp_rules = logic ? logic->find(world_->find_actor("Lamps")) : nullptr;
-    if (!lamp_rules || lamp_rules->disabled()) return kern::fail("the level's Blueprint \"Lamps\" is missing or has errors");
-    lamps::bind(lamp_rules);
-    kern::logic::Instance* sirens = logic ? logic->find(world_->find_actor("Sirens")) : nullptr;
-    if (!sirens || sirens->disabled()) return kern::fail("the level's Blueprint \"Sirens\" is missing or has errors");
-    gaps::bind_sirens(sirens);
-    kern::logic::Instance* control_rules = logic ? logic->find(world_->find_actor("Controls")) : nullptr;
-    if (!control_rules || control_rules->disabled()) return kern::fail("the level's Blueprint \"Controls\" is missing or has errors");
-    controls::bind(control_rules);
-    kern::logic::Instance* settings = logic ? logic->find(world_->find_actor("Settings")) : nullptr;
-    if (!settings || settings->disabled() || !bind_settings(settings)) return kern::fail("the level's Blueprint \"Settings\" is missing, has errors or not one row per setting");
-    ui_.settings = Settings();  // every setting at the table's default (the page replays the player's own with "set")
-    kern::logic::Instance* jetpack = logic ? logic->find(world_->find_actor("Jetpack")) : nullptr;
-    if (!jetpack || jetpack->disabled()) return kern::fail("the level's Blueprint \"Jetpack\" is missing or has errors");
-    Jetpack::bind(jetpack);
-    kern::logic::Instance* traffic = logic ? logic->find(world_->find_actor("Traffic")) : nullptr;
-    if (!traffic || traffic->disabled()) return kern::fail("the level's Blueprint \"Traffic\" is missing or has errors");
-    TrafficRules::bind(traffic);
-    kern::logic::Instance* multiplayer = logic ? logic->find(world_->find_actor("Multiplayer")) : nullptr;
-    if (!multiplayer || multiplayer->disabled()) return kern::fail("the level's Blueprint \"Multiplayer\" is missing or has errors");
-    mp::bind(multiplayer);
+    if (!logic || !wanted::bind(*logic)) return kern::fail("the level's Blueprint \"Wanted\" is missing or has errors");
+    if (!detail::bind(*logic)) return kern::fail("the level's Blueprint \"CombatDetail\" is missing or has errors");
+    if (!guided::bind(*logic)) return kern::fail("the level's Blueprint \"Guided\" is missing or has errors");
+    if (!spawn::bind(*logic)) return kern::fail("the level's Blueprint \"SpawnGuard\" is missing or has errors");
+    if (!seats::bind(*logic)) return kern::fail("the level's Blueprint \"JetSeats\" is missing or has errors");
+    if (!lamps::bind(*logic)) return kern::fail("the level's Blueprint \"Lamps\" is missing or has errors");
+    if (!gaps::bind_sirens(*logic)) return kern::fail("the level's Blueprint \"Sirens\" is missing or has errors");
+    if (!controls::bind(*logic)) return kern::fail("the level's Blueprint \"Controls\" is missing or has errors");
+    if (!bind_settings(*logic, ui_.settings_table)) return kern::fail("the level's Blueprint \"Settings\" is missing, has errors or not one row per setting");
+    ui_.settings = Settings(ui_.settings_table);  // every setting at the table's default (the page replays the player's own with "set")
+    if (!Jetpack::bind(*logic)) return kern::fail("the level's Blueprint \"Jetpack\" is missing or has errors");
+    if (!TrafficRules::bind(*logic)) return kern::fail("the level's Blueprint \"Traffic\" is missing or has errors");
+    life_->rules.take_laws();
+    if (!mp::bind(*logic)) return kern::fail("the level's Blueprint \"Multiplayer\" is missing or has errors");
     // the combat and event rules (combat_rules.h)
-    const struct { const char* actor; bool (*bind)(kern::logic::Instance*); } combat_rules[] = {
-        {"Military", &combat::bind_military}, {"Zombies", &combat::bind_zombies}, {"Sandbox", &combat::bind_sandbox}, {"Fun", &combat::bind_fun}, {"Race", &combat::bind_race}};
-    for (const auto& r : combat_rules) {
-      kern::logic::Instance* running = logic ? logic->find(world_->find_actor(r.actor)) : nullptr;
-      if (!running || running->disabled() || !r.bind(running)) return kern::fail("the level's Blueprint \"%s\" is missing, has errors or a table the game cannot read", r.actor);
-    }
+    if (!combat::bind_military(*logic)) return kern::fail("the level's Blueprint \"Military\" is missing, has errors or a table the game cannot read");
+    if (!combat::bind_zombies(*logic)) return kern::fail("the level's Blueprint \"Zombies\" is missing, has errors or a table the game cannot read");
+    if (!combat::bind_sandbox(*logic)) return kern::fail("the level's Blueprint \"Sandbox\" is missing, has errors or a table the game cannot read");
+    if (!combat::bind_fun(*logic)) return kern::fail("the level's Blueprint \"Fun\" is missing, has errors or a table the game cannot read");
+    if (!combat::bind_race(*logic)) return kern::fail("the level's Blueprint \"Race\" is missing, has errors or a table the game cannot read");
   }
   ctl_.dev.platform(!coarse, coarse, coarse ? 5 : 0);  // the page reports the real device (game_controls.cpp)
   soldier_ = world_->find_actor("Player");
@@ -348,12 +326,12 @@ bool Game::start(kern::Engine& e) {
     const std::string wsel = e.arg("world", "");
     city_.training_offline = wsel == "training" || (wsel != "town" && e.arg_number("offline", 0) <= 0);
   }
-  city_.start(e.renderer, world_->physics(), lon_, lat_, e.arg_number("dem", 1) > 0 && e.arg_number("offline", 0) <= 0);
+  city_.start(e.renderer(), world_->physics(), lon_, lat_, e.arg_number("dem", 1) > 0 && e.arg_number("offline", 0) <= 0);
   if (e.arg_number("offline", 0) > 0) city_.go_offline();
-  if (!art_.init(e.renderer)) return false;
-  if (!people_art_.init(e.renderer)) return false;
-  if (!combat_art_.init(e.renderer)) return false;  // combat and events (game_military.cpp)
-  destruction_.init(e.renderer);
+  if (!art_.init(e.renderer())) return false;
+  if (!people_art_.init(e.renderer())) return false;
+  if (!combat_art_.init(e.renderer())) return false;  // combat and events (game_military.cpp)
+  destruction_.init(e.renderer());
   gaps_init(e);  // sc-m3-gaps (game_gaps.cpp)
   people_.set_budget(mobile_ ? 68 : 100);  // PERSON_SLOTS (world_procedural_population.mjs)
   if (mobile_) people_.set_ranges(140, 160);  // world_procedural_population.mjs PEOPLE_SHOW_M / HIDE_M (phone)
@@ -361,7 +339,7 @@ bool Game::start(kern::Engine& e) {
   e.set_status("SpawnCity: Karte wird geladen ...");
   cam_.eye = {-30, -40, 60};
   cam_.target = {0, 0, 0};
-  e.renderer.camera = cam_;
+  e.renderer().set_camera(cam_);
   return true;
 }
 
@@ -632,7 +610,7 @@ void Game::switch_mode(Mode m, i32 vehicle) {
       TrafficCar& c = cars_[vehicle];
       if (c.driver && c.placed) {
         // Carjacking: the driver is thrown out; a witness reports it (wanted_system_logic.mjs).
-        wanted_.report(wanted::Crime::carjacking, true);
+        wanted::report(wanted::Crime::carjacking, true);
         eject_driver(vehicle);  // M3: the driver gets out and runs (game_traffic.cpp)
         toast_ = "Auto geklaut! Der Fahrer ist raus.";
         toast_age_ = 0;
@@ -832,7 +810,7 @@ void Game::drive_traffic(f32 h) {
     // service's: game_traffic.cpp)
     {
       i32 limiter = -1;
-      const f32 free_way = traffic_gap(static_cast<i32>(i), s.position, fwd, &limiter);
+      const f32 free_way = traffic_gap(static_cast<i32>(i), s.position, fwd, limiter);
       c.ahead = free_way < 0.6f ? limiter : -1;
       want_speed = std::fmin(want_speed, free_way);
     }
@@ -1076,7 +1054,7 @@ void Game::update(kern::Engine& e, const kern::Frame& f) {
   update_camera(e, dt);
   ui_camera(dt);  // LIVE GPS views (game_ui.cpp)
   look_camera(dt);  // FPV stabilizer, camera shake, speed (game_look.cpp)
-  e.renderer.camera = cam_;
+  e.renderer().set_camera(cam_);
   world_->set_view(cam_);
   night_ = world_->apply_lighting(cam_.eye);
   look_lighting(dt);  // own day clock, point lights, quality (game_look.cpp)
@@ -1255,8 +1233,8 @@ void Game::draw_vehicles() {
       art_.jet(matrix_of(jet_actor_), jet_.gear_down(), jet_.nozzle(), jet_.thrust() / jet_.spec().thrust_max, mode_ == Mode::jet && jet_cockpit_);
     }
     if (drone_out_) {
-      Vec3 motors[4];
-      f32 angles[4];
+      std::array<Vec3, 4> motors;
+      std::array<f32, 4> angles;
       for (int i = 0; i < 4; ++i) { motors[i] = drone_.motor_position(i); angles[i] = drone_.rotor_angle(i); }
       art_.drone(gaps_drone_matrix(), motors,  // visual_pose_stabilization.mjs (game_gaps.cpp)
                  angles, drone_.params().prop_d, drone_.telemetry().armed, mode_ == Mode::drone && drone_cam_ == 0);
@@ -1284,18 +1262,18 @@ bool Game::audio_init(u32 rate) {
   return true;
 }
 
-const f32* Game::audio_render(u32 frames) {
+const std::vector<f32>& Game::audio_render(u32 frames) {
   audio_out_.resize(static_cast<std::size_t>(frames) * 2);
   if (mixer_.ready()) {
     mixer_.render(audio_out_.data(), frames);
     // the page plays the original's own sound (game_audio_web.cpp): Kern's mix is not heard and
     // its music not made
     if (web_audio_) std::fill(audio_out_.begin(), audio_out_.end(), 0.0f);
-    else ui_render_music(audio_out_.data(), frames);  // title music and car radio (game_equipment.cpp)
+    else ui_render_music(audio_out_, frames);  // title music and car radio (game_equipment.cpp)
   }
   else std::fill(audio_out_.begin(), audio_out_.end(), 0.0f);
-  mix_voice(audio_out_.data(), frames);  // proximity voice of the other players (game_net.cpp)
-  return audio_out_.data();
+  mix_voice(audio_out_, frames);  // proximity voice of the other players (game_net.cpp)
+  return audio_out_;
 }
 
 void Game::update_sound(f32 dt) {
@@ -1343,36 +1321,43 @@ void Game::update_sound(f32 dt) {
 std::string Game::hud_json() {
   char b[512];
   std::string s = "{";
-  auto add = [&](const char* fmt, auto... v) { std::snprintf(b, sizeof b, fmt, v...); s += b; };
-  add("\"mode\":\"%s\",\"placed\":%s,\"offline\":%s,\"realData\":%s", mode_name(mode_), world_placed_ ? "true" : "false", city_.offline() ? "true" : "false",
-      city_.has_real_data() ? "true" : "false");
+  std::snprintf(b, sizeof b, "\"mode\":\"%s\",\"placed\":%s,\"offline\":%s,\"realData\":%s", mode_name(mode_), world_placed_ ? "true" : "false", city_.offline() ? "true" : "false",
+                             city_.has_real_data() ? "true" : "false");
+  s += b;
   const StreamStats& st = city_.stats();
-  add(",\"tiles\":{\"ready\":%u,\"loading\":%u,\"failed\":%u,\"buildings\":%u,\"colliders\":%u", st.tiles_ready, st.tiles_loading, st.tiles_failed, st.buildings,
-      st.colliders);
-  add(",\"t\":{\"request\":%.0f,\"data\":%.0f,\"decoded\":%.0f,\"terrain\":%.0f,\"built\":%.0f,\"collision\":%.0f,\"work\":%.0f,\"worst\":%.1f,\"worstStep\":\"%s\",\"worstStepMs\":%.1f,\"rebuilds\":%u,\"relays\":%u,\"uploads\":%u,\"uploadKVerts\":%u}}", st.t_request, st.t_data,
-      st.t_decoded, st.t_terrain, st.t_built, st.t_collision, st.work_ms, st.worst_ms, st.worst_step, st.worst_step_ms, st.rebuilds, st.relays, st.uploads, st.upload_vertices);
+  std::snprintf(b, sizeof b, ",\"tiles\":{\"ready\":%u,\"loading\":%u,\"failed\":%u,\"buildings\":%u,\"colliders\":%u", st.tiles_ready, st.tiles_loading, st.tiles_failed, st.buildings,
+                             st.colliders);
+  s += b;
+  std::snprintf(b, sizeof b, ",\"t\":{\"request\":%.0f,\"data\":%.0f,\"decoded\":%.0f,\"terrain\":%.0f,\"built\":%.0f,\"collision\":%.0f,\"work\":%.0f,\"worst\":%.1f,\"worstStep\":\"%s\",\"worstStepMs\":%.1f,\"rebuilds\":%u,\"relays\":%u,\"uploads\":%u,\"uploadKVerts\":%u}}", st.t_request, st.t_data,
+                             st.t_decoded, st.t_terrain, st.t_built, st.t_collision, st.work_ms, st.worst_ms, st.worst_step, st.worst_step_ms, st.rebuilds, st.relays, st.uploads, st.upload_vertices);
+  s += b;
   if (vr_) s += vr_menu_json();  // the headset's wrist menu (game_vr.cpp)
   hud_world(s);  // terrain, water, animals, ... (game_world.cpp)
   life_hud(s);   // animals, street life, ragdolls, interiors (game_life.cpp)
-  add(",\"fps\":%.0f,\"touch\":%s,\"stars\":%d,\"heat\":%.1f", fps_, touch_mode_ ? "true" : "false", wanted_.stars(), wanted_.heat());
+  std::snprintf(b, sizeof b, ",\"fps\":%.0f,\"touch\":%s,\"stars\":%d,\"heat\":%.1f", fps_, touch_mode_ ? "true" : "false", wanted::stars(), wanted::heat());
+  s += b;
   {
     u32 units = 0;
     for (const PoliceUnit& u : units_) units += u.car >= 0 ? 1 : 0;
-    add(",\"people\":%u,\"officers\":%u,\"police\":%u", people_.count(People::Kind::citizen), people_.count(People::Kind::officer), units);
-    if (mode_ == Mode::car && car_index_ >= 0) add(",\"carHp\":%.0f", cars_[car_index_].hp);
+    std::snprintf(b, sizeof b, ",\"people\":%u,\"officers\":%u,\"police\":%u", people_.count(People::Kind::citizen), people_.count(People::Kind::officer), units);
+    s += b;
+    if (mode_ == Mode::car && car_index_ >= 0) { std::snprintf(b, sizeof b, ",\"carHp\":%.0f", cars_[car_index_].hp); s += b; }
     const f32 now = world_->sim_time();
-    add(",\"weapon\":\"%s\",\"grenades\":%d,\"emp\":%.1f,\"projectiles\":%u", mode_ == Mode::drone ? (drone_weapon_ == 0 ? "MG" : drone_weapon_ == 1 ? "Raketen" : "GUIDED")
-        : mode_ == Mode::jet ? "Bordkanone" : weapons::spec(foot_weapon_).name, grenades_, std::fmax(0.0f, emp_ready_at_ - now), static_cast<u32>(projectiles_.size()));
+    std::snprintf(b, sizeof b, ",\"weapon\":\"%s\",\"grenades\":%d,\"emp\":%.1f,\"projectiles\":%u", mode_ == Mode::drone ? (drone_weapon_ == 0 ? "MG" : drone_weapon_ == 1 ? "Raketen" : "GUIDED")
+                               : mode_ == Mode::jet ? "Bordkanone" : weapons::spec(foot_weapon_).name, grenades_, std::fmax(0.0f, emp_ready_at_ - now), static_cast<u32>(projectiles_.size()));
+    s += b;
     u32 drones = 0;
     for (const PoliceDrone& d : pdrones_) drones += d.active ? 1 : 0;
-    add(",\"policeDrones\":%u,\"explosions\":%u", drones, explosions_);
+    std::snprintf(b, sizeof b, ",\"policeDrones\":%u,\"explosions\":%u", drones, explosions_);
+    s += b;
     if (net_.active()) {
-      add(",\"net\":{\"host\":%s,\"connected\":%s,\"slot\":%u,\"players\":%zu,\"status\":\"%s\"}", net_.hosting() ? "true" : "false", net_.connected() ? "true" : "false",
-          net_.self_slot(), net_.remotes().size() + 1, json_escape(net_.status()).c_str());
+      std::snprintf(b, sizeof b, ",\"net\":{\"host\":%s,\"connected\":%s,\"slot\":%u,\"players\":%zu,\"status\":\"%s\"}", net_.hosting() ? "true" : "false", net_.connected() ? "true" : "false",
+                                 net_.self_slot(), net_.remotes().size() + 1, json_escape(net_.status()).c_str());
+      s += b;
     }
     s += mp_hud_json();  // multiplayer HUD data (game_net.cpp)
-    if (mode_ == Mode::drone) add(",\"droneHp\":%.0f", drone_hp_);
-    if (mode_ == Mode::jet) add(",\"jetHp\":%.0f", jet_hp_);
+    if (mode_ == Mode::drone) { std::snprintf(b, sizeof b, ",\"droneHp\":%.0f", drone_hp_); s += b; }
+    if (mode_ == Mode::jet) { std::snprintf(b, sizeof b, ",\"jetHp\":%.0f", jet_hp_); s += b; }
   }
   const kern::game::Hud& h = world_->hud();
   // Launchers and melee are the game's: their rounds (melee: none) instead of Kern's magazine.
@@ -1382,8 +1367,9 @@ std::string Game::hud_json() {
   (void)h.ammo;
   // player_vitals_runtime.mjs: PLAYER_MAX_HP 100, every hit divided by PLAYER_DAMAGE_TOLERANCE 1.18. Kern's
   // soldier holds 118 (the same thing for every source of damage, falls included): shown as 0..100
-  add(",\"health\":%.0f,\"maxHealth\":%.0f,\"ammo\":%d,\"mag\":%d,\"reserve\":%d,\"reload\":%.2f,\"spread\":%.2f,\"aiming\":%s,\"ads\":%.2f,\"respawn\":%.1f",
-      h.health >= 0 ? h.health / 1.18f : h.health, h.max_health > 0 ? h.max_health / 1.18f : h.max_health, ammo, mag, reserve, h.reload, h.spread, h.aiming ? "true" : "false", world_->aim_blend(), net_.active() ? h.respawn_in : respawn_wait());
+  std::snprintf(b, sizeof b, ",\"health\":%.0f,\"maxHealth\":%.0f,\"ammo\":%d,\"mag\":%d,\"reserve\":%d,\"reload\":%.2f,\"spread\":%.2f,\"aiming\":%s,\"ads\":%.2f,\"respawn\":%.1f",
+                             h.health >= 0 ? h.health / 1.18f : h.health, h.max_health > 0 ? h.max_health / 1.18f : h.max_health, ammo, mag, reserve, h.reload, h.spread, h.aiming ? "true" : "false", world_->aim_blend(), net_.active() ? h.respawn_in : respawn_wait());
+  s += b;
   Vec3 pos = focus_position(), vel;
   f32 agl = pos.z - city_.ground_height(pos.x, pos.y);
   switch (mode_) {
@@ -1392,11 +1378,12 @@ std::string Game::hud_json() {
       vel = world_->actor_velocity(drone_actor_);
       const DroneTelemetry& t = drone_.telemetry();
       agl = t.agl >= 0 ? t.agl : agl;
-      add(",\"drone\":{\"armed\":%s,\"calibrating\":%s,\"fault\":%s,\"game\":%s,\"landing\":%s,\"battery\":%.2f,\"volts\":%.2f,\"amps\":%.1f,\"clearance\":%.1f,"
-          "\"cam\":%d,\"pulses\":[%u,%u,%u,%u]}",
-          t.armed ? "true" : "false", t.calibrating ? "true" : "false", t.fault ? "true" : "false", sticks_.game_mode ? "true" : "false",
-          landing_ ? "true" : "false", t.battery_soc, t.battery_v, t.current_a, sticks_.clearance, drone_cam_, t.pulses[0], t.pulses[1], t.pulses[2],
-          t.pulses[3]);
+      std::snprintf(b, sizeof b, ",\"drone\":{\"armed\":%s,\"calibrating\":%s,\"fault\":%s,\"game\":%s,\"landing\":%s,\"battery\":%.2f,\"volts\":%.2f,\"amps\":%.1f,\"clearance\":%.1f,"
+                                 "\"cam\":%d,\"pulses\":[%u,%u,%u,%u]}",
+                                 t.armed ? "true" : "false", t.calibrating ? "true" : "false", t.fault ? "true" : "false", sticks_.game_mode ? "true" : "false",
+                                 landing_ ? "true" : "false", t.battery_soc, t.battery_v, t.current_a, sticks_.clearance, drone_cam_, t.pulses[0], t.pulses[1], t.pulses[2],
+                                 t.pulses[3]);
+      s += b;
       break;
     }
     case Mode::car:
@@ -1408,9 +1395,10 @@ std::string Game::hud_json() {
         const Vec3 cp = matrix_of(cars_[car_index_].actor).translation();
         i32 contacts = 0;
         for (int w = 0; w < 4; ++w) contacts += cc.wheel(w).contact ? 1 : 0;
-        add(",\"car\":{\"gear\":\"%s\",\"bus\":%s,\"throttle\":%.2f,\"vf\":%.2f,\"contacts\":%d,\"agl\":%.2f,\"jacked\":%.0f,\"awake\":%s}", cc.gear() < 0 ? "R" : "D",
-            cc.spec().radius > 0.4f ? "true" : "false", cc.throttle(), cc.forward_speed(), contacts, cp.z - city_.ground_height(cp.x, cp.y), jacked_at_,
-            world_->physics().body_valid(body(cars_[car_index_].actor)) && world_->physics().awake(body(cars_[car_index_].actor)) ? "true" : "false");
+        std::snprintf(b, sizeof b, ",\"car\":{\"gear\":\"%s\",\"bus\":%s,\"throttle\":%.2f,\"vf\":%.2f,\"contacts\":%d,\"agl\":%.2f,\"jacked\":%.0f,\"awake\":%s}", cc.gear() < 0 ? "R" : "D",
+                                   cc.spec().radius > 0.4f ? "true" : "false", cc.throttle(), cc.forward_speed(), contacts, cp.z - city_.ground_height(cp.x, cp.y), jacked_at_,
+                                   world_->physics().body_valid(body(cars_[car_index_].actor)) && world_->physics().awake(body(cars_[car_index_].actor)) ? "true" : "false");
+        s += b;
       }
       }
       break;
@@ -1418,18 +1406,21 @@ std::string Game::hud_json() {
       vel = world_->actor_velocity(jet_actor_);
       const JetTelemetry& t = jet_.telemetry();
       agl = t.agl;
-      add(",\"jet\":{\"mode\":\"%s\",\"thrust\":%.2f,\"lever\":%.2f,\"mach\":%.2f,\"alpha\":%.1f,\"nz\":%.1f,\"gear\":%s,\"heading\":%.0f,\"pitch\":%.1f,\"roll\":%.1f,"
-          "\"fuel\":%.2f}",
-          jet_.mode() == Jet::Mode::hover ? "SCHWEBEN" : "FLUG", jet_.thrust() / jet_.spec().thrust_max, jet_.lever(), t.mach, t.alpha / kDeg, t.nz,
-          jet_.gear_down() ? "true" : "false", std::fmod(-t.heading / kDeg + 360, 360.0f), t.pitch / kDeg, t.roll / kDeg, jet_.fuel);
+      std::snprintf(b, sizeof b, ",\"jet\":{\"mode\":\"%s\",\"thrust\":%.2f,\"lever\":%.2f,\"mach\":%.2f,\"alpha\":%.1f,\"nz\":%.1f,\"gear\":%s,\"heading\":%.0f,\"pitch\":%.1f,\"roll\":%.1f,"
+                                 "\"fuel\":%.2f}",
+                                 jet_.mode() == Jet::Mode::hover ? "SCHWEBEN" : "FLUG", jet_.thrust() / jet_.spec().thrust_max, jet_.lever(), t.mach, t.alpha / kDeg, t.nz,
+                                 jet_.gear_down() ? "true" : "false", std::fmod(-t.heading / kDeg + 360, 360.0f), t.pitch / kDeg, t.roll / kDeg, jet_.fuel);
+      s += b;
       break;
     }
-    case Mode::parachute: vel = world_->actor_velocity(chute_actor_); add(",\"chute\":%s", chute_open_ ? "true" : "false"); break;
+    case Mode::parachute: vel = world_->actor_velocity(chute_actor_); { std::snprintf(b, sizeof b, ",\"chute\":%s", chute_open_ ? "true" : "false"); s += b; } break;
   }
-  add(",\"speed\":%.2f,\"vz\":%.2f,\"agl\":%.1f,\"alt\":%.1f,\"t\":%.3f", kern::length(vel), vel.z, agl, pos.z, world_->sim_time());
+  std::snprintf(b, sizeof b, ",\"speed\":%.2f,\"vz\":%.2f,\"agl\":%.1f,\"alt\":%.1f,\"t\":%.3f", kern::length(vel), vel.z, agl, pos.z, world_->sim_time());
+  s += b;
   f64 lon, lat;
   unproject(city_.projector(), pos.x, pos.y, lon, lat);
-  add(",\"lon\":%.6f,\"lat\":%.6f", lon, lat);
+  std::snprintf(b, sizeof b, ",\"lon\":%.6f,\"lat\":%.6f", lon, lat);
+  s += b;
   // Context hint.
   hint_.clear();
   if (mode_ == Mode::foot && world_placed_) {
@@ -1574,9 +1565,9 @@ std::string Game::command(const std::string& cmd) {
   if (starts("vr hud ")) { vr_hud_tex_ = static_cast<u32>(std::atoi(cmd.c_str() + 7)); vr_hud_mesh_ = 0; return "hud"; }
   if (cmd == "vr state") {
     char b[200];
-    const Vec3 rf = engine_ ? engine_->xr_room_forward : Vec3{};
-    std::snprintf(b, sizeof b, "{\"body\":%.1f,\"head\":%.1f,\"room\":%.1f,\"follow\":%d,\"hand\":%d,\"arms\":%d,\"scope\":%d}", world_->camera_yaw(), engine_ ? engine_->xr_head_yaw : 0,
-                  std::atan2(rf.y, rf.x) / kDeg, engine_ && engine_->xr_follow_head ? 1 : 0, vr_hands_[1].valid ? 1 : 0, vr_arms_ ? 1 : 0, engine_ && engine_->xr_scope ? 1 : 0);
+    const Vec3 rf = engine_ ? engine_->xr_room_forward() : Vec3{};
+    std::snprintf(b, sizeof b, "{\"body\":%.1f,\"head\":%.1f,\"room\":%.1f,\"follow\":%d,\"hand\":%d,\"arms\":%d,\"scope\":%d}", world_->camera_yaw(), engine_ ? engine_->xr_head_yaw() : 0,
+                  std::atan2(rf.y, rf.x) / kDeg, engine_ && engine_->xr_follow_head() ? 1 : 0, vr_hands_[1].valid ? 1 : 0, vr_arms_ ? 1 : 0, engine_ && engine_->xr_scope() ? 1 : 0);
     return b;
   }
   if (cmd == "destroy sync") return dsync_json();
@@ -1615,10 +1606,10 @@ std::string Game::command(const std::string& cmd) {
   if (starts("wanted ")) {
     // Tests / debugging: raise the wanted level to N stars (0 clears it).
     const int n = std::atoi(cmd.c_str() + 7);
-    wanted_.clear();
-    for (int k = 0; k < 64 && wanted_.stars() < n; ++k) wanted_.report(wanted::Crime::police_officer, true);
-    if (n > 0) star_since_ = world_->sim_time() - wanted::arrival_delay_ms(wanted_.stars()) / 1000;  // units are due at once
-    return std::to_string(wanted_.stars());
+    wanted::clear();
+    for (int k = 0; k < 64 && wanted::stars() < n; ++k) wanted::report(wanted::Crime::police_officer, true);
+    if (n > 0) star_since_ = world_->sim_time() - wanted::arrival_delay_ms(wanted::stars()) / 1000;  // units are due at once
+    return std::to_string(wanted::stars());
   }
   {
     std::string out;  // time, quality, perf, look (game_look.cpp)

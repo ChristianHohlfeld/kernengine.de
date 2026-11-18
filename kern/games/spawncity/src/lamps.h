@@ -11,22 +11,23 @@
 // asks the Blueprint about each lamp in reach and decides nothing itself.
 #pragma once
 
-#include <functional>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
+#include "city_stream.h"
 #include "common.h"
+#include "kern/core/map.h"
 #include "kern/logic/logic.h"
 
 namespace sc::lamps {
 
-/// The running Blueprint of the actor "Lamps" (the game binds it once its world has started;
-/// tests bind the one they run). Unbound, nothing happens to a lamp.
-void bind(kern::logic::Instance* blueprint);
-kern::logic::Instance* blueprint();
+/// Binds the rules to the logic the level's Blueprints run in (the game once its world has started,
+/// tests the one they run): the Blueprint of the actor "Lamps" is found by its name at every call.
+/// True: the actor has a Blueprint that runs there. Unbound, nothing happens to a lamp.
+bool bind(kern::logic::Runtime& logic);
 /// The Blueprint's variable PoleRadius.
 f32 pole_radius();
+/// The Blueprint's function Worse: may a lamp in `state` become `to`?
+bool worse(u8 state, u8 to);
 
 // The lamp as it is built and laid out (the model and the field, not a rule).
 constexpr f32 kSpacing = 34, kPoleH = 6.2f, kGridM = 10, kArm = 1.42f, kHeadZ = kPoleH - 0.2f, kKerb = 1.15f;
@@ -46,14 +47,14 @@ i64 cell_key(f32 x, f32 y);
 
 class Field {
  public:
-  /// Places the lamps of one street (centre line, width). `ground` gives the height.
-  void place_road(const std::vector<Vec2>& pts, f32 width, u32 lane, const std::function<f32(f32, f32)>& ground);
+  /// Places the lamps of one street (centre line, width), their feet at the height `ground`.
+  void place_road(const std::vector<Vec2>& pts, f32 width, u32 lane, f32 ground);
   /// The lamps of the loaded map tiles (tiles.h furnish), all at once: the field is laid anew
-  /// (what was broken stays broken, by cell key). `ground` gives the height.
-  struct Spot { f32 x, y, yaw; };
-  void rebuild(const std::vector<Spot>& spots, const std::function<f32(f32, f32)>& ground);
-  /// Lamps whose foot lies in the rect stand on the ground as it is now.
-  void reground(f32 x0, f32 y0, f32 x1, f32 y1, const std::function<f32(f32, f32)>& ground);
+  /// (what was broken stays broken, by cell key). A spot's z: the height of the ground there.
+  struct Spot { f32 x, y, yaw; f32 z = 0; };
+  void rebuild(const std::vector<Spot>& spots);
+  /// Lamps whose foot lies in the rect stand on the ground of `city` as it is now.
+  void reground(f32 x0, f32 y0, f32 x1, f32 y1, const CityStream& city);
   void clear() { lamps_.clear(); seen_.clear(); grid_.clear(); }
   std::vector<Lamp>& all() { return lamps_; }
   const std::vector<Lamp>& all() const { return lamps_; }
@@ -61,6 +62,8 @@ class Field {
   std::vector<i32> near(f32 x, f32 y, f32 r) const;
   /// setState: only ever worse. Returns true when it changed; remembers it for re-placement.
   bool set_state(i32 i, u8 state);
+  /// Lamp i (one of all()) gets the state, remembered for re-placement - set_state once worse() has said yes.
+  void set(i32 i, u8 state);
   /// The lit head nearest along the segment a -> b within 0.38 m (onTracer), or -1.
   i32 shot(Vec3 a, Vec3 b) const;
   struct BlastHit { i32 lamp; u8 state; Vec2 dir; f32 speed; };
@@ -80,9 +83,9 @@ class Field {
 
  private:
   std::vector<Lamp> lamps_;
-  std::unordered_set<i64> seen_;
-  std::unordered_map<i64, u8> broken_;
-  std::unordered_map<i64, std::vector<i32>> grid_;
+  kern::Set<i64> seen_;
+  kern::Map<i64, u8> broken_;
+  kern::Map<i64, std::vector<i32>> grid_;
 };
 
 }  // namespace sc::lamps

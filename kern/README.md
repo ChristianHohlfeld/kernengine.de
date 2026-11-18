@@ -78,7 +78,7 @@ class MyGame final : public App {
   RendererOptions configure() override { RendererOptions o; o.shadows = true; return o; }
 
   bool start(Engine& engine) override {
-    Renderer& r = engine.renderer;
+    Renderer& r = engine.renderer();
     box_ = r.allocate_id();
     MeshData box = primitives::box_on_ground({2, 2, 2}, {0.9f, 0.6f, 0.3f});
     MeshInput in = box.as_input();
@@ -87,9 +87,11 @@ class MyGame final : public App {
   }
 
   void update(Engine& engine, const Frame& frame) override {
-    if (engine.input.down(Key::left)) yaw_ += frame.dt;
-    engine.renderer.camera.eye = {std::cos(yaw_) * 12, std::sin(yaw_) * 12, 6};
-    engine.renderer.camera.target = {0, 0, 1};
+    if (engine.input().down(Key::left)) yaw_ += frame.dt;
+    Camera camera = engine.renderer().camera();
+    camera.eye = {std::cos(yaw_) * 12, std::sin(yaw_) * 12, 6};
+    camera.target = {0, 0, 1};
+    engine.renderer().set_camera(camera);
     engine.set_status("Hallo Kern");
   }
 

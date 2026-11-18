@@ -9,10 +9,9 @@
 #include <vector>
 #include <array>
 #include <cstring>
-#include <unordered_map>
-#include <unordered_set>
 #include <string_view>
 #include "../../src/tiles.h"
+#include "kern/core/map.h"
 #include "../converted.h"
 
 namespace converted_tiles_cpp {
@@ -22,10 +21,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -38,14 +37,26 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Whole64 {
-  u32 high = 0;
-  u32 low = 0;
+struct Vec4 {
+  f32 x = 0, y = 0, z = 0, w = 0;
+  constexpr Vec4() = default;
+  constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}
+  
+  
+  
 };
-enum class Surface : u8 { none, cloth, tpu, floor };
+namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
+namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
+constexpr f32 kPi = 3.14159265358979323846;
+inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
 struct Rng {
-  u32 s;
-  explicit Rng(u32 seed = 0x9e3779b9u) : s(seed ? seed : 0x9e3779b9u) {}
+  // Plain state: `Rng{seed}` starts at that seed, an Rng of its own starts at the default one. A
+  // seed must not be 0 (xorshift would stay there) - a seed that is computed goes through seeded().
+  u32 s = 0x9e3779b9u;
+  f32 spare_ = 0;           // gaussian(): the second number of a pair, kept for the next call
+  bool has_spare_ = false;
+  /// The generator for a seed that may be 0 (0: the default seed).
+  static Rng seeded(u32 seed) { return Rng{seed ? seed : 0x9e3779b9u}; }
   u32 next() { s ^= s << 13; s ^= s >> 17; s ^= s << 5; return s; }
   f32 unit() { return static_cast<f32>(next() >> 8) * (1.0 / 16777216.0); }
   f32 range(f32 a, f32 b) { return a + (b - a) * unit(); }
@@ -58,10 +69,6 @@ struct Rng {
 
 
 
-
- private:
-  f32 spare_ = 0;
-  bool has_spare_ = false;
 };
 struct GeoProjector {
   f64 lon0 = 0, lat0 = 0, cos_lat = 1;
@@ -79,6 +86,16 @@ struct GeoProjector {
     y = (lat - lat0) * kRad * kEarthRadius;
   }
 };
+namespace mvt { enum class GeomType : u8 { unknown = 0, point = 1, line = 2, polygon = 3 }; }
+namespace mvt { namespace Value { enum class Kind : u8 { none, string, number, boolean }; } }
+namespace mvt { struct Feature {
+  u64 id = 0;
+  GeomType type = GeomType::unknown;
+  std::vector<std::pair<u32, u32>> tags;  // key index, value index into the layer
+  /// Geometry as rings / lines / points: `parts[i]` holds xy pairs (tile units).
+  std::vector<std::vector<Vec2>> parts;
+}; }
+namespace mvt { f64 ring_area(const std::vector<Vec2>& ring); }
 constexpr i32 kTileZoom = 14;
 struct TileKey {
   i32 z = kTileZoom, x = 0, y = 0;
@@ -118,7 +135,15 @@ struct MapFeatures {
   std::vector<Spot> trees, lamps;  // furnish(): the tile's own, inside its square
   bool procedural = false;  // the stand-in city, not real map data
 };
+std::vector<std::vector<Vec2>> clip_line(const std::vector<Vec2>& line, const Vec4& rect);
 void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out);
+void training_level(MapFeatures& out);
+namespace mvt { f64 ring_area(const std::vector<Vec2>& ring) {
+  f64 a = 0;
+  const std::size_t n = ring.size();
+  for (std::size_t i = 0, j = n ? converted::minus(n, 1) : 0; i < n; j = converted::post_inc(i)) a += static_cast<f64>(converted::at(ring, j).x) * converted::at(ring, i).y - static_cast<f64>(converted::at(ring, i).x) * converted::at(ring, j).y;
+  return a * 0.5;
+} }
 constexpr f64 kPiD = 3.14159265358979323846;
 TileKey tile_at(f64 lon, f64 lat, i32 z) {
   const f64 n = ldexp_bp(1.0, z);
@@ -158,6 +183,25 @@ f32 road_width(RoadClass c) {
 }
 bool road_is_water(RoadClass c) { return c == RoadClass::river || c == RoadClass::canal || c == RoadClass::stream; }
 bool road_drivable(RoadClass c) { return static_cast<u8>(c) <= static_cast<u8>(RoadClass::service); }
+bool parse_road(std::string_view cls, RoadClass& out) {
+  struct M { const char* n; RoadClass c; };
+  static const M map[] = {{"motorway", RoadClass::motorway}, {"trunk", RoadClass::trunk},       {"primary", RoadClass::primary},
+                          {"secondary", RoadClass::secondary}, {"tertiary", RoadClass::tertiary}, {"minor", RoadClass::minor},
+                          {"service", RoadClass::service},   {"track", RoadClass::track},       {"path", RoadClass::path},
+                          {"pedestrian", RoadClass::pedestrian}, {"raceway", RoadClass::tertiary}, {"busway", RoadClass::minor}};
+  for (const M& m : map)
+    if (cls == m.n) { out = m.c; return true; }
+  return false;
+}
+void polygons(const mvt::Feature& f, std::vector<std::vector<std::vector<Vec2>>>& out) {
+  out.clear();
+  for (const auto& part : f.parts) {
+    if (part.size() < 3) continue;
+    const f64 a = mvt::ring_area(part);
+    if (a > 0 || out.empty()) out.emplace_back();
+    converted::back(out).push_back(part);
+  }
+}
 struct Projector {
   f64 x0, x1, y0, ym, y1, inv_extent;
   Projector(const TileKey& key, const GeoProjector& proj, f64 extent) : inv_extent(1.0 / extent) {
@@ -178,17 +222,139 @@ struct Projector {
     return {static_cast<f32>(x0 + fx * (x1 - x0)), static_cast<f32>(y)};
   }
 };
+bool inside_side(i32 side, Vec2 p, f32 ext) { return side == 0 ? p.x >= 0 : side == 1 ? p.x <= ext : side == 2 ? p.y >= 0 : p.y <= ext; }
+Vec2 cut_side(i32 side, Vec2 p, Vec2 q, f32 ext) {
+  if (side < 2) {
+    const f32 x = side == 0 ? 0.0 : ext;
+    const f32 t = (x - p.x) / (q.x - p.x);
+    return Vec2{x, p.y + (q.y - p.y) * t};
+  }
+  const f32 y = side == 2 ? 0.0 : ext;
+  const f32 t = (y - p.y) / (q.y - p.y);
+  return Vec2{p.x + (q.x - p.x) * t, y};
+}
 u32 hash_u32(u64 v) {
   v ^= converted::shr_bits(v, 33); converted::times_bits_to(v, 0xff51afd7ed558ccdull); v ^= converted::shr_bits(v, 33); converted::times_bits_to(v, 0xc4ceb9fe1a85ec53ull); v ^= converted::shr_bits(v, 33);
   return static_cast<u32>(v);
 }
-namespace FurnishIndex { static constexpr f32 kCell = 20; }
-namespace FurnishIndex { inline u64 key(i32 x, i32 y) { return (converted::shl_bits(static_cast<u64>(static_cast<u32>(x)), 32)) | static_cast<u32>(y); } }
-namespace FurnishIndex { inline i32 cell(f32 v) { return static_cast<i32>(converted::fits<int>(std::floor(v / kCell))); } }
+struct FurnishIndex {
+  static constexpr f32 kCell = 20;
+  struct Seg { Vec2 a, b; f32 half; u32 road; bool paved; };
+  /// A house's outline: the outer ring of the tile's building `index`, or the apron's ring `index`
+  /// (the outlines that reach over the tile's edge), with its bounding box.
+  struct Ring { bool apron; u32 index; Vec4 box; };
+  std::vector<Seg> segs;
+  std::vector<Ring> rings;
+  converted::wide::Map<u64, std::vector<u32>> seg_cells, ring_cells;
+  static u64 key(i32 x, i32 y) { return (converted::shl_bits(static_cast<u64>(static_cast<u32>(x)), 32)) | static_cast<u32>(y); }
+  static i32 cell(f32 v) { return static_cast<i32>(converted::fits<int>(std::floor(v / kCell))); }
+  void add_seg(Vec2 a, Vec2 b, f32 half, u32 road, bool paved) {
+    const u32 id = static_cast<u32>(segs.size());
+    segs.push_back({a, b, half, road, paved});
+    const f32 m = half + 3;
+    for (i32 x = cell(std::fmin(a.x, b.x) - m); x <= cell(std::fmax(a.x, b.x) + m); ++x)
+      for (i32 y = cell(std::fmin(a.y, b.y) - m); y <= cell(std::fmax(a.y, b.y) + m); ++y) seg_cells[key(x, y)].push_back(id);
+  }
+  void add_ring(const std::vector<Vec2>& r, bool apron, u32 index) {
+    if (r.size() < 3) return;
+    Vec4 box{1e30, 1e30, -1e30, -1e30};
+    for (Vec2 p : r) box = {std::fmin(box.x, p.x), std::fmin(box.y, p.y), std::fmax(box.z, p.x), std::fmax(box.w, p.y)};
+    if (box.z - box.x > 4000 || box.w - box.y > 4000) return;
+    const u32 id = static_cast<u32>(rings.size());
+    rings.push_back({apron, index, box});
+    for (i32 x = cell(box.x); x <= cell(box.z); ++x)
+      for (i32 y = cell(box.y); y <= cell(box.w); ++y) ring_cells[key(x, y)].push_back(id);
+  }
+  /// Inside a house (of the tile's `buildings` or the `apron` the rings were added from).
+  bool built(Vec2 p, const std::vector<MapFeatures::Building>& buildings, const std::vector<std::vector<Vec2>>& apron) const {
+    const auto it = ring_cells.find(key(cell(p.x), cell(p.y)));
+    if (it == ring_cells.end()) return false;
+    for (u32 id : it->second) {
+      const Ring& g = converted::at(rings, id);
+      if (p.x < g.box.x || p.x > g.box.z || p.y < g.box.y || p.y > g.box.w) continue;
+      const std::vector<Vec2>& r = g.apron ? converted::at(apron, g.index) : converted::at(converted::at(buildings, g.index).rings, 0);
+      bool c = false;
+      for (std::size_t i = 0, j = converted::minus(r.size(), 1); i < r.size(); j = converted::post_inc(i))
+        if ((converted::at(r, i).y > p.y) != (converted::at(r, j).y > p.y) && p.x < (converted::at(r, j).x - converted::at(r, i).x) * (p.y - converted::at(r, i).y) / (converted::at(r, j).y - converted::at(r, i).y + 1e-12) + converted::at(r, i).x) c = !c;
+      if (c) return true;
+    }
+    return false;
+  }
+  /// Clear of every street by `paved` beyond its carriageway and of every path by `unpaved`.
+  bool off_roads(Vec2 p, f32 paved, f32 unpaved) const {
+    const auto it = seg_cells.find(key(cell(p.x), cell(p.y)));
+    if (it == seg_cells.end()) return true;
+    for (u32 id : it->second) {
+      const Seg& s = converted::at(segs, id);
+      const Vec2 d = s.b - s.a;
+      const f32 l2 = d.x * d.x + d.y * d.y;
+      const f32 t = l2 > 1e-6 ? clampf(((p.x - s.a.x) * d.x + (p.y - s.a.y) * d.y) / l2, 0, 1) : 0;
+      if (hypot_bp(p.x - s.a.x - d.x * t, p.y - s.a.y - d.y * t) < s.half + (s.paved ? paved : unpaved)) return false;
+    }
+    return true;
+  }
+};
+void training_level(MapFeatures& out) {
+  out.procedural = true;
+  auto road = [&](f32 x, f32 y, f32 w, f32 h, RoadClass c) {
+    // the plane's long side is the centreline (these match trainingRoutes())
+    MapFeatures::Road r;
+    r.cls = c;
+    if (w >= h) r.points = {{x - w / 2, y}, {x + w / 2, y}};
+    else r.points = {{x, y - h / 2}, {x, y + h / 2}};
+    out.roads.push_back(std::move(r));
+  };
+  road(0, -38, 124, 8, RoadClass::secondary);
+  road(0, 38, 124, 8, RoadClass::secondary);
+  road(-62, 0, 8, 76, RoadClass::secondary);
+  road(62, 0, 8, 76, RoadClass::secondary);
+  road(0, 0, 168, 11, RoadClass::primary);
+  road(0, 0, 10, 152, RoadClass::primary);
+  road(0, 54, 140, 8, RoadClass::tertiary);
+  {
+    // the pedestrian bridge over the pond (5 x 42 m)
+    MapFeatures::Road b;
+    b.cls = RoadClass::pedestrian;
+    b.bridge = true;
+    b.points = {{34, 31 - 21}, {34, 31 + 21}};
+    out.roads.push_back(std::move(b));
+  }
+  auto rect = [](f32 x, f32 y, f32 w, f32 h) { return std::vector<Vec2>{{x - w / 2, y - h / 2}, {x + w / 2, y - h / 2}, {x + w / 2, y + h / 2}, {x - w / 2, y + h / 2}}; };
+  for (const auto& [x, y, w, h] : std::initializer_list<std::array<f32, 4>>{{-38, 28, 42, 30}, {48, -25, 32, 22}}) {
+    MapFeatures::Area a;
+    a.kind = AreaKind::park;
+    a.rings.push_back(rect(x, y, w, h));
+    out.areas.push_back(std::move(a));
+  }
+  {
+    // the saturated harbour pond: a circle of 20 m stretched 1.55 x .92 at (34, 31)
+    MapFeatures::Area pond;
+    pond.kind = AreaKind::water;
+    std::vector<Vec2> ring;
+    for (int i = 0; i < 48; ++i) {
+      const f32 a = 2 * kPi * static_cast<f32>(i) / 48;
+      ring.push_back({34 + kern::math::cos(a) * 20 * 1.55, 31 + kern::math::sin(a) * 20 * 0.92});
+    }
+    pond.rings.push_back(std::move(ring));
+    out.areas.push_back(std::move(pond));
+  }
+  // the compact skyline: x, y, width, depth, height
+  const std::array<f32, 5> houses[] = {{-47, -22, 15, 13, 10}, {-27, -23, 13, 12, 15}, {31, -23, 15, 13, 12}, {50, -22, 12, 12, 18}, {-51, 18, 13, 12, 14},
+                                       {-18, 24, 14, 11, 20},  {54, 15, 13, 12, 11},   {-55, 61, 16, 11, 9},  {55, 64, 18, 12, 13}};
+  u32 n = 0;
+  for (const auto& [x, y, w, d, h] : houses) {
+    MapFeatures::Building b;
+    b.rings.push_back(rect(x, y, w, d));
+    b.base = 0;
+    b.top = h;
+    b.seed = 0x7a1e0u + n++ * 2654435761u;
+    out.buildings.push_back(std::move(b));
+  }
+}
 void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out) {
   // A walled-town grid with a market square: blocks of narrow terraced houses (3-6 storeys),
   // a ring road, a park and a lake shore to the north. Nothing here comes from real map data.
-  Rng rng(seed);
+  Rng rng = Rng::seeded(seed);
   out.procedural = true;
   const f32 pitch = 76, street = 12;
   const int blocks = std::max(3, static_cast<int>(converted::fits<int>(size / pitch)));
@@ -249,6 +415,33 @@ void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out) {
                         {static_cast<f32>(cx) - half * 2, ly + 900}});
   out.areas.push_back(lake);
 }
+std::vector<std::vector<Vec2>> clip_line(const std::vector<Vec2>& line, const Vec4& rect) {
+  // Liang-Barsky per stretch; stretches that follow each other inside stay one part
+  std::vector<std::vector<Vec2>> out;
+  std::vector<Vec2> cur;
+  auto close = [&] { if (cur.size() >= 2) out.push_back(std::move(cur)); cur.clear(); };
+  for (std::size_t i = 0; converted::plus(i, 1) < line.size(); converted::pre_inc(i)) {
+    const Vec2 a = converted::at(line, i), b = converted::at(line, converted::plus(i, 1));
+    const f32 dx = b.x - a.x, dy = b.y - a.y;
+    f32 t0 = 0, t1 = 1;
+    bool in = true;
+    const f32 p[4] = {-dx, dx, -dy, dy}, q[4] = {a.x - rect.x, rect.z - a.x, a.y - rect.y, rect.w - a.y};
+    for (int k = 0; k < 4 && in; ++k) {
+      if (converted::at(p, k) == 0) { in = converted::at(q, k) >= 0; continue; }
+      const f32 r = converted::at(q, k) / converted::at(p, k);
+      if (converted::at(p, k) < 0) { if (r > t1) in = false; else if (r > t0) t0 = r; }
+      else { if (r < t0) in = false; else if (r < t1) t1 = r; }
+    }
+    if (!in || t1 <= t0) { close(); continue; }
+    const Vec2 ca{a.x + dx * t0, a.y + dy * t0}, cb{a.x + dx * t1, a.y + dy * t1};
+    if (cur.empty()) cur.push_back(ca);
+    else if (t0 > 0) { close(); cur.push_back(ca); }  // (it came back in: a new part)
+    cur.push_back(cb);
+    if (t1 < 1) close();
+  }
+  close();
+  return out;
+}
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
@@ -277,6 +470,21 @@ void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out) {
 [[maybe_unused]] static bool defined(const GeoProjector& s) { return defined(s.lon0) && defined(s.lat0) && defined(s.cos_lat); }
 [[maybe_unused]] static std::string text(const GeoProjector& s) { return std::string("{") + text(s.lon0) + ", " + text(s.lat0) + ", " + text(s.cos_lat) + "}"; }
 [[maybe_unused]] static void take(GeoProjector& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<double>(s.lon0, (*v.rows)[0]); converted::take_as<double>(s.lat0, (*v.rows)[1]); converted::take_as<double>(s.cos_lat, (*v.rows)[2]); }
+[[maybe_unused]] static mvt::Feature draw_mvt__Feature(converted::Draw& draw) {
+  mvt::Feature s{};
+  s.id = static_cast<u64>(draw.bits());
+  s.type = static_cast<mvt::GeomType>(draw.below(4));
+  s.tags = draw_list(draw, [&]() -> std::pair<unsigned int, unsigned int> { return std::pair<unsigned int, unsigned int>(static_cast<unsigned int>(draw.below(40)), static_cast<unsigned int>(draw.below(40))); });
+  s.parts = draw_list(draw, [&]() -> std::vector<Vec2> { return draw_list(draw, [&]() -> Vec2 { return draw.vector2(); }); });
+  return s;
+}
+namespace mvt { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const mvt::Feature& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id)), arg(s.type), arg(s.tags), arg(s.parts)}); }
+[[maybe_unused]] static bool same(const mvt::Feature& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]) && same(want.type, (*got.rows)[1]) && same(want.tags, (*got.rows)[2]) && same(want.parts, (*got.rows)[3]); }
+[[maybe_unused]] static bool defined(const mvt::Feature& s) { return defined(converted::shaped<converted::Whole>(s.id)) && defined(s.type) && defined(s.tags) && defined(s.parts); }
+[[maybe_unused]] static std::string text(const mvt::Feature& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + ", " + text(s.type) + ", " + text(s.tags) + ", " + text(s.parts) + "}"; }
+[[maybe_unused]] static void take(mvt::Feature& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); converted::take_as<mvt::GeomType>(s.type, (*v.rows)[1]); converted::take_as<std::vector<std::pair<unsigned int, unsigned int>>>(s.tags, (*v.rows)[2]); converted::take_as<std::vector<std::vector<Vec2>>>(s.parts, (*v.rows)[3]); }
+}
 [[maybe_unused]] static Projector draw_Projector(converted::Draw& draw) {
   Projector s = Projector(draw_TileKey(draw), draw_kern__GeoProjector(draw), draw.number());
   s.x0 = draw.number();
@@ -292,6 +500,59 @@ void procedural_city(f64 cx, f64 cy, f64 size, u32 seed, MapFeatures& out) {
 [[maybe_unused]] static bool defined(const Projector& s) { return defined(s.x0) && defined(s.x1) && defined(s.y0) && defined(s.ym) && defined(s.y1) && defined(s.inv_extent); }
 [[maybe_unused]] static std::string text(const Projector& s) { return std::string("{") + text(s.x0) + ", " + text(s.x1) + ", " + text(s.y0) + ", " + text(s.ym) + ", " + text(s.y1) + ", " + text(s.inv_extent) + "}"; }
 [[maybe_unused]] static void take(Projector& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<double>(s.x0, (*v.rows)[0]); converted::take_as<double>(s.x1, (*v.rows)[1]); converted::take_as<double>(s.y0, (*v.rows)[2]); converted::take_as<double>(s.ym, (*v.rows)[3]); converted::take_as<double>(s.y1, (*v.rows)[4]); converted::take_as<double>(s.inv_extent, (*v.rows)[5]); }
+[[maybe_unused]] static FurnishIndex::Seg draw_FurnishIndex__Seg(converted::Draw& draw) {
+  FurnishIndex::Seg s{};
+  s.a = draw.vector2();
+  s.b = draw.vector2();
+  s.half = draw.number();
+  s.road = static_cast<unsigned int>(draw.below(40));
+  s.paved = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const FurnishIndex::Seg& s) { return converted::Value::structure({arg(s.a), arg(s.b), arg(s.half), arg(s.road), arg(s.paved)}); }
+[[maybe_unused]] static bool same(const FurnishIndex::Seg& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.a, (*got.rows)[0]) && same(want.b, (*got.rows)[1]) && same(want.half, (*got.rows)[2]) && same(want.road, (*got.rows)[3]) && same(want.paved, (*got.rows)[4]); }
+[[maybe_unused]] static bool defined(const FurnishIndex::Seg& s) { return defined(s.a) && defined(s.b) && defined(s.half) && defined(s.road) && defined(s.paved); }
+[[maybe_unused]] static std::string text(const FurnishIndex::Seg& s) { return std::string("{") + text(s.a) + ", " + text(s.b) + ", " + text(s.half) + ", " + text(s.road) + ", " + text(s.paved) + "}"; }
+[[maybe_unused]] static void take(FurnishIndex::Seg& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<Vec2>(s.a, (*v.rows)[0]); converted::take_as<Vec2>(s.b, (*v.rows)[1]); converted::take_as<double>(s.half, (*v.rows)[2]); converted::take_as<unsigned int>(s.road, (*v.rows)[3]); converted::take_as<bool>(s.paved, (*v.rows)[4]); }
+[[maybe_unused]] static Vec4 draw_kern__Vec4(converted::Draw& draw) {
+  if (draw.flag()) return Vec4(draw.number(), draw.number(), draw.number(), draw.number());
+  Vec4 s{};
+  s.x = draw.number();
+  s.y = draw.number();
+  s.z = draw.number();
+  s.w = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Vec4& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
+[[maybe_unused]] static bool same(const Vec4& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
+[[maybe_unused]] static bool defined(const Vec4& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
+[[maybe_unused]] static std::string text(const Vec4& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
+[[maybe_unused]] static void take(Vec4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
+[[maybe_unused]] static FurnishIndex::Ring draw_FurnishIndex__Ring(converted::Draw& draw) {
+  FurnishIndex::Ring s{};
+  s.apron = draw.flag();
+  s.index = static_cast<unsigned int>(draw.below(40));
+  s.box = draw_kern__Vec4(draw);
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const FurnishIndex::Ring& s) { return converted::Value::structure({arg(s.apron), arg(s.index), arg(s.box)}); }
+[[maybe_unused]] static bool same(const FurnishIndex::Ring& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.apron, (*got.rows)[0]) && same(want.index, (*got.rows)[1]) && same(want.box, (*got.rows)[2]); }
+[[maybe_unused]] static bool defined(const FurnishIndex::Ring& s) { return defined(s.apron) && defined(s.index) && defined(s.box); }
+[[maybe_unused]] static std::string text(const FurnishIndex::Ring& s) { return std::string("{") + text(s.apron) + ", " + text(s.index) + ", " + text(s.box) + "}"; }
+[[maybe_unused]] static void take(FurnishIndex::Ring& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<bool>(s.apron, (*v.rows)[0]); converted::take_as<unsigned int>(s.index, (*v.rows)[1]); converted::take_as<Vec4>(s.box, (*v.rows)[2]); }
+[[maybe_unused]] static FurnishIndex draw_FurnishIndex(converted::Draw& draw) {
+  FurnishIndex s{};
+  s.segs = draw_list(draw, [&]() -> FurnishIndex::Seg { return draw_FurnishIndex__Seg(draw); });
+  s.rings = draw_list(draw, [&]() -> FurnishIndex::Ring { return draw_FurnishIndex__Ring(draw); });
+  s.seg_cells = converted::draw_map<converted::wide::Map<u64, std::vector<unsigned int>>>(draw, [&]() -> u64 { return static_cast<u64>(draw.bits()); }, [&]() -> std::vector<unsigned int> { return draw_list(draw, [&]() -> unsigned int { return static_cast<unsigned int>(draw.below(40)); }); });
+  s.ring_cells = converted::draw_map<converted::wide::Map<u64, std::vector<unsigned int>>>(draw, [&]() -> u64 { return static_cast<u64>(draw.bits()); }, [&]() -> std::vector<unsigned int> { return draw_list(draw, [&]() -> unsigned int { return static_cast<unsigned int>(draw.below(40)); }); });
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const FurnishIndex& s) { return converted::Value::structure({arg(s.segs), arg(s.rings), arg(converted::shaped<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(s.seg_cells)), arg(converted::shaped<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(s.ring_cells))}); }
+[[maybe_unused]] static bool same(const FurnishIndex& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.segs, (*got.rows)[0]) && same(want.rings, (*got.rows)[1]) && same(converted::shaped<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(want.seg_cells), (*got.rows)[2]) && same(converted::shaped<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(want.ring_cells), (*got.rows)[3]); }
+[[maybe_unused]] static bool defined(const FurnishIndex& s) { return defined(s.segs) && defined(s.rings) && defined(converted::shaped<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(s.seg_cells)) && defined(converted::shaped<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(s.ring_cells)); }
+[[maybe_unused]] static std::string text(const FurnishIndex& s) { return std::string("{") + text(s.segs) + ", " + text(s.rings) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(s.seg_cells)) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(s.ring_cells)) + "}"; }
+[[maybe_unused]] static void take(FurnishIndex& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<std::vector<FurnishIndex::Seg>>(s.segs, (*v.rows)[0]); converted::take_as<std::vector<FurnishIndex::Ring>>(s.rings, (*v.rows)[1]); converted::take_as<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(s.seg_cells, (*v.rows)[2]); converted::take_as<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(s.ring_cells, (*v.rows)[3]); }
 [[maybe_unused]] static MapFeatures::Building draw_MapFeatures__Building(converted::Draw& draw) {
   MapFeatures::Building s{};
   s.rings = draw_list(draw, [&]() -> std::vector<Vec2> { return draw_list(draw, [&]() -> Vec2 { return draw.vector2(); }); });
@@ -364,6 +625,10 @@ struct Out_unproject { double lon; double lat; };
 [[maybe_unused]] static bool same(const Out_unproject& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.lon, (*got.rows)[0]) && same(want.lat, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_unproject& s) { return defined(s.lon) && defined(s.lat); }
 [[maybe_unused]] static std::string text(const Out_unproject& s) { return std::string("{") + text(s.lon) + ", " + text(s.lat) + "}"; }
+struct Out_parse_road { bool Result; RoadClass out; };
+[[maybe_unused]] static bool same(const Out_parse_road& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.out, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const Out_parse_road& s) { return defined(s.Result) && defined(s.out); }
+[[maybe_unused]] static std::string text(const Out_parse_road& s) { return std::string("{") + text(s.Result) + ", " + text(s.out) + "}"; }
 
 SC_TEST(converted_tiles_cpp) {
   converted::Blueprint bp("tiles_cpp");
@@ -372,57 +637,66 @@ SC_TEST(converted_tiles_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] int a2) { return converted::counted([&] { return converted_tiles_cpp::tile_at(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const double a0 = draw.number();
-      const double a1 = draw.number();
-      const int a2 = static_cast<int>(draw.whole());
+      double a0 = draw.number();
+      double a1 = draw.number();
+      int a2 = static_cast<int>(draw.whole());
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // tile_lonlat
     converted::Tally tally("tile_lonlat");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TileKey a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { converted::counted([&] { return converted_tiles_cpp::tile_lonlat(a0, std::move(a1), std::move(a2), a3, a4); }); return Out_tile_lonlat{a3, a4}; };
+    const auto run = [&]([[maybe_unused]] TileKey a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { converted::counted([&] { return converted_tiles_cpp::tile_lonlat(a0, std::move(a1), std::move(a2), a3, a4); }); return Out_tile_lonlat{std::move(a3), std::move(a4)}; };
     for (int i = 0; tally.more(i); ++i) {
-      const TileKey a0 = draw_TileKey(draw);
-      const double a1 = draw.number();
-      const double a2 = draw.number();
-      const double a3 = draw.number();
-      const double a4 = draw.number();
+      TileKey a0 = draw_TileKey(draw);
+      double a1 = draw.number();
+      double a2 = draw.number();
+      double a3 = draw.number();
+      double a4 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a3), arg(a4), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3, a4);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a3), arg(a4), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); }, {0, 1});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
   {  // unproject
     converted::Tally tally("unproject");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GeoProjector a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { converted::counted([&] { return converted_tiles_cpp::unproject(a0, std::move(a1), std::move(a2), a3, a4); }); return Out_unproject{a3, a4}; };
+    const auto run = [&]([[maybe_unused]] GeoProjector a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { converted::counted([&] { return converted_tiles_cpp::unproject(a0, std::move(a1), std::move(a2), a3, a4); }); return Out_unproject{std::move(a3), std::move(a4)}; };
     for (int i = 0; tally.more(i); ++i) {
-      const GeoProjector a0 = draw_kern__GeoProjector(draw);
-      const double a1 = draw.number();
-      const double a2 = draw.number();
-      const double a3 = draw.number();
-      const double a4 = draw.number();
+      GeoProjector a0 = draw_kern__GeoProjector(draw);
+      double a1 = draw.number();
+      double a2 = draw.number();
+      double a3 = draw.number();
+      double a4 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a3), arg(a4), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3, a4);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a3), arg(a4), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); }, {0, 1});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
   {  // road_width
@@ -430,15 +704,18 @@ SC_TEST(converted_tiles_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] RoadClass a0) { return converted::counted([&] { return converted_tiles_cpp::road_width(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const RoadClass a0 = static_cast<RoadClass>(draw.below(13));
+      RoadClass a0 = static_cast<RoadClass>(draw.below(13));
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // road_is_water
@@ -446,15 +723,18 @@ SC_TEST(converted_tiles_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] RoadClass a0) { return converted::counted([&] { return converted_tiles_cpp::road_is_water(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const RoadClass a0 = static_cast<RoadClass>(draw.below(13));
+      RoadClass a0 = static_cast<RoadClass>(draw.below(13));
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // road_drivable
@@ -462,15 +742,58 @@ SC_TEST(converted_tiles_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] RoadClass a0) { return converted::counted([&] { return converted_tiles_cpp::road_drivable(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const RoadClass a0 = static_cast<RoadClass>(draw.below(13));
+      RoadClass a0 = static_cast<RoadClass>(draw.below(13));
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // parse_road
+    converted::Tally tally("parse_road");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::string_view a0, [[maybe_unused]] RoadClass a1) { auto r = converted::counted([&] { return converted_tiles_cpp::parse_road(std::move(a0), a1); }); return Out_parse_road{std::move(r), std::move(a1)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      std::string_view a0 = std::string_view(draw.c_word());
+      RoadClass a1 = static_cast<RoadClass>(draw.below(13));
+      const std::vector<converted::Value> given = {arg(a1), arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
+    }
+  }
+  {  // polygons
+    converted::Tally tally("polygons");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] mvt::Feature a0, [[maybe_unused]] std::vector<std::vector<std::vector<Vec2>>> a1) { converted::counted([&] { return converted_tiles_cpp::polygons(a0, a1); }); return a1; };
+    for (int i = 0; tally.more(i); ++i) {
+      mvt::Feature a0 = draw_mvt__Feature(draw);
+      std::vector<std::vector<std::vector<Vec2>>> a1 = draw_list(draw, [&]() -> std::vector<std::vector<Vec2>> { return draw_list(draw, [&]() -> std::vector<Vec2> { return draw_list(draw, [&]() -> Vec2 { return draw.vector2(); }); }); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Projector::Projector
@@ -478,17 +801,20 @@ SC_TEST(converted_tiles_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] TileKey a0, [[maybe_unused]] GeoProjector a1, [[maybe_unused]] double a2) { return converted::counted([&] { return Projector(a0, a1, std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const TileKey a0 = draw_TileKey(draw);
-      const GeoProjector a1 = draw_kern__GeoProjector(draw);
-      const double a2 = draw.number();
+      TileKey a0 = draw_TileKey(draw);
+      GeoProjector a1 = draw_kern__GeoProjector(draw);
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Projector::operator()
@@ -496,16 +822,62 @@ SC_TEST(converted_tiles_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] Projector a0, [[maybe_unused]] Vec2 a1) { return converted::counted([&] { return a0.operator()(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Projector a0 = draw_Projector(draw);
-      const Vec2 a1 = draw.vector2();
+      Projector a0 = draw_Projector(draw);
+      Vec2 a1 = draw.vector2();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // inside_side
+    converted::Tally tally("inside_side");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] int a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_tiles_cpp::inside_side(std::move(a0), std::move(a1), std::move(a2)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      int a0 = static_cast<int>(draw.whole());
+      Vec2 a1 = draw.vector2();
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // cut_side
+    converted::Tally tally("cut_side");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] int a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] Vec2 a2, [[maybe_unused]] double a3) { return converted::counted([&] { return converted_tiles_cpp::cut_side(std::move(a0), std::move(a1), std::move(a2), std::move(a3)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      int a0 = static_cast<int>(draw.whole());
+      Vec2 a1 = draw.vector2();
+      Vec2 a2 = draw.vector2();
+      double a3 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // hash_u32
@@ -513,48 +885,166 @@ SC_TEST(converted_tiles_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] u64 a0) { return converted::counted([&] { return converted_tiles_cpp::hash_u32(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const u64 a0 = static_cast<u64>(draw.bits());
+      u64 a0 = static_cast<u64>(draw.bits());
+      const std::vector<converted::Value> given = {arg(converted::shaped<converted::Whole>(a0))};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(converted::shaped<converted::Whole>(a0))}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // FurnishIndex::key
     converted::Tally tally("FurnishIndex_key");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0, [[maybe_unused]] int a1) { return converted::counted([&] { return converted_tiles_cpp::FurnishIndex::key(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] int a0, [[maybe_unused]] int a1) { return converted::counted([&] { return FurnishIndex::key(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const int a0 = static_cast<int>(draw.whole());
-      const int a1 = static_cast<int>(draw.whole());
+      int a0 = static_cast<int>(draw.whole());
+      int a1 = static_cast<int>(draw.whole());
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = converted::shaped<converted::Whole>(run(a0, a1));
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = converted::shaped<converted::Whole>(made);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // FurnishIndex::cell
     converted::Tally tally("FurnishIndex_cell");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_tiles_cpp::FurnishIndex::cell(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return FurnishIndex::cell(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const double a0 = draw.number();
+      double a0 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // FurnishIndex::add_seg
+    converted::Tally tally("FurnishIndex_add_seg");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] FurnishIndex a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] Vec2 a2, [[maybe_unused]] double a3, [[maybe_unused]] unsigned int a4, [[maybe_unused]] bool a5) { converted::counted([&] { return a0.add_seg(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      FurnishIndex a0 = draw_FurnishIndex(draw);
+      Vec2 a1 = draw.vector2();
+      Vec2 a2 = draw.vector2();
+      double a3 = draw.number();
+      unsigned int a4 = static_cast<unsigned int>(draw.below(40));
+      bool a5 = draw.flag();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // FurnishIndex::add_ring
+    converted::Tally tally("FurnishIndex_add_ring");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] FurnishIndex a0, [[maybe_unused]] std::vector<Vec2> a1, [[maybe_unused]] bool a2, [[maybe_unused]] unsigned int a3) { converted::counted([&] { return a0.add_ring(a1, std::move(a2), std::move(a3)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      FurnishIndex a0 = draw_FurnishIndex(draw);
+      std::vector<Vec2> a1 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+      bool a2 = draw.flag();
+      unsigned int a3 = static_cast<unsigned int>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // FurnishIndex::built
+    converted::Tally tally("FurnishIndex_built");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] FurnishIndex a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] std::vector<MapFeatures::Building> a2, [[maybe_unused]] std::vector<std::vector<Vec2>> a3) { return converted::counted([&] { return a0.built(std::move(a1), a2, a3); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      FurnishIndex a0 = draw_FurnishIndex(draw);
+      Vec2 a1 = draw.vector2();
+      std::vector<MapFeatures::Building> a2 = draw_list(draw, [&]() -> MapFeatures::Building { return draw_MapFeatures__Building(draw); });
+      std::vector<std::vector<Vec2>> a3 = draw_list(draw, [&]() -> std::vector<Vec2> { return draw_list(draw, [&]() -> Vec2 { return draw.vector2(); }); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a3), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // FurnishIndex::off_roads
+    converted::Tally tally("FurnishIndex_off_roads");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] FurnishIndex a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return converted::counted([&] { return a0.off_roads(std::move(a1), std::move(a2), std::move(a3)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      FurnishIndex a0 = draw_FurnishIndex(draw);
+      Vec2 a1 = draw.vector2();
+      double a2 = draw.number();
+      double a3 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // training_level
+    converted::Tally tally("training_level");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] MapFeatures a0) { converted::counted([&] { return converted_tiles_cpp::training_level(a0); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      MapFeatures a0 = draw_MapFeatures(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // procedural_city
@@ -562,19 +1052,42 @@ SC_TEST(converted_tiles_cpp) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] unsigned int a3, [[maybe_unused]] MapFeatures a4) { converted::counted([&] { return converted_tiles_cpp::procedural_city(std::move(a0), std::move(a1), std::move(a2), std::move(a3), a4); }); return a4; };
     for (int i = 0; tally.more(i); ++i) {
-      const double a0 = draw.number();
-      const double a1 = draw.number();
-      const double a2 = draw.number();
-      const unsigned int a3 = static_cast<unsigned int>(draw.below(40));
-      const MapFeatures a4 = draw_MapFeatures(draw);
+      double a0 = draw.number();
+      double a1 = draw.number();
+      double a2 = draw.number();
+      unsigned int a3 = static_cast<unsigned int>(draw.below(40));
+      MapFeatures a4 = draw_MapFeatures(draw);
+      const std::vector<converted::Value> given = {arg(a4), arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3, a4);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a4), arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // clip_line
+    converted::Tally tally("clip_line");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] Vec4 a1) { return converted::counted([&] { return converted_tiles_cpp::clip_line(a0, a1); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+      Vec4 a1 = draw_kern__Vec4(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

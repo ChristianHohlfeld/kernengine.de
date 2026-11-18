@@ -11,7 +11,7 @@
 // From inside the facade's back faces are not drawn, so the window openings show the city.
 #pragma once
 
-#include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -56,8 +56,9 @@ class Interiors {
   void draw(LifeArt& art, f32 now, Vec3 eye) const;
   void hud(std::string& s) const;
   /// "interior" (state), "interior go" (to the nearest building's door), "interior up" (onto
-  /// the next storey's stairs), "interior roof".
-  bool command(const std::string& cmd, Vec3 me, std::string& out, const std::function<bool(Vec3, f32)>& teleport);
+  /// the next storey's stairs), "interior roof". A command that moves the player gives where to
+  /// in `go` (the caller teleports and says "ok", or "not on foot") and leaves `out` as it is.
+  bool command(const std::string& cmd, Vec3 me, std::string& out, std::optional<Vec3>& go);
   bool active() const { return active_; }
   bool inside(Vec3 p) const;
   i32 level_at(Vec3 p) const;

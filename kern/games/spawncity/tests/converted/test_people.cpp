@@ -7,9 +7,9 @@
 #include <string>
 #include <type_traits>
 #include <vector>
-#include <functional>
 #include "../../src/city_stream.h"
 #include "../../src/common.h"
+#include "../../src/spawn_guard.h"
 #include "../../src/wanted.h"
 #include "../converted.h"
 
@@ -20,10 +20,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -38,22 +38,17 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #define protected public
 enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
 enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
-enum class GeomType : u8 { unknown = 0, point = 1, line = 2, polygon = 3 };
-enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, count
-};
-struct State {
-  u32 id = 0;
-  std::string name;
-  f32 x = 0, y = 0;
-  bool initial = false;
-};
-namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; }
-namespace Runtime { enum class Chain : u8 { event, call, call_inside }; }
-enum class Crime : u8 { person, person_hit, player, car, bus, police_drone, police_officer, police_car, carjacking, bird };
+namespace mvt { enum class GeomType : u8 { unknown = 0, point = 1, line = 2, polygon = 3 }; }
+namespace CityStream { namespace Tile { enum class State : u8 { requested, decoding, terrain_wait, building, roads, areas, collision, ready, failed }; } }
+namespace logic { enum class PinType : u8 {
+  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
+  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
+  map, set, count
+}; }
+namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
+namespace wanted { enum class Crime : u8 { person, person_hit, player, car, bus, police_drone, police_officer, police_car, carjacking, bird }; }
 struct CrimeReport {
-  Crime crime;
+  wanted::Crime crime;
   Vec3 at;
   bool witnessed;
 };
@@ -111,6 +106,10 @@ struct People {
   void clear() { people_.clear(); }
   /// Walks, flees, spawns and retires people around the focus; knocks people down under vehicles.
   
+  /// What the spawn gate (PeopleView::spawn_viewers) said in the last update: arrivals it
+  /// allowed, arrivals it denied.
+  u32 spawns_allowed() const { return spawns_allowed_; }
+  u32 spawns_denied() const { return spawns_denied_; }
   /// A bullet from `from` to `to`: the first person on that line takes `damage` (x3 on the head).
   /// Returns the index hit (-1: nobody) and shortens `to` to the hit point.
   /// Passers-by take hits as world_procedural_population.mjs handleProceduralHit: a round does 55
@@ -133,7 +132,7 @@ struct People {
   /// his pavement route (lane, seg, along, side, off) and what he does.
   
   
-  const std::vector<Person>& all() const { return people_; }
+  
   /// A free step along `dir` that does not go through walls (tries turned directions).
   
   /// Someone sees the place (a living citizen within 45 m): crimes there are witnessed.
@@ -184,18 +183,20 @@ struct People {
 
  public:
   /// VR grab: the person goes down as a ragdoll (gets up again later), pushed by `push`.
-  
+  void grab_knock(i32 index, Vec3 push, f32 now) { if (index >= 0 && index < static_cast<i32>(people_.size())) knock(index, push, now); }
 
  private:
   
   
+  /// Person `i` (its place in people_) down for good.
   
   /// Down as a ragdoll that gets up again (world_procedural_population.mjs knockPerson).
-  
-
-
-
-
+  void knock(i32 i, Vec3 push, f32 now) {
+    Person& p = converted::at(people_, static_cast<std::size_t>(i));
+    falls_.push_back({i, push, false, true});
+    p.knocked_until = now + 6;
+    p.v = 0;
+  }
   
   std::vector<Person> people_;
   std::vector<CrimeReport> reports_;
@@ -205,6 +206,7 @@ struct People {
   std::vector<Hurt> hurts_;
   bool last_head_ = false, puppets_ = false;
   u32 budget_ = 60, serial_ = 1;
+  u32 spawns_allowed_ = 0, spawns_denied_ = 0;
   f32 show_ = 170, hide_ = 190;
 };
 #undef private
@@ -269,7 +271,7 @@ struct People {
 [[maybe_unused]] static void take(People::Person& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 47) return; converted::take_as<People::Kind>(s.kind, (*v.rows)[0]); converted::take_as<People::State>(s.state, (*v.rows)[1]); converted::take_as<Vec3>(s.pos, (*v.rows)[2]); converted::take_as<double>(s.yaw, (*v.rows)[3]); converted::take_as<double>(s.speed, (*v.rows)[4]); converted::take_as<double>(s.v, (*v.rows)[5]); converted::take_as<double>(s.hp, (*v.rows)[6]); converted::take_as<double>(s.phase, (*v.rows)[7]); converted::take_as<Vec3>(s.shirt, (*v.rows)[8]); converted::take_as<Vec3>(s.pants, (*v.rows)[9]); converted::take_as<Vec3>(s.skin, (*v.rows)[10]); converted::take_as<int>(s.lane, (*v.rows)[11]); converted::take_as<int>(s.seg, (*v.rows)[12]); converted::take_as<int>(s.dir, (*v.rows)[13]); converted::take_as<double>(s.along, (*v.rows)[14]); converted::take_as<double>(s.side, (*v.rows)[15]); converted::take_as<double>(s.off, (*v.rows)[16]); converted::take_as<double>(s.flee_until, (*v.rows)[17]); converted::take_as<double>(s.burst_until, (*v.rows)[18]); converted::take_as<double>(s.flee_speed, (*v.rows)[19]); converted::take_as<double>(s.hands_up_until, (*v.rows)[20]); converted::take_as<double>(s.shaken_until, (*v.rows)[21]); converted::take_as<double>(s.wait_until, (*v.rows)[22]); converted::take_as<Vec2>(s.flee_dir, (*v.rows)[23]); converted::take_as<double>(s.fitness, (*v.rows)[24]); converted::take_as<double>(s.down_at, (*v.rows)[25]); converted::take_as<Vec3>(s.fall_dir, (*v.rows)[26]); converted::take_as<int>(s.unit, (*v.rows)[27]); converted::take_as<bool>(s.aiming, (*v.rows)[28]); converted::take_as<double>(s.aim_pitch, (*v.rows)[29]); converted::take_as<int>(s.held, (*v.rows)[30]); converted::take_as<bool>(s.hands, (*v.rows)[31]); converted::take_as<Vec3>(s.hand_l, (*v.rows)[32]); converted::take_as<Vec3>(s.hand_r, (*v.rows)[33]); converted::take_as<unsigned char>(s.punch, (*v.rows)[34]); converted::take_as<unsigned int>(s.seed, (*v.rows)[35]); converted::take_as<double>(s.provoked_at, (*v.rows)[36]); converted::take_as<double>(s.fight_until, (*v.rows)[37]); converted::take_as<double>(s.last_attack, (*v.rows)[38]); converted::take_as<bool>(s.provoked_hit, (*v.rows)[39]); converted::take_as<unsigned char>(s.role, (*v.rows)[40]); converted::take_as<double>(s.knocked_until, (*v.rows)[41]); converted::take_as<double>(s.hurt_at, (*v.rows)[42]); converted::take_as<bool>(s.remote, (*v.rows)[43]); converted::take_as<int>(s.net, (*v.rows)[44]); converted::take_as<Vec3>(s.net_to, (*v.rows)[45]); converted::take_as<double>(s.net_at, (*v.rows)[46]); }
 [[maybe_unused]] static CrimeReport draw_CrimeReport(converted::Draw& draw) {
   CrimeReport s{};
-  s.crime = static_cast<Crime>(draw.below(10));
+  s.crime = static_cast<wanted::Crime>(draw.below(10));
   s.at = draw.vector();
   s.witnessed = draw.flag();
   return s;
@@ -278,7 +280,7 @@ struct People {
 [[maybe_unused]] static bool same(const CrimeReport& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.crime, (*got.rows)[0]) && same(want.at, (*got.rows)[1]) && same(want.witnessed, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const CrimeReport& s) { return defined(s.crime) && defined(s.at) && defined(s.witnessed); }
 [[maybe_unused]] static std::string text(const CrimeReport& s) { return std::string("{") + text(s.crime) + ", " + text(s.at) + ", " + text(s.witnessed) + "}"; }
-[[maybe_unused]] static void take(CrimeReport& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<Crime>(s.crime, (*v.rows)[0]); converted::take_as<Vec3>(s.at, (*v.rows)[1]); converted::take_as<bool>(s.witnessed, (*v.rows)[2]); }
+[[maybe_unused]] static void take(CrimeReport& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<wanted::Crime>(s.crime, (*v.rows)[0]); converted::take_as<Vec3>(s.at, (*v.rows)[1]); converted::take_as<bool>(s.witnessed, (*v.rows)[2]); }
 [[maybe_unused]] static People::Death draw_People__Death(converted::Draw& draw) {
   People::Death s{};
   s.index = static_cast<int>(draw.whole());
@@ -342,15 +344,17 @@ struct People {
   s.puppets_ = draw.flag();
   s.budget_ = static_cast<unsigned int>(draw.below(40));
   s.serial_ = static_cast<unsigned int>(draw.below(40));
+  s.spawns_allowed_ = static_cast<unsigned int>(draw.below(40));
+  s.spawns_denied_ = static_cast<unsigned int>(draw.below(40));
   s.show_ = draw.number();
   s.hide_ = draw.number();
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const People& s) { return converted::Value::structure({arg(s.people_), arg(s.reports_), arg(s.deaths_), arg(s.falls_), arg(s.remote_hits_), arg(s.hurts_), arg(s.last_head_), arg(s.puppets_), arg(s.budget_), arg(s.serial_), arg(s.show_), arg(s.hide_)}); }
-[[maybe_unused]] static bool same(const People& want, const converted::Value& got) { return got.rows && got.rows->size() == 12 && same(want.people_, (*got.rows)[0]) && same(want.reports_, (*got.rows)[1]) && same(want.deaths_, (*got.rows)[2]) && same(want.falls_, (*got.rows)[3]) && same(want.remote_hits_, (*got.rows)[4]) && same(want.hurts_, (*got.rows)[5]) && same(want.last_head_, (*got.rows)[6]) && same(want.puppets_, (*got.rows)[7]) && same(want.budget_, (*got.rows)[8]) && same(want.serial_, (*got.rows)[9]) && same(want.show_, (*got.rows)[10]) && same(want.hide_, (*got.rows)[11]); }
-[[maybe_unused]] static bool defined(const People& s) { return defined(s.people_) && defined(s.reports_) && defined(s.deaths_) && defined(s.falls_) && defined(s.remote_hits_) && defined(s.hurts_) && defined(s.last_head_) && defined(s.puppets_) && defined(s.budget_) && defined(s.serial_) && defined(s.show_) && defined(s.hide_); }
-[[maybe_unused]] static std::string text(const People& s) { return std::string("{") + text(s.people_) + ", " + text(s.reports_) + ", " + text(s.deaths_) + ", " + text(s.falls_) + ", " + text(s.remote_hits_) + ", " + text(s.hurts_) + ", " + text(s.last_head_) + ", " + text(s.puppets_) + ", " + text(s.budget_) + ", " + text(s.serial_) + ", " + text(s.show_) + ", " + text(s.hide_) + "}"; }
-[[maybe_unused]] static void take(People& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 12) return; converted::take_as<std::vector<People::Person>>(s.people_, (*v.rows)[0]); converted::take_as<std::vector<CrimeReport>>(s.reports_, (*v.rows)[1]); converted::take_as<std::vector<People::Death>>(s.deaths_, (*v.rows)[2]); converted::take_as<std::vector<People::Fall>>(s.falls_, (*v.rows)[3]); converted::take_as<std::vector<People::RemoteHit>>(s.remote_hits_, (*v.rows)[4]); converted::take_as<std::vector<People::Hurt>>(s.hurts_, (*v.rows)[5]); converted::take_as<bool>(s.last_head_, (*v.rows)[6]); converted::take_as<bool>(s.puppets_, (*v.rows)[7]); converted::take_as<unsigned int>(s.budget_, (*v.rows)[8]); converted::take_as<unsigned int>(s.serial_, (*v.rows)[9]); converted::take_as<double>(s.show_, (*v.rows)[10]); converted::take_as<double>(s.hide_, (*v.rows)[11]); }
+[[maybe_unused]] static converted::Value arg(const People& s) { return converted::Value::structure({arg(s.people_), arg(s.reports_), arg(s.deaths_), arg(s.falls_), arg(s.remote_hits_), arg(s.hurts_), arg(s.last_head_), arg(s.puppets_), arg(s.budget_), arg(s.serial_), arg(s.spawns_allowed_), arg(s.spawns_denied_), arg(s.show_), arg(s.hide_)}); }
+[[maybe_unused]] static bool same(const People& want, const converted::Value& got) { return got.rows && got.rows->size() == 14 && same(want.people_, (*got.rows)[0]) && same(want.reports_, (*got.rows)[1]) && same(want.deaths_, (*got.rows)[2]) && same(want.falls_, (*got.rows)[3]) && same(want.remote_hits_, (*got.rows)[4]) && same(want.hurts_, (*got.rows)[5]) && same(want.last_head_, (*got.rows)[6]) && same(want.puppets_, (*got.rows)[7]) && same(want.budget_, (*got.rows)[8]) && same(want.serial_, (*got.rows)[9]) && same(want.spawns_allowed_, (*got.rows)[10]) && same(want.spawns_denied_, (*got.rows)[11]) && same(want.show_, (*got.rows)[12]) && same(want.hide_, (*got.rows)[13]); }
+[[maybe_unused]] static bool defined(const People& s) { return defined(s.people_) && defined(s.reports_) && defined(s.deaths_) && defined(s.falls_) && defined(s.remote_hits_) && defined(s.hurts_) && defined(s.last_head_) && defined(s.puppets_) && defined(s.budget_) && defined(s.serial_) && defined(s.spawns_allowed_) && defined(s.spawns_denied_) && defined(s.show_) && defined(s.hide_); }
+[[maybe_unused]] static std::string text(const People& s) { return std::string("{") + text(s.people_) + ", " + text(s.reports_) + ", " + text(s.deaths_) + ", " + text(s.falls_) + ", " + text(s.remote_hits_) + ", " + text(s.hurts_) + ", " + text(s.last_head_) + ", " + text(s.puppets_) + ", " + text(s.budget_) + ", " + text(s.serial_) + ", " + text(s.spawns_allowed_) + ", " + text(s.spawns_denied_) + ", " + text(s.show_) + ", " + text(s.hide_) + "}"; }
+[[maybe_unused]] static void take(People& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 14) return; converted::take_as<std::vector<People::Person>>(s.people_, (*v.rows)[0]); converted::take_as<std::vector<CrimeReport>>(s.reports_, (*v.rows)[1]); converted::take_as<std::vector<People::Death>>(s.deaths_, (*v.rows)[2]); converted::take_as<std::vector<People::Fall>>(s.falls_, (*v.rows)[3]); converted::take_as<std::vector<People::RemoteHit>>(s.remote_hits_, (*v.rows)[4]); converted::take_as<std::vector<People::Hurt>>(s.hurts_, (*v.rows)[5]); converted::take_as<bool>(s.last_head_, (*v.rows)[6]); converted::take_as<bool>(s.puppets_, (*v.rows)[7]); converted::take_as<unsigned int>(s.budget_, (*v.rows)[8]); converted::take_as<unsigned int>(s.serial_, (*v.rows)[9]); converted::take_as<unsigned int>(s.spawns_allowed_, (*v.rows)[10]); converted::take_as<unsigned int>(s.spawns_denied_, (*v.rows)[11]); converted::take_as<double>(s.show_, (*v.rows)[12]); converted::take_as<double>(s.hide_, (*v.rows)[13]); }
 struct Out_People_take_reports { People Self; std::vector<CrimeReport> out; };
 [[maybe_unused]] static bool same(const Out_People_take_reports& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.out, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_People_take_reports& s) { return defined(s.Self) && defined(s.out); }
@@ -379,16 +383,19 @@ SC_TEST(converted_people) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] unsigned int a1) { converted::counted([&] { return a0.set_budget(std::move(a1)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
-      const People a0 = draw_People(draw);
-      const unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      People a0 = draw_People(draw);
+      unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // People::set_ranges
@@ -396,17 +403,20 @@ SC_TEST(converted_people) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.set_ranges(std::move(a1), std::move(a2)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
-      const People a0 = draw_People(draw);
-      const double a1 = draw.number();
-      const double a2 = draw.number();
+      People a0 = draw_People(draw);
+      double a1 = draw.number();
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // People::clear
@@ -414,116 +424,156 @@ SC_TEST(converted_people) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] People a0) { converted::counted([&] { return a0.clear(); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
-      const People a0 = draw_People(draw);
+      People a0 = draw_People(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // People::spawns_allowed
+    converted::Tally tally("People_spawns_allowed");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] People a0) { return converted::counted([&] { return a0.spawns_allowed(); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      People a0 = draw_People(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // People::spawns_denied
+    converted::Tally tally("People_spawns_denied");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] People a0) { return converted::counted([&] { return a0.spawns_denied(); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      People a0 = draw_People(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // People::take_reports
     converted::Tally tally("People_take_reports");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] std::vector<CrimeReport> a1) { converted::counted([&] { return a0.take_reports(a1); }); return Out_People_take_reports{a0, a1}; };
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] std::vector<CrimeReport> a1) { converted::counted([&] { return a0.take_reports(a1); }); return Out_People_take_reports{std::move(a0), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
-      const People a0 = draw_People(draw);
-      const std::vector<CrimeReport> a1 = draw_list(draw, [&]() -> CrimeReport { return draw_CrimeReport(draw); });
+      People a0 = draw_People(draw);
+      std::vector<CrimeReport> a1 = draw_list(draw, [&]() -> CrimeReport { return draw_CrimeReport(draw); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {0, 1});
-    }
-  }
-  {  // People::all
-    converted::Tally tally("People_all");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0) { return converted::counted([&] { return a0.all(); }); };
-    for (int i = 0; tally.more(i); ++i) {
-      const People a0 = draw_People(draw);
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      const auto want = run(a0);
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
   {  // People::take_deaths
     converted::Tally tally("People_take_deaths");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] std::vector<People::Death> a1) { converted::counted([&] { return a0.take_deaths(a1); }); return Out_People_take_deaths{a0, a1}; };
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] std::vector<People::Death> a1) { converted::counted([&] { return a0.take_deaths(a1); }); return Out_People_take_deaths{std::move(a0), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
-      const People a0 = draw_People(draw);
-      const std::vector<People::Death> a1 = draw_list(draw, [&]() -> People::Death { return draw_People__Death(draw); });
+      People a0 = draw_People(draw);
+      std::vector<People::Death> a1 = draw_list(draw, [&]() -> People::Death { return draw_People__Death(draw); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {0, 1});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
   {  // People::take_remote_hits
     converted::Tally tally("People_take_remote_hits");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] std::vector<People::RemoteHit> a1) { converted::counted([&] { return a0.take_remote_hits(a1); }); return Out_People_take_remote_hits{a0, a1}; };
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] std::vector<People::RemoteHit> a1) { converted::counted([&] { return a0.take_remote_hits(a1); }); return Out_People_take_remote_hits{std::move(a0), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
-      const People a0 = draw_People(draw);
-      const std::vector<People::RemoteHit> a1 = draw_list(draw, [&]() -> People::RemoteHit { return draw_People__RemoteHit(draw); });
+      People a0 = draw_People(draw);
+      std::vector<People::RemoteHit> a1 = draw_list(draw, [&]() -> People::RemoteHit { return draw_People__RemoteHit(draw); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {0, 1});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
   {  // People::take_hurts
     converted::Tally tally("People_take_hurts");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] std::vector<People::Hurt> a1) { converted::counted([&] { return a0.take_hurts(a1); }); return Out_People_take_hurts{a0, a1}; };
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] std::vector<People::Hurt> a1) { converted::counted([&] { return a0.take_hurts(a1); }); return Out_People_take_hurts{std::move(a0), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
-      const People a0 = draw_People(draw);
-      const std::vector<People::Hurt> a1 = draw_list(draw, [&]() -> People::Hurt { return draw_People__Hurt(draw); });
+      People a0 = draw_People(draw);
+      std::vector<People::Hurt> a1 = draw_list(draw, [&]() -> People::Hurt { return draw_People__Hurt(draw); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {0, 1});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
   {  // People::take_falls
     converted::Tally tally("People_take_falls");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] std::vector<People::Fall> a1) { converted::counted([&] { return a0.take_falls(a1); }); return Out_People_take_falls{a0, a1}; };
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] std::vector<People::Fall> a1) { converted::counted([&] { return a0.take_falls(a1); }); return Out_People_take_falls{std::move(a0), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
-      const People a0 = draw_People(draw);
-      const std::vector<People::Fall> a1 = draw_list(draw, [&]() -> People::Fall { return draw_People__Fall(draw); });
+      People a0 = draw_People(draw);
+      std::vector<People::Fall> a1 = draw_list(draw, [&]() -> People::Fall { return draw_People__Fall(draw); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {0, 1});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
   {  // People::set_puppets
@@ -531,16 +581,19 @@ SC_TEST(converted_people) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] bool a1) { converted::counted([&] { return a0.set_puppets(std::move(a1)); }); return a0; };
     for (int i = 0; tally.more(i); ++i) {
-      const People a0 = draw_People(draw);
-      const bool a1 = draw.flag();
+      People a0 = draw_People(draw);
+      bool a1 = draw.flag();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // People::puppets
@@ -548,15 +601,18 @@ SC_TEST(converted_people) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] People a0) { return converted::counted([&] { return a0.puppets(); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const People a0 = draw_People(draw);
+      People a0 = draw_People(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // People::last_head
@@ -564,15 +620,62 @@ SC_TEST(converted_people) {
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     const auto run = [&]([[maybe_unused]] People a0) { return converted::counted([&] { return a0.last_head(); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const People a0 = draw_People(draw);
+      People a0 = draw_People(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // People::knock
+    converted::Tally tally("People_knock");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] int a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3) { converted::counted([&] { return a0.knock(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      People a0 = draw_People(draw);
+      int a1 = static_cast<int>(draw.whole());
+      Vec3 a2 = draw.vector();
+      double a3 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // People::grab_knock
+    converted::Tally tally("People_grab_knock");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] int a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3) { converted::counted([&] { return a0.grab_knock(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      People a0 = draw_People(draw);
+      int a1 = static_cast<int>(draw.whole());
+      Vec3 a2 = draw.vector();
+      double a3 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

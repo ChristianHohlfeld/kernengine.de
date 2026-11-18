@@ -8,6 +8,7 @@
 
 #include "kern/game/runtime.h"
 #include "kern/game/walker_policy.h"
+#include "kern/logic/engine_host.h"
 
 namespace kern::game {
 
@@ -203,9 +204,22 @@ class GameWorld::LogicHost : public logic::Host {
     return s;
   }
   void* game() override { return &w_; }
+  logic::ActorRef find_actor(std::string_view name) override { return w_.find_actor(name); }
+  /// The engine's nodes on the engine itself (kern/logic/engine_host.h): the objects the world's
+  /// Blueprints made or were given, by their handles; a call that fails says why.
+  bool engine(std::string_view function, const std::vector<logic::Value>& in, std::vector<logic::Value>& out) override {
+    if (logic::call_engine(objects_, function, in, out)) return true;
+    engine_failed(function);
+    return false;
+  }
+  /// A Blueprint's class calls the engine's functions on the same objects itself (kern/logic/engine_direct.h).
+  logic::EngineObjects* engine_objects() override { return &objects_; }
+  void engine_failed(std::string_view function) override { error(std::string(function) + ": " + objects_.error); }
+  logic::EngineObjects& objects() { return objects_; }
 
  private:
   GameWorld& w_;
+  logic::EngineObjects objects_;
 };
 
 }  // namespace kern::game

@@ -225,7 +225,7 @@ void Game::blast_police_drones(Vec3 at, f32 radius, f32 damage, bool by_player) 
     if (d.hp <= 0) {
       d.active = false;
       d.destroyed_until = now + 9;
-      if (by_player) wanted_.report(wanted::Crime::police_drone, true);
+      if (by_player) wanted::report(wanted::Crime::police_drone, true);
     }
   }
 }
@@ -237,7 +237,7 @@ Vec3 Game::rocket_laser_dot() {
   if (!flying) laser_pinned_ = false;
   if (laser_pinned_) { laser_valid_ = true; laser_dot_ = laser_pin_; return laser_dot_; }
   Vec3 from, ad;
-  if (engine_ && engine_->xr) { from = engine_->xr_eye; ad = engine_->xr_forward; }  // VR: where you look steers the rocket
+  if (engine_ && engine_->xr()) { from = engine_->xr_eye(); ad = engine_->xr_forward(); }  // VR: where you look steers the rocket
   else if (laser_finger_) ctl_screen_ray(laser_fx_, laser_fy_, from, ad);
   else { ad = kern::normalize(cam_.target - cam_.eye, {1, 0, 0}); from = cam_.eye; }
   const RayResult r = cast(world_->physics(), from, ad, kLaserRange, body(soldier_));
@@ -297,14 +297,15 @@ void Game::foot_rounds_update(f32 dt) {
     const Vec3 seg = s.to - s.from;
     const f32 l2 = kern::dot(seg, seg);
     if (l2 < 1e-6f) continue;
-    Projectile* best = nullptr;
+    std::size_t best = projectiles_.size();  // (its place in projectiles_; none: the end)
     f32 bt = 2;
-    for (Projectile& p : projectiles_) {
+    for (std::size_t i = 0; i < projectiles_.size(); ++i) {
+      const Projectile& p = projectiles_[i];
       if (!p.alive || p.ghost || !foot_round(p.id)) continue;
       const f32 t = clampf(kern::dot(p.pos - s.from, seg) / l2, 0, 1);
-      if (kern::length(s.from + seg * t - p.pos) <= kShotHit && t < bt) { bt = t; best = &p; }
+      if (kern::length(s.from + seg * t - p.pos) <= kShotHit && t < bt) { bt = t; best = i; }
     }
-    if (best) { best->fuse = 0; best->born = now - 1; }
+    if (best < projectiles_.size()) { projectiles_[best].fuse = 0; projectiles_[best].born = now - 1; }
   }
   // knifeAt: the blade connects at the strike frame, 130 ms after the press, along the ray then
   if (g.knife_due >= 0 && now >= g.knife_due) {

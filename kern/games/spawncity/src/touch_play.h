@@ -122,7 +122,8 @@ class TouchPlay {
   void layout();
   void apply_dom_rects();
   bool no_sticks() const { return lay_.aiming || (lay_.mode == TouchMode::drone && lay_.pad_drone); }
-  TouchBtn* button_at(f32 x, f32 y);
+  /// The button under a finger: its place in buttons_, -1 for none.
+  i32 button_at(f32 x, f32 y) const;
   bool in_circle(f32 cx, f32 cy, f32 r, f32 x, f32 y) const;
   void place_row(std::vector<TouchBtn>& items, f32 x0, f32 bottom, f32 dir, f32 max_w);
   void add(const TouchBtn& b) { buttons_.push_back(b); }

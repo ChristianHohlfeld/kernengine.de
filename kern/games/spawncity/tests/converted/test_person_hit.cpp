@@ -18,10 +18,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -35,11 +35,11 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #define private public
 #define protected public
 enum class BodyPart : u8 { none, legs, torso, head };
-constexpr f32 kHipZ = 0.92, kHeadUp = 0.73, kHeadR = 0.155;
-inline f32 lean(f32 speed) { return std::clamp(speed - 2.5, 0.0, 5.0) * 0.035; }
-inline bool box_entry(Vec3 from, Vec3 seg, Vec3 c, Vec3 ax, Vec3 ay, Vec3 az, Vec3 h, f32& t_out) {
+namespace person_hit { constexpr f32 kHipZ = 0.92, kHeadUp = 0.73, kHeadR = 0.155; }
+namespace person_hit { inline f32 lean(f32 speed) { return std::clamp(speed - 2.5, 0.0, 5.0) * 0.035; } }
+namespace person_hit { inline bool box_entry(Vec3 from, Vec3 seg, Vec3 c, Vec3 ax, Vec3 ay, Vec3 az, Vec3 h, f32& t_out) {
   const Vec3 o = from - c;
-  const f32 po[3] = {dot(o, ax), dot(o, ay), dot(o, az)}, pd[3] = {dot(seg, ax), dot(seg, ay), dot(seg, az)};
+  const f32 po[3] = {converted::wide::dot(o, ax), converted::wide::dot(o, ay), converted::wide::dot(o, az)}, pd[3] = {converted::wide::dot(seg, ax), converted::wide::dot(seg, ay), converted::wide::dot(seg, az)};
   const f32 hh[3] = {h.x, h.y, h.z};
   f32 t0 = 0, t1 = 1;
   for (int a = 0; a < 3; ++a) {
@@ -52,10 +52,10 @@ inline bool box_entry(Vec3 from, Vec3 seg, Vec3 c, Vec3 ax, Vec3 ay, Vec3 az, Ve
   }
   t_out = t0;
   return true;
-}
-inline bool sphere_entry(Vec3 from, Vec3 seg, Vec3 c, f32 r, f32& t_out) {
+} }
+namespace person_hit { inline bool sphere_entry(Vec3 from, Vec3 seg, Vec3 c, f32 r, f32& t_out) {
   const Vec3 o = from - c;
-  const f32 a = dot(seg, seg), b = dot(o, seg), cc = dot(o, o) - r * r;
+  const f32 a = converted::wide::dot(seg, seg), b = converted::wide::dot(o, seg), cc = converted::wide::dot(o, o) - r * r;
   if (a < 1e-9) return false;
   if (cc <= 0) { t_out = 0; return true; }
   const f32 disc = b * b - a * cc;
@@ -64,8 +64,8 @@ inline bool sphere_entry(Vec3 from, Vec3 seg, Vec3 c, f32 r, f32& t_out) {
   if (t > 1) return false;
   t_out = std::fmax(0.0, t);
   return true;
-}
-inline BodyPart hit(Vec3 feet, f32 yaw, f32 speed, Vec3 from, Vec3 seg, f32& t_out, f32 pad = 1.0, f32 scale = 1.0) {
+} }
+namespace person_hit { inline BodyPart hit(Vec3 feet, f32 yaw, f32 speed, Vec3 from, Vec3 seg, f32& t_out, f32 pad = 1.0, f32 scale = 1.0) {
   const f32 cy = kern::math::cos(yaw), sy = kern::math::sin(yaw), l = lean(speed), cl = kern::math::cos(l), sl = kern::math::sin(l);
   const Vec3 fx{cy, sy, 0}, fy{-sy, cy, 0}, up{0, 0, 1};
   // the leaning body frame: up tilts forward
@@ -80,7 +80,7 @@ inline BodyPart hit(Vec3 feet, f32 yaw, f32 speed, Vec3 from, Vec3 seg, f32& t_o
   if (box_entry(from, seg, feet + up * (0.47 * scale), fx, fy, up, Vec3{0.15, 0.2, 0.47} * (pad * scale), t) && t < bt - 1e-5) { bt = t; best = BodyPart::legs; }
   t_out = bt;
   return best;
-}
+} }
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
@@ -103,83 +103,95 @@ SC_TEST(converted_person_hit) {
   {  // lean
     converted::Tally tally("lean");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_person_hit::lean(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_person_hit::person_hit::lean(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const double a0 = draw.number();
+      double a0 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // box_entry
     converted::Tally tally("box_entry");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] Vec3 a4, [[maybe_unused]] Vec3 a5, [[maybe_unused]] Vec3 a6, [[maybe_unused]] double a7) { const auto r = converted::counted([&] { return converted_person_hit::box_entry(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6), a7); }); return Out_box_entry{r, a7}; };
+    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] Vec3 a4, [[maybe_unused]] Vec3 a5, [[maybe_unused]] Vec3 a6, [[maybe_unused]] double a7) { auto r = converted::counted([&] { return converted_person_hit::person_hit::box_entry(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6), a7); }); return Out_box_entry{std::move(r), std::move(a7)}; };
     for (int i = 0; tally.more(i); ++i) {
-      const Vec3 a0 = draw.vector();
-      const Vec3 a1 = draw.vector();
-      const Vec3 a2 = draw.vector();
-      const Vec3 a3 = draw.vector();
-      const Vec3 a4 = draw.vector();
-      const Vec3 a5 = draw.vector();
-      const Vec3 a6 = draw.vector();
-      const double a7 = draw.number();
+      Vec3 a0 = draw.vector();
+      Vec3 a1 = draw.vector();
+      Vec3 a2 = draw.vector();
+      Vec3 a3 = draw.vector();
+      Vec3 a4 = draw.vector();
+      Vec3 a5 = draw.vector();
+      Vec3 a6 = draw.vector();
+      double a7 = draw.number();
+      const std::vector<converted::Value> given = {arg(a7), arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5), arg(a6)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3, a4, a5, a6, a7);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6), std::move(a7));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a7), arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5), arg(a6)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5) + ", " + text(a6) + ", " + text(a7); }, {0, 1});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
   {  // sphere_entry
     converted::Tally tally("sphere_entry");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { const auto r = converted::counted([&] { return converted_person_hit::sphere_entry(std::move(a0), std::move(a1), std::move(a2), std::move(a3), a4); }); return Out_sphere_entry{r, a4}; };
+    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { auto r = converted::counted([&] { return converted_person_hit::person_hit::sphere_entry(std::move(a0), std::move(a1), std::move(a2), std::move(a3), a4); }); return Out_sphere_entry{std::move(r), std::move(a4)}; };
     for (int i = 0; tally.more(i); ++i) {
-      const Vec3 a0 = draw.vector();
-      const Vec3 a1 = draw.vector();
-      const Vec3 a2 = draw.vector();
-      const double a3 = draw.number();
-      const double a4 = draw.number();
+      Vec3 a0 = draw.vector();
+      Vec3 a1 = draw.vector();
+      Vec3 a2 = draw.vector();
+      double a3 = draw.number();
+      double a4 = draw.number();
+      const std::vector<converted::Value> given = {arg(a4), arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3, a4);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a4), arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); }, {0, 1});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
   {  // hit
     converted::Tally tally("hit");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] Vec3 a4, [[maybe_unused]] double a5, [[maybe_unused]] double a6, [[maybe_unused]] double a7) { const auto r = converted::counted([&] { return converted_person_hit::hit(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), a5, std::move(a6), std::move(a7)); }); return Out_hit{r, a5}; };
+    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] Vec3 a4, [[maybe_unused]] double a5, [[maybe_unused]] double a6, [[maybe_unused]] double a7) { auto r = converted::counted([&] { return converted_person_hit::person_hit::hit(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), a5, std::move(a6), std::move(a7)); }); return Out_hit{std::move(r), std::move(a5)}; };
     for (int i = 0; tally.more(i); ++i) {
-      const Vec3 a0 = draw.vector();
-      const double a1 = draw.number();
-      const double a2 = draw.number();
-      const Vec3 a3 = draw.vector();
-      const Vec3 a4 = draw.vector();
-      const double a5 = draw.number();
-      const double a6 = draw.number();
-      const double a7 = draw.number();
+      Vec3 a0 = draw.vector();
+      double a1 = draw.number();
+      double a2 = draw.number();
+      Vec3 a3 = draw.vector();
+      Vec3 a4 = draw.vector();
+      double a5 = draw.number();
+      double a6 = draw.number();
+      double a7 = draw.number();
+      const std::vector<converted::Value> given = {arg(a5), arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a6), arg(a7)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3, a4, a5, a6, a7);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6), std::move(a7));
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a5), arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a6), arg(a7)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5) + ", " + text(a6) + ", " + text(a7); }, {0, 1});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
 }
