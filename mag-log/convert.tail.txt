@@ -1,0 +1,80 @@
+    TouchPlay::look_live (1): written
+    TouchPlay::look_edge (1): written
+    TouchPlay::fires (1): a name for a place - written where it is called
+    TouchPlay::drop_lifted (1): written
+    TouchPlay::clearance (1): written
+    TouchPlay::grenade_drag (1): written
+    TouchPlay::inject (1): written
+    TouchPlay::any (1): written
+    TouchPlay::buttons (1): a name for a place - written where it is called
+    TouchPlay::mode (1): written
+    TouchPlay::no_sticks (1): written
+    TouchPlay::add (1): written
+water_look                      1 /    1 functions        1 /      1 lines
+    WaterLook::name (1): written
+weapons                         2 /    2 functions        5 /      5 lines
+    spec (1): a name for a place - written where it is called
+    blast_factor (4): written
+wire                           28 /   28 functions      141 /    141 lines
+    f32_bytes (1): written
+    put_u8 (1): written
+    put_i8 (4): written
+    put_u16 (4): written
+    put_i16 (4): written
+    put_u32 (4): written
+    put_i32 (4): written
+    put_u64 (4): written
+    put_i64 (4): written
+    put_f32 (4): written
+    put_f64 (4): written
+    put_vec3 (4): written
+    put_quat (4): written
+    put_bytes (4): written
+    Reader::get_u8 (6): written
+    Reader::get_i8 (7): written
+    Reader::get_u16 (7): written
+    Reader::get_i16 (7): written
+    Reader::get_u32 (7): written
+    Reader::get_i32 (7): written
+    Reader::get_u64 (7): written
+    Reader::get_i64 (7): written
+    Reader::get_f32 (7): written
+    Reader::get_f64 (7): written
+    Reader::get_vec3 (7): written
+    Reader::get_quat (7): written
+    Reader::get_bytes (7): written
+    Reader::done (1): written
+world_art                       1 /    1 functions        1 /      1 lines
+    WorldArt::renderer (1): written
+world_marks                     1 /    1 functions        1 /      1 lines
+    Marks::stats (1): a name for a place - written where it is called
+world_traffic                   1 /    1 functions        1 /      1 lines
+    TrafficRules::junctions (1): a name for a place - written where it is called
+
+382 of 423 functions of the program are written as Blueprints (1521 of 2032 lines), and 6 of the engine's headers that they call: 50 Blueprints - 2 of source files, 0 of states, 48 of headers and of shapes
+325 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+    12 (   251)   the state of its object: the struct Game has more than 96 fields
+     3 (   104)   it calls decode_sbus(), which waits
+     2 (    58)   it calls crc16_ccitt(), which waits
+     1 (    23)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no match for call to ‘(const converted_Arondight45_DroneFC_Core::converted_Arondight45_DroneFC_Core()::<lambda(const std::vector<unsigned char>&, long long int&, converted_Arondight45_DroneFC_Core::fc)
+     1 (    16)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: cannot convert ‘std::vector<converted_lamps_cpp::Spot>’ to ‘const std::vector<converted_lamps_cpp::lamps::Field::Spot>&’)
+     1 (    14)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no match for call to ‘(const converted_Arondight45_HardwareSensors::converted_Arondight45_HardwareSensors()::<lambda(const std::vector<unsigned char>&, long long int&, converted_Arondight45_HardwareSe)
+     1 (    10)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no match for call to ‘(const converted_Arondight45_HardwareSensors::converted_Arondight45_HardwareSensors()::<lambda(const std::vector<unsigned char>&, long long int&, long unsigned int&)>) (std::vect)
+     1 (     7)   kill() is defined in another file
+     1 (     5)   it calls encode_navigation_wire(), which waits
+     5 (     5)   input() is defined in another file
+     1 (     4)   it calls CityStream::ground_height(), which waits
+     4 (     4)   put() is defined in another file
+     1 (     3)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no match for call to ‘(const converted_Arondight45_HardwareSensors::converted_Arondight45_HardwareSensors()::<lambda(const std::vector<unsigned char>&, long long int&)>) (std::vector<unsigned char>&, )
+     2 (     2)   find() is defined in another file
+     1 (     1)   height() is defined in another file
+     1 (     1)   reset() is defined in another file
+     1 (     1)   set_mode() is defined in another file
+     1 (     1)   kill_pet() is defined in another file
+     1 (     1)   elevation() is defined in another file
+
+real	5m58,987s
+user	11m26,220s
+sys	0m46,021s
