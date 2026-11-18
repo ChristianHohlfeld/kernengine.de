@@ -1,0 +1,14 @@
+FAIL converted_destruction_cpp
+FAIL converted_rigid_spec
+ok   converted_car
+ok   converted_car_cpp
+ok   converted_city_stream
+ok   converted_common
+ok   converted_destruction
+ok   converted_engine_geo_mesh_data
+ok   converted_engine_math_math
+ok   converted_engine_physics_physics
+ok   converted_mvt
+ok   converted_terrain
+ok   converted_tiles
+--- 11 ok, 2 FAIL, 0 ABBRUCH, 0 LECK, 0 ZEIT, von 13 Tests; cost: 9, note: 4
