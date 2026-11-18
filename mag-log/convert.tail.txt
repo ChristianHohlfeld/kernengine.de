@@ -1,0 +1,80 @@
+    Game::spawn_guard (26): it calls Mat4::translation(), which waits
+    Game::place_world (43): it calls Game::clear_spot(), which waits
+    Game::hide_soldier (4): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: /home/chris/spawncity-jobs/work-probe-153408-10770/converted.h: No such file or directory)
+    Game::show_soldier (9): it calls CityStream::ground_height(), which waits
+    Game::put_down (8): it calls CityStream::ground_height(), which waits
+    Game::spawn_guard_step (34): it calls Mat4::translation(), which waits
+    Game::standing_feet (11): it calls CityStream::ground_height(), which waits
+    Game::toggle_drone (41): gaps_riding() is defined in another file
+    Game::switch_mode (34): it calls Game::toggle_drone(), which waits
+    Game::try_enter (18): gaps_seat_press() is defined in another file
+    Game::exit_vehicle (31): it calls Game::state_of(), which waits
+    Game::eject (14): it calls Game::state_of(), which waits
+    Game::fixed_step (34): it calls Game::spawn_guard_step(), which waits
+    Game::drive_traffic (86): detach() is defined in another file
+    Game::traffic_advance (26): it calls Rng::next(), which waits
+    Game::step_parachute (20): it calls Game::body(), which waits
+    Game::manage_traffic (98): it calls Game::focus_position(), which waits
+    Game::update (87): look_begin() is defined in another file
+    Game::update_camera (149): it calls CityStream::ground_height(), which waits
+    Game::draw_vehicles (27): begin() is defined in another file
+    Game::audio_init (11): init() is defined in another file
+    Game::audio_render (13): ui_render_music() is defined in another file
+    Game::update_sound (38): it calls Settings::get(), which waits
+    Game::hud_json (136): mode_name() of the Blueprint game_cpp is not written
+    Game::command (268): ctl_command() is defined in another file
+game_cpp                        0 /    5 functions        0 /     65 lines
+    car_color (5): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: /home/chris/spawncity-jobs/work-probe-153408-10770/converted.h: No such file or directory)
+    vehicle_actor (37): its test cannot compare it yet (the class Graph is not written)
+    json_escape (9): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: /home/chris/spawncity-jobs/work-probe-153408-10770/converted.h: No such file or directory)
+    mode_name (10): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: /home/chris/spawncity-jobs/work-probe-153408-10770/converted.h: No such file or directory)
+    game (4): the state of the Blueprint Game (its one object is that Blueprint, no value)
+
+63 of 436 functions of the program are written as Blueprints (63 of 3694 lines): 8 Blueprints - 0 of source files, 1 of states, 7 of headers and of shapes
+0 functions of the Blueprints are compared with their source, bit for bit, by the tests in /home/chris/spawncity-jobs/work-probe-153408-10770/probe-test - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+   281 (   983)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: /home/chris/spawncity-jobs/work-probe-153408-10770/converted.h: No such file or directory)
+     3 (   294)   it calls state_intent(), which waits
+     1 (   268)   ctl_command() is defined in another file
+     5 (   216)   it calls CityStream::ground_height(), which waits
+     1 (   136)   mode_name() of the Blueprint game_cpp is not written
+     1 (   115)   ui_equipment_command() is defined in another file
+     1 (   111)   it calls register_node(), which waits
+     1 (    99)   an object of the engine as a local that is not made by a constructor of it
+     1 (    98)   it calls Game::focus_position(), which waits
+     1 (    87)   look_begin() is defined in another file
+     3 (    87)   it calls Settings::get(), which waits
+     1 (    86)   detach() is defined in another file
+     2 (    79)   it calls decode_sbus(), which waits
+     4 (    77)   it calls Mat4::translation(), which waits
+     1 (    70)   it calls Vec4::Vec4(), which waits
+     1 (    47)   it calls MeshData::push(), which waits
+     1 (    46)   gaps_lamps_reset() is defined in another file
+     2 (    45)   it calls Game::state_of(), which waits
+     1 (    43)   it calls Game::clear_spot(), which waits
+     2 (    42)   it calls GpsLive::active(), which waits
+     1 (    41)   gaps_riding() is defined in another file
+     1 (    37)   its test cannot compare it yet (the class Graph is not written)
+     1 (    35)   it calls centered(), which waits
+     2 (    34)   it calls finite(), which waits
+     1 (    34)   it calls Game::toggle_drone(), which waits
+     1 (    34)   it calls Game::spawn_guard_step(), which waits
+     3 (    31)   a call on the Blueprint of the actor Settings, which the level does not have
+     1 (    29)   it calls crc16_ccitt(), which waits
+     1 (    27)   begin() is defined in another file
+     1 (    26)   it calls Rng::next(), which waits
+     1 (    20)   it calls Game::body(), which waits
+     1 (    20)   it calls Game::ui_apply_settings(), which waits
+     1 (    18)   an object of the engine (NodeDef) copied or moved as a whole
+     1 (    18)   gaps_seat_press() is defined in another file
+     1 (    17)   an assignment to CXXMemberCallExpr
+     1 (    17)   it calls Settings::version(), which waits
+     1 (    17)   it calls find_opt(), which waits
+     2 (    15)   it calls Quat::axis_angle(), which waits
+     1 (    14)   it calls read_be_i16(), which waits
+     1 (    13)   ui_render_music() is defined in another file
+
+real	3m56,519s
+user	8m32,785s
+sys	0m33,132s
