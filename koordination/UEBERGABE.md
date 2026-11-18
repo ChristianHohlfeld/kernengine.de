@@ -777,3 +777,22 @@ mag rechnet unabhängig weiter (der volle Lauf `work-voll-162644-5528` seit 17:3
 - Zweiter Neustart des Servers hinter der Sitzung um 22:43 (wie 21:30, jeweils zusammen mit einer Unterbrechung der Antwort): alle fünf Agenten per SendMessage an ihre
   ID fortgesetzt. Ein beim Neustart laufender Auftrag kann seine Startmeldung auf mag verlieren (`work-k-vergleich-224717` erschien als „wartet“ und lieferte doch).
 
+### 16.17 Stand 23:35 – t2 eingemischt, voller Lauf neu, Paket g, Entscheidungen E10–E13
+- **work-zusammen = 5a445af8** = 946303c2 + Merge work-d 50832229 (Array-Parameter fester Länge, aec5ded8) + Merge work-t2 19b96a95 (b41427f5) + Merge work-k
+  fa3dc97d. **Voller Lauf: `work-zusammen-voll-232247-24031`, Start 23:23:02** (der von 23:13 auf aec5ded8 lief 8 min und wurde abgebrochen: ohne t2 hätte er die
+  Game-Dateien nicht gezeigt). Budget der Warteschlange jetzt über die Datei `cap` im Zweig mag/auftrag (84).
+- **t2 ist beendet** (Lauf zu Ende): rund 100 der 118 wartenden Funktionen haben ihren Test (Namensraum je Quelldatei, enum ohne Namen, Konstanten-Anweisung nur
+  einmal, take(Span), scan_c). Sein Vergleich über sieben Game-Quelltexte (`work-t2-vergleich-223555-30482`): 50 ok / 7 FAIL / 2 ABBRUCH – echte Abweichungen, die
+  vorher kein Test erreichte. Reste (lamps Field::Spot ×3, Graph, Beleg scan_c) → t1.
+- **Agenten (fünf):** t1 (Testrahmen/Test-Schreiber; jetzt: Suite auf clang), k (Regeln, Nicht-Game-Dateien), **g** (neu 23:27: Regeln, Game-Dateien – PAKET3_g.md,
+  Zweig work-g1), d (Nachfolger 3: Stellvertreter-Befunde, dann Platz der Engine), p (Nachfolger: text_format-Fix, Leistung).
+- **E10 (p):** Wert an einem Eingang „Liste fester Länge“ als `Fixed<T, N>{…}` (wie bei Feldern). **E11 (t2):** `-Wno-missing-field-initializers` im Test ist keine
+  Toleranz. **E12 (t2):** ein `logic::Graph` in einem Ergebnis wird über seine Serialisierung verglichen; bis dahin warten vehicle_actor und audio_init ehrlich.
+- **E13 – ändert den Beweis und ist darum für Chris sichtbar:** Die ganze Spiel-Suite baut mit **clang**, dem Compiler des Spiels (bisher GCC). Anlass: zwei Stellen, an
+  denen C++ die Reihenfolge von Argumenten offen lässt (destruction.cpp:191/194, game.h:170) – GCC rechnet von rechts, clang von links wie das Original in JS und
+  wie der Blueprint. Verglichen wird damit gegen die Bedeutung, die das Spiel wirklich hat; keine Absenkung je Stelle, kein Differenztest, der unter GCC nicht grün
+  sein kann. Der Absenkungs-Teil von E9 ist damit überholt (k nimmt 90ecf01f zurück). Offen: ob clang-18 mit ASan/UBSan auf mag linkt (t1 klärt es als Erstes;
+  auf mag wird nichts installiert) – wenn nicht, bleibt GCC und E9 gilt wieder (Absenkung + Differenztest unter clang als eigenes Programm).
+- **Nächste Schritte:** Zwischenstand des vollen Laufs (~23:50: convert rc, Zahlen; `grundlage` nachführen), Spiel-Suite (~00:20) → Liste (t1); Belegtes einmischen
+  (g c4d4544b, p 25a7318f text_format → danach k 12e3da24 zurück, d Stellvertreter-Block, t1 clang); nächster voller Lauf mit clang.
+

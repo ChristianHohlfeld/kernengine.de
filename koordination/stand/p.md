@@ -1,10 +1,25 @@
 # Stand Paket p (Leistung der exportierten Klasse) – 18.11.2026, 23:05
 
-Zweig work-p, letzter Commit 8a028f9c (gepusht).
+Zweig work-p, letzter Commit 6c7b9c5f (gepusht).
 - BEWIESEN: E2.1 Schritt 1 (bis 2416329): mag `work-p-engine-221509-17831` engine rc=0 (197 ok, blueprint_native_test 55 Blueprints/14102 Aufrufe,
   game_native_test ok). Probe `work-p-probe-221512-17868` (alle Quelltexte, vor der 22:25-Regel) abgebrochen – überholt durch den Kopf.
-- LÄUFT: `work-p-vergleich-230429-15316` (Kopf 63467c0b: E2.1, E2.2, E2.1 Schritt 2, Fix text_format) über qr_code, settings, nostr, controls,
-  combat_rules. Danach `engine` auf dem Kopf. CI: run 44407872390 (work-p, 63467c0b).
+- LÄUFT: `work-p-vergleich-230429-15316` (gestartet 23:14 auf 8a028f9c: E2.1, E2.2, E2.1 Schritt 2, Fix text_format, E3-A) über qr_code, settings,
+  nostr, controls, combat_rules. NICHT darin: E10 + Leser-Fix (Commit vor 6c7b9c5f). Danach `engine` auf dem Kopf. CI: run 44407872390 (work-p, 63467c0b).
+
+## Beleg vergleich `work-p-vergleich-230429-15316` (8a028f9c; 23:29)
+convert rc=0, bau rc=0, alle rc=0: **12 ok, 0 FAIL, 0 ABBRUCH, 0 LECK, 0 ZEIT von 12 – in beiden Durchgängen (Stellvertreter und SC_ENGINE=real)**,
+alle-abweichungen.txt und alle-real-abweichungen.txt leer. Tests: blueprint_call, combat_rules_cpp, common, controls, controls_cpp, engine_math_math,
+engine_physics_physics, nostr_cpp, qr_code, qr_code_cpp, settings, settings_cpp. → E2.1, E2.2, E2.1 Schritt 2 Bit für Bit gleich.
+E3-A Wirkung: cost-Zeilen controls_cpp 44 → 10, combat_rules_cpp 69 → 11 (vorher: $S/t1/suite203000_cost_note.txt). Was bleibt, sind Aufrufe mit
+Struktur-Argumenten/-Ergebnissen (z. B. WorldLook_add: controls_Look als logic::Value – Felder im Vektor des Value), nicht der Aufrufweg.
+Fix text_format: hier NICHT belegt – der Stand enthält ks Umgehung 12e3da24 (Text in eigener Variable); belegt lokal mit ASan (alter Header UAF,
+neuer sauber) und durch den Engine-Fall format_text_of_value. Laufend: `work-p-engine-232958-27563` (engine auf 6c7b9c5f).
+
+## E10 (Fixed-Literal am Eingang, genehmigt 23:2x) + Leser-Fix E2.1 – gebaut (Commit vor 6c7b9c5f), lokal geprüft, UNBEWIESEN
+- PinDef::count (typed_pin, Funktions-Pins); Schreiber literal_of mit TypeRef → `struct_make<fc_Filters>(Fixed<fc_PT1, 3>{…}, …)`; Leser lehnt falsche Länge ab.
+- **Fehler in E2.1 gefunden und behoben:** Leser zählte bei `[](Int …) -> Int` alle beim Lesen der Argumente entstandenen Drähte – ein Argument
+  `In[kern::to<Int>(…)]` macht eigene → to_cpp-Text wurde abgelehnt (Arondight45_DroneFC_Core). Jetzt nur Drähte in die Formel. Engine-Fall formula_whole_indexed.
+- Beleg offen: vergleich über src/firmware?… (Arondight45: cost-Zeilen Runtime_reset/new) + engine auf dem Kopf.
 
 ## E3-A Aufrufweg ohne std::vector – gebaut 2b?/8a028f9c, UNBEWIESEN
 - func_call_on: std::array für Argumente/Ergebnisse; Runtime::call_on(span,span), call_on_into, Instance::call_into/call_class; logic::Results
@@ -192,7 +207,7 @@ Schwelle 1,5: das Rauschen dieser Maschine (geteilt) lag bei unveränderten Fäl
 lamps_near 2,24/1,65/3,02 bei gleichem Code) – mit 1,0 wäre der Test rot ohne Grund. Vorschlag CI: zwei Läufe, rot nur wenn beide über 1,5; je Fall eine
 Liste „bekannt über der Schwelle, mit Ursache“ bis E2 entschieden ist (heute 13 Fälle). Läuft ohne Engine (nur Klassen + musl), ~1 min Bau.
 
-## ENTSCHEIDUNG NÖTIG (E7) – Literal einer Liste fester Länge an einem Eingang (Befund k, E3-C/Arondight45_*), 23:25
+## (entschieden: E10 = JA, 23:2x) E7 – Literal einer Liste fester Länge an einem Eingang (Befund k, E3-C/Arondight45_*), 23:25
 Gelesen (Leser+to_cpp über Arondight45_DroneFC_Core aus work-zusammen-voll-203000-750): Feld-Vorgaben und Struktur-Literale schreibt to_cpp schon als
 `Fixed<fc_PT1, 3>{…}` (literal mit TypeRef). Die Anforderungen kommen von einem **Wert an einem Eingang**: `self.filters_ = struct_make<fc_Filters>(List<fc_PT1>{…}, List<fc_PT1>{…}, …)`
 (Runtime_reset, Z. 543/632) – der Schreiber schreibt den Wert eines Pins mit `literal(v, of, g)` ohne die Länge des Felds; `List<…>{…}` ist ein std::vector,

@@ -1,4 +1,15 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 23:35 **Entscheidung E13 – die ganze Spiel-Suite baut mit clang, dem Compiler des Spiels (ersetzt den Absenkungs-Teil von E9).** g fand die zweite Stelle
+  derselben Art (game.h:170 `read_body(world_->physics(), body(a))`: GCC ruft actor_body zuerst, clang und der Blueprint physics – eject 65/65, state_of 91/91).
+  Die Bedeutung der Quelle ist die, die der Compiler des Spiels ihr gibt (emscripten ist clang) – also vergleicht der Test gegen genau den, statt je Stelle zu
+  senken. t1 stellt run_tests.sh um (cxx = clang nach der Suche des Konverters; fehlt clang, schlägt der Lauf fehl; Compiler im Cache-Schlüssel; CI). Erste
+  Klärung: linkt clang-18 mit ASan/UBSan auf mag. Die Absenkung von destruction.cpp (k, 90ecf01f) wird nicht gemergt und zurückgenommen, sobald ein Vergleich
+  unter clang collapse/fracture ohne sie gleich zeigt. Beleg des Grundsatzes: Kleinstfall von k (clang alt = neu, g++ alt ≠ neu).
+  · g (23:27 gestartet): c4d4544b – eine for-Grenze, die die Engine fragt (`c < server_->max_clients()`), wird je Runde gefragt (Beleg läuft).
+    **BEFUNDE FÜR t1 (von g):** Session-Kopie ruft am Ende client.release (300/300 bei Session_*); Temporär `kern::LightPool(n, 96)` ohne light_pool.make im
+    Stellvertreter (look_apply_tier); Abbruch game_look: gezogener Index außerhalb eines Arrays fester Länge (`kTier[t]`).
+    **BEFUNDE FÜR d (von g, t2):** matrix_of – Antwort des Stellvertreters für `f32 m[16]` hat 0–2 statt 16 Einträge; `push_incoming(from, const u8* data, int bytes)` –
+    die Zahl neben dem Zeiger wird am Namen erkannt (Namensliste, greift bei `bytes` nicht): die Zahl sagt es künftig in ihrem Typ (Count<Per>); set_pcm (t2).
 - 23:25 **work-zusammen = 5a445af8** (+ t2 19b96a95: rund 100 der 118 wartenden Funktionen bekommen ihren Test; + k fa3dc97d: u64-Schlüssel einer Map).
   **Der volle Lauf ist neu abgelegt: `work-zusammen-voll-232247-24031`** (der von 23:13 lief 8 min und ist abgebrochen – ohne t2 hätte er die Game-Dateien nicht gezeigt).
   · t2 ist beendet (Lauf zu Ende). Sein Vergleich `work-t2-vergleich-223555-30482` über sieben Game-Quelltexte: convert rc=0, bau rc=0, 50 ok / 7 FAIL / 2 ABBRUCH –
