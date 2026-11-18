@@ -157,7 +157,7 @@ bool c6(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
   ev::take<ev::List<ev::Float>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Int>(o, in, 1, a1);
-  if (ev::room(a1) > a0.size()) { o.error = "the list positions has fewer entries than vertex_count says"; return false; }
+  if (ev::numbers(a1) > a0.size()) { o.error = "the list positions has fewer entries than vertex_count says"; return false; }
   decltype(auto) r = kern::bounding_sphere(a0.empty() ? nullptr : a0.data(), std::move(a1));
   ev::give<ev::Struct<S_Sphere>>(o, out, 0, r);
   return true;
@@ -169,7 +169,7 @@ bool c7(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
   ev::take<ev::List<ev::Float>>(o, in, 0, a0);
   auto a1 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Int>(o, in, 1, a1);
-  if (ev::room(a1) > a0.size()) { o.error = "the list transforms has fewer entries than instance_count says"; return false; }
+  if (ev::numbers(a1) > a0.size()) { o.error = "the list transforms has fewer entries than instance_count says"; return false; }
   decltype(auto) r = kern::mirror_state(a0.empty() ? nullptr : a0.data(), std::move(a1));
   ev::give<ev::Int>(o, out, 0, r);
   return true;
@@ -191,7 +191,7 @@ bool c9(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
   ev::take<ev::List<ev::Float>>(o, in, 1, a1);
   auto a2 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Int>(o, in, 2, a2);
-  if (ev::room(a2) > a1.size()) { o.error = "the list transforms has fewer entries than instance_count says"; return false; }
+  if (ev::numbers(a2) > a1.size()) { o.error = "the list transforms has fewer entries than instance_count says"; return false; }
   decltype(auto) r = kern::instanced_bounds(a0, a1.empty() ? nullptr : a1.data(), std::move(a2));
   ev::give<ev::Struct<S_Sphere>>(o, out, 0, r);
   return true;
@@ -776,7 +776,7 @@ bool c62(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   ev::take<ev::List<ev::Float>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<int>>();
   ev::take<ev::Int>(o, in, 3, a2);
-  if (ev::room(a2) > a1.size()) { o.error = "the list values has fewer entries than count says"; return false; }
+  if (ev::numbers(a2) > a1.size()) { o.error = "the list values has fewer entries than count says"; return false; }
   self->set_vec4_array(std::move(a0), a1.empty() ? nullptr : a1.data(), std::move(a2));
   return true;
 }
@@ -791,7 +791,7 @@ bool c63(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   ev::take<ev::List<ev::Float>>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<int>>();
   ev::take<ev::Int>(o, in, 3, a2);
-  if (ev::room(a2) > a1.size()) { o.error = "the list values has fewer entries than count says"; return false; }
+  if (ev::numbers(a2) > a1.size()) { o.error = "the list values has fewer entries than count says"; return false; }
   self->set_vec3_array(std::move(a0), a1.empty() ? nullptr : a1.data(), std::move(a2));
   return true;
 }
@@ -816,7 +816,7 @@ bool c65(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   ev::take<ev::List<ev::Float>>(o, in, 1, a1);
   auto a2 = ev::blank<std::remove_cvref_t<int>>();
   ev::take<ev::Int>(o, in, 2, a2);
-  if (ev::room(a2) > a1.size()) { o.error = "the list values has fewer entries than count says"; return false; }
+  if (ev::numbers(a2) > a1.size()) { o.error = "the list values has fewer entries than count says"; return false; }
   kern::UniformCache::set_mat4_array(std::move(a0), a1.empty() ? nullptr : a1.data(), std::move(a2));
   return true;
 }

@@ -6729,7 +6729,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::size_t>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, length, kern_a1);
       decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_BuildingOptions>, std::remove_cvref_t<kern::BuildingOptions const&>>(*kern_o, options);
-      if (::kern::logic::engine_values::room(kern_a1) > kern_a0.size()) { kern_o->error = "the list stream has fewer entries than length says"; { this->kern_engine_failed("engine.building_builder.begin"); return; } }
+      if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list stream has fewer entries than length says"; { this->kern_engine_failed("engine.building_builder.begin"); return; } }
       decltype(auto) kern_r = kern_self->begin(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1), kern_a2);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
@@ -6745,7 +6745,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::size_t>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, length, kern_a1);
       decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_BuildingOptions>, std::remove_cvref_t<kern::BuildingOptions const&>>(*kern_o, options);
-      if (::kern::logic::engine_values::room(kern_a1) > kern_a0.size()) { kern_o->error = "the list stream has fewer entries than length says"; { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.building_builder.begin"); return; } }
+      if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list stream has fewer entries than length says"; { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.building_builder.begin"); return; } }
       decltype(auto) kern_r = kern_self->begin(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1), kern_a2);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
@@ -6910,7 +6910,7 @@ template <class Core> struct EngineNodesOf : Core {
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Vector>, std::vector<kern::Vec2>>(*kern_o, points);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, count, kern_a1);
-      if (::kern::logic::engine_values::room(kern_a1) > kern_a0.size()) { kern_o->error = "the list points has fewer entries than count says"; { this->kern_engine_failed("engine.footprint_stream.ring"); return; } }
+      if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list points has fewer entries than count says"; { this->kern_engine_failed("engine.footprint_stream.ring"); return; } }
       kern_self->ring(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1));
       return;
     }
@@ -6966,7 +6966,7 @@ template <class Core> struct EngineNodesOf : Core {
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<double>>(*kern_o, xy);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, count, kern_a1);
-      if (::kern::logic::engine_values::room(kern_a1) > kern_a0.size()) { kern_o->error = "the list xy has fewer entries than count says"; { this->kern_engine_failed("engine.ring_area"); return Float{}; } }
+      if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list xy has fewer entries than count says"; { this->kern_engine_failed("engine.ring_area"); return Float{}; } }
       decltype(auto) kern_r = kern::ring_area(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::template make<Float>(*kern_o, kern_r);
     }
@@ -6978,15 +6978,15 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Earcut>(*kern_o, static_cast<::kern::i64>(earcut), "earcut");
       if (!kern_self) { this->kern_engine_failed("engine.earcut.triangulate"); return; }
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<double>>(*kern_o, xy);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<2u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, vertex_count, kern_a1);
       decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned int>>(*kern_o, hole_starts);
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, hole_count, kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<unsigned int, std::allocator<unsigned int> >&>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, out, kern_a4);
-      if (::kern::logic::engine_values::room(kern_a1) > kern_a0.size()) { kern_o->error = "the list xy has fewer entries than vertex_count says"; { this->kern_engine_failed("engine.earcut.triangulate"); return; } }
-      if (::kern::logic::engine_values::room(kern_a3) > kern_a2.size()) { kern_o->error = "the list hole_starts has fewer entries than hole_count says"; { this->kern_engine_failed("engine.earcut.triangulate"); return; } }
+      if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list xy has fewer entries than vertex_count says"; { this->kern_engine_failed("engine.earcut.triangulate"); return; } }
+      if (::kern::logic::engine_values::numbers(kern_a3) > kern_a2.size()) { kern_o->error = "the list hole_starts has fewer entries than hole_count says"; { this->kern_engine_failed("engine.earcut.triangulate"); return; } }
       kern_self->triangulate(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1), kern_a2.empty() ? nullptr : kern_a2.data(), std::move(kern_a3), kern_a4);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::pass(*kern_o, kern_a4);
       return;
@@ -6999,15 +6999,15 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Earcut>(*kern_o, static_cast<::kern::i64>(earcut), "earcut");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.out); this->kern_engine_failed("engine.earcut.triangulate"); return; }
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<double>>(*kern_o, xy);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<2u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, vertex_count, kern_a1);
       decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned int>>(*kern_o, hole_starts);
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, hole_count, kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<unsigned int, std::allocator<unsigned int> >&>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, out, kern_a4);
-      if (::kern::logic::engine_values::room(kern_a1) > kern_a0.size()) { kern_o->error = "the list xy has fewer entries than vertex_count says"; { ::kern::logic::engine_values::none(kern_n.out); this->kern_engine_failed("engine.earcut.triangulate"); return; } }
-      if (::kern::logic::engine_values::room(kern_a3) > kern_a2.size()) { kern_o->error = "the list hole_starts has fewer entries than hole_count says"; { ::kern::logic::engine_values::none(kern_n.out); this->kern_engine_failed("engine.earcut.triangulate"); return; } }
+      if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list xy has fewer entries than vertex_count says"; { ::kern::logic::engine_values::none(kern_n.out); this->kern_engine_failed("engine.earcut.triangulate"); return; } }
+      if (::kern::logic::engine_values::numbers(kern_a3) > kern_a2.size()) { kern_o->error = "the list hole_starts has fewer entries than hole_count says"; { ::kern::logic::engine_values::none(kern_n.out); this->kern_engine_failed("engine.earcut.triangulate"); return; } }
       kern_self->triangulate(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1), kern_a2.empty() ? nullptr : kern_a2.data(), std::move(kern_a3), kern_a4);
       kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a4);
       return;
@@ -7020,7 +7020,7 @@ template <class Core> struct EngineNodesOf : Core {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<double>>(*kern_o, xy);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<2u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, vertex_count, kern_a1);
       decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned int>>(*kern_o, hole_starts);
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
@@ -7028,9 +7028,9 @@ template <class Core> struct EngineNodesOf : Core {
       decltype(auto) kern_a4 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned int>>(*kern_o, triangles);
       auto kern_a5 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, index_count, kern_a5);
-      if (::kern::logic::engine_values::room(kern_a1) > kern_a0.size()) { kern_o->error = "the list xy has fewer entries than vertex_count says"; { this->kern_engine_failed("engine.earcut.deviation"); return Float{}; } }
-      if (::kern::logic::engine_values::room(kern_a3) > kern_a2.size()) { kern_o->error = "the list hole_starts has fewer entries than hole_count says"; { this->kern_engine_failed("engine.earcut.deviation"); return Float{}; } }
-      if (::kern::logic::engine_values::room(kern_a5) > kern_a4.size()) { kern_o->error = "the list triangles has fewer entries than index_count says"; { this->kern_engine_failed("engine.earcut.deviation"); return Float{}; } }
+      if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list xy has fewer entries than vertex_count says"; { this->kern_engine_failed("engine.earcut.deviation"); return Float{}; } }
+      if (::kern::logic::engine_values::numbers(kern_a3) > kern_a2.size()) { kern_o->error = "the list hole_starts has fewer entries than hole_count says"; { this->kern_engine_failed("engine.earcut.deviation"); return Float{}; } }
+      if (::kern::logic::engine_values::numbers(kern_a5) > kern_a4.size()) { kern_o->error = "the list triangles has fewer entries than index_count says"; { this->kern_engine_failed("engine.earcut.deviation"); return Float{}; } }
       decltype(auto) kern_r = kern::Earcut::deviation(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1), kern_a2.empty() ? nullptr : kern_a2.data(), std::move(kern_a3), kern_a4.empty() ? nullptr : kern_a4.data(), std::move(kern_a5));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::template make<Float>(*kern_o, kern_r);
     }
@@ -7316,7 +7316,7 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_a2) { this->kern_engine_failed("engine.road_builder.begin"); return; }
       kern::HeightSampler* const kern_a3 = ::kern::logic::engine_values::object_of<kern::HeightSampler>(*kern_o, static_cast<::kern::i64>(heights), "heights");
       if (!kern_a3) { this->kern_engine_failed("engine.road_builder.begin"); return; }
-      if (::kern::logic::engine_values::room(kern_a1) > kern_a0.size()) { kern_o->error = "the list stream has fewer entries than length says"; { this->kern_engine_failed("engine.road_builder.begin"); return; } }
+      if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list stream has fewer entries than length says"; { this->kern_engine_failed("engine.road_builder.begin"); return; } }
       decltype(auto) kern_r = kern_self->begin(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1), *kern_a2, *kern_a3);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
@@ -7335,7 +7335,7 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_a2) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.road_builder.begin"); return; }
       kern::HeightSampler* const kern_a3 = ::kern::logic::engine_values::object_of<kern::HeightSampler>(*kern_o, static_cast<::kern::i64>(heights), "heights");
       if (!kern_a3) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.road_builder.begin"); return; }
-      if (::kern::logic::engine_values::room(kern_a1) > kern_a0.size()) { kern_o->error = "the list stream has fewer entries than length says"; { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.road_builder.begin"); return; } }
+      if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list stream has fewer entries than length says"; { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.road_builder.begin"); return; } }
       decltype(auto) kern_r = kern_self->begin(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1), *kern_a2, *kern_a3);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
@@ -7449,7 +7449,7 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, surface_color, kern_a4);
       auto kern_a5 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, marking_color, kern_a5);
-      if (::kern::logic::engine_values::room(kern_a1) > kern_a0.size()) { kern_o->error = "the list points has fewer entries than count says"; { this->kern_engine_failed("engine.road_stream.road"); return; } }
+      if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list points has fewer entries than count says"; { this->kern_engine_failed("engine.road_stream.road"); return; } }
       kern_self->road(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1), std::move(kern_a2), std::move(kern_a3), std::move(kern_a4), std::move(kern_a5));
       return;
     }
@@ -7609,7 +7609,7 @@ template <class Core> struct EngineNodesOf : Core {
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, positions);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, vertex_count, kern_a1);
-      if (::kern::logic::engine_values::room(kern_a1) > kern_a0.size()) { kern_o->error = "the list positions has fewer entries than vertex_count says"; { this->kern_engine_failed("engine.bounding_sphere"); return kern_G(*kern_o); } }
+      if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list positions has fewer entries than vertex_count says"; { this->kern_engine_failed("engine.bounding_sphere"); return kern_G(*kern_o); } }
       decltype(auto) kern_r = kern::bounding_sphere(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1));
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
@@ -7622,7 +7622,7 @@ template <class Core> struct EngineNodesOf : Core {
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, transforms);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, instance_count, kern_a1);
-      if (::kern::logic::engine_values::room(kern_a1) > kern_a0.size()) { kern_o->error = "the list transforms has fewer entries than instance_count says"; { this->kern_engine_failed("engine.mirror_state"); return Int{}; } }
+      if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list transforms has fewer entries than instance_count says"; { this->kern_engine_failed("engine.mirror_state"); return Int{}; } }
       decltype(auto) kern_r = kern::mirror_state(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<Int>(*kern_o, kern_r);
     }
@@ -7649,7 +7649,7 @@ template <class Core> struct EngineNodesOf : Core {
       decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, transforms);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, instance_count, kern_a2);
-      if (::kern::logic::engine_values::room(kern_a2) > kern_a1.size()) { kern_o->error = "the list transforms has fewer entries than instance_count says"; { this->kern_engine_failed("engine.instanced_bounds"); return kern_G(*kern_o); } }
+      if (::kern::logic::engine_values::numbers(kern_a2) > kern_a1.size()) { kern_o->error = "the list transforms has fewer entries than instance_count says"; { this->kern_engine_failed("engine.instanced_bounds"); return kern_G(*kern_o); } }
       decltype(auto) kern_r = kern::instanced_bounds(kern_a0, kern_a1.empty() ? nullptr : kern_a1.data(), std::move(kern_a2));
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
@@ -8536,7 +8536,7 @@ template <class Core> struct EngineNodesOf : Core {
       decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, values);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, count, kern_a2);
-      if (::kern::logic::engine_values::room(kern_a2) > kern_a1.size()) { kern_o->error = "the list values has fewer entries than count says"; { this->kern_engine_failed("engine.uniform_cache.set_vec4_array"); return; } }
+      if (::kern::logic::engine_values::numbers(kern_a2) > kern_a1.size()) { kern_o->error = "the list values has fewer entries than count says"; { this->kern_engine_failed("engine.uniform_cache.set_vec4_array"); return; } }
       kern_self->set_vec4_array(std::move(kern_a0), kern_a1.empty() ? nullptr : kern_a1.data(), std::move(kern_a2));
       return;
     }
@@ -8552,7 +8552,7 @@ template <class Core> struct EngineNodesOf : Core {
       decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, values);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, count, kern_a2);
-      if (::kern::logic::engine_values::room(kern_a2) > kern_a1.size()) { kern_o->error = "the list values has fewer entries than count says"; { this->kern_engine_failed("engine.uniform_cache.set_vec3_array"); return; } }
+      if (::kern::logic::engine_values::numbers(kern_a2) > kern_a1.size()) { kern_o->error = "the list values has fewer entries than count says"; { this->kern_engine_failed("engine.uniform_cache.set_vec3_array"); return; } }
       kern_self->set_vec3_array(std::move(kern_a0), kern_a1.empty() ? nullptr : kern_a1.data(), std::move(kern_a2));
       return;
     }
@@ -8580,7 +8580,7 @@ template <class Core> struct EngineNodesOf : Core {
       decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, values);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, count, kern_a2);
-      if (::kern::logic::engine_values::room(kern_a2) > kern_a1.size()) { kern_o->error = "the list values has fewer entries than count says"; { this->kern_engine_failed("engine.uniform_cache.set_mat4_array"); return; } }
+      if (::kern::logic::engine_values::numbers(kern_a2) > kern_a1.size()) { kern_o->error = "the list values has fewer entries than count says"; { this->kern_engine_failed("engine.uniform_cache.set_mat4_array"); return; } }
       kern::UniformCache::set_mat4_array(std::move(kern_a0), kern_a1.empty() ? nullptr : kern_a1.data(), std::move(kern_a2));
       return;
     }
@@ -13257,8 +13257,8 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, index_count, kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, leaf_size, kern_a4);
-      if (::kern::logic::engine_values::room(kern_a1) > kern_a0.size()) { kern_o->error = "the list positions has fewer entries than vertex_count says"; { this->kern_engine_failed("engine.bvh.build"); return; } }
-      if (::kern::logic::engine_values::room(kern_a3) > kern_a2.size()) { kern_o->error = "the list indices has fewer entries than index_count says"; { this->kern_engine_failed("engine.bvh.build"); return; } }
+      if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list positions has fewer entries than vertex_count says"; { this->kern_engine_failed("engine.bvh.build"); return; } }
+      if (::kern::logic::engine_values::numbers(kern_a3) > kern_a2.size()) { kern_o->error = "the list indices has fewer entries than index_count says"; { this->kern_engine_failed("engine.bvh.build"); return; } }
       kern_self->build(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1), kern_a2.empty() ? nullptr : kern_a2.data(), std::move(kern_a3), std::move(kern_a4));
       return;
     }
