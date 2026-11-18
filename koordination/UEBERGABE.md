@@ -581,7 +581,8 @@ dem Paket-Zweig). CI-Lauf `44341582015` (work `90b5ab8`): determinism und native
 | **f2** | ZUERST test_main.cpp:4796 (687b163 übersetzt nicht), Lists Equal für Strukturen in jeder Stufe bewiesen, Proben auswerten, Differenztests grün | wie f1 |
 Bewusst **nicht** gestartet: **c** (Entwurf bestätigt, baut nach d – engine_api.py), **s5** (wartet auf p), **r** (bei der CLI auf mag; `mag/differenztest`
 zuletzt 3c536af, 17:00, noch kein BERICHT.md). Die agentIds dieser Sitzung stehen in `/home/claude/agenten.txt` (nicht im Repo).
-Kontingent: Chris um 17:38 um die Prozentzahl gebeten (jetzt und nach einer Stunde); bei ~8 %/h zurück auf d, p, t1, t2, k.
+Kontingent: 17:08 → 31 %, **17:46 → 32 %** (Chris). Das Einlesen des Koordinators und der Start der neun Agenten haben also etwa einen Punkt gekostet; die
+Rate mit neun laufenden Agenten zeigt erst die nächste Zahl (erbeten für ~18:45). Regel bleibt: bei ~8 %/h zurück auf d, p, t1, t2, k.
 
 ### 16.5 Was der Koordinator als Nächstes tut (Reihenfolge)
 1. Ergebnis von `work-voll-162644-5528` abwarten → Summenzeilen, `suite`/`engine` rc, `cost:`-Zeilen → Commit 1 nach `work`, pushen, CI (Schritt 1 fertig); die neuen
