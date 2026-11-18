@@ -971,6 +971,64 @@ void take(std::unique_ptr<T>& to, const Value& v) {
 template <class T> void take(std::vector<T>& to, const Value& v);
 /// A view of a list the source holds (kern::Span - what Renderer::meshes() gives): of the list, kept for it
 /// (as a text the source holds by a view, see take of a std::string_view).
+/// sscanf of the source, its places the test's (a float the test holds as a double or a Num32): each value is
+/// read as the C type its conversion says (%f: float, %lf: double, %llu: unsigned long long ...) and then given
+/// to its place - what the source reads, as many as it reads (EOF before the first, as sscanf).
+template <class A> int scan_one(const char*& p, const std::string& head, char conv, const std::string& len, A* out) {
+  int used = 0, r = 0;
+  const std::string f = head + "%n";
+  auto into = [&](auto tmp) {
+    r = std::sscanf(p, f.c_str(), &tmp, &used);
+    if constexpr (std::is_arithmetic_v<A> || std::is_same_v<A, wide::Num32>) { if (r == 1) *out = static_cast<A>(tmp); }
+  };
+  if (conv == 's' || conv == 'c' || conv == '[') {
+    if constexpr (std::is_same_v<A, char>) r = std::sscanf(p, f.c_str(), out, &used);
+  } else if (conv == 'f' || conv == 'e' || conv == 'g' || conv == 'a') {
+    if (len == "l") into(double{}); else if (len == "L") into((long double){}); else into(float{});
+  } else if (conv == 'd' || conv == 'i') {
+    if (len == "hh") into((signed char){}); else if (len == "h") into(short{}); else if (len == "l") into(long{}); else if (len == "ll") into((long long){}); else into(int{});
+  } else {
+    if (len == "hh") into((unsigned char){}); else if (len == "h") into((unsigned short){}); else if (len == "l") into((unsigned long){}); else if (len == "ll") into((unsigned long long){}); else into(unsigned{});
+  }
+  if (r == 1) p += used;
+  return r;
+}
+template <class... A> int scan_c(const char* s, const char* fmt, A*... out) {
+  // the format, one piece per value: what stands before its conversion (text, %%, %*...) and the conversion
+  std::vector<std::string> heads, lens;
+  std::vector<char> convs;
+  std::string head;
+  for (const char* c = fmt; *c;) {
+    if (*c != '%') { head += *c++; continue; }
+    const char* at = c++;
+    if (*c == '%') { head += "%%"; ++c; continue; }
+    const bool skip = *c == '*';
+    if (skip) ++c;
+    while (*c >= '0' && *c <= '9') ++c;
+    std::string len;
+    while (*c == 'h' || *c == 'l' || *c == 'L' || *c == 'j' || *c == 'z' || *c == 't') len += *c++;
+    if (*c == '[') { ++c; if (*c == ']') ++c; while (*c && *c != ']') ++c; }
+    const char conv = *c;
+    if (*c) ++c;
+    head.append(at, c);
+    if (skip) continue;
+    heads.push_back(head), lens.push_back(len), convs.push_back(conv == ']' ? '[' : conv);
+    head.clear();
+  }
+  const char* p = s;
+  int count = 0;
+  std::size_t i = 0;
+  bool going = true;
+  auto step = [&](auto* o) {
+    if (!going || i >= heads.size()) { going = false; return; }
+    const int r = scan_one(p, heads[i], convs[i], lens[i], o);
+    ++i;
+    if (r == 1) ++count;
+    else { going = false; if (count == 0 && r == EOF) count = EOF; }
+  };
+  (step(out), ...);
+  return count;
+}
 template <class T> void take(kern::Span<T>& to, const Value& v) {
   static std::deque<std::vector<std::remove_const_t<T>>> kept;
   kept.emplace_back();

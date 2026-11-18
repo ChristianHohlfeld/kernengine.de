@@ -9974,6 +9974,9 @@ class TestWriter:
     def widen_code(text):
         text = re.sub(r"(?<![\w.])((?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?)[fF]\b", lambda m: m.group(1) if re.search(r"[.eE]", m.group(1)) else m.group(1) + ".0", text)
         text = re.sub(r"\bfloat\b", "double", text)
+        # (what sscanf reads into a place that is now the test's number - a float as double, a component as
+        # Num32: as the C type its conversion says, then given to the place - converted::scan_c)
+        text = re.sub(r"(?<![\w:.>])(?:::)?(?:std::)?sscanf\s*\(", "converted::scan_c(", text)
         text = re.sub(r"\b(?:std::)?(u?)int64_t\b", lambda m: "u64" if m.group(1) else "i64", text)
         text = re.sub(r"\b(?:" + ENGINE + r"::)?dm::(" + "|".join(WIDE_MATH) + r")\s*\(", lambda m: WIDE_MATH[m.group(1)] + "(", text)   # (the engine's own functions of numbers: the formula's)
         return re.sub(r"\bstd::(" + "|".join(WIDE_MATH) + r")f?\s*\(", lambda m: WIDE_MATH[m.group(1)] + "(", text)
