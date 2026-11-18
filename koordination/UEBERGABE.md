@@ -628,3 +628,21 @@ mag rechnet unabhängig weiter (der volle Lauf `work-voll-162644-5528` seit 17:3
   `work-f2-engine-174611-9407` um 18:04:22). mag.sh zeigt den Zwischenstand eines vollen Laufs.
 - **Reihenfolge der Merges, sobald das Ergebnis des vollen Laufs übernommen ist:** Fix von d (`6f62201`, wenn seine zwei Engine-Suiten und CI 44351625418 grün sind) →
   k (Konvertierung parallel: verkürzt jeden weiteren Lauf) → t1/t2 → dann `voll origin/work`.
+
+### 16.8 Stand 18:55 – der Basislauf auf `work` ist verloren; der Weg über eine Probe-Zusammenführung
+- **`work` (90b5ab8) lässt sich nicht ins Level lesen:** `net_session_cpp.cpp: line 611, column 20: the number 78 names two nodes` (Probe `work-probe-182522-630`;
+  ebenso alle vier `konvert`-Läufe von k). Der Basislauf `work-voll-162644-5528` (seit 17:38:59) endet darum mit `convert rc=1` und dem alten Level – **es gibt weiter
+  keinen gültigen vollen Lauf seit dem 14.11.** Sein convert.log bleibt als Liste „geschrieben/wartet“ für 90b5ab8 brauchbar. Auf work-f2 liest net_session (67/67).
+  Hinter einem Lesefehler können weitere liegen (work-f1 hat zwei weitere Leser-Korrekturen: `entries_ended`, `assigned`).
+- **Gemergt nach `work`: work-d** (Merge 4283186, Baum 5367e14) – F1 behoben, bewiesen (Engine-Suite auf mag zweimal grün, CI 44351625418, Generator ohne
+  Abweichung). `work` = 4283186.
+- **k bewiesen eindeutig:** 8 gegen 40 Kerne byteweise gleich (tests/converted) auf zwei Ständen; 41–45 min bei 40 Kernen unter voller Last (14 Runden).
+  Acht Rückfälle „was written and waits now“ (game_look ×7, game_lamps ×1 – Test übersetzt nicht mehr: Renderer unvollständig, `Game` nicht deklariert → t2).
+- **Probe-Zusammenführung `work-zusammen` (9931aea)** – Inhalt und die drei aufgelösten Doppelbauten: `stand/KOORDINATOR.md`, Eintrag 18:55. Der volle Lauf
+  `work-zusammen-voll-185405-1226` ist der Beweis für genau diesen Baum: Level und Tests erscheinen gleich nach der Konvertierung (`$S/mag.sh holen <name>` zeigt den
+  Zwischenstand), dann Spiel-Suite, Engine-Suite parallel. **Ist `convert rc=0`:** das ist der erste gültige Stand seit dem 14.11. – Zahlen lesen, Suite abwarten;
+  sind die Suiten grün (oder nur an Stellen rot, die es auf `work` auch sind und die benannt werden), `work-zusammen` samt dem Commit „Level und Tests“ nach `work`
+  mergen, CI. **Ist `convert rc≠0`:** der nächste Lesefehler steht in `mag-zwischen/convert.tail.txt` – beheben (Besitzer der Datei) und neu.
+- Nicht in der Zusammenführung und weiter offen: die Absenkungen der Game-Dateien von g1/g2 (warten auf den Differenztest „zwei Bauten“), alles von f1 außer dem
+  Konverter (seine Differenztests übersetzen nicht), p (ungepusht, gesichert), s5.
+- Agenten: weiterhin keine (Neustart nur auf Chris' ausdrückliches Wort; seit 17:59 keine Nachricht von ihm).
