@@ -12485,6 +12485,11 @@ def main(argv):
             took[u], got[u] = futures[u].result()
         for u in now:
             r = got[u]
+            # (what is given only grows - more of the others written - and with it what is written: a function
+            # that was written and waits now goes against that; it is said, a finding of what the converter writes)
+            for k, e in sorted(r["table"].items()):
+                if k in tables.get(u, {}) and not tables[u][k]["wait"] and e["wait"]:
+                    print(f"{u}: {e['cpp']}() was written and waits now ({e['wait']})", flush=True)
             given[u] = asks[u]
             results[u] = r
             tables[u], exports[u] = r["table"], r["exports"]
