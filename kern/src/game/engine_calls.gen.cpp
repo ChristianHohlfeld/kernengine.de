@@ -1185,6 +1185,14 @@ bool c97(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   return true;
 }
 
+// engine.game_world.hud_mut@set: what stands at the place kern::game::GameWorld::hud_mut gives
+bool c97_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
+  if (!self) return false;
+  ev::take<ev::Struct<S_game_Hud>>(o, in, 1, self->hud_mut());
+  return true;
+}
+
 // engine.game_world.start_replica: kern::game::GameWorld::start_replica
 bool c98(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
@@ -1349,6 +1357,14 @@ bool c112(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   return true;
 }
 
+// engine.game_world.events@set: what stands at the place kern::game::GameWorld::events gives
+bool c112_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
+  if (!self) return false;
+  ev::take<ev::List<ev::Text>>(o, in, 1, self->events());
+  return true;
+}
+
 // engine.game_world.sound_cues: kern::game::GameWorld::sound_cues
 bool c113(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
@@ -1358,12 +1374,28 @@ bool c113(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   return true;
 }
 
+// engine.game_world.sound_cues@set: what stands at the place kern::game::GameWorld::sound_cues gives
+bool c113_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
+  if (!self) return false;
+  ev::take<ev::List<ev::Struct<S_game_SoundCue>>>(o, in, 1, self->sound_cues());
+  return true;
+}
+
 // engine.game_world.shots: kern::game::GameWorld::shots
 bool c114(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->shots();
   ev::give<ev::List<ev::Struct<S_game_ShotEvent>>>(o, out, 0, r);
+  return true;
+}
+
+// engine.game_world.shots@set: what stands at the place kern::game::GameWorld::shots gives
+bool c114_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
+  if (!self) return false;
+  ev::take<ev::List<ev::Struct<S_game_ShotEvent>>>(o, in, 1, self->shots());
   return true;
 }
 
@@ -2940,6 +2972,14 @@ const EngineCall kCalls[] = {
     {"engine.sound_bank.release", &c226},
     {"engine.texture_asset.make", &c227},
     {"engine.texture_asset.release", &c228},
+    {"engine.game_world.hud_mut@get", &c97},
+    {"engine.game_world.hud_mut@set", &c97_set},
+    {"engine.game_world.events@get", &c112},
+    {"engine.game_world.events@set", &c112_set},
+    {"engine.game_world.sound_cues@get", &c113},
+    {"engine.game_world.sound_cues@set", &c113_set},
+    {"engine.game_world.shots@get", &c114},
+    {"engine.game_world.shots@set", &c114_set},
 };
 const EngineCalls kAll(kCalls, std::size(kCalls));
 

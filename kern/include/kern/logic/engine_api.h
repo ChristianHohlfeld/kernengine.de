@@ -57,6 +57,14 @@ struct EngineFunction {
   const char* help;
   bool value;            // a value (it changes nothing): no exec pins
   std::vector<EnginePin> inputs, outputs;
+  /// A place of the engine: the function gives a reference (not const) to something its object holds, and
+  /// only looks it up (`std::vector<ShotEvent>& shots() { return shots_; }`). The node binds it - its output
+  /// "result" is that place - and the nodes that name a place work on it there (kern/docs/blueprint_cpp.md,
+  /// "Plätze der Engine").
+  bool place = false;
+  /// It reads a clock (KERN_CLOCK, kern/core/base.h: now_ms, wall_ms): what it gives changes by itself - two
+  /// plays of the same program on the engine itself do not get the same from it (kern/tests/native_show.h).
+  bool clock = false;
 };
 
 /// Every function of the engine that is a node, in the order of the headers.

@@ -92,6 +92,14 @@ bool c3(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
   return true;
 }
 
+// engine.building_builder.chunks@set: what stands at the place kern::BuildingBuilder::chunks gives
+bool c3_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::BuildingBuilder>(o, in, 0, "building_builder");
+  if (!self) return false;
+  ev::take<ev::List<ev::Struct<S_GeoChunk>>>(o, in, 1, self->chunks());
+  return true;
+}
+
 // engine.building_builder.processed: kern::BuildingBuilder::processed
 bool c4(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::BuildingBuilder>(o, in, 0, "building_builder");
@@ -500,6 +508,14 @@ bool c35(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   return true;
 }
 
+// engine.road_builder.chunks@set: what stands at the place kern::RoadBuilder::chunks gives
+bool c35_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::RoadBuilder>(o, in, 0, "road_builder");
+  if (!self) return false;
+  ev::take<ev::List<ev::Struct<S_GeoChunk>>>(o, in, 1, self->chunks());
+  return true;
+}
+
 // engine.road_builder.roads: kern::RoadBuilder::roads
 bool c36(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::RoadBuilder>(o, in, 0, "road_builder");
@@ -745,6 +761,10 @@ const EngineCall kCalls[] = {
     {"engine.road_options.release", &c53},
     {"engine.road_stream.make", &c54},
     {"engine.road_stream.release", &c55},
+    {"engine.building_builder.chunks@get", &c3},
+    {"engine.building_builder.chunks@set", &c3_set},
+    {"engine.road_builder.chunks@get", &c35},
+    {"engine.road_builder.chunks@set", &c35_set},
 };
 const EngineCalls kAll(kCalls, std::size(kCalls));
 

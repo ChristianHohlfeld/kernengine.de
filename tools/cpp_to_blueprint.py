@@ -9097,17 +9097,47 @@ class Api:
                 changes = True
         counts = {name: params[k][0] for name, k in counts.items()}
         ret = qtype(d).split("(")[0].strip()
+        place = False
         if ret != "void":
-            bt, _, handle = self.handed(ret)
+            bt, gives_place, handle = self.handed(ret)
             outs.insert(0, ("result", bt, handle))
+            # a reference (not const) to something the engine holds, by a method that only looks it up: a place of the
+            # engine (kern/docs/blueprint_cpp.md, "Plätze der Engine") - the node binds it, the place nodes work on it
+            place = gives_place and handle is None and method and not ins[1:] and len(outs) == 1 and self.looks_up(d)
         qualified = self.home(d) + "::" + d["name"]
-        value = ret != "void" and len(outs) == 1 and (const or not method) and not changes and qualified not in ENGINE_STEPS
+        value = not place and ret != "void" and len(outs) == 1 and (const or not method) and not changes and qualified not in ENGINE_STEPS
         for _, bt, _ in ins + outs:
             self.pin(bt)
             self.shape(bt)
         words = d["name"].replace("_", " ").title()
         return {"type": self.type_of(d), "cpp": qualified, "label": words, "category": "Engine: " + self.home(d).split("::")[-1].replace("kern", "Engine"),
-                "help": u.comment_of(d), "value": value, "ins": ins, "outs": outs, "params": params, "decl": d, "counts": counts, "per": per}
+                "help": u.comment_of(d), "value": value, "place": place, "ins": ins, "outs": outs, "params": params, "decl": d, "counts": counts, "per": per,
+                "clock": self.reads_clock(d)}
+
+    @staticmethod
+    def looks_up(d):
+        """Does the method only look up a member of its object - is its body `return member_;`, nothing else? (What
+        it gives is then where the object holds it, and asking for it does nothing.)"""
+        def bare(x):
+            while x.get("kind") in ("ImplicitCastExpr", "ParenExpr") and len(kids(x)) == 1:
+                x = kids(x)[0]
+            return x
+        body = [x for x in kids(d) if x.get("kind") == "CompoundStmt"]
+        if len(body) != 1 or len(kids(body[0])) != 1 or kids(body[0])[0].get("kind") != "ReturnStmt":
+            return False
+        given = kids(kids(body[0])[0])
+        if len(given) != 1:
+            return False
+        member = bare(given[0])
+        return member.get("kind") == "MemberExpr" and len(kids(member)) == 1 and bare(kids(member)[0]).get("kind") == "CXXThisExpr"
+
+    def reads_clock(self, d):
+        """Does the declaration say that the function reads a clock (`KERN_CLOCK f64 now_ms();`, kern/core/base.h)?"""
+        text = self.tree.text(d.get("_file", ""))
+        a = d.get("_at", (None, None))[0]
+        if a is None or not text:
+            return False
+        return re.match(r"\s*KERN_CLOCK\b", text[text.rfind("\n", 0, a) + 1:]) is not None
 
     def written_list(self, p, after):
         """A parameter that is a pointer to numbers the function writes through, with their count beside it -

@@ -1189,7 +1189,12 @@ selbst“).
   einen Wert sagt. Geprüft: der native Fall „Engine“ spielt seine Aufrufe auf Objekten ein
   weiteres Mal auf der Engine selbst – der Interpreter durch die Tür, die Klasse direkt, jede
   Variable gleich, und die Klasse nicht ein Mal durch die Tür (`kern/tests/blueprint_native.h`,
-  `native_show.h`); `engine_calls_class_calls_the_engine_itself` vergleicht dieselbe Klasse mit und
+  `native_show.h`); seine freien Funktionen ebenso, dreimal (Tür, Klasse, Tür), jedes Mal in einem eigenen
+  Prozess, der vom selben Zustand der Engine ausgeht (die Nummer des nächsten Jobs, ihr letzter Fehler …), und
+  mit den Jobs der Engine auf dem Frame-Thread (`kern::jobs::set_threads(false)`: wann ein Job läuft, legen die
+  Aufrufe fest) – alle drei geben dasselbe, Zeichen für Zeichen; nur was eine Uhr gibt, ist nicht zweimal
+  dasselbe: Eine Funktion, die eine Uhr liest, sagt es in ihrem Header (`KERN_CLOCK f64 now_ms();`), die
+  Tabelle hat es (`EngineFunction::clock`), und der Test vergleicht die Variablen nicht, die aus ihr kommen; `engine_calls_class_calls_the_engine_itself` vergleicht dieselbe Klasse mit und
   ohne Objekte und mit C++ selbst, `engine_calls_class_asks_for_no_memory` zählt die
   Speicheranforderungen (`kern/tests/test_main.cpp`). Ein Build, der Klassen bindet, bindet die
   Teile der Engine, deren Funktionen sie rufen (ein Knoten, den keine Klasse ruft, braucht nichts).
