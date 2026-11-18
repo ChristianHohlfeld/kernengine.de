@@ -79,3 +79,20 @@
 - city_stream.cpp, destruction.cpp auf ad36eee9 (mit t1s Testrahmen): converted_city_stream_cpp ok in beiden Durchgängen (buildings_near,
   upload), 11 ok von 12, keine LECK. Übrig nur converted_destruction_cpp (collapse/fracture/blast: pieces_[i].size/.p – die
   Argumentreihenfolge, E9; die Absenkung 90ecf01f kam nach diesem Stand). Beleg dafür: work-k-vergleich auf 90ecf01f (destruction.cpp).
+
+## E13 (ändert E9): Spiel-Suite baut mit clang – 90ecf01f wird NICHT gemeldet
+- 90ecf01f (Absenkung destruction.cpp) wird auf work-k zurückgenommen („zurückgenommen wegen E13“), sobald t1s Umstellung da ist und
+  ein vergleich über destruction.cpp unter clang collapse/fracture ohne Abweichung zeigt. work-k-vergleich-231448-21204 abgebrochen.
+- Kleinstfall für E13: $S/k/order_e13.cpp (clang++ alt = neu, g++ alt ≠ neu). Kleinstfälle der Regeln: $S/k/mini_regeln.cpp.
+- **Destruction_blast 1/161 (bzw. 1/171):** kein fehlender Map-Eintrag – erste Stelle `.Self.pieces_[1].size.x` (Quelle 6.409…, Blueprint
+  5.904…), dieselbe Argumentreihenfolge (blast → collapse → fracture → launch). Fällt mit E13 weg.
+
+## Voller Lauf 232247-24031: convert rc=1 (Game-Einheiten pendeln ab Runde 9)
+- Diagnose im Ablauf: c32f607b (nur Meldung „goes round: <Einheit>: f: written -> <Grund>; exports differ: …“ vor dem Abbruch) –
+  bitte in work-zusammen mischen, dann zeigt der nächste volle Lauf, was im Kreis geht. Einziger Hinweis im Protokoll: Runde 10
+  „Game::combat_hud() was written and waits now (its test … combat::Fun has no member named ‘mul…“ (Test-Schreiber/g).
+
+## WARTET AUF
+- t1: Spiel-Suite mit clang (E13) → dann vergleich destruction.cpp unter clang, danach 90ecf01f zurücknehmen.
+- p: text_format-Fix der Klasse → dann 12e3da24 zurücknehmen (vergleich combat_rules.cpp).
+- einen gültigen vollen Lauf → Liste für meine Dateien (city_stream, destruction, combat_*, drone, car, Firmware-Einheiten).

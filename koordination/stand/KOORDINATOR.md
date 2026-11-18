@@ -1,4 +1,11 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 23:55 **Der volle Lauf `work-zusammen-voll-232247-24031` (5a445af8): `convert rc=1` (23:50, 27 min) – der Ablauf pendelt.** Ab Runde 9 geben 30 Game-Einheiten Runde
+  für Runde, was sie vorher gaben („what one writes takes from the other what it writes“), bis zur Sicherung in Runde 16. Einzige Meldung davor (Runde 10):
+  `Game::combat_hud()` „was written and waits now“ – sein Test übersetzt nicht: „‘combat::Fun’ has no member named ‘multiplier’ – ‘g_fun’ is not a member of
+  ‘…::combat::combat_rules_cpp_local’“ (die Familie, die t2 mit `file_home` behoben hatte; t2s Sieben-Dateien-Vergleich lief sauber – also die Zusammenführung oder
+  erst das ganze Programm). **k klärt beides:** die Ursache (gezielte Probe, Eingrenzen zwischen den Merge-Ständen) und dass der Ablauf nicht pendeln kann
+  (was in einer Runde wartet, wartet weiter). Kein gültiges Level aus diesem Lauf; seine Suiten rechnen zu Ende (erster Blick auf die Liste, Engine-Suite) – kein Beweis.
+  `grundlage` auf mag bleibt der Lauf 203000.
 - 23:35 **Entscheidung E13 – die ganze Spiel-Suite baut mit clang, dem Compiler des Spiels (ersetzt den Absenkungs-Teil von E9).** g fand die zweite Stelle
   derselben Art (game.h:170 `read_body(world_->physics(), body(a))`: GCC ruft actor_body zuerst, clang und der Blueprint physics – eject 65/65, state_of 91/91).
   Die Bedeutung der Quelle ist die, die der Compiler des Spiels ihr gibt (emscripten ist clang) – also vergleicht der Test gegen genau den, statt je Stelle zu

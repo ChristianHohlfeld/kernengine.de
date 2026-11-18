@@ -1,6 +1,6 @@
 # Stand Paket p (Leistung der exportierten Klasse) – 18.11.2026, 23:05
 
-Zweig work-p, letzter Commit 6c7b9c5f (gepusht).
+Zweig work-p, letzter Commit a53ce271 (gepusht; dazu Switch on Text ohne Liste, alt/neu lokal gleich über 121 Paare).
 - BEWIESEN: E2.1 Schritt 1 (bis 2416329): mag `work-p-engine-221509-17831` engine rc=0 (197 ok, blueprint_native_test 55 Blueprints/14102 Aufrufe,
   game_native_test ok). Probe `work-p-probe-221512-17868` (alle Quelltexte, vor der 22:25-Regel) abgebrochen – überholt durch den Kopf.
 - LÄUFT: `work-p-vergleich-230429-15316` (gestartet 23:14 auf 8a028f9c: E2.1, E2.2, E2.1 Schritt 2, Fix text_format, E3-A) über qr_code, settings,
@@ -69,6 +69,40 @@ neuer sauber) und durch den Engine-Fall format_text_of_value. Laufend: `work-p-e
 - **E3-A Plan** (noch nicht gebaut): func_call_on baut `std::vector<Value>` für Argumente und Ergebnisse, Runtime::call_on dazu `results` (from_json) und
   `got`; Instance::call füllt `got`. Null Anforderungen: Argumente als `std::span<const Value>` aus einem `std::array` auf dem Stapel, Ergebnisse in einen
   Puffer fester Größe (die Zahl der Ausgänge ist bekannt), Runtime::call_on/Instance::call auf Span umstellen (alle Aufrufer in logic.cpp mit).
+
+## Messung nach Block B/C (Bestzeiten, Verhältnis Klasse/C++; $S/p/nach_e21s2.txt, nach_c.txt) – Prüfsummen alle gleich
+| Fall | nach E2.1+E2.2 (min) | nach B (c064f234) | Kopf a53ce271 |
+|---|---|---|---|
+| qr_encode | 4.99 | 4.94 | 4.94 |
+| qr_gf_mul | 3.46 | 3.45 | 3.45 |
+| qr_rs_remainder | 5.10 | 5.03 | 5.01 |
+| nostr_sha256 | 12.80 | 6.62 | 6.71 |
+| nostr_mulm | 6.56 | 8.21 | 7.84 |
+| nostr_from_hex | 6.04 | 5.09 | 5.10 |
+| common_rng_next | 2.18 | 1.66 | 1.67 |
+| tiles_key_hash | 1.02 | 1.06 | 1.03 |
+| lamps_grid_key | 1.38 | 1.37 | 1.27 |
+| mvt_zigzag | 1.00 | 1.00 | 1.00 |
+| mvt_read_geometry | 2.56 | 2.52 | 2.52 |
+| wire_put_u32 | 1.53 | 1.53 | 1.52 |
+| wire_get_u32 | 3.91 | 3.95 | 3.90 |
+| settings_escape | 7.56 | 6.96 | 7.01 |
+| settings_num | 1.26 | 1.29 | 1.29 |
+| common_wrap_pi | 1.23 | 1.82 | 1.88 |
+| common_damp_alpha | 1.03 | 1.05 | 1.05 |
+| common_qnormalize | 1.19 | 1.20 | 1.20 |
+| common_slerp | 1.20 | 1.19 | 1.19 |
+| common_to_local | 1.33 | 1.32 | 1.33 |
+| common_rng_unit | 1.75 | 1.81 | 1.82 |
+| person_hit | 1.44 | 1.44 | 1.45 |
+| person_sphere | 0.84 | 0.98 | 0.97 |
+| wire_put_f32 | 1.51 | 1.54 | 1.54 |
+| mvt_ring_area | 3.51 | 3.43 | 3.40 |
+| perf_governor | 1.45 | 1.44 | 1.45 |
+| audio_render | 1.37 | 1.37 | 1.37 |
+| lamps_place_road | 1.17 | 1.25 | 1.22 |
+| lamps_near | 2.59 | 2.36 | 2.19 |
+25 von 29 über 1,10 (unverändert rot, läuft als Bericht).
 
 ## Messung nach E2.1 + E2.2 (Verhältnis Klasse/C++)
 | Fall | nach a–c (med) | nach E2.1+E2.2: min | med | Klasse µs (min) | C++ µs (min) |

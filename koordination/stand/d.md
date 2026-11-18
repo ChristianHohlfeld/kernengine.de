@@ -91,3 +91,18 @@
 - Eltern: work-zusammen e9eec02, enthält nur den Fix (cherry-pick oder merge sauber). mag `vergleich origin/work-d src/drone.cpp` auf ddb54b72:
   convert rc=0, bau rc=0; **converted_rigid_spec ok in beiden Durchgängen** (Stellvertreter und SC_ENGINE=real; vorher 300 of 300 calls differ).
   Übrig: converted_drone_cpp „Drone_step: 1 of 5 calls differ“ in beiden – das ist G7 von k (u16-Rückwandlung, 2a6ef5b3, nur auf work-k), nicht dieser Fix.
+
+## STAND 23:40 (Nachfolger 3 endet – Kontingent): Befund-Block Zeiger/Array-Längen OFFEN, an Nachfolger 4
+- Auftrag Koordinator (23:3x): VOR weiterem Platz-Beweis als ein Block, je Fix eigener Commit auf work-zusammen (5a445af8+), Beleg `vergleich`:
+  (1) set_pcm (t2: gaps_guided_sounds 12/38) – `set_pcm(id, const f32* samples, u32 frames, u32 channels, u32 rate)` liest frames·channels;
+      Stellvertreter der Quelle zeichnet 1 Zahl auf (Name „frames“ trifft die Namensregel nicht). Beleg: vergleich src/game_gaps.cpp.
+  (2) matrix_of 88/88 (g): Form `{[n]}` für Mat4 (`f32 m[16]`) – ein Feld/Ergebnis `T m[N]` hat genau N Werte (Antwort des Stellvertreters,
+      Beschreibung/Form). Beleg: vergleich über eine Datei, die actor_matrix ruft.
+  (3) net_session ABBRUCH (g): `HostTransport::push_incoming(from, const u8* data, int bytes)` – Zahl neben Zeiger per TYP sagen
+      (kern::Count<Per> in den Erklärungen der Engine), Namensregel `count|size|len|num|^n$` (engine_api.py Calls.body/direct ~Z. 457/593,
+      TestWriter.stand_in Zweig Zeiger-Eingänge) abschaffen; alle Erklärungen mit Zeiger + Zahl umstellen; was danach ohne Count neben
+      einem Zeiger steht, meldet der Erzeuger. Beleg: vergleich src/net_session.cpp.
+  Hinweis zu (1): frames·channels ist kein festes Per – Count<Per> trägt es nicht. Möglichkeit: Zahl der Samples als Count<1> (frames = n/channels
+  in sound.cpp; alle Spiel-Aufrufer geben channels=1, studio.cpp:82 gibt frames·channels) – das ändert die Bedeutung eines Engine-Parameters:
+  mit dem Koordinator klären, falls nicht offensichtlich.
+- Vorbild: 690ea4f (Count<Per> earcut), 50832229 (declared_length, Array-Parameter) – beides gemergt.
