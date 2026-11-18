@@ -2978,12 +2978,16 @@ void Life::update_pigeons(f32 dt, f32 now, const LifeView& view, const CityStrea
     if (!f.air) {
       const f32 dp = dist2d(me, f.at);
       if (dp < kSpookPlayer + 2.4f && view.player_speed > 0.3f) spook(f, me, now, rng, view, city, out);
-      else if (const std::size_t mate = [&]() -> std::size_t { for (std::size_t i = 0; i < view.mates.size(); ++i) if (dist2d(Vec2{::sc::converted::at(view.mates, i).x, ::sc::converted::at(view.mates, i).y}, f.at) < kSpookPlayer + 1.4f) return i; return view.mates.size(); }();
-               mate < view.mates.size())
-        spook(f, {::sc::converted::at(view.mates, mate).x, ::sc::converted::at(view.mates, mate).y}, now, rng, view, city, out);  // a mate walking up to them (host: his flocks are everybody's)
-      else
-        for (const LifeCar& c : view.cars)
-          if (std::hypot(c.position.x - f.at.x, c.position.y - f.at.y) < kSpookCar && kern::length(c.velocity) > 2) { spook(f, {c.position.x, c.position.y}, now, rng, view, city, out); break; }
+      else {
+        std::size_t mate = view.mates.size();   // (the first mate near them, or none)
+        for (std::size_t i = 0; i < view.mates.size(); ++i)
+          if (dist2d(Vec2{::sc::converted::at(view.mates, i).x, ::sc::converted::at(view.mates, i).y}, f.at) < kSpookPlayer + 1.4f) { mate = i; break; }
+        if (mate < view.mates.size())
+          spook(f, {::sc::converted::at(view.mates, mate).x, ::sc::converted::at(view.mates, mate).y}, now, rng, view, city, out);  // a mate walking up to them (host: his flocks are everybody's)
+        else
+          for (const LifeCar& c : view.cars)
+            if (std::hypot(c.position.x - f.at.x, c.position.y - f.at.y) < kSpookCar && kern::length(c.velocity) > 2) { spook(f, {c.position.x, c.position.y}, now, rng, view, city, out); break; }
+      }
       if (!f.air && now > f.next_flight) spook(f, f.at + Vec2{rng.range(-1, 1), rng.range(-1, 1)}, now, rng, view, city, out);
       if (!f.air && now > f.coo_at) {
         f.coo_at = now + rng.range(3.5f, 11);
