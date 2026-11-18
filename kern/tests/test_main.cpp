@@ -6314,6 +6314,312 @@ TEST(engine_calls_default_objects) {
   CHECK(a.size() == 1 && b.size() == 1);
 }
 
+}  // namespace
+
+// A Blueprint's class calls the functions of the engine's nodes itself where its host gives it the engine's
+// objects (kern/logic/engine_direct.h): typed, without a value of the interpreter and without the host's
+// door. The class below is written as a Blueprint's text is; how its structs are held as values says, as
+// the glue of a Blueprint's class does (logic::native_glue), Held<> - the door needs it, the calls the class
+// makes itself do not.
+namespace engine_probe {
+
+struct Probe : kern::Blueprint {
+  KERN_ENUM(audio_Bus, master, music, sfx, ambience, ui, voice, count);
+  KERN_ENUM(audio_Rolloff, inverse, linear, exponential);
+  KERN_ENUM(game_Shape, box, sphere, cylinder, cone, capsule, plane, torus, ramp, mesh);
+  KERN_ENUM(physics_Surface, none, cloth, tpu, floor_);
+  KERN_STRUCT(Quat) { Float x = 0.0; Float y = 0.0; Float z = 0.0; Float w = 1.0; };
+  KERN_STRUCT(Mat4) { Fixed<Float, 16> m = Fixed<Float, 16>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}; };
+  KERN_STRUCT(Sphere) { Vector center = Vector{0.0, 0.0, 0.0}; Float radius = -1.0; };
+  KERN_STRUCT(MeshData) { List<Float> positions = List<Float>{}; List<Float> normals = List<Float>{}; List<Float> colors = List<Float>{}; List<Float> uvs = List<Float>{}; List<Float> extra = List<Float>{}; Int extra_size = 0; List<Int> indices = List<Int>{}; };
+  KERN_STRUCT(audio_PlayParams) { Float volume = 1.0; Float pitch = 1.0; Float pan = 0.0; Bool the_loop = false; audio_Bus bus = audio_Bus::sfx; Float fade_in = 0.0; Float start = 0.0; Int priority = 0; Bool spatial = false; Vector position = Vector{0.0, 0.0, 0.0}; Vector velocity = Vector{0.0, 0.0, 0.0}; Float min_distance = 1.0; Float max_distance = 50.0; audio_Rolloff rolloff = audio_Rolloff::inverse; Float spread = 0.0; Float doppler = 1.0; };
+  KERN_STRUCT(game_Transform) { Vector position = Vector{0.0, 0.0, 0.0}; Vector rotation = Vector{0.0, 0.0, 0.0}; Vector scale = Vector{1.0, 1.0, 1.0}; };
+  KERN_STRUCT(physics_Pose) { Vector position = Vector{0.0, 0.0, 0.0}; Quat rotation = Quat{0.0, 0.0, 0.0, 1.0}; };
+
+  // what the calls are given
+  List<Float> Samples = List<Float>{};
+  audio_PlayParams Params = audio_PlayParams{};
+  game_Transform Placed = game_Transform{Vector{1.0, 2.0, 3.0}, Vector{10.0, 20.0, 30.0}, Vector{1.0, 1.5, 2.0}};
+  // what they gave
+  Int Mixer = 0;
+  Bool Ready = false;
+  Int Clip = 0;
+  Int64 Voice = Int64{0x0};
+  List<Float> Sound = List<Float>{};
+  Int Rate = 0;
+  Int Clips = 0;
+  List<Float> Gone = List<Float>{1.0};
+  Quat Turned = Quat{};
+  Vector Angles = Vector{0.0, 0.0, 0.0};
+  Mat4 Matrix = Mat4{};
+  game_Transform Back = game_Transform{};
+  Bool Parsed = false;
+  game_Shape Shape = game_Shape::box;
+  Bool Unparsed = true;
+  game_Shape Kept = game_Shape::box;
+  Text Name = "";
+  MeshData Box = MeshData{};
+  Sphere Ball = Sphere{};
+  Float Friction = 0.0;
+  physics_Pose Frame = physics_Pose{};
+  Text Hex = "";
+  Bool HexOk = false;
+  Vector Color = Vector{0.0, 0.0, 0.0};
+  Bool Known = false;
+
+  struct { Int result = 0; } n1;
+  struct { Bool result = false; } n2;
+  struct { Int result = 0; } n3;
+  struct { Int64 result = Int64{0x0}; } n4;
+  struct { List<Float> out = List<Float>{}; } n5;
+  struct { Bool result = false; game_Shape out = game_Shape::box; } n7;
+  struct { Bool result = false; Vector out = Vector{0.0, 0.0, 0.0}; } n8;
+
+  void Sounds();
+  void Numbers();
+  std::string shown() const;
+};
+
+/// How a struct of the class is held as a value, field by field (what logic::native_glue writes for a
+/// Blueprint's class): `M` its fields in their order.
+template <class S, auto... M> struct HeldBy {
+  static constexpr logic::PinType type = logic::PinType::structure;
+  static bool is(const logic::Value& v) {
+    if (v.type != type || v.fields() != sizeof...(M)) return false;
+    std::size_t k = 0;
+    return (logic::is_value<std::remove_cvref_t<decltype(std::declval<S&>().*M)>>(*v.field(k++)) && ...);
+  }
+  static S from(const logic::Value& v) {
+    S s{};
+    if (!is(v)) return s;
+    std::size_t k = 0;
+    ((s.*M = logic::from_value<std::remove_cvref_t<decltype(s.*M)>>(*v.field(k++))), ...);
+    return s;
+  }
+  static logic::Value to(const S& s) { return logic::Value::structure({logic::to_value(s.*M)...}); }
+};
+
+inline bool counting = false;  // the allocator counts (below)
+inline long asks = 0;
+
+}  // namespace engine_probe
+
+namespace kern::logic::detail {
+using engine_probe::HeldBy;
+using engine_probe::Probe;
+template <> struct Held<Probe::Quat> : HeldBy<Probe::Quat, &Probe::Quat::x, &Probe::Quat::y, &Probe::Quat::z, &Probe::Quat::w> {};
+template <> struct Held<Probe::Mat4> : HeldBy<Probe::Mat4, &Probe::Mat4::m> {};
+template <> struct Held<Probe::Sphere> : HeldBy<Probe::Sphere, &Probe::Sphere::center, &Probe::Sphere::radius> {};
+template <>
+struct Held<Probe::MeshData> : HeldBy<Probe::MeshData, &Probe::MeshData::positions, &Probe::MeshData::normals, &Probe::MeshData::colors, &Probe::MeshData::uvs, &Probe::MeshData::extra,
+                                      &Probe::MeshData::extra_size, &Probe::MeshData::indices> {};
+template <>
+struct Held<Probe::audio_PlayParams>
+    : HeldBy<Probe::audio_PlayParams, &Probe::audio_PlayParams::volume, &Probe::audio_PlayParams::pitch, &Probe::audio_PlayParams::pan, &Probe::audio_PlayParams::the_loop,
+             &Probe::audio_PlayParams::bus, &Probe::audio_PlayParams::fade_in, &Probe::audio_PlayParams::start, &Probe::audio_PlayParams::priority, &Probe::audio_PlayParams::spatial,
+             &Probe::audio_PlayParams::position, &Probe::audio_PlayParams::velocity, &Probe::audio_PlayParams::min_distance, &Probe::audio_PlayParams::max_distance,
+             &Probe::audio_PlayParams::rolloff, &Probe::audio_PlayParams::spread, &Probe::audio_PlayParams::doppler> {};
+template <> struct Held<Probe::game_Transform> : HeldBy<Probe::game_Transform, &Probe::game_Transform::position, &Probe::game_Transform::rotation, &Probe::game_Transform::scale> {};
+template <> struct Held<Probe::physics_Pose> : HeldBy<Probe::physics_Pose, &Probe::physics_Pose::position, &Probe::physics_Pose::rotation> {};
+}  // namespace kern::logic::detail
+
+namespace engine_probe {
+
+// A mixer: made, set up, given a clip, played and rendered - handles, a list the engine takes, a text, a
+// struct, what the engine writes through a pointer; then ended, and asked once more (that call fails).
+inline void Probe::Sounds() {
+  engine_mixer_make(n1);
+  Mixer = n1.result;
+  engine_mixer_init(n2, Mixer, 48000, 16);
+  Ready = n2.result;
+  engine_mixer_adopt_clip(n3, Mixer, Samples, 1, "tone", false);
+  Clip = n3.result;
+  engine_mixer_play(n4, Mixer, Clip, Params);
+  Voice = n4.result;
+  engine_mixer_render(n5, Mixer, 300);
+  Sound = n5.out;
+  Rate = engine_mixer_sample_rate(Mixer);
+  Clips = engine_mixer_clip_count(Mixer);
+  engine_mixer_release(Mixer);
+  engine_mixer_render(n5, Mixer, 4);
+  Gone = n5.out;
+}
+// Functions that only compute: vectors, structs in and out (one in another, a list of a fixed length),
+// enums in and out, a parameter the function writes through, texts, a struct of lists, a list with its count.
+inline void Probe::Numbers() {
+  Turned = engine_game_euler_to_quat(Vector{10.0, 20.0, 30.0});
+  Angles = engine_game_quat_to_euler(Turned);
+  Matrix = engine_game_transform_matrix(Placed);
+  Back = engine_game_matrix_transform(Matrix);
+  engine_game_parse_shape(n7, "cone", game_Shape::box);
+  Parsed = n7.result;
+  Shape = n7.out;
+  engine_game_parse_shape(n7, "no shape", game_Shape::torus);
+  Unparsed = n7.result;
+  Kept = n7.out;
+  Name = engine_game_shape_name(game_Shape::torus);
+  Box = engine_primitives_box(Vector{1.0, 2.0, 3.0}, Vector{0.5, 0.25, 1.0});
+  Ball = engine_bounding_sphere(Box.positions, Int(static_cast<i64>(Box.positions.size() / 3)));
+  Friction = engine_physics_surface_friction(physics_Surface::cloth, physics_Surface::tpu);
+  Frame = engine_physics_frame_from_axis(Vector{1.0, 2.0, 3.0}, Vector{0.0, 0.0, 1.0}, true);
+  Hex = engine_game_hex_color(Vector{1.0, 0.5, 0.0});
+  engine_game_parse_hex_color(n8, "#336699", Vector{0.0, 0.0, 0.0});
+  HexOk = n8.result;
+  Color = n8.out;
+  Known = engine_game_motion_name_ok("idle");
+}
+inline std::string Probe::shown() const {
+  std::string s;
+  const auto put = [&](const char* name, const auto& v) { s += std::string(name) + "=" + logic::engine_shown(logic::to_value(v)) + "\n"; };
+  put("Mixer", Mixer), put("Ready", Ready), put("Clip", Clip), put("Voice", Voice), put("Sound", Sound), put("Rate", Rate), put("Clips", Clips), put("Gone", Gone);
+  put("Turned", Turned), put("Angles", Angles), put("Matrix", Matrix), put("Back", Back), put("Parsed", Parsed), put("Shape", Shape), put("Unparsed", Unparsed), put("Kept", Kept);
+  put("Name", Name), put("Box", Box), put("Ball", Ball), put("Friction", Friction), put("Frame", Frame), put("Hex", Hex), put("HexOk", HexOk), put("Color", Color), put("Known", Known);
+  return s;
+}
+
+}  // namespace engine_probe
+
+// The allocator says every piece of memory it is asked for while a test counts (engine_probe::counting):
+// with the sanitizers, their allocator through its hook; without them, operator new itself.
+#if defined(__SANITIZE_ADDRESS__)
+// (the sanitizers' own interface - sanitizer/allocator_interface.h, where a compiler brings that header)
+extern "C" int __sanitizer_install_malloc_and_free_hooks(void (*asked)(const volatile void*, std::size_t), void (*given_back)(const volatile void*));
+static void probe_asked_for_memory(const volatile void*, std::size_t) { engine_probe::asks += engine_probe::counting ? 1 : 0; }
+static void probe_gave_memory_back(const volatile void*) {}
+static void probe_count_memory() {
+  static const int installed = __sanitizer_install_malloc_and_free_hooks(probe_asked_for_memory, probe_gave_memory_back);
+  (void)installed;
+}
+#else
+void* operator new(std::size_t size) {
+  engine_probe::asks += engine_probe::counting ? 1 : 0;
+  if (void* p = std::malloc(size ? size : 1)) return p;
+  std::abort();
+}
+void* operator new[](std::size_t size) { return operator new(size); }
+void operator delete(void* p) noexcept { std::free(p); }
+void operator delete[](void* p) noexcept { std::free(p); }
+void operator delete(void* p, std::size_t) noexcept { std::free(p); }
+void operator delete[](void* p, std::size_t) noexcept { std::free(p); }
+static void probe_count_memory() {}
+#endif
+
+namespace {
+
+/// How often `work` asks for memory.
+template <class Work> long memory_asked_by(Work&& work) {
+  probe_count_memory();
+  engine_probe::asks = 0;
+  engine_probe::counting = true;
+  work();
+  engine_probe::counting = false;
+  return engine_probe::asks;
+}
+
+// The class calls the engine itself and does what the door does: the same class once with a host that
+// gives it the engine's objects and once with one that has only its door - every value the calls gave is
+// the same, bit for bit, and so is what the host is told of the call that fails; and what the mixer wrote
+// is what a mixer of C++ writes.
+TEST(engine_calls_class_calls_the_engine_itself) {
+  const std::vector<f32> tone = sine(48000, 0.25f, 440);
+  NativeEngineHost itself, door;
+  itself.direct = true;
+  engine_probe::Probe a, b;
+  a.kern_world.host = &itself;
+  a.kern_world.engine = itself.engine_objects();
+  b.kern_world.host = &door;
+  CHECK(a.kern_world.engine == &itself.objects && !b.kern_world.engine && !door.engine_objects());
+  for (engine_probe::Probe* p : {&a, &b}) {
+    for (f32 x : tone) p->Samples.push_back(static_cast<f64>(x));
+    p->Sounds();
+    p->Numbers();
+  }
+  CHECK(itself.door == 0);  // (not one call through the door)
+  CHECK(door.door == 23);   // (every call of the two functions)
+  const std::string got = a.shown(), want = b.shown();
+  CHECK(got == want);
+  if (got != want) std::printf("the class itself:\n%s\nthrough the door:\n%s\n", got.c_str(), want.c_str());
+  CHECK(itself.told == door.told);
+  CHECK(itself.told == " !engine.mixer.render: no object of the engine of its class at the input mixer");
+  CHECK(itself.objects.size() == 0 && door.objects.size() == 0);
+  // ... and it is the engine: the values C++ gets from the same functions
+  CHECK(a.Mixer == 1 && a.Ready && a.Rate == 48000 && a.Clips == 1 && a.Gone.empty());
+  audio::Mixer m;
+  CHECK(m.init(48000, 16));
+  const audio::ClipId c = m.adopt_clip(tone, 1, "tone");
+  CHECK(static_cast<i64>(c) == static_cast<i64>(a.Clip));
+  CHECK(static_cast<u64>(m.play(c, audio::PlayParams{})) == a.Voice.bits);
+  std::vector<f32> wrote(600);
+  m.render(wrote.data(), 300);
+  bool same = a.Sound.size() == wrote.size(), sounds = false;
+  for (std::size_t k = 0; same && k < wrote.size(); ++k) same = std::bit_cast<u64>(a.Sound[k]) == std::bit_cast<u64>(static_cast<f64>(wrote[k]));
+  for (f32 x : wrote) sounds |= x != 0;
+  CHECK(same && sounds);
+  const Quat q = game::euler_to_quat(Vec3(10, 20, 30));
+  CHECK(std::bit_cast<u64>(a.Turned.x) == std::bit_cast<u64>(static_cast<f64>(q.x)) && std::bit_cast<u64>(a.Turned.w) == std::bit_cast<u64>(static_cast<f64>(q.w)));
+  const Mat4 placed = game::transform_matrix(game::Transform{Vec3(1, 2, 3), Vec3(10, 20, 30), Vec3(1, 1.5f, 2)});
+  bool matrix = true;
+  for (std::size_t k = 0; k < 16; ++k) matrix = matrix && std::bit_cast<u64>(a.Matrix.m[k]) == std::bit_cast<u64>(static_cast<f64>(placed.m[k]));
+  CHECK(matrix);
+  CHECK(a.Parsed && a.Shape == engine_probe::Probe::game_Shape::cone && !a.Unparsed && a.Name == logic::Text("torus"));
+  const MeshData box = primitives::box(Vec3(1, 2, 3), Vec3(0.5f, 0.25f, 1));
+  CHECK(a.Box.positions.size() == box.positions.size() && a.Box.indices.size() == box.indices.size() && !box.positions.empty());
+  CHECK(std::bit_cast<u64>(a.Friction) == std::bit_cast<u64>(static_cast<f64>(physics::surface_friction(physics::Surface::cloth, physics::Surface::tpu))));
+}
+
+// What a call the class makes itself costs: where the function of the engine asks for no memory, the call
+// asks for none - nothing is packed into a value, no list of values is made, no name is looked up. (The
+// same calls through the door ask for memory every time.)
+TEST(engine_calls_class_asks_for_no_memory) {
+  NativeEngineHost itself, door;
+  itself.direct = true;
+  engine_probe::Probe a, b;
+  a.kern_world.host = &itself;
+  a.kern_world.engine = itself.engine_objects();
+  b.kern_world.host = &door;
+  bool known = false;
+  f32 friction = 0;
+  Quat q;
+  Vec3 angles;
+  Mat4 matrix;
+  game::Transform back;
+  physics::Pose frame;
+  const game::Transform placed{Vec3(1, 2, 3), Vec3(10, 20, 30), Vec3(1, 1.5f, 2)};
+  // the functions of the engine themselves ask for none
+  CHECK(memory_asked_by([&] {
+          q = game::euler_to_quat(Vec3(10, 20, 30));
+          angles = game::quat_to_euler(q);
+          matrix = game::transform_matrix(placed);
+          back = game::matrix_transform(matrix);
+          friction = physics::surface_friction(physics::Surface::cloth, physics::Surface::tpu);
+          frame = physics::frame_from_axis(Vec3(1, 2, 3), Vec3(0, 0, 1), true);
+          known = game::motion_name_ok("idle");
+        }) == 0);
+  (void)known, (void)friction, (void)angles, (void)back, (void)frame;
+  for (engine_probe::Probe* p : {&a, &b}) {
+    p->engine_mixer_make(p->n1);
+    p->Mixer = p->n1.result;
+    p->engine_mixer_init(p->n2, p->Mixer, 48000, 16);
+  }
+  const auto calls = [](engine_probe::Probe& p) {
+    p.Rate = p.engine_mixer_sample_rate(p.Mixer);            // an object of the engine by its handle
+    p.Clips = p.engine_mixer_clip_count(p.Mixer);
+    p.Turned = p.engine_game_euler_to_quat(kern::Vec3(10, 20, 30));  // a struct the engine gives
+    p.Angles = p.engine_game_quat_to_euler(p.Turned);        // ... and takes
+    p.Matrix = p.engine_game_transform_matrix(p.Placed);     // a list of a fixed length in a struct
+    p.Back = p.engine_game_matrix_transform(p.Matrix);
+    p.Friction = p.engine_physics_surface_friction(engine_probe::Probe::physics_Surface::cloth, engine_probe::Probe::physics_Surface::tpu);  // enums
+    p.Frame = p.engine_physics_frame_from_axis(kern::Vec3(1, 2, 3), kern::Vec3(0, 0, 1), true);  // a struct in a struct
+    p.Known = p.engine_game_motion_name_ok("idle");          // a text written out in the program
+  };
+  const long by_itself = memory_asked_by([&] { calls(a); });
+  const long through_door = memory_asked_by([&] { calls(b); });
+  CHECK(by_itself == 0);
+  CHECK(through_door > 0);
+  if (by_itself != 0) std::printf("the class asked for memory %ld times in calls of the engine it made itself\n", by_itself);
+  CHECK(itself.door == 0 && a.Rate == 48000 && b.Rate == 48000 && a.shown() == b.shown());
+}
+
 TEST(audio_mixer_panning_and_limits) {
   audio::Mixer m;
   CHECK(!m.ready());
