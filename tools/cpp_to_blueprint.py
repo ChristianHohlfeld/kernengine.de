@@ -4518,7 +4518,8 @@ class Emit:
         i = bare(inc) if inc else {}
         counting = (v is not None and NUMBER.get(self.ctype(v)) == "Int" and v.get("init") and c.get("kind") == "BinaryOperator" and c.get("opcode") in ("<", "<=")
                     and self.refers(kids(c)[0], v["id"]) and i.get("kind") == "UnaryOperator" and i.get("opcode") == "++" and self.refers(kids(i)[0], v["id"])
-                    and v["id"] not in self.assigned(body) and not any(x in self.assigned(body) for x in self.reads(kids(c)[1])) and not has_break)
+                    and v["id"] not in self.assigned(body) and not any(x in self.assigned(body) for x in self.reads(kids(c)[1])) and not has_break
+                    and not self.asks_engine(kids(c)[1]))
         if counting:
             node = self.u.next_node
             self.u.next_node += 1
@@ -4540,6 +4541,18 @@ class Emit:
         loop = self.enter_loop(body)
         lines = self.loop_body(loop, [body], self.effect_stmt(inc) if inc else None)
         return out + self.loop_lines(condition, cond_pre, lines, loop)
+
+    def asks_engine(self, n):
+        """Does this expression call a function only the engine can do (Api.declared_only)? C++ works out the
+        condition of a loop before every round: a bound that asks the engine (`c < server_->max_clients()`)
+        is asked every round - the engine sees each call -, so it is no bound a counting loop works out once."""
+        tree = self.tree
+        for x in walk(n):
+            for i in (x.get("referencedDecl", {}).get("id"), x.get("referencedMemberDecl")):
+                e = tree.decl.get(i) if i else None
+                if e is not None and (e["id"] in self.u.engine_calls or self.u.api().declared_only(e)):
+                    return True
+        return False
 
     def effect_stmt(self, n):
         saved, self.pre = self.pre, []
@@ -13611,6 +13624,18 @@ def main(argv):
         # what they are given, and that changes back)
         state = (tuple(sorted(asks.items())), tuple(sorted(given.items())))
         if state in met:
+            # (what goes round: per Blueprint, the functions whose outcome differs between what it gave - written or the reason
+            # it waits -, and what of its exports differs: the finding to look for the cause with)
+            for u in sorted(new):
+                seen = gave[u]
+                for a, b in zip(seen, seen[1:]):
+                    ta, tb = a[0], b[0]
+                    moved = [f"{tb.get(k, ta.get(k))['cpp']}: {ta[k]['wait'] or 'written' if k in ta else 'absent'} -> {tb[k]['wait'] or 'written' if k in tb else 'absent'}"
+                             for k in sorted(set(ta) | set(tb)) if (ta.get(k) or {}).get("wait") != (tb.get(k) or {}).get("wait") or (k in ta) != (k in tb)]
+                    ea, eb = a[1], b[1]
+                    exported = [k for da, db in zip(ea, eb) if isinstance(da, dict) and isinstance(db, dict)
+                                for k in sorted(set(da) | set(db), key=str) if da.get(k) != db.get(k)]
+                    print(f"goes round: {u}: " + "; ".join(moved[:6]) + (f"; exports differ: {', '.join(map(str, exported[:6]))}" if exported else ("" if moved else "; exports differ")), flush=True)
             raise SystemExit("these Blueprints give, round after round, what they gave before (what one writes takes from the other what "
                              "it writes): " + ", ".join(sorted(new)))
         met.add(state)
