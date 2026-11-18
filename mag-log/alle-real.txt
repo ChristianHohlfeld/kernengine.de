@@ -1,0 +1,22 @@
+FAIL converted_city_stream_cpp
+FAIL converted_rigid_spec
+ok   converted_Arondight45_DroneFC_Core
+ok   converted_Arondight45_FirmwareRuntime
+ok   converted_Arondight45_HardwareSensors
+ok   converted_Arondight45_StateControl
+ok   converted_blueprint_call
+ok   converted_city_stream
+ok   converted_combat_rules_cpp
+ok   converted_common
+ok   converted_drone
+ok   converted_drone_cpp
+ok   converted_engine_geo_mesh_data
+ok   converted_engine_geo_roads
+ok   converted_engine_math_math
+ok   converted_engine_physics_physics
+ok   converted_mvt
+ok   converted_terrain
+ok   converted_tiles
+LECK converted_city_stream_cpp: SUMMARY: AddressSanitizer: 82761079 byte(s) leaked in 302396 allocation(s).
+LECK converted_city_stream: SUMMARY: AddressSanitizer: 84012427 byte(s) leaked in 307383 allocation(s).
+--- 17 ok, 2 FAIL, 0 ABBRUCH, 2 LECK, 0 ZEIT, von 19 Tests; cost: 52, note: 19
