@@ -159,6 +159,27 @@ MATH = {"sqrt": "sqrt", "sqrtf": "sqrt", "fabs": "abs", "fabsf": "abs", "abs": "
         "copysign": "copysign", "copysignf": "copysign", "remainder": "remainder", "remainderf": "remainder"}
 
 
+# The functions of a formula whose number only the engine's own mathematics says (kern::math: sin, cos, tan ... as
+# every machine computes them the same) - each with how many arguments it takes. A constant of the program
+# computed with one of them is the number the engine gives for it (engine_formula).
+ENGINE_MATH = {"sin": 1, "cos": 1, "tan": 1, "asin": 1, "acos": 1, "atan": 1, "atan2": 2, "exp": 1, "log": 1, "pow": 2}
+_FORMULAS = {}
+
+
+def engine_formula(text):
+    """What a formula without inputs gives, computed by the engine (tools/blueprint_cpp.sh --formula): the bits
+    of the number a Blueprint has for it, in every tier and on every machine."""
+    if text not in _FORMULAS:
+        r = subprocess.run([os.path.join(ROOT, "tools", "blueprint_cpp.sh"), "--formula", text], capture_output=True, text=True)
+        try:
+            _FORMULAS[text] = float.fromhex(r.stdout.strip()) if r.returncode == 0 else None
+        except ValueError:
+            _FORMULAS[text] = None
+    if _FORMULAS[text] is None:
+        raise Wait(f"a constant the engine's formula does not compute: {text}")
+    return _FORMULAS[text]
+
+
 VECTOR_FUNCTIONS = ("length", "dot", "cross", "distance", "normalize", "lerp", "length_sq", "distance_sq", "finite", "min_of", "max_of", "clamp", "hex_color", "vmin", "vmax")
 MORE_MATH = ("hypot", "clampf", "lerp", "sign0", "hash_u32", "ldexp", "ldexpf", "tanh", "tanhf", "sinh", "sinhf", "cosh", "coshf", "asinh", "asinhf", "log2", "log2f", "log10", "log10f", "cbrt", "cbrtf")
 
@@ -2480,6 +2501,10 @@ class Const:
                 return min(args)
             if name in ("max", "max_of", "fmax"):
                 return max(args)
+            # (sin, cos, tan ... : the number the language's own function gives - the engine computes it, with its
+            # own mathematics, the same on every machine: what a Blueprint calling the function has)
+            if MATH.get(name) in ENGINE_MATH and len(args) == ENGINE_MATH[MATH[name]] and all(math.isfinite(a) for a in args):
+                return engine_formula(f"{MATH[name]}({', '.join(repr(float(a)) for a in args)})")
             raise Wait(f"a constant computed with {name}()")
         if k == "CXXDefaultInitExpr" or k == "ImplicitValueInitExpr" or k == "CXXScalarValueInitExpr":
             return 0.0
@@ -4188,8 +4213,13 @@ class Emit:
             return self.for_loop(s), False
         if k == "WhileStmt":
             c = kids(s)
+            declared = []
+            if s.get("hasVar") and len(c) > 2 and c[0].get("kind") == "DeclStmt":
+                # `while (auto m = next()) ...` - what the condition declares is made anew before every test of it
+                declared = self.block([c[0]])
+                c = c[1:]
             cond = self.bx(c[0])
-            cond_pre = self.take_pre()
+            cond_pre = declared + self.take_pre()
             loop = self.enter_loop(c[-1])
             body = self.loop_body(loop, [c[-1]])
             return self.loop_lines(cond, cond_pre, body, loop), False
@@ -5694,6 +5724,8 @@ class Emit:
                 break
         if self.nothing(b):
             return bt + "{}"
+        if b.get("kind") == "MemberExpr" and b.get("name") == "data" and kids(b) and re.match(r"(?:const\s+)?(?:kern::)?Span<", self.ctype(kids(b)[0])) and self.tp_or_none(kids(b)[0]) == bt:
+            return self.ex(kids(b)[0], bt)   # (the data of a view of a list - kern::Span - is the list the view is)
         if b.get("kind") == "UnaryOperator" and b.get("opcode") == "&":
             return f'list_make<{it}, "1">({self.ex(kids(b)[0], it)})'
         raw = bare(a)
@@ -8462,6 +8494,14 @@ class Emit:
                 return (r if name == "operator==" else f"logic_not({r})"), "Bool"
         if len(ops) == 2 and self.tp(ops[1]) == "Text" and name in ("operator==", "operator!=") and t0 == "Text":
             pass
+        if t0 and t0.startswith("List<") and name in ("operator==", "operator!=") and len(ops) == 2 and self.tp(ops[1]) == t0 and not self.own(ref.get("id")):
+            # a == b of two std::vector of one type: Lists Equal - as many items, each equal to the one at its
+            # place. (Items that are numbers, flags, texts or values of an enum: their == is the language's; what
+            # the == of a class of the program says is that class's own matter.)
+            it = t0[5:-1]
+            if it in ("Int", "Float", "Bool", "Text", "Int64") or it in self.u.enum_values:
+                r = f"list_equal<{it}>({self.ex(ops[0], t0)}, {self.ex(ops[1], t0)})"
+                return (r if name == "operator==" else f"logic_not({r})"), "Bool"
         raise Wait(f"the operator {name[8:]} of {t0}")
 
     def owned_object(self, n):

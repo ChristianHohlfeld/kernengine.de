@@ -261,19 +261,27 @@ class Version:
 
     @staticmethod
     def _unify(pattern, instance, names):
-        """The types the template's parameters are in an instance: the pattern's type matched with the instance's."""
+        """The types the template's parameters are in an instance: the pattern's type matched with the instance's.
+        (The compiler spells one type in more than one way - `std::vector<Scorch> &`, `const sc::Marks::Scorch &`:
+        the same name at the end, more or less of what it stands in before it. The fullest spelling is the type.)"""
         parts = re.split(r"(?<![\w])(" + "|".join(re.escape(nm) for nm in names) + r")(?![\w])", re.sub(r"\s+", " ", pattern))
-        rx, met = "", set()
+        rx, met = "", {}
         for k, part in enumerate(parts):
             if k % 2 == 0:
                 rx += re.escape(part)
             else:
-                rx += f"(?P={part})" if part in met else f"(?P<{part}>.+?)"
-                met.add(part)
+                met.setdefault(part, []).append(f"p{k}")
+                rx += f"(?P<p{k}>.+?)"
         m = re.fullmatch(rx, re.sub(r"\s+", " ", instance))
         if not m:
             raise Stop(f"the instance {instance} of the template {pattern}: its types are not found")
-        return {nm: m.group(nm) for nm in names}
+        out = {}
+        for nm in names:
+            spelled = sorted({m.group(g) for g in met.get(nm, [])}, key=len)
+            if not spelled or any(a != spelled[-1] and not spelled[-1].endswith("::" + a) for a in spelled):
+                raise Stop(f"the instance {instance} of the template {pattern}: its types are not found")
+            out[nm] = spelled[-1]
+        return out
 
     # ---- what the file keeps ----
     def actor_of(self, node):

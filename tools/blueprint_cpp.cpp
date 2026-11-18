@@ -4,6 +4,7 @@
 //   tools/blueprint_cpp.sh --apply <level.klevel> <actor | Level> <text.cpp> [<actor> <text.cpp> ...]
 //                                                        (the other way: Blueprints from their C++ texts)
 //   tools/blueprint_cpp.sh --node-names                  (the names the nodes have in a Blueprint's C++)
+//   tools/blueprint_cpp.sh --formula "tan(0.5)"          (what a formula without inputs gives, with every bit)
 //
 // For every Blueprint of the level - the level's own and each actor's - that a C++ compiler can
 // run as it stands (logic::native_ready), <out.cpp> gets its C++ text, exactly as logic::to_cpp
@@ -172,8 +173,19 @@ int main(int argc, char** argv) {
     }
     return 0;
   }
+  if (argc == 3 && std::string(argv[1]) == "--formula") {
+    // (what a formula without inputs gives: the number as the language computes it - its own sin, cos, tan ... -,
+    // said with every bit: C's hexadecimal notation of a double)
+    const logic::Formula f(argv[2]);
+    if (!f.ok() || !f.inputs().empty()) {
+      std::fprintf(stderr, "%s: %s\n", argv[2], f.ok() ? "a formula without inputs is asked for" : f.error().c_str());
+      return 1;
+    }
+    std::printf("%a\n", f.evaluate(nullptr, 0));
+    return 0;
+  }
   if (argc < 3 || std::string(argv[1]) == "--apply") {
-    std::fprintf(stderr, "usage: blueprint_cpp <level.klevel> <out.cpp>\n       blueprint_cpp --apply <level.klevel> <actor | Level> <text.cpp> [<actor> <text.cpp> ...]\n       blueprint_cpp --node-names\n");
+    std::fprintf(stderr, "usage: blueprint_cpp <level.klevel> <out.cpp>\n       blueprint_cpp --apply <level.klevel> <actor | Level> <text.cpp> [<actor> <text.cpp> ...]\n       blueprint_cpp --node-names\n       blueprint_cpp --formula <formula without inputs>\n");
     return 2;
   }
   std::string text, why;
