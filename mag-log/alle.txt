@@ -1,0 +1,13 @@
+FAIL converted_rigid_spec
+ok   converted_Arondight45_DroneFC_Core
+ok   converted_Arondight45_FirmwareRuntime
+ok   converted_Arondight45_HardwareSensors
+ok   converted_Arondight45_StateControl
+ok   converted_blueprint_call
+ok   converted_common
+ok   converted_drone
+ok   converted_drone_cpp
+ok   converted_engine_math_math
+ok   converted_engine_physics_physics
+ABBRUCH converted_combat_rules_cpp (rc=1): ==913944==ERROR: AddressSanitizer: heap-use-after-free on address 0x503004fdc320 at pc 0x5f9f1c30f6e3 bp 0x7ffef0762040 sp 0x7ffef0762030 SUMMARY: AddressSanitizer: heap-use-after-free /dev/shm/spawncity-jobs-chris/work-k-vergleich-222911-25281/kern/include/ke
+--- 10 ok, 1 FAIL, 1 ABBRUCH, 0 ZEIT, von 12 Tests; cost: 10, note: 4

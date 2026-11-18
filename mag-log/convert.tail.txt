@@ -1,0 +1,80 @@
+    enemy_hit_chance (5): written
+    enemy_budget (5): written
+    run_of (1): written
+    take (6): written
+    Chaos::award (7): written
+    Chaos::tick (5): written
+    bind_fun (13): state outside a function (a variable of the file: a library keeps nothing)
+    contract (1): state outside a function (a variable of the file: a library keeps nothing)
+    run_of (4): written
+    take (20): written
+    Fun::apply (7): written
+    Fun::multiplier (1): written
+    Fun::police_damage_scale (5): written
+    bind_race (18): state outside a function (a variable of the file: a library keeps nothing)
+    gate (1): state outside a function (a variable of the file: a library keeps nothing)
+    gate_axes (6): written
+    Race::reset (1): written
+    Race::crossed (5): written
+    Race::update (21): written
+    race_time (7): written
+common                         18 /   18 functions       51 /     51 lines
+    clampf (1): written
+    sign0 (1): written
+    rate_limit (1): written
+    damp_alpha (1): written
+    wrap_pi (5): written
+    conj (1): written
+    to_local (1): written
+    qnormalize (4): written
+    yaw_quat (1): written
+    heading_of (1): written
+    slerp (8): written
+    read_body (4): written
+    Rng::seeded (1): written
+    Rng::next (1): written
+    Rng::unit (1): written
+    Rng::range (1): written
+    Rng::gaussian (8): written
+    cast (10): written
+drone                           5 /    5 functions        5 /      5 lines
+    Drone::telemetry (1): a name for a place - written where it is called
+    Drone::params (1): a name for a place - written where it is called
+    Drone::motor_position (1): written
+    Drone::rotor_angle (1): written
+    Drone::parked (1): written
+drone_cpp                      13 /   13 functions      342 /    342 lines
+    battery_ocv (4): written
+    battery_under_load (3): written
+    encode_sbus (10): written
+    put_be16 (6): written
+    quat_yaw_deg (3): written
+    clearance_rate (6): written
+    clearance_lead (6): written
+    Drone::Drone (12): written
+    Drone::rigid_spec (75): written
+    Drone::reset (22): written
+    Drone::imu_bytes (25): written
+    Drone::motor_tick (39): written
+    Drone::step (131): written
+engine_math_math                2 /    2 functions       10 /     10 lines   (what the program calls of it)
+    Quat::axis_angle (5): written
+    Quat::rotate (5): written
+engine_physics_physics          2 /    2 functions        2 /      2 lines   (what the program calls of it)
+    Body::valid (1): written
+    QueryFilter::QueryFilter (1): written
+rigid_spec                      3 /    3 functions       51 /     51 lines
+    capsule_between (14): written
+    create_body (29): written
+    box_inertia (8): written
+
+158 of 166 functions of the program are written as Blueprints (1778 of 1894 lines), and 4 of the engine's headers that they call: 13 Blueprints - 2 of source files, 0 of states, 11 of headers and of shapes
+152 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+     2 (    67)   state outside the function is changed
+     6 (    49)   state outside a function (a variable of the file: a library keeps nothing)
+
+real	2m58,752s
+user	5m11,716s
+sys	0m17,063s
