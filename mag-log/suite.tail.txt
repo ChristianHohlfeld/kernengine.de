@@ -1,0 +1,80 @@
+    [5728, 5760) '<unknown>'
+    [5792, 5824) '<unknown>'
+    [5856, 5888) '<unknown>'
+    [5920, 5952) '<unknown>'
+    [5984, 6016) '<unknown>'
+    [6048, 6080) '<unknown>'
+    [6112, 6144) '<unknown>'
+    [6176, 6208) '<unknown>'
+    [6240, 6272) '<unknown>'
+    [6304, 6336) '<unknown>'
+    [6368, 6400) '<unknown>'
+    [6432, 6464) '<unknown>'
+    [6496, 6528) '<unknown>'
+    [6560, 6592) '<unknown>'
+    [6624, 6656) '<unknown>'
+    [6688, 6720) '<unknown>'
+    [6752, 6784) '<unknown>'
+    [6816, 6848) '<unknown>'
+    [6880, 6912) '<unknown>'
+    [6944, 6976) '<unknown>'
+    [7008, 7040) '<unknown>'
+    [7072, 7104) '<unknown>'
+    [7136, 7168) '<unknown>'
+    [7200, 7232) '<unknown>'
+    [7264, 7296) '<unknown>'
+    [7328, 7360) '<unknown>'
+    [7392, 7424) '<unknown>'
+    [7456, 7488) '<unknown>'
+    [7520, 7576) 'made' (line 504)
+    [7616, 7704) 'draw' (line 472)
+    [7744, 7832) 'draw' (line 491)
+    [7872, 7960) 'draw' (line 513)
+    [8000, 8088) 'draw' (line 533)
+    [8128, 8216) 'draw' (line 555)
+    [8256, 8344) 'draw' (line 577)
+    [8384, 8512) '<unknown>'
+    [8544, 8800) '<unknown>'
+    [8864, 9376) '<unknown>'
+    [9440, 9952) '<unknown>'
+    [10016, 10528) '<unknown>'
+    [10592, 11104) '<unknown>'
+HINT: this may be a false positive if your program uses some custom stack unwind mechanism, swapcontext or vfork
+      (longjmp and C++ exceptions *are* supported)
+SUMMARY: AddressSanitizer: stack-buffer-overflow ../../../../src/libsanitizer/sanitizer_common/sanitizer_common_interceptors.inc:3566 in StrtolFixAndCheck
+Shadow bytes around the buggy address:
+  0x792b02dbd280: f2 f2 f2 f2 f8 f8 f2 f2 f8 f8 f2 f2 00 00 f2 f2
+  0x792b02dbd300: 00 00 f2 f2 f8 f8 f8 f8 f2 f2 f2 f2 f8 f8 f8 f8
+  0x792b02dbd380: f2 f2 f2 f2 f8 f8 f8 f8 f2 f2 f2 f2 f8 f8 f8 f8
+  0x792b02dbd400: f2 f2 f2 f2 f8 f8 f8 f8 f2 f2 f2 f2 f8 f8 f8 f8
+  0x792b02dbd480: f2 f2 f2 f2 00 00 00 00 f2 f2 f2 f2 00 00 00 00
+=>0x792b02dbd500: f2[f2]f2 f2 00 00 00 00 f2 f2 f2 f2 00 00 00 00
+  0x792b02dbd580: f2 f2 f2 f2 00 00 00 00 f2 f2 f2 f2 00 00 00 00
+  0x792b02dbd600: f2 f2 f2 f2 f8 f8 f8 f8 f2 f2 f2 f2 f8 f8 f8 f8
+  0x792b02dbd680: f2 f2 f2 f2 f8 f8 f8 f8 f2 f2 f2 f2 00 00 00 00
+  0x792b02dbd700: f2 f2 f2 f2 00 00 00 00 f2 f2 f2 f2 00 00 00 00
+  0x792b02dbd780: f2 f2 f2 f2 00 00 00 00 f2 f2 f2 f2 00 00 00 00
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+==670768==ABORTING
+
+real	28m47,665s
+user	273m11,350s
+sys	6m8,408s

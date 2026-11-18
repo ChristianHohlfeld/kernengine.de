@@ -1,0 +1,80 @@
+    Game::player_position (13): written
+    Game::focus_position (4): written
+    Game::clear_spot (39): a Game_Spot where a Int is needed
+    Game::spawn_guard (26): it calls Game::clear_spot(), which waits
+    Game::place_world (43): it calls Game::clear_spot(), which waits
+    Game::hide_soldier (4): written
+    Game::show_soldier (9): written
+    Game::put_down (8): written
+    Game::spawn_guard_step (34): written
+    Game::standing_feet (11): written
+    Game::toggle_drone (41): written
+    Game::switch_mode (34): written
+    Game::try_enter (18): it calls Session::to_host(), which waits
+    Game::exit_vehicle (31): written
+    Game::eject (14): written
+    Game::fixed_step (34): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a ImplicitCastExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    Game::drive_traffic (86): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a ImplicitCastExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    Game::traffic_advance (26): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a ImplicitCastExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    Game::step_parachute (20): written
+    Game::manage_traffic (98): an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
+    Game::update (87): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘look_apply_tier’ was not declared in this scope)
+    Game::update_camera (149): a break in the middle of a switch case
+    Game::draw_vehicles (27): a Car made by a constructor
+    Game::audio_init (11): its test cannot compare it yet (the test has no values of the variables of Game: sfx_id_ids (the test has no values of ))
+    Game::audio_render (13): written
+    Game::update_sound (38): tuple / variant
+    Game::hud_json (136): its test cannot compare it yet (the test has no values of the variables of Game: life_draw_ragdolls_bones (the test has no values of ))
+    Game::command (268): it calls Game::ctl_strike_confirm(), which waits
+Game/game_foot_rounds_cpp is converted again: what it calls of Game/game_weapons_cpp is written now
+Game/game_vr_cpp is converted again: what it calls of Game/game_weapons_cpp is written now
+Game/game_weapons_cpp           6 /   13 functions       89 /    380 lines
+    Game::init_weapons (8): written
+    Game::select_foot_weapon (42): written
+    Game::cycle_foot_weapon (7): written
+    Game::game_weapon_in_hand (1): written
+    Game::aim_ray (6): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘draw_state_Game’ was not declared in this scope; did you mean ‘draw_seats__Table’?)
+    Game::hit_scan (86): its test cannot compare it yet (the test has no values of the variables of Game: sfx_id_ids (the test has no values of ))
+    Game::fire_projectile (20): written
+    Game::update_projectiles (61): it calls Game::aim_ray(), which waits
+    Game::foot_attack (43): it calls Game::aim_ray(), which waits
+    Game::throw_grenade (14): it calls Game::aim_ray(), which waits
+    Game::drone_attack (32): it calls Game::aim_ray(), which waits
+    Game::jet_attack (49): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘draw_state_Game’ was not declared in this scope; did you mean ‘draw_seats__Table’?)
+    Game::draw_projectiles (11): written
+Game/game_foot_rounds_cpp       8 /   14 functions       98 /    401 lines
+    Game::soft_target_near (17): written
+    Game::car_near_point (12): written
+    Game::round_meets_mate (7): written
+    Game::grenade_bounce (21): its test cannot compare it yet (the test has no values of the variables of Game: sfx_id_ids (the test has no values of ))
+    Game::foot_round_step (100): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘draw_state_Game’ was not declared in this scope; did you mean ‘draw_seats__Table’?)
+    Game::foot_remote_detonate (9): written
+    Game::blast_police_drones (19): written
+    Game::rocket_laser_dot (15): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘draw_state_Game’ was not declared in this scope; did you mean ‘draw_seats__Table’?)
+    Game::foot_rocket_launched (8): written
+    Game::rocket_smoke_emit (12): written
+    Game::foot_rounds_update (60): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘draw_state_Game’ was not declared in this scope; did you mean ‘draw_seats__Table’?)
+    Game::gaps_sniper_rounds (14): written
+    Game::melee_hit (46): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘draw_state_Game’ was not declared in this scope; did you mean ‘draw_seats__Table’?)
+    Game::melee_attack (61): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘draw_state_Game’ was not declared in this scope; did you mean ‘draw_seats__Table’?)
+Game/game_vr_cpp                8 /   13 functions      144 /    652 lines
+/dev/shm/spawncity-jobs-chris/work-voll-162644-5528/tmp/kern-cpp-to-blueprint-mc7tp2db/net_session_cpp.cpp: line 611, column 20: the number 78 names two nodes
+  (the texts: /dev/shm/spawncity-jobs-chris/work-voll-162644-5528/tmp/kern-cpp-to-blueprint-mc7tp2db)
+    Game::vr_melee (81): it calls Session::to_host(), which waits
+    Game::vr_grab (142): it calls Session::to_host(), which waits
+    Game::vr_menu_input (115): it calls Game::ctl_strike_confirm(), which waits
+    Game::vr_menu_json (15): written
+    Game::vr_set_hand (8): written
+    Game::vr_room (18): written
+    Game::vr_room_forward (5): written
+    Game::vr_hand_matrix (14): written
+    Game::vr_hand_ray (7): written
+    Game::vr_foot (82): it calls Game::ctl_strike_confirm(), which waits
+    Game::vr_scope_update (60): written
+    Game::vr_update_view (17): written
+    Game::vr_comfort (88): a member of Int is set
+the Blueprints were not read: the level is as it was
+
+real	82m1,786s
+user	155m45,266s
+sys	8m16,028s
