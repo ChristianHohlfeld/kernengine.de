@@ -1,0 +1,80 @@
+       |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp: In member function ‘void kern_blueprint_85007f20c314edae::net_session_cpp::Session_destroy_to_host(kern_blueprint_7b52d5b89126c494::net_session::net_Session&, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::List<kern::logic::Whole>&)’:
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp:101517:10: warning: unused variable ‘connected’ [-Wunused-variable]
+101517 |     Bool connected = false;
+       |          ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp:101520:10: warning: variable ‘send’ set but not used [-Wunused-but-set-variable]
+101520 |     Bool send = false;
+       |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp: In member function ‘void kern_blueprint_5386c74954a8d1bb::drone_cpp::Drone_step(kern_blueprint_726062f8b819c73a::drone::Drone&, const kern_blueprint_726062f8b819c73a::drone::DroneSticks&, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::Int, kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Body, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::Float)’:
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp:106613:22: warning: unused variable ‘body_type’ [-Wunused-variable]
+106613 |     physics_BodyType body_type = physics_BodyType::fixed;
+       |                      ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp: In member function ‘void kern_blueprint_9add7362c66b8919::world_marks_cpp::Marks_clear(kern_blueprint_707d0495a568cad6::world_marks::Marks&, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::Int)’:
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp:109406:10: warning: unused variable ‘body_valid’ [-Wunused-variable]
+109406 |     Bool body_valid = false;
+       |          ^~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp: In member function ‘kern_blueprint_65219a58ae2620f9::Game::respawn_waitResult kern_blueprint_65219a58ae2620f9::Game::respawn_wait()’:
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp:110844:11: warning: unused variable ‘sim_time’ [-Wunused-variable]
+110844 |     Float sim_time = 0.0;
+       |           ^~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp: In member function ‘void kern_blueprint_65219a58ae2620f9::Game::Game_look_lighting_req(kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::Vector, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::Int, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::Float, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::Float, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::Float)’:
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp:111417:10: warning: variable ‘request’ set but not used [-Wunused-but-set-variable]
+111417 |     Bool request = false;
+       |          ^~~~~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp: In member function ‘void kern_blueprint_65219a58ae2620f9::Game::look_vr_hud()’:
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp:111429:10: warning: unused variable ‘xr’ [-Wunused-variable]
+111429 |     Bool xr = false;
+       |          ^~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp:111432:10: warning: variable ‘set_visible’ set but not used [-Wunused-but-set-variable]
+111432 |     Bool set_visible = false;
+       |          ^~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp:111453:10: warning: variable ‘update_instances’ set but not used [-Wunused-but-set-variable]
+111453 |     Bool update_instances = false;
+       |          ^~~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp:111454:10: warning: variable ‘set_visible_2’ set but not used [-Wunused-but-set-variable]
+111454 |     Bool set_visible_2 = false;
+       |          ^~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp: In member function ‘void kern_blueprint_65219a58ae2620f9::Game::mix_voice(kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::List<double>&, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::Int)’:
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp:111621:10: warning: unused variable ‘ready’ [-Wunused-variable]
+111621 |     Bool ready = false;
+       |          ^~~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp: In member function ‘void kern_blueprint_65219a58ae2620f9::Game::draw_world_vehicles()’:
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp:111893:10: warning: unused variable ‘body_valid’ [-Wunused-variable]
+111893 |     Bool body_valid = false;
+       |          ^~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp: In member function ‘void kern_blueprint_65219a58ae2620f9::Game::vr_room(kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::Vector&, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::Vector&, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::Vector&)’:
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp:112042:10: warning: unused variable ‘xr_follow_head’ [-Wunused-variable]
+112042 |     Bool xr_follow_head = false;
+       |          ^~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp:112049:10: warning: unused variable ‘xr_full_room’ [-Wunused-variable]
+112049 |     Bool xr_full_room = false;
+       |          ^~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp: In member function ‘kern_blueprint_65219a58ae2620f9::Game::vr_hand_matrixResult kern_blueprint_65219a58ae2620f9::Game::vr_hand_matrix(kern_blueprint_388516bead732334::engine_math_math::Mat4&, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::Int)’:
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp:112092:10: warning: unused variable ‘xr’ [-Wunused-variable]
+112092 |     Bool xr = false;
+       |          ^~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp: In member function ‘kern_blueprint_65219a58ae2620f9::Game::vr_grab_validResult kern_blueprint_65219a58ae2620f9::Game::vr_grab_valid(kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::Int, kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Body)’:
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp:112136:10: warning: unused variable ‘body_valid’ [-Wunused-variable]
+112136 |     Bool body_valid = false;
+       |          ^~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp:112139:22: warning: unused variable ‘body_type’ [-Wunused-variable]
+112139 |     physics_BodyType body_type = physics_BodyType::fixed;
+       |                      ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp: In member function ‘void kern_blueprint_65219a58ae2620f9::Game::vr_scope_update()’:
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp:112198:10: warning: unused variable ‘xr’ [-Wunused-variable]
+112198 |     Bool xr = false;
+       |          ^~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp:112202:10: warning: variable ‘set_visible’ set but not used [-Wunused-but-set-variable]
+112202 |     Bool set_visible = false;
+       |          ^~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp:112229:10: warning: variable ‘update_instances’ set but not used [-Wunused-but-set-variable]
+112229 |     Bool update_instances = false;
+       |          ^~~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp:112230:10: warning: variable ‘set_visible_2’ set but not used [-Wunused-but-set-variable]
+112230 |     Bool set_visible_2 = false;
+       |          ^~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp: In member function ‘void kern_blueprint_65219a58ae2620f9::Game::Game_step_world_water(kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::Int, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::Int, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::Int, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::Vector, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::Bool)’:
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-232247-24031/kern/games/spawncity/src/level_blueprints.cpp:112461:10: warning: unused variable ‘actor_alive’ [-Wunused-variable]
+112461 |     Bool actor_alive = false;
+       |          ^~~~~~~~~~~
