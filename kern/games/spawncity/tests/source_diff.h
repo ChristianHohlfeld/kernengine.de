@@ -19,6 +19,7 @@
 #pragma once
 
 #include <bit>
+#include <chrono>
 #include <climits>
 #include <deque>
 #include <cstring>
@@ -627,8 +628,18 @@ struct Tally {
   std::string function;
   int compared = 0, outside = 0, wrong = 0, costlier = 0;
   long most_new = 0, with_old = 0;
+  std::chrono::steady_clock::time_point began = std::chrono::steady_clock::now();
   explicit Tally(std::string f) : function(std::move(f)) {}
-  bool more(int tried) const { return compared < kCalls && tried < kCalls * 20; }
+  /// Another call? Up to kCalls compared ones; of a function whose calls take long, as many as two seconds have room
+  /// for, but twenty at least - and of one whose calls take seconds each (a 256-bit number raised to a power, limb by
+  /// limb), five at least and as many more as twenty seconds have room for (as the converted tests: converted::Tally).
+  bool more(int tried) const {
+    if (compared >= kCalls || tried >= kCalls * 20) return false;
+    if (compared >= 20) return seconds() < 2.0;
+    return compared < 5 || seconds() < kLong;
+  }
+  static constexpr double kLong = 20.0;
+  double seconds() const { return std::chrono::duration<double>(std::chrono::steady_clock::now() - began).count(); }
   /// One call: whether both sides said what they give (`defined`), what differs (empty: nothing), how often each
   /// asked for memory.
   void take(bool defined, const std::string& differs, long old_asks, long new_asks, int call) {
@@ -639,6 +650,7 @@ struct Tally {
     ++compared;
     if (!differs.empty() && ++wrong <= 3) std::printf("  %s, call %d: %s\n", function.c_str(), call, differs.c_str());
     if (new_asks > old_asks) {
+      if (costlier == 0) std::printf("  %s, call %d: the old asks for memory %ld times, the new %ld times\n", function.c_str(), call, old_asks, new_asks);
       ++costlier;
       if (new_asks - old_asks > most_new - with_old) most_new = new_asks, with_old = old_asks;
     }
@@ -647,7 +659,9 @@ struct Tally {
     SC_CHECK(wrong == 0, "%s: %d of %d calls differ", function.c_str(), wrong, compared);
     SC_CHECK(costlier == 0, "%s: in %d of %d calls the new asks for memory more often than the old (up to %ld times instead of %ld)", function.c_str(), costlier,
              compared, most_new, with_old);
-    SC_CHECK(compared >= 20, "%s: only %d calls could be compared (in %d C++ leaves open what they give)", function.c_str(), compared, outside);
+    const bool long_calls = compared >= 5 && compared < 20 && seconds() >= kLong;
+    if (long_calls) std::printf("  note: %s: %d calls compared (they take %.0f s)\n", function.c_str(), compared, seconds());
+    SC_CHECK(compared >= 20 || long_calls, "%s: only %d calls could be compared (in %d C++ leaves open what they give)", function.c_str(), compared, outside);
     std::printf("  %s: %d calls compared, %d not (C++ leaves them open)\n", function.c_str(), compared, outside);
   }
 };

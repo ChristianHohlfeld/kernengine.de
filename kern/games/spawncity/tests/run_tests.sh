@@ -58,12 +58,14 @@ for b in $(cat "$here"/lowered/test_*.cpp 2>/dev/null | sed -n 's|^// base: \([0
   fi
   printf '#pragma once\n#include "kern/core/jobs.h"\n#undef KERN_JOB\n#define KERN_JOB(kind, fn) static_assert(true)\n' > "$out/base/prelude.h"
   base_sources=()
-  for f in "$dir"/*.cpp; do [ "$(basename "$f")" = main.cpp ] || grep -q '#include "game.h"' "$f" || base_sources+=("$f"); done
+  for f in "$dir"/*.cpp; do case "$(basename "$f")" in main.cpp|level_data.cpp) continue ;; esac; grep -q '#include "game.h"' "$f" || base_sources+=("$f"); done
+  # (the level's text as it stands: what the old program reads of the level is the level the tests run)
+  cp -p "$game/src/level_data.cpp" "$dir/level_data.cpp" && base_sources+=("$dir/level_data.cpp")
   # (a file of the old program the engine as it stands does not compile is not in it: a test that needs it does not link)
   printf '%s\n' "${base_sources[@]}" | CXX_="$cxx" PRELUDE="$out/base/prelude.h" xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c '
     src="$1"; ns="$2"; shift 2
     o="${src%.cpp}.o"
-    [ -f "$o" ] || [ -f "$o.failed" ] || "$CXX_" "$@" -D"sc=$ns" -include "$PRELUDE" -w -c "$src" -o "$o" 2> "$o.log" || touch "$o.failed"' _ {} "$ns" "${flags[@]}"
+    { [ -f "$o" ] && [ ! "$src" -nt "$o" ]; } || [ -f "$o.failed" ] || "$CXX_" "$@" -D"sc=$ns" -include "$PRELUDE" -w -c "$src" -o "$o" 2> "$o.log" || touch "$o.failed"' _ {} "$ns" "${flags[@]}"
   built=()
   for f in "${base_sources[@]}"; do [ -f "${f%.cpp}.o" ] && built+=("${f%.cpp}.o"); done
   lib="$out/base/$ns.a"

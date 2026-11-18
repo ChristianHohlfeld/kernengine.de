@@ -186,6 +186,8 @@ class Version:
         self.record_ids = {}    # id -> qualified name
         self.enums = {}         # qualified name -> the definition (of the whole namespace: what the test may draw)
         self.aliases = {}       # qualified name -> a typedef / using of a type
+        self.declared = []      # (a function the changed files declare without defining it, its scope)
+        self.program_ns = namespace   # (the namespace of the program around this side: the old program's for the old)
         self.variables = []     # (qualified name, node) - the variables of the source file's namespaces
         self.decl_by_id = {}
         for o in self.dumps:
@@ -259,6 +261,8 @@ class Version:
             f = self._function(n, scope, own, None)
             if f is not None:
                 self.functions.append(f)
+            elif own is None and n.get("kind") == "FunctionDecl" and n.get("_at", (None, None))[0] is not None:
+                self.declared.append((n, scope))
         elif k == "VarDecl" and owner is None and os.path.abspath(n.get("_file") or "?") == self.cpp:
             self.variables.append((q(n.get("name") or "?"), n, scope))
 
@@ -422,6 +426,19 @@ class Version:
         """The changes to the file's text that send what C++ leaves open through the guards (source_diff.h,
         converted.h) - and leave out what registers itself at static initialization: {file: [(at, end, text, key)]}."""
         edits = {f: [] for f in self.files}
+        # (a function the changed files declare and another file defines - the level's text, level_data.cpp: the
+        # program's, named where the declaration stands)
+        defined = {(tuple(f.scope), f.name) for f in self.functions}
+        for n, scope in self.declared:
+            if (tuple(scope), n.get("name")) in defined:
+                continue
+            f = os.path.abspath(n.get("_file") or "?")
+            if f not in edits:
+                continue
+            a, b = n["_at"]
+            mm = re.match(r"\s*;", self.text(f)[b:])
+            chain = "::".join([self.program_ns] + [x for x in scope[1:] if x != "(anonymous)"] + [n["name"]])
+            edits[f].append((a, b + (mm.end() if mm else 0), f"using ::{chain};", (a, 2, 0)))
         for f in self.functions:
             self._guard(f.body, edits[f.file], f.file, 0)
             # (and what a constructor makes its fields with: `puffs_(pool)` is a list of `pool` entries)
@@ -769,6 +786,7 @@ class Module:
         self.old_include_dirs = [f[2:] for f in old_flags if f.startswith("-I")]
         self.old = Version(old_cpp, old_header, old_flags, namespace, "old", root=old_dir)
         self.old.now_root = self.src_dir
+        self.old.program_ns = self.base_ns
         self.new = Version(src, self.header, flags, namespace, "new", root=self.src_dir)
         self.namespace = namespace
 
@@ -1301,6 +1319,10 @@ class Writer:
         # every field - the old program's with its namespace renamed, as run_tests.sh builds it)
         game = [h for h in hoisted if h.startswith('#include "') and os.path.exists(os.path.join(m.src_dir, h[10:-1]))]
         out += ['#include "../source_diff.h"'] + [h for h in hoisted if h not in game] + ["#define private public", "#define protected public"]
+        if any(not any(f.name == n.get("name") and tuple(f.scope) == tuple(sc) for f in m.old.functions) for n, sc in m.old.declared) and m.old.header:
+            # (what the old text's header declares and another file of the old program defines: the old program's header
+            # names it there)
+            old_game.setdefault(os.path.relpath(m.old.header, m.old.root), None)
         if old_game:
             out += [f"#define {m.namespace} {m.base_ns}"] + [f'#include "{m.base_ns}/{h}"' for h in old_game] + [f"#undef {m.namespace}"]
         out += game + [""]
@@ -1401,12 +1423,36 @@ class Writer:
             other = next(((nq, r) for nq, (r, _) in m.new.records.items() if nq == q and m.new.mine(r)), None)
             if other is None:
                 continue
-            ofields = [norm(m.old.decl_text(c)) for c in kids(rec) if c.get("kind") == "FieldDecl"]
-            nfields = [norm(m.new.decl_text(c)) for c in kids(other[1]) if c.get("kind") == "FieldDecl"]
+            # (what each field is written with - its initializer's text; a field written without one gives no value)
+            def inits(v, r):
+                out = []
+                for c in kids(r):
+                    if c.get("kind") != "FieldDecl":
+                        continue
+                    init = next((x for x in kids(c) if x.get("kind", "").endswith("Expr") or x.get("kind", "").endswith("Literal")), None) if c.get("hasInClassInitializer") else None
+                    out.append(norm(v.text(os.path.abspath(init["_file"]))[init["_at"][0]:init["_at"][1]]) if init and init.get("_at", (None, None))[1] else None)
+                return out
+            ofields, nfields = inits(m.old, rec), inits(m.new, other[1])
+            if all(x is None for x in ofields + nfields):
+                continue
             written = any(c.get("kind") == "CXXConstructorDecl" and not c.get("isImplicit") for r in (rec, other[1]) for c in kids(r))
             if ofields != nfields and not written and [c.get("name") for c in kids(rec) if c.get("kind") == "FieldDecl"] == [c.get("name") for c in kids(other[1]) if c.get("kind") == "FieldDecl"]:
                 out.append((q, other[0]))
-        return out
+        # (one that holds a class whose fields changed - a list of a reader's entries that became others - cannot be
+        # carried: what its constructor makes is compared where the file's functions make it)
+        def names(q):
+            r = m.old.records.get(q)
+            return [c.get("name") for c in kids(r[0]) if c.get("kind") == "FieldDecl"] if r else None
+        def reshaped(q, depth=0):
+            r = m.old.records.get(q)
+            if r is None or depth > 6:
+                return False
+            nr = m.new.records.get(q)
+            if nr is None or names(q) != [c.get("name") for c in kids(nr[0]) if c.get("kind") == "FieldDecl"]:
+                return True
+            toks = set(re.findall(r"[A-Za-z_]\w*", " ".join((c.get("type") or {}).get("qualType", "") for c in kids(r[0]) if c.get("kind") == "FieldDecl")))
+            return any(reshaped(oq, depth + 1) for oq in m.old.records if oq.split("::")[-1] in toks and m.old.mine(m.old.records[oq][0]) and oq != q)
+        return [x for x in out if not reshaped(x[0])]
 
     def init_case(self, q_old, q_new):
         """The comparison of the compiler's constructors of a class: what each makes, bit for bit."""
