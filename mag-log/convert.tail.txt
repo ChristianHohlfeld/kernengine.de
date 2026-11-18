@@ -1,0 +1,80 @@
+    cast (10): written
+destruction                     4 /    4 functions        8 /      8 lines
+    Destruction::init (1): written
+    Destruction::stats (1): a name for a place - written where it is called
+    Destruction::take_points_log (1): written
+    Destruction::points_list (5): written
+destruction_cpp                 9 /   11 functions      198 /    246 lines
+    norm2 (4): written
+    Destruction::merge_points (11): written
+    Destruction::blast (44): written
+    Destruction::collapse (8): written
+    Destruction::tear (66): written
+    Destruction::fracture (39): written
+    Destruction::spawn (13): written
+    Destruction::free_torn (4): written
+    Destruction::update (41): it calls CityStream::ground_height(), which waits
+    Destruction::draw (7): put() is defined in another file
+    Destruction::reset (9): written
+engine_geo_mesh_data            3 /    3 functions        8 /      8 lines   (what the program calls of it)
+    MeshData::vertex_count (1): written
+    MeshData::triangle_count (1): written
+    MeshData::push (6): written
+engine_geo_roads                1 /    2 functions        4 /     11 lines   (what the program calls of it)
+    GeoProjector::init (7): the engine's fail() (it has no node: a variadic function)
+    GeoProjector::project (4): written
+engine_math_math                7 /    7 functions       36 /     36 lines   (what the program calls of it)
+    Vec4::Vec4 (1): written
+    Quat::axis_angle (5): written
+    Quat::operator* (4): written
+    Quat::rotate (5): written
+    Mat4::operator* (9): written
+    Mat4::translate (1): written
+    Mat4::trs (11): written
+engine_physics_physics          3 /    3 functions        3 /      3 lines   (what the program calls of it)
+    Body::valid (1): written
+    Shape::valid (1): written
+    QueryFilter::QueryFilter (1): written
+mvt                             4 /    4 functions        4 /      4 lines
+    Decoder::done (1): written
+    Decoder::failed (1): written
+    Decoder::tile (1): a name for a place - written where it is called
+    Writer::bytes (1): a name for a place - written where it is called
+terrain                         8 /    9 functions       11 /     12 lines
+    Terrain::settled (1): written
+    Terrain::has_dem (1): written
+    Terrain::water_level (1): elevation() is defined in another file
+    Terrain::deformed (4): written
+    Terrain::crater_count (1): written
+    CraterRec::operator== (1): written
+    Terrain::take_changes (1): written
+    Terrain::stats (1): a name for a place - written where it is called
+    terrarium_height (1): written
+tiles                           2 /    2 functions        2 /      2 lines
+    TileKey::operator== (1): written
+    TileKey::hash (1): written
+
+86 of 114 functions of the program are written as Blueprints (629 of 1384 lines), and 14 of the engine's headers that they call: 15 Blueprints - 2 of source files, 0 of states, 13 of headers and of shapes
+89 functions of the Blueprints are compared with their source, bit for bit, by the tests in /dev/shm/spawncity-jobs-chris/work-d-probe-212615-8375/pt/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+     8 (   255)   the engine's now_ms() (its node is another one in the engine: its pins differ)
+     1 (   110)   read_features() is defined in another file
+     1 (    61)   road_is_water() is defined in another file
+     3 (    60)   remove_tints() is defined in another file
+     2 (    60)   it calls CityStream::ground_height(), which waits
+     3 (    56)   unproject() is defined in another file
+     1 (    44)   chunk_count() is defined in another file
+     1 (    22)   it calls CityStream::remove(), which waits
+     1 (    22)   buildings_input() is defined in another file
+     1 (    17)   a member of Int is set
+     1 (    14)   ready_at() is defined in another file
+     1 (    13)   it calls CityStream::begin_roads(), which waits
+     1 (    12)   add_water_polygon() is defined in another file
+     1 (     7)   put() is defined in another file
+     1 (     1)   height() is defined in another file
+     1 (     1)   elevation() is defined in another file
+
+real	2m53,986s
+user	5m18,875s
+sys	0m18,612s
