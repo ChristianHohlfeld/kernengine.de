@@ -437,7 +437,7 @@ template <class Tag, class C, class B> struct RefCore {
     if (kern_door) kern_door->wrote();
   }
   /// The same place one step on: a field (its member of C and of B), or an entry of a list.
-  template <class T, class CF, class BF> RefCore<T, CF, BF> kern_step(CF C::*c, BF B::*b) const {
+  template <class T, class CF, class BF, class CC = C, class BB = B> RefCore<T, CF, BF> kern_step(CF CC::*c, BF BB::*b) const {
     return {kern_own ? nullptr : &(kern_at->*c), kern_own ? &(kern_own->*b) : nullptr, kern_o, kern_door, kern_keep};
   }
   std::size_t kern_count() const { return kern_own ? kern_own->size() : kern_at->size(); }

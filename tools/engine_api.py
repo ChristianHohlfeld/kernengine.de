@@ -112,6 +112,30 @@ def case_text(api, functions):
             variables.append(f"  {bt} {inputs[bt]} = {zero(bt)};")
         return inputs[bt]
     node = 10
+
+    def place_lines(f, name, at, args, r, binder):
+        bt = f["outs"][0][1]
+        out = [f"{name}({', '.join([f'n{binder}'] + args)});"]
+        variables.append(f"  {bt} {r}_0 = {zero(bt)};")
+        out.append(f"{r}_0 = {at};")
+        if bt.startswith("List<"):
+            item = bt[5:-1]
+            variables.append(f"  Int {r}_1 = 0;")
+            variables.append(f"  {item} {r}_2 = {zero(item)};")
+            variables.append(f"  {bt} {r}_3 = {zero(bt)};")
+            out += [f"list_add({at}, {value(item)});", f"{at}[0] = {value(item)};", f"{r}_1 = list_length<{item}>({at});",
+                    f"{r}_2 = {at}[9];", f"{r}_3 = {at};"]
+        else:
+            variables.append(f"  {bt} {r}_3 = {zero(bt)};")
+            out += [f"{at} = {value(bt)};", f"{r}_3 = {at};"]
+        return out
+
+    # (where the class of a place has a maker without inputs and a releaser: the place of an object it made - and of
+    # the same handle after the object ended)
+    made = {}
+    for f in functions:
+        if f.get("role") in ("make", "release") and (f["role"] == "release" or not f["ins"]):
+            made.setdefault(f.get("class"), {})[f["role"]] = f
     for k, f in enumerate(functions):
         name = f["type"].replace(".", "_")
         args = [value(bt) for _, bt, _ in f["ins"]]
@@ -122,6 +146,12 @@ def case_text(api, functions):
             lines.append(f"R{k} = {name}({', '.join(args)});")
         elif not f["outs"]:
             lines.append(f"{name}({', '.join(args)});")
+        elif f.get("place"):
+            # (a place of the engine: the node binds it, the nodes of places name it - read, set, and a list's
+            # length, an item added, an entry set, one beside it read; here on the handle of no object)
+            node += 1
+            members.append(f"  struct {{ {name}_place<{f['outs'][0][1]}> {f['outs'][0][0]} = {{}}; }} n{node};")
+            lines += place_lines(f, name, f"n{node}.{f['outs'][0][0]}", args, f"R{k}", node)
         else:
             node += 1
             members.append("  struct { " + " ".join(f"{bt} {o} = {zero(bt)};" for o, bt, _ in f["outs"]) + f" }} n{node};")
@@ -133,6 +163,24 @@ def case_text(api, functions):
         method = f.get("role") is None and d.get("kind") == "CXXMethodDecl" and d.get("storageClass") != "static"
         on_object = (method and bool(f["ins"]) and f["ins"][0][2] is not None) or f.get("role") == "release" or (f.get("role") == "make" and not f["ins"])
         (bodies if on_object else free).append(lines)
+    places = []
+    for k, f in enumerate(functions):
+        life = made.get(f["ins"][0][2] if f.get("place") and f["ins"] else None, {})
+        if "make" not in life or "release" not in life:
+            continue
+        node += 1
+        maker, name, mk = life["make"]["type"].replace(".", "_"), f["type"].replace(".", "_"), node
+        variables.append(f"  Int H{k} = 0;")
+        members.append(f"  struct {{ Int result = 0; }} n{mk};")
+        node += 1
+        members.append(f"  struct {{ {name}_place<{f['outs'][0][1]}> {f['outs'][0][0]} = {{}}; }} n{node};")
+        lines = [f"{maker}(n{mk});", f"H{k} = n{mk}.result;", *place_lines(f, name, f"n{node}.{f['outs'][0][0]}", [f"H{k}"], f"P{k}", node)]
+        lines.append(f"{life['release']['type'].replace('.', '_')}(H{k});")
+        variables.append(f"  {f['outs'][0][1]} P{k}_4 = {zero(f['outs'][0][1])};")
+        lines += [f"P{k}_4 = n{node}.{f['outs'][0][0]};", f"n{node}.{f['outs'][0][0]} = {value(f['outs'][0][1])};"]
+        places.append(lines)
+    if places:
+        bodies.append([ln for body in places for ln in body])
     word = re.compile(r"[A-Za-z_]\w*")
     used = set(word.findall("\n".join(variables + members)))
     keep, changed = [False] * len(u.types), True

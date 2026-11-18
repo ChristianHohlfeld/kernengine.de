@@ -294,7 +294,20 @@ struct BlueprintCore : logic::PureNodes {
     return -1;
   }
   template <class T> static Bool list_contains(logic::Items<T> list, const std::type_identity_t<T>& item) { return list_find<T>(list, item) >= 0; }
+  // (the same on a place of the engine - the list the engine holds: read where it stands, as the interpreter
+  // reads it; its length without reading it)
+  template <class X> static decltype(auto) read_of(const X& x) {
+    if constexpr (logic::engine_values::NamesPlace<X>) return x.ref().kern_read();
+    else return (x);
+  }
+  template <class T, logic::engine_values::NamesPlace P> static Int list_length(const P& place) { return static_cast<i64>(place.ref().kern_count()); }
+  template <class T, logic::engine_values::NamesPlace P> static T list_get(const P& place, Int index) { return list_get<T>(read_of(place), index); }
+  template <class T, logic::engine_values::NamesPlace P> static Int list_find(const P& place, const std::type_identity_t<T>& item) { return list_find<T>(read_of(place), item); }
+  template <class T, logic::engine_values::NamesPlace P> static Bool list_contains(const P& place, const std::type_identity_t<T>& item) { return list_find<T>(read_of(place), item) >= 0; }
   /// Lists Equal: as many items, and each equal to the one at its place (the == of two std::vector).
+  template <class T, class A, class B>
+    requires(logic::engine_values::NamesPlace<A> || logic::engine_values::NamesPlace<B>)
+  static Bool list_equal(const A& list, const B& other) { return list_equal<T>(logic::Items<T>(read_of(list)), logic::Items<T>(read_of(other))); }
   template <class T> static Bool list_equal(logic::Items<T> list, logic::Items<T> other) {
     if (list.size() != other.size()) return false;
     for (std::size_t k = 0; k < list.size(); ++k)
@@ -384,8 +397,10 @@ struct BlueprintCore : logic::PureNodes {
   }
   template <logic::engine_values::NamesPlace P, class L> static void list_append(const P& place, const L& items) {
     using BI = typename std::remove_pointer_t<decltype(decltype(place.ref())::kern_own)>::value_type;
-    logic::engine_values::list_append(place, logic::Items<BI>(items));
+    logic::engine_values::list_append(place, logic::Items<BI>(read_of(items)));
   }
+  template <class T, logic::engine_values::NamesPlace P> static void list_append(List<T>& list, const P& items) { list_append<T>(list, read_of(items)); }
+  template <class T, logic::engine_values::NamesPlace P> static void list_insert_list(List<T>& list, Int index, const P& items) { list_insert_list<T>(list, index, read_of(items)); }
   template <class T> static void list_append(List<T>& list, std::type_identity_t<logic::Items<T>> items) {
     logic::list::insert_items(list, static_cast<i64>(list.size()), items.first, items.count);
   }
@@ -403,6 +418,10 @@ struct BlueprintCore : logic::PureNodes {
   template <Setting Into, Setting Of, class T, std::size_t N>
   static void list_copy_bytes(Fixed<T, N>& list, Int at, logic::Items<BytesNumber<logic::bytes::code_of(Of.view())>> items, Int from, Int count) {
     copy_bytes<Into, Of, T>(list.items.data(), N, at, items, from, count);
+  }
+  template <Setting Into, Setting Of, class L, logic::engine_values::NamesPlace P>
+  static void list_copy_bytes(L& list, Int at, const P& items, Int from, Int count) {
+    list_copy_bytes<Into, Of>(list, at, read_of(items), from, count);
   }
   template <Setting Into, Setting Of, class T, class Item, class S>
   static void copy_bytes(Item* to, std::size_t size, Int at, const logic::Items<S>& items, Int from, Int count) {
@@ -486,6 +505,7 @@ struct BlueprintCore : logic::PureNodes {
   }
   /// Text of Bytes: the text a list of bytes is, from At on (one request for memory, as std::string makes it).
   static Text text_of_bytes(logic::Items<Int> bytes, Int at, Int count) { return logic::texts::of_bytes(bytes, at, count); }
+  template <logic::engine_values::NamesPlace P> static Text text_of_bytes(const P& bytes, Int at, Int count) { return text_of_bytes(read_of(bytes), at, count); }
   static Text text_repeat(const Text& a, Int count) { return logic::texts::repeat(a.view(), count); }
   /// Bytes of Text: its bytes, 0 .. 255 (one request for memory, as std::vector of the text's range makes it).
   static List<Int> text_bytes(const Text& a) {
@@ -673,6 +693,7 @@ struct BlueprintCore : logic::PureNodes {
     logic::structs::fields(value, [&](const auto&... field) { (put_bytes(out.items.data(), kLayout.fields[k++], field), ...); });
     return out;
   }
+  template <class S, Setting Layout, logic::engine_values::NamesPlace P> static S struct_of_bytes(const P& bytes, Int at) { return struct_of_bytes<S, Layout>(read_of(bytes), at); }
   template <class S, Setting Layout> static S struct_of_bytes(logic::Items<Int> bytes, Int at) {
     static constexpr logic::bytes::Layout kLayout = logic::bytes::layout(Layout.view());
     static_assert(kLayout.error == nullptr, "the layout of Struct of Bytes cannot be read");
