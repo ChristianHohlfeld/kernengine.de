@@ -1,6 +1,6 @@
 // State of this player's multiplayer presentation (game_net.cpp): tracers and flashes, the kill
 // feed, hit markers, voice, the spawn anchor, the big map and its route. One member of Game
-// (`mp_`), there from where it is first needed (mp_made_).
+// (`mp_`), made when it is first needed.
 //
 // Licensed under the Apache License 2.0 (see LICENSE in the repository root).
 #pragma once
@@ -15,7 +15,7 @@
 
 namespace sc {
 
-/// Per-player multiplayer presentation state (Game::mp_).
+/// Per-player multiplayer presentation state (owned by Game through mp_).
 struct MpLocal {
   MpArt art;
   f32 world_own[16] = {};  // our own WORLD switches while the host's apply
