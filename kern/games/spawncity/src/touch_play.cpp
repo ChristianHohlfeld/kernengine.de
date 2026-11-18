@@ -273,10 +273,11 @@ bool TouchPlay::pointer(u32 type, i32 id, f32 x, f32 y, f64 t_ms) {
       }
     } else if (lay_.mode == TouchMode::car) {
       f.kind = Finger::pinch;
-      const Finger* other = nullptr;
-      for (const Finger& g : fingers_)
-        if (g.kind == Finger::pinch) other = &g;
-      if (other) pinch_d_ = std::hypot(other->x - x, other->y - y);
+      // the other finger of the pinch: its place in fingers_ (the last one), fingers_.size() if none
+      std::size_t other = fingers_.size();
+      for (std::size_t i = 0; i < fingers_.size(); ++i)
+        if (fingers_[i].kind == Finger::pinch) other = i;
+      if (other < fingers_.size()) pinch_d_ = std::hypot(fingers_[other].x - x, fingers_[other].y - y);
     } else {
       f.kind = Finger::none;
     }
@@ -339,11 +340,11 @@ bool TouchPlay::pointer(u32 type, i32 id, f32 x, f32 y, f64 t_ms) {
         if (f.button == "nade") nade_up_ = f.y0 - y;  // drag "up" = stronger throw
         break;
       case Finger::pinch: {
-        const Finger* other = nullptr;
-        for (const Finger& g : fingers_)
-          if (g.kind == Finger::pinch && g.id != id) other = &g;
-        if (other) {
-          const f32 d = std::hypot(other->x - x, other->y - y);
+        std::size_t other = fingers_.size();
+        for (std::size_t i = 0; i < fingers_.size(); ++i)
+          if (fingers_[i].kind == Finger::pinch && fingers_[i].id != id) other = i;
+        if (other < fingers_.size()) {
+          const f32 d = std::hypot(fingers_[other].x - x, fingers_[other].y - y);
           if (pinch_d_ > 10 && d > 10) zoom_ *= pinch_d_ / d;
           pinch_d_ = d;
         }
