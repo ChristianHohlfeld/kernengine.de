@@ -27,5 +27,8 @@
   Aus einem Kommentar die Länge abzuleiten wäre eine Sonderregel.
 - engine_api.py: Änderungen für „Platz der Engine“ noch nicht fertig (Vermerk folgt hier, sobald gepusht – Paket c wartet).
 
-## B – Platz der Engine: Schritt 1+2/7 (edae85f), weiter ab 3 (in Arbeit)
+## B – Platz der Engine (in Arbeit, Nachfolger 2)
+- A erledigt: origin/work-zusammen (8874e79) eingemischt – Fast-Forward (work-zusammen enthielt work-d schon), gepusht.
+- Schritt 3 (Interpreter) fertig, Syntax ✓, gepusht: 6310a9e (Root::bound, Spot::bound, Context::bind, read/write über @get/@set,
+  EngineStandIn::places). In Arbeit: Schritt 4 (Klasse).
 - Übergabe: $S/uebergabe/d.md

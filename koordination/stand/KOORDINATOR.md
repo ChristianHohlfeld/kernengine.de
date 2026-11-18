@@ -1,4 +1,17 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 21:25 **Die erste ausgeführte Spiel-Suite ist ROT und unvollständig** (`work-zusammen-voll-203000-750`: convert rc=0, **suite rc=1**, engine rc=0).
+  · Gelaufen sind nur 21 von 269 Tests (17 ok, 4 FAIL), dann brach ein ASan-Fehler in `converted_engine_geo_mesh_data` (MeshData_push_extra) das ganze
+    Testprogramm ab; der Durchgang `SC_ENGINE=real` lief nicht. Auswertung von t1: `stand/t1.md`, Abschnitt „SUITE 203000“ (7 Gruppen) – **das ist die Arbeitsliste.**
+  · **Zuordnung:** 1 (push_extra, Bereich hinter einem gezogenen Zeiger) und 2 (city_stream ×15: `self` als Wert, Zerstörung im Aufzeichnungsfenster) → **t1**;
+    3 (earcut.triangulate: Länge eines Zeiger-Eingangs im Stellvertreter; danach Destruction_fracture/update/blast neu beurteilen) → **d**;
+    4 (flak_cell: `snprintf("%lld")` mit großem i64), 5 (Car_new 300/300), 6 (feed_terrain, upload), 7 (Drone_step) → Regeln des Konverters, ordnet der
+    Koordinator zu, sobald die ganze Liste da ist (f1/f2 laufen nicht).
+  · **Neue Auftragsart auf mag: `./mag.sh alle <stand mit Level und Tests>`** – baut einmal und lässt jeden Vergleichstest in seinem eigenen Lauf rechnen, einmal
+    gegen den Stellvertreter, einmal gegen die Engine selbst; ein Abbruch hält die anderen nicht auf. Ergebnis: `mag-log/alle.txt`, `alle-real.txt`,
+    `alle-abweichungen.txt`, `alle-real-abweichungen.txt`, `*-cost.txt`, `einzeln.tar.xz`. Läuft seit 21:20 auf dem gültigen Lauf:
+    `ergebnis-work-zusammen-voll-203000-750-alle-212005-5593` → `$S/mag/<name>/` nach `./mag.sh holen <name>`. Der Umbau des Testrahmens (t1: jeder Test im
+    eigenen Kindprozess, real-Durchgang immer) bleibt gewollt – er gilt dann überall, auch in der CI.
+  · `work-zusammen` geht NICHT nach `work`, solange die Suite rot ist. `work` bleibt 42831863.
 - 20:35 **Stand:**
   · `work-zusammen-voll-195003-886` (c432166): wieder `convert rc=1`, derselbe Lesefehler („pad“ von Controls_DeviceInput). Ursache genauer: die Erklärung steht
     in der **Bibliothek** `controls_cpp`; Game benutzt sie und hat die Variable `pad` – gebunden steht die Erklärung im Graphen von Game. Der erste Fix (nur für

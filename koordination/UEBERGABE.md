@@ -677,3 +677,25 @@ mag rechnet unabhängig weiter (der volle Lauf `work-voll-162644-5528` seit 17:3
 - **Neuer Takt (PAKET_COMMON3.md, Nachtrag 21:10):** Basis für alle ist `origin/work-zusammen`; Agenten beheben und belegen mit Proben und melden „BEREIT ZUM MERGEN“
   in ihrer Stand-Datei; den vollen Lauf rechnet der Koordinator auf dem zusammengeführten Stand und bringt ihn nach `work`, wenn er grün ist.
 - Noch nicht wieder gestartet (brauchen Chris' Wort): g1, g2, f1, f2; angehalten: c (nach d), s5 (nach p).
+
+### 16.12 Stand 21:25 – die erste ausgeführte Spiel-Suite ist rot und brach ab; Auftragsart „alle“
+- **`work-zusammen-voll-203000-750`: `suite rc=1` (21:15), `engine rc=0` (21:05).** Die Spiel-Suite lief nicht durch: nach 21 von 269 Tests (17 ok, 4 FAIL)
+  brach AddressSanitizer das Testprogramm ab (heap-buffer-overflow in der Quelltext-Kopie `MeshData::push_extra`, Test `converted_engine_geo_mesh_data`: der Test
+  gibt einen Zeiger in eine gezogene Liste, der Quelltext liest `extra_size` Einträge darüber hinaus – in C++ undefiniert, gehört in den Test-Schreiber, t1).
+  246 Tests und der Durchgang `SC_ENGINE=real` liefen nicht. 121 `cost:`-Zeilen (93 „… instead of 0“ – Speicher, den die Klasse braucht und der Quelltext nicht:
+  Arbeit für p/Konverter), 23 `note:`-Zeilen. **Damit ist `work-zusammen` nicht nach `work` zu bringen; `work` bleibt 42831863.**
+- **Die 7 Gruppen der Auswertung (t1, `stand/t1.md` „SUITE 203000“) mit Zuordnung:** (1) push_extra-Abbruch → t1; (2) 15 Funktionen von city_stream – der Test
+  nimmt `self` als Wert, die Zerstörung (`road_builder.release`) fällt ins Aufzeichnungsfenster → t1; (3) `earcut.triangulate(xy, vertex_count, …)` – der
+  Stellvertreter nimmt vertex_count statt 2·vertex_count Zahlen (CityStream_building_shape, Destruction_tear/collapse; danach fracture/update/blast neu
+  beurteilen) → d; (4) flak_cell 201/255: `snprintf("%lld")` mit großem i64 → Regel des Konverters; (5) Car_new 300/300 → f2-Gebiet; (6) CityStream_feed_terrain
+  4/38, upload 35/300 → f1-Gebiet; (7) Drone_step (nur Klasse verglichen) → Regel des Konverters. 4–7 haben keinen laufenden Agenten (f1/f2 nicht gestartet).
+- **Neue Auftragsart `alle` auf mag (lauf2.sh e01e7245, mag.sh):** `./mag.sh alle origin/mag/ergebnis-<voller lauf>` baut das Testprogramm einmal und lässt jeden
+  Test `converted_<einheit>` in seinem eigenen Lauf rechnen – gegen den Stellvertreter und gegen die Engine selbst; ein Abbruch oder Fehlschlag hält die anderen
+  nicht auf. So zeigt EIN Lauf die ganze Liste. Ergebnis in `mag-log/`: `alle.txt`, `alle-real.txt` (je Test ok/FAIL/ABBRUCH und eine Summenzeile),
+  `alle-abweichungen.txt`, `alle-real-abweichungen.txt`, `alle-cost.txt`, `einzeln.tar.xz` (jede Ausgabe). `mag.sh` erkennt „fertig“ jetzt daran, dass `when`
+  diesem Auftrag gehört und ein Ergebnis nennt (ein Stand, der selbst ein Ergebnis-Zweig ist, bringt dessen mag-log mit).
+  Abgelegt 21:20: `ergebnis-work-zusammen-voll-203000-750-alle-212005-5593`. **Nicht erfasst von `alle`:** die eigenen Tests des Spiels und `tests/lowered`
+  (kein `converted_` im Namen) – die zeigt erst wieder ein Lauf der ganzen Suite, sobald sie nicht mehr abbricht (Umbau des Testrahmens durch t1: jeder Test
+  im eigenen Kindprozess, real-Durchgang immer).
+- **Nächster Schritt:** Ergebnis von `alle` holen, die ganze Abweichungsliste je Gebiet in `stand/KOORDINATOR.md` schreiben und zuordnen; bereite Zweige (t1, t2, d)
+  in `work-zusammen` einmischen, `voll` darauf; erst ein gültiger Lauf mit grüner Spiel-Suite (beide Durchgänge) und grüner Engine-Suite geht nach `work`.

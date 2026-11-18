@@ -5,6 +5,7 @@
 #   mag.sh spiel origin/work-f1 [filter]                            Spiel-Suite (run_tests.sh, ohne neue Konvertierung)
 #   mag.sh konvert origin/work-k 8                                  nur die Konvertierung des ganzen Spiels mit genau so vielen Kernen
 #   mag.sh voll origin/work                                         Konvertierung + Spiel-Suite + Engine-Suite (nur der Koordinator)
+#   mag.sh alle origin/mag/ergebnis-<voller-lauf>                   jeder Vergleichstest einzeln (Stellvertreter und Engine selbst): ALLE Abweichungen in einem Lauf
 # Der Stand muss gepusht sein. Wartet, bis mag fertig ist, und legt die Protokolle nach $S/mag/<name>/ (when, *.tail.txt, *.log.xz, texts/).
 # Gibt when und das Ende jedes Protokolls aus. Ein Auftrag dauert: Probe wenige Minuten, Suiten 10-30 Minuten.
 #   MAG_NOWAIT=1 mag.sh ...     nur ablegen, den Namen ausgeben, nicht warten
@@ -19,7 +20,10 @@ K=/home/claude/kw
 holen() {  # name -> 0, wenn die Protokolle da sind
   local name="$1" ref="refs/remotes/origin/mag/ergebnis-$1"
   git -C "$K" fetch -q origin "+refs/heads/mag/ergebnis-$name:$ref" 2>/dev/null || return 1
-  if [ "$(git -C "$K" rev-list --count "$ref" -- mag-log 2>/dev/null)" -lt 2 ]; then
+  # (fertig: mag-log ist zweimal geschrieben, und when gehört diesem Auftrag und nennt ein Ergebnis - ein Auftrag, dessen Stand selbst ein
+  # Ergebnis-Zweig ist ("alle"), bringt dessen mag-log mit)
+  local w; w="$(git -C "$K" show "$ref:mag-log/when" 2>/dev/null)"
+  if [ "$(git -C "$K" rev-list --count "$ref" -- mag-log 2>/dev/null)" -lt 2 ] || ! echo "$w" | head -1 | grep -q "^$name:" || ! echo "$w" | grep -q ' rc='; then
     # (ein voller Lauf pusht Level und Tests gleich nach der Konvertierung: mag-zwischen/when, convert.tail.txt, convert.log.xz - die Suiten rechnen dann noch)
     if git -C "$K" cat-file -e "$ref:mag-zwischen/when" 2>/dev/null; then
       mkdir -p "$S/mag/$name/zwischen"; git -C "$K" archive "$ref" mag-zwischen | tar -x -C "$S/mag/$name/zwischen" --strip-components=1
