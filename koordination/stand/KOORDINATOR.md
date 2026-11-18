@@ -1,4 +1,15 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 19:50 **Stand:**
+  · Voller Lauf der Zusammenführung `work-zusammen-voll-185405-1226` (auf 9931aea): **Konvertierung in 27 min** (15 Runden, 37 Kerne) – geschrieben
+    **1.660 / 1.878 Funktionen (88,4 %), 18.926 / 31.103 Zeilen (60,8 %)** (f9: 1.577 / 1.876, 16.136 / 31.096); 101 Funktionen „its test cannot compare it yet“,
+    9 Rückfälle „was written and waits now“. **Engine-Suite grün (rc=0)** auf dem zusammengeführten Baum. **Aber `convert rc=1`:** der Leser weist das Level ab –
+    `Game.cpp: error: the input "pad" of Controls_DeviceInput has the name of a variable or a function` (controls.cpp ist ein Teil von Game und kennt Games Variable
+    `pad` nicht). Spiel-Suite darum wertlos (altes Level, rc=1).
+  · **Behoben im Konverter (work-zusammen c432166, allgemein):** die Erklärung einer Funktion eines Actor-Blueprints (KERN_EXTERN) wird für einen Blueprint aus
+    mehreren Teilen beim Zusammensetzen festgelegt – kein Eingang heißt wie etwas des ganzen Blueprints, in jedem Teil gleich (`settled_extern`).
+  · Neu abgelegt: Probe `work-zusammen-probe-194959-848` (controls + game + game_controls, mit Level), voller Lauf **`work-zusammen-voll-195003-886`**.
+    lauf2.sh 9d621c4: ein voller Lauf legt jetzt auch die Texte der Blueprints nach `mag-zwischen/texts`.
+  · t1-/t2-Proben über alle Quelltexte sind fertig (`work-t1-probe-174058-4177`, `work-t2-probe-163129-9216`, beide rc=0, beide vor 18:04 gestartet: ohne Level).
 - 18:55 **Stand:**
   · **Lesefehler bestätigt auf `work`** (Probe `work-probe-182522-630` auf 90b5ab8: net_session_cpp 52/67, „the number 78 names two nodes“, nicht gelesen) – der
     Basislauf `work-voll-162644-5528` endet also ohne gültiges Level. Auf work-f2 liest es (`work-f2-probe-182528-670`: net_session_cpp 67/67, rc=0).

@@ -646,3 +646,12 @@ mag rechnet unabhängig weiter (der volle Lauf `work-voll-162644-5528` seit 17:3
 - Nicht in der Zusammenführung und weiter offen: die Absenkungen der Game-Dateien von g1/g2 (warten auf den Differenztest „zwei Bauten“), alles von f1 außer dem
   Konverter (seine Differenztests übersetzen nicht), p (ungepusht, gesichert), s5.
 - Agenten: weiterhin keine (Neustart nur auf Chris' ausdrückliches Wort; seit 17:59 keine Nachricht von ihm).
+
+### 16.9 Stand 19:50 – erste Zahlen des zusammengeführten Stands, zweiter Lesefehler behoben
+- `work-zusammen-voll-185405-1226` (9931aea): Konvertierung **27 min** (mit dem Ablauf von k, 37 Kerne, 15 Runden; vorher rund 60 min).
+  **Geschrieben 1.660 / 1.878 Funktionen (88,4 %), 18.926 / 31.103 Zeilen (60,8 %)** – aus den Zeilen je Einheit summiert (die Summenzeile fehlt, weil das Einlesen
+  scheiterte). 101 Funktionen warten im Test („its test cannot compare it yet“), 9 Rückfälle. Engine-Suite **rc=0**. `convert rc=1`: Leser – „the input "pad" of
+  Controls_DeviceInput has the name of a variable or a function“ (Game.cpp).
+- Fix `c432166` auf work-zusammen (Konverter, `settled_extern` beim Zusammensetzen der Teile). Neuer voller Lauf `work-zusammen-voll-195003-886` (19:50).
+  **Vorgehen bleibt:** `convert rc=0` → Spiel-Suite lesen → grün (oder nur benannt rot wie auf `work`) → work-zusammen samt „Level und Tests“ nach `work`, CI.
+  Weiterer Lesefehler → Texte liegen jetzt in `mag-zwischen/texts` (lauf2.sh 9d621c4).
