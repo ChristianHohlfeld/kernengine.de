@@ -49,7 +49,8 @@ run_job() {  # name
       git add kern/games/spawncity/level/spawncity.klevel kern/games/spawncity/tests/converted
       $G commit -q -m "mag: $name auf $SHA – Level und Tests der Blueprints" || true ;;
     probe)
-      ( cd kern/games/spawncity && mkdir -p "$W/probe-test" && time FUNCTIONS=1 $conv --test "$W/probe-test" --texts "$W/mag-log/texts" -- $rest ) > mag-log/convert.log 2>&1
+      mkdir -p "$W/pt/converted" && cp kern/games/spawncity/tests/*.h "$W/pt/"   # (der Test-Schreiber sucht <test>/../converted.h)
+      ( cd kern/games/spawncity && time FUNCTIONS=1 TEST_ERRORS=1 $conv --test "$W/pt/converted" --texts "$W/mag-log/texts" -- $rest ) > mag-log/convert.log 2>&1
       echo "convert rc=$? $(date '+%T')" >> mag-log/when ;;
     engine) ( time kern/tests/run.sh $rest ) > mag-log/engine.log 2>&1; echo "engine rc=$? $(date '+%T')" >> mag-log/when ;;
     spiel)  ( time kern/games/spawncity/tests/run_tests.sh $rest ) > mag-log/suite.log 2>&1; echo "suite rc=$? $(date '+%T')" >> mag-log/when ;;
