@@ -1,0 +1,13 @@
+wrong == 0 | Session_destroy_to_all: 97 of 300 calls differ
+wrong == 0 | Session_finish_ballot: 107 of 300 calls differ
+wrong == 0 | Session_push: 213 of 300 calls differ
+wrong == 0 | Session_send_proj: 109 of 300 calls differ
+wrong == 0 | Session_send_rules: 94 of 300 calls differ
+wrong == 0 | Session_send_scores: 94 of 300 calls differ
+wrong == 0 | Session_send_seats: 94 of 300 calls differ
+wrong == 0 | Session_send_toss: 109 of 300 calls differ
+wrong == 0 | Session_send_world: 109 of 300 calls differ
+wrong == 0 | Session_set_origin: 86 of 300 calls differ
+wrong == 0 | Session_set_world_rules: 105 of 300 calls differ
+wrong == 0 | Session_to_all: 94 of 300 calls differ
+wrong == 0 | Session_town_to_all: 109 of 300 calls differ

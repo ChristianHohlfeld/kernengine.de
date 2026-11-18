@@ -1,0 +1,80 @@
+    Session::send_scores (6): written
+    Session::send_rules (6): written
+    Session::set_world_rules (7): written
+    Session::send_anchor (13): group_spawn_center() is defined in another file
+    Session::begin_ballot (14): create_ballot() is defined in another file
+    Session::finish_ballot (10): written
+    Session::seat_request (10): claim() is defined in another file
+    Session::judge_seat (4): claim() is defined in another file
+    Session::send_seats (8): written
+    Session::dispatch (145): claim() is defined in another file
+    Session::deliver (120): ensure() is defined in another file
+    Session::on_pose (29): ensure() is defined in another file
+    Session::update (92): ensure() is defined in another file
+    Session::status (7): written
+terrain                         8 /    9 functions       11 /     12 lines
+    Terrain::settled (1): written
+    Terrain::has_dem (1): written
+    Terrain::water_level (1): elevation() is defined in another file
+    Terrain::deformed (4): written
+    Terrain::crater_count (1): written
+    CraterRec::operator== (1): written
+    Terrain::take_changes (1): written
+    Terrain::stats (1): a name for a place - written where it is called
+    terrarium_height (1): written
+tiles                           2 /    2 functions        2 /      2 lines
+    TileKey::operator== (1): written
+    TileKey::hash (1): written
+wire                           28 /   28 functions      141 /    141 lines
+    (test_net_session_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_lamps_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_lamps_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_lamps_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    f32_bytes (1): written
+    put_u8 (1): written
+    put_i8 (4): written
+    put_u16 (4): written
+    put_i16 (4): written
+    put_u32 (4): written
+    put_i32 (4): written
+    put_u64 (4): written
+    put_i64 (4): written
+    put_f32 (4): written
+    put_f64 (4): written
+    put_vec3 (4): written
+    put_quat (4): written
+    put_bytes (4): written
+    Reader::get_u8 (6): written
+    Reader::get_i8 (7): written
+    Reader::get_u16 (7): written
+    Reader::get_i16 (7): written
+    Reader::get_u32 (7): written
+    Reader::get_i32 (7): written
+    Reader::get_u64 (7): written
+    Reader::get_i64 (7): written
+    Reader::get_f32 (7): written
+    Reader::get_f64 (7): written
+    Reader::get_vec3 (7): written
+    Reader::get_quat (7): written
+    Reader::get_bytes (7): written
+    Reader::done (1): written
+
+190 of 216 functions of the program are written as Blueprints (780 of 1345 lines), and 3 of the engine's headers that they call: 21 Blueprints - 2 of source files, 0 of states, 19 of headers and of shapes
+172 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+     4 (   255)   ensure() is defined in another file
+     4 (   163)   claim() is defined in another file
+    10 (    73)   it calls Session::to_host(), which waits
+     1 (    17)   judge_hit() is defined in another file
+     1 (    16)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no viable conversion from 'vector<converted_lamps_cpp::Spot>' to 'const vector<converted_lamps_cpp::lamps::Field::Spot>')
+     1 (    14)   create_ballot() is defined in another file
+     1 (    13)   group_spawn_center() is defined in another file
+     1 (     8)   assign_colors() is defined in another file
+     1 (     4)   it calls CityStream::ground_height(), which waits
+     1 (     1)   height() is defined in another file
+     1 (     1)   elevation() is defined in another file
+
+real	2m56,998s
+user	5m33,937s
+sys	0m18,644s
