@@ -92,7 +92,10 @@ Du bist der **Nachfolger** auf deinem Paket in einer neuen Sitzung. Was bleibt: 
      `MAG_NOWAIT=1 $S/mag.sh probe origin/work-<paket> src/a.cpp …` → gibt den Namen; dann `$S/mag.sh warten <name>` (wartet bis 9 Minuten; „läuft noch“ → noch einmal),
      oder zwischendurch weiterarbeiten und später `$S/mag.sh holen <name>`. Kein eigenes Schleifen-Abfragen mit git.
    - Arten: `probe <ref> <quellen…>` (Minuten; mit allen game*.cpp oder allen Quelltexten bis ~1 h), `spiel <ref> [filter]` (~20 min), `engine <ref> [filter]` (~35 min),
-     `konvert <ref> <kerne>` und `voll <ref>` nur nach Absprache mit dem Koordinator (je ~1 h+, mag ist voll).
+     `voll <ref>` (Konvertierung des ganzen Spiels + Spiel-Suite + Engine-Suite, ~1,5–2,5 h): **einmal als Abschlussbeweis deines Zweigs**, wenn deine Proben
+     sauber sind und origin/work eingemischt ist – nicht zum Probieren. `konvert <ref> <kerne>` nur Paket k.
+   - Ob eine rote Stelle in einem vollen Lauf von dir kommt, zeigt der Vergleich mit dem Basislauf auf `work`: `$S/mag.sh holen work-voll-162644-5528`
+     (sobald fertig; convert.log.xz, suite.log.xz, engine.log.xz). Was dort genauso rot ist, ist nicht deins – nenne es trotzdem.
    - mag rechnet den Stand des Zweigs **zum Zeitpunkt des Starts** des Auftrags, nicht des Ablegens: erst pushen, dann ablegen; `mag-log/when` nennt den Commit.
    - Bündeln: eine Probe je Hypothese, mehrere Korrekturen in einer Probe. Lokal nur Syntax je Datei (`-fsyntax-only`) und Kleinstfälle; lokale Konverter-Proben
      (≤3 Quelltexte, KERN_JOBS=1, `flock $S/heavy2.lock` bzw. `heavy3.lock`) nur, wenn mag nichts annimmt.
@@ -106,10 +109,18 @@ Du bist der **Nachfolger** auf deinem Paket in einer neuen Sitzung. Was bleibt: 
    Du hast keinen Rückkanal während der Arbeit: **Brauchst du eine Entscheidung**, die über dein Paket hinausgeht, oder scheiterst du zweimal am selben Grund –
    bring den Stand in einen übersetzbaren Zustand, pushe, schreibe die Frage mit allem, was der Koordinator zum Entscheiden braucht, nach `$S/stand/<paket>.md`
    unter „ENTSCHEIDUNG NÖTIG“ und beende deinen Lauf mit genau dieser Frage als Bericht. Der Koordinator setzt dich mit der Antwort fort (dein Kontext bleibt).
-   Arbeite aber vorher alles ab, was die Frage nicht berührt. Ebenso endest du mit „BEREIT ZUM MERGEN“ (mit Beweis: mag-Auftrag/CI, Zahlen) oder mit dem Bericht laut
-   „Arbeitsweise“. Befunde für andere Pakete: in `$S/stand/<paket>.md` unter „BEFUND FÜR <paket>“ und im Bericht.
+   Arbeite aber vorher alles ab, was die Frage nicht berührt. **„BEREIT ZUM MERGEN“** (mit Beweis: mag-Auftrag/CI, Zahlen, die Commits) schreibst du als
+   eigene Überschrift nach `$S/stand/<paket>.md`, sobald ein Teil bewiesen ist – und arbeitest weiter, wenn dein Auftrag mehr hat (der Koordinator liest die
+   Stand-Dateien regelmäßig und mergt von dort); dein Lauf endet erst, wenn alles getan ist, du eine Entscheidung brauchst oder nur noch auf andere wartest.
+   Befunde für andere Pakete: in `$S/stand/<paket>.md` unter „BEFUND FÜR <paket>“ und im Bericht.
+   Dein letzter Text ist dein Bericht an den Koordinator; er beginnt mit einer dieser Zeilen: `BEREIT ZUM MERGEN: …`, `ENTSCHEIDUNG NÖTIG: …`, `WARTET AUF: …`
+   oder `STAND: …`; dann Zweig + letzter Commit, die Beweise (Namen der mag-Aufträge, Zahlen), was offen ist und warum.
 8. **Spawne keine weiteren Agenten.** Antworte und berichte auf Deutsch, knapp. „Sparsam arbeiten“ (Nachtrag 17:10) gilt weiter; an der Strenge wird nichts gespart.
-9. **Bekannt bei Sitzungsbeginn (18.11., 17:30):**
+9. **Diese Maschine: 2 Kerne, 8 GB, für alle Agenten zusammen.** Jeder Befehl, der einen Compiler startet (auch `-fsyntax-only`, `tools/engine_api.py`,
+   `tools/blueprint_cpp.sh`, `tools/source_diff.py`, jede lokale Konverter-Probe), läuft unter einer der zwei Sperren: `flock $S/heavy2.lock <befehl>` oder
+   `flock $S/heavy3.lock <befehl>` (nimm die freie: erst `flock -n -E 99 $S/heavy2.lock …`, bei 99 die andere ohne `-n`). Nie mehr als ein solcher Befehl von dir
+   zugleich; nichts Schweres im Hintergrund liegen lassen. Zeitmessungen (Paket p): beide Sperren nehmen (`flock $S/heavy2.lock flock $S/heavy3.lock …`), kurz halten.
+10. **Bekannt bei Sitzungsbeginn (18.11., 17:30):**
    - Seit dem 14.11. gibt es keinen gültigen vollen Lauf; Level und tests/converted auf `work` sind von f8 und passen nicht zu den Quellen – darum ist die
      Spiel-Suite auf `work` rot (bricht bei converted_car ab; mag `work-d-spiel-154354-17035`). Der volle Lauf auf `work` (90b5ab8) ist auf mag eingereiht
      (`work-voll-162644-5528`); der Koordinator bringt sein Ergebnis nach `work` und sagt Bescheid. `work-voll-153849-12713` ist ein abgebrochener Lauf (nie verwenden).
