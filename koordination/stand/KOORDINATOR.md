@@ -1,4 +1,9 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 22:45 Zweiter Neustart des Servers hinter der Sitzung (~22:43): t1, t2, k, d, p abgebrochen und aus ihrem Verlauf fortgesetzt. mag und CI liefen weiter.
+- 22:57 **Entscheidung E7 (d):** `list_append` auf einem Platz der Engine wächst wie `insert` der Bibliothek (`list.insert(end, n, blank<C>())`, dann
+  `Direct::from` je Eintrag) – dieselbe Regel wie für Blueprint-Listen (insert_items) und den Quelltext; keine eigene Reserve-Regel am Platz. Bedingungen: Werte in
+  allen drei Stufen gleich (Engine-Fall), keine Sonderbehandlung, andere Listenschritte am Platz ebenso angleichen. d (Nachfolger 3): Klasse, Palette, Doku gebaut
+  (c0d6d24, 42c86fe, 62d0978), Engine-Suite `work-d-engine-223942-31317` wartet, CI 44403776223 läuft.
 - 22:35 **mag-Warteschlange neu (lauf2.sh 43cc7e0b):** angenommen wird nur, was ins Budget an Kernen passt (70 von 56 Threads: ein voller Lauf + ein Vergleich);
   volle Läufe zuerst, dann vergleich/alle, dann der Rest. **`./mag.sh abbrechen <name>`** beendet den EIGENEN Auftrag (er schreibt sein Protokoll und räumt auf).
   Ursache der Überbuchung war die Schleife selbst: nach jedem Ersetzen zählte sie die laufenden Aufträge nicht mehr.

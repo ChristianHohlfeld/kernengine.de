@@ -53,3 +53,23 @@
 - Schritt 3 ✓ (6310a9e), Schritt 4 ~ (64cb433, nur Header-Syntax, nie instanziiert), Schritt 5 ~ (Schreibweise 64cb433,
   check() 2250736; Palette offen), Schritt 6 offen (Engine-Test, nativer Fall in case_text, Fall mit jedem Knoten, Doku), C/D offen.
 - Einzelheiten und nächste Schritte: $S/uebergabe/d.md, Abschnitt B „Stand der 7 Schritte“.
+
+## Platz der Engine – Nachfolger 3 (ab 22:20)
+- work-zusammen (8844531a) eingemischt: d6869e1. Commit **c0d6d24**: Klasse instanziiert (nativer Fall EnginePlaces, Engine-Test
+  engine_places_class_names_the_engines_list gegen C++ BuildingBuilder::chunks, Fall mit jedem Knoten mit `bound`, case_text mit Plätzen);
+  Leser/Schreiber-Fehler behoben (Member `_place` wurde abgelehnt bzw. nicht geschrieben). Lokal (Harness $S/d/): Interpreter = Klasse auf
+  Stellvertreter und auf der Engine (geo), Fixpunkt, g++/clang++ -Werror. libc++ (wasi-sdk fehlt hier) prüft nur CI „build“.
+- Beweis läuft: mag `work-d-engine-223942-31317`, CI 44403776223 (Stand c0d6d24).
+- engine_api.py (für Paket c): case_text schreibt Plätze als `_place`-Member mit Lese/Setz-/Listenschritten und einem Lauf auf gemachten
+  Objekten (Klasse mit Macher ohne Eingänge + Freigeber). Sonst unverändert seit 690ea4f.
+
+## ENTSCHEIDUNG NÖTIG (d, 22:55): Wachstum von `list_append` auf einem Platz der Engine
+- Befund: Werte sieht der Vergleich nie anders (dieselben Einträge). Die `cost:`-Zeile zählt Anforderungen: heute reserviert
+  `engine_values::list_append` (engine_direct.h) genau `size+n` und hängt einzeln an. Die erste Anforderung stimmt mit C++
+  `v.insert(v.end(), a, b)` überein (beide 1, wenn die Kapazität nicht reicht), die Kapazität danach aber nicht: Beispiel size 4,
+  cap 4, +1 → hier cap 5, libstdc++ cap 8 (size+max(size,n)), libc++ max(2·cap, size+n). Ein folgendes push_back fordert hier
+  Speicher an, in C++ nicht → `cost:` weicht um 1 ab. Blueprint-Listen (logic::list::insert_items) nutzen schon vector::insert und
+  wachsen wie C++.
+- Vorschlag: auf einem Platz `list.insert(list.end(), n, blank<C>())` (Füll-Einfügen: dieselbe Wachstumsregel der Bibliothek wie
+  das Bereichs-Einfügen, in libstdc++ und libc++), danach jeden neuen Eintrag mit Direct::from setzen – eine Anforderung wie C++,
+  dieselbe Kapazität danach, innere Listen je Eintrag wie beim Kopieren. Konform (kein Proxy-Iterator). Nicht umgesetzt – wartet auf Antwort.
