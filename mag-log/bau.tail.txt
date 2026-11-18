@@ -1,0 +1,80 @@
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-230203-14801/kern/games/spawncity/tests/converted/test_city_stream_cpp.cpp:2024:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2024 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-230203-14801/kern/games/spawncity/tests/converted/test_city_stream_cpp.cpp:2045:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2045 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-230203-14801/kern/games/spawncity/tests/converted/test_city_stream_cpp.cpp:2066:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2066 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-230203-14801/kern/games/spawncity/tests/converted/test_city_stream_cpp.cpp:2089:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2089 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-230203-14801/kern/games/spawncity/tests/converted/test_city_stream_cpp.cpp:2111:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2111 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-230203-14801/kern/games/spawncity/tests/converted/test_city_stream_cpp.cpp:2132:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2132 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-230203-14801/kern/games/spawncity/tests/converted/test_city_stream_cpp.cpp:2152:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2152 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-230203-14801/kern/games/spawncity/tests/converted/test_city_stream_cpp.cpp:2176:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2176 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-230203-14801/kern/games/spawncity/tests/converted/test_city_stream_cpp.cpp:2198:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2198 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-230203-14801/kern/games/spawncity/tests/converted/test_city_stream_cpp.cpp:2220:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2220 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-230203-14801/kern/games/spawncity/tests/converted/test_city_stream_cpp.cpp:2243:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2243 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-230203-14801/kern/games/spawncity/tests/converted/test_city_stream_cpp.cpp:2268:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2268 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-230203-14801/kern/games/spawncity/tests/converted/test_city_stream_cpp.cpp:2291:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2291 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-230203-14801/kern/games/spawncity/tests/converted/test_city_stream_cpp.cpp:2316:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2316 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-230203-14801/kern/games/spawncity/tests/converted/test_city_stream_cpp.cpp:2338:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2338 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-230203-14801/kern/games/spawncity/tests/converted/test_city_stream_cpp.cpp:2361:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2361 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-230203-14801/kern/games/spawncity/tests/converted/test_city_stream_cpp.cpp:2384:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2384 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-230203-14801/kern/games/spawncity/tests/converted/test_city_stream_cpp.cpp:2405:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2405 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-230203-14801/kern/games/spawncity/tests/converted/test_city_stream_cpp.cpp:2429:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2429 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-230203-14801/kern/games/spawncity/tests/converted/test_city_stream_cpp.cpp:2451:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2451 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-230203-14801/kern/games/spawncity/tests/converted/test_city_stream_cpp.cpp:2475:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2475 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-230203-14801/kern/games/spawncity/tests/converted/test_city_stream_cpp.cpp:2497:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2497 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-230203-14801/kern/games/spawncity/tests/converted/test_city_stream_cpp.cpp:2522:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2522 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-230203-14801/kern/games/spawncity/tests/converted/test_city_stream_cpp.cpp:2544:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2544 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-230203-14801/kern/games/spawncity/tests/converted/test_city_stream_cpp.cpp:2567:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2567 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+0 tests, 0 checks, 0 failures
+
+real	4m48,546s
+user	27m1,196s
+sys	1m8,839s

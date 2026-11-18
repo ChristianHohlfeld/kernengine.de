@@ -1,0 +1,5 @@
+wrong == 0 | Destruction_blast: 1 of 170 calls differ
+wrong == 0 | Destruction_blast: 1 of 181 calls differ
+wrong == 0 | Destruction_collapse: 13 of 42 calls differ
+wrong == 0 | Destruction_collapse: 9 of 31 calls differ
+wrong == 0 | Destruction_fracture: 16 of 39 calls differ
