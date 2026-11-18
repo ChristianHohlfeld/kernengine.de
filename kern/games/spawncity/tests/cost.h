@@ -11,10 +11,20 @@
 // out why; it changes nothing that is counted.
 #pragma once
 
+// Are the tests built with AddressSanitizer? GCC says it with __SANITIZE_ADDRESS__, clang - the compiler of the
+// game and of the tests (run_tests.sh) - with __has_feature(address_sanitizer).
+#if defined(__SANITIZE_ADDRESS__)
+#define SC_ASAN 1
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define SC_ASAN 1
+#endif
+#endif
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#if defined(__SANITIZE_ADDRESS__)
+#if defined(SC_ASAN)
 #include <execinfo.h>
 extern "C" void __sanitizer_symbolize_pc(void* pc, const char* format, char* out, unsigned long size);
 #endif
@@ -38,7 +48,7 @@ inline Trace now;              // the count that runs, or the one that ended las
 inline void asked() {
   if (!counting) return;
   ++asks;
-#if defined(__SANITIZE_ADDRESS__)
+#if defined(SC_ASAN)
   if (tracing && now.kept < Trace::kAsks) {
     counting = false;  // (what taking the trace asks for is not the function's)
     now.deep[now.kept] = backtrace(now.frame[now.kept], Trace::kDeep);
@@ -65,7 +75,7 @@ inline const char* where() {
 /// without the allocator's own frames and what lies outside the function's call.
 inline void print(const char* who, const Trace& t, long asked_for) {
   std::printf("    %s asks %ld time(s)%s\n", who, asked_for, asked_for > t.kept ? " (the first are shown)" : "");
-#if defined(__SANITIZE_ADDRESS__)
+#if defined(SC_ASAN)
   for (int k = 0; k < t.kept; ++k) {
     std::printf("      %d:", k + 1);
     int shown = 0;
