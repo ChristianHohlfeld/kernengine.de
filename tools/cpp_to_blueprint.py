@@ -6426,12 +6426,20 @@ class Emit:
                     found.append(base)
                     return self.ex(idx, "Int")
             return None
-        at = place_of(init)
-        if at is None or not found or any(not self.same_list(found[0], x) for x in found[1:]):
+        # (the place is worked out apart: a branch of `there ? &list[i] : nullptr` that needs steps of its own
+        # would run them whether it is taken or not - such a pointer waits)
+        try:
+            pre, at = self.lazily(lambda: place_of(init))
+        except Hoists:
             return None
-        home = self.steady(found[0])
-        got = self.spot(home)
-        if got is None or not got[1].startswith("List<"):
+        if at is None or pre or not found or any(not self.same_list(found[0], x) for x in found[1:]):
+            return None
+        try:
+            home = self.steady(found[0])
+        except Wait:
+            return None   # (an entry of a list that is itself at a place that is computed)
+        pre, got = self.lazily(lambda: self.spot(home))
+        if got is None or pre or not got[1].startswith("List<"):
             return None
         name = self.temp((v.get("name") or "p") + "_at", "Int")
         self.pointers[v["id"]] = (got[0], name, got[1][5:-1])
