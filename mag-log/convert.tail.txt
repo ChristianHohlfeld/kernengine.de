@@ -1,0 +1,80 @@
+    Game::jet_attack (49): a constant computed with cos()
+    Game::draw_projectiles (11): projectile() is defined in another file
+Game/game_foot_rounds_cpp       6 /   14 functions       65 /    401 lines
+    Game::soft_target_near (17): it calls CityStream::ground_height(), which waits
+    Game::car_near_point (12): written
+    Game::round_meets_mate (7): written
+    Game::grenade_bounce (21): it calls sfx_id(), which waits
+    Game::foot_round_step (100): unit_hash() is defined in another file
+    Game::foot_remote_detonate (9): written
+    Game::blast_police_drones (19): report() is defined in another file
+    Game::rocket_laser_dot (15): written
+    Game::foot_rocket_launched (8): written
+    Game::rocket_smoke_emit (12): unit_hash() is defined in another file
+    Game::foot_rounds_update (60): send_fx() is defined in another file
+    Game::gaps_sniper_rounds (14): written
+    Game::melee_hit (46): send_fx() is defined in another file
+    Game::melee_attack (61): add() is defined in another file
+Game/game_vr_cpp                8 /   13 functions      144 /    652 lines
+    Game::vr_melee (81): send_fx() is defined in another file
+    Game::vr_grab (142): send_fx() is defined in another file
+    Game::vr_menu_input (115): Game::show_soldier() of the Blueprint Game is not written
+    Game::vr_menu_json (15): written
+    Game::vr_set_hand (8): written
+    Game::vr_room (18): written
+    Game::vr_room_forward (5): written
+    Game::vr_hand_matrix (14): written
+    Game::vr_hand_ray (7): written
+    Game::vr_foot (82): it calls Devices::touch_down(), which waits
+    Game::vr_scope_update (60): written
+    Game::vr_update_view (17): written
+    Game::vr_comfort (88): a member of Int is set
+
+540 of 834 functions of the program are written as Blueprints (3208 of 16552 lines), and 22 of the engine's headers that they call: 96 Blueprints - 24 of source files, 1 of states, 71 of headers and of shapes
+498 functions of the Blueprints are compared with their source, bit for bit, by the tests in /dev/shm/spawncity-jobs-chris/work-g1-probe-164649-20186/pt/converted - each once, in the Blueprint it stands in; 1 give nothing
+
+what the others wait for: functions (lines)
+    11 (   953)   stars() is defined in another file
+    21 (   836)   it calls CityStream::ground_height(), which waits
+     7 (   665)   it calls Game::mp_local_ready(), which waits
+     8 (   622)   remote_index() is defined in another file
+     4 (   491)   it calls Devices::touch_down(), which waits
+     1 (   472)   the struct List (its field g: a pointer)
+    10 (   431)   send_fx() is defined in another file
+     6 (   408)   Game::player_position() of the Blueprint Game is not written
+     6 (   306)   it calls Game::player_position(), which waits
+     4 (   296)   step() is defined in another file
+     4 (   248)   unit_hash() is defined in another file
+     5 (   237)   update() is defined in another file
+     2 (   234)   the end of a Ragdolls runs its destructor ~Ragdolls(), which is not written yet
+     6 (   194)   reset() is defined in another file
+     1 (   191)   look_curve_strength() is defined in another file
+     2 (   191)   a pointer
+     2 (   184)   active() is defined in another file
+     1 (   171)   damage_of() is defined in another file
+     2 (   168)   json() is defined in another file
+     4 (   165)   init() is defined in another file
+     2 (   161)   Game::show_soldier() of the Blueprint Game is not written
+     4 (   159)   lane_signature() is defined in another file
+     1 (   158)   day_lighting() is defined in another file
+     3 (   157)   it calls Game::clear_spot(), which waits
+     6 (   144)   begin() is defined in another file
+     1 (   142)   it calls Ragdolls::bone_body(), which waits
+     4 (   138)   add() is defined in another file
+     6 (   137)   it calls Game::gaps_ride_pose(), which waits
+     7 (   135)   put() is defined in another file
+     2 (   134)   heli() is defined in another file
+     1 (   124)   kind_of() is defined in another file
+     1 (   111)   it calls register_node(), which waits
+     2 (   106)   frighten() is defined in another file
+     2 (   104)   cooldown() is defined in another file
+     1 (   104)   send_swarm() is defined in another file
+     2 (   103)   horn_low() is defined in another file
+     1 (   103)   it calls Game::gaps_hud(), which waits
+     1 (   103)   send_proj() is defined in another file
+     2 (   101)   detach() is defined in another file
+     1 (   101)   flak_cell() is defined in another file
+
+real	73m6,174s
+user	111m14,362s
+sys	5m33,076s
