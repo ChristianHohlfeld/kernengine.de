@@ -1,0 +1,1 @@
+probe origin/work-k src/game.cpp src/game_lamps.cpp src/game_look.cpp
