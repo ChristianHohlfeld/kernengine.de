@@ -590,6 +590,7 @@ struct BlueprintCore : logic::PureNodes {
   /// lives until text_format ends; made into a Text first, the view would be of a Text that is gone)
   static logic::format::Arg format_arg(const std::string& v) { return logic::format::arg(std::string_view(v)); }
   static logic::format::Arg format_arg(std::string_view v) { return logic::format::arg(v); }
+  static logic::format::Arg format_arg(const char* v) { return logic::format::arg(std::string_view(v)); }  // ("abc": the characters where they are)
 
   // ---- enums ----
   // An enum the Blueprint declares with KERN_ENUM; the nodes' setting "Enum" is the type:
