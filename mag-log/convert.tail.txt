@@ -1,0 +1,80 @@
+    Game::grenade_bounce (21): written
+    Game::foot_round_step (100): written
+    Game::foot_remote_detonate (9): written
+    Game::blast_police_drones (19): a call on the Blueprint of the actor Wanted, which the level does not have
+    Game::rocket_laser_dot (15): written
+    Game::foot_rocket_launched (8): written
+    Game::rocket_smoke_emit (12): written
+    Game::foot_rounds_update (60): it calls Session::to_host(), which waits
+    Game::gaps_sniper_rounds (14): written
+    Game::melee_hit (46): it calls Session::to_host(), which waits
+    Game::melee_attack (61): it calls Game::melee_hit(), which waits
+Game/game_toss_cpp              3 /    5 functions       32 /    244 lines
+    Game::toss_own (16): written
+    Game::toss_own_body (7): written
+    Game::toss_update (142): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_toss_cpp::net::Session’ has no member named ‘send_toss’)
+    Game::toss_command (70): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: format ‘%f’ expects argument of type ‘float*’, but argument 3 has type ‘sc::converted::wide::Num32*’ [-Werror=format=])
+    Game::toss_json (9): written
+Game/game_vr_cpp                8 /   13 functions      144 /    652 lines
+    Game::vr_melee (81): it calls Session::to_host(), which waits
+    Game::vr_grab (142): it calls Session::to_host(), which waits
+    Game::vr_menu_input (115): a call on the Blueprint of the actor Controls, which the level does not have
+    Game::vr_menu_json (15): written
+    Game::vr_set_hand (8): written
+    Game::vr_room (18): written
+    Game::vr_room_forward (5): written
+    Game::vr_hand_matrix (14): written
+    Game::vr_hand_ray (7): written
+    Game::vr_foot (82): a call on the Blueprint of the actor Controls, which the level does not have
+    Game::vr_scope_update (60): written
+    Game::vr_update_view (17): written
+    Game::vr_comfort (88): a member of Int is set
+
+1355 of 1840 functions of the program are written as Blueprints (15026 of 30969 lines), and 27 of the engine's headers that they call: 153 Blueprints - 67 of source files, 1 of states, 85 of headers and of shapes
+1314 functions of the Blueprints are compared with their source, bit for bit, by the tests in /dev/shm/spawncity-jobs-chris/work-t1-probe-174058-4177/pt/converted - each once, in the Blueprint it stands in; 2 give nothing
+
+what the others wait for: functions (lines)
+    55 (  1665)   a call on the Blueprint of the actor Controls, which the level does not have
+    19 (  1305)   a pointer
+    34 (  1304)   a call on the Blueprint of the actor Wanted, which the level does not have
+    23 (   673)   it calls Session::to_host(), which waits
+    19 (   604)   a call on the Blueprint of the actor JetSeats, which the level does not have
+     9 (   573)   Game::explosion() of the Blueprint Game is not written
+    28 (   552)   a call on the Blueprint of the actor Multiplayer, which the level does not have
+     1 (   472)   the struct List (its field g: a pointer)
+    14 (   395)   a call on the Blueprint of the actor Military, which the level does not have
+     1 (   306)   a vector constant written as CallExpr
+     9 (   250)   list: erase()
+     2 (   234)   the end of a Ragdolls runs its destructor ~Ragdolls(), which is not written yet
+     1 (   225)   it calls Game::hit_remotes(), which waits
+     9 (   201)   a call on the Blueprint of the actor SpawnGuard, which the level does not have
+     6 (   191)   a call on the Blueprint of the actor Traffic, which the level does not have
+     6 (   186)   a call on the Blueprint of the actor Settings, which the level does not have
+     1 (   171)   it calls Game::dsync_send_full(), which waits
+     1 (   171)   it calls tyre(), which waits
+     3 (   166)   a member of Int is set
+     4 (   159)   it calls Game::spawn_unseen(), which waits
+     1 (   158)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_look_cpp::GameWorld’ has no member named ‘level’)
+     3 (   157)   it calls Game::clear_spot(), which waits
+     7 (   157)   a variable of the Blueprint of the actor Wanted, which the level does not have
+     4 (   151)   it calls Game::gaps_barricade_doors(), which waits
+     1 (   149)   a break in the middle of a switch case
+     1 (   142)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘struct converted_Game__game_toss_cpp::net::Session’ has no member named ‘send_toss’)
+     3 (   139)   a reference to something it changes
+     7 (   136)   a call on the Blueprint of the actor Lamps, which the level does not have
+     2 (   131)   it calls Game::traffic_make_near(), which waits
+     5 (   124)   call: ring_put()
+     1 (   124)   Game::damage_car() of the Blueprint Game is not written
+     2 (   120)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘look_apply_tier’ was not declared in this scope)
+     1 (   120)   it calls clip_to_tile(), which waits
+     1 (   117)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: ‘kJetSpeed’ was not declared in this scope)
+     1 (   117)   it calls MeshData::push_extra(), which waits
+     3 (   115)   it calls Game::launch_jets(), which waits
+     2 (   115)   an object of the engine as a local that is not made by a constructor of it
+     5 (   114)   a call on the Blueprint of the actor Race, which the level does not have
+    10 (   112)   a variable of the Blueprint of the actor Guided, which the level does not have
+     1 (   111)   it calls register_node(), which waits
+
+real	84m48,728s
+user	153m17,583s
+sys	7m57,465s
