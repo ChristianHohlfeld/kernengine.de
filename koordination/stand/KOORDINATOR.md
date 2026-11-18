@@ -1,4 +1,9 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 23:17 **Der volle Lauf rechnet: `work-zusammen-voll-230430-15353` auf aec5ded8, Start 23:13:36** (mit t1, k 20cb5259, d Array-Fix, p Teil 1). Das Budget
+  der Warteschlange steht jetzt in der Datei `cap` auf mag/auftrag (84: voller Lauf + eine Engine-Suite + ein Vergleich) – Vergleiche warten, bis sie passen.
+  · **Entscheidung E10 (p):** der Wert an einem Eingang vom Typ „Liste fester Länge“ wird als `Fixed<T, N>{…}` geschrieben (wie bei Feldern; Bedeutung und Graph
+    gleich, der Text der Klasse ändert sich) – JA: Länge aus dem Typ des Eingangs, der Leser lehnt eine falsche Länge ab, Fixpunkt, Engine-Fall, Doku.
+  · p: Fix `text_format` 25a7318f gebaut, lokal mit ASan belegt (Vergleich wartet); Aufrufweg an einen Actor gebaut, unbewiesen.
 - 23:13 **work-zusammen = HEAD nach Merge work-d 50832229** (Array-Parameter fester Länge: `inertia[6]` liest 6 Zahlen; Beleg `work-d-vergleich-225255-10477`,
   converted_rigid_spec in beiden Durchgängen ok). Der volle Lauf `work-zusammen-voll-230430-15353` wartete noch und nimmt diesen Stand (mag löst den Stand beim Start auf).
   d: E7 umgesetzt (cf8786c), Schritt 7 gebaut (e02ea24, unbewiesen), CI build auf c0d6d24 grün, Engine-Suite wartet auf mag.

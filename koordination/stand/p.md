@@ -1,10 +1,15 @@
 # Stand Paket p (Leistung der exportierten Klasse) – 18.11.2026, 23:05
 
-Zweig work-p, letzter Commit 63467c0b (gepusht; work-zusammen c6e4c1cf eingemischt).
+Zweig work-p, letzter Commit 8a028f9c (gepusht).
 - BEWIESEN: E2.1 Schritt 1 (bis 2416329): mag `work-p-engine-221509-17831` engine rc=0 (197 ok, blueprint_native_test 55 Blueprints/14102 Aufrufe,
   game_native_test ok). Probe `work-p-probe-221512-17868` (alle Quelltexte, vor der 22:25-Regel) abgebrochen – überholt durch den Kopf.
 - LÄUFT: `work-p-vergleich-230429-15316` (Kopf 63467c0b: E2.1, E2.2, E2.1 Schritt 2, Fix text_format) über qr_code, settings, nostr, controls,
   combat_rules. Danach `engine` auf dem Kopf. CI: run 44407872390 (work-p, 63467c0b).
+
+## E3-A Aufrufweg ohne std::vector – gebaut 2b?/8a028f9c, UNBEWIESEN
+- func_call_on: std::array für Argumente/Ergebnisse; Runtime::call_on(span,span), call_on_into, Instance::call_into/call_class; logic::Results
+  (Vektor oder Plätze) als Ziel von NativeBlueprint::call; Glue-Signatur angepasst (nicht Teil der Schreibweise). Lokal: übersetzt (Werkzeug,
+  Glue des Falls call_on, Bench-Klassen). Beweis offen: engine auf dem Kopf + vergleich über controls.cpp, combat_rules.cpp (cost-Zeilen).
 
 ## Fix text_format (Befund von k) – 25a7318f, lokal bewiesen, mag läuft
 - blueprint.h `format_arg(const std::string&)`/`(std::string_view)`: Sicht auf den Wert selbst (vorher vorläufiger Text, der vor dem Schreiben verging).
@@ -186,3 +191,13 @@ Frage: E2.1 bauen (ja/nein)? E2.2? E2.3?
 Schwelle 1,5: das Rauschen dieser Maschine (geteilt) lag bei unveränderten Fällen zwischen zwei Läufen bei bis zu ±0,4 (wrap_pi 1,30/1,56/1,85,
 lamps_near 2,24/1,65/3,02 bei gleichem Code) – mit 1,0 wäre der Test rot ohne Grund. Vorschlag CI: zwei Läufe, rot nur wenn beide über 1,5; je Fall eine
 Liste „bekannt über der Schwelle, mit Ursache“ bis E2 entschieden ist (heute 13 Fälle). Läuft ohne Engine (nur Klassen + musl), ~1 min Bau.
+
+## ENTSCHEIDUNG NÖTIG (E7) – Literal einer Liste fester Länge an einem Eingang (Befund k, E3-C/Arondight45_*), 23:25
+Gelesen (Leser+to_cpp über Arondight45_DroneFC_Core aus work-zusammen-voll-203000-750): Feld-Vorgaben und Struktur-Literale schreibt to_cpp schon als
+`Fixed<fc_PT1, 3>{…}` (literal mit TypeRef). Die Anforderungen kommen von einem **Wert an einem Eingang**: `self.filters_ = struct_make<fc_Filters>(List<fc_PT1>{…}, List<fc_PT1>{…}, …)`
+(Runtime_reset, Z. 543/632) – der Schreiber schreibt den Wert eines Pins mit `literal(v, of, g)` ohne die Länge des Felds; `List<…>{…}` ist ein std::vector,
+der dann in das Fixed des Felds kopiert wird (2 Anforderungen je Aufruf). Vorschlag: der Wert an einem Eingang, dessen Typ eine Liste fester Länge ist
+(bei struct.make: das Feld; allgemein: der Pin mit count), wird mit seinem Typ geschrieben: `struct_make<fc_Filters>(Fixed<fc_PT1, 3>{…}, …)` – dieselbe
+Schreibweise wie bei Feldern/Variablen (blueprint_cpp.md „Plätze“), der Leser liest sie schon dort. Bedeutung gleich (dieselben Einträge, Rest null),
+in keiner Stufe ein anderer Wert; Graph unverändert; ändert den Text der Klasse (betroffene Klassen: jede mit einem Listen-Literal an einem Fixed-Eingang).
+Kosten: Schreiber (Pin-Typ mit count an den Literal-Schreiber), Leser prüfen (Fixed-Literal an einem Eingang), Fixpunkt-Fall, Doku. Frage: bauen (ja/nein)?

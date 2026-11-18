@@ -14,7 +14,7 @@
 | G5 Car_new 300/300 | kein Konverterfehler: `Applied::on` unbestimmt (C++ lässt offen) | – | Quelle car.h:110 | BEFUND FÜR t1 |
 | E3-C (p) fc_Filters `List<fc_PT1>` in FirmwareRuntime_new | kein Konverterfehler: Felder sind Fixed<fc_PT1, 3>; ein Wertliteral einer Struktur schreibt ihre festen Felder als List (Sprache, notation.cpp literal()) – die Klasse legt dafür einen std::vector an | – | Kleinstfall /tmp/k_mini, lesen.py | BEFUND FÜR d/p |
 | G6 CityStream_upload 29/243 | `m[key].push_back(x)`: variable_of hob `put = t_2` (Zurückschreiben) vor `t_2 = m[key]` – zurück ging der alte Inhalt | 20cb5259 | work-k-vergleich-224717-8097 | belegt |
-| CityStream_buildings_near 5/300 (t1) | Schlüssel u64 eines Map-Eintrags (`[k, t]`) ging als Int (Compiler nennt `unsigned long`) | fa3dc97d | Vergleich city_stream+destruction auf ad36eee9 | läuft |
+| CityStream_buildings_near 5/300 (t1) | Schlüssel u64 eines Map-Eintrags (`[k, t]`) ging als Int (Compiler nennt `unsigned long`) | fa3dc97d | work-k-vergleich-230203-14801: converted_city_stream_cpp ok in beiden Durchgängen | belegt |
 | G6 CityStream_feed_terrain | im Lauf 222045-20677 nicht geschrieben (wartet) – nichts zu vergleichen | – | – | offen |
 
 ## BEFUND FÜR t1
@@ -74,3 +74,8 @@
   (1 Paar: Destruction::fracture). Kleinstfall /tmp/k_order/order.cpp: clang++ alt = neu, g++ alt ≠ neu.
 - WARTET AUF: t1s Umstellung (tests/lowered mit clang) – dann Differenztest grün belegen, erst dann BEREIT ZUM MERGEN für 90ecf01f.
   Danach `vergleich` über destruction.cpp (unter GCC sollten collapse/fracture dann gleich sein).
+
+## BEREIT ZUM MERGEN: fa3dc97d (+ Merge ad36eee9) – Beleg work-k-vergleich-230203-14801
+- city_stream.cpp, destruction.cpp auf ad36eee9 (mit t1s Testrahmen): converted_city_stream_cpp ok in beiden Durchgängen (buildings_near,
+  upload), 11 ok von 12, keine LECK. Übrig nur converted_destruction_cpp (collapse/fracture/blast: pieces_[i].size/.p – die
+  Argumentreihenfolge, E9; die Absenkung 90ecf01f kam nach diesem Stand). Beleg dafür: work-k-vergleich auf 90ecf01f (destruction.cpp).
