@@ -1,0 +1,1 @@
+probe origin/work src/qr_code.cpp src/settings.cpp src/game.cpp
