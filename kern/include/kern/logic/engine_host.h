@@ -503,6 +503,12 @@ template <class C> std::size_t room(const C& c) {
   else if constexpr (std::is_signed_v<C>) return c > 0 ? static_cast<std::size_t>(c) : 0;
   else return static_cast<std::size_t>(c);
 }
+/// How many numbers a count says are read through the pointer before it: the count - Count<Per>: Per numbers
+/// each (`triangulate(const f64* xy, Count<2> vertex_count, ...)` reads 2 * vertex_count numbers).
+template <class C> std::size_t numbers(const C& c) {
+  if constexpr (is_count<C>) return static_cast<std::size_t>(static_cast<u32>(c)) * C::per;
+  else return room(c);
+}
 /// What a function gives that is an object of the engine: its handle - the host's own (a reference, a
 /// pointer: adopted), or one given by value (owned from now on).
 template <class T, class... Bases, class R> i64 handle_of(EngineObjects& o, R&& r) {
