@@ -2967,7 +2967,7 @@ Instance* Runtime::add(const Graph& own, ActorRef self, std::string name) {
     auto own = blueprint_registry().find(graph_hash(graph));
     if (native && own != blueprint_registry().end()) {
       added->blueprint_ = own->second();
-      added->blueprint_->attach({&host_, this, added, self, counters_});
+      added->blueprint_->attach({&host_, this, added, self, counters_, host_.engine_objects()});
     } else if (jit && added->jit_fits_) {
       added->jit_pending_ = host_.jit_compile(compile_wasm(*added), added->id_);
     }
