@@ -1332,6 +1332,7 @@ class Unit:
         self.lives, self.deciding_life = {}, set()       # the program's classes -> what ends with a value of one (life)
         self.makings, self.deciding_making = {}, set()   # the program's classes -> does C++ make more of one than its defaults (needs_making)
         self.externs = {}           # a function of an actor's Blueprint it calls on that actor -> (its inputs, its outputs: [(name, type)], its declaration)
+        self.extern_inputs = {}     # such a function -> (the head of its declaration, its inputs as the actor's Blueprint names them: [(type, name, default)])
         self.working = set()
         self.short = collections.defaultdict(list)
         for q in list(tree.records) + list(tree.enums):
@@ -5972,9 +5973,11 @@ class Emit:
             if gives:
                 lines.append(f"  struct {local}Result {{ " + " ".join(f"{t} {o} = {u.zero(t)};" for o, t in pins[1]) + " };")
             lines.append(f"  /// (of the Blueprint of the actor {actor}, called on it)")
-            lines.append(f"  KERN_EXTERN_AS({text_literal(function)}) {local + 'Result' if gives else 'void'} {local}(" + ", ".join(f"{t} {x} = {u.zero(t)}" for x, t in pins[0]) + ");")
+            head = f"  KERN_EXTERN_AS({text_literal(function)}) {local + 'Result' if gives else 'void'} {local}("
+            lines.append(head + ", ".join(f"{t} {x} = {u.zero(t)}" for x, t in pins[0]) + ");")
             u.names.update({local, local + "Result"})
             u.externs[local] = (*pins, lines)
+            u.extern_inputs[local] = (head, [(t, x, u.zero(t)) for x, t in zip(ins, in_types)])
         elif held[:2] != pins:
             raise Wait(f"two calls of {function} on the Blueprint of the actor {actor} with other values (a Blueprint says once what a function of another one looks like)")
         texts = [self.ex(a, t) for a, t in zip(values, in_types)]
@@ -13105,7 +13108,28 @@ def convert_unit(job):
             "said": [f"    {f.cpp} ({f.lines}): " + ("written" if f.text else "a name for a place - written where it is called" if f.place else f.wait) for f in fs],
             "table": {f.key: unit.entry_of(f) for f in unit.functions.values() if not f.lifted and f.key}, "written": len(unit.order),
             "parts": (variables, functions, members), "types": types, "uses": unit.uses(), "missing": sorted(unit.missing), "asked": sorted(unit.asked), "state": unit.state_used,
-            "test": (unit.test[0], [(f.cpp, why) for f, why in unit.test[1]]), "exports": exports, "errors": said.getvalue()}
+            "test": (unit.test[0], [(f.cpp, why) for f, why in unit.test[1]]), "exports": exports, "errors": said.getvalue(),
+            "names": sorted((unit.names - world.taken) | set(unit.type_line)),
+            "externs": {"\n".join(unit.externs[x][2]): unit.extern_inputs[x] for x in unit.extern_inputs if x in unit.externs}}
+
+
+def settled_extern(text, shape, whole):
+    """The declaration of a function of an actor's Blueprint (KERN_EXTERN_AS ...) for a Blueprint of several parts: its
+    inputs as the actor's Blueprint names them - but none called as something of the whole Blueprint (`whole`: its
+    variables, functions, types) or as an input before it. `shape`: the head of the declaration and the inputs (type,
+    the actor's name, default) - None for any other text, which stays."""
+    if shape is None:
+        return text
+    head, inputs = shape
+    named = []
+    for _, x, _ in inputs:
+        name, i = x, 1
+        while name in whole or name in named:
+            i += 1
+            name = f"{x}_{i}"
+        named.append(name)
+    lines = text.split("\n")
+    return "\n".join(lines[:-1] + [head + ", ".join(f"{t} {name} = {zero}" for (t, _, zero), name in zip(inputs, named)) + ");"])
 
 
 def convert_timed(job):
@@ -13480,6 +13504,16 @@ def main(argv):
     for blueprint in sorted(set(world.parts.values())):
         mine = sorted((p for p in results if world.parts.get(p) == blueprint), key=lambda p: world.part_numbers[p])
         state, constants, said_by, texts_, members, types_, uses_ = {}, [], {}, [], [], {}, set()
+        # What the whole Blueprint calls something: what each of its parts has in the end, and its variables. A part knows its
+        # own names only - an input of a function of an actor's Blueprint (KERN_EXTERN) is named there as the actor names it,
+        # and may be the name of a variable another part declares (Game's `pad`, the input `pad` of Controls' DeviceInput). An
+        # input of a function is not called as a variable or a function of the Blueprint: the declaration is settled here, for
+        # the whole Blueprint, from the actor's names - the same in every part (a call gives its values in their order, by no name).
+        whole = set()
+        for p in mine:
+            whole.update(results[p].get("names", ()))
+            for lines in results[p]["state"].values():
+                whole.update(re.sub(r"\s*=.*", "", line).split()[-1] for line in lines if line.strip() and not line.strip().startswith("///"))
         for p in mine:
             r = results[p]
             for at, lines in r["state"].items():
@@ -13502,6 +13536,7 @@ def main(argv):
                     constants += block
                 block = []
             # (what a function of an actor's Blueprint looks like: once, also where several parts call it)
+            functions_ = [settled_extern(t, r.get("externs", {}).get(t), whole) for t in functions_]
             texts_ += [t for t in functions_ if not ("KERN_EXTERN" in t and t in texts_)]
             members += members_
             types_.update(r["types"])
