@@ -7139,7 +7139,8 @@ class Emit:
         u = self.u
         q = next((x for x, n_ in u.structs.items() if n_ == t and isinstance(x, str)), None)
         rec = self.tree.records.get(q, {})
-        ctors = [c for c in kids(rec) if c.get("kind") == "CXXConstructorDecl" and not c.get("isImplicit")]
+        # (a constructor the class deletes - `Car(const Car&) = delete;` - makes nothing: no call can mean it)
+        ctors = [c for c in kids(rec) if c.get("kind") == "CXXConstructorDecl" and not c.get("isImplicit") and not c.get("explicitlyDeleted")]
         fits = [c for c in ctors if (ctor_type and c.get("type", {}).get("qualType") == ctor_type) or (not ctor_type and len([p for p in kids(c) if p.get("kind") == "ParmVarDecl"]) == len(arg_nodes))]
         if not arg_nodes and q is not None and u.own_default_ctor(q) is None:
             return self.finished(t, q, u.zero(t))   # (C++'s own constructor: the defaults, and what C++ makes of the fields)
