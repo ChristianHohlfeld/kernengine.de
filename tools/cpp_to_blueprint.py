@@ -10372,6 +10372,15 @@ class TestWriter:
                 by_class[owner].append(f)
             else:
                 free.append(f)
+        if True:   # T1DBG (temporary)
+            all_ = [(q_, f_) for q_, fs_ in by_class.items() for f_ in fs_] + [("", f_) for f_ in free]
+            seen_ = collections.Counter((q_, f_["decl"].get("name"), f_.get("role")) for q_, f_ in all_)
+            for q_, f_ in all_:
+                if seen_[(q_, f_["decl"].get("name"), f_.get("role"))] > 1:
+                    i_ = [k_ for k_, v_ in u.engine_calls.items() if v_ is f_]
+                    j_ = [k_ for k_, v_ in self.more_engine.items() if v_ is f_]
+                    d_ = f_["decl"]
+                    sys.stderr.write(f"T1DUP {u.job} {q_} {d_.get('name')} decl={d_['id']} prev={d_.get('previousDecl')} ident={self.ident(d_)} own={i_} more={j_} role={f_.get('role')} type={f_.get('type')} inG={d_['id'] in G_engine_dbg} indecl={self.tree.decl.get(d_['id']) is d_} inbody={self.tree.body.get(d_['id']) is d_}\n")
         chunks, defs = [], []
         for q in sorted(set(by_class) - u.objects_seen):
             if q in tree.records and not u.engine_object(q):
@@ -11580,9 +11589,12 @@ class TestWriter:
                     self.more_engine[i] = u.api().function(d)
                 except Wait:
                     pass
+        global G_engine_dbg
+        G_engine_dbg = set(G.engine)
         object_chunks, object_defs = self.stand_ins(pairs)
         for place, piece in G.foreign.items():   # (the stand-ins other tests hand on: defined with this test's own)
             if piece["kind"] == "engine":
+                sys.stderr.write(f"T1FOR {u.job} {place} {str(piece.get('stand_in'))[:160]}\n")
                 pairs += [tuple(x) for x in piece.get("pairs", ())]
                 object_defs.append((("foreign", place), piece["stand_in"][1]))
         rename = self.renamer(pairs)
