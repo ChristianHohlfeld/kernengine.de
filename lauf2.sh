@@ -11,10 +11,12 @@
 # Ergebnis: Branch mag/ergebnis-<name> (bei "voll": Commit 1 = Level und Tests, Commit 2 = Protokolle in mag-log/;
 # sonst nur die Protokolle). Beim Start jedes Auftrags erscheint mag/ergebnis-<name> schon mit mag-log/when.
 # Bis zu $SLOTS Aufträge laufen zugleich (ein "voll" allein mit allen Kernen). Pusht nie auf main/work, erzwingt
-# nichts, installiert nichts; jeder Auftrag rechnet in ~/spawncity-jobs/<name> und räumt den Ordner danach weg.
+# nichts, installiert nichts; jeder Auftrag rechnet im Arbeitsspeicher (/dev/shm/spawncity-jobs-<nutzer>/<name>, sonst ~/spawncity-jobs/<name>) und räumt den Ordner danach weg.
 # Die Schleife ersetzt sich selbst, wenn diese Datei auf dem Branch neuer ist.
 set -u
-A="$(cd "$(dirname "$0")" && pwd)"; J=~/spawncity-jobs; REPO=https://github.com/ChristianHohlfeld/kernengine.de
+A="$(cd "$(dirname "$0")" && pwd)"; J=~/spawncity-jobs
+# Im Arbeitsspeicher rechnen, wo es geht (/dev/shm: Klon, Zwischendateien, Objekte - nichts davon geht über die Platte).
+[ -d /dev/shm ] && [ -w /dev/shm ] && J="/dev/shm/spawncity-jobs-$(id -un)"; REPO=https://github.com/ChristianHohlfeld/kernengine.de
 N="$(nproc)"; SLOTS="${SLOTS:-6}"; mkdir -p "$J" "$A/.done"
 me="$(sha256sum "$0" | cut -c1-16)"
 G="git -c user.name=mag -c user.email=mag@localhost"
