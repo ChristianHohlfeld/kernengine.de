@@ -314,7 +314,7 @@ class Game {
   void jet_attack(bool gun, bool missile, bool bomb);
   void draw_projectiles();
   // multiplayer (game_net.cpp; its state lives in MpLocal, see mp_rules.h / net_session.h)
-  /// (made where it is first needed: then mp_ holds it)
+  /// (where it is first needed: from then on it is there - mp_made_ - and its art is made once the renderer is)
   void mp_local_ready();
   // ---- the mates' units (game_swarm.cpp: zombie_nights.mjs zombie-sync, military_response.mjs mil-snap;
   // the police and the sandbox enemies the same way)
@@ -726,7 +726,8 @@ class Game {
   net::Session net_;
   std::unique_ptr<Car> remote_car_, remote_bus_;
   bool rebased_ = false;
-  std::unique_ptr<MpLocal> mp_;  // pings, feed, voice, big map (game_net.h)
+  MpLocal mp_;  // pings, feed, voice, big map (game_net.h)
+  bool mp_made_ = false;  // mp_local_ready has run: from then on the multiplayer presentation is there
   // street lamps and night
   struct Lamp { Vec3 foot; f32 yaw; u32 lane; u8 state = 0; };  // state: street_lamps.mjs 0 lit, 1 dark, 2 down
   std::vector<Lamp> lamps_;
