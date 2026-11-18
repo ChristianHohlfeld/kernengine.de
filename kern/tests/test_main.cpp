@@ -4448,7 +4448,7 @@ TEST(logic_native_blueprints) {
     f64 heat = 1;
     void attach(const logic::BlueprintWorld&) override {}
     void run(int, int) override {}
-    bool call(std::string_view function, const std::vector<logic::Value>& args, std::vector<logic::Value>& results) override {
+    bool call(std::string_view function, std::span<const logic::Value> args, logic::Results& results) override {
       results.clear();
       if (function != "Twice") return false;
       results = {logic::Value::number(2 * (args.empty() ? 0.0 : args[0].as_number()) + heat)};

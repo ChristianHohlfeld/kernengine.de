@@ -4956,7 +4956,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
                   "    using kern::logic::native_out;\n    (void)entry;\n" +
                   events +
                   "  }\n"
-                  "  bool call(std::string_view function, const std::vector<kern::logic::Value>& args, std::vector<kern::logic::Value>& results) override {\n"
+                  "  bool call(std::string_view function, std::span<const kern::logic::Value> args, kern::logic::Results& results) override {\n"
                   "    using kern::logic::native_arg;\n    using kern::logic::to_value;\n    (void)args;\n    results.clear();\n";
   for (const Function& f : g.functions) {
     if (f.external || !f.from.empty()) continue;  // (a function of another Blueprint, or of a library: nothing of it is here to call by name)

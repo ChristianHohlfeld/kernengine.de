@@ -11,10 +11,12 @@
 // nodes (kern/game/blueprint_nodes.h). logic::native_ready tells what a Blueprint still lacks.
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <functional>
 #include <initializer_list>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -77,8 +79,8 @@ constexpr math::Exact formula(F&& f, A... values) { return {static_cast<i64>(f(v
 /// order of the function's outputs (func_call_on).
 template <class... O> struct Out {
   std::tuple<O&...> to;
-  void take(const std::vector<logic::Value>& results) { take(results, std::index_sequence_for<O...>{}); }
-  template <std::size_t... I> void take(const std::vector<logic::Value>& results, std::index_sequence<I...>) {
+  void take(std::span<const logic::Value> results) { take(results, std::index_sequence_for<O...>{}); }
+  template <std::size_t... I> void take(std::span<const logic::Value> results, std::index_sequence<I...>) {
     ((I < results.size() ? void(std::get<I>(to) = logic::from_value<O>(results[I])) : void()), ...);
   }
 };
@@ -123,9 +125,13 @@ struct BlueprintCore : logic::PureNodes {
   /// Call on Actor: runs the function `Name` of the Blueprint of `target` (Actor{0}: the Level's)
   /// with `args`, and `out` takes what it gave - func_call_on<"Stars">(who, kern::out(n7.stars), x);
   template <Setting Name, class... O, class... A> void func_call_on(Actor target, Out<O...> out, const A&... args) {
-    std::vector<logic::Value> results;
-    if (kern_world.runtime && kern_world.instance) kern_world.runtime->call_on(*kern_world.instance, Name.view(), target.id, {logic::to_value(args)...}, results);
-    out.take(results);
+    // (the arguments and what the function gives in places of this call: no memory asked for - Runtime::call_on)
+    const std::array<logic::Value, sizeof...(A)> in{logic::to_value(args)...};
+    std::array<logic::Value, sizeof...(O)> results{};
+    std::size_t given = 0;
+    if (kern_world.runtime && kern_world.instance)
+      given = kern_world.runtime->call_on(*kern_world.instance, Name.view(), target.id, std::span<const logic::Value>(in), std::span<logic::Value>(results));
+    out.take(std::span<const logic::Value>(results.data(), given));
   }
 
   /// Get Variable on Actor: what the variable `Name` of the Blueprint of `target` holds, as a T -

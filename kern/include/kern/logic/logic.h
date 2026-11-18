@@ -47,6 +47,7 @@
 #include <functional>
 #include <limits>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -989,6 +990,35 @@ struct BlueprintWorld {
   /// on them itself. Null: through the host's door (Host::engine).
   class EngineObjects* engine = nullptr;
 };
+/// Where a call by name puts what the function gave (Instance::call, NativeBlueprint::call): a vector,
+/// or places the caller holds - as many as it has; what does not fit is left out. A call from a
+/// Blueprint's class on another one (BlueprintCore::func_call_on) gives its places: no memory asked for.
+class Results {
+ public:
+  Results(std::vector<Value>& grow) : grow_(&grow) {}  // NOLINT (implicit: a vector is one)
+  explicit Results(std::span<Value> places) : places_(places) {}
+  void clear() {
+    if (grow_) grow_->clear();
+    given_ = 0;
+  }
+  void push_back(Value v) {
+    if (grow_) grow_->push_back(std::move(v));
+    else if (given_ < places_.size()) places_[given_++] = std::move(v);
+  }
+  Results& operator=(std::initializer_list<Value> values) {
+    if (grow_) { grow_->assign(values); return *this; }
+    given_ = 0;
+    for (const Value& v : values) push_back(v);
+    return *this;
+  }
+  /// How many it holds.
+  std::size_t size() const { return grow_ ? grow_->size() : given_; }
+
+ private:
+  std::vector<Value>* grow_ = nullptr;
+  std::span<Value> places_;
+  std::size_t given_ = 0;
+};
 class NativeBlueprint {
  public:
   virtual ~NativeBlueprint() = default;
@@ -999,7 +1029,7 @@ class NativeBlueprint {
   /// event's values on the node's outputs (Instance::output).
   virtual void run(int node, int entry) = 0;
   /// As Instance::call (false: no such function, `results` empty).
-  virtual bool call(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results) = 0;
+  virtual bool call(std::string_view function, std::span<const Value> args, Results& results) = 0;
   virtual bool get(std::string_view variable, Value& out) const = 0;
   virtual bool set(std::string_view variable, const Value& value) = 0;
 };
@@ -1115,6 +1145,10 @@ class Instance {
   /// from; what the function made of it stands behind the outputs in `results`, for every
   /// reference input that is not const, in the inputs' order.
   bool call(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results);
+  /// The same into places the caller holds (`given`: how many the function filled; the rest are
+  /// left as they are) - a Blueprint's class answers without asking for memory (Runtime::call_on
+  /// from a class).
+  bool call_into(std::string_view function, std::span<const Value> args, std::span<Value> results, std::size_t& given);
   /// The same from a call node of this graph (Call Function, Function Value). The call belongs to
   /// the chain it is made in: it is no chain of its own for how deep events may nest - in the
   /// Blueprint's C++ it is a call like any other.
@@ -1233,6 +1267,7 @@ class Instance {
     f64 entered = 0;
   };
   bool call_function(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results, bool inside, const std::vector<Spot>* places = nullptr);
+  bool call_class(std::string_view function, std::span<const Value> args, Results& results);  // (the class's: NativeBlueprint::call)
   Value read(const Spot& s) const;
   bool write(const Spot& s, const std::function<void(Value&)>& change);
   std::vector<std::vector<Spot>> refs_;                   // per function: where its reference inputs are, for the call that runs
@@ -1332,6 +1367,10 @@ class Runtime {
   /// chains nest: at most 64, then the call is left out and reported), and a Blueprint that is in
   /// the middle of a call of that function has its own values back afterwards.
   void call_on(Instance& caller, std::string_view function, ActorRef target, const std::vector<Value>& args, std::vector<Value>& results);
+  /// The same into places the caller holds, one for each of its outputs (a Blueprint's class:
+  /// BlueprintCore::func_call_on - no memory asked for where the target is a class too): gives how
+  /// many of them hold an output of the declared function (the declared defaults where the call gave none).
+  std::size_t call_on(Instance& caller, std::string_view function, ActorRef target, std::span<const Value> args, std::span<Value> results);
   /// Get Variable on Actor: the variable `name` of the Blueprint of `target` as a value of `type` (what
   /// a variable of that type holds when nothing else is said - its zero - where the target has none:
   /// no such Blueprint, no such variable, one of a type that does not become `type`).
@@ -1344,6 +1383,7 @@ class Runtime {
   /// Blueprints nest more than 64 deep (it is reported, naming `caller`). A Blueprint that is in the
   /// middle of a call of that function has its own values back afterwards.
   bool call_on(ActorRef target, std::string_view function, const std::vector<Value>& args, std::vector<Value>& got, std::string_view caller);
+  bool call_on_into(ActorRef target, std::string_view function, std::span<const Value> args, std::span<Value> got, std::size_t& given, std::string_view caller);
   /// The one way of Get Variable on Actor, whoever reads (get_on above, ActorBlueprint::get): the
   /// variable `name` of the Blueprint of `target` (0: the Level's) as that Blueprint holds it. False:
   /// the target has no Blueprint, no such variable, or one whose type does not become `as` (a number

@@ -2206,7 +2206,7 @@ template <class C, class R, class... A> std::tuple<std::remove_cvref_t<A>...> pa
 /// NativeParam<&Door::Tune, 0>. What holds a reference input for a call by name - a variable of
 /// exactly the class's type, so the function's reference binds to it (logic::native_glue).
 template <auto Function, std::size_t K> using NativeParam = std::tuple_element_t<K, decltype(detail::params_of(Function))>;
-template <class T> T native_arg(const std::vector<Value>& args, std::size_t i, const T& fallback) {
+template <class T> T native_arg(std::span<const Value> args, std::size_t i, const T& fallback) {
   return i < args.size() ? from_value<T>(args[i].converted(pin_type_of<T>())) : fallback;
 }
 /// A value an event brought, as the C++ type of its handler's parameter: output `out` of the
