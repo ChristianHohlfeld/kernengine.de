@@ -13,9 +13,11 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 [ $# -ge 1 ] || { echo "usage: tools/blueprint_bench.sh <level.klevel> [rounds] [case ...]" >&2; exit 2; }
 level="$1"; shift
 cxx="${BENCH_CXX:-clang++-18}"
-dir="${TMPDIR:-/tmp}/kern-blueprint-bench/$$"
+if [ -n "${BENCH_DIR:-}" ]; then dir="$BENCH_DIR"; else  # (BENCH_DIR: keep the build there, to read it)
+  dir="${TMPDIR:-/tmp}/kern-blueprint-bench/$$"
+  trap 'rm -rf "$dir"' EXIT
+fi
 mkdir -p "$dir"
-trap 'rm -rf "$dir"' EXIT
 bench="$root/kern/games/spawncity/tests/bench"
 # (the actors whose Blueprints are measured - the libraries they use come with them)
 "$root/tools/blueprint_cpp.sh" --classes "$level" "$dir/classes.h" \
