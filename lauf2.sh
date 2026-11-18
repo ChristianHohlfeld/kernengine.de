@@ -18,7 +18,8 @@
 #                                       Ergebnis: mag-log/alle.txt (je Test ok/FAIL/ABBRUCH), alle-real.txt, einzeln.tar.xz (jede Ausgabe)
 # Ergebnis: Branch mag/ergebnis-<name> (bei "voll": Commit 1 = Level und Tests, Commit 2 = Protokolle in mag-log/;
 # sonst nur die Protokolle). Beim Start jedes Auftrags erscheint mag/ergebnis-<name> schon mit mag-log/when.
-# Bis zu $SLOTS Aufträge laufen zugleich (ein "voll" allein mit allen Kernen). Pusht nie auf main/work, erzwingt
+# Aufträge laufen zugleich, solange sie zusammen ins Budget an Kernen passen (CAP; volle Läufe zuerst, dann vergleich/alle, dann der Rest).
+# Abbrechen: eine Datei abbruch/<name> auf dem Zweig (mag.sh abbrechen <name>) - was der Auftrag rechnen lässt, endet; er schreibt sein Protokoll und räumt auf. Pusht nie auf main/work, erzwingt
 # nichts, installiert nichts; jeder Auftrag rechnet im Arbeitsspeicher (/dev/shm/spawncity-jobs-<nutzer>/<name>, sonst ~/spawncity-jobs/<name>) und räumt den Ordner danach weg.
 # Die Schleife ersetzt sich selbst, wenn diese Datei auf dem Branch neuer ist.
 # Fassung 18.11., 18:10: (1) "probe" gibt dem Konverter eine Kopie des Levels mit (--level): ohne sie wartete jede Funktion, die den Blueprint
@@ -44,13 +45,92 @@ find_clang() {
   done
 }
 CLANGXX="$(find_clang)"; export CLANGXX
+# >>> warteschlange (diese Funktionen prüft /tmp-Probe des Koordinators einzeln, ehe eine neue Fassung auf den Zweig geht)
+mkdir -p "$J" "$A/.done" "$A/.lauf"
+CAP=$(( N * 5 / 4 ))   # (Kerne, die Aufträge zusammen belegen dürfen: ein voller Lauf und ein Vergleich daneben - mehr macht alle langsam)
+need() { case "$1" in voll) echo "$N" ;; alle) echo $(( N * 2 / 3 )) ;; vergleich) echo $(( N / 4 )) ;; *) echo $(( N / 6 )) ;; esac; }
+# Kerne, die laufende Aufträge belegen. Jeder angenommene Auftrag steht in .lauf/<name> mit seinem Bedarf und, sobald er läuft, der Nummer seiner Schale
+# (ersetzt sich die Schleife, laufen ihre Aufträge weiter - die Liste der Schale kennt sie dann nicht mehr, diese Dateien schon). Ein Auftrag einer älteren
+# Fassung steht dort nicht: er zählt, solange ein Prozess in seinem Ordner arbeitet.
+used() {
+  local s=0 f name k pid d kind cw
+  cw="$(ls -l /proc/[0-9]*/cwd 2>/dev/null | sed 's/^.* -> //')"
+  for f in "$A"/.lauf/*; do
+    [ -f "$f" ] || continue
+    k=0; pid=""; read -r k pid < "$f" || true
+    if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then rm -f "$f"; continue; fi                    # (zu Ende, ohne aufzuräumen)
+    if [ -z "$pid" ] && [ -n "$(find "$f" -mmin +5 2>/dev/null)" ]; then rm -f "$f"; continue; fi     # (angenommen und nie gestartet)
+    s=$(( s + k ))
+  done
+  for d in "$J"/*/; do
+    [ -d "$d" ] || continue; d="${d%/}"; name="$(basename "$d")"; [ -e "$A/.lauf/$name" ] && continue
+    printf '%s\n' "$cw" | awk -v d="$d" '$0 == d || index($0, d "/") == 1 { f = 1 } END { exit !f }' || continue
+    kind=probe; [ -f "$A/jobs/$name" ] && { read -r kind _ < "$A/jobs/$name" || true; }
+    s=$(( s + $(need "$kind") ))
+  done
+  echo "$s"
+}
+# Abbruch (Datei abbruch/<name> auf dem Zweig): beendet, was der Auftrag rechnen lässt - Konverter, Compiler, Tests: jeden Prozess, der in seinem Ordner
+# arbeitet. Die Schale des Auftrags selbst bleibt (und git, xz, tar): sie schreibt ihr Protokoll, pusht es und räumt den Ordner weg. Solange der Ordner steht,
+# wiederholt die Schleife das alle 20 Sekunden - so endet auch, was der Auftrag danach noch beginnt.
+cancel_job() {
+  local name="$1" d pid ppid comm main="" x="" et mode
+  case "$name" in ""|.*|*[!A-Za-z0-9._-]*) return 0 ;; esac
+  d="$J/$name"; [ -n "$J" ] && [ -d "$d" ] || return 0
+  # (steht in der Datei "tests": nur die Hänger - Testläufe dieses Auftrags, die länger als ${HANG:-1200} Sekunden laufen; der Auftrag selbst rechnet weiter)
+  mode="$(head -1 "$A/abbruch/$name" 2>/dev/null)"
+  if [ "$mode" = tests ]; then
+    ls -l /proc/[0-9]*/cwd 2>/dev/null | awk -v d="$d" '{ i = index($0, " -> "); c = substr($0, i + 4); if (c == d || index(c, d "/") == 1) { n = split(substr($0, 1, i - 1), a, "/"); print a[n - 1] } }' | while read -r pid; do
+      et=""; comm=""; read -r et comm < <(ps -o etimes=,comm= -p "$pid" 2>/dev/null) || true
+      [ "$comm" = spawncity_tests ] && [ -n "$et" ] && [ "$et" -ge "${HANG:-1200}" ] && { kill "$pid" 2>/dev/null; echo "$(date '+%F %T') $name: Testlauf $pid nach $et s beendet"; }
+    done
+    return 0
+  fi
+  if [ ! -e "$d/.abbruch" ]; then touch "$d/.abbruch"; echo "abgebrochen $(date '+%T') (abbruch/$name)" >> "$d/mag-log/when" 2>/dev/null; echo "$(date '+%F %T') $name: Abbruch"; fi
+  [ -f "$A/.lauf/$name" ] && { read -r x main < "$A/.lauf/$name" || true; }
+  ls -l /proc/[0-9]*/cwd 2>/dev/null | awk -v d="$d" '{ i = index($0, " -> "); c = substr($0, i + 4); if (c == d || index(c, d "/") == 1) { n = split(substr($0, 1, i - 1), a, "/"); print a[n - 1] } }' | while read -r pid; do
+    [ "$pid" = "$main" ] && continue
+    ppid=""; comm=""; read -r ppid comm < <(ps -o ppid=,comm= -p "$pid" 2>/dev/null) || true
+    [ -n "$ppid" ] || continue
+    [ "$ppid" = "$$" ] && continue      # (die Schale des Auftrags, auch eines Auftrags einer älteren Fassung)
+    case "$comm" in git|git-remote-http*|xz|tar|tail|ssh|rm|cp) continue ;; esac
+    kill "$pid" 2>/dev/null
+  done
+  return 0
+}
+# Annahme: volle Läufe zuerst, dann "vergleich" und "alle", dann der Rest - je in der Reihenfolge des Eintreffens. Angenommen wird nur, was ins Budget an
+# Kernen passt; der erste, der nicht passt, hält die nach ihm auf - so verhungert kein großer Auftrag hinter vielen kleinen.
+annehmen() {
+  local f name kind k u prio
+  for f in "$A"/abbruch/*; do [ -f "$f" ] && cancel_job "$(basename "$f")"; done
+  u="$(used)"
+  for prio in voll "vergleich alle" rest; do
+    for name in $(ls -tr "$A/jobs" 2>/dev/null); do
+      f="$A/jobs/$name"; [ -f "$f" ] || continue; [ -e "$A/.done/$name" ] && continue
+      [ -e "$A/abbruch/$name" ] && { touch "$A/.done/$name"; continue; }      # (abgebrochen, ehe er begann)
+      kind=""; read -r kind _ < "$f" || true; [ -n "$kind" ] || continue
+      case "$prio" in
+        rest) case " voll vergleich alle " in *" $kind "*) continue ;; esac ;;
+        *) case " $prio " in *" $kind "*) ;; *) continue ;; esac ;;
+      esac
+      k="$(need "$kind")"
+      if [ "$u" -gt 0 ] && [ $(( u + k )) -gt "$CAP" ]; then return 0; fi
+      touch "$A/.done/$name"; echo "$k" > "$A/.lauf/$name"; u=$(( u + k ))
+      echo "$(date '+%F %T') $name: $(head -1 "$f") ($u von $CAP Kernen belegt)"
+      run_job "$name" 8>&- &
+    done
+  done
+  return 0
+}
+# <<< warteschlange
 run_job() {  # name
   local name="$1" kind ref rest W jobs
   read -r kind ref rest < "$A/jobs/$name"
+  echo "$(need "$kind") $BASHPID" > "$A/.lauf/$name"
   W="$J/$name"; rm -rf "$W"
   # Ein Spiegel des Repos im Arbeitsspeicher: jeder Auftrag holt nur das Neue und klont lokal (Sekunden statt Minuten).
   ( flock 7; [ -d "$J/.spiegel.git" ] || git clone -q --mirror "$REPO" "$J/.spiegel.git"; git -C "$J/.spiegel.git" fetch -q --prune origin ) 7> "$J/.spiegel.lock"
-  git clone -q "$J/.spiegel.git" "$W" 2>/dev/null && cd "$W" && git remote set-url origin "$REPO" && git checkout -q --detach "$ref" 2>/dev/null || { echo "$name: Stand $ref nicht gefunden"; return; }
+  git clone -q "$J/.spiegel.git" "$W" 2>/dev/null && cd "$W" && git remote set-url origin "$REPO" && git checkout -q --detach "$ref" 2>/dev/null || { echo "$name: Stand $ref nicht gefunden"; cd "$A"; rm -rf "$W"; rm -f "$A/.lauf/$name"; return; }
   local SHA; SHA="$(git rev-parse --short HEAD)"
   jobs=$(( N / 6 )); [ "$kind" = voll ] && jobs=$(( N * 2 / 3 )); [ "$kind" = alle ] && jobs=$(( N * 2 / 3 )); [ "$kind" = vergleich ] && jobs=$(( N / 4 ))
   export KERN_JOBS="$jobs" TMPDIR="$W/tmp" SC_TEST_OUT="$W/tmp/sc-tests"; mkdir -p "$TMPDIR" mag-log
@@ -106,7 +186,7 @@ run_job() {  # name
   for f in mag-log/*.log; do [ -f "$f" ] && tail -80 "$f" > "${f%.log}.tail.txt"; done
   xz -9 -T0 mag-log/*.log 2>/dev/null; git add -f mag-log
   $G commit -q -m "mag: Protokolle von $name auf $SHA"; git push -q origin "mag/ergebnis-$name" || echo "$name: Push fehlgeschlagen"
-  cd "$A"; rm -rf "$W"; echo "$(date '+%F %T') $name fertig"
+  cd "$A"; rm -rf "$W"; rm -f "$A/.lauf/$name"; echo "$(date '+%F %T') $name fertig"
 }
 # (jeder Vergleichstest aus tests/converted in seinem eigenen Lauf - gegen den Stellvertreter und gegen die Engine selbst, höchstens 20 Minuten je Lauf; ein
 # Abbruch, ein Fehlschlag oder ein Hänger hält die anderen nicht auf. Schreibt mag-log/alle.txt, alle-real.txt, *-abweichungen.txt, *-cost.txt, einzeln.tar.xz
@@ -145,14 +225,7 @@ while [ ! -e "$A/STOP" ]; do
   git -C "$A" pull -q --ff-only origin mag/auftrag 2>/dev/null || true
   if [ "$(sha256sum "$A/lauf2.sh" | cut -c1-16)" != "$me" ]; then   # (neue Fassung: nichts Neues annehmen, auslaufen lassen, ersetzen)
     echo "$(date '+%F %T') neue Fassung ($(jobs -rp | wc -l) Aufträge laufen weiter)"; exec bash "$A/lauf2.sh"; fi   # (die laufenden halten die Sperre nicht)
-  for f in "$A"/jobs/*; do
-    [ -f "$f" ] || continue; name="$(basename "$f")"; [ -e "$A/.done/$name" ] && continue
-    read -r kind _ < "$f"
-    running="$(jobs -rp | wc -l)"
-    [ "$running" -lt "$SLOTS" ] || break
-    touch "$A/.done/$name"; echo "$(date '+%F %T') $name: $(head -1 "$f")"
-    run_job "$name" 8>&- &   # (auch ein voller Lauf hält die Warteschlange nicht auf: die Proben laufen daneben)
-  done
+  annehmen
   sleep 20
 done
 wait; echo "$(date '+%F %T') beendet (STOP)"
