@@ -41,6 +41,13 @@ void add_engine_nodes(Library& lib) {
       for (std::size_t k = 0; k < f.inputs.size(); ++k) in.push_back(c.in(first + k));
       for (const EnginePin& p : f.outputs) out.push_back(Value::zero(p.type));
       c.host().engine(f.type, in, out);
+      // A place of the engine: the node binds it - its output is not what the function gave (a copy)
+      // but what it was given, the place's key: the nodes that name it (setting "bound") read and set
+      // what the engine holds there through the door, "<function>@get" / "<function>@set".
+      if (f.place) {
+        c.bind(first, std::move(in));
+        return f.value ? kStop : 0;
+      }
       for (std::size_t k = 0; k < f.outputs.size(); ++k) c.out(first + k, std::move(out[k]));
       return f.value ? kStop : 0;
     };
@@ -172,6 +179,28 @@ Value answer(std::string_view shape, std::size_t& at, u64& state, u64 most = ~u6
 }  // namespace
 
 bool EngineStandIn::engine(std::string_view function, const std::vector<Value>& in, std::vector<Value>& out) {
+  const std::size_t at = function.find('@');
+  if (at != std::string_view::npos) {
+    // (a place of the engine: read or set what the stand-in holds there)
+    const EngineFunction* f = engine_function(function.substr(0, at));
+    const std::string_view op = function.substr(at + 1);
+    if (!f || !f->place || (op != "get" && op != "set") || (op == "set" && in.empty())) return false;
+    const std::vector<Value> key_in(in.begin(), in.end() - (op == "set" ? 1 : 0));
+    const std::string key = engine_call_shown(f->type, key_in);
+    if (op == "set") {
+      places[key] = in.back();
+      return true;
+    }
+    auto it = places.find(key);
+    if (it == places.end()) {
+      u64 state = 1469598103934665603ull;
+      for (const char ch : std::string(function) + key) state = (state ^ static_cast<unsigned char>(ch)) * 1099511628211ull;
+      std::size_t from = 0;
+      it = places.emplace(key, answer(f->outputs[0].shape, from, state)).first;
+    }
+    if (!out.empty()) out[0] = it->second;
+    return true;
+  }
   const EngineFunction* f = engine_function(function);
   if (!f) return false;
   std::string call = engine_call_shown(function, in);

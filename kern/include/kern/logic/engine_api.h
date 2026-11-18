@@ -28,6 +28,7 @@
 // stand-in). Both do the same: the tool writes both from this table.
 #pragma once
 
+#include <map>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -78,8 +79,13 @@ void add_engine_nodes(Library& lib);
 /// its outputs' forms - made from the function's name and its inputs, so the same call gets the
 /// same answer in every tier - and keeps what it was asked, call by call. An output list with a
 /// count (EnginePin::count) has no more entries than that input says (times EnginePin::per).
+/// A place of the engine (EngineFunction::place) is a state of the stand-in, per function and inputs: what
+/// "<function>@get" gives there is what "<function>@set" set there last (at first a value of the output's
+/// form, made from the call) - and neither is a call it keeps: the function was called once, when the place
+/// was bound; what is read and set there after is the engine's memory, as in C++.
 struct EngineStandIn {
   std::vector<std::string> calls;  // "engine.world.pose(1, {2, 0})" ...
+  std::map<std::string, Value> places;  // "engine.game_world.shots(1)" -> what is there
   bool engine(std::string_view function, const std::vector<Value>& in, std::vector<Value>& out);
 };
 /// A value as the stand-in writes it down: every number with all its digits.

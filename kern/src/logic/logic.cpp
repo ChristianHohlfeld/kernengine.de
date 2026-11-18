@@ -1,5 +1,6 @@
 // Kern Logic: values, graph data, the node library, checking and the interpreter.
 #include "kern/logic/logic.h"
+#include "kern/logic/engine_api.h"
 
 #include <algorithm>
 #include <cmath>
@@ -863,7 +864,26 @@ Variable* Graph::variable(std::string_view name) {
   return nullptr;
 }
 bool Graph::variable_of(const Node& n, Variable& out) const { return root_of(n, out) != Root::none; }
+const EngineFunction* bound_function(const Graph& g, const Node& n, const Node** binder) {
+  const std::string b = n.param("bound");
+  if (b.empty() || b.find_first_not_of("0123456789") != std::string::npos || b.size() > 9) return nullptr;
+  const Node* e = g.find(static_cast<u32>(std::stoul(b)));
+  const EngineFunction* f = e ? engine_function(e->type) : nullptr;
+  if (!f || !f->place || f->outputs.empty()) return nullptr;
+  if (binder) *binder = e;
+  return f;
+}
 Graph::Root Graph::root_of(const Node& n, Variable& out, std::string_view prefix) const {
+  if (prefix.empty() && !n.param("bound").empty()) {
+    // (a place of the engine: what the node of the engine named there bound when it ran - of the type
+    // of its output "result")
+    const EngineFunction* f = bound_function(*this, n);
+    if (!f) return Root::none;
+    const EnginePin& p = f->outputs[0];
+    const TypeRef t{p.type, p.of ? p.of : ""};
+    out = Variable{"n" + n.param("bound") + "." + p.id, p.type, zero_of(t, *this).to_json(*this, t), {}, t.of};
+    return Root::bound;
+  }
   const std::string name = n.param(std::string(prefix) + "variable"), scope = n.param("scope");
   const Function* f = scope.empty() ? nullptr : function(scope);
   // (in a function: its local variables and its inputs come before the Blueprint's variables -
@@ -2743,6 +2763,26 @@ void change_at(Value& v, const TypeRef& t, const std::vector<Instance::Spot::Ste
 }  // namespace
 bool Instance::spot(const Node& n, std::string_view prefix, const std::vector<i64>& indices, Spot& out) const {
   out = Spot();
+  if (prefix.empty() && !n.param("bound").empty()) {
+    // A place of the engine: what the node of the engine bound when it ran. Naming it asks the engine
+    // nothing - what is there is read when it is read (Instance::read), and beside its list the place
+    // goes on in an entry of its own then (value_at, change_at), as in a Blueprint's class.
+    const Node* binder = nullptr;
+    if (!bound_function(graph_, n, &binder)) return false;
+    auto at = index_.find(binder->id);
+    if (at == index_.end()) return false;
+    out.bound = at->second;
+    std::vector<std::string> steps;
+    if (!path_steps(n.param("path"), steps)) return false;
+    std::size_t entry = 0;
+    for (std::string& step : steps) {
+      Spot::Step st;
+      if (step.empty()) st.index = entry < indices.size() ? indices[entry] : -1, ++entry;
+      else st.field = std::move(step);
+      out.steps.push_back(std::move(st));
+    }
+    return true;
+  }
   const std::string name = n.param(std::string(prefix) + "variable"), scope = n.param("scope");
   auto fn = scope.empty() ? fn_index_.end() : fn_index_.find(scope);
   const Function* f = fn == fn_index_.end() ? nullptr : &graph_.functions[static_cast<std::size_t>(fn->second)];
@@ -2839,7 +2879,29 @@ bool Instance::spot(const Node& n, std::string_view prefix, const std::vector<i6
   }
   return true;
 }
+bool Instance::bound_now(const Spot& s, std::string& function, std::vector<Value>& in, TypeRef& t, Value& now) const {
+  const CNode& e = nodes_[static_cast<std::size_t>(s.bound)];
+  const EngineFunction* f = engine_function(e.def->type);
+  const std::size_t o = f && !f->value ? 1 : 0;  // (the output "result": a step's first after "then")
+  function = e.def->type;
+  t = o < e.out.size() ? TypeRef{e.out[o].type, e.out[o].of} : TypeRef{};
+  // (what the node was given when it ran - none before it ran: the place is not bound, and the engine
+  // says so as it says it of a handle of no object)
+  in = o < e.outputs.size() && e.outputs[o].type == PinType::structure && e.outputs[o].rows ? *e.outputs[o].rows : std::vector<Value>();
+  std::vector<Value> out{zero_of(t, graph_)};
+  const bool ok = rt_.host().engine(function + "@get", in, out);
+  now = ok && !out.empty() ? std::move(out[0]) : zero_of(t, graph_);
+  return ok;
+}
 Value Instance::read(const Spot& s) const {
+  if (s.bound >= 0) {
+    std::string function;
+    std::vector<Value> in;
+    TypeRef t;
+    Value now;
+    bound_now(s, function, in, t, now);
+    return value_at(now, t, s.steps, 0, graph_);
+  }
   if (s.beside) return value_at(s.beside->value, s.beside->type, s.steps, 0, graph_);
   if (s.entry >= 0) {
     const CNode& e = nodes_[static_cast<std::size_t>(s.entry)];
@@ -2851,6 +2913,21 @@ Value Instance::read(const Spot& s) const {
   return s.steps.empty() ? held(s.key) : value_at(held(s.key), t->second, s.steps, 0, graph_);
 }
 bool Instance::write(const Spot& s, const std::function<void(Value&)>& change) {
+  if (s.bound >= 0) {
+    // (what the engine holds is read, changed at the place, and set back - where it holds nothing, the
+    // change goes into an entry of its own that nobody keeps, as in a Blueprint's class)
+    std::string function;
+    std::vector<Value> in;
+    TypeRef t;
+    Value now;
+    const bool there = bound_now(s, function, in, t, now);
+    change_at(now, t, s.steps, 0, graph_, change);
+    if (!there) return true;
+    in.push_back(std::move(now));
+    std::vector<Value> none;
+    rt_.host().engine(function + "@set", in, none);
+    return true;
+  }
   if (s.beside) {
     change_at(s.beside->value, s.beside->type, s.steps, 0, graph_, change);
     return true;
@@ -3419,6 +3496,10 @@ void Context::out(std::size_t index, Value v) {
   if (s >= 0) inst_.slots_[static_cast<std::size_t>(s)] = c.outputs[index].as_number();
 }
 
+void Context::bind(std::size_t index, std::vector<Value> in) {
+  Instance::CNode& c = inst_.nodes_[static_cast<std::size_t>(node_)];
+  if (index < c.outputs.size()) c.outputs[index] = Value::structure(std::move(in));
+}
 void Context::out(std::string_view pin, Value v) {
   const Instance::CNode& c = inst_.nodes_[static_cast<std::size_t>(node_)];
   for (std::size_t i = 0; i < c.out.size(); ++i) if (c.out[i].id == pin) { out(i, std::move(v)); return; }
