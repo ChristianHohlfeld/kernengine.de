@@ -1,0 +1,47 @@
+engine_math_math                2 /    2 functions       10 /     10 lines   (what the program calls of it)
+    Quat::axis_angle (5): written
+    Quat::rotate (5): written
+engine_physics_physics          1 /    1 functions        1 /      1 lines   (what the program calls of it)
+    QueryFilter::QueryFilter (1): written
+common                         18 /   18 functions       51 /     51 lines
+    clampf (1): written
+    sign0 (1): written
+    rate_limit (1): written
+    damp_alpha (1): written
+    wrap_pi (5): written
+    conj (1): written
+    to_local (1): written
+    qnormalize (4): written
+    yaw_quat (1): written
+    heading_of (1): written
+    slerp (8): written
+    read_body (4): written
+    Rng::seeded (1): written
+    Rng::next (1): written
+    Rng::unit (1): written
+    Rng::range (1): written
+    Rng::gaussian (8): written
+    cast (10): written
+qr_code                         1 /    1 functions        1 /      1 lines
+    Code::dark (1): written
+qr_code_cpp                    11 /   11 functions      176 /    176 lines
+    raw_modules (9): written
+    data_codewords (1): written
+    gf_mul (8): written
+    rs_divisor (13): written
+    rs_remainder (10): written
+    alignment_positions (9): written
+    Grid::set (1): written
+    finder (9): written
+    format_bits (15): written
+    encode (86): written
+    read_format (15): written
+
+30 of 30 functions of the program are written as Blueprints (228 of 228 lines), and 3 of the engine's headers that they call: 6 Blueprints - 1 of source files, 0 of states, 5 of headers and of shapes
+33 functions of the Blueprints are compared with their source, bit for bit, by the tests in /dev/shm/spawncity-jobs-chris/work-probe-163224-10135/pt/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+
+real	3m11,267s
+user	3m24,212s
+sys	0m10,551s
