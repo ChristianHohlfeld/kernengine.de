@@ -1,0 +1,80 @@
+    Life::ring_area (5): written
+    Life::pet_params (9): written
+    Life::init (13): written
+    Life::clear (25): written
+    Life::update (11): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    Life::rebuild_herds (74): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    Life::spawn_herd (29): written
+    Life::graze_spot (11): written
+    Life::scare_cow (8): written
+    Life::kill_cow (26): written
+    Life::grab_animal (75): written
+    Life::update_cows (123): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    Life::blocked (6): written
+    Life::spot_near (8): written
+    Life::spawn_flock (21): written
+    Life::spook (19): written
+    Life::catch_pigeon (20): written
+    Life::hold_pigeon (4): written
+    Life::release_pigeon (4): written
+    Life::spook_pigeons (3): written
+    Life::update_pigeons (149): written
+    Life::update_birds (38): written
+    Life::update_trees (35): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    Life::species (4): written
+    Life::provoke_cat (9): written
+    Life::kill_pet (30): written
+    Life::update_pets (180): written
+    Life::sample (15): written
+    Life::spawn_joggers (65): written
+    Life::kill_runner (28): written
+    Life::apply_joggers (34): written
+    Life::set_remote_animals (13): written
+    Life::apply_cows (33): written
+    Life::apply_pets (35): written
+    Life::apply_flocks (33): written
+    Life::net_carry_cow (8): written
+    Life::net_carry_pet (8): written
+    Life::net_bird (16): written
+    Life::update_joggers (76): a pointer
+    Life::shot (122): written
+    Life::remote_cow_death (9): written
+    Life::heard_shot (9): written
+    Life::blast (56): written
+    Life::shout (23): written
+    Life::honk (10): written
+    Life::scream (7): written
+    Life::update_voices (4): written
+
+281 of 326 functions of the program are written as Blueprints (3220 of 4860 lines), and 13 of the engine's headers that they call: 23 Blueprints - 5 of source files, 0 of states, 18 of headers and of shapes
+269 functions of the Blueprints are compared with their source, bit for bit, by the tests in /dev/shm/spawncity-jobs-chris/work-f2-probe-153935-13438/pt/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+    11 (   345)   its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+     7 (   186)   unproject() is defined in another file
+     1 (   117)   it calls MeshData::push_extra(), which waits
+     1 (   110)   read_features() is defined in another file
+     1 (    91)   the type value_type
+     1 (    85)   it calls CityStream::request_around(), which waits
+     1 (    81)   it calls Terrain::plan_windows(), which waits
+     1 (    76)   a pointer
+     2 (    73)   road_is_water() is defined in another file
+     1 (    73)   can_spawn() is defined in another file
+     4 (    67)   list: erase()
+     1 (    64)   it calls People::spawn(), which waits
+     1 (    50)   it calls GeoProjector::init(), which waits
+     1 (    44)   chunk_count() is defined in another file
+     1 (    36)   it calls Terrain::image_bounds(), which waits
+     2 (    33)   it calls CityStream::remove(), which waits
+     1 (    22)   buildings_input() is defined in another file
+     1 (    19)   its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a ImplicitCastExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+     1 (    17)   a member of Int is set
+     1 (    13)   it calls CityStream::begin_roads(), which waits
+     1 (    13)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no match for ‘operator==’ (operand types are ‘const converted_terrain_cpp::Terrain::CraterRec’ and ‘const converted_terrain_cpp::Terrain::CraterRec’))
+     1 (     9)   tile_input() is defined in another file
+     1 (     9)   tile_lonlat() is defined in another file
+     1 (     7)   an object of the engine (HeightSampler) given back by value (C++ moves it to the caller)
+
+real	5m18,721s
+user	9m19,613s
+sys	0m33,413s
