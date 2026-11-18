@@ -3400,6 +3400,51 @@ class Emit:
         d = self.tree.decl.get(b.get("referencedDecl", {}).get("id")) or b.get("referencedDecl", {})
         return self.text_buffer(d) if d.get("kind") == "VarDecl" and d.get("id") in self.names else None
 
+    WIDE = W64 + ("long", "long long", "unsigned long", "unsigned long long")
+
+    def bits64(self, x):
+        """A u64/i64 under casts that keep its 64 bits (`static_cast<long long>(cx)` of an i64): the value the
+        Blueprint holds as an Int64, with all 64 bits - None: not one (an Int is exact to 2^53 only)."""
+        y = bare(x)
+        while self.ctype(y) not in W64:
+            if self.ctype(y) not in self.WIDE or y.get("kind") not in CAST or not kids(y):
+                return None
+            y = bare(kids(y)[-1])
+        return y
+
+    def format_values(self, fmt, args, kinds):
+        """The format and the values Format Text takes for a printf format and its arguments. A u64/i64 that an
+        integer conversion writes goes in as the text of its 64 bits - Int64 to Text Signed (d i), Int64 to Text (u),
+        Int64 to Hex (x) - at a %s of the same width and the same `-` (the digits are the same; printf pads a
+        number and a text alike); another flag, a precision or another conversion of one: Wait."""
+        out, values, at, k = [], [], 0, 0
+        while at < len(fmt):
+            if fmt[at] != "%":
+                out.append(fmt[at])
+                at += 1
+                continue
+            m = re.match(r"%([-+ 0#]*)(\d*)(?:\.(\d*))?(hh|h|ll|l|j|z|t)?([diuxXocsfFeEgG%])", fmt[at:])
+            spec = m.group(0)
+            if m.group(5) != "%":
+                x, t = args[k], kinds[k]
+                k += 1
+                w = self.bits64(x) if t == "Int" else None
+                if w is None:
+                    values.append(self.ex(x, t))
+                else:
+                    node = {"d": "int64_text_signed", "i": "int64_text_signed", "u": "int64_text", "x": "int64_text_hex"}.get(m.group(5))
+                    if node is None or set(m.group(1)) - {"-"} or m.group(3) is not None or m.group(4) in ("h", "hh"):
+                        raise Wait("a 64-bit number in a format Int64 to Text does not write so (a flag, a precision, X, o, c)")
+                    spec = f"%{m.group(1)}{m.group(2)}s"
+                    # (the text in a variable of its own: Format Text reads its values where they lie, and the
+                    # text a node gives is a temporary - in the class it would be gone before it is read)
+                    digits = self.temp("digits", "Text")
+                    self.hoist([f"{digits} = {node}({self.ex(w, 'Int64')});"])
+                    values.append(digits)
+            out.append(spec)
+            at += m.end()
+        return "".join(out), values
+
     @staticmethod
     def format_kinds(fmt):
         """The types of the values a printf format takes (logic::format): Int, Float or Text each - None:
@@ -3447,7 +3492,8 @@ class Emit:
             raise Wait("a format Format Text does not know (d i u x X o c s f e g, flags, width, precision)")
         if len(kinds) != len(a) - 3:
             raise Wait("a format whose conversions are not its values")
-        values = [self.ex(x, t) for x, t in zip(a[3:], kinds)]
+        fmt, values = self.format_values(fmt.decode("latin-1") if isinstance(fmt, bytes) else fmt, a[3:], kinds)
+        fmt = fmt.encode("latin-1")
         b = a[0]
         while b.get("kind") in ("ImplicitCastExpr", "ParenExpr") and kids(b):
             b = kids(b)[0]
@@ -3474,7 +3520,7 @@ class Emit:
             raise Wait("a format Format Text does not know (d i u x X o c s f e g, flags, width, precision)")
         if len(kinds) != len(a) - 1:
             raise Wait("a format whose conversions are not its values")
-        values = [self.ex(x, t) for x, t in zip(a[1:], kinds)]
+        fmt, values = self.format_values(fmt, a[1:], kinds)
         self.f.pure = False   # (a step: the log gets a line)
         return self.take_pre() + [f"debug_print(text_format<{text_literal(fmt.encode('latin-1'))}>({', '.join(['-1'] + values)}), false);"]
 
@@ -5282,9 +5328,10 @@ class Emit:
             a, b = kids(n)
             op = n["opcode"][:-1]
             ta = self.tp(a)
-            if op == "+" and self.plain_variable(a) and ta in ("Float", "Int"):
+            computed = n.get("type", {}) if "computeResultType" not in n else n["computeResultType"]
+            if op == "+" and self.plain_variable(a) and (ta == "Float" or ta == "Int" and self.ctype(a) in self.UNCUT and self.u.clean(qtype({"type": computed})) == self.ctype(a)):
                 return [f"{self.lvalue(a)} += {self.ex(b, ta)};"]
-            synth = {"kind": "BinaryOperator", "opcode": op, "type": n.get("type", {}) if "computeResultType" not in n else n["computeResultType"], "inner": [a, b]}
+            synth = self.held_as(a, {"kind": "BinaryOperator", "opcode": op, "type": computed, "inner": [a, b]})
             lines = self.store(a, lambda t: self.ex(synth, t))
             if synth.get("_w64"):
                 n["_w64"] = True
@@ -5292,10 +5339,12 @@ class Emit:
         if k == "UnaryOperator" and n.get("opcode") in ("++", "--"):
             a = kids(n)[0]
             ta = self.tp(a)
-            if n["opcode"] == "++" and self.plain_variable(a) and ta in ("Float", "Int"):
+            if n["opcode"] == "++" and self.plain_variable(a) and (ta == "Float" or ta == "Int" and self.ctype(a) in self.UNCUT):
                 return [f"{self.lvalue(a)} += {'1' if ta == 'Int' else '1.0'};"]
             one = {"kind": "IntegerLiteral", "value": "1", "type": {"qualType": "int"}}
-            synth = {"kind": "BinaryOperator", "opcode": "+" if n["opcode"] == "++" else "-", "type": a.get("type", {}), "inner": [a, one]}
+            # (x++ is x += 1: a type smaller than int counts as an int, the sum goes back into x's type - a u16 at 65535 + 1 is 0)
+            computed = {"qualType": "int"} if self.ctype(a) in self.PROMOTED else a.get("type", {})
+            synth = self.held_as(a, {"kind": "BinaryOperator", "opcode": "+" if n["opcode"] == "++" else "-", "type": computed, "inner": [a, one]})
             lines = self.store(a, lambda t: self.ex(synth, t))
             if synth.get("_w64"):
                 n["_w64"] = True
@@ -7338,6 +7387,24 @@ class Emit:
         if n.get("kind") == "CallExpr" and callee_name(n) == "move" and "&&" in by:
             n["_taken"] = True
 
+    # whole numbers a Blueprint's Int holds as C++ computes them (`x += 1` is x + 1): int (past its end C++ leaves it
+    # open) and the 64-bit ones; the others wrap around at their size
+    UNCUT = frozenset(("int", "long", "long long", "unsigned long", "unsigned long long"))
+    PROMOTED = frozenset(("bool", "char", "signed char", "unsigned char", "short", "unsigned short"))
+
+    def held_as(self, a, synth):
+        """`a op= b` and `++a` computed in the type C++ computes them in: the result converted back to a's whole-number
+        type where that keeps less of it (C++ [expr.ass]: E1 = E1 op E2, the value converted to E1's type)."""
+        have, want = self.u.clean(qtype(synth)), self.ctype(a)
+        if have == want or NUMBER.get(have) != "Int" or NUMBER.get(want) != "Int":
+            return synth
+        try:
+            if self.narrow("x", have, want, None) == "x":
+                return synth
+        except Wait:
+            pass   # (a conversion the formula does not know: the cast says so where it is written)
+        return {"kind": "ImplicitCastExpr", "castKind": "IntegralCast", "type": a.get("type", {}), "inner": [synth]}
+
     def plain_variable(self, n):
         n = bare(n)
         return n.get("kind") == "DeclRefExpr" and n.get("referencedDecl", {}).get("id") in self.names and re.fullmatch(r"\w+", self.names[n["referencedDecl"]["id"]]) is not None
@@ -7631,7 +7698,13 @@ class Emit:
         if got is not None and self.writable(got[0]):
             return [], got[0], []
         tmp = self.temp("t", t)
-        return [f"{tmp} = {self.ex(n, t)};"], tmp, self.store(n, self.typed(tmp, t))
+        before = [f"{tmp} = {self.ex(n, t)};"]
+        # (storing it back runs after the change: what the store does before it - `m[key] = v` takes the value
+        # first, `put = t` - belongs there too, not with the steps before the statement, where t is not read yet)
+        held, self.pre = self.pre, []
+        after = self.store(n, self.typed(tmp, t))
+        after, self.pre = self.pre + after, held
+        return before, tmp, after
 
     def typed(self, text, have):
         """A value for store: the text, converted to the type the place has."""
@@ -8950,8 +9023,9 @@ class Emit:
                 c = self.ctype(a[0])
                 fmt = {"int": "%d", "short": "%d", "signed char": "%d", "char": "%d", "unsigned int": "%u", "unsigned short": "%u", "unsigned char": "%u",
                        "long": "%lld", "long long": "%lld", "unsigned long": "%llu", "unsigned long long": "%llu", "float": "%f", "double": "%f"}.get(c)
-                if c in ("whole64u", "whole64s"):   # (a u64, an i64: the decimal of its bits)
-                    return f"int64_text{'' if c == 'whole64u' else '_signed'}({self.ex(a[0], 'Int64')})", "Text"
+                w = self.bits64(a[0])
+                if w is not None:   # (a u64, an i64, also under a cast that keeps its 64 bits: the decimal of its bits, as the type says)
+                    return f"int64_text{'_signed' if c in ('whole64s', 'long', 'long long') else ''}({self.ex(w, 'Int64')})", "Text"
                 if fmt is None:
                     raise Wait(f"std::to_string of a {c}")
                 return f'text_format<"{fmt}">(-1, {self.ex(a[0], "Float" if fmt == "%f" else "Int")})', "Text"
