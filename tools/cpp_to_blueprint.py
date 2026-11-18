@@ -12467,7 +12467,10 @@ class TestWriter:
                 "      converted::may_bail(true);",
                 "      bp.before_source();   // (the Blueprints of the actors it calls, as they started)",
                 # (what the source gave, kept: as the Blueprint holds it, a view of it may be what is compared)
-                f"      const auto made = run({', '.join(names)});",
+                # (on zeroed memory: what C++ leaves open in what the call makes is the Blueprint's zero - converted::Zeroed)
+                "      converted::zero_stack();",
+                f"      const converted::Zeroed<decltype(run({', '.join(names)}))> held([&] {{ return run({', '.join(names)}); }});",
+                "      const auto& made = held.get();",
                 f"      const auto& want = {self.wrap('made', want_type)};" if self.wrap('made', want_type) != 'made' else "      const auto& want = made;",
                 "      converted::g_can_bail = false;",
                 "      converted::may_bail(false);",

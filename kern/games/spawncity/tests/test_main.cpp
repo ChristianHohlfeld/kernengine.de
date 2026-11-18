@@ -29,14 +29,19 @@ int failures = 0, checks = 0;
 #if defined(__SANITIZE_ADDRESS__)
 // (the sanitizers' own interface - sanitizer/allocator_interface.h, where a compiler brings that header)
 extern "C" int __sanitizer_install_malloc_and_free_hooks(void (*asked)(const volatile void*, std::size_t), void (*given_back)(const volatile void*));
-static void asked_for_memory(const volatile void*, std::size_t) { sc::cost::asked(); }
+// (and what it gives is zeroed: what C++ leaves open in an object that nothing sets is then the zero the
+// Blueprint starts from, one of the values C++ allows - converted.h, zero_stack)
+static void asked_for_memory(const volatile void* p, std::size_t size) {
+  sc::cost::asked();
+  if (p != nullptr) std::memset(const_cast<void*>(p), 0, size);
+}
 static void gave_memory_back(const volatile void*) {}
 static void count_memory() { __sanitizer_install_malloc_and_free_hooks(asked_for_memory, gave_memory_back); }
 #else
 #include <new>
 void* operator new(std::size_t size) {
   sc::cost::asked();
-  if (void* p = std::malloc(size ? size : 1)) return p;
+  if (void* p = std::calloc(1, size ? size : 1)) return p;   // (zeroed: see the sanitizers' hook above)
   std::abort();
 }
 void* operator new[](std::size_t size) { return operator new(size); }

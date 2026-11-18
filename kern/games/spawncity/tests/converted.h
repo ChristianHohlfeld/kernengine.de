@@ -1171,6 +1171,32 @@ inline constexpr int kCalls = 300;
 // What makes the arguments and takes the results is outside on both sides.
 inline long g_source_asks = 0, g_class_asks = 0;
 inline cost::Trace g_source_trace, g_class_trace;   // (from where they asked: kept for the function SC_COST_WHERE names - cost.h)
+// ---- what C++ leaves open in an object: what nothing sets (a member without an initializer, `i32 on;`) ----
+// Its value is indeterminate - C++ does not say it; the Blueprint starts every value at the zero of its type.
+// The source's call runs on zeroed memory - its stack below the test (zero_stack), what it gives in zeroed
+// room (Zeroed), what it asks the allocator for zeroed (test_main.cpp) -: then what C++ leaves open is that
+// zero, which is one of the values C++ allows there. Nothing C++ sets changes: a value set overwrites it.
+[[gnu::noinline]] inline void zero_stack() {
+  unsigned char room[1 << 16];
+  std::memset(room, 0, sizeof room);
+  asm volatile("" : : "r"(room) : "memory");   // (written, as if read: not left out)
+}
+/// What the source's call gives, made in zeroed room (C++17: the value a call gives is made right there).
+template <class T> class Zeroed {
+ public:
+  template <class F> explicit Zeroed(F&& make) {
+    std::memset(room_, 0, sizeof room_);
+    made_ = ::new (static_cast<void*>(room_)) T(make());
+  }
+  ~Zeroed() { made_->~T(); }
+  Zeroed(const Zeroed&) = delete;
+  Zeroed& operator=(const Zeroed&) = delete;
+  const T& get() const { return *made_; }
+ private:
+  alignas(T) unsigned char room_[sizeof(T)];
+  T* made_ = nullptr;
+};
+
 /// The source's own call, counted: from where it begins until it has returned what it gives.
 template <class Call> decltype(auto) counted(Call&& call) {
   struct Ends {
