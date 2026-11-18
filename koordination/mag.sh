@@ -19,7 +19,14 @@ K=/home/claude/kw
 holen() {  # name -> 0, wenn die Protokolle da sind
   local name="$1" ref="refs/remotes/origin/mag/ergebnis-$1"
   git -C "$K" fetch -q origin "+refs/heads/mag/ergebnis-$name:$ref" 2>/dev/null || return 1
-  [ "$(git -C "$K" rev-list --count "$ref" -- mag-log 2>/dev/null)" -ge 2 ] || return 1
+  if [ "$(git -C "$K" rev-list --count "$ref" -- mag-log 2>/dev/null)" -lt 2 ]; then
+    # (ein voller Lauf pusht Level und Tests gleich nach der Konvertierung: mag-zwischen/when, convert.tail.txt, convert.log.xz - die Suiten rechnen dann noch)
+    if git -C "$K" cat-file -e "$ref:mag-zwischen/when" 2>/dev/null; then
+      mkdir -p "$S/mag/$name/zwischen"; git -C "$K" archive "$ref" mag-zwischen | tar -x -C "$S/mag/$name/zwischen" --strip-components=1
+      echo "Zwischenstand von $name (Konvertierung fertig, Suiten rechnen noch) in $S/mag/$name/zwischen:"; cat "$S/mag/$name/zwischen/when"
+    fi
+    return 1
+  fi
   mkdir -p "$S/mag/$name"; git -C "$K" archive "$ref" mag-log | tar -x -C "$S/mag/$name" --strip-components=1
   echo "fertig $(date +%H:%M:%S): $S/mag/$name   (Zweig origin/mag/ergebnis-$name)"; cat "$S/mag/$name/when"
   for t in "$S/mag/$name"/*.tail.txt; do [ -f "$t" ] && { echo "--- $(basename "$t")"; tail -25 "$t"; }; done

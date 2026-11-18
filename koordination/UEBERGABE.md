@@ -615,3 +615,16 @@ Was die Agenten bis dahin gepusht haben (alles auf GitHub, Arbeitsbäume sauber 
 - **p** `04f1a57` unverändert; **ungepushte Arbeit** (logic.h, notation.cpp, tools/blueprint_cpp.cpp, tests/bench/) liegt im Worktree `/home/claude/w-p` und als
   Sicherung in `koordination/p/unterbrochen_1750/` (Patch + bench) – ungeprüft, mitten in der Änderung.
 mag rechnet unabhängig weiter (der volle Lauf `work-voll-162644-5528` seit 17:38:59).
+
+### 16.7 Kontingent und der schnellste Weg (18.11., 18:10)
+- **Kontingent:** 17:46 → 32 %, **17:56 → 36 %** – vier Punkte in zehn Minuten (Kaltstart von neun Agenten, die sich zugleich einlesen, plus mehrere kurze Antworten
+  des Koordinators, der den ganzen Projektstand im Kontext hält – jede Antwort des Koordinators kostet etwa so viel wie der Kaltstart eines Agenten). Das Kontingent,
+  nicht die Uhr, ist der Engpass: 64 % müssen bis zum Reset am 25.11., 13:00, reichen.
+- Chris, 17:59: „Finde die schnellste Lösung alles zu finalisieren“. Ein gestoppter Agent lässt sich nicht fortsetzen (SendMessage wird abgewiesen); ein Neustart
+  braucht Chris' ausdrückliches Wort. Empfehlung des Koordinators: nur der kritische Pfad – **d, p, t1, t2, k** –, g1/g2/f1/f2 erst, wenn t1/t2/d gemergt sind
+  (viele ihrer Funktionen warten auf diese drei); c nach d, s5 nach p. Wenige, seltene Kontrollen des Koordinators (jede kostet).
+- **Ohne Kontingent getan (mag):** lauf2.sh `d6a7ddc` – Probe mit Level (Befund f2), voller Lauf mit Engine-Suite parallel und frühem Push von Level und Tests
+  (spart je vollem Lauf rund 55 Minuten bis zur Übernahme). Die neue Schleife hat sich um 18:04 selbst ersetzt und startet Aufträge (geprüft: `work-probe-180405-238`,
+  `work-f2-engine-174611-9407` um 18:04:22). mag.sh zeigt den Zwischenstand eines vollen Laufs.
+- **Reihenfolge der Merges, sobald das Ergebnis des vollen Laufs übernommen ist:** Fix von d (`6f62201`, wenn seine zwei Engine-Suiten und CI 44351625418 grün sind) →
+  k (Konvertierung parallel: verkürzt jeden weiteren Lauf) → t1/t2 → dann `voll origin/work`.

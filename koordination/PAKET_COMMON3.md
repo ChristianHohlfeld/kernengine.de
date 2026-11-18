@@ -129,3 +129,16 @@ Du bist der **Nachfolger** auf deinem Paket in einer neuen Sitzung. Was bleibt: 
      nicht verglichen; auf mag (56 Threads) ist die Tür wiederholbar und die Klasse weicht ab. Paket d behebt das als Erstes. Bis dahin: eine Engine-Suite deines
      Zweigs, die NUR daran scheitert, ist für dein Paket kein Fehler – nenne es im Bericht so; jede andere Abweichung ist deine.
    - „Geschrieben und verglichen“ in einer Probe heißt nur: der Test übersetzt. Bit für Bit geprüft wird in der Spiel-Suite (`spiel`).
+
+## Nachtrag 18:10 (Koordinator) – mag rechnet anders, und das Kontingent ist sehr knapp
+1. **Proben haben seit 18:04 das Level** (lauf2.sh d6a7ddc: `--level` mit einer Kopie). Vorher wartete in JEDER mag-Probe jede Funktion, die den Blueprint eines
+   Regel-Actors ruft (Controls, Traffic, JetSeats, Multiplayer, Lamps …), mit „… the Blueprint of the actor X, which the level does not have“ – ein Artefakt der Probe
+   (Befund f2). Alle Proben, die vor 18:04 gestartet sind (`mag-log/when` nennt den Start), haben es: diese Zeilen sind keine Gründe, und was dahinter läge, zeigen sie
+   nicht. Eine Probe liest ihre Blueprints jetzt am Ende auch ins Level ein – scheitert das, nennt `when` `convert rc≠0` und convert.log den Grund: das ist ein Befund.
+2. **Ein voller Lauf (`voll`) liefert früher:** die Engine-Suite rechnet von Anfang an neben der Konvertierung; Level und Tests werden gleich nach der Konvertierung
+   gepusht (Commit „… Level und Tests der Blueprints“, Protokoll in `mag-zwischen/`: `$S/mag.sh holen <name>` zeigt den Zwischenstand und legt ihn nach
+   `$S/mag/<name>/zwischen/`). `mag-log/` kommt wie bisher am Ende. Gilt für Läufe, die nach 18:04 starten.
+3. **Warten kostet:** auf mag nur in Stücken von höchstens 4 Minuten warten (`$S/mag.sh warten <name> 4`, wiederholen) und in der Zeit nichts Großes nachlesen.
+   Keine Ausgabe über ~40 Zeilen. Keine Arbeit auf Verdacht: keine Änderung ohne Beleg aus einer Probe oder einem Kleinstfall.
+4. mag ist voll (bis zu 17 Aufträge zugleich, darunter vier `konvert` und der volle Lauf): eine Probe über alle game*.cpp braucht zurzeit 45 Minuten und mehr.
+   Lege nichts doppelt ab; `$S/mag.sh stand` zeigt, was läuft.
