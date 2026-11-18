@@ -612,6 +612,7 @@ bool c46(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   ev::take<ev::Vector>(o, in, 3, a2);
   std::vector<float> a3;
   ev::take<ev::List<ev::Float>>(o, in, 4, a3);
+  if (a3.size() < 6) { o.error = "the list inertia has fewer than 6 entries"; return false; }
   self->set_mass_data(std::move(a0), std::move(a1), std::move(a2), a3.empty() ? nullptr : a3.data());
   return true;
 }
