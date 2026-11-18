@@ -10,16 +10,20 @@ constexpr u32 kScorches = 40, kSoots = 48, kBreaches = 64, kRubble = 36, kCracks
 constexpr f32 kRubbleSeconds = 25;
 const Vec3 kRubbleColor = kern::hex_color(0x8a857c);
 
-template <class T>
-void ring_put(std::vector<T>& v, u32& cursor, u32 cap, const T& item) {
+// The irregular soft edge of soot and scorch (facade_marks.mjs SOOT_FS edge).
+f32 ragged(f32 a, f32 seed) { return 0.74f + 0.13f * std::sin(a * 5 + seed * 7) + 0.08f * std::sin(a * 11 + seed * 3) + 0.05f * std::sin(a * 23 + seed); }
+}  // namespace
+
+void Marks::ring_put_Scorch(std::vector<Scorch>& v, u32& cursor, u32 cap, const Scorch& item) {
   if (v.size() < cap) v.push_back(item);
   else v[cursor % cap] = item;
   ++cursor;
 }
-
-// The irregular soft edge of soot and scorch (facade_marks.mjs SOOT_FS edge).
-f32 ragged(f32 a, f32 seed) { return 0.74f + 0.13f * std::sin(a * 5 + seed * 7) + 0.08f * std::sin(a * 11 + seed * 3) + 0.05f * std::sin(a * 23 + seed); }
-}  // namespace
+void Marks::ring_put_WallMark(std::vector<WallMark>& v, u32& cursor, u32 cap, const WallMark& item) {
+  if (v.size() < cap) v.push_back(item);
+  else v[cursor % cap] = item;
+  ++cursor;
+}
 
 void Marks::clear(kern::physics::World* w) {
   if (w)
@@ -52,7 +56,7 @@ void Marks::blast(Vec3 at, f32 r, f32 strength, CityStream& city, kern::physics:
     ++stats_.craters;
   }
   // world_impacts.mjs: a scorch if the blast is low enough
-  if (above < r * 0.6f) ring_put(scorches_, scorch_cursor_, kScorches, Scorch{{at.x, at.y}, clampf(std::fmin(5.5f, r * 0.5f) * 0.72f, 0.5f, 4.2f), rng.next()});
+  if (above < r * 0.6f) ring_put_Scorch(scorches_, scorch_cursor_, kScorches, Scorch{{at.x, at.y}, clampf(std::fmin(5.5f, r * 0.5f) * 0.72f, 0.5f, 4.2f), rng.next()});
   city.walls_near({at.x, at.y}, r, near_);
   add_soot(at, r, near_, t, rng);
   add_breach(at, r, clampf(strength, 0, 1.4f), near_, t, w, rng, now);
@@ -87,7 +91,7 @@ void Marks::add_soot(Vec3 at, f32 r, const std::vector<CityStream::Wall>& walls,
     m.size = rr;
     m.level = 0.7f * std::fmax(0.4f, 1 - c.d / (r * 0.55f));
     m.seed = rng.next();
-    ring_put(soots_, soot_cursor_, kSoots, m);
+    ring_put_WallMark(soots_, soot_cursor_, kSoots, m);
     ++placed;
   }
 }
@@ -126,7 +130,7 @@ void Marks::add_breach(Vec3 at, f32 r, f32 strength, const std::vector<CityStrea
       nb.c = {foot.x + wl.normal.x * 0.015f, foot.y + wl.normal.y * 0.015f, zc};
       nb.n = wl.normal;
       nb.d = wl.dir;
-      ring_put(breaches_, breach_cursor_, kBreaches, nb);
+      ring_put_WallMark(breaches_, breach_cursor_, kBreaches, nb);
       at_mark = static_cast<i32>((breach_cursor_ - 1) % kBreaches);
     }
     WallMark& m = breaches_[at_mark];
@@ -226,11 +230,11 @@ bool Marks::bullet(Vec3 p, const CityStream& city, Rng& rng) {
 }
 
 void Marks::update(f32 now, const CityStream& city, kern::physics::World& w) {
-  for (auto it = rubble_.begin(); it != rubble_.end();) {
-    if (now > it->until) {
-      if (it->body.valid() && w.body_valid(it->body)) w.destroy_body(it->body);
-      it = rubble_.erase(it);
-    } else ++it;
+  for (std::size_t i = 0; i < rubble_.size();) {
+    if (now > rubble_[i].until) {
+      if (rubble_[i].body.valid() && w.body_valid(rubble_[i].body)) w.destroy_body(rubble_[i].body);
+      rubble_.erase(rubble_.begin() + static_cast<std::ptrdiff_t>(i));
+    } else ++i;
   }
   if (struck_ && city.damage_serial() != damage_seen_) { damage_seen_ = city.damage_serial(); prune_walls(city); }
   stats_.scorches = static_cast<u32>(scorches_.size());
