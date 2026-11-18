@@ -1,0 +1,1 @@
+vergleich origin/work-p src/qr_code.cpp src/settings.cpp src/nostr.cpp src/controls.cpp src/combat_rules.cpp
