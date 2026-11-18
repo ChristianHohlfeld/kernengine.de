@@ -66,8 +66,7 @@ void Game::traffic_make_far(TrafficCar& c) {
   c.far = true;
 }
 
-bool Game::traffic_make_near(std::size_t i) {
-  TrafficCar& c = cars_[i];
+bool Game::traffic_make_near(TrafficCar& c, std::size_t i) {
   kern::physics::World& w = world_->physics();
   const kern::physics::Body b = body(c.actor);
   if (!b.valid() || !w.body_valid(b)) { c.far = false; return false; }
@@ -125,7 +124,7 @@ void Game::traffic_far_switch() {
       c.far_speed = c.driver ? std::fmax(0.0f, c.car->forward_speed()) : 0;
       traffic_make_far(c);
     } else if (c.far && (keep || d < kPhysNear)) {
-      if (!traffic_make_near(i) && keep) {
+      if (!traffic_make_near(c, i) && keep) {
         // (one that must have physics - a cruiser, a wreck, the player's: it has it where it is)
         w.set_body_type(b, kern::physics::BodyType::dynamic);
         const RigidSpec rs = Car::rigid_spec(c.car->spec());
