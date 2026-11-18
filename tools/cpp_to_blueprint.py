@@ -3692,8 +3692,6 @@ class Emit:
 
     def made_by(self, q, c):
         """A value of the program's class `q` made by its own constructor `c` without arguments (its defaults for all)."""
-        if c["id"] not in self.tree.body:
-            raise Wait(f"a {q.split('::')[-1]} made by a constructor that is defined in another file")
         return self.invoke(self.u.function(c["id"]), [{"kind": "CXXDefaultArgExpr"} for p in kids(c) if p.get("kind") == "ParmVarDecl"])[0]
 
     def finished(self, t, q, text, inits=None):
@@ -7104,8 +7102,6 @@ class Emit:
         if not arg_nodes and q is not None and u.own_default_ctor(q) is None:
             return self.finished(t, q, u.zero(t))   # (C++'s own constructor: the defaults, and what C++ makes of the fields)
         if len(fits) == 1:
-            if fits[0]["id"] not in self.tree.body:
-                raise Wait(f"a {t} made by a constructor that is defined in another file")
             return self.invoke(u.function(fits[0]["id"]), arg_nodes)[0]
         if ctors and arg_nodes:
             raise Wait(f"a {t} made by a constructor")
@@ -8596,8 +8592,6 @@ class Emit:
                     if c.get("kind") == "CXXConstructorDecl" and not c.get("isImplicit") and qtype(c) == want or (c.get("kind") == "CXXConstructorDecl" and not c.get("isImplicit") and c.get("type", {}).get("qualType") == want):
                         if not a and q is not None and u.own_default_ctor(q) is None:
                             break   # (C++'s own - `= default`: what it makes is made here)
-                        if c["id"] not in self.tree.body:
-                            raise Wait(f"a {t} made by a constructor that is defined in another file")
                         return self.invoke(u.function(c["id"]), kids(b))
                 if a:
                     raise Wait(f"a {t} made by a constructor")
