@@ -7107,6 +7107,9 @@ class Emit:
         t = self.unwrap(target)
         k = t.get("kind")
         if k == "DeclRefExpr":
+            if self.held_type(t) in self.u.rows:   # (the entry of a list inside a list a name stands for - `auto& ring : rings` -
+                # is held as a struct of that list: its place is that field, as `spot` says)
+                return [f"{self.lvalue(t)}.items = {value(self.tp(t))};"]
             return [f"{self.lvalue(t)} = {value(self.tp(t))};"]
         got = self.spot(t)
         if got is not None and self.writable(got[0]):   # a place of the notation: set where it stands
