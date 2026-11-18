@@ -2837,6 +2837,7 @@ class Emit:
         self.result_struct = None
         self.homes = {}       # decl id of an iterator (or of what insert() gave) -> the list it goes through
         self.pointers = {}    # decl id of a parameter that is a pointer into a list -> (the list's input, the place's input, the entries' type)
+        self.or_none = {}     # decl id of a text or none (text_or_none) -> the Bool that says whether there is one
         self.text_ptrs = {}   # decl id of a local pointer into a text (char* end of strtod) -> {"text": the text, "at": the Int of its place}
         self.assigned_ids = set()   # (the variables the body changes - see assigned)
         self.keyed_vars = {}  # decl id of a name for an entry of a map or a set (a loop's variable, `auto& [k, v]`) -> (the map or set, its place)
@@ -4130,6 +4131,10 @@ class Emit:
                 if end_pointer is not None:
                     out += end_pointer
                     continue
+                or_none = self.text_or_none(v)
+                if or_none is not None:
+                    out += self.take_pre() + or_none
+                    continue
                 if v.get("id") in self.named_places:
                     # (a name for a place: written out where it is used - what making the place does, a new row of a map, is done here)
                     if any(x.get("kind") == "CXXOperatorCallExpr" and self.is_slot(x) for x in walk(kids(v)[-1])):
@@ -4545,6 +4550,96 @@ class Emit:
         del self.names[v["id"]]
         self.text_ptrs[v["id"]] = {"text": None, "at": name}
         return [f"{name} = 0;"]
+
+    def text_or_none(self, v):
+        """`const char* reason = nullptr;` - a text of the program or none: a variable of the function that is given
+        texts and null and is asked whether it is null. It is two values: the text, and whether there is one
+        (`!reason`, `reason == nullptr` ask the second). The text itself is read only where C++ knows there is one:
+        after a statement of its block `if (!reason || ...) continue;` (return, break) that follows all that is
+        given to it - anywhere else a null would be read as an empty text, which it is not: that waits.
+        Gives the lines that set the two - None: `v` is no such variable."""
+        if qtype(v).strip() != "const char *":
+            return None
+        init = self.init_of(v)
+        if init is None:
+            return None
+        vid = v["id"]
+        def names(n):
+            b = self.unwrap(n)
+            while b.get("kind") == "ParenExpr" and kids(b):
+                b = self.unwrap(kids(b)[0])
+            return b.get("kind") == "DeclRefExpr" and (b.get("referencedDecl") or {}).get("id") == vid
+        def asks(n):
+            """`!p`, `p == nullptr`, `p != nullptr`, `p` as a condition: (the nodes that only ask whether there is one)."""
+            k = n.get("kind")
+            if k == "ImplicitCastExpr" and n.get("castKind") == "PointerToBoolean" and kids(n) and names(kids(n)[0]):
+                return True
+            return k == "BinaryOperator" and n.get("opcode") in ("==", "!=") and len(kids(n)) == 2 and (
+                names(kids(n)[0]) and self.nothing(kids(n)[1]) or names(kids(n)[1]) and self.nothing(kids(n)[0]))
+        def gives(n):
+            return n.get("kind") == "BinaryOperator" and n.get("opcode") == "=" and names(kids(n)[0])
+        def none_first(c):
+            """Is the condition true whenever there is none: `!p`, `p == nullptr`, or one of them `|| ...`?"""
+            b = bare(c)
+            while b.get("kind") in ("ParenExpr", "ExprWithCleanups") and kids(b):
+                b = bare(kids(b)[0])
+            if b.get("kind") == "BinaryOperator" and b.get("opcode") == "||":
+                return none_first(kids(b)[0]) or none_first(kids(b)[1])
+            if b.get("kind") == "UnaryOperator" and b.get("opcode") == "!" and kids(b):
+                return asks(bare(kids(b)[0]))
+            return b.get("kind") == "BinaryOperator" and b.get("opcode") == "==" and asks(b)
+        def leaves(n):
+            k = n.get("kind")
+            return k in ("ReturnStmt", "BreakStmt", "ContinueStmt") or (k == "CompoundStmt" and bool(kids(n)) and leaves(kids(n)[-1]))
+        given = [init] + [kids(n)[1] for n in walk(self.f.decl) if gives(n)]
+        if not any(self.nothing(x) for x in given):
+            return None   # (never none: a text like any other)
+        if any(not self.nothing(x) and self.tp_or_none(x) != "Text" for x in given):
+            return None
+        block = next((b for b in walk(self.f.decl) if b.get("kind") == "CompoundStmt" and any(c.get("kind") == "DeclStmt" and any(d is v for d in kids(c)) for c in kids(b))), None)
+        if block is None:
+            return None
+        stmts = kids(block)
+        at = next(i for i, c in enumerate(stmts) if c.get("kind") == "DeclStmt" and any(d is v for d in kids(c)))
+        guard = next((i for i in range(at + 1, len(stmts)) if stmts[i].get("kind") == "IfStmt" and not stmts[i].get("hasElse") and not stmts[i].get("hasInit")
+                      and not stmts[i].get("hasVar") and len(kids(stmts[i])) == 2 and none_first(kids(stmts[i])[0]) and leaves(kids(stmts[i])[1])), None)
+        # where it is given a value and where its text is read, by the statement of its block
+        def uses(n, out):
+            if gives(n):
+                out.append("given")
+                uses(kids(n)[1], out)
+                return
+            if asks(n):
+                return
+            if n.get("kind") == "DeclRefExpr" and (n.get("referencedDecl") or {}).get("id") == vid:
+                out.append("read")
+            for c in kids(n):
+                uses(c, out)
+        for i, st in enumerate(stmts[at + 1:], at + 1):
+            found = []
+            uses(st, found)
+            if "given" in found and guard is not None and i >= guard:
+                raise Wait("a text that may be none (a null pointer), given a value after it is known to be one")
+            if "read" in found and (guard is None or i <= guard):
+                raise Wait("a text that may be none (a null pointer), read where it may be none")
+        name = self.local(v, "Text")
+        there = self.temp(name + "_there", "Bool")
+        self.or_none[vid] = there
+        return self.text_or_none_set(v, init)
+
+    def text_or_none_set(self, v, value):
+        """A text or none (text_or_none) is given a value: the two steps."""
+        name, there = self.names[v["id"]], self.or_none[v["id"]]
+        if self.nothing(value):
+            return [f'{name} = "";', f"{there} = false;"]
+        return [f"{name} = {self.ex(value, 'Text')};", f"{there} = true;"]
+
+    def asked_or_none(self, n):
+        """The flag of a text or none (text_or_none) that `n` names - None: it names none."""
+        b = self.unwrap(n)
+        while b.get("kind") == "ParenExpr" and kids(b):
+            b = self.unwrap(kids(b)[0])
+        return self.or_none.get((b.get("referencedDecl") or {}).get("id")) if b.get("kind") == "DeclRefExpr" else None
 
     def end_into(self, end, text, place):
         """`&end` of strtod: the pointer `end` is the place `place` of `text` from here on."""
@@ -5001,6 +5096,8 @@ class Emit:
                        (x.get("kind") == "BinaryOperator" and x.get("opcode") == "=") or (x.get("kind") == "UnaryOperator" and x.get("opcode") in ("++", "--"))
                        for x in walk(inner))
             return self.effect(inner) if acts else []
+        if k == "BinaryOperator" and n.get("opcode") == "=" and self.asked_or_none(kids(n)[0]) is not None:
+            return self.text_or_none_set(self.unwrap(kids(n)[0])["referencedDecl"], kids(n)[1])   # (a text or none is given one, or none)
         if k == "BinaryOperator" and n.get("opcode") == "=":
             a, b = kids(n)
             inner = self.unwrap(b)
@@ -7618,6 +7715,8 @@ class Emit:
         if k in CAST:
             inner = kids(b)[-1]
             ck = b.get("castKind", "")
+            if ck == "PointerToBoolean" and self.asked_or_none(inner) is not None:   # (a text or none: is there one)
+                return self.asked_or_none(inner), "Bool"
             if ck == "PointerToBoolean" and self.pointer_of(inner) is not None:   # (a pointer into a list: not null - it has a place)
                 return f'math_compare<">=">({self.cast("Float", self.pointer_of(inner)[1])}, 0.0)', "Bool"
             if ck == "NullToPointer" and self.u.object_of(qtype(b)):
@@ -7745,6 +7844,9 @@ class Emit:
                     if not ENGINE_NODES:
                         raise
                     return self.either(op, left, y)
+            if op in ("==", "!=") and (self.asked_or_none(x) is not None and self.nothing(y) or self.asked_or_none(y) is not None and self.nothing(x)):
+                there = self.asked_or_none(x) or self.asked_or_none(y)   # (a text or none and null: is there none)
+                return (f"logic_not({there})" if op == "==" else there), "Bool"
             if op in ("==", "!=") and (self.pointer_of(x) is not None and self.nothing(y) or self.pointer_of(y) is not None and self.nothing(x)):
                 at = (self.pointer_of(x) or self.pointer_of(y))[1]   # (a pointer into a list and null: has it no place)
                 return f'math_compare<"{"<" if op == "==" else ">="}">({self.cast("Float", at)}, 0.0)', "Bool"
