@@ -99,6 +99,17 @@ TEST(base_fail) {
   RoadStream roads;
   roads.road(square, 4, 6, true, 0);
   CHECK(roads.values().size() == roads.size() && roads.values().data() == roads.data() && roads.values()[0] == 1);
+  // the chunks of a builder taken out of it: the same chunks, and the builder has none after
+  BuildingOptions options;
+  options.style.walls = {Rgb{0.8, 0.8, 0.8}};
+  options.style.roofs = {Rgb{0.3, 0.3, 0.3}};
+  BuildingBuilder builder;
+  CHECK(builder.begin(footprints.data(), footprints.size(), options));
+  while (!builder.step(1e9)) {}
+  const std::size_t made = builder.chunks().size();
+  const u32 vertices = made ? builder.chunks()[0].mesh.vertex_count() : 0;
+  const std::vector<GeoChunk> taken = builder.take_chunks();
+  CHECK(made == 1 && taken.size() == made && taken[0].mesh.vertex_count() == vertices && vertices > 0 && builder.chunks().empty());
   clear_error();
 }
 

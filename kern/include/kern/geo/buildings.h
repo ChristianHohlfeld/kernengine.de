@@ -60,6 +60,13 @@ class BuildingBuilder {
   bool done() const { return done_; }
 
   std::vector<GeoChunk>& chunks() { return chunks_; }
+  /// The chunks, taken out of the builder: it has none after (nothing is copied).
+  std::vector<GeoChunk> take_chunks() {
+    std::vector<GeoChunk> taken = std::move(chunks_);
+    chunks_.clear();
+    chunk_index_.clear();
+    return taken;
+  }
   u32 processed() const { return processed_; }
   u32 built() const { return built_; }
   u32 skipped() const { return skipped_; }

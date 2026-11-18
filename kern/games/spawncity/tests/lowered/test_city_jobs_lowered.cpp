@@ -506,7 +506,7 @@ void run_buildings(kern::Span<const u8> in, std::vector<u8>& out) {
   if (!b.begin(stream.data(), stream.size(), o)) return;
   while (!b.step(1e9)) {}
   // (the builder is done: its chunks are taken out of it, welded and written)
-  std::vector<kern::GeoChunk> chunks = std::move(b.chunks());
+  std::vector<kern::GeoChunk> chunks = b.take_chunks();
   wire::put_u32(out, static_cast<u32>(chunks.size()));
   for (auto& c : chunks) {
     kern::weld(c.mesh);

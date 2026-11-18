@@ -918,6 +918,33 @@ u32 hash_u32(u64 v) {
   return static_cast<u32>(v);
 }
 
+/// The layers of a tile whose polygons are areas of the map; each says in its own way what kind
+/// of area a feature is.
+enum class AreaLayer : u8 { water, park, landcover, landuse };
+/// The kind of area a feature of such a layer is (false: none the map draws).
+bool area_kind(AreaLayer rule, const mvt::Layer& l, const mvt::Feature& f, AreaKind& k) {
+  switch (rule) {
+    case AreaLayer::water: k = AreaKind::water; return true;
+    case AreaLayer::park: k = AreaKind::park; return true;
+    case AreaLayer::landcover: {
+      const std::string_view c = l.text(f, "class");
+      if (c == "wood") k = AreaKind::wood;
+      else if (c == "grass") k = AreaKind::grass;
+      else if (c == "sand") k = AreaKind::sand;
+      else return false;
+      return true;
+    }
+    case AreaLayer::landuse: {
+      const std::string_view c = l.text(f, "class");
+      if (c == "pitch" || c == "playground") k = AreaKind::pitch;
+      else if (c == "cemetery" || c == "garden") k = AreaKind::grass;
+      else return false;
+      return true;
+    }
+  }
+  return false;
+}
+
 }  // namespace
 
 void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector& proj, MapFeatures& out) {
@@ -995,7 +1022,7 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
       }
     }
   }
-  auto areas = [&](const char* layer, auto kind_of) {
+  auto areas = [&](const char* layer, AreaLayer rule) {
     const i32 at = tile.layer(layer);
     if (at < 0) return;
     const mvt::Layer& l = ::sc::converted::at(tile.layers, static_cast<std::size_t>(at));
@@ -1003,7 +1030,7 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
     for (const mvt::Feature& f : l.features) {
       if (f.type != mvt::GeomType::polygon) continue;
       AreaKind kind;
-      if (!kind_of(l, f, kind)) continue;
+      if (!area_kind(rule, l, f, kind)) continue;
       polygons(f, polys);
       for (auto& poly : polys) {
         MapFeatures::Area a;
@@ -1017,23 +1044,10 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
       }
     }
   };
-  areas("water", [](const mvt::Layer&, const mvt::Feature&, AreaKind& k) { k = AreaKind::water; return true; });
-  areas("park", [](const mvt::Layer&, const mvt::Feature&, AreaKind& k) { k = AreaKind::park; return true; });
-  areas("landcover", [](const mvt::Layer& l, const mvt::Feature& f, AreaKind& k) {
-    const std::string_view c = l.text(f, "class");
-    if (c == "wood") k = AreaKind::wood;
-    else if (c == "grass") k = AreaKind::grass;
-    else if (c == "sand") k = AreaKind::sand;
-    else return false;
-    return true;
-  });
-  areas("landuse", [](const mvt::Layer& l, const mvt::Feature& f, AreaKind& k) {
-    const std::string_view c = l.text(f, "class");
-    if (c == "pitch" || c == "playground") k = AreaKind::pitch;
-    else if (c == "cemetery" || c == "garden") k = AreaKind::grass;
-    else return false;
-    return true;
-  });
+  areas("water", AreaLayer::water);
+  areas("park", AreaLayer::park);
+  areas("landcover", AreaLayer::landcover);
+  areas("landuse", AreaLayer::landuse);
   {
     const Projector P(key, proj, 1.0);
     const Vec2 a = P({0, 0}), b = P({1, 1});
@@ -1356,6 +1370,7 @@ template <> struct Values<::sc_old_tiles::sc::RoadClass> { static constexpr long
 template <> struct Values<::sc_old_tiles::sc::AreaKind> { static constexpr long long all[] = {static_cast<long long>(::sc_old_tiles::sc::AreaKind::water), static_cast<long long>(::sc_old_tiles::sc::AreaKind::park), static_cast<long long>(::sc_old_tiles::sc::AreaKind::wood), static_cast<long long>(::sc_old_tiles::sc::AreaKind::grass), static_cast<long long>(::sc_old_tiles::sc::AreaKind::sand), static_cast<long long>(::sc_old_tiles::sc::AreaKind::pitch)}; };
 template <> struct Values<::sc_new_tiles::sc::RoadClass> { static constexpr long long all[] = {static_cast<long long>(::sc_new_tiles::sc::RoadClass::motorway), static_cast<long long>(::sc_new_tiles::sc::RoadClass::trunk), static_cast<long long>(::sc_new_tiles::sc::RoadClass::primary), static_cast<long long>(::sc_new_tiles::sc::RoadClass::secondary), static_cast<long long>(::sc_new_tiles::sc::RoadClass::tertiary), static_cast<long long>(::sc_new_tiles::sc::RoadClass::minor), static_cast<long long>(::sc_new_tiles::sc::RoadClass::service), static_cast<long long>(::sc_new_tiles::sc::RoadClass::track), static_cast<long long>(::sc_new_tiles::sc::RoadClass::path), static_cast<long long>(::sc_new_tiles::sc::RoadClass::pedestrian), static_cast<long long>(::sc_new_tiles::sc::RoadClass::river), static_cast<long long>(::sc_new_tiles::sc::RoadClass::canal), static_cast<long long>(::sc_new_tiles::sc::RoadClass::stream)}; };
 template <> struct Values<::sc_new_tiles::sc::AreaKind> { static constexpr long long all[] = {static_cast<long long>(::sc_new_tiles::sc::AreaKind::water), static_cast<long long>(::sc_new_tiles::sc::AreaKind::park), static_cast<long long>(::sc_new_tiles::sc::AreaKind::wood), static_cast<long long>(::sc_new_tiles::sc::AreaKind::grass), static_cast<long long>(::sc_new_tiles::sc::AreaKind::sand), static_cast<long long>(::sc_new_tiles::sc::AreaKind::pitch)}; };
+template <> struct Values<::sc_new_tiles::sc::AreaLayer> { static constexpr long long all[] = {static_cast<long long>(::sc_new_tiles::sc::AreaLayer::water), static_cast<long long>(::sc_new_tiles::sc::AreaLayer::park), static_cast<long long>(::sc_new_tiles::sc::AreaLayer::landcover), static_cast<long long>(::sc_new_tiles::sc::AreaLayer::landuse)}; };
 }  // namespace sc::lowered
 
 namespace sc {
@@ -1379,6 +1394,34 @@ SC_TEST(lowered_tiles_cpp) {
       const bool new_defined = ::sc::lowered::run([&] { n_r.emplace(::sc_new_tiles::sc::clip_to_tile(n0.get(), n1.get())); }, new_asks);
       ::sc::lowered::Differs differs;
       differs.check("what it returns", o_r, n_r);
+      tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
+    }
+  }
+  {  // extract(const mvt::Tile &, const TileKey &, const kern::GeoProjector &, MapFeatures &)  ->  extract(const mvt::Tile &, const TileKey &, const kern::GeoProjector &, MapFeatures &)
+    ::sc::lowered::Tally tally("extract(const mvt::Tile &, const TileKey &, const kern::GeoProjector &, MapFeatures &)");
+    ::sc::converted::Draw draw;
+    for (int call = 0; tally.more(call); ++call) {
+      ::sc::lowered::Arg<const mvt::Tile &> o0;
+      ::sc::lowered::draw(draw, o0);
+      ::sc::lowered::Arg<const mvt::Tile &> n0;
+      ::sc::lowered::carry(o0, n0);
+      ::sc::lowered::Arg<const ::sc_old_tiles::sc::TileKey &> o1;
+      ::sc::lowered::draw(draw, o1);
+      ::sc::lowered::Arg<const ::sc_new_tiles::sc::TileKey &> n1;
+      ::sc::lowered::carry(o1, n1);
+      ::sc::lowered::Arg<const kern::GeoProjector &> o2;
+      ::sc::lowered::draw(draw, o2);
+      ::sc::lowered::Arg<const kern::GeoProjector &> n2;
+      ::sc::lowered::carry(o2, n2);
+      ::sc::lowered::Arg<::sc_old_tiles::sc::MapFeatures &> o3;
+      ::sc::lowered::draw(draw, o3);
+      ::sc::lowered::Arg<::sc_new_tiles::sc::MapFeatures &> n3;
+      ::sc::lowered::carry(o3, n3);
+      long old_asks = 0, new_asks = 0;
+      const bool old_defined = ::sc::lowered::run([&] { ::sc_old_tiles::sc::extract(o0.get(), o1.get(), o2.get(), o3.get()); }, old_asks);
+      const bool new_defined = ::sc::lowered::run([&] { ::sc_new_tiles::sc::extract(n0.get(), n1.get(), n2.get(), n3.get()); }, new_asks);
+      ::sc::lowered::Differs differs;
+      differs.check("its parameter out", o3, n3);
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }

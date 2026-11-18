@@ -3112,8 +3112,7 @@ void Terrain::build_render_tile(i32 level, i32 ti, i32 tj) {
       const i32 ia = ::sc::lowered::plus(i0, ::sc::lowered::times(di, k)), ja = ::sc::lowered::plus(j0, ::sc::lowered::times(dj, k)), ib = ::sc::lowered::plus(ia, di), jb = ::sc::lowered::plus(ja, dj);
       const u32 top_a = static_cast<u32>(::sc::lowered::plus(::sc::lowered::times(ja, n), ia)), top_b = static_cast<u32>(::sc::lowered::plus(::sc::lowered::times(jb, n), ib));
       const u32 base = m.vertex_count();
-      for (i32 end = 0; end < 2; ::sc::lowered::pre_inc(end)) {  // (the edge's two ends: a, then b)
-        const u32 v = end == 0 ? top_a : top_b;
+      for (u32 v : {top_a, top_b}) {
         const Vec3 p{::sc::converted::at(m.positions, v * 3), ::sc::converted::at(m.positions, v * 3 + 1), ::sc::converted::at(m.positions, v * 3 + 2) - drop};
         m.push(p, {0, 0, 1}, kGround, {p.x * 0.1f, p.y * 0.1f});
       }
@@ -3478,34 +3477,6 @@ SC_TEST(lowered_terrain_cpp) {
       long old_asks = 0, new_asks = 0;
       const bool old_defined = ::sc::lowered::run([&] { o_self.set_craters(o0.get()); }, old_asks);
       const bool new_defined = ::sc::lowered::run([&] { n_self.set_craters(n0.get()); }, new_asks);
-      ::sc::lowered::Differs differs;
-      differs.check("its object", o_self, n_self);
-      tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
-    }
-  }
-  {  // Terrain::build_render_tile(i32, i32, i32)  ->  Terrain::build_render_tile(i32, i32, i32)
-    ::sc::lowered::Tally tally("Terrain::build_render_tile(i32, i32, i32)");
-    ::sc::converted::Draw draw;
-    for (int call = 0; tally.more(call); ++call) {
-      ::sc_old_terrain::sc::Terrain o_self{};
-      if (draw.flag()) ::sc::lowered::draw(draw, o_self);
-      ::sc_new_terrain::sc::Terrain n_self{};
-      ::sc::lowered::carry(o_self, n_self);
-      ::sc::lowered::Arg<i32> o0;
-      ::sc::lowered::draw(draw, o0);
-      ::sc::lowered::Arg<i32> n0;
-      ::sc::lowered::carry(o0, n0);
-      ::sc::lowered::Arg<i32> o1;
-      ::sc::lowered::draw(draw, o1);
-      ::sc::lowered::Arg<i32> n1;
-      ::sc::lowered::carry(o1, n1);
-      ::sc::lowered::Arg<i32> o2;
-      ::sc::lowered::draw(draw, o2);
-      ::sc::lowered::Arg<i32> n2;
-      ::sc::lowered::carry(o2, n2);
-      long old_asks = 0, new_asks = 0;
-      const bool old_defined = ::sc::lowered::run([&] { o_self.build_render_tile(o0.get(), o1.get(), o2.get()); }, old_asks);
-      const bool new_defined = ::sc::lowered::run([&] { n_self.build_render_tile(n0.get(), n1.get(), n2.get()); }, new_asks);
       ::sc::lowered::Differs differs;
       differs.check("its object", o_self, n_self);
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);

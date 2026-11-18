@@ -151,6 +151,33 @@ u32 hash_u32(u64 v) {
   return static_cast<u32>(v);
 }
 
+/// The layers of a tile whose polygons are areas of the map; each says in its own way what kind
+/// of area a feature is.
+enum class AreaLayer : u8 { water, park, landcover, landuse };
+/// The kind of area a feature of such a layer is (false: none the map draws).
+bool area_kind(AreaLayer rule, const mvt::Layer& l, const mvt::Feature& f, AreaKind& k) {
+  switch (rule) {
+    case AreaLayer::water: k = AreaKind::water; return true;
+    case AreaLayer::park: k = AreaKind::park; return true;
+    case AreaLayer::landcover: {
+      const std::string_view c = l.text(f, "class");
+      if (c == "wood") k = AreaKind::wood;
+      else if (c == "grass") k = AreaKind::grass;
+      else if (c == "sand") k = AreaKind::sand;
+      else return false;
+      return true;
+    }
+    case AreaLayer::landuse: {
+      const std::string_view c = l.text(f, "class");
+      if (c == "pitch" || c == "playground") k = AreaKind::pitch;
+      else if (c == "cemetery" || c == "garden") k = AreaKind::grass;
+      else return false;
+      return true;
+    }
+  }
+  return false;
+}
+
 }  // namespace
 
 void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector& proj, MapFeatures& out) {
@@ -228,7 +255,7 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
       }
     }
   }
-  auto areas = [&](const char* layer, auto kind_of) {
+  auto areas = [&](const char* layer, AreaLayer rule) {
     const i32 at = tile.layer(layer);
     if (at < 0) return;
     const mvt::Layer& l = tile.layers[static_cast<std::size_t>(at)];
@@ -236,7 +263,7 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
     for (const mvt::Feature& f : l.features) {
       if (f.type != mvt::GeomType::polygon) continue;
       AreaKind kind;
-      if (!kind_of(l, f, kind)) continue;
+      if (!area_kind(rule, l, f, kind)) continue;
       polygons(f, polys);
       for (auto& poly : polys) {
         MapFeatures::Area a;
@@ -250,23 +277,10 @@ void extract(const mvt::Tile& tile, const TileKey& key, const kern::GeoProjector
       }
     }
   };
-  areas("water", [](const mvt::Layer&, const mvt::Feature&, AreaKind& k) { k = AreaKind::water; return true; });
-  areas("park", [](const mvt::Layer&, const mvt::Feature&, AreaKind& k) { k = AreaKind::park; return true; });
-  areas("landcover", [](const mvt::Layer& l, const mvt::Feature& f, AreaKind& k) {
-    const std::string_view c = l.text(f, "class");
-    if (c == "wood") k = AreaKind::wood;
-    else if (c == "grass") k = AreaKind::grass;
-    else if (c == "sand") k = AreaKind::sand;
-    else return false;
-    return true;
-  });
-  areas("landuse", [](const mvt::Layer& l, const mvt::Feature& f, AreaKind& k) {
-    const std::string_view c = l.text(f, "class");
-    if (c == "pitch" || c == "playground") k = AreaKind::pitch;
-    else if (c == "cemetery" || c == "garden") k = AreaKind::grass;
-    else return false;
-    return true;
-  });
+  areas("water", AreaLayer::water);
+  areas("park", AreaLayer::park);
+  areas("landcover", AreaLayer::landcover);
+  areas("landuse", AreaLayer::landuse);
   {
     const Projector P(key, proj, 1.0);
     const Vec2 a = P({0, 0}), b = P({1, 1});
