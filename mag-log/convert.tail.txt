@@ -1,0 +1,80 @@
+    Game::blast_shown (9): send_fx() is defined in another file
+    Game::blast_remotes (19): send_fx() is defined in another file
+    Game::draw_remote_people (76): person() is defined in another file
+    Game::draw_remote_vehicles (55): begin() is defined in another file
+    Game::update_nav (34): it calls Game::player_position(), which waits
+    Game::project_screen (24): written
+    Game::mp_hud_json (133): it calls Game::mp_local_ready(), which waits
+    Game::bigmap_json (69): it calls Game::mp_local_ready(), which waits
+    Game::net_command (225): it calls Game::mp_local_ready(), which waits
+Game/game_town_cpp              2 /   21 functions       14 /   1054 lines
+    Game::line_of_sight (9): written
+    Game::people_view (37): it calls Game::player_position(), which waits
+    Game::handle_shots (80): a reference to something it changes
+    Game::damage_car (26): town_car_remote() is defined in another file
+    Game::wreck_car (32): it calls CityStream::ground_height(), which waits
+    Game::damage_player_vehicle (22): it calls Game::damage_car(), which waits
+    Game::explosion (45): look_blast() is defined in another file
+    Game::spawn_police_unit (54): gaps_riding() is defined in another file
+    Game::step_cop (81): stars() is defined in another file
+    Game::drive_police (120): gaps_riding() is defined in another file
+    Game::police_drone_mate_hit (16): osfx() is defined in another file
+    Game::spawn_police_drones (40): stars() is defined in another file
+    Game::emp_pulse (37): stars() is defined in another file
+    Game::update_police_drones (111): stars() is defined in another file
+    Game::update_police (65): stars() is defined in another file
+    Game::request_respawn (5): written
+    Game::update_town (88): it calls Game::clear_spot(), which waits
+    Game::update_lamps (4): gaps_lamps_place() is defined in another file
+    Game::map_json (60): it calls Game::player_position(), which waits
+    Game::draw_town (38): begin() is defined in another file
+    Game::minimap_json (84): it calls Game::player_position(), which waits
+
+377 of 477 functions of the program are written as Blueprints (1665 of 6040 lines), and 12 of the engine's headers that they call: 56 Blueprints - 4 of source files, 1 of states, 51 of headers and of shapes
+326 functions of the Blueprints are compared with their source, bit for bit, by the tests in /dev/shm/spawncity-jobs-chris/work-g2-probe-154057-15427/pt/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+     7 (   665)   it calls Game::mp_local_ready(), which waits
+     7 (   517)   stars() is defined in another file
+     6 (   444)   gaps_riding() is defined in another file
+     8 (   297)   it calls CityStream::ground_height(), which waits
+     1 (   268)   ctl_command() is defined in another file
+     5 (   219)   it calls Game::player_position(), which waits
+     3 (   157)   it calls Game::clear_spot(), which waits
+     1 (   136)   vr_menu_json() is defined in another file
+     4 (   125)   begin() is defined in another file
+     1 (   111)   it calls register_node(), which waits
+     1 (    99)   an object of the engine as a local that is not made by a constructor of it
+     1 (    98)   it calls Game::focus_position(), which waits
+     1 (    93)   vr_hand_ray() is defined in another file
+     1 (    87)   look_begin() is defined in another file
+     1 (    86)   detach() is defined in another file
+     2 (    84)   update() is defined in another file
+     1 (    80)   temper_of() is defined in another file
+     1 (    80)   a reference to something it changes
+     1 (    76)   person() is defined in another file
+     5 (    75)   put() is defined in another file
+     1 (    45)   look_blast() is defined in another file
+     1 (    40)   it calls Game::remote_on_segment(), which waits
+     1 (    38)   ui_mix_cues() is defined in another file
+     1 (    37)   its test cannot compare it yet (the class Graph is not written)
+     1 (    35)   contract() is defined in another file
+     1 (    34)   ground_ready() is defined in another file
+     1 (    34)   it calls Game::toggle_drone(), which waits
+     1 (    34)   it calls Game::spawn_guard_step(), which waits
+     2 (    28)   send_fx() is defined in another file
+     1 (    26)   its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a ImplicitCastExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+     2 (    26)   reset() is defined in another file
+     1 (    26)   town_car_remote() is defined in another file
+     1 (    24)   Game::explosion() of the Blueprint Game is not written
+     1 (    22)   it calls Game::damage_car(), which waits
+     1 (    18)   an object of the engine (NodeDef) copied or moved as a whole
+     1 (    18)   gaps_seat_press() is defined in another file
+     1 (    16)   osfx() is defined in another file
+     2 (    15)   init() is defined in another file
+     1 (    13)   ui_render_music() is defined in another file
+     1 (    12)   opt_spec() is defined in another file
+
+real	13m30,879s
+user	25m28,161s
+sys	1m28,597s
