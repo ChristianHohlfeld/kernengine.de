@@ -25,7 +25,9 @@ if [ "$skip_wasm" = 0 ]; then
   # The level file (the project: world settings, actors, their Blueprints) as a source the game links.
   python3 "$here/tools/embed_level.py" "$here/level/spawncity.klevel" "$here/src/level_data.cpp"
   # ... and its Blueprints as C++ classes: the game runs them as compiled code (kern/docs/blueprint_cpp.md).
-  "$root/tools/blueprint_cpp.sh" "$here/level/spawncity.klevel" "$here/src/level_blueprints.cpp"
+  # Those of the folder "Program" - files of the game that are Blueprints now - the game's C++ calls as their
+  # classes: they, and the libraries they use, stand in level_blueprints.h (BLUEPRINTS.md, "5 - Umschalten").
+  "$root/tools/blueprint_cpp.sh" "$here/level/spawncity.klevel" "$here/src/level_blueprints.cpp" "$here/src/level_blueprints.h" Program
   # Each game source compiles through a generated wrapper that names the hashes of the game's
   # headers and of the source: kern/build.sh hashes the wrapper's text, so a change recompiles the
   # game's objects only (a -D flag would change the flags key and rebuild the whole engine).

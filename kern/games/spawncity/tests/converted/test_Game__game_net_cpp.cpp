@@ -10,10 +10,10 @@
 #include <algorithm>
 #include "../../src/game.h"
 #include "../../src/game_world.h"
+#include "../../src/level_blueprints.h"
 #include "../../src/person_hit.h"
 #include "../../src/mp_art.h"
 #include "../../src/mp_rules.h"
-#include "../../src/qr_code.h"
 #include "../../src/tiles.h"
 #include "../converted.h"
 

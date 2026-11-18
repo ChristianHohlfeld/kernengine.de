@@ -8,3 +8,4 @@ kern/build/
 kern/games/spawncity/src/level_data.cpp
 # ... and its Blueprints as C++ classes (tools/blueprint_cpp.sh writes them at build time)
 kern/games/spawncity/src/level_blueprints.cpp
+kern/games/spawncity/src/level_blueprints.h
