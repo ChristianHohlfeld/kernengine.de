@@ -29,6 +29,7 @@
 #include "kern/game/net_game.h"
 #include "kern/logic/actor_blueprint.h"
 #include "kern/logic/blueprint.h"
+#include "kern/logic/blueprint_class.h"
 #include "kern/logic/logic.h"
 #include "kern/logic/engine_host.h"
 #include "blueprint_native.h"
@@ -4453,6 +4454,7 @@ TEST(logic_native_blueprints) {
       heat = value.as_number();
       return true;
     }
+    void* object(const void* type) override { return type == &logic::class_key<Fake> ? this : nullptr; }
   };
   const logic::Graph g = logic_graph(R"({"variables":[{"name":"Heat","type":"float","value":5}],
     "functions":[{"name":"Twice","pure":true,"inputs":[{"name":"x","type":"float","value":0}],"outputs":[{"name":"r","type":"float","value":0}]}],
@@ -4466,6 +4468,12 @@ TEST(logic_native_blueprints) {
   CHECK(inst->call_number("Twice", {4}) == 9);
   CHECK(inst->get("Heat").as_number() == 1 && inst->set("Heat", logic::Value::number(3)) && inst->call_number("Twice", {4}) == 11);
   CHECK(!inst->set("Nope", logic::Value::number(1)) && inst->call_number("Nope", {1}, -7) == -7 && inst->has_function("Twice"));
+  // the program's own C++ calls the class directly (kern/logic/blueprint_class.h): bound once to the object the
+  // runtime runs the Blueprint as - what it does there is what the instance has, and the other way round
+  CHECK(inst->native_object<Fake>() && !inst->native_object<FakeLogicHost>());
+  CHECK(logic::bind_blueprint<Fake>(rt) && &logic::blueprint<Fake>() == inst->native_object<Fake>());
+  logic::blueprint<Fake>().heat = 6;
+  CHECK(inst->get("Heat").as_number() == 6 && inst->set("Heat", logic::Value::number(3)) && logic::blueprint<Fake>().heat == 3);
   // a moved node is the same Blueprint (the hash leaves places out); a changed one is another:
   // the class never runs a graph it was not written from
   logic::Graph moved = g, changed = g;
@@ -4479,6 +4487,8 @@ TEST(logic_native_blueprints) {
   plain.native = false;
   logic::Instance* interpreted = plain.add(g, 0, "Plain");
   CHECK(std::string(interpreted->tier()) != "native C++" && interpreted->call_number("Twice", {4}) == 8 && interpreted->get("Heat").as_number() == 5);
+  // (no instance there runs as the class: nothing is bound)
+  CHECK(!interpreted->native_object<Fake>() && !logic::bind_blueprint<Fake>(plain) && !logic::blueprint_object<Fake>);
   // the glue for it: every function and variable by name, registered under the graph's hash
   std::string glue, why;
   CHECK(logic::native_glue(g, "Hosted", glue, &why));
@@ -4486,7 +4496,10 @@ TEST(logic_native_blueprints) {
                            // (the argument is made, the function runs between the two calls a host can measure by, what it gave is handed back)
                            "      kern::f64 in0 = native_arg<kern::f64>(args, 0, 0.0);\n      kern::logic::native_call(true);\n      const auto out = self.Twice(std::move(in0));\n"
                            "      kern::logic::native_call(false);\n      results = {to_value(out.r)};",
-                           "if (variable == \"Heat\") { kern::logic::native_set(self.Heat, value); return true; }", "kern::logic::register_native_blueprint(0x"})
+                           "if (variable == \"Heat\") { kern::logic::native_set(self.Heat, value); return true; }",
+                           // (the object, for the program's C++ that calls the class directly)
+                           "  void* object(const void* type) override { return type == &kern::logic::class_key<Hosted> ? &self : nullptr; }\n",
+                           "kern::logic::register_native_blueprint(0x"})
     CHECK(glue.find(line) != std::string::npos);
   {
     // a node that is not a function of blueprint.h (NodeDef::native: a library decides for its own

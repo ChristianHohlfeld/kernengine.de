@@ -1723,7 +1723,7 @@ inline bool write_file(const std::string& path, const std::string& text) {
 /// (the calls) and blueprint_native_expected.txt (the interpreter's answers).
 inline bool emit(const std::string& dir, const std::vector<Case>& all, std::string* error) {
   std::string main = "// written by kern_tests --emit-native: the calls of the native Blueprint test\n"
-                     "#include <cstdio>\n#include <fstream>\n#include <limits>\n#include <sstream>\n#include <string>\n\n#include \"logic_cases.h\"\n#include \"native_show.h\"\n";
+                     "#include <cstdio>\n#include <fstream>\n#include <limits>\n#include <sstream>\n#include <string>\n\n#include \"kern/logic/blueprint_class.h\"\n#include \"logic_cases.h\"\n#include \"native_show.h\"\n";
   std::string runs, expected;
   for (const Case& c : all) {
     std::string text, glue, why;
@@ -1789,6 +1789,8 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
             used +
             "  kern::logic::Instance* inst = rt.add(graph, 0, \"" + c.name + "\");\n  rt.begin();\n  hosted += \"== " + c.name + "\\n\";\n"
             "  if (std::string(inst->tier()) != \"native C++\") hosted += std::string(\"(it runs in the \") + inst->tier() + \", not as its class)\\n\";\n"
+            "  // (the program's own C++ binds the class once, to the object the runtime runs it as - kern/logic/blueprint_class.h)\n"
+            "  if (!kern::logic::bind_blueprint<" + c.name + ">(rt) || &kern::logic::blueprint<" + c.name + ">() != inst->native_object<" + c.name + ">()) hosted += \"(its class is not bound)\\n\";\n"
             "  const auto hosted_variables = [&] {\n    return std::string(\" |\")";
     for (const logic::Variable& v : c.graph.variables) body += " + \" " + v.name + "=\" + native_show(inst->get(\"" + v.name + "\"))";
     body += ";\n  };\n";
