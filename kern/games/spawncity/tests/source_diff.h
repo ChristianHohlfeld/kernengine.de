@@ -20,6 +20,7 @@
 
 #include <bit>
 #include <climits>
+#include <deque>
 #include <cstring>
 #include <optional>
 #include <string>
@@ -51,6 +52,15 @@ template <class T> struct is_span : std::false_type {};
 template <class T> struct is_span<kern::Span<T>> : std::true_type {};
 template <class T> struct is_optional : std::false_type {};
 template <class T> struct is_optional<std::optional<T>> : std::true_type {};
+template <class T> struct is_pair : std::false_type {};
+template <class A, class B> struct is_pair<std::pair<A, B>> : std::true_type {};
+/// A map (std::map, std::unordered_map, kern::Map) and a set (std::set, std::unordered_set, kern::Set): by what they
+/// are, not by their name - keys, and for a map the values. One of them keeps no order (unordered_*): two are then
+/// the same when they hold the same, in any order.
+template <class T> concept MapLike = requires { typename T::key_type; typename T::mapped_type; } && requires(const T& m) { m.find(std::declval<const typename T::key_type&>()); };
+template <class T> concept SetLike = requires { typename T::key_type; } && !requires { typename T::mapped_type; } &&
+                                     std::is_same_v<typename T::key_type, typename T::value_type> && requires(const T& m) { m.find(std::declval<const typename T::key_type&>()); };
+template <class T> concept Unordered = requires { typename T::hasher; typename T::local_iterator; };
 template <class T> inline constexpr bool is_vec =
     std::is_same_v<T, kern::Vec2> || std::is_same_v<T, kern::Vec3> || std::is_same_v<T, kern::Vec4> || std::is_same_v<T, kern::Quat>;
 template <class T> inline constexpr bool is_text = std::is_same_v<T, std::string> || std::is_same_v<T, std::string_view>;
@@ -99,6 +109,19 @@ template <class T> void draw(Draw& d, T& x) {
   } else if constexpr (is_optional<U>::value) {
     if (d.flag()) x = drawn<typename U::value_type>(d);
     else x.reset();
+  } else if constexpr (is_pair<U>::value) {
+    draw(d, x.first);
+    draw(d, x.second);
+  } else if constexpr (MapLike<U>) {
+    x.clear();
+    for (u32 n = d.below(6); n > 0; --n) {
+      auto k = drawn<typename U::key_type>(d);
+      auto v = drawn<typename U::mapped_type>(d);
+      x.insert_or_assign(k, std::move(v));
+    }
+  } else if constexpr (SetLike<U>) {
+    x.clear();
+    for (u32 n = d.below(6); n > 0; --n) x.insert(drawn<typename U::key_type>(d));
   } else if constexpr (HasFields<U>) {
     std::apply([&](auto&... f) { (draw(d, f), ...); }, fields(x));
   } else if constexpr (std::is_default_constructible_v<U> && std::is_class_v<U>) {
@@ -115,10 +138,35 @@ template <class T> void draw(Draw& d, T& x) {
 // ---- carried: the same value in the type of the other side (a class of the file is two classes, sc_old's
 // and sc_new's - field by field, by name: source_diff.py checks that they have the same fields). A list and a
 // text get the room the old side's has (its capacity): what the two ask for memory is then compared alike ----
+template <class T> kern::logic::Value as_value(const T& x);
+/// Whether a type holds values of the Blueprint (kern::logic::Value): the old program kept the Blueprint's structs so;
+/// the test draws them on the side where they are structs (draw_pair).
+/// So did it hold texts by a pointer to their characters (const char*), where the new holds std::string: those are
+/// drawn on the new side too, and the old side's pointers point to texts the test keeps.
+template <class T> constexpr bool drawn_on_new();
+template <class T> struct holds_value : std::bool_constant<drawn_on_new<std::remove_cv_t<T>>()> {};
+template <class T> constexpr bool drawn_on_new() {
+  if constexpr (std::is_same_v<T, kern::logic::Value> || std::is_same_v<T, const char*>) return true;
+  else if constexpr (is_vector<T>::value || is_array<T>::value || is_optional<T>::value) return drawn_on_new<std::remove_cv_t<typename T::value_type>>();
+  else if constexpr (std::is_array_v<T>) return drawn_on_new<std::remove_cv_t<std::remove_extent_t<T>>>();
+  else if constexpr (std::is_class_v<T> && HasFields<T>) {
+    using F = decltype(fields(std::declval<T&>()));
+    return []<std::size_t... I>(std::index_sequence<I...>) { return (drawn_on_new<std::remove_cvref_t<std::tuple_element_t<I, F>>>() || ...); }(std::make_index_sequence<std::tuple_size_v<F>>{});
+  } else return false;
+}
+/// The characters of a text the old side points to: kept for as long as the test runs.
+inline const char* kept_text(const std::string& t) {
+  static std::deque<std::string> kept;
+  if (kept.size() > 100000) kept.clear();   // (the texts of calls long done)
+  return kept.emplace_back(t).c_str();
+}
 template <class A, class B> void carry(const A& a, B& b) {
   using X = std::remove_cv_t<A>;
   using Y = std::remove_cv_t<B>;
-  if constexpr (std::is_same_v<X, Y> && std::is_trivially_copyable_v<X> && !Named<X> && !std::is_array_v<X>) b = a;
+  if constexpr (std::is_same_v<Y, kern::logic::Value> && !std::is_same_v<X, kern::logic::Value>) b = as_value(a);   // (the struct as the old program held it)
+  else if constexpr (std::is_same_v<Y, const char*> && is_text<X>) b = kept_text(std::string(a));
+  else if constexpr (std::is_same_v<X, const char*> && std::is_same_v<Y, std::string>) b = a ? a : "";
+  else if constexpr (std::is_same_v<X, Y> && std::is_trivially_copyable_v<X> && !Named<X> && !std::is_array_v<X>) b = a;
   else if constexpr (std::is_same_v<X, std::string> && std::is_same_v<Y, std::string>) {
     b.clear();
     b.reserve(a.capacity());
@@ -141,6 +189,28 @@ template <class A, class B> void carry(const A& a, B& b) {
   } else if constexpr (is_optional<X>::value && is_optional<Y>::value) {
     if (a) carry(*a, b.emplace());
     else b.reset();
+  } else if constexpr (is_pair<X>::value && is_pair<Y>::value) {
+    carry(a.first, b.first);
+    carry(a.second, b.second);
+  } else if constexpr (MapLike<X> && MapLike<Y>) {
+    // (in the order the old side gives its entries: the new keeps that one)
+    b.clear();
+    if constexpr (requires { b.reserve(a.size()); }) b.reserve(a.size());
+    for (const auto& [k, v] : a) {
+      typename Y::key_type kb{};
+      carry(k, kb);
+      typename Y::mapped_type vb{};
+      carry(v, vb);
+      b.insert_or_assign(kb, std::move(vb));
+    }
+  } else if constexpr (SetLike<X> && SetLike<Y>) {
+    b.clear();
+    if constexpr (requires { b.reserve(a.size()); }) b.reserve(a.size());
+    for (const auto& k : a) {
+      typename Y::key_type kb{};
+      carry(k, kb);
+      b.insert(kb);
+    }
   } else if constexpr (std::is_same_v<X, Y> && std::is_class_v<X> && !HasFields<X> && std::is_copy_assignable_v<X>) {
     b = a;   // (a class that keeps what it holds to itself: the same type on both sides)
   } else if constexpr (HasFields<X> && HasFields<Y>) {
@@ -153,11 +223,29 @@ template <class A, class B> void carry(const A& a, B& b) {
   }
 }
 
+/// A value drawn for both sides: on the old one and carried to the new - or, where the old holds values of the Blueprint,
+/// on the new one (its structs) and carried to the old.
+template <class P> struct Arg;
+template <class O, class N> void draw_pair(Draw& d, O& old, N& now) {
+  if constexpr (holds_value<std::remove_cv_t<O>>::value && !holds_value<std::remove_cv_t<N>>::value) {
+    draw(d, now);
+    carry(now, old);
+  } else {
+    draw(d, old);
+    carry(old, now);
+  }
+}
+
 // ---- the same, bit for bit ----
+template <class T> kern::logic::Value as_value(const T& x);
 template <class A, class B> bool same(const A& a, const B& b) {
   using X = std::remove_cv_t<A>;
   using Y = std::remove_cv_t<B>;
-  if constexpr (std::is_floating_point_v<X>) {
+  if constexpr (std::is_same_v<X, kern::logic::Value> && !std::is_same_v<Y, kern::logic::Value>) {
+    return converted::same_value(a, as_value(b));   // (a value of the Blueprint and the struct the new one holds)
+  } else if constexpr (std::is_same_v<X, kern::logic::Value> && std::is_same_v<Y, kern::logic::Value>) {
+    return converted::same_value(a, b);
+  } else if constexpr (std::is_floating_point_v<X>) {
     static_assert(std::is_same_v<X, Y>, "a number of another type");
     if constexpr (sizeof(X) == 4) return std::bit_cast<u32>(a) == std::bit_cast<u32>(b);
     else if constexpr (sizeof(X) == 8) return std::bit_cast<u64>(a) == std::bit_cast<u64>(b);
@@ -171,6 +259,10 @@ template <class A, class B> bool same(const A& a, const B& b) {
     return std::string_view(a) == std::string_view(b);
   } else if constexpr (std::is_same_v<X, const char*> && std::is_same_v<Y, const char*>) {
     return (a == nullptr) == (b == nullptr) && (a == nullptr || std::strcmp(a, b) == 0);
+  } else if constexpr (std::is_same_v<X, const char*> && is_text<Y>) {
+    return a != nullptr && std::string_view(a) == std::string_view(b);   // (a text by its characters, and the text)
+  } else if constexpr (is_text<X> && std::is_same_v<Y, const char*>) {
+    return b != nullptr && std::string_view(a) == std::string_view(b);
   } else if constexpr (is_vec<X> && std::is_same_v<X, Y>) {
     auto ca = components(a);
     auto cb = components(b);
@@ -192,6 +284,29 @@ template <class A, class B> bool same(const A& a, const B& b) {
     return true;
   } else if constexpr (is_optional<X>::value && is_optional<Y>::value) {
     return a.has_value() == b.has_value() && (!a || same(*a, *b));
+  } else if constexpr (is_pair<X>::value && is_pair<Y>::value) {
+    return same(a.first, b.first) && same(a.second, b.second);
+  } else if constexpr ((MapLike<X> && MapLike<Y>) || (SetLike<X> && SetLike<Y>)) {
+    if (a.size() != b.size()) return false;
+    if constexpr (Unordered<X> || Unordered<Y>) {
+      // (one keeps no order: every entry of the one is the other's - the keys are the program's own numbers and texts)
+      for (const auto& e : a) {
+        if constexpr (MapLike<X>) {
+          const auto it = b.find(static_cast<typename Y::key_type>(e.first));
+          if (it == b.end() || !same(e.first, it->first) || !same(e.second, it->second)) return false;
+        } else {
+          const auto it = b.find(static_cast<typename Y::key_type>(e));
+          if (it == b.end() || !same(e, *it)) return false;
+        }
+      }
+      return true;
+    } else {
+      auto ia = a.begin();
+      auto ib = b.begin();
+      for (; ia != a.end(); ++ia, ++ib)
+        if (!same(*ia, *ib)) return false;
+      return true;
+    }
   } else if constexpr (HasFields<X> && HasFields<Y>) {
     auto fa = fields(a);
     auto fb = fields(b);
@@ -222,6 +337,7 @@ template <class T> struct Arg<kern::Span<T>> {
 template <class T> struct Arg<const kern::Span<T>&> : Arg<kern::Span<T>> {};
 template <class T> struct Arg<const kern::Span<T>> : Arg<kern::Span<T>> {};
 template <class P> void draw(Draw& d, Arg<P>& a) { draw(d, a.v); }
+template <class P, class Q> void draw_pair(Draw& d, Arg<P>& o, Arg<Q>& n) { draw_pair(d, o.v, n.v); }
 template <class P, class Q> void carry(const Arg<P>& a, Arg<Q>& b) { carry(a.v, b.v); }
 template <class P, class Q> bool same(const Arg<P>& a, const Arg<Q>& b) { return same(a.v, b.v); }
 
@@ -305,6 +421,15 @@ template <class T, class F> constexpr F fits(F x) {
   return x;
 }
 
+/// A whole number made a value of an enum whose type is not fixed: one outside the range of its values marks the call.
+template <long long Lo, long long Hi, class N> constexpr N enum_fits(N x) {
+  if (static_cast<long long>(x) < Lo || static_cast<long long>(x) > Hi) {
+    converted::g_open = true;
+    return N{0};
+  }
+  return x;
+}
+
 // ---- a copy of bytes between places of lists (std::memcpy / std::memmove of the source): checked against the
 // lists the source names - a place outside a list, or more bytes than are there, marks the call ----
 struct Place {
@@ -321,6 +446,11 @@ template <class L> Place at_place(L&& list, long long k) {
   else return {list.data() + k, static_cast<std::size_t>(n - k) * sizeof(list.data()[0]), true};
 }
 template <class T> Place value_place(T& v) { return {&v, sizeof v, true}; }
+struct Region;
+inline std::vector<Region>& regions();
+/// The place a pointer of another kind names: in a list the test handed, up to its end; else the test does not know its
+/// room (it stands as it is - the sanitizers watch it).
+inline Place pointer_place(const void* p);
 inline void* copy(Place to, Place from, std::size_t n) {
   if (!to.there || !from.there || n > to.room || n > from.room) {
     converted::g_open = true;
@@ -336,6 +466,71 @@ inline void* move(Place to, Place from, std::size_t n) {
   return n ? std::memmove(const_cast<void*>(to.at), from.at, n) : const_cast<void*>(to.at);
 }
 
+// ---- the places the test hands the old text by a pointer (a list's first entry, one value): an entry by a pointer
+// is checked against them - one outside marks the call. A pointer into another place (a table of the file, a local
+// array) is not the test's: its entry stands as it is (the sanitizers watch it) ----
+struct Region {
+  const char* begin;
+  const char* end;
+};
+inline std::vector<Region>& regions() {
+  static std::vector<Region> r;
+  return r;
+}
+/// A place handed to the old text, for as long as the call runs.
+struct Placed {
+  template <class T> Placed(T* at, std::size_t n) {
+    const char* b = reinterpret_cast<const char*>(at);
+    regions().push_back({b, b + n * sizeof(T)});
+  }
+  ~Placed() { regions().pop_back(); }
+  Placed(const Placed&) = delete;
+  Placed& operator=(const Placed&) = delete;
+};
+inline Place pointer_place(const void* p) {
+  const char* a = static_cast<const char*>(p);
+  for (auto r = regions().rbegin(); r != regions().rend(); ++r)
+    if (a >= r->begin && a <= r->end) return {p, static_cast<std::size_t>(r->end - a), true};
+  return {p, static_cast<std::size_t>(-1), true};
+}
+template <class P, class I> P& entry(P* p, I k) {
+  const char* a = reinterpret_cast<const char*>(p);
+  for (auto r = regions().rbegin(); r != regions().rend(); ++r) {
+    if (a < r->begin || a > r->end) continue;
+    const long long at = static_cast<long long>((a - r->begin) / static_cast<long long>(sizeof(P))) + static_cast<long long>(k);
+    const long long n = static_cast<long long>((r->end - r->begin) / static_cast<long long>(sizeof(P)));
+    if (at < 0 || at >= n) {
+      converted::open_read();   // (marks the call - and gives it up when it goes on so: a loop to a length that is not there)
+      static std::remove_const_t<P> none{};
+      none = std::remove_const_t<P>{};
+      return none;
+    }
+    return p[k];
+  }
+  return p[k];
+}
+
+// ---- a value of the Blueprint (kern::logic::Value), as the old program handed one: what the engine makes of a value of
+// the program (kern::logic::ActorBlueprint's arguments - a flag, a whole number, a decimal, a vector, a text, an enum's
+// value, a plain struct of them, a list) ----
+template <class T> kern::logic::Value as_value(const T& x) {
+  using kern::logic::Value;
+  using U = std::remove_cvref_t<T>;
+  if constexpr (std::is_same_v<U, bool>) return Value::boolean(x);
+  else if constexpr (std::is_enum_v<U>) return Value::enumeration(static_cast<i64>(x));
+  else if constexpr (std::is_integral_v<U>) return Value::integer(static_cast<i64>(x));
+  else if constexpr (std::is_floating_point_v<U>) return Value::number(static_cast<f64>(x));
+  else if constexpr (is_vec<U>) return Value::vector(kern::Vec3(x));
+  else if constexpr (is_text<U>) return Value::text(std::string(x));
+  else if constexpr (is_vector<U>::value) {
+    std::vector<Value> items;
+    for (const auto& e : x) items.push_back(as_value(e));
+    return Value::structures(std::move(items));
+  } else {
+    return std::apply([](const auto&... f) { return Value::structure({as_value(f)...}); }, fields(const_cast<U&>(x)));
+  }
+}
+
 // ---- the world the two sides run in ----
 /// The logic each side's Blueprints of actors run in (the level's actors the file's ActorBlueprints name), and
 /// those actors' variables as they started: before every call both start there; after it they must be the same.
@@ -349,6 +544,13 @@ struct World {
     new_actors.keep(new_side, actors);
   }
   kern::logic::Runtime& logic(bool old) { return old ? old_side.rt : new_side.rt; }
+  /// The running Blueprint of an actor on one side (how the old program bound a file to it).
+  kern::logic::Instance* instance(bool old, const char* actor) {
+    kern::logic::Runtime& rt = logic(old);
+    kern::logic::Instance* i = rt.find(rt.host().find_actor(actor));
+    SC_CHECK(i != nullptr, "the actor %s has no running Blueprint", actor);
+    return i;
+  }
   void before() {
     old_actors.restore();
     new_actors.restore();
@@ -362,12 +564,24 @@ struct World {
   }
 };
 
+/// The rounds of the loops of a call: one that goes round more often than this is given up (not compared).
+inline long g_rounds = 0;
+inline constexpr long kRounds = 20000000;
+inline void tick() {
+  if (++g_rounds > kRounds && converted::g_can_bail) {
+    converted::g_can_bail = false;
+    converted::g_open = true;
+    std::longjmp(converted::g_bail, 1);
+  }
+}
+
 /// One side's call: run with the guards armed. False: C++ leaves open what it gives (a guard marked it, or
 /// it read outside a list so long that it was given up - converted::open_read). `asks`: how often it asked
 /// for memory.
 template <class F> bool run(F&& f, long& asks) {
   converted::g_open = false;
   converted::g_open_reads = 0;
+  g_rounds = 0;
   if (setjmp(converted::g_bail) != 0) {
     cost::end();
     converted::may_bail(false);
