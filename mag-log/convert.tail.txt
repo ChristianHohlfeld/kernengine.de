@@ -1,0 +1,80 @@
+tiles                           2 /    2 functions        2 /      2 lines
+    TileKey::operator== (1): written
+    TileKey::hash (1): written
+touch_play                     16 /   16 functions       16 /     16 lines
+    TouchPlay::right_inset (1): written
+    TouchPlay::move (1): written
+    TouchPlay::look (1): written
+    TouchPlay::move_live (1): written
+    TouchPlay::look_live (1): written
+    TouchPlay::look_edge (1): written
+    TouchPlay::fires (1): a name for a place - written where it is called
+    TouchPlay::drop_lifted (1): written
+    TouchPlay::clearance (1): written
+    TouchPlay::grenade_drag (1): written
+    TouchPlay::inject (1): written
+    TouchPlay::any (1): written
+    TouchPlay::buttons (1): a name for a place - written where it is called
+    TouchPlay::mode (1): written
+    TouchPlay::no_sticks (1): written
+    TouchPlay::add (1): written
+water_look                      1 /    1 functions        1 /      1 lines
+    WaterLook::name (1): written
+weapons                         2 /    2 functions        5 /      5 lines
+    spec (1): a name for a place - written where it is called
+    blast_factor (4): written
+world_art                       1 /    1 functions        1 /      1 lines
+    WorldArt::renderer (1): written
+world_marks                     1 /    1 functions        1 /      1 lines
+    Marks::stats (1): a name for a place - written where it is called
+world_traffic                   1 /    1 functions        1 /      1 lines
+    TrafficRules::junctions (1): a name for a place - written where it is called
+
+400 of 469 functions of the program are written as Blueprints (1737 of 4126 lines), and 11 of the engine's headers that they call: 55 Blueprints - 3 of source files, 1 of states, 51 of headers and of shapes
+348 functions of the Blueprints are compared with their source, bit for bit, by the tests in /dev/shm/spawncity-jobs-chris/work-zusammen-probe-235554-4594/pt/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+     1 (   268)   ctl_command() is defined in another file
+     7 (   265)   it calls CityStream::ground_height(), which waits
+     3 (   205)   gaps_riding() is defined in another file
+     2 (   183)   stars() is defined in another file
+     1 (   136)   vr_menu_json() is defined in another file
+     1 (   111)   it calls register_node(), which waits
+     3 (   104)   it calls decode_sbus(), which waits
+     1 (    99)   an object of the engine as a local that is not made by a constructor of it
+     1 (    98)   it calls Game::focus_position(), which waits
+     1 (    87)   look_begin() is defined in another file
+     1 (    86)   detach() is defined in another file
+     2 (    84)   combat_banner() is defined in another file
+     1 (    80)   the engine's shots() (its node is another one in the engine: its pins differ)
+     5 (    75)   put() is defined in another file
+     2 (    69)   it calls Game::clear_spot(), which waits
+     2 (    58)   it calls crc16_ccitt(), which waits
+     1 (    38)   ui_mix_cues() is defined in another file
+     1 (    37)   its test cannot compare it yet (the class Graph is not written)
+     1 (    34)   ground_ready() is defined in another file
+     1 (    34)   it calls Game::toggle_drone(), which waits
+     1 (    34)   it calls Game::spawn_guard_step(), which waits
+     2 (    32)   begin() is defined in another file
+     1 (    24)   explosion() is defined in another file
+     1 (    23)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no match for call to ‘(const converted_Arondight45_DroneFC_Core::converted_Arondight45_DroneFC_Core()::<lambda(const std::vector<unsigned char>&, long long int&, converted_Arondight45_DroneFC_Core::fc)
+     1 (    18)   an object of the engine (NodeDef) copied or moved as a whole
+     1 (    18)   gaps_seat_press() is defined in another file
+     1 (    14)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no match for call to ‘(const converted_Arondight45_HardwareSensors::converted_Arondight45_HardwareSensors()::<lambda(const std::vector<unsigned char>&, long long int&, converted_Arondight45_HardwareSe)
+     1 (    13)   ui_render_music() is defined in another file
+     1 (    11)   init() is defined in another file
+     1 (    10)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no match for call to ‘(const converted_Arondight45_HardwareSensors::converted_Arondight45_HardwareSensors()::<lambda(const std::vector<unsigned char>&, long long int&, long unsigned int&)>) (std::vect)
+     1 (     7)   kill() is defined in another file
+     1 (     5)   it calls encode_navigation_wire(), which waits
+     5 (     5)   input() is defined in another file
+     1 (     4)   the end of a Ragdolls runs its destructor ~Ragdolls(), which is not written yet
+     1 (     4)   it calls Game::player_position(), which waits
+     1 (     4)   the state of the Blueprint Game (its one object is that Blueprint, no value)
+     1 (     3)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no match for call to ‘(const converted_Arondight45_HardwareSensors::converted_Arondight45_HardwareSensors()::<lambda(const std::vector<unsigned char>&, long long int&)>) (std::vector<unsigned char>&, )
+     2 (     2)   find() is defined in another file
+     1 (     1)   it calls Devices::key(), which waits
+     1 (     1)   CityStream() is defined in another file
+
+real	6m50,124s
+user	17m51,675s
+sys	1m6,718s
