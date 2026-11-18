@@ -160,6 +160,7 @@ struct World : converted::EngineObject {
 namespace mvt { enum class GeomType : u8 { unknown = 0, point = 1, line = 2, polygon = 3 }; }
 namespace mvt { namespace Value { enum class Kind : u8 { none, string, number, boolean }; } }
 enum class RoadClass : u8 { motorway, trunk, primary, secondary, tertiary, minor, service, track, path, pedestrian, river, canal, stream };
+enum class AreaKind : u8 { water, park, wood, grass, sand, pitch };
 struct Ragdolls {
  public:
   enum Bone : u8 { pelvis, chest, head, upper_arm_l, upper_arm_r, lower_arm_l, lower_arm_r, thigh_l, thigh_r, shin_l, shin_r, kBones };
@@ -220,7 +221,24 @@ struct Ragdolls {
   u32 max_ = 10, spawned_ = 0;
   i32 group_ = 0;
 };
-namespace LifeOut { enum class Sound : u8 { moo, moo_pain, coo, flap, squawk, thud, stomp, stomp_accent, jingle, horn, horn_bus, scream, scream_f, dog, cat, hiss, yowl, screech, kCount }; }
+struct LifeOut {
+  enum class Sound : u8 { moo, moo_pain, coo, flap, squawk, thud, stomp, stomp_accent, jingle, horn, horn_bus, scream, scream_f, dog, cat, hiss, yowl, screech, kCount };
+  struct Play { Sound sound; Vec3 at; f32 volume, pitch; };
+  struct Say { std::string text; f32 pitch = 1, rate = 1, volume = 1, delay = 0; };  // browser speech (de-DE)
+  struct Bubble { Vec3 at; std::string text; std::string mood; f32 until; };
+  struct Impulse { i32 car; Vec3 impulse; };
+  struct Burst { Vec3 at; Vec3 color; };
+  std::vector<Play> sounds;
+  std::vector<Say> speech;
+  std::vector<Impulse> impulses;
+  std::vector<Burst> bursts;
+  std::string banner;   // big call-out (jogger streak)
+  f32 banner_for = 0;
+  bool kill_player = false;  // the black cat got him
+  struct CowDeath { Vec3 at, impulse; };
+  std::vector<CowDeath> cow_deaths;  // for the other players (cows.mjs sendDeath)
+  void clear() { sounds.clear(); speech.clear(); impulses.clear(); bursts.clear(); banner.clear(); banner_for = 0; kill_player = false; cow_deaths.clear(); }
+};
 struct Life {
  public:
   struct Cow {
@@ -448,6 +466,83 @@ struct Life {
 #undef protected
 #pragma GCC diagnostic pop
 
+[[maybe_unused]] static LifeOut::Play draw_LifeOut__Play(converted::Draw& draw) {
+  LifeOut::Play s{};
+  s.sound = static_cast<LifeOut::Sound>(draw.below(19));
+  s.at = draw.vector();
+  s.volume = draw.number();
+  s.pitch = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const LifeOut::Play& s) { return converted::Value::structure({arg(s.sound), arg(s.at), arg(s.volume), arg(s.pitch)}); }
+[[maybe_unused]] static bool same(const LifeOut::Play& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.sound, (*got.rows)[0]) && same(want.at, (*got.rows)[1]) && same(want.volume, (*got.rows)[2]) && same(want.pitch, (*got.rows)[3]); }
+[[maybe_unused]] static bool defined(const LifeOut::Play& s) { return defined(s.sound) && defined(s.at) && defined(s.volume) && defined(s.pitch); }
+[[maybe_unused]] static std::string text(const LifeOut::Play& s) { return std::string("{") + text(s.sound) + ", " + text(s.at) + ", " + text(s.volume) + ", " + text(s.pitch) + "}"; }
+[[maybe_unused]] static void take(LifeOut::Play& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<LifeOut::Sound>(s.sound, (*v.rows)[0]); converted::take_as<Vec3>(s.at, (*v.rows)[1]); converted::take_as<double>(s.volume, (*v.rows)[2]); converted::take_as<double>(s.pitch, (*v.rows)[3]); }
+[[maybe_unused]] static LifeOut::Say draw_LifeOut__Say(converted::Draw& draw) {
+  LifeOut::Say s{};
+  s.text = draw.word();
+  s.pitch = draw.number();
+  s.rate = draw.number();
+  s.volume = draw.number();
+  s.delay = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const LifeOut::Say& s) { return converted::Value::structure({arg(s.text), arg(s.pitch), arg(s.rate), arg(s.volume), arg(s.delay)}); }
+[[maybe_unused]] static bool same(const LifeOut::Say& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.text, (*got.rows)[0]) && same(want.pitch, (*got.rows)[1]) && same(want.rate, (*got.rows)[2]) && same(want.volume, (*got.rows)[3]) && same(want.delay, (*got.rows)[4]); }
+[[maybe_unused]] static bool defined(const LifeOut::Say& s) { return defined(s.text) && defined(s.pitch) && defined(s.rate) && defined(s.volume) && defined(s.delay); }
+[[maybe_unused]] static std::string text(const LifeOut::Say& s) { return std::string("{") + text(s.text) + ", " + text(s.pitch) + ", " + text(s.rate) + ", " + text(s.volume) + ", " + text(s.delay) + "}"; }
+[[maybe_unused]] static void take(LifeOut::Say& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<std::string>(s.text, (*v.rows)[0]); converted::take_as<double>(s.pitch, (*v.rows)[1]); converted::take_as<double>(s.rate, (*v.rows)[2]); converted::take_as<double>(s.volume, (*v.rows)[3]); converted::take_as<double>(s.delay, (*v.rows)[4]); }
+[[maybe_unused]] static LifeOut::Impulse draw_LifeOut__Impulse(converted::Draw& draw) {
+  LifeOut::Impulse s{};
+  s.car = static_cast<int>(draw.whole());
+  s.impulse = draw.vector();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const LifeOut::Impulse& s) { return converted::Value::structure({arg(s.car), arg(s.impulse)}); }
+[[maybe_unused]] static bool same(const LifeOut::Impulse& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.car, (*got.rows)[0]) && same(want.impulse, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const LifeOut::Impulse& s) { return defined(s.car) && defined(s.impulse); }
+[[maybe_unused]] static std::string text(const LifeOut::Impulse& s) { return std::string("{") + text(s.car) + ", " + text(s.impulse) + "}"; }
+[[maybe_unused]] static void take(LifeOut::Impulse& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<int>(s.car, (*v.rows)[0]); converted::take_as<Vec3>(s.impulse, (*v.rows)[1]); }
+[[maybe_unused]] static LifeOut::Burst draw_LifeOut__Burst(converted::Draw& draw) {
+  LifeOut::Burst s{};
+  s.at = draw.vector();
+  s.color = draw.vector();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const LifeOut::Burst& s) { return converted::Value::structure({arg(s.at), arg(s.color)}); }
+[[maybe_unused]] static bool same(const LifeOut::Burst& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.at, (*got.rows)[0]) && same(want.color, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const LifeOut::Burst& s) { return defined(s.at) && defined(s.color); }
+[[maybe_unused]] static std::string text(const LifeOut::Burst& s) { return std::string("{") + text(s.at) + ", " + text(s.color) + "}"; }
+[[maybe_unused]] static void take(LifeOut::Burst& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<Vec3>(s.at, (*v.rows)[0]); converted::take_as<Vec3>(s.color, (*v.rows)[1]); }
+[[maybe_unused]] static LifeOut::CowDeath draw_LifeOut__CowDeath(converted::Draw& draw) {
+  LifeOut::CowDeath s{};
+  s.at = draw.vector();
+  s.impulse = draw.vector();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const LifeOut::CowDeath& s) { return converted::Value::structure({arg(s.at), arg(s.impulse)}); }
+[[maybe_unused]] static bool same(const LifeOut::CowDeath& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.at, (*got.rows)[0]) && same(want.impulse, (*got.rows)[1]); }
+[[maybe_unused]] static bool defined(const LifeOut::CowDeath& s) { return defined(s.at) && defined(s.impulse); }
+[[maybe_unused]] static std::string text(const LifeOut::CowDeath& s) { return std::string("{") + text(s.at) + ", " + text(s.impulse) + "}"; }
+[[maybe_unused]] static void take(LifeOut::CowDeath& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<Vec3>(s.at, (*v.rows)[0]); converted::take_as<Vec3>(s.impulse, (*v.rows)[1]); }
+[[maybe_unused]] static LifeOut draw_LifeOut(converted::Draw& draw) {
+  LifeOut s{};
+  s.sounds = draw_list(draw, [&]() -> LifeOut::Play { return draw_LifeOut__Play(draw); });
+  s.speech = draw_list(draw, [&]() -> LifeOut::Say { return draw_LifeOut__Say(draw); });
+  s.impulses = draw_list(draw, [&]() -> LifeOut::Impulse { return draw_LifeOut__Impulse(draw); });
+  s.bursts = draw_list(draw, [&]() -> LifeOut::Burst { return draw_LifeOut__Burst(draw); });
+  s.banner = draw.word();
+  s.banner_for = draw.number();
+  s.kill_player = draw.flag();
+  s.cow_deaths = draw_list(draw, [&]() -> LifeOut::CowDeath { return draw_LifeOut__CowDeath(draw); });
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const LifeOut& s) { return converted::Value::structure({arg(s.sounds), arg(s.speech), arg(s.impulses), arg(s.bursts), arg(s.banner), arg(s.banner_for), arg(s.kill_player), arg(s.cow_deaths)}); }
+[[maybe_unused]] static bool same(const LifeOut& want, const converted::Value& got) { return got.rows && got.rows->size() == 8 && same(want.sounds, (*got.rows)[0]) && same(want.speech, (*got.rows)[1]) && same(want.impulses, (*got.rows)[2]) && same(want.bursts, (*got.rows)[3]) && same(want.banner, (*got.rows)[4]) && same(want.banner_for, (*got.rows)[5]) && same(want.kill_player, (*got.rows)[6]) && same(want.cow_deaths, (*got.rows)[7]); }
+[[maybe_unused]] static bool defined(const LifeOut& s) { return defined(s.sounds) && defined(s.speech) && defined(s.impulses) && defined(s.bursts) && defined(s.banner) && defined(s.banner_for) && defined(s.kill_player) && defined(s.cow_deaths); }
+[[maybe_unused]] static std::string text(const LifeOut& s) { return std::string("{") + text(s.sounds) + ", " + text(s.speech) + ", " + text(s.impulses) + ", " + text(s.bursts) + ", " + text(s.banner) + ", " + text(s.banner_for) + ", " + text(s.kill_player) + ", " + text(s.cow_deaths) + "}"; }
+[[maybe_unused]] static void take(LifeOut& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 8) return; converted::take_as<std::vector<LifeOut::Play>>(s.sounds, (*v.rows)[0]); converted::take_as<std::vector<LifeOut::Say>>(s.speech, (*v.rows)[1]); converted::take_as<std::vector<LifeOut::Impulse>>(s.impulses, (*v.rows)[2]); converted::take_as<std::vector<LifeOut::Burst>>(s.bursts, (*v.rows)[3]); converted::take_as<std::string>(s.banner, (*v.rows)[4]); converted::take_as<double>(s.banner_for, (*v.rows)[5]); converted::take_as<bool>(s.kill_player, (*v.rows)[6]); converted::take_as<std::vector<LifeOut::CowDeath>>(s.cow_deaths, (*v.rows)[7]); }
 [[maybe_unused]] static Life::LooseBird draw_Life__LooseBird(converted::Draw& draw) {
   Life::LooseBird s{};
   s.id = static_cast<int>(draw.whole());
@@ -884,6 +979,25 @@ struct Out_Life_animal_of { unsigned char Result; u64 id; };
 
 SC_TEST(converted_life) {
   converted::Blueprint bp("life");
+  {  // LifeOut::clear
+    converted::Tally tally("LifeOut_clear");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] LifeOut a0) { converted::counted([&] { return a0.clear(); }); return a0; };
+    for (int i = 0; tally.more(i); ++i) {
+      LifeOut a0 = draw_LifeOut(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      const auto made = run(std::move(a0));
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
   {  // Life::trees_down
     converted::Tally tally("Life_trees_down");
     converted::Draw draw;   // (every function its own arguments, the same in every run)

@@ -736,13 +736,13 @@ void CityStream::exclude_building(u64 tile, i32 index) {
   if (tile == excl_tile_ && index == excl_index_) return;
   if (excl_tile_) {
     auto it = tiles_.find(excl_tile_);
-    if (it != tiles_.end()) { it->second->skip = -1; recollide(*it->second); }
+    if (it != tiles_.end()) { converted::present(it->second)->skip = -1; recollide(*converted::present(it->second)); }
   }
   excl_tile_ = tile;
   excl_index_ = tile ? index : -1;
   if (tile) {
     auto it = tiles_.find(tile);
-    if (it != tiles_.end()) { it->second->skip = index; recollide(*it->second); }
+    if (it != tiles_.end()) { converted::present(it->second)->skip = index; recollide(*converted::present(it->second)); }
   }
 }
 constexpr f32 kActivate = 30, kDoorsRadius = 95, kDoorW = 1.8;
@@ -1657,10 +1657,6 @@ struct Out_door_gap { bool Result; double t0; double t1; };
 [[maybe_unused]] static bool same(const Out_door_gap& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Result, (*got.rows)[0]) && same(want.t0, (*got.rows)[1]) && same(want.t1, (*got.rows)[2]); }
 [[maybe_unused]] static bool defined(const Out_door_gap& s) { return defined(s.Result) && defined(s.t0) && defined(s.t1); }
 [[maybe_unused]] static std::string text(const Out_door_gap& s) { return std::string("{") + text(s.Result) + ", " + text(s.t0) + ", " + text(s.t1) + "}"; }
-struct Out_Interiors_doors_of { std::vector<Vec2> Self; std::vector<Interiors::Door> Result; };
-[[maybe_unused]] static bool same(const Out_Interiors_doors_of& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
-[[maybe_unused]] static bool defined(const Out_Interiors_doors_of& s) { return defined(s.Self) && defined(s.Result); }
-[[maybe_unused]] static std::string text(const Out_Interiors_doors_of& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Interiors_release { Interiors Self; CityStream city; };
 [[maybe_unused]] static bool same(const Out_Interiors_release& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.city, (*got.rows)[1]); }
 [[maybe_unused]] static bool defined(const Out_Interiors_release& s) { return defined(s.Self) && defined(s.city); }
@@ -2070,7 +2066,7 @@ SC_TEST(converted_interiors_cpp) {
   {  // Interiors::doors_of
     converted::Tally tally("Interiors_doors_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] double a1) { auto r = converted::counted([&] { return Interiors::doors_of(a0, std::move(a1)); }); return Out_Interiors_doors_of{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] double a1) { return converted::counted([&] { return Interiors::doors_of(a0, std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       double a1 = draw.number();
@@ -2084,7 +2080,7 @@ SC_TEST(converted_interiors_cpp) {
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Interiors::clear
@@ -2172,7 +2168,7 @@ SC_TEST(converted_interiors_cpp) {
     const auto run = [&]([[maybe_unused]] Interiors a0, [[maybe_unused]] std::string a1) { converted::counted([&] { return a0.hud(a1); }); return a1; };
     for (int i = 0; tally.more(i); ++i) {
       Interiors a0 = draw_Interiors(draw);
-      std::string a1 = draw.word();
+      std::string a1 = draw.said_word({"true", "false"});
       const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
@@ -2192,9 +2188,9 @@ SC_TEST(converted_interiors_cpp) {
     const auto run = [&]([[maybe_unused]] Interiors a0, [[maybe_unused]] std::string a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] std::string a3, [[maybe_unused]] std::optional<Vec3> a4) { auto r = converted::counted([&] { return a0.command(a1, std::move(a2), a3, a4); }); return Out_Interiors_command{std::move(a0), std::move(r), std::move(a3), std::move(a4)}; };
     for (int i = 0; tally.more(i); ++i) {
       Interiors a0 = draw_Interiors(draw);
-      std::string a1 = draw.word();
+      std::string a1 = draw.said_word({"interior", "true", "false", "no building", "interior door", "interior in", "interior up", "interior roof", "no stairs", "no roof access", "?"});
       Vec3 a2 = draw.vector();
-      std::string a3 = draw.word();
+      std::string a3 = draw.said_word({"interior", "true", "false", "no building", "interior door", "interior in", "interior up", "interior roof", "no stairs", "no roof access", "?"});
       std::optional<Vec3> a4 = converted::draw_maybe<std::optional<Vec3>>(draw, [&]() -> Vec3 { return draw.vector(); });
       const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a3), arg(a4), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;

@@ -8,7 +8,6 @@
 #include <type_traits>
 #include <vector>
 #include <algorithm>
-#include <chrono>
 #include <cstdint>
 #include "../../src/game.h"
 #include "../../src/game_life.h"
