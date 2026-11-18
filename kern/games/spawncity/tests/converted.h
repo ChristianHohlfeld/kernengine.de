@@ -353,6 +353,10 @@ template <class Make> auto draw_list(Draw& draw, Make make) {
   if constexpr (std::is_arithmetic_v<decltype(make())>) {
     if (draw.below(5) == 0) n = 300 + draw.below(300);
   }
+  // (as long as it is, no room to spare: a list the class is given from a Value is that, and a function that
+  // appends - put_i32 into the bytes - asks for memory where the class does; spare room on the source's side
+  // only would hide that ask - a cost line that is the test's, not the class's)
+  out.reserve(n);
   for (; n > 0; --n) out.push_back(make());
   return out;
 }
