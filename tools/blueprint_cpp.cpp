@@ -6,7 +6,8 @@
 //   tools/blueprint_cpp.sh --node-names                  (the names the nodes have in a Blueprint's C++)
 //   tools/blueprint_cpp.sh --classes <level.klevel> <out.h> <actor> [<actor> ...]
 //                                                        (only the classes of these actors' Blueprints and of the
-//                                                        libraries they use, without glue, named in the namespace
+//                                                        libraries they use, without glue (only how their structs are
+//                                                        held as values), named in the namespace
 //                                                        `blueprints`: what a program that calls them directly, or a
 //                                                        measurement of them (tools/blueprint_bench.sh), compiles)
 //
@@ -306,7 +307,7 @@ int main(int argc, char** argv) {
       continue;
     }
     std::string code, glue;
-    if (!logic::to_cpp(g, cls, code, &error) || (!classes_only && !logic::native_glue(g, cls, glue, &error, logic::library(), space, all))) {
+    if (!logic::to_cpp(g, cls, code, &error) || !logic::native_glue(g, cls, glue, &error, logic::library(), space, all, classes_only)) {
       std::fprintf(stderr, "%s: the Blueprint of %s: %s\n", argv[1], owner.c_str(), error.c_str());
       return 1;
     }

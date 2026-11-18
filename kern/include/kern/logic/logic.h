@@ -1045,8 +1045,11 @@ inline void native_call(bool begins) {
 /// `space`: the namespace the class stands in (the glue is written into it too), empty: none.
 /// `all`: the Blueprints of the project, for a Blueprint that uses libraries - it is registered
 /// under the hash of the one graph it is with them (logic::link), as Runtime::add looks it up.
+/// `held_only`: only how the class's structs are held as values (detail::Held) - what its text
+/// needs to compile in a program that calls the class directly, without registering it
+/// (tools/blueprint_cpp --classes).
 bool native_glue(const Graph& g, const std::string& name, std::string& out, std::string* error = nullptr, const Library& lib = library(), std::string_view space = {},
-                 const Blueprints& all = {});
+                 const Blueprints& all = {}, bool held_only = false);
 
 struct NodeState {           // per node instance: Do Once, Gate, Flip Flop, loops, latent waits
   f64 time = 0, a = 0, b = 0;
