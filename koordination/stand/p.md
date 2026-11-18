@@ -1,9 +1,63 @@
-# Stand Paket p (Leistung der exportierten Klasse) – 18.11.2026, 21:35
+# Stand Paket p (Leistung der exportierten Klasse) – 18.11.2026, 22:25
 
-Zweig work-p, letzter Commit 7aacebf (gepusht; origin/work-zusammen 8874e79 eingemischt).
-IN ARBEIT: Beweis für a–c läuft auf mag (`work-p-engine-212302-7164`, engine auf 7aacebf, Start 21:23). Danach: Spiel-Suite-Probe,
-die neuen cost:-Zeilen („instead of 0“, $S/t1/suite203000_cost_note.txt), Entwurf zu E, Zeit-Test.
+Zweig work-p, letzter Commit 133bb742 (gepusht; origin/work-zusammen 8844531a eingemischt, f647f5e0).
+IN ARBEIT / WARTET AUF mag: `work-p-engine-212302-7164` (a–c, 7aacebf), `work-p-engine-221509-17831` + `work-p-probe-221512-17868` (E2.1, 2416329).
+Entscheidungen 21:50 (PAKET3_p.md) umgesetzt: E2.1 (95ada08, 2416329), E2.2 (e7538f1), Zeit-Test (133bb74). Offen: E3-A (Aufrufweg), Beweise.
 
+## Nach Nachtrag 21:50
+- **E2.1** Formel ganzer Zahlen: `whole` steht in der Funktions-Tabelle (formula.cpp `Fn::whole`, band…mul32), `Formula::whole()` (Wurzel eine solche
+  Funktion, jeder Eingang nur Argument einer solchen). Schreiber: `[](Int a) -> Int` + Ints ohne kern::to, wenn jeder Eingang ein Draht von einem Int ist.
+  Leser: Int-Form nur bei Formula::whole, nur Drähte von Ints, kein kern::to, keine geschriebene Zahl (7 Lesefehler-Tests in test_main.cpp, lokal
+  geprüft: alle abgelehnt mit dem erwarteten Text). Klasse: Int → Bits über `bits_of(Whole)` = bits_of(Exact); `-> Int` = Whole(Exact) = normal;
+  `kern::formula` gibt bei Int-Lambda `Exact`. Engine-Fall `formula_whole_ints` (23 Int-Randwerte inkl. ±(2^63−1), 2^62, Schiebeweiten 31..65; W als Int,
+  R als 64 Bit); Fixpunkt to_cpp→from_cpp→to_cpp lokal gleich (und im Suite-Test logic_notation_tier_cases für jeden Fall). Doku blueprint_cpp.md „Formeln“.
+  +, −, × (zweiter Schritt) noch nicht gebaut.
+- **E2.2** `O = text_append(std::move(O), x, "")`: `NodeDef::takes_first` (beim Knoten Append), Regel `taken_first` in notation.cpp (ein Leser, der Set derselben
+  Variable als Ganzes; die gelesene var.get nur von diesem Wert gelesen). Engine-Fall `append_in_place` (auch T + T), Fixpunkt lokal gleich, Doku.
+- **Zeit-Test** `tools/blueprint_bench.sh <level> --check 1.10`: Bestzeiten im Wechsel. Drei Läufe desselben Programms: Spanne des Verhältnisses der
+  Bestzeiten im Mittel 1,7 %, höchstens 6,0 %; des Medians im Mittel 2,8 %, höchstens 15 % → Bestzeiten, Grenze 1,10 (6 % + Rand). Heute 25 von 29
+  Fällen darüber (rc=1) – läuft als Bericht, nicht in der CI.
+- **E3-C (Firmware Arondight45_*):** `FirmwareRuntime_new` legt `fc_Filters{List<fc_PT1>{…3 Einträge…}, …}` an – die Felder sind Listen variabler Länge
+  (std::vector, Speicher) wo die Quelle feste Arrays hat; die Sprache hat Listen fester Länge (`Fixed<T, N>`, blueprint_cpp.md „Plätze“). Ursache:
+  wie der Konverter die Felder typt (Paket Konverter), nicht die Klasse. BEFUND FÜR den Konverter.
+- **E3-A Plan** (noch nicht gebaut): func_call_on baut `std::vector<Value>` für Argumente und Ergebnisse, Runtime::call_on dazu `results` (from_json) und
+  `got`; Instance::call füllt `got`. Null Anforderungen: Argumente als `std::span<const Value>` aus einem `std::array` auf dem Stapel, Ergebnisse in einen
+  Puffer fester Größe (die Zahl der Ausgänge ist bekannt), Runtime::call_on/Instance::call auf Span umstellen (alle Aufrufer in logic.cpp mit).
+
+## Messung nach E2.1 + E2.2 (Verhältnis Klasse/C++)
+| Fall | nach a–c (med) | nach E2.1+E2.2: min | med | Klasse µs (min) | C++ µs (min) |
+|---|---|---|---|---|---|
+| qr_encode | 14.40 | 4.99 | 5.01 | 134.91 | 27.04 |
+| qr_gf_mul | 18.53 | 3.46 | 3.43 | 5.16 | 1.49 |
+| qr_rs_remainder | 17.98 | 5.10 | 5.11 | 267.43 | 52.48 |
+| nostr_sha256 | 14.15 | 12.80 | 12.49 | 39.39 | 3.08 |
+| nostr_mulm | 7.53 | 6.56 | 6.30 | 252.55 | 38.53 |
+| nostr_from_hex | 5.54 | 6.04 | 5.52 | 6.88 | 1.14 |
+| common_rng_next | 12.87 | 2.18 | 2.34 | 1.13 | 0.52 |
+| tiles_key_hash | 1.68 | 1.02 | 1.07 | 0.46 | 0.45 |
+| lamps_grid_key | 1.37 | 1.38 | 1.29 | 1.02 | 0.74 |
+| mvt_zigzag | 1.00 | 1.00 | 1.01 | 0.45 | 0.45 |
+| mvt_read_geometry | 2.69 | 2.56 | 2.43 | 4.39 | 1.71 |
+| wire_put_u32 | 1.53 | 1.53 | 1.52 | 4.24 | 2.77 |
+| wire_get_u32 | 3.95 | 3.91 | 3.89 | 1.38 | 0.35 |
+| settings_escape | 9.02 | 7.56 | 7.51 | 14.49 | 1.92 |
+| settings_num | 1.29 | 1.26 | 1.26 | 13.78 | 10.97 |
+| common_wrap_pi | 1.85 | 1.23 | 1.28 | 0.66 | 0.54 |
+| common_damp_alpha | 1.05 | 1.03 | 1.04 | 1.48 | 1.44 |
+| common_qnormalize | 1.20 | 1.19 | 1.20 | 1.99 | 1.67 |
+| common_slerp | 1.19 | 1.20 | 1.19 | 14.88 | 12.45 |
+| common_to_local | 1.33 | 1.33 | 1.32 | 4.15 | 3.11 |
+| common_rng_unit | 10.52 | 1.75 | 1.78 | 1.14 | 0.65 |
+| person_hit | 1.72 | 1.44 | 1.46 | 18.38 | 12.74 |
+| person_sphere | 0.92 | 0.84 | 0.97 | 1.60 | 1.92 |
+| wire_put_f32 | 1.54 | 1.51 | 1.64 | 4.21 | 2.78 |
+| mvt_ring_area | 4.22 | 3.51 | 3.49 | 0.77 | 0.22 |
+| perf_governor | 1.43 | 1.45 | 1.44 | 1.88 | 1.30 |
+| audio_render | 1.43 | 1.37 | 1.39 | 140.32 | 102.78 |
+| lamps_place_road | 1.19 | 1.17 | 1.17 | 4.31 | 3.70 |
+| lamps_near | 3.02 | 2.59 | 2.62 | 31.05 | 12.01 |
+
+## Früher (bis 21:35)
 ## Commits
 - f50c07d Messwerkzeug `tools/blueprint_bench.sh <level> [runden] [fall…]` + kern/games/spawncity/tests/bench/ (29 Fälle, Quelle gegen Klasse,
   clang-18 `-O3 -flto=thin -DNDEBUG -ffp-contract=off -fno-exceptions -fno-rtti`, Klassen per `tools/blueprint_cpp.sh --classes`; Prüfsummen

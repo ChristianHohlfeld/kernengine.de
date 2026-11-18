@@ -712,3 +712,23 @@ mag rechnet unabhängig weiter (der volle Lauf `work-voll-162644-5528` seit 17:3
 - **~21:30 Neustart des Servers hinter der Sitzung:** t1, t2, p wurden abgebrochen (nicht von Chris gestoppt) und per SendMessage aus ihrem Verlauf fortgesetzt
   (das geht in diesem Fall – anders als bei den um 17:50 vom Nutzer gestoppten). Aufträge auf mag liefen weiter. Nächste Kontrolle 22:02 (Auswertung von „alle“).
 
+### 16.14 Stand 22:30 – „Just decide and do it“: Auftragsart „vergleich“, k und d-Nachfolger gestartet, Entscheidungen E4–E6
+- **Chris, 22:16: „Just decide and do it“** (auf die Fragen nach Quote / k / Nachfolger d). Der Koordinator entscheidet also selbst über Starts und Entwürfe;
+  Maß bleibt die Quote (Stand unbekannt, zuletzt 36 % um 17:56) – nicht mehr als fünf Agenten zugleich, g1/g2/f1/f2 nicht einzeln (ihr Rest liegt bei k), c nach d, s5 nach p.
+- **Der eigentliche Engpass war der Beweis-Takt:** eine Probe belegt keine Werte (nur dass der Test übersetzt) – Bit für Bit zeigte bisher erst ein voller Lauf (~45–60 min,
+  nur der Koordinator). **Neu: `./mag.sh vergleich <ref> <quellen…>`** (lauf2.sh 310cfd47): Konverter über diese Quelltexte auf dem Level des letzten gültigen vollen
+  Laufs (Datei `grundlage` im Zweig mag/auftrag nennt dessen Ergebnis-Zweig – **nach jedem gültigen vollen Lauf nachführen**), dann werden nur ihre Tests gebaut und
+  laufen jeder für sich, gegen den Stellvertreter und gegen die Engine selbst, je höchstens 20 min. Ergebnis wie bei „alle“. Regel für alle Agenten
+  (PAKET_COMMON3.md, Nachtrag 22:25): ein Fix an einer Abweichung ist erst belegt, wenn `vergleich` in beiden Durchgängen keine Abweichung mehr nennt.
+  Erster Auftrag: `work-zusammen-vergleich-222045-20677` (destruction, city_stream auf 8844531a – prüft ds earcut-Fix Bit für Bit; noch ungeprüft, ob die Auftragsart
+  selbst sauber durchläuft: beim ersten Ergebnis ansehen).
+- **„alle“ erkennt Abbrüche jetzt an der fehlenden Summenzeile** („N tests, M checks“; ASan endet mit 1 wie ein Fehlschlag) und begrenzt jeden Lauf auf 20 min (Hänger →
+  „ZEIT“). Der Lauf `…-alle-212005-5593` (alte Fassung, ohne Zeitgrenze) war um 22:17 nach 57 min noch nicht fertig – mag war überbucht (zehn Aufträge, ~100 Threads
+  auf 56); hängt er, neu ablegen (neue Fassung). **mag-Regel:** keine Probe über alle Quelltexte mehr, höchstens ein eigener Auftrag je Agent.
+- **Gestartet 22:27 (Opus 5.5, mittlere Stufe):** **k** – neuer Auftrag „Regeln des Konverters, die die Spiel-Suite rot machen“ (Gruppen 4–7, danach die Liste aus
+  „alle“; PAKET3_k.md Nachtrag 22:25); **d, Nachfolger 3** – Platz der Engine beweisen (instanziieren, Engine-Tests, mag, CI) und Schritte 5–7 (PAKET3_d.md Nachtrag 22:25).
+  Laufen weiter: t1, t2, p. IDs in /home/claude/agenten.txt.
+- **Entscheidungen E4–E6 für p (21:50, PAKET3_p.md):** ganzzahlige Formel `[](Int s) -> Int` JA (Eigenschaft steht bei der Formel-Funktion; Beweis drei Stufen an den
+  Rändern, Fixpunkt); Weitergabe beim Anhängen JA; `at_known` zurückgestellt; Aufrufweg an einen Actor darf p ändern (Text/Bedeutung unverändert); Zeit-Test ohne
+  Ausnahmeliste, bis dahin Bericht. Gemessen von p: Ganzzahl-Fälle 10–18× langsamer als das C++, Ursache Float-Grenze der Formel (Projektion 25,1 → 2,8 ns, C++ 1,85 ns).
+
