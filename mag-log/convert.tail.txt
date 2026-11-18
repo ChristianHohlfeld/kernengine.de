@@ -1,0 +1,80 @@
+    PingBoard::expire (1): written
+    PingBoard::fade (1): written
+net_session_cpp                67 /   67 functions      914 /    914 lines
+    config (13): written
+    sane (1): written
+    pack_swarm (20): written
+    unpack_swarm (26): written
+    pack_swarm_hit (9): written
+    unpack_swarm_hit (8): written
+    pack_hit (10): written
+    unpack_hit (5): written
+    pack_fx (9): written
+    unpack_fx (5): written
+    pack (27): written
+    unpack (17): written
+    Session::host (14): written
+    Session::join (12): written
+    Session::stop (14): written
+    Session::connected (4): written
+    Session::host_lost (5): written
+    Session::successor (7): written
+    Session::set_origin (10): written
+    Session::origin (6): written
+    Session::remote_index (4): written
+    Session::roster (7): written
+    Session::color_of (8): written
+    Session::index_of (7): written
+    Session::protected_now (4): written
+    Session::focus_of (7): written
+    Session::hp_of (7): written
+    Session::refused (4): written
+    Session::to_client (4): written
+    Session::to_all (6): written
+    Session::to_host (4): written
+    Session::send_fx (5): written
+    Session::send_swarm (13): written
+    Session::swarm_part (27): written
+    Session::town_to_host (3): written
+    Session::town_to_all (3): written
+    Session::town_to (3): written
+    Session::send_world (3): written
+    Session::send_world_to (3): written
+    Session::send_proj (9): written
+    Session::send_toss (9): written
+    Session::destroy_to_host (3): written
+    Session::destroy_to_all (3): written
+    Session::destroy_to (3): written
+    Session::send_swarm_hit (5): written
+    Session::request_hit (5): written
+    Session::report_death (8): written
+    Session::report_respawn (1): written
+    Session::send_ping (9): written
+    Session::send_voice (9): written
+    Session::propose_rule (8): written
+    Session::vote (10): written
+    Session::judge (17): written
+    Session::send_scores (6): written
+    Session::send_rules (6): written
+    Session::set_world_rules (7): written
+    Session::send_anchor (13): written
+    Session::begin_ballot (14): written
+    Session::finish_ballot (10): written
+    Session::seat_request (10): written
+    Session::judge_seat (4): written
+    Session::send_seats (8): written
+    Session::dispatch (145): written
+    Session::deliver (120): written
+    Session::on_pose (29): written
+    Session::update (92): written
+    Session::status (7): written
+
+228 of 230 functions of the program are written as Blueprints (1669 of 1688 lines), and 3 of the engine's headers that they call: 16 Blueprints - 3 of source files, 0 of states, 13 of headers and of shapes
+222 functions of the Blueprints are compared with their source, bit for bit, by the tests in /dev/shm/spawncity-jobs-chris/work-f2-probe-182528-670/pt/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+     2 (    19)   state outside a function (a variable of the file: a library keeps nothing)
+
+real	2m57,674s
+user	6m27,982s
+sys	0m21,571s
