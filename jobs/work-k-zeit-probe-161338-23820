@@ -1,1 +1,0 @@
-probe origin/work-k-zeit src/game.cpp src/game_lamps.cpp src/game_look.cpp
