@@ -3512,7 +3512,9 @@ class Emit:
                     pt = {"qualType": qtype(pick) or "long"}
                     decl = {"kind": "VarDecl", "id": pid, "name": f"{v.get('name', 'ref')}_at", "type": dict(pt), "init": "c",
                             "_file": v.get("_file", ""), "_at": v.get("_at", (None, None)), "inner": [pick]}
+                    # (the local variable stands for the index where the source has it: its place there is the index's)
                     ref = {"kind": "ImplicitCastExpr", "castKind": "LValueToRValue", "type": dict(pt), "valueCategory": "prvalue",
+                           **{k: pick[k] for k in ("_at", "_file") if k in pick},
                            "inner": [{"kind": "DeclRefExpr", "type": dict(pt), "valueCategory": "lvalue",
                                       "referencedDecl": {"id": pid, "kind": "VarDecl", "name": decl["name"], "type": dict(pt)}}]}
                     node["inner"][next(j for j, c in enumerate(node["inner"]) if c is pick)] = ref
@@ -6132,8 +6134,9 @@ class Emit:
                     whole = {"kind": "DeclRefExpr", "referencedDecl": {"id": d["id"], "kind": "VarDecl", "name": d.get("name", "")}, "type": d.get("type", {})}
                     was = n.get("type", {})
                     part = names[n["referencedDecl"]["id"]]
+                    stood = self.stood(n)
                     n.clear()
-                    n.update({"kind": "MemberExpr", "name": part, "isArrow": False, "type": was, "inner": [whole]})
+                    n.update({"kind": "MemberExpr", "name": part, "isArrow": False, "type": was, "inner": [whole], **stood})
             return
         lt = self.u.rows.get(bt, bt)
         if lt.startswith("List<") and self.u.fixed(re.sub(r"&", "", qtype(d))) == len(binds):
@@ -6144,8 +6147,9 @@ class Emit:
                     whole = {"kind": "DeclRefExpr", "referencedDecl": {"id": d["id"], "kind": "VarDecl", "name": d.get("name", "")}, "type": d.get("type", {}), "_bt": bt}
                     at = {"kind": "IntegerLiteral", "value": str(ids[n["referencedDecl"]["id"]]), "type": {"qualType": "int"}}
                     was = n.get("type", {})
+                    stood = self.stood(n)
                     n.clear()
-                    n.update({"kind": "ArraySubscriptExpr", "type": was, "_bt": lt[5:-1], "inner": [whole, at]})
+                    n.update({"kind": "ArraySubscriptExpr", "type": was, "_bt": lt[5:-1], "inner": [whole, at], **stood})
             return
         if fields is None or len(fields) != len(binds) or any(f[3] is None for f in fields):
             raise Wait("names for the parts of something that is not a struct")
@@ -6155,8 +6159,16 @@ class Emit:
                 f, ft = fields[ids[n["referencedDecl"]["id"]]][3], fields[ids[n["referencedDecl"]["id"]]][1]
                 whole = {"kind": "DeclRefExpr", "referencedDecl": {"id": d["id"], "kind": "VarDecl", "name": d.get("name", "")}, "type": d.get("type", {}), "_bt": bt}
                 was = n.get("type", {})
+                stood = self.stood(n)
                 n.clear()
-                n.update({"kind": "MemberExpr", "name": f, "isArrow": False, "type": was, "_bt": ft, "inner": [whole]})
+                n.update({"kind": "MemberExpr", "name": f, "isArrow": False, "type": was, "_bt": ft, "inner": [whole], **stood})
+
+    @staticmethod
+    def stood(n):
+        """Where a name for a part of a value stands in the source (`t` of `auto& [k, t] = entry;`): what is
+        written out in its place (the part: `entry.second`) stands there, and is that name there (`_named`) -
+        the test's source has the name, and nothing in it C++ leaves open (TestWriter.guard)."""
+        return {"_named": True, **{k: n[k] for k in ("_at", "_file") if k in n}}
 
     @staticmethod
     def init_of(v):
@@ -9434,6 +9446,8 @@ class TestWriter:
         def visit(n, depth):
             if n.get("_call") is not None:   # (a place written out for a call: the source has the call)
                 return visit(n["_call"], depth)
+            if n.get("_named"):   # (a name for a part of a value - Emit.stood: the source has the name, there for every call)
+                return
             k, ks = n.get("kind"), kids(n)
             # the bytes of a value of a struct with a float, as the program lays them out (Bytes of Struct,
             # Struct of Bytes): the test holds the float as a 64-bit number
@@ -9738,12 +9752,18 @@ class TestWriter:
             m = list(re.finditer(r"\b" + re.escape(v.get("name") or "?") + r"\b", raw[a:b]))
             at = a + m[-1].start() if m else b
         init = self.tree.said(raw[at + len(v.get("name") or ""):b]) if at < b else ""
-        scope = (self.tree.owner.get(d["id"]) or "") + "::" if self.tree.owner.get(d["id"]) else self.tree.scope_of.get(d["id"], "")
         try:
-            spelled = self.spell(self.in_scope(qtype(v), scope.rstrip(":")))
+            spelled = self.spell(self.kept_type(v["id"]))
         except Wait:
             spelled = qtype(v)
         return self.in_spaces(d, f"static {spelled} {name}{init};")
+
+    def kept_type(self, i):
+        """The type of a variable a function keeps (see kept_edits), as the compiler spells it where the function
+        stands: a name it gives without its classes is the one C++ finds there (in_scope)."""
+        _, d, v = self.kept[i]
+        scope = (self.tree.owner.get(d["id"]) or "") + "::" if self.tree.owner.get(d["id"]) else self.tree.scope_of.get(d["id"], "")
+        return self.in_scope(qtype(v), scope.rstrip(":"))
 
     def kept_held(self, i):
         """How the test names a variable a function keeps (see kept_edits) - None: its source does not hold it."""
@@ -10186,10 +10206,12 @@ class TestWriter:
                 # method keeps in itself (static in its body) no code outside the method reaches
                 for i, (variable, _) in self.u.state_statics.items():
                     v = self.tree.decl.get(i) or {}
+                    vt = qtype(v)
                     if i in self.kept:   # (kept by a function in its body: before it in the test's source - see kept_edits)
                         held = self.kept_held(i)
                         if held is None:
                             continue   # (not held by the source the test holds)
+                        v, vt = self.kept[i][2], self.kept_type(i)   # (its declaration stands in the function; its type as that names it)
                     elif self.in_function(v) or v.get("storageClass") == "static" and v.get("isStaticLocal") or not v.get("name"):
                         if self.held_locals is None:
                             self.held_locals = {x.get("id") for f in self.whole.functions.values() for x in walk(f) if x.get("kind") == "VarDecl"}
@@ -10205,8 +10227,8 @@ class TestWriter:
                             first = self.tree.decl[first["previousDecl"]]
                         held = "::".join(self.classes_of(self.tree.scope_of.get(first["id"], "")) + [v["name"]])
                     try:
-                        spelled = self.spell(qtype(v))
-                        draws.append(f"  {held} = {self.draw(qtype(v))};")
+                        spelled = self.spell(vt)
+                        draws.append(f"  {held} = {self.draw(vt)};")
                     except Wait as w:
                         missing.append(f"{variable} ({w})")
                         continue
@@ -11263,8 +11285,10 @@ class TestWriter:
             for x in walk_source(d):
                 for i in (x.get("referencedDecl", {}).get("id"), x.get("referencedMemberDecl")):
                     e = tree.decl.get(i) if i else None
-                    if e is not None and i not in out and (i in u.engine_calls or u.api().declared_only(e)):
-                        out[i] = e
+                    # (by the declaration's own address: a dump may name it by another one - Tree.join_dumps -, and
+                    # it is one function, with one stand-in)
+                    if e is not None and e["id"] not in out and (e["id"] in u.engine_calls or u.api().declared_only(e)):
+                        out[e["id"]] = e
         return out
 
     def guard_or_none(self, d):
