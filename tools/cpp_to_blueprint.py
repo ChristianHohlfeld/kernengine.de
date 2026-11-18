@@ -12509,7 +12509,7 @@ class TestWriter:
                                        f"std::vector<{inner}> {lst} = draw_list(draw, [&]() -> {inner} {{ return {self.draw(entry)}; }}); {lst}.push_back({self.draw(entry)});"]
                         if extent and not n_fixed:   # (as many entries as the array has, at the least)
                             decl_lines.append(f"while ({lst}.size() < {int(extent.group(1))}) {lst}.push_back({self.draw(entry)});")
-                        decl_lines.append(f"const long long {at} = draw.below(8) == 0 ? -1 : static_cast<long long>(draw.below(static_cast<u32>({lst}.size(){room}) + 1));")
+                        decl_lines.append(f"long long {at} = draw.below(8) == 0 ? -1 : static_cast<long long>(draw.below(static_cast<u32>({lst}.size(){room}) + 1));")
                         names += [lst, at]
                         held_lists.append(lst)
                         continue
@@ -12918,6 +12918,15 @@ class TestWriter:
             roots.setdefault(name, root[1] if root else (name, message))
         return message if root is None else f"{message} - that went with {root[1][0]}: {root[1][1]}"
 
+    @staticmethod
+    def test_compiler():
+        """The compiler that builds the tests - the one run_tests.sh takes (decision E13): CXX, else clang as it is
+        looked for there (CLANGXX, clang++, clang++-20 ... clang++-16). Whether a test compiles is told by that one."""
+        for c in (os.environ.get("CXX"), os.environ.get("CLANGXX"), "clang++", *(f"clang++-{v}" for v in range(20, 15, -1))):
+            if c and shutil.which(c):
+                return c
+        sys.exit("no clang (CXX, CLANGXX, clang++, clang++-20 ... clang++-16): the tests are built with the game's compiler")
+
     def compiles(self, text, stem):
         """What the compiler complains of in the test: [(line, complaint)], empty when it compiles."""
         d = tempfile.mkdtemp(prefix="kern-converted-check-")   # (nothing is kept between runs)
@@ -12930,12 +12939,17 @@ class TestWriter:
             os.makedirs(os.environ["TEST_KEEP"], exist_ok=True)
             n = len([x for x in os.listdir(os.environ["TEST_KEEP"]) if x.startswith(f"test_{stem}.")])
             shutil.copy(path, os.path.join(os.environ["TEST_KEEP"], f"test_{stem}.{n}.cpp"))
-        r = subprocess.run([os.environ.get("CXX", "g++"), "-std=c++20", "-fsyntax-only", "-ffp-contract=off", "-fno-exceptions", "-fno-rtti", "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter",
+        # (the switches of the suite itself - run_tests.sh: -Wall -Wextra, no -Werror: what only warns there does not
+        # make a function wait here; its warnings are said in the log - see below)
+        r = subprocess.run([self.test_compiler(), "-std=c++20", "-fsyntax-only", "-ffp-contract=off", "-fno-exceptions", "-fno-rtti", "-Wall", "-Wextra", "-Wno-unused-parameter",
                             # (a member an initializer list leaves out is made as by `{}` - in the source as in the test; the
                             # game's own build says so, without an error: TrafficRules::Arm `{dir, width}`)
                             "-Wno-missing-field-initializers",
                             *self.flags, "-I" + os.path.join(ROOT, "kern", "tests"), path], capture_output=True, text=True)
         errors = []
+        warned = sorted({w.group(1)[:160] for w in re.finditer(r"\bwarning: (.*)", r.stderr)})
+        if warned:
+            print(f"    (test_{stem}: compiles with {len(warned)} kind(s) of warning, as in the suite: {warned[0]}{' …' if len(warned) > 1 else ''})")
         if r.returncode != 0:
             # a complaint counts for the line of the test it is about: its own, or the one it was "required from"
             out = r.stderr.split("\n")
