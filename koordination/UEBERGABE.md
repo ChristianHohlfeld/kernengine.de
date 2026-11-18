@@ -418,8 +418,10 @@ Nach jedem Schritt: `BLUEPRINTS.md` (Stand-Absatz) nachführen, pushen.
 Letzte Commits (alles gepusht): `work-g1 7d1d656`, `work-g2 ffa277f`, `work-f1 3903052`, `work-f2 687b163`,
 `work-t1 c7c49ed`, `work-t2 a546621`, `work-k e5f2bf1`, `work-p 04f1a57`, `work-s5 e749453`,
 `work-d edae85f` (ein Commit über `work`: „Zwischenstand: Plätze der Engine – der Generator erkennt sie, die Tür
-kann sie lesen und setzen“, unbewiesen; Stand, Schrittliste und bestätigter Entwurf in `uebergabe/d.md` – die Datei ist
-von 16:59, der Agent hat sie beim Sitzungswechsel nicht mehr fortgeschrieben; die Auflagen stehen in Abschnitt 4.5), `work-c`: kein Commit (nur Entwurf, `uebergabe/c.md`),
+kann sie lesen und setzen“, unbewiesen; Stand, Schrittliste und bestätigter Entwurf in `uebergabe/d.md` – vom Agenten
+zur Übergabe vollständig fortgeschrieben: Schritt 1 und 2 von 7 gepusht – der Generator erkennt 6 Plätze, darunter
+`game_world.shots`, `events`, `sound_cues`, `hud_mut`; die Tür kann sie lesen und setzen, nur Syntax geprüft; es fehlen
+Interpreter, Klasse, Schreibweise mit check() und Palette, Tests und Doku, Stellvertreter im Test, Konverter), `work-c`: kein Commit (nur Entwurf, `uebergabe/c.md`),
 `work-r fde4b9f`.
 
 **Wichtig – fast nichts davon ist durch einen Lauf bewiesen.** mag hat von 15:39 bis 16:52 keinen Auftrag
