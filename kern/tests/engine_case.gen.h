@@ -964,25 +964,17 @@ struct Engine : kern::Blueprint {
     engine_app_update(0, 0, In4);
     engine_app_resized(0, 0);
     engine_app_stop(0, 0);
-    R75 = engine_audio_bus_name(In5);
-    engine_audio_parse_bus(n15, "", In5);
-    R76_0 = n15.result;
-    R76_1 = n15.out;
-    R77 = engine_audio_rolloff_name(In6);
-    engine_audio_parse_rolloff(n16, "", In6);
-    R78_0 = n16.result;
-    R78_1 = n16.out;
     engine_mixer_init(n17, 0, 0, 0);
     R79_0 = n17.result;
-  }
-
-  void Run3() {
     R80 = engine_mixer_sample_rate(0);
     R81 = engine_mixer_ready(0);
     engine_mixer_create_clip(n18, 0, List<Float>{}, 0, 0, 0, "");
     R82_0 = n18.result;
     engine_mixer_adopt_clip(n19, 0, List<Float>{}, 0, "", false);
     R83_0 = n19.result;
+  }
+
+  void Run3() {
     engine_mixer_destroy_clip(n20, 0, 0);
     R84_0 = n20.result;
     R85 = engine_mixer_clip_info(0, 0);
@@ -1009,19 +1001,6 @@ struct Engine : kern::Blueprint {
     engine_mixer_render(n23, 0, 0);
     R104_0 = n23.out;
     R105 = engine_mixer_stats(0);
-    R106 = engine_audio_synthesize(In9, 0);
-    engine_audio_mix_into(n24, List<Float>{}, List<Float>{}, 0.0, 0, 0.0);
-    R107_0 = n24.dst;
-    engine_audio_make_seamless(n25, List<Float>{}, 0, 0.0);
-    R108_0 = n25.samples;
-    engine_audio_normalize(n26, List<Float>{}, 0.0);
-    R109_0 = n26.samples;
-    R110 = engine_audio_builtin_sounds();
-    R111 = engine_audio_find_builtin("");
-    engine_audio_render_builtin(n27, "", 0, List<Float>{}, 0);
-    R112_0 = n27.result;
-    R112_1 = n27.out;
-    R112_2 = n27.channels;
     engine_builtin_job_start(n28, 0, "", 0);
     R113_0 = n28.result;
     engine_builtin_job_step(n29, 0, 0.0);
@@ -1031,92 +1010,6 @@ struct Engine : kern::Blueprint {
     engine_builtin_job_take(n30, 0, 0);
     R117_0 = n30.result;
     R117_1 = n30.channels;
-    engine_fail_text(n31, "");
-    R118_0 = n31.result;
-    R119 = engine_last_error();
-  }
-
-  void Run4() {
-    engine_clear_error();
-    R121 = engine_now_ms();
-    R122 = engine_wall_ms();
-    engine_jobs_submit(n32, 0, List<Int>{});
-    R123_0 = n32.result;
-    engine_jobs_take(n33, 0, List<Int>{});
-    R124_0 = n33.result;
-    R124_1 = n33.out;
-    engine_jobs_cancel(0);
-    engine_jobs_pump(0.0);
-    R127 = engine_jobs_pending();
-    engine_jobs_set_external(false);
-    R129 = engine_jobs_external();
-    R130 = engine_jobs_take_queued();
-    engine_jobs_run(n34, 0, List<Int>{}, List<Int>{});
-    R131_0 = n34.output;
-    engine_jobs_done(0, List<Int>{});
-    R133 = engine_game_shape_mesh(In10);
-    R134 = engine_game_shape_bounds(In10);
-    R135 = engine_game_fit_collider(In10);
-    R136 = engine_game_shape_hull_points(In10);
-    engine_game_build_city(n35, In11, In12);
-    R137_0 = n35.result;
-    R137_1 = n35.out;
-    engine_game_city_street_point(n36, In11, In13);
-    R138_0 = n36.result;
-    R138_1 = n36.rng;
-    R139 = engine_game_euler_to_quat(Vector{0.0, 0.0, 0.0});
-    R140 = engine_game_quat_to_euler(In14);
-    R141 = engine_game_transform_matrix(In15);
-    R142 = engine_game_matrix_transform(In16);
-    R143 = engine_game_shape_name(In17);
-    engine_game_parse_shape(n37, "", In17);
-    R144_0 = n37.result;
-    R144_1 = n37.out;
-    R145 = engine_game_motion_name(In18);
-    R146 = engine_game_collider_shape_name(In19);
-    R147 = engine_game_joint_kind_name(In20);
-    R148 = engine_game_control_mode_name(In21);
-    R149 = engine_game_camera_mode_name(In22);
-    R150 = engine_game_weapon_kind_name(In23);
-    R151 = engine_game_weapon_preset(In23);
-    R152 = engine_game_trigger_action_name(In24);
-    R153 = engine_game_mover_mode_name(In25);
-    R154 = engine_game_game_goal_name(In26);
-    R155 = engine_game_motion_name_ok("");
-    R156 = engine_game_default_player(In27);
-    R157 = engine_game_channel_names(In28);
-    R158 = engine_game_channel_bits(In28, "");
-    R159 = engine_level_find_2(In27, 0);
-  }
-
-  void Run5() {
-    engine_level_add(n38, In27, In29);
-    R160_0 = n38.result;
-    R160_1 = n38.self;
-    R161 = engine_level_children(In27, 0);
-    R162 = engine_level_world_matrix(In27, 0);
-    R163 = engine_level_body_owner(In27, 0);
-    R164 = engine_level_is_ancestor(In27, 0, 0);
-    R165 = engine_level_texture(In27, "");
-    R166 = engine_level_sound(In27, "");
-    R167 = engine_level_motion(In27, "");
-    engine_level_motion_2(n39, In27, "");
-    R168_0 = n39.result;
-    R168_1 = n39.self;
-    R169 = engine_game_to_json(In27);
-    R170 = engine_game_to_text(In27, 0);
-    R171 = engine_game_actor_to_json(In29);
-    R172 = engine_game_world_to_json(In28);
-    R173 = engine_game_sound_reference_ok(In27, "");
-    R174 = engine_game_validate(In27);
-    R175 = engine_game_hex_color(Vector{0.0, 0.0, 0.0});
-    engine_game_parse_hex_color(n40, "", Vector{0.0, 0.0, 0.0});
-    R176_0 = n40.result;
-    R176_1 = n40.out;
-    R177 = engine_game_srgb_to_linear(Vector{0.0, 0.0, 0.0});
-    R178 = engine_game_logic_node_shapes_registered();
-    R179 = engine_game_logic_node_types();
-    R180 = engine_game_logic_nodes_registered();
     R181 = engine_night_windows_name(0);
     R182 = engine_night_windows_attributes(0);
     R183 = engine_night_windows_vertex_declarations(0);
@@ -1125,8 +1018,6 @@ struct Engine : kern::Blueprint {
     R186 = engine_night_windows_fragment_surface(0);
     engine_night_windows_bind(0, 0);
     engine_night_windows_frame_uniforms(0, 0, 0);
-    R189 = engine_game_plan_bodies(In27);
-    R190 = engine_game_game_status_name(In30);
     engine_game_world_set_layers(0, 0);
     engine_game_world_sync(0, In27);
     engine_game_world_clear(0);
@@ -1134,6 +1025,9 @@ struct Engine : kern::Blueprint {
     engine_game_world_actor_matrix(n41, 0, 0, In16);
     R195_0 = n41.result;
     R195_1 = n41.out;
+  }
+
+  void Run4() {
     engine_game_world_actor_bounds(n42, 0, 0, In31);
     R196_0 = n42.result;
     R196_1 = n42.out;
@@ -1142,9 +1036,6 @@ struct Engine : kern::Blueprint {
     R198 = engine_game_world_pending_textures(0);
     engine_game_world_set_texture_pixels(n44, 0, "", 0, 0, List<Int>{});
     R199_0 = n44.result;
-  }
-
-  void Run6() {
     engine_game_world_apply_lighting(n45, 0, Vector{0.0, 0.0, 0.0});
     R200_0 = n45.result;
     R201 = engine_game_world_time_of_day(0);
@@ -1193,14 +1084,14 @@ struct Engine : kern::Blueprint {
     engine_game_world_step_replica(0, 0.0, 0.0, In33);
     R234 = engine_game_world_hud(0);
     R235 = engine_game_world_aim_blend(0);
+  }
+
+  void Run5() {
     R236 = engine_game_world_stats(0);
     R237 = engine_game_world_level(0);
     engine_game_world_physics(n56, 0);
     R238_0 = n56.result;
     R239 = engine_game_world_actor_body(0, 0);
-  }
-
-  void Run7() {
     engine_game_world_begin_grab(n57, 0, 0, Vector{0.0, 0.0, 0.0});
     R240_0 = n57.result;
     engine_game_world_move_grab(0, Vector{0.0, 0.0, 0.0});
@@ -1262,6 +1153,9 @@ struct Engine : kern::Blueprint {
     engine_game_world_actors_with_tag(n77, 0, "", List<Int>{});
     R274_0 = n77.out;
     R275 = engine_game_world_has_tag(0, 0, "");
+  }
+
+  void Run6() {
     engine_game_world_line_trace(n78, 0, Vector{0.0, 0.0, 0.0}, Vector{0.0, 0.0, 0.0}, 0, 0, Vector{0.0, 0.0, 0.0}, Vector{0.0, 0.0, 0.0}, In38);
     R276_0 = n78.result;
     R276_1 = n78.actor;
@@ -1270,9 +1164,6 @@ struct Engine : kern::Blueprint {
     engine_game_world_add_score(0, 0.0);
     engine_game_world_end_game(0, false, "");
     engine_game_world_show_message(0, "");
-  }
-
-  void Run8() {
     engine_game_world_play_sound(0, "", Vector{0.0, 0.0, 0.0}, 0.0, 0.0, false, 0);
     engine_game_world_particle_burst(0, Vector{0.0, 0.0, 0.0}, Vector{0.0, 0.0, 0.0});
     engine_game_world_shake_camera(0, 0.0);
@@ -1339,14 +1230,14 @@ struct Engine : kern::Blueprint {
     R315_1 = n99.visible;
     R315_2 = n99.bearing;
     R315_3 = n99.distance;
+  }
+
+  void Run7() {
     R316 = engine_game_world_walker_state(0, 0);
     R317 = engine_game_world_walkers(0);
     R318 = engine_game_world_art_stats(0);
     engine_sound_bank_mixer(n100, 0);
     R319_0 = n100.result;
-  }
-
-  void Run9() {
     engine_sound_bank_clip(n101, 0, "");
     R320_0 = n101.result;
     engine_sound_bank_request(0, "");
@@ -1373,7 +1264,6 @@ struct Engine : kern::Blueprint {
     R340 = engine_game_audio_muted(0);
     R341 = engine_game_audio_cues_played(0);
     R342 = engine_game_audio_cues_dropped(0);
-    R343 = engine_game_engine_sound_for(In42);
     engine_building_builder_begin(n104, 0, List<Float>{}, 0, In43);
     R344_0 = n104.result;
     engine_building_builder_step(n105, 0, 0.0);
@@ -1391,35 +1281,14 @@ struct Engine : kern::Blueprint {
     engine_footprint_stream_begin_2(0, 0, 0.0, 0.0, 0.0, 0.0);
     R355 = engine_footprint_stream_empty(0);
     engine_footprint_stream_ring(0, List<Vector>{}, 0);
+  }
+
+  void Run8() {
     R357 = engine_footprint_stream_data(0);
     R358 = engine_footprint_stream_size(0);
     R359 = engine_footprint_stream_values(0);
-  }
-
-  void Run10() {
-    engine_clean_ring(n108, List<Float>{});
-    R360_0 = n108.xy;
-    R361 = engine_ring_area(List<Float>{}, 0);
     engine_earcut_triangulate(n109, 0, List<Float>{}, 0, List<Int>{}, 0, List<Int>{});
     R362_0 = n109.out;
-    R363 = engine_earcut_deviation(List<Float>{}, 0, List<Int>{}, 0, List<Int>{}, 0);
-    R364 = engine_mesh_data_as_input(In44, 0);
-    engine_upsert(n110, 0, 0, In44, In45, List<Float>{}, List<Float>{});
-    R365_0 = n110.result;
-    engine_weld(n111, In44, 0);
-    R366_0 = n111.result;
-    R366_1 = n111.mesh;
-    R367 = engine_content_hash(In44);
-    R368 = engine_primitives_box(Vector{0.0, 0.0, 0.0}, Vector{0.0, 0.0, 0.0});
-    R369 = engine_primitives_box_on_ground(Vector{0.0, 0.0, 0.0}, Vector{0.0, 0.0, 0.0});
-    R370 = engine_primitives_sphere(0.0, 0, 0, Vector{0.0, 0.0, 0.0});
-    R371 = engine_primitives_capsule(0.0, 0.0, 0, 0, Vector{0.0, 0.0, 0.0});
-    R372 = engine_primitives_torus(0.0, 0.0, 0, 0, Vector{0.0, 0.0, 0.0});
-    R373 = engine_primitives_cylinder(0.0, 0.0, 0, Vector{0.0, 0.0, 0.0});
-    R374 = engine_primitives_cone(0.0, 0.0, 0, Vector{0.0, 0.0, 0.0});
-    R375 = engine_primitives_plane(0.0, 0.0, Vector{0.0, 0.0, 0.0}, 0.0);
-    engine_primitives_append(n112, In44, In44, In16);
-    R376_0 = n112.dst;
     engine_road_builder_begin(n113, 0, List<Float>{}, 0, 0, 0);
     R377_0 = n113.result;
     engine_road_builder_step(n114, 0, 0.0);
@@ -1436,24 +1305,12 @@ struct Engine : kern::Blueprint {
     R386 = engine_road_stream_data(0);
     R387 = engine_road_stream_size(0);
     R388 = engine_road_stream_values(0);
-    engine_build_terrain_tile(n117, 0.0, 0.0, 0.0, 0, In46, 0, In44);
-    R389_0 = n117.result;
-    R389_1 = n117.out;
-    R389_2 = n117.min_height;
-    R389_3 = n117.max_height;
     R390 = engine_mesh_skinned(0);
     R391 = engine_mesh_cull_mode(0);
     R392 = engine_mesh_vertex_count(0);
     R393 = engine_mesh_element_count(0);
     R394 = engine_mesh_triangle_count(0);
     R395 = engine_mesh_posed_vertex(0, 0);
-    R396 = engine_bounding_sphere(List<Float>{}, 0);
-    R397 = engine_mirror_state(List<Float>{}, 0);
-    engine_apply_cull_mode(0);
-    R399 = engine_instanced_bounds(In47, List<Float>{}, 0);
-  }
-
-  void Run11() {
     engine_particles_init(n118, 0, 0, 0, 0);
     R400_0 = n118.result;
     engine_particles_emit(n119, 0, In48);
@@ -1480,6 +1337,9 @@ struct Engine : kern::Blueprint {
     R415 = engine_sun_shadow_map_matrix(0);
     R416 = engine_sun_shadow_map_depth_texture(0);
     R417 = engine_sun_shadow_map_options(0);
+  }
+
+  void Run9() {
     engine_sun_shadow_map_set_filter(0, 0);
     R419 = engine_sun_shadow_map_extent(0);
     engine_sky_pass_init(n126, 0);
@@ -1505,9 +1365,6 @@ struct Engine : kern::Blueprint {
     engine_ambient_occlusion_pass_destroy(0, false);
     R438 = engine_ambient_occlusion_pass_quality(0);
     R439 = engine_ambient_occlusion_pass_half_resolution(0);
-  }
-
-  void Run12() {
     engine_program_build(n129, 0, "", "", "");
     R440_0 = n129.result;
     engine_program_destroy(0, false);
@@ -1524,12 +1381,14 @@ struct Engine : kern::Blueprint {
     engine_uniform_cache_set_vec4_array(0, 0, List<Float>{}, 0);
     engine_uniform_cache_set_vec3_array(0, 0, List<Float>{}, 0);
     engine_uniform_cache_set_mat4(0, 0, List<Float>{});
-    engine_uniform_cache_set_mat4_array(0, List<Float>{}, 0);
     engine_renderer_init(n130, 0, In55, List<Int>{});
     R456_0 = n130.result;
     engine_renderer_shutdown(0);
     engine_renderer_resize(n131, 0, 0, 0);
     R458_0 = n131.result;
+  }
+
+  void Run10() {
     R459 = engine_renderer_width(0);
     R460 = engine_renderer_height(0);
     engine_renderer_allocate_id(n132, 0);
@@ -1565,9 +1424,6 @@ struct Engine : kern::Blueprint {
     R477_0 = n143.result;
     R478 = engine_renderer_camera(0);
     engine_renderer_set_camera(0, In3);
-  }
-
-  void Run13() {
     R480 = engine_renderer_lighting(0);
     engine_renderer_set_lighting(0, In58);
     R482 = engine_renderer_sky(0);
@@ -1596,6 +1452,9 @@ struct Engine : kern::Blueprint {
     R498_0 = n148.result;
     R498_1 = n148.hit;
     R498_2 = n148.stats;
+  }
+
+  void Run11() {
     engine_renderer_pick_ray(n149, 0, In63, In64, In65);
     R499_0 = n149.result;
     R499_1 = n149.hit;
@@ -1617,13 +1476,8 @@ struct Engine : kern::Blueprint {
     engine_shader_extension_bind(0, 0);
     engine_shader_extension_frame_uniforms(0, 0, 0);
     engine_shader_extension_material_uniforms(0, 0, In57, List<Int>{});
-    R516 = engine_build_standard_shader(List<Int>{});
-    R517 = engine_net_client_state_name(In66);
     engine_client_connect(0, In67, 0.0);
     engine_client_disconnect(0);
-  }
-
-  void Run14() {
     R520 = engine_client_state(0);
     R521 = engine_client_connected(0);
     R522 = engine_client_client_index(0);
@@ -1648,6 +1502,9 @@ struct Engine : kern::Blueprint {
     R538 = engine_server_client_address(0, 0);
     engine_server_disconnect_client(0, 0);
     engine_server_receive_packets(0);
+  }
+
+  void Run12() {
     engine_server_advance_time(0, 0.0);
     engine_server_send_packets(0);
     engine_server_send(n154, 0, 0, 0, 0, List<Int>{});
@@ -1658,7 +1515,6 @@ struct Engine : kern::Blueprint {
     R545_0 = n156.result;
     engine_server_take_events(n157, 0);
     R546_0 = n157.result;
-    R547 = engine_net_connection_error_name(In68);
     engine_connection_reset(0);
     R549 = engine_connection_can_send(0, 0);
     engine_connection_send(n158, 0, 0, 0, List<Int>{});
@@ -1674,9 +1530,6 @@ struct Engine : kern::Blueprint {
     R557_0 = n160.result;
     R558 = engine_connection_channel_count(0);
     R559 = engine_connection_pending(0, 0);
-  }
-
-  void Run15() {
     engine_endpoint_reset(0);
     R561 = engine_endpoint_next_sequence(0);
     engine_endpoint_send_packet(n161, 0, List<Int>{}, 0);
@@ -1702,6 +1555,9 @@ struct Engine : kern::Blueprint {
     R580_0 = n162.result;
     engine_bit_reader_read_align(n163, 0);
     R581_0 = n163.result;
+  }
+
+  void Run13() {
     engine_bit_reader_read_bytes(n164, 0, 0);
     R582_0 = n164.data;
     R583 = engine_bit_reader_align_bits(0);
@@ -1732,9 +1588,6 @@ struct Engine : kern::Blueprint {
     engine_read_stream_serialize_bytes(n172, 0, 0);
     R599_0 = n172.result;
     R599_1 = n172.data;
-  }
-
-  void Run16() {
     engine_read_stream_serialize_align(n173, 0);
     R600_0 = n173.result;
     engine_read_stream_serialize_check(n174, 0, 0);
@@ -1769,6 +1622,9 @@ struct Engine : kern::Blueprint {
     R619_0 = n182.out;
     engine_simulator_clear(0);
     R621 = engine_simulator_in_flight(0);
+  }
+
+  void Run14() {
     R622 = engine_simulator_dropped(0);
     R623 = engine_simulator_duplicated(0);
     engine_loopback_network_create(n183, 0);
@@ -1794,16 +1650,6 @@ struct Engine : kern::Blueprint {
     R635_2 = n187.data;
     engine_host_transport_simulator(n188, 0);
     R636_0 = n188.result;
-    R637 = engine_physics_surface_name(In70);
-    engine_physics_parse_surface(n189, "", In70);
-    R638_0 = n189.result;
-    R638_1 = n189.out;
-    R639 = engine_physics_surface_friction(In70, In70);
-  }
-
-  void Run17() {
-    R640 = engine_physics_frame_from_axis(Vector{0.0, 0.0, 0.0}, Vector{0.0, 0.0, 0.0}, false);
-    R641 = engine_physics_version();
     engine_world_create(n190, 0, In71);
     R642_0 = n190.result;
     engine_world_destroy(0);
@@ -1833,6 +1679,9 @@ struct Engine : kern::Blueprint {
     engine_world_apply_torque(0, In73, Vector{0.0, 0.0, 0.0});
     engine_world_apply_linear_impulse(0, In73, Vector{0.0, 0.0, 0.0}, Vector{0.0, 0.0, 0.0});
     engine_world_apply_linear_impulse_to_center(0, In73, Vector{0.0, 0.0, 0.0});
+  }
+
+  void Run15() {
     engine_world_apply_angular_impulse(0, In73, Vector{0.0, 0.0, 0.0});
     engine_world_set_awake(0, In73, false);
     R669 = engine_world_awake(0, In73);
@@ -1847,9 +1696,6 @@ struct Engine : kern::Blueprint {
     R677 = engine_world_world_vector(0, In73, Vector{0.0, 0.0, 0.0});
     R678 = engine_world_body_user(0, In73);
     R679 = engine_world_shape_user(0, In75);
-  }
-
-  void Run18() {
     R680 = engine_world_shape_body(0, In75);
     engine_world_set_motion_locks(0, In73, In80);
     engine_world_set_mass(0, In73, 0.0);
@@ -1880,6 +1726,9 @@ struct Engine : kern::Blueprint {
     R704 = engine_world_contact_end(0);
     R705 = engine_world_sensor_begin(0);
     R706 = engine_world_sensor_end(0);
+  }
+
+  void Run16() {
     R707 = engine_world_hits(0);
     R708 = engine_world_joint_events(0);
     R709 = engine_world_body_count(0);
@@ -1894,9 +1743,6 @@ struct Engine : kern::Blueprint {
     engine_mouse_grab_end(0);
     R718 = engine_mouse_grab_active(0);
     R719 = engine_mouse_grab_body(0);
-  }
-
-  void Run19() {
     R720 = engine_mouse_grab_anchor(0);
     R721 = engine_mouse_grab_max_force(0);
     engine_character_mover_reset(0, Vector{0.0, 0.0, 0.0});
@@ -1909,19 +1755,9 @@ struct Engine : kern::Blueprint {
     R728 = engine_character_mover_on_ground(0);
     R729 = engine_character_mover_planes(0);
     R730 = engine_character_mover_capsule(0);
-    engine_physics_hull_mesh(n200, List<Vector>{}, In44, Vector{0.0, 0.0, 0.0});
-    R731_0 = n200.result;
-    R731_1 = n200.out;
     engine_bvh_build(0, List<Float>{}, 0, List<Int>{}, 0, 0);
     R733 = engine_bvh_empty(0);
     R734 = engine_bvh_triangle_count(0);
-    engine_screen_ray(n201, In3, 0.0, 0.0, 0.0, 0.0, In63);
-    R735_0 = n201.result;
-    R735_1 = n201.out;
-    engine_pick_meshes(n202, List<Int>{}, In63, In64, In65);
-    R736_0 = n202.result;
-    R736_1 = n202.hit;
-    R736_2 = n202.stats;
     engine_ambient_occlusion_pass_make(n203);
     R737_0 = n203.result;
     engine_ambient_occlusion_pass_release(0);
@@ -1937,29 +1773,25 @@ struct Engine : kern::Blueprint {
     engine_earcut_make(n207);
     R745_0 = n207.result;
     engine_earcut_release(0);
-    engine_engine_make(n208, 0);
-    R747_0 = n208.result;
     engine_engine_release(0);
     engine_footprint_stream_make(n209);
     R749_0 = n209.result;
     engine_footprint_stream_release(0);
+  }
+
+  void Run17() {
     engine_height_sampler_make(n210);
     R751_0 = n210.result;
     engine_height_sampler_release(0);
     engine_input_make(n211);
     R753_0 = n211.result;
     engine_input_release(0);
-    engine_light_pool_make(n212, 0, 0);
-    R755_0 = n212.result;
     engine_light_pool_release(0);
     engine_mesh_make(n213);
     R757_0 = n213.result;
     engine_mesh_release(0);
     engine_particles_make(n214);
     R759_0 = n214.result;
-  }
-
-  void Run20() {
     engine_particles_release(0);
     engine_program_make(n215);
     R761_0 = n215.result;
@@ -1994,11 +1826,7 @@ struct Engine : kern::Blueprint {
     engine_mixer_make(n225);
     R781_0 = n225.result;
     engine_mixer_release(0);
-    engine_game_audio_make(n226, 0, 0);
-    R783_0 = n226.result;
     engine_game_audio_release(0);
-    engine_game_world_make(n227, 0, 0);
-    R785_0 = n227.result;
     engine_game_world_release(0);
     engine_property_change_make(n228);
     R787_0 = n228.result;
@@ -2011,39 +1839,25 @@ struct Engine : kern::Blueprint {
     engine_night_windows_release(0);
     engine_soldier_art_delete_make(n231);
     R793_0 = n231.result;
+  }
+
+  void Run18() {
     engine_soldier_art_delete_release(0);
     engine_sound_asset_make(n232);
     R795_0 = n232.result;
     engine_sound_asset_release(0);
-    engine_sound_bank_make(n233, 0);
-    R797_0 = n233.result;
     engine_sound_bank_release(0);
     engine_texture_asset_make(n234);
     R799_0 = n234.result;
-  }
-
-  void Run21() {
     engine_texture_asset_release(0);
-    engine_client_make(n235, 0, In86, Int64{0x0});
-    R801_0 = n235.result;
     engine_client_release(0);
-    engine_connection_make(n236, In87, 0.0);
-    R803_0 = n236.result;
     engine_connection_release(0);
-    engine_host_transport_make(n237, In67);
-    R805_0 = n237.result;
     engine_host_transport_release(0);
-    engine_loopback_network_make(n238, 0);
-    R807_0 = n238.result;
     engine_loopback_network_release(0);
     engine_measure_stream_make(n239);
     R809_0 = n239.result;
     engine_measure_stream_release(0);
-    engine_server_make(n240, 0, In86, Int64{0x0});
-    R811_0 = n240.result;
     engine_server_release(0);
-    engine_simulator_make(n241, 0);
-    R813_0 = n241.result;
     engine_simulator_release(0);
     engine_character_mover_make(n242);
     R815_0 = n242.result;
@@ -2054,6 +1868,195 @@ struct Engine : kern::Blueprint {
     engine_world_make(n244);
     R819_0 = n244.result;
     engine_world_release(0);
+  }
+
+  void Free1() {
+    R75 = engine_audio_bus_name(In5);
+    engine_audio_parse_bus(n15, "", In5);
+    R76_0 = n15.result;
+    R76_1 = n15.out;
+    R77 = engine_audio_rolloff_name(In6);
+    engine_audio_parse_rolloff(n16, "", In6);
+    R78_0 = n16.result;
+    R78_1 = n16.out;
+    R106 = engine_audio_synthesize(In9, 0);
+    engine_audio_mix_into(n24, List<Float>{}, List<Float>{}, 0.0, 0, 0.0);
+    R107_0 = n24.dst;
+    engine_audio_make_seamless(n25, List<Float>{}, 0, 0.0);
+    R108_0 = n25.samples;
+    engine_audio_normalize(n26, List<Float>{}, 0.0);
+    R109_0 = n26.samples;
+    R110 = engine_audio_builtin_sounds();
+    R111 = engine_audio_find_builtin("");
+    engine_audio_render_builtin(n27, "", 0, List<Float>{}, 0);
+    R112_0 = n27.result;
+    R112_1 = n27.out;
+    R112_2 = n27.channels;
+    engine_fail_text(n31, "");
+    R118_0 = n31.result;
+    R119 = engine_last_error();
+    engine_clear_error();
+    R121 = engine_now_ms();
+    R122 = engine_wall_ms();
+    engine_jobs_submit(n32, 0, List<Int>{});
+    R123_0 = n32.result;
+    engine_jobs_take(n33, 0, List<Int>{});
+    R124_0 = n33.result;
+    R124_1 = n33.out;
+    engine_jobs_cancel(0);
+    engine_jobs_pump(0.0);
+    R127 = engine_jobs_pending();
+    engine_jobs_set_external(false);
+    R129 = engine_jobs_external();
+    R130 = engine_jobs_take_queued();
+    engine_jobs_run(n34, 0, List<Int>{}, List<Int>{});
+    R131_0 = n34.output;
+    engine_jobs_done(0, List<Int>{});
+    R133 = engine_game_shape_mesh(In10);
+    R134 = engine_game_shape_bounds(In10);
+    R135 = engine_game_fit_collider(In10);
+    R136 = engine_game_shape_hull_points(In10);
+    engine_game_build_city(n35, In11, In12);
+    R137_0 = n35.result;
+    R137_1 = n35.out;
+    engine_game_city_street_point(n36, In11, In13);
+    R138_0 = n36.result;
+    R138_1 = n36.rng;
+    R139 = engine_game_euler_to_quat(Vector{0.0, 0.0, 0.0});
+    R140 = engine_game_quat_to_euler(In14);
+    R141 = engine_game_transform_matrix(In15);
+    R142 = engine_game_matrix_transform(In16);
+    R143 = engine_game_shape_name(In17);
+    engine_game_parse_shape(n37, "", In17);
+    R144_0 = n37.result;
+    R144_1 = n37.out;
+    R145 = engine_game_motion_name(In18);
+    R146 = engine_game_collider_shape_name(In19);
+  }
+
+  void Free2() {
+    R147 = engine_game_joint_kind_name(In20);
+    R148 = engine_game_control_mode_name(In21);
+    R149 = engine_game_camera_mode_name(In22);
+    R150 = engine_game_weapon_kind_name(In23);
+    R151 = engine_game_weapon_preset(In23);
+    R152 = engine_game_trigger_action_name(In24);
+    R153 = engine_game_mover_mode_name(In25);
+    R154 = engine_game_game_goal_name(In26);
+    R155 = engine_game_motion_name_ok("");
+    R156 = engine_game_default_player(In27);
+    R157 = engine_game_channel_names(In28);
+    R158 = engine_game_channel_bits(In28, "");
+    R159 = engine_level_find_2(In27, 0);
+    engine_level_add(n38, In27, In29);
+    R160_0 = n38.result;
+    R160_1 = n38.self;
+    R161 = engine_level_children(In27, 0);
+    R162 = engine_level_world_matrix(In27, 0);
+    R163 = engine_level_body_owner(In27, 0);
+    R164 = engine_level_is_ancestor(In27, 0, 0);
+    R165 = engine_level_texture(In27, "");
+    R166 = engine_level_sound(In27, "");
+    R167 = engine_level_motion(In27, "");
+    engine_level_motion_2(n39, In27, "");
+    R168_0 = n39.result;
+    R168_1 = n39.self;
+    R169 = engine_game_to_json(In27);
+    R170 = engine_game_to_text(In27, 0);
+    R171 = engine_game_actor_to_json(In29);
+    R172 = engine_game_world_to_json(In28);
+    R173 = engine_game_sound_reference_ok(In27, "");
+    R174 = engine_game_validate(In27);
+    R175 = engine_game_hex_color(Vector{0.0, 0.0, 0.0});
+    engine_game_parse_hex_color(n40, "", Vector{0.0, 0.0, 0.0});
+    R176_0 = n40.result;
+    R176_1 = n40.out;
+    R177 = engine_game_srgb_to_linear(Vector{0.0, 0.0, 0.0});
+    R178 = engine_game_logic_node_shapes_registered();
+    R179 = engine_game_logic_node_types();
+    R180 = engine_game_logic_nodes_registered();
+    R189 = engine_game_plan_bodies(In27);
+    R190 = engine_game_game_status_name(In30);
+    R343 = engine_game_engine_sound_for(In42);
+    engine_clean_ring(n108, List<Float>{});
+    R360_0 = n108.xy;
+    R361 = engine_ring_area(List<Float>{}, 0);
+    R363 = engine_earcut_deviation(List<Float>{}, 0, List<Int>{}, 0, List<Int>{}, 0);
+  }
+
+  void Free3() {
+    R364 = engine_mesh_data_as_input(In44, 0);
+    engine_upsert(n110, 0, 0, In44, In45, List<Float>{}, List<Float>{});
+    R365_0 = n110.result;
+    engine_weld(n111, In44, 0);
+    R366_0 = n111.result;
+    R366_1 = n111.mesh;
+    R367 = engine_content_hash(In44);
+    R368 = engine_primitives_box(Vector{0.0, 0.0, 0.0}, Vector{0.0, 0.0, 0.0});
+    R369 = engine_primitives_box_on_ground(Vector{0.0, 0.0, 0.0}, Vector{0.0, 0.0, 0.0});
+    R370 = engine_primitives_sphere(0.0, 0, 0, Vector{0.0, 0.0, 0.0});
+    R371 = engine_primitives_capsule(0.0, 0.0, 0, 0, Vector{0.0, 0.0, 0.0});
+    R372 = engine_primitives_torus(0.0, 0.0, 0, 0, Vector{0.0, 0.0, 0.0});
+    R373 = engine_primitives_cylinder(0.0, 0.0, 0, Vector{0.0, 0.0, 0.0});
+    R374 = engine_primitives_cone(0.0, 0.0, 0, Vector{0.0, 0.0, 0.0});
+    R375 = engine_primitives_plane(0.0, 0.0, Vector{0.0, 0.0, 0.0}, 0.0);
+    engine_primitives_append(n112, In44, In44, In16);
+    R376_0 = n112.dst;
+    engine_build_terrain_tile(n117, 0.0, 0.0, 0.0, 0, In46, 0, In44);
+    R389_0 = n117.result;
+    R389_1 = n117.out;
+    R389_2 = n117.min_height;
+    R389_3 = n117.max_height;
+    R396 = engine_bounding_sphere(List<Float>{}, 0);
+    R397 = engine_mirror_state(List<Float>{}, 0);
+    engine_apply_cull_mode(0);
+    R399 = engine_instanced_bounds(In47, List<Float>{}, 0);
+    engine_uniform_cache_set_mat4_array(0, List<Float>{}, 0);
+    R516 = engine_build_standard_shader(List<Int>{});
+    R517 = engine_net_client_state_name(In66);
+    R547 = engine_net_connection_error_name(In68);
+    R637 = engine_physics_surface_name(In70);
+    engine_physics_parse_surface(n189, "", In70);
+    R638_0 = n189.result;
+    R638_1 = n189.out;
+    R639 = engine_physics_surface_friction(In70, In70);
+    R640 = engine_physics_frame_from_axis(Vector{0.0, 0.0, 0.0}, Vector{0.0, 0.0, 0.0}, false);
+    R641 = engine_physics_version();
+    engine_physics_hull_mesh(n200, List<Vector>{}, In44, Vector{0.0, 0.0, 0.0});
+    R731_0 = n200.result;
+    R731_1 = n200.out;
+    engine_screen_ray(n201, In3, 0.0, 0.0, 0.0, 0.0, In63);
+    R735_0 = n201.result;
+    R735_1 = n201.out;
+    engine_pick_meshes(n202, List<Int>{}, In63, In64, In65);
+    R736_0 = n202.result;
+    R736_1 = n202.hit;
+    R736_2 = n202.stats;
+    engine_engine_make(n208, 0);
+    R747_0 = n208.result;
+    engine_light_pool_make(n212, 0, 0);
+    R755_0 = n212.result;
+    engine_game_audio_make(n226, 0, 0);
+    R783_0 = n226.result;
+    engine_game_world_make(n227, 0, 0);
+    R785_0 = n227.result;
+    engine_sound_bank_make(n233, 0);
+    R797_0 = n233.result;
+    engine_client_make(n235, 0, In86, Int64{0x0});
+    R801_0 = n235.result;
+    engine_connection_make(n236, In87, 0.0);
+    R803_0 = n236.result;
+    engine_host_transport_make(n237, In67);
+    R805_0 = n237.result;
+    engine_loopback_network_make(n238, 0);
+    R807_0 = n238.result;
+    engine_server_make(n240, 0, In86, Int64{0x0});
+    R811_0 = n240.result;
+  }
+
+  void Free4() {
+    engine_simulator_make(n241, 0);
+    R813_0 = n241.result;
   }
 
   struct { Int result = 0; } n11;
@@ -2293,6 +2296,8 @@ struct Engine : kern::Blueprint {
 };
 )kn";
 
-inline const char* const kRuns[] = {"Run1", "Run2", "Run3", "Run4", "Run5", "Run6", "Run7", "Run8", "Run9", "Run10", "Run11", "Run12", "Run13", "Run14", "Run15", "Run16", "Run17", "Run18", "Run19", "Run20", "Run21"};
+inline const char* const kRuns[] = {"Run1", "Run2", "Run3", "Run4", "Run5", "Run6", "Run7", "Run8", "Run9", "Run10", "Run11", "Run12", "Run13", "Run14", "Run15", "Run16", "Run17", "Run18", "Free1", "Free2", "Free3", "Free4"};
+// (those whose calls are on objects of the engine: played once more on the engine itself)
+inline const char* const kRunsOnObjects[] = {"Run1", "Run2", "Run3", "Run4", "Run5", "Run6", "Run7", "Run8", "Run9", "Run10", "Run11", "Run12", "Run13", "Run14", "Run15", "Run16", "Run17", "Run18"};
 
 }  // namespace engine_case

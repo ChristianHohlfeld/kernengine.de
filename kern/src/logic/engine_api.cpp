@@ -50,6 +50,8 @@ void add_engine_nodes(Library& lib) {
 
 bool Host::engine(std::string_view, const std::vector<Value>&, std::vector<Value>&) { return false; }
 ActorRef Host::find_actor(std::string_view) { return 0; }
+EngineObjects* Host::engine_objects() { return nullptr; }
+void Host::engine_failed(std::string_view) {}
 
 std::string engine_shown(const Value& v) {
   char b[128];
