@@ -165,7 +165,7 @@ void Game::worldsync_update(f32 dt) {
       auto near = [&](Vec3 p, f32 reach) { return dist2d(p, at) < reach; };
       // one list: its entries packed into numbered parts of at most ~1100 bytes
       struct List {
-        Game* g; u8 to, type; Vec3 o; u32 t_ms;
+        u8 to, type; Vec3 o; u32 t_ms;
         std::vector<u8> extra;  // after the header of every part (the list's own header)
         std::vector<u8> w;
         u8 n = 0, part = 0;
@@ -179,10 +179,11 @@ void Game::worldsync_update(f32 dt) {
           w.insert(w.end(), extra.begin(), extra.end());
           n = 0;
         }
-        void flush(bool last) { w[1] = static_cast<u8>(n | (last ? 0x80 : 0)); g->net_.send_world_to(to, w); ++part; head(); }
-        void entry(const std::vector<u8>& e) { if (n >= 120 || w.size() + e.size() > 1100) flush(false); w.insert(w.end(), e.begin(), e.end()); ++n; }
+        // (the session it goes out through: handed to the call that sends)
+        void flush(net::Session& net, bool last) { w[1] = static_cast<u8>(n | (last ? 0x80 : 0)); net.send_world_to(to, w); ++part; head(); }
+        void entry(net::Session& net, const std::vector<u8>& e) { if (n >= 120 || w.size() + e.size() > 1100) flush(net, false); w.insert(w.end(), e.begin(), e.end()); ++n; }
       };
-      auto list = [&](u8 type) { List l{this, to, type, o, t_ms, {}, {}, 0, 0}; return l; };
+      auto list = [&](u8 type) { List l{to, type, o, t_ms, {}, {}, 0, 0}; return l; };
       if (send_cars) {
         List L = list(kCars);
         L.head();
@@ -199,7 +200,7 @@ void Game::worldsync_update(f32 dt) {
           const bool rest = kern::length(s.velocity) < 0.03f && kern::length(s.angular) < 0.03f;
           if (rest && (world_tick_ + i) % kRestEvery != 0) {
             wire::put_u8(e, static_cast<u8>(fl | 0x80));
-            L.entry(e);
+            L.entry(net_, e);
             continue;
           }
           wire::put_u8(e, fl);
@@ -208,9 +209,9 @@ void Game::worldsync_update(f32 dt) {
           wire::put_i16(e, q16(s.rotation.x)); wire::put_i16(e, q16(s.rotation.y)); wire::put_i16(e, q16(s.rotation.z)); wire::put_i16(e, q16(s.rotation.w));
           wire::put_i16(e, cms(s.velocity.x)); wire::put_i16(e, cms(s.velocity.y)); wire::put_i16(e, cms(s.velocity.z));
           wire::put_i16(e, ang16(c.car->steer_angle()));
-          L.entry(e);
+          L.entry(net_, e);
         }
-        L.flush(true);
+        L.flush(net_, true);
         ++world_sent_;
       }
       if (send_people) {
@@ -228,9 +229,9 @@ void Game::worldsync_update(f32 dt) {
             wire::put_i16(e, p5(p.pos.x, o.x)); wire::put_i16(e, p5(p.pos.y, o.y));
             wire::put_u8(e, ang8(p.yaw));
             wire::put_u8(e, static_cast<u8>(std::lround(clampf(p.v * 20, 0, 255))));
-            L.entry(e);
+            L.entry(net_, e);
           }
-          L.flush(true);
+          L.flush(net_, true);
         }
         // the animals: the cows (by key), the dogs and cats (by index; their rounds are a function
         // of the host's wall clock and their neighbourhood's anchor - both sent, so they walk the
@@ -250,9 +251,9 @@ void Game::worldsync_update(f32 dt) {
               const u8 fl = static_cast<u8>((c.dead ? 1 : 0) | (c.walking ? 2 : 0) | (c.carried ? 4 : 0));
               wire::put_u8(e, fl);
               if (fl & 5) quat(e, c.rot);
-              L.entry(e);
+              L.entry(net_, e);
             }
-            L.flush(true);
+            L.flush(net_, true);
           }
           {
             List L = list(kPets);
@@ -278,9 +279,9 @@ void Game::worldsync_update(f32 dt) {
               const u8 fl = static_cast<u8>((p.shown ? 1 : 0) | (p.dead_at >= 0 ? 2 : 0) | (p.carried ? 4 : 0));
               wire::put_u8(e, fl);
               if (fl & 6) quat(e, p.rot);
-              L.entry(e);
+              L.entry(net_, e);
             }
-            L.flush(true);
+            L.flush(net_, true);
           }
           {
             List L = list(kFlocks);
@@ -299,9 +300,9 @@ void Game::worldsync_update(f32 dt) {
                 wire::put_i16(e, p5(b.pos.x, o.x)); wire::put_i16(e, p5(b.pos.y, o.y)); wire::put_i16(e, p1(b.pos.z, o.z));
                 wire::put_u8(e, ang8(b.yaw));
               }
-              L.entry(e);
+              L.entry(net_, e);
             }
-            L.flush(true);
+            L.flush(net_, true);
           }
           // the running club (jogger_chain.mjs): its id and its runners, when it runs near him
           {
@@ -319,9 +320,9 @@ void Game::worldsync_update(f32 dt) {
                 wire::put_i16(e, p5(rn.pos.x, o.x)); wire::put_i16(e, p5(rn.pos.y, o.y));
                 wire::put_u8(e, ang8(rn.yaw));
               }
-              L.entry(e);
+              L.entry(net_, e);
             }
-            L.flush(true);
+            L.flush(net_, true);
           }
         }
       }

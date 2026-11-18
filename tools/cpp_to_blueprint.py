@@ -57,7 +57,10 @@ with: the Blueprint's whole number, as above.)
 A map is the list of its rows - structs of a key (`first`) and what it holds (`second`) -, a set
 the list of its keys, in the order the keys were put in (std::map and std::set: in the order of
 the keys). An iterator into a map, a set or a list is the place it stands at, a whole number; the
-end is the list's length. `auto [a, b] = value;` gives names to the parts of a value: where they
+end is the list's length; one that goes through a list from its end (rbegin() ... rend()) is the place
+it holds, as C++ defines it: the list's length at first, 0 at the end, the entry it names the one before
+that place. `it = v.erase(it)` takes the entry out and leaves the iterator where it stood; `a.swap(b)` of
+two lists hands each what the other held (three Takes and Sets, nothing copied). `auto [a, b] = value;` gives names to the parts of a value: where they
 stand, the part is written out.
 
 An object of the engine is a handle in a Blueprint (0: none). One a value holds as a field (a
@@ -73,7 +76,16 @@ in or given back by value, a list or a map of them changed - waits (Emit.lifetim
 A parameter `const T*` a function reads entries through (`p[i]`, `*p`), hands on (`p + 2`) or asks
 whether it is null is a pointer into a list, like an iterator: the list, read where it stands (a const
 reference input), and the place in it (an Int; null is -1). Its list is of the type every call of the
-program hands it - a std::array<T, N> is Fixed<T, N> - and `a.data() + k` hands (a, k).
+program hands it - a std::array<T, N> is Fixed<T, N> - and `a.data() + k` hands (a, k). A pointer of a
+function to an entry of a list, or to none (`Car* job = there ? &cars[i] : nullptr;`, never given another
+value), is the same: the list where it stands and the place in it; `job->x` is the entry's field, read and
+changed there, `!job` asks whether it has a place. A text of the program or none (`const char* reason =
+nullptr;`) is two values of the function, the text and whether there is one; the text is read only behind
+the check that leaves the block (`if (!reason) continue;`). An array of texts (`const char* const kNames[]
+= {...}`) is a list of texts.
+
+A break in the middle of a switch's case leaves the case by a flag, as the break of a loop leaves the loop:
+what follows it in the case runs only while the flag is not set.
 
   tools/cpp_to_blueprint.py --check <namespace> <include flags...> -- <file.cpp>...
 
@@ -138,6 +150,10 @@ KEYED = re.compile(r"std::(unordered_)?(multi)?(map|set)<")
 # kern::Map, kern::Set (kern/core/map.h): the language's Map and Set - values under keys, keys, in the order the keys came
 KEYED_KERN = re.compile(r"kern::(Map|Set)<")
 ITERATOR = re.compile(r"std::__detail::_Node_(?:const_)?iterator(?:_base)?<|std::_Rb_tree_(?:const_)?iterator<|__gnu_cxx::__normal_iterator<")
+# An iterator that goes through a list from its end (v.rbegin() ... v.rend()) holds, as C++ defines it, a place of
+# the list and names the entry before it: that place is what it is here - rbegin() the list's length, rend() 0,
+# a step forward one place down.
+REVERSE_ITERATOR = re.compile(r"std::reverse_iterator<__gnu_cxx::__normal_iterator<")
 UNSIGNED = {"unsigned char", "unsigned short", "unsigned int", "unsigned long", "unsigned long long"}
 # An unsigned 64-bit whole number is, in a Blueprint, the whole number its bits are read with a sign
 # (2^64 - 1 is -1): what C++ adds, subtracts and multiplies around 2^64 comes out the same, exactly,
@@ -367,6 +383,31 @@ def unit_order(path, flags):
     return out
 
 
+# The length of an array a type names by an expression (`std::array<ClipId, static_cast<u32>(Sound::kCount)>`)
+# is the number the compiler works out. It says so wherever it names the type of a value (there it writes the
+# type out: std::array<unsigned int, 18>), not behind a reference (`...& clips`): what the spelling means is
+# taken from where it is said - {the type as spelled: the type written out; None where the compiler has said
+# two things of one spelling}. Read by Unit.clean.
+SAID_ARRAYS = {}
+
+
+def spelled_length(t):
+    """Is this the name of a std::array whose length is not a number written out?"""
+    if not t.startswith("std::array<") or not t.endswith(">"):
+        return False
+    args = template_args(t)
+    return len(args) == 2 and not re.fullmatch(r"\d+[uUlL]*", args[1])
+
+
+def note_array(spelled, written):
+    spelled = re.sub(r"^(?:const\s+)?(.*?)(?:\s*&)*$", r"\1", spelled.strip())
+    written = re.sub(r"^(?:const\s+)?(.*?)(?:\s*&)*$", r"\1", written.strip())
+    if not spelled_length(spelled) or not written.startswith("std::array<") or spelled_length(written):
+        return
+    if SAID_ARRAYS.setdefault(spelled, written) != written:
+        SAID_ARRAYS[spelled] = None
+
+
 def annotate(o, st):
     """Every place of the tree gets the file it is in (clang names a file only where it changes)."""
     if isinstance(o, list):
@@ -375,6 +416,8 @@ def annotate(o, st):
         return
     if not isinstance(o, dict):
         return
+    if "desugaredQualType" in o and "std::array<" in o.get("qualType", ""):
+        note_array(o["qualType"], o["desugaredQualType"])
     if "offset" in o and "kind" not in o:
         if "file" in o:
             st["file"] = o["file"]
@@ -1320,6 +1363,10 @@ class Unit:
 
     # ---- types ----
     def clean(self, t):
+        if SAID_ARRAYS and "std::array<" in t:   # (an array's length written as an expression: SAID_ARRAYS)
+            for spelled, written in SAID_ARRAYS.items():
+                if written and spelled in t:
+                    t = t.replace(spelled, written)
         if "enum at " in t:   # (a place of an enum without a name holds a number of its underlying type)
             t = re.sub(r"(?:(?:[A-Za-z_]\w*|\(anonymous namespace\))::)*(\((?:unnamed|anonymous) enum at [^)]*\))", lambda m: self.tree.unnamed.get(m.group(1), m.group(0)), t)
         t = re.sub(r"\b(const|volatile|struct|class|enum)\b", " ", t).replace("&&", " ").replace("&", " ")
@@ -1542,6 +1589,11 @@ class Unit:
         """The Blueprint type of a C++ type."""
         if raw.strip() in ("const char *", "const char *const"):
             return "Text"
+        if re.fullmatch(r"const char \*\s*(?:const\s*)?(?:\[\d*\]\s*)+", raw.strip()):
+            # (an array of texts of the program - `const char* const kNames[] = {"A", "B"}`: a list of texts;
+            # said here, where the type still says that what its entries point at is not changed)
+            inner = re.sub(r"\[\d*\]\s*$", "", raw.strip(), count=1).strip()
+            return f"List<{self.element(self.btype(inner), self.entries(inner))}>"
         if self.object_of(raw):
             return "Int"
         t = self.clean(raw)
@@ -1557,7 +1609,7 @@ class Unit:
             return "Vector"
         if t == "void":
             return None
-        if ITERATOR.match(t):
+        if ITERATOR.match(t) or REVERSE_ITERATOR.match(t):
             return "Int"
         if t == "std::_Bit_reference":
             return "Bool"   # (std::vector<bool>'s entry where it stands: in a List<Bool> a place like any other - see member_call, for_each)
@@ -2826,6 +2878,8 @@ class Emit:
         self.result_struct = None
         self.homes = {}       # decl id of an iterator (or of what insert() gave) -> the list it goes through
         self.pointers = {}    # decl id of a parameter that is a pointer into a list -> (the list's input, the place's input, the entries' type)
+        self.or_none = {}     # decl id of a text or none (text_or_none) -> the Bool that says whether there is one
+        self.unbound = {}     # decl id of a pointer to an entry of a list that began as none (entry_pointer) -> the Int its place is
         self.text_ptrs = {}   # decl id of a local pointer into a text (char* end of strtod) -> {"text": the text, "at": the Int of its place}
         self.assigned_ids = set()   # (the variables the body changes - see assigned)
         self.keyed_vars = {}  # decl id of a name for an entry of a map or a set (a loop's variable, `auto& [k, v]`) -> (the map or set, its place)
@@ -4123,9 +4177,17 @@ class Emit:
                 if alias is not None:
                     out += self.take_pre() + alias
                     continue
+                to_entry = self.entry_pointer(v)
+                if to_entry is not None:
+                    out += self.take_pre() + to_entry
+                    continue
                 end_pointer = self.text_pointer_local(v)
                 if end_pointer is not None:
                     out += end_pointer
+                    continue
+                or_none = self.text_or_none(v)
+                if or_none is not None:
+                    out += self.take_pre() + or_none
                     continue
                 if v.get("id") in self.named_places:
                     # (a name for a place: written out where it is used - what making the place does, a new row of a map, is done here)
@@ -4178,7 +4240,7 @@ class Emit:
                     text = self.made_list(said[0], self.types[v['id']]) if said else self.ex(init, self.types[v['id']])
                     out += self.take_pre() + [f"{name} = {text};"]
                     c = self.ctype(v)
-                    if ITERATOR.match(c):
+                    if ITERATOR.match(c) or REVERSE_ITERATOR.match(c):
                         self.note_home(v["id"], init)
                     elif c.startswith("std::pair<") and ITERATOR.match(template_args(c)[0]):
                         self.note_home(v["id"], init, of_pair=True)
@@ -4209,6 +4271,20 @@ class Emit:
                 return self.take_pre() + self.releases(made) + [self.ret_line(None)], True
             kept = self.temp("returned", self.f.value)
             return self.take_pre() + [f"{kept} = {text};"] + self.releases(made) + [self.ret_line(kept)], True
+        if k == "IfStmt" and (s.get("hasInit") or s.get("hasVar")) and len(kids(s)) > 2 and kids(s)[0].get("kind") == "DeclStmt":
+            # `if (T& x = place; cond) ...`: what the if declares lives as long as the if - the block of the
+            # declaration and the if without it (a reference it declares is a name for its place in all of the if)
+            c = kids(s)
+            # (`if (init; T x = value)` has two declarations: the first goes into the block, the second stays the if's)
+            rest = dict(s, inner=c[1:], hasInit=False, hasVar=bool(s.get("hasInit") and s.get("hasVar")))
+            self.scopes.append([])
+            try:
+                out, ended = self.block_of([c[0], rest])
+            finally:
+                made = self.scopes.pop()
+            if made:
+                raise Wait("an object of the engine made in the declaration of an if, a for or a while")
+            return out, ended
         if k == "IfStmt":
             c = kids(s)
             out = []
@@ -4547,6 +4623,96 @@ class Emit:
         del self.names[v["id"]]
         self.text_ptrs[v["id"]] = {"text": None, "at": name}
         return [f"{name} = 0;"]
+
+    def text_or_none(self, v):
+        """`const char* reason = nullptr;` - a text of the program or none: a variable of the function that is given
+        texts and null and is asked whether it is null. It is two values: the text, and whether there is one
+        (`!reason`, `reason == nullptr` ask the second). The text itself is read only where C++ knows there is one:
+        after a statement of its block `if (!reason || ...) continue;` (return, break) that follows all that is
+        given to it - anywhere else a null would be read as an empty text, which it is not: that waits.
+        Gives the lines that set the two - None: `v` is no such variable."""
+        if qtype(v).strip() != "const char *":
+            return None
+        init = self.init_of(v)
+        if init is None:
+            return None
+        vid = v["id"]
+        def names(n):
+            b = self.unwrap(n)
+            while b.get("kind") == "ParenExpr" and kids(b):
+                b = self.unwrap(kids(b)[0])
+            return b.get("kind") == "DeclRefExpr" and (b.get("referencedDecl") or {}).get("id") == vid
+        def asks(n):
+            """`!p`, `p == nullptr`, `p != nullptr`, `p` as a condition: (the nodes that only ask whether there is one)."""
+            k = n.get("kind")
+            if k == "ImplicitCastExpr" and n.get("castKind") == "PointerToBoolean" and kids(n) and names(kids(n)[0]):
+                return True
+            return k == "BinaryOperator" and n.get("opcode") in ("==", "!=") and len(kids(n)) == 2 and (
+                names(kids(n)[0]) and self.nothing(kids(n)[1]) or names(kids(n)[1]) and self.nothing(kids(n)[0]))
+        def gives(n):
+            return n.get("kind") == "BinaryOperator" and n.get("opcode") == "=" and names(kids(n)[0])
+        def none_first(c):
+            """Is the condition true whenever there is none: `!p`, `p == nullptr`, or one of them `|| ...`?"""
+            b = bare(c)
+            while b.get("kind") in ("ParenExpr", "ExprWithCleanups") and kids(b):
+                b = bare(kids(b)[0])
+            if b.get("kind") == "BinaryOperator" and b.get("opcode") == "||":
+                return none_first(kids(b)[0]) or none_first(kids(b)[1])
+            if b.get("kind") == "UnaryOperator" and b.get("opcode") == "!" and kids(b):
+                return asks(bare(kids(b)[0]))
+            return b.get("kind") == "BinaryOperator" and b.get("opcode") == "==" and asks(b)
+        def leaves(n):
+            k = n.get("kind")
+            return k in ("ReturnStmt", "BreakStmt", "ContinueStmt") or (k == "CompoundStmt" and bool(kids(n)) and leaves(kids(n)[-1]))
+        given = [init] + [kids(n)[1] for n in walk(self.f.decl) if gives(n)]
+        if not any(self.nothing(x) for x in given):
+            return None   # (never none: a text like any other)
+        if any(not self.nothing(x) and self.tp_or_none(x) != "Text" for x in given):
+            return None
+        block = next((b for b in walk(self.f.decl) if b.get("kind") == "CompoundStmt" and any(c.get("kind") == "DeclStmt" and any(d is v for d in kids(c)) for c in kids(b))), None)
+        if block is None:
+            return None
+        stmts = kids(block)
+        at = next(i for i, c in enumerate(stmts) if c.get("kind") == "DeclStmt" and any(d is v for d in kids(c)))
+        guard = next((i for i in range(at + 1, len(stmts)) if stmts[i].get("kind") == "IfStmt" and not stmts[i].get("hasElse") and not stmts[i].get("hasInit")
+                      and not stmts[i].get("hasVar") and len(kids(stmts[i])) == 2 and none_first(kids(stmts[i])[0]) and leaves(kids(stmts[i])[1])), None)
+        # where it is given a value and where its text is read, by the statement of its block
+        def uses(n, out):
+            if gives(n):
+                out.append("given")
+                uses(kids(n)[1], out)
+                return
+            if asks(n):
+                return
+            if n.get("kind") == "DeclRefExpr" and (n.get("referencedDecl") or {}).get("id") == vid:
+                out.append("read")
+            for c in kids(n):
+                uses(c, out)
+        for i, st in enumerate(stmts[at + 1:], at + 1):
+            found = []
+            uses(st, found)
+            if "given" in found and guard is not None and i >= guard:
+                raise Wait("a text that may be none (a null pointer), given a value after it is known to be one")
+            if "read" in found and (guard is None or i <= guard):
+                raise Wait("a text that may be none (a null pointer), read where it may be none")
+        name = self.local(v, "Text")
+        there = self.temp(name + "_there", "Bool")
+        self.or_none[vid] = there
+        return self.text_or_none_set(v, init)
+
+    def text_or_none_set(self, v, value):
+        """A text or none (text_or_none) is given a value: the two steps."""
+        name, there = self.names[v["id"]], self.or_none[v["id"]]
+        if self.nothing(value):
+            return [f'{name} = "";', f"{there} = false;"]
+        return [f"{name} = {self.ex(value, 'Text')};", f"{there} = true;"]
+
+    def asked_or_none(self, n):
+        """The flag of a text or none (text_or_none) that `n` names - None: it names none."""
+        b = self.unwrap(n)
+        while b.get("kind") == "ParenExpr" and kids(b):
+            b = self.unwrap(kids(b)[0])
+        return self.or_none.get((b.get("referencedDecl") or {}).get("id")) if b.get("kind") == "DeclRefExpr" else None
 
     def end_into(self, end, text, place):
         """`&end` of strtod: the pointer `end` is the place `place` of `text` from here on."""
@@ -4906,8 +5072,6 @@ class Emit:
                     break
             if not closed and (labels, stmts) is not (cases[-1][0], cases[-1][1]) and cases[-1] is not None and labels is not cases[-1][0]:
                 raise Wait("a switch case that falls through")
-            for x in body_stmts:
-                self.no_switch_break(x)
             ends = self.ends(body_stmts)
             all_end = all_end and ends
             out_cases.append((labels, body_stmts, ends))
@@ -4918,7 +5082,7 @@ class Emit:
             covered = set()
             default_body = next((b for labels, b, _ in out_cases if None in labels), None)
             def one(name, stmts):
-                body = self.block(stmts) if stmts is not None else []
+                body = self.case_block(stmts) if stmts is not None else []
                 return [f"  case {st}::{name}: {{", *["    " + ln for ln in body], "  } break;"]
             by_value = {}
             for labels, stmts, _ in out_cases:
@@ -4957,12 +5121,12 @@ class Emit:
             cond = conds[0]
             for x in conds[1:]:
                 cond = f"logic_or({cond}, {x})"
-            body = self.block(stmts)
+            body = self.case_block(stmts)
             lines.append(("if" if first else "} else if") + f" ({cond}) {{")
             lines += ["  " + ln for ln in body]
             first = False
         if default is not None:
-            body = self.block(default)
+            body = self.case_block(default)
             if first:
                 lines += body
             else:
@@ -4971,14 +5135,28 @@ class Emit:
             lines.append("}")
         return lines, all_end and has_default
 
-    def no_switch_break(self, n):
+    def leaves_case(self, n):
+        """Is there a break of the switch's case in this statement (not one of a loop or a switch inside it)?"""
         k = n.get("kind")
         if k == "BreakStmt":
-            raise Wait("a break in the middle of a switch case")
+            return True
         if k in ("ForStmt", "WhileStmt", "DoStmt", "CXXForRangeStmt", "SwitchStmt", "LambdaExpr"):
-            return
-        for c in kids(n):
-            self.no_switch_break(c)
+            return False
+        return any(self.leaves_case(c) for c in kids(n))
+
+    def case_block(self, stmts):
+        """The statements of a switch's case (without the break that ends it). A break in their middle - `if (gone)
+        { state = off; break; }` - leaves the case: it sets a flag, and what follows it in the case runs only while
+        the flag is not set, as after a loop's break (block_of). A continue in the case is the enclosing loop's."""
+        if not any(self.leaves_case(x) for x in stmts):
+            return self.block(stmts)
+        left = self.temp("left", "Bool")
+        self.loops.append({"stop": left, "skip": self.loops[-1]["skip"] if self.loops else None})
+        try:
+            body = self.block(stmts)
+        finally:
+            self.loops.pop()
+        return [f"{left} = false;"] + body
 
     # ---- statements that change something ----
     def effect(self, s):
@@ -4991,6 +5169,10 @@ class Emit:
                        (x.get("kind") == "BinaryOperator" and x.get("opcode") == "=") or (x.get("kind") == "UnaryOperator" and x.get("opcode") in ("++", "--"))
                        for x in walk(inner))
             return self.effect(inner) if acts else []
+        if k == "BinaryOperator" and n.get("opcode") == "=" and self.unwrap(kids(n)[0]).get("kind") == "DeclRefExpr" and (self.unwrap(kids(n)[0]).get("referencedDecl") or {}).get("id") in self.unbound:
+            return self.entry_pointer_set(self.unwrap(kids(n)[0])["referencedDecl"]["id"], kids(n)[1])   # (a pointer to an entry is given one, or none)
+        if k == "BinaryOperator" and n.get("opcode") == "=" and self.asked_or_none(kids(n)[0]) is not None:
+            return self.text_or_none_set(self.unwrap(kids(n)[0])["referencedDecl"], kids(n)[1])   # (a text or none is given one, or none)
         if k == "BinaryOperator" and n.get("opcode") == "=":
             a, b = kids(n)
             inner = self.unwrap(b)
@@ -5034,12 +5216,13 @@ class Emit:
         if k == "CXXOperatorCallExpr":
             name = callee_name(n)
             ops = kids(n)[1:]
-            if ops and self.is_iter(ops[0]) and name in ("operator++", "operator--", "operator+=", "operator-="):
+            if ops and (self.is_iter(ops[0]) or self.is_reverse_iter(ops[0])) and name in ("operator++", "operator--", "operator+=", "operator-="):
                 by = "1" if name[-1] != "=" else self.ex(ops[1], "Int")
-                if name == "operator++" and self.plain_variable(ops[0]):
+                back = self.is_reverse_iter(ops[0])   # (forward for it is down the list)
+                if name == "operator++" and self.plain_variable(ops[0]) and not back:
                     return [f"{self.lvalue(ops[0])} += 1;"]
-                return self.store(ops[0], lambda t: self.whole_math("+" if name in ("operator++", "operator+=") else "-", self.ex(ops[0], "Int"), by))
-            if ops and self.is_iter(ops[0]) and name == "operator=":
+                return self.store(ops[0], lambda t: self.whole_math("+" if (name in ("operator++", "operator+=")) != back else "-", self.ex(ops[0], "Int"), by))
+            if ops and (self.is_iter(ops[0]) or self.is_reverse_iter(ops[0])) and name == "operator=":
                 target = self.unwrap(ops[0])
                 if target.get("kind") == "DeclRefExpr":
                     self.note_home(target.get("referencedDecl", {}).get("id"), ops[1])
@@ -5876,6 +6059,10 @@ class Emit:
     def is_iter(self, n):
         return ITERATOR.match(self.ctype(n)) is not None
 
+    def is_reverse_iter(self, n):
+        """An iterator through a list from its end (REVERSE_ITERATOR): the place it holds, the entry before it."""
+        return REVERSE_ITERATOR.match(self.ctype(n)) is not None
+
     def rows(self, n):
         """(the map's or set's type, its type's settings - "K, V" or "K" -, a key's type, a value's - None in a set)."""
         lt = self.tp(n)
@@ -5963,7 +6150,8 @@ class Emit:
     def iter_node(self, n):
         """An iterator's expression without what only converts it (an iterator made a const_iterator)."""
         b = self.unwrap(n)
-        while b.get("kind") in ("CXXConstructExpr", "CXXFunctionalCastExpr", "CXXStaticCastExpr") and len(kids(b)) == 1 and self.is_iter(kids(b)[0]):
+        while (b.get("kind") in ("CXXConstructExpr", "CXXFunctionalCastExpr", "CXXStaticCastExpr") and len(kids(b)) == 1
+               and (self.is_iter(kids(b)[0]) if not self.is_reverse_iter(b) else self.is_reverse_iter(kids(b)[0]))):
             b = self.unwrap(kids(b)[0])
         return b
 
@@ -5975,6 +6163,10 @@ class Emit:
             if self.keyed(home):   # (an entry of a map or a set: its key and value - keyed_entry)
                 return {"kind": "_Entry", "_keyed": (home, kids(b)[1]), "type": {"qualType": "int"}, "_bt": "Entry"}
             return self.entry(home, kids(b)[1], self.tp(home)[5:-1])
+        if b.get("kind") == "CXXOperatorCallExpr" and not b.get("_op") and callee_name(b) in ("operator->", "operator*") and len(kids(b)) == 2 and self.is_reverse_iter(kids(b)[1]):
+            # (through a list from its end: the entry before the place the iterator holds)
+            home = self.home(kids(b)[1])
+            return self.entry(home, self.whole_math("-", self.ex(kids(b)[1], "Int"), "1"), self.tp(home)[5:-1])
         return None
 
     def home(self, n):
@@ -5990,6 +6182,8 @@ class Emit:
             m = callee(b)
             base = kids(m)[0] if kids(m) else None
             if base is not None and not self.is_this(base) and m.get("name") in ("begin", "cbegin", "end", "cend", "find", "erase", "insert", "lower_bound", "upper_bound") and (self.tp_or_none(base) or "").startswith(("List<", "Map<", "Set<")):
+                return base
+            if base is not None and not self.is_this(base) and m.get("name") in ("rbegin", "crbegin", "rend", "crend") and (self.tp_or_none(base) or "").startswith("List<"):
                 return base
         if k == "MemberExpr" and b.get("name") == "first" and kids(b):   # (what insert() and emplace() give: the place and whether the key was new)
             x = self.unwrap(kids(b)[0])
@@ -6277,6 +6471,144 @@ class Emit:
         self.pointers[v["id"]] = (lst["_text"], name, entries)
         return [f"{name} = {at};"]
 
+    def entry_pointer(self, v):
+        """`T* p = &list[i];`, `T* p = there ? &list[i] : nullptr;` - a pointer of the function to an entry of a list
+        (or to none), never given another value: like a pointer into a list a function is handed, it is the list -
+        the place where it stands, named as an iterator's list is (steady) - and the place in it (an Int; null is
+        -1). `p->x` is the entry's field, read and changed where it stands; `!p` asks whether it has a place. Gives
+        the lines that set the place - None: `v` is no such pointer."""
+        raw = qtype(v).strip()
+        init = self.init_of(v)
+        if init is None or not re.match(r"(?:const\s+)?[^*&]+\*(?:\s*const)?$", raw) or self.repointed(v):
+            return None
+        if re.fullmatch(r"(?:const\s+)?char\s*\*(?:\s*const)?", raw):
+            return None   # (a text of the program, or a place in one: text_or_none, text_pointer_local)
+        if self.nothing(init) and self.given_to(v):
+            # `T* best = nullptr; ... best = &list[i];` - it begins as none and is given entries later: its place is
+            # none (-1) here; the list is the one the first entry it is given stands in (entry_pointer_set)
+            try:
+                self.u.btype(re.sub(r"\*(?:\s*const)?$", "", raw).strip())
+            except Wait:
+                return None   # (what it points at has no type here: no entry of a list of the Blueprint)
+            name = self.temp((v.get("name") or "p") + "_at", "Int")
+            self.unbound[v["id"]] = name
+            return [f"{name} = -1;"]
+        if self.given_to(v):
+            return None
+        found = []   # (the lists the entries it may point at stand in)
+        def place_of(n):
+            b = self.unwrap(n)
+            while b.get("kind") == "ParenExpr" and kids(b):
+                b = self.unwrap(kids(b)[0])
+            if self.nothing(b):
+                return "-1"
+            if b.get("kind") == "ConditionalOperator" and len(kids(b)) == 3:
+                cond, yes, no = kids(b)
+                a, c = place_of(yes), place_of(no)
+                if a is None or c is None:
+                    return None
+                return f"logic_select<Int>({self.bx(cond)}, {a}, {c})"
+            if b.get("kind") == "UnaryOperator" and b.get("opcode") == "&" and kids(b):
+                e = self.unwrap(kids(b)[0])
+                k = e.get("kind")
+                if k == "ArraySubscriptExpr" or (k == "CXXOperatorCallExpr" and not e.get("_op") and callee_name(e) == "operator[]" and len(kids(e)) == 3):
+                    base, idx = (kids(e)[0], kids(e)[1]) if k == "ArraySubscriptExpr" else (kids(e)[1], kids(e)[2])
+                    if self.is_this(base) or not (self.tp_or_none(base) or "").startswith("List<") or self.is_slot(e):
+                        return None
+                    found.append(base)
+                    return self.ex(idx, "Int")
+            return None
+        # (the place is worked out apart: a branch of `there ? &list[i] : nullptr` that needs steps of its own
+        # would run them whether it is taken or not - such a pointer waits)
+        try:
+            pre, at = self.lazily(lambda: place_of(init))
+        except Hoists:
+            return None
+        if at is None or pre or not found or any(not self.same_list(found[0], x) for x in found[1:]):
+            return None
+        try:
+            home = self.steady(found[0])
+        except Wait:
+            return None   # (an entry of a list that is itself at a place that is computed)
+        pre, got = self.lazily(lambda: self.spot(home))
+        if got is None or pre or not got[1].startswith("List<"):
+            return None
+        name = self.temp((v.get("name") or "p") + "_at", "Int")
+        self.pointers[v["id"]] = (got[0], name, got[1][5:-1])
+        return [f"{name} = {at};"]
+
+    def given_to(self, v):
+        """The values a pointer of the function is given after it is made (`p = ...`)."""
+        out = []
+        for n in walk(self.f.decl):
+            if n.get("kind") == "BinaryOperator" and n.get("opcode") == "=" and len(kids(n)) == 2:
+                b = self.unwrap(kids(n)[0])
+                if b.get("kind") == "DeclRefExpr" and (b.get("referencedDecl") or {}).get("id") == v.get("id"):
+                    out.append(kids(n)[1])
+        return out
+
+    def entry_pointer_set(self, vid, value):
+        """`best = &list[i];`, `best = nullptr;` - a pointer that began as none (entry_pointer) is given an entry: its
+        place is set. The first entry says which list it points into; every later one stands in the same list."""
+        name = self.unbound[vid]
+        b = self.unwrap(value)
+        while b.get("kind") == "ParenExpr" and kids(b):
+            b = self.unwrap(kids(b)[0])
+        if self.nothing(b):
+            return [f"{name} = -1;"]
+        e = self.unwrap(kids(b)[0]) if b.get("kind") == "UnaryOperator" and b.get("opcode") == "&" and kids(b) else {}
+        k = e.get("kind")
+        if not (k == "ArraySubscriptExpr" or (k == "CXXOperatorCallExpr" and not e.get("_op") and callee_name(e) == "operator[]" and len(kids(e)) == 3)) or self.is_slot(e):
+            raise Wait("a pointer")
+        base, idx = (kids(e)[0], kids(e)[1]) if k == "ArraySubscriptExpr" else (kids(e)[1], kids(e)[2])
+        if self.is_this(base) or not (self.tp_or_none(base) or "").startswith("List<"):
+            raise Wait("a pointer")
+        try:
+            home = self.steady(base)
+        except Wait:
+            raise Wait("a pointer to an entry of a list that is itself at a place that is computed")
+        got = self.spot(home)
+        if got is None or not got[1].startswith("List<"):
+            raise Wait("a pointer")
+        bound = self.pointers.get(vid)
+        if bound is not None and re.sub(r"\s+", "", bound[0]) != re.sub(r"\s+", "", got[0]):
+            raise Wait("a pointer that is given entries of two lists")
+        self.pointers[vid] = (got[0], name, got[1][5:-1])
+        return [f"{name} = {self.ex(idx, 'Int')};"]
+
+    def repointed(self, v):
+        """Is a pointer of the function moved (`++p`, `p += 1`), or is its own address taken (`&p`: something else
+        could then change it)? What it points at may be changed (`p->x = 1`); another entry it is given is
+        entry_pointer's."""
+        def names(n):
+            b = self.unwrap(n)
+            while b.get("kind") == "ParenExpr" and kids(b):
+                b = self.unwrap(kids(b)[0])
+            return b.get("kind") == "DeclRefExpr" and (b.get("referencedDecl") or {}).get("id") == v.get("id")
+        for n in walk(self.f.decl):
+            k = n.get("kind")
+            if k == "CompoundAssignOperator" and names(kids(n)[0]):
+                return True
+            if k == "UnaryOperator" and n.get("opcode") in ("++", "--", "&") and kids(n) and names(kids(n)[0]):
+                return True
+            if k == "DeclRefExpr" and (n.get("referencedDecl") or {}).get("id") == v.get("id") and re.search(r"\*\s*&$", qtype(n).strip()):
+                return True
+        return False
+
+    def unbound_at(self, n):
+        """The place of a pointer to an entry that began as none (entry_pointer), where `n` names one - else None."""
+        b = self.unwrap(n)
+        while b.get("kind") == "ParenExpr" and kids(b):
+            b = self.unwrap(kids(b)[0])
+        return self.unbound.get((b.get("referencedDecl") or {}).get("id")) if b.get("kind") == "DeclRefExpr" else None
+
+    def pointed_entry(self, base):
+        """`p->` of a pointer to an entry of a list (pointer_of): that entry, as an expression of its own - None: no such pointer."""
+        if self.pointer_of(base) is None:
+            return None
+        t = re.sub(r"\*\s*(?:const\s*)?$", "", qtype(self.unwrap(base)).strip()).strip()
+        return {"kind": "UnaryOperator", "opcode": "*", "type": {"qualType": t}, "inner": [base]}
+
     def pointer_arg(self, a, entries, fixed=None):
         """What a call hands a pointer into a list (Unit.pointed): [the list, the place in it] - the list where it
         stands, read there (nothing is copied). `fixed`: the input is a list of that fixed length."""
@@ -6383,6 +6715,14 @@ class Emit:
                 f"  list_resize({lv}, {self.whole_math('+', kept, '1')}, {self.u.zero(it)});",
                 "}"]
 
+    def entry_removed(self, base, lv, at):
+        """v.erase(place): the entry at that place goes, the ones after it move down."""
+        h = self.entry_life(self.ctype(base))
+        if h is not None:   # (the entry taken out ends)
+            held = self.temp("at", "Int")
+            return [f"{held} = {at};", *self.ended_entry(h, f"{lv}[{held}]"), f"list_remove_at({lv}, {held});"]
+        return [f"list_remove_at({lv}, {at});"]
+
     def list_step(self, name, base, lv, it, args):
         """A call that changes a list (erase, insert, resize, assign) as the steps the language has."""
         length = f"kern::to<Float>(list_length<{it}>({lv}))"
@@ -6390,11 +6730,7 @@ class Emit:
             lst, at = self.place(args[0])
             if not self.same_list(lst, base):
                 raise Wait("list: erase() at a place of another list")
-            h = self.entry_life(self.ctype(base))
-            if h is not None:   # (the entry taken out ends: the ones after it move down)
-                held = self.temp("at", "Int")
-                return [f"{held} = {at};", *self.ended_entry(h, f"{lv}[{held}]"), f"list_remove_at({lv}, {held});"]
-            return [f"list_remove_at({lv}, {at});"]
+            return self.entry_removed(base, lv, at)
         if name == "erase" and len(args) == 2:
             inner = self.unwrap(args[0])
             while inner.get("kind") in ("CXXConstructExpr",) and len(kids(inner)) == 1:
@@ -6470,7 +6806,25 @@ class Emit:
             # the loop C++ runs, nothing asked for
             fill, last = self.temp("fill", it), self.temp("last", "Int")
             return [f"{fill} = {self.ex(args[0], it)};", f"{last} = {self.whole_math('-', f'list_length<{it}>({lv})', '1')};"] + self.count_loop("0", last, lambda i: [f"{lv}[{i}] = {fill};"])
+        if name == "swap" and len(args) == 1 and self.tp_or_none(args[0]) == f"List<{it}>":
+            return self.swapped_lists(lv, args[0], f"List<{it}>")
         raise Wait(f"list: {name}()")
+
+    def swapped_lists(self, lv, other, lt):
+        """a.swap(b) of two lists: each holds what the other held, and nothing is copied or asked for - as C++
+        exchanges what the two hold. Three steps that hand a list on: a Take at each place, and a Set of each
+        with what the other gave (the first through a variable of the function, read once)."""
+        got = self.spot(other)
+        if got is None or got[1] != lt or not self.writable(got[0]):
+            raise Wait("list: swap() with what is no place")
+        if re.sub(r"\s+", "", got[0]) == re.sub(r"\s+", "", lv):
+            return []   # (a list swapped with itself stays)
+        first, second = self.u.next_node, self.u.next_node + 1
+        self.u.next_node += 2
+        for node in (first, second):
+            self.u.members.append(f"  struct {{ {lt} value = {self.u.zero(lt)}; }} n{node};")
+        held = self.temp("swapped", lt)
+        return [f"var_take(n{first}, {lv});", f"{held} = n{first}.value;", f"var_take(n{second}, {got[0]});", f"{lv} = n{second}.value;", f"{got[0]} = {held};"]
 
     # ---- algorithms over a range of a list (<algorithm>): a loop over its places ----
     def range_of(self, name, first, last):
@@ -7093,6 +7447,8 @@ class Emit:
             at_iterator = self.entry_of(base)
             if at_iterator is not None:
                 base = at_iterator
+            elif b.get("isArrow") and self.pointed_entry(base) is not None:
+                base = self.pointed_entry(base)
             elif b.get("isArrow"):
                 if self.box(base) is None:
                     return None
@@ -7196,7 +7552,8 @@ class Emit:
         u = self.u
         q = next((x for x, n_ in u.structs.items() if n_ == t and isinstance(x, str)), None)
         rec = self.tree.records.get(q, {})
-        ctors = [c for c in kids(rec) if c.get("kind") == "CXXConstructorDecl" and not c.get("isImplicit")]
+        # (a constructor the class deletes - `Car(const Car&) = delete;` - makes nothing: no call can mean it)
+        ctors = [c for c in kids(rec) if c.get("kind") == "CXXConstructorDecl" and not c.get("isImplicit") and not c.get("explicitlyDeleted")]
         fits = [c for c in ctors if (ctor_type and c.get("type", {}).get("qualType") == ctor_type) or (not ctor_type and len([p for p in kids(c) if p.get("kind") == "ParmVarDecl"]) == len(arg_nodes))]
         if not arg_nodes and q is not None and u.own_default_ctor(q) is None:
             return self.finished(t, q, u.zero(t))   # (C++'s own constructor: the defaults, and what C++ makes of the fields)
@@ -7264,6 +7621,8 @@ class Emit:
             at_iterator = self.entry_of(base)
             if at_iterator is not None:
                 base = at_iterator
+            elif t.get("isArrow") and self.pointed_entry(base) is not None:
+                base = self.pointed_entry(base)
             elif t.get("isArrow"):
                 if self.box(base) is None:
                     raise Wait("a pointer")
@@ -7583,6 +7942,10 @@ class Emit:
         if k in CAST:
             inner = kids(b)[-1]
             ck = b.get("castKind", "")
+            if ck == "PointerToBoolean" and self.unbound_at(inner) is not None:   # (a pointer to an entry that began as none: has it a place)
+                return f'math_compare<">=">({self.cast("Float", self.unbound_at(inner))}, 0.0)', "Bool"
+            if ck == "PointerToBoolean" and self.asked_or_none(inner) is not None:   # (a text or none: is there one)
+                return self.asked_or_none(inner), "Bool"
             if ck == "PointerToBoolean" and self.pointer_of(inner) is not None:   # (a pointer into a list: not null - it has a place)
                 return f'math_compare<">=">({self.cast("Float", self.pointer_of(inner)[1])}, 0.0)', "Bool"
             if ck == "NullToPointer" and self.u.object_of(qtype(b)):
@@ -7651,6 +8014,8 @@ class Emit:
             at_iterator = self.entry_of(base)
             if at_iterator is not None:
                 base = at_iterator
+            elif b.get("isArrow") and self.pointed_entry(base) is not None:
+                base = self.pointed_entry(base)
             elif b.get("isArrow"):
                 if self.box(base) is None:
                     raise Wait("a pointer")
@@ -7708,6 +8073,12 @@ class Emit:
                     if not ENGINE_NODES:
                         raise
                     return self.either(op, left, y)
+            if op in ("==", "!=") and (self.unbound_at(x) is not None and self.nothing(y) or self.unbound_at(y) is not None and self.nothing(x)):
+                at = self.unbound_at(x) or self.unbound_at(y)   # (a pointer to an entry and null: has it no place)
+                return f'math_compare<"{"<" if op == "==" else ">="}">({self.cast("Float", at)}, 0.0)', "Bool"
+            if op in ("==", "!=") and (self.asked_or_none(x) is not None and self.nothing(y) or self.asked_or_none(y) is not None and self.nothing(x)):
+                there = self.asked_or_none(x) or self.asked_or_none(y)   # (a text or none and null: is there none)
+                return (f"logic_not({there})" if op == "==" else there), "Bool"
             if op in ("==", "!=") and (self.pointer_of(x) is not None and self.nothing(y) or self.pointer_of(y) is not None and self.nothing(x)):
                 at = (self.pointer_of(x) or self.pointer_of(y))[1]   # (a pointer into a list and null: has it no place)
                 return f'math_compare<"{"<" if op == "==" else ">="}">({self.cast("Float", at)}, 0.0)', "Bool"
@@ -8071,6 +8442,9 @@ class Emit:
             return f"({self.fx(x, leaves)} {b['opcode']} {self.fx(y, leaves)})"
         if k == "UnaryOperator" and b.get("opcode") == "!":
             return f"(!{self.fb(kids(b)[0], leaves)})"
+        if k in CAST and kids(b) and b.get("castKind") == "PointerToBoolean" and (self.asked_or_none(kids(b)[-1]) is not None or self.pointer_of(kids(b)[-1]) is not None or self.unbound_at(kids(b)[-1]) is not None):
+            # (a text or none, a pointer into a list, asked whether it is there: the question is the leaf - value)
+            return f"({self.leaf(b, leaves, self.conv(self.bx(b), 'Bool', 'Float'))} != 0.0)"
         if k in CAST and kids(b) and self.numeric(kids(b)[-1]) and self.tp(kids(b)[-1]) != "Bool":
             return f"({self.fx(kids(b)[-1], leaves)} != 0.0)"
         if k in CAST and kids(b):
@@ -8508,6 +8882,28 @@ class Emit:
             return self.value(self.held_by(b))
         if ops and not b.get("_op") and name in ("operator->", "operator*") and len(ops) == 1 and self.u.object_of(qtype(ops[0])):
             return self.ex(ops[0], "Int"), "Int"   # (an owned object of the engine: its handle)
+        if ops and not b.get("_op") and self.is_reverse_iter(ops[0]):
+            # an iterator through a list from its end is the place it holds (REVERSE_ITERATOR): later for it is
+            # a lower place
+            if name in ("operator*", "operator->") and len(ops) == 1:
+                return self.value(self.entry_of(b))
+            if name in ("operator==", "operator!=") and len(ops) == 2:
+                same = f'math_compare<"==">({self.cast("Float", self.ex(ops[0], "Int"))}, {self.cast("Float", self.ex(ops[1], "Int"))})'
+                return (same if name == "operator==" else f"logic_not({same})"), "Bool"
+            if name in ("operator<", "operator>", "operator<=", "operator>=") and len(ops) == 2:
+                return f'math_compare<"{name[8:]}">({self.cast("Float", self.ex(ops[1], "Int"))}, {self.cast("Float", self.ex(ops[0], "Int"))})', "Bool"
+            if name in ("operator+", "operator-") and len(ops) == 2:
+                if self.is_reverse_iter(ops[1]):   # (how far one is behind the other)
+                    return self.whole_math("-", self.ex(ops[1], "Int"), self.ex(ops[0], "Int")), "Int"
+                return self.whole_math("-" if name[-1] == "+" else "+", self.ex(ops[0], "Int"), self.ex(ops[1], "Int")), "Int"
+            if name in ("operator++", "operator--"):
+                var = self.stepped_place(ops[0])
+                if len(ops) == 2:   # (it++: what it was before)
+                    old = self.temp("was", "Int")
+                    self.hoist([f"{old} = {var};"] + self.effect(b))
+                    return old, "Int"
+                self.hoist(self.effect(b))
+                return var, "Int"
         if ops and not b.get("_op") and self.is_iter(ops[0]):
             # an iterator is the place it stands at
             if name in ("operator*", "operator->") and len(ops) == 1:
@@ -8890,6 +9286,9 @@ class Emit:
         if bt.startswith("List<") and name in ("begin", "cbegin", "end", "cend") and not a and self.is_iter(b):
             # an iterator is the place it stands at: the first entry's is 0, the end the list's length
             return ("0" if "begin" in name else f"list_length<{bt[5:-1]}>({self.ex(base, bt)})"), "Int"
+        if bt.startswith("List<") and name in ("rbegin", "crbegin", "rend", "crend") and not a and self.is_reverse_iter(b):
+            # through the list from its end: it begins holding the place behind the last entry and ends holding the first
+            return (f"list_length<{bt[5:-1]}>({self.ex(base, bt)})" if "begin" in name else "0"), "Int"
         if bt.startswith(("Map<", "Set<")):
             got = self.keyed_call(b, base, name, a)
             if got is not None:
@@ -8913,6 +9312,17 @@ class Emit:
                 return f"list_get<{it}>({lst}, 0)", it
             if name == "back" and not a:
                 return f"list_get<{it}>({lst}, kern::to<Int>(kern::formula([](Float n) -> Float {{ return n - 1.0; }}, kern::to<Float>(list_length<{it}>({lst})))))", it
+            if name == "erase" and len(a) == 1 and self.is_iter(b):
+                # `it = v.erase(it)`: the entry goes, and what erase gives is the place it stood at - where the
+                # entry after it stands now (an iterator is the place it stands at). The place is held before
+                # the entry goes; the step is the one of the statement `v.erase(it);`.
+                at_list, at = self.place(a[0])
+                if not self.same_list(at_list, base):
+                    raise Wait("list: erase() at a place of another list")
+                before, lv, after = self.variable_of(base, bt)
+                held = self.temp("at", "Int")
+                self.hoist(before + [f"{held} = {at};"] + self.entry_removed(base, lv, held) + after)
+                return held, "Int"
             raise Wait(f"list: {name}()")
         if bt == "Text":
             got = self.text_member(b, base, name, a)

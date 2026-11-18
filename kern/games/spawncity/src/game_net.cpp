@@ -68,8 +68,8 @@ mp::Weapon mp_weapon(weapons::Id id) {
 }  // namespace
 
 void Game::mp_local_ready() {
-  if (!mp_) mp_ = std::make_unique<MpLocal>();
-  if (!mp_->art.ready() && engine_) mp_->art.init(engine_->renderer());
+  mp_made_ = true;
+  if (!mp_.art.ready() && engine_) mp_.art.init(engine_->renderer());
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -81,7 +81,7 @@ constexpr Opt kWorldRules[] = {Opt::world_people, Opt::world_traffic, Opt::world
                                Opt::world_military, Opt::world_flak, Opt::world_jetpack, Opt::world_terrain, Opt::world_guided, Opt::world_always_day};
 }  // namespace
 
-bool Game::voice_mic_on() const { return mp_ && mp_->mic && !mp_->muted && net_.active(); }
+bool Game::voice_mic_on() const { return mp_made_ && mp_.mic && !mp_.muted && net_.active(); }
 
 bool Game::world_rule_locked(Opt o) const {
   if (!net_.active() || net_.hosting()) return false;
@@ -92,7 +92,7 @@ bool Game::world_rule_locked(Opt o) const {
 void Game::net_world_rules() {
   Settings& st = ui_.settings;
   mp_local_ready();
-  MpLocal& m = *mp_;
+  MpLocal& m = mp_;
   if (!net_.active()) {
     // out of the session: our own switches again
     if (m.world_saved) { for (u32 i = 0; i < std::size(kWorldRules); ++i) st.set(ui_.settings_table, kWorldRules[i], m.world_own[i]); m.world_saved = false; }
@@ -210,7 +210,7 @@ net::PlayerState Game::my_state() const {
     s.jet_pos = j.position;
     s.jet_rot = j.rotation;
   }
-  if (mp_ && mp_->mic && !mp_->muted) f |= net::kTalking;
+  if (mp_made_ && mp_.mic && !mp_.muted) f |= net::kTalking;
   if (ui_.jetpack.thrusting && mode_ == Mode::foot) f |= net::kJetpack;  // game_equipment.cpp
   if (Vec3 rp; gaps_riding() && !(gaps_ && gaps_->ride_car)) {  // (a car's passenger: himself, standing in it)
     // riding in a mate's jet (game_seats.cpp): where we are is his jet, and nobody walks there
@@ -254,7 +254,7 @@ void Game::rebase_origin(f64 lon, f64 lat) {
 
 void Game::update_net(f32 dt) {
   mp_local_ready();
-  MpLocal& m = *mp_;
+  MpLocal& m = mp_;
   ++m.frames;
   const f64 now = time_ * 1000;
   m.pings.expire(now);
@@ -455,7 +455,7 @@ void Game::update_net(f32 dt) {
 void Game::mp_input(kern::Engine& e, f32 dt) {
   (void)dt;
   mp_local_ready();
-  MpLocal& m = *mp_;
+  MpLocal& m = mp_;
   (void)e;
   // H / K, Z / middle mouse, M and the pad's R3, R3+Y, D-pad right, VIEW hold are read with every
   // other control in game_controls.cpp (voice_control_bindings.mjs, ping_marker.mjs, pad_actions.mjs).
@@ -469,12 +469,12 @@ void Game::mp_input(kern::Engine& e, f32 dt) {
 
 void Game::voice_capture(kern::Span<const f32> samples, u32 rate) {
   mp_local_ready();
-  MpLocal& m = *mp_;
+  MpLocal& m = mp_;
   if (m.mic && !m.muted) m.capture.push(samples, rate);
 }
 
 void Game::mix_voice(std::vector<f32>& out, u32 frames) {
-  if (!net_.active() || !mp_ || !mixer_.ready()) return;
+  if (!net_.active() || !mp_made_ || !mixer_.ready()) return;
   for (net::Remote& r : net_.remotes()) r.voice.render(out, frames, mixer_.sample_rate());
 }
 
@@ -585,7 +585,7 @@ bool Game::hit_remotes(Vec3 from, Vec3& to, f32 damage, bool melee) {
   const bool body_zone = r.state.mode == net::PlayerMode::foot || r.state.mode == net::PlayerMode::drone || r.state.mode == net::PlayerMode::parachute;
   const mp::Zone zone = body_zone ? best_zone : mp::Zone::torso;
   mp_local_ready();
-  mp_->shot_zone = static_cast<u8>(zone);
+  mp_.shot_zone = static_cast<u8>(zone);
   const mp::Weapon w = mp_weapon(wid);
   net_.request_hit(r.state.slot, mp::round_damage(w, zone), static_cast<u8>(w), static_cast<u8>(zone), from);
   return true;
@@ -702,8 +702,8 @@ void Game::draw_remote_people() {
 }
 
 void Game::draw_remote_vehicles() {
-  if (!mp_) return;
-  MpLocal& m = *mp_;
+  if (!mp_made_) return;
+  MpLocal& m = mp_;
   const f64 now_ms = time_ * 1000;
   const f32 now = static_cast<f32>(time_);
   if (m.art.ready()) m.art.begin();
@@ -762,7 +762,7 @@ void Game::draw_remote_vehicles() {
 // route the page fetches from routing.openstreetmap.de when the streets do not reach it).
 
 void Game::update_nav() {
-  MpLocal& m = *mp_;
+  MpLocal& m = mp_;
   if (!m.has_dest) return;
   const Vec3 p3 = focus_position();
   const Vec2 me{p3.x, p3.y};
@@ -826,7 +826,7 @@ bool Game::project_screen(Vec3 p, f32& x, f32& y, f32& depth) const {
 
 std::string Game::mp_hud_json() {
   mp_local_ready();
-  MpLocal& m = *mp_;
+  MpLocal& m = mp_;
   const f64 now = time_ * 1000;
   std::string s;
   char b[512];
@@ -962,7 +962,7 @@ std::string Game::bigmap_json(f32 cx, f32 cy, f32 range) {
   // The big map (world_map_full.mjs, "a world it draws itself"): streets, players, pings,
   // destination and route around (cx, cy) in local metres.
   mp_local_ready();
-  MpLocal& m = *mp_;
+  MpLocal& m = mp_;
   std::string o;
   char b[256];
   const Vec3 me = focus_position();
@@ -1033,7 +1033,7 @@ std::string Game::bigmap_json(f32 cx, f32 cy, f32 range) {
 
 std::string Game::net_command(const std::string& cmd) {
   mp_local_ready();
-  MpLocal& m = *mp_;
+  MpLocal& m = mp_;
   auto starts = [&](const char* p) { return cmd.rfind(p, 0) == 0; };
   const f64 now = time_ * 1000;
   if (starts("net ")) {
@@ -1093,7 +1093,7 @@ std::string Game::net_command(const std::string& cmd) {
       const bool hit = hit_remotes(from, to, static_cast<f32>(std::atof(rest.c_str() + 4)));
       if (!hit) return "miss";
       mp_local_ready();
-      return std::string("hit ") + mp::zone_name(static_cast<mp::Zone>(mp_->shot_zone));
+      return std::string("hit ") + mp::zone_name(static_cast<mp::Zone>(mp_.shot_zone));
     }
     if (rest.rfind("blast", 0) == 0) {
       if (net_.remotes().empty()) return "nobody";
