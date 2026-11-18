@@ -1363,7 +1363,7 @@ const std::vector<EngineFunction>& engine_functions() {
        {{"uniform_cache", PinType::integer, "", "i"}, {"location", PinType::integer, "", "i"}, {"values", PinType::number_list, "", "[n]"}},
        {}},
       {"engine.uniform_cache.set_mat4_array", "kern::UniformCache::set_mat4_array", "Set Mat4 Array", "Engine: UniformCache", "Uncached upload (large or always-changing data such as bone palettes).", false,
-       {{"location", PinType::integer, "", "i"}, {"values", PinType::number_list, "", "[n]"}, {"count", PinType::integer, "", "i"}},
+       {{"location", PinType::integer, "", "i"}, {"values", PinType::number_list, "", "[n]"}, {"n", PinType::integer, "", "i"}},
        {}},
       {"engine.renderer.init", "kern::Renderer::init", "Init", "Engine: Renderer", "Extensions must outlive the renderer.", false,
        {{"renderer", PinType::integer, "", "i"}, {"options", PinType::structure, "RendererOptions", "{iib{inni}{bbb}{be4bnnb}b}"}, {"extensions", PinType::integer_list, "", "[i]"}},

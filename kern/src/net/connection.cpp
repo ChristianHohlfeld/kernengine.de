@@ -461,7 +461,7 @@ void Connection::send_packet() {
   endpoint_.send_packet(packet_.data(), w.bytes_processed());
 }
 
-void Connection::receive_packet(const u8* data, int bytes) {
+void Connection::receive_packet(const u8* data, Count<1> bytes) {
   endpoint_.receive_packet(data, bytes);
   for (u16 seq : endpoint_.acks())
     for (auto& c : channels_) c->ack(seq);

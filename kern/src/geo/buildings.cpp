@@ -5,7 +5,7 @@
 
 namespace kern {
 
-f64 ring_area(const f64* xy, u32 n) {
+f64 ring_area(const f64* xy, Count<2> n) {
   f64 s = 0;
   for (u32 i = 0; i < n; ++i) {
     const u32 j = (i + 1) % n;
@@ -44,7 +44,7 @@ Vec2 v2(f64 x, f64 y) { return {static_cast<f32>(x), static_cast<f32>(y)}; }
 
 }  // namespace
 
-bool BuildingBuilder::begin(const f64* stream, std::size_t length, const BuildingOptions& options) {
+bool BuildingBuilder::begin(const f64* stream, Count<1> length, const BuildingOptions& options) {
   if (!(options.chunk_size >= 20) || !(options.max_buildings > 0)) return fail("invalid city geometry budget");
   if (options.style.walls.empty() || options.style.roofs.empty()) return fail("building palette must not be empty");
   if (!stream || length < 1) return fail("empty footprint stream");

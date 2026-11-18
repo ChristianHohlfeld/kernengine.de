@@ -124,6 +124,7 @@ bool c7(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
   ev::take<ev::Int>(o, in, 4, a3);
   auto a4 = ev::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>>();
   ev::take<ev::Text>(o, in, 5, a4);
+  if (ev::numbers(a1) > a0.size()) { o.error = "the list data has fewer entries than samples says"; return false; }
   decltype(auto) r = self->create_clip(a0.empty() ? nullptr : a0.data(), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
   ev::give<ev::Int>(o, out, 0, r);
   return true;
