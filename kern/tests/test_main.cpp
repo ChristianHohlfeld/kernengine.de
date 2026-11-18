@@ -6281,6 +6281,21 @@ TEST(engine_calls_every_node) {
   CHECK(objects.size() == 0);
 }
 
+TEST(engine_stand_in_fixed_length) {
+  using logic::Value;
+  // a field that is an array of C++ (`f32 m[16]` of Mat4) has as many entries in the form - and so in every answer of
+  // the stand-in - as C++ holds: 16, not 0 to 2 (a list of any length)
+  const logic::EngineFunction* f = logic::engine_function("engine.game_world.actor_matrix");
+  CHECK(f && f->outputs.size() == 2 && std::string(f->outputs[1].shape) == "{[16n]}");
+  logic::EngineStandIn s;
+  for (i64 id = 0; id < 8; ++id) {
+    std::vector<Value> out(2);
+    CHECK(s.engine("engine.game_world.actor_matrix", {Value::integer(1), Value::integer(id), Value::zero(logic::PinType::structure)}, out));
+    CHECK(out.size() == 2 && out[1].rows && out[1].rows->size() == 1 && (*out[1].rows)[0].list &&
+          std::get<std::vector<f64>>(*(*out[1].rows)[0].list).size() == 16);
+  }
+}
+
 TEST(engine_calls_mixer_is_the_mixer) {
   using logic::Value;
   // what the engine writes through `out` is 2 numbers a frame: the table says so
