@@ -142,3 +142,23 @@ Du bist der **Nachfolger** auf deinem Paket in einer neuen Sitzung. Was bleibt: 
    Keine Ausgabe über ~40 Zeilen. Keine Arbeit auf Verdacht: keine Änderung ohne Beleg aus einer Probe oder einem Kleinstfall.
 4. mag ist voll (bis zu 17 Aufträge zugleich, darunter vier `konvert` und der volle Lauf): eine Probe über alle game*.cpp braucht zurzeit 45 Minuten und mehr.
    Lege nichts doppelt ab; `$S/mag.sh stand` zeigt, was läuft.
+
+## Nachtrag 21:10 (Koordinator) – der zusammengeführte Stand ist die Basis; so wird ab jetzt bewiesen und gemergt
+1. **Basis ist `origin/work-zusammen` (8874e79 oder neuer)**, nicht mehr dein alter Zweigstand: dort sind work (mit dem Fix von d), k, t1, t2, f2, g1, g2 und von f1
+   der Konverter zusammengeführt. Drei doppelt gebaute Fähigkeiten stehen dort in EINER Fassung – baue nur auf diesen: `scope_for` (nicht `looked_from`),
+   `case_block`/`leaves_case` für break mitten im switch-Fall (nicht `switch_break`), `stood` für Namen von Teilen eines Werts (nicht `where_of`). Dazu neu im
+   Konverter: `settled_extern` (jede KERN_EXTERN-Erklärung einmal für das ganze Programm). **Als Erstes: `git fetch origin && git merge origin/work-zusammen`** in
+   deinen Zweig (Merge-Commit), pushen. Die Absenkungen der Game-Dateien von g1/g2 und alles von f1 außer dem Konverter sind dort bewusst NICHT enthalten.
+2. **Es gibt wieder einen gültigen vollen Lauf:** `work-zusammen-voll-203000-750` auf 8874e79 – `convert rc=0`, 1.632 von 1.844 Funktionen geschrieben (18.813 von
+   30.978 Zeilen), 1.589 im Test; 118 Funktionen „its test cannot compare it yet“, 9 Rückfälle „was written and waits now“. Das ist deine Arbeitsliste:
+   `$S/mag.sh holen work-zusammen-voll-203000-750` → `$S/mag/work-zusammen-voll-203000-750/` (nach Ende: convert.log.xz, suite.log.xz, engine.log.xz; schon vorher
+   `zwischen/convert.log.xz` und `zwischen/texts/` = die Texte aller 156 Blueprints). Nur mit xzgrep lesen. `f9_*` ist damit überholt.
+3. **Der Takt:** du behebst und belegst mit Proben (mit Level, Minuten; über alle Quelltexte ~25 min: aus kern/games/spawncity
+   `$(ls src/*.cpp | grep -v "level_data.cpp\|level_blueprints.cpp\|main.cpp")`), schreibst „BEREIT ZUM MERGEN“ mit Commits und Auftragsnamen nach
+   `$S/stand/<paket>.md` und arbeitest weiter. **Den vollen Lauf macht der Koordinator**: er mischt die bereiten Zweige in `work-zusammen`, lässt `voll` rechnen
+   (Konvertierung 23 min, Suiten ~20 min) und bringt den Stand nach `work`, wenn er grün ist. Du legst selbst KEINEN `voll` ab. mag ist zurzeit fast leer.
+4. **Lesefehler lokal prüfen statt mit einem Lauf:** `python3 $S/lesen.py <worktree> <texts-ordner>` liest die Texte (einer Probe: `mag/<name>/texts`, eines vollen Laufs:
+   `mag/<name>/zwischen/texts`) wie der Konverter ins Level, 1 Minute, unter einer Sperre (`flock $S/heavy3.lock …`, `TMPDIR=$S/shared-tmp`).
+5. Rückkanal: du kannst dem Koordinator mit SendMessage an `main` schreiben – nur für eine Entscheidung, die dich wirklich aufhält. Sonst Stand-Datei.
+6. Alles aus „Nachtrag 17:45“ und „Nachtrag 18:10“ gilt weiter (Worktree besteht schon; sparsam: Warten in Stücken von 4 Minuten, keine großen Ausgaben, keine Arbeit
+   auf Verdacht; Sperren für lokale Compiler; nie main/work pushen; keine weiteren Agenten).
