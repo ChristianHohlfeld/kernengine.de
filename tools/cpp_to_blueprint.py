@@ -102,6 +102,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import traceback
 
 ROOT = os.environ.get("KERN_ROOT") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -2203,6 +2204,9 @@ class Unit:
             self.order.append(f)
         except Wait as w:
             f.wait = str(w)
+            if os.environ.get("WHY") and re.search(os.environ["WHY"], f.cpp):
+                # (to look at: where in this tool the reason was found - its last steps, innermost first)
+                f.wait += " [" + " < ".join(f"{t.name}:{t.lineno}" for t in reversed(traceback.extract_tb(w.__traceback__)[-10:])) + "]"
             # (what it had begun to declare stays known - a function written on the way may use it; the
             # Blueprint's text has only the declarations its functions use: see text)
             raise
@@ -6287,6 +6291,8 @@ class Emit:
             return None
 
     def same_list(self, a, b):
+        if a.get("kind") == "_Text" or b.get("kind") == "_Text":   # (a pointer into a list: the list it points into)
+            return a.get("kind") == b.get("kind") and a["_text"] == b["_text"]
         return re.sub(r"\s+", "", self.tree.source(self.unwrap(a))) == re.sub(r"\s+", "", self.tree.source(self.unwrap(b))) != ""
 
     def count_loop(self, first, last, body):
@@ -6377,9 +6383,24 @@ class Emit:
                 if self.whole_list(args[1], args[2]) or (n is not None and first.strip() == "0" and last.strip() in (str(n), f"{n}.0")):
                     # the whole list, in one go (one request for memory, as in C++)
                     return lines + [f"list_append({lv}, {self.ex(s0, st)});" if end else f"list_insert_list({lv}, {p}, {self.ex(s0, st)});"]
-                src = self.temp("from", st)
+                # a part of another list: read where it stands when it is a place (nothing is copied, as in C++)
+                held = s0["_text"] if s0.get("kind") == "_Text" else None
+                if held is None:
+                    pre, got = self.lazily(lambda: self.spot(s0))
+                    held = got[0] if got is not None and not pre else None
+                src = held
+                if src is None:
+                    src = self.temp("from", st)
+                    lines.append(f"{src} = {self.ex(s0, st)};")
                 a, b = self.temp("first", "Int"), self.temp("last", "Int")
-                lines += [f"{src} = {self.ex(s0, st)};", f"{a} = {first};", f"{b} = {self.whole_math('-', last, '1')};"]
+                lines += [f"{a} = {first};", f"{b} = {self.whole_math('-', last, '1')};"]
+                if end:
+                    # at the end, in one go (one request for memory at most, as in C++): the list that much
+                    # longer (Set Length), then each new entry set where it stands
+                    n0 = self.temp("length", "Int")
+                    lines += [f"{n0} = list_length<{it}>({lv});",
+                              f"list_resize({lv}, {self.whole_math('+', n0, self.whole_math('+', self.whole_math('-', b, a), '1'))}, {self.u.zero(it)});"]
+                    return lines + self.count_loop(a, b, lambda i: [f"{lv}[{self.whole_math('+', n0, self.whole_math('-', i, a))}] = list_get<{it}>({src}, {i});"])
                 return lines + self.count_loop(a, b, lambda i: [put(f"list_get<{it}>({src}, {i})", self.whole_math("-", i, a))])
             one = self.unwrap(args[1])
             if one.get("kind") in ("CXXStdInitializerListExpr", "InitListExpr"):
@@ -8794,7 +8815,7 @@ class Emit:
 # Not the engine a game calls: the Blueprint language itself, the engine's own helpers.
 ENGINE_SKIP = ("kern::logic::", "kern::json::", "kern::detail::", "kern::dm::", "kern::game::nodes::")
 # Functions that give something and change something (the rule below would call them values).
-ENGINE_STEPS = {"kern::jobs::submit", "kern::jobs::take"}
+ENGINE_STEPS = {"kern::jobs::submit", "kern::jobs::take", "kern::fail_text"}
 # (a u64 or an i64 the engine takes or gives - a mask of bits, a key, a counter of 64 bits - is an Int64 pin: 64
 # bits, as C++ has them; a list of them a List<Int64>)
 ENGINE_PIN = {"Bool": "boolean", "Int": "integer", "Float": "number", "Vector": "vector", "Text": "text", "Int64": "int64"}

@@ -1,6 +1,8 @@
 // The original's facade shader on Kern's standard surface shader (see facades.h).
 #include "facades.h"
 
+#include "kern/gfx/renderer.h"
+
 #include "kern/gfx/program.h"
 
 namespace sc {

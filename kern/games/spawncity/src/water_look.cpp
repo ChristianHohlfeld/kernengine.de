@@ -1,6 +1,8 @@
 // The original's water shader on Kern's standard surface shader (see water_look.h).
 #include "water_look.h"
 
+#include "kern/gfx/renderer.h"
+
 #include "kern/gfx/program.h"
 
 namespace sc {

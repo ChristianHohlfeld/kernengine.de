@@ -110,6 +110,8 @@ class FootprintStream {
   }
   const f64* data() const { return data_.data(); }
   std::size_t size() const { return data_.size(); }
+  /// The stream as its numbers: what data() points at, all size() of them.
+  const std::vector<f64>& values() const { return data_; }
 
  private:
   std::vector<f64> data_;

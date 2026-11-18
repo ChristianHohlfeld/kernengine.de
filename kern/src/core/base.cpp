@@ -34,6 +34,11 @@ bool fail(const char* format, ...) {
   return false;
 }
 
+bool fail_text(const char* message) {
+  std::snprintf(g_error, sizeof g_error, "%s", message);
+  return false;
+}
+
 const char* last_error() { return g_error; }
 void clear_error() { g_error[0] = 0; }
 

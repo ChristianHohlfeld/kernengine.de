@@ -914,10 +914,10 @@ void Terrain::add_tint(u64 owner, const std::vector<std::vector<Vec2>>& rings, V
 }
 
 void Terrain::remove_tints(u64 owner) {
-  for (auto it = tints_.begin(); it != tints_.end();) {
-    if (it->owner != owner) { ++it; continue; }
-    repaint(it->box);
-    it = tints_.erase(it);
+  for (std::size_t i = 0; i < tints_.size();) {
+    if (tints_[i].owner != owner) { ++i; continue; }
+    repaint(tints_[i].box);
+    tints_.erase(tints_.begin() + static_cast<std::ptrdiff_t>(i));
   }
 }
 
@@ -953,10 +953,20 @@ void Terrain::crater_list(std::vector<CraterRec>& out) const {
   for (const Crater& c : craters_) out.push_back({c.c.x, c.c.y, c.r, c.depth});
 }
 
+namespace {
+/// Are two lists the same craters in the same order?
+bool same_craters(const std::vector<Terrain::CraterRec>& a, const std::vector<Terrain::CraterRec>& b) {
+  if (a.size() != b.size()) return false;
+  for (std::size_t i = 0; i < a.size(); ++i)
+    if (!(a[i] == b[i])) return false;
+  return true;
+}
+}  // namespace
+
 void Terrain::set_craters(const std::vector<CraterRec>& list) {
   std::vector<CraterRec> mine;
   crater_list(mine);
-  if (mine == list) return;
+  if (same_craters(mine, list)) return;
   auto has = [](const std::vector<CraterRec>& v, const CraterRec& c) { return std::find(v.begin(), v.end(), c) != v.end(); };
   // the ground changes only where a crater came or went (a reorder alone changes nothing: the
   // height adds every bowl up)
@@ -1138,7 +1148,8 @@ void Terrain::build_render_tile(i32 level, i32 ti, i32 tj) {
       const i32 ia = i0 + di * k, ja = j0 + dj * k, ib = ia + di, jb = ja + dj;
       const u32 top_a = static_cast<u32>(ja * n + ia), top_b = static_cast<u32>(jb * n + ib);
       const u32 base = m.vertex_count();
-      for (u32 v : {top_a, top_b}) {
+      for (i32 end = 0; end < 2; ++end) {  // (the edge's two ends: a, then b)
+        const u32 v = end == 0 ? top_a : top_b;
         const Vec3 p{m.positions[v * 3], m.positions[v * 3 + 1], m.positions[v * 3 + 2] - drop};
         m.push(p, {0, 0, 1}, kGround, {p.x * 0.1f, p.y * 0.1f});
       }

@@ -4,6 +4,7 @@
 #include <bit>
 
 #include "kern/core/base.h"
+#include "wire.h"
 
 namespace sc::mvt {
 
@@ -236,11 +237,11 @@ bool Decoder::step(kern::Span<const u8> bytes, f64 budget_ms) {
       feature_ = 0;
       layer_open_ = true;
     }
-    Layer& layer = tile_.layers.back();
+    // (the layer the features go into is the last of the tile's)
     while (feature_ < features_.size()) {
       Feature f;
       if (!read_feature(bytes, Reader{features_[feature_].at, features_[feature_].end}, f)) { failed_ = done_ = true; return true; }
-      layer.features.push_back(std::move(f));
+      tile_.layers.back().features.push_back(std::move(f));
       ++feature_;
       if ((++work & 63) == 0 && budget_ms > 0 && kern::now_ms() - start > budget_ms) return false;
     }
@@ -341,7 +342,7 @@ void Writer::end_layer() {
     std::vector<u8> e;
     switch (v.kind) {
       case Value::Kind::string: put_bytes(e, 1, v.s); break;
-      case Value::Kind::number: { put_key(e, 3, 1); const u8* p = reinterpret_cast<const u8*>(&v.n); e.insert(e.end(), p, p + 8); break; }
+      case Value::Kind::number: put_key(e, 3, 1); wire::put_f64(e, v.n); break;  // (its eight bytes, the low one first)
       case Value::Kind::boolean: put_key(e, 7, 0); put_varint(e, v.b ? 1 : 0); break;
       default: break;
     }

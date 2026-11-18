@@ -122,8 +122,8 @@ Vec2 cut_side(i32 side, Vec2 p, Vec2 q, f32 ext) {
   const f32 t = (y - p.y) / (q.y - p.y);
   return Vec2{p.x + (q.x - p.x) * t, y};
 }
-/// One pass of the clip: what of `a` lies inside the side, into `b` - then `a` is that.
-void clip_pass(std::vector<Vec2>& a, std::vector<Vec2>& b, i32 side, f32 ext) {
+/// One pass of the clip: what of `a` lies inside the side, into `b`.
+void clip_pass(const std::vector<Vec2>& a, std::vector<Vec2>& b, i32 side, f32 ext) {
   b.clear();
   for (std::size_t i = 0; i < a.size(); ++i) {
     const Vec2 p = a[i], q = a[(i + 1) % a.size()];
@@ -131,15 +131,19 @@ void clip_pass(std::vector<Vec2>& a, std::vector<Vec2>& b, i32 side, f32 ext) {
     if (pi) b.push_back(p);
     if (pi != qi) b.push_back(cut_side(side, p, q, ext));
   }
-  a.swap(b);
 }
 }  // namespace
 
 std::vector<Vec2> clip_to_tile(const std::vector<Vec2>& ring, f32 ext) {
+  // Two lists take turns: each pass reads the one the ring is in and writes the other.
   std::vector<Vec2> a = ring, b;
-  for (i32 side = 0; side < 4; ++side)
-    if (a.size() >= 3) clip_pass(a, b, side, ext);
-  return a;
+  bool in_a = true;
+  for (i32 side = 0; side < 4; ++side) {
+    if (in_a && a.size() >= 3) { clip_pass(a, b, side, ext); in_a = false; }
+    else if (!in_a && b.size() >= 3) { clip_pass(b, a, side, ext); in_a = true; }
+  }
+  if (in_a) return a;
+  return b;
 }
 
 u32 hash_u32(u64 v) {

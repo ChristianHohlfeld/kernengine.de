@@ -27,6 +27,9 @@ using f64 = double;
 /// Records the last error (printf-style). Always returns false so call sites
 /// can write `return fail("...")`.
 bool fail(const char* format, ...) __attribute__((format(printf, 1, 2)));
+/// The same for a message that is said as it stands (no format, nothing filled in): `return
+/// fail_text("...")`. Always returns false.
+bool fail_text(const char* message);
 /// The message of the most recent fail(); empty string when none.
 const char* last_error();
 void clear_error();

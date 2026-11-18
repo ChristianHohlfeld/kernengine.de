@@ -182,7 +182,8 @@ void run_buildings(kern::Span<const u8> in, std::vector<u8>& out) {
   kern::BuildingBuilder b;
   if (!b.begin(stream.data(), stream.size(), o)) return;
   while (!b.step(1e9)) {}
-  auto& chunks = b.chunks();
+  // (the builder is done: its chunks are taken out of it, welded and written)
+  std::vector<kern::GeoChunk> chunks = std::move(b.chunks());
   wire::put_u32(out, static_cast<u32>(chunks.size()));
   for (auto& c : chunks) {
     kern::weld(c.mesh);
@@ -241,8 +242,7 @@ std::vector<u8> buildings_input(const kern::FootprintStream& footprints, const k
   for (const auto& c : o.style.roofs) rgb(c);
   rgb(o.style.trim);
   wire::put_f64(b, o.style.trim_mix);
-  std::vector<f64> stream(footprints.data(), footprints.data() + footprints.size());
-  put_array_f64(b, stream);
+  put_array_f64(b, footprints.values());
   return b;
 }
 

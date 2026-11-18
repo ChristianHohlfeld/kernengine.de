@@ -173,7 +173,7 @@ void CityStream::request_around(Vec3 focus, i32 ring) {
     tile_lonlat(k, 1, 0, lo, la);
     proj_.project(lo, la, x1, y1);
     t->bounds = {static_cast<f32>(x0), static_cast<f32>(y0), static_cast<f32>(x1), static_cast<f32>(y1)};
-    tiles_[k.hash()] = std::move(t);
+    tiles_.emplace(k.hash(), std::move(t));  // (no tile of this key yet: see above)
     requests_.push_back(k);
   }
 }
@@ -469,7 +469,7 @@ void CityStream::begin_roads(Tile& t) {
   ro.palette = road_palette();
   // over a crater the ribbon is draped finely (0.9 m quads): it lies in the bowl, not over it
   ro.deformed = [this](f64 x, f64 y, f64 r) { return terrain_.deformed(static_cast<f32>(x), static_cast<f32>(y), static_cast<f32>(r)); };
-  t.road_builder.begin(t.roads.data(), t.roads.size(), ro, terrain_.sampler());
+  t.road_builder.begin(t.roads.values().data(), t.roads.values().size(), ro, terrain_.sampler());
   t.roads_at = mid;
   ++relays_;
   t.upload_next = 0;
@@ -796,113 +796,120 @@ bool CityStream::finish_cells(Tile& t, f64 deadline) {
 
 bool CityStream::work(Tile& t, f64 deadline) {
   using S = Tile::State;
-  switch (t.state) {
-    case S::ready:
-      // the drawn cells: built off the frame, uploaded a chunk a step, swapped when complete
-      if (t.cell_job || t.cell_uploading) {
-        const f64 t1 = kern::now_ms();
-        const bool done = finish_cells(t, deadline);
-        step_time("cells.swap", t1);
-        if (!done) return kern::now_ms() <= deadline;
-      }
-      if (!t.dirty_cells.empty() && !t.cell_job && !t.cell_uploading) {
-        const f64 t1 = kern::now_ms();
-        begin_cells(t);
-        step_time("cells.begin", t1);
-      }
-      // the streets round the player (world_city_roads.mjs RADIUS_M 720): laid again after
-      // REBUILD_MOVE_M 260 m of travel
-      if (const Vec2 mid{focus_.x + view_lead.x * 0.5f, focus_.y + view_lead.y * 0.5f};
-          !t.relay && std::hypot(mid.x - t.roads_at.x, mid.y - t.roads_at.y) >= 260 && rect_distance_to(t.bounds, mid.x, mid.y) < 720 + 260 + std::hypot(view_lead.x, view_lead.y) * 0.5f) {
-        t.relay = true;
-        t.old_lay = std::move(t.lay_meshes);
-        t.lay_meshes.clear();
-        begin_roads(t);
-        return kern::now_ms() <= deadline;
-      }
-      return kern::now_ms() <= deadline;
-    case S::requested:
-    case S::failed: return true;
-    case S::decoding: {
-      std::vector<u8> out;
-      if (!kern::jobs::take(t.tile_job, out)) return true;  // still decoding off the frame: next tile
-      t.tile_job = 0;
-      if (!cityjobs::read_features(out, t.features)) { t.state = S::failed; return true; }
-      ++real_tiles_;
-      if (t.key == origin_tile_ && ms_.t_decoded < 0) ms_.t_decoded = kern::now_ms() - start_ms_;
-      feed_terrain(t);
-      t.state = S::terrain_wait;
-      return kern::now_ms() > deadline ? false : work(t, deadline);
-    }
-    case S::terrain_wait:
-      // Buildings and streets stand on the terrain: wait until the ground of the whole tile is
-      // known for good (terrain.h covers) - a house is never based on a height that changes later.
-      // (the tile's data reaches a little over its square - its buffer - and the streets' profile
-      // is smoothed over the ground beside them: 80 m more must be known)
-      if (!terrain_.settled() || !terrain_.covers({t.bounds.x - 80, t.bounds.y - 80, t.bounds.z + 80, t.bounds.w + 80})) return true;
-      if (ms_.t_terrain < 0) ms_.t_terrain = kern::now_ms() - start_ms_;
-      finish_features(t);
-      return kern::now_ms() > deadline ? false : work(t, deadline);
-    case S::building:
-      // (the drawn buildings are cells now - see S::ready; a tile goes from its features to its streets)
-      begin_roads(t);
-      return kern::now_ms() > deadline ? false : work(t, deadline);
-    case S::roads: {
-      {
-        const f64 t1 = kern::now_ms();
-        const bool built = t.road_builder.step(std::max(0.5, deadline - kern::now_ms()));
-        step_time("roads.build", t1);
-        if (!built) return false;
-      }
-      kern::Material m;
-      m.roughness = 0.95f;
-      m.cast_shadow = false;
-      m.double_sided = true;
-      auto& chunks = t.road_builder.chunks();
-      while (t.upload_next < chunks.size()) {
-        const std::size_t before = t.meshes.size();
-        const f64 t1 = kern::now_ms();
-        upload(t, chunks[t.upload_next], m, false);
-        step_time("roads.upload", t1);
-        // road meshes are the re-layable ones
-        t.lay_meshes.insert(t.lay_meshes.end(), t.meshes.begin() + static_cast<std::ptrdiff_t>(before), t.meshes.end());
-        t.meshes.resize(before);
-        chunks[t.upload_next++].mesh = kern::MeshData{};
-        if (kern::now_ms() > deadline) return false;
-      }
-      chunks.clear();
-      chunks.shrink_to_fit();
-      t.upload_next = 0;
-      t.state = S::areas;
-      return kern::now_ms() > deadline ? false : work(t, deadline);
-    }
-    case S::areas:
-      // the map areas are painted into the ground (Terrain::add_tint), as in world_ground.mjs
-      if (t.relay) {
-        // New layer in place: the old one goes now (no frame without roads).
-        for (u32 id : t.old_lay) r_->remove(id);
-        t.old_lay.clear();
-        t.relay = false;
-        t.state = S::ready;
-        if (t.relay_again) {
-          t.relay_again = false;
+  // (a tile that finished a stage goes on with its next one in the same call, while there is time: once more round)
+  for (;;) {
+    switch (t.state) {
+      case S::ready:
+        // the drawn cells: built off the frame, uploaded a chunk a step, swapped when complete
+        if (t.cell_job || t.cell_uploading) {
+          const f64 t1 = kern::now_ms();
+          const bool done = finish_cells(t, deadline);
+          step_time("cells.swap", t1);
+          if (!done) return kern::now_ms() <= deadline;
+        }
+        if (!t.dirty_cells.empty() && !t.cell_job && !t.cell_uploading) {
+          const f64 t1 = kern::now_ms();
+          begin_cells(t);
+          step_time("cells.begin", t1);
+        }
+        // the streets round the player (world_city_roads.mjs RADIUS_M 720): laid again after
+        // REBUILD_MOVE_M 260 m of travel
+        if (const Vec2 mid{focus_.x + view_lead.x * 0.5f, focus_.y + view_lead.y * 0.5f};
+            !t.relay && std::hypot(mid.x - t.roads_at.x, mid.y - t.roads_at.y) >= 260 && rect_distance_to(t.bounds, mid.x, mid.y) < 720 + 260 + std::hypot(view_lead.x, view_lead.y) * 0.5f) {
           t.relay = true;
           t.old_lay = std::move(t.lay_meshes);
           t.lay_meshes.clear();
           begin_roads(t);
+          return kern::now_ms() <= deadline;
         }
-        return true;
+        return kern::now_ms() <= deadline;
+      case S::requested:
+      case S::failed: return true;
+      case S::decoding: {
+        std::vector<u8> out;
+        if (!kern::jobs::take(t.tile_job, out)) return true;  // still decoding off the frame: next tile
+        t.tile_job = 0;
+        if (!cityjobs::read_features(out, t.features)) { t.state = S::failed; return true; }
+        ++real_tiles_;
+        if (t.key == origin_tile_ && ms_.t_decoded < 0) ms_.t_decoded = kern::now_ms() - start_ms_;
+        feed_terrain(t);
+        t.state = S::terrain_wait;
+        if (kern::now_ms() > deadline) return false;
+        continue;
       }
-      t.state = S::ready;  // collision: the working set around the player (update_collision)
-      // a new set only when this tile brings buildings into the 340 m around the player
-      for (Vec2 c : t.cent)
-        if (std::hypot(c.x - focus_.x, c.y - focus_.y) <= 340) { near_.dirty = true; break; }
-      return true;
-    case S::collision:
-      t.state = S::ready;
-      return true;
+      case S::terrain_wait:
+        // Buildings and streets stand on the terrain: wait until the ground of the whole tile is
+        // known for good (terrain.h covers) - a house is never based on a height that changes later.
+        // (the tile's data reaches a little over its square - its buffer - and the streets' profile
+        // is smoothed over the ground beside them: 80 m more must be known)
+        if (!terrain_.settled() || !terrain_.covers({t.bounds.x - 80, t.bounds.y - 80, t.bounds.z + 80, t.bounds.w + 80})) return true;
+        if (ms_.t_terrain < 0) ms_.t_terrain = kern::now_ms() - start_ms_;
+        finish_features(t);
+        if (kern::now_ms() > deadline) return false;
+        continue;
+      case S::building:
+        // (the drawn buildings are cells now - see S::ready; a tile goes from its features to its streets)
+        begin_roads(t);
+        if (kern::now_ms() > deadline) return false;
+        continue;
+      case S::roads: {
+        {
+          const f64 t1 = kern::now_ms();
+          const bool built = t.road_builder.step(std::max(0.5, deadline - kern::now_ms()));
+          step_time("roads.build", t1);
+          if (!built) return false;
+        }
+        kern::Material m;
+        m.roughness = 0.95f;
+        m.cast_shadow = false;
+        m.double_sided = true;
+        auto& chunks = t.road_builder.chunks();
+        while (t.upload_next < chunks.size()) {
+          const std::size_t before = t.meshes.size();
+          const f64 t1 = kern::now_ms();
+          upload(t, chunks[t.upload_next], m, false);
+          step_time("roads.upload", t1);
+          // road meshes are the re-layable ones
+          t.lay_meshes.insert(t.lay_meshes.end(), t.meshes.begin() + static_cast<std::ptrdiff_t>(before), t.meshes.end());
+          t.meshes.resize(before);
+          chunks[t.upload_next++].mesh = kern::MeshData{};
+          if (kern::now_ms() > deadline) return false;
+        }
+        chunks.clear();
+        chunks.shrink_to_fit();
+        t.upload_next = 0;
+        t.state = S::areas;
+        if (kern::now_ms() > deadline) return false;
+        continue;
+      }
+      case S::areas:
+        // the map areas are painted into the ground (Terrain::add_tint), as in world_ground.mjs
+        if (t.relay) {
+          // New layer in place: the old one goes now (no frame without roads).
+          for (u32 id : t.old_lay) r_->remove(id);
+          t.old_lay.clear();
+          t.relay = false;
+          t.state = S::ready;
+          if (t.relay_again) {
+            t.relay_again = false;
+            t.relay = true;
+            t.old_lay = std::move(t.lay_meshes);
+            t.lay_meshes.clear();
+            begin_roads(t);
+          }
+          return true;
+        }
+        t.state = S::ready;  // collision: the working set around the player (update_collision)
+        // a new set only when this tile brings buildings into the 340 m around the player
+        for (Vec2 c : t.cent)
+          if (std::hypot(c.x - focus_.x, c.y - focus_.y) <= 340) { near_.dirty = true; break; }
+        return true;
+      case S::collision:
+        t.state = S::ready;
+        return true;
+    }
+    return true;
   }
-  return true;
 }
 
 void CityStream::update(Vec3 focus, f64 budget_ms) {

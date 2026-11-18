@@ -71,6 +71,8 @@ class RoadStream {
   }
   const f64* data() const { return data_.data(); }
   std::size_t size() const { return data_.size(); }
+  /// The stream as its numbers: what data() points at, all size() of them.
+  const std::vector<f64>& values() const { return data_; }
 
  private:
   std::vector<f64> data_;
@@ -88,7 +90,7 @@ struct GeoProjector {
   static constexpr f64 kEarthRadius = 6378137.0;
   static constexpr f64 kRad = 3.14159265358979323846 / 180.0;
   bool init(f64 lon, f64 lat) {
-    if (!std::isfinite(lon) || !std::isfinite(lat) || std::fabs(lon) > 180 || std::fabs(lat) > 85) return fail("invalid projection origin");
+    if (!std::isfinite(lon) || !std::isfinite(lat) || std::fabs(lon) > 180 || std::fabs(lat) > 85) return fail_text("invalid projection origin");
     lon0 = lon;
     lat0 = lat;
     cos_lat = max_of(0.01, std::cos(lat * kRad));

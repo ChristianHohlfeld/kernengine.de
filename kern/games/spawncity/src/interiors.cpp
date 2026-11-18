@@ -20,8 +20,8 @@ constexpr u32 kMaxClosedDoors = 24, kMaxLevels = 12;
 constexpr f32 kLane = 1.2f, kCoreW = 2 * kLane + 0.2f, kLand = 1.3f, kRun = 3.6f, kCoreL = 2 * kLand + kRun, kSlab = 0.25f, kRoofHouse = 2.7f;
 constexpr f32 kRelease = 45;  // a little more than ACTIVATE: no flicker at the edge
 
-Vec3 rgb(u32 h) { return {((h >> 16) & 255) / 255.0f, ((h >> 8) & 255) / 255.0f, (h & 255) / 255.0f}; }
-const Vec3 kWall = rgb(0xe9e4da), kStairWall = rgb(0xdad8d2), kAccent = rgb(0x7f9a8a), kOak = rgb(0x8a5f3a), kStone = rgb(0x7a746b), kCeil = rgb(0xedebe6),
+constexpr Vec3 rgb(u32 h) { return {((h >> 16) & 255) / 255.0f, ((h >> 8) & 255) / 255.0f, (h & 255) / 255.0f}; }
+constexpr Vec3 kWall = rgb(0xe9e4da), kStairWall = rgb(0xdad8d2), kAccent = rgb(0x7f9a8a), kOak = rgb(0x8a5f3a), kStone = rgb(0x7a746b), kCeil = rgb(0xedebe6),
            kConcrete = rgb(0x767675), kRiser = rgb(0xa9a39a), kDark = rgb(0x24262a), kTrim = rgb(0x5e3f2a);
 
 f32 signed_area(const std::vector<Vec2>& r) {
